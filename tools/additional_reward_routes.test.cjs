@@ -27,20 +27,24 @@ function assertSettlementInsideFinishTransaction(
 }
 
 test("single finish grants and publishes additional rewards atomically", () => {
-    const source = readSource("src/routes/api/singleBattleQuest.ts")
-    assertSettlementInsideFinishTransaction(
-        source,
-        "single finish",
-        "runSingleFinishSettlementTransaction(",
-        "const executeFinishWrites = ({",
-    )
-    assert.match(source, /settleAdditionalRewardsSync\([\s\S]*?isMulti: false,/)
+    const route = readSource("src/routes/api/singleBattleQuest.ts")
+    const orchestrator = readSource("src/lib/quest/finish/single-orchestrator.ts")
+    const writes = readSource("src/lib/quest/finish/single-settlement-writes.ts")
+    const writesStart = writes.indexOf("export function executeSingleSettlementWrites(")
+    const settlement = writes.indexOf("settleAdditionalRewardsSync(", writesStart)
+    assert.ok(writesStart >= 0, "single finish must define focused settlement writes")
+    assert.ok(settlement > writesStart, "single additional rewards must settle in writes")
     assert.match(
-        source,
+        orchestrator,
+        /runSingleFinishSettlementTransaction\(\{[\s\S]*?settle:\s*\(\{ activeQuest, player \}\) => executeSingleSettlementWrites\(/,
+    )
+    assert.match(writes, /settleAdditionalRewardsSync\([\s\S]*?isMulti: false,/)
+    assert.match(
+        writes,
         /\.\.\.\(additionalRewardSettlement\.rewardResult\?\.items \?\? \{\}\),/,
     )
     assert.match(
-        source,
+        route,
         /"drop_additional_reward_ids": additionalRewardSettlement\.dropAdditionalRewardIds/,
     )
 })

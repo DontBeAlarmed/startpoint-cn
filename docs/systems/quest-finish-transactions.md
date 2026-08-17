@@ -5,9 +5,11 @@
 
 ## 单人分类覆盖
 
-`src/routes/api/singleBattleQuest.ts` 先完成请求、关卡、active quest 和奖励配置校验，再通过一个外层
-`getDb().transaction(executeFinishWrites)()` 执行全部持久写入。该总事务适用于 `getQuestFromCategorySync()`
-支持的所有通用战斗分类，不依赖分类是否另有专用响应字段。
+`src/routes/api/singleBattleQuest.ts` 只完成请求校验、session 适配和响应投影。它把已校验请求、玩家存档与
+内存 active quest 交给 `src/lib/quest/finish/single-orchestrator.ts`；协调器读取关卡与奖励配置、准备只读结算上下文，
+再通过 `runSingleFinishSettlementTransaction()` 进入一个外层事务。事务回调调用
+`src/lib/quest/finish/single-settlement-writes.ts` 执行全部持久写入。该总事务适用于
+`getQuestFromCategorySync()` 支持的所有通用战斗分类，不依赖分类是否另有专用响应字段。
 
 通用事务包括：
 
@@ -28,7 +30,7 @@
 | `27 SCORE_ATTACK_EVENT` | 无限演武履历、最高分、档位奖励与 active quest 删除 |
 
 专用处理器内部若再次开启 SQLite transaction，`better-sqlite3` 会把它作为嵌套保存点；异常继续向外传播，最终
-由外层事务回滚全部通用和专用写入。数据库提交成功后才删除进程内 active quest，因此失败请求可用原请求重试。
+由外层事务回滚全部通用和专用写入。协调器只在数据库提交成功后删除进程内 active quest，因此失败请求可用原请求重试。
 
 ## 协力结算
 

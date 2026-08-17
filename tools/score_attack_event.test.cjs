@@ -256,7 +256,11 @@ const finishSource = fs.readFileSync(
     path.join(projectRoot, "src/routes/api/singleBattleQuest.ts"),
     "utf8",
 )
+const finishWritesSource = fs.readFileSync(
+    path.join(projectRoot, "src/lib/quest/finish/single-settlement-writes.ts"),
+    "utf8",
+)
 assert.match(finishSource, /"score_attack_event"\s*:\s*scoreAttackEventData/)
-assert.match(finishSource, /handleScoreAttackEventFinish\s*\(/)
+assert.match(finishWritesSource, /handleScoreAttackEventFinish\s*\(/)
 
 console.log("score attack event tests passed")

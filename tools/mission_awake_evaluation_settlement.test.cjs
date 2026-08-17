@@ -227,25 +227,38 @@ test("unaccomplished and empty battles return before Catalog Session or database
 })
 
 test("single and multi production finish routes call the shared Awake battle seam inside finish writes", () => {
-    for (const routePath of [
-        "src/routes/api/singleBattleQuest.ts",
-        "src/multi/http/battle.ts",
-    ]) {
+    const singleWrites = fs.readFileSync(
+        path.join(__dirname, "../src/lib/quest/finish/single-settlement-writes.ts"),
+        "utf8",
+    )
+    const singleOrchestrator = fs.readFileSync(
+        path.join(__dirname, "../src/lib/quest/finish/single-orchestrator.ts"),
+        "utf8",
+    )
+    const singleTransactionBody = singleWrites.indexOf("export function executeSingleSettlementWrites(")
+    const singleSeamCall = singleWrites.indexOf("settleAwakeBattleMissions({", singleTransactionBody)
+    const singleTransactionCall = singleOrchestrator.indexOf("runSingleFinishSettlementTransaction({")
+    const singleSettleBinding = singleOrchestrator.indexOf(
+        "settle: ({ activeQuest, player }) => executeSingleSettlementWrites({",
+        singleTransactionCall,
+    )
+    assert.equal(singleTransactionBody >= 0, true, "single settlement writes function")
+    assert.equal(singleSeamCall > singleTransactionBody, true, "single shared Awake seam call")
+    assert.equal(singleTransactionCall >= 0, true, "single transaction call")
+    assert.equal(singleSettleBinding > singleTransactionCall, true, "single transaction callback")
+
+    for (const routePath of ["src/multi/http/battle.ts"]) {
         const source = fs.readFileSync(path.join(__dirname, "..", routePath), "utf8")
-        const single = routePath === "src/routes/api/singleBattleQuest.ts"
         const finishStart = source.indexOf('fastify.post("/finish"')
         const finishEnd = source.indexOf('fastify.post("/abort"', finishStart)
         const finishSource = source.slice(finishStart, finishEnd)
-        const transactionBody = finishSource.indexOf(single
-            ? "const executeFinishWrites = ({"
-            : "const executeFinishWrites = () => {")
+        const transactionBody = finishSource.indexOf("const executeFinishWrites = () => {")
         const seamCall = finishSource.indexOf("settleAwakeBattleMissions({", transactionBody)
-        const transactionCall = finishSource.indexOf(single
-            ? "finishWrites = runSingleFinishSettlementTransaction({"
-            : "finishWrites = runMultiActiveQuestSettlementTransaction(", seamCall)
-        const settleBinding = finishSource.indexOf(single
-            ? "settle: executeFinishWrites"
-            : "executeFinishWrites,", transactionCall)
+        const transactionCall = finishSource.indexOf(
+            "finishWrites = runMultiActiveQuestSettlementTransaction(",
+            seamCall,
+        )
+        const settleBinding = finishSource.indexOf("executeFinishWrites,", transactionCall)
         assert.equal(finishStart >= 0 && finishEnd > finishStart, true, `${routePath} finish block`)
         assert.equal(transactionBody >= 0, true, `${routePath} transaction body`)
         assert.equal(seamCall > transactionBody, true, `${routePath} shared Awake seam call`)

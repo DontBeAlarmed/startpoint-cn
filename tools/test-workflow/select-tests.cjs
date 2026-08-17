@@ -127,6 +127,21 @@ const SOURCE_RULES = [
         groups: ["integration:quest"],
     },
     {
+        pattern: /^src\/lib\/quest\/finish\/single-orchestrator\.ts$/,
+        groups: ["integration:mission", "integration:quest", "quick:quest"],
+    },
+    {
+        pattern: /^src\/lib\/quest\/finish\/single-settlement-writes\.ts$/,
+        groups: [
+            "integration:compiled",
+            "integration:event",
+            "integration:mission",
+            "integration:quest",
+            "quick:modes",
+            "quick:quest",
+        ],
+    },
+    {
         pattern: /^src\/lib\/quest\/single-finish-validation\.ts$/,
         groups: ["integration:quest"],
     },
@@ -279,7 +294,7 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^(?:tools\/(?:single_battle_finish_validation|single_finish_request_validation)\.test\.cjs|tools\/perf\/single_battle_settlement_(?:(?:admission|baseline)(?:\.test)?|fixture|harness|request_runner|scenario_helpers|time|(?:lifecycle|finish)_scenarios|scenarios)\.cjs|tools\/perf\/__snapshots__\/single_battle_settlement_baseline\.json)$/,
+        pattern: /^(?:tools\/(?:single_battle_finish_validation|single_finish_orchestrator_architecture|single_finish_request_validation)\.test\.cjs|tools\/perf\/single_battle_settlement_(?:(?:admission|baseline)(?:\.test)?|fixture|harness|request_runner|scenario_helpers|time|(?:lifecycle|finish)_scenarios|scenarios)\.cjs|tools\/perf\/__snapshots__\/single_battle_settlement_baseline\.json)$/,
         groups: ["integration:quest"],
     },
     {

@@ -189,7 +189,8 @@ function getLastCallPosition(source, calleeName) {
 }
 
 function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
-    const singleBattleSource = readRouteSource("singleBattleQuest.ts")
+    const singleBattleRouteSource = readRouteSource("singleBattleQuest.ts")
+    const singleBattleSource = readProjectSource("src/lib/quest/finish/single-settlement-writes.ts")
     const storySource = readRouteSource("storyQuest.ts")
     const bondSource = readRouteSource("character/bond.ts")
     const missionSource = readRouteSource("mission.ts")
@@ -213,13 +214,13 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
 
     const singleBattleCall = singleBattleSource.lastIndexOf("reconcileAwakeUnlockCharacterList(")
     assert.equal(countOccurrences(singleBattleSource, "reconcileAwakeUnlockCharacterList("), 1)
-    assert.equal(singleBattleCall > singleBattleSource.indexOf("recordMissionBattleFacts(finishCtx)"), true)
+    assert.equal(singleBattleCall > singleBattleSource.indexOf("recordMissionBattleFacts(finishCtx, settlementTime)"), true)
     assert.equal(singleBattleCall > singleBattleSource.indexOf("givePlayerCharactersExpSync("), true)
-    assert.equal(singleBattleCall > singleBattleSource.indexOf("handleRushEventFinish({"), true)
+    assert.equal(singleBattleCall > singleBattleSource.indexOf("handleRushEventFinish("), true)
     assert.equal(singleBattleCall > singleBattleSource.indexOf("handleCarnivalEventFinish({"), true)
     const singleBattleMergeBlock = singleBattleSource.slice(
         singleBattleSource.indexOf("const characterList = reconcileAwakeUnlockCharacterList("),
-        singleBattleSource.indexOf("reply.header", singleBattleCall)
+        singleBattleSource.indexOf("if (!isScoreAttackEvent)", singleBattleCall)
     )
     for (const existingSegment of [
         "...rewardCharacterExpResult.character_list",
@@ -229,7 +230,7 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     ]) {
         assert.equal(singleBattleMergeBlock.includes(existingSegment), true)
     }
-    assert.equal(singleBattleSource.includes('"character_list": characterList'), true)
+    assert.equal(singleBattleRouteSource.includes('"character_list": characterList'), true)
 
     const storyCall = storySource.lastIndexOf("reconcileAwakeUnlockCharacterList(")
     assert.equal(countOccurrences(storySource, "reconcileAwakeUnlockCharacterList("), 1)

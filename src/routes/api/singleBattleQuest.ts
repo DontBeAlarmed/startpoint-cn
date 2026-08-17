@@ -1,88 +1,25 @@
-import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { deletePlayerActiveQuestSync, getPlayerActiveQuestSync } from "../../data/domains/quest_active"
-import { deletePlayerRushEventPlayedPartyListSync, getPlayerRushEventPlayedPartiesSync, getPlayerRushEventSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, updatePlayerRushEventSync } from "../../data/domains/rushEvent"
-import { getPlayerDailyChallengePointListSync, getPlayerSync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../data/domains/player"
-import { getPlayerItemSync, givePlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
+import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
+import { getPlayerActiveQuestSync } from "../../data/domains/quest_active"
+import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
+import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
 import { getPlayerMailCountSync } from "../../data/domains/mail"
-import { getServerGameplaySettingsSync } from "../../data/domains/server-settings"
-import {
-    getRaidEventBossStateSync,
-    incrementPlayerRaidEventQuestKillCountSync,
-    upsertRaidEventBossStateSync,
-} from "../../data/domains/raidEvent"
-import { getPlayerSingleQuestProgressSync, insertPlayerQuestProgressSync, updatePlayerQuestProgressSync } from "../../data/domains/quest"
-import { getSession } from "../../data/domains/session"
-import { incrementPlayerCharacterClearSync } from "../../data/domains/character_clear"
-import { getPlayerEquipmentListSync, updatePlayerEquipmentSync } from "../../data/domains/equipment"
-import { insertPlayerScoreAttackBattleHistorySync } from "../../data/domains/score-attack-history"
-import { insertPlayerPracticeBattleHistorySync } from "../../data/domains/practice-battle-history"
-import {
-    getPlayerCarnivalEventRecordsSync,
-    getPlayerClaimedCarnivalRewardIdsSync,
-    insertPlayerClaimedCarnivalRewardIdsSync,
-    runCarnivalEventTransactionSync,
-    upsertPlayerCarnivalEventRecordSync,
-} from "../../data/domains/carnivalEvent"
-import { getQuestConfigurationErrorResponse, getQuestFromCategorySync, getRushEventFolderClearRewards, getRushEventFolderMaxRoundSync, getRushEventQuestConfigurationErrorResponse, getScoreAttackBorderRewards } from "../../lib/assets";
-import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../lib/character";
-import { givePlayerRewardsSync, givePlayerRewardSync, givePlayerScoreRewardsSync } from "../../lib/quest";
-import { getCommonScoreRewardCount } from "../../lib/score-reward-lottery";
-import {
-    calculateCharacterBattleExp,
-    calculateFixedQuestMana,
-    calculateFixedQuestPoolExp,
-    getRewardCampaignRates,
-} from "../../lib/reward-campaign";
-import { BattleQuest, EquipmentItemReward, PlayerRewardResult, QuestCategory } from "../../lib/types";
-import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
-import { RushEventBattleType, UserRushEventPlayedParty } from "../../data/types";
-import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { computeRealTimeStamina, getRankDegree, getMaxStamina } from "../../lib/stamina";
-import { getStaminaCost } from "../../lib/stamina-cost";
-import { handleCarnivalEventFinish } from "../../lib/quest/finish/carnival-handler";
-import { handleRushEventFinish } from "../../lib/quest/finish/rush-handler";
-import { dispatchModeQuestStart, dispatchModeRushFinish } from "../../modes/registry";
-import { createModeHost, createModeTransactionHost } from "../../modes/loader";
-
-// Read-only host for the pre-entry hook (no transaction is open there) and a
-// writable one for settlement, which runs inside the finish transaction.
-const singleBattleModeHost = createModeHost(message => console.log(message));
-const settlementModeHost = createModeTransactionHost(message => console.log(message));
-import { handleRaidEventFinish } from "../../lib/quest/finish/raid-handler";
-import { calculateClearRank } from "../../lib/quest/finish/quest-calc";
-import {
-    calculateScoreAttackClearRank,
-    handleScoreAttackEventFinish,
-    resolveScoreAttackBorderTiers,
-    ScoreAttackBorderTier,
-} from "../../lib/quest/finish/score-attack-handler";
-import { validateSessionAndPlayer } from "../../lib/quest/finish/session-validator";
-import { handleDailyChallengePoint } from "../../lib/quest/finish/challenge-point";
-import { buildBattleMissionSettlementScopes, recordMissionBattleFacts } from "../../lib/mission/battle-facts";
-import type { FinishContext } from "../../lib/quest/finish/types";
-import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json";
-import bundledEventChallengePointMap from "../../../assets/event_challenge_point_map.json";
-import bundledAdditionalRewardRules from "../../../assets/additional_reward_rules.json";
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
-import { getContentSnapshot } from "../../content/runtime/content-snapshot";
-import {
-    settleAdditionalRewardsSync,
-    type AdditionalRewardTable,
-} from "../../lib/additional-reward";
-
-import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
+import { getQuestConfigurationErrorResponse, getQuestFromCategorySync } from "../../lib/assets"
+import type { BattleQuest } from "../../lib/types"
+import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils"
+import { computeRealTimeStamina } from "../../lib/stamina"
+import { getStaminaCost } from "../../lib/stamina-cost"
+import { dispatchModeQuestStart } from "../../modes/registry"
+import { createModeHost } from "../../modes/loader"
+import { validateSessionAndPlayer } from "../../lib/quest/finish/session-validator"
+import { settleSingleBattleQuest } from "../../lib/quest/finish/single-orchestrator"
+import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json"
+import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 import {
     mergeMissionSettlementResponse,
-    reconcileActiveMissionFacts,
-    reconcileAwakeUnlockCharacterList,
-    settleAwakeBattleMissions,
     settleMissionCategories,
-} from "../../lib/mission";
-import type { MissionSettlementResult } from "../../lib/mission";
-import { getCarnivalRewardDefinitions, grantCarnivalRewards } from "../../lib/carnival-rewards";
-import { givePlayerDegreeSync } from "../../data/domains/degree";
-import { givePlayerEquipmentSync } from "../../lib/equipment";
-import { getDb } from "../../data/db";
+} from "../../lib/mission"
+import type { MissionSettlementResult } from "../../lib/mission"
+import { getDb } from "../../data/db"
 import {
     ActiveQuestAlreadyExistsError,
     buildStartEntryItemList,
@@ -91,34 +28,27 @@ import {
     PlayerNotFoundError,
     runStartEntryTransaction,
     StartEntryCost,
-} from "../../lib/quest/start-entry";
+} from "../../lib/quest/start-entry"
 import {
     ActiveQuest,
     activeQuests,
     persistActiveQuest,
     publishActiveQuest,
     runAbortActiveQuestTransaction,
-} from "../../lib/quest/active-quest-service";
+} from "../../lib/quest/active-quest-service"
 import {
     AUTO_START_STOP_RESULT_CODE,
     shouldStopAutoStartForStamina,
 } from "../../lib/quest/auto-start-stop"
 import { getMailArrivedSync } from "../../lib/mail-notification"
-import { recordActiveMissionQuestChallengeFactSync } from "../../lib/mission/active-entry-facts";
-import { getRaidEventRequiredKillCount } from "../../lib/raid-event-master";
-import { resolveQuestRewardEligibility } from "../../lib/quest/first-clear-reward";
-import { buildScoreAttackBattleHistoryRecord } from "../../lib/quest/score-attack-history";
-import { buildPracticeBattleHistoryRecord } from "../../lib/quest/practice-battle-history";
-import {
-    runSingleFinishSettlementTransaction,
-    SingleFinishSettlementContext,
-    SingleFinishSettlementValidationError,
-} from "../../lib/quest/single-finish-settlement";
-import { runSingleContinueLifecycleTransaction } from "../../lib/quest/single-continue-lifecycle";
+import { recordActiveMissionQuestChallengeFactSync } from "../../lib/mission/active-entry-facts"
+import { runSingleContinueLifecycleTransaction } from "../../lib/quest/single-continue-lifecycle"
 import {
     validateSingleFinishRequest,
     type ValidatedSingleFinishBody,
-} from "../../lib/quest/single-finish-validation";
+} from "../../lib/quest/single-finish-validation"
+
+const singleBattleModeHost = createModeHost(message => console.log(message))
 
 interface StartBody {
     quest_id: number
@@ -177,23 +107,6 @@ interface AbortBody {
     category: number
 }
 
-interface ReturnRushEvent {
-    rush_battle_reward_list: {
-        kind: number,
-        kind_id: number,
-        number: number
-    }[],
-    rush_battle_played_party_list: Record<number, UserRushEventPlayedParty> | null,
-    endless_battle_played_party_list: Record<number, UserRushEventPlayedParty> | null,
-    is_out_of_period: boolean,
-    endless_battle_next_round: number | null,
-    endless_battle_max_round: number | null,
-    high_score: number | null,
-    best_elapsed_time_ms: number | null,
-    old_endless_battle_max_round: number | null,
-    old_best_elapsed_time_ms: number | null
-}
-
 function optionalNumber(value: unknown): number | null {
     return typeof value === "number" && Number.isFinite(value) ? value : null
 }
@@ -222,498 +135,14 @@ const routes = async (fastify: FastifyInstance) => {
         })
         const { playerId, playerData } = sessionResult
 
-        // get active quest data
-        const activeQuestData = activeQuests[playerId]
-        console.log(`[FINISH] req: playerId=${playerId} questId=${body.quest_id} category=${body.category} activeExists=${activeQuestData !== undefined} multi=${activeQuestData?.isMulti ?? false}`)
-        if (activeQuestData === undefined) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "No active quest to finish."
+        const finishResult = settleSingleBattleQuest({
+            playerId,
+            playerData,
+            memoryActiveQuest: activeQuests[playerId],
+            body,
         })
-
-        const questCategory = activeQuestData.category
-        const questId = activeQuestData.questId
-        console.log(`[FINISH] active: category=${questCategory} questId=${questId}`)
-        let questData: BattleQuest | null
-        try {
-            questData = getQuestFromCategorySync(questCategory, questId)
-        } catch (error) {
-            const configurationError = getQuestConfigurationErrorResponse(error)
-            if (configurationError !== null) return reply.status(500).send(configurationError)
-            throw error
-        }
-        if (questData === null || !('rankPointReward' in questData)) {
-            console.log(`[BATTLE] finish failed: category=${questCategory} questId=${questId} found=${!!questData} hasRankReward=${questData ? ('rankPointReward' in questData) : 'N/A'}`)
-            return reply.status(400).send({
-                "error": "Bad Request",
-                "message": "Quest doesn't exist."
-            })
-        }
-
-        let rushEventFolderMaxRound: number | undefined
-        if (questCategory === QuestCategory.RUSH_EVENT && questData.rushEventRound !== 0) {
-            try {
-                rushEventFolderMaxRound = getRushEventFolderMaxRoundSync(
-                    questData.rushEventId,
-                    questData.rushEventFolderId,
-                )
-            } catch (error) {
-                const configurationError = getRushEventQuestConfigurationErrorResponse(error)
-                if (configurationError !== null) return reply.status(500).send(configurationError)
-                throw error
-            }
-        }
-
-        // calculate clear rank
-        const clearTime = body.elapsed_time_ms
-        const isScoreAttackEvent = questCategory === QuestCategory.SCORE_ATTACK_EVENT
-        if (isScoreAttackEvent && (
-            questData.bRankScore === undefined
-            || questData.aRankScore === undefined
-            || questData.sRankScore === undefined
-            || questData.ssRankScore === undefined
-        )) {
-            return reply.status(500).send({
-                "error": "Internal Server Error",
-                "message": "Score attack rank thresholds are missing.",
-            })
-        }
-        const clearRank = isScoreAttackEvent
-            ? calculateScoreAttackClearRank(body.score, {
-                bRankScore: questData.bRankScore!,
-                aRankScore: questData.aRankScore!,
-                sRankScore: questData.sRankScore!,
-                ssRankScore: questData.ssRankScore!,
-            })
-            : calculateClearRank(clearTime, questData)
-
-        // check current quest progress
-        const questProgress = getPlayerSingleQuestProgressSync(playerId, questCategory, questId);
-        const questProgressExists = questProgress !== null
-        const questPreviouslyCompleted = questProgress?.finished === true
-
-        let questAccomplished = body.is_accomplished
-        let scoreAttackBorderTiers: ScoreAttackBorderTier[] = []
-        if (isScoreAttackEvent) {
-            try {
-                scoreAttackBorderTiers = resolveScoreAttackBorderTiers(
-                    questData.eventId,
-                    questData.scoreAttackQuestId,
-                    getScoreAttackBorderRewards(),
-                )
-            } catch (error) {
-                console.error(`[SCORE_ATTACK] invalid configuration: ${(error as Error).message}`)
-                return reply.status(500).send({
-                    "error": "Internal Server Error",
-                    "message": "Score attack reward configuration is missing.",
-                })
-            }
-            questAccomplished = body.score >= scoreAttackBorderTiers[0].score
-        }
-        const rewardEligibility = resolveQuestRewardEligibility({
-            questAccomplished,
-            clearRank,
-            questProgress,
-        })
-
-        const leaderId = body.statistics.party.characters[0]?.id
-
-        const bodyPartyStatistics = body.statistics.party
-        const partyCharacterIds = [...bodyPartyStatistics.characters, ...bodyPartyStatistics.unison_characters]
-        const finishCtx: FinishContext = {
-            playerId, questCategory, questId,
-            questAccomplished,
-            clearTime: body.elapsed_time_ms,
-            clearRank,
-            score: body.score,
-            party: body.statistics.party,
-            statistics: body.statistics,
-            equipmentElements: body.equipment_element,
-            player: playerData,
-            questPreviouslyCompleted,
-            questProgress,
-        }
-        const partyCharacterIdsArray: number[] = []
-        for (const value of partyCharacterIds.values()) {
-            const characterId = value?.id
-            if (typeof characterId === "number"
-                && Number.isSafeInteger(characterId)
-                && characterId > 0) partyCharacterIdsArray.push(characterId)
-        }
-        const executeFinishWrites = ({
-            activeQuest: settlementActiveQuest,
-            player: settlementPlayer,
-        }: SingleFinishSettlementContext) => {
-            const beforeRankPoint = settlementPlayer.rankPoint
-            const newRankPoint = beforeRankPoint + questData.rankPointReward
-            const newBoostPoint = settlementPlayer.boostPoint
-                - (settlementActiveQuest.useBoostPoint ? 1 : 0)
-            const newBossBoostPoint = settlementPlayer.bossBoostPoint
-                - (settlementActiveQuest.useBossBoostPoint ? 1 : 0)
-            const useBoostPoint = settlementActiveQuest.useBoostPoint
-                || settlementActiveQuest.useBossBoostPoint
-            const settlementTime = new Date(getServerTime() * 1000)
-            const rewardCampaignRates = getRewardCampaignRates(
-                questCategory,
-                questId,
-                settlementTime,
-            )
-            const fixedManaReward = calculateFixedQuestMana(
-                questData.manaReward,
-                rewardCampaignRates,
-                useBoostPoint,
-            )
-            const fixedPoolExpReward = calculateFixedQuestPoolExp(
-                questData.poolExpReward,
-                rewardCampaignRates,
-                useBoostPoint,
-            )
-            const addExpAmount = calculateCharacterBattleExp(
-                questData.characterExpReward,
-                rewardCampaignRates,
-            )
-            const newMana = settlementPlayer.freeMana + fixedManaReward + body.add_mana
-            const manaObtained = fixedManaReward + body.add_mana
-            finishCtx.manaObtained = manaObtained
-            const clearReward = !isScoreAttackEvent && rewardEligibility.firstClear && questData.clearReward !== undefined
-                ? givePlayerRewardSync(playerId, questData.clearReward)
-                : null
-            const sPlusClearReward = !isScoreAttackEvent && rewardEligibility.sPlus && questData.sPlusReward !== undefined
-                ? givePlayerRewardSync(playerId, questData.sPlusReward)
-                : null
-
-            if (questAccomplished && !isScoreAttackEvent) {
-                if (questProgressExists) {
-                    const updateData: any = {
-                        questId: questId,
-                        finished: true,
-                        bestElapsedTimeMs: questProgress.bestElapsedTimeMs === undefined || questProgress.bestElapsedTimeMs === null ? clearTime : Math.min(clearTime, questProgress.bestElapsedTimeMs),
-                        highScore: questProgress.highScore === undefined ? body.score : Math.max(body.score, questProgress.highScore),
-                        leaderCharacterId: leaderId ?? undefined
-                    }
-                    if (clearRank !== null) {
-                        updateData.clearRank = questProgress.clearRank === undefined ? clearRank : Math.max(clearRank, questProgress.clearRank)
-                    }
-                    updatePlayerQuestProgressSync(playerId, questCategory, updateData)
-                } else {
-                    insertPlayerQuestProgressSync(playerId, questCategory, {
-                        questId: questId,
-                        finished: true,
-                        bestElapsedTimeMs: clearTime,
-                        highScore: body.score,
-                        clearRank: clearRank ?? 5,
-                        leaderCharacterId: leaderId ?? undefined
-                    })
-                }
-            }
-
-            const oldRkDegree = getRankDegree(beforeRankPoint)
-            const newDegreeId = getRankDegree(newRankPoint)
-            const didLevelUp = newDegreeId > oldRkDegree
-            const afterStamina = didLevelUp
-                ? settlementPlayer.stamina + getMaxStamina(newDegreeId)
-                : settlementPlayer.stamina
-            const afterStaminaHealTime = didLevelUp
-                ? new Date()
-                : settlementPlayer.staminaHealTime
-            updatePlayerSync({
-                id: playerId,
-                freeMana: newMana,
-                expPool: settlementPlayer.expPool + fixedPoolExpReward,
-                rankPoint: newRankPoint,
-                boostPoint: newBoostPoint,
-                bossBoostPoint: newBossBoostPoint,
-                totalManaObtained: (settlementPlayer.totalManaObtained ?? 0) + manaObtained,
-                maxComboAchieved: Math.max(
-                    settlementPlayer.maxComboAchieved ?? 0,
-                    body.statistics.max_combo_count ?? 0,
-                ),
-                ...(didLevelUp ? { stamina: afterStamina, staminaHealTime: afterStaminaHealTime } : {}),
-            })
-            if (didLevelUp) {
-                console.log(`[BATTLE-FINISH] player ${playerId} leveled up: ${oldRkDegree} -> ${newDegreeId}, stamina refilled`)
-            }
-
-            const dailyChallengePointList = handleDailyChallengePoint({
-                questCategory,
-                eventId: questData.eventId,
-                playerId,
-                challengePointMap: getRuntimeContentTableSync(
-                    "event_challenge_point_map.json",
-                    bundledEventChallengePointMap as Record<string, number>,
-                ),
-                getEntries: (pid) => getPlayerDailyChallengePointListSync(pid),
-                updatePoint: (pid, id, pt) => updatePlayerDailyChallengePointSync(pid, id, pt),
-            })
-
-            console.log(`[BATTLE] scoreReward groupId=${questData.scoreRewardGroupId} groupLen=${questData.scoreRewardGroup?.length ?? 'null'} questId=${questId} category=${questCategory}`)
-            const scoreRewardsResult = givePlayerScoreRewardsSync(
-                playerId,
-                questData.scoreRewardGroupId,
-                questData.scoreRewardGroup,
-                useBoostPoint,
-                questData.element,
-                {
-                    commonRewardCount: getCommonScoreRewardCount(questData, clearRank) ?? undefined,
-                    rewardCampaignRates,
-                    rewardDate: settlementTime,
-                },
-            )
-            const additionalRewardSettlement = questAccomplished
-                ? settleAdditionalRewardsSync(
-                    getRuntimeContentTableSync(
-                        "additional_reward_rules.json",
-                        bundledAdditionalRewardRules as AdditionalRewardTable,
-                    ),
-                    {
-                        questCategory,
-                        questId,
-                        enemyLevel: questData.enemyLevel,
-                        nowMs: settlementTime.getTime(),
-                        isMulti: false,
-                        isQuestCleared: (category, requiredQuestId) => (
-                            getPlayerSingleQuestProgressSync(
-                                playerId,
-                                category,
-                                requiredQuestId,
-                            )?.finished === true
-                        ),
-                        rewardCampaignRates,
-                        boostPointUsed: useBoostPoint,
-                        serverDropMultiplier: getServerGameplaySettingsSync().dropMultiplier,
-                    },
-                    { grantRewards: rewards => givePlayerRewardsSync(playerId, rewards) },
-                )
-                : { dropAdditionalRewardIds: [], rewardResult: null }
-
-            const missionBattleFacts = recordMissionBattleFacts(finishCtx, settlementTime)
-
-            const rewardCharacterExpResult = givePlayerCharactersExpSync(
-                playerId,
-                partyCharacterIdsArray,
-                addExpAmount,
-                questData.fixedParty !== undefined
-            )
-
-            const rushFinishParams = {
-                questCategory,
-                questAccomplished,
-                questData,
-                clearTime,
-                party: bodyPartyStatistics,
-                playerId,
-                questId,
-                getEvoLevels: (pid: number, chars: (number | null)[]) => getCharactersEvolutionImgLevels(pid, chars),
-                folderMaxRound: rushEventFolderMaxRound,
-                getRushEvent: (pid: number, eid: number) => getPlayerRushEventSync(pid, eid),
-                updateRushEvent: (pid: number, data: any) => updatePlayerRushEventSync(pid, data),
-                insertParty: (pid: number, eid: number, p: any) => insertPlayerRushEventPlayedPartySync(pid, eid, p),
-                insertClearedFolder: (pid: number, eid: number, fid: number) => insertPlayerRushEventClearedFolderSync(pid, eid, fid),
-                deletePartyList: (pid: number, eid: number, bt: number) => deletePlayerRushEventPlayedPartyListSync(pid, eid, bt),
-                getSerializedParties: (pid: number, eid: number) => getSerializedPlayerRushEventPlayedPartiesSync(pid, eid),
-                getFolderRewards: (eid: number, fid: number) => getRushEventFolderClearRewards(eid, fid),
-                giveRewards: (pid: number, r: any[]) => givePlayerRewardsSync(pid, r),
-                transaction: (operation: () => any) => getDb().transaction(operation)(),
-            }
-            const { rushEventData, rushEventRewardsResult } = handleRushEventFinish(rushFinishParams)
-            // Mode seam: installed mode modules may extend the rush settlement
-            // using the same injected primitives; no modules → no-op.
-            const modeRushExtension = dispatchModeRushFinish(rushFinishParams, settlementModeHost)
-            if (modeRushExtension?.rush_battle_reward_list?.length && rushEventData) {
-                rushEventData.rush_battle_reward_list.push(...modeRushExtension.rush_battle_reward_list)
-            }
-
-            const raidEventData = handleRaidEventFinish({
-                questCategory,
-                questAccomplished,
-                activeEventId: settlementActiveQuest.eventId ?? undefined,
-                killCountWeight: questData.killCountWeight,
-                party: bodyPartyStatistics,
-                playerId,
-                questId,
-                getEvoLevelsFn: (pid, chars) => getCharactersEvolutionImgLevels(pid, chars),
-                insertPartyFn: (pid, eid, p) => insertPlayerRushEventPlayedPartySync(pid, eid, p),
-                getRequiredKillCountFn: eid => getRaidEventRequiredKillCount(eid),
-                getRaidBossStateFn: eid => getRaidEventBossStateSync(eid),
-                updateRaidBossStateFn: (eid, state) => upsertRaidEventBossStateSync(eid, state),
-                incrementQuestKillCountFn: (pid, eid, qid) => (
-                    incrementPlayerRaidEventQuestKillCountSync(pid, eid, qid)
-                ),
-            })
-
-            const carnivalFinishResult = handleCarnivalEventFinish({
-                questCategory,
-                questAccomplished,
-                questId,
-                questData,
-                clearTime,
-                party: bodyPartyStatistics,
-                playerId,
-                getRecordsFn: (pid, eid) => getPlayerCarnivalEventRecordsSync(pid, eid),
-                upsertFn: (pid, eid, fid, score, chars, unisons) => upsertPlayerCarnivalEventRecordSync(pid, eid, fid, score, chars, unisons),
-                getRewardDefinitionsFn: eid => getCarnivalRewardDefinitions(eid),
-                getClaimedRewardIdsFn: (pid, eid) => getPlayerClaimedCarnivalRewardIdsSync(pid, eid),
-                grantRewardsFn: (pid, definitions) => grantCarnivalRewards(pid, definitions, {
-                    getPlayer: getPlayerSync,
-                    giveItem: givePlayerItemSync,
-                    giveEquipment: givePlayerEquipmentSync,
-                    giveDegree: givePlayerDegreeSync,
-                    updatePlayer: updatePlayerSync,
-                }),
-                claimRewardIdsFn: (pid, eid, rewardIds) => insertPlayerClaimedCarnivalRewardIdsSync(pid, eid, rewardIds),
-                transactionFn: runCarnivalEventTransactionSync,
-            })
-            const carnivalEventData = carnivalFinishResult?.carnivalEventData ?? null
-            const carnivalRewardResult = carnivalFinishResult?.rewardResult
-
-            if (isScoreAttackEvent) {
-                insertPlayerScoreAttackBattleHistorySync(buildScoreAttackBattleHistoryRecord({
-                    playerId,
-                    eventId: questData.eventId!,
-                    playId: settlementActiveQuest.playId,
-                    categoryId: questCategory,
-                    questId,
-                    finishKind: 0,
-                    createdAt: settlementTime,
-                    elapsedTimeMs: clearTime,
-                    score: body.score,
-                    clearRank,
-                    party: bodyPartyStatistics,
-                    statistics: body.statistics,
-                    equipmentList: getPlayerEquipmentListSync(playerId),
-                }))
-            }
-            if (questCategory === QuestCategory.PRACTICE) {
-                insertPlayerPracticeBattleHistorySync(buildPracticeBattleHistoryRecord({
-                    playerId,
-                    playId: settlementActiveQuest.playId,
-                    categoryId: questCategory,
-                    questId,
-                    finishKind: questAccomplished ? 0 : 1,
-                    createdAt: settlementTime,
-                    elapsedTimeMs: clearTime,
-                    score: body.score,
-                    clearRank: questAccomplished ? clearRank : null,
-                    party: bodyPartyStatistics,
-                    statistics: body.statistics,
-                    equipmentList: getPlayerEquipmentListSync(playerId),
-                }))
-            }
-            const scoreAttackFinishResult = isScoreAttackEvent
-                ? handleScoreAttackEventFinish({
-                    playerId,
-                    questId,
-                    category: questCategory,
-                    score: body.score,
-                    elapsedTimeMs: clearTime,
-                    isAccomplished: questAccomplished,
-                    quest: {
-                        bRankScore: questData.bRankScore!,
-                        aRankScore: questData.aRankScore!,
-                        sRankScore: questData.sRankScore!,
-                        ssRankScore: questData.ssRankScore!,
-                    },
-                    tiers: scoreAttackBorderTiers,
-                    party: bodyPartyStatistics,
-                }, {
-                    transaction: operation => operation(),
-                    getProgress: (pid, category, qid) => getPlayerSingleQuestProgressSync(pid, category, qid),
-                    grantRewards: (pid, rewards) => givePlayerRewardsSync(pid, rewards),
-                    updateProgress: (pid, category, progress) => updatePlayerQuestProgressSync(pid, category, progress),
-                    insertProgress: (pid, category, progress) => insertPlayerQuestProgressSync(pid, category, progress),
-                    deleteActiveQuest: pid => deletePlayerActiveQuestSync(pid),
-                })
-                : null
-            const scoreAttackRewardResult = scoreAttackFinishResult?.rewardResult
-            const missionSettlement = settleMissionCategories(
-                playerId,
-                buildBattleMissionSettlementScopes(partyCharacterIdsArray),
-                settlementTime,
-            )
-            const awakeMissionSettlement = settleAwakeBattleMissions({
-                playerId,
-                questAccomplished,
-                characterIds: partyCharacterIdsArray,
-                directlyChangedMissionIds: missionBattleFacts.awakeMissionIds,
-                evaluationTime: settlementTime,
-            })
-            const activeMissionList = reconcileActiveMissionFacts({
-                playerId,
-                repository: getContentSnapshot().repository,
-                now: settlementTime,
-            })
-            const itemList = {
-                ...(settlementActiveQuest.entryItemId ? { [settlementActiveQuest.entryItemId]: getPlayerItemSync(playerId, settlementActiveQuest.entryItemId) ?? 0 } : {}),
-                ...scoreRewardsResult.items,
-                ...(additionalRewardSettlement.rewardResult?.items ?? {}),
-                ...(scoreAttackRewardResult?.items ?? {}),
-                ...(rushEventRewardsResult?.items ?? {}),
-                ...(carnivalRewardResult?.item_list ?? {}),
-            }
-            const characterList = reconcileAwakeUnlockCharacterList(playerId, [
-                ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
-                ...((clearReward?.character_list || []) as Record<string, unknown>[]),
-                ...((sPlusClearReward?.character_list || []) as Record<string, unknown>[]),
-                ...(scoreRewardsResult.character_list as Record<string, unknown>[]),
-                ...((scoreAttackRewardResult?.character_list ?? []) as Record<string, unknown>[]),
-                ...(missionSettlement.characterList as Record<string, unknown>[]),
-                ...awakeMissionSettlement.characterList,
-            ])
-
-            if (!isScoreAttackEvent) deletePlayerActiveQuestSync(playerId)
-
-            return {
-                afterStamina,
-                afterStaminaHealTime,
-                dailyChallengePointList,
-                scoreRewardsResult,
-                additionalRewardSettlement,
-                rewardCharacterExpResult,
-                rushEventData,
-                rushEventRewardsResult,
-                raidEventData,
-                carnivalEventData,
-                carnivalRewardResult,
-                scoreAttackFinishResult,
-                scoreAttackRewardResult,
-                itemList,
-                characterList,
-                clearReward,
-                sPlusClearReward,
-                missionSettlement,
-                awakeMissionSettlement,
-                activeMissionList,
-                fixedManaReward,
-                fixedPoolExpReward,
-                newMana,
-                beforeRankPoint,
-                newRankPoint,
-                newBoostPoint,
-                newBossBoostPoint,
-            }
-        }
-
-        let finishWrites
-        try {
-            finishWrites = runSingleFinishSettlementTransaction({
-                playerId,
-                memoryQuest: activeQuestData,
-                request: {
-                    playId: body.play_id,
-                    questId: body.quest_id,
-                    category: body.category,
-                    continueCount: body.continue_count,
-                },
-                player: playerData,
-                settle: executeFinishWrites,
-            })
-        } catch (error) {
-            if (error instanceof SingleFinishSettlementValidationError) {
-                return reply.status(400).send({
-                    "error": "Bad Request",
-                    "message": error.message,
-                })
-            }
-            throw error
+        if (!finishResult.ok) {
+            return reply.status(finishResult.statusCode).send(finishResult.payload)
         }
         const {
             afterStamina,
@@ -743,8 +172,9 @@ const routes = async (fastify: FastifyInstance) => {
             newRankPoint,
             newBoostPoint,
             newBossBoostPoint,
-        } = finishWrites
-        delete activeQuests[playerId]
+            clearRank,
+            questProgress,
+        } = finishResult
         const scoreAttackEventData = scoreAttackFinishResult?.scoreAttackEvent ?? null
 
         const dataHeaders = generateDataHeaders({ viewer_id: viewerId })

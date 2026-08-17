@@ -180,11 +180,19 @@ function finishRouteSource(source) {
     return source.slice(start, end)
 }
 
-const singleBattleSource = finishRouteSource(fs.readFileSync(
+const singleRouteSource = finishRouteSource(fs.readFileSync(
     path.join(__dirname, "../src/routes/api/singleBattleQuest.ts"),
     "utf8",
 ))
-const singleTransactionStart = singleBattleSource.indexOf("const executeFinishWrites = ({")
+const singleBattleSource = fs.readFileSync(
+    path.join(__dirname, "../src/lib/quest/finish/single-settlement-writes.ts"),
+    "utf8",
+)
+const singleOrchestratorSource = fs.readFileSync(
+    path.join(__dirname, "../src/lib/quest/finish/single-orchestrator.ts"),
+    "utf8",
+)
+const singleTransactionStart = singleBattleSource.indexOf("export function executeSingleSettlementWrites(")
 const singleEvaluationTime = singleBattleSource.indexOf(
     "const settlementTime = new Date(getServerTime() * 1000)",
     singleTransactionStart,
@@ -198,26 +206,25 @@ const singleCharacterExp = singleBattleSource.indexOf(
     singleFactCall,
 )
 const singleSettlementTime = singleBattleSource.indexOf(
-    "buildBattleMissionSettlementScopes(partyCharacterIdsArray),\n                settlementTime,",
+    "buildBattleMissionSettlementScopes(partyCharacterIds), settlementTime,",
     singleFactCall,
 )
 const singleAwakeSettlement = singleBattleSource.indexOf(
     "settleAwakeBattleMissions({",
     singleSettlementTime,
 )
-const singleGeneralMerge = singleBattleSource.indexOf(
+const singleGeneralMerge = singleRouteSource.indexOf(
     "mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)",
 )
-const singleAwakeMerge = singleBattleSource.indexOf(
+const singleAwakeMerge = singleRouteSource.indexOf(
     "mergeMissionSettlementResponse(responseData, awakeMissionSettlement, viewerId)",
     singleGeneralMerge,
 )
-const singleTransactionCall = singleBattleSource.indexOf(
-    "finishWrites = runSingleFinishSettlementTransaction({",
-    singleAwakeSettlement,
+const singleTransactionCall = singleOrchestratorSource.indexOf(
+    "settlement = runSingleFinishSettlementTransaction({",
 )
-const singleTransactionBinding = singleBattleSource.indexOf(
-    "settle: executeFinishWrites",
+const singleTransactionBinding = singleOrchestratorSource.indexOf(
+    "settle: ({ activeQuest, player }) => executeSingleSettlementWrites({",
     singleTransactionCall,
 )
 assert.equal(singleEvaluationTime > singleTransactionStart, true, "单人 finish 必须在事务体内固定任务时间")
@@ -234,10 +241,10 @@ assert.match(
 )
 assert.match(
     singleBattleSource,
-    /const characterId = value\?\.id[\s\S]*?Number\.isSafeInteger\(characterId\)[\s\S]*?characterId > 0[\s\S]*?partyCharacterIdsArray\.push\(characterId\)/,
+    /const characterId = value\?\.id[\s\S]*?Number\.isSafeInteger\(characterId\)[\s\S]*?characterId > 0[\s\S]*?partyCharacterIds\.push\(characterId\)/,
     "单人 finish 必须只收集 main/Sub 的有效正整数角色 ID",
 )
-assert.equal(singleTransactionCall > singleAwakeSettlement, true, "单人写入闭包必须交给 finish 事务")
+assert.equal(singleTransactionCall >= 0, true, "单人写入闭包必须交给 finish 事务")
 assert.equal(singleTransactionBinding > singleTransactionCall, true, "所有单人同步结算写入必须共享事务")
 
 const multiBattleSource = finishRouteSource(fs.readFileSync(

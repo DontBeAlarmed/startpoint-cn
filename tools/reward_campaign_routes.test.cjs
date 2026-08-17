@@ -7,12 +7,13 @@ function routeSource(relativePath) {
     return fs.readFileSync(path.join(__dirname, "..", relativePath), "utf8")
 }
 
-for (const [name, relativePath] of [
-    ["单人", "src/routes/api/singleBattleQuest.ts"],
-    ["联机", "src/multi/http/battle.ts"],
+for (const [name, settlementPath, responsePath] of [
+    ["单人", "src/lib/quest/finish/single-settlement-writes.ts", "src/routes/api/singleBattleQuest.ts"],
+    ["联机", "src/multi/http/battle.ts", "src/multi/http/battle.ts"],
 ]) {
     test(`${name}结算复用同一服务器时间并接入奖励活动倍率`, () => {
-        const source = routeSource(relativePath)
+        const source = routeSource(settlementPath)
+        const responseSource = routeSource(responsePath)
         assert.match(source, /const settlementTime = new Date\(getServerTime\(\) \* 1000\)/)
         assert.match(
             source,
@@ -34,6 +35,6 @@ for (const [name, relativePath] of [
         assert.match(source, /rewardDate:\s*settlementTime/)
         assert.match(source, /recordMissionBattleFacts\(finishCtx, settlementTime\)/)
         assert.match(source, /expPool:\s*[^,\n]+\+\s*fixedPoolExpReward/)
-        assert.match(source, /"reward_pool_exp":\s*fixedPoolExpReward/)
+        assert.match(responseSource, /"reward_pool_exp":\s*fixedPoolExpReward/)
     })
 }
