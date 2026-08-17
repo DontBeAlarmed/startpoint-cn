@@ -10,7 +10,10 @@ import { computeRealTimeStamina } from "../../lib/stamina"
 import { getStaminaCost } from "../../lib/stamina-cost"
 import { dispatchModeQuestStart } from "../../modes/registry"
 import { createModeHost } from "../../modes/loader"
-import { validateSessionAndPlayer } from "../../lib/quest/finish/session-validator"
+import {
+    validateSessionAndPlayer,
+    validateSessionIdentity,
+} from "../../lib/quest/finish/session-validator"
 import { settleSingleBattleQuest } from "../../lib/quest/finish/single-orchestrator"
 import { buildSingleFinishResponse } from "../../lib/quest/finish/single-response-projector"
 import type { SingleFinishResponseHeaders } from "../../lib/quest/finish/single-response-projector"
@@ -180,7 +183,7 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Bad Request", "message": "Invalid request body."
         })
 
-        const sessionResult = await validateSessionAndPlayer(viewerId)
+        const sessionResult = await validateSessionIdentity(viewerId)
         if (!sessionResult) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid viewer id."
         })
@@ -188,18 +191,19 @@ const routes = async (fastify: FastifyInstance) => {
 
         const headers = generateDataHeaders({ viewer_id: body.viewer_id })
 
-        const activeQuest = getPlayerActiveQuestSync(playerId)
         const playId = typeof body.play_id === "string" && body.play_id.length > 0
             ? body.play_id
-            : activeQuest?.playId ?? ""
-        const questId = optionalNumber(body.quest_id) ?? activeQuest?.questId ?? 0
-        const category = optionalNumber(body.category) ?? activeQuest?.category ?? 0
+            : null
+        const questId = optionalNumber(body.quest_id)
+        const category = optionalNumber(body.category)
 
         const abortResult = runAbortActiveQuestTransaction(playerId, {
             playId,
             questId,
             category,
         })
+        const resolvedIdentity = abortResult.resolvedIdentity
+        const observedActiveQuest = abortResult.observedActiveQuest
         console.log([
             "[SINGLE_ABORT]",
             `player=${playerId}`,
@@ -207,8 +211,8 @@ const routes = async (fastify: FastifyInstance) => {
             `missing_play=${typeof body.play_id !== "string" || body.play_id.length === 0}`,
             `missing_quest=${optionalNumber(body.quest_id) === null}`,
             `missing_category=${optionalNumber(body.category) === null}`,
-            `active=${activeQuest ? `${activeQuest.category}_${activeQuest.questId}` : "none"}`,
-            `resolved=${category}_${questId}`,
+            `active=${observedActiveQuest ? `${observedActiveQuest.category}_${observedActiveQuest.questId}` : "none"}`,
+            `resolved=${resolvedIdentity.category}_${resolvedIdentity.questId}`,
             `cancelled=${abortResult.cancelled}`,
             `refund=${summarizeItemList(abortResult.itemList)}`,
         ].join(" "))
@@ -218,7 +222,7 @@ const routes = async (fastify: FastifyInstance) => {
             "data_headers": headers,
             "data": {
                 "user_info": {},
-                "category_id": category,
+                "category_id": resolvedIdentity.category,
                 "is_multi": "single",
                 "start_time": headers['servertime'],
                 "quest_name": "",
@@ -241,11 +245,11 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Bad Request", "message": "Invalid request body."
         })
 
-        const sessionResult = await validateSessionAndPlayer(viewerId)
+        const sessionResult = await validateSessionIdentity(viewerId)
         if (!sessionResult) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid viewer id."
         })
-        const { playerId, playerData: player } = sessionResult
+        const { playerId } = sessionResult
 
         // get quest data
         let questData: BattleQuest | null
@@ -351,7 +355,7 @@ const routes = async (fastify: FastifyInstance) => {
             }
             throw error
         }
-        console.log(`[BATTLE-START] stamina: ${player.stamina} -> ${startResult.afterStamina} (cost: ${staminaCost}, rate: ${staminaInfo.rate})`)
+        console.log(`[BATTLE-START] stamina: ${startResult.beforeStamina} -> ${startResult.afterStamina} (cost: ${staminaCost}, rate: ${staminaInfo.rate})`)
 
         const dataHeaders = generateDataHeaders({
             viewer_id: viewerId
@@ -405,7 +409,7 @@ const routes = async (fastify: FastifyInstance) => {
             || body.statistics.continue_count < 0
         ) return sendBadRequest("Invalid request body.")
 
-        const sessionResult = await validateSessionAndPlayer(viewerId)
+        const sessionResult = await validateSessionIdentity(viewerId)
         if (!sessionResult) return sendBadRequest("Invalid viewer id.")
         const { playerId } = sessionResult
 

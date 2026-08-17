@@ -9,6 +9,7 @@ const projectRoot = path.resolve(__dirname, "..")
 const {
     InsufficientEntryItemError,
     InsufficientStaminaError,
+    PlayerNotFoundError,
     buildStartEntryItemList,
     runStartEntryTransaction,
 } = require("../src/lib/quest/start-entry")
@@ -19,6 +20,7 @@ function createFixture({
     failDuringWrite = false,
     failDuringCommit = false,
     failDuringAfterPersist = false,
+    beforeTransaction,
 } = {}) {
     let databaseState = {
         itemCount,
@@ -54,6 +56,7 @@ function createFixture({
     const dependencies = {
         transaction(operation) {
             transactionCount++
+            beforeTransaction?.(databaseState)
             const databaseSnapshot = structuredClone(databaseState)
             transactionActive = true
             try {
@@ -196,6 +199,32 @@ function createInput() {
 }
 
 {
+    const fixture = createFixture({
+        itemCount: 4,
+        stamina: 40,
+        beforeTransaction: state => { state.player.stamina = 9 },
+    })
+    assert.throws(
+        () => runStartEntryTransaction(createInput(), fixture.dependencies),
+        InsufficientStaminaError,
+    )
+    assert.equal(fixture.getState().player.stamina, 9)
+    assert.deepEqual(fixture.writes, [])
+}
+
+{
+    const fixture = createFixture({
+        beforeTransaction: state => { state.player = null },
+    })
+    assert.throws(
+        () => runStartEntryTransaction(createInput(), fixture.dependencies),
+        PlayerNotFoundError,
+    )
+    assert.equal(fixture.getState().player, null)
+    assert.deepEqual(fixture.writes, [])
+}
+
+{
     const fixture = createFixture({ failDuringWrite: true })
     assert.throws(
         () => runStartEntryTransaction(createInput(), fixture.dependencies),
@@ -214,6 +243,7 @@ function createInput() {
     const fixture = createFixture({ itemCount: 4, stamina: 40 })
     for (const expectedCount of [3, 2, 1, 0]) {
         const result = runStartEntryTransaction(createInput(), fixture.dependencies)
+        assert.equal(result.beforeStamina, expectedCount * 10 + 10)
         assert.equal(result.entryItemCount, expectedCount)
         assert.deepEqual(buildStartEntryItemList(result), { 500000: expectedCount })
     }

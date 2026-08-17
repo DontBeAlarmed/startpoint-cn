@@ -3,6 +3,23 @@
 本文记录 `single_battle_quest/finish` 与 `multi_battle_quest/finish` 的数据库事务边界。审计目标是避免客户端收到
 失败响应后重试，却因上一次请求已经写入部分奖励、进度或任务事实而形成重复领取或撕裂存档。
 
+## 单人请求身份与事务权威
+
+单人 `/start`、`/play_continue` 和 `/abort` 先通过 viewer session 形成只包含 `accountId`、`playerId` 的身份快照。
+该快照不读取、验证或缓存完整 Player，也不携带余额、体力或 active quest 等可变状态。身份解析成功只表示请求能够定位
+存档；若 Player 在身份解析后被删除，后续事务内领域路径仍必须 fail closed。
+
+`/start` 的 Player、实时体力与入场成本结果由 `runStartEntryTransaction()` 在同一个 SQLite 事务内读取和计算，日志中的
+扣费前后体力也使用该事务结果。`/play_continue` 的 Player 余额与持久化 active quest 由
+`runSingleContinueLifecycleTransaction()` 在事务内读取，首次请求和幂等 replay 均不得复用事务外 Player 快照。
+`/abort` 把可缺省的 `play_id`、`quest_id`、`category` 传入 `runAbortEntryTransaction()`；该事务只读取一次 stored active，
+并用同一行恢复真正缺失的字段、判断身份匹配、退款和删除。显式有限数值（包括 `category=0`）保持请求值，不按缺失处理。
+事务结果返回已解析身份和观察到的 active 信息，供响应与日志投影使用；只有数据库提交成功后才清理内存 active quest。
+
+单人 `/finish` 不使用上述 identity-only 入口，仍通过 `validateSessionAndPlayer()` 获取完整 Player，并交给既有 finish
+协调器。这里没有全局请求上下文或跨事务缓存：identity snapshot 只负责定位，所有会影响写入决定的可变状态继续以所属
+事务内读取为权威。
+
 ## 单人分类覆盖
 
 `src/routes/api/singleBattleQuest.ts` 只完成请求校验、session 适配、协调器调用和 HTTP 发送。它把已校验请求、玩家存档与
@@ -64,6 +81,9 @@ active quest，并严格比较 `playId`、关卡分类与 ID、协力标记、�
 
 ## 回归约束
 
+- `tools/quest_session_identity.test.cjs` 确认 identity-only resolver 在 session/playerId 缺失时 fail closed，且不调用
+  Player loader；`tools/single_battle_identity_reads.test.cjs` 对真实 Fastify 和 SQLite 请求逐次统计 start、continue
+  首次/replay、abort 完整/缺字段的 Player 与 active SELECT；
 - `tools/score_attack_route_transaction.test.cjs` 对 category 27 和普通 category 1 注入晚期删除失败，确认所有
   数值、奖励、进度、履历和任务写入回滚，数据库及内存 active quest 保留；
 - `tools/multi_finish_follow_info.test.cjs` 注入单个队友资料查询异常，确认其他队友仍返回且只记录一条警告；

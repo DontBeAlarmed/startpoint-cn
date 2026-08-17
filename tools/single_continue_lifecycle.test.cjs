@@ -129,6 +129,40 @@ test("rejects stale, multi, and missing authoritative state without writes", asy
     }
 })
 
+test("uses Player state changed after identity resolution and before the transaction", async t => {
+    await t.test("deleted Player fails closed", () => {
+        const fixture = createFixture({
+            player: { freeVmoney: 100, vmoney: 100 },
+            beforeTransaction: state => { state.player = null },
+        })
+        const result = lifecycle.runSingleContinueLifecycleTransaction(
+            createInput(createActiveQuest()),
+            fixture.dependencies,
+        )
+
+        assert.deepEqual(result, { ok: false, message: "Player not found." })
+        assert.equal(fixture.getState().player, null)
+        assert.deepEqual(fixture.writes, [])
+    })
+
+    await t.test("changed balance is authoritative", () => {
+        const fixture = createFixture({
+            player: { freeVmoney: 100, vmoney: 100 },
+            beforeTransaction: state => {
+                state.player = { freeVmoney: 0, vmoney: 20 }
+            },
+        })
+        const result = lifecycle.runSingleContinueLifecycleTransaction(
+            createInput(createActiveQuest()),
+            fixture.dependencies,
+        )
+
+        assert.deepEqual(result, { ok: false, message: "Not enough vmoney to continue" })
+        assert.deepEqual(fixture.getState().player, { freeVmoney: 0, vmoney: 20 })
+        assert.deepEqual(fixture.writes, [])
+    })
+})
+
 test("rejects each stored single identity mismatch inside the transaction without writes", async t => {
     for (const scenario of [
         { field: "playId", value: "other-stored-play" },

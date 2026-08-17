@@ -123,6 +123,14 @@ const SOURCE_RULES = [
         groups: ["integration:quest", "integration:rules", "quick:quest"],
     },
     {
+        pattern: /^(?:src\/lib\/quest\/finish\/session-validator\.ts|tools\/quest_session_identity\.test\.cjs)$/,
+        groups: ["integration:quest", "quick:quest"],
+    },
+    {
+        pattern: /^(?:src\/lib\/quest\/(?:entry-lifecycle|start-entry)\.ts|src\/routes\/api\/singleBattleQuest\.ts|tools\/(?:quest_abort_route|quest_entry_lifecycle|single_battle_identity_reads|single_continue_(?:idempotency|lifecycle|route|route_errors))\.test\.cjs)$/,
+        groups: ["integration:quest", "integration:rules", "quick:quest"],
+    },
+    {
         pattern: /^src\/lib\/quest\/single-finish-settlement\.ts$/,
         groups: ["integration:quest"],
     },

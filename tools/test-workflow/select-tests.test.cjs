@@ -8,6 +8,30 @@ const { selectTestGroups } = require("./select-tests.cjs")
 
 test("maps representative source files to focused groups", () => {
     assert.deepEqual(
+        selectTestGroups(["src/lib/quest/finish/session-validator.ts"]),
+        ["integration:quest", "quick:quest"],
+    )
+    for (const file of [
+        "src/lib/quest/entry-lifecycle.ts",
+        "src/lib/quest/start-entry.ts",
+    ]) {
+        assert.deepEqual(
+            selectTestGroups([file]),
+            ["integration:quest", "integration:rules", "quick:quest"],
+            file,
+        )
+    }
+    assert.deepEqual(
+        selectTestGroups(["tools/quest_session_identity.test.cjs"]),
+        ["quick:quest"],
+    )
+    for (const file of [
+        "tools/quest_entry_lifecycle.test.cjs",
+        "tools/single_battle_identity_reads.test.cjs",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["integration:quest"], file)
+    }
+    assert.deepEqual(
         selectTestGroups(["scripts/gen_mission_event_battle_rules.js"]),
         ["generator:mission-event"],
     )
@@ -1279,6 +1303,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/perf/single_battle_settlement_admission.test.cjs",
         "tools/perf/single_battle_settlement_baseline.test.cjs",
         "tools/quest_entry_lifecycle.test.cjs",
+        "tools/single_battle_identity_reads.test.cjs",
         "tools/quest_host_finish.test.cjs",
         "tools/single_battle_finish_validation.test.cjs",
         "tools/single_finish_orchestrator_architecture.test.cjs",

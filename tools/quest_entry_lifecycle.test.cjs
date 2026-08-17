@@ -55,6 +55,7 @@ function createFixture({
     let databaseState = { activeQuest, itemCount }
     let memoryActiveQuest = activeQuest ? { ...activeQuest } : null
     let transactionActive = false
+    let activeReads = 0
     const writes = []
 
     const dependencies = {
@@ -74,6 +75,7 @@ function createFixture({
         },
         getActiveQuest() {
             assert.equal(transactionActive, true)
+            activeReads++
             return databaseState.activeQuest
         },
         getItemCount() {
@@ -102,6 +104,7 @@ function createFixture({
 
     return {
         dependencies,
+        getActiveReads: () => activeReads,
         getState: () => ({ ...databaseState, memoryActiveQuest }),
         writes,
     }
@@ -112,6 +115,13 @@ function createFixture({
     const result = lifecycle.runAbortEntryTransaction(createAbortInput(), fixture.dependencies)
 
     assert.equal(result.cancelled, true)
+    assert.deepEqual(result.resolvedIdentity, {
+        playId: "ticket-play-1",
+        questId: 200076009,
+        category: 7,
+    })
+    assert.equal(result.observedActiveQuest.playId, "ticket-play-1")
+    assert.equal(fixture.getActiveReads(), 1)
     assert.deepEqual(result.itemList, { 10000072: 1 })
     assert.equal(fixture.getState().itemCount, 1)
     assert.equal(fixture.getState().activeQuest, null)
@@ -127,6 +137,58 @@ function createFixture({
         "dbActiveQuest",
         "memoryActiveQuest",
     ])
+}
+
+{
+    const fixture = createFixture()
+    const result = lifecycle.runAbortEntryTransaction(createAbortInput({
+        playId: null,
+        questId: null,
+        category: null,
+    }), fixture.dependencies)
+
+    assert.equal(result.cancelled, true)
+    assert.deepEqual(result.resolvedIdentity, {
+        playId: "ticket-play-1",
+        questId: 200076009,
+        category: 7,
+    })
+    assert.equal(result.observedActiveQuest.playId, "ticket-play-1")
+    assert.equal(fixture.getActiveReads(), 1)
+}
+
+{
+    const fixture = createFixture({ activeQuest: null, itemCount: 4 })
+    const result = lifecycle.runAbortEntryTransaction(createAbortInput({
+        playId: null,
+        questId: null,
+        category: null,
+    }), fixture.dependencies)
+
+    assert.deepEqual(result, {
+        cancelled: false,
+        activeQuest: null,
+        observedActiveQuest: null,
+        resolvedIdentity: { playId: "", questId: 0, category: 0 },
+        itemList: {},
+    })
+    assert.equal(fixture.getActiveReads(), 1)
+    assert.deepEqual(fixture.writes, [])
+}
+
+{
+    const fixture = createFixture()
+    const result = lifecycle.runAbortEntryTransaction(createAbortInput({
+        category: 0,
+    }), fixture.dependencies)
+
+    assert.equal(result.cancelled, false)
+    assert.equal(result.resolvedIdentity.category, 0)
+    assert.equal(result.observedActiveQuest.category, 7)
+    assert.equal(fixture.getState().activeQuest.playId, "ticket-play-1")
+    assert.equal(fixture.getState().memoryActiveQuest.playId, "ticket-play-1")
+    assert.equal(fixture.getActiveReads(), 1)
+    assert.deepEqual(fixture.writes, [])
 }
 
 {

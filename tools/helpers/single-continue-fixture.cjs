@@ -34,6 +34,7 @@ function createFixture({
     player = { freeVmoney: 30, vmoney: 40 },
     storedQuest = createActiveQuest(),
     failCommit = false,
+    beforeTransaction,
 } = {}) {
     let databaseState = structuredClone({ player, storedQuest })
     let transactionActive = false
@@ -42,6 +43,7 @@ function createFixture({
 
     const dependencies = {
         transaction(operation) {
+            beforeTransaction?.(databaseState)
             const snapshot = structuredClone(databaseState)
             transactionCalls++
             transactionActive = true

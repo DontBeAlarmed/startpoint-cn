@@ -134,19 +134,19 @@
       },
       "behaviorSha256": "261e0b5baca8233743ced169fb138290e66542e525e524ace70f7c3f1150257a",
       "sql": {
-        "statements": 55,
-        "selectStatements": 36,
+        "statements": 50,
+        "selectStatements": 31,
         "writeStatements": 11,
         "transactionStatements": 8,
         "byTable": {
           "players": {
-            "statements": 9,
-            "reads": 8,
+            "statements": 6,
+            "reads": 5,
             "writes": 1
           },
           "players_active_quests": {
-            "statements": 7,
-            "reads": 5,
+            "statements": 5,
+            "reads": 3,
             "writes": 2
           },
           "players_category_mission_stages": {
@@ -4167,14 +4167,14 @@
       },
       "behaviorSha256": "5b5670ec3feaba0fb3919e0db1cad9efa33ee8cf6efa2def989400bba923868d",
       "sql": {
-        "statements": 10,
-        "selectStatements": 6,
+        "statements": 9,
+        "selectStatements": 5,
         "writeStatements": 2,
         "transactionStatements": 2,
         "byTable": {
           "players": {
-            "statements": 4,
-            "reads": 3,
+            "statements": 3,
+            "reads": 2,
             "writes": 1
           },
           "players_active_quests": {
@@ -4338,14 +4338,14 @@
       },
       "behaviorSha256": "0f8d44986b78239b50775bb7882487748b349b563c3b035549879e74565c7b5a",
       "sql": {
-        "statements": 35,
-        "selectStatements": 23,
+        "statements": 34,
+        "selectStatements": 22,
         "writeStatements": 8,
         "transactionStatements": 4,
         "byTable": {
           "players": {
-            "statements": 5,
-            "reads": 4,
+            "statements": 4,
+            "reads": 3,
             "writes": 1
           },
           "players_active_quests": {

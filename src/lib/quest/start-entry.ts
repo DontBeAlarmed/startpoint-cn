@@ -37,6 +37,7 @@ export interface StartEntryDependencies<TActiveQuest> {
 }
 
 export interface StartEntryResult {
+    beforeStamina: number
     afterStamina: number
     entryItemId: number | null
     entryItemCount: number | null
@@ -140,6 +141,7 @@ export function runStartEntryTransaction<TActiveQuest>(
         dependencies.afterPersist?.(input.playerId)
 
         return {
+            beforeStamina: currentStamina,
             afterStamina,
             entryItemId,
             entryItemCount,

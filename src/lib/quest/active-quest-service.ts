@@ -162,7 +162,11 @@ export function runContinueActiveQuestTransaction(
 
 export function runAbortActiveQuestTransaction(
     playerId: number,
-    identity: ActiveQuestIdentity,
+    identity: {
+        playId: string | null
+        questId: number | null
+        category: number | null
+    },
 ) {
     return runAbortEntryTransaction({ playerId, ...identity }, {
         transaction: operation => getDb().transaction(operation)(),

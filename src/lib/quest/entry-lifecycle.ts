@@ -10,9 +10,9 @@ export interface EntryLifecycleActiveQuest {
 
 export interface AbortEntryInput {
     playerId: number
-    playId: string
-    questId: number
-    category: number
+    playId: string | null
+    questId: number | null
+    category: number | null
 }
 
 export interface AbortEntryDependencies<TActiveQuest extends EntryLifecycleActiveQuest> {
@@ -34,6 +34,12 @@ export interface RestoreActiveQuestDependencies<TActiveQuest extends EntryLifecy
 export interface AbortEntryResult<TActiveQuest> {
     cancelled: boolean
     activeQuest: TActiveQuest | null
+    observedActiveQuest: TActiveQuest | null
+    resolvedIdentity: {
+        playId: string
+        questId: number
+        category: number
+    }
     itemList: Record<string, number>
 }
 
@@ -65,12 +71,23 @@ export function runAbortEntryTransaction<TActiveQuest extends EntryLifecycleActi
 ): AbortEntryResult<TActiveQuest> {
     const result = dependencies.transaction(() => {
         const activeQuest = dependencies.getActiveQuest(input.playerId)
+        const resolvedIdentity = {
+            playId: input.playId ?? activeQuest?.playId ?? "",
+            questId: input.questId ?? activeQuest?.questId ?? 0,
+            category: input.category ?? activeQuest?.category ?? 0,
+        }
         const matchesActiveQuest = activeQuest
-            && activeQuest.playId === input.playId
-            && activeQuest.questId === input.questId
-            && activeQuest.category === input.category
+            && activeQuest.playId === resolvedIdentity.playId
+            && activeQuest.questId === resolvedIdentity.questId
+            && activeQuest.category === resolvedIdentity.category
         if (!activeQuest || !matchesActiveQuest) {
-            return { cancelled: false, activeQuest: null, itemList: {} }
+            return {
+                cancelled: false,
+                activeQuest: null,
+                observedActiveQuest: activeQuest,
+                resolvedIdentity,
+                itemList: {},
+            }
         }
 
         const prepaidItem = resolvePrepaidEntryItem(activeQuest, dependencies.getEntryCost)
@@ -83,7 +100,13 @@ export function runAbortEntryTransaction<TActiveQuest extends EntryLifecycleActi
         }
 
         dependencies.deleteActiveQuest(input.playerId)
-        return { cancelled: true, activeQuest, itemList }
+        return {
+            cancelled: true,
+            activeQuest,
+            observedActiveQuest: activeQuest,
+            resolvedIdentity,
+            itemList,
+        }
     })
 
     if (result.cancelled) dependencies.clearActiveQuest(input.playerId)
