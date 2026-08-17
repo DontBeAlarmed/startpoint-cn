@@ -265,6 +265,15 @@ const TEST_GROUPS = Object.freeze({
             "tools/mail_notification_write_routes.test.cjs",
         ],
     },
+    "integration:reward-grant": {
+        execution: "serial",
+        timeoutMs: 60_000,
+        tests: [
+            "tools/reward_grant_plan.test.cjs",
+            "tools/reward_grant_executor.test.cjs",
+            "tools/reward_grant_architecture.test.cjs",
+        ],
+    },
     "integration:database": {
         execution: "serial",
         tests: [

@@ -381,6 +381,31 @@ test("maps single continue lifecycle implementation and regression precisely", (
     )
 })
 
+test("maps the public reward grant layer and its regressions to one focused leaf", () => {
+    const group = "integration:reward-grant"
+    const tests = [
+        "tools/reward_grant_plan.test.cjs",
+        "tools/reward_grant_executor.test.cjs",
+        "tools/reward_grant_architecture.test.cjs",
+    ]
+
+    assert.deepEqual(TEST_GROUPS[group], {
+        execution: "serial",
+        timeoutMs: 60_000,
+        tests,
+    })
+    for (const file of [
+        "src/lib/reward-grant/types.ts",
+        "src/lib/reward-grant/plan.ts",
+        "src/lib/reward-grant/executor.ts",
+        "src/lib/reward-grant/index.ts",
+        "docs/systems/reward-grant-transactions.md",
+        ...tests,
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), [group], file)
+    }
+})
+
 test("maps the single battle settlement baseline family to integration quest", () => {
     for (const file of [
         "tools/perf/single_battle_settlement_admission.cjs",

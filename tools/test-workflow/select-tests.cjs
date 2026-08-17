@@ -156,6 +156,10 @@ const SOURCE_RULES = [
         groups: ["integration:quest"],
     },
     {
+        pattern: /^(?:src\/lib\/reward-grant\/.*\.ts|docs\/systems\/reward-grant-transactions\.md)$/,
+        groups: ["integration:reward-grant"],
+    },
+    {
         pattern: /^docs\/systems\/save-validation\.md$/,
         groups: ["integration:database"],
     },

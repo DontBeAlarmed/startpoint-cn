@@ -12,6 +12,7 @@
 - [配队装备与魂珠校验](./party-loadout-validation.md)
 - [经验池边界](./exp-pool.md)
 - [背包与装备写入事务](./inventory-write-transactions.md)
+- [奖励发放事务](./reward-grant-transactions.md)
 - [漫画](./comic.md)
 
 ## 关卡与活动
