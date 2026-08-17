@@ -11,7 +11,6 @@ import { getStaminaCost } from "../../lib/stamina-cost"
 import { dispatchModeQuestStart } from "../../modes/registry"
 import { createModeHost } from "../../modes/loader"
 import {
-    validateSessionAndPlayer,
     validateSessionIdentity,
 } from "../../lib/quest/finish/session-validator"
 import { settleSingleBattleQuest } from "../../lib/quest/finish/single-orchestrator"
@@ -122,15 +121,14 @@ const routes = async (fastify: FastifyInstance) => {
         const body = validationResult.body
 
         const viewerId = body.viewer_id
-        const sessionResult = await validateSessionAndPlayer(viewerId)
+        const sessionResult = await validateSessionIdentity(viewerId)
         if (!sessionResult) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid viewer id."
         })
-        const { playerId, playerData } = sessionResult
+        const { playerId } = sessionResult
 
         const finishResult = settleSingleBattleQuest({
             playerId,
-            playerData,
             memoryActiveQuest: activeQuests[playerId],
             body,
         })
@@ -150,10 +148,10 @@ const routes = async (fastify: FastifyInstance) => {
             result: finishResult,
             dataHeaders,
             player: {
-                freeVmoney: playerData.freeVmoney,
-                degreeId: playerData.degreeId,
+                freeVmoney: finishResult.playerSnapshot.freeVmoney,
+                degreeId: finishResult.playerSnapshot.degreeId,
             },
-            expPooledTime: getServerTime(playerData.expPooledTime),
+            expPooledTime: getServerTime(finishResult.playerSnapshot.expPooledTime),
             staminaHealTime: realToVirtual(finishResult.afterStaminaHealTime),
             mailArrived: getPlayerMailCountSync(playerId, true) > 0,
         })

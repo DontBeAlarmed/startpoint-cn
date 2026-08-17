@@ -1,5 +1,7 @@
-import type { Player } from "../../data/types"
+import type { Player, PlayerQuestProgress } from "../../data/types"
 import { getDb } from "../../data/db"
+import { getPlayerSync } from "../../data/domains/player"
+import { getPlayerSingleQuestProgressSync } from "../../data/domains/quest"
 import { getPlayerActiveQuestSync } from "../../data/domains/quest_active"
 import type { ActiveQuest } from "./active-quest-service"
 
@@ -13,16 +15,25 @@ export interface SingleFinishRequestIdentity {
 export interface SingleFinishSettlementContext {
     activeQuest: ActiveQuest
     player: Player
+    questProgress: PlayerQuestProgress | null
 }
 
 interface SingleFinishSettlementDependencies {
     transaction<T>(operation: () => T): T
     getStoredActiveQuest(playerId: number): ActiveQuest | null
+    getPlayer(playerId: number): Player | null
+    getQuestProgress(
+        playerId: number,
+        category: number,
+        questId: number,
+    ): PlayerQuestProgress | null
 }
 
 const defaultDependencies: SingleFinishSettlementDependencies = {
     transaction: operation => getDb().transaction(operation)(),
     getStoredActiveQuest: getPlayerActiveQuestSync,
+    getPlayer: getPlayerSync,
+    getQuestProgress: getPlayerSingleQuestProgressSync,
 }
 
 export class SingleFinishSettlementValidationError extends Error {
@@ -99,20 +110,27 @@ export function runSingleFinishSettlementTransaction<T>({
     playerId,
     memoryQuest,
     request,
-    player,
     settle,
     dependencies = defaultDependencies,
 }: {
     playerId: number
     memoryQuest: ActiveQuest
     request: SingleFinishRequestIdentity
-    player: Player
     settle(context: SingleFinishSettlementContext): T
     dependencies?: SingleFinishSettlementDependencies
 }): T {
     return dependencies.transaction(() => {
         const storedQuest = dependencies.getStoredActiveQuest(playerId)
+        const player = dependencies.getPlayer(playerId)
+        if (!player) {
+            throw new SingleFinishSettlementValidationError("Invalid viewer id.")
+        }
         validateSettlementState(memoryQuest, storedQuest, request, player)
-        return settle({ activeQuest: storedQuest, player })
+        const questProgress = dependencies.getQuestProgress(
+            playerId,
+            storedQuest.category,
+            storedQuest.questId,
+        )
+        return settle({ activeQuest: storedQuest, player, questProgress })
     })
 }

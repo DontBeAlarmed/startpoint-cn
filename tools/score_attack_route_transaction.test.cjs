@@ -413,6 +413,7 @@ stubModule("../src/lib/stamina", {
 stubModule("../src/lib/stamina-cost", { getStaminaCost: () => 0 })
 stubModule("../src/lib/quest/finish/session-validator", {
     validateSessionAndPlayer: async () => ({ playerId: 17, playerData: playerRow() }),
+    validateSessionIdentity: async () => ({ accountId: 1, playerId: 17 }),
 })
 stubModule("../src/lib/quest/finish/challenge-point", { handleDailyChallengePoint: () => [] })
 stubModule("../src/lib/quest/finish/character-clear-tracker", {

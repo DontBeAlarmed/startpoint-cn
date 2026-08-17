@@ -134,7 +134,7 @@ test("full validator rejects invalid viewer ids before session or Player reads",
     assert.equal(defaultPlayerCalls, 0)
 })
 
-test("single battle routes keep finish full and entry routes identity-only", () => {
+test("single battle routes use identity-only resolution without loading Player", () => {
     const source = fs.readFileSync(
         path.resolve(__dirname, "../src/routes/api/singleBattleQuest.ts"),
         "utf8",
@@ -148,8 +148,9 @@ test("single battle routes keep finish full and entry routes identity-only", () 
     }
 
     const finish = routeBlock("finish", "abort")
-    assert.match(finish, /validateSessionAndPlayer\(viewerId\)/)
-    assert.doesNotMatch(finish, /validateSessionIdentity\(viewerId\)/)
+    assert.match(finish, /validateSessionIdentity\(viewerId\)/)
+    assert.doesNotMatch(finish, /validateSessionAndPlayer\(viewerId\)/)
+    assert.doesNotMatch(finish, /\bplayerData\b/)
 
     for (const [route, nextRoute] of [
         ["abort", "start"],

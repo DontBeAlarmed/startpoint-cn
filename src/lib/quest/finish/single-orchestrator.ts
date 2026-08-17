@@ -14,7 +14,6 @@ import {
     SingleFinishSettlementValidationError,
 } from "../single-finish-settlement"
 import type { ValidatedSingleFinishBody } from "../single-finish-validation"
-import { getPlayerSingleQuestProgressSync } from "../../../data/domains/quest"
 import { calculateClearRank } from "./quest-calc"
 import {
     calculateScoreAttackClearRank,
@@ -38,6 +37,7 @@ export type SingleFinishSuccess = SingleSettlementWritesResult & {
     ok: true
     body: ValidatedSingleFinishBody
     clearRank: number | null
+    playerSnapshot: Player
     questProgress: PlayerQuestProgress | null
 }
 
@@ -53,12 +53,10 @@ function failure(
 
 export function settleSingleBattleQuest({
     playerId,
-    playerData,
     memoryActiveQuest,
     body,
 }: {
     playerId: number
-    playerData: Player
     memoryActiveQuest: ActiveQuest | undefined
     body: ValidatedSingleFinishBody
 }): SingleFinishResult {
@@ -121,8 +119,6 @@ export function settleSingleBattleQuest({
         })
         : calculateClearRank(clearTime, finishQuest)
 
-    const questProgress = getPlayerSingleQuestProgressSync(playerId, questCategory, questId)
-    const questPreviouslyCompleted = questProgress?.finished === true
     let questAccomplished = body.is_accomplished
     let scoreAttackBorderTiers: ScoreAttackBorderTier[] = []
     if (isScoreAttackEvent) {
@@ -138,31 +134,13 @@ export function settleSingleBattleQuest({
         }
         questAccomplished = body.score >= scoreAttackBorderTiers[0].score
     }
-    const rewardEligibility = resolveQuestRewardEligibility({
-        questAccomplished,
-        clearRank,
-        questProgress,
-    })
-    const party = body.statistics.party
-    const finishCtx: FinishContext = {
-        playerId,
-        questCategory,
-        questId,
-        questAccomplished,
-        clearTime,
-        clearRank,
-        score: body.score,
-        party,
-        statistics: body.statistics,
-        equipmentElements: body.equipment_element,
-        player: playerData,
-        questPreviouslyCompleted,
-        questProgress,
+    let transactionResult: {
+        settlement: SingleSettlementWritesResult
+        playerSnapshot: Player
+        questProgress: PlayerQuestProgress | null
     }
-
-    let settlement: SingleSettlementWritesResult
     try {
-        settlement = runSingleFinishSettlementTransaction({
+        transactionResult = runSingleFinishSettlementTransaction({
             playerId,
             memoryQuest: memoryActiveQuest,
             request: {
@@ -171,15 +149,38 @@ export function settleSingleBattleQuest({
                 category: body.category,
                 continueCount: body.continue_count,
             },
-            player: playerData,
-            settle: ({ activeQuest, player }) => executeSingleSettlementWrites({
-                body,
-                questData: finishQuest,
-                rewardEligibility,
-                finishCtx,
-                rushEventFolderMaxRound,
-                scoreAttackBorderTiers,
-            }, activeQuest, player),
+            settle: ({ activeQuest, player, questProgress }) => {
+                const questPreviouslyCompleted = questProgress?.finished === true
+                const rewardEligibility = resolveQuestRewardEligibility({
+                    questAccomplished,
+                    clearRank,
+                    questProgress,
+                })
+                const finishCtx: FinishContext = {
+                    playerId,
+                    questCategory,
+                    questId,
+                    questAccomplished,
+                    clearTime,
+                    clearRank,
+                    score: body.score,
+                    party: body.statistics.party,
+                    statistics: body.statistics,
+                    equipmentElements: body.equipment_element,
+                    player,
+                    questPreviouslyCompleted,
+                    questProgress,
+                }
+                const settlement = executeSingleSettlementWrites({
+                    body,
+                    questData: finishQuest,
+                    rewardEligibility,
+                    finishCtx,
+                    rushEventFolderMaxRound,
+                    scoreAttackBorderTiers,
+                }, activeQuest, player)
+                return { settlement, playerSnapshot: player, questProgress }
+            },
         })
     } catch (error) {
         if (error instanceof SingleFinishSettlementValidationError) {
@@ -190,9 +191,16 @@ export function settleSingleBattleQuest({
 
     recordScoreRewardSettlement(
         playerId,
-        settlement.scoreRewardSelection,
-        settlement.scoreRewardsResult,
+        transactionResult.settlement.scoreRewardSelection,
+        transactionResult.settlement.scoreRewardsResult,
     )
     delete activeQuests[playerId]
-    return { ok: true, body, clearRank, questProgress, ...settlement }
+    return {
+        ok: true,
+        body,
+        clearRank,
+        playerSnapshot: transactionResult.playerSnapshot,
+        questProgress: transactionResult.questProgress,
+        ...transactionResult.settlement,
+    }
 }

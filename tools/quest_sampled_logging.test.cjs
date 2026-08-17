@@ -66,7 +66,7 @@ test("score reward settlement emits one sampled lazy summary instead of per-rewa
     assert.equal(singleOrchestratorSource.match(/recordScoreRewardSettlement\s*\(/g)?.length, 1)
 
     const transactionCall = singleOrchestratorSource.indexOf(
-        "settlement = runSingleFinishSettlementTransaction(",
+        "transactionResult = runSingleFinishSettlementTransaction(",
     )
     const postCommitLog = singleOrchestratorSource.indexOf("recordScoreRewardSettlement(")
     assert(transactionCall >= 0)

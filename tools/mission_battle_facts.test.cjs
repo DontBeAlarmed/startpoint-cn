@@ -221,11 +221,15 @@ const singleAwakeMerge = singleProjectorSource.indexOf(
     singleGeneralMerge,
 )
 const singleTransactionCall = singleOrchestratorSource.indexOf(
-    "settlement = runSingleFinishSettlementTransaction({",
+    "transactionResult = runSingleFinishSettlementTransaction({",
 )
 const singleTransactionBinding = singleOrchestratorSource.indexOf(
-    "settle: ({ activeQuest, player }) => executeSingleSettlementWrites({",
+    "settle: ({ activeQuest, player, questProgress }) => {",
     singleTransactionCall,
+)
+const singleWritesBinding = singleOrchestratorSource.indexOf(
+    "executeSingleSettlementWrites({",
+    singleTransactionBinding,
 )
 assert.equal(singleEvaluationTime > singleTransactionStart, true, "单人 finish 必须在事务体内固定任务时间")
 assert.equal(singleFactCall > singleEvaluationTime, true, "单人任务事实必须使用事务时间")
@@ -246,6 +250,7 @@ assert.match(
 )
 assert.equal(singleTransactionCall >= 0, true, "单人写入闭包必须交给 finish 事务")
 assert.equal(singleTransactionBinding > singleTransactionCall, true, "所有单人同步结算写入必须共享事务")
+assert.equal(singleWritesBinding > singleTransactionBinding, true, "单人写入必须在事务回调内执行")
 
 const multiBattleSource = finishRouteSource(fs.readFileSync(
     path.join(__dirname, "../src/multi/http/battle.ts"),

@@ -239,13 +239,18 @@ test("single and multi production finish routes call the shared Awake battle sea
     const singleSeamCall = singleWrites.indexOf("settleAwakeBattleMissions({", singleTransactionBody)
     const singleTransactionCall = singleOrchestrator.indexOf("runSingleFinishSettlementTransaction({")
     const singleSettleBinding = singleOrchestrator.indexOf(
-        "settle: ({ activeQuest, player }) => executeSingleSettlementWrites({",
+        "settle: ({ activeQuest, player, questProgress }) => {",
         singleTransactionCall,
+    )
+    const singleWritesCall = singleOrchestrator.indexOf(
+        "executeSingleSettlementWrites({",
+        singleSettleBinding,
     )
     assert.equal(singleTransactionBody >= 0, true, "single settlement writes function")
     assert.equal(singleSeamCall > singleTransactionBody, true, "single shared Awake seam call")
     assert.equal(singleTransactionCall >= 0, true, "single transaction call")
     assert.equal(singleSettleBinding > singleTransactionCall, true, "single transaction callback")
+    assert.equal(singleWritesCall > singleSettleBinding, true, "single writes inside transaction callback")
 
     for (const routePath of ["src/multi/http/battle.ts"]) {
         const source = fs.readFileSync(path.join(__dirname, "..", routePath), "utf8")

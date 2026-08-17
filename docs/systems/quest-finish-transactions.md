@@ -5,7 +5,7 @@
 
 ## 单人请求身份与事务权威
 
-单人 `/start`、`/play_continue` 和 `/abort` 先通过 viewer session 形成只包含 `accountId`、`playerId` 的身份快照。
+单人 `/start`、`/play_continue`、`/finish` 和 `/abort` 先通过 viewer session 形成只包含 `accountId`、`playerId` 的身份快照。
 viewer ID 必须是正安全整数；0、负数、小数、非有限值和 unsafe integer 在查询 session 前拒绝，full Player 校验复用同一边界。
 该快照不读取、验证或缓存完整 Player，也不携带余额、体力或 active quest 等可变状态。身份解析成功只表示请求能够定位
 存档；若 Player 在身份解析后被删除，后续事务内领域路径仍必须 fail closed。
@@ -21,14 +21,16 @@ viewer ID 必须是正安全整数；0、负数、小数、非有限值和 unsaf
 数据库提交成功后，完整匹配取消或权威观察到 stored active 不存在时清理内存 active quest；stored active 存在但身份不匹配时
 保留内存状态，事务异常时也不得执行提交后清理。
 
-单人 `/finish` 不使用上述 identity-only 入口，仍通过 `validateSessionAndPlayer()` 获取完整 Player，并交给既有 finish
-协调器。这里没有全局请求上下文或跨事务缓存：identity snapshot 只负责定位，所有会影响写入决定的可变状态继续以所属
-事务内读取为权威。
+单人 `/finish` 同样使用 identity-only 入口，不在路由或 session validator 读取完整 Player。协调器可在事务外准备关卡、
+奖励、Rank 和 Score 档位等静态内容；`runSingleFinishSettlementTransaction()` 在同一个 SQLite 事务内按 stored active、
+Player、该关卡旧 progress 的顺序读取可变权威状态。Player 缺失、请求/内存/stored active 身份不匹配、续关次数不匹配、
+Boost 标记或余额非法时，均在奖励与进度写入前 fail closed。旧 progress 读取完成后，协调器才据事务内 Player/progress 构造
+`rewardEligibility`、`questPreviouslyCompleted` 和 `FinishContext`，并调用写入层。这里不增加全局请求上下文或额外最终查询。
 
 ## 单人分类覆盖
 
-`src/routes/api/singleBattleQuest.ts` 只完成请求校验、session 适配、协调器调用和 HTTP 发送。它把已校验请求、玩家存档与
-内存 active quest 交给 `src/lib/quest/finish/single-orchestrator.ts`；协调器读取关卡与奖励配置、准备只读结算上下文，
+`src/routes/api/singleBattleQuest.ts` 只完成请求校验、session 适配、协调器调用和 HTTP 发送。它把已校验请求、player ID 与
+内存 active quest 交给 `src/lib/quest/finish/single-orchestrator.ts`；协调器读取关卡与奖励配置、准备静态只读结算输入，
 再通过 `runSingleFinishSettlementTransaction()` 进入一个外层事务。事务回调调用
 `src/lib/quest/finish/single-settlement-writes.ts` 执行全部持久写入。该总事务适用于
 `getQuestFromCategorySync()` 支持的所有通用战斗分类，不依赖分类是否另有专用响应字段。
@@ -39,7 +41,8 @@ executor 模块内部的 `executeRewardGrantPlanInTransactionOwnerSync()` 发放
 
 Score 的抽取、倍率和 ELEMENT/AETHER 上下文 ID 在进入 owner 前由纯选择核心一次完成；运行时 wrapper 只负责读取内容、服务器设置和服务器时间并注入核心。Plan source 以 `score_common`、`score_rare` 保留 group、客户端 index 和最终数量，响应 drop IDs 与执行结果共同使用这些 source。执行后协调器直接采用 owner 返回的 `playerAfter`，不再从响应 `user_info` 重复推导货币后态。采样日志只在最外层事务提交成功后记录一次，任一后续写入失败并回滚时不记录。
 
-事务提交成功后，路由预先计算响应头、服务器时间换算与邮件状态，再交给
+事务成功结果携带事务内读取的 Player 快照与写入前旧 progress；它们只用于保持既有响应投影，不作为事务后的新权威状态，
+也不触发额外 Player SELECT。事务提交成功后，路由预先计算响应头、服务器时间换算与邮件状态，再交给
 `src/lib/quest/finish/single-response-projector.ts` 构造成功响应。projector 是纯投影层：不读取数据库、运行时内容或当前时间，
 也不访问 Fastify；它只消费协调器成功结果和路由提供的只读快照，并按既有顺序合并通用任务与角色觉醒任务响应。
 失败响应、HTTP header、状态码和发送仍由路由负责。
@@ -63,8 +66,10 @@ Score 的抽取、倍率和 ELEMENT/AETHER 上下文 ID 在进入 owner 前由�
 | `27 SCORE_ATTACK_EVENT` | 无限演武履历、最高分、档位奖励与 active quest 删除 |
 
 专用处理器内部若再次开启 SQLite transaction，`better-sqlite3` 会把它作为嵌套保存点；异常继续向外传播，最终
-由外层事务回滚全部通用和专用写入。协调器只在数据库提交成功后删除进程内 active quest，因此失败请求可用原请求重试。
-单人结算事务拥有者负责把 `playerId` 与请求开始时读取的玩家状态绑定，并在固定奖励、普通 Score、角色战斗经验和后续直接奖励之间维护 `freeMana`、`freeVmoney` 和 `expPool` 后态；因此首通 clear/S+ 各省去一次玩家前态查询，不增加奖励写入或事务语句。owner 状态或奖励异常必须继续向外传播，不能在结算回调内捕获后提交。
+由外层事务回滚全部通用和专用写入。协调器只在数据库提交成功后删除进程内 active quest 并记录 Score sampled log，
+因此失败请求可用原请求重试，数据库和内存 active 均保留。单人结算事务拥有者负责把 `playerId` 与事务开始后读取的玩家状态
+绑定，并在固定奖励、普通 Score、角色战斗经验和后续直接奖励之间维护 `freeMana`、`freeVmoney` 和 `expPool` 后态；因此首通
+clear/S+ 各省去一次玩家前态查询，不增加奖励写入或事务语句。owner 状态或奖励异常必须继续向外传播，不能在结算回调内捕获后提交。
 
 ## 协力结算
 
@@ -90,6 +95,8 @@ active quest，并严格比较 `playId`、关卡分类与 ID、协力标记、�
   Player loader；`tools/single_battle_abort_validation.test.cjs` 通过真实 Fastify、MsgPack 和 SQLite 覆盖 abort 输入边界、
   stale memory 与事务回滚；`tools/single_battle_identity_reads.test.cjs` 对真实 Fastify 和 SQLite 请求逐次统计 start、continue
   首次/replay、abort 完整/缺字段的 Player 与 active SELECT；
+- `tools/single_finish_authority_transaction.test.cjs` 确认 stored active、Player 和旧 progress 在同一事务内按序读取，
+  缺失 Player 或非法 Boost 在 progress/writes 前失败，并覆盖 identity 解析后 Player/progress 变化时采用新权威值；
 - `tools/score_attack_route_transaction.test.cjs` 对 category 27 和普通 category 1 注入晚期删除失败，确认所有
   数值、奖励、进度、履历和任务写入回滚，数据库及内存 active quest 保留；
 - `tools/multi_finish_follow_info.test.cjs` 注入单个队友资料查询异常，确认其他队友仍返回且只记录一条警告；

@@ -31,6 +31,9 @@ test("single finish route delegates preparation and settlement to the orchestrat
     const writes = readSource("src/lib/quest/finish/single-settlement-writes.ts")
 
     assert.match(route, /settleSingleBattleQuest\s*\(\s*\{/)
+    assert.match(route, /validateSessionIdentity\s*\(\s*viewerId\s*\)/)
+    assert.doesNotMatch(route, /validateSessionAndPlayer\s*\(/)
+    assert.doesNotMatch(route, /\bplayerData\b/)
     for (const directResponsibility of [
         "getQuestFromCategorySync",
         "runSingleFinishSettlementTransaction",
@@ -50,6 +53,15 @@ test("single finish route delegates preparation and settlement to the orchestrat
 
     assert.match(orchestrator, /getQuestFromCategorySync\s*\(/)
     assert.match(orchestrator, /runSingleFinishSettlementTransaction\s*\(/)
+    assert.doesNotMatch(
+        sourceBetween(
+            orchestrator,
+            "export function settleSingleBattleQuest",
+            "runSingleFinishSettlementTransaction({",
+            "single finish pre-transaction preparation",
+        ),
+        /getPlayerSingleQuestProgressSync\s*\(/,
+    )
     assert.match(writes, /settleAdditionalRewardsSync\s*\(/)
     assert.match(writes, /settleSingleBattleMissionCategories\s*\(/)
     assert.match(writes, /handleRushEventFinish\s*\(/)
@@ -69,11 +81,9 @@ test("single finish route delegates pure success response projection", () => {
     )
 
     assert.match(route, /buildSingleFinishResponse\s*\(\s*\{/)
-    assert.match(
-        projectionCall,
-        /player:\s*\{\s*freeVmoney:\s*playerData\.freeVmoney,\s*degreeId:\s*playerData\.degreeId,?\s*\}/,
-    )
-    assert.doesNotMatch(projectionCall, /player:\s*playerData\b/)
+    assert.match(projectionCall, /player:\s*\{[\s\S]*?finishResult\.playerSnapshot\.freeVmoney/)
+    assert.match(projectionCall, /degreeId:\s*finishResult\.playerSnapshot\.degreeId/)
+    assert.doesNotMatch(projectionCall, /\bplayerData\b/)
     for (const directProjection of [
         "responseData",
         "mergeMissionSettlementResponse",

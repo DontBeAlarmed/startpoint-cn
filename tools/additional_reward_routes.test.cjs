@@ -36,7 +36,7 @@ test("single finish grants and publishes additional rewards atomically", () => {
     assert.ok(settlement > writesStart, "single additional rewards must settle in writes")
     assert.match(
         orchestrator,
-        /runSingleFinishSettlementTransaction\(\{[\s\S]*?settle:\s*\(\{ activeQuest, player \}\) => executeSingleSettlementWrites\(/,
+        /runSingleFinishSettlementTransaction\(\{[\s\S]*?settle:\s*\(\{ activeQuest, player, questProgress \}\) => \{[\s\S]*?executeSingleSettlementWrites\(/,
     )
     assert.match(writes, /settleAdditionalRewardsSync\([\s\S]*?isMulti: false,/)
     assert.match(

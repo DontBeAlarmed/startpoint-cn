@@ -55,15 +55,16 @@ function assertHelperRejected({
             category: storedQuest.category,
             continueCount: storedQuest.continueCount,
         },
-        player: {
-            boostPoint: 10,
-            bossBoostPoint: 3,
-            ...playerOverrides,
-        },
         settle: () => { settleCalls++ },
         dependencies: {
             transaction: operation => operation(),
             getStoredActiveQuest: () => storedQuest,
+            getPlayer: () => ({
+                boostPoint: 10,
+                bossBoostPoint: 3,
+                ...playerOverrides,
+            }),
+            getQuestProgress: () => null,
         },
     }), error => (
         error instanceof SingleFinishSettlementValidationError
@@ -561,7 +562,7 @@ test("single finish route validates before identity and party access", () => {
     const finishSource = source.slice(finishStart, finishEnd)
     const validationCall = finishSource.indexOf("validateSingleFinishRequest(request.body)")
     const validatedBody = finishSource.indexOf("const body = validationResult.body")
-    const identityGate = finishSource.indexOf("validateSessionAndPlayer")
+    const identityGate = finishSource.indexOf("validateSessionIdentity")
     const orchestratorCall = finishSource.indexOf("settleSingleBattleQuest({")
 
     assert.ok(validationCall >= 0, "finish must call the pure request validator")
