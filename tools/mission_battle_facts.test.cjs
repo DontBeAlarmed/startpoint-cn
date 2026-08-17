@@ -180,16 +180,16 @@ function finishRouteSource(source) {
     return source.slice(start, end)
 }
 
-const singleRouteSource = finishRouteSource(fs.readFileSync(
-    path.join(__dirname, "../src/routes/api/singleBattleQuest.ts"),
-    "utf8",
-))
 const singleBattleSource = fs.readFileSync(
     path.join(__dirname, "../src/lib/quest/finish/single-settlement-writes.ts"),
     "utf8",
 )
 const singleOrchestratorSource = fs.readFileSync(
     path.join(__dirname, "../src/lib/quest/finish/single-orchestrator.ts"),
+    "utf8",
+)
+const singleProjectorSource = fs.readFileSync(
+    path.join(__dirname, "../src/lib/quest/finish/single-response-projector.ts"),
     "utf8",
 )
 const singleTransactionStart = singleBattleSource.indexOf("export function executeSingleSettlementWrites(")
@@ -213,10 +213,10 @@ const singleAwakeSettlement = singleBattleSource.indexOf(
     "settleAwakeBattleMissions({",
     singleSettlementTime,
 )
-const singleGeneralMerge = singleRouteSource.indexOf(
+const singleGeneralMerge = singleProjectorSource.indexOf(
     "mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)",
 )
-const singleAwakeMerge = singleRouteSource.indexOf(
+const singleAwakeMerge = singleProjectorSource.indexOf(
     "mergeMissionSettlementResponse(responseData, awakeMissionSettlement, viewerId)",
     singleGeneralMerge,
 )

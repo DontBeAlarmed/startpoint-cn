@@ -339,11 +339,25 @@ test("maps single finish settlement implementation and regression precisely", ()
         ],
     )
     assert.deepEqual(
+        selectTestGroups(["src/lib/quest/finish/single-response-projector.ts"]),
+        [
+            "integration:compiled",
+            "integration:mission",
+            "integration:quest",
+            "quick:content",
+            "quick:quest",
+        ],
+    )
+    assert.deepEqual(
         selectTestGroups(["tools/single_battle_finish_validation.test.cjs"]),
         ["integration:quest"],
     )
     assert.deepEqual(
         selectTestGroups(["tools/single_finish_orchestrator_architecture.test.cjs"]),
+        ["integration:quest"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/single_finish_response_projector.test.cjs"]),
         ["integration:quest"],
     )
     assert.deepEqual(
@@ -845,7 +859,7 @@ test("keeps runtime wiring contracts in full instead of generator", () => {
     const contracts = [
         {
             data: "tools/score_attack_event_data.test.cjs",
-            markers: ["src/routes/api/singleBattleQuest.ts", "scoreAttackEventData"],
+            markers: ["src/lib/quest/finish/single-response-projector.ts", "scoreAttackEventData"],
             runtime: "tools/score_attack_event.test.cjs",
         },
         {
@@ -1055,6 +1069,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/quest_host_finish.test.cjs",
         "tools/single_battle_finish_validation.test.cjs",
         "tools/single_finish_orchestrator_architecture.test.cjs",
+        "tools/single_finish_response_projector.test.cjs",
         "tools/single_finish_request_validation.test.cjs",
         "tools/story_quest_finish.test.cjs",
         "tools/tutorial_update_step.test.cjs",

@@ -12,6 +12,8 @@ import { dispatchModeQuestStart } from "../../modes/registry"
 import { createModeHost } from "../../modes/loader"
 import { validateSessionAndPlayer } from "../../lib/quest/finish/session-validator"
 import { settleSingleBattleQuest } from "../../lib/quest/finish/single-orchestrator"
+import { buildSingleFinishResponse } from "../../lib/quest/finish/single-response-projector"
+import type { SingleFinishResponseHeaders } from "../../lib/quest/finish/single-response-projector"
 import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json"
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 import {
@@ -144,105 +146,28 @@ const routes = async (fastify: FastifyInstance) => {
         if (!finishResult.ok) {
             return reply.status(finishResult.statusCode).send(finishResult.payload)
         }
-        const {
-            afterStamina,
-            afterStaminaHealTime,
-            dailyChallengePointList,
-            scoreRewardsResult,
-            additionalRewardSettlement,
-            rewardCharacterExpResult,
-            rushEventData,
-            rushEventRewardsResult,
-            raidEventData,
-            carnivalEventData,
-            carnivalRewardResult,
-            scoreAttackFinishResult,
-            scoreAttackRewardResult,
-            itemList,
-            characterList,
-            clearReward,
-            sPlusClearReward,
-            missionSettlement,
-            awakeMissionSettlement,
-            activeMissionList,
-            fixedManaReward,
-            fixedPoolExpReward,
-            newMana,
-            beforeRankPoint,
-            newRankPoint,
-            newBoostPoint,
-            newBossBoostPoint,
-            clearRank,
-            questProgress,
-        } = finishResult
-        const scoreAttackEventData = scoreAttackFinishResult?.scoreAttackEvent ?? null
-
-        const dataHeaders = generateDataHeaders({ viewer_id: viewerId })
-        reply.header("content-type", "application/x-msgpack")
-        const responseData: Record<string, any> = {
-                "user_info": {
-                    "free_mana": newMana + (clearReward?.user_info.free_mana || 0) + (sPlusClearReward?.user_info.free_mana || 0) + scoreRewardsResult.user_info.free_mana + (scoreAttackRewardResult?.user_info.free_mana ?? 0) + (carnivalRewardResult?.user_info.free_mana ?? 0),
-                    "exp_pool": rewardCharacterExpResult.exp_pool + (clearReward?.user_info.exp_pool || 0) + scoreRewardsResult.user_info.exp_pool + (scoreAttackRewardResult?.user_info.exp_pool ?? 0) + (carnivalRewardResult?.user_info.exp_pool ?? 0),
-                    "exp_pooled_time": getServerTime(playerData.expPooledTime),
-                    "free_vmoney": playerData.freeVmoney + (clearReward?.user_info.free_vmoney || 0) + (sPlusClearReward?.user_info.free_vmoney || 0) + scoreRewardsResult.user_info.free_vmoney + (scoreAttackRewardResult?.user_info.free_vmoney ?? 0) + (carnivalRewardResult?.user_info.free_vmoney ?? 0),
-                    "rank_point": newRankPoint,
-                    "degree_id": playerData.degreeId,
-                    "stamina": afterStamina,
-                    "stamina_heal_time": realToVirtual(afterStaminaHealTime),
-                    "boost_point": newBoostPoint,
-                    "boss_boost_point": newBossBoostPoint
-                },
-                "add_exp_list": rewardCharacterExpResult.add_exp_list,
-                "character_list": characterList,
-                "bond_token_status_list": rewardCharacterExpResult.bond_token_status_list,
-                "rewards": {
-                    "overflow_pool_exp": 0,
-                    "converted_pool_exp": 0,
-                    "reward_pool_exp": fixedPoolExpReward,
-                    "reward_mana": fixedManaReward,
-                    "field_mana": body.add_mana
-                },
-                "old_high_score": scoreAttackFinishResult?.oldHighScore ?? (questProgress === null ? 0 : questProgress.highScore || 0),
-                "joined_character_id_list": [
-                    ...(clearReward?.joined_character_id_list || []),
-                    ...(sPlusClearReward?.joined_character_id_list || []),
-                    ...scoreRewardsResult.joined_character_id_list,
-                    ...(scoreAttackRewardResult?.joined_character_id_list ?? []),
-                ],
-                "before_rank_point": beforeRankPoint,
-                "clear_rank": clearRank ?? 5,
-                "drop_score_reward_ids": scoreRewardsResult.drop_score_reward_ids,
-                "drop_rare_reward_ids": scoreRewardsResult.drop_rare_reward_ids,
-                "drop_additional_reward_ids": additionalRewardSettlement.dropAdditionalRewardIds,
-                "drop_periodic_reward_ids": [],
-                "equipment_list": [
-                    ...scoreRewardsResult.equipment_list,
-                    ...(clearReward?.equipment_list || []),
-                    ...(sPlusClearReward?.equipment_list || []),
-                    ...(rushEventRewardsResult?.equipment_list || []),
-                    ...(scoreAttackRewardResult?.equipment_list ?? []),
-                    ...(carnivalRewardResult?.equipment_list ?? []),
-                ],
-                "category_id": body.category,
-                "start_time": dataHeaders['servertime'],
-                "is_multi": "single",
-                "quest_name": "",
-                "item_list": itemList,
-                "raid_event": raidEventData,
-                "rush_event": rushEventData,
-                "carnival_event": carnivalEventData,
-                "score_attack_event": scoreAttackEventData,
-                "user_daily_challenge_point_list": dailyChallengePointList ?? [],
-                "presigned_quest_category": []
+        const generatedDataHeaders: Record<string, unknown> = generateDataHeaders({ viewer_id: viewerId })
+        const serverTime = generatedDataHeaders.servertime
+        if (typeof serverTime !== "number") {
+            throw new Error("Single finish response headers are missing servertime.")
         }
-        responseData.active_mission_list = activeMissionList
-        mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)
-        mergeMissionSettlementResponse(responseData, awakeMissionSettlement, viewerId)
-        responseData.mail_arrived = getPlayerMailCountSync(playerId, true) > 0
-        return reply.status(200).send({
-            "data_headers": dataHeaders,
-            "data": responseData,
+        const dataHeaders: SingleFinishResponseHeaders = {
+            ...generatedDataHeaders,
+            servertime: serverTime,
+        }
+        const response = buildSingleFinishResponse({
+            result: finishResult,
+            dataHeaders,
+            player: {
+                freeVmoney: playerData.freeVmoney,
+                degreeId: playerData.degreeId,
+            },
+            expPooledTime: getServerTime(playerData.expPooledTime),
+            staminaHealTime: realToVirtual(finishResult.afterStaminaHealTime),
+            mailArrived: getPlayerMailCountSync(playerId, true) > 0,
         })
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send(response)
 
     })
 

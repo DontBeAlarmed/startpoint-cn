@@ -142,6 +142,16 @@ const SOURCE_RULES = [
         ],
     },
     {
+        pattern: /^src\/lib\/quest\/finish\/single-response-projector\.ts$/,
+        groups: [
+            "integration:compiled",
+            "integration:mission",
+            "integration:quest",
+            "quick:content",
+            "quick:quest",
+        ],
+    },
+    {
         pattern: /^src\/lib\/quest\/single-finish-validation\.ts$/,
         groups: ["integration:quest"],
     },

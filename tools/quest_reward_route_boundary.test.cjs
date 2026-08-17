@@ -12,7 +12,7 @@ const multiBattleSource = fs.readFileSync(
     "utf8",
 )
 const singleBattleSource = fs.readFileSync(
-    path.join(__dirname, "../src/routes/api/singleBattleQuest.ts"),
+    path.join(__dirname, "../src/lib/quest/finish/single-response-projector.ts"),
     "utf8",
 )
 assert.match(multiBattleSource, /settleActivityPeriodicRewardsSync/)

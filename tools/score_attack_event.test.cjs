@@ -253,7 +253,7 @@ assert.equal(calculateClearRank(999, {
 }), 2)
 
 const finishSource = fs.readFileSync(
-    path.join(projectRoot, "src/routes/api/singleBattleQuest.ts"),
+    path.join(projectRoot, "src/lib/quest/finish/single-response-projector.ts"),
     "utf8",
 )
 const finishWritesSource = fs.readFileSync(

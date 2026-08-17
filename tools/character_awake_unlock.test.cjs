@@ -189,7 +189,9 @@ function getLastCallPosition(source, calleeName) {
 }
 
 function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
-    const singleBattleRouteSource = readRouteSource("singleBattleQuest.ts")
+    const singleBattleProjectorSource = readProjectSource(
+        "src/lib/quest/finish/single-response-projector.ts",
+    )
     const singleBattleSource = readProjectSource("src/lib/quest/finish/single-settlement-writes.ts")
     const storySource = readRouteSource("storyQuest.ts")
     const bondSource = readRouteSource("character/bond.ts")
@@ -230,7 +232,7 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     ]) {
         assert.equal(singleBattleMergeBlock.includes(existingSegment), true)
     }
-    assert.equal(singleBattleRouteSource.includes('"character_list": characterList'), true)
+    assert.equal(singleBattleProjectorSource.includes('"character_list": characterList'), true)
 
     const storyCall = storySource.lastIndexOf("reconcileAwakeUnlockCharacterList(")
     assert.equal(countOccurrences(storySource, "reconcileAwakeUnlockCharacterList("), 1)

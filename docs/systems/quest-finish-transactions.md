@@ -5,11 +5,16 @@
 
 ## 单人分类覆盖
 
-`src/routes/api/singleBattleQuest.ts` 只完成请求校验、session 适配和响应投影。它把已校验请求、玩家存档与
+`src/routes/api/singleBattleQuest.ts` 只完成请求校验、session 适配、协调器调用和 HTTP 发送。它把已校验请求、玩家存档与
 内存 active quest 交给 `src/lib/quest/finish/single-orchestrator.ts`；协调器读取关卡与奖励配置、准备只读结算上下文，
 再通过 `runSingleFinishSettlementTransaction()` 进入一个外层事务。事务回调调用
 `src/lib/quest/finish/single-settlement-writes.ts` 执行全部持久写入。该总事务适用于
 `getQuestFromCategorySync()` 支持的所有通用战斗分类，不依赖分类是否另有专用响应字段。
+
+事务提交成功后，路由预先计算响应头、服务器时间换算与邮件状态，再交给
+`src/lib/quest/finish/single-response-projector.ts` 构造成功响应。projector 是纯投影层：不读取数据库、运行时内容或当前时间，
+也不访问 Fastify；它只消费协调器成功结果和路由提供的只读快照，并按既有顺序合并通用任务与角色觉醒任务响应。
+失败响应、HTTP header、状态码和发送仍由路由负责。
 
 通用事务包括：
 

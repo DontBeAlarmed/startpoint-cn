@@ -27,9 +27,9 @@ function assertSettlementInsideFinishTransaction(
 }
 
 test("single finish grants and publishes additional rewards atomically", () => {
-    const route = readSource("src/routes/api/singleBattleQuest.ts")
     const orchestrator = readSource("src/lib/quest/finish/single-orchestrator.ts")
     const writes = readSource("src/lib/quest/finish/single-settlement-writes.ts")
+    const projector = readSource("src/lib/quest/finish/single-response-projector.ts")
     const writesStart = writes.indexOf("export function executeSingleSettlementWrites(")
     const settlement = writes.indexOf("settleAdditionalRewardsSync(", writesStart)
     assert.ok(writesStart >= 0, "single finish must define focused settlement writes")
@@ -44,7 +44,7 @@ test("single finish grants and publishes additional rewards atomically", () => {
         /\.\.\.\(additionalRewardSettlement\.rewardResult\?\.items \?\? \{\}\),/,
     )
     assert.match(
-        route,
+        projector,
         /"drop_additional_reward_ids": additionalRewardSettlement\.dropAdditionalRewardIds/,
     )
 })
