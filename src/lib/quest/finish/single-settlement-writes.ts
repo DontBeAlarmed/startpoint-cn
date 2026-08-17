@@ -14,7 +14,6 @@ import { getDb } from "../../../data/db"
 import type { Player, PlayerQuestProgress } from "../../../data/types"
 import { getRushEventFolderClearRewards } from "../../assets"
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../character"
-import { givePlayerScoreRewardsSync } from "../../quest"
 import { getCommonScoreRewardCount } from "../../score-reward-lottery"
 import { calculateCharacterBattleExp, calculateFixedQuestMana, calculateFixedQuestPoolExp, getRewardCampaignRates } from "../../reward-campaign"
 import { QuestCategory, type BattleQuest, type Reward } from "../../types"
@@ -44,13 +43,13 @@ import { handleRaidEventFinish } from "./raid-handler"
 import { handleScoreAttackEventFinish, type ScoreAttackBorderTier } from "./score-attack-handler"
 import { handleDailyChallengePoint } from "./challenge-point"
 import type { FinishContext } from "./types"
+import { selectScoreRewardGrantPlan } from "../score-reward-selection"
 import {
-    advanceSingleSettlementRewardPlayerState,
+    grantSingleSettlementScoreRewardsWithinTransactionSync,
     grantSingleSettlementRewardsWithinTransactionSync,
     type SingleSettlementRewardSourceKind,
     withSingleSettlementExpPool,
 } from "./single-settlement-reward-grant"
-
 const settlementModeHost = createModeTransactionHost(message => console.log(message))
 
 export interface SingleSettlementWritesInput {
@@ -171,17 +170,17 @@ export function executeSingleSettlementWrites(
         updatePoint: (pid, id, point) => updatePlayerDailyChallengePointSync(pid, id, point),
     })
     console.log(`[BATTLE] scoreReward groupId=${questData.scoreRewardGroupId} groupLen=${questData.scoreRewardGroup?.length ?? "null"} questId=${questId} category=${questCategory}`)
-    const scoreRewardsResult = givePlayerScoreRewardsSync(
-        playerId, questData.scoreRewardGroupId, questData.scoreRewardGroup,
-        useBoostPoint, questData.element, {
+    const scoreRewardSelection = selectScoreRewardGrantPlan(
+        questData.scoreRewardGroupId, questData.scoreRewardGroup, useBoostPoint, questData.element, {
             commonRewardCount: getCommonScoreRewardCount(questData, clearRank) ?? undefined,
-            rewardCampaignRates,
-            rewardDate: settlementTime,
+            rewardCampaignRates, rewardDate: settlementTime,
         },
     )
-    rewardPlayerState = advanceSingleSettlementRewardPlayerState(
-        rewardPlayerState, scoreRewardsResult.user_info,
+    const scoreRewardGrant = grantSingleSettlementScoreRewardsWithinTransactionSync(
+        playerId, scoreRewardSelection, rewardPlayerState,
     )
+    rewardPlayerState = scoreRewardGrant.grant.playerAfter
+    const scoreRewardsResult = scoreRewardGrant.result
     const additionalRewardSettlement = questAccomplished
         ? settleAdditionalRewardsSync(
             getRuntimeContentTableSync(
@@ -316,7 +315,8 @@ export function executeSingleSettlementWrites(
     if (!isScoreAttackEvent) deletePlayerActiveQuestSync(playerId)
 
     return {
-        afterStamina, afterStaminaHealTime, dailyChallengePointList, scoreRewardsResult,
+        afterStamina, afterStaminaHealTime, dailyChallengePointList,
+        scoreRewardSelection, scoreRewardsResult,
         additionalRewardSettlement, rewardCharacterExpResult, rushEventData, rushEventRewardsResult,
         raidEventData, carnivalEventData, carnivalRewardResult, scoreAttackFinishResult,
         scoreAttackRewardResult, itemList, characterList, clearReward, sPlusClearReward,

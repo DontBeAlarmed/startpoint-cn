@@ -1,15 +1,19 @@
 import { getDb } from "../../data/db"
-import { getPlayerCharacterSync } from "../../data/domains/character"
 import { getPlayerItemSync, givePlayerItemSync } from "../../data/domains/item"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { givePlayerCharacterSync } from "../character"
 import { givePlayerEquipmentSync } from "../equipment"
 import { PlayerRewardResult, RewardType } from "../types/rewards"
 import { createRewardGrantPlan } from "./plan"
-import { snapshotKnownRewardGrantPlayer } from "./known-player"
+import {
+    createRewardGrantEntryResult,
+    projectPublicRewardGrantResult,
+    type InternalRewardGrantEntryResult,
+    type InternalRewardGrantResult,
+    type RewardGrantEntryExecution,
+} from "./entry-result"
 import {
     RewardGrantEntry,
-    RewardGrantEntryResult,
     RewardGrantPlan,
     RewardGrantPlayerAfter,
     RewardGrantResult,
@@ -47,7 +51,7 @@ export class RewardGrantExecutionError extends Error {
     }
 }
 
-function normalizeRewardGrantPlan<TSource>(
+export function normalizeRewardGrantPlanInternal<TSource>(
     plan: RewardGrantPlan<TSource>,
 ): RewardGrantPlan<TSource> {
     const entries = typeof plan === "object" && plan !== null
@@ -106,21 +110,20 @@ function grantEntrySync(
     reward: RewardGrantReward,
     entryIndex: number,
     grantCurrency: typeof grantCurrencySync = grantCurrencySync,
-): PlayerRewardResult {
+): RewardGrantEntryExecution {
     const result = emptyPlayerRewardResult()
     switch (reward.type) {
         case RewardType.ITEM:
         case RewardType.ELEMENT:
         case RewardType.AETHER:
             result.items[reward.id] = givePlayerItemSync(playerId, reward.id, reward.count)
-            return result
+            return { result }
         case RewardType.EQUIPMENT:
             result.equipment_list.push(
                 givePlayerEquipmentSync(playerId, reward.id, reward.count),
             )
-            return result
+            return { result }
         case RewardType.CHARACTER: {
-            const alreadyOwned = getPlayerCharacterSync(playerId, reward.id) !== null
             const granted = givePlayerCharacterSync(playerId, reward.id)
             if (granted === null) {
                 throw new RewardGrantExecutionError(
@@ -130,7 +133,7 @@ function grantEntrySync(
                 )
             }
             result.character_list.push(granted.character)
-            if (!alreadyOwned) result.joined_character_id_list.push(reward.id)
+            if (granted.isNew) result.joined_character_id_list.push(reward.id)
             if (granted.item !== undefined) {
                 const finalCount = getPlayerItemSync(playerId, granted.item.id)
                 if (finalCount === null) {
@@ -141,13 +144,19 @@ function grantEntrySync(
                     )
                 }
                 result.items[granted.item.id] = finalCount
+                return {
+                    result,
+                    itemDeltas: {
+                        [String(granted.item.id)]: granted.item.count,
+                    },
+                }
             }
-            return result
+            return { result }
         }
         case RewardType.BEADS:
         case RewardType.MANA:
         case RewardType.EXP:
-            return grantCurrency(playerId, reward)
+            return { result: grantCurrency(playerId, reward) }
     }
 }
 
@@ -182,7 +191,7 @@ function grantCurrencyFromKnownPlayerSync(
 }
 
 function aggregateEntryResults<TSource>(
-    entries: readonly RewardGrantEntryResult<TSource>[],
+    entries: readonly InternalRewardGrantEntryResult<TSource>[],
 ): PlayerRewardResult {
     const aggregate = emptyPlayerRewardResult()
     const characters = new Map<number, Object>()
@@ -220,14 +229,13 @@ function aggregateEntryResults<TSource>(
 function executeNormalizedRewardGrantPlanSync<TSource>(
     playerId: number,
     plan: RewardGrantPlan<TSource>,
-): RewardGrantResult<TSource> {
+): InternalRewardGrantResult<TSource> {
     if (getPlayerSync(playerId) === null) throw new RewardGrantPlayerNotFoundError(playerId)
 
-    const entries = plan.entries.map((entry, entryIndex): RewardGrantEntryResult<TSource> => ({
-        source: entry.source,
-        reward: entry.reward,
-        result: grantEntrySync(playerId, entry.reward, entryIndex),
-    }))
+    const entries = plan.entries.map((entry, entryIndex) => createRewardGrantEntryResult(
+        entry,
+        grantEntrySync(playerId, entry.reward, entryIndex),
+    ))
     const playerAfter = getExistingPlayer(playerId)
     return {
         aggregate: aggregateEntryResults(entries),
@@ -240,18 +248,17 @@ function executeNormalizedRewardGrantPlanSync<TSource>(
     }
 }
 
-function executeNormalizedRewardGrantPlanAsTransactionOwnerSync<TSource>(
+export function executeNormalizedRewardGrantPlanAsTransactionOwnerInternalSync<TSource>(
     playerId: number,
     plan: RewardGrantPlan<TSource>,
     knownPlayerBefore: RewardGrantPlayerAfter,
-): RewardGrantResult<TSource> {
+): InternalRewardGrantResult<TSource> {
     const playerAfter = { ...knownPlayerBefore }
-    const entries = plan.entries.map((entry, entryIndex): RewardGrantEntryResult<TSource> => ({
-        source: entry.source,
-        reward: entry.reward,
-        result: grantEntrySync(playerId, entry.reward, entryIndex, (pid, reward) =>
+    const entries = plan.entries.map((entry, entryIndex) => createRewardGrantEntryResult(
+        entry,
+        grantEntrySync(playerId, entry.reward, entryIndex, (pid, reward) =>
             grantCurrencyFromKnownPlayerSync(pid, reward, playerAfter)),
-    }))
+    ))
     return { aggregate: aggregateEntryResults(entries), entries, playerAfter }
 }
 
@@ -261,36 +268,18 @@ export function executeRewardGrantPlanWithinTransactionSync<TSource>(
 ): RewardGrantResult<TSource> {
     const db = getDb()
     if (!db.inTransaction) throw new RewardGrantTransactionRequiredError()
-    const normalizedPlan = normalizeRewardGrantPlan(plan)
-    return db.transaction(() =>
-        executeNormalizedRewardGrantPlanSync(playerId, normalizedPlan))()
+    const normalizedPlan = normalizeRewardGrantPlanInternal(plan)
+    return db.transaction(() => projectPublicRewardGrantResult(
+        executeNormalizedRewardGrantPlanSync(playerId, normalizedPlan),
+    ))()
 }
 
 export function executeRewardGrantPlanSync<TSource>(
     playerId: number,
     plan: RewardGrantPlan<TSource>,
 ): RewardGrantResult<TSource> {
-    const normalizedPlan = normalizeRewardGrantPlan(plan)
-    return getDb().transaction(() =>
-        executeNormalizedRewardGrantPlanSync(playerId, normalizedPlan))()
-}
-
-/**
- * Only for an outer transaction owner that lets every execution error propagate.
- * This entry has no plan savepoint and cannot provide rollback after a caller catch.
- */
-export function executeRewardGrantPlanInTransactionOwnerSync<TSource>(
-    playerId: number,
-    plan: RewardGrantPlan<TSource>,
-    knownPlayerBefore: RewardGrantPlayerAfter,
-): RewardGrantResult<TSource> {
-    const db = getDb()
-    if (!db.inTransaction) throw new RewardGrantTransactionRequiredError()
-    const knownPlayerSnapshot = snapshotKnownRewardGrantPlayer(knownPlayerBefore)
-    const normalizedPlan = normalizeRewardGrantPlan(plan)
-    return executeNormalizedRewardGrantPlanAsTransactionOwnerSync(
-        playerId,
-        normalizedPlan,
-        knownPlayerSnapshot,
-    )
+    const normalizedPlan = normalizeRewardGrantPlanInternal(plan)
+    return getDb().transaction(() => projectPublicRewardGrantResult(
+        executeNormalizedRewardGrantPlanSync(playerId, normalizedPlan),
+    ))()
 }

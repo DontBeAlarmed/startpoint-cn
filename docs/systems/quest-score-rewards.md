@@ -18,9 +18,17 @@
 1. `score_reward` type 1 行的 `rarity` 是该稀有组的独立出现概率，使用严格的 `roll < probability`。
 2. 出现后，`rare_score_reward` 每行的 `rarity` 是组内条件概率。按概率降序、相同概率按原始 index 升序计算累计概率，再以严格 `<` 选择一项。
 
+组内每项条件概率必须不大于 1，累计概率也不能超过 1；合法的累计概率小于 1 时保留现有缺口语义，落入缺口的随机值继续 fail closed。
+
 组内不是均匀随机。服务端保留 `rare_score_reward` 的原始 index，并将它写入 `drop_rare_reward_ids`；不再把排序后位置误当作协议 index。随机数使用 32 位单位区间，不再把概率压缩为百分之一精度。
 
 Rare 的 ELEMENT/AETHER 行中 `id` 表示素材稀有度，不是背包物品 ID；发奖前会结合关卡属性转换为实际素材 ID，与普通掉落保持一致。
+
+## 选择与写入边界
+
+`src/lib/quest/score-reward-selection-core.ts` 是无玩家写入、无运行时读取的纯选择核心。它显式接收服务器掉落倍率、奖励日期、campaign、随机源以及 Rare group、活动货币和关卡属性素材解析器，按上述顺序完成普通与 Rare 抽取并输出不可变 `RewardGrantPlan`。`src/lib/quest/score-reward-selection.ts` 是轻量运行时适配层，负责读取内容表、服务器设置和服务器时间后调用核心，不能称为纯函数。每条 source 使用 `score_common` 或 `score_rare` 区分类别，并保留真实 group ID、客户端 OrderedMap index 和最终数量；`drop_score_reward_ids` 与 `drop_rare_reward_ids` 只从这些 source 投影，不另行推导。
+
+单人 finish 在最外层事务内执行该 Plan，并直接采用 `RewardGrantResult.playerAfter` 维护后续奖励的货币状态。Score 专用 projection 按 entry 顺序保留普通物品的最终库存，同时对 CHARACTER 补偿使用内部 `itemDeltas`，复现旧 writer 的 `item_list` 语义；该 metadata 不进入协议。`givePlayerScoreRewardsSync()` 仍是协力等旧调用方的兼容 API：它复用同一选择结果，但继续按原顺序调用原有写入原语，不把协力迁移到 transaction-owner API。兼容路径在写入成功后记录一次 `quest-score-rewards` 采样摘要；单人路径只在最外层事务提交后记录一次，后续写入失败并回滚时不记录。选择核心、运行时适配层和响应投影都不记录日志。
 
 ## 仍独立处理的机制
 

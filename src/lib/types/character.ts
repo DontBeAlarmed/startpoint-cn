@@ -56,6 +56,7 @@ export interface RewardPlayerCharacterExpResult {
 
 
 export interface GivePlayerCharacterResult {
+    isNew: boolean,
     character: Object,
     item?: {
         id: number,

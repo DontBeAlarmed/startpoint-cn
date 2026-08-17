@@ -1,45 +1,19 @@
 import { getPlayerCharacterSync } from "../data/domains/character"
 import { getPlayerSync, updatePlayerSync } from "../data/domains/player"
 import { givePlayerItemSync } from "../data/domains/item"
-import { getRareScoreRewardGroup } from "./assets";
 import { givePlayerCharacterSync } from "./character";
 import { givePlayerEquipmentSync } from "./equipment";
-import { CharacterReward, CommonScoreReward, CurrencyReward, CurrencyScoreReward, DropScoreRewardId, EquipmentItemReward, GivePlayerScoreRewardsResult, ItemScoreReward, PlayerRewardResult, Reward, RewardType, ScoreReward, ScoreRewardType } from "./types";
+import { CharacterReward, CurrencyReward, EquipmentItemReward, GivePlayerScoreRewardsResult, PlayerRewardResult, Reward, RewardType, ScoreReward } from "./types";
 import { Player } from "../data/types";
-import bundledRewardElementMap from "../../assets/reward_element_map.json";
-import { resolveEventCurrencyId } from "./event-currency";
-import { getDateFromServerTime, getServerTime } from "../utils";
-import { getServerGameplaySettingsSync } from "../data/domains/server-settings";
-import { selectCommonScoreRewards, selectRareScoreRewards, UnitRandom } from "./score-reward-lottery";
 import {
-    calculateScoreRewardAmount,
-    type RewardCampaignRates,
-} from "./reward-campaign";
-import { getRuntimeContentTableSync } from "../content/runtime/table-access";
-import { sampledLog } from "./sampled-log";
-import { formatQuestScoreRewardsSummary } from "./hot-path-log-formatters";
-
-const ELEMENT_TO_ENEMY_MAP: Record<number, number> = {
-    0: 3, 1: 0, 2: 1, 3: 2, 4: 5, 5: 4,
-};
-
-function resolveElementItemId(rarity: number, questElement?: number): number {
-    const enemyElement = ELEMENT_TO_ENEMY_MAP[questElement ?? 0] ?? 3;
-    const map = getRuntimeContentTableSync(
-        "reward_element_map.json",
-        bundledRewardElementMap as Record<string, Record<string, Record<string, string[][]>>>,
-    );
-    return Number(map["1"][String(rarity)][String(enemyElement)][0][0]);
-}
-
-function resolveAetherItemId(rarity: number, questElement?: number): number {
-    const enemyElement = ELEMENT_TO_ENEMY_MAP[questElement ?? 0] ?? 3;
-    const map = getRuntimeContentTableSync(
-        "reward_element_map.json",
-        bundledRewardElementMap as Record<string, Record<string, Record<string, string[][]>>>,
-    );
-    return Number(map["2"][String(rarity)][String(enemyElement)][0][0]);
-}
+    selectScoreRewardGrantPlan,
+    type ScoreRewardSelectionOptions,
+    type ScoreRewardSource,
+} from "./quest/score-reward-selection"
+import {
+    projectScoreRewardSettlementResult,
+    recordScoreRewardSettlement,
+} from "./quest/score-reward-settlement"
 
 /**
  * Grants a player score rewards.
@@ -55,17 +29,15 @@ export function givePlayerScoreRewardsSync(
     scoreRewards?: ScoreReward[],
     boostPointUsed: boolean = false,
     questElement?: number,
-    lottery?: {
-        commonRewardCount?: number,
-        random?: UnitRandom,
-        rewardCampaignRates?: RewardCampaignRates,
-        rewardDate?: Date,
-    },
+    lottery?: ScoreRewardSelectionOptions,
 ): GivePlayerScoreRewardsResult {
-
-    const dropScoreRewardIds: DropScoreRewardId[] = []
-    const dropRareRewardIds: DropScoreRewardId[] = []
-
+    const selection = selectScoreRewardGrantPlan(
+        groupId,
+        scoreRewards,
+        boostPointUsed,
+        questElement,
+        lottery,
+    )
     let mana = 0
     let vmoney = 0
     let expPool = 0
@@ -73,144 +45,64 @@ export function givePlayerScoreRewardsSync(
     let characterList: Object[] = []
     let equipmentList: Object[] = []
     let items: Record<string, number> = {}
+    const settledEntries: Array<{
+        readonly source: ScoreRewardSource
+        readonly reward: typeof selection.plan.entries[number]["reward"]
+    }> = []
 
-    if (scoreRewards != null && groupId != null) {
-        const dropMultiplier = getServerGameplaySettingsSync().dropMultiplier
-        const campaignRates = lottery?.rewardCampaignRates ?? { item: 1, exp: 1, mana: 1 }
-        const rewardDate = lottery?.rewardDate ?? getDateFromServerTime(getServerTime())
-        const commonRewards = lottery?.commonRewardCount === undefined
-            ? scoreRewards.filter((reward): reward is CommonScoreReward => reward.type === ScoreRewardType.ITEM)
-            : selectCommonScoreRewards(scoreRewards, lottery.commonRewardCount, lottery.random)
-        for (const reward of commonRewards) {
-            const rewardIndex = reward.position ?? scoreRewards.indexOf(reward) + 1
-            let rewardAmount = 0
-
-            switch (reward.reward_type) {
-                case RewardType.ITEM: {
-                    const itemReward = reward as ItemScoreReward
-                    const itemId = resolveEventCurrencyId(itemReward.id, rewardDate)
-                    rewardAmount = calculateScoreRewardAmount(
-                        itemReward.count, reward.reward_type, campaignRates,
-                        boostPointUsed, dropMultiplier,
+    for (const entry of selection.plan.entries) {
+        const reward = entry.reward
+        if (entry.source.kind === "score_common") {
+            switch (reward.type) {
+                case RewardType.ITEM:
+                case RewardType.ELEMENT:
+                case RewardType.AETHER:
+                    items[String(reward.id)] = givePlayerItemSync(
+                        playerId,
+                        reward.id,
+                        reward.count,
                     )
-                    items[String(itemId)] = givePlayerItemSync(playerId, itemId, rewardAmount)
                     break
-                }
                 case RewardType.MANA: {
                     const player = getPlayerSync(playerId)
-                    const currencyReward = reward as CurrencyScoreReward
-                    rewardAmount = calculateScoreRewardAmount(
-                        currencyReward.count, reward.reward_type, campaignRates,
-                        boostPointUsed, dropMultiplier,
-                    )
-                    mana += rewardAmount
+                    mana += reward.count
                     updatePlayerSync({
                         id: playerId,
-                        freeMana: (player?.freeMana || 0) + rewardAmount,
-                        totalManaObtained: (player?.totalManaObtained || 0) + rewardAmount
+                        freeMana: (player?.freeMana || 0) + reward.count,
+                        totalManaObtained: (player?.totalManaObtained || 0) + reward.count,
                     })
                     break
                 }
                 case RewardType.EXP: {
                     const player = getPlayerSync(playerId)
-                    const currencyReward = reward as CurrencyScoreReward
-                    rewardAmount = calculateScoreRewardAmount(
-                        currencyReward.count, reward.reward_type, campaignRates,
-                        boostPointUsed, dropMultiplier,
-                    )
-                    expPool += rewardAmount
+                    expPool += reward.count
                     updatePlayerSync({
                         id: playerId,
-                        expPool: (player?.expPool || 0) + rewardAmount
+                        expPool: (player?.expPool || 0) + reward.count,
                     })
                     break
                 }
-                case RewardType.ELEMENT: {
-                    const itemReward = reward as ItemScoreReward
-                    const itemId = resolveElementItemId(itemReward.id, questElement)
-                    rewardAmount = calculateScoreRewardAmount(
-                        itemReward.count, reward.reward_type, campaignRates,
-                        boostPointUsed, dropMultiplier,
-                    )
-                    items[String(itemId)] = givePlayerItemSync(playerId, itemId, rewardAmount)
-                    break
-                }
-                case RewardType.AETHER: {
-                    const itemReward = reward as ItemScoreReward
-                    const itemId = resolveAetherItemId(itemReward.id, questElement)
-                    rewardAmount = calculateScoreRewardAmount(
-                        itemReward.count, reward.reward_type, campaignRates,
-                        boostPointUsed, dropMultiplier,
-                    )
-                    items[String(itemId)] = givePlayerItemSync(playerId, itemId, rewardAmount)
-                    break
-                }
+                default:
+                    throw new RangeError(`unsupported common score reward type ${reward.type}`)
             }
-
-            dropScoreRewardIds.push({
-                group_id: groupId,
-                index: rewardIndex,
-                number: rewardAmount
-            })
+            settledEntries.push(entry)
+            continue
         }
 
-        const rareRewards = selectRareScoreRewards(
-            scoreRewards,
-            getRareScoreRewardGroup,
-            lottery?.random,
-        )
-        for (const selected of rareRewards) {
-            const reward = selected.reward
-            const hasCount = "count" in reward && typeof reward.count === "number"
-            const rewardAmount = hasCount
-                ? calculateScoreRewardAmount(
-                    reward.count as number,
-                    reward.type,
-                    campaignRates,
-                    boostPointUsed,
-                    dropMultiplier,
-                )
-                : 1
-            const adjustedReward = hasCount
-                ? { ...reward, count: rewardAmount }
-                : reward
-            const adjustedItemReward = adjustedReward as EquipmentItemReward
-            const contextualReward = adjustedReward.type === RewardType.ELEMENT
-                ? { ...adjustedReward, id: resolveElementItemId(adjustedItemReward.id, questElement) }
-                : adjustedReward.type === RewardType.AETHER
-                    ? { ...adjustedReward, id: resolveAetherItemId(adjustedItemReward.id, questElement) }
-                    : adjustedReward
-            const result = givePlayerRewardSync(playerId, contextualReward)
-            if (!result) continue
-
-            mana += result.user_info.free_mana
-            vmoney += result.user_info.free_vmoney
-            joinedCharacterIdList = [...joinedCharacterIdList, ...result.joined_character_id_list]
-            characterList = [...characterList, ...result.character_list]
-            equipmentList = [...equipmentList, ...result.equipment_list]
-            for (const [itemId, count] of Object.entries(result.items)) {
-                items[itemId] = count
-            }
-
-            dropRareRewardIds.push({
-                group_id: selected.groupId,
-                index: selected.index,
-                number: rewardAmount,
-            })
+        const result = givePlayerRewardSync(playerId, reward)
+        if (!result) continue
+        settledEntries.push(entry)
+        mana += result.user_info.free_mana
+        vmoney += result.user_info.free_vmoney
+        joinedCharacterIdList = [...joinedCharacterIdList, ...result.joined_character_id_list]
+        characterList = [...characterList, ...result.character_list]
+        equipmentList = [...equipmentList, ...result.equipment_list]
+        for (const [itemId, count] of Object.entries(result.items)) {
+            items[itemId] = count
         }
-
-        sampledLog("quest-score-rewards", () => formatQuestScoreRewardsSummary({
-            playerId,
-            groupId,
-            commonDrops: dropScoreRewardIds,
-            rareDrops: dropRareRewardIds,
-            inventoryTotals: items,
-        }))
     }
 
-    return {
-        drop_score_reward_ids: dropScoreRewardIds,
-        drop_rare_reward_ids: dropRareRewardIds,
+    const result = projectScoreRewardSettlementResult(selection, {
         user_info: {
             free_mana: mana,
             free_vmoney: vmoney,
@@ -219,8 +111,10 @@ export function givePlayerScoreRewardsSync(
         character_list: characterList,
         joined_character_id_list: joinedCharacterIdList,
         equipment_list: equipmentList,
-        items: items
-    }
+        items,
+    }, settledEntries)
+    recordScoreRewardSettlement(playerId, selection, result)
+    return result
 }
 
 /**

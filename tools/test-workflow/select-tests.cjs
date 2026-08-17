@@ -164,6 +164,10 @@ const SOURCE_RULES = [
         groups: ["integration:reward-grant"],
     },
     {
+        pattern: /^(?:src\/lib\/quest\/score-reward-(?:selection(?:-core)?|normalization|projection|settlement)\.ts|docs\/systems\/quest-score-rewards\.md)$/,
+        groups: ["integration:reward-grant", "integration:rules", "quick:quest"],
+    },
+    {
         pattern: /^docs\/systems\/save-validation\.md$/,
         groups: ["integration:database"],
     },

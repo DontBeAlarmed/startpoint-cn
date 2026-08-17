@@ -11,9 +11,11 @@
 `src/lib/quest/finish/single-settlement-writes.ts` 执行全部持久写入。该总事务适用于
 `getQuestFromCategorySync()` 支持的所有通用战斗分类，不依赖分类是否另有专用响应字段。
 
-clear、S+、additional、rush 和 score-attack 的直接标准奖励由该最外层事务的拥有者通过
-executor 模块内部的 `executeRewardGrantPlanInTransactionOwnerSync()` 发放；该入口不从 reward-grant 公共 barrel 导出。入口在首写前把调用方维护的 `freeMana`、`freeVmoney` 和 `expPool` 各读取一次，校验为非负安全整数并复制为精确三字段快照，再规范化 Plan。它不查询玩家前后态，也不增加计划 savepoint；奖励异常不得在结算回调内捕获，必须继续向外传播并回滚整个 finish。需要允许调用方捕获错误并继续提交时，仍应使用带计划 savepoint 的
+clear、S+、普通与 Rare Score、additional、rush 和 score-attack 的标准奖励由该最外层事务的拥有者通过
+executor 模块内部的 `executeRewardGrantPlanInTransactionOwnerSync()` 发放；该入口不从 reward-grant 公共 barrel 导出。只有 Score 单人适配器 direct import 名为 `Internal` 的详细 owner 入口，用于读取 CHARACTER 补偿增量；该 metadata 不进入公共 `RewardGrantResult`、HTTP/TCP 响应或其他结算模块。入口在首写前把调用方维护的 `freeMana`、`freeVmoney` 和 `expPool` 各读取一次，校验为非负安全整数并复制为精确三字段快照，再规范化 Plan。它不查询玩家前后态，也不增加计划 savepoint；奖励异常不得在结算回调内捕获，必须继续向外传播并回滚整个 finish。需要允许调用方捕获错误并继续提交时，仍应使用带计划 savepoint 的
 `executeRewardGrantPlanWithinTransactionSync()`。
+
+Score 的抽取、倍率和 ELEMENT/AETHER 上下文 ID 在进入 owner 前由纯选择核心一次完成；运行时 wrapper 只负责读取内容、服务器设置和服务器时间并注入核心。Plan source 以 `score_common`、`score_rare` 保留 group、客户端 index 和最终数量，响应 drop IDs 与执行结果共同使用这些 source。执行后协调器直接采用 owner 返回的 `playerAfter`，不再从响应 `user_info` 重复推导货币后态。采样日志只在最外层事务提交成功后记录一次，任一后续写入失败并回滚时不记录。
 
 事务提交成功后，路由预先计算响应头、服务器时间换算与邮件状态，再交给
 `src/lib/quest/finish/single-response-projector.ts` 构造成功响应。projector 是纯投影层：不读取数据库、运行时内容或当前时间，

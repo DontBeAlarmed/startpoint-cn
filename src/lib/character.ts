@@ -143,6 +143,7 @@ export function givePlayerCharacterSync(
         
         const serializedDate = clientSerializeDate(joinTime)
         return {
+            isNew: true,
             character: {
                 "viewer_id": 0,
                 "character_id": characterId,
@@ -181,6 +182,7 @@ export function givePlayerCharacterSync(
         })
 
         return {
+            isNew: false,
             character: {
                 "character_id": characterId,
                 "stack": newStack,

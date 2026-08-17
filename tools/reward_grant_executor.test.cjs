@@ -22,6 +22,7 @@ const { getPlayerCharacterSync } = require("../src/data/domains/character")
 const { getPlayerEquipmentSync } = require("../src/data/domains/equipment")
 const { getPlayerItemSync, givePlayerItemSync } = require("../src/data/domains/item")
 const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
+const { givePlayerCharacterSync } = require("../src/lib/character")
 const {
     createRewardGrantPlan,
     executeRewardGrantPlanSync,
@@ -32,9 +33,12 @@ const {
     RewardGrantTransactionRequiredError,
 } = require("../src/lib/reward-grant")
 const {
-    executeRewardGrantPlanInTransactionOwnerSync,
     RewardGrantKnownPlayerValidationError,
 } = require("../src/lib/reward-grant/executor")
+const {
+    executeRewardGrantPlanInTransactionOwnerInternalSync,
+    executeRewardGrantPlanInTransactionOwnerSync,
+} = require("../src/lib/reward-grant/owner-executor")
 const { RewardType } = require("../src/lib/types/rewards")
 
 const ITEM_ID = 910001
@@ -181,6 +185,37 @@ test("transaction-owner execution uses known currency state without player reads
         expPool: before.expPool + 6,
         totalManaObtained: before.totalManaObtained + 4,
     })
+})
+
+test("character grants report ownership transition and RewardGrant reuses it without a pre-read", () => {
+    const directPlayerId = createPlayer("character-ownership-fact")
+    const first = givePlayerCharacterSync(directPlayerId, CHARACTER_ID)
+    const second = givePlayerCharacterSync(directPlayerId, CHARACTER_ID)
+
+    assert.equal(first.isNew, true)
+    assert.equal(second.isNew, false)
+    assert.equal(Object.hasOwn(first.character, "isNew"), false)
+    assert.equal(Object.hasOwn(second.character, "isNew"), false)
+
+    const playerId = createPlayer("owner-character-no-pre-read")
+    const before = playerState(playerId)
+    let measured
+    database.transaction(() => {
+        measured = captureSql(() => executeRewardGrantPlanInTransactionOwnerSync(
+            playerId,
+            createRewardGrantPlan([{
+                source: "character",
+                reward: { type: RewardType.CHARACTER, id: CHARACTER_ID },
+            }]),
+            before,
+        ))
+    })()
+
+    const characterReads = measured.statements.filter(sql => (
+        /^\s*SELECT/i.test(sql) && /\bFROM\s+players_characters\b/i.test(sql)
+    ))
+    assert.equal(characterReads.length, 1)
+    assert.deepEqual(measured.result.entries[0].result.joined_character_id_list, [CHARACTER_ID])
 })
 
 test("transaction-owner execution snapshots known player fields once without leaking extras", () => {
@@ -423,6 +458,7 @@ test("executes mixed rewards in order and returns compatible per-entry and aggre
         executeRewardGrantPlanWithinTransactionSync(playerId, plan))()
 
     assert.deepEqual(result.entries.map(entry => entry.source), sources)
+    assert.equal(Object.hasOwn(result.entries[0], "itemDeltas"), false)
     assert.equal(result.entries[0].result.items[ITEM_ID], 2)
     assert.equal(result.entries[1].result.items[ITEM_ID], 5)
     assert.deepEqual(result.entries[5].result.joined_character_id_list, [CHARACTER_ID])
@@ -464,10 +500,47 @@ test("duplicate character compensation reports final item inventory post-state",
 
     assert.equal(result.entries[0].result.items[DUPLICATE_CHARACTER_ITEM_ID], 1)
     assert.equal(result.entries[1].result.items[DUPLICATE_CHARACTER_ITEM_ID], 2)
+    assert.equal(Object.hasOwn(result.entries[0], "itemDeltas"), false)
+    assert.equal(Object.hasOwn(result.entries[1], "itemDeltas"), false)
     assert.equal(result.aggregate.items[DUPLICATE_CHARACTER_ITEM_ID], 2)
     assert.equal(result.aggregate.character_list.length, 1)
     assert.deepEqual(result.aggregate.joined_character_id_list, [])
     assert.equal(getPlayerItemSync(playerId, DUPLICATE_CHARACTER_ITEM_ID), 2)
+})
+
+test("internal owner result retains compensation delta outside the public barrel", () => {
+    const playerId = createPlayer("internal-character-detail")
+    const before = playerState(playerId)
+    const result = database.transaction(() => executeRewardGrantPlanInTransactionOwnerInternalSync(
+        playerId,
+        createRewardGrantPlan([{
+            source: "character",
+            reward: { type: RewardType.CHARACTER, id: DUPLICATE_CHARACTER_ID },
+        }]),
+        before,
+    ))()
+
+    assert.deepEqual(result.entries[0].itemDeltas, { [DUPLICATE_CHARACTER_ITEM_ID]: 1 })
+    assert.equal(
+        require("../src/lib/reward-grant").executeRewardGrantPlanInTransactionOwnerInternalSync,
+        undefined,
+    )
+})
+
+test("public transaction-owner result strips Score-only compensation metadata", () => {
+    const playerId = createPlayer("public-owner-character-detail")
+    const before = playerState(playerId)
+    const result = database.transaction(() => executeRewardGrantPlanInTransactionOwnerSync(
+        playerId,
+        createRewardGrantPlan([{
+            source: "character",
+            reward: { type: RewardType.CHARACTER, id: DUPLICATE_CHARACTER_ID },
+        }]),
+        before,
+    ))()
+
+    assert.equal(Object.hasOwn(result.entries[0], "itemDeltas"), false)
+    assert.equal(result.entries[0].result.items[DUPLICATE_CHARACTER_ITEM_ID], 1)
 })
 
 test("standalone execution owns one transaction and commits its result", () => {

@@ -9,10 +9,10 @@ import {
 
 export type UnitRandom = () => number
 
-export interface SelectedRareScoreReward {
+export interface SelectedRareScoreReward<TRareReward extends RareScoreReward = RareScoreReward> {
     readonly groupId: number
     readonly index: number
-    readonly reward: RareScoreReward
+    readonly reward: TRareReward
 }
 
 export interface CommonScoreRewardCountSource {
@@ -109,15 +109,15 @@ export function selectCommonScoreRewards(
     return selected
 }
 
-export function selectRareScoreRewards(
+export function selectRareScoreRewards<TRareReward extends RareScoreReward>(
     scoreRewards: readonly ScoreReward[],
-    getGroup: (groupId: number) => readonly RareScoreReward[] | null,
+    getGroup: (groupId: number) => readonly TRareReward[] | null,
     random: UnitRandom = cryptoUnitRandom,
-): SelectedRareScoreReward[] {
+): SelectedRareScoreReward<TRareReward>[] {
     const pools = scoreRewards
         .filter((reward): reward is RareScoreRewardGroup => reward.type === ScoreRewardType.RARE_POOL)
         .sort((left, right) => right.rarity - left.rarity || left.id - right.id)
-    const selected: SelectedRareScoreReward[] = []
+    const selected: SelectedRareScoreReward<TRareReward>[] = []
 
     for (const pool of pools) {
         const dropProbability = positiveWeight(pool.rarity, "rare score reward drop probability")

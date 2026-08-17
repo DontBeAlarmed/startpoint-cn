@@ -18,7 +18,7 @@ const expectedAccess = Object.freeze({
         "pass_card_event.json": "bundledPassCardEvents",
         "pass_card_reward.json": "bundledPassCardRewards",
     }),
-    "src/lib/quest.ts": Object.freeze({
+    "src/lib/quest/score-reward-selection.ts": Object.freeze({
         "reward_element_map.json": "bundledRewardElementMap",
     }),
     "src/multi/player-context.ts": Object.freeze({

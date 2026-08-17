@@ -26,6 +26,7 @@ import {
     executeSingleSettlementWrites,
     type SingleSettlementWritesResult,
 } from "./single-settlement-writes"
+import { recordScoreRewardSettlement } from "../score-reward-settlement"
 
 export interface SingleFinishFailure {
     ok: false
@@ -187,6 +188,11 @@ export function settleSingleBattleQuest({
         throw error
     }
 
+    recordScoreRewardSettlement(
+        playerId,
+        settlement.scoreRewardSelection,
+        settlement.scoreRewardsResult,
+    )
     delete activeQuests[playerId]
     return { ok: true, body, clearRank, questProgress, ...settlement }
 }

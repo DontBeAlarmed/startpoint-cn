@@ -149,6 +149,17 @@ const scoreQuest = {
     characterExpReward: 15,
     manaReward: 15,
     poolExpReward: 15,
+    scoreRewardGroupId: 990099,
+    scoreRewardGroup: [{
+        position: 1,
+        name: "",
+        type: 0,
+        reward_type: 6,
+        id: 4,
+        count: 1,
+        field5: 1,
+    }],
+    commonRewardCount: 1,
 }
 const activeQuests = {
     17: {
@@ -487,6 +498,25 @@ function transactionalState() {
 }
 
 async function main() {
+    let scoreRecordCalls = 0
+    const scoreSelection = require("../src/lib/quest/score-reward-selection")
+    const selectScoreRewardGrantPlan = scoreSelection.selectScoreRewardGrantPlan
+    stubModule("../src/lib/quest/score-reward-selection", {
+        ...scoreSelection,
+        selectScoreRewardGrantPlan(...args) {
+            scoreRewardOptions = args[4]
+            return selectScoreRewardGrantPlan(...args)
+        },
+    })
+    const scoreSettlement = require("../src/lib/quest/score-reward-settlement")
+    const recordScoreRewardSettlement = scoreSettlement.recordScoreRewardSettlement
+    stubModule("../src/lib/quest/score-reward-settlement", {
+        ...scoreSettlement,
+        recordScoreRewardSettlement(...args) {
+            scoreRecordCalls++
+            return recordScoreRewardSettlement(...args)
+        },
+    })
     const routes = require("../src/routes/api/singleBattleQuest").default
     const fastify = Fastify()
     fastify.addHook("onSend", (_request, reply, payload, done) => {
@@ -523,6 +553,7 @@ async function main() {
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM players_active_quests").get().count, 1)
     assert.ok(activeQuests[17])
     assert.ok(writeAttempts > 0, failed.body)
+    assert.equal(scoreRecordCalls, 0)
 
     db.exec("DROP TRIGGER fail_score_attack_active_delete")
     writeAttempts = 0
@@ -537,6 +568,7 @@ async function main() {
     assert.equal(db.prepare("SELECT clear_count FROM mission_state WHERE player_id = 17").get().clear_count, 1)
     assert.equal(db.prepare("SELECT count FROM item_state WHERE player_id = 17 AND item_id = 40501").get().count, 8)
     assert.equal(db.prepare("SELECT count FROM item_state WHERE player_id = 17 AND item_id = 40502").get().count, 12)
+    assert.equal(db.prepare("SELECT count FROM item_state WHERE player_id = 17 AND item_id = 16").get().count, 6)
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM quest_progress").get().count, 1)
     assert.deepEqual(db.prepare("SELECT * FROM score_history").all(), [{
         player_id: 17,
@@ -565,6 +597,7 @@ async function main() {
     assert.equal(rewardCampaignCalls[0].questId, 1101)
     assert.equal(scoreRewardOptions.rewardDate, rewardCampaignCalls[0].now)
     assert.deepEqual(scoreRewardOptions.rewardCampaignRates, { item: 2, exp: 2, mana: 2 })
+    assert.equal(scoreRecordCalls, 1)
 
     activeQuests[17] = {
         questId: 1101,
@@ -602,6 +635,7 @@ async function main() {
     )
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM players_active_quests").get().count, 1)
     assert.ok(activeQuests[17])
+    assert.equal(scoreRecordCalls, 1)
 
     activeQuests[17] = {
         questId: 1101,

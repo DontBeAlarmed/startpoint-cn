@@ -10,6 +10,7 @@ const productionFiles = [
     "src/lib/reward-grant/types.ts",
     "src/lib/reward-grant/plan.ts",
     "src/lib/reward-grant/executor.ts",
+    "src/lib/reward-grant/owner-executor.ts",
     "src/lib/reward-grant/known-player.ts",
     "src/lib/reward-grant/index.ts",
 ]
@@ -60,7 +61,7 @@ test("within-transaction execution normalizes before one plan savepoint", () => 
     )
 
     assert.match(withinTransaction, /(?:getDb\(\)|db)\.inTransaction/)
-    assert.match(withinTransaction, /normalizeRewardGrantPlan\s*\(/)
+    assert.match(withinTransaction, /normalizeRewardGrantPlanInternal\s*\(/)
     assert.equal((withinTransaction.match(/\.transaction\s*\(/g) ?? []).length, 1)
     assert.match(withinTransaction, /executeNormalizedRewardGrantPlanSync\s*\(/)
     assert.ok(
@@ -78,11 +79,11 @@ test("standalone execution normalizes before one transaction without calling wit
     const standalone = exportedFunctionSource(
         executor,
         "executeRewardGrantPlanSync",
-        "export function executeRewardGrantPlanInTransactionOwnerSync",
+        null,
     )
 
     assert.equal((standalone.match(/\.transaction\s*\(/g) ?? []).length, 1)
-    assert.match(standalone, /normalizeRewardGrantPlan\s*\(/)
+    assert.match(standalone, /normalizeRewardGrantPlanInternal\s*\(/)
     assert.match(standalone, /executeNormalizedRewardGrantPlanSync\s*\(/)
     assert.doesNotMatch(standalone, /executeRewardGrantPlanWithinTransactionSync\s*\(/)
     assert.ok(
@@ -92,22 +93,29 @@ test("standalone execution normalizes before one transaction without calling wit
 })
 
 test("transaction-owner execution is strongly named and adds no savepoint or player reads", () => {
-    const executor = readSource("src/lib/reward-grant/executor.ts")
-    const owner = exportedFunctionSource(
+    const executor = readSource("src/lib/reward-grant/owner-executor.ts")
+    const internalOwner = exportedFunctionSource(
+        executor,
+        "executeRewardGrantPlanInTransactionOwnerInternalSync",
+        "export function executeRewardGrantPlanInTransactionOwnerSync",
+    )
+    const publicOwner = exportedFunctionSource(
         executor,
         "executeRewardGrantPlanInTransactionOwnerSync",
         null,
     )
 
-    assert.match(owner, /(?:getDb\(\)|db)\.inTransaction/)
-    assert.match(owner, /normalizeRewardGrantPlan\s*\(/)
-    assert.match(owner, /knownPlayerBefore/)
-    assert.doesNotMatch(owner, /\.transaction\s*\(/)
-    assert.doesNotMatch(owner, /getPlayerSync\s*\(/)
+    assert.match(internalOwner, /(?:getDb\(\)|db)\.inTransaction/)
+    assert.match(internalOwner, /normalizeRewardGrantPlanInternal\s*\(/)
+    assert.match(internalOwner, /knownPlayerBefore/)
+    assert.doesNotMatch(internalOwner, /\.transaction\s*\(/)
+    assert.doesNotMatch(internalOwner, /getPlayerSync\s*\(/)
     assert.ok(
-        owner.indexOf("inTransaction") < owner.indexOf("normalizeRewardGrantPlan"),
+        internalOwner.indexOf("inTransaction") < internalOwner.indexOf("normalizeRewardGrantPlan"),
         "transaction state must be checked before normalization",
     )
+    assert.match(publicOwner, /projectPublicRewardGrantResult\s*\(/)
+    assert.match(publicOwner, /executeRewardGrantPlanInTransactionOwnerInternalSync\s*\(/)
 })
 
 test("safe within and standalone executors share a private body that checks the player first", () => {
@@ -129,14 +137,19 @@ test("safe within and standalone executors share a private body that checks the 
 
 test("public barrel excludes the internal transaction-owner entry", () => {
     const index = readSource("src/lib/reward-grant/index.ts")
+    const types = readSource("src/lib/reward-grant/types.ts")
+    const owner = readSource("src/lib/reward-grant/owner-executor.ts")
 
     assert.doesNotMatch(index, /export \* from ["']\.\/executor["']/)
     assert.doesNotMatch(index, /executeRewardGrantPlanInTransactionOwnerSync/)
+    assert.doesNotMatch(index, /executeRewardGrantPlanInTransactionOwnerInternalSync/)
+    assert.doesNotMatch(types, /itemDeltas/)
+    assert.match(owner, /executeRewardGrantPlanInTransactionOwnerInternalSync/)
     assert.match(index, /executeRewardGrantPlanWithinTransactionSync/)
     assert.match(index, /executeRewardGrantPlanSync/)
 })
 
-test("only the approved single settlement path is migrated to reward grants", () => {
+test("only score planning and the approved single settlement path consume reward grants", () => {
     const consumers = sourceFilesBelow("src")
         .filter(relativePath => !relativePath.startsWith("src/lib/reward-grant/"))
         .filter(relativePath => /reward-grant/.test(readSource(relativePath)))
@@ -144,5 +157,10 @@ test("only the approved single settlement path is migrated to reward grants", ()
     assert.deepEqual(consumers, [
         "src/lib/quest/finish/single-settlement-reward-grant.ts",
         "src/lib/quest/finish/single-settlement-writes.ts",
+        "src/lib/quest/score-reward-normalization.ts",
+        "src/lib/quest/score-reward-projection.ts",
+        "src/lib/quest/score-reward-selection-core.ts",
+        "src/lib/quest/score-reward-selection.ts",
+        "src/lib/quest/score-reward-settlement.ts",
     ])
 })
