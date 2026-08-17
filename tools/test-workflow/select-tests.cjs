@@ -229,7 +229,7 @@ const SOURCE_RULES = [
     },
     {
         pattern: /^src\/lib\/(?:gacha|gacha-reward-(?:grant|legacy))\.ts$/,
-        groups: ["integration:reward-grant", "quick:gacha"],
+        groups: ["integration:reward-grant", "integration:rules", "quick:gacha"],
     },
     {
         pattern: /^src\/lib\/(?:gacha-draw|gacha-equipment-movie|gacha-exec-plan|gacha-rules|gacha-seed-catalog|gacha-ticket)\.ts$/,
