@@ -200,6 +200,7 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     const itemSource = readRouteSource("item.ts")
     const shopSource = readRouteSource("shop.ts")
     const shopPurchaseSource = readProjectSource("src/lib/event-shop-purchase.ts")
+    const shopRewardGrantSource = readProjectSource("src/lib/shop-reward-grant.ts")
     const routeSources = [
         singleBattleSource,
         storySource,
@@ -321,7 +322,17 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
             > shopPurchaseSource.indexOf("dependencies.grantRewards("),
         true
     )
-    assert.equal(shopBuyBlock.includes("grantRewards: givePlayerRewardsSync"), true)
+    assert.deepEqual(
+        findPropertyAssignmentValues(shopBuyBlock, "grantRewards"),
+        ["grantShopRewardsInTransactionOwnerSync"]
+    )
+    assert.deepEqual(
+        getOnlyCall(
+            shopRewardGrantSource,
+            "executeRewardGrantPlanInTransactionOwnerSync"
+        ).arguments.slice(0, 3),
+        ["playerId", "createShopRewardPlan(rewards)", "knownPlayerBefore"]
+    )
     assert.equal(shopReadOnlyBlock.includes("reconcileAwakeUnlockCharacterList("), false)
     assert.equal(
         shopBulkBuyBlock.indexOf("reconcileAwakeUnlockCharacterList(")

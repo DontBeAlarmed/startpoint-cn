@@ -40,6 +40,11 @@
 
 `playerAfter` 同时返回执行后的 `freeMana`、`freeVmoney` 和 `expPool`，后续调用方不需要为这些字段再次查询玩家。
 
+RewardGrant 只负责调用方事务中的奖励计划与结果，不保存 HTTP 成功响应。当前 single finish 会在同一外层事务内形成最终
+Player/item 投影并删除数据库 active，提交后再删除内存 active；若后续 projector、序列化或网络发送失败，旧成功响应不能
+重放，重试会因 active 不存在而拒绝。当前明确不新增通用 receipt 表或全局 finish 幂等框架，这是已知边界，不是待本 Gate
+完成的迁移项。
+
 ## 抽卡逐抽 projection
 
 普通抽卡的 plan source 只携带 `{ drawIndex, kind, rewardId }`，不携带 gacha 或 movie 大对象。gacha projection 在 owner detailed entries 上重建客户端结果：角色 entry 的内部补偿 delta 只成为当前 draw 的 `ex_boost_item` 增量，entry result 的 item 后态成为对应 ID 的最终 `item_list`；角色对象按同 ID 的出现顺序合并，特殊 `rarity_5_guarantee` 路径保持独立。装备 entry 按抽次生成 `draw_equipment`，movie effect 的 rank/guarantee metadata 同样按抽次匹配，响应中的 equipment list 对重复 ID 保留最后状态。

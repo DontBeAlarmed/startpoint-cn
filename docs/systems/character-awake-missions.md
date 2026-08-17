@@ -111,11 +111,10 @@ ID，避免遍历其他角色任务。旧 unlock cleanup 只在基础资格可�
 
 - 拉芙(2630022) type_2 使用 `player.totalManaObtained`
 - DB 列 `total_mana_obtained`，所有玛纳发放点累加：
-  - 关卡结算：`singleBattleQuest.ts` + `multi/http/battle.ts`
-  - 掉落奖励：`lib/quest.ts`（`givePlayerRewardsSync` + `givePlayerScoreRewardsSync`）
-  - 邮件领取：`mail.ts`
-  - 活跃任务：`activeMission.ts`
-  - 觉醒任务自奖励：`src/routes/api/mission.ts`
+  - 单人固定结算与协力基础结算：`single-settlement-writes.ts` + `multi/http/battle.ts`
+  - 标准奖励计划：`reward-grant/owner-currency.ts`（单人奖励、生产抽卡、普通/bulk shop、邮件标准附件）
+  - 兼容或独立奖励路径：`lib/quest.ts`（协力、Raid summary 与 standalone gacha fallback）
+  - 普通、觉醒与 Active Mission：`mission/grants.ts`
   - 物品出售：`item-sell.ts`
 
 ### 特定关卡通关（2026-07-27）

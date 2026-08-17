@@ -60,10 +60,12 @@ abort 路由显式返回 `application/x-msgpack`，由 CN 服务的 `onSend` hoo
 
 ## finish 事务边界
 
-单人 finish 已把通用奖励、活动专用结算、进度、任务事实和数据库 active quest 删除纳入同一个外层 SQLite
-事务。任一持久写入失败时全部回滚，数据库与内存 active quest 都保留，客户端可以使用原请求重试；只有事务
-提交成功后才清除进程内 active quest。成功 finish 保留 start 阶段已经预扣的 `Always` 门票，不会重复扣除或
-返还。完整范围与回归约束见[战斗关卡结算事务](./quest-finish-transactions.md)。
+单人 finish 已把事务内读取的 Player/旧 progress、通用奖励、活动专用结算、进度、任务事实、最终 Player/item
+投影和数据库 active quest 删除纳入同一个外层 SQLite 事务。事务提交前失败时全部回滚，数据库与内存 active quest
+都保留，客户端可以使用原请求重试；只有事务提交成功后才清除进程内 active quest。成功 finish 保留 start 阶段
+已经预扣的 `Always` 门票，不会重复扣除或返还。数据库已提交且 active 已删除后的投影、序列化或网络发送失败不能
+重放旧成功响应，重试会因 active 不存在而拒绝；当前不新增通用 receipt 或全局 finish 幂等框架。完整范围与回归约束
+见[战斗关卡结算事务](./quest-finish-transactions.md)。
 
 ## Once 关卡
 

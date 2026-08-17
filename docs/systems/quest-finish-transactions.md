@@ -1,7 +1,7 @@
 # 战斗关卡结算事务
 
-本文记录 `single_battle_quest/finish` 与 `multi_battle_quest/finish` 的数据库事务边界。审计目标是避免客户端收到
-失败响应后重试，却因上一次请求已经写入部分奖励、进度或任务事实而形成重复领取或撕裂存档。
+本文记录 `single_battle_quest/finish` 与 `multi_battle_quest/finish` 的数据库事务边界。审计目标是避免事务提交前
+失败后重试，却因上一次请求已经写入部分奖励、进度或任务事实而形成重复领取或撕裂存档。
 
 ## 单人请求身份与事务权威
 
@@ -25,7 +25,8 @@ viewer ID 必须是正安全整数；0、负数、小数、非有限值和 unsaf
 奖励、Rank 和 Score 档位等静态内容；`runSingleFinishSettlementTransaction()` 在同一个 SQLite 事务内按 stored active、
 Player、该关卡旧 progress 的顺序读取可变权威状态。Player 缺失、请求/内存/stored active 身份不匹配、续关次数不匹配、
 Boost 标记或余额非法时，均在奖励与进度写入前 fail closed。旧 progress 读取完成后，协调器才据事务内 Player/progress 构造
-`rewardEligibility`、`questPreviouslyCompleted` 和 `FinishContext`，并调用写入层。这里不增加全局请求上下文或额外最终查询。
+`rewardEligibility`、`questPreviouslyCompleted` 和 `FinishContext`，并调用写入层。奖励写入、最终 Player 投影与最终
+`item_list` 也在该外层事务内按实际写入顺序权威形成；这里不增加全局请求上下文或额外最终查询。
 
 ## 单人分类覆盖
 
@@ -76,10 +77,15 @@ Carnival、mission 等来源继续按实际执行顺序推进。Carnival `new_de
 | `27 SCORE_ATTACK_EVENT` | 无限演武履历、最高分、档位奖励与 active quest 删除 |
 
 专用处理器内部若再次开启 SQLite transaction，`better-sqlite3` 会把它作为嵌套保存点；异常继续向外传播，最终
-由外层事务回滚全部通用和专用写入。协调器只在数据库提交成功后删除进程内 active quest 并记录 Score sampled log，
-因此失败请求可用原请求重试，数据库和内存 active 均保留。单人结算事务拥有者负责把 `playerId` 与事务开始后读取的玩家状态
-绑定，并在固定奖励、普通 Score、角色战斗经验和后续直接奖励之间维护 `freeMana`、`freeVmoney` 和 `expPool` 后态；因此首通
-clear/S+ 各省去一次玩家前态查询，不增加奖励写入或事务语句。owner 状态或奖励异常必须继续向外传播，不能在结算回调内捕获后提交。
+由外层事务回滚全部通用和专用写入。事务提交前的校验、投影形成或写入失败会整体回滚；数据库和内存 active 均保留，
+因此可用原请求重试。协调器只在数据库提交成功后删除进程内 active quest 并记录 Score sampled log。单人结算事务拥有者负责把
+`playerId` 与事务开始后读取的玩家状态绑定，并在固定奖励、普通 Score、角色战斗经验和后续直接奖励之间维护 `freeMana`、
+`freeVmoney` 和 `expPool` 后态；因此首通 clear/S+ 各省去一次玩家前态查询，不增加奖励写入或事务语句。owner 状态或奖励异常
+必须继续向外传播，不能在结算回调内捕获后提交。
+
+数据库已经提交且进程内 active 已删除后，headers、最终响应 projector、邮件状态查询、MsgPack 序列化或网络发送仍可能失败。
+这种提交后失败不会回滚已落库的成功结算；当前也不能重放旧成功响应，客户端重试会因 active 不存在而拒绝。当前边界明确不新增
+通用 receipt 表或全局 finish 幂等框架，这是已知限制，不是本 Gate 尚待实现的项目。
 
 ## 协力结算
 
