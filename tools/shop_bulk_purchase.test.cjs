@@ -105,7 +105,7 @@ function createHarness(itemBalance = 20) {
             getPurchaseCounts,
             addPurchaseCounts,
             recordManaSpent(_playerId, amount) { manaSpent += amount },
-            grantRewards(playerId, rewards) {
+            grantRewards(playerId, rewards, knownPlayerBefore) {
                 if (failGrant) throw new Error("injected reward failure")
                 const items = {}
                 for (const reward of rewards) {
@@ -114,12 +114,20 @@ function createHarness(itemBalance = 20) {
                     this.setItem(playerId, reward.id, total)
                     items[String(reward.id)] = total
                 }
-                return {
+                const rewardResult = {
                     user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
                     character_list: [],
                     joined_character_id_list: [],
                     equipment_list: [],
                     items,
+                }
+                return {
+                    rewardResult,
+                    playerAfter: {
+                        freeMana: knownPlayerBefore.freeMana,
+                        freeVmoney: knownPlayerBefore.freeVmoney,
+                        expPool: knownPlayerBefore.expPool,
+                    },
                 }
             },
         },

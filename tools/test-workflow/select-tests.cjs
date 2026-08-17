@@ -240,6 +240,10 @@ const SOURCE_RULES = [
         groups: ["integration:rules", "quick:quest"],
     },
     {
+        pattern: /^(?:src\/lib\/(?:event-shop-purchase|shop-reward-grant)\.ts|src\/routes\/api\/shop\.ts)$/,
+        groups: ["integration:reward-grant", "integration:rules"],
+    },
+    {
         pattern: /^src\/routes\/api\/gacha\.ts$/,
         groups: ["integration:reward-grant", "integration:rules", "quick:gacha"],
     },

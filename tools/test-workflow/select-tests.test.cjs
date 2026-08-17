@@ -80,6 +80,20 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["src/lib/quest.ts"]),
         ["integration:rules", "quick:quest"],
     )
+    for (const file of [
+        "src/lib/event-shop-purchase.ts",
+        "src/lib/shop-reward-grant.ts",
+    ]) {
+        assert.deepEqual(
+            selectTestGroups([file]),
+            ["integration:reward-grant", "integration:rules"],
+        )
+    }
+    assert.deepEqual(
+        selectTestGroups(["src/routes/api/shop.ts"]),
+        ["full", "integration:reward-grant", "integration:rules"],
+    )
+    assert.deepEqual(selectTestGroups(["src/routes/api/mail.ts"]), ["full"])
     assert.deepEqual(
         selectTestGroups(["src/data/domains/session.ts"]),
         ["full", "integration:database", "quick:workflow"],
@@ -415,6 +429,7 @@ test("maps the public reward grant layer and its regressions to one focused leaf
         "tools/score_reward_selection.test.cjs",
         "tools/single_settlement_reward_grant.test.cjs",
         "tools/task23c_reward_grants.test.cjs",
+        "tools/shop_reward_grant.test.cjs",
     ]
 
     assert.deepEqual(TEST_GROUPS[group], {
@@ -1237,6 +1252,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/quest_score_reward_settlement.test.cjs",
         "tools/reward_campaign.test.cjs",
         "tools/shop_bulk_purchase.test.cjs",
+        "tools/shop_reward_purchase_contract.test.cjs",
         "tools/mail_notification.test.cjs",
         "tools/mail_notification_write_routes.test.cjs",
     ])

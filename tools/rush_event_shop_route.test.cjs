@@ -116,6 +116,7 @@ function getUsedManaCount(playerId) {
 
 let globalNowSeconds = Date.parse("2023-12-01T00:00:00+08:00") / 1000
 let failRewardAfterWrite = false
+let shopRewardGrantCalls = 0
 
 stubModule("../src/data/db", { getDb: () => db })
 stubModule("../src/data/domains/shopPurchase", {
@@ -249,8 +250,9 @@ stubModule("../src/utils", {
     getServerTime: () => globalNowSeconds,
     realToVirtual: date => Math.floor(date.getTime() / 1000),
 })
-stubModule("../src/lib/quest", {
-    givePlayerRewardsSync(playerId, rewards) {
+stubModule("../src/lib/shop-reward-grant", {
+    grantShopRewardsInTransactionOwnerSync(playerId, rewards, knownPlayerBefore) {
+        shopRewardGrantCalls++
         const items = {}
         let mana = 0
         let expPool = 0
@@ -273,12 +275,20 @@ stubModule("../src/lib/quest", {
             }
         }
         if (failRewardAfterWrite) throw new Error("injected reward failure")
-        return {
+        const rewardResult = {
             user_info: { free_mana: mana, free_vmoney: 0, exp_pool: expPool },
             character_list: [],
             joined_character_id_list: [],
             equipment_list: [],
             items,
+        }
+        return {
+            rewardResult,
+            playerAfter: {
+                freeMana: knownPlayerBefore.freeMana + mana,
+                freeVmoney: knownPlayerBefore.freeVmoney,
+                expPool: knownPlayerBefore.expPool + expPool,
+            },
         }
     },
 })
@@ -594,6 +604,7 @@ async function main() {
 
         const enhancementItem = equipmentEnhancementShopAsset["2001"]
         enhancementItem.userCost = { type: 1, amount: 30 }
+        const grantsBeforeEnhancement = shopRewardGrantCalls
         try {
             const enhancementPurchase = await fastify.inject({
                 method: "POST",
@@ -605,6 +616,11 @@ async function main() {
                 getUsedManaCount(17),
                 31,
                 "追忆强化独立事务也必须累计实际消费的玛纳",
+            )
+            assert.equal(
+                shopRewardGrantCalls,
+                grantsBeforeEnhancement,
+                "追忆强化专用分支不得迁移到标准 RewardGrant adapter",
             )
         } finally {
             delete enhancementItem.userCost

@@ -169,7 +169,9 @@ test("only approved standard reward domains and single settlement paths consume 
         "src/lib/quest/score-reward-selection-core.ts",
         "src/lib/quest/score-reward-selection.ts",
         "src/lib/quest/score-reward-settlement.ts",
+        "src/lib/shop-reward-grant.ts",
         "src/routes/api/gacha.ts",
+        "src/routes/api/shop.ts",
         "src/routes/api/tutorial.ts",
     ])
 })

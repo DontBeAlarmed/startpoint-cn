@@ -249,7 +249,7 @@ function createPurchaseHarness(options = {}) {
             `).run(playerId, amount)
             maybeFail("counter")
         },
-        grantRewards(playerId, rewards) {
+        grantRewards(playerId, rewards, knownPlayerBefore) {
             const items = {}
             let mana = 0
             let expPool = 0
@@ -272,12 +272,20 @@ function createPurchaseHarness(options = {}) {
                 }
             }
             maybeFail("reward")
-            return {
+            const rewardResult = {
                 user_info: { free_mana: mana, free_vmoney: 0, exp_pool: expPool },
                 character_list: [],
                 joined_character_id_list: [],
                 equipment_list: [],
                 items,
+            }
+            return {
+                rewardResult,
+                playerAfter: {
+                    freeMana: knownPlayerBefore.freeMana + mana,
+                    freeVmoney: knownPlayerBefore.freeVmoney,
+                    expPool: knownPlayerBefore.expPool + expPool,
+                },
             }
         },
     }

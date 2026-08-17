@@ -21,7 +21,7 @@ import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getBossCoinShopItemsSync, getConfigSync, getEventShopItemsSync, getGenericShopItemsSync, getShopItemSync, getShopSelectItemCampaignsSync } from "../../lib/assets";
 import { ShopItem, ShopItems, ShopItemUserCostType, ShopType } from "../../lib/types";
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
-import { givePlayerRewardsSync } from "../../lib/quest";
+import { grantShopRewardsInTransactionOwnerSync } from "../../lib/shop-reward-grant";
 import { computeRealTimeStamina } from "../../lib/stamina";
 import { clientSerializeEquipment } from "../../lib/equipment";
 import { planEquipmentEnhancementPurchase } from "../../lib/equipment-enhancement";
@@ -294,7 +294,7 @@ const routes = async (fastify: FastifyInstance) => {
                         recordMissionOperationFactsSync(id, "treasure_mana", amount)
                     }
                 },
-                grantRewards: givePlayerRewardsSync,
+                grantRewards: grantShopRewardsInTransactionOwnerSync,
                 grantPassCardPoints: (id, amount) => {
                     const activeEvent = getActivePassCardEventDefinitionAt(new Date(getServerTime() * 1000))
                     if (!activeEvent) throw new ShopPurchaseError("No active pass card.")
@@ -594,7 +594,7 @@ const routes = async (fastify: FastifyInstance) => {
                 getPurchaseCounts: getPlayerShopPurchaseCountsByTypeSync,
                 addPurchaseCounts: addPlayerShopPurchaseCountsByTypeSync,
                 recordManaSpent: incrementActiveMissionUsedManaCountSync,
-                grantRewards: givePlayerRewardsSync,
+                grantRewards: grantShopRewardsInTransactionOwnerSync,
             })
         } catch (error) {
             if (error instanceof ShopPeriodError) {

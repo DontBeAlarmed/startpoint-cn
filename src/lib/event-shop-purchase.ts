@@ -54,8 +54,17 @@ export interface GenericShopPurchaseDependencies {
         keys: ShopPurchasePeriodKeys,
     ): ShopPurchaseCounts
     recordManaSpent(playerId: number, amount: number): void
-    grantRewards(playerId: number, rewards: Reward[]): PlayerRewardResult | null
+    grantRewards(
+        playerId: number,
+        rewards: Reward[],
+        knownPlayerBefore: GenericShopPlayerState,
+    ): GenericShopRewardGrantResult
     grantPassCardPoints?(playerId: number, amount: number): void
+}
+
+export interface GenericShopRewardGrantResult {
+    rewardResult: PlayerRewardResult
+    playerAfter: Pick<GenericShopPlayerState, "freeMana" | "freeVmoney" | "expPool">
 }
 
 export interface GenericShopPurchaseResult {
@@ -345,11 +354,12 @@ export function executeGenericShopPurchaseSync(
             dependencies.setItem(input.playerId, Number(itemId), nextAmount)
         }
 
-        const rewardResult = dependencies.grantRewards(
+        const rewardGrant = dependencies.grantRewards(
             input.playerId,
             buildRewards(input.shopItem, purchaseAmount),
+            nextPlayer,
         )
-        if (rewardResult === null) throw new ShopPurchaseError("Failed to grant shop rewards.")
+        const rewardResult = rewardGrant.rewardResult
         if (input.shopItem.passCardPoints !== undefined) {
             if (!dependencies.grantPassCardPoints) {
                 throw new ShopPurchaseError("Pass card point rewards are unavailable.")
@@ -373,8 +383,10 @@ export function executeGenericShopPurchaseSync(
                 userCost.amount * purchaseAmount,
             )
         }
-        const finalPlayer = dependencies.getPlayer(input.playerId)
-        if (finalPlayer === null) throw new ShopPurchaseError("Player disappeared during purchase.")
+        const finalPlayer = {
+            ...nextPlayer,
+            ...rewardGrant.playerAfter,
+        }
 
         return {
             player: finalPlayer,
@@ -469,8 +481,8 @@ export function executeGenericShopBatchPurchaseSync(
             dependencies.setItem(input.playerId, Number(itemId), nextAmount)
         }
 
-        const rewardResult = dependencies.grantRewards(input.playerId, rewards)
-        if (rewardResult === null) throw new ShopPurchaseError("Failed to grant shop rewards.")
+        const rewardGrant = dependencies.grantRewards(input.playerId, rewards, nextPlayer)
+        const rewardResult = rewardGrant.rewardResult
 
         const purchaseCounts: Record<string, number> = {}
         for (const entry of normalized) {
@@ -485,8 +497,10 @@ export function executeGenericShopBatchPurchaseSync(
         }
         if (manaSpent > 0) dependencies.recordManaSpent(input.playerId, manaSpent)
 
-        const finalPlayer = dependencies.getPlayer(input.playerId)
-        if (finalPlayer === null) throw new ShopPurchaseError("Player disappeared during purchase.")
+        const finalPlayer = {
+            ...nextPlayer,
+            ...rewardGrant.playerAfter,
+        }
         return {
             player: finalPlayer,
             rewardResult,
