@@ -119,7 +119,7 @@ const SOURCE_RULES = [
         groups: ["integration:quest", "quick:quest"],
     },
     {
-        pattern: /^src\/lib\/quest\/single-continue-lifecycle\.ts$/,
+        pattern: /^(?:src\/lib\/quest\/single-continue-lifecycle\.ts|tools\/helpers\/single-continue-fixture\.cjs)$/,
         groups: ["integration:quest", "integration:rules", "quick:quest"],
     },
     {
@@ -258,7 +258,13 @@ const SOURCE_RULES = [
     { pattern: /^src\/routes\/web_api\/seeds\.ts$/, groups: ["quick:seed"] },
     {
         pattern: /^src\/routes\/api\/singleBattleQuest\.ts$/,
-        groups: ["integration:compiled", "integration:mission", "integration:quest", "quick:quest"],
+        groups: [
+            "integration:compiled",
+            "integration:mission",
+            "integration:quest",
+            "integration:rules",
+            "quick:quest",
+        ],
     },
     {
         pattern: /^src\/routes\/api\/questUnlock\.ts$/,

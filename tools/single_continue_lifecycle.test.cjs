@@ -1,96 +1,16 @@
 "use strict"
 
-require("ts-node/register/transpile-only")
-
 const assert = require("node:assert/strict")
 const fs = require("node:fs")
 const path = require("node:path")
 const test = require("node:test")
 
-let lifecycle = {}
-try {
-    lifecycle = require("../src/lib/quest/single-continue-lifecycle")
-} catch {
-    // The first RED run intentionally reaches this branch before the service exists.
-}
-
-function createActiveQuest(overrides = {}) {
-    return {
-        playerId: 7,
-        playId: "single-continue-play",
-        questId: 1001001,
-        category: 1,
-        isMulti: false,
-        continueCount: 2,
-        ...overrides,
-    }
-}
-
-function createInput(memoryQuest = createActiveQuest(), overrides = {}) {
-    return {
-        playerId: 7,
-        memoryQuest,
-        playId: "single-continue-play",
-        questId: 1001001,
-        category: 1,
-        cost: 50,
-        ...overrides,
-    }
-}
-
-function createFixture({
-    player = { freeVmoney: 30, vmoney: 40 },
-    storedQuest = createActiveQuest(),
-    failCommit = false,
-} = {}) {
-    let databaseState = structuredClone({ player, storedQuest })
-    let transactionActive = false
-    let transactionCalls = 0
-    const writes = []
-
-    const dependencies = {
-        transaction(operation) {
-            const snapshot = structuredClone(databaseState)
-            transactionCalls++
-            transactionActive = true
-            try {
-                const result = operation()
-                if (failCommit) throw new Error("simulated continue commit failure")
-                return result
-            } catch (error) {
-                databaseState = snapshot
-                throw error
-            } finally {
-                transactionActive = false
-            }
-        },
-        getPlayer() {
-            assert.equal(transactionActive, true)
-            return databaseState.player
-        },
-        getStoredActiveQuest() {
-            assert.equal(transactionActive, true)
-            return databaseState.storedQuest
-        },
-        updatePlayerCurrency(_playerId, freeVmoney, vmoney) {
-            assert.equal(transactionActive, true)
-            writes.push("player")
-            databaseState.player = { freeVmoney, vmoney }
-        },
-        updateStoredContinueCount(_playerId, continueCount) {
-            assert.equal(transactionActive, true)
-            writes.push("activeQuest")
-            databaseState.storedQuest.continueCount = continueCount
-        },
-    }
-
-    return {
-        dependencies,
-        getState: () => structuredClone(databaseState),
-        getTransactionCalls: () => transactionCalls,
-        writes,
-    }
-}
+const {
+    createActiveQuest,
+    createFixture,
+    createInput,
+    lifecycle,
+} = require("./helpers/single-continue-fixture.cjs")
 
 test("spends free currency first and increments the stored continue count", () => {
     const memoryQuest = createActiveQuest()
@@ -271,8 +191,30 @@ test("rejects invalid currency balances without writes", async t => {
     }
 })
 
-test("rejects invalid stored continue counts and costs without writes", async t => {
+test("rejects invalid expected and stored continue counts and costs without writes", async t => {
     const invalidValues = [-1, 1.5, Infinity, NaN, Number.MAX_SAFE_INTEGER + 1]
+    for (const value of [...invalidValues, "2"]) {
+        await t.test(`expectedContinueCount=${String(value)}`, () => {
+            const memoryQuest = createActiveQuest()
+            const fixture = createFixture()
+            const before = fixture.getState()
+
+            const result = lifecycle.runSingleContinueLifecycleTransaction(
+                createInput(memoryQuest, { expectedContinueCount: value }),
+                fixture.dependencies,
+            )
+
+            assert.deepEqual(result, {
+                ok: false,
+                message: "Expected continue count is invalid.",
+            })
+            assert.deepEqual(fixture.getState(), before)
+            assert.equal(memoryQuest.continueCount, 2)
+            assert.equal(fixture.getTransactionCalls(), 0)
+            assert.deepEqual(fixture.writes, [])
+        })
+    }
+
     for (const value of invalidValues) {
         await t.test(`continueCount=${String(value)}`, () => {
             const memoryQuest = createActiveQuest()
@@ -315,55 +257,6 @@ test("rejects invalid stored continue counts and costs without writes", async t 
     }
 })
 
-test("rejects MAX_SAFE stored continue count before incrementing without writes", () => {
-    const memoryQuest = createActiveQuest()
-    const fixture = createFixture({
-        player: { freeVmoney: 30, vmoney: 40 },
-        storedQuest: createActiveQuest({ continueCount: Number.MAX_SAFE_INTEGER }),
-    })
-    const before = fixture.getState()
-
-    const result = lifecycle.runSingleContinueLifecycleTransaction(
-        createInput(memoryQuest),
-        fixture.dependencies,
-    )
-
-    assert.deepEqual(result, {
-        ok: false,
-        message: "Persisted continue count is invalid.",
-    })
-    assert.equal(fixture.getTransactionCalls(), 1)
-    assert.deepEqual(fixture.getState().player, before.player)
-    assert.equal(
-        fixture.getState().storedQuest.continueCount,
-        Number.MAX_SAFE_INTEGER,
-    )
-    assert.equal(memoryQuest.continueCount, 2)
-    assert.deepEqual(fixture.writes, [])
-})
-
-test("uses stored continue count as authority and repairs stale memory after commit", () => {
-    const memoryQuest = createActiveQuest({ continueCount: 1 })
-    const fixture = createFixture({
-        player: { freeVmoney: 100, vmoney: 100 },
-        storedQuest: createActiveQuest({ continueCount: 5 }),
-    })
-
-    const result = lifecycle.runSingleContinueLifecycleTransaction(
-        createInput(memoryQuest),
-        fixture.dependencies,
-    )
-
-    assert.deepEqual(result, {
-        ok: true,
-        freeVmoney: 50,
-        vmoney: 100,
-        continueCount: 6,
-    })
-    assert.equal(fixture.getState().storedQuest.continueCount, 6)
-    assert.equal(memoryQuest.continueCount, 6)
-})
-
 test("rolls database writes back and leaves memory unchanged when commit fails", () => {
     const memoryQuest = createActiveQuest()
     const fixture = createFixture({ failCommit: true })
@@ -390,6 +283,7 @@ test("single battle continue route delegates transaction and writes to the lifec
     )
 
     assert.match(continueBlock, /runSingleContinueLifecycleTransaction\s*\(/)
+    assert.match(continueBlock, /expectedContinueCount:\s*body\.statistics\.continue_count/)
     assert.doesNotMatch(continueBlock, /getDb\(\)\.transaction\s*\(/)
     assert.doesNotMatch(continueBlock, /updatePlayerSync\s*\(/)
     assert.doesNotMatch(continueBlock, /updatePlayerActiveQuestContinueCountSync\s*\(/)

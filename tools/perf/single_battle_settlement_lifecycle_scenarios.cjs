@@ -132,16 +132,24 @@ async function playContinueFreeThenPaid() {
         harness.updatePlayer({ freeVmoney: 30, vmoney: 40 })
         harness.insertActiveQuest(harness.createActiveQuest({ playId: "gate-task-18-continue" }))
         const beforeState = harness.snapshotState()
-        const measured = await harness.measure(() => harness.post("play_continue", {
+        const payload = {
             viewer_id: VIEWER_ID,
             api_count: 1,
             payment_type: 1,
             quest_id: MAIN_QUEST_ID,
             category: MAIN_CATEGORY,
             play_id: "gate-task-18-continue",
-        }))
+            statistics: { continue_count: 0 },
+        }
+        const measured = await harness.measure(() => harness.post("play_continue", payload))
         if (measured.error) throw measured.error
         assertSuccessful(measured.value, "play continue")
+        const replayed = await harness.measure(() => harness.post("play_continue", payload))
+        if (replayed.error) throw replayed.error
+        assertSuccessful(replayed.value, "play continue replay")
+        if (replayed.sql.writeStatements !== 0) {
+            throw new Error("play continue replay must not write SQL")
+        }
         const afterState = harness.snapshotState()
         return {
             sql: measured.sql,

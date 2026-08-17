@@ -19,6 +19,7 @@ export interface SingleContinueLifecycleInput {
     playId: string
     questId: number
     category: number
+    expectedContinueCount: number
     cost: number
 }
 
@@ -69,6 +70,9 @@ export function runSingleContinueLifecycleTransaction(
     if (!Number.isSafeInteger(input.cost) || input.cost <= 0) {
         return { ok: false, message: "Continue cost is invalid." }
     }
+    if (!isNonNegativeSafeInteger(input.expectedContinueCount)) {
+        return { ok: false, message: "Expected continue count is invalid." }
+    }
     if (!input.memoryQuest) {
         return { ok: false, message: "No active quest to continue." }
     }
@@ -96,9 +100,29 @@ export function runSingleContinueLifecycleTransaction(
             || !isNonNegativeSafeInteger(player.vmoney)) {
             return { ok: false, message: "Player vmoney balance is invalid." }
         }
-        if (!isNonNegativeSafeInteger(storedQuest.continueCount)
-            || storedQuest.continueCount === Number.MAX_SAFE_INTEGER) {
+        if (!isNonNegativeSafeInteger(storedQuest.continueCount)) {
             return { ok: false, message: "Persisted continue count is invalid." }
+        }
+        if (storedQuest.continueCount !== input.expectedContinueCount) {
+            if (input.expectedContinueCount !== Number.MAX_SAFE_INTEGER
+                && storedQuest.continueCount === input.expectedContinueCount + 1) {
+                return {
+                    ok: true,
+                    freeVmoney: player.freeVmoney,
+                    vmoney: player.vmoney,
+                    continueCount: storedQuest.continueCount,
+                }
+            }
+            return {
+                ok: false,
+                message: "Continue count does not match persisted active quest.",
+            }
+        }
+        if (storedQuest.continueCount === Number.MAX_SAFE_INTEGER) {
+            return {
+                ok: false,
+                message: "Persisted continue count cannot be incremented.",
+            }
         }
 
         const freeSpent = Math.min(player.freeVmoney, input.cost)

@@ -140,6 +140,7 @@ test("single battle continue commits currency and persisted count before publish
             play_id: activeQuest.playId,
             payment_type: 1,
             api_count: 1,
+            statistics: { continue_count: 0 },
         },
     })
 
@@ -200,6 +201,7 @@ test("single battle continue spends free currency before paid currency", async t
             play_id: activeQuest.playId,
             payment_type: 1,
             api_count: 1,
+            statistics: { continue_count: 0 },
         },
     })
 
@@ -237,6 +239,7 @@ test("single battle continue rejects a stale active quest identity", async t => 
             play_id: "stale-play",
             payment_type: 1,
             api_count: 1,
+            statistics: { continue_count: 0 },
         },
     })
 
@@ -273,6 +276,7 @@ test("single battle continue rejects memory state without persisted active quest
             play_id: activeQuest.playId,
             payment_type: 1,
             api_count: 1,
+            statistics: { continue_count: 0 },
         },
     })
 

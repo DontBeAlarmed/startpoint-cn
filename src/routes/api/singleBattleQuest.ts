@@ -66,6 +66,7 @@ interface StartBody {
 
 interface QuestStatistics {
     clear_phase: number,
+    continue_count: number,
     party: {
         unison_characters: ({ id: (number | null) } | null)[],
         characters: ({ id: (number | null) } | null)[],
@@ -96,7 +97,7 @@ interface PlayContinueBody {
     viewer_id: number,
     play_id: string,
     category: number,
-    statistics?: QuestStatistics
+    statistics: QuestStatistics
 }
 
 interface AbortBody {
@@ -390,6 +391,10 @@ const routes = async (fastify: FastifyInstance) => {
             || typeof body.play_id !== "string"
             || body.play_id.length === 0
             || body.payment_type !== 1
+            || typeof body.statistics !== "object"
+            || body.statistics === null
+            || !Number.isSafeInteger(body.statistics.continue_count)
+            || body.statistics.continue_count < 0
         ) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         })
@@ -406,6 +411,7 @@ const routes = async (fastify: FastifyInstance) => {
             playId: body.play_id,
             questId: body.quest_id,
             category: body.category,
+            expectedContinueCount: body.statistics.continue_count,
             cost: continueVmoneyCost,
         })
         if (!continueResult.ok) return reply.status(400).send({

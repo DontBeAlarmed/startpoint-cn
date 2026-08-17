@@ -343,13 +343,25 @@ test("accumulates every directly related source group", () => {
     )
     assert.deepEqual(
         selectTestGroups(["src/routes/api/singleBattleQuest.ts"]),
-        ["integration:compiled", "integration:mission", "integration:quest", "quick:quest"],
+        [
+            "integration:compiled",
+            "integration:mission",
+            "integration:quest",
+            "integration:rules",
+            "quick:quest",
+        ],
     )
 })
 
 test("selects quest and mission regressions for the single battle route", () => {
     const groups = selectTestGroups(["src/routes/api/singleBattleQuest.ts"])
-    assert.deepEqual(groups, ["integration:compiled", "integration:mission", "integration:quest", "quick:quest"])
+    assert.deepEqual(groups, [
+        "integration:compiled",
+        "integration:mission",
+        "integration:quest",
+        "integration:rules",
+        "quick:quest",
+    ])
     assert.ok(
         groups.flatMap(group => TEST_GROUPS[group].tests)
             .includes("tools/mission_auto_settlement_route.test.cjs"),
@@ -362,12 +374,22 @@ test("selects quest and mission regressions for the single battle route", () => 
         TEST_GROUPS["integration:quest"].tests
             .includes("tools/perf/single_battle_settlement_admission.test.cjs"),
     )
+    assert.ok(
+        TEST_GROUPS["integration:rules"].tests
+            .includes("tools/single_continue_route.test.cjs"),
+    )
 })
 
 test("maps single finish settlement implementation and regression precisely", () => {
     assert.deepEqual(
         selectTestGroups(["src/routes/api/singleBattleQuest.ts"]),
-        ["integration:compiled", "integration:mission", "integration:quest", "quick:quest"],
+        [
+            "integration:compiled",
+            "integration:mission",
+            "integration:quest",
+            "integration:rules",
+            "quick:quest",
+        ],
     )
     assert.deepEqual(
         selectTestGroups(["src/lib/quest/single-finish-settlement.ts"]),
@@ -441,6 +463,39 @@ test("maps single continue lifecycle implementation and regression precisely", (
     assert.deepEqual(
         selectTestGroups(["tools/single_continue_lifecycle.test.cjs"]),
         ["quick:quest"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/single_continue_idempotency.test.cjs"]),
+        ["quick:quest"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/helpers/single-continue-fixture.cjs"]),
+        ["integration:quest", "integration:rules", "quick:quest"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/routes/api/singleBattleQuest.ts"]),
+        [
+            "integration:compiled",
+            "integration:mission",
+            "integration:quest",
+            "integration:rules",
+            "quick:quest",
+        ],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/single_continue_route.test.cjs"]),
+        ["integration:rules"],
+    )
+    assert.equal(
+        selectTestGroups([
+            "src/lib/quest/single-continue-lifecycle.ts",
+            "src/routes/api/singleBattleQuest.ts",
+            "tools/helpers/single-continue-fixture.cjs",
+            "tools/single_continue_idempotency.test.cjs",
+            "tools/single_continue_lifecycle.test.cjs",
+            "tools/single_continue_route.test.cjs",
+        ]).some(group => group.includes("multi")),
+        false,
     )
 })
 
@@ -1275,6 +1330,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/inventory_rules.test.cjs",
         "tools/party_loadout_validation.test.cjs",
         "tools/quest_write_transaction.test.cjs",
+        "tools/single_continue_route.test.cjs",
         "tools/score_reward_lottery.test.cjs",
         "tools/quest_score_reward_settlement.test.cjs",
         "tools/reward_campaign.test.cjs",

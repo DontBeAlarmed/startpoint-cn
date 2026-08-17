@@ -39,12 +39,24 @@ Content Sync 现在直接从 20 张官方关卡表生成入口记录：只要关
 1. `/single_battle_quest/start` 在一个 SQLite 事务中校验门票和体力、预扣门票、扣除体力并保存 active quest。事务失败时全部回滚，内存中也不会发布 active quest。
 2. active quest 同时持久化 `entry_item_id` 和 `entry_item_count`。旧数据库会自动增加数量列；迁移前遗留的 `entry_item_count=NULL` 只在当前 `category + quest_id` 的门票 ID 一致且数量恰好为 1 时回退。这是一条一次性兼容规则，未来若出现一次消耗多张门票的关卡，服务端不会猜测并返还数量。
 3. `/single_battle_quest/abort` 在一个事务中读取 active quest，并同时核对请求的 `play_id/quest_id/category`。三项全部匹配才返还门票并删除 active；旧 abort 延迟到达且当前已有新战斗时，服务端返回成功和空 `item_list`，但不会修改数据库或清除内存。正常提交后才清除内存记录，重复 abort 也不会重复返还。
-4. abort 不返还体力。`/play_continue` 只处理续关费用和次数。续关请求必须与内存及 SQLite 中的 `play_id/quest_id/category` 同时一致；事务内重新读取余额，先扣免费星导石，不足部分再扣付费星导石，并同步持久化 continue count，提交成功后才更新内存 active quest。成功 finish 保留 start 的门票扣除，不再扣除第二次，也不返还。
+4. abort 不返还体力。`/play_continue` 只处理续关费用和次数，并按客户端提交的复活前 count 幂等结算；详细规则见下节。成功 finish 保留 start 的门票扣除，不再扣除第二次，也不返还。
 5. CN `/load` 会把有效的持久化 active quest 重新发布到内存，因此服务重启后仍可继续、完成或放弃。多人房间已失效时，load 会先执行同一取消事务再序列化背包，不再直接删除记录。
 
 abort 路由显式返回 `application/x-msgpack`，由 CN 服务的 `onSend` hook 执行 MsgPack 打包和 Base64 编码。active quest 的 registry、持久化与取消事务位于独立 service，load 和各战斗路由不再互相导入。
 
 多人战斗同样读取当前 Content snapshot 的 `quest_entry_costs`，但入场成本只由房主承担：房主 start 在一个事务内预扣体力和 Always 门票、保存 `entry_item_id/count` 与 active quest；成员 start 以零成本保存各自的 active quest。事务提交后才更新内存 active quest 和房间战斗状态，因此扣除或写库失败不会把房间提前卡进战斗态。房主 abort 按同一规则返还门票但不返体力，成员没有入场道具可返还。
+
+## 单人付费复活幂等
+
+单人 `/play_continue` 固定接受 `payment_type=1`，并要求 `statistics.continue_count` 是非负安全整数。该值是客户端发起复活前观察到的次数，不使用 `api_count` 充当幂等键。缺失、负数、小数、字符串或超出安全整数范围的 count 会在任何持久写入前返回 400。
+
+服务端在同一个 SQLite 事务内重新读取玩家余额和 active quest，并始终核对内存及 SQLite 中的 `play_id/quest_id/category` 与单人身份。SQLite 的 `continue_count` 是权威值：
+
+- 权威值等于请求值时，这是首次结算。服务端先扣免费星导石，不足部分再扣付费星导石，然后把权威值安全地加一；当前值已经是 `Number.MAX_SAFE_INTEGER` 时拒绝，不能产生不安全整数。
+- 权威值等于请求值加一时，这是成功响应丢失后的原请求重放。服务端返回当前数据库余额，把内存 active quest 同步到权威 count，但不写数据库、不重复扣费。该判断只依赖当前 SQLite 状态，因此服务重启并由 `/load` 恢复 active quest 后仍可重放。
+- 其他差值均视为 stale 或 future 请求，返回 400 且不写入。
+
+事务抛错时余额与 count 一起回滚，内存 count 只在事务成功返回后更新。这里的幂等范围只覆盖同一场单人战斗中的付费复活；自动连战由客户端结果页重新调用 `/start` 建立下一场战斗，不复用 `/play_continue`，也不在本规则中实现 `battle_max_continue_count`。
 
 ## finish 事务边界
 
