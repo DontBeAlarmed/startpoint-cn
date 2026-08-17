@@ -178,19 +178,22 @@ function createActiveQuest({
 }
 
 function finishPayload({
+    addMana = 11,
+    category = MAIN_CATEGORY,
     characterId = AWAKE_CHARACTER_ID,
     elapsedTimeMs = 1_000,
     playId = "gate-task-18-finish",
+    questId = MAIN_QUEST_ID,
 } = {}) {
     return {
         viewer_id: VIEWER_ID,
         api_count: 1,
         play_id: playId,
-        quest_id: MAIN_QUEST_ID,
-        category: MAIN_CATEGORY,
+        quest_id: questId,
+        category,
         score: 123_456,
         elapsed_time_ms: elapsedTimeMs,
-        add_mana: 11,
+        add_mana: addMana,
         is_accomplished: true,
         is_restored: false,
         continue_count: 0,

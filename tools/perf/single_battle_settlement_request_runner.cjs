@@ -5,8 +5,19 @@ require("ts-node/register/transpile-only")
 const Fastify = require("fastify")
 const { pack, unpack } = require("msgpackr")
 
-const singleBattleRoutes = require("../../src/routes/api/singleBattleQuest").default
+function loadFreshSingleBattleRoutes() {
+    for (const modulePath of [
+        "../../src/routes/api/singleBattleQuest",
+        "../../src/lib/quest/finish/single-orchestrator",
+        "../../src/lib/quest/finish/single-settlement-writes",
+    ]) {
+        delete require.cache[require.resolve(modulePath)]
+    }
+    return require("../../src/routes/api/singleBattleQuest").default
+}
+
 function createSingleBattleApp() {
+    const singleBattleRoutes = loadFreshSingleBattleRoutes()
     const app = Fastify({ logger: false })
     app.addContentTypeParser(
         "application/x-www-form-urlencoded",

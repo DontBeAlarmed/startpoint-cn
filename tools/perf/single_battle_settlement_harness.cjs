@@ -32,6 +32,7 @@ const {
 } = require("./single_battle_settlement_request_runner.cjs")
 
 async function withSingleBattleHarness(name, operation, {
+    additionalSettlementOverride,
     tableOverrides = {},
 } = {}) {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), `single-battle-settlement-${name}-`))
@@ -41,6 +42,7 @@ async function withSingleBattleHarness(name, operation, {
     const originalConsole = { error: console.error, log: console.log, warn: console.warn }
     let app
     let restoreContent = () => {}
+    let restoreAdditionalSettlement = () => {}
     let primaryError = null
     let result
     try {
@@ -60,6 +62,14 @@ async function withSingleBattleHarness(name, operation, {
             }),
         })
         const playerId = fixture.createFixturePlayer()
+        if (additionalSettlementOverride !== undefined) {
+            const additionalReward = require("../../src/lib/additional-reward")
+            const originalSettlement = additionalReward.settleAdditionalRewardsSync
+            additionalReward.settleAdditionalRewardsSync = additionalSettlementOverride
+            restoreAdditionalSettlement = () => {
+                additionalReward.settleAdditionalRewardsSync = originalSettlement
+            }
+        }
         const staminaHealTimeTracker = createStaminaHealTimeTracker(
             getPlayerSync(playerId).staminaHealTime,
         )
@@ -96,6 +106,7 @@ async function withSingleBattleHarness(name, operation, {
     const cleanupErrors = []
     for (const cleanup of [
         async () => { if (app) await app.close() },
+        () => restoreAdditionalSettlement(),
         () => { for (const playerId of Object.keys(activeQuests)) delete activeQuests[playerId] },
         () => closeDatabase(),
         () => restoreContent(),
