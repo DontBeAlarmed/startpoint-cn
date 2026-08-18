@@ -99,6 +99,17 @@ function recordPlayerCollectedItemSync(
     `).run(playerId, Number(itemId), obtainedAmount)
 }
 
+export function recordPlayerCollectedItemWithinTransactionSync(
+    playerId: number,
+    itemId: number | string,
+    obtainedAmount: number,
+): void {
+    if (!getDb().inTransaction) {
+        throw new Error("recordPlayerCollectedItemWithinTransactionSync requires an active caller transaction")
+    }
+    recordPlayerCollectedItemSync(playerId, itemId, obtainedAmount)
+}
+
 /**
  * Inserts a singular item into the player's inventory.
  * 
@@ -154,6 +165,24 @@ export function updatePlayerItemSync(
     SET amount = ?
     WHERE player_id = ? AND id = ?
     `).run(amount, playerId, Number(itemId))
+}
+
+/**
+ * Sets an item amount while the caller owns the transaction and already knows
+ * whether the inventory row exists. This avoids a read-after-plan in compound
+ * inventory settlements.
+ */
+export function setPlayerItemWithinTransactionSync(
+    playerId: number,
+    itemId: string | number,
+    amount: number,
+    hasExistingRow: boolean,
+): void {
+    if (!getDb().inTransaction) {
+        throw new Error("setPlayerItemWithinTransactionSync requires an active caller transaction")
+    }
+    if (hasExistingRow) updatePlayerItemSync(playerId, itemId, amount)
+    else insertPlayerItemSync(playerId, itemId, amount)
 }
 
 /**

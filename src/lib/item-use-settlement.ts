@@ -1,4 +1,9 @@
-import { getPlayerItemSync, givePlayerItemWithinTransactionSync, updatePlayerItemSync } from "../data/domains/item"
+import {
+    getPlayerItemSync,
+    recordPlayerCollectedItemWithinTransactionSync,
+    setPlayerItemWithinTransactionSync,
+    updatePlayerItemSync,
+} from "../data/domains/item"
 import { getPlayerSync, updatePlayerSync } from "../data/domains/player"
 import { getDb } from "../data/db"
 import { getItemEffectSync, ItemEffectEntry } from "./assets"
@@ -10,6 +15,7 @@ const AS3_INT_MAX = 2_147_483_647
 export interface ItemUseInventoryChange {
     readonly id: number
     readonly beforeCount: number
+    readonly hasExistingRow: boolean
     readonly deductionCount: number
     readonly rewardCount: number
     readonly finalCount: number
@@ -200,7 +206,8 @@ function createItemUsePlan(
     for (const itemId of affectedItemIds) {
         const deductionCount = requestedCounts.get(itemId) ?? 0
         const rewardCount = rewardCounts.get(itemId) ?? 0
-        const beforeCount = getPlayerItemSync(player.id, itemId) ?? 0
+        const beforeAmount = getPlayerItemSync(player.id, itemId)
+        const beforeCount = beforeAmount ?? 0
         if (beforeCount < deductionCount) throw new ItemUseValidationError("Insufficient items.")
         const finalCount = beforeCount - deductionCount + rewardCount
         if (!Number.isSafeInteger(finalCount) || finalCount < 0 || finalCount > AS3_INT_MAX) {
@@ -209,6 +216,7 @@ function createItemUsePlan(
         inventoryChanges.push({
             id: itemId,
             beforeCount,
+            hasExistingRow: beforeAmount !== null,
             deductionCount,
             rewardCount,
             finalCount,
@@ -241,7 +249,7 @@ function createItemUsePlan(
 
 function applyItemUsePlanSync(playerId: number, plan: ItemUsePlan): Record<string, number> {
     for (const item of plan.inventoryChanges) {
-        if (item.deductionCount > 0) {
+        if (item.deductionCount > 0 && item.rewardCount === 0) {
             updatePlayerItemSync(playerId, item.id, item.beforeCount - item.deductionCount)
         }
     }
@@ -252,8 +260,15 @@ function applyItemUsePlanSync(playerId: number, plan: ItemUsePlan): Record<strin
             staminaHealTime: plan.stamina.recoveryTime,
         })
     }
-    for (const reward of plan.rewards) {
-        givePlayerItemWithinTransactionSync(playerId, reward.id, reward.count)
+    for (const item of plan.inventoryChanges) {
+        if (item.rewardCount <= 0) continue
+        setPlayerItemWithinTransactionSync(
+            playerId,
+            item.id,
+            item.finalCount,
+            item.hasExistingRow,
+        )
+        recordPlayerCollectedItemWithinTransactionSync(playerId, item.id, item.rewardCount)
     }
 
     return Object.fromEntries(plan.inventoryChanges.map(item => [

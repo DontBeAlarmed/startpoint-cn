@@ -9,6 +9,7 @@ const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
 const Fastify = require("fastify")
+const BetterSqlite3 = require("better-sqlite3")
 const { unpack } = require("msgpackr")
 
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "item-use-cultivate-pack-"))
@@ -61,6 +62,7 @@ const AS3_INT_MAX = 2_147_483_647
 let database
 let app
 let nextViewerId = 850000000
+const sqlStatements = []
 
 async function createPlayer(label) {
     const account = insertAccountSync({
@@ -102,7 +104,11 @@ function assertRejectedWithoutWrites(response, playerId, itemIds, expectedCounts
 }
 
 test.before(async () => {
-    database = data.initializeDatabase()
+    database = data.initializeDatabase({
+        databaseFactory: databasePath => new BetterSqlite3(databasePath, {
+            verbose: sql => sqlStatements.push(sql),
+        }),
+    })
     app = Fastify({ logger: false })
     registerCnMsgpackOnSend(app)
     await app.register(itemRoutes, { prefix: "/item" })
@@ -167,6 +173,23 @@ test("same item deduction and reward use one before count and one final count", 
     assert.equal(getPlayerItemSync(playerId, 990004), 1)
     assert.equal(responseData.item_list["990004"], 1)
     assert.equal(getPlayerCollectedItemTotalSync(playerId, 990004), collectedBefore + 1)
+})
+
+test("same item reward reuses the planned inventory state without a second item read", async () => {
+    const { playerId, viewerId } = await createPlayer("planned-final-count")
+    givePlayerItemSync(playerId, 990004, 1)
+    const start = sqlStatements.length
+
+    const response = decodeSuccess(await useItem(viewerId, [
+        { id: 990004, number: 1, selectIndex: 1 },
+    ]))
+
+    const itemReads = sqlStatements
+        .slice(start)
+        .filter(sql => /\bFROM\s+players_items\b/i.test(sql))
+    assert.equal(itemReads.length, 1, itemReads.join("\n---\n"))
+    assert.equal(response.data.item_list["990004"], 1)
+    assert.equal(getPlayerItemSync(playerId, 990004), 1)
 })
 
 test("reward final count may reach the AS3 int maximum", async () => {
