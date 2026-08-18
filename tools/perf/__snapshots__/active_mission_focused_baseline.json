@@ -1,0 +1,6486 @@
+{
+  "scenarios": {
+    "load-large-change": {
+      "statusCode": 200,
+      "activeMissionDelta": [
+        {
+          "mission_id": 11030,
+          "progress_value": 159,
+          "stages": [
+            {
+              "stage": 1,
+              "received": false
+            }
+          ]
+        },
+        {
+          "mission_id": 11050,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": false
+            }
+          ]
+        },
+        {
+          "mission_id": 11100,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": false
+            }
+          ]
+        },
+        {
+          "mission_id": 11110,
+          "progress_value": 3,
+          "stages": []
+        },
+        {
+          "mission_id": 99101,
+          "progress_value": 140,
+          "stages": [
+            {
+              "stage": 1,
+              "received": false
+            }
+          ]
+        }
+      ],
+      "allActiveMissionState": {
+        "missions": [
+          {
+            "id": 11030,
+            "progress": 159
+          },
+          {
+            "id": 11050,
+            "progress": 1
+          },
+          {
+            "id": 11100,
+            "progress": 1
+          },
+          {
+            "id": 11110,
+            "progress": 3
+          },
+          {
+            "id": 99101,
+            "progress": 140
+          }
+        ],
+        "stages": [
+          {
+            "stage": 1,
+            "status": 0,
+            "missionId": 11030
+          },
+          {
+            "stage": 1,
+            "status": 0,
+            "missionId": 11050
+          },
+          {
+            "stage": 1,
+            "status": 0,
+            "missionId": 11100
+          },
+          {
+            "stage": 1,
+            "status": 0,
+            "missionId": 99101
+          }
+        ]
+      },
+      "awakeMissionState": {
+        "missions": [],
+        "stages": []
+      },
+      "rewardState": {
+        "player": {
+          "freeVmoney": 100,
+          "freeMana": 2000,
+          "expPool": 0,
+          "totalManaObtained": 20000
+        },
+        "items": [
+          {
+            "id": 1,
+            "amount": 1
+          },
+          {
+            "id": 2,
+            "amount": 2
+          },
+          {
+            "id": 3,
+            "amount": 3
+          },
+          {
+            "id": 4,
+            "amount": 4
+          },
+          {
+            "id": 5,
+            "amount": 5
+          },
+          {
+            "id": 6,
+            "amount": 6
+          },
+          {
+            "id": 7,
+            "amount": 7
+          },
+          {
+            "id": 8,
+            "amount": 8
+          },
+          {
+            "id": 9,
+            "amount": 9
+          },
+          {
+            "id": 10,
+            "amount": 10
+          },
+          {
+            "id": 11,
+            "amount": 11
+          },
+          {
+            "id": 12,
+            "amount": 12
+          },
+          {
+            "id": 13,
+            "amount": 13
+          },
+          {
+            "id": 14,
+            "amount": 14
+          },
+          {
+            "id": 15,
+            "amount": 15
+          },
+          {
+            "id": 16,
+            "amount": 16
+          },
+          {
+            "id": 42,
+            "amount": 17
+          },
+          {
+            "id": 43,
+            "amount": 18
+          },
+          {
+            "id": 44,
+            "amount": 19
+          },
+          {
+            "id": 45,
+            "amount": 20
+          },
+          {
+            "id": 46,
+            "amount": 21
+          },
+          {
+            "id": 47,
+            "amount": 22
+          },
+          {
+            "id": 48,
+            "amount": 23
+          },
+          {
+            "id": 49,
+            "amount": 24
+          },
+          {
+            "id": 50,
+            "amount": 25
+          },
+          {
+            "id": 51,
+            "amount": 26
+          },
+          {
+            "id": 52,
+            "amount": 27
+          },
+          {
+            "id": 53,
+            "amount": 28
+          },
+          {
+            "id": 54,
+            "amount": 29
+          },
+          {
+            "id": 55,
+            "amount": 30
+          },
+          {
+            "id": 56,
+            "amount": 31
+          },
+          {
+            "id": 57,
+            "amount": 32
+          },
+          {
+            "id": 58,
+            "amount": 33
+          },
+          {
+            "id": 59,
+            "amount": 34
+          },
+          {
+            "id": 60,
+            "amount": 35
+          },
+          {
+            "id": 61,
+            "amount": 36
+          },
+          {
+            "id": 62,
+            "amount": 37
+          },
+          {
+            "id": 63,
+            "amount": 38
+          },
+          {
+            "id": 64,
+            "amount": 39
+          },
+          {
+            "id": 65,
+            "amount": 40
+          },
+          {
+            "id": 66,
+            "amount": 41
+          },
+          {
+            "id": 67,
+            "amount": 42
+          },
+          {
+            "id": 99,
+            "amount": 43
+          },
+          {
+            "id": 100,
+            "amount": 44
+          },
+          {
+            "id": 101,
+            "amount": 45
+          },
+          {
+            "id": 102,
+            "amount": 46
+          },
+          {
+            "id": 106,
+            "amount": 47
+          },
+          {
+            "id": 200,
+            "amount": 48
+          },
+          {
+            "id": 201,
+            "amount": 49
+          },
+          {
+            "id": 202,
+            "amount": 50
+          },
+          {
+            "id": 203,
+            "amount": 51
+          },
+          {
+            "id": 204,
+            "amount": 52
+          },
+          {
+            "id": 205,
+            "amount": 53
+          },
+          {
+            "id": 206,
+            "amount": 54
+          },
+          {
+            "id": 207,
+            "amount": 55
+          },
+          {
+            "id": 208,
+            "amount": 56
+          },
+          {
+            "id": 209,
+            "amount": 57
+          },
+          {
+            "id": 210,
+            "amount": 58
+          },
+          {
+            "id": 211,
+            "amount": 59
+          },
+          {
+            "id": 212,
+            "amount": 60
+          },
+          {
+            "id": 213,
+            "amount": 61
+          },
+          {
+            "id": 214,
+            "amount": 62
+          },
+          {
+            "id": 215,
+            "amount": 63
+          },
+          {
+            "id": 216,
+            "amount": 64
+          },
+          {
+            "id": 217,
+            "amount": 65
+          },
+          {
+            "id": 218,
+            "amount": 66
+          },
+          {
+            "id": 219,
+            "amount": 67
+          },
+          {
+            "id": 220,
+            "amount": 68
+          },
+          {
+            "id": 221,
+            "amount": 69
+          },
+          {
+            "id": 222,
+            "amount": 70
+          },
+          {
+            "id": 223,
+            "amount": 71
+          },
+          {
+            "id": 224,
+            "amount": 72
+          },
+          {
+            "id": 225,
+            "amount": 73
+          },
+          {
+            "id": 226,
+            "amount": 74
+          },
+          {
+            "id": 227,
+            "amount": 75
+          },
+          {
+            "id": 228,
+            "amount": 76
+          },
+          {
+            "id": 229,
+            "amount": 77
+          },
+          {
+            "id": 230,
+            "amount": 78
+          },
+          {
+            "id": 231,
+            "amount": 79
+          },
+          {
+            "id": 232,
+            "amount": 80
+          },
+          {
+            "id": 233,
+            "amount": 81
+          },
+          {
+            "id": 234,
+            "amount": 82
+          },
+          {
+            "id": 235,
+            "amount": 83
+          },
+          {
+            "id": 236,
+            "amount": 84
+          },
+          {
+            "id": 237,
+            "amount": 85
+          },
+          {
+            "id": 238,
+            "amount": 86
+          },
+          {
+            "id": 239,
+            "amount": 87
+          },
+          {
+            "id": 240,
+            "amount": 88
+          },
+          {
+            "id": 241,
+            "amount": 89
+          },
+          {
+            "id": 242,
+            "amount": 90
+          },
+          {
+            "id": 243,
+            "amount": 91
+          },
+          {
+            "id": 244,
+            "amount": 92
+          },
+          {
+            "id": 245,
+            "amount": 93
+          },
+          {
+            "id": 246,
+            "amount": 94
+          },
+          {
+            "id": 247,
+            "amount": 95
+          },
+          {
+            "id": 248,
+            "amount": 96
+          },
+          {
+            "id": 249,
+            "amount": 97
+          },
+          {
+            "id": 250,
+            "amount": 98
+          },
+          {
+            "id": 251,
+            "amount": 99
+          },
+          {
+            "id": 252,
+            "amount": 100
+          },
+          {
+            "id": 253,
+            "amount": 101
+          },
+          {
+            "id": 254,
+            "amount": 102
+          },
+          {
+            "id": 255,
+            "amount": 103
+          },
+          {
+            "id": 256,
+            "amount": 104
+          },
+          {
+            "id": 257,
+            "amount": 105
+          },
+          {
+            "id": 258,
+            "amount": 106
+          },
+          {
+            "id": 259,
+            "amount": 107
+          },
+          {
+            "id": 260,
+            "amount": 108
+          },
+          {
+            "id": 261,
+            "amount": 109
+          },
+          {
+            "id": 262,
+            "amount": 110
+          },
+          {
+            "id": 263,
+            "amount": 111
+          },
+          {
+            "id": 264,
+            "amount": 112
+          },
+          {
+            "id": 265,
+            "amount": 113
+          },
+          {
+            "id": 266,
+            "amount": 114
+          },
+          {
+            "id": 267,
+            "amount": 115
+          },
+          {
+            "id": 901,
+            "amount": 116
+          },
+          {
+            "id": 10001,
+            "amount": 117
+          },
+          {
+            "id": 10002,
+            "amount": 118
+          },
+          {
+            "id": 10003,
+            "amount": 119
+          },
+          {
+            "id": 11001,
+            "amount": 120
+          },
+          {
+            "id": 11002,
+            "amount": 121
+          },
+          {
+            "id": 11003,
+            "amount": 122
+          },
+          {
+            "id": 12001,
+            "amount": 123
+          },
+          {
+            "id": 12002,
+            "amount": 124
+          },
+          {
+            "id": 13001,
+            "amount": 125
+          },
+          {
+            "id": 14001,
+            "amount": 126
+          },
+          {
+            "id": 14002,
+            "amount": 127
+          },
+          {
+            "id": 14003,
+            "amount": 128
+          },
+          {
+            "id": 14004,
+            "amount": 129
+          },
+          {
+            "id": 14005,
+            "amount": 130
+          },
+          {
+            "id": 14006,
+            "amount": 131
+          },
+          {
+            "id": 14007,
+            "amount": 132
+          },
+          {
+            "id": 14008,
+            "amount": 133
+          },
+          {
+            "id": 14009,
+            "amount": 134
+          },
+          {
+            "id": 14010,
+            "amount": 135
+          },
+          {
+            "id": 14011,
+            "amount": 136
+          },
+          {
+            "id": 14012,
+            "amount": 137
+          },
+          {
+            "id": 14013,
+            "amount": 138
+          },
+          {
+            "id": 14014,
+            "amount": 139
+          },
+          {
+            "id": 14015,
+            "amount": 140
+          },
+          {
+            "id": 14016,
+            "amount": 141
+          },
+          {
+            "id": 14017,
+            "amount": 142
+          },
+          {
+            "id": 14018,
+            "amount": 143
+          },
+          {
+            "id": 14033,
+            "amount": 144
+          },
+          {
+            "id": 14034,
+            "amount": 145
+          },
+          {
+            "id": 14035,
+            "amount": 146
+          },
+          {
+            "id": 14036,
+            "amount": 147
+          },
+          {
+            "id": 14037,
+            "amount": 148
+          },
+          {
+            "id": 14038,
+            "amount": 149
+          },
+          {
+            "id": 14040,
+            "amount": 150
+          },
+          {
+            "id": 14041,
+            "amount": 151
+          },
+          {
+            "id": 14042,
+            "amount": 152
+          },
+          {
+            "id": 14043,
+            "amount": 153
+          },
+          {
+            "id": 14044,
+            "amount": 154
+          },
+          {
+            "id": 14045,
+            "amount": 155
+          },
+          {
+            "id": 14046,
+            "amount": 156
+          },
+          {
+            "id": 20001,
+            "amount": 157
+          },
+          {
+            "id": 20002,
+            "amount": 158
+          },
+          {
+            "id": 20003,
+            "amount": 159
+          },
+          {
+            "id": 20004,
+            "amount": 160
+          }
+        ],
+        "characters": [
+          {
+            "id": 1,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 10,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 10,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 0,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111001,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 10000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111002,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 20000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111003,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 30000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111004,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 40000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111005,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 50000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111006,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 60000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111007,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 70000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111009,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 80000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111015,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 90000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111021,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 100000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111027,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 110000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111033,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 120000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111039,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 130000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111045,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 140000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111051,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 150000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111057,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 160000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111063,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 170000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111069,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 180000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111081,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 190000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111087,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 200000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111093,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 210000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111099,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 220000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111105,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 230000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111111,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 240000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111117,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 250000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111123,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 260000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111129,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 270000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111135,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 280000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111141,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 290000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111147,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 300000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111153,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 310000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111159,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 320000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111165,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 330000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111171,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 340000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111177,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 350000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111183,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 360000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 113001,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 370000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121001,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 380000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121002,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 390000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121003,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 400000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121004,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 410000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121005,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 420000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121006,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 430000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121007,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 440000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121008,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 450000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121009,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 460000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121015,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 470000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121021,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 480000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121027,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 490000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121033,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 500000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121039,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 510000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121045,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 520000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121051,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 530000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121057,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 540000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121069,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 550000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121070,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 560000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121075,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 570000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121081,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 580000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121087,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 590000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121093,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 600000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121099,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 610000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121105,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 620000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121111,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 630000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121117,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 640000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121123,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 650000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121129,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 660000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121135,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 670000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121141,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 680000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121147,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 690000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121153,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 700000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121159,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 710000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121165,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 720000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121171,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 730000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121177,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 740000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121183,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 750000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121189,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 760000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 123001,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 770000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 131001,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 780000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 131002,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 790000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          }
+        ],
+        "equipment": [
+          {
+            "id": 100001,
+            "level": 1,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 100002,
+            "level": 1,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 100003,
+            "level": 1,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 100004,
+            "level": 1,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 100005,
+            "level": 1,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 100006,
+            "level": 1,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 100007,
+            "level": 1,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 100008,
+            "level": 1,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 100009,
+            "level": 1,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 100010,
+            "level": 1,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 100011,
+            "level": 1,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 100012,
+            "level": 1,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 200001,
+            "level": 1,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 200002,
+            "level": 1,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 200003,
+            "level": 1,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 200004,
+            "level": 1,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 200005,
+            "level": 1,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 200006,
+            "level": 1,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 300001,
+            "level": 1,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 300002,
+            "level": 1,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 1010001,
+            "level": 5,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 1060001,
+            "level": 2,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 1080001,
+            "level": 3,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 2010002,
+            "level": 4,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 2020001,
+            "level": 5,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 2030001,
+            "level": 1,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 2040001,
+            "level": 2,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 2050001,
+            "level": 3,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 2070001,
+            "level": 4,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3010006,
+            "level": 5,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3010007,
+            "level": 1,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3010008,
+            "level": 2,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3010013,
+            "level": 3,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3010023,
+            "level": 1,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3010027,
+            "level": 5,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3010035,
+            "level": 1,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3010053,
+            "level": 2,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3020003,
+            "level": 1,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3020006,
+            "level": 4,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3020011,
+            "level": 5,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3020012,
+            "level": 1,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3030006,
+            "level": 2,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3030007,
+            "level": 3,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3030012,
+            "level": 4,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3030013,
+            "level": 5,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3030027,
+            "level": 1,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3040003,
+            "level": 2,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3040006,
+            "level": 3,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3040032,
+            "level": 4,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3050002,
+            "level": 5,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3050005,
+            "level": 1,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3050010,
+            "level": 2,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3060002,
+            "level": 3,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3060003,
+            "level": 4,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3060007,
+            "level": 5,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3060010,
+            "level": 1,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3070006,
+            "level": 2,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3070010,
+            "level": 3,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3070018,
+            "level": 4,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3070022,
+            "level": 5,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3080002,
+            "level": 1,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3080008,
+            "level": 2,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3080009,
+            "level": 3,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3080017,
+            "level": 4,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3090036,
+            "level": 5,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3100007,
+            "level": 1,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4010003,
+            "level": 2,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4010010,
+            "level": 3,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4010014,
+            "level": 4,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4010015,
+            "level": 5,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4010017,
+            "level": 1,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4010018,
+            "level": 2,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4010021,
+            "level": 3,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4010024,
+            "level": 4,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4010048,
+            "level": 5,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4010049,
+            "level": 1,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4010052,
+            "level": 2,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4010071,
+            "level": 3,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4020007,
+            "level": 4,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4020013,
+            "level": 5,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4020014,
+            "level": 1,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4020016,
+            "level": 2,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4020019,
+            "level": 3,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4020021,
+            "level": 4,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4020033,
+            "level": 5,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4020034,
+            "level": 1,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4030003,
+            "level": 2,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4030004,
+            "level": 3,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4030008,
+            "level": 4,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4030009,
+            "level": 5,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4030014,
+            "level": 1,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4030019,
+            "level": 2,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4030024,
+            "level": 3,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4030032,
+            "level": 4,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4040007,
+            "level": 5,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4040008,
+            "level": 1,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4040012,
+            "level": 2,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4040021,
+            "level": 3,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4040023,
+            "level": 4,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4040024,
+            "level": 5,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          }
+        ],
+        "degrees": []
+      },
+      "unsupportedMissionIds": [
+        21030,
+        25009,
+        25010,
+        25011,
+        25012,
+        25013,
+        25014,
+        25017,
+        25018,
+        25022
+      ]
+    },
+    "load-large-stable": {
+      "statusCode": 200,
+      "activeMissionDelta": [],
+      "allActiveMissionState": {
+        "missions": [
+          {
+            "id": 11030,
+            "progress": 159
+          },
+          {
+            "id": 11050,
+            "progress": 1
+          },
+          {
+            "id": 11100,
+            "progress": 1
+          },
+          {
+            "id": 11110,
+            "progress": 3
+          },
+          {
+            "id": 99101,
+            "progress": 140
+          }
+        ],
+        "stages": [
+          {
+            "stage": 1,
+            "status": 0,
+            "missionId": 11030
+          },
+          {
+            "stage": 1,
+            "status": 0,
+            "missionId": 11050
+          },
+          {
+            "stage": 1,
+            "status": 0,
+            "missionId": 11100
+          },
+          {
+            "stage": 1,
+            "status": 0,
+            "missionId": 99101
+          }
+        ]
+      },
+      "awakeMissionState": {
+        "missions": [],
+        "stages": []
+      },
+      "rewardState": {
+        "player": {
+          "freeVmoney": 100,
+          "freeMana": 2000,
+          "expPool": 0,
+          "totalManaObtained": 20000
+        },
+        "items": [
+          {
+            "id": 1,
+            "amount": 1
+          },
+          {
+            "id": 2,
+            "amount": 2
+          },
+          {
+            "id": 3,
+            "amount": 3
+          },
+          {
+            "id": 4,
+            "amount": 4
+          },
+          {
+            "id": 5,
+            "amount": 5
+          },
+          {
+            "id": 6,
+            "amount": 6
+          },
+          {
+            "id": 7,
+            "amount": 7
+          },
+          {
+            "id": 8,
+            "amount": 8
+          },
+          {
+            "id": 9,
+            "amount": 9
+          },
+          {
+            "id": 10,
+            "amount": 10
+          },
+          {
+            "id": 11,
+            "amount": 11
+          },
+          {
+            "id": 12,
+            "amount": 12
+          },
+          {
+            "id": 13,
+            "amount": 13
+          },
+          {
+            "id": 14,
+            "amount": 14
+          },
+          {
+            "id": 15,
+            "amount": 15
+          },
+          {
+            "id": 16,
+            "amount": 16
+          },
+          {
+            "id": 42,
+            "amount": 17
+          },
+          {
+            "id": 43,
+            "amount": 18
+          },
+          {
+            "id": 44,
+            "amount": 19
+          },
+          {
+            "id": 45,
+            "amount": 20
+          },
+          {
+            "id": 46,
+            "amount": 21
+          },
+          {
+            "id": 47,
+            "amount": 22
+          },
+          {
+            "id": 48,
+            "amount": 23
+          },
+          {
+            "id": 49,
+            "amount": 24
+          },
+          {
+            "id": 50,
+            "amount": 25
+          },
+          {
+            "id": 51,
+            "amount": 26
+          },
+          {
+            "id": 52,
+            "amount": 27
+          },
+          {
+            "id": 53,
+            "amount": 28
+          },
+          {
+            "id": 54,
+            "amount": 29
+          },
+          {
+            "id": 55,
+            "amount": 30
+          },
+          {
+            "id": 56,
+            "amount": 31
+          },
+          {
+            "id": 57,
+            "amount": 32
+          },
+          {
+            "id": 58,
+            "amount": 33
+          },
+          {
+            "id": 59,
+            "amount": 34
+          },
+          {
+            "id": 60,
+            "amount": 35
+          },
+          {
+            "id": 61,
+            "amount": 36
+          },
+          {
+            "id": 62,
+            "amount": 37
+          },
+          {
+            "id": 63,
+            "amount": 38
+          },
+          {
+            "id": 64,
+            "amount": 39
+          },
+          {
+            "id": 65,
+            "amount": 40
+          },
+          {
+            "id": 66,
+            "amount": 41
+          },
+          {
+            "id": 67,
+            "amount": 42
+          },
+          {
+            "id": 99,
+            "amount": 43
+          },
+          {
+            "id": 100,
+            "amount": 44
+          },
+          {
+            "id": 101,
+            "amount": 45
+          },
+          {
+            "id": 102,
+            "amount": 46
+          },
+          {
+            "id": 106,
+            "amount": 47
+          },
+          {
+            "id": 200,
+            "amount": 48
+          },
+          {
+            "id": 201,
+            "amount": 49
+          },
+          {
+            "id": 202,
+            "amount": 50
+          },
+          {
+            "id": 203,
+            "amount": 51
+          },
+          {
+            "id": 204,
+            "amount": 52
+          },
+          {
+            "id": 205,
+            "amount": 53
+          },
+          {
+            "id": 206,
+            "amount": 54
+          },
+          {
+            "id": 207,
+            "amount": 55
+          },
+          {
+            "id": 208,
+            "amount": 56
+          },
+          {
+            "id": 209,
+            "amount": 57
+          },
+          {
+            "id": 210,
+            "amount": 58
+          },
+          {
+            "id": 211,
+            "amount": 59
+          },
+          {
+            "id": 212,
+            "amount": 60
+          },
+          {
+            "id": 213,
+            "amount": 61
+          },
+          {
+            "id": 214,
+            "amount": 62
+          },
+          {
+            "id": 215,
+            "amount": 63
+          },
+          {
+            "id": 216,
+            "amount": 64
+          },
+          {
+            "id": 217,
+            "amount": 65
+          },
+          {
+            "id": 218,
+            "amount": 66
+          },
+          {
+            "id": 219,
+            "amount": 67
+          },
+          {
+            "id": 220,
+            "amount": 68
+          },
+          {
+            "id": 221,
+            "amount": 69
+          },
+          {
+            "id": 222,
+            "amount": 70
+          },
+          {
+            "id": 223,
+            "amount": 71
+          },
+          {
+            "id": 224,
+            "amount": 72
+          },
+          {
+            "id": 225,
+            "amount": 73
+          },
+          {
+            "id": 226,
+            "amount": 74
+          },
+          {
+            "id": 227,
+            "amount": 75
+          },
+          {
+            "id": 228,
+            "amount": 76
+          },
+          {
+            "id": 229,
+            "amount": 77
+          },
+          {
+            "id": 230,
+            "amount": 78
+          },
+          {
+            "id": 231,
+            "amount": 79
+          },
+          {
+            "id": 232,
+            "amount": 80
+          },
+          {
+            "id": 233,
+            "amount": 81
+          },
+          {
+            "id": 234,
+            "amount": 82
+          },
+          {
+            "id": 235,
+            "amount": 83
+          },
+          {
+            "id": 236,
+            "amount": 84
+          },
+          {
+            "id": 237,
+            "amount": 85
+          },
+          {
+            "id": 238,
+            "amount": 86
+          },
+          {
+            "id": 239,
+            "amount": 87
+          },
+          {
+            "id": 240,
+            "amount": 88
+          },
+          {
+            "id": 241,
+            "amount": 89
+          },
+          {
+            "id": 242,
+            "amount": 90
+          },
+          {
+            "id": 243,
+            "amount": 91
+          },
+          {
+            "id": 244,
+            "amount": 92
+          },
+          {
+            "id": 245,
+            "amount": 93
+          },
+          {
+            "id": 246,
+            "amount": 94
+          },
+          {
+            "id": 247,
+            "amount": 95
+          },
+          {
+            "id": 248,
+            "amount": 96
+          },
+          {
+            "id": 249,
+            "amount": 97
+          },
+          {
+            "id": 250,
+            "amount": 98
+          },
+          {
+            "id": 251,
+            "amount": 99
+          },
+          {
+            "id": 252,
+            "amount": 100
+          },
+          {
+            "id": 253,
+            "amount": 101
+          },
+          {
+            "id": 254,
+            "amount": 102
+          },
+          {
+            "id": 255,
+            "amount": 103
+          },
+          {
+            "id": 256,
+            "amount": 104
+          },
+          {
+            "id": 257,
+            "amount": 105
+          },
+          {
+            "id": 258,
+            "amount": 106
+          },
+          {
+            "id": 259,
+            "amount": 107
+          },
+          {
+            "id": 260,
+            "amount": 108
+          },
+          {
+            "id": 261,
+            "amount": 109
+          },
+          {
+            "id": 262,
+            "amount": 110
+          },
+          {
+            "id": 263,
+            "amount": 111
+          },
+          {
+            "id": 264,
+            "amount": 112
+          },
+          {
+            "id": 265,
+            "amount": 113
+          },
+          {
+            "id": 266,
+            "amount": 114
+          },
+          {
+            "id": 267,
+            "amount": 115
+          },
+          {
+            "id": 901,
+            "amount": 116
+          },
+          {
+            "id": 10001,
+            "amount": 117
+          },
+          {
+            "id": 10002,
+            "amount": 118
+          },
+          {
+            "id": 10003,
+            "amount": 119
+          },
+          {
+            "id": 11001,
+            "amount": 120
+          },
+          {
+            "id": 11002,
+            "amount": 121
+          },
+          {
+            "id": 11003,
+            "amount": 122
+          },
+          {
+            "id": 12001,
+            "amount": 123
+          },
+          {
+            "id": 12002,
+            "amount": 124
+          },
+          {
+            "id": 13001,
+            "amount": 125
+          },
+          {
+            "id": 14001,
+            "amount": 126
+          },
+          {
+            "id": 14002,
+            "amount": 127
+          },
+          {
+            "id": 14003,
+            "amount": 128
+          },
+          {
+            "id": 14004,
+            "amount": 129
+          },
+          {
+            "id": 14005,
+            "amount": 130
+          },
+          {
+            "id": 14006,
+            "amount": 131
+          },
+          {
+            "id": 14007,
+            "amount": 132
+          },
+          {
+            "id": 14008,
+            "amount": 133
+          },
+          {
+            "id": 14009,
+            "amount": 134
+          },
+          {
+            "id": 14010,
+            "amount": 135
+          },
+          {
+            "id": 14011,
+            "amount": 136
+          },
+          {
+            "id": 14012,
+            "amount": 137
+          },
+          {
+            "id": 14013,
+            "amount": 138
+          },
+          {
+            "id": 14014,
+            "amount": 139
+          },
+          {
+            "id": 14015,
+            "amount": 140
+          },
+          {
+            "id": 14016,
+            "amount": 141
+          },
+          {
+            "id": 14017,
+            "amount": 142
+          },
+          {
+            "id": 14018,
+            "amount": 143
+          },
+          {
+            "id": 14033,
+            "amount": 144
+          },
+          {
+            "id": 14034,
+            "amount": 145
+          },
+          {
+            "id": 14035,
+            "amount": 146
+          },
+          {
+            "id": 14036,
+            "amount": 147
+          },
+          {
+            "id": 14037,
+            "amount": 148
+          },
+          {
+            "id": 14038,
+            "amount": 149
+          },
+          {
+            "id": 14040,
+            "amount": 150
+          },
+          {
+            "id": 14041,
+            "amount": 151
+          },
+          {
+            "id": 14042,
+            "amount": 152
+          },
+          {
+            "id": 14043,
+            "amount": 153
+          },
+          {
+            "id": 14044,
+            "amount": 154
+          },
+          {
+            "id": 14045,
+            "amount": 155
+          },
+          {
+            "id": 14046,
+            "amount": 156
+          },
+          {
+            "id": 20001,
+            "amount": 157
+          },
+          {
+            "id": 20002,
+            "amount": 158
+          },
+          {
+            "id": 20003,
+            "amount": 159
+          },
+          {
+            "id": 20004,
+            "amount": 160
+          }
+        ],
+        "characters": [
+          {
+            "id": 1,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 10,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 10,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 0,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111001,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 10000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111002,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 20000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111003,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 30000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111004,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 40000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111005,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 50000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111006,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 60000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111007,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 70000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111009,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 80000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111015,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 90000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111021,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 100000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111027,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 110000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111033,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 120000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111039,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 130000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111045,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 140000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111051,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 150000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111057,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 160000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111063,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 170000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111069,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 180000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111081,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 190000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111087,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 200000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111093,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 210000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111099,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 220000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111105,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 230000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111111,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 240000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111117,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 250000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111123,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 260000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111129,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 270000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111135,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 280000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111141,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 290000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111147,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 300000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111153,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 310000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111159,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 320000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111165,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 330000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111171,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 340000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111177,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 350000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 111183,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 360000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 113001,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 370000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121001,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 380000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121002,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 390000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121003,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 400000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121004,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 410000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121005,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 420000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121006,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 430000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121007,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 440000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121008,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 450000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121009,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 460000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121015,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 470000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121021,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 480000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121027,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 490000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121033,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 500000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121039,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 510000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121045,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 520000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121051,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 530000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121057,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 540000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121069,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 550000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121070,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 560000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121075,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 570000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121081,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 580000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121087,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 590000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121093,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 600000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121099,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 610000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121105,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 620000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121111,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 630000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121117,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 640000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121123,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 650000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121129,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 660000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121135,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 670000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121141,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 680000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121147,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 690000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121153,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 700000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121159,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 710000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121165,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 720000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121171,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 730000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121177,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 2,
+            "protection": 0,
+            "exp": 740000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121183,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 3,
+            "protection": 0,
+            "exp": 750000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 121189,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 4,
+            "protection": 0,
+            "exp": 760000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 123001,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 5,
+            "protection": 0,
+            "exp": 770000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 131001,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 780000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          },
+          {
+            "id": 131002,
+            "entryCount": 1,
+            "evolutionLevel": 1,
+            "overLimitStep": 1,
+            "protection": 0,
+            "exp": 790000,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          }
+        ],
+        "equipment": [
+          {
+            "id": 100001,
+            "level": 1,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 100002,
+            "level": 1,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 100003,
+            "level": 1,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 100004,
+            "level": 1,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 100005,
+            "level": 1,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 100006,
+            "level": 1,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 100007,
+            "level": 1,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 100008,
+            "level": 1,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 100009,
+            "level": 1,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 100010,
+            "level": 1,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 100011,
+            "level": 1,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 100012,
+            "level": 1,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 200001,
+            "level": 1,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 200002,
+            "level": 1,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 200003,
+            "level": 1,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 200004,
+            "level": 1,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 200005,
+            "level": 1,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 200006,
+            "level": 1,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 300001,
+            "level": 1,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 300002,
+            "level": 1,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 1010001,
+            "level": 5,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 1060001,
+            "level": 2,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 1080001,
+            "level": 3,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 2010002,
+            "level": 4,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 2020001,
+            "level": 5,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 2030001,
+            "level": 1,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 2040001,
+            "level": 2,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 2050001,
+            "level": 3,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 2070001,
+            "level": 4,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3010006,
+            "level": 5,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3010007,
+            "level": 1,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3010008,
+            "level": 2,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3010013,
+            "level": 3,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3010023,
+            "level": 1,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3010027,
+            "level": 5,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3010035,
+            "level": 1,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3010053,
+            "level": 2,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3020003,
+            "level": 1,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3020006,
+            "level": 4,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3020011,
+            "level": 5,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3020012,
+            "level": 1,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3030006,
+            "level": 2,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3030007,
+            "level": 3,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3030012,
+            "level": 4,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3030013,
+            "level": 5,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3030027,
+            "level": 1,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3040003,
+            "level": 2,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3040006,
+            "level": 3,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3040032,
+            "level": 4,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3050002,
+            "level": 5,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3050005,
+            "level": 1,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3050010,
+            "level": 2,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3060002,
+            "level": 3,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3060003,
+            "level": 4,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3060007,
+            "level": 5,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3060010,
+            "level": 1,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3070006,
+            "level": 2,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3070010,
+            "level": 3,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3070018,
+            "level": 4,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3070022,
+            "level": 5,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3080002,
+            "level": 1,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3080008,
+            "level": 2,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3080009,
+            "level": 3,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 3080017,
+            "level": 4,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 3090036,
+            "level": 5,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 3100007,
+            "level": 1,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4010003,
+            "level": 2,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4010010,
+            "level": 3,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4010014,
+            "level": 4,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4010015,
+            "level": 5,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4010017,
+            "level": 1,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4010018,
+            "level": 2,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4010021,
+            "level": 3,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4010024,
+            "level": 4,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4010048,
+            "level": 5,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4010049,
+            "level": 1,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4010052,
+            "level": 2,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4010071,
+            "level": 3,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4020007,
+            "level": 4,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4020013,
+            "level": 5,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4020014,
+            "level": 1,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4020016,
+            "level": 2,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4020019,
+            "level": 3,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4020021,
+            "level": 4,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4020033,
+            "level": 5,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4020034,
+            "level": 1,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4030003,
+            "level": 2,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4030004,
+            "level": 3,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4030008,
+            "level": 4,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4030009,
+            "level": 5,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4030014,
+            "level": 1,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4030019,
+            "level": 2,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4030024,
+            "level": 3,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4030032,
+            "level": 4,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4040007,
+            "level": 5,
+            "enhancementLevel": 4,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4040008,
+            "level": 1,
+            "enhancementLevel": 5,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4040012,
+            "level": 2,
+            "enhancementLevel": 0,
+            "protection": 0,
+            "stack": 0
+          },
+          {
+            "id": 4040021,
+            "level": 3,
+            "enhancementLevel": 1,
+            "protection": 0,
+            "stack": 1
+          },
+          {
+            "id": 4040023,
+            "level": 4,
+            "enhancementLevel": 2,
+            "protection": 0,
+            "stack": 2
+          },
+          {
+            "id": 4040024,
+            "level": 5,
+            "enhancementLevel": 3,
+            "protection": 0,
+            "stack": 0
+          }
+        ],
+        "degrees": []
+      },
+      "unsupportedMissionIds": [
+        21030,
+        25009,
+        25010,
+        25011,
+        25012,
+        25013,
+        25014,
+        25017,
+        25018,
+        25022
+      ]
+    },
+    "load-new": {
+      "statusCode": 200,
+      "activeMissionDelta": [
+        {
+          "mission_id": 99101,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": false
+            }
+          ]
+        }
+      ],
+      "allActiveMissionState": {
+        "missions": [
+          {
+            "id": 99101,
+            "progress": 1
+          }
+        ],
+        "stages": [
+          {
+            "stage": 1,
+            "status": 0,
+            "missionId": 99101
+          }
+        ]
+      },
+      "awakeMissionState": {
+        "missions": [],
+        "stages": []
+      },
+      "rewardState": {
+        "player": {
+          "freeVmoney": 100,
+          "freeMana": 2000,
+          "expPool": 0,
+          "totalManaObtained": 0
+        },
+        "items": [],
+        "characters": [
+          {
+            "id": 1,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 10,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          }
+        ],
+        "equipment": [],
+        "degrees": []
+      },
+      "unsupportedMissionIds": [
+        21030,
+        25009,
+        25010,
+        25011,
+        25012,
+        25013,
+        25014,
+        25017,
+        25018,
+        25022
+      ]
+    },
+    "receive-batch-1": {
+      "statusCode": 200,
+      "activeMissionDelta": [
+        {
+          "mission_id": 99201,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        }
+      ],
+      "allActiveMissionState": {
+        "missions": [
+          {
+            "id": 99201,
+            "progress": 1
+          }
+        ],
+        "stages": [
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99201
+          }
+        ]
+      },
+      "awakeMissionState": {
+        "missions": [],
+        "stages": []
+      },
+      "rewardState": {
+        "player": {
+          "freeVmoney": 100,
+          "freeMana": 2000,
+          "expPool": 0,
+          "totalManaObtained": 0
+        },
+        "items": [
+          {
+            "id": 992001,
+            "amount": 1
+          }
+        ],
+        "characters": [
+          {
+            "id": 1,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 10,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          }
+        ],
+        "equipment": [],
+        "degrees": []
+      },
+      "unsupportedMissionIds": [
+        21030,
+        25009,
+        25010,
+        25011,
+        25012,
+        25013,
+        25014,
+        25017,
+        25018,
+        25022
+      ]
+    },
+    "receive-batch-8": {
+      "statusCode": 200,
+      "activeMissionDelta": [
+        {
+          "mission_id": 99201,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99202,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99203,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99204,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99205,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99206,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99207,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99208,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        }
+      ],
+      "allActiveMissionState": {
+        "missions": [
+          {
+            "id": 99201,
+            "progress": 1
+          },
+          {
+            "id": 99202,
+            "progress": 1
+          },
+          {
+            "id": 99203,
+            "progress": 1
+          },
+          {
+            "id": 99204,
+            "progress": 1
+          },
+          {
+            "id": 99205,
+            "progress": 1
+          },
+          {
+            "id": 99206,
+            "progress": 1
+          },
+          {
+            "id": 99207,
+            "progress": 1
+          },
+          {
+            "id": 99208,
+            "progress": 1
+          }
+        ],
+        "stages": [
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99201
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99202
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99203
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99204
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99205
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99206
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99207
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99208
+          }
+        ]
+      },
+      "awakeMissionState": {
+        "missions": [],
+        "stages": []
+      },
+      "rewardState": {
+        "player": {
+          "freeVmoney": 100,
+          "freeMana": 2000,
+          "expPool": 0,
+          "totalManaObtained": 0
+        },
+        "items": [
+          {
+            "id": 992001,
+            "amount": 1
+          },
+          {
+            "id": 992002,
+            "amount": 1
+          },
+          {
+            "id": 992003,
+            "amount": 1
+          },
+          {
+            "id": 992004,
+            "amount": 1
+          },
+          {
+            "id": 992005,
+            "amount": 1
+          },
+          {
+            "id": 992006,
+            "amount": 1
+          },
+          {
+            "id": 992007,
+            "amount": 1
+          },
+          {
+            "id": 992008,
+            "amount": 1
+          }
+        ],
+        "characters": [
+          {
+            "id": 1,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 10,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          }
+        ],
+        "equipment": [],
+        "degrees": []
+      },
+      "unsupportedMissionIds": [
+        21030,
+        25009,
+        25010,
+        25011,
+        25012,
+        25013,
+        25014,
+        25017,
+        25018,
+        25022
+      ]
+    },
+    "receive-batch-32": {
+      "statusCode": 200,
+      "activeMissionDelta": [
+        {
+          "mission_id": 99201,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99202,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99203,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99204,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99205,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99206,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99207,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99208,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99209,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99210,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99211,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99212,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99213,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99214,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99215,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99216,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99217,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99218,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99219,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99220,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99221,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99222,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99223,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99224,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99225,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99226,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99227,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99228,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99229,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99230,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99231,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        },
+        {
+          "mission_id": 99232,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": true
+            }
+          ]
+        }
+      ],
+      "allActiveMissionState": {
+        "missions": [
+          {
+            "id": 99201,
+            "progress": 1
+          },
+          {
+            "id": 99202,
+            "progress": 1
+          },
+          {
+            "id": 99203,
+            "progress": 1
+          },
+          {
+            "id": 99204,
+            "progress": 1
+          },
+          {
+            "id": 99205,
+            "progress": 1
+          },
+          {
+            "id": 99206,
+            "progress": 1
+          },
+          {
+            "id": 99207,
+            "progress": 1
+          },
+          {
+            "id": 99208,
+            "progress": 1
+          },
+          {
+            "id": 99209,
+            "progress": 1
+          },
+          {
+            "id": 99210,
+            "progress": 1
+          },
+          {
+            "id": 99211,
+            "progress": 1
+          },
+          {
+            "id": 99212,
+            "progress": 1
+          },
+          {
+            "id": 99213,
+            "progress": 1
+          },
+          {
+            "id": 99214,
+            "progress": 1
+          },
+          {
+            "id": 99215,
+            "progress": 1
+          },
+          {
+            "id": 99216,
+            "progress": 1
+          },
+          {
+            "id": 99217,
+            "progress": 1
+          },
+          {
+            "id": 99218,
+            "progress": 1
+          },
+          {
+            "id": 99219,
+            "progress": 1
+          },
+          {
+            "id": 99220,
+            "progress": 1
+          },
+          {
+            "id": 99221,
+            "progress": 1
+          },
+          {
+            "id": 99222,
+            "progress": 1
+          },
+          {
+            "id": 99223,
+            "progress": 1
+          },
+          {
+            "id": 99224,
+            "progress": 1
+          },
+          {
+            "id": 99225,
+            "progress": 1
+          },
+          {
+            "id": 99226,
+            "progress": 1
+          },
+          {
+            "id": 99227,
+            "progress": 1
+          },
+          {
+            "id": 99228,
+            "progress": 1
+          },
+          {
+            "id": 99229,
+            "progress": 1
+          },
+          {
+            "id": 99230,
+            "progress": 1
+          },
+          {
+            "id": 99231,
+            "progress": 1
+          },
+          {
+            "id": 99232,
+            "progress": 1
+          }
+        ],
+        "stages": [
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99201
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99202
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99203
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99204
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99205
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99206
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99207
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99208
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99209
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99210
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99211
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99212
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99213
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99214
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99215
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99216
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99217
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99218
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99219
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99220
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99221
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99222
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99223
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99224
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99225
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99226
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99227
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99228
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99229
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99230
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99231
+          },
+          {
+            "stage": 1,
+            "status": 1,
+            "missionId": 99232
+          }
+        ]
+      },
+      "awakeMissionState": {
+        "missions": [],
+        "stages": []
+      },
+      "rewardState": {
+        "player": {
+          "freeVmoney": 100,
+          "freeMana": 2000,
+          "expPool": 0,
+          "totalManaObtained": 0
+        },
+        "items": [
+          {
+            "id": 992001,
+            "amount": 1
+          },
+          {
+            "id": 992002,
+            "amount": 1
+          },
+          {
+            "id": 992003,
+            "amount": 1
+          },
+          {
+            "id": 992004,
+            "amount": 1
+          },
+          {
+            "id": 992005,
+            "amount": 1
+          },
+          {
+            "id": 992006,
+            "amount": 1
+          },
+          {
+            "id": 992007,
+            "amount": 1
+          },
+          {
+            "id": 992008,
+            "amount": 1
+          },
+          {
+            "id": 992009,
+            "amount": 1
+          },
+          {
+            "id": 992010,
+            "amount": 1
+          },
+          {
+            "id": 992011,
+            "amount": 1
+          },
+          {
+            "id": 992012,
+            "amount": 1
+          },
+          {
+            "id": 992013,
+            "amount": 1
+          },
+          {
+            "id": 992014,
+            "amount": 1
+          },
+          {
+            "id": 992015,
+            "amount": 1
+          },
+          {
+            "id": 992016,
+            "amount": 1
+          },
+          {
+            "id": 992017,
+            "amount": 1
+          },
+          {
+            "id": 992018,
+            "amount": 1
+          },
+          {
+            "id": 992019,
+            "amount": 1
+          },
+          {
+            "id": 992020,
+            "amount": 1
+          },
+          {
+            "id": 992021,
+            "amount": 1
+          },
+          {
+            "id": 992022,
+            "amount": 1
+          },
+          {
+            "id": 992023,
+            "amount": 1
+          },
+          {
+            "id": 992024,
+            "amount": 1
+          },
+          {
+            "id": 992025,
+            "amount": 1
+          },
+          {
+            "id": 992026,
+            "amount": 1
+          },
+          {
+            "id": 992027,
+            "amount": 1
+          },
+          {
+            "id": 992028,
+            "amount": 1
+          },
+          {
+            "id": 992029,
+            "amount": 1
+          },
+          {
+            "id": 992030,
+            "amount": 1
+          },
+          {
+            "id": 992031,
+            "amount": 1
+          },
+          {
+            "id": 992032,
+            "amount": 1
+          }
+        ],
+        "characters": [
+          {
+            "id": 1,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 10,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          }
+        ],
+        "equipment": [],
+        "degrees": []
+      },
+      "unsupportedMissionIds": [
+        21030,
+        25009,
+        25010,
+        25011,
+        25012,
+        25013,
+        25014,
+        25017,
+        25018,
+        25022
+      ]
+    },
+    "single-finish-active": {
+      "statusCode": 200,
+      "activeMissionDelta": [
+        {
+          "mission_id": 99301,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": false
+            }
+          ]
+        }
+      ],
+      "allActiveMissionState": {
+        "missions": [
+          {
+            "id": 99301,
+            "progress": 1
+          }
+        ],
+        "stages": [
+          {
+            "stage": 1,
+            "status": 0,
+            "missionId": 99301
+          }
+        ]
+      },
+      "awakeMissionState": {
+        "missions": [
+          {
+            "id": 13,
+            "progress": 5
+          }
+        ],
+        "stages": []
+      },
+      "rewardState": {
+        "player": {
+          "freeVmoney": 160,
+          "freeMana": 2020,
+          "expPool": 13,
+          "totalManaObtained": 20
+        },
+        "items": [
+          {
+            "id": 910001,
+            "amount": 2
+          }
+        ],
+        "characters": [
+          {
+            "id": 1,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 23,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          }
+        ],
+        "equipment": [],
+        "degrees": [
+          {
+            "degreeId": 15000
+          },
+          {
+            "degreeId": 15010
+          },
+          {
+            "degreeId": 15020
+          }
+        ]
+      },
+      "unsupportedMissionIds": [
+        21030,
+        25009,
+        25010,
+        25011,
+        25012,
+        25013,
+        25014,
+        25017,
+        25018,
+        25022
+      ]
+    },
+    "single-finish-no-match": {
+      "statusCode": 200,
+      "activeMissionDelta": [],
+      "allActiveMissionState": {
+        "missions": [],
+        "stages": []
+      },
+      "awakeMissionState": {
+        "missions": [],
+        "stages": []
+      },
+      "rewardState": {
+        "player": {
+          "freeVmoney": 115,
+          "freeMana": 2020,
+          "expPool": 13,
+          "totalManaObtained": 20
+        },
+        "items": [
+          {
+            "id": 910001,
+            "amount": 2
+          }
+        ],
+        "characters": [
+          {
+            "id": 1,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 23,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          }
+        ],
+        "equipment": [],
+        "degrees": []
+      },
+      "unsupportedMissionIds": [
+        21030,
+        25009,
+        25010,
+        25011,
+        25012,
+        25013,
+        25014,
+        25017,
+        25018,
+        25022
+      ]
+    },
+    "story-finish-first": {
+      "statusCode": 200,
+      "activeMissionDelta": [
+        {
+          "mission_id": 11010,
+          "progress_value": 1,
+          "stages": [
+            {
+              "stage": 1,
+              "received": false
+            }
+          ]
+        },
+        {
+          "mission_id": 11110,
+          "progress_value": 1,
+          "stages": []
+        }
+      ],
+      "allActiveMissionState": {
+        "missions": [
+          {
+            "id": 11010,
+            "progress": 1
+          },
+          {
+            "id": 11110,
+            "progress": 1
+          }
+        ],
+        "stages": [
+          {
+            "stage": 1,
+            "status": 0,
+            "missionId": 11010
+          }
+        ]
+      },
+      "awakeMissionState": {
+        "missions": [],
+        "stages": []
+      },
+      "rewardState": {
+        "player": {
+          "freeVmoney": 115,
+          "freeMana": 2000,
+          "expPool": 0,
+          "totalManaObtained": 0
+        },
+        "items": [],
+        "characters": [
+          {
+            "id": 1,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 10,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          }
+        ],
+        "equipment": [],
+        "degrees": []
+      },
+      "unsupportedMissionIds": [
+        21030,
+        25009,
+        25010,
+        25011,
+        25012,
+        25013,
+        25014,
+        25017,
+        25018,
+        25022
+      ]
+    },
+    "story-finish-repeat": {
+      "statusCode": 200,
+      "activeMissionDelta": [],
+      "allActiveMissionState": {
+        "missions": [
+          {
+            "id": 11010,
+            "progress": 1
+          },
+          {
+            "id": 11110,
+            "progress": 1
+          }
+        ],
+        "stages": [
+          {
+            "stage": 1,
+            "status": 0,
+            "missionId": 11010
+          }
+        ]
+      },
+      "awakeMissionState": {
+        "missions": [],
+        "stages": []
+      },
+      "rewardState": {
+        "player": {
+          "freeVmoney": 115,
+          "freeMana": 2000,
+          "expPool": 0,
+          "totalManaObtained": 0
+        },
+        "items": [],
+        "characters": [
+          {
+            "id": 1,
+            "entryCount": 1,
+            "evolutionLevel": 0,
+            "overLimitStep": 0,
+            "protection": 0,
+            "exp": 10,
+            "stack": 0,
+            "manaBoardIndex": 1,
+            "exBoostStatusId": null,
+            "exBoostAbilityIdList": null,
+            "illustrationSettings": null
+          }
+        ],
+        "equipment": [],
+        "degrees": []
+      },
+      "unsupportedMissionIds": [
+        21030,
+        25009,
+        25010,
+        25011,
+        25012,
+        25013,
+        25014,
+        25017,
+        25018,
+        25022
+      ]
+    }
+  },
+  "unsupportedMissionIds": [
+    21030,
+    25009,
+    25010,
+    25011,
+    25012,
+    25013,
+    25014,
+    25017,
+    25018,
+    25022
+  ],
+  "rollback": {
+    "load": true,
+    "singleFinish": true,
+    "storyFinish": true,
+    "receive": true
+  }
+}

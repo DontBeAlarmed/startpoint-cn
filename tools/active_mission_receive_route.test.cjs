@@ -17,6 +17,7 @@ delete process.env.WDFP_DATABASE_DIR
 let db
 let restoreSnapshot = () => {}
 let restoreTime = () => {}
+const warnings = []
 
 function cleanup() {
     if (db?.open) db.close()
@@ -53,48 +54,14 @@ rewardRow[4] = "(None)"
 rewardRow[7] = "0"
 rewardRow[8] = "5"
 
-const tables = {
-    ...require("./helpers/install-bundled-gameplay-snapshot.cjs")
-        .getBundledStandardMissionTables(),
-    "daily_challenge_point_lookup.json": require("../assets/daily_challenge_point_lookup.json"),
-    "hard_multi_event.json": {},
-    "hard_multi_event_quest.json": {},
-    "periodic_reward_point.json": {},
-    "mission_regular.json": require("../assets/mission_regular.json"),
-    "mission_daily.json": require("../assets/mission_daily.json"),
-    "mission_event.json": require("../assets/mission_event.json"),
-    "mission_collect_item.json": require("../assets/mission_collect_item.json"),
-    "mission_degree.json": require("../assets/mission_degree.json"),
-    "mission_char_awake.json": require("../assets/mission_char_awake.json"),
-    "mission_weekly_def.json": require("../assets/mission_weekly_def.json"),
-    "mission_pass_daily.json": require("../assets/mission_pass_daily.json"),
-    "mission_pass_week.json": require("../assets/mission_pass_week.json"),
-    "mission_pass_event.json": require("../assets/mission_pass_event.json"),
-    "mission_active.json": { 99001: [missionRow] },
-    "mission_active_event.json": { 99: [eventRow] },
-    "mission_active_reward.json": { 99001: { 1: [rewardRow] } },
-}
-
-const { productionContentSnapshotProvider } = require("../src/content/runtime/content-snapshot")
-const previousSnapshot = productionContentSnapshotProvider.snapshot
-productionContentSnapshotProvider.snapshot = {
-    cdn: { targetVersion: "test" },
-    repository: {
-        info: () => ({
-            source: "release",
-            assetVersion: "test",
-            generatorVersion: 1,
-            releaseDigest: "sha256:test",
-        }),
-        table: tableName => {
-            if (!(tableName in tables)) throw new Error(`unexpected table ${tableName}`)
-            return tables[tableName]
-        },
+const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+restoreSnapshot = installBundledGameplaySnapshot({
+    tableOverrides: {
+        "mission_active.json": { 99001: [missionRow] },
+        "mission_active_event.json": { 99: [eventRow] },
+        "mission_active_reward.json": { 99001: { 1: [rewardRow] } },
     },
-}
-restoreSnapshot = () => {
-    productionContentSnapshotProvider.snapshot = previousSnapshot
-}
+})
 
 const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
@@ -138,34 +105,37 @@ function decodeResponse(response) {
 }
 
 async function main() {
-    const fastify = Fastify()
-    fastify.addContentTypeParser(
-        "application/x-www-form-urlencoded",
-        { parseAs: "string" },
-        (_request, body, done) => done(null, unpack(Buffer.from(body, "base64"))),
-    )
-    fastify.addHook("onSend", (_request, reply, payload, done) => {
-        if (String(reply.getHeader("content-type")).includes("application/x-msgpack")) {
-            done(null, pack(payload).toString("base64"))
-            return
-        }
-        done(null, payload)
-    })
-    await fastify.register(activeMissionRoutes, { prefix: "/api/index.php/active_mission" })
-    await fastify.ready()
-
-    const request = () => fastify.inject({
-        method: "POST",
-        url: "/api/index.php/active_mission/receive",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        payload: encodeRequest({
-            viewer_id: viewerId,
-            api_count: 1,
-            active_mission_list: [{ mission_id: 99001, stages: [1] }],
-        }),
-    })
-
+    const originalConsoleWarn = console.warn
+    let fastify
+    console.warn = (...args) => warnings.push(args.map(String).join(" "))
     try {
+        fastify = Fastify()
+        fastify.addContentTypeParser(
+            "application/x-www-form-urlencoded",
+            { parseAs: "string" },
+            (_request, body, done) => done(null, unpack(Buffer.from(body, "base64"))),
+        )
+        fastify.addHook("onSend", (_request, reply, payload, done) => {
+            if (String(reply.getHeader("content-type")).includes("application/x-msgpack")) {
+                done(null, pack(payload).toString("base64"))
+                return
+            }
+            done(null, payload)
+        })
+        await fastify.register(activeMissionRoutes, { prefix: "/api/index.php/active_mission" })
+        await fastify.ready()
+
+        const request = () => fastify.inject({
+            method: "POST",
+            url: "/api/index.php/active_mission/receive",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            payload: encodeRequest({
+                viewer_id: viewerId,
+                api_count: 1,
+                active_mission_list: [{ mission_id: 99001, stages: [1] }],
+            }),
+        })
+
         const locked = await request()
         assert.equal(locked.statusCode, 400, locked.body)
         assert.equal(JSON.parse(locked.body).message, "Active mission is not available.")
@@ -191,10 +161,45 @@ async function main() {
         assert.equal(repeated.statusCode, 200, repeated.body)
         assert.deepEqual(decodeResponse(repeated).data.active_mission_list, [])
         assert.equal(getPlayerSync(playerId).freeVmoney, vmoneyBefore + 5)
+        assert.equal(
+            warnings.some(message => /character\.json/i.test(message)),
+            false,
+            `bundled fixture must provide character.json: ${warnings.join("\n")}`,
+        )
     } finally {
-        await fastify.close()
-        cleanup()
-        process.removeListener("exit", cleanup)
+        console.warn = originalConsoleWarn
+        let closeError = null
+        let cleanupError = null
+        try {
+            if (fastify) await fastify.close()
+        } catch (error) {
+            closeError = error
+        } finally {
+            try {
+                cleanup()
+            } catch (error) {
+                cleanupError = error
+            } finally {
+                try {
+                    process.removeListener("exit", cleanup)
+                } catch (error) {
+                    cleanupError = cleanupError === null
+                        ? error
+                        : new AggregateError([cleanupError, error], "receive route cleanup failed")
+                }
+            }
+        }
+        if (closeError !== null) {
+            if (cleanupError !== null) {
+                if (closeError instanceof Error && closeError.cause === undefined) {
+                    closeError.cause = cleanupError
+                } else {
+                    throw new AggregateError([closeError, cleanupError], "receive route close and cleanup failed")
+                }
+            }
+            throw closeError
+        }
+        if (cleanupError !== null) throw cleanupError
     }
 }
 

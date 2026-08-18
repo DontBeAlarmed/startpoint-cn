@@ -440,6 +440,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/perf/mission_engine_focused_baseline.test.cjs",
             "tools/perf/mission_engine_focused_runner.test.cjs",
             "tools/perf/active_mission_metrics.test.cjs",
+            "tools/perf/active-mission/baseline.test.cjs",
             "tools/perf/mission_entry_base_oracle.test.cjs",
             "tools/perf/mission_entry_layered_load.test.cjs",
             "tools/perf/mission_entry_load_metrics.test.cjs",
