@@ -35,6 +35,23 @@ async function postCnRequest(app, url, payload, headers = {}) {
     return decodeHttpResponse(response)
 }
 
+function requireSuccessfulCnResponse(response, entry) {
+    if (response.statusCode !== 200) {
+        throw new Error(`${entry} route failed with ${response.statusCode}: ${JSON.stringify(response.payload)}`)
+    }
+    if (response.payload === null || typeof response.payload !== "object") {
+        throw new Error(`${entry} route returned an invalid payload`)
+    }
+    if (response.payload.data_headers?.result_code !== 1) {
+        throw new Error(`${entry} result_code must be 1`)
+    }
+    const contentType = String(response.headers?.["content-type"] ?? "")
+    if (!contentType.includes("application/x-msgpack")) {
+        throw new Error(`${entry} response content-type must include application/x-msgpack`)
+    }
+    return response.payload
+}
+
 function isPlainObject(value) {
     if (value === null || typeof value !== "object") return false
     const prototype = Object.getPrototypeOf(value)
@@ -108,4 +125,5 @@ module.exports = {
     decodeHttpResponse,
     encodeCnRequest,
     postCnRequest,
+    requireSuccessfulCnResponse,
 }

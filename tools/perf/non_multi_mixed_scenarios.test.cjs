@@ -13,7 +13,6 @@ const previousDataDirectory = process.env.DATA_DIR
 const previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR
 process.env.DATA_DIR = databaseDirectory
 delete process.env.WDFP_DATABASE_DIR
-
 let app = null
 let data = null
 let restoreContentSnapshot = () => {}
@@ -26,13 +25,13 @@ function restoreEnvironment() {
     if (previousDatabaseDirectory === undefined) delete process.env.WDFP_DATABASE_DIR
     else process.env.WDFP_DATABASE_DIR = previousDatabaseDirectory
 }
-
 async function cleanup() {
     if (cleaned) return
     cleaned = true
     const errors = []
     for (const action of [
         async () => { if (app) await app.close() },
+        () => restoreActiveQuests(activeQuestsFixture.initial),
         () => data?.closeDatabase(),
         () => restoreContentSnapshot(),
         () => restoreTime(),
@@ -44,9 +43,9 @@ async function cleanup() {
     if (errors.length === 1) throw errors[0]
     if (errors.length > 1) throw new AggregateError(errors, "scenario test cleanup failed")
 }
-
 process.once("exit", () => {
     if (cleaned) return
+    try { restoreActiveQuests(activeQuestsFixture.initial) } catch {}
     try { data?.closeDatabase() } catch {}
     try { restoreContentSnapshot() } catch {}
     try { restoreTime() } catch {}
@@ -54,7 +53,6 @@ process.once("exit", () => {
     restoreEnvironment()
 })
 test.after(cleanup)
-
 data = require("../../src/data")
 const { getDb } = require("../../src/data/db")
 const { insertAccountSync } = require("../../src/data/domains/account")
@@ -65,7 +63,9 @@ const cnLoadRoutes = require("../../src/routes/cn/load").default
 const { registerCnMsgpackOnSend } = require("../../src/routes/cn/msgpack")
 const cnToolRoutes = require("../../src/routes/cn/tool").default
 const missionRoutes = require("../../src/routes/api/mission").default
+const singleBattleRoutes = require("../../src/routes/api/singleBattleQuest").default
 const { getTimeOffset, setServerTimeOffset } = require("../../src/utils")
+const { activeQuests } = require("../../src/lib/quest/active-quest-service")
 const originalTimeOffset = getTimeOffset()
 restoreTime = () => setServerTimeOffset(originalTimeOffset)
 const {
@@ -77,10 +77,18 @@ const {
 } = require("./non_multi_mixed_http.cjs")
 const { executeScenario } = require("./non_multi_mixed_scenarios.cjs")
 const {
+    createActiveQuestSentinel,
+    prepareSingleBattleIdentity,
+} = require("./non_multi_mixed_battle.cjs")
+const {
+    prepareActiveQuests,
+    restoreActiveQuests,
+} = require("./non_multi_mixed_active_quests.cjs")
+const {
     projectNonMultiMixedOwnerState,
     snapshotNonMultiMixedOwnerState,
 } = require("./non_multi_mixed_state_snapshot.cjs")
-
+const activeQuestsFixture = prepareActiveQuests({ createSentinel: createActiveQuestSentinel })
 const FIXED_SERVER_TIME = "2024-08-14T12:00:00.000Z"
 function assertOtherOwnersUnchanged(before, after, targetIdentity) {
     assert.deepEqual(
@@ -88,7 +96,6 @@ function assertOtherOwnersUnchanged(before, after, targetIdentity) {
         projectNonMultiMixedOwnerState(before, targetIdentity),
     )
 }
-
 function inspectAuthIdentity(db, identity) {
     const binding = db.prepare(`
         SELECT device_id, account_id FROM device_bindings WHERE device_id = ?
@@ -99,10 +106,11 @@ function inspectAuthIdentity(db, identity) {
     `).all(identity.accountId, SessionType.VIEWER)
     return { binding, viewerSessions }
 }
-
-test("auth, load, and mission-progress use isolated real CN HTTP journeys", async () => {
+test("auth, load, mission-progress, and single-battle use isolated real CN HTTP journeys", async () => {
     setServerTimeOffset(Date.parse(FIXED_SERVER_TIME) - Date.now())
-    restoreContentSnapshot = installBundledGameplaySnapshot()
+    restoreContentSnapshot = installBundledGameplaySnapshot({
+        additionalTableNames: ["event_item_shop.json", "event_item_shop_id_map.json"],
+    })
     data.initializeDatabase()
     const db = getDb()
     const pool = seedNonMultiMixedFixture({
@@ -137,10 +145,40 @@ test("auth, load, and mission-progress use isolated real CN HTTP journeys", asyn
                 },
             },
             { plugin: missionRoutes, prefix: "/api/index.php/mission" },
+            { plugin: singleBattleRoutes, prefix: "/api/index.php/single_battle_quest" },
         ],
     })
     const byEntry = Object.fromEntries(pool.identities.map(identity => [identity.entryName, identity]))
-    const context = { inspectAuthIdentity: identity => inspectAuthIdentity(db, identity) }
+    prepareSingleBattleIdentity(db, byEntry["single-battle"])
+    let snapshotSingleBattleCalls = 0
+    const context = {
+        inspectAuthIdentity: identity => inspectAuthIdentity(db, identity),
+        prepareSingleBattleIdentity: identity => prepareSingleBattleIdentity(db, identity),
+        singleBattlePeer: byEntry.auth,
+        snapshotSingleBattleState: () => {
+            snapshotSingleBattleCalls++
+            return {
+                db: snapshotNonMultiMixedOwnerState(db),
+                memory: structuredClone(activeQuests),
+            }
+        },
+        getMultiRecoveryInspections: () => multiRecoveryInspections,
+    }
+
+    assert.deepEqual(
+        db.prepare(`
+            SELECT id FROM players_characters
+            WHERE player_id = ? ORDER BY id
+        `).all(byEntry["single-battle"].playerId),
+        [{ id: 1 }],
+    )
+    assert.equal(
+        db.prepare(`
+            SELECT character_id_1 FROM players_parties
+            WHERE player_id = ? AND slot = 2 AND group_id = 1 AND category = 1
+        `).get(byEntry["single-battle"].playerId)?.character_id_1,
+        1,
+    )
 
     let before = snapshotNonMultiMixedOwnerState(db)
     const authPlayerBefore = db.prepare("SELECT * FROM players WHERE id = ?")
@@ -209,7 +247,49 @@ test("auth, load, and mission-progress use isolated real CN HTTP journeys", asyn
     assert.doesNotThrow(() => JSON.stringify(mission))
     assertOtherOwnersUnchanged(before, after, byEntry["mission-progress"])
 
-    for (const entry of ["single-battle", "shop", "gacha", "mail", "unknown"]) {
+    before = after
+    const singleBattle = await executeScenario(app, byEntry["single-battle"], context)
+    after = snapshotNonMultiMixedOwnerState(db)
+    assert.deepEqual(singleBattle, {
+        entry: "single-battle",
+        adapter: "fastify-route:/api/index.php/single_battle_quest/start->finish",
+        statusCode: 200,
+        resultCode: 1,
+        viewerId: byEntry["single-battle"].viewerId,
+        category: 1,
+        questId: 1001002,
+        playId: "non-multi-mixed-single-battle",
+        isMulti: "single",
+        start: {
+            activeQuest: {
+                playId: "non-multi-mixed-single-battle",
+                questId: 1001002,
+                category: 1,
+                isMulti: false,
+                continueCount: 0,
+            },
+            stamina: { before: 100, after: 94, spent: 6 },
+        },
+        finish: {
+            activeQuest: null,
+            stamina: { before: 94, after: 94, delta: 0 },
+            reward: { rewardMana: 20, fieldMana: 11, rewardPoolExp: 13 },
+            missionProgressChanged: true,
+        },
+        repeatedFinishRejected: true,
+        negativeLifecycle: {
+            crossOwnerFinishRejected: true,
+            wrongPlayIdFinishRejected: true,
+            duplicateStartRejected: true,
+        },
+        multiRecoveryInspections: 0,
+    })
+    assert.deepEqual(activeQuests[activeQuestsFixture.sentinelKey], createActiveQuestSentinel())
+    assert.equal(snapshotSingleBattleCalls, 8)
+    assertOtherOwnersUnchanged(before, after, byEntry["single-battle"])
+
+    // Unsupported dispatcher entries stay fail-closed; do not emit meaningless HTTP requests.
+    for (const entry of ["shop", "gacha", "mail", "unknown"]) {
         const identity = entry === "unknown"
             ? { ...byEntry.auth, entryName: entry }
             : byEntry[entry]

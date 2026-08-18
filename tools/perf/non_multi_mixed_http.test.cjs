@@ -2,9 +2,51 @@
 
 const assert = require("node:assert/strict")
 const test = require("node:test")
+const { pack } = require("msgpackr")
 const {
     createNonMultiMixedHttpHarness,
 } = require("./non_multi_mixed_http.cjs")
+const { executeScenario } = require("./non_multi_mixed_scenarios.cjs")
+
+function responseApp(payload, { msgpack = false } = {}) {
+    return {
+        async inject() {
+            return {
+                statusCode: 200,
+                headers: {
+                    "content-type": msgpack ? "application/x-msgpack" : "application/json",
+                },
+                body: msgpack ? pack(payload).toString("base64") : JSON.stringify(payload),
+            }
+        },
+    }
+}
+
+function validLoadPayload() {
+    return {
+        data_headers: { result_code: 1, viewer_id: 11, asset_update: false },
+        data: {
+            available_asset_version: "1.4.54",
+            character_list: [],
+            equipment_list: {},
+            item_list: [],
+            unfinished_quest_list: [],
+            unfinished_multi_quest_list: [],
+        },
+    }
+}
+
+test("successful lifecycle responses reject JSON 200 and accept CN MsgPack 200", async () => {
+    const identity = { entryName: "load", accountId: 11, playerId: 21, viewerId: 31 }
+    await assert.rejects(
+        () => executeScenario(responseApp(validLoadPayload()), identity),
+        /application\/x-msgpack/,
+    )
+    assert.equal(
+        (await executeScenario(responseApp(validLoadPayload(), { msgpack: true }), identity)).resultCode,
+        1,
+    )
+})
 
 function createLifecycleProbe({ failAt, closeFails = false } = {}) {
     const calls = { close: 0, factory: 0 }

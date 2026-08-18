@@ -3,7 +3,13 @@
 const {
     createMissionProgressSummary,
 } = require("./mission_engine_focused_helpers.cjs")
-const { postCnRequest } = require("./non_multi_mixed_http.cjs")
+const {
+    postCnRequest,
+    requireSuccessfulCnResponse,
+} = require("./non_multi_mixed_http.cjs")
+const {
+    executeSingleBattleScenario,
+} = require("./non_multi_mixed_battle.cjs")
 
 const LOAD_RES_VERSION = "1.4.54"
 const VIEWER_SESSION_TYPE = 2
@@ -12,19 +18,6 @@ function isPlainObject(value) {
     if (value === null || typeof value !== "object") return false
     const prototype = Object.getPrototypeOf(value)
     return prototype === Object.prototype || prototype === null
-}
-
-function requireSuccessfulResponse(response, entry) {
-    if (response.statusCode !== 200) {
-        throw new Error(`${entry} route failed with ${response.statusCode}: ${JSON.stringify(response.payload)}`)
-    }
-    if (response.payload === null || typeof response.payload !== "object") {
-        throw new Error(`${entry} route returned an invalid payload`)
-    }
-    if (response.payload.data_headers?.result_code !== 1) {
-        throw new Error(`${entry} result_code must be 1`)
-    }
-    return response.payload
 }
 
 function countCollection(value) {
@@ -85,7 +78,7 @@ async function executeAuth(app, identity, context) {
         device_id: identity.deviceId,
         channelNo: "performance_fixture",
     }, { udid: `performance-fixture-${identity.deviceId}` })
-    const payload = requireSuccessfulResponse(response, "auth")
+    const payload = requireSuccessfulCnResponse(response, "auth")
     const after = await context.inspectAuthIdentity(identity)
     if (!validAuthState(after)) throw new Error("auth identity state is invalid after signup")
 
@@ -124,7 +117,7 @@ async function executeLoad(app, identity) {
         platform_os_version: "test",
         storage_directory_path: "",
     }, { res_ver: LOAD_RES_VERSION })
-    const payload = requireSuccessfulResponse(response, "load")
+    const payload = requireSuccessfulCnResponse(response, "load")
     if (payload.data_headers?.viewer_id !== identity.accountId) {
         throw new Error("load viewer_id must match the identity account")
     }
@@ -175,7 +168,7 @@ async function executeMissionProgress(app, identity) {
             category_list: [{ category: 1 }],
         },
     )
-    const payload = requireSuccessfulResponse(response, "mission-progress")
+    const payload = requireSuccessfulCnResponse(response, "mission-progress")
     if (payload.data_headers?.viewer_id !== identity.viewerId) {
         throw new Error("mission-progress viewer_id must match the identity")
     }
@@ -202,6 +195,7 @@ async function executeScenario(app, identity, context = {}) {
     if (entry === "auth") return executeAuth(app, identity, context)
     if (entry === "load") return executeLoad(app, identity)
     if (entry === "mission-progress") return executeMissionProgress(app, identity)
+    if (entry === "single-battle") return executeSingleBattleScenario(app, identity, context)
     throw new Error(`unsupported non-multi mixed scenario: ${String(entry)}`)
 }
 

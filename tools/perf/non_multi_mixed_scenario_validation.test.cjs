@@ -4,6 +4,7 @@ const assert = require("node:assert/strict")
 const test = require("node:test")
 const { pack } = require("msgpackr")
 const { executeScenario } = require("./non_multi_mixed_scenarios.cjs")
+const { requireRejected } = require("./non_multi_mixed_battle.cjs")
 const {
     projectNonMultiMixedOwnerState,
     quoteSqlIdentifier,
@@ -73,6 +74,24 @@ function validMissionPayload(identity) {
     }
 }
 
+test("single battle rejection helper accepts only the expected bad-request shape", () => {
+    assert.doesNotThrow(() => requireRejected({
+        statusCode: 400,
+        payload: { error: "Bad Request", message: "invalid active quest" },
+    }, "expected rejection"))
+    for (const response of [
+        { statusCode: 500, payload: { error: "Internal Server Error" } },
+        { statusCode: 200, payload: { data_headers: { result_code: 0 } } },
+        { statusCode: 400, payload: { error: "Unexpected Error" } },
+        { statusCode: 400, payload: "Bad Request" },
+    ]) {
+        assert.throws(
+            () => requireRejected(response, "malformed rejection"),
+            /must be rejected with HTTP 400 Bad Request/,
+        )
+    }
+})
+
 test("all scenarios reject HTTP 200 responses with a non-success result code", async () => {
     const cases = [
         ["auth", identity => ({
@@ -115,7 +134,7 @@ test("auth rejects a viewer session with the wrong token or type", async () => {
     ]) {
         await assert.rejects(
             () => executeScenario(
-                responseApp(payload),
+                responseApp(payload, 200, { msgpack: true }),
                 identity,
                 validAuthContext(identity, sessionOverrides),
             ),
@@ -136,7 +155,7 @@ test("load rejects mismatched viewer and client-owned asset state", async () => 
         const payload = validLoadPayload(identity)
         mutate(payload)
         await assert.rejects(
-            () => executeScenario(responseApp(payload), identity),
+            () => executeScenario(responseApp(payload, 200, { msgpack: true }), identity),
             /viewer_id|asset_update|available_asset_version/,
             label,
         )
@@ -158,7 +177,7 @@ test("load rejects missing and malformed response collections", async () => {
             if (missing) delete payload.data[field]
             else payload.data[field] = invalidValue
             await assert.rejects(
-                () => executeScenario(responseApp(payload), identity),
+                () => executeScenario(responseApp(payload, 200, { msgpack: true }), identity),
                 new RegExp(field),
             )
         }
@@ -177,7 +196,7 @@ test("mission-progress rejects viewer mismatch and absent progress", async () =>
         const payload = validMissionPayload(identity)
         mutate(payload)
         await assert.rejects(
-            () => executeScenario(responseApp(payload), identity),
+            () => executeScenario(responseApp(payload, 200, { msgpack: true }), identity),
             /viewer_id|mission_progress_list/,
             label,
         )
