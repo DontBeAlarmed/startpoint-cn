@@ -358,6 +358,8 @@ const SOURCE_RULES = [
         pattern: /^(?:tools\/perf\/mission_engine_focused_(?:admission|baseline|helpers|report|runner|scenarios)(?:\.test)?\.cjs|tools\/perf\/__snapshots__\/mission_engine_focused_baseline\.json)$/,
         groups: ["integration:mission"],
     },
+    { pattern: /^tools\/perf\/active-mission\//, groups: ["integration:mission"] },
+    { pattern: /^tools\/perf\/active_mission_metrics\.test\.cjs$/, groups: ["integration:mission"] },
     {
         pattern: /^(?:tools\/perf\/mission_entry_(?:base_oracle|layered_load|load_metrics|load_scenarios)(?:\.test)?\.cjs|tools\/perf\/__snapshots__\/mission_entry_layered_load_reference\.json)$/,
         groups: ["integration:mission"],
@@ -409,6 +411,9 @@ const SOURCE_RULES = [
         pattern: /^src\/lib\/mission\/active-mission-specific-battle-facts\.ts$/,
         groups: ["integration:mission"],
     },
+    { pattern: /^src\/lib\/mission\/active-.*\.ts$/, groups: ["integration:mission"] },
+    { pattern: /^src\/routes\/api\/activeMission\.ts$/, groups: ["integration:mission"] },
+    { pattern: /^src\/data\/domains\/active_mission(?:_.*)?\.ts$/, groups: ["integration:mission"] },
     {
         pattern: /^(?:assets\/server\/npc_contributor_names\.json|tools\/npc_contributor_names(?:\.test)?\.cjs)$/,
         groups: ["quick:protocol"],

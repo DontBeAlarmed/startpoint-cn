@@ -1,0 +1,120 @@
+"use strict"
+
+const assert = require("node:assert/strict")
+const test = require("node:test")
+
+const { createActiveMissionObserver } = require("./active-mission/observer.cjs")
+const {
+    evaluateActiveMissionReport,
+} = require("./active-mission/admission.cjs")
+const {
+    describeActiveMissionFixture,
+    normalizeActiveMissionScenario,
+} = require("./active-mission/fixture.cjs")
+
+function validReport(overrides = {}) {
+    return {
+        version: 1,
+        fixture: { name: "new-account", profile: "New" },
+        behaviorHash: "a".repeat(64),
+        unsupportedMissionIds: [21030],
+        factLoaders: {
+            characters: { calls: 1, rows: 13 },
+        },
+        structural: {
+            sqlReads: 10,
+            sqlWrites: 2,
+            definitionVisits: 1,
+            loaderCalls: 1,
+            staticComputes: 1,
+            dependencyComputes: 1,
+        },
+        ...overrides,
+    }
+}
+
+test("observer separates static and dependency computes", () => {
+    const observer = createActiveMissionObserver()
+
+    observer.definitionVisited(11010)
+    observer.factLoaded("characters", 13)
+    observer.staticComputed(11010)
+    observer.dependencyComputed(11090)
+
+    assert.deepEqual(observer.snapshot(), {
+        definitionVisits: 1,
+        factLoaders: { characters: { calls: 1, rows: 13 } },
+        staticComputes: 1,
+        dependencyComputes: 1,
+    })
+})
+
+test("observer snapshot is stable and immutable", () => {
+    const observer = createActiveMissionObserver()
+    observer.factLoaded("equipment", 2)
+    observer.factLoaded("characters", 1)
+
+    const snapshot = observer.snapshot()
+    assert.deepEqual(Object.keys(snapshot.factLoaders), ["characters", "equipment"])
+    assert.throws(() => { snapshot.factLoaders.characters.calls = 99 }, TypeError)
+    assert.deepEqual(observer.snapshot().factLoaders.characters, { calls: 1, rows: 1 })
+})
+
+test("admission rejects changed fail-closed ids", () => {
+    const baseline = validReport()
+    const current = validReport({ unsupportedMissionIds: [21030, 25009] })
+
+    const admission = evaluateActiveMissionReport(baseline, current)
+
+    assert.equal(admission.behaviorEquivalent, false)
+    assert.equal(admission.admitted, false)
+    assert.equal(admission.unsupportedMissionSetEquivalent, false)
+})
+
+test("admission rejects sparse arrays, NaN, negative values, and contradictory metrics fail closed", () => {
+    const malformedReports = [
+        { ...validReport(), unsupportedMissionIds: Object.assign([], { 1: 21030, length: 2 }) },
+        { ...validReport(), structural: { ...validReport().structural, sqlReads: Number.NaN } },
+        { ...validReport(), unsupportedMissionIds: [-1] },
+        {
+            ...validReport(),
+            structural: { ...validReport().structural, loaderCalls: 2 },
+        },
+    ]
+
+    for (const malformed of malformedReports) {
+        let admission
+        assert.doesNotThrow(() => {
+            admission = evaluateActiveMissionReport(validReport(), malformed)
+        })
+        for (const gate of [
+            "behaviorEquivalent",
+            "unsupportedMissionSetEquivalent",
+            "structuralNonIncreasing",
+            "reportStructureValid",
+            "metricsValid",
+        ]) assert.equal(admission[gate], false, gate)
+        assert.equal(admission.admitted, false)
+    }
+})
+
+test("fixture scale contract reuses mission settlement scenario semantics", () => {
+    assert.deepEqual(normalizeActiveMissionScenario("New"), "new-account")
+    assert.deepEqual(normalizeActiveMissionScenario("Small"), "normal-progress")
+    assert.deepEqual(normalizeActiveMissionScenario("Large"), "high-completion-volume")
+    assert.deepEqual(describeActiveMissionFixture("New"), {
+        name: "new-account",
+        profile: "New",
+    })
+    assert.deepEqual(describeActiveMissionFixture("Small"), {
+        name: "normal-progress",
+        profile: "Small",
+        scale: 3,
+    })
+    assert.deepEqual(describeActiveMissionFixture("Large"), {
+        name: "high-completion-volume",
+        profile: "Large",
+        scale: 20,
+    })
+    assert.throws(() => normalizeActiveMissionScenario("medium"), /unknown active mission scenario/i)
+})

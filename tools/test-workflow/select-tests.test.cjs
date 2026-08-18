@@ -1094,6 +1094,31 @@ test("routes focused mission performance admission files to the mission group", 
     }
 })
 
+test("routes active mission focused metrics and production boundaries to the mission group", () => {
+    for (const file of [
+        "tools/perf/active-mission/fixture.cjs",
+        "tools/perf/active-mission/observer.cjs",
+        "tools/perf/active-mission/report.cjs",
+        "tools/perf/active-mission/admission.cjs",
+        "tools/perf/active_mission_metrics.test.cjs",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["integration:mission"], file)
+    }
+    assert.deepEqual(selectTestGroups(["src/routes/api/activeMission.ts"]), [
+        "full",
+        "integration:mission",
+    ])
+    assert.deepEqual(selectTestGroups(["src/data/domains/active_mission_counters.ts"]), [
+        "full",
+        "integration:database",
+        "integration:mission",
+    ])
+    assert.deepEqual(selectTestGroups(["src/data/domains/mission.ts"]), [
+        "full",
+        "integration:database",
+    ])
+})
+
 test("keeps external data concerns out of self-contained runtime tests", () => {
     const runtimeTests = [
         "tools/score_attack_event.test.cjs",
@@ -1304,6 +1329,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/perf/mission_engine_focused_admission.test.cjs",
         "tools/perf/mission_engine_focused_baseline.test.cjs",
         "tools/perf/mission_engine_focused_runner.test.cjs",
+        "tools/perf/active_mission_metrics.test.cjs",
         "tools/perf/mission_entry_base_oracle.test.cjs",
         "tools/perf/mission_entry_layered_load.test.cjs",
         "tools/perf/mission_entry_load_metrics.test.cjs",
