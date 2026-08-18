@@ -158,6 +158,10 @@ const CHARACTER_MANA_ADMISSION_SOURCES = [
     "master/character/character_level.orderedmap",
 ] as const
 
+const CHARACTER_MANA_ADMISSION_BUNDLED_SOURCES = [
+    "assets/content-seeds/character_level_apk_3_5.json",
+] as const
+
 const CHARACTER_MANA_ADMISSION_TABLES = [
     "character_level.json",
     "level_required_mana_node.json",
@@ -192,6 +196,7 @@ const ITEM_EQUIPMENT_TABLES = [
 
 const BUNDLED_TABLE_NAMES = [
     "cdndata/player_rank_full.json",
+    "content-seeds/character_level_apk_3_5.json",
     "encyclopedia.json",
     "mission_event_battle_rules.json",
     "mission_event_quest_map.json",
@@ -283,9 +288,10 @@ function characterManaAdmissionDefinition(tableName: string): TableSourceInput {
         tableName,
         scope: "cdn",
         sourceOrderedMaps: CHARACTER_MANA_ADMISSION_SOURCES,
+        bundledSources: CHARACTER_MANA_ADMISSION_BUNDLED_SOURCES,
         converterId: "character-mana-admission",
-        converterVersion: 1,
-        outputShapeVersion: 1,
+        converterVersion: 2,
+        outputShapeVersion: 2,
     }
 }
 

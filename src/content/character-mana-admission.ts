@@ -73,12 +73,21 @@ export function parseLevelRequiredManaNodeTable(value: unknown): LevelRequiredMa
 
 export function parseCharacterLevelTable(value: unknown): CharacterLevelTable {
     const source = record(value, "character level table")
-    if (Object.keys(source).length === 0) throw new Error("character level table is empty")
+    if (Object.keys(source).sort().join(",") !== "1,2,3,4,5") {
+        throw new Error("character level rarity keys must be 1 through 5")
+    }
     const result: Record<string, Record<string, number>> = {}
     for (const [rarityText, rawCurve] of Object.entries(source)) {
         const rarity = canonicalKey(rarityText, "character level rarity")
         if (rarity > 5) throw new Error(`character level has unknown rarity ${rarity}`)
         const curve = record(rawCurve, `character level rarity ${rarity}`)
+        if (Object.keys(curve).length !== 100
+            || Array.from({ length: 100 }, (_, index) => String(index + 1))
+                .some(level => !Object.prototype.hasOwnProperty.call(curve, level))) {
+            throw new Error(
+                `character level rarity ${rarity} must contain exactly levels 1 through 100`,
+            )
+        }
         const resultCurve: Record<string, number> = {}
         let expectedLevel = 1
         let previous = -1
@@ -99,7 +108,6 @@ export function parseCharacterLevelTable(value: unknown): CharacterLevelTable {
             expectedLevel += 1
             previous = rawTotal
         }
-        if (expectedLevel === 1) throw new Error(`character level rarity ${rarity} is empty`)
         result[rarityText] = resultCurve
     }
     return deepFreeze(result)

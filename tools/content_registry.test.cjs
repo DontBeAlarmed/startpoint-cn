@@ -201,6 +201,8 @@ const EXPECTED_MANA_NODE_CDN_TABLES = Object.freeze({
     "mana_node.json": ["master/mana_board/mana_node.orderedmap"],
 })
 
+const CHARACTER_LEVEL_BUNDLED_SEED = "assets/content-seeds/character_level_apk_3_5.json"
+
 const EXPECTED_CHARACTER_MANA_ADMISSION_CDN_TABLES = Object.freeze({
     "character_level.json": [
         "master/mana_board/level_required_mana_node.orderedmap",
@@ -289,6 +291,7 @@ const EXPECTED_BUNDLED_TABLES = Object.freeze([
     "character_quest_lookup.json",
     "character_level.json",
     "clear_reward.json",
+    "content-seeds/character_level_apk_3_5.json",
     "daily_challenge_point_lookup.json",
     "daily_exp_mana_event_quest.json",
     "daily_week_event_quest.json",
@@ -519,6 +522,10 @@ test("registry derives character mana admission tables as one authoritative clos
         assert.equal(entry.scope, "cdn", tableName)
         assert.equal(entry.converterId, "character-mana-admission", tableName)
         assert.deepEqual(entry.sourceOrderedMaps, sources, tableName)
+        assert.deepEqual(entry.bundledSources, [CHARACTER_LEVEL_BUNDLED_SEED], tableName)
+        assert.deepEqual(entry.manifestSources, [...sources, CHARACTER_LEVEL_BUNDLED_SEED], tableName)
+        assert.equal(entry.converterVersion, 2, tableName)
+        assert.equal(entry.outputShapeVersion, 2, tableName)
     }
 })
 
@@ -660,7 +667,7 @@ test("registry independently covers static CN runtime JSON references", () => {
 })
 
 test("every registry table has an explicit existing bundled fallback", () => {
-    assert.equal(TABLE_SOURCES.length, 125)
+    assert.equal(TABLE_SOURCES.length, 126)
     for (const entry of TABLE_SOURCES) {
         const sourcePath = path.resolve(projectRoot, entry.bundledPath)
         assert.ok(fs.existsSync(sourcePath), `${entry.tableName} source must exist`)

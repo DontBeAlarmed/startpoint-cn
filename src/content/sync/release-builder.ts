@@ -35,6 +35,7 @@ import {
 } from "../converters/mana-node"
 import {
     convertCharacterManaAdmissionTables,
+    type CharacterManaAdmissionConversionCompatibility,
     type CharacterManaAdmissionConversionOutput,
     type CharacterManaAdmissionSourceReader,
 } from "../converters/character-mana-admission"
@@ -141,6 +142,7 @@ export interface DefaultContentTableBuilderDependencies {
     ) => ManaNodeConversionOutput | Promise<ManaNodeConversionOutput>
     readonly convertCharacterManaAdmissionTables?: (
         reader: CharacterManaAdmissionSourceReader,
+        compatibility: CharacterManaAdmissionConversionCompatibility,
     ) => CharacterManaAdmissionConversionOutput | Promise<CharacterManaAdmissionConversionOutput>
     readonly convertItemEquipmentTables?: (
         reader: ItemEquipmentSourceReader,
@@ -511,7 +513,11 @@ export function createDefaultContentTableBuilder(
                 addConverterOutput(
                     values,
                     "character-mana-admission",
-                    await characterManaAdmissionConverter(reader),
+                    await characterManaAdmissionConverter(reader, {
+                        characterLevelBundledSeed: await readBundled(
+                            "content-seeds/character_level_apk_3_5.json",
+                        ),
+                    }),
                 )
             }
             if (converterIds.has("gacha")) {

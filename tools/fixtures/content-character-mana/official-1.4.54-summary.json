@@ -3,11 +3,14 @@
   "sources": {
     "levelRequirements": "master/mana_board/level_required_mana_node.orderedmap",
     "characterLevels": "master/character/character_level.orderedmap",
+    "characterLevelsBundledArchive": "production/android_bundle/23/a83b55daad153a95f8d5b66667b32e47f3dca2",
+    "characterLevelsBundledSeed": "assets/content-seeds/character_level_apk_3_5.json",
     "manaBoard": "master/generated/mana_board.orderedmap"
   },
   "decodedReferenceSha256": {
     "levelRequirements": "46dd139f79a1df91e0f7cdd7e6c08b80f59108581aea90201f68cf91f6731713",
     "characterLevels": "41b3e01150cb2846851384cb02439042a1f0808773e3cdb77c49f8fa3a9fe848",
+    "characterLevelsBundledBlob": "eb21a7fe67d9f58730235ce276d1421b26a14cb84e7d27fd35cb2e0cae2b3565",
     "manaBoard": "08d34f9bf1f0ecffc74cba404f7737e4290172bc2ba57c64a33d96f5d956221d"
   },
   "levelRequirementRows": {
@@ -18,23 +21,35 @@
     "5": ["(None)", "10", "40", "90", "95", "100", "25"]
   },
   "characterLevelSummary": {
-    "rarities": [1, 2],
+    "rarities": [1, 2, 3, 4, 5],
+    "ordinaryRarities": [1, 2],
+    "bundledRarities": [3, 4, 5],
     "levelsPerRarity": 100,
     "firstLevel": 1,
     "lastLevel": 100,
     "firstTotalExperience": 0,
-    "lastTotalExperience": 308043,
-    "boundaryRows": {
-      "1": 0,
-      "9": 269,
-      "10": 348,
-      "24": 3058,
-      "25": 3392,
-      "39": 10672,
-      "40": 11416,
-      "89": 207492,
-      "90": 216633,
-      "100": 308043
+    "fullTableDigest": "sha256:5b11b56478922f8821d1c34700ba4ec32965c187ab8237bf9f84fb54acd3c8dc",
+    "curves": {
+      "1": {
+        "digest": "sha256:ffd98d4d6e9880e2ab7fcd573f7b01ce202eb54ba480b6069b39c62dc1452b41",
+        "boundaryRows": { "1": 0, "9": 269, "10": 348, "24": 3058, "25": 3392, "39": 10672, "40": 11416, "80": 125223, "89": 207492, "90": 216633, "100": 308043 }
+      },
+      "2": {
+        "digest": "sha256:ffd98d4d6e9880e2ab7fcd573f7b01ce202eb54ba480b6069b39c62dc1452b41",
+        "boundaryRows": { "1": 0, "9": 269, "10": 348, "24": 3058, "25": 3392, "39": 10672, "40": 11416, "80": 125223, "89": 207492, "90": 216633, "100": 308043 }
+      },
+      "3": {
+        "digest": "sha256:ffd98d4d6e9880e2ab7fcd573f7b01ce202eb54ba480b6069b39c62dc1452b41",
+        "boundaryRows": { "1": 0, "9": 269, "10": 348, "24": 3058, "25": 3392, "39": 10672, "40": 11416, "80": 125223, "89": 207492, "90": 216633, "100": 308043 }
+      },
+      "4": {
+        "digest": "sha256:10cccaf5e0d1a62d569141dfb7ec148f35c742d9d25d4eabb007fc18e38f37f2",
+        "boundaryRows": { "1": 0, "9": 323, "10": 418, "24": 3688, "25": 4093, "39": 12976, "40": 13881, "80": 139190, "89": 230639, "90": 240800, "100": 342410 }
+      },
+      "5": {
+        "digest": "sha256:c3aaee2815172e3d17d421a77141124ae2c7251fbefef107c1911787b19ee510",
+        "boundaryRows": { "1": 0, "9": 379, "10": 491, "24": 4366, "25": 4848, "39": 15485, "40": 16567, "80": 153988, "89": 255688, "90": 266988, "100": 379988 }
+      }
     }
   },
   "manaBoardSummary": {

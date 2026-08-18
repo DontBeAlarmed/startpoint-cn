@@ -10,10 +10,15 @@ Gate Task 29a 新增三项只读权威内容能力，尚未改变 `learn_mana_no
 - `master/mana_board/level_required_mana_node.orderedmap` 动态生成
   `level_required_mana_node.json`。rarity 1–5 的 `ability_1..6` 与 `skill_evolution` 均按客户端
   `Option` 语义解析，`(None)` 表示无等级要求，其他值必须为正安全整数。
-- `master/character/character_level.orderedmap` 动态生成 `character_level.json`。每条 rarity 曲线从等级 1、
-  累计经验 0 开始，等级连续且累计经验严格递增；运行时用完整阈值二分得到精确等级，不能复用
-  `characterExpCaps` 中只列每 5 级上限的兼容数据。缺 rarity、断档、非 canonical key、非安全整数或非单调曲线
-  一律拒绝。
+- `character_level.json` 按客户端双分片语义生成：普通 CDN 的
+  `master/character/character_level.orderedmap` 提供 rarity 1/2，客户端 bundled master 提供 rarity 3/4/5。
+  后者以 `assets/content-seeds/character_level_apk_3_5.json` 保存为紧凑、可审查的 tracked seed，记录 archive
+  logical path、源 blob SHA-256、Lv80/90/100 与逐曲线摘要；Content Registry 把它作为 bundled source 传给
+  converter，部署和同步不读取 APK 或工作区外的本地资源目录。
+- 两个分片必须分别精确包含 1/2 和 3/4/5，跨分片重复 key 即使值相同也失败；合并后必须是 rarity 1–5
+  各 1..100 级。每条曲线从累计经验 0 开始并严格递增，运行时用完整阈值二分得到精确等级，不能复用
+  `characterExpCaps` 中只列每 5 级上限的兼容数据。缺 rarity、断档、非 canonical key、非安全整数、摘要漂移
+  或非单调曲线一律拒绝。
 - `master/generated/mana_board.orderedmap` 的原始 bundled/release 形状保持不变。运行时只建立小型
   `character -> board -> multiplied_id -> parent` 索引；parent 必须是 `(None)` 或同角色同板节点，缺失、跨板、
   自引用与重复节点都会 fail closed，不向 19,811 行 bundled 表写入派生字段。
@@ -27,6 +32,10 @@ learn 拒绝重复学习并把新节点规划为 `awake_level=0`。awake 要求�
 等级的节点保留为 no-op 响应项，只有真正升级的节点产生费用和更新。全 no-op 计划以
 `hasResourceWrites=false` 明确表示无需资源或节点写入。领域错误使用稳定 `ManaNodeMutationValidationError.code`，
 不绑定 HTTP 状态或响应文本。
+
+客户端来源合并证据为 `CommonLogicAssetContainer.as:203-225`：读取普通路径后追加 `bundledPaths`，再把全部路径
+交给同一 master reader；`RootMasterBinary.as:110-175` 按 slice 合并 map，并在主键重复时抛错。tracked seed
+只复刻该 bundled 分片，不改变普通 CDN 分片，也不把 APK 变成生产运行依赖。
 
 29b 接入时必须从同一个 Content snapshot 构造 nodes、parent 与等级要求，并先完整生成 plan，再在单个 SQLite
 事务中按 plan 扣费和写节点。路由仍负责 session/ownership、免费与付费 Mana 拆分、awake cost 选择、bond、进化、

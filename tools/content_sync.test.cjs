@@ -437,8 +437,13 @@ test("default release builder closes all registry tables and runs each CDN conve
             converterCalls.characterElection++
             return converterOutput("character-election")
         },
-        convertCharacterManaAdmissionTables: async () => {
+        convertCharacterManaAdmissionTables: async (_reader, compatibility) => {
             converterCalls.characterManaAdmission++
+            assert.deepEqual(compatibility, {
+                characterLevelBundledSeed: {
+                    imported: "content-seeds/character_level_apk_3_5.json",
+                },
+            })
             return converterOutput("character-mana-admission")
         },
         convertGachas: async () => {

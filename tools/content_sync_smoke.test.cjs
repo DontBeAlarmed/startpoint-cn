@@ -476,10 +476,8 @@ test("角色 Mana 准入表必须逐张等于 bundled 官方基线", () => {
         { tableName: "level_required_mana_node.json", converterId: "character-mana-admission" },
     ]
     const bundled = {
-        "character_level.json": { "1": { "1": 0, "2": 10 } },
-        "level_required_mana_node.json": {
-            "1": { abilityLevels: [null, 10, null, null, null, null], skillEvolutionLevel: 25 },
-        },
+        "character_level.json": require("../assets/character_level.json"),
+        "level_required_mana_node.json": require("../assets/level_required_mana_node.json"),
     }
     const release = structuredClone(bundled)
 
@@ -487,7 +485,18 @@ test("角色 Mana 准入表必须逐张等于 bundled 官方基线", () => {
         definitions,
         readBundled: tableName => bundled[tableName],
         readRelease: tableName => release[tableName],
-    }), { tables: 2 })
+    }), {
+        tables: 2,
+        characterLevelRarities: 5,
+        characterLevelRows: 500,
+        characterLevelMaxima: {
+            "1": 308043,
+            "2": 308043,
+            "3": 308043,
+            "4": 342410,
+            "5": 379988,
+        },
+    })
 
     release["character_level.json"][1][2] = 11
     assert.throws(() => smoke.validateCharacterManaAdmissionTables({

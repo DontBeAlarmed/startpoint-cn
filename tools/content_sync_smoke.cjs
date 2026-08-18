@@ -8,7 +8,7 @@ const { spawnSync } = require("node:child_process")
 const { isDeepStrictEqual } = require("node:util")
 
 const EXPECTED_VERSION = "1.4.54"
-const EXPECTED_TABLE_COUNT = 125
+const EXPECTED_TABLE_COUNT = 126
 const EXPECTED_FEATURE_DIGEST = "sha256:21898330b538f6c60a0c8114a15f8e247934bea46a104ca4711cc72cde761bf4"
 const EXPECTED_FEATURE_COUNTS = Object.freeze({
     outer: 543,
@@ -1052,7 +1052,44 @@ function validateCharacterManaAdmissionTables({ definitions, readBundled, readRe
             )
         }
     }
-    return { tables: admissionDefinitions.length }
+    const levels = readRelease("character_level.json")
+    const expectedRarities = ["1", "2", "3", "4", "5"]
+    const invalidLevels = !levels
+        || typeof levels !== "object"
+        || Array.isArray(levels)
+        || !isDeepStrictEqual(Object.keys(levels).sort(), expectedRarities)
+        || expectedRarities.some(rarity => {
+            const curve = levels[rarity]
+            if (!curve || typeof curve !== "object" || Array.isArray(curve)) return true
+            const expectedLevelKeys = Array.from({ length: 100 }, (_, index) => String(index + 1))
+            if (!isDeepStrictEqual(Object.keys(curve), expectedLevelKeys)) return true
+            let previous = -1
+            return expectedLevelKeys.some((level, index) => {
+                const total = curve[level]
+                const invalid = !Number.isSafeInteger(total)
+                    || total < 0
+                    || (index === 0 ? total !== 0 : total <= previous)
+                previous = total
+                return invalid
+            })
+        })
+    if (invalidLevels) {
+        baselineError(
+            "CONTENT_SYNC_SMOKE_CHARACTER_MANA_ADMISSION_BASELINE",
+            "character_level.json 必须包含 rarity 1 至 5 的完整 100 级累计经验曲线",
+        )
+    }
+    return {
+        tables: admissionDefinitions.length,
+        characterLevelRarities: expectedRarities.length,
+        characterLevelRows: expectedRarities.reduce(
+            (count, rarity) => count + Object.keys(levels[rarity]).length,
+            0,
+        ),
+        characterLevelMaxima: Object.fromEntries(expectedRarities.map(rarity => (
+            [rarity, levels[rarity]["100"]]
+        ))),
+    }
 }
 
 function validateItemEquipmentTables({

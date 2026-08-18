@@ -230,7 +230,7 @@ test("mission asset contracts reject broken awake groups and pass event referenc
 
 test("asset audit verifies all Content Registry runtime tables", () => {
     const result = auditRuntimeRegistryTables(path.join(__dirname, "../assets"))
-    assert.deepEqual(result, { registryTableCount: 125, readableRuntimeTableCount: 125 })
+    assert.deepEqual(result, { registryTableCount: 126, readableRuntimeTableCount: 126 })
 })
 
 test("Content Registry keeps CDN, bundled, and server table boundaries explicit", () => {
@@ -243,10 +243,11 @@ test("Content Registry keeps CDN, bundled, and server table boundaries explicit"
 
     assert.deepEqual(
         Object.fromEntries([...tablesByScope].map(([scope, tables]) => [scope, tables.length])),
-        { bundled: 5, cdn: 116, server: 4 },
+        { bundled: 6, cdn: 116, server: 4 },
     )
     assert.deepEqual(tablesByScope.get("bundled"), [
         "cdndata/player_rank_full.json",
+        "content-seeds/character_level_apk_3_5.json",
         "encyclopedia.json",
         "mission_event_battle_rules.json",
         "mission_event_quest_map.json",
