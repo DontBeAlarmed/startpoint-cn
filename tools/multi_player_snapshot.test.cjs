@@ -66,7 +66,9 @@ function fixture() {
             ? normalGroups
             : eventGroups,
         getCharacter: (_playerId, characterId) => characters.get(characterId) ?? null,
-        getManaNodes: (_playerId, characterId) => characterId === 101001 ? [301, 302] : [],
+        getManaNodeAwakeLevels: (_playerId, characterId) => characterId === 101001
+            ? { 301: 0, 302: 2 }
+            : {},
         getEquipment: (_playerId, equipmentId) => equipmentId === 501001 ? equipment : null,
         getRankLevel: () => 42,
     }
@@ -113,7 +115,7 @@ test("builds the minimal current-player snapshot and at most two NPC parties", a
         evolution_level: 2,
         exp: 345,
         over_limit_step: 1,
-        mana_node_ids: { 301: 0, 302: 0 },
+        mana_node_ids: { 301: 0, 302: 2 },
         ex_boost: [0, { ability_id_list: [11, 12], status_id: 7 }],
         illustration_settings: [1],
     }])

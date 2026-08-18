@@ -206,10 +206,15 @@ async function main() {
     const openSuccess = await createPlayer(8)
     updatePlayerCharacterSync(openSuccess.playerId, 1, {
         exp: characterExpCaps[4][0],
+        evolutionLevel: 3,
         overLimitStep: 4,
     })
     for (const nodeId of firstBoardNodeIds) insertOpenNode.run(nodeId, openSuccess.playerId)
     updatePlayerCharacterBondTokenSync(openSuccess.playerId, 1, { manaBoardIndex: 1, status: 2 })
+    db.prepare(`
+        DELETE FROM players_characters_bond_tokens
+        WHERE player_id = ? AND character_id = 1 AND mana_board_index = 2
+    `).run(openSuccess.playerId)
     const openSuccessResponse = await app.inject({
         method: "POST",
         url: "/bond/open_mana_board",
@@ -226,6 +231,14 @@ async function main() {
         openSuccessPayload.data.mission_info.some(entry => entry.mission_category_id === 1 && entry.mission_id === 95),
         "opening the second mana board should settle regular mission 95 in the same response",
     )
+    const openCharacter = openSuccessPayload.data.character_list.find(entry => entry.character_id === 1)
+    assert.equal(openCharacter.evolution_level, 3)
+    assert.equal(openCharacter.evolution_img_level, 3)
+    assert.equal(openCharacter.mana_board_index, 2)
+    assert.deepEqual(openCharacter.bond_token_list, [
+        { mana_board_index: 1, status: 2 },
+        { mana_board_index: 2, status: 0 },
+    ])
 
     const overLimit = await createPlayer(4)
     givePlayerItemSync(overLimit.playerId, 10002, 1)

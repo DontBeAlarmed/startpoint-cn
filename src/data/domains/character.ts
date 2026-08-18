@@ -434,6 +434,23 @@ export function getPlayerCharacterManaNodesSync(
     return rawNodes.map(rawNode => rawNode.value);
 }
 
+/** Returns one character's learned mana nodes with their persisted awake levels. */
+export function getPlayerCharacterManaNodeAwakeLevelsSync(
+    playerId: number,
+    characterId: number,
+): Record<number, number> {
+    const rawNodes = getDb().prepare(`
+    SELECT value, awake_level
+    FROM players_characters_mana_nodes
+    WHERE character_id = ? AND player_id = ?
+    `).all(characterId, playerId) as RawPlayerCharacterManaNode[]
+
+    return Object.fromEntries(rawNodes.map(rawNode => [
+        rawNode.value,
+        rawNode.awake_level ?? 0,
+    ]))
+}
+
 /**
  * Checks whether a player has unlocked a specific mana node.
  * 

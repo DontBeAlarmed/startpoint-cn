@@ -122,6 +122,10 @@ token 行，与角色 `mana_board_index` 更新处于同一个事务；索引更
 不会要求玩家重新进入任务页面或重新登录才能看到“解放第二枚玛纳板”的完成状态。第二板的第一板条件按客户端语义
 直接检查第一板全部节点，而不是只依赖信赖之证状态。
 
+开板写入成功后会重新读取角色并通过标准角色投影返回最终状态；`character_list` 同时包含持久化的
+`evolution_level/evolution_img_level`、新 `mana_board_index` 与补齐后的 bond token 列表，不再返回缺少养成字段的
+手工最小对象。
+
 ### `awake_mana_node`
 
 路由一次批量读取玩家 learned/awake 状态并复用目标角色部分，在内存中叠加本次目标等级；玛纳、材料、Active Mission 玛纳

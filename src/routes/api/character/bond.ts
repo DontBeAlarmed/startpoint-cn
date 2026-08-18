@@ -6,7 +6,6 @@ import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
 import { getSession } from "../../../data/domains/session"
 import { getServerDate } from "../../../utils";
 import { getCharacterDataSync, getCharacterManaBoardCountSync, getCharacterManaNodesSync } from "../../../lib/assets";
-import { clientSerializeDate } from "../../../data/utils";
 import { resolvePlayerIdSync } from "../../../data/activeAccount";
 import { validateSessionAndPlayer, validateCharacterOwnership, buildCharacterListEntry, sendCharacterResponse } from "../../../lib/character-helpers";
 import { characterExpCaps } from "../../../lib/character";
@@ -198,17 +197,16 @@ const routes = async (fastify: FastifyInstance) => {
             updatePlayerCharacterSync(playerId, characterId, { manaBoardIndex })
         })()
 
+        const finalCharacterData = getPlayerCharacterSync(playerId, characterId)
+        if (!finalCharacterData) throw new Error(`opened mana board character ${characterId} is missing`)
+
         const missionSettlement = settleMissionCategories(playerId, [1], getServerDate())
         const responseData = {
             "user_info": {},
-            "character_list": [{
+            "character_list": [buildCharacterListEntry(characterId, finalCharacterData, {
                 "viewer_id": viewerId,
-                "character_id": characterId,
-                "mana_board_index": manaBoardIndex,
-                "create_time": clientSerializeDate(characterData.joinTime),
-                "update_time": clientSerializeDate(characterData.updateTime),
-                "join_time": clientSerializeDate(characterData.joinTime)
-            }],
+                "mana_board_index": finalCharacterData.manaBoardIndex,
+            })],
             "user_character_mana_node_list": {},
             "item_list": {},
             "evolution": [],

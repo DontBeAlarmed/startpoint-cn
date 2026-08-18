@@ -28,6 +28,7 @@ const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const {
+    getPlayerCharacterManaNodeAwakeLevelsSync,
     getPlayerCharactersManaNodeAwakeLevelsSync,
     insertPlayerCharacterManaNodesSync,
     updatePlayerCharacterManaNodeAwakeLevelSync,
@@ -72,6 +73,10 @@ try {
     ]))
     assert.deepEqual(getPlayerCharactersManaNodeAwakeLevelsSync(playerId), {
         1: { 2201: 1, 2202: 2 },
+    })
+    assert.deepEqual(getPlayerCharacterManaNodeAwakeLevelsSync(playerId, characterId), {
+        2201: 1,
+        2202: 2,
     })
     const validSave = JSON.parse(JSON.stringify(getMergedPlayerDataSync(playerId)))
     const originalAwakeState = {
@@ -155,6 +160,10 @@ try {
     assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId), new Map())
     assert.deepEqual(getPlayerCharactersManaNodeAwakeLevelsSync(playerId), {
         1: { 2201: 0, 2202: 0 },
+    })
+    assert.deepEqual(getPlayerCharacterManaNodeAwakeLevelsSync(playerId, characterId), {
+        2201: 0,
+        2202: 0,
     })
 
     console.log("player awake save roundtrip tests passed")

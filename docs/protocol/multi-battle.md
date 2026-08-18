@@ -261,12 +261,13 @@ session party 的角色、合击角色、装备和能力魂槽位都必须按 Op
 
 ## 8. Party 与 `mana_node_ids`
 
-真实玩家 party 由 `buildRealParty()` 从 SQLite 构建。角色和合击角色的 `mana_node_ids` 必须是 IntMap 形态，例如 `{ "1001": 0, "1002": 0 }`。
+真实玩家 party 由玩家快照从 SQLite 构建。角色和合击角色的 `mana_node_ids` 必须是 IntMap 形态，例如
+`{ "1001": 0, "1002": 2 }`。
 
 规则如下：
 
 - key 是已学习 mana node ID 的字符串形式；
-- value 当前固定为 `0`；
+- value 是该节点持久化的 `awake_level`，未觉醒节点为 `0`；
 - 真实玩家角色不得把 `mana_node_ids` 序列化为数组；
 - 空的真实玩家 mana node 集合也应表达为空对象，而不是 `[]`；
 - `illustration_settings` 必须随 session character 一起提供。

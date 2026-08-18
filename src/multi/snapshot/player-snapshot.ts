@@ -1,5 +1,5 @@
 import {
-    getPlayerCharacterManaNodesSync,
+    getPlayerCharacterManaNodeAwakeLevelsSync,
     getPlayerCharacterSync,
 } from "../../data/domains/character"
 import { getPlayerEquipmentSync } from "../../data/domains/equipment"
@@ -63,7 +63,7 @@ export interface PlayerSnapshotDependencies {
     resolvePlayerContext(viewerId: number): Promise<MultiPlayerContext | null>
     getPartyGroups(playerId: number, category: PartyCategory): Record<string, PlayerPartyGroup>
     getCharacter(playerId: number, characterId: number): PlayerCharacter | null
-    getManaNodes(playerId: number, characterId: number): number[]
+    getManaNodeAwakeLevels(playerId: number, characterId: number): Record<number, number>
     getEquipment(playerId: number, equipmentId: number): PlayerEquipment | null
     getRankLevel(rankPoint: number): number
 }
@@ -72,7 +72,7 @@ const defaultDependencies: PlayerSnapshotDependencies = {
     resolvePlayerContext: resolveMultiPlayerContext,
     getPartyGroups: getPlayerPartyGroupListSync,
     getCharacter: getPlayerCharacterSync,
-    getManaNodes: getPlayerCharacterManaNodesSync,
+    getManaNodeAwakeLevels: getPlayerCharacterManaNodeAwakeLevelsSync,
     getEquipment: getPlayerEquipmentSync,
     getRankLevel: getPlayerRankLevel,
 }
@@ -121,10 +121,9 @@ function buildCharacter(
     const character = dependencies.getCharacter(playerId, characterId)
     if (!character) return none()
 
-    const manaNodeIds: Record<string, number> = {}
-    for (const nodeId of dependencies.getManaNodes(playerId, characterId)) {
-        manaNodeIds[String(nodeId)] = 0
-    }
+    const manaNodeIds = Object.fromEntries(Object.entries(
+        dependencies.getManaNodeAwakeLevels(playerId, characterId),
+    ).map(([nodeId, awakeLevel]) => [String(nodeId), awakeLevel]))
     const exBoost = character.exBoost?.abilityIdList.length
         ? [0, {
             ability_id_list: [...character.exBoost.abilityIdList],
