@@ -9,8 +9,9 @@ import { reviveMergedPlayerDates } from "../utils/date"
 import {
     PLAYER_SAVE_EXCLUDED_TABLES,
     PLAYER_SAVE_TABLES,
-    discoverPlayerOwnedTablesSync,
+    inspectPlayerSaveSchemaSync,
     quotePlayerSaveIdentifier,
+    type PlayerSaveTableMetadata,
 } from "./registry"
 import {
     PLAYER_SAVE_FORMAT_VERSION,
@@ -100,7 +101,18 @@ function getTableColumns(database: Database, tableName: string): SqliteColumn[] 
     ).all() as SqliteColumn[]
 }
 
-function getPrimaryKeyOrder(database: Database, tableName: string): string[] {
+function getPrimaryKeyOrder(
+    database: Database,
+    tableName: string,
+    metadata?: ReadonlyMap<string, PlayerSaveTableMetadata>,
+): string[] {
+    const cachedColumns = metadata?.get(tableName)?.columns
+    if (cachedColumns !== undefined) {
+        return cachedColumns
+            .filter(column => column.pk > 0)
+            .sort((left, right) => left.pk - right.pk)
+            .map(column => column.name)
+    }
     return getTableColumns(database, tableName)
         .filter(column => column.pk > 0)
         .sort((left, right) => left.pk - right.pk)
@@ -117,8 +129,9 @@ function createEmptyDomains(): Record<PlayerSaveDomainName, PlayerSaveDomainSnap
     }
 }
 
-function assertRegistryMatchesDatabase(database: Database): void {
-    const discovered = discoverPlayerOwnedTablesSync(database)
+function assertRegistryMatchesDatabase(database: Database): ReadonlyMap<string, PlayerSaveTableMetadata> {
+    const inspection = inspectPlayerSaveSchemaSync(database)
+    const discovered = inspection.ownedTables
     const classified = [
         ...PLAYER_SAVE_TABLES.map(definition => definition.name),
         ...PLAYER_SAVE_EXCLUDED_TABLES.map(definition => definition.name),
@@ -126,16 +139,18 @@ function assertRegistryMatchesDatabase(database: Database): void {
     if (new Set(classified).size !== classified.length || discovered.join("\n") !== classified.join("\n")) {
         throw new Error("Player save table registry does not match the current database schema")
     }
+    return inspection.metadata
 }
 
 function selectPlayerRows(
     database: Database,
     definition: PlayerSaveTableDefinition,
     playerId: number,
+    metadata?: ReadonlyMap<string, PlayerSaveTableMetadata>,
 ): PlayerSaveRow[] {
     const identifier = quotePlayerSaveIdentifier(definition.name)
     const predicate = definition.name === "players" ? "id = ?" : "player_id = ?"
-    const primaryKey = getPrimaryKeyOrder(database, definition.name)
+    const primaryKey = getPrimaryKeyOrder(database, definition.name, metadata)
     const orderBy = primaryKey.length > 0
         ? ` ORDER BY ${primaryKey.map(quotePlayerSaveIdentifier).join(", ")}`
         : ""
@@ -149,11 +164,16 @@ export function exportPlayerSaveV2Sync(
     database: Database = getDb(),
 ): PlayerSaveV2Snapshot {
     requireSafePositiveInteger(playerId, "playerId")
-    assertRegistryMatchesDatabase(database)
+    const schemaMetadata = assertRegistryMatchesDatabase(database)
 
     const domains = createEmptyDomains()
     for (const definition of PLAYER_SAVE_TABLES) {
-        domains[definition.domain].tables[definition.name] = selectPlayerRows(database, definition, playerId)
+        domains[definition.domain].tables[definition.name] = selectPlayerRows(
+            database,
+            definition,
+            playerId,
+            schemaMetadata,
+        )
     }
     if (domains.core.tables.players.length !== 1) throw new Error(`Player ${playerId} was not found`)
 

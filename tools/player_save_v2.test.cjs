@@ -49,6 +49,7 @@ const {
 } = require("../src/routes/web_api/player-save-download")
 
 let db
+const sqlStatements = []
 
 function createAccount(label) {
     return insertAccountSync({
@@ -159,7 +160,11 @@ function normalizeSnapshotRows(definition, rows) {
 }
 
 test.before(() => {
-    db = data.initializeDatabase()
+    db = data.initializeDatabase({
+        databaseFactory: databasePath => new Sqlite(databasePath, {
+            verbose: sql => sqlStatements.push(sql),
+        }),
+    })
 })
 
 test.after(() => {
@@ -268,6 +273,22 @@ test("v2 export includes all registered domains and excludes transient battle st
     assert.equal(tables.players_player_history_settings[0].background_card_id, 2)
     assert.equal(Object.hasOwn(tables, "players_active_quests"), false)
     assert.deepEqual(snapshot.excludedDomains, ["account", "session", "serverConfig", "activeQuest"])
+})
+
+test("v2 export reads table column metadata once per current table", () => {
+    const account = createAccount("export-metadata")
+    const playerId = insertDefaultPlayerSync(account.id).id
+    sqlStatements.length = 0
+
+    exportPlayerSaveV2Sync(playerId)
+
+    const currentTableCount = db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM sqlite_master
+        WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+    `).get().count
+    const tableInfoReads = sqlStatements.filter(sql => /^PRAGMA table_info/i.test(sql)).length
+    assert.equal(tableInfoReads, currentTableCount)
 })
 
 test("restore preserves target identity, replaces all domains, and clears active quest", () => {

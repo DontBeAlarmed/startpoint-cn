@@ -99,20 +99,35 @@ function listTableNames(database: Database): string[] {
     `).all() as Array<{ name: string }>).map(row => row.name)
 }
 
-export function discoverPlayerOwnedTablesSync(database: Database): string[] {
+export interface PlayerSaveTableMetadata {
+    readonly columns: readonly { name: string, pk: number }[]
+    readonly parents: readonly string[]
+}
+
+export interface PlayerSaveSchemaInspection {
+    readonly metadata: ReadonlyMap<string, PlayerSaveTableMetadata>
+    readonly ownedTables: readonly string[]
+}
+
+export function inspectPlayerSaveSchemaSync(database: Database): PlayerSaveSchemaInspection {
     const tableNames = listTableNames(database)
     const metadata = new Map(tableNames.map(name => {
         const identifier = quoteIdentifier(name)
-        const columns = database.prepare(`PRAGMA table_info(${identifier})`).all() as Array<{ name: string }>
+        const columns = database.prepare(`PRAGMA table_info(${identifier})`).all() as Array<{
+            name: string
+            pk: number
+        }>
         const foreignKeys = database.prepare(`PRAGMA foreign_key_list(${identifier})`).all() as Array<{ table: string }>
         return [name, {
-            hasPlayerId: columns.some(column => column.name === "player_id"),
+            columns: columns.map(column => ({ name: column.name, pk: column.pk })),
             parents: foreignKeys.map(foreignKey => foreignKey.table),
         }] as const
     }))
     const owned = new Set<string>(["players"])
     for (const [name, tableMetadata] of metadata) {
-        if (tableMetadata.hasPlayerId || name.startsWith("players_")) owned.add(name)
+        if (tableMetadata.columns.some(column => column.name === "player_id") || name.startsWith("players_")) {
+            owned.add(name)
+        }
     }
 
     let changed = true
@@ -126,7 +141,14 @@ export function discoverPlayerOwnedTablesSync(database: Database): string[] {
             }
         }
     }
-    return [...owned].filter(name => metadata.has(name)).sort()
+    return {
+        metadata,
+        ownedTables: [...owned].filter(name => metadata.has(name)).sort(),
+    }
+}
+
+export function discoverPlayerOwnedTablesSync(database: Database): string[] {
+    return [...inspectPlayerSaveSchemaSync(database).ownedTables]
 }
 
 export function getPlayerSaveTableDefinition(name: string): PlayerSaveTableDefinition | undefined {
