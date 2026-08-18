@@ -122,6 +122,7 @@ test("smoke executes all seven entries, attributes SQL, and cleans its root", as
         assert.equal(validateReportStructure(report), true)
         assert.equal(createAdmissionGate(report).zeroErrors, true)
         assert.equal(report.gate.admitted, false)
+        assert.equal(report.gate.rollbackVerified, true)
         assert.deepEqual(report.steps[0].entries.map(entry => entry.name), [
             "auth", "load", "mission-progress", "single-battle", "shop", "gacha", "mail",
         ])
@@ -130,7 +131,7 @@ test("smoke executes all seven entries, attributes SQL, and cleans its root", as
         assert.deepEqual(
             report.steps[0].entries.filter(entry => ["single-battle", "shop", "gacha", "mail"].includes(entry.name))
                 .map(entry => entry.rollbackVerified),
-            [false, false, false, false],
+            [true, true, true, true],
         )
         assert.equal(fs.readdirSync(parent).length, 0)
     } finally {

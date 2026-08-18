@@ -448,6 +448,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/perf/non_multi_mixed_scenario_validation.test.cjs",
             "tools/perf/non_multi_mixed_scenarios.test.cjs",
             "tools/perf/non_multi_mixed_workload.test.cjs",
+            "tools/perf/sqlite_fault_injection.test.cjs",
             "tools/perf/mission_settlement_baseline.test.cjs",
             "tools/oracle/git-object-runtime.test.cjs",
             "tools/mission_settlement_base_oracle.test.cjs",

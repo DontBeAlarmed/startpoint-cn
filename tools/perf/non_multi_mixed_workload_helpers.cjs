@@ -39,7 +39,7 @@ function delayMilliseconds(nanoseconds) {
     return round(Number(nanoseconds) / 1_000_000)
 }
 
-function summarizeEntries(results) {
+function summarizeEntries(results, rollbackVerification) {
     return ENTRY_NAMES.map(name => {
         const samples = results.filter(result => result.entry === name)
         const errors = samples.filter(result => result.error !== null)
@@ -56,7 +56,8 @@ function summarizeEntries(results) {
                 readsMax: Math.max(0, ...samples.map(result => result.sql.selectStatements)),
                 writesMax: Math.max(0, ...samples.map(result => result.sql.writeStatements)),
             },
-            rollbackVerified: !WRITE_ENTRY_NAMES.includes(name),
+            rollbackVerified: !WRITE_ENTRY_NAMES.includes(name)
+                || rollbackVerification?.[name] === true,
         }
     })
 }
@@ -74,7 +75,13 @@ function createMetadata(profile, entryRequests, fixedTime) {
     }
 }
 
-function createStepSummary({ concurrency, results, elapsedMs, eventLoopDelay }) {
+function createStepSummary({
+    concurrency,
+    results,
+    elapsedMs,
+    eventLoopDelay,
+    rollbackVerification,
+}) {
     return {
         concurrency,
         requests: results.length,
@@ -86,7 +93,7 @@ function createStepSummary({ concurrency, results, elapsedMs, eventLoopDelay }) 
             p95: delayMilliseconds(eventLoopDelay.percentile(95)),
             max: delayMilliseconds(eventLoopDelay.max),
         },
-        entries: summarizeEntries(results),
+        entries: summarizeEntries(results, rollbackVerification),
     }
 }
 

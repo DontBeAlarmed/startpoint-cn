@@ -33,6 +33,7 @@ const {
     prepareSeed,
 } = require("./non_multi_mixed_workload_setup.cjs")
 const { createSqlCounter } = require("./mission_settlement_sql.cjs")
+const { verifyWriteRollbacks } = require("./non_multi_mixed_rollback.cjs")
 
 const FIXED_TIME = "2024-08-14T12:00:00.000Z"
 const DEFAULT_PROFILE = Object.freeze({
@@ -85,6 +86,7 @@ async function runStep({
     pool,
     mailFixtureByIdentity,
     concurrency,
+    rollbackVerification,
 }) {
     const storage = new AsyncLocalStorage()
     let runDirectoryCreated = false
@@ -149,6 +151,7 @@ async function runStep({
             results,
             elapsedMs,
             eventLoopDelay: delay,
+            rollbackVerification,
         })
     } catch (error) {
         primaryError = error
@@ -224,6 +227,14 @@ async function runNonMultiMixedWorkload({
         databaseOwned = true
         const prepared = prepareSeed(runtime, scenarioDependencies, seedDirectory, profile)
         databaseOwned = false
+        const rollbackVerification = await verifyWriteRollbacks({
+            runtime,
+            scenarioDependencies,
+            seedDirectory,
+            suiteDirectory,
+            pool: prepared.pool,
+            mailFixtureByIdentity: prepared.mailFixtureByIdentity,
+        })
         const steps = []
         for (const concurrency of profile.concurrencySteps) {
             steps.push(await runStep({
@@ -234,6 +245,7 @@ async function runNonMultiMixedWorkload({
                 pool: prepared.pool,
                 mailFixtureByIdentity: prepared.mailFixtureByIdentity,
                 concurrency,
+                rollbackVerification,
             }))
         }
         const report = {

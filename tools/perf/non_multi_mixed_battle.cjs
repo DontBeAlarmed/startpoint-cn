@@ -311,6 +311,8 @@ module.exports = {
     QUEST_ID,
     createActiveQuestSentinel,
     executeSingleBattleScenario,
+    finishPayload,
     prepareSingleBattleIdentity,
     requireRejected,
+    startPayload,
 }
