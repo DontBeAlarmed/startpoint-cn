@@ -36,6 +36,7 @@ const missionRow = []
 missionRow[0] = "99"
 missionRow[1] = "1"
 missionRow[3] = "route_repository_claim"
+missionRow[29] = "0"
 missionRow[56] = "(None)"
 missionRow[58] = "(None)"
 missionRow[60] = "2020-01-01 00:00:00"

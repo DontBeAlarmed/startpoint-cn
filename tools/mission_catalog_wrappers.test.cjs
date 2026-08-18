@@ -76,6 +76,27 @@ function activeRewardRow(itemId) {
     return row
 }
 
+function activeMissionRow(eventId, stringId = "active_wrapper_mission") {
+    const row = []
+    row[0] = String(eventId)
+    row[1] = "1"
+    row[3] = stringId
+    row[29] = "0"
+    row[56] = "(None)"
+    row[58] = "(None)"
+    return row
+}
+
+function activeEventRow() {
+    const row = []
+    row[2] = "0"
+    row[3] = "1"
+    row[14] = "2020-01-01 00:00:00"
+    row[15] = "(None)"
+    row[22] = "(None)"
+    return row
+}
+
 function awakeDefinitionRow(characterId) {
     const row = []
     row[1] = String(characterId)
@@ -315,6 +336,8 @@ test("legacy unsupported categories and strict date boundaries remain compatible
 
 test("Active Mission rewards remain independent from standard catalog tables", () => {
     const tables = {
+        "mission_active.json": { 9001: [activeMissionRow(9002)] },
+        "mission_active_event.json": { 9002: [activeEventRow()] },
         "mission_active_reward.json": { 9001: { 1: [activeRewardRow(701)] } },
     }
     const activeOnlyRepository = repository(tables, "active-only")

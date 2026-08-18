@@ -2,7 +2,12 @@ import type { ReadonlyContentRepository } from "../../content/runtime/content-sn
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { incrementActiveMissionBattleFactSync } from "../../data/domains/active_mission_battle_facts"
 import type { FinishContext } from "../quest/finish/types"
-import { getActiveMissionMasterDefinitions, type ActiveMissionMasterDefinition } from "./active-master-data"
+import type { ActiveMissionMasterDefinition } from "./active-master-data"
+import {
+    getActiveMissionPlan,
+    type PlannedActiveMissionDefinition,
+} from "./active-plan"
+import { matchesPlannedActiveMissionQuestRange } from "./active-quest-range"
 import { matchesActiveMissionQuestRange } from "./active-reconciliation"
 
 const LOADOUT_PATTERN = 89
@@ -39,6 +44,26 @@ export interface ActiveMissionBattleFact {
 
 function matchesBattleKind(battleKind: number, isMulti: boolean): boolean {
     return battleKind === 3 || battleKind === 2 && isMulti || battleKind === 1 && !isMulti
+}
+
+function isPlannedDefinition(
+    definition: ActiveMissionMasterDefinition,
+): definition is PlannedActiveMissionDefinition {
+    return "questRange" in definition && "pattern" in definition
+}
+
+function getDefinitionPattern(definition: ActiveMissionMasterDefinition): number {
+    return isPlannedDefinition(definition) ? definition.pattern : Number(definition.row[29])
+}
+
+function matchesDefinitionQuestRange(
+    definition: ActiveMissionMasterDefinition,
+    category: number,
+    questId: number,
+): boolean {
+    return isPlannedDefinition(definition)
+        ? matchesPlannedActiveMissionQuestRange(definition.questRange, category, questId)
+        : matchesActiveMissionQuestRange(definition.row, category, questId)
 }
 
 function parseTargetElement(value: unknown): number | null {
@@ -128,11 +153,11 @@ export function collectActiveMissionSpecificBattleFacts(
     const matched: ActiveMissionBattleFact[] = []
     for (const definition of definitions) {
         try {
-            const pattern = Number(definition.row[29])
+            const pattern = getDefinitionPattern(definition)
             const battleKind = Number(definition.row[32])
             if (!Number.isSafeInteger(battleKind)
                 || !matchesBattleKind(battleKind, context.isMulti)
-                || !matchesActiveMissionQuestRange(definition.row, context.questCategory, context.questId)) continue
+                || !matchesDefinitionQuestRange(definition, context.questCategory, context.questId)) continue
             if (pattern === LOADOUT_PATTERN
                 && matchesCharacterElement(
                     parseTargetElement(definition.row[69]),
@@ -172,12 +197,9 @@ function resolveRepository(): ReadonlyContentRepository | undefined {
 function resolveDefinitions(
     repository?: ReadonlyContentRepository,
 ): readonly ActiveMissionMasterDefinition[] {
-    if (!repository) return getActiveMissionMasterDefinitions()
-    try {
-        return getActiveMissionMasterDefinitions(repository)
-    } catch {
-        return getActiveMissionMasterDefinitions()
-    }
+    const plan = getActiveMissionPlan(repository)
+    return [LOADOUT_PATTERN, SKILL_EFFECT_PATTERN, FULL_SKILL_START_PATTERN]
+        .flatMap(pattern => plan.getDefinitionsByPattern(pattern))
 }
 
 export function recordActiveMissionSpecificBattleFactsSync(context: FinishContext): void {
@@ -190,7 +212,7 @@ export function recordActiveMissionSpecificBattleFactsSync(context: FinishContex
         .flatMap(character => character?.id ? [character.id] : [])
     const allCharacterIds = [...partyCharacterIds, ...unisonCharacterIds]
     const targetCharacterIds = new Set(definitions.flatMap(definition => {
-        const pattern = Number(definition.row[29])
+        const pattern = getDefinitionPattern(definition)
         const targetElement = parseTargetElement(definition.row[69])
         return pattern === LOADOUT_PATTERN && targetElement !== null
             ? allCharacterIds
@@ -210,7 +232,7 @@ export function recordActiveMissionSpecificBattleFactsSync(context: FinishContex
         if (Number.isSafeInteger(element)) characters[String(characterId)] = { element: element as number }
     }
     let skillEffects: Readonly<Record<string, ActiveMissionSkillEffectState>> | undefined
-    if (definitions.some(definition => Number(definition.row[29]) === SKILL_EFFECT_PATTERN)) {
+    if (definitions.some(definition => getDefinitionPattern(definition) === SKILL_EFFECT_PATTERN)) {
         try {
             skillEffects = getContentSnapshot().repository.table<{
                 readonly schemaVersion?: number

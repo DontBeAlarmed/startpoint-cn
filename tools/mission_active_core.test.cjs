@@ -34,8 +34,15 @@ rewardRow[8] = "7"
 rewardRow[9] = "101"
 
 const tables = {
-    "mission_active.json": { 99001: [["99"]] },
-    "mission_active_event.json": { 99: [["", "", "0"]] },
+    "mission_active.json": { 99001: [missionRow({
+        eventId: 99,
+        stringId: "repository_active_mission",
+        pattern: 0,
+    })] },
+    "mission_active_event.json": { 99: [eventRow({
+        kind: 0,
+        start: "2020-01-01 00:00:00",
+    })] },
     "mission_active_reward.json": { 99001: { 1: [rewardRow] } },
 }
 const repository = {
@@ -68,11 +75,12 @@ assert.deepEqual(
     "load 白名单必须跟随当前 repository，不能保留 bundled 任务 ID",
 )
 
-function missionRow({ eventId, phase, stringId, need, show, start, end }) {
+function missionRow({ eventId, phase, stringId, pattern = 0, need, show, start, end }) {
     const row = []
     row[0] = String(eventId)
     row[1] = phase === undefined ? "(None)" : String(phase)
     row[3] = stringId
+    row[29] = String(pattern)
     row[56] = need ? String(need.missionId) : "(None)"
     row[57] = need ? String(need.stage) : ""
     row[58] = show ? String(show.missionId) : "(None)"

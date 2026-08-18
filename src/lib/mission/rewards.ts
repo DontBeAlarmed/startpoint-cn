@@ -1,22 +1,17 @@
-// Active Mission rewards keep their independent table path; standard rewards use MissionCatalog.
-
-import bundledActiveRewards from "../../../assets/mission_active_reward.json"
 import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
+import {
+    getActiveMissionPlan,
+    getActiveMissionPlanRewardStages,
+    type ActiveMissionReward,
+    type PlannedActiveMissionRewardStage,
+} from "./active-plan"
 import {
     getMissionCatalog,
     type MissionCatalogReward,
     type MissionCatalogStage,
 } from "./mission-catalog"
 
-export interface ActiveMissionReward {
-    kind: number
-    amount: number
-    itemId?: number
-    characterId?: number
-    equipmentId?: number
-    degreeId?: number
-}
+export type { ActiveMissionReward } from "./active-plan"
 
 export interface MissionRewardStageDefinition {
     targetProgress: number
@@ -39,74 +34,17 @@ export interface AwakeMissionRewardStageDefinition extends MissionRewardStageDef
     specialReward?: AwakeMissionSpecialReward
 }
 
-type RewardTable = Record<string, Record<string, any[]>>
-
-function getRewardRow(
-    table: RewardTable,
+function getActiveRewardStage(
     missionId: number,
     stage: number,
-): any[] | undefined {
-    return table[String(missionId)]?.[String(stage)]?.[0]
-}
-
-function parseOptionalInteger(value: unknown): number | undefined {
-    if (value === undefined || value === null || value === "" || value === "(None)") return undefined
-    const parsed = Number.parseInt(String(value))
-    return Number.isNaN(parsed) ? undefined : parsed
-}
-
-function parseMissionRewardSlots(
-    row: any[],
-    firstKindIndex: number,
-    slotCount = 4,
-): ActiveMissionReward[] {
-    const result: ActiveMissionReward[] = []
-    for (let slot = 0; slot < slotCount; slot++) {
-        const base = firstKindIndex + slot * 6
-        const kind = parseOptionalInteger(row[base])
-        if (kind === undefined) continue
-
-        const amount = parseOptionalInteger(row[base + 1]) ?? 0
-        const itemId = parseOptionalInteger(row[base + 2])
-        const characterId = parseOptionalInteger(row[base + 3])
-        const equipmentId = parseOptionalInteger(row[base + 4])
-        const degreeId = parseOptionalInteger(row[base + 5])
-
-        if (amount === 0 && kind !== 6) continue
-        if (kind === 1 && itemId === undefined) continue
-        if (kind === 2 && equipmentId === undefined) continue
-        if (kind === 4 && characterId === undefined) continue
-        if (kind === 6 && degreeId === undefined) continue
-
-        result.push({
-            kind,
-            amount,
-            ...(itemId !== undefined ? { itemId } : {}),
-            ...(characterId !== undefined ? { characterId } : {}),
-            ...(equipmentId !== undefined ? { equipmentId } : {}),
-            ...(degreeId !== undefined ? { degreeId } : {}),
-        })
-    }
-    return result
-}
-
-interface RewardTableSource {
-    readonly tableName: string
-    readonly bundledBeforeInitialization: RewardTable
-}
-
-function getRewardTable(
-    source: RewardTableSource,
     repository?: ReadonlyContentRepository,
-): RewardTable {
-    return repository
-        ? repository.table<RewardTable>(source.tableName)
-        : getRuntimeContentTableSync(source.tableName, source.bundledBeforeInitialization)
+): PlannedActiveMissionRewardStage | undefined {
+    return getActiveMissionPlanRewardStages(getActiveMissionPlan(repository), missionId)
+        .find(definition => definition.stage === stage)
 }
 
-const ACTIVE_REWARD_SOURCE: RewardTableSource = {
-    tableName: "mission_active_reward.json",
-    bundledBeforeInitialization: bundledActiveRewards as RewardTable,
+function cloneActiveReward(reward: ActiveMissionReward): ActiveMissionReward {
+    return { ...reward }
 }
 
 export function getActiveMissionRewards(
@@ -114,8 +52,7 @@ export function getActiveMissionRewards(
     stage: number,
     repository?: ReadonlyContentRepository,
 ): ActiveMissionReward[] {
-    const row = getRewardRow(getRewardTable(ACTIVE_REWARD_SOURCE, repository), missionId, stage)
-    return row ? parseMissionRewardSlots(row, 7) : []
+    return getActiveRewardStage(missionId, stage, repository)?.rewards.map(cloneActiveReward) ?? []
 }
 
 export function getMissionRewardStageDefinition(
@@ -123,14 +60,12 @@ export function getMissionRewardStageDefinition(
     stage: number,
     repository?: ReadonlyContentRepository,
 ): MissionRewardStageDefinition | null {
-    const row = getRewardRow(getRewardTable(ACTIVE_REWARD_SOURCE, repository), missionId, stage)
-    if (!row) return null
-    const targetProgress = Number.parseFloat(String(row[3]))
-    if (!Number.isFinite(targetProgress)) return null
+    const definition = getActiveRewardStage(missionId, stage, repository)
+    if (!definition) return null
     return {
-        targetProgress,
-        targetClearSeconds: parseOptionalInteger(row[4]),
-        rewards: parseMissionRewardSlots(row, 7),
+        targetProgress: definition.targetProgress,
+        targetClearSeconds: definition.targetClearSeconds,
+        rewards: definition.rewards.map(cloneActiveReward),
     }
 }
 

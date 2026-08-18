@@ -55,6 +55,31 @@ function activeRewardRow(targetProgress, itemId) {
     return row
 }
 
+function activeMissionRow(eventId, stringId, pattern = 0, marker = stringId) {
+    const row = []
+    row[0] = String(eventId)
+    row[1] = "1"
+    row[3] = stringId
+    row[24] = marker
+    row[29] = String(pattern)
+    row[56] = "(None)"
+    row[58] = "(None)"
+    row[60] = "2020-01-01 00:00:00"
+    row[61] = "(None)"
+    return row
+}
+
+function activeEventRow(marker) {
+    const row = []
+    row[0] = marker
+    row[2] = "0"
+    row[3] = "1"
+    row[14] = "2020-01-01 00:00:00"
+    row[15] = "(None)"
+    row[22] = "(None)"
+    return row
+}
+
 function awakeRewardRow(rewardId, targetProgress, itemId) {
     const row = []
     row[0] = String(rewardId)
@@ -118,8 +143,10 @@ function releaseTables(marker) {
         ids: { missionId, eventId, characterId, questId, rewardId, itemId, awakeMissionId },
         tables: {
             ...emptyStandardMissionTables(),
-            "mission_active.json": { [missionId]: [[`active-${marker}`]] },
-            "mission_active_event.json": { [eventId]: [[`event-${marker}`]] },
+            "mission_active.json": {
+                [missionId]: [activeMissionRow(eventId, `active-${marker}`, 0, `active-${marker}`)],
+            },
+            "mission_active_event.json": { [eventId]: [activeEventRow(`event-${marker}`)] },
             "character_quest_lookup.json": {
                 [questId]: [[String(characterId), "(None)", "(None)"]],
             },
@@ -226,7 +253,7 @@ test("mission tables imported before snapshot follow the current complete runtim
     installRelease(second, "release-b")
     assert.equal(activeMasterData.getActiveMissionMasterDefinition(first.ids.missionId), undefined)
     assert.equal(
-        activeMasterData.getActiveMissionMasterDefinition(second.ids.missionId).row[0],
+        activeMasterData.getActiveMissionMasterDefinition(second.ids.missionId).row[24],
         "active-2",
     )
     assert.equal(

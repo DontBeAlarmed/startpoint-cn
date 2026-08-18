@@ -36,6 +36,7 @@ function missionRow(eventId, stringId = "contents_guide_start") {
     row[0] = String(eventId)
     row[1] = "1"
     row[3] = stringId
+    row[29] = "0"
     row[56] = "(None)"
     row[58] = "(None)"
     row[60] = "2020-01-01 00:00:00"

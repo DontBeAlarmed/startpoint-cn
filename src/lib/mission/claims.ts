@@ -1,6 +1,5 @@
-import { getMissionRewardStageDefinition } from "./rewards"
 import type { ActiveMissionReward } from "./rewards"
-import { getActiveMissionMasterDefinition } from "./active-master-data"
+import { getActiveMissionPlan } from "./active-plan"
 import {
     isActiveMissionClaimable,
     type ActiveMissionAvailabilityContext,
@@ -46,6 +45,7 @@ export function validateMissionRewardClaims(
 
     const claims: ValidatedMissionRewardClaim[] = []
     const seen = new Set<string>()
+    const plan = getActiveMissionPlan(context?.repository)
     const availabilityMissions = context
         ? normalizeAvailabilityMissions(activeMissions)
         : null
@@ -60,7 +60,8 @@ export function validateMissionRewardClaims(
             return { ok: false, message: "Invalid active mission claim." }
         }
 
-        if (!getActiveMissionMasterDefinition(missionId, context?.repository)) {
+        const plannedMission = plan.getMission(missionId)
+        if (!plannedMission) {
             return { ok: false, message: "Unknown active mission." }
         }
 
@@ -83,14 +84,19 @@ export function validateMissionRewardClaims(
             seen.add(key)
             if (existingStages[String(stage)] === true) continue
 
-            const definition = getMissionRewardStageDefinition(missionId, stage, context?.repository)
+            const definition = plannedMission.rewardStages.find(candidate => candidate.stage === stage)
             if (!definition) return { ok: false, message: "Unknown mission reward stage." }
             if (existingStages[String(stage)] !== false && (
                 mission.progress < definition.targetProgress || definition.targetClearSeconds !== undefined
             )) {
                 return { ok: false, message: "Mission stage is not complete." }
             }
-            claims.push({ missionId, stage, progress: mission.progress, rewards: definition.rewards })
+            claims.push({
+                missionId,
+                stage,
+                progress: mission.progress,
+                rewards: definition.rewards.map(reward => ({ ...reward })),
+            })
         }
     }
 

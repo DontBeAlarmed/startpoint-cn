@@ -4,7 +4,12 @@ import { getPlayerCharacterSync, getPlayerCharacterManaNodesSync } from "../../d
 import { incrementActiveMissionConditionalBattleFactSync } from "../../data/domains/active_mission_battle_condition_facts"
 import { getCharacterDataSync, getCharacterManaNodesSync } from "../assets"
 import type { FinishContext } from "../quest/finish/types"
-import { getActiveMissionMasterDefinitions, type ActiveMissionMasterDefinition } from "./active-master-data"
+import type { ActiveMissionMasterDefinition } from "./active-master-data"
+import {
+    getActiveMissionPlan,
+    type PlannedActiveMissionDefinition,
+} from "./active-plan"
+import { matchesPlannedActiveMissionQuestRange } from "./active-quest-range"
 import {
     estimateActiveMissionCharacterLevel,
     matchesActiveMissionQuestRange,
@@ -48,6 +53,26 @@ function matchesBattleKind(battleKind: number, isMulti: boolean): boolean {
     return battleKind === 3 || battleKind === 2 && isMulti || battleKind === 1 && !isMulti
 }
 
+function isPlannedDefinition(
+    definition: ActiveMissionMasterDefinition,
+): definition is PlannedActiveMissionDefinition {
+    return "questRange" in definition && "pattern" in definition
+}
+
+function getDefinitionPattern(definition: ActiveMissionMasterDefinition): number {
+    return isPlannedDefinition(definition) ? definition.pattern : Number(definition.row[29])
+}
+
+function matchesDefinitionQuestRange(
+    definition: ActiveMissionMasterDefinition,
+    category: number,
+    questId: number,
+): boolean {
+    return isPlannedDefinition(definition)
+        ? matchesPlannedActiveMissionQuestRange(definition.questRange, category, questId)
+        : matchesActiveMissionQuestRange(definition.row, category, questId)
+}
+
 export function collectActiveMissionConditionalBattleFacts(
     definitions: readonly ActiveMissionMasterDefinition[],
     context: ConditionalBattleContext,
@@ -58,7 +83,7 @@ export function collectActiveMissionConditionalBattleFacts(
     const matched = new Map<string, ConditionalBattleFact>()
     for (const definition of definitions) {
         try {
-            const pattern = Number(definition.row[29])
+            const pattern = getDefinitionPattern(definition)
             if (!CONDITIONAL_PATTERNS.has(pattern)) continue
             const battleKind = Number(definition.row[32])
             const characterId = Number(definition.row[43])
@@ -66,8 +91,8 @@ export function collectActiveMissionConditionalBattleFacts(
                 || !Number.isSafeInteger(characterId)
                 || !matchesBattleKind(battleKind, context.isMulti)
                 || !partyCharacterIds.has(characterId)
-                || !matchesActiveMissionQuestRange(
-                    definition.row,
+                || !matchesDefinitionQuestRange(
+                    definition,
                     context.questCategory,
                     context.questId,
                 )) continue
@@ -97,12 +122,8 @@ function resolveRepository(): ReadonlyContentRepository | undefined {
 function resolveDefinitions(
     repository?: ReadonlyContentRepository,
 ): readonly ActiveMissionMasterDefinition[] {
-    if (!repository) return getActiveMissionMasterDefinitions()
-    try {
-        return getActiveMissionMasterDefinitions(repository)
-    } catch {
-        return getActiveMissionMasterDefinitions()
-    }
+    const plan = getActiveMissionPlan(repository)
+    return [...CONDITIONAL_PATTERNS].flatMap(pattern => plan.getDefinitionsByPattern(pattern))
 }
 
 function buildCharacterState(
@@ -139,7 +160,7 @@ export function recordActiveMissionConditionalBattleFactsSync(context: FinishCon
         .flatMap(character => character?.id ? [character.id] : [])
     const partyCharacterIdSet = new Set(partyCharacterIds)
     const targetCharacterIds = new Set(definitions.flatMap(definition => {
-        const pattern = Number(definition.row[29])
+        const pattern = getDefinitionPattern(definition)
         const characterId = Number(definition.row[43])
         return CONDITIONAL_PATTERNS.has(pattern)
             && Number.isSafeInteger(characterId)
