@@ -10,12 +10,17 @@ const {
 const {
     describeActiveMissionFixture,
     normalizeActiveMissionScenario,
+    selectActiveMissionFixture,
 } = require("./active-mission/fixture.cjs")
+const {
+    canonicalizeActiveMissionReport,
+} = require("./active-mission/report.cjs")
+const { SCENARIOS } = require("./mission_settlement_scenarios.cjs")
 
 function validReport(overrides = {}) {
     return {
         version: 1,
-        fixture: { name: "new-account", profile: "New" },
+        fixture: { name: "new-account", profile: "New", scale: 0 },
         behaviorHash: "a".repeat(64),
         unsupportedMissionIds: [21030],
         factLoaders: {
@@ -71,6 +76,16 @@ test("admission rejects changed fail-closed ids", () => {
     assert.equal(admission.unsupportedMissionSetEquivalent, false)
 })
 
+test("admission rejects reports with different fixture scales", () => {
+    const baseline = validReport()
+    const current = validReport({ fixture: describeActiveMissionFixture("Small") })
+
+    const admission = evaluateActiveMissionReport(baseline, current)
+
+    assert.equal(admission.behaviorEquivalent, false)
+    assert.equal(admission.admitted, false)
+})
+
 test("admission rejects sparse arrays, NaN, negative values, and contradictory metrics fail closed", () => {
     const malformedReports = [
         { ...validReport(), unsupportedMissionIds: Object.assign([], { 1: 21030, length: 2 }) },
@@ -105,6 +120,7 @@ test("fixture scale contract reuses mission settlement scenario semantics", () =
     assert.deepEqual(describeActiveMissionFixture("New"), {
         name: "new-account",
         profile: "New",
+        scale: 0,
     })
     assert.deepEqual(describeActiveMissionFixture("Small"), {
         name: "normal-progress",
@@ -116,5 +132,58 @@ test("fixture scale contract reuses mission settlement scenario semantics", () =
         profile: "Large",
         scale: 20,
     })
+    for (const [profile, name, scale] of [
+        ["New", "new-account", 0],
+        ["Small", "normal-progress", 3],
+        ["Large", "high-completion-volume", 20],
+    ]) {
+        const scenario = selectActiveMissionFixture(profile)
+        assert.equal(scenario.name, name)
+        assert.equal(scenario.scale, scale)
+        assert.equal(SCENARIOS.find(candidate => candidate.name === name).scale, scale)
+    }
     assert.throws(() => normalizeActiveMissionScenario("medium"), /unknown active mission scenario/i)
+})
+
+test("report rejects special fact loader keys without throwing", () => {
+    for (const name of ["__proto__", "constructor", "prototype"]) {
+        const factLoaders = {}
+        Object.defineProperty(factLoaders, name, {
+            configurable: true,
+            enumerable: true,
+            value: { calls: 1, rows: 13 },
+        })
+        const malformed = validReport({ factLoaders })
+        let admission
+        assert.doesNotThrow(() => {
+            admission = evaluateActiveMissionReport(validReport(), malformed)
+        }, name)
+        for (const gate of [
+            "behaviorEquivalent",
+            "unsupportedMissionSetEquivalent",
+            "structuralNonIncreasing",
+            "reportStructureValid",
+            "metricsValid",
+        ]) assert.equal(admission[gate], false, `${name}:${gate}`)
+        assert.equal(admission.admitted, false, name)
+    }
+})
+
+test("canonical report sorts IDs and recursively freezes nested metrics", () => {
+    const report = canonicalizeActiveMissionReport(validReport({
+        unsupportedMissionIds: [25009, 21030],
+    }))
+
+    assert.deepEqual(report.unsupportedMissionIds, [21030, 25009])
+    assert.throws(() => { report.factLoaders.characters.calls = 9 }, TypeError)
+    assert.throws(() => { report.structural.sqlReads = 99 }, TypeError)
+})
+
+test("fixture validation compares fields independently of property order", () => {
+    const baseline = validReport()
+    const current = validReport({
+        fixture: { scale: 0, profile: "New", name: "new-account" },
+    })
+
+    assert.equal(evaluateActiveMissionReport(baseline, current).admitted, true)
 })

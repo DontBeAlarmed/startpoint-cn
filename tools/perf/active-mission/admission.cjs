@@ -9,6 +9,7 @@ const {
 
 const GATES = Object.freeze([
     "behaviorEquivalent",
+    "fixtureEquivalent",
     "unsupportedMissionSetEquivalent",
     "structuralNonIncreasing",
     "reportStructureValid",
@@ -18,6 +19,7 @@ const GATES = Object.freeze([
 function failedAdmission(failures = []) {
     return {
         behaviorEquivalent: false,
+        fixtureEquivalent: false,
         unsupportedMissionSetEquivalent: false,
         structuralNonIncreasing: false,
         reportStructureValid: false,
@@ -40,7 +42,11 @@ function evaluateActiveMissionReport(baseline, current) {
 
         const expected = baselineInspection.report
         const actual = currentInspection.report
-        const behaviorEquivalent = actual.behaviorHash === expected.behaviorHash
+        const fixtureEquivalent = ["name", "profile", "scale"].every(field => (
+            actual.fixture[field] === expected.fixture[field]
+        ))
+        const behaviorEquivalent = fixtureEquivalent
+            && actual.behaviorHash === expected.behaviorHash
             && isDeepStrictEqual(actual.unsupportedMissionIds, expected.unsupportedMissionIds)
         const unsupportedMissionSetEquivalent = isDeepStrictEqual(
             actual.unsupportedMissionIds,
@@ -51,6 +57,7 @@ function evaluateActiveMissionReport(baseline, current) {
         ))
         const result = {
             behaviorEquivalent,
+            fixtureEquivalent,
             unsupportedMissionSetEquivalent,
             structuralNonIncreasing,
             reportStructureValid: true,

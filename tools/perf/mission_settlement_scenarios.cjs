@@ -1,9 +1,5 @@
 "use strict"
 
-const { getDb } = require("../../src/data/db")
-const { insertAccountSync } = require("../../src/data/domains/account")
-const { insertDefaultPlayerSync } = require("../../src/data/domains/player")
-
 const characterTable = require("../../assets/character.json")
 const equipmentTable = require("../../assets/equipment_dissolve.json")
 const itemTable = require("../../assets/item_sale.json")
@@ -23,7 +19,13 @@ const EVENT_QUEST_IDS = Object.entries(rushEventQuestTable)
     .map(([questId]) => Number(questId))
     .sort((left, right) => left - right)
 
+function getDb() {
+    return require("../../src/data/db").getDb()
+}
+
 function createPlayer(name) {
+    const { insertAccountSync } = require("../../src/data/domains/account")
+    const { insertDefaultPlayerSync } = require("../../src/data/domains/player")
     const account = insertAccountSync({
         appId: "wf_cn",
         idpAlias: "",
@@ -133,29 +135,22 @@ function seedProgress(playerId, scale) {
     seedEventProgress(playerId, scale >= 10 ? 7 : 2)
 }
 
+function createScenario(name, scale) {
+    return {
+        name,
+        scale,
+        create() {
+            const playerId = createPlayer(name)
+            if (scale > 0) seedProgress(playerId, scale)
+            return playerId
+        },
+    }
+}
+
 const SCENARIOS = Object.freeze([
-    {
-        name: "new-account",
-        create() {
-            return createPlayer("new-account")
-        },
-    },
-    {
-        name: "normal-progress",
-        create() {
-            const playerId = createPlayer("normal-progress")
-            seedProgress(playerId, 3)
-            return playerId
-        },
-    },
-    {
-        name: "high-completion-volume",
-        create() {
-            const playerId = createPlayer("high-completion-volume")
-            seedProgress(playerId, 20)
-            return playerId
-        },
-    },
+    createScenario("new-account", 0),
+    createScenario("normal-progress", 3),
+    createScenario("high-completion-volume", 20),
 ])
 
 module.exports = { SCENARIOS }

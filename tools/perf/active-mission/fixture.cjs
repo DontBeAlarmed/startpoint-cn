@@ -1,9 +1,21 @@
 "use strict"
 
+const { SCENARIOS } = require("../mission_settlement_scenarios.cjs")
+
+const SCENARIO_BY_NAME = new Map(SCENARIOS.map(scenario => [scenario.name, scenario]))
+
+function createProfileDefinition(profile, name) {
+    const scenario = SCENARIO_BY_NAME.get(name)
+    if (!scenario || !Number.isSafeInteger(scenario.scale) || scenario.scale < 0) {
+        throw new Error(`active mission fixture is missing valid scale metadata for ${name}`)
+    }
+    return Object.freeze({ name, profile, scale: scenario.scale })
+}
+
 const PROFILE_DEFINITIONS = Object.freeze({
-    New: Object.freeze({ name: "new-account", profile: "New" }),
-    Small: Object.freeze({ name: "normal-progress", profile: "Small", scale: 3 }),
-    Large: Object.freeze({ name: "high-completion-volume", profile: "Large", scale: 20 }),
+    New: createProfileDefinition("New", "new-account"),
+    Small: createProfileDefinition("Small", "normal-progress"),
+    Large: createProfileDefinition("Large", "high-completion-volume"),
 })
 const PROFILE_BY_NAME = new Map(
     Object.values(PROFILE_DEFINITIONS).map(definition => [definition.name, definition.profile]),
@@ -30,11 +42,7 @@ function describeActiveMissionFixture(value) {
 
 function selectActiveMissionFixture(value) {
     const name = normalizeActiveMissionScenario(value)
-    const { SCENARIOS } = require("../mission_settlement_scenarios.cjs")
-    if (!SCENARIOS.some(scenario => scenario.name === name)) {
-        throw new Error(`active mission fixture is missing ${name}`)
-    }
-    return SCENARIOS.find(scenario => scenario.name === name)
+    return SCENARIO_BY_NAME.get(name)
 }
 
 module.exports = {

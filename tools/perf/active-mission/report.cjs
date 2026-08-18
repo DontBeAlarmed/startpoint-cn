@@ -21,6 +21,8 @@ const STRUCTURAL_METRICS = Object.freeze([
     "staticComputes",
     "dependencyComputes",
 ])
+const FIXTURE_FIELDS = Object.freeze(["name", "profile", "scale"])
+const RESERVED_FACT_LOADER_NAMES = new Set(["__proto__", "constructor", "prototype"])
 
 function isPlainObject(value) {
     if (value === null || typeof value !== "object" || Array.isArray(value)) return false
@@ -36,6 +38,12 @@ function isDenseArray(value) {
     return Array.isArray(value)
         && Object.keys(value).length === value.length
         && Object.keys(value).every(key => String(Number(key)) === key)
+}
+
+function deepFreeze(value) {
+    if (value === null || typeof value !== "object" || Object.isFrozen(value)) return value
+    for (const nested of Object.values(value)) deepFreeze(nested)
+    return Object.freeze(value)
 }
 
 function normalizeMissionIds(value) {
@@ -54,8 +62,11 @@ function normalizeMissionIds(value) {
 
 function normalizeFactLoaders(value) {
     if (!isPlainObject(value)) throw new TypeError("factLoaders must be a plain object")
-    const result = {}
+    const result = Object.create(null)
     for (const name of Object.keys(value).sort()) {
+        if (RESERVED_FACT_LOADER_NAMES.has(name)) {
+            throw new TypeError(`fact loader name ${name} is reserved`)
+        }
         const loader = value[name]
         if (!isPlainObject(loader)
             || Object.keys(loader).sort().join(",") !== "calls,rows"
@@ -71,10 +82,11 @@ function normalizeFactLoaders(value) {
 function normalizeFixture(value) {
     if (!isPlainObject(value)) throw new TypeError("fixture must be a plain object")
     const expected = describeActiveMissionFixture(value.profile ?? value.name)
-    if (JSON.stringify(value) !== JSON.stringify(expected)) {
+    if (Object.keys(value).sort().join(",") !== [...FIXTURE_FIELDS].sort().join(",")
+        || FIXTURE_FIELDS.some(field => value[field] !== expected[field])) {
         throw new TypeError("fixture does not match the active mission scale contract")
     }
-    return expected
+    return { ...expected }
 }
 
 function normalizeStructural(value, factLoaders) {
@@ -110,7 +122,7 @@ function canonicalizeActiveMissionReport(report) {
     const factLoaders = normalizeFactLoaders(report.factLoaders)
     const fixture = normalizeFixture(report.fixture)
     const structural = normalizeStructural(report.structural, factLoaders)
-    return Object.freeze({
+    return deepFreeze({
         version: report.version,
         fixture,
         behaviorHash: report.behaviorHash,
