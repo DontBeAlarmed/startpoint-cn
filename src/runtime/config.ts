@@ -12,6 +12,10 @@ import {
     isValidNetworkHost,
     resolveDisplayHost,
 } from "./network-host"
+import {
+    snapshotContentPathEnvironment,
+    type ContentPathEnvironment,
+} from "../content/paths"
 
 export interface RuntimeEnvironment extends AssetModeEnvironment {
     readonly SESSION_HOST?: string
@@ -92,6 +96,7 @@ export interface CnRuntimeConfig {
     readonly multi: MultiRuntimeConfig
     readonly multiTuning: MultiRuntimeTuningConfig
     readonly assetProvider: AssetProviderConfig
+    readonly contentEnvironment: Readonly<ContentPathEnvironment>
     readonly comicDir: string | null
     readonly summonComSeconds: number
     readonly dailyResetHour: number
@@ -403,6 +408,7 @@ export function parseCnRuntimeConfig({
     const multi = parseMultiRuntimeConfig(env, projectRoot)
     const multiTuning = parseMultiRuntimeTuning(env)
     const assetProvider = parseAssetProviderConfig({ projectRoot, env })
+    const contentEnvironment = snapshotContentPathEnvironment(env)
     const comicDir = resolveComicDir(env, projectRoot)
     const summonComSeconds = parseNonNegativeInteger(env.SUMMON_COM_SECONDS, 5)
     const dailyResetHour = parseDailyResetHour(env.DAILY_RESET_HOUR)
@@ -414,6 +420,7 @@ export function parseCnRuntimeConfig({
         multi,
         multiTuning,
         assetProvider,
+        contentEnvironment,
         comicDir,
         summonComSeconds,
         dailyResetHour,

@@ -14,6 +14,26 @@ export interface ContentPathEnvironment {
     readonly WDFP_DATABASE_DIR?: string
 }
 
+const CONTENT_PATH_ENVIRONMENT_KEYS = [
+    "CDN_DIR",
+    "DATA_DIR",
+    "CONTENT_DIR",
+    "CONTENT_STORE_DIR",
+    "CONTENT_STATE_DIR",
+    "CONTENT_RUNTIME_DIR",
+    "WDFP_DATABASE_DIR",
+] as const
+
+export function snapshotContentPathEnvironment(
+    env: ContentPathEnvironment,
+): Readonly<ContentPathEnvironment> {
+    return Object.freeze(Object.fromEntries(
+        CONTENT_PATH_ENVIRONMENT_KEYS.flatMap(key => (
+            env[key] === undefined ? [] : [[key, env[key]]]
+        )),
+    ))
+}
+
 export type ContentPathLayout = "modern" | "legacy"
 
 export interface ContentRuntimePaths {

@@ -19,6 +19,7 @@ import {
 import {
     resolveContentPaths,
     resolveContentRuntimePaths,
+    snapshotContentPathEnvironment,
     type ContentPathEnvironment,
     type ContentPaths,
     type ContentRuntimePaths,
@@ -163,11 +164,13 @@ export class ContentSnapshotProvider {
 export interface ContentSnapshotRuntimeConfiguration {
     readonly assetMode: AssetMode
     readonly localCdn: boolean
+    readonly contentEnvironment: Readonly<ContentPathEnvironment>
 }
 
 export interface InitializeContentSnapshotOptions {
     readonly assetMode?: AssetMode
     readonly localCdn?: boolean
+    readonly contentEnvironment?: ContentPathEnvironment
 }
 
 export type ContentSnapshotConfigurationErrorCode =
@@ -207,7 +210,19 @@ function normalizeRuntimeConfiguration(
             "content snapshot runtime configuration is invalid",
         )
     }
-    return Object.freeze({ assetMode, localCdn })
+    return Object.freeze({
+        assetMode,
+        localCdn,
+        contentEnvironment: snapshotContentPathEnvironment(options.contentEnvironment ?? process.env),
+    })
+}
+
+function sameContentEnvironment(
+    left: Readonly<ContentPathEnvironment>,
+    right: Readonly<ContentPathEnvironment>,
+): boolean {
+    const keys = new Set([...Object.keys(left), ...Object.keys(right)])
+    return [...keys].every(key => left[key] === right[key])
 }
 
 function lockRuntimeConfiguration(
@@ -219,7 +234,9 @@ function lockRuntimeConfiguration(
         state.configuration = requested
         return
     }
-    if (current.assetMode !== requested.assetMode || current.localCdn !== requested.localCdn) {
+    if (current.assetMode !== requested.assetMode
+        || current.localCdn !== requested.localCdn
+        || !sameContentEnvironment(current.contentEnvironment, requested.contentEnvironment)) {
         throw new ContentSnapshotConfigurationError(
             "CONTENT_SNAPSHOT_CONFIGURATION_CONFLICT",
             "content snapshot runtime configuration is already locked",
@@ -423,6 +440,7 @@ export const productionContentSnapshotProvider = createConfiguredContentSnapshot
     createProvider: configuration => (
         createProjectContentSnapshotProvider({
             projectRoot: resolveContentProjectRoot(__dirname),
+            env: configuration.contentEnvironment,
             localCdn: configuration.localCdn,
         })
     ),

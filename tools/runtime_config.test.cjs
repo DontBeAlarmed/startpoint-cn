@@ -47,6 +47,29 @@ test("runtime client response settings are parsed once at startup", () => {
     assert.equal(Object.isFrozen(config), true)
 })
 
+test("runtime config freezes only content path environment used by the snapshot", () => {
+    const env = {
+        ASSET_MODE: "client-owned",
+        CDN_DIR: ".cdn-first",
+        DATA_DIR: ".data-first",
+        CONTENT_RUNTIME_DIR: "assets-first",
+        MULTI_HUB_TOKEN: "must-not-be-copied",
+    }
+    const config = parseCnRuntimeConfig({ projectRoot, env })
+
+    env.CDN_DIR = ".cdn-second"
+    env.DATA_DIR = ".data-second"
+    env.CONTENT_RUNTIME_DIR = "assets-second"
+
+    assert.deepEqual(config.contentEnvironment, {
+        CDN_DIR: ".cdn-first",
+        DATA_DIR: ".data-first",
+        CONTENT_RUNTIME_DIR: "assets-first",
+    })
+    assert.equal(Object.isFrozen(config.contentEnvironment), true)
+    assert.equal(config.contentEnvironment.MULTI_HUB_TOKEN, undefined)
+})
+
 test("runtime rejects invalid client response settings", () => {
     for (const [key, value] of [
         ["SUMMON_COM_SECONDS", "-1"],

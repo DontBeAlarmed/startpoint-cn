@@ -90,6 +90,9 @@ test("independent configured provider shares one initialization and rejects mode
             assert.deepEqual(configuration, {
                 assetMode: "remote",
                 localCdn: false,
+                contentEnvironment: {
+                    CONTENT_RUNTIME_DIR: "runtime-first",
+                },
             })
             return new ContentSnapshotProvider({
                 snapshotSource: {
@@ -103,14 +106,28 @@ test("independent configured provider shares one initialization and rejects mode
         },
     })
 
-    const first = provider.initialize({ assetMode: "remote", localCdn: false })
-    const concurrent = provider.initialize({ assetMode: "remote", localCdn: false })
+    const contentEnvironment = { CONTENT_RUNTIME_DIR: "runtime-first" }
+    const first = provider.initialize({
+        assetMode: "remote",
+        localCdn: false,
+        contentEnvironment,
+    })
+    contentEnvironment.CONTENT_RUNTIME_DIR = "runtime-second"
+    const concurrent = provider.initialize({
+        assetMode: "remote",
+        localCdn: false,
+        contentEnvironment: { CONTENT_RUNTIME_DIR: "runtime-first" },
+    })
     assert.strictEqual(concurrent, first)
     assert.equal(providerCreations, 1)
     assert.equal(sourceLoads, 1)
 
     assert.throws(
-        () => provider.initialize({ assetMode: "client-owned", localCdn: false }),
+        () => provider.initialize({
+            assetMode: "client-owned",
+            localCdn: false,
+            contentEnvironment: { CONTENT_RUNTIME_DIR: "runtime-first" },
+        }),
         error => error.code === "CONTENT_SNAPSHOT_CONFIGURATION_CONFLICT",
     )
     releaseSource()

@@ -388,6 +388,7 @@ runtimeCoordinator = createRuntimeCoordinator({
         initializeContentSnapshot: config => initializeContentSnapshot({
             assetMode: config.assetProvider.mode,
             localCdn: config.assetProvider.mode === "local",
+            contentEnvironment: config.contentEnvironment,
         }),
     }),
     readyHttp: async () => { await fastify.ready(); },

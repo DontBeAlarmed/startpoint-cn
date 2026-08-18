@@ -28,8 +28,8 @@ CN 客户端 -> TCP 会话 -> 进程内房间与联机状态机
 2. bootstrap 读取 `ASSET_MODE`。
 3. `local` 模式先执行 `content:sync`，成功后启动 `out/cn-server.js`；同步失败则不启动。
 4. `remote` 和 `client-owned` 模式跳过本地 `content:sync`，直接启动 `out/cn-server.js`。
-5. 运行时解析配置并初始化 SQLite。
-6. 按资源模式加载本次进程固定使用的 Content snapshot。
+5. 运行时一次解析并冻结网络、资源模式及 Content 路径环境，然后初始化 SQLite。
+6. 按冻结的资源模式和路径环境加载本次进程固定使用的 Content snapshot。
 7. 启动多人运行时并取得多人 HTTP 上下文；默认 `embedded` 模式在此监听 TCP，`host`/`client` 模式故障时进入降级状态。
 8. Fastify 注册依赖运行时上下文的路由并监听 HTTP，随后进入 `ready`。
 
@@ -63,7 +63,7 @@ CN 客户端不能正确处理部分 `uint32` 标记，响应层会把安全范�
 - `runtime/` 加载并冻结当前 Content snapshot；
 - `startup/` 保证本地资源模式先同步、后启动。
 
-同一进程中的资产版本、下载清单和业务表来自同一 snapshot，不在请求期间重新扫描 CDN。当前转换器只覆盖已接入的表，其余 `assets/` 数据仍作为版本内置数据使用。职责与支持边界见[CDN 与内容索引](./cdn/README.md)。
+同一进程中的资产版本、下载清单和业务表来自同一 snapshot，不在请求期间重新扫描 CDN。Snapshot 初始化使用 `RuntimeConfig` 保存的 Content 路径环境，不会在配置解析后再次读取可能变化的进程环境。当前转换器只覆盖已接入的表，其余 `assets/` 数据仍作为版本内置数据使用。职责与支持边界见[CDN 与内容索引](./cdn/README.md)。
 
 ## 5. SQLite 状态
 
