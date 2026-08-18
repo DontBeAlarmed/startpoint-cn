@@ -10,6 +10,9 @@ const {
 const {
     executeSingleBattleScenario,
 } = require("./non_multi_mixed_battle.cjs")
+const { executeGachaScenario } = require("./non_multi_mixed_gacha.cjs")
+const { executeMailScenario } = require("./non_multi_mixed_mail.cjs")
+const { executeShopScenario } = require("./non_multi_mixed_shop.cjs")
 
 const LOAD_RES_VERSION = "1.4.54"
 const VIEWER_SESSION_TYPE = 2
@@ -196,6 +199,9 @@ async function executeScenario(app, identity, context = {}) {
     if (entry === "load") return executeLoad(app, identity)
     if (entry === "mission-progress") return executeMissionProgress(app, identity)
     if (entry === "single-battle") return executeSingleBattleScenario(app, identity, context)
+    if (entry === "shop") return executeShopScenario(app, identity, context)
+    if (entry === "mail") return executeMailScenario(app, identity, context)
+    if (entry === "gacha") return executeGachaScenario(app, identity, context)
     throw new Error(`unsupported non-multi mixed scenario: ${String(entry)}`)
 }
 

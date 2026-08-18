@@ -56,13 +56,17 @@ test.after(cleanup)
 data = require("../../src/data")
 const { getDb } = require("../../src/data/db")
 const { insertAccountSync } = require("../../src/data/domains/account")
+const { insertMailSync } = require("../../src/data/domains/mail")
 const { insertDefaultPlayerSync } = require("../../src/data/domains/player")
 const { insertDeviceBindingSync } = require("../../src/data/domains/session")
 const { SessionType } = require("../../src/data/types")
 const cnLoadRoutes = require("../../src/routes/cn/load").default
 const { registerCnMsgpackOnSend } = require("../../src/routes/cn/msgpack")
 const cnToolRoutes = require("../../src/routes/cn/tool").default
+const gachaRoutes = require("../../src/routes/api/gacha").default
+const mailRoutes = require("../../src/routes/api/mail").default
 const missionRoutes = require("../../src/routes/api/mission").default
+const shopRoutes = require("../../src/routes/api/shop").default
 const singleBattleRoutes = require("../../src/routes/api/singleBattleQuest").default
 const { getTimeOffset, setServerTimeOffset } = require("../../src/utils")
 const { activeQuests } = require("../../src/lib/quest/active-quest-service")
@@ -88,6 +92,15 @@ const {
     projectNonMultiMixedOwnerState,
     snapshotNonMultiMixedOwnerState,
 } = require("./non_multi_mixed_state_snapshot.cjs")
+const { GACHA_ID } = require("./non_multi_mixed_gacha.cjs")
+const { MAIL_ITEM_ID } = require("./non_multi_mixed_mail.cjs")
+const {
+    SHOP_ITEM_ID,
+    SHOP_REWARD_EQUIPMENT_ID,
+} = require("./non_multi_mixed_shop.cjs")
+const {
+    createNonMultiMixedWriteContext,
+} = require("./non_multi_mixed_write_fixture.cjs")
 const activeQuestsFixture = prepareActiveQuests({ createSentinel: createActiveQuestSentinel })
 const FIXED_SERVER_TIME = "2024-08-14T12:00:00.000Z"
 function assertOtherOwnersUnchanged(before, after, targetIdentity) {
@@ -106,10 +119,15 @@ function inspectAuthIdentity(db, identity) {
     `).all(identity.accountId, SessionType.VIEWER)
     return { binding, viewerSessions }
 }
-test("auth, load, mission-progress, and single-battle use isolated real CN HTTP journeys", async () => {
+test("all non-multi entries use isolated real CN HTTP journeys", async () => {
     setServerTimeOffset(Date.parse(FIXED_SERVER_TIME) - Date.now())
     restoreContentSnapshot = installBundledGameplaySnapshot({
-        additionalTableNames: ["event_item_shop.json", "event_item_shop_id_map.json"],
+        additionalTableNames: [
+            "event_item_shop.json",
+            "event_item_shop_id_map.json",
+            "gacha.json",
+            "general_shop.json",
+        ],
     })
     data.initializeDatabase()
     const db = getDb()
@@ -146,6 +164,9 @@ test("auth, load, mission-progress, and single-battle use isolated real CN HTTP 
             },
             { plugin: missionRoutes, prefix: "/api/index.php/mission" },
             { plugin: singleBattleRoutes, prefix: "/api/index.php/single_battle_quest" },
+            { plugin: shopRoutes, prefix: "/api/index.php/shop" },
+            { plugin: gachaRoutes, prefix: "/api/index.php/gacha" },
+            { plugin: mailRoutes, prefix: "/api/index.php/mail" },
         ],
     })
     const byEntry = Object.fromEntries(pool.identities.map(identity => [identity.entryName, identity]))
@@ -153,6 +174,7 @@ test("auth, load, mission-progress, and single-battle use isolated real CN HTTP 
     let snapshotSingleBattleCalls = 0
     const context = {
         inspectAuthIdentity: identity => inspectAuthIdentity(db, identity),
+        ...createNonMultiMixedWriteContext(db, { insertMail: insertMailSync }),
         prepareSingleBattleIdentity: identity => prepareSingleBattleIdentity(db, identity),
         singleBattlePeer: byEntry.auth,
         snapshotSingleBattleState: () => {
@@ -288,14 +310,74 @@ test("auth, load, mission-progress, and single-battle use isolated real CN HTTP 
     assert.equal(snapshotSingleBattleCalls, 8)
     assertOtherOwnersUnchanged(before, after, byEntry["single-battle"])
 
-    // Unsupported dispatcher entries stay fail-closed; do not emit meaningless HTTP requests.
-    for (const entry of ["shop", "gacha", "mail", "unknown"]) {
-        const identity = entry === "unknown"
-            ? { ...byEntry.auth, entryName: entry }
-            : byEntry[entry]
-        await assert.rejects(
-            () => executeScenario(app, identity, context),
-            new RegExp(`unsupported non-multi mixed scenario: ${entry}`),
-        )
-    }
+    before = after
+    const shop = await executeScenario(app, byEntry.shop, context)
+    after = snapshotNonMultiMixedOwnerState(db)
+    assert.deepEqual(shop, {
+        entry: "shop",
+        adapter: "fastify-route:/api/index.php/shop/get_sales_list->buy->get_sales_list",
+        statusCode: 200,
+        resultCode: 1,
+        salesCount: 27,
+        shopType: 8,
+        shopItemId: SHOP_ITEM_ID,
+        currency: { kind: "bond-token", before: 500, after: 450, spent: 50 },
+        stock: { before: 1, after: 0, purchaseCountAfter: 1 },
+        reward: { equipmentId: SHOP_REWARD_EQUIPMENT_ID, equipmentCountAfter: 1 },
+    })
+    assert.doesNotThrow(() => JSON.stringify(shop))
+    assertOtherOwnersUnchanged(before, after, byEntry.shop)
+
+    before = after
+    const mail = await executeScenario(app, byEntry.mail, context)
+    after = snapshotNonMultiMixedOwnerState(db)
+    assert.deepEqual(mail, {
+        entry: "mail",
+        adapter: "fastify-route:/api/index.php/mail/index->receive",
+        statusCode: 200,
+        resultCode: 1,
+        listCount: 1,
+        item: { itemId: MAIL_ITEM_ID, before: 0, after: 2, delta: 2 },
+        unreceived: { before: 1, after: 0 },
+        receiveHistory: { before: 0, after: 1, delta: 1 },
+    })
+    assert.doesNotThrow(() => JSON.stringify(mail))
+    assertOtherOwnersUnchanged(before, after, byEntry.mail)
+
+    before = after
+    const gacha = await executeScenario(app, byEntry.gacha, context)
+    after = snapshotNonMultiMixedOwnerState(db)
+    assert.deepEqual(gacha, {
+        entry: "gacha",
+        adapter: "fastify-route:/api/index.php/load->gacha/exec",
+        statusCode: 200,
+        resultCode: 1,
+        gachaId: GACHA_ID,
+        loadGachaInfoCount: 0,
+        currency: { before: 1000, after: 850, spent: 150 },
+        exchangePoint: { before: 0, after: 1, delta: 1 },
+        receiveHistory: { before: 0, after: 1, delta: 1 },
+        activeMissionGacha: { before: 0, after: 1, delta: 1 },
+        responseCounts: {
+            draw: 1,
+            character: 1,
+            item: 0,
+            gachaInfo: 1,
+            gachaCampaign: 0,
+            encyclopedia: 0,
+        },
+    })
+    assert.doesNotThrow(() => JSON.stringify(gacha))
+    assertOtherOwnersUnchanged(before, after, byEntry.gacha)
+
+    before = after
+    const repeatedGacha = await executeScenario(app, byEntry.gacha, context)
+    after = snapshotNonMultiMixedOwnerState(db)
+    assert.deepEqual(repeatedGacha, gacha)
+    assertOtherOwnersUnchanged(before, after, byEntry.gacha)
+
+    await assert.rejects(
+        () => executeScenario(app, { ...byEntry.auth, entryName: "unknown" }, context),
+        /unsupported non-multi mixed scenario: unknown/,
+    )
 })

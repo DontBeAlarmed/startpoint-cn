@@ -24,6 +24,21 @@ function responseApp(payload, statusCode = 200, { msgpack = false } = {}) {
     }
 }
 
+function responseSequenceApp(payloads) {
+    let index = 0
+    return {
+        async inject() {
+            const payload = payloads[index++]
+            if (payload === undefined) throw new Error("unexpected extra HTTP request")
+            return {
+                statusCode: 200,
+                headers: { "content-type": "application/x-msgpack" },
+                body: pack(payload).toString("base64"),
+            }
+        },
+    }
+}
+
 function scenarioIdentity(entryName) {
     return { entryName, accountId: 11, playerId: 21, viewerId: 31, deviceId: 41 }
 }
@@ -74,6 +89,37 @@ function validMissionPayload(identity) {
     }
 }
 
+function writeScenarioContext(entry) {
+    if (entry === "shop") return {
+        prepareShopIdentity() {},
+        inspectShopIdentity: () => ({
+            bondToken: 500,
+            purchaseCount: 0,
+            rewardEquipmentCount: 0,
+        }),
+    }
+    if (entry === "mail") return {
+        prepareMailIdentity: () => ({ mailId: 1 }),
+        inspectMailIdentity: () => ({
+            itemCount: 0,
+            unreceivedMailCount: 1,
+            receiveHistoryCount: 0,
+        }),
+    }
+    if (entry === "gacha") return {
+        prepareGachaIdentity() {},
+        inspectGachaIdentity: () => ({
+            freeVmoney: 1000,
+            exchangePoint: 0,
+            receiveHistoryCount: 0,
+            characterCount: 0,
+            partyCharacterReferenceCount: 0,
+            activeMissionGachaCount: 0,
+        }),
+    }
+    throw new Error(`unsupported validation context: ${entry}`)
+}
+
 test("single battle rejection helper accepts only the expected bad-request shape", () => {
     assert.doesNotThrow(() => requireRejected({
         statusCode: 400,
@@ -109,6 +155,13 @@ test("all scenarios reject HTTP 200 responses with a non-success result code", a
             return payload
         }, () => ({})],
     ]
+    for (const entry of ["shop", "mail", "gacha"]) {
+        cases.push([
+            entry,
+            () => ({ data_headers: { result_code: 0 }, data: {} }),
+            () => writeScenarioContext(entry),
+        ])
+    }
     for (const [entry, createPayload, createContext] of cases) {
         const identity = scenarioIdentity(entry)
         await assert.rejects(
@@ -120,6 +173,145 @@ test("all scenarios reject HTTP 200 responses with a non-success result code", a
             /result_code must be 1/,
         )
     }
+})
+
+test("shop, mail, and gacha read paths reject malformed response collections", async () => {
+    const cases = [
+        ["shop", { sales_list: {} }, /sales_list/],
+        ["mail", { mail: {}, total_count: 0 }, /mail index list/],
+        ["gacha", { gacha_info_list: {} }, /gacha_info_list/],
+    ]
+    for (const [entry, data, message] of cases) {
+        const identity = scenarioIdentity(entry)
+        await assert.rejects(
+            () => executeScenario(
+                responseApp({
+                    data_headers: {
+                        result_code: 1,
+                        viewer_id: entry === "gacha" ? identity.accountId : identity.viewerId,
+                    },
+                    data,
+                }, 200, { msgpack: true }),
+                identity,
+                writeScenarioContext(entry),
+            ),
+            message,
+        )
+    }
+})
+
+test("shop rejects a buy response that omits the purchased equipment", async () => {
+    const identity = scenarioIdentity("shop")
+    let inspections = 0
+    const context = {
+        prepareShopIdentity() {},
+        inspectShopIdentity() {
+            inspections++
+            return inspections === 1
+                ? { bondToken: 500, purchaseCount: 0, rewardEquipmentCount: 0 }
+                : { bondToken: 450, purchaseCount: 1, rewardEquipmentCount: 1 }
+        },
+    }
+    await assert.rejects(
+        () => executeScenario(responseSequenceApp([{
+            data_headers: { result_code: 1, viewer_id: identity.viewerId },
+            data: {
+                sales_list: [{
+                    shop_type: 8,
+                    shop_item_id: 100001,
+                    stock_quantity: 1,
+                    total_purchase_num: 0,
+                }],
+            },
+        }, {
+            data_headers: { result_code: 1, viewer_id: identity.viewerId },
+            data: { user_info: { bond_token: 450 }, equipment_list: [] },
+        }]), identity, context),
+        /purchased equipment/,
+    )
+})
+
+test("mail rejects a listed fixture mail with mismatched attachment fields", async () => {
+    const identity = scenarioIdentity("mail")
+    let inspections = 0
+    const context = {
+        prepareMailIdentity: () => ({ mailId: 1 }),
+        inspectMailIdentity() {
+            inspections++
+            return inspections === 1
+                ? { itemCount: 0, unreceivedMailCount: 1, receiveHistoryCount: 0 }
+                : { itemCount: 2, unreceivedMailCount: 0, receiveHistoryCount: 1 }
+        },
+    }
+    await assert.rejects(
+        () => executeScenario(responseSequenceApp([{
+            data_headers: { result_code: 1, viewer_id: identity.viewerId },
+            data: {
+                mail: [{
+                    id: 1,
+                    type: 0,
+                    type_id: 99999,
+                    number: 0,
+                    receive_time: "0000-00-00 00:00:00",
+                }],
+                total_count: 1,
+            },
+        }, {
+            data_headers: { result_code: 1, viewer_id: identity.viewerId },
+            data: {
+                item_list: { 30005: 2 },
+                total_count: 1,
+                mail_arrived: false,
+            },
+        }]), identity, context),
+        /fixture attachment/,
+    )
+})
+
+test("gacha rejects null draw entries even when response counts match", async () => {
+    const identity = scenarioIdentity("gacha")
+    let inspections = 0
+    const context = {
+        prepareGachaIdentity() {},
+        inspectGachaIdentity() {
+            inspections++
+            return inspections === 1
+                ? {
+                    freeVmoney: 1000,
+                    exchangePoint: 0,
+                    receiveHistoryCount: 0,
+                    characterCount: 0,
+                    partyCharacterReferenceCount: 0,
+                    activeMissionGachaCount: 0,
+                }
+                : {
+                    freeVmoney: 850,
+                    exchangePoint: 1,
+                    receiveHistoryCount: 1,
+                    characterCount: 1,
+                    partyCharacterReferenceCount: 0,
+                    activeMissionGachaCount: 1,
+                }
+        },
+    }
+    await assert.rejects(
+        () => executeScenario(responseSequenceApp([{
+            data_headers: { result_code: 1, viewer_id: identity.accountId },
+            data: { gacha_info_list: [] },
+        }, {
+            data_headers: { result_code: 1, viewer_id: identity.viewerId },
+            data: {
+                user_info: { free_vmoney: 850 },
+                draw: [null],
+                character_list: [{ character_id: 1, entry_count: 1 }],
+                item_list: {},
+                gacha_info_list: [{ gacha_id: 1638, gacha_exchange_point: 1 }],
+                gacha_campaign_list: [],
+                encyclopedia_info: [],
+            },
+        }]), identity, context),
+        /draw entry/,
+    )
 })
 
 test("auth rejects a viewer session with the wrong token or type", async () => {
