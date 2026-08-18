@@ -28,8 +28,10 @@ function cleanup() {
 
 process.once("exit", cleanup)
 
-restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
-    .installBundledGameplaySnapshot()
+const {
+    installBundledGameplaySnapshot,
+} = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+restoreContentSnapshot = installBundledGameplaySnapshot()
 
 const { initializeDatabase } = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
@@ -40,7 +42,8 @@ const {
     updatePlayerCharacterSync,
 } = require("../src/data/domains/character")
 const { upsertPlayerCharacterAwakeUnlockSync } = require("../src/data/domains/character_awake")
-const { getPlayerItemsSync, givePlayerItemSync } = require("../src/data/domains/item")
+const itemDomain = require("../src/data/domains/item")
+const { getPlayerItemsSync, givePlayerItemSync } = itemDomain
 const { updatePlayerCategoryMissionSync } = require("../src/data/domains/mission")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
@@ -76,6 +79,7 @@ async function createPlayer(sequence) {
         expires: new Date("2099-01-01T00:00:00.000Z"),
         type: SessionType.VIEWER,
     })
+    updatePlayerCharacterSync(playerId, CHARACTER_ID, { exp: 100000 })
     return { playerId, viewerId }
 }
 
@@ -170,7 +174,10 @@ test.before(async () => {
 
 test("learn_mana_node persists and returns CN evolution before board completion", async () => {
     const learned = await createPlayer(1)
-    insertPlayerCharacterManaNodesSync(learned.playerId, CHARACTER_ID, SLOT_NODE_IDS)
+    insertPlayerCharacterManaNodesSync(learned.playerId, CHARACTER_ID, [
+        ...SLOT_NODE_IDS,
+        2202,
+    ])
     grantLearnCost(learned.playerId, SKILL_EVOLUTION_NODE_ID)
     const learnResponse = await app.inject({
         method: "POST",
@@ -195,6 +202,7 @@ test("learn_mana_node persists and returns CN evolution before board completion"
 test("learn_mana_node corrects an overstated persisted evolution without a growth response", async () => {
     const corrected = await createPlayer(6)
     updatePlayerCharacterSync(corrected.playerId, CHARACTER_ID, { evolutionLevel: 3 })
+    insertPlayerCharacterManaNodesSync(corrected.playerId, CHARACTER_ID, [2219])
     grantLearnCost(corrected.playerId, 2220)
     const response = await app.inject({
         method: "POST",
@@ -340,6 +348,33 @@ test("awake_mana_node no-op corrects authoritative evolution from current node s
     const corrected = await createPlayer(4)
     seedBoardNodes(corrected.playerId, { [SKILL_EVOLUTION_NODE_ID]: 2 })
     upsertPlayerCharacterAwakeUnlockSync(corrected.playerId, CHARACTER_ID, 1, 2)
+    const beforeCorrection = routeState(corrected.playerId)
+    db.exec(`
+        CREATE TRIGGER reject_noop_player_resource_update
+        BEFORE UPDATE OF free_mana, paid_mana ON players
+        WHEN OLD.id = ${corrected.playerId}
+        BEGIN SELECT RAISE(ABORT, 'no-op must not write mana'); END;
+
+        CREATE TRIGGER reject_noop_item_update
+        BEFORE UPDATE ON players_items
+        WHEN OLD.player_id = ${corrected.playerId}
+        BEGIN SELECT RAISE(ABORT, 'no-op must not write items'); END;
+
+        CREATE TRIGGER reject_noop_mission_counter_insert
+        BEFORE INSERT ON players_active_mission_counters
+        WHEN NEW.player_id = ${corrected.playerId}
+        BEGIN SELECT RAISE(ABORT, 'no-op must not insert mission counters'); END;
+
+        CREATE TRIGGER reject_noop_mission_counter_update
+        BEFORE UPDATE ON players_active_mission_counters
+        WHEN OLD.player_id = ${corrected.playerId}
+        BEGIN SELECT RAISE(ABORT, 'no-op must not update mission counters'); END;
+
+        CREATE TRIGGER reject_noop_awake_node_update
+        BEFORE UPDATE OF awake_level ON players_characters_mana_nodes
+        WHEN OLD.player_id = ${corrected.playerId}
+        BEGIN SELECT RAISE(ABORT, 'no-op must not rewrite awake nodes'); END;
+    `)
     const correctionResponse = await app.inject({
         method: "POST",
         url: "/mana/awake_mana_node",
@@ -357,6 +392,11 @@ test("awake_mana_node no-op corrects authoritative evolution from current node s
     assert.equal(characterEntry(correctionData).evolution_level, 3)
     assert.deepEqual(correctionData.evolution, { character_id: CHARACTER_ID, level: 3, img_level: 3 })
     assert.deepEqual(characterEntry(correctionData).bond_token_list, bondTokenList(corrected.playerId))
+    const afterCorrection = routeState(corrected.playerId)
+    assert.deepEqual(afterCorrection.player, beforeCorrection.player)
+    assert.deepEqual(afterCorrection.items, beforeCorrection.items)
+    assert.deepEqual(afterCorrection.nodes, beforeCorrection.nodes)
+    assert.equal(afterCorrection.usedMana, beforeCorrection.usedMana)
 })
 
 test("awake_mana_node rolls back node, costs, and evolution on a late failure", async () => {
@@ -387,6 +427,158 @@ test("awake_mana_node rolls back node, costs, and evolution on a late failure", 
     })
     assert.equal(failedAwake.statusCode, 500)
     assert.deepEqual(routeState(awakeRollback.playerId), beforeAwakeRollback)
+})
+
+test("mana routes map request validation errors to HTTP 400", async () => {
+    const invalidRequest = await createPlayer(8)
+    const response = await app.inject({
+        method: "POST",
+        url: "/mana/learn_mana_node",
+        payload: {
+            viewer_id: invalidRequest.viewerId,
+            character_id: CHARACTER_ID,
+            mana_node_multiplied_id_list: [],
+            api_count: 1,
+        },
+    })
+
+    assert.equal(response.statusCode, 400, response.body)
+    assert.equal(JSON.parse(response.body).error, "Bad Request")
+    assert.match(JSON.parse(response.body).message, /INVALID_REQUEST/)
+})
+
+test("mana routes map malformed content to explicit HTTP 500 responses", async () => {
+    const malformedManaBoard = structuredClone(require("../assets/mana_board.json"))
+    malformedManaBoard[String(CHARACTER_ID)]["1"]["1"][0][5] = "malformed-parent"
+    const restoreMalformedSnapshot = installBundledGameplaySnapshot({
+        tableOverrides: { "mana_board.json": malformedManaBoard },
+    })
+    try {
+        const learn = await createPlayer(9)
+        const learnResponse = await app.inject({
+            method: "POST",
+            url: "/mana/learn_mana_node",
+            payload: {
+                viewer_id: learn.viewerId,
+                character_id: CHARACTER_ID,
+                mana_node_multiplied_id_list: [2201],
+                api_count: 1,
+            },
+        })
+        assert.equal(learnResponse.statusCode, 500, learnResponse.body)
+        assert.equal(JSON.parse(learnResponse.body).error, "Internal Server Error")
+        assert.match(JSON.parse(learnResponse.body).message, /CONTENT_INVALID/)
+
+        const awake = await createPlayer(10)
+        const awakeResponse = await app.inject({
+            method: "POST",
+            url: "/mana/awake_mana_node",
+            payload: {
+                viewer_id: awake.viewerId,
+                character_id: CHARACTER_ID,
+                mana_node_multiplied_id_list: [2201],
+                awake_level: 1,
+                api_count: 1,
+            },
+        })
+        assert.equal(awakeResponse.statusCode, 500, awakeResponse.body)
+        assert.equal(JSON.parse(awakeResponse.body).error, "Internal Server Error")
+        assert.match(JSON.parse(awakeResponse.body).message, /CONTENT_INVALID/)
+    } finally {
+        restoreMalformedSnapshot()
+    }
+})
+
+test("awake_mana_node maps a missing awake cost to HTTP 500", async () => {
+    const restoreMissingCostSnapshot = installBundledGameplaySnapshot({
+        tableOverrides: { "mana_node_awake.json": {} },
+    })
+    try {
+        const missingCost = await createPlayer(11)
+        seedBoardNodes(missingCost.playerId)
+        upsertPlayerCharacterAwakeUnlockSync(missingCost.playerId, CHARACTER_ID, 1, 1)
+        const response = await app.inject({
+            method: "POST",
+            url: "/mana/awake_mana_node",
+            payload: {
+                viewer_id: missingCost.viewerId,
+                character_id: CHARACTER_ID,
+                mana_node_multiplied_id_list: [SKILL_EVOLUTION_NODE_ID],
+                awake_level: 1,
+                api_count: 1,
+            },
+        })
+
+        assert.equal(response.statusCode, 500, response.body)
+        assert.equal(JSON.parse(response.body).error, "Internal Server Error")
+        assert.match(JSON.parse(response.body).message, /AWAKE_COST_MISSING/)
+    } finally {
+        restoreMissingCostSnapshot()
+    }
+})
+
+test("awake_mana_node rejects a malformed awake cost instead of granting it for free", async () => {
+    const malformedManaNodeAwake = structuredClone(require("../assets/mana_node_awake.json"))
+    for (const rarity of Object.values(malformedManaNodeAwake)) {
+        for (const slots of Object.values(rarity)) {
+            for (const rows of Object.values(slots)) rows[0][2] = "not-a-number"
+        }
+    }
+    const restoreMalformedCostSnapshot = installBundledGameplaySnapshot({
+        tableOverrides: { "mana_node_awake.json": malformedManaNodeAwake },
+    })
+    try {
+        const malformedCost = await createPlayer(13)
+        seedBoardNodes(malformedCost.playerId)
+        upsertPlayerCharacterAwakeUnlockSync(malformedCost.playerId, CHARACTER_ID, 1, 1)
+        const response = await app.inject({
+            method: "POST",
+            url: "/mana/awake_mana_node",
+            payload: {
+                viewer_id: malformedCost.viewerId,
+                character_id: CHARACTER_ID,
+                mana_node_multiplied_id_list: [SKILL_EVOLUTION_NODE_ID],
+                awake_level: 1,
+                api_count: 1,
+            },
+        })
+
+        assert.equal(response.statusCode, 500, response.body)
+        assert.equal(JSON.parse(response.body).error, "Internal Server Error")
+        assert.match(JSON.parse(response.body).message, /AWAKE_COST_MISSING/)
+    } finally {
+        restoreMalformedCostSnapshot()
+    }
+})
+
+test("awake_mana_node reads one item snapshot for planning and settlement", async () => {
+    const singleSnapshot = await createPlayer(12)
+    seedBoardNodes(singleSnapshot.playerId)
+    upsertPlayerCharacterAwakeUnlockSync(singleSnapshot.playerId, CHARACTER_ID, 1, 1)
+    grantAwakeCost(singleSnapshot.playerId, SKILL_EVOLUTION_NODE_ID)
+    const originalGetPlayerItemsSync = itemDomain.getPlayerItemsSync
+    let readCount = 0
+    itemDomain.getPlayerItemsSync = (...args) => {
+        if (args[0] === singleSnapshot.playerId) readCount += 1
+        return originalGetPlayerItemsSync(...args)
+    }
+    try {
+        const response = await app.inject({
+            method: "POST",
+            url: "/mana/awake_mana_node",
+            payload: {
+                viewer_id: singleSnapshot.viewerId,
+                character_id: CHARACTER_ID,
+                mana_node_multiplied_id_list: [SKILL_EVOLUTION_NODE_ID],
+                awake_level: 1,
+                api_count: 1,
+            },
+        })
+        assert.equal(response.statusCode, 200, response.body)
+        assert.equal(readCount, 1)
+    } finally {
+        itemDomain.getPlayerItemsSync = originalGetPlayerItemsSync
+    }
 })
 
 test.after(async () => {

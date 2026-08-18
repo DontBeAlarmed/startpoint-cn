@@ -5,7 +5,8 @@
 
 ## Mana 准入权威内容与纯规划边界
 
-Gate Task 29a 新增三项只读权威内容能力，尚未改变 `learn_mana_node` 或 `awake_mana_node` 的生产路由：
+Gate Task 29a 新增三项只读权威内容能力，Task 29b 已将它们接入 `learn_mana_node` 和
+`awake_mana_node` 的生产路由：
 
 - `master/mana_board/level_required_mana_node.orderedmap` 动态生成
   `level_required_mana_node.json`。rarity 1–5 的 `ability_1..6` 与 `skill_evolution` 均按客户端
@@ -52,15 +53,17 @@ learn 拒绝重复学习并把新节点规划为 `awake_level=0`。awake 要求�
 交给同一 master reader；`RootMasterBinary.as:110-175` 按 slice 合并 map，并在主键重复时抛错。tracked seed
 只复刻该 bundled 分片，不改变普通 CDN 分片，也不把 APK 变成生产运行依赖。
 
-29b 接入时必须从同一个 Content snapshot 构造 nodes、parent 与等级要求，并先完整生成 plan，再在单个 SQLite
-事务中按 plan 扣费和写节点。路由仍负责 session/ownership、免费与付费 Mana 拆分、awake cost 选择、bond、进化、
-任务事实与响应合并；这些职责不进入纯 planner。
+生产路由从同一个 Content snapshot 构造 nodes、parent 与等级要求，并先完整生成 plan，再在单个 SQLite
+事务中按 plan 扣费和写节点。parent 索引和等级要求解析结果按 snapshot 表对象缓存；内容快照切换后会自然使用新对象
+重建，不跨快照复用。路由仍负责 session/ownership、免费与付费 Mana 拆分、awake cost 选择、bond、进化、任务事实与
+响应合并；这些职责不进入纯 planner。
 
 ## 已覆盖入口
 
 ### `learn_mana_node`
 
-请求先只读校验节点、玛纳和材料余额，再在一个 SQLite 事务中完成：
+请求先根据权威角色经验曲线计算当前等级，再由纯 planner 按请求顺序校验节点、parent、等级、玛纳和材料余额；
+规划成功后才在一个 SQLite 事务中完成：
 
 1. 扣除免费/付费玛纳并累计 Active Mission 的玛纳消费事实；
 2. 扣除全部节点材料；
@@ -124,9 +127,10 @@ token 行，与角色 `mana_board_index` 更新处于同一个事务；索引更
 路由一次批量读取玩家 learned/awake 状态并复用目标角色部分，在内存中叠加本次目标等级；玛纳、材料、Active Mission 玛纳
 消费事实、节点 `awake_level` 与精确 `evolution_level` 在同一个 SQLite 事务中提交。事务后不再全量查询节点。
 
-若请求节点都已达到目标等级，路由仍会用当前节点状态重算进化：持久值一致时走只读响应；不一致时开启事务纠正
-数据库。`character_list` 立即返回相同的 `evolution_level/evolution_img_level`，等级上升时 `evolution` 返回正确的
-`level/img_level`；普通节点觉醒不会提高进化等级。
+若请求节点都已达到目标等级，路由仍会用当前节点状态重算进化：持久值一致时走只读响应；不一致时只在事务内纠正
+角色进化等级，不重复写 Mana、材料、Active Mission 计数器或节点。`character_list` 立即返回相同的
+`evolution_level/evolution_img_level`，等级上升时 `evolution` 返回正确的 `level/img_level`；普通节点觉醒不会提高
+进化等级。
 
 ### `over_limit` 与 `bulk_over_limit`
 
@@ -142,6 +146,7 @@ token 行，与角色 `mana_board_index` 更新处于同一个事务；索引更
 `tools/character_growth_transaction.test.cjs` 使用独立 SQLite 数据库和真实 Fastify 路由，分别用 trigger 阻止：
 
 - 学习节点的最终 INSERT；
+- 跳过未学习 parent 直接学习子节点；
 - 信赖证领取状态 UPDATE；
 - 开板索引 UPDATE。
 - 道具突破和批量突破中的角色 UPDATE；
@@ -149,7 +154,7 @@ token 行，与角色 `mana_board_index` 更新处于同一个事务；索引更
 
 `tools/character_evolution_route.test.cjs` 另用真实 Fastify + SQLite 覆盖未满板进化、节点 awake 后的 2/3 级结果、
 no-op 权威纠正、bond token 列表保持，以及在 evolution UPDATE 处注入晚失败后的节点、费用、bond/evolution
-整体回滚。
+整体回滚。no-op 用额外 trigger 禁止 Mana、材料、任务计数器和节点写入，确保权威纠正不会退化成资源伪写入。
 
 这些请求都必须返回失败，且请求前后的玩家货币、材料、角色、bond token 和节点快照完全一致。该测试验证的是
 数据库原子性，不替代客户端对动画、提示、玛纳板显示与觉醒页面切换的人工验收。

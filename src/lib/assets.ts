@@ -524,6 +524,18 @@ export interface ManaNodeAwakeCost {
     items: Record<string, number>
 }
 
+function parseCanonicalNonNegativeInteger(value: unknown): number | null {
+    if (typeof value !== "string" || !/^\d+$/.test(value)) return null
+    const parsed = Number(value)
+    return Number.isSafeInteger(parsed) ? parsed : null
+}
+
+function parseCanonicalPositiveInteger(value: unknown): number | null {
+    if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) return null
+    const parsed = Number(value)
+    return Number.isSafeInteger(parsed) ? parsed : null
+}
+
 /**
  * Gets the awake cost for awakening a mana node.
  * CDN lookup: mana_node_awake[rarity][slot][pedestal_size]
@@ -552,20 +564,25 @@ export function getManaNodeAwakeCost(
     if (!targetRows || !targetRows[0]) return null
 
     const row = targetRows[0]
+    if (!Array.isArray(row) || row.length < 3) return null
     // row[0]: "item_id_1,item_id_2,..." (IDs)
     // row[1]: "count_1,count_2,..." (counts)
     // row[2]: mana amount
-    const idStrings = String(row[0]).split(',')
-    const countStrings = String(row[1]).split(',')
-    const manaAmount = parseInt(String(row[2])) || 0
+    if (typeof row[0] !== "string" || typeof row[1] !== "string") return null
+    const idStrings = row[0].split(',')
+    const countStrings = row[1].split(',')
+    if (idStrings.length === 0 || idStrings.length !== countStrings.length) return null
+    const manaAmount = parseCanonicalNonNegativeInteger(row[2])
+    if (manaAmount === null) return null
 
     const items: Record<string, number> = {}
     for (let i = 0; i < idStrings.length; i++) {
-        const id = parseInt(idStrings[i]) || 0
-        const count = parseInt(countStrings[i]) || 0
-        if (id > 0 && count > 0) {
-            items[String(id)] = (items[String(id)] || 0) + count
-        }
+        const id = parseCanonicalPositiveInteger(idStrings[i])
+        const count = parseCanonicalPositiveInteger(countStrings[i])
+        if (id === null || count === null) return null
+        const nextAmount = (items[String(id)] || 0) + count
+        if (!Number.isSafeInteger(nextAmount)) return null
+        items[String(id)] = nextAmount
     }
 
     return { manaAmount, items }

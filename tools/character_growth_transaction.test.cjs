@@ -127,6 +127,23 @@ async function main() {
     assert.equal(learnResponse.statusCode, 500)
     assert.deepEqual(characterState(learn.playerId), beforeLearn)
 
+    const parentGuard = await createPlayer(9)
+    updatePlayerSync({ id: parentGuard.playerId, freeMana: 1000, paidMana: 0 })
+    givePlayerItemSync(parentGuard.playerId, 1, 10)
+    const parentGuardResponse = await app.inject({
+        method: "POST",
+        url: "/mana/learn_mana_node",
+        payload: {
+            viewer_id: parentGuard.viewerId,
+            character_id: 1,
+            mana_node_multiplied_id_list: [2202],
+            api_count: 1,
+        },
+    })
+    assert.equal(parentGuardResponse.statusCode, 400)
+    assert.match(parentGuardResponse.body, /PARENT_NOT_LEARNED/)
+    assert.deepEqual(characterState(parentGuard.playerId).nodes, [])
+
     const bond = await createPlayer(2)
     updatePlayerCharacterBondTokenSync(bond.playerId, 1, { manaBoardIndex: 1, status: 1 })
     const beforeBond = characterState(bond.playerId)
