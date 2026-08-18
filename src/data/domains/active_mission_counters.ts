@@ -8,13 +8,14 @@ export interface ActiveMissionCounters {
     totalPartyCharacterSetCount: number
     totalInjectedExpCount: number
     totalGachaCampaignCount: number
+    practiceQuestChallengeCount: number
 }
 
 export function getActiveMissionCountersSync(playerId: number): ActiveMissionCounters {
     const row = getDb().prepare(`
         SELECT total_used_mana_count, total_gacha_character_count,
             total_equipment_equip_count, total_unison_set_count, total_party_character_set_count,
-            total_injected_exp_count, total_gacha_campaign_count
+            total_injected_exp_count, total_gacha_campaign_count, practice_quest_challenge_count
         FROM players_active_mission_counters
         WHERE player_id = ?
     `).get(playerId) as {
@@ -25,6 +26,7 @@ export function getActiveMissionCountersSync(playerId: number): ActiveMissionCou
         total_party_character_set_count: number
         total_injected_exp_count: number
         total_gacha_campaign_count: number
+        practice_quest_challenge_count: number
     } | undefined
     return {
         totalUsedManaCount: Math.max(0, row?.total_used_mana_count ?? 0),
@@ -34,6 +36,7 @@ export function getActiveMissionCountersSync(playerId: number): ActiveMissionCou
         totalPartyCharacterSetCount: Math.max(0, row?.total_party_character_set_count ?? 0),
         totalInjectedExpCount: Math.max(0, row?.total_injected_exp_count ?? 0),
         totalGachaCampaignCount: Math.max(0, row?.total_gacha_campaign_count ?? 0),
+        practiceQuestChallengeCount: Math.max(0, row?.practice_quest_challenge_count ?? 0),
     }
 }
 

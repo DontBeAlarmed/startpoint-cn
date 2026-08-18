@@ -9,14 +9,11 @@ import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../..
 import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
 import { getPlayerShopPurchasesMapSync } from "../../data/domains/shopPurchase"
 import { getPlayerPartyGroupListSync } from "../../data/domains/party"
-import {
-    getActiveMissionCountersSync,
-    getActiveMissionPracticeQuestChallengeCountSync,
-} from "../../data/domains/active_mission_counters"
+import { getActiveMissionCountersSync } from "../../data/domains/active_mission_counters"
 import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { getMissionBattleCountersSync } from "../../data/domains/mission_battle_facts"
-import { getPlayerCharacterClearSync } from "../../data/domains/character_clear"
+import { getPlayerCharacterClearsSync } from "../../data/domains/character_clear"
 import { ShopType } from "../types"
 import { getActiveMissionConditionalBattleFactsSync } from "../../data/domains/active_mission_battle_condition_facts"
 import { getActiveMissionBattleFactsSync } from "../../data/domains/active_mission_battle_facts"
@@ -581,6 +578,7 @@ function buildActiveMissionFactState(
     const treasurePurchases = getPlayerShopPurchasesMapSync(playerId, ShopType.TREASURE)
     const bossCoinPurchases = getPlayerShopPurchasesMapSync(playerId, ShopType.BOSS_COIN)
     const counters = getActiveMissionCountersSync(playerId)
+    const characterClears = getPlayerCharacterClearsSync(playerId)
     const battleCounters = getMissionBattleCountersSync(playerId)
     const treasureShopItemIds = new Set(Object.keys(readRepositoryTable<Record<string, unknown>>(
         repository,
@@ -615,12 +613,12 @@ function buildActiveMissionFactState(
             "1": battleQuestIds(mainQuestTable, 0),
             "4": battleQuestIds(exQuestTable, 10_000_000),
         },
-        practiceQuestChallengeCount: getActiveMissionPracticeQuestChallengeCountSync(playerId),
+        practiceQuestChallengeCount: counters.practiceQuestChallengeCount,
         leaderClearCounts: Object.fromEntries(Object.keys(characters).map(characterId => {
-            const clears = getPlayerCharacterClearSync(playerId, Number(characterId))
+            const clears = characterClears[characterId]
             return [characterId, {
-                all: Math.max(0, clears.leader_clear_count),
-                multi: Math.max(0, clears.leader_multi_count),
+                all: Math.max(0, clears?.leader_clear_count ?? 0),
+                multi: Math.max(0, clears?.leader_multi_count ?? 0),
             }]
         })),
         conditionalBattleFacts: getActiveMissionConditionalBattleFactsSync(playerId),

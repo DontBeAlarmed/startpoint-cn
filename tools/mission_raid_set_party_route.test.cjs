@@ -25,7 +25,8 @@ db.exec(`
         total_unison_set_count INTEGER NOT NULL DEFAULT 0,
         total_party_character_set_count INTEGER NOT NULL DEFAULT 0,
         total_injected_exp_count INTEGER NOT NULL DEFAULT 0,
-        total_gacha_campaign_count INTEGER NOT NULL DEFAULT 0
+        total_gacha_campaign_count INTEGER NOT NULL DEFAULT 0,
+        practice_quest_challenge_count INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE players_category_missions (
         category INTEGER NOT NULL,

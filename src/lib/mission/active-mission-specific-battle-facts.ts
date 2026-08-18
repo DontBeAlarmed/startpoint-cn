@@ -1,7 +1,10 @@
-import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { incrementActiveMissionBattleFactSync } from "../../data/domains/active_mission_battle_facts"
 import type { FinishContext } from "../quest/finish/types"
+import {
+    createActiveBattleFactContext,
+    type ActiveBattleFactContext,
+} from "./active-battle-fact-context"
 import type { ActiveMissionMasterDefinition } from "./active-master-data"
 import {
     getActiveMissionPlan,
@@ -186,42 +189,45 @@ export function collectActiveMissionSpecificBattleFacts(
     return matched.sort((left, right) => left.missionId - right.missionId)
 }
 
-function resolveRepository(): ReadonlyContentRepository | undefined {
-    try {
-        return getContentSnapshot().repository
-    } catch {
-        return undefined
-    }
-}
-
 function resolveDefinitions(
-    repository?: ReadonlyContentRepository,
+    context: ActiveBattleFactContext,
 ): readonly ActiveMissionMasterDefinition[] {
-    const plan = getActiveMissionPlan(repository)
     return [LOADOUT_PATTERN, SKILL_EFFECT_PATTERN, FULL_SKILL_START_PATTERN]
-        .flatMap(pattern => plan.getDefinitionsByPattern(pattern))
+        .flatMap(pattern => context.plan.getDefinitionsByPattern(pattern))
 }
 
-export function recordActiveMissionSpecificBattleFactsSync(context: FinishContext): void {
+function createRecorderContext(context: FinishContext): ActiveBattleFactContext {
+    let repository
+    try {
+        repository = getContentSnapshot().repository
+    } catch {
+        repository = undefined
+    }
+    return createActiveBattleFactContext(
+        context,
+        getActiveMissionPlan(repository),
+        repository,
+    )
+}
+
+export function recordActiveMissionSpecificBattleFactsSync(
+    context: FinishContext,
+    providedActiveContext?: ActiveBattleFactContext,
+): void {
     if (!context.questAccomplished) return
-    const repository = resolveRepository()
-    const definitions = resolveDefinitions(repository)
-    const partyCharacterIds = context.party.characters
-        .flatMap(character => character?.id ? [character.id] : [])
-    const unisonCharacterIds = context.party.unison_characters
-        .flatMap(character => character?.id ? [character.id] : [])
-    const allCharacterIds = [...partyCharacterIds, ...unisonCharacterIds]
+    const activeContext = providedActiveContext ?? createRecorderContext(context)
+    const definitions = resolveDefinitions(activeContext)
     const targetCharacterIds = new Set(definitions.flatMap(definition => {
         const pattern = getDefinitionPattern(definition)
         const targetElement = parseTargetElement(definition.row[69])
         return pattern === LOADOUT_PATTERN && targetElement !== null
-            ? allCharacterIds
+            ? activeContext.allPartyCharacterIds
             : []
     }))
     let characterTable: Record<string, { readonly element?: number }> = {}
-    if (repository) {
+    if (activeContext.repository) {
         try {
-            characterTable = repository.table<Record<string, { readonly element?: number }>>("character.json")
+            characterTable = activeContext.repository.table<Record<string, { readonly element?: number }>>("character.json")
         } catch {
             characterTable = {}
         }
@@ -234,7 +240,7 @@ export function recordActiveMissionSpecificBattleFactsSync(context: FinishContex
     let skillEffects: Readonly<Record<string, ActiveMissionSkillEffectState>> | undefined
     if (definitions.some(definition => getDefinitionPattern(definition) === SKILL_EFFECT_PATTERN)) {
         try {
-            skillEffects = getContentSnapshot().repository.table<{
+            skillEffects = activeContext.repository?.table<{
                 readonly schemaVersion?: number
                 readonly characters?: Readonly<Record<string, ActiveMissionSkillEffectState>>
             }>("cdndata/active_mission_skill_effects.json").characters
@@ -247,8 +253,8 @@ export function recordActiveMissionSpecificBattleFactsSync(context: FinishContex
         isMulti: context.isMulti === true,
         questCategory: context.questCategory,
         questId: context.questId,
-        partyCharacterIds,
-        unisonCharacterIds,
+        partyCharacterIds: activeContext.partyCharacterIds,
+        unisonCharacterIds: activeContext.unisonCharacterIds,
         equipmentElements: context.equipmentElements,
         zones: context.statistics.zones,
         skillEffects,

@@ -51,6 +51,7 @@ assert.deepEqual(getActiveMissionCountersSync(playerId), {
     totalPartyCharacterSetCount: 0,
     totalInjectedExpCount: 0,
     totalGachaCampaignCount: 0,
+    practiceQuestChallengeCount: 0,
 })
 incrementActiveMissionUsedManaCountSync(playerId, 120)
 incrementActiveMissionGachaCharacterCountSync(playerId, 3)
@@ -70,6 +71,7 @@ assert.deepEqual(getActiveMissionCountersSync(playerId), {
     totalPartyCharacterSetCount: 1,
     totalInjectedExpCount: 1,
     totalGachaCampaignCount: 1,
+    practiceQuestChallengeCount: 0,
 })
 
 console.log("active mission counter storage tests passed")

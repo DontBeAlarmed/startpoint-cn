@@ -1,9 +1,11 @@
-import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
-import { getPlayerCharacterSync, getPlayerCharacterManaNodesSync } from "../../data/domains/character"
 import { incrementActiveMissionConditionalBattleFactSync } from "../../data/domains/active_mission_battle_condition_facts"
 import { getCharacterDataSync, getCharacterManaNodesSync } from "../assets"
 import type { FinishContext } from "../quest/finish/types"
+import {
+    createActiveBattleFactContext,
+    type ActiveBattleFactContext,
+} from "./active-battle-fact-context"
 import type { ActiveMissionMasterDefinition } from "./active-master-data"
 import {
     getActiveMissionPlan,
@@ -111,32 +113,22 @@ export function collectActiveMissionConditionalBattleFacts(
     ))
 }
 
-function resolveRepository(): ReadonlyContentRepository | undefined {
-    try {
-        return getContentSnapshot().repository
-    } catch {
-        return undefined
-    }
-}
-
 function resolveDefinitions(
-    repository?: ReadonlyContentRepository,
+    context: ActiveBattleFactContext,
 ): readonly ActiveMissionMasterDefinition[] {
-    const plan = getActiveMissionPlan(repository)
-    return [...CONDITIONAL_PATTERNS].flatMap(pattern => plan.getDefinitionsByPattern(pattern))
+    return [...CONDITIONAL_PATTERNS].flatMap(pattern => context.plan.getDefinitionsByPattern(pattern))
 }
 
 function buildCharacterState(
-    playerId: number,
     characterId: number,
-    repository?: ReadonlyContentRepository,
+    context: ActiveBattleFactContext,
 ): ConditionalBattleCharacterState | null {
-    const character = getPlayerCharacterSync(playerId, characterId)
-    if (!character) return null
+    const growth = context.characterGrowthFacts[String(characterId)]
+    if (!growth) return null
     let rarity = getCharacterDataSync(characterId)?.rarity
-    if (repository) {
+    if (context.repository) {
         try {
-            rarity = repository.table<Record<string, { readonly rarity?: number }>>("character.json")
+            rarity = context.repository.table<Record<string, { readonly rarity?: number }>>("character.json")
                 [String(characterId)]?.rarity ?? rarity
         } catch {
             // Bundled character data remains the compatibility fallback.
@@ -144,32 +136,43 @@ function buildCharacterState(
     }
     const secondBoard = getCharacterManaNodesSync(characterId, 2) ?? {}
     return {
-        level: estimateActiveMissionCharacterLevel({ ...character, rarity }),
+        level: estimateActiveMissionCharacterLevel({
+            ...growth,
+            rarity,
+            evolutionLevel: 0,
+            overLimitStep: 0,
+            bondTokenList: [],
+        }),
         secondBoardAbilitiesComplete: hasCompletedSecondManaBoardAbilities(
             secondBoard,
-            getPlayerCharacterManaNodesSync(playerId, characterId),
+            context.characterManaNodes[String(characterId)] ?? [],
         ),
     }
 }
 
-export function recordActiveMissionConditionalBattleFactsSync(context: FinishContext): void {
+function createRecorderContext(context: FinishContext): ActiveBattleFactContext {
+    let repository
+    try {
+        repository = getContentSnapshot().repository
+    } catch {
+        repository = undefined
+    }
+    return createActiveBattleFactContext(
+        context,
+        getActiveMissionPlan(repository),
+        repository,
+    )
+}
+
+export function recordActiveMissionConditionalBattleFactsSync(
+    context: FinishContext,
+    providedActiveContext?: ActiveBattleFactContext,
+): void {
     if (!context.questAccomplished) return
-    const repository = resolveRepository()
-    const definitions = resolveDefinitions(repository)
-    const partyCharacterIds = [...context.party.characters, ...context.party.unison_characters]
-        .flatMap(character => character?.id ? [character.id] : [])
-    const partyCharacterIdSet = new Set(partyCharacterIds)
-    const targetCharacterIds = new Set(definitions.flatMap(definition => {
-        const pattern = getDefinitionPattern(definition)
-        const characterId = Number(definition.row[43])
-        return CONDITIONAL_PATTERNS.has(pattern)
-            && Number.isSafeInteger(characterId)
-            && partyCharacterIdSet.has(characterId)
-            ? [characterId]
-            : []
-    }))
-    const characters = Object.fromEntries([...targetCharacterIds].flatMap(characterId => {
-        const state = buildCharacterState(context.playerId, characterId, repository)
+    const activeContext = providedActiveContext ?? createRecorderContext(context)
+    const definitions = resolveDefinitions(activeContext)
+    const characters = Object.fromEntries(activeContext.targetCharacterIds.flatMap(characterId => {
+        const state = buildCharacterState(characterId, activeContext)
         return state ? [[String(characterId), state]] : []
     }))
     const facts = collectActiveMissionConditionalBattleFacts(definitions, {
@@ -177,7 +180,7 @@ export function recordActiveMissionConditionalBattleFactsSync(context: FinishCon
         isMulti: context.isMulti === true,
         questCategory: context.questCategory,
         questId: context.questId,
-        partyCharacterIds,
+        partyCharacterIds: activeContext.allPartyCharacterIds,
     }, characters)
     for (const fact of facts) {
         incrementActiveMissionConditionalBattleFactSync(

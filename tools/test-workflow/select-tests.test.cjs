@@ -1107,6 +1107,7 @@ test("routes active mission focused metrics, baseline, and production boundaries
         "tools/perf/active-mission/scenarios-receive.cjs",
         "tools/perf/__snapshots__/active_mission_focused_baseline.json",
         "tools/perf/active_mission_metrics.test.cjs",
+        "tools/active_mission_batch_facts.test.cjs",
     ]) {
         assert.deepEqual(selectTestGroups([file]), ["integration:mission"], file)
     }
@@ -1303,6 +1304,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_raid_summary_route.test.cjs",
         "tools/mission_active_content.test.cjs",
         "tools/mission_active_core.test.cjs",
+        "tools/active_mission_plan.test.cjs",
         "tools/active_mission_counter_storage.test.cjs",
         "tools/party_action_counter.test.cjs",
         "tools/expod_inject_exp_route.test.cjs",
@@ -1312,6 +1314,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/active_mission_chapter_facts.test.cjs",
         "tools/active_mission_quest_challenge.test.cjs",
         "tools/active_mission_specific_party_facts.test.cjs",
+        "tools/active_mission_batch_facts.test.cjs",
         "tools/active_mission_conditional_battle_facts.test.cjs",
         "tools/active_mission_specific_battle_facts.test.cjs",
         "tools/active_mission_receive_route.test.cjs",

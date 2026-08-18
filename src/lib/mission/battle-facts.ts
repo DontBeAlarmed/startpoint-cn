@@ -1,5 +1,6 @@
 import { incrementPlayerQuestMultiClearSync } from "../../data/domains/quest"
 import { recordMissionBattleResultSync } from "../../data/domains/mission_battle_facts"
+import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { trackCharacterClears } from "../quest/finish/character-clear-tracker"
 import { trackLeaderPowerflip } from "../quest/finish/leader-powerflip-tracker"
 import { trackPartyCoClears } from "../quest/finish/party-co-clear-tracker"
@@ -10,6 +11,8 @@ import { recordEventMissionBattleFacts } from "./event-battle-facts"
 import { recordPassMissionBattleFacts } from "./pass-battle-facts"
 import { recordActiveMissionConditionalBattleFactsSync } from "./active-conditional-battle-facts"
 import { recordActiveMissionSpecificBattleFactsSync } from "./active-mission-specific-battle-facts"
+import { createActiveBattleFactContext } from "./active-battle-fact-context"
+import { getActiveMissionPlan } from "./active-plan"
 import { recordDailyMissionBattleFacts } from "./daily-battle-facts"
 import { recordDegreeMissionBattleFacts } from "./degree-battle-facts"
 import { recordDegreeBattleStatisticsSync } from "./degree-battle-stat-facts"
@@ -90,8 +93,19 @@ export function recordMissionBattleFacts(
         isMulti: ctx.isMulti,
         isMvp: ctx.statistics.is_mvp === true,
     }, evaluationTime)
-    recordActiveMissionSpecificBattleFactsSync(ctx)
-    recordActiveMissionConditionalBattleFactsSync(ctx)
+    let repository
+    try {
+        repository = getContentSnapshot().repository
+    } catch {
+        repository = undefined
+    }
+    const activeBattleFactContext = createActiveBattleFactContext(
+        ctx,
+        getActiveMissionPlan(repository),
+        repository,
+    )
+    recordActiveMissionSpecificBattleFactsSync(ctx, activeBattleFactContext)
+    recordActiveMissionConditionalBattleFactsSync(ctx, activeBattleFactContext)
     if (ctx.isMulti) {
         incrementPlayerQuestMultiClearSync(ctx.playerId, ctx.questCategory, ctx.questId)
     }

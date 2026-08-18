@@ -3,6 +3,21 @@ import { PlayerCharacter, PlayerCharacterBondToken, PlayerCharacterExBoost, RawP
 import { deserializeBoolean, deserializeNumberList, serializeBoolean, serializeNumberList } from "../utils/primitives";
 import { getCharacterDataSync } from "../../lib/assets";
 
+export interface PlayerCharacterGrowthFact {
+    readonly exp: number
+}
+
+function normalizeCharacterFactIds(ids: readonly number[]): number[] {
+    const normalized = new Set<number>()
+    for (const id of ids) {
+        if (!Number.isSafeInteger(id) || id <= 0) {
+            throw new TypeError("character fact IDs must be positive safe integers.")
+        }
+        normalized.add(id)
+    }
+    return [...normalized].sort((left, right) => left - right)
+}
+
 /**
  * Converts a RawPlayerCharacterBondToken into a PlayerCharacterBondToken
  * 
@@ -114,6 +129,23 @@ export function getPlayerCharacterSync(
         rawCharacter,
         rawBondTokens.map(raw => buildCharacterBondToken(raw))
     )
+}
+
+export function getPlayerCharacterGrowthFactsByIdsSync(
+    playerId: number,
+    ids: readonly number[],
+): Record<string, PlayerCharacterGrowthFact> {
+    const characterIds = normalizeCharacterFactIds(ids)
+    if (characterIds.length === 0) return {}
+    const placeholders = characterIds.map(() => "?").join(", ")
+    const rows = getDb().prepare(`
+        SELECT id, exp
+        FROM players_characters
+        WHERE player_id = ? AND id IN (${placeholders})
+    `).all(playerId, ...characterIds) as { id: number, exp: number }[]
+    return Object.fromEntries(rows.map(row => [String(row.id), {
+        exp: row.exp,
+    }]))
 }
 
 /**
@@ -432,6 +464,28 @@ export function getPlayerCharacterManaNodesSync(
     `).all(characterId, playerId) as RawPlayerCharacterManaNode[]
 
     return rawNodes.map(rawNode => rawNode.value);
+}
+
+export function getPlayerCharacterManaNodesByIdsSync(
+    playerId: number,
+    ids: readonly number[],
+): Record<string, number[]> {
+    const characterIds = normalizeCharacterFactIds(ids)
+    if (characterIds.length === 0) return {}
+    const placeholders = characterIds.map(() => "?").join(", ")
+    const rawNodes = getDb().prepare(`
+        SELECT value, character_id
+        FROM players_characters_mana_nodes
+        WHERE player_id = ? AND character_id IN (${placeholders})
+    `).all(playerId, ...characterIds) as RawPlayerCharacterManaNode[]
+    const buckets: Record<string, number[]> = {}
+    for (const rawNode of rawNodes) {
+        const characterId = String(rawNode.character_id)
+        const bucket = buckets[characterId] ?? []
+        bucket.push(rawNode.value)
+        buckets[characterId] = bucket
+    }
+    return buckets
 }
 
 /** Returns one character's learned mana nodes with their persisted awake levels. */
