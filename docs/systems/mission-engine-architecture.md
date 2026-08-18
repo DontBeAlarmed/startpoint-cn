@@ -1,6 +1,6 @@
 # 任务引擎演进架构
 
-> 状态：阶段 1～5 已实施，阶段 6 的第 13、14 项已实施；Category 1～10（包含 Awake 9）已接入 Session，结构性能基线与自动准入已固化。第 15 项最终全量回归与最终双审仍待执行，任务引擎整体尚未完成。
+> 状态：阶段 1～5 已实施，阶段 6 的第 13、14 项已实施；Category 1～10（包含 Awake 9）已接入 Session，结构性能基线与自动准入已固化。第 15 项已执行全量回归，但仍有一条既有 character-bond SQL 基线不增断言失败，最终双审与任务引擎整体收尾暂不宣告完成。
 
 ## 目标
 
@@ -308,7 +308,9 @@ Awake 保留独立 eligibility、角色候选和奖励解锁语义，但接入�
 - 分层 600 状态负载按已检入 summary/reference 的 `get_progress` entry structural max 为 `25/4/214`（每个 entry 的最大 SQL reads/writes/mission computes）；single/multi 仍使用 `mission-finish-boundary` adapter，不代表完整 battle HTTP；
 - focused 自动准入要求场景集合完全一致、行为 payload/hash 完全一致、三项结构指标均为非负安全整数且不高于已检入 snapshot；允许后续优化下降，延迟不作为跨机器硬门槛；
 - 普通 `benchmark:mission-engine-focused` 只读 snapshot，只有显式确定性 `--write` 才能在行为准入通过后更新结构值；Degree 与 Event 的专项等价/不增断言继续保留；
-- 第 15 项最终全量回归与最终双审仍未执行，任务引擎整体状态暂不宣告完成。
+- Task 33.4 已为登录、load、任务进度、单人结算、商店、抽卡和邮件混合旅程增加 SQL 统计及四类事务后段故障注入；每个写入口均在完整玩家 owner 表和内存 active quest 快照上验证失败回滚。
+- Task 33.5 的 1000 份独立存档、600 个活跃身份、并发 `[10,25,50,100]` 正式 profile 四档均为 600 请求、0 错误、行为稳定、回滚通过，报告 `admitted=true`。商店列表的 `players_shop_purchase_counters` 读取从单请求 229 次降至 44 次，库存输出保持等价。
+- 全量 `verify:full` 已执行 864 个测试，其中 863 个通过；唯一失败是既有 `mission_entry_layered_load.test.cjs` 的 character-bond SQL 结构基线（当前 reads `20`，reference 为 `18`），与 Task 33.4/33.5 改动无共享实现文件。第 15 项最终双审与任务引擎整体状态暂不宣告完成。
 
 每个阶段独立提交，不自动 push。若阶段需要改变数据库结构、客户端协议、Active Mission 所有权或事务外部边界，必须停止并重新确认。
 
@@ -372,6 +374,6 @@ Settlement BASE fixture 与负载 reference 分别由固定无参数 generator
 ## 已知后续项
 
 - 为 Degree 的 mana、章节、练习、商店和装备事实补齐逐族 scoped 正向矩阵；
-- 第 15 项执行最终全量回归与最终双审；完成前不得宣告任务引擎整体完成；
+- 处理 `mission_entry_layered_load` 的 character-bond SQL 基线差异，确认是应优化的查库还是需要更新的权威基线；完成第 15 项最终双审前不得宣告任务引擎整体完成；
 - Active Mission 的共享事实、固定点和统一事务协调留到独立 Gate；
 - 跨请求缓存、数据库物化事实和 Content 热切换不在当前路线中。
