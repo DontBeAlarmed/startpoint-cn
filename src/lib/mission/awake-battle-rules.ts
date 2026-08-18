@@ -75,6 +75,8 @@ interface NoDeathRule {
     leaderCharacterId: number
 }
 
+const BARAK_AWAKE_PRACTICE_QUEST_ID = 25
+
 const QUEST_PARTY_RULES: readonly QuestPartyRule[] = Object.freeze([
     {
         missionId: 1510062,
@@ -129,7 +131,7 @@ const QUEST_RANGE_RULES: readonly QuestRangeRule[] = Object.freeze([
 
 const EXACT_QUEST_RULES: readonly ExactQuestRule[] = Object.freeze([
     { missionId: 1110013, category: 2, questIds: [1028004], leaderCharacterId: 111001, singleOnly: true },
-    { missionId: 1310052, category: 15, questIds: [96], leaderCharacterId: 131005, singleOnly: true },
+    { missionId: 1310052, category: 15, questIds: [BARAK_AWAKE_PRACTICE_QUEST_ID], leaderCharacterId: 131005, singleOnly: true },
     { missionId: 2110013, category: 2, questIds: [1028004], leaderCharacterId: 211001, singleOnly: false },
     { missionId: 2310013, category: 2, questIds: [1010004], leaderCharacterId: 231001, singleOnly: true, timeLimitMs: 90000 },
     { missionId: 2510032, category: 13, questIds: [1020, 1023, 1026, 1029, 1032, 1035, 1038], leaderCharacterId: 251003, singleOnly: true },

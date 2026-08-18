@@ -213,6 +213,16 @@ assert.deepEqual(
     getMatchedAwakeDirectBattleMissionIds(directBattleContext(13, 1039, [341001]), ""),
     [3410012],
 )
+for (const questId of [92, 96]) {
+    assert.deepEqual(
+        getMatchedAwakeDirectBattleMissionIds(directBattleContext(15, questId, [131005]), ""),
+        [],
+    )
+}
+assert.deepEqual(
+    getMatchedAwakeDirectBattleMissionIds(directBattleContext(15, 25, [131005]), ""),
+    [1310052],
+)
 assert.deepEqual(
     getMatchedAwakeDirectBattleMissionIds(directBattleContext(13, 1040, [341001], { isMulti: true }), ""),
     [],
@@ -354,7 +364,7 @@ assert.deepEqual(getAwakeBattleProgressFacts(battleFactContext({
 
 for (const [missionIds, category, questId, leaderId, clearTime, isMulti] of [
     [[1110013], 2, 1028004, 111001, 1000, false],
-    [[1310052], 15, 96, 131005, 1000, false],
+    [[1310052], 15, 25, 131005, 1000, false],
     [[2110013], 2, 1028004, 211001, 1000, true],
     [[2310013], 2, 1010004, 231001, 90000, false],
     [[2510032, 2510033], 13, 1020, 251003, 1000, false],
@@ -377,6 +387,8 @@ for (const context of [
     battleFactContext({ category: 2, questId: 1028005, ids: [111001] }),
     battleFactContext({ category: 2, questId: 1028004, ids: [111001], isMulti: true }),
     battleFactContext({ category: 2, questId: 1010004, ids: [231001], clearTime: 90001 }),
+    battleFactContext({ category: 15, questId: 92, ids: [131005] }),
+    battleFactContext({ category: 15, questId: 96, ids: [131005] }),
 ]) {
     assert.deepEqual(getAwakeBattleProgressFacts(context), { increments: [], maxima: [] })
 }
