@@ -52,9 +52,13 @@ function evaluateActiveMissionReport(baseline, current) {
             actual.unsupportedMissionIds,
             expected.unsupportedMissionIds,
         )
-        const structuralNonIncreasing = STRUCTURAL_METRICS.every(metric => (
+        const structuralMetricsNonIncreasing = STRUCTURAL_METRICS.every(metric => (
             actual.structural[metric] <= expected.structural[metric]
         ))
+        const repeatedFactLoaders = Object.entries(actual.factLoaders)
+            .filter(([, loader]) => loader.calls > 1)
+        const structuralNonIncreasing = structuralMetricsNonIncreasing
+            && repeatedFactLoaders.length === 0
         const result = {
             behaviorEquivalent,
             fixtureEquivalent,
@@ -72,7 +76,10 @@ function evaluateActiveMissionReport(baseline, current) {
         if (!unsupportedMissionSetEquivalent) {
             result.failures.push("unsupported mission set differs")
         }
-        if (!structuralNonIncreasing) result.failures.push("structural metric increased")
+        if (!structuralMetricsNonIncreasing) result.failures.push("structural metric increased")
+        for (const [name, loader] of repeatedFactLoaders) {
+            result.failures.push(`fact loader ${name} has multiple calls (${loader.calls})`)
+        }
         result.admitted = GATES.every(gate => result[gate])
         return result
     } catch (error) {

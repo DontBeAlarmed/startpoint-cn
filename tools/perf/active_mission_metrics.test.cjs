@@ -141,6 +141,41 @@ test("admission rejects sparse arrays, NaN, negative values, and contradictory m
     }
 })
 
+test("admission rejects repeated current fact loader calls even when totals do not increase", () => {
+    const baseline = validReport({
+        factLoaders: {
+            A: { calls: 1, rows: 1 },
+            B: { calls: 1, rows: 1 },
+        },
+        structural: { ...validReport().structural, loaderCalls: 2 },
+    })
+    const current = validReport({
+        factLoaders: {
+            A: { calls: 2, rows: 2 },
+        },
+        structural: { ...validReport().structural, loaderCalls: 2 },
+    })
+
+    const admission = evaluateActiveMissionReport(baseline, current)
+
+    assert.equal(admission.structuralNonIncreasing, false)
+    assert.equal(admission.admitted, false)
+    assert.match(admission.failures.join("\n"), /fact loader A.*multiple calls/i)
+})
+
+test("canonical reports allow repeated baseline loads when current uses one call", () => {
+    const baseline = canonicalizeActiveMissionReport(validReport({
+        factLoaders: { A: { calls: 2, rows: 2 } },
+        structural: { ...validReport().structural, loaderCalls: 2 },
+    }))
+    const current = canonicalizeActiveMissionReport(validReport({
+        factLoaders: { A: { calls: 1, rows: 1 } },
+    }))
+
+    assert.equal(baseline.factLoaders.A.calls, 2)
+    assert.equal(evaluateActiveMissionReport(baseline, current).admitted, true)
+})
+
 test("fixture scale contract reuses mission settlement scenario semantics", () => {
     assert.deepEqual(normalizeActiveMissionScenario("New"), "new-account")
     assert.deepEqual(normalizeActiveMissionScenario("Small"), "normal-progress")
