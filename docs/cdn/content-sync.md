@@ -148,7 +148,7 @@ npm run content:sync
 
 normal 依次检查 current Release 是否存在、CDN `assetVersion`、全局 `generatorVersion`、已安装补丁来源状态，以及 Release 表集合与当前 Registry 是否兼容。补丁 manifest 或 inner ZIP 文件身份在同一目标版本下变化时返回 `source-state`，随后完整校验摘要并重建或失败关闭；注册表新增、移除，或任一表的 `scope`、`converterId`、`converterVersion`、`sources` 变化时返回 `table-registry` 并自动重建。Quest converter v4 升级到 v5 就属于该路径，同 CDN 版本也不会复用旧 Release，不需要 `--force`。所有状态完全一致时才快速跳过。
 
-这项契约判断本身只使用 manifest 元数据；当前 `ContentObjectStore` 读取 current Release 时仍会先校验并读取该 Release 的对象闭包，因此 `--check` 也会检查对象可读性，但不会执行 orderedmap 转换或重建。转换器内部算法改变但注册元数据不变时，开发者仍必须递增对应 `converterVersion`；影响全部内容生成的规则变化使用 `generatorVersion`。运行时继续执行同一套严格 Registry 校验，作为最后的加载防线。
+这项契约判断本身只使用 manifest 元数据；当前 `ContentObjectStore` 读取 current Release 时仍会先校验并读取该 Release 的对象闭包，因此 `--check` 也会检查对象可读性，但不会执行 orderedmap 转换或重建。同步判断直接复用该闭包中已经校验的 summary，不再次读取和校验同一对象。转换器内部算法改变但注册元数据不变时，开发者仍必须递增对应 `converterVersion`；影响全部内容生成的规则变化使用 `generatorVersion`。运行时继续执行同一套严格 Registry 校验，作为最后的加载防线。
 
 只检查是否需要同步，不建立 ArchiveIndex、不转换 orderedmap、不写内容：
 

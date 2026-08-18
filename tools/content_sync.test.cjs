@@ -807,7 +807,7 @@ test("check scans current metadata without locking, materializing, indexing, or 
     assert.equal(fs.existsSync(fixture.paths.contentStateDir), false)
 })
 
-test("check consumes the store current release snapshot without rereading it", async t => {
+test("check reuses current release objects without rereading its summary", async t => {
     const { paths } = createSandbox(t)
     let snapshotReads = 0
     const current = {
@@ -818,6 +818,7 @@ test("check consumes the store current release snapshot without rereading it", a
     const manifest = {
         assetVersion: "1.4.54",
         generatorVersion: 1,
+        summary: { object: `sha256:${"b".repeat(64)}` },
         tables: Object.fromEntries(TEST_TABLE_SOURCES.map(definition => [
             definition.tableName,
             {
@@ -839,8 +840,15 @@ test("check consumes the store current release snapshot without rereading it", a
         createStore: () => ({
             readCurrentRelease: async () => {
                 snapshotReads++
-                return { current, manifest }
+                return {
+                    current,
+                    manifest,
+                    objects: {
+                        [manifest.summary.object]: { patchSourceDigest: null },
+                    },
+                }
             },
+            readObject: async () => { throw new Error("summary object was reread") },
             readCurrent: async () => { throw new Error("current pointer was reread") },
             readRelease: async () => { throw new Error("release manifest was reread") },
         }),

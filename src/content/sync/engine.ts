@@ -94,6 +94,7 @@ export interface ContentSyncResult {
 interface CurrentRelease {
     readonly current: ContentCurrentPointer
     readonly manifest: ContentReleaseManifest
+    readonly objects?: Readonly<Record<`sha256:${string}`, unknown>>
     readonly summary?: unknown
 }
 
@@ -147,7 +148,7 @@ function requireGeneratorVersion(version: number): number {
 }
 
 async function readCurrentRelease(store: ContentStore): Promise<CurrentRelease | null> {
-    const release = store.readCurrentRelease
+    const release: CurrentRelease | null = store.readCurrentRelease
         ? await store.readCurrentRelease()
         : await (async () => {
             const current = await store.readCurrent()
@@ -155,9 +156,10 @@ async function readCurrentRelease(store: ContentStore): Promise<CurrentRelease |
             return { current, manifest: await store.readRelease(current) }
         })()
     if (release === null) return null
-    const summary = store.readObject
-        ? await store.readObject(release.manifest.summary.object)
-        : null
+    const summary = release.objects?.[release.manifest.summary.object]
+        ?? (store.readObject
+            ? await store.readObject(release.manifest.summary.object)
+            : null)
     return { ...release, summary }
 }
 
