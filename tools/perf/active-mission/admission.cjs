@@ -65,7 +65,13 @@ function evaluateActiveMissionReport(baseline, current) {
             admitted: false,
             failures: [],
         }
-        if (!behaviorEquivalent) result.failures.push("behavior or unsupported mission set differs")
+        if (!fixtureEquivalent) result.failures.push("fixture/workload mismatch")
+        if (actual.behaviorHash !== expected.behaviorHash) {
+            result.failures.push("behavior hash differs")
+        }
+        if (!unsupportedMissionSetEquivalent) {
+            result.failures.push("unsupported mission set differs")
+        }
         if (!structuralNonIncreasing) result.failures.push("structural metric increased")
         result.admitted = GATES.every(gate => result[gate])
         return result

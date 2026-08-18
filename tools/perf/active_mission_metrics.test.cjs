@@ -84,6 +84,34 @@ test("admission rejects reports with different fixture scales", () => {
 
     assert.equal(admission.behaviorEquivalent, false)
     assert.equal(admission.admitted, false)
+    assert.deepEqual(admission.failures, ["fixture/workload mismatch"])
+})
+
+test("admission fails closed when fixture fields are missing", () => {
+    const fixture = { name: "new-account", profile: "New" }
+    let admission
+
+    assert.doesNotThrow(() => {
+        admission = evaluateActiveMissionReport(validReport(), validReport({ fixture }))
+    })
+    assert.equal(admission.admitted, false)
+    assert.equal(admission.reportStructureValid, false)
+})
+
+test("admission fails closed when fixture fields are unexpected", () => {
+    const fixture = {
+        name: "new-account",
+        profile: "New",
+        scale: 0,
+        shard: "local",
+    }
+    let admission
+
+    assert.doesNotThrow(() => {
+        admission = evaluateActiveMissionReport(validReport(), validReport({ fixture }))
+    })
+    assert.equal(admission.admitted, false)
+    assert.equal(admission.reportStructureValid, false)
 })
 
 test("admission rejects sparse arrays, NaN, negative values, and contradictory metrics fail closed", () => {
