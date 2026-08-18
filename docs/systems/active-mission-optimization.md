@@ -28,6 +28,25 @@
 - `/load` reconcile 后，玩家序列化阶段再次读取 Active Mission 状态；
 - 当前 Active Mission 相关玩家表部分使用 `player_id` 非首列主键，存在全表扫描风险，但首版不通过 schema 迁移处理。
 
+### 已验证私服的事实对照边界
+
+Task 34 在性能基线前参考了 `Ku1o/startpoint-cn-private` 的远程 `main`。两边的任务与奖励主数据一致，因此只吸收能由 CN 客户端或结算协议闭合的事实，不直接复制参考服的任务架构。
+
+已采纳并在 34.0 阶段独立修正：
+
+- Active Mission 20007 的第二玛纳板能力节点按 `field6=4/5/6` 判断；
+- 觉醒任务 1310052 的 `quest_kind=11` 按客户端 `CharacterAwakeMissionValues` 解析为 Practice 25。
+
+明确不纳入本 Gate 生产逻辑：
+
+- 通过中文角色文本正则推断技能能力；当前 20015/20016 继续使用同一 Content snapshot 的 Action DSL；
+- 新增 `players_mission_counters` 物化事实表、跨请求事实缓存或其他 schema 迁移；
+- 从请求体重建缺失的 Active Quest；
+- Mode15、自制掉落、救援碎片和末期运营奖励映射；
+- 救援/新手救援来源事实，留到联机与 Hub Gate 建立可重复房间测试后处理。
+
+参考仓库的 snapshot 主数据索引、按需事实需求和批量角色读取只作为 Task 34 的结构与 fixture 参考；当前 Gate 仍保留既有固定点、事务、RewardGrant 和 fail-closed 语义。
+
 ## 已确认边界
 
 ### 包含
