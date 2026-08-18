@@ -27,6 +27,7 @@ import type {
     PreparedMissionSettlement,
 } from "./settlement"
 import type { FactKey } from "./facts/fact-key"
+import type { MissionSettlementRewardDependencies } from "./settlement-write"
 
 export interface AwakeMissionComputedProgress {
     missionId: number
@@ -99,8 +100,15 @@ export function settleAwakeMissionCandidates(
     playerId: number,
     missionIds: readonly number[],
     evaluationTime: Date,
+    dependencies: MissionSettlementRewardDependencies = {},
 ): AwakeMissionSettlementResult {
-    return settleAwakeMissionCandidatesWithEvaluation(playerId, missionIds, evaluationTime)
+    return settleAwakeMissionCandidatesWithEvaluation(
+        playerId,
+        missionIds,
+        evaluationTime,
+        undefined,
+        dependencies,
+    )
         ?.settlement ?? emptyAwakeMissionSettlement()
 }
 
@@ -109,6 +117,7 @@ export function settleAwakeMissionCandidatesWithEvaluation(
     missionIds: readonly number[],
     evaluationTime: Date,
     resolver?: CharacterAwakeEligibilityResolver,
+    dependencies: MissionSettlementRewardDependencies = {},
 ): AwakeMissionSettlementEvaluation | null {
     if (missionIds.length === 0) return null
     const candidates = getAwakeBattleMissionIds([], missionIds)
@@ -128,6 +137,8 @@ export function settleAwakeMissionCandidatesWithEvaluation(
         const settled = settleAwakeMissionEvaluationWithInvalidations(
             evaluation,
             resolver ?? createCharacterAwakeEligibilityResolver(playerId, evaluationTime),
+            undefined,
+            dependencies,
         )
         return {
             prepared,
@@ -140,6 +151,7 @@ export function settleAwakeMissionCandidatesWithEvaluation(
 
 export function settleAwakeBattleMissions(
     params: AwakeBattleMissionSettlementParams,
+    dependencies: MissionSettlementRewardDependencies = {},
 ): AwakeMissionSettlementResult {
     if (!params.questAccomplished) return emptyAwakeMissionSettlement()
     const missionIds = getAwakeBattleMissionIds(
@@ -151,6 +163,7 @@ export function settleAwakeBattleMissions(
         params.playerId,
         missionIds,
         params.evaluationTime,
+        dependencies,
     )
 }
 

@@ -315,7 +315,7 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^src\/lib\/mission\/(?:awake-settlement|awake-unlock-response|evaluation-session|fact-loaders|index|mission-catalog|mission-catalog-source|production-fact-loaders)\.ts$/,
+        pattern: /^(?:src\/lib\/mission\/(?:awake-evaluation-settlement|awake-settlement|awake-unlock-response|evaluation-session|fact-loaders|index|mission-catalog|mission-catalog-source|production-fact-loaders)\.ts|tools\/mission_awake_reward_owner\.test\.cjs)$/,
         groups: ["integration:mission"],
     },
     {
@@ -363,7 +363,7 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^(?:tools\/(?:single_battle_finish_validation|single_finish_(?:authority_transaction|final_projection|orchestrator_architecture|request_validation))\.test\.cjs|tools\/perf\/single_battle_settlement_(?:(?:admission|baseline)(?:\.test)?|fixture|harness|request_runner|scenario_helpers|time|(?:lifecycle|finish)_scenarios|scenarios)\.cjs|tools\/perf\/__snapshots__\/single_battle_settlement_baseline\.json)$/,
+        pattern: /^(?:tools\/(?:single_battle_finish_validation|single_finish_(?:authority_transaction|awake_reward_owner|final_projection|orchestrator_architecture|request_validation))\.test\.cjs|tools\/perf\/single_battle_settlement_(?:(?:admission|baseline)(?:\.test)?|fixture|harness|request_runner|scenario_helpers|time|(?:lifecycle|finish)_scenarios|scenarios)\.cjs|tools\/perf\/__snapshots__\/single_battle_settlement_baseline\.json)$/,
         groups: ["integration:quest"],
     },
     {

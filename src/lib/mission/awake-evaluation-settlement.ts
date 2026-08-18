@@ -12,6 +12,7 @@ import { getCharacterIdFromMission } from "./character-queries"
 import { getCompletedStageNumbers } from "./stages"
 import { getFactKeyId, normalizeFactKey, type FactKey } from "./facts/fact-key"
 import type { MissionEvaluationResult, MissionSettlementObserver } from "./settlement"
+import type { MissionSettlementRewardDependencies } from "./settlement-write"
 
 export interface AwakeMissionEvaluationSettlement {
     readonly settlement: AwakeMissionSettlementResult
@@ -30,6 +31,7 @@ export function settleAwakeMissionEvaluationWithInvalidations(
     evaluation: MissionEvaluationResult,
     resolver: CharacterAwakeEligibilityResolver,
     observer?: MissionSettlementObserver,
+    dependencies: MissionSettlementRewardDependencies = {},
 ): AwakeMissionEvaluationSettlement {
     const missions = evaluation.missions.filter(mission => (
         mission.category === 9
@@ -66,7 +68,10 @@ export function settleAwakeMissionEvaluationWithInvalidations(
                 mission.missionId,
                 true,
             )
-            granter.grant(definition.rewards)
+            granter.grant(definition.rewards, {
+                definitionId: definition.missionRewardId,
+                standardRewardGrant: dependencies.standardRewardGrant,
+            })
             missionInfo.push({
                 mission_category_id: 9,
                 mission_id: mission.missionId,

@@ -277,7 +277,7 @@ export function executeSingleSettlementWrites(
         playerId, questAccomplished, characterIds: partyCharacterIds,
         directlyChangedMissionIds: missionBattleFacts.awakeMissionIds,
         evaluationTime: settlementTime,
-    })
+    }, { standardRewardGrant: standardRewardGrant.forMission })
     responseState.observeResult(awakeMissionSettlement)
     const activeMissionList = reconcileActiveMissionFacts({
         playerId, repository: getContentSnapshot().repository, now: settlementTime,

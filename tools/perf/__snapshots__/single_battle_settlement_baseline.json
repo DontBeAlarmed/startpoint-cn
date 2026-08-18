@@ -1090,10 +1090,10 @@
       },
       "behaviorSha256": "72e2c2ade754a2fb54b94f2fe04dce20bc2799198461f0d1f2a49ff1baf3287f",
       "sql": {
-        "statements": 217,
+        "statements": 209,
         "selectStatements": 92,
         "writeStatements": 107,
-        "transactionStatements": 18,
+        "transactionStatements": 10,
         "byTable": {
           "players": {
             "statements": 14,
@@ -1396,10 +1396,10 @@
       },
       "behaviorSha256": "ece93a5759d57939832dd018021034f586638e6c14584eb71c241c6f4ff00a9e",
       "sql": {
-        "statements": 216,
+        "statements": 208,
         "selectStatements": 91,
         "writeStatements": 107,
-        "transactionStatements": 18,
+        "transactionStatements": 10,
         "byTable": {
           "players": {
             "statements": 14,
