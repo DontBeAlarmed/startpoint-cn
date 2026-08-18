@@ -23,6 +23,7 @@ function entry(name, requests, overrides = {}) {
         errors: 0,
         latencyMs: { p50: 1.25, p95: 2.5 },
         behaviorSignatures: [`${name}-stable`],
+        sql: { readsMax: 3, writesMax: 2 },
         rollbackVerified: true,
         ...overrides,
     }
@@ -34,17 +35,30 @@ function report({
     concurrencies = [...FORMAL_CONCURRENCY_STEPS],
     entryRequests = EXPECTED_FORMAL_ENTRY_REQUESTS,
 } = {}) {
+    const metadata = {
+        fixedTime: "2024-08-14T12:00:00.000Z",
+        activeIdentitiesAreConcurrentRequests: false,
+        entryDistribution: ENTRY_NAMES.map((name, index) => ({
+            name,
+            requests: entryRequests[index],
+            weight: entryRequests[index] / activeIdentities,
+        })),
+        entryDistributionNote: "acceptance coverage; not production traffic proportions",
+    }
     return {
         profile: {
             independentSaves,
             activeIdentities,
             concurrencySteps: [...concurrencies],
         },
+        metadata,
         steps: concurrencies.map(concurrency => ({
             concurrency,
             requests: entryRequests.reduce((sum, requests) => sum + requests, 0),
             errors: 0,
             latencyMs: { p50: 2.5, p95: 5.75 },
+            throughputPerSecond: 100,
+            eventLoopDelayMs: { p50: 0.1, p95: 0.2, max: 0.3 },
             entries: ENTRY_NAMES.map((name, index) => entry(name, entryRequests[index])),
         })),
     }
@@ -103,7 +117,23 @@ test("a valid formal report passes every admission check", () => {
     })
 })
 
-test("a reduced smoke report is structurally valid but not formal", () => {
+test("embedded admission gate must match the report evidence", () => {
+    const forged = report()
+    forged.steps[0].entries.find(item => item.name === "shop").rollbackVerified = false
+    forged.gate = {
+        reportStructureValid: true,
+        zeroErrors: true,
+        behaviorStable: true,
+        rollbackVerified: true,
+        loadProfileValid: true,
+        admitted: true,
+    }
+
+    assert.equal(validateReportStructure(forged), false)
+    assert.equal(createAdmissionGate(forged).admitted, false)
+})
+
+test("a smoke report is structurally valid but not formal", () => {
     const smoke = report({
         independentSaves: 12,
         activeIdentities: 7,
@@ -126,7 +156,17 @@ test("report structure rejects malformed and contradictory statistics fail close
     const cases = [
         ["null report", () => null],
         ["missing profile", value => { delete value.profile }],
+        ["missing metadata", value => { delete value.metadata }],
         ["extra report field", value => { value.hostname = "builder.local" }],
+        ["metadata claims identities are requests", value => {
+            value.metadata.activeIdentitiesAreConcurrentRequests = true
+        }],
+        ["metadata claims production proportions", value => {
+            value.metadata.entryDistributionNote = "production traffic proportions"
+        }],
+        ["metadata weight exceeds report precision", value => {
+            value.metadata.entryDistribution[0].weight += 0.01
+        }],
         ["NaN save count", value => { value.profile.independentSaves = Number.NaN }],
         ["negative active count", value => { value.profile.activeIdentities = -1 }],
         ["unsafe active count", value => {
@@ -158,6 +198,10 @@ test("report structure rejects malformed and contradictory statistics fail close
         ["step requests are fractional", value => { value.steps[0].requests = 600.5 }],
         ["step requests disagree with entries", value => { value.steps[0].requests-- }],
         ["step errors disagree with entries", value => { value.steps[0].errors = 1 }],
+        ["entry requests disagree with declared distribution", value => {
+            value.steps[0].entries[0].requests++
+            value.steps[0].entries[1].requests--
+        }],
         ["entry errors hidden by step", value => {
             value.steps[0].entries[0].errors = 1
         }],
@@ -194,6 +238,18 @@ test("report structure rejects malformed and contradictory statistics fail close
         }],
         ["missing latency observation", value => {
             delete value.steps[0].latencyMs.p95
+        }],
+        ["missing event-loop observation", value => {
+            delete value.steps[0].eventLoopDelayMs.max
+        }],
+        ["negative throughput", value => {
+            value.steps[0].throughputPerSecond = -1
+        }],
+        ["missing entry SQL", value => {
+            delete value.steps[0].entries[0].sql
+        }],
+        ["entry without SQL read evidence", value => {
+            value.steps[0].entries[0].sql.readsMax = 0
         }],
         ["NaN latency observation", value => {
             value.steps[0].entries[0].latencyMs.p50 = Number.NaN
@@ -332,8 +388,7 @@ test("formal admission cannot pass on profile metadata alone", () => {
         step.requests--
     }
 
-    assert.equal(validateReportStructure(skippedRequests), true)
-    assert.equal(createAdmissionGate(skippedRequests).loadProfileValid, false)
+    assert.equal(validateReportStructure(skippedRequests), false)
     assert.equal(createAdmissionGate(skippedRequests).admitted, false)
 })
 

@@ -16,7 +16,8 @@ const FORMAL_ENTRY_REQUESTS = Object.freeze([86, 86, 86, 86, 86, 85, 85])
 const WRITE_ENTRY_NAMES = Object.freeze(["single-battle", "shop", "gacha", "mail"])
 const WRITE_ENTRY_SET = new Set(WRITE_ENTRY_NAMES)
 
-const REPORT_FIELDS = Object.freeze(["profile", "steps"])
+const REPORT_FIELDS = Object.freeze(["metadata", "profile", "steps"])
+const REPORT_FIELDS_WITH_GATE = Object.freeze(["gate", "metadata", "profile", "steps"])
 const PROFILE_FIELDS = Object.freeze([
     "activeIdentities",
     "concurrencySteps",
@@ -26,8 +27,10 @@ const STEP_FIELDS = Object.freeze([
     "concurrency",
     "entries",
     "errors",
+    "eventLoopDelayMs",
     "latencyMs",
     "requests",
+    "throughputPerSecond",
 ])
 const ENTRY_FIELDS = Object.freeze([
     "behaviorSignatures",
@@ -36,8 +39,26 @@ const ENTRY_FIELDS = Object.freeze([
     "name",
     "requests",
     "rollbackVerified",
+    "sql",
 ])
 const LATENCY_FIELDS = Object.freeze(["p50", "p95"])
+const DELAY_FIELDS = Object.freeze(["max", "p50", "p95"])
+const SQL_FIELDS = Object.freeze(["readsMax", "writesMax"])
+const METADATA_FIELDS = Object.freeze([
+    "activeIdentitiesAreConcurrentRequests",
+    "entryDistribution",
+    "entryDistributionNote",
+    "fixedTime",
+])
+const DISTRIBUTION_FIELDS = Object.freeze(["name", "requests", "weight"])
+const GATE_FIELDS = Object.freeze([
+    "admitted",
+    "behaviorStable",
+    "loadProfileValid",
+    "reportStructureValid",
+    "rollbackVerified",
+    "zeroErrors",
+])
 
 function isPlainObject(value) {
     if (value === null || typeof value !== "object") return false
@@ -78,6 +99,61 @@ function validLatency(latency) {
         && latency.p95 >= latency.p50
 }
 
+function validDelay(delay) {
+    return isPlainObject(delay)
+        && hasExactFields(delay, DELAY_FIELDS)
+        && Number.isFinite(delay.p50)
+        && delay.p50 >= 0
+        && Number.isFinite(delay.p95)
+        && delay.p95 >= delay.p50
+        && Number.isFinite(delay.max)
+        && delay.max >= delay.p95
+}
+
+function validSql(sql) {
+    return isPlainObject(sql)
+        && hasExactFields(sql, SQL_FIELDS)
+        && isPositiveSafeInteger(sql.readsMax)
+        && isNonNegativeSafeInteger(sql.writesMax)
+}
+
+function validMetadata(metadata, activeIdentities) {
+    if (!isPlainObject(metadata)
+        || !hasExactFields(metadata, METADATA_FIELDS)
+        || metadata.activeIdentitiesAreConcurrentRequests !== false
+        || typeof metadata.fixedTime !== "string"
+        || metadata.fixedTime.length === 0
+        || metadata.entryDistributionNote !== "acceptance coverage; not production traffic proportions"
+        || !isDenseArray(metadata.entryDistribution)
+        || metadata.entryDistribution.length !== ENTRY_NAMES.length) {
+        return false
+    }
+    let requestTotal = 0
+    let weightTotal = 0
+    for (let index = 0; index < metadata.entryDistribution.length; index++) {
+        const item = metadata.entryDistribution[index]
+        if (!isPlainObject(item)
+            || !hasExactFields(item, DISTRIBUTION_FIELDS)
+            || item.name !== ENTRY_NAMES[index]
+            || !isPositiveSafeInteger(item.requests)
+            || !Number.isFinite(item.weight)
+            || item.weight <= 0
+            || Math.abs(item.weight - item.requests / activeIdentities) > 0.0005
+            || !Number.isSafeInteger(requestTotal + item.requests)) {
+            return false
+        }
+        requestTotal += item.requests
+        weightTotal += item.weight
+    }
+    return requestTotal === activeIdentities && Math.abs(weightTotal - 1) <= 0.005
+}
+
+function validGate(gate) {
+    return isPlainObject(gate)
+        && hasExactFields(gate, GATE_FIELDS)
+        && GATE_FIELDS.every(field => typeof gate[field] === "boolean")
+}
+
 function hasExactEntryOrder(entries) {
     if (!isDenseArray(entries) || entries.length !== ENTRY_NAMES.length) return false
     for (let index = 0; index < entries.length; index++) {
@@ -97,7 +173,9 @@ function hasValidBehaviorSignatures(signatures) {
 }
 
 function inspectReportStructure(report) {
-    if (!isPlainObject(report) || !hasExactFields(report, REPORT_FIELDS)) return null
+    if (!isPlainObject(report)
+        || (!hasExactFields(report, REPORT_FIELDS)
+            && !hasExactFields(report, REPORT_FIELDS_WITH_GATE))) return null
     const profile = report.profile
     if (!isPlainObject(profile)
         || !hasExactFields(profile, PROFILE_FIELDS)
@@ -106,6 +184,8 @@ function inspectReportStructure(report) {
         || profile.activeIdentities > profile.independentSaves
         || !isDenseArray(profile.concurrencySteps)
         || profile.concurrencySteps.length === 0
+        || !validMetadata(report.metadata, profile.activeIdentities)
+        || (Object.hasOwn(report, "gate") && !validGate(report.gate))
         || !isDenseArray(report.steps)
         || report.steps.length !== profile.concurrencySteps.length) {
         return null
@@ -130,6 +210,10 @@ function inspectReportStructure(report) {
             || !isNonNegativeSafeInteger(step.errors)
             || step.errors > step.requests
             || !validLatency(step.latencyMs)
+            || !validDelay(step.eventLoopDelayMs)
+            || !Number.isFinite(step.throughputPerSecond)
+            || step.throughputPerSecond < 0
+            || step.requests !== profile.activeIdentities
             || !hasExactEntryOrder(step.entries)) {
             return null
         }
@@ -146,6 +230,8 @@ function inspectReportStructure(report) {
                 || !validLatency(entry.latencyMs)
                 || !hasValidBehaviorSignatures(entry.behaviorSignatures)
                 || typeof entry.rollbackVerified !== "boolean"
+                || !validSql(entry.sql)
+                || entry.requests !== report.metadata.entryDistribution[entryIndex].requests
                 || !Number.isSafeInteger(entryRequests + entry.requests)
                 || !Number.isSafeInteger(entryErrors + entry.errors)) {
                 return null
@@ -156,6 +242,12 @@ function inspectReportStructure(report) {
         if (step.requests !== entryRequests || step.errors !== entryErrors) return null
     }
 
+    if (Object.hasOwn(report, "gate")) {
+        const expectedGate = computeAdmissionGate(report)
+        if (!GATE_FIELDS.every(field => report.gate[field] === expectedGate[field])) {
+            return null
+        }
+    }
     return report
 }
 
@@ -212,31 +304,34 @@ function isFormalLoadProfile(report) {
     return true
 }
 
+function computeAdmissionGate(inspected) {
+    let zeroErrors = true
+    let rollbackVerified = true
+    for (let stepIndex = 0; stepIndex < inspected.steps.length; stepIndex++) {
+        const step = inspected.steps[stepIndex]
+        if (step.errors !== 0) zeroErrors = false
+        for (let entryIndex = 0; entryIndex < step.entries.length; entryIndex++) {
+            const entry = step.entries[entryIndex]
+            if (WRITE_ENTRY_SET.has(entry.name) && !entry.rollbackVerified) {
+                rollbackVerified = false
+            }
+        }
+    }
+    const gate = {
+        reportStructureValid: true,
+        zeroErrors,
+        behaviorStable: hasStableBehavior(inspected),
+        rollbackVerified,
+        loadProfileValid: isFormalLoadProfile(inspected),
+    }
+    return { ...gate, admitted: Object.values(gate).every(Boolean) }
+}
+
 function createAdmissionGate(report) {
     try {
         const inspected = inspectReportStructure(report)
         if (inspected === null) throw new Error("invalid mixed-load report")
-
-        let zeroErrors = true
-        let rollbackVerified = true
-        for (let stepIndex = 0; stepIndex < inspected.steps.length; stepIndex++) {
-            const step = inspected.steps[stepIndex]
-            if (step.errors !== 0) zeroErrors = false
-            for (let entryIndex = 0; entryIndex < step.entries.length; entryIndex++) {
-                const entry = step.entries[entryIndex]
-                if (WRITE_ENTRY_SET.has(entry.name) && !entry.rollbackVerified) {
-                    rollbackVerified = false
-                }
-            }
-        }
-        const gate = {
-            reportStructureValid: true,
-            zeroErrors,
-            behaviorStable: hasStableBehavior(inspected),
-            rollbackVerified,
-            loadProfileValid: isFormalLoadProfile(inspected),
-        }
-        return { ...gate, admitted: Object.values(gate).every(Boolean) }
+        return computeAdmissionGate(inspected)
     } catch {
         return {
             reportStructureValid: false,

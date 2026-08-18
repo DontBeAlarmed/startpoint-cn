@@ -25,7 +25,9 @@ async function executeMailScenario(app, identity, context = {}) {
     if (typeof context.prepareMailIdentity !== "function") {
         throw new TypeError("mail scenario requires context.prepareMailIdentity")
     }
-    const fixture = context.prepareMailIdentity(identity)
+    const fixture = context.skipPrepare
+        ? context.mailFixtureByIdentity?.[identity.playerId]
+        : context.prepareMailIdentity(identity)
     assert.ok(Number.isSafeInteger(fixture?.mailId) && fixture.mailId > 0, "mail fixture id")
     const before = requireMailState(context, identity, "mail before")
 

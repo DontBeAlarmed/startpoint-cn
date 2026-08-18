@@ -173,7 +173,7 @@ function requireRejected(response, label) {
 }
 
 async function executeSingleBattleScenario(app, identity, context = {}) {
-    if (typeof context.prepareSingleBattleIdentity === "function") {
+    if (!context.skipPrepare && typeof context.prepareSingleBattleIdentity === "function") {
         context.prepareSingleBattleIdentity(identity)
     }
     const beforePlayer = getPlayerSync(identity.playerId)

@@ -40,7 +40,7 @@ async function executeShopScenario(app, identity, context = {}) {
     if (typeof context.prepareShopIdentity !== "function") {
         throw new TypeError("shop scenario requires context.prepareShopIdentity")
     }
-    context.prepareShopIdentity(identity)
+    if (!context.skipPrepare) context.prepareShopIdentity(identity)
     const before = requireState(context, "shop before", identity)
 
     const salesList = await fetchSalesList(app, identity, "shop list")

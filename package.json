@@ -49,6 +49,7 @@
     "benchmark:mission-settlement": "node tools/perf/mission_settlement_baseline.cjs",
     "benchmark:mission-engine-focused": "node tools/perf/mission_engine_focused_baseline.cjs",
     "benchmark:mission-entry-load": "node tools/perf/mission_entry_layered_load.cjs",
+    "benchmark:non-multi-mixed": "node tools/perf/non_multi_mixed_workload.cjs",
     "benchmark:single-battle-settlement": "node tools/perf/single_battle_settlement_baseline.cjs",
     "docs:check": "node tools/docs_check.cjs",
     "hygiene": "bash scripts/check-hygiene.sh --all",

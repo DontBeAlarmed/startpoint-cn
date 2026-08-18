@@ -31,7 +31,7 @@ async function executeGachaScenario(app, identity, context = {}) {
     if (typeof context.prepareGachaIdentity !== "function") {
         throw new TypeError("gacha scenario requires context.prepareGachaIdentity")
     }
-    context.prepareGachaIdentity(identity)
+    if (!context.skipPrepare) context.prepareGachaIdentity(identity)
     const before = requireGachaState(context, identity, "gacha before")
 
     const loadResponse = await postCnRequest(app, "/api/index.php/load", {
