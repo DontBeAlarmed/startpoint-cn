@@ -30,7 +30,10 @@ const {
 } = require("../src/data/domains/active_mission_battle_condition_facts")
 const {
     collectActiveMissionConditionalBattleFacts,
+    hasCompletedSecondManaBoardAbilities,
 } = require("../src/lib/mission/active-conditional-battle-facts")
+const { getCharacterManaNodesSync } = require("../src/lib/assets")
+const { getActiveMissionMasterDefinition } = require("../src/lib/mission/active-master-data")
 const {
     computeActiveMissionFactProgress,
 } = require("../src/lib/mission/active-reconciliation")
@@ -56,6 +59,40 @@ const context = {
     questId: 1006003,
     partyCharacterIds: [121033, 999999],
 }
+
+assert.equal(typeof hasCompletedSecondManaBoardAbilities, "function")
+const secondBoard = getCharacterManaNodesSync(121033, 2)
+assert.ok(secondBoard)
+const secondBoardAbilityNodeIds = Object.entries(secondBoard)
+    .filter(([, node]) => node.field6 === "4" || node.field6 === "5" || node.field6 === "6")
+    .map(([nodeId]) => Number(nodeId))
+assert.equal(secondBoardAbilityNodeIds.length, 18)
+assert.equal(hasCompletedSecondManaBoardAbilities(secondBoard, secondBoardAbilityNodeIds), true)
+assert.equal(hasCompletedSecondManaBoardAbilities(
+    secondBoard,
+    secondBoardAbilityNodeIds.slice(0, -1),
+), false)
+assert.equal(hasCompletedSecondManaBoardAbilities({
+    ...secondBoard,
+    0: { field6: "4" },
+    "-1": { field6: "5" },
+    9007199254740992: { field6: "6" },
+}, secondBoardAbilityNodeIds), true)
+assert.equal(hasCompletedSecondManaBoardAbilities({ 0: { field6: "4" } }, []), false)
+
+const mission20007 = getActiveMissionMasterDefinition(20007)
+assert.ok(mission20007)
+assert.deepEqual(collectActiveMissionConditionalBattleFacts([mission20007], context, {
+    "121033": {
+        level: 100,
+        secondBoardAbilitiesComplete: hasCompletedSecondManaBoardAbilities(
+            secondBoard,
+            secondBoardAbilityNodeIds,
+        ),
+    },
+}), [
+    { pattern: 71, characterId: 121033 },
+])
 
 assert.deepEqual(collectActiveMissionConditionalBattleFacts(definitions, context, {
     "121033": { level: 80, secondBoardAbilitiesComplete: true },

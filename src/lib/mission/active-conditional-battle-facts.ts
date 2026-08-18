@@ -11,6 +11,7 @@ import {
 } from "./active-reconciliation"
 
 const CONDITIONAL_PATTERNS = new Set([71, 72, 73])
+const SECOND_MANA_BOARD_ABILITY_SLOTS = new Set(["4", "5", "6"])
 
 export interface ConditionalBattleCharacterState {
     readonly level: number
@@ -28,6 +29,19 @@ export interface ConditionalBattleContext {
 export interface ConditionalBattleFact {
     readonly pattern: number
     readonly characterId: number
+}
+
+export function hasCompletedSecondManaBoardAbilities(
+    secondBoard: Readonly<Record<string, { readonly field6?: string }>>,
+    unlockedNodeIds: readonly number[],
+): boolean {
+    const abilityNodeIds = Object.entries(secondBoard)
+        .filter(([, node]) => SECOND_MANA_BOARD_ABILITY_SLOTS.has(node.field6 ?? ""))
+        .map(([nodeId]) => Number(nodeId))
+        .filter(nodeId => Number.isSafeInteger(nodeId) && nodeId > 0)
+    if (abilityNodeIds.length === 0) return false
+    const unlockedNodes = new Set(unlockedNodeIds)
+    return abilityNodeIds.every(nodeId => unlockedNodes.has(nodeId))
 }
 
 function matchesBattleKind(battleKind: number, isMulti: boolean): boolean {
@@ -108,14 +122,12 @@ function buildCharacterState(
         }
     }
     const secondBoard = getCharacterManaNodesSync(characterId, 2) ?? {}
-    const abilityNodeIds = Object.entries(secondBoard)
-        .filter(([, node]) => node.field6 === "1" || node.field6 === "2" || node.field6 === "3")
-        .map(([nodeId]) => Number(nodeId))
-    const unlockedNodes = new Set(getPlayerCharacterManaNodesSync(playerId, characterId))
     return {
         level: estimateActiveMissionCharacterLevel({ ...character, rarity }),
-        secondBoardAbilitiesComplete: abilityNodeIds.length > 0
-            && abilityNodeIds.every(nodeId => unlockedNodes.has(nodeId)),
+        secondBoardAbilitiesComplete: hasCompletedSecondManaBoardAbilities(
+            secondBoard,
+            getPlayerCharacterManaNodesSync(playerId, characterId),
+        ),
     }
 }
 
