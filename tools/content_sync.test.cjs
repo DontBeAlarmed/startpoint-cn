@@ -406,6 +406,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         boxGacha: 0,
         character: 0,
         characterElection: 0,
+        characterManaAdmission: 0,
         gacha: 0,
         gameplay: 0,
         itemEquipment: 0,
@@ -435,6 +436,10 @@ test("default release builder closes all registry tables and runs each CDN conve
         convertCharacterElections: async () => {
             converterCalls.characterElection++
             return converterOutput("character-election")
+        },
+        convertCharacterManaAdmissionTables: async () => {
+            converterCalls.characterManaAdmission++
+            return converterOutput("character-mana-admission")
         },
         convertGachas: async () => {
             converterCalls.gacha++
@@ -494,6 +499,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         boxGacha: 1,
         character: 1,
         characterElection: 1,
+        characterManaAdmission: 1,
         gacha: 1,
         gameplay: 1,
         itemEquipment: 1,
@@ -542,6 +548,7 @@ test("default release builder fails explicitly for a missing dynamic gacha refer
     const builder = createDefaultContentTableBuilder({
         convertCharacters: async () => converterOutput("character"),
         convertCharacterElections: async () => converterOutput("character-election"),
+        convertCharacterManaAdmissionTables: async () => converterOutput("character-mana-admission"),
         convertGachas: async () => converterOutput("gacha"),
         convertShops: async () => converterOutput("shop"),
         convertSkillEffects: async () => converterOutput("skill-effects"),
@@ -585,6 +592,7 @@ test("default release builder rejects an incomplete converter output", async () 
         convertAdditionalRewards: async () => converterOutput("additional-reward"),
         convertCharacters: async () => incompleteCharacterOutput,
         convertCharacterElections: async () => converterOutput("character-election"),
+        convertCharacterManaAdmissionTables: async () => converterOutput("character-mana-admission"),
         convertGachas: async () => converterOutput("gacha"),
         convertShops: async () => converterOutput("shop"),
         convertSkillEffects: async () => converterOutput("skill-effects"),
@@ -637,6 +645,7 @@ test("default release builder bounds parallel reads and imports while preserving
         convertAdditionalRewards: async () => converterOutput("additional-reward"),
         convertCharacters: async () => converterOutput("character"),
         convertCharacterElections: async () => converterOutput("character-election"),
+        convertCharacterManaAdmissionTables: async () => converterOutput("character-mana-admission"),
         convertGachas: async () => converterOutput("gacha"),
         convertShops: async () => converterOutput("shop"),
         convertSkillEffects: async () => converterOutput("skill-effects"),

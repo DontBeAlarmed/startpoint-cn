@@ -107,6 +107,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/character_evolution.test.cjs",
             "tools/character_evolution_route.test.cjs",
             "tools/character_growth_transaction.test.cjs",
+            "tools/character_mana_mutation_plan.test.cjs",
             "tools/ex_boost_pending_draw.test.cjs",
             "tools/small_write_route_boundaries.test.cjs",
             "tools/mana_board_availability.test.cjs",
@@ -164,6 +165,7 @@ const TEST_GROUPS = Object.freeze({
         tests: [
             "tools/character_content.test.cjs",
             "tools/content_character_converter.test.cjs",
+            "tools/content_character_mana_admission_converter.test.cjs",
             "tools/content_character_election_converter.test.cjs",
             "tools/content_asset_audit.test.cjs",
             "tools/content_additional_reward_converter.test.cjs",
@@ -175,6 +177,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/content_gameplay_runtime.test.cjs",
             "tools/content_item_equipment_converter.test.cjs",
             "tools/content_mana_node_converter.test.cjs",
+            "tools/mana_board_parent_index.test.cjs",
             "tools/content_quest_converter.test.cjs",
             "tools/content_reward_campaign_converter.test.cjs",
             "tools/content_reward_converter.test.cjs",

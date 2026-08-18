@@ -153,6 +153,16 @@ const MANA_NODE_TABLES = [
     ["mana_node.json", ["master/mana_board/mana_node.orderedmap"]],
 ] as const
 
+const CHARACTER_MANA_ADMISSION_SOURCES = [
+    "master/mana_board/level_required_mana_node.orderedmap",
+    "master/character/character_level.orderedmap",
+] as const
+
+const CHARACTER_MANA_ADMISSION_TABLES = [
+    "character_level.json",
+    "level_required_mana_node.json",
+] as const
+
 const ITEM_EQUIPMENT_TABLES = [
     [
         "equipment_craft.json",
@@ -263,6 +273,17 @@ function manaNodeDefinition(tableName: string, sourceOrderedMaps: readonly strin
         scope: "cdn",
         sourceOrderedMaps,
         converterId: "mana-node",
+        converterVersion: 1,
+        outputShapeVersion: 1,
+    }
+}
+
+function characterManaAdmissionDefinition(tableName: string): TableSourceInput {
+    return {
+        tableName,
+        scope: "cdn",
+        sourceOrderedMaps: CHARACTER_MANA_ADMISSION_SOURCES,
+        converterId: "character-mana-admission",
         converterVersion: 1,
         outputShapeVersion: 1,
     }
@@ -554,6 +575,7 @@ const definitionInputs: TableSourceInput[] = [
     ...MANA_NODE_TABLES.map(([tableName, sourceOrderedMaps]) => (
         manaNodeDefinition(tableName, sourceOrderedMaps)
     )),
+    ...CHARACTER_MANA_ADMISSION_TABLES.map(characterManaAdmissionDefinition),
     ...ITEM_EQUIPMENT_TABLES.map(([tableName, sourceOrderedMaps, bundledSources]) => (
         itemEquipmentDefinition(tableName, sourceOrderedMaps, bundledSources)
     )),

@@ -8,7 +8,7 @@ const { spawnSync } = require("node:child_process")
 const { isDeepStrictEqual } = require("node:util")
 
 const EXPECTED_VERSION = "1.4.54"
-const EXPECTED_TABLE_COUNT = 109
+const EXPECTED_TABLE_COUNT = 125
 const EXPECTED_FEATURE_DIGEST = "sha256:21898330b538f6c60a0c8114a15f8e247934bea46a104ca4711cc72cde761bf4"
 const EXPECTED_FEATURE_COUNTS = Object.freeze({
     outer: 543,
@@ -1037,6 +1037,24 @@ function validateManaNodeTables({ definitions, readBundled, readRelease }) {
     return { tables: manaNodeDefinitions.length }
 }
 
+function validateCharacterManaAdmissionTables({ definitions, readBundled, readRelease }) {
+    const admissionDefinitions = definitions.filter(definition => (
+        definition.converterId === "character-mana-admission"
+    ))
+    for (const definition of admissionDefinitions) {
+        if (!isDeepStrictEqual(
+            readRelease(definition.tableName),
+            readBundled(definition.tableName),
+        )) {
+            baselineError(
+                "CONTENT_SYNC_SMOKE_CHARACTER_MANA_ADMISSION_BASELINE",
+                `${definition.tableName} 与 bundled 官方角色 Mana 准入基线不一致`,
+            )
+        }
+    }
+    return { tables: admissionDefinitions.length }
+}
+
 function validateItemEquipmentTables({
     definitions,
     readBundled,
@@ -1358,6 +1376,11 @@ async function validateSynchronizedContent({ paths, syncResult }) {
         readBundled: tableName => readJson(paths.projectRoot, `assets/${tableName}`),
         readRelease: tableName => repository.table(tableName),
     })
+    const characterManaAdmissionStats = validateCharacterManaAdmissionTables({
+        definitions: runtime.TABLE_SOURCES,
+        readBundled: tableName => readJson(paths.projectRoot, `assets/${tableName}`),
+        readRelease: tableName => repository.table(tableName),
+    })
     const itemEquipmentStats = validateItemEquipmentTables({
         definitions: runtime.TABLE_SOURCES,
         readBundled: tableName => readJson(paths.projectRoot, `assets/${tableName}`),
@@ -1474,6 +1497,7 @@ async function validateSynchronizedContent({ paths, syncResult }) {
         boxGachaTables: boxGachaStats.tables,
         gameplayTables: gameplayStats.tables,
         manaNodeTables: manaNodeStats.tables,
+        characterManaAdmissionTables: characterManaAdmissionStats.tables,
         itemEquipmentTables: itemEquipmentStats.tables,
         equipmentLookupEntries: itemEquipmentStats.equipmentLookupEntries,
         itemEffects: itemEquipmentStats.itemEffects,
@@ -1628,6 +1652,7 @@ module.exports = {
     runContentSyncSmoke,
     runContentSyncSmokeCli,
     validateCharacters,
+    validateCharacterManaAdmissionTables,
     validateBoxGachaTables,
     validateDirectOrderedMapTables,
     validateGachas,

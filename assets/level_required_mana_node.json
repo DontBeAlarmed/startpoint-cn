@@ -1,0 +1,7 @@
+{
+  "1": { "abilityLevels": [null, 10, null, null, null, null], "skillEvolutionLevel": 25 },
+  "2": { "abilityLevels": [null, 10, null, null, null, null], "skillEvolutionLevel": 25 },
+  "3": { "abilityLevels": [null, 10, 40, 90, 95, 100], "skillEvolutionLevel": 25 },
+  "4": { "abilityLevels": [null, 10, 40, 90, 95, 100], "skillEvolutionLevel": 25 },
+  "5": { "abilityLevels": [null, 10, 40, 90, 95, 100], "skillEvolutionLevel": 25 }
+}

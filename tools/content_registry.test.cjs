@@ -201,6 +201,17 @@ const EXPECTED_MANA_NODE_CDN_TABLES = Object.freeze({
     "mana_node.json": ["master/mana_board/mana_node.orderedmap"],
 })
 
+const EXPECTED_CHARACTER_MANA_ADMISSION_CDN_TABLES = Object.freeze({
+    "character_level.json": [
+        "master/mana_board/level_required_mana_node.orderedmap",
+        "master/character/character_level.orderedmap",
+    ],
+    "level_required_mana_node.json": [
+        "master/mana_board/level_required_mana_node.orderedmap",
+        "master/character/character_level.orderedmap",
+    ],
+})
+
 const EXPECTED_ITEM_EQUIPMENT_CDN_TABLES = Object.freeze({
     "equipment_craft.json": [
         "master/item/equipment_craft_point_exchange.orderedmap",
@@ -276,6 +287,7 @@ const EXPECTED_BUNDLED_TABLES = Object.freeze([
     "challenge_dungeon_event_quest.json",
     "character_quest.json",
     "character_quest_lookup.json",
+    "character_level.json",
     "clear_reward.json",
     "daily_challenge_point_lookup.json",
     "daily_exp_mana_event_quest.json",
@@ -297,6 +309,7 @@ const EXPECTED_BUNDLED_TABLES = Object.freeze([
     "item_ids.json",
     "item_lookup.json",
     "item_sale.json",
+    "level_required_mana_node.json",
     "main_quest.json",
     "mana_board.json",
     "mana_node.json",
@@ -498,6 +511,17 @@ test("registry derives mana node costs from the official nested map", () => {
     }
 })
 
+test("registry derives character mana admission tables as one authoritative closure", () => {
+    for (const [tableName, sources] of Object.entries(
+        EXPECTED_CHARACTER_MANA_ADMISSION_CDN_TABLES
+    )) {
+        const entry = findTableSource(tableName)
+        assert.equal(entry.scope, "cdn", tableName)
+        assert.equal(entry.converterId, "character-mana-admission", tableName)
+        assert.deepEqual(entry.sourceOrderedMaps, sources, tableName)
+    }
+})
+
 test("registry derives item and equipment runtime tables from official OrderedMaps", () => {
     for (const [tableName, sources] of Object.entries(EXPECTED_ITEM_EQUIPMENT_CDN_TABLES)) {
         const entry = findTableSource(tableName)
@@ -591,6 +615,7 @@ test("registry closes over current static runtime tables", () => {
                 && !(tableName in EXPECTED_GAMEPLAY_CDN_TABLES)
                 && !(tableName in EXPECTED_BOX_GACHA_CDN_TABLES)
                 && !(tableName in EXPECTED_MANA_NODE_CDN_TABLES)
+                && !(tableName in EXPECTED_CHARACTER_MANA_ADMISSION_CDN_TABLES)
                 && !(tableName in EXPECTED_ITEM_EQUIPMENT_CDN_TABLES)
                 && !(tableName in EXPECTED_QUEST_CDN_TABLES)
                 && !(tableName in EXPECTED_QUEST_DERIVED_CDN_TABLES)
@@ -635,7 +660,7 @@ test("registry independently covers static CN runtime JSON references", () => {
 })
 
 test("every registry table has an explicit existing bundled fallback", () => {
-    assert.equal(TABLE_SOURCES.length, 123)
+    assert.equal(TABLE_SOURCES.length, 125)
     for (const entry of TABLE_SOURCES) {
         const sourcePath = path.resolve(projectRoot, entry.bundledPath)
         assert.ok(fs.existsSync(sourcePath), `${entry.tableName} source must exist`)

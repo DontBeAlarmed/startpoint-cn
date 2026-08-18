@@ -1,0 +1,46 @@
+{
+  "assetVersion": "1.4.54",
+  "sources": {
+    "levelRequirements": "master/mana_board/level_required_mana_node.orderedmap",
+    "characterLevels": "master/character/character_level.orderedmap",
+    "manaBoard": "master/generated/mana_board.orderedmap"
+  },
+  "decodedReferenceSha256": {
+    "levelRequirements": "46dd139f79a1df91e0f7cdd7e6c08b80f59108581aea90201f68cf91f6731713",
+    "characterLevels": "41b3e01150cb2846851384cb02439042a1f0808773e3cdb77c49f8fa3a9fe848",
+    "manaBoard": "08d34f9bf1f0ecffc74cba404f7737e4290172bc2ba57c64a33d96f5d956221d"
+  },
+  "levelRequirementRows": {
+    "1": ["(None)", "10", "(None)", "(None)", "(None)", "(None)", "25"],
+    "2": ["(None)", "10", "(None)", "(None)", "(None)", "(None)", "25"],
+    "3": ["(None)", "10", "40", "90", "95", "100", "25"],
+    "4": ["(None)", "10", "40", "90", "95", "100", "25"],
+    "5": ["(None)", "10", "40", "90", "95", "100", "25"]
+  },
+  "characterLevelSummary": {
+    "rarities": [1, 2],
+    "levelsPerRarity": 100,
+    "firstLevel": 1,
+    "lastLevel": 100,
+    "firstTotalExperience": 0,
+    "lastTotalExperience": 308043,
+    "boundaryRows": {
+      "1": 0,
+      "9": 269,
+      "10": 348,
+      "24": 3058,
+      "25": 3392,
+      "39": 10672,
+      "40": 11416,
+      "89": 207492,
+      "90": 216633,
+      "100": 308043
+    }
+  },
+  "manaBoardSummary": {
+    "characters": 494,
+    "boards": 970,
+    "nodes": 19811,
+    "nodesWithParent": 18524
+  }
+}

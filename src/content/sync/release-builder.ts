@@ -34,6 +34,11 @@ import {
     type ManaNodeSourceReader,
 } from "../converters/mana-node"
 import {
+    convertCharacterManaAdmissionTables,
+    type CharacterManaAdmissionConversionOutput,
+    type CharacterManaAdmissionSourceReader,
+} from "../converters/character-mana-admission"
+import {
     convertItemEquipmentTables,
     type ItemEquipmentConversionOutput,
     type ItemEquipmentConversionCompatibility,
@@ -93,6 +98,7 @@ const SUPPORTED_CONVERTER_IDS = new Set([
     "additional-reward",
     "character",
     "character-election",
+    "character-mana-admission",
     "box-gacha",
     "gacha",
     "gameplay",
@@ -133,6 +139,9 @@ export interface DefaultContentTableBuilderDependencies {
     readonly convertManaNodes?: (
         reader: ManaNodeSourceReader,
     ) => ManaNodeConversionOutput | Promise<ManaNodeConversionOutput>
+    readonly convertCharacterManaAdmissionTables?: (
+        reader: CharacterManaAdmissionSourceReader,
+    ) => CharacterManaAdmissionConversionOutput | Promise<CharacterManaAdmissionConversionOutput>
     readonly convertItemEquipmentTables?: (
         reader: ItemEquipmentSourceReader,
         compatibility: ItemEquipmentConversionCompatibility,
@@ -180,7 +189,8 @@ function requireLogicalPath(logicalPath: string): string {
 }
 
 class StrictOrderedMapReader implements BoxGachaSourceReader, GachaSourceReader, GameplaySourceReader,
-    AdditionalRewardSourceReader, ItemEquipmentSourceReader, ManaNodeSourceReader,
+    AdditionalRewardSourceReader, CharacterManaAdmissionSourceReader,
+    ItemEquipmentSourceReader, ManaNodeSourceReader,
     ShopSourceReader, RewardSourceReader,
     QuestSourceReader, PeriodicRewardSourceReader {
     private readonly context: ContentTableBuildContext
@@ -421,6 +431,8 @@ export function createDefaultContentTableBuilder(
     const itemEquipmentConverter = dependencies.convertItemEquipmentTables
         ?? convertItemEquipmentTables
     const manaNodeConverter = dependencies.convertManaNodes ?? convertManaNodes
+    const characterManaAdmissionConverter = dependencies.convertCharacterManaAdmissionTables
+        ?? convertCharacterManaAdmissionTables
     const shopConverter = dependencies.convertShops ?? convertShops
     const skillEffectConverter = dependencies.convertSkillEffects ?? convertSkillEffects
     const rewardConverter = dependencies.convertRewards ?? convertRewards
@@ -442,6 +454,7 @@ export function createDefaultContentTableBuilder(
                 definition.converterId === "character"
                     || definition.converterId === "additional-reward"
                     || definition.converterId === "character-election"
+                    || definition.converterId === "character-mana-admission"
                     || definition.converterId === "box-gacha"
                     || definition.converterId === "gacha"
                     || definition.converterId === "gameplay"
@@ -492,6 +505,13 @@ export function createDefaultContentTableBuilder(
                     values,
                     "character-election",
                     await runCharacterElectionConverter(reader, characterElectionConverter),
+                )
+            }
+            if (converterIds.has("character-mana-admission")) {
+                addConverterOutput(
+                    values,
+                    "character-mana-admission",
+                    await characterManaAdmissionConverter(reader),
                 )
             }
             if (converterIds.has("gacha")) {

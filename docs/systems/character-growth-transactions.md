@@ -3,6 +3,35 @@
 角色养成接口常同时写玩家货币、材料、角色状态、节点和任务事实。一次请求的业务结果必须同成同败；不能在
 最后一步失败后留下已扣资源，也不能先发放信赖证再让领取状态保持未领取。
 
+## Mana 准入权威内容与纯规划边界
+
+Gate Task 29a 新增三项只读权威内容能力，尚未改变 `learn_mana_node` 或 `awake_mana_node` 的生产路由：
+
+- `master/mana_board/level_required_mana_node.orderedmap` 动态生成
+  `level_required_mana_node.json`。rarity 1–5 的 `ability_1..6` 与 `skill_evolution` 均按客户端
+  `Option` 语义解析，`(None)` 表示无等级要求，其他值必须为正安全整数。
+- `master/character/character_level.orderedmap` 动态生成 `character_level.json`。每条 rarity 曲线从等级 1、
+  累计经验 0 开始，等级连续且累计经验严格递增；运行时用完整阈值二分得到精确等级，不能复用
+  `characterExpCaps` 中只列每 5 级上限的兼容数据。缺 rarity、断档、非 canonical key、非安全整数或非单调曲线
+  一律拒绝。
+- `master/generated/mana_board.orderedmap` 的原始 bundled/release 形状保持不变。运行时只建立小型
+  `character -> board -> multiplied_id -> parent` 索引；parent 必须是 `(None)` 或同角色同板节点，缺失、跨板、
+  自引用与重复节点都会 fail closed，不向 19,811 行 bundled 表写入派生字段。
+
+`character-mana-mutation-plan` 只接受上述已解析内容、目标角色/当前板和调用方提供的玩家快照。它不读 Content
+全局单例、数据库或 awake 全局资产，也不执行写入。learn/awake 均按请求顺序检查 parent、精确等级、Mana 与材料；
+只有请求前已学习或列表中更早学习的 parent 才可满足条件。所有费用使用安全整数逐节点模拟并聚合，输出有序节点
+更新、最终 learned/awake 状态、总费用、剩余余额和客户端 node entries。
+
+learn 拒绝重复学习并把新节点规划为 `awake_level=0`。awake 要求节点已学习，费用由调用方按节点传入；达到目标
+等级的节点保留为 no-op 响应项，只有真正升级的节点产生费用和更新。全 no-op 计划以
+`hasResourceWrites=false` 明确表示无需资源或节点写入。领域错误使用稳定 `ManaNodeMutationValidationError.code`，
+不绑定 HTTP 状态或响应文本。
+
+29b 接入时必须从同一个 Content snapshot 构造 nodes、parent 与等级要求，并先完整生成 plan，再在单个 SQLite
+事务中按 plan 扣费和写节点。路由仍负责 session/ownership、免费与付费 Mana 拆分、awake cost 选择、bond、进化、
+任务事实与响应合并；这些职责不进入纯 planner。
+
 ## 已覆盖入口
 
 ### `learn_mana_node`

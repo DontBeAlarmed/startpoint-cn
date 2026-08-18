@@ -469,6 +469,34 @@ test("玛纳节点成本表必须等于 bundled 官方基线", () => {
     }), error => error?.code === "CONTENT_SYNC_SMOKE_MANA_NODE_BASELINE")
 })
 
+test("角色 Mana 准入表必须逐张等于 bundled 官方基线", () => {
+    assert.equal(typeof smoke.validateCharacterManaAdmissionTables, "function")
+    const definitions = [
+        { tableName: "character_level.json", converterId: "character-mana-admission" },
+        { tableName: "level_required_mana_node.json", converterId: "character-mana-admission" },
+    ]
+    const bundled = {
+        "character_level.json": { "1": { "1": 0, "2": 10 } },
+        "level_required_mana_node.json": {
+            "1": { abilityLevels: [null, 10, null, null, null, null], skillEvolutionLevel: 25 },
+        },
+    }
+    const release = structuredClone(bundled)
+
+    assert.deepEqual(smoke.validateCharacterManaAdmissionTables({
+        definitions,
+        readBundled: tableName => bundled[tableName],
+        readRelease: tableName => release[tableName],
+    }), { tables: 2 })
+
+    release["character_level.json"][1][2] = 11
+    assert.throws(() => smoke.validateCharacterManaAdmissionTables({
+        definitions,
+        readBundled: tableName => bundled[tableName],
+        readRelease: tableName => release[tableName],
+    }), error => error?.code === "CONTENT_SYNC_SMOKE_CHARACTER_MANA_ADMISSION_BASELINE")
+})
+
 test("关卡派生表必须匹配官方摘要且奖励引用闭合", () => {
     function canonical(value) {
         if (Array.isArray(value)) return value.map(canonical)
