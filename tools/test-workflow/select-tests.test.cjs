@@ -1457,10 +1457,28 @@ test("quick character includes growth transaction rollback coverage", () => {
     assert.equal(TEST_GROUPS["quick:character"].timeoutMs, 60_000)
     assert.deepEqual(TEST_GROUPS["quick:character"].tests, [
         "tools/character_awake_eligibility.test.cjs",
+        "tools/character_evolution.test.cjs",
+        "tools/character_evolution_route.test.cjs",
         "tools/character_growth_transaction.test.cjs",
         "tools/ex_boost_pending_draw.test.cjs",
         "tools/small_write_route_boundaries.test.cjs",
         "tools/mana_board_availability.test.cjs",
         "tools/player_awake_save_roundtrip.test.cjs",
     ])
+    assert.deepEqual(
+        selectTestGroups(["src/content/mana-node-semantics.ts"]),
+        ["quick:character", "quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/character-evolution.ts"]),
+        ["quick:character", "quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/routes/api/character/mana-awake.ts"]),
+        ["full", "quick:character", "quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["assets/mana_node.json"]),
+        ["quick:character", "quick:content"],
+    )
 })

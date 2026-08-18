@@ -104,6 +104,8 @@ const TEST_GROUPS = Object.freeze({
         timeoutMs: 60_000,
         tests: [
             "tools/character_awake_eligibility.test.cjs",
+            "tools/character_evolution.test.cjs",
+            "tools/character_evolution_route.test.cjs",
             "tools/character_growth_transaction.test.cjs",
             "tools/ex_boost_pending_draw.test.cjs",
             "tools/small_write_route_boundaries.test.cjs",

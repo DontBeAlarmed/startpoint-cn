@@ -4,6 +4,10 @@ import {
     parseTextOrderedMap,
 } from "../sync/ordered-map"
 import { parseCsvLine } from "./csv"
+import {
+    InvalidManaNodeSemanticsError,
+    parseManaNodeEvolutionSemantics,
+} from "../mana-node-semantics"
 
 const MANA_NODE_PATH = "master/mana_board/mana_node.orderedmap"
 const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/
@@ -86,34 +90,45 @@ export async function convertManaNodes(
                 if (Object.prototype.hasOwnProperty.call(convertedNodes, nodeId)) {
                     invalidManaNode(`mana_node[${characterId}][${boardId}] has duplicate node ${nodeId}`)
                 }
+                const nodeSubject = `mana_node[${characterId}][${boardId}][${nodeId}]`
+                try {
+                    parseManaNodeEvolutionSemantics({
+                        field1: fields[1],
+                        field5: fields[5],
+                        field6: fields[6],
+                    })
+                } catch (error) {
+                    if (!(error instanceof InvalidManaNodeSemanticsError)) throw error
+                    invalidManaNode(`${nodeSubject}.${error.message}`)
+                }
                 const itemIds = parseList(fields[2])
                 const itemCounts = parseList(fields[3])
                 if (itemIds.length !== itemCounts.length) {
                     invalidManaNode(
-                        `mana_node[${characterId}][${boardId}][${nodeId}] item and count list lengths differ`,
+                        `${nodeSubject} item and count list lengths differ`,
                     )
                 }
                 const items: Record<string, number> = {}
                 for (let index = 0; index < itemIds.length; index += 1) {
                     const itemId = requireId(
                         itemIds[index],
-                        `mana_node[${characterId}][${boardId}][${nodeId}].item[${index}].id`,
+                        `${nodeSubject}.item[${index}].id`,
                     )
                     if (Object.prototype.hasOwnProperty.call(items, itemId)) {
                         invalidManaNode(
-                            `mana_node[${characterId}][${boardId}][${nodeId}] has duplicate item ${itemId}`,
+                            `${nodeSubject} has duplicate item ${itemId}`,
                         )
                     }
                     items[itemId] = parsePositiveInteger(
                         itemCounts[index],
-                        `mana_node[${characterId}][${boardId}][${nodeId}].item[${index}].count`,
+                        `${nodeSubject}.item[${index}].count`,
                     )
                 }
                 convertedNodes[nodeId] = {
                     items,
                     manaCost: parseNonNegativeInteger(
                         fields[4],
-                        `mana_node[${characterId}][${boardId}][${nodeId}].manaCost`,
+                        `${nodeSubject}.manaCost`,
                     ),
                     field1: fields[1],
                     field5: fields[5],

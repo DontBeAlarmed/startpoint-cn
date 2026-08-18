@@ -291,7 +291,7 @@ const SOURCE_RULES = [
         groups: ["integration:mission", "integration:mission-compiled"],
     },
     {
-        pattern: /^(?:assets\/mana_board2_open_condition\.json|src\/lib\/mana-board-availability\.ts|src\/routes\/api\/character\/(?:mana|bond)\.ts|src\/data\/utils\/serialize-player\.ts)$/,
+        pattern: /^(?:assets\/(?:mana_node|mana_board2_open_condition)\.json|src\/content\/mana-node-semantics\.ts|src\/lib\/(?:character-evolution|mana-board-availability)\.ts|src\/routes\/api\/character\/(?:mana|mana-awake|bond)\.ts|src\/data\/utils\/serialize-player\.ts|tools\/character_evolution(?:_route)?\.test\.cjs)$/,
         groups: ["quick:character", "quick:content"],
     },
     {

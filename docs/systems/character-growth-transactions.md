@@ -11,12 +11,42 @@
 
 1. 扣除免费/付费玛纳并累计 Active Mission 的玛纳消费事实；
 2. 扣除全部节点材料；
-3. 满板时更新 bond token 状态及首次进化；
-4. 插入本次学习的全部节点；
-5. 按写入后的节点状态校准角色觉醒解锁，并构造响应角色列表。
+3. 插入本次学习的全部节点；
+4. 仅在满板时更新 bond token 状态；
+5. 用“既有节点 + 本次节点”的最终状态计算并保存精确 `evolution_level`；
+6. 按写入后的节点状态校准角色觉醒解锁，并构造响应角色列表。
 
 节点唯一约束、外键、材料写入、角色状态或觉醒校准中的未捕获异常都会回滚上述写入。资源计算仍在事务前完成，
 但计算阶段不修改数据库。
+
+## CN 一板进化规则
+
+字段和算法来自 CN 1.8.1 客户端，不从节点 ID 白名单或角色名单推断：
+
+- `pinball/master/generated/ManaNodeValues.as` 把原始列 `field1=0/1` 解为 Ability/Episode；仅 Ability
+  继续把 `field5=0/1/2` 解为 Ability/ActionSkillLevel/ActionSkillEvolution，且只有 Ability effect
+  使用 `field6` 作为 `skill_slot_index`。
+- `GeneralManaNodeLogic.getAbilitySlotIndex()` 只有 Ability effect 返回 slot；
+  `isCharacterEvolutionRequisiteNodeForSkillEvolution()` 只有 ActionSkillEvolution effect 返回真。
+- `GeneralCharacterLogic.getEvolutionLevelForLearnedAbilities()` 先按 node ID 的 board digit 等于 `1` 过滤，
+  再检查每个实际存在的 ability slot 组是否至少学习一枚节点，以及 skill-evolution requisite 组是否至少学习
+  一枚节点；不存在 requisite 时第二项自动满足。
+- 两项满足时基础进化为 `1`。若存在 requisite，客户端只读取第一枚 requisite node 的 awake level；正数
+  `N` 返回 `1 + N`，因此可得到 `2`、`3` 及更高等级。
+
+对应证据位于工作区 `wf-1.8.1-cn-decompiled/scripts/pinball/` 下的
+`common/data/character/GeneralCharacterLogic.as:853-981`、
+`common/data/ability/GeneralManaNodeLogic.as:110-137,459-485`、`master/generated/ManaNodeValues.as`。
+二板节点、普通无关节点、满板状态和 bond token 均不参与进化计算。
+
+`mana_node.json` 继续保留原始 `field1/field5/field6` 形状，不为 19863 个节点复制派生字段。
+`src/content/mana-node-semantics.ts` 是 converter 和 runtime 共用的 fail-closed 解析器：Content Sync 会拒绝未知
+field，业务计算在读取当前 Content snapshot 时用同一解析器得到 slot 与 requisite 语义。
+
+服务端始终保存精确结果，允许修正过高或过低的历史值；但响应 `evolution` 只在新等级高于请求前持久值时返回
+`character_id/level/img_level`。这与 `CharacterLearnManaNodeProcessingFlow.as:90-108`、
+`CharacterAwakeManaNodeProcessingFlow.as:147-154` 在应用存档后比较前后等级，以及
+`EvolutionScene.as:167-199` 按新等级展示成长内容的客户端时序一致。
 
 ### `receive_bond_token`
 
@@ -34,8 +64,12 @@ token 行，与角色 `mana_board_index` 更新处于同一个事务；索引更
 
 ### `awake_mana_node`
 
-节点觉醒原有实现已经把玛纳、材料、Active Mission 玛纳消费事实和全部节点觉醒等级放在一个事务，本轮保持
-该边界，不重复改写。
+路由一次批量读取玩家 learned/awake 状态并复用目标角色部分，在内存中叠加本次目标等级；玛纳、材料、Active Mission 玛纳
+消费事实、节点 `awake_level` 与精确 `evolution_level` 在同一个 SQLite 事务中提交。事务后不再全量查询节点。
+
+若请求节点都已达到目标等级，路由仍会用当前节点状态重算进化：持久值一致时走只读响应；不一致时开启事务纠正
+数据库。`character_list` 立即返回相同的 `evolution_level/evolution_img_level`，等级上升时 `evolution` 返回正确的
+`level/img_level`；普通节点觉醒不会提高进化等级。
 
 ### `over_limit` 与 `bulk_over_limit`
 
@@ -55,6 +89,10 @@ token 行，与角色 `mana_board_index` 更新处于同一个事务；索引更
 - 开板索引 UPDATE。
 - 道具突破和批量突破中的角色 UPDATE；
 - EX 首抽与 EX 选择确认中的角色 UPDATE。
+
+`tools/character_evolution_route.test.cjs` 另用真实 Fastify + SQLite 覆盖未满板进化、节点 awake 后的 2/3 级结果、
+no-op 权威纠正、bond token 列表保持，以及在 evolution UPDATE 处注入晚失败后的节点、费用、bond/evolution
+整体回滚。
 
 这些请求都必须返回失败，且请求前后的玩家货币、材料、角色、bond token 和节点快照完全一致。该测试验证的是
 数据库原子性，不替代客户端对动画、提示、玛纳板显示与觉醒页面切换的人工验收。

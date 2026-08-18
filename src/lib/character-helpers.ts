@@ -7,7 +7,7 @@ import { getPlayerCharacterSync } from "../data/domains/character"
 import { getSession } from "../data/domains/session"
 import { resolvePlayerIdSync } from "../data/activeAccount"
 import { getPlayerItemSync } from "../data/domains/item"
-import { updatePlayerCharacterBondTokenSync, updatePlayerCharacterSync } from "../data/domains/character"
+import { updatePlayerCharacterBondTokenSync } from "../data/domains/character"
 import { generateDataHeaders } from "../utils"
 import { clientSerializeDate } from "../data/utils/date"
 
@@ -127,7 +127,10 @@ export function buildCharacterListEntry(
         create_time: clientSerializeDate(characterData.joinTime),
         update_time: clientSerializeDate(characterData.updateTime),
         join_time: clientSerializeDate(characterData.joinTime),
-        bond_token_list: [],
+        bond_token_list: characterData.bondTokenList.map(entry => ({
+            mana_board_index: entry.manaBoardIndex,
+            status: entry.status,
+        })),
         ...extras,
     }
 }
@@ -203,47 +206,37 @@ export function validateManaBoardAwakeRequest(
     return null
 }
 
-// ─── Bond token + evolution ───
+// ─── Bond token ───
 
 export interface BondTokenResult {
-    characterEvolutionLevel: number
-    evolutionData: Object
     bondTokenList: Object[]
+    bondTokenGranted: boolean
 }
 
 /**
- * Checks board completion and handles bond token grant + first evolution.
- * Used by both /learn_mana_node and /awake_mana_node.
- *
- * @param boardIndex — the mana board index being processed (1 for awake, currentManaNodeIndex for learn)
+ * Checks board completion and updates the independently earned bond token.
  */
-export function computeBondTokenAndEvolution(
+export function updateBondTokenForCompletedBoard(
     playerId: number,
     characterId: number,
     characterData: PlayerCharacter,
     boardIndex: number,
     isBoardComplete: boolean
 ): BondTokenResult {
-    let characterEvolutionLevel = characterData.evolutionLevel
-    let evolutionData: Object = []
-    const bondTokenList: Object[] = []
+    const bondTokenGranted = characterData.bondTokenList[boardIndex - 1]?.status === 0
+        && isBoardComplete
 
-    if (characterData.bondTokenList[boardIndex - 1]?.status === 0 && isBoardComplete) {
+    if (bondTokenGranted) {
         updatePlayerCharacterBondTokenSync(playerId, characterId, { manaBoardIndex: boardIndex, status: 1 })
-        for (const entry of characterData.bondTokenList) {
-            bondTokenList.push({
-                "mana_board_index": entry.manaBoardIndex,
-                "status": entry.manaBoardIndex === boardIndex ? 1 : entry.status,
-            })
-        }
-        if (characterEvolutionLevel === 0) {
-            characterEvolutionLevel = 1
-            updatePlayerCharacterSync(playerId, characterId, { evolutionLevel: characterEvolutionLevel })
-            evolutionData = { "character_id": characterId, "level": 1, "img_level": 1 }
-        }
     }
 
-    return { characterEvolutionLevel, evolutionData, bondTokenList }
+    return {
+        bondTokenGranted,
+        bondTokenList: characterData.bondTokenList.map(entry => ({
+            "mana_board_index": entry.manaBoardIndex,
+            "status": bondTokenGranted && entry.manaBoardIndex === boardIndex ? 1 : entry.status,
+        })),
+    }
 }
 
 /** Sends a standard-format mana-related response. */
