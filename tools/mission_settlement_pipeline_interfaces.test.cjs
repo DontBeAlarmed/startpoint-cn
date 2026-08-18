@@ -27,7 +27,7 @@ test("mission settlement keeps the three-stage API internal", () => {
     assert.equal(typeof write.settleMissionEvaluation, "function")
 })
 
-test("architecture status records Stage 5 and completed performance while keeping final review pending", () => {
+test("architecture status records completed Stage 5 and Task 33.6 review", () => {
     const architecture = fs.readFileSync(path.join(
         __dirname,
         "..",
@@ -40,7 +40,8 @@ test("architecture status records Stage 5 and completed performance while keepin
 
     assert.match(stage5, /状态：已实施。/)
     assert.doesNotMatch(stage5, /待阶段 4 完成后实施/)
-    assert.match(stage6, /状态：第 13、14 项已实施；第 15 项最终全量回归与最终双审待执行/)
-    assert.match(stage6, /任务引擎整体状态暂不宣告完成/)
+    assert.match(stage6, /状态：第 13～15 项已实施；Task 33\.6 已完成最终全量回归与独立审查/)
+    assert.match(stage6, /全量回归通过 398 个测试文件、0 失败、0 跳过/)
+    assert.doesNotMatch(stage6, /最终全量回归与最终双审待执行|任务引擎整体状态暂不宣告完成/)
     assert.doesNotMatch(stage6, /将本文状态从“设计”改为“已实现”/)
 })
