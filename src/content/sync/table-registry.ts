@@ -1,5 +1,8 @@
 import { deepFreeze } from "../deep-freeze"
-import { CHARACTER_LEVEL_SEED_TABLE } from "../character-level-seed"
+import {
+    CHARACTER_LEVEL_SEED_ASSET_PATH,
+    CHARACTER_LEVEL_SEED_TABLE,
+} from "../character-level-seed"
 import { ADDITIONAL_REWARD_PATHS } from "../converters/additional-reward"
 import { PERIODIC_REWARD_TABLE_SOURCES } from "../converters/periodic-reward"
 import {
@@ -160,7 +163,7 @@ const CHARACTER_MANA_ADMISSION_SOURCES = [
 ] as const
 
 const CHARACTER_MANA_ADMISSION_BUNDLED_SOURCES = [
-    `assets/${CHARACTER_LEVEL_SEED_TABLE}`,
+    CHARACTER_LEVEL_SEED_ASSET_PATH,
 ] as const
 
 const CHARACTER_MANA_ADMISSION_TABLES = [

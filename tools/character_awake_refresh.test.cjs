@@ -52,18 +52,17 @@ function testIndependentUnlockAndNodeStateAreMergedByMaximum() {
 }
 
 function testAwakeAuthorizationUsesIndependentUnlockState() {
-    const manaRouteSource = fs.readFileSync(
-        path.join(__dirname, "../src/routes/api/character/mana.ts"),
+    const awakeRouteSource = fs.readFileSync(
+        path.join(__dirname, "../src/routes/api/character/mana-awake.ts"),
         "utf8"
     )
-    const awakeRouteBlock = manaRouteSource.split('fastify.post("/awake_mana_node"')[1]
-    const authorizationBlock = awakeRouteBlock
-        .split("const unlockedAwakeMap =")[1]
-        .split("const unlockedAwakeLevel =")[0]
 
-    assert.equal(authorizationBlock.includes("getPlayerCharacterAwakeUnlocksSync(playerId)"), true)
-    assert.equal(authorizationBlock.includes("computeManaBoardAwakeFromNodes"), false)
-    assert.equal(authorizationBlock.includes("computeAwakeSummary"), false)
+    assert.match(
+        awakeRouteSource,
+        /const unlockedAwakeLevel = getPlayerCharacterAwakeUnlocksSync\(playerId\)/,
+    )
+    assert.doesNotMatch(awakeRouteSource, /computeManaBoardAwakeFromNodes/)
+    assert.doesNotMatch(awakeRouteSource, /computeAwakeSummary/)
 }
 
 function testLoadReconcilesFromComputedAwakeSummary() {

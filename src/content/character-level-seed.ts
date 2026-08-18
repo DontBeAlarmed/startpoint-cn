@@ -1,10 +1,15 @@
+import { createHash } from "node:crypto"
+import { inflateRawSync } from "node:zlib"
 import { canonicalJsonBuffer, sha256Object } from "./sync/canonical-json"
+import { convertOrderedMapJson } from "./converters/ordered-map-json"
 import {
     CHARACTER_LEVEL_KEYS,
     validateCharacterLevelCurve,
 } from "./character-level-table-validator"
 
 export const CHARACTER_LEVEL_SEED_TABLE = "content-seeds/character_level_apk_3_5.json"
+export const CHARACTER_LEVEL_SEED_ASSET_PATH =
+    "assets/content-seeds/character_level_apk_3_5.json"
 export const CHARACTER_LEVEL_BUNDLED_ARCHIVE_PATH =
     "production/android_bundle/23/a83b55daad153a95f8d5b66667b32e47f3dca2"
 export const CHARACTER_LEVEL_BUNDLED_BLOB_SHA256 =
@@ -44,6 +49,70 @@ function parseCurve(value: unknown, rarity: string): Record<string, number> {
     }
 }
 
+function parseSourceCurve(value: unknown, rarity: string): Record<string, number> {
+    const source = record(value, `source rarity ${rarity}`)
+    if (!exactKeys(source, CHARACTER_LEVEL_KEYS)) {
+        invalid(`source rarity ${rarity} must contain exactly levels 1 through 100`)
+    }
+    const expanded = Object.fromEntries(CHARACTER_LEVEL_KEYS.map(level => {
+        const row = source[level]
+        if (!Array.isArray(row)
+            || row.length !== 1
+            || !Array.isArray(row[0])
+            || row[0].length !== 1
+            || typeof row[0][0] !== "string") {
+            invalid(`source rarity ${rarity} level ${level} must contain one CSV value`)
+        }
+        if (!/^\d+$/.test(row[0][0])) {
+            invalid(`source rarity ${rarity} level ${level} must be a decimal integer`)
+        }
+        const value = Number(row[0][0])
+        if (!Number.isSafeInteger(value)) {
+            invalid(`source rarity ${rarity} level ${level} must be a safe integer`)
+        }
+        return [level, value]
+    }))
+    try {
+        return validateCharacterLevelCurve(expanded, `source rarity ${rarity} curve`)
+    } catch (error) {
+        invalid(error instanceof Error ? error.message : String(error))
+    }
+}
+
+export function parseCharacterLevelBundledSourceBlob(
+    sourceBlob: Buffer,
+): CharacterLevelSeedCurves {
+    if (!Buffer.isBuffer(sourceBlob)) invalid("source blob must be a Buffer")
+
+    let decoded: Buffer
+    try {
+        decoded = inflateRawSync(sourceBlob)
+    } catch (error) {
+        invalid(`source blob is not a raw-deflate orderedmap: ${error instanceof Error ? error.message : String(error)}`)
+    }
+
+    let extracted: unknown
+    try {
+        extracted = convertOrderedMapJson(decoded, 2)
+    } catch (error) {
+        invalid(`source blob orderedmap is invalid: ${error instanceof Error ? error.message : String(error)}`)
+    }
+    const source = record(extracted, "source character level table")
+    if (!exactKeys(source, ["3", "4", "5"])) {
+        invalid("source character level table must contain rarities 3 through 5")
+    }
+    return Object.fromEntries(["3", "4", "5"].map(rarity => (
+        [rarity, parseSourceCurve(source[rarity], rarity)]
+    )))
+}
+
+function sameCurves(
+    left: CharacterLevelSeedCurves,
+    right: CharacterLevelSeedCurves,
+): boolean {
+    return JSON.stringify(left) === JSON.stringify(right)
+}
+
 export function parseCharacterLevelBundledSeed(
     value: unknown,
     sourceBlobSha256 = CHARACTER_LEVEL_BUNDLED_BLOB_SHA256,
@@ -56,7 +125,6 @@ export function parseCharacterLevelBundledSeed(
     const source = record(seed.source, "source")
     if (!exactKeys(source, ["archiveLogicalPath", "blobSha256"])
         || source.archiveLogicalPath !== CHARACTER_LEVEL_BUNDLED_ARCHIVE_PATH
-        || source.blobSha256 !== CHARACTER_LEVEL_BUNDLED_BLOB_SHA256
         || source.blobSha256 !== sourceBlobSha256) {
         invalid("source metadata or blob SHA-256 is invalid")
     }
@@ -98,13 +166,24 @@ export function parseCharacterLevelBundledSeed(
 export function canonicalizeCharacterLevelBundledSeed(
     value: unknown,
     sourceBlobSha256 = CHARACTER_LEVEL_BUNDLED_BLOB_SHA256,
+    sourceBlob?: Buffer,
 ): Record<string, unknown> {
     const curves = parseCharacterLevelBundledSeed(value, sourceBlobSha256)
+    if (sourceBlob !== undefined) {
+        const actualBlobSha256 = createHash("sha256").update(sourceBlob).digest("hex")
+        if (actualBlobSha256 !== sourceBlobSha256) {
+            invalid("source blob SHA-256 does not match seed metadata")
+        }
+        const sourceCurves = parseCharacterLevelBundledSourceBlob(sourceBlob)
+        if (!sameCurves(curves, sourceCurves)) {
+            invalid("seed curves do not match source blob")
+        }
+    }
     return {
         schemaVersion: 1,
         source: {
             archiveLogicalPath: CHARACTER_LEVEL_BUNDLED_ARCHIVE_PATH,
-            blobSha256: CHARACTER_LEVEL_BUNDLED_BLOB_SHA256,
+            blobSha256: sourceBlobSha256,
         },
         summary: {
             rarities: [3, 4, 5],

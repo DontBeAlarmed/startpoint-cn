@@ -38,10 +38,21 @@ function main(argv) {
     try {
         const args = parseArguments(argv)
         const input = JSON.parse(fs.readFileSync(args["--input"], "utf8"))
-        const sourceBlobSha256 = args["--source-blob"] === undefined
+        const sourceBlobPath = args["--source-blob"]
+        if (args["--output"] !== undefined && sourceBlobPath === undefined) {
+            throw new Error("source blob is required when writing a canonical seed")
+        }
+        const sourceBlob = sourceBlobPath === undefined
             ? undefined
-            : blobSha256(args["--source-blob"])
-        const canonical = canonicalizeCharacterLevelBundledSeed(input, sourceBlobSha256)
+            : fs.readFileSync(sourceBlobPath)
+        const sourceBlobSha256 = sourceBlob === undefined
+            ? undefined
+            : blobSha256(sourceBlobPath)
+        const canonical = canonicalizeCharacterLevelBundledSeed(
+            input,
+            sourceBlobSha256,
+            sourceBlob,
+        )
         const bytes = canonicalJsonBuffer(canonical)
         if (args["--output"] === undefined) {
             process.stdout.write(bytes)
