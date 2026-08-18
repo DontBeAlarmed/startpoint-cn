@@ -19,6 +19,10 @@
 节点唯一约束、外键、材料写入、角色状态或觉醒校准中的未捕获异常都会回滚上述写入。资源计算仍在事务前完成，
 但计算阶段不修改数据库。
 
+事务内的觉醒解锁发布使用 `reconcileAwakeUnlockCharacterListStrict`，数据库异常必须继续抛给外层事务；其他需要兼容
+旧响应的路径仍通过 `reconcileAwakeUnlockCharacterList`（best-effort 兼容入口）记录异常并保留原角色列表。两种入口
+共享同一调和 core，不会因 strict 路径复制查询或开启额外事务。
+
 ## CN 一板进化规则
 
 字段和算法来自 CN 1.8.1 客户端，不从节点 ID 白名单或角色名单推断：

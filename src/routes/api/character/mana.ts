@@ -9,7 +9,7 @@ import { getDb } from "../../../data/db";
 import { incrementActiveMissionUsedManaCountSync } from "../../../data/domains/active_mission_counters"
 import { validateSessionAndPlayer, validateCharacterOwnership, computeManaDeduction, computeItemDeductions, buildCharacterListEntry, sendCharacterResponse, updateBondTokenForCompletedBoard } from "../../../lib/character-helpers";
 import { getMailArrivedSync } from "../../../lib/mail-notification";
-import { reconcileAwakeUnlockCharacterList } from "../../../lib/mission";
+import { reconcileAwakeUnlockCharacterListStrict } from "../../../lib/mission";
 import { isCharacterSecondManaBoardAvailable } from "../../../lib/mana-board-availability";
 import { buildCharacterEvolutionNodes, buildCharacterEvolutionResponse, computeCharacterEvolutionLevel } from "../../../lib/character-evolution";
 import { registerAwakeManaNodeRoute } from "./mana-awake";
@@ -126,7 +126,7 @@ const routes = async (fastify: FastifyInstance) => {
                     evolutionLevel: characterEvolutionLevel,
                 })
             }
-            const characterList = reconcileAwakeUnlockCharacterList(playerId, [
+            const characterList = reconcileAwakeUnlockCharacterListStrict(playerId, [
                 buildCharacterListEntry(characterId, characterData, {
                     evolution_level: characterEvolutionLevel,
                     evolution_img_level: characterEvolutionLevel,

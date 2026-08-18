@@ -87,7 +87,11 @@ export type { AwakeUnlockProgress, AwakeUnlockReconciliationResult } from "./awa
 export { reconcileAwakeUnlocks, reconcileAwakeUnlocksFromProgress } from "./awake-unlock"
 export type { CharacterAwakeBaseReadiness, CharacterAwakeEligibilityResolver } from "./awake-eligibility"
 export { createCharacterAwakeEligibilityResolver, getCharacterAwakeBaseReadiness, isCharacterAwakeBaseReady, isCharacterAwakeNewUnlockEligible } from "./awake-eligibility"
-export { reconcileAwakeUnlockCharacterList } from "./awake-unlock-response"
+export {
+    reconcileAwakeUnlockCharacterList,
+    reconcileAwakeUnlockCharacterListBestEffort,
+    reconcileAwakeUnlockCharacterListStrict,
+} from "./awake-unlock-response"
 
 // Degree helpers
 export { getTargetDegree } from "./computer-degree"

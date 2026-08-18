@@ -35,11 +35,13 @@ const { initializeDatabase } = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const {
     getPlayerCharacterSync,
+    insertDefaultPlayerCharacterSync,
     insertPlayerCharacterManaNodesSync,
     updatePlayerCharacterSync,
 } = require("../src/data/domains/character")
 const { upsertPlayerCharacterAwakeUnlockSync } = require("../src/data/domains/character_awake")
 const { getPlayerItemsSync, givePlayerItemSync } = require("../src/data/domains/item")
+const { updatePlayerCategoryMissionSync } = require("../src/data/domains/mission")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
@@ -48,9 +50,13 @@ const {
     getCharacterManaNodesSync,
     getManaNodeAwakeCost,
 } = require("../src/lib/assets")
+const { characterExpCaps } = require("../src/lib/character")
 const manaRoutes = require("../src/routes/api/character/mana").default
+const { getTimeOffset, setServerTime, setServerTimeOffset } = require("../src/utils")
 
 const CHARACTER_ID = 1
+const AWAKE_CHARACTER_ID = 341005
+const AWAKE_MISSION_ID = 3410054
 const SLOT_NODE_IDS = [2201, 2207, 2213]
 const SKILL_EVOLUTION_NODE_ID = 2219
 
@@ -77,27 +83,33 @@ function decode(response) {
     return unpack(Buffer.from(response.body, "base64")).data
 }
 
-function bondTokenList(playerId) {
+function bondTokenList(playerId, characterId = CHARACTER_ID) {
     return db.prepare(`
         SELECT mana_board_index, status
         FROM players_characters_bond_tokens
         WHERE player_id = ? AND character_id = ?
         ORDER BY mana_board_index
-    `).all(playerId, CHARACTER_ID)
+    `).all(playerId, characterId)
 }
 
-function routeState(playerId) {
+function routeState(playerId, characterId = CHARACTER_ID) {
     return {
         player: getPlayerSync(playerId),
-        character: getPlayerCharacterSync(playerId, CHARACTER_ID),
+        character: getPlayerCharacterSync(playerId, characterId),
         items: getPlayerItemsSync(playerId),
-        bonds: bondTokenList(playerId),
+        bonds: bondTokenList(playerId, characterId),
         nodes: db.prepare(`
             SELECT value, awake_level
             FROM players_characters_mana_nodes
             WHERE player_id = ? AND character_id = ?
             ORDER BY value
-        `).all(playerId, CHARACTER_ID),
+        `).all(playerId, characterId),
+        awakeUnlocks: db.prepare(`
+            SELECT character_id, board_index, awake_level
+            FROM players_character_awake_unlocks
+            WHERE player_id = ? AND character_id = ?
+            ORDER BY board_index
+        `).all(playerId, characterId),
         usedMana: db.prepare(`
             SELECT total_used_mana_count AS value
             FROM players_active_mission_counters
@@ -120,8 +132,8 @@ function seedBoardNodes(playerId, awakeLevels = {}) {
     return boardNodeIds
 }
 
-function grantLearnCost(playerId, nodeId) {
-    const node = getCharacterManaNodesSync(CHARACTER_ID, 1)[String(nodeId)]
+function grantLearnCost(playerId, nodeId, characterId = CHARACTER_ID) {
+    const node = getCharacterManaNodesSync(characterId, 1)[String(nodeId)]
     updatePlayerSync({ id: playerId, freeMana: node.manaCost, paidMana: 0 })
     for (const [itemId, amount] of Object.entries(node.items)) {
         givePlayerItemSync(playerId, itemId, amount)
@@ -234,6 +246,68 @@ test("learn_mana_node rolls back node, costs, bond, and evolution on a late fail
     })
     assert.equal(failedLearn.statusCode, 500)
     assert.deepEqual(routeState(learnRollback.playerId), beforeLearnRollback)
+})
+
+test("learn_mana_node rolls back all writes when awake unlock reconciliation fails", async () => {
+    const rejectedUnlock = await createPlayer(7)
+    insertDefaultPlayerCharacterSync(rejectedUnlock.playerId, AWAKE_CHARACTER_ID)
+    const boardNodeIds = Object.keys(getCharacterManaNodesSync(AWAKE_CHARACTER_ID, 1)).map(Number)
+    const finalNodeId = boardNodeIds.at(-1)
+    assert.notEqual(finalNodeId, undefined)
+    insertPlayerCharacterManaNodesSync(
+        rejectedUnlock.playerId,
+        AWAKE_CHARACTER_ID,
+        boardNodeIds.filter(nodeId => nodeId !== finalNodeId),
+    )
+    const rarity = getCharacterDataSync(AWAKE_CHARACTER_ID).rarity
+    updatePlayerCharacterSync(rejectedUnlock.playerId, AWAKE_CHARACTER_ID, {
+        exp: characterExpCaps[rarity][0],
+    })
+    updatePlayerCategoryMissionSync(
+        rejectedUnlock.playerId,
+        9,
+        AWAKE_MISSION_ID,
+        3,
+    )
+    grantLearnCost(rejectedUnlock.playerId, finalNodeId, AWAKE_CHARACTER_ID)
+
+    const previousTimeOffset = getTimeOffset()
+    setServerTime(new Date("2025-01-01T12:00:00.000Z"))
+    try {
+        const beforeRejectedUnlock = routeState(rejectedUnlock.playerId, AWAKE_CHARACTER_ID)
+        assert.deepEqual(beforeRejectedUnlock.awakeUnlocks, [])
+        db.exec(`
+            CREATE TRIGGER reject_learn_awake_unlock_insert
+            BEFORE INSERT ON players_character_awake_unlocks
+            WHEN NEW.player_id = ${rejectedUnlock.playerId}
+                AND NEW.character_id = ${AWAKE_CHARACTER_ID}
+            BEGIN SELECT RAISE(ABORT, 'forced awake unlock insert failure'); END;
+
+            CREATE TRIGGER reject_learn_awake_unlock_update
+            BEFORE UPDATE ON players_character_awake_unlocks
+            WHEN NEW.player_id = ${rejectedUnlock.playerId}
+                AND NEW.character_id = ${AWAKE_CHARACTER_ID}
+            BEGIN SELECT RAISE(ABORT, 'forced awake unlock update failure'); END;
+        `)
+        const failedLearn = await app.inject({
+            method: "POST",
+            url: "/mana/learn_mana_node",
+            payload: {
+                viewer_id: rejectedUnlock.viewerId,
+                character_id: AWAKE_CHARACTER_ID,
+                mana_node_multiplied_id_list: [finalNodeId],
+                api_count: 1,
+            },
+        })
+
+        assert.equal(failedLearn.statusCode, 500, failedLearn.body)
+        assert.deepEqual(
+            routeState(rejectedUnlock.playerId, AWAKE_CHARACTER_ID),
+            beforeRejectedUnlock,
+        )
+    } finally {
+        setServerTimeOffset(previousTimeOffset)
+    }
 })
 
 test("awake_mana_node persists and returns the skill requisite awake evolution", async () => {
