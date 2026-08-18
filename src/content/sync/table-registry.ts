@@ -1,4 +1,5 @@
 import { deepFreeze } from "../deep-freeze"
+import { CHARACTER_LEVEL_SEED_TABLE } from "../character-level-seed"
 import { ADDITIONAL_REWARD_PATHS } from "../converters/additional-reward"
 import { PERIODIC_REWARD_TABLE_SOURCES } from "../converters/periodic-reward"
 import {
@@ -159,7 +160,7 @@ const CHARACTER_MANA_ADMISSION_SOURCES = [
 ] as const
 
 const CHARACTER_MANA_ADMISSION_BUNDLED_SOURCES = [
-    "assets/content-seeds/character_level_apk_3_5.json",
+    `assets/${CHARACTER_LEVEL_SEED_TABLE}`,
 ] as const
 
 const CHARACTER_MANA_ADMISSION_TABLES = [
@@ -196,7 +197,7 @@ const ITEM_EQUIPMENT_TABLES = [
 
 const BUNDLED_TABLE_NAMES = [
     "cdndata/player_rank_full.json",
-    "content-seeds/character_level_apk_3_5.json",
+    CHARACTER_LEVEL_SEED_TABLE,
     "encyclopedia.json",
     "mission_event_battle_rules.json",
     "mission_event_quest_map.json",

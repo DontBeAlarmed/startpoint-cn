@@ -91,6 +91,18 @@ function expectCode(action, code) {
     ))
 }
 
+test("planner converts null and missing content or snapshot into stable validation errors", () => {
+    for (const input of [
+        null,
+        {},
+        { ...learn(), content: null },
+        { ...learn(), snapshot: null },
+    ]) {
+        expectCode(() => planLearnManaNodeMutation(input), "INVALID_REQUEST")
+    }
+    expectCode(() => planAwakeManaNodeMutation(null), "INVALID_REQUEST")
+})
+
 test("learn validates non-empty canonical unique ids and current content scope", () => {
     assert.equal(typeof planLearnManaNodeMutation, "function")
     for (const requestedNodeIds of [[], [0], [-1], [1.5], [Number.MAX_SAFE_INTEGER + 1], ["101"]]) {

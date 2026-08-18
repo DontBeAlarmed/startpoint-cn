@@ -17,6 +17,7 @@ let convertCharacterManaAdmissionTables
 let getCharacterLevelByExperience
 let parseCharacterLevelTable
 let parseLevelRequiredManaNodeTable
+let validateCharacterLevelTable
 try {
     ;({ convertCharacterManaAdmissionTables } = require(
         "../src/content/converters/character-mana-admission"
@@ -26,6 +27,9 @@ try {
         parseCharacterLevelTable,
         parseLevelRequiredManaNodeTable,
     } = require("../src/content/character-mana-admission"))
+    ;({ validateCharacterLevelTable } = require(
+        "../src/content/character-level-table-validator"
+    ))
 } catch (error) {
     if (error?.code !== "MODULE_NOT_FOUND") throw error
 }
@@ -36,6 +40,8 @@ const BUNDLED_ARCHIVE_PATH =
     "production/android_bundle/23/a83b55daad153a95f8d5b66667b32e47f3dca2"
 const BUNDLED_BLOB_SHA256 =
     "eb21a7fe67d9f58730235ce276d1421b26a14cb84e7d27fd35cb2e0cae2b3565"
+const TRACKED_SEED_PATH = "../assets/content-seeds/character_level_apk_3_5.json"
+const TRACKED_SEED = require(TRACKED_SEED_PATH)
 
 function flat(entries) {
     return serializeOrderedMap(entries.map(([key, row]) => ({ key, row: row.join(",") })))
@@ -89,7 +95,7 @@ function bundledSeedFixture() {
     }
 }
 
-function compatibility(seed = bundledSeedFixture()) {
+function compatibility(seed = TRACKED_SEED) {
     return { characterLevelBundledSeed: seed }
 }
 
@@ -128,7 +134,14 @@ test("converter parses Option levels and cumulative character experience", async
     })
     assert.deepEqual(Object.keys(output["character_level.json"]), ["1", "2", "3", "4", "5"])
     assert.deepEqual(output["character_level.json"]["1"], expandedCurve(curve(1)))
-    assert.deepEqual(output["character_level.json"]["5"], expandedCurve(curve(5)))
+    assert.deepEqual(
+        output["character_level.json"]["3"],
+        expandedCurve(TRACKED_SEED.curves["3"]),
+    )
+    assert.deepEqual(
+        output["character_level.json"]["5"],
+        expandedCurve(TRACKED_SEED.curves["5"]),
+    )
     assert.equal(Object.isFrozen(output["level_required_mana_node.json"]["3"].abilityLevels), true)
 })
 
@@ -239,10 +252,27 @@ test("bundled official curves derive exact levels at admission boundaries", () =
     assert.equal(typeof parseCharacterLevelTable, "function")
     assert.equal(typeof getCharacterLevelByExperience, "function")
     const table = parseCharacterLevelTable(require("../assets/character_level.json"))
+    assert.deepEqual(TRACKED_SEED.source, {
+        archiveLogicalPath: BUNDLED_ARCHIVE_PATH,
+        blobSha256: BUNDLED_BLOB_SHA256,
+    })
+    assert.equal(typeof validateCharacterLevelTable, "function")
+    assert.deepEqual(validateCharacterLevelTable(table), table)
+    assert.equal(
+        sha256Object(canonicalJsonBuffer(table)),
+        official.characterLevelSummary.fullTableDigest,
+    )
     for (const [rarityText, curveSummary] of Object.entries(
         official.characterLevelSummary.curves
     )) {
         const rarity = Number(rarityText)
+        if (rarity >= 3) {
+            assert.equal(
+                TRACKED_SEED.summary.curves[rarityText].digest,
+                curveSummary.digest,
+            )
+            assert.deepEqual(table[rarityText], expandedCurve(TRACKED_SEED.curves[rarityText]))
+        }
         for (const [levelText, totalExperience] of Object.entries(curveSummary.boundaryRows)) {
             const level = Number(levelText)
             assert.equal(getCharacterLevelByExperience(table, rarity, totalExperience), level)
@@ -256,6 +286,18 @@ test("bundled official curves derive exact levels at admission boundaries", () =
     }
     assert.notEqual(table["3"]["80"], table["4"]["80"])
     assert.notEqual(table["4"]["90"], table["5"]["90"])
+    assert.deepEqual(
+        [table["3"]["80"], table["3"]["90"], table["3"]["100"]],
+        [125223, 216633, 308043],
+    )
+    assert.deepEqual(
+        [table["4"]["80"], table["4"]["90"], table["4"]["100"]],
+        [139190, 240800, 342410],
+    )
+    assert.deepEqual(
+        [table["5"]["80"], table["5"]["90"], table["5"]["100"]],
+        [153988, 266988, 379988],
+    )
 })
 
 test("runtime level requirement parser fails closed for unknown and damaged content", () => {
@@ -277,6 +319,20 @@ test("runtime level requirement parser fails closed for unknown and damaged cont
     delete full["5"]["100"]
     assert.throws(
         () => parseCharacterLevelTable(full),
+        /exactly levels 1 through 100/i,
+    )
+})
+
+test("converter and runtime share the exact character level curve validator", () => {
+    assert.equal(typeof validateCharacterLevelTable, "function")
+    const malformed = structuredClone(require("../assets/character_level.json"))
+    delete malformed["5"]["100"]
+    assert.throws(
+        () => validateCharacterLevelTable(malformed),
+        /exactly levels 1 through 100/i,
+    )
+    assert.throws(
+        () => parseCharacterLevelTable(malformed),
         /exactly levels 1 through 100/i,
     )
 })

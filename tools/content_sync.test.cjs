@@ -325,7 +325,7 @@ function inMemoryArchiveIndex(logicalEntries, reads, beforeRead = async () => {}
     }
 }
 
-function defaultBuilderContext(archiveIndex) {
+function defaultBuilderContext(archiveIndex, definitions = TABLE_SOURCES) {
     const scan = fakeScan({ cdnRoot: "/unused-cdn" })
     return {
         projectRoot,
@@ -336,7 +336,7 @@ function defaultBuilderContext(archiveIndex) {
         scan,
         catalog: fakeCatalog(scan.targetVersion),
         archiveIndex,
-        definitions: TABLE_SOURCES,
+        definitions,
     }
 }
 
@@ -381,10 +381,49 @@ test("orderedmap serializer loads as pure CJS without ts-node startup", () => {
     assert.ok(elapsedMs < 2_500, `pure CJS require took ${elapsedMs}ms`)
 })
 
-test("default release builder closes all registry tables and runs each CDN converter once", async () => {
-    const { createDefaultContentTableBuilder } = require(
+test("release builder derives the character seed importer path from the current definition", () => {
+    const { deriveCharacterManaAdmissionSeedTableName } = require(
         "../src/content/sync/release-builder"
     )
+    const oldSeedName = "content-seeds/character_level_apk_3_5.json"
+    const renamedSeedName = "content-seeds/character_level_apk_3_5-renamed.json"
+    const renamedDefinitions = TABLE_SOURCES
+        .filter(definition => definition.converterId === "character-mana-admission")
+        .map(definition => ({
+            ...definition,
+            bundledSources: [`assets/${renamedSeedName}`],
+            manifestSources: [...definition.sourceOrderedMaps, `assets/${renamedSeedName}`],
+        }))
+    assert.equal(
+        deriveCharacterManaAdmissionSeedTableName(renamedDefinitions),
+        renamedSeedName,
+    )
+    assert.equal(
+        deriveCharacterManaAdmissionSeedTableName(TABLE_SOURCES),
+        oldSeedName,
+    )
+    assert.throws(
+        () => deriveCharacterManaAdmissionSeedTableName([
+            ...renamedDefinitions,
+            { ...renamedDefinitions[0], bundledSources: ["assets/content-seeds/other.json"] },
+        ]),
+        /exactly one shared bundled seed source/i,
+    )
+    assert.deepEqual(
+        renamedDefinitions[0].manifestSources,
+        [...renamedDefinitions[0].sourceOrderedMaps, `assets/${renamedSeedName}`],
+    )
+    assert.notEqual(renamedSeedName, oldSeedName)
+})
+
+test("default release builder closes all registry tables and runs each CDN converter once", async () => {
+    const {
+        createDefaultContentTableBuilder,
+        deriveCharacterManaAdmissionSeedTableName,
+    } = require(
+        "../src/content/sync/release-builder"
+    )
+    const characterSeedTableName = deriveCharacterManaAdmissionSeedTableName(TABLE_SOURCES)
     const reads = []
     const logicalEntries = new Map([
         ["master/character/character.orderedmap", serializeOrderedMap([])],
@@ -441,7 +480,7 @@ test("default release builder closes all registry tables and runs each CDN conve
             converterCalls.characterManaAdmission++
             assert.deepEqual(compatibility, {
                 characterLevelBundledSeed: {
-                    imported: "content-seeds/character_level_apk_3_5.json",
+                    imported: characterSeedTableName,
                 },
             })
             return converterOutput("character-mana-admission")

@@ -94,6 +94,16 @@ export interface ValidatedMutationInput {
 }
 
 export function validateMutationInput(input: BaseManaNodeMutationInput): ValidatedMutationInput {
+    if (input.content === null
+        || typeof input.content !== "object"
+        || Array.isArray(input.content)) {
+        fail("INVALID_REQUEST", "content is required")
+    }
+    if (input.snapshot === null
+        || typeof input.snapshot !== "object"
+        || Array.isArray(input.snapshot)) {
+        fail("INVALID_REQUEST", "snapshot is required")
+    }
     for (const [subject, value] of [
         ["character id", input.characterId],
         ["board id", input.boardId],

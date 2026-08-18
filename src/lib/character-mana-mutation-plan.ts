@@ -29,6 +29,16 @@ interface ResourceSimulation {
     readonly totalItems: Record<string, number>
 }
 
+function requireMutationInput(value: unknown): BaseManaNodeMutationInput {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) {
+        throw new ManaNodeMutationValidationError(
+            "INVALID_REQUEST",
+            "mutation input must be an object",
+        )
+    }
+    return value as BaseManaNodeMutationInput
+}
+
 function orderedRecord(values: Readonly<Record<string, number>>): Record<string, number> {
     return Object.fromEntries(Object.entries(values).sort((left, right) => (
         Number(left[0]) - Number(right[0])
@@ -117,7 +127,7 @@ function finishPlan(
 export function planLearnManaNodeMutation(
     input: LearnManaNodeMutationInput,
 ): ManaNodeMutationPlan {
-    const state = baseState(input)
+    const state = baseState(requireMutationInput(input))
     const updates: Array<{ nodeId: number; awakeLevel: number }> = []
     const entries: Array<{ multiplied_id: number; awake_level: number }> = []
     for (const nodeId of state.requestedNodeIds) {
@@ -137,13 +147,15 @@ export function planLearnManaNodeMutation(
 export function planAwakeManaNodeMutation(
     input: AwakeManaNodeMutationInput,
 ): ManaNodeMutationPlan {
-    if (!Number.isSafeInteger(input.targetAwakeLevel) || input.targetAwakeLevel <= 0) {
+    const normalizedInput = requireMutationInput(input) as AwakeManaNodeMutationInput
+    if (!Number.isSafeInteger(normalizedInput.targetAwakeLevel)
+        || normalizedInput.targetAwakeLevel <= 0) {
         throw new ManaNodeMutationValidationError(
             "INVALID_AWAKE_TARGET",
             "target awake level must be a positive safe integer",
         )
     }
-    const state = baseState(input)
+    const state = baseState(normalizedInput)
     const updates: Array<{ nodeId: number; awakeLevel: number }> = []
     const entries: Array<{ multiplied_id: number; awake_level: number }> = []
     for (const nodeId of state.requestedNodeIds) {
@@ -152,22 +164,22 @@ export function planAwakeManaNodeMutation(
         }
         assertParent(nodeId, state.parents[String(nodeId)], state.learned)
         const current = state.awakeLevels.get(nodeId) as number
-        if (current > input.targetAwakeLevel) {
+        if (current > normalizedInput.targetAwakeLevel) {
             throw new ManaNodeMutationValidationError(
                 "INVALID_AWAKE_TARGET",
                 `node ${nodeId} is already above target awake level`,
             )
         }
-        if (current < input.targetAwakeLevel) {
+        if (current < normalizedInput.targetAwakeLevel) {
             charge(
                 state.resources,
-                validateAwakeCost(input.awakeCosts?.[String(nodeId)], nodeId),
+                validateAwakeCost(normalizedInput.awakeCosts?.[String(nodeId)], nodeId),
                 nodeId,
             )
-            state.awakeLevels.set(nodeId, input.targetAwakeLevel)
-            updates.push({ nodeId, awakeLevel: input.targetAwakeLevel })
+            state.awakeLevels.set(nodeId, normalizedInput.targetAwakeLevel)
+            updates.push({ nodeId, awakeLevel: normalizedInput.targetAwakeLevel })
         }
-        entries.push({ multiplied_id: nodeId, awake_level: input.targetAwakeLevel })
+        entries.push({ multiplied_id: nodeId, awake_level: normalizedInput.targetAwakeLevel })
     }
     return finishPlan("awake", state, updates, entries)
 }

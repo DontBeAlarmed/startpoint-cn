@@ -118,6 +118,25 @@ const SUPPORTED_CONVERTER_IDS = new Set([
     "server-json",
 ])
 
+export function deriveCharacterManaAdmissionSeedTableName(
+    definitions: readonly Pick<TableSourceDefinition, "converterId" | "bundledSources">[],
+): string {
+    const sources = definitions
+        .filter(definition => definition.converterId === "character-mana-admission")
+        .flatMap(definition => definition.bundledSources)
+    const uniqueSources = [...new Set(sources)]
+    if (uniqueSources.length !== 1) {
+        throw new Error(
+            "character-mana-admission must declare exactly one shared bundled seed source",
+        )
+    }
+    const source = uniqueSources[0]
+    if (!source.startsWith("assets/") || source === "assets/") {
+        throw new Error("character-mana-admission bundled seed source must be under assets/")
+    }
+    return source.slice("assets/".length)
+}
+
 export interface DefaultContentTableBuilderDependencies {
     readonly convertAdditionalRewards?: (
         reader: AdditionalRewardSourceReader,
@@ -510,13 +529,14 @@ export function createDefaultContentTableBuilder(
                 )
             }
             if (converterIds.has("character-mana-admission")) {
+                const characterLevelSeedTableName = deriveCharacterManaAdmissionSeedTableName(
+                    context.definitions,
+                )
                 addConverterOutput(
                     values,
                     "character-mana-admission",
                     await characterManaAdmissionConverter(reader, {
-                        characterLevelBundledSeed: await readBundled(
-                            "content-seeds/character_level_apk_3_5.json",
-                        ),
+                        characterLevelBundledSeed: await readBundled(characterLevelSeedTableName),
                     }),
                 )
             }

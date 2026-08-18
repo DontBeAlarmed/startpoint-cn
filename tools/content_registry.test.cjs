@@ -527,6 +527,10 @@ test("registry derives character mana admission tables as one authoritative clos
         assert.equal(entry.converterVersion, 2, tableName)
         assert.equal(entry.outputShapeVersion, 2, tableName)
     }
+    assert.deepEqual(
+        findTableSource("content-seeds/character_level_apk_3_5.json").sourceOrderedMaps,
+        [CHARACTER_LEVEL_BUNDLED_SEED],
+    )
 })
 
 test("registry derives item and equipment runtime tables from official OrderedMaps", () => {

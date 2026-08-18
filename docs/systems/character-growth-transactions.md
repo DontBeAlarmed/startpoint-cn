@@ -19,6 +19,19 @@ Gate Task 29a 新增三项只读权威内容能力，尚未改变 `learn_mana_no
   各 1..100 级。每条曲线从累计经验 0 开始并严格递增，运行时用完整阈值二分得到精确等级，不能复用
   `characterExpCaps` 中只列每 5 级上限的兼容数据。缺 rarity、断档、非 canonical key、非安全整数、摘要漂移
   或非单调曲线一律拒绝。
+- seed 更新只允许离线、人工提供已提取的 JSON 和源 blob；不读取 `wf-assets-cn`、APK 路径或运行机器上的
+  固定绝对路径。校验/规范化命令为：
+
+  ```bash
+  node tools/character-level-seed.cjs \
+    --input <EXTRACTED_SEED_JSON> \
+    --source-blob <EXTRACTED_SOURCE_BLOB> \
+    --output assets/content-seeds/character_level_apk_3_5.json
+  ```
+
+  工具固定检查 archive logical path 与源 blob SHA-256，再检查 rarity 3/4/5 各 100 个连续等级、累计经验
+  单调性、Lv80/90/100 摘要和 canonical per-curve digest；任一来源、摘要或曲线漂移都不生成输出。提交前还要
+  用生成后的完整 `assets/character_level.json` 校验固定 full-table digest，防止 seed 与 generated asset 一起被错误修改。
 - `master/generated/mana_board.orderedmap` 的原始 bundled/release 形状保持不变。运行时只建立小型
   `character -> board -> multiplied_id -> parent` 索引；parent 必须是 `(None)` 或同角色同板节点，缺失、跨板、
   自引用与重复节点都会 fail closed，不向 19,811 行 bundled 表写入派生字段。

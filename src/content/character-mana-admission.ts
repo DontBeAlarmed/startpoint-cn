@@ -1,4 +1,5 @@
 import { deepFreeze } from "./deep-freeze"
+import { validateCharacterLevelTable } from "./character-level-table-validator"
 import type { LevelRequiredManaNodeRow } from "./converters/character-mana-admission"
 
 export type LevelRequiredManaNodeTable = Readonly<Record<string, LevelRequiredManaNodeRow>>
@@ -9,8 +10,6 @@ export interface ManaNodeLevelFields {
     readonly field5: string
     readonly field6: string
 }
-
-const POSITIVE_INTEGER = /^[1-9]\d*$/
 
 function record(value: unknown, subject: string): Record<string, unknown> {
     if (value === null || typeof value !== "object" || Array.isArray(value)) {
@@ -28,13 +27,6 @@ function positiveSafe(value: unknown, subject: string): number {
 
 function optionLevel(value: unknown, subject: string): number | null {
     return value === null ? null : positiveSafe(value, subject)
-}
-
-function canonicalKey(value: string, subject: string): number {
-    if (!POSITIVE_INTEGER.test(value)) throw new Error(`${subject} must be canonical`)
-    const parsed = Number(value)
-    if (!Number.isSafeInteger(parsed)) throw new Error(`${subject} must be safe`)
-    return parsed
 }
 
 function exactKeys(value: Record<string, unknown>, expected: readonly string[], subject: string): void {
@@ -72,45 +64,7 @@ export function parseLevelRequiredManaNodeTable(value: unknown): LevelRequiredMa
 }
 
 export function parseCharacterLevelTable(value: unknown): CharacterLevelTable {
-    const source = record(value, "character level table")
-    if (Object.keys(source).sort().join(",") !== "1,2,3,4,5") {
-        throw new Error("character level rarity keys must be 1 through 5")
-    }
-    const result: Record<string, Record<string, number>> = {}
-    for (const [rarityText, rawCurve] of Object.entries(source)) {
-        const rarity = canonicalKey(rarityText, "character level rarity")
-        if (rarity > 5) throw new Error(`character level has unknown rarity ${rarity}`)
-        const curve = record(rawCurve, `character level rarity ${rarity}`)
-        if (Object.keys(curve).length !== 100
-            || Array.from({ length: 100 }, (_, index) => String(index + 1))
-                .some(level => !Object.prototype.hasOwnProperty.call(curve, level))) {
-            throw new Error(
-                `character level rarity ${rarity} must contain exactly levels 1 through 100`,
-            )
-        }
-        const resultCurve: Record<string, number> = {}
-        let expectedLevel = 1
-        let previous = -1
-        for (const [levelText, rawTotal] of Object.entries(curve)) {
-            const level = canonicalKey(levelText, `character level rarity ${rarity} level`)
-            if (level !== expectedLevel) {
-                throw new Error(`character level rarity ${rarity} levels must be contiguous from 1`)
-            }
-            if (typeof rawTotal !== "number"
-                || !Number.isSafeInteger(rawTotal)
-                || rawTotal < 0) {
-                throw new Error(`character level rarity ${rarity} level ${level} is invalid`)
-            }
-            if ((level === 1 && rawTotal !== 0) || (level > 1 && rawTotal <= previous)) {
-                throw new Error(`character level rarity ${rarity} must be strictly increasing from zero`)
-            }
-            resultCurve[levelText] = rawTotal
-            expectedLevel += 1
-            previous = rawTotal
-        }
-        result[rarityText] = resultCurve
-    }
-    return deepFreeze(result)
+    return deepFreeze(validateCharacterLevelTable(value))
 }
 
 export function getCharacterLevelByExperience(

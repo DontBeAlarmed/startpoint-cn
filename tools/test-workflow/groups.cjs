@@ -166,6 +166,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/character_content.test.cjs",
             "tools/content_character_converter.test.cjs",
             "tools/content_character_mana_admission_converter.test.cjs",
+            "tools/character_level_seed.test.cjs",
             "tools/content_character_election_converter.test.cjs",
             "tools/content_asset_audit.test.cjs",
             "tools/content_additional_reward_converter.test.cjs",

@@ -30,6 +30,27 @@ function parent(value: unknown, subject: string): number | null {
     return value === "(None)" ? null : id(value, subject)
 }
 
+function rejectParentCycles(
+    characterKey: string,
+    boardKey: string,
+    nodes: Readonly<Record<string, number | null>>,
+): void {
+    const visiting = new Set<string>()
+    const visited = new Set<string>()
+    const visit = (nodeKey: string): void => {
+        if (visited.has(nodeKey)) return
+        if (visiting.has(nodeKey)) {
+            invalid(`character ${characterKey} board ${boardKey} contains a parent cycle at node ${nodeKey}`)
+        }
+        visiting.add(nodeKey)
+        const parentId = nodes[nodeKey]
+        if (parentId !== null) visit(String(parentId))
+        visiting.delete(nodeKey)
+        visited.add(nodeKey)
+    }
+    for (const nodeKey of Object.keys(nodes)) visit(nodeKey)
+}
+
 export function buildManaBoardParentIndex(value: unknown): ManaBoardParentIndex {
     const source = asRecord(value, "table")
     const result: Record<string, Record<string, Record<string, number | null>>> = {}
@@ -61,6 +82,7 @@ export function buildManaBoardParentIndex(value: unknown): ManaBoardParentIndex 
                     invalid(`node ${nodeKey} parent ${parentId} must exist on the same board`)
                 }
             }
+            rejectParentCycles(characterKey, boardKey, resultNodes)
             resultBoards[boardKey] = resultNodes
         }
         result[characterKey] = resultBoards

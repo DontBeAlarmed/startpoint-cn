@@ -54,6 +54,17 @@ test("parent index rejects missing, cross-board, and self parent references", ()
     assert.throws(() => buildManaBoardParentIndex(self), /must not reference itself/i)
 })
 
+test("parent index rejects a cycle anywhere on a character board", () => {
+    const cyclic = validTable()
+    cyclic["10"]["1"]["1"] = row(101, 102)
+    cyclic["10"]["1"]["2"] = row(102, 101)
+
+    assert.throws(
+        () => buildManaBoardParentIndex(cyclic),
+        /cycle/i,
+    )
+})
+
 test("parent index rejects non-canonical keys, node ids, and malformed rows", () => {
     for (const source of [
         { "01": validTable()["10"] },
