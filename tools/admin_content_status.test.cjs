@@ -45,6 +45,8 @@ function snapshotWithPatches() {
                 assetVersion: "1.4.56",
                 generatorVersion: 3,
                 releaseDigest: `sha256:${"d".repeat(64)}`,
+                contentDigest: `sha256:${"e".repeat(64)}`,
+                multiBattleContentDigest: `sha256:${"f".repeat(64)}`,
             }),
         },
     }
@@ -97,6 +99,8 @@ test("builds active overlay status from the pinned content snapshot", () => {
         assetVersion: "1.4.56",
         generatorVersion: 3,
         releaseDigest: `sha256:${"d".repeat(64)}`,
+        contentDigest: `sha256:${"e".repeat(64)}`,
+        multiBattleContentDigest: `sha256:${"f".repeat(64)}`,
     })
 })
 
@@ -110,6 +114,8 @@ test("reports an empty overlay without inventing patch state", () => {
         assetVersion: "1.4.54",
         generatorVersion: 3,
         releaseDigest: null,
+        contentDigest: `sha256:${"1".repeat(64)}`,
+        multiBattleContentDigest: `sha256:${"2".repeat(64)}`,
     })
 
     const result = buildAdminContentStatus({
@@ -127,4 +133,6 @@ test("reports an empty overlay without inventing patch state", () => {
     assert.equal(result.storage.directoryPresent, false)
     assert.equal(result.storage.archiveCount, 1)
     assert.equal(result.contentRelease.source, "bundled")
+    assert.equal(result.contentRelease.contentDigest, `sha256:${"1".repeat(64)}`)
+    assert.equal(result.contentRelease.multiBattleContentDigest, `sha256:${"2".repeat(64)}`)
 })

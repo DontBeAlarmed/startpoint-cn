@@ -39,6 +39,19 @@ export function getActivePlayerId(): number | null {
     return readState().activePlayerId;
 }
 
+export interface AdminPlayerSelectionState {
+    readonly activePlayerId: number | null
+    readonly defaultPlayers: Readonly<Record<number, number>>
+}
+
+export function getAdminPlayerSelectionState(): AdminPlayerSelectionState {
+    const state = readState()
+    return Object.freeze({
+        activePlayerId: state.activePlayerId,
+        defaultPlayers: Object.freeze({ ...state.defaultPlayers }),
+    })
+}
+
 export function setActivePlayerId(id: number | null): void {
     const state = readState();
     state.activePlayerId = id;

@@ -101,6 +101,14 @@ try {
 
     for (const { item } of originalRarities) delete item.rarity
     for (const item of injectedGachaItems) delete item.rarity
+    productionContentSnapshotProvider.snapshot = Object.freeze({
+        cdn: Object.freeze({ targetVersion: "test-release-without-gacha-rarity" }),
+        repository: repository(
+            Object.freeze({ "121069": injectedCharacter }),
+            Object.freeze({ "121069": Object.freeze([Object.freeze(injectedTextRow)]) }),
+            Object.freeze({ "900002": Object.freeze(injectedGacha) }),
+        ),
+    })
     const releaseTimeline = buildShortUpCharacterGachaTimeline(
         new Date("2021-10-18T14:00:00.000Z"),
     )
@@ -119,6 +127,34 @@ try {
     assert.strictEqual(releaseCharacter.rarity, injectedCharacter.rarity)
     assert.strictEqual(releaseCharacter.element, injectedCharacter.element)
     assert.strictEqual(getCharacterDataSync(121069), injectedCharacter)
+
+    let tableReads = 0
+    const cachedRepository = Object.freeze({
+        info: () => Object.freeze({
+            source: "release",
+            assetVersion: "cache-test",
+            generatorVersion: 1,
+            releaseDigest: null,
+        }),
+        table: (tableName) => {
+            tableReads++
+            if (tableName === "gacha.json") return Object.freeze({ "900002": Object.freeze(injectedGacha) })
+            if (tableName === "character.json") return Object.freeze({ "121069": injectedCharacter })
+            if (tableName === "cdndata/character_text.json") {
+                return Object.freeze({ "121069": Object.freeze([Object.freeze(injectedTextRow)]) })
+            }
+            throw new Error(`unexpected content table: ${tableName}`)
+        },
+    })
+    productionContentSnapshotProvider.snapshot = Object.freeze({
+        cdn: Object.freeze({ targetVersion: "cache-test" }),
+        repository: cachedRepository,
+    })
+
+    const cachedFirst = buildShortUpCharacterGachaTimeline(new Date("2021-10-18T14:00:00.000Z"))
+    const cachedSecond = buildShortUpCharacterGachaTimeline(new Date("2021-10-18T15:00:00.000Z"))
+    assert.strictEqual(tableReads, 3, "同一个固定 Repository 只应构建一次静态千里眼数据")
+    assert.notStrictEqual(cachedFirst.currentTime, cachedSecond.currentTime)
 } finally {
     for (const { item, hasRarity, rarity } of originalRarities) {
         if (hasRarity) item.rarity = rarity

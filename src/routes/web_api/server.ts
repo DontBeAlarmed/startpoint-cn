@@ -5,9 +5,13 @@ import { validateServerTimePackage } from "../../runtime/server-time/store";
 import type { ServerTimePackage, ServerTimeSnapshot } from "../../runtime/server-time/types";
 import { deleteAccountSync, getAccountPlayersSync, getAllAccountsSync } from "../../data/domains/account"
 import { deletePlayerSync, getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } from "../../data/domains/player"
+import {
+    getAllAdminPlayerSummariesSync,
+    type AdminPlayerSummary,
+} from "../../data/domains/admin-player"
 import { getAllDeviceBindingsSync, updateDeviceBindingNameSync } from "../../data/domains/session"
 import { getPlayerCharactersSync } from "../../data/domains/character"
-import { getActivePlayerId, setActivePlayerId, saveAccountDefaultPlayer, getAccountDefaultPlayer } from "../../data/activeAccount";
+import { getActivePlayerId, getAdminPlayerSelectionState, setActivePlayerId, saveAccountDefaultPlayer, getAccountDefaultPlayer } from "../../data/activeAccount";
 import { saveDefaultSaveTemplate, loadDefaultSaveTemplate, clearDefaultSaveTemplate, getDefaultSaveMeta } from "../../data/defaultSave";
 import { getEffectiveVersion } from "../../lib/version";
 import { buildShortUpCharacterGachaTimeline } from "../../lib/admin-clairvoyance";
@@ -194,7 +198,14 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
 
     fastify.get("/accounts", async (_request: FastifyRequest, reply: FastifyReply) => {
         const accounts = getAllAccountsSync()
-        const activePlayerId = getActivePlayerId()
+        const selection = getAdminPlayerSelectionState()
+        const activePlayerId = selection.activePlayerId
+        const playersByAccount = new Map<number, AdminPlayerSummary[]>()
+        for (const player of getAllAdminPlayerSummariesSync()) {
+            const players = playersByAccount.get(player.accountId) ?? []
+            players.push(player)
+            playersByAccount.set(player.accountId, players)
+        }
         const devicesByAccount = new Map<number, Array<{ deviceId: number; name: string | null }>>()
         for (const binding of getAllDeviceBindingsSync()) {
             const devices = devicesByAccount.get(binding.account_id) ?? []
@@ -202,12 +213,13 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
             devicesByAccount.set(binding.account_id, devices)
         }
         const result = accounts.map(acc => {
-            const playerIds = getAccountPlayersSync(acc.id)
-            const savedDefaultPid = getAccountDefaultPlayer(acc.id)
+            const players = playersByAccount.get(acc.id) ?? []
+            const playerIds = players.map(player => player.id)
+            const savedDefaultPid = selection.defaultPlayers[acc.id]
             const defaultPid = savedDefaultPid && playerIds.includes(savedDefaultPid)
                 ? savedDefaultPid
                 : (playerIds[0] ?? null)
-            const defaultPlayer = defaultPid ? getPlayerSync(defaultPid) : null
+            const defaultPlayer = players.find(player => player.id === defaultPid)
             return {
                 id: acc.id,
                 saveCount: playerIds.length,
@@ -215,15 +227,14 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
                 defaultPlayerName: defaultPlayer?.name ?? null,
                 activePlayerId,
                 devices: devicesByAccount.get(acc.id) ?? [],
-                players: playerIds.map(pid => {
-                    const player = getPlayerSync(pid)
+                players: players.map(player => {
                     return {
-                        id: pid,
+                        id: player.id,
                         accountId: acc.id,
-                        name: player?.name ?? `存档 #${pid}`,
-                        degreeId: player?.degreeId ?? 0,
-                        isDefault: defaultPid === pid,
-                        isActive: activePlayerId === pid,
+                        name: player.name,
+                        degreeId: player.degreeId,
+                        isDefault: defaultPid === player.id,
+                        isActive: activePlayerId === player.id,
                     }
                 }),
                 playerIds

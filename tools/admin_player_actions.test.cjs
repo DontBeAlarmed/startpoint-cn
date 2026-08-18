@@ -5,6 +5,7 @@ const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
+const Sqlite = require("better-sqlite3")
 
 require("ts-node/register/transpile-only")
 
@@ -21,6 +22,7 @@ const playerRoutes = require("../src/routes/web_api/player").default
 const serverRoutes = require("../src/routes/web_api/server").default
 
 let database
+const sqlStatements = []
 
 function createAccount(label) {
     return insertAccountSync({
@@ -59,7 +61,11 @@ async function createAdminServer(t) {
 }
 
 test.before(() => {
-    database = data.initializeDatabase()
+    database = data.initializeDatabase({
+        databaseFactory: databasePath => new Sqlite(databasePath, {
+            verbose: sql => sqlStatements.push(sql),
+        }),
+    })
 })
 
 test.after(() => {
@@ -148,6 +154,22 @@ test("accounts expose device bindings and device names can be changed", async t 
     })
     assert.equal(missing.statusCode, 404)
     assert.deepEqual(missing.json(), { error: "Device binding not found" })
+})
+
+test("accounts list reads all player summaries in one query", async t => {
+    const first = createAccount("account-list-batch-first")
+    const second = createAccount("account-list-batch-second")
+    insertDefaultPlayerSync(first.id)
+    insertDefaultPlayerSync(first.id)
+    insertDefaultPlayerSync(second.id)
+    sqlStatements.length = 0
+    const app = await createAdminServer(t)
+
+    const response = await app.inject({ method: "GET", url: "/api/server/accounts" })
+
+    assert.equal(response.statusCode, 200)
+    const playerReads = sqlStatements.filter(sql => /\bFROM\s+players\b/i.test(sql))
+    assert.equal(playerReads.length, 1, playerReads.join("\n"))
 })
 
 test("retired SSR-only admin actions are no longer registered", async t => {

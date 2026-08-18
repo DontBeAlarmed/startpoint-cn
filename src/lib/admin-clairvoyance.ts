@@ -1,4 +1,8 @@
-import { getContentSnapshot } from "../content/runtime/content-snapshot"
+import { deepFreeze } from "../content/deep-freeze"
+import {
+    getContentSnapshot,
+    type ReadonlyContentRepository,
+} from "../content/runtime/content-snapshot"
 
 const SHORT_TERM_MAX_DAYS = 60
 const CHARACTER_GACHA_TYPE = 0
@@ -69,6 +73,13 @@ export interface ClairvoyanceTimeline {
     timeline: ClairvoyanceGacha[]
     searchIndex: ClairvoyanceSearchRow[]
 }
+
+interface StaticClairvoyanceTimeline {
+    readonly timeline: ClairvoyanceGacha[]
+    readonly searchIndex: ClairvoyanceSearchRow[]
+}
+
+const staticTimelineByRepository = new WeakMap<ReadonlyContentRepository, StaticClairvoyanceTimeline>()
 
 function parseCdnDate(value: string): Date {
     return new Date(`${value.replace(" ", "T")}+08:00`)
@@ -169,8 +180,7 @@ function buildSearchIndex(timeline: ClairvoyanceGacha[]): ClairvoyanceSearchRow[
     return [...byCharacter.values()].sort((a, b) => a.characterId - b.characterId)
 }
 
-export function buildShortUpCharacterGachaTimeline(now: Date = new Date()): ClairvoyanceTimeline {
-    const repository = getContentSnapshot().repository
+function buildStaticTimeline(repository: ReadonlyContentRepository): StaticClairvoyanceTimeline {
     const gachas = repository.table<Record<string, RawGacha>>("gacha.json")
     const characterMeta = repository.table<Record<string, CharacterMeta>>("character.json")
     const characterText = repository.table<CharacterTextRows>("cdndata/character_text.json")
@@ -178,15 +188,29 @@ export function buildShortUpCharacterGachaTimeline(now: Date = new Date()): Clai
         .map(([id, rawGacha]) => toGacha(id, rawGacha, characterMeta, characterText))
         .filter((gacha): gacha is ClairvoyanceGacha => gacha !== null)
         .sort((a, b) => a.startTime.localeCompare(b.startTime) || a.id - b.id)
+    return deepFreeze({ timeline, searchIndex: buildSearchIndex(timeline) })
+}
+
+function getStaticTimeline(repository: ReadonlyContentRepository): StaticClairvoyanceTimeline {
+    const cached = staticTimelineByRepository.get(repository)
+    if (cached !== undefined) return cached
+    const built = buildStaticTimeline(repository)
+    staticTimelineByRepository.set(repository, built)
+    return built
+}
+
+export function buildShortUpCharacterGachaTimeline(now: Date = new Date()): ClairvoyanceTimeline {
+    const repository = getContentSnapshot().repository
+    const staticTimeline = getStaticTimeline(repository)
     const nowMs = now.getTime()
     return {
         scope: "short-up-character-gacha",
         currentTime: now.toISOString(),
-        current: timeline.filter((gacha) =>
-            parseCdnDate(gacha.startDate).getTime() <= nowMs
-            && parseCdnDate(gacha.endDate).getTime() >= nowMs
+        current: staticTimeline.timeline.filter((gacha) =>
+            Date.parse(gacha.startTime) <= nowMs
+            && Date.parse(gacha.endTime) >= nowMs
         ),
-        timeline,
-        searchIndex: buildSearchIndex(timeline),
+        timeline: staticTimeline.timeline,
+        searchIndex: staticTimeline.searchIndex,
     }
 }

@@ -66,6 +66,8 @@ interface ServerStatus {
             assetVersion: string
             generatorVersion: number
             releaseDigest: string | null
+            contentDigest: string
+            multiBattleContentDigest: string
         }
         configuredDir: string
         directoryPresent: boolean
@@ -372,7 +374,7 @@ export default function Dashboard() {
                                         </Space>
                                     </Descriptions.Item>
                                     <Descriptions.Item label="完整包版本">{status.cdn.baseline.fullVersion}</Descriptions.Item>
-                                    <Descriptions.Item label="归档">
+                                    <Descriptions.Item label="Snapshot 声明归档">
                                         {status.cdn.storage.archiveCount} 个 ZIP / {formatBytes(status.cdn.storage.archiveBytes)}
                                     </Descriptions.Item>
                                     <Descriptions.Item label="内容来源">
@@ -383,13 +385,23 @@ export default function Dashboard() {
                                             {status.cdn.contentRelease.releaseDigest?.slice(0, 23) ?? "bundled"}
                                         </Typography.Text>
                                     </Descriptions.Item>
+                                    <Descriptions.Item label="业务内容摘要">
+                                        <Typography.Text code copyable={{ text: status.cdn.contentRelease.contentDigest }}>
+                                            {status.cdn.contentRelease.contentDigest.slice(0, 23)}
+                                        </Typography.Text>
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="多人内容摘要">
+                                        <Typography.Text code copyable={{ text: status.cdn.contentRelease.multiBattleContentDigest }}>
+                                            {status.cdn.contentRelease.multiBattleContentDigest.slice(0, 23)}
+                                        </Typography.Text>
+                                    </Descriptions.Item>
                                 </Descriptions>
                                 <Divider style={{ margin: "4px 0" }} />
                                 <Space direction="vertical" size="small" className="admin-stack">
-                                    <Typography.Text strong>已加载补丁</Typography.Text>
+                                    <Typography.Text strong>Snapshot 中已声明补丁</Typography.Text>
                                     <Space wrap>
                                         <Tag color={status.cdn.extension.runtimeEnabled ? "green" : "default"}>
-                                            {status.cdn.extension.runtimeEnabled ? "Overlay 已启用" : "无补丁"}
+                                            {status.cdn.extension.runtimeEnabled ? "Snapshot 含 Overlay" : "无补丁"}
                                         </Tag>
                                         <Tag>归档 {status.cdn.extension.activePatchArchiveCount}</Tag>
                                         {status.cdn.extension.versions.map(version => (
