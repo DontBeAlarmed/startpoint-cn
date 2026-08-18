@@ -187,6 +187,7 @@ const routes = async (fastify: FastifyInstance) => {
             console.log(`[MANA] open_mana_board: auto-creating bond tokens, missing=${missingBondTokenIndices.join(",")} boardCount=${boardCount}`)
         }
 
+        const characterUpdate = { manaBoardIndex, updateTime: new Date() }
         getDb().transaction(() => {
             for (const index of missingBondTokenIndices) {
                 insertPlayerCharacterBondTokenSync(playerId, characterId, {
@@ -194,11 +195,20 @@ const routes = async (fastify: FastifyInstance) => {
                     status: 0,
                 })
             }
-            updatePlayerCharacterSync(playerId, characterId, { manaBoardIndex })
+            updatePlayerCharacterSync(playerId, characterId, characterUpdate)
         })()
 
-        const finalCharacterData = getPlayerCharacterSync(playerId, characterId)
-        if (!finalCharacterData) throw new Error(`opened mana board character ${characterId} is missing`)
+        const finalCharacterData = {
+            ...characterData,
+            ...characterUpdate,
+            bondTokenList: [
+                ...characterData.bondTokenList,
+                ...missingBondTokenIndices.map(index => ({
+                    manaBoardIndex: index,
+                    status: 0,
+                })),
+            ],
+        }
 
         const missionSettlement = settleMissionCategories(playerId, [1], getServerDate())
         const responseData = {
