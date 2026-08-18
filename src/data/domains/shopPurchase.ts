@@ -18,6 +18,25 @@ export interface ShopPurchasePeriodCounts {
     readonly total: number
 }
 
+export interface ShopPurchaseQuery {
+    readonly shopType: number
+    readonly shopItemId: number
+    readonly keys: ShopPurchasePeriodKeys
+}
+
+export function getShopPurchaseQueryKey(query: ShopPurchaseQuery): string {
+    return `${query.shopType}:${query.shopItemId}:${query.keys.daily}:${query.keys.monthly}`
+}
+
+function getCounterKey(
+    shopType: number,
+    shopItemId: number,
+    periodType: "daily" | "monthly" | "total",
+    periodKey: string,
+): string {
+    return `${shopType}:${shopItemId}:${periodType}:${periodKey}`
+}
+
 function getCounterSync(
     playerId: number,
     shopType: number,
@@ -48,6 +67,50 @@ export function getPlayerShopPurchaseCountsByTypeSync(
         monthly: getCounterSync(playerId, shopType, shopItemId, "monthly", keys.monthly) ?? 0,
         total: exactTotal ?? legacyTotal ?? 0,
     }
+}
+
+export function getPlayerShopPurchaseCountsByTypeBulkSync(
+    playerId: number,
+    queries: readonly ShopPurchaseQuery[],
+): ReadonlyMap<string, ShopPurchasePeriodCounts> {
+    if (queries.length === 0) return new Map()
+
+    const rows = getDb().prepare(`
+        SELECT shop_type, shop_item_id, period_type, period_key, count
+        FROM players_shop_purchase_counters
+        WHERE player_id = ?
+    `).all(playerId) as Array<{
+        shop_type: number
+        shop_item_id: number
+        period_type: "daily" | "monthly" | "total"
+        period_key: string
+        count: number
+    }>
+    const counters = new Map<string, number>()
+    for (const row of rows) {
+        counters.set(
+            getCounterKey(row.shop_type, row.shop_item_id, row.period_type, row.period_key),
+            row.count,
+        )
+    }
+
+    return new Map(queries.map(query => {
+        const exactTotal = counters.get(
+            getCounterKey(query.shopType, query.shopItemId, "total", ""),
+        )
+        const legacyTotal = exactTotal === undefined
+            ? counters.get(getCounterKey(-1, query.shopItemId, "total", ""))
+            : undefined
+        return [getShopPurchaseQueryKey(query), {
+            daily: counters.get(
+                getCounterKey(query.shopType, query.shopItemId, "daily", query.keys.daily),
+            ) ?? 0,
+            monthly: counters.get(
+                getCounterKey(query.shopType, query.shopItemId, "monthly", query.keys.monthly),
+            ) ?? 0,
+            total: exactTotal ?? legacyTotal ?? 0,
+        }]
+    }))
 }
 
 export function addPlayerShopPurchaseCountsByTypeSync(

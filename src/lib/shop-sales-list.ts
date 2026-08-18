@@ -1,6 +1,9 @@
 import CDN_GENERAL_SHOP_WHITELIST from "../../assets/cdn_general_shop_whitelist.json"
 import {
+    getPlayerShopPurchaseCountsByTypeBulkSync,
     getPlayerShopPurchaseCountsByTypeSync,
+    getShopPurchaseQueryKey,
+    ShopPurchaseQuery,
 } from "../data/domains/shopPurchase"
 import {
     calculateShopStockQuantity,
@@ -13,6 +16,7 @@ const GENERAL_SHOP_CDN_KEYS: Set<number> = new Set(CDN_GENERAL_SHOP_WHITELIST)
 
 export interface ShopSalesListDependencies {
     getPurchaseCounts?: typeof getPlayerShopPurchaseCountsByTypeSync
+    getPurchaseCountsBulk?: typeof getPlayerShopPurchaseCountsByTypeBulkSync
     getEquipmentEnhancementLevel?: (playerId: number, equipmentId: number) => number
 }
 
@@ -92,10 +96,17 @@ export function buildShopSalesListSync(
     dependencies: ShopSalesListDependencies = {},
 ): ShopSalesListBuildResult {
     const getPurchaseCounts = dependencies.getPurchaseCounts ?? getPlayerShopPurchaseCountsByTypeSync
+    const getPurchaseCountsBulk = dependencies.getPurchaseCountsBulk
     const getEquipmentEnhancementLevel = dependencies.getEquipmentEnhancementLevel ?? (() => -1)
     const salesList: Object[] = []
     let filteredGeneralCount = 0
     const enhancementItems: ShopItems = {}
+    const pendingSales: Array<{
+        itemId: number
+        item: ShopItem
+        shopType: number
+        query: ShopPurchaseQuery
+    }> = []
 
     for (const [shopTypeText, items] of Object.entries(input.itemsByType)) {
         const shopType = Number(shopTypeText)
@@ -119,10 +130,19 @@ export function buildShopSalesListSync(
             }
 
             const periodKeys = getShopPurchasePeriodKeys(input.nowMs, item.specifiedMonths)
-            const counts = getPurchaseCounts(input.playerId, shopType, Number(itemId), periodKeys)
+            pendingSales.push({
+                itemId: Number(itemId),
+                item,
+                shopType,
+                query: { shopType, shopItemId: Number(itemId), keys: periodKeys },
+            })
+        }
+    }
+
+    const appendSale = ({ itemId, item, shopType, query }: typeof pendingSales[number], counts: ReturnType<typeof getPurchaseCounts>) => {
             const stockQuantity = calculateShopStockQuantity(item, counts)
             salesList.push({
-                shop_item_id: Number(itemId),
+                shop_item_id: itemId,
                 stock_quantity: stockQuantity,
                 today_purchase_num: item.dailyStock === undefined ? 0 : counts.daily,
                 this_month_purchase_num: item.monthlyStock === undefined ? null : counts.monthly,
@@ -134,6 +154,31 @@ export function buildShopSalesListSync(
                 },
                 shop_type: shopType,
             })
+    }
+
+    if (getPurchaseCountsBulk !== undefined) {
+        const countsByKey = getPurchaseCountsBulk(
+            input.playerId,
+            pendingSales.map(sale => sale.query),
+        )
+        for (const sale of pendingSales) {
+            const counts = countsByKey.get(getShopPurchaseQueryKey(sale.query))
+            if (counts === undefined) {
+                throw new Error(`Missing bulk purchase counts for shop item ${sale.itemId}.`)
+            }
+            appendSale(sale, counts)
+        }
+    } else {
+        for (const sale of pendingSales) {
+            appendSale(
+                sale,
+                getPurchaseCounts(
+                    input.playerId,
+                    sale.shopType,
+                    sale.itemId,
+                    sale.query.keys,
+                ),
+            )
         }
     }
 

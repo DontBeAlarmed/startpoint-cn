@@ -25,7 +25,9 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const {
     addPlayerShopPurchaseCountsByTypeSync,
+    getPlayerShopPurchaseCountsByTypeBulkSync,
     getPlayerShopPurchaseCountsByTypeSync,
+    getShopPurchaseQueryKey,
 } = require("../src/data/domains/shopPurchase")
 
 initializeDatabase()
@@ -61,6 +63,16 @@ assert.deepEqual(getPlayerShopPurchaseCountsByTypeSync(playerId, 7, 300001, firs
     monthly: 0,
     total: 0,
 }, "跨商店重名商品必须隔离")
+const bulkCounts = getPlayerShopPurchaseCountsByTypeBulkSync(playerId, [
+    { shopType: 4, shopItemId: 300001, keys: first },
+    { shopType: 7, shopItemId: 300001, keys: first },
+])
+assert.deepEqual(bulkCounts.get(getShopPurchaseQueryKey({
+    shopType: 4, shopItemId: 300001, keys: first,
+})), { daily: 2, monthly: 2, total: 2 })
+assert.deepEqual(bulkCounts.get(getShopPurchaseQueryKey({
+    shopType: 7, shopItemId: 300001, keys: first,
+})), { daily: 0, monthly: 0, total: 0 })
 
 db.prepare(`
     INSERT INTO players_shop_purchases (player_id, shop_item_id, count)

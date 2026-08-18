@@ -3,6 +3,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
     addPlayerShopPurchaseCountsByTypeSync,
+    getPlayerShopPurchaseCountsByTypeBulkSync,
     getPlayerShopPurchaseCountsByTypeSync,
 } from "../../data/domains/shopPurchase"
 import {
@@ -417,6 +418,7 @@ const routes = async (fastify: FastifyInstance) => {
                 isShopItemVisibleForCampaign(item, shopType, campaignLineups)
             ),
         }, {
+            getPurchaseCountsBulk: getPlayerShopPurchaseCountsByTypeBulkSync,
             getEquipmentEnhancementLevel: (ownerId, equipmentId) => (
                 playerOwnsEquipmentSync(ownerId, equipmentId)
                     ? (getPlayerEquipmentSync(ownerId, equipmentId)?.enhancementLevel ?? 0)
