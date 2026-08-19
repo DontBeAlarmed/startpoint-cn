@@ -5,8 +5,16 @@ import type {
     PlannedActiveMissionDefinition,
     PlannedActiveMissionRewardStage,
     PlannedActiveMissionTargetRequirement,
+    ActiveMissionEvaluatorKind,
 } from "./active-plan"
-import { parseActiveMissionQuestRange } from "./active-quest-range"
+import {
+    ACTIVE_MISSION_FACT_KINDS,
+    type ActiveMissionFactKind,
+} from "./active-fact-kinds"
+import {
+    parseActiveMissionQuestRange,
+    type ActiveMissionQuestRange,
+} from "./active-quest-range"
 import {
     parseActiveMissionTableRows,
     parseActiveMissionTableValues,
@@ -14,6 +22,92 @@ import {
 
 const CN_MASTER_OFFSET_MILLISECONDS = 8 * 60 * 60 * 1000
 const NONE_VALUES = new Set<unknown>([undefined, null, "", "(None)"])
+
+const SUPPORTED_PATTERNS: ReadonlySet<number> = new Set([
+    0, 4, 5, 7, 8, 9, 13, 14, 16, 17, 21, 23, 26, 34, 35, 36,
+    39, 45, 46, 48, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 70,
+    71, 72, 73, 78, 83, 84, 89, 90, 91,
+])
+
+function factKindsForPattern(
+    pattern: number,
+    questRange: ActiveMissionQuestRange | null,
+): readonly ActiveMissionFactKind[] {
+    if (!SUPPORTED_PATTERNS.has(pattern)) return Object.freeze([])
+
+    const kinds = new Set<ActiveMissionFactKind>()
+    const add = (...values: ActiveMissionFactKind[]) => values.forEach(value => kinds.add(value))
+    switch (pattern) {
+        case 0:
+        case 39:
+            add("player")
+            break
+        case 4:
+        case 5:
+        case 8:
+        case 9:
+        case 21:
+        case 61:
+            add("characters")
+            break
+        case 7:
+        case 48:
+        case 62:
+            add("manaNodes")
+            break
+        case 14:
+        case 16:
+        case 17:
+        case 26:
+            add("battleCounters")
+            break
+        case 34:
+        case 36:
+            add("equipment")
+            break
+        case 35:
+            add("party")
+            break
+        case 45:
+        case 64:
+        case 84:
+            add("shopPurchases")
+            break
+        case 46:
+        case 58:
+        case 59:
+        case 60:
+        case 63:
+        case 65:
+        case 78:
+        case 83:
+            add("counters")
+            break
+        case 70:
+            if (questRange === null) add("characterClear")
+            break
+        case 71:
+        case 72:
+        case 73:
+            add("conditionalBattleFacts")
+            break
+        case 89:
+        case 90:
+        case 91:
+            add("missionSpecificBattleFacts")
+            break
+        default:
+            break
+    }
+    return Object.freeze([...kinds].sort((left, right) => (
+        ACTIVE_MISSION_FACT_KINDS.indexOf(left) - ACTIVE_MISSION_FACT_KINDS.indexOf(right)
+    )))
+}
+
+function evaluatorForPattern(pattern: number): ActiveMissionEvaluatorKind | null {
+    if (!SUPPORTED_PATTERNS.has(pattern)) return null
+    return pattern === 13 ? "dependency" : "static"
+}
 
 export interface ActiveMissionPlanSource {
     readonly definitions: readonly PlannedActiveMissionDefinition[]
@@ -294,18 +388,21 @@ export function buildActiveMissionPlanSource(
                     `Missing ${rewardTableName} ID ${entry.id} referenced by ${missionTableName} ID ${entry.id}.`,
                 )
             }
+            const questRange = parseActiveMissionQuestRange(entry.row)
             definitions.push(Object.freeze({
                 missionId: entry.id,
                 pattern,
                 mission,
                 row: entry.row,
                 rewardStages: missionRewardStages,
-                questRange: parseActiveMissionQuestRange(entry.row),
+                questRange,
                 targetMissionRequirements: buildTargetMissionRequirements(
                     pattern,
                     entry.row,
                     rewardStages,
                 ),
+                factKinds: factKindsForPattern(pattern, questRange),
+                evaluator: evaluatorForPattern(pattern),
             }))
         } catch (error) {
             throw contextualError(missionTableName, entry.id, error)

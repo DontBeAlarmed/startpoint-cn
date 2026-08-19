@@ -1205,7 +1205,7 @@ test("keeps isolated test groups parallel while infrastructure groups stay seria
     assert.equal(TEST_GROUPS["integration:database"].execution, "serial")
     assert.equal(TEST_GROUPS["integration:event"].execution, "parallel")
     assert.equal(TEST_GROUPS["integration:mission"].execution, "parallel")
-    assert.equal(TEST_GROUPS["integration:mission"].timeoutMs, 60_000)
+    assert.equal(TEST_GROUPS["integration:mission"].timeoutMs, 120_000)
     assert.equal(TEST_GROUPS["integration:party"].execution, "parallel")
     assert.equal(TEST_GROUPS["integration:quest"].execution, "parallel")
     assert.equal(TEST_GROUPS["integration:quest"].timeoutMs, 60_000)
@@ -1316,6 +1316,8 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/active_mission_plan.test.cjs",
         "tools/active_mission_evaluator_equivalence.test.cjs",
         "tools/active_mission_counter_storage.test.cjs",
+        "tools/active_mission_fact_session.test.cjs",
+        "tools/active_mission_fixed_point.test.cjs",
         "tools/party_action_counter.test.cjs",
         "tools/expod_inject_exp_route.test.cjs",
         "tools/active_mission_reconciliation.test.cjs",

@@ -302,6 +302,7 @@ export function evaluateActiveMissionFact(
     state: ActiveMissionFactState,
     activeMissions: Readonly<Record<string, ActiveMissionFactProgressState>>,
 ): number | null {
+    if (definition.evaluator === null) return null
     if (definition.pattern === PATTERN_QUEST_CLEAR) {
         if (definition.questRange === null) return null
         return resolveActiveMissionQuestRangeIds(definition.questRange)

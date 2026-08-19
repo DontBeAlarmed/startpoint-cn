@@ -24,6 +24,21 @@ import { getPlayerCharacterAwakeUnlockRecordSync } from "../domains/character_aw
 import { reconcileInterruptedStartTutorialSync } from "../../lib/start-tutorial-state"
 export { getDefaultPlayerData } from "./default-player"
 
+export interface GetClientSerializedDataOptions extends SerializePlayerDataOptions {
+    readonly activeMissionsOverride?: ReturnType<typeof getPlayerActiveMissionsSync>
+}
+
+function restoreActiveMissionPayloadShape(
+    missions: ReturnType<typeof getPlayerActiveMissionsSync>,
+): ReturnType<typeof getPlayerActiveMissionsSync> {
+    return Object.fromEntries(Object.entries(missions).map(([missionId, mission]) => [missionId, {
+        ...mission,
+        stages: !Array.isArray(mission.stages) && Object.keys(mission.stages).length === 0
+            ? []
+            : mission.stages,
+    }]))
+}
+
 /**
  * Takes a playerID and returns all of the necessary data for the game client.
  * 
@@ -33,7 +48,7 @@ export { getDefaultPlayerData } from "./default-player"
  */
 export function getClientSerializedData(
     playerId: number,
-    options: SerializePlayerDataOptions
+    options: GetClientSerializedDataOptions
 ): ClientPlayerData | null {
 
     reconcileInterruptedStartTutorialSync(playerId)
@@ -80,7 +95,9 @@ export function getClientSerializedData(
         drawnQuestList: getPlayerDrawnQuestsSync(playerId),
         periodicRewardPointList: getPlayerPeriodicRewardPointsSync(playerId),
         allActiveMissionList: filterToActiveMissions(
-            getPlayerActiveMissionsSync(playerId),
+            options.activeMissionsOverride
+                ? restoreActiveMissionPayloadShape(options.activeMissionsOverride)
+                : getPlayerActiveMissionsSync(playerId),
             getContentSnapshot().repository,
         ),
         boxGachaList: getPlayerBoxGachasSync(playerId),

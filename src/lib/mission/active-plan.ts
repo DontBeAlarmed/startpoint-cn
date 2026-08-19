@@ -8,6 +8,7 @@ import {
     type ActiveMissionPlanSource,
 } from "./active-plan-builder"
 import type { ActiveMissionQuestRange } from "./active-quest-range"
+import type { ActiveMissionFactKind } from "./active-fact-kinds"
 
 export {
     parseActiveMissionDefinition,
@@ -16,6 +17,8 @@ export {
     parseJstDateTime,
 } from "./active-plan-builder"
 export type { ActiveMissionQuestRange } from "./active-quest-range"
+export { ACTIVE_MISSION_FACT_KINDS } from "./active-fact-kinds"
+export type { ActiveMissionFactKind } from "./active-fact-kinds"
 
 const UNSUPPORTED_ACTIVE_MISSION_IDS: readonly number[] = Object.freeze([
     21030,
@@ -30,6 +33,8 @@ const UNSUPPORTED_ACTIVE_MISSION_IDS: readonly number[] = Object.freeze([
     25022,
 ])
 const EMPTY_DEFINITIONS: readonly PlannedActiveMissionDefinition[] = Object.freeze([])
+
+export type ActiveMissionEvaluatorKind = "static" | "dependency"
 
 export interface ActiveMissionStageReference {
     readonly missionId: number
@@ -88,6 +93,8 @@ export interface PlannedActiveMissionDefinition {
     readonly rewardStages: readonly PlannedActiveMissionRewardStage[]
     readonly questRange: ActiveMissionQuestRange | null
     readonly targetMissionRequirements: readonly PlannedActiveMissionTargetRequirement[]
+    readonly factKinds: readonly ActiveMissionFactKind[]
+    readonly evaluator: ActiveMissionEvaluatorKind | null
 }
 
 export interface ActiveMissionPlan {

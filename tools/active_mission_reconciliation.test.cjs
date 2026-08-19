@@ -418,6 +418,15 @@ async function main() {
         assert.equal(data.all_active_mission_list[90004].progress, 4)
         assert.equal(data.all_active_mission_list[90005].progress, 25)
         assert.equal(data.all_active_mission_list[90009].progress, 1)
+        const expectedAllActiveMissionList = Object.fromEntries(
+            Object.entries(getPlayerActiveMissionsSync(playerId))
+                .filter(([missionId]) => Object.hasOwn(tables["mission_active.json"], missionId)),
+        )
+        assert.deepEqual(
+            data.all_active_mission_list,
+            expectedAllActiveMissionList,
+            "load override must preserve database active mission payload shapes",
+        )
         assert.deepEqual(
             data.active_mission_list,
             awakeBefore,

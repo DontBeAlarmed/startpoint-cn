@@ -74,7 +74,11 @@ export {
     settleActiveMissionProgress,
 } from "./active-core"
 export type { ActiveMissionEventEligibilityContext, ReconcileActiveMissionFactsInput } from "./active-reconciliation"
-export { reconcileActiveMissionFacts, resolveActiveMissionQuestIds } from "./active-reconciliation"
+export {
+    reconcileActiveMissionFacts,
+    reconcileActiveMissionFactsWithResult,
+    resolveActiveMissionQuestIds,
+} from "./active-reconciliation"
 
 // Character queries
 export { getCharacterStoryQuestIds, getCharacterIdFromMission } from "./character-queries"

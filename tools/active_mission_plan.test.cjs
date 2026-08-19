@@ -190,4 +190,47 @@ const recoveredPlan = getActiveMissionPlan(retryRepository)
 assert.notEqual(recoveredPlan, first)
 assert.equal(recoveredPlan.getMission(11010).pattern, first.getMission(11010).pattern)
 
+for (const definition of first.getDefinitionsByPattern(70)) {
+    assert.deepEqual(
+        definition.factKinds,
+        definition.questRange === null ? ["characterClear"] : [],
+        `pattern 70 mission ${definition.missionId} must only load its actual fact domain`,
+    )
+}
+
+const expectedFactKinds = new Map([
+    [0, ["player"]], [4, ["characters"]], [5, ["characters"]], [7, ["manaNodes"]],
+    [8, ["characters"]], [9, ["characters"]], [13, []], [14, ["battleCounters"]],
+    [16, ["battleCounters"]], [17, ["battleCounters"]], [21, ["characters"]], [23, []],
+    [26, ["battleCounters"]], [34, ["equipment"]], [35, ["party"]], [36, ["equipment"]],
+    [39, ["player"]], [45, ["shopPurchases"]], [46, ["counters"]], [48, ["manaNodes"]],
+    [57, []], [58, ["counters"]], [59, ["counters"]], [60, ["counters"]],
+    [61, ["characters"]], [62, ["manaNodes"]], [63, ["counters"]], [64, ["shopPurchases"]],
+    [65, ["counters"]], [66, []], [71, ["conditionalBattleFacts"]],
+    [72, ["conditionalBattleFacts"]], [73, ["conditionalBattleFacts"]], [78, ["counters"]],
+    [83, ["counters"]], [84, ["shopPurchases"]], [89, ["missionSpecificBattleFacts"]],
+    [90, ["missionSpecificBattleFacts"]], [91, ["missionSpecificBattleFacts"]],
+])
+for (const definition of first.definitions) {
+    const factKinds = definition.pattern === 70
+        ? definition.questRange === null ? ["characterClear"] : []
+        : expectedFactKinds.get(definition.pattern)
+    assert.deepEqual(definition.factKinds, factKinds ?? [], `pattern ${definition.pattern}`)
+    assert.equal(
+        definition.evaluator,
+        factKinds === undefined ? null : definition.pattern === 13 ? "dependency" : "static",
+        `pattern ${definition.pattern}`,
+    )
+}
+
+const unknownPatternTables = {
+    "mission_active.json": clone(bundledMissions),
+    "mission_active_event.json": clone(bundledEvents),
+    "mission_active_reward.json": clone(bundledRewards),
+}
+unknownPatternTables["mission_active.json"]["11010"][0][29] = "999"
+const unknownPatternPlan = getActiveMissionPlan(repository(unknownPatternTables))
+assert.deepEqual(unknownPatternPlan.getMission(11010).factKinds, [])
+assert.equal(unknownPatternPlan.getMission(11010).evaluator, null)
+
 console.log("active mission plan tests passed")

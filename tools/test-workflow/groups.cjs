@@ -341,7 +341,7 @@ const TEST_GROUPS = Object.freeze({
     },
     "integration:mission": {
         execution: "parallel",
-        timeoutMs: 60_000,
+        timeoutMs: 120_000,
         tests: [
             "tools/character_awake_battle_tracker.test.cjs",
             "tools/character_awake_facts.test.cjs",
@@ -409,6 +409,8 @@ const TEST_GROUPS = Object.freeze({
             "tools/active_mission_plan.test.cjs",
             "tools/active_mission_evaluator_equivalence.test.cjs",
             "tools/active_mission_counter_storage.test.cjs",
+            "tools/active_mission_fact_session.test.cjs",
+            "tools/active_mission_fixed_point.test.cjs",
             "tools/party_action_counter.test.cjs",
             "tools/expod_inject_exp_route.test.cjs",
             "tools/active_mission_reconciliation.test.cjs",

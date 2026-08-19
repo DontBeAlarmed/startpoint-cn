@@ -24,7 +24,7 @@ import {
 } from "../../content/cdn/asset-mode";
 import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
-import { reconcileActiveMissionFacts } from "../../lib/mission/active-reconciliation";
+import { reconcileActiveMissionFactsWithResult } from "../../lib/mission/active-reconciliation";
 import { recordEventLoginMissionFactSync } from "../../lib/mission/event-entry-facts";
 import { setCnMsgpackPendingCommit } from "./msgpack";
 import {
@@ -268,7 +268,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
         }
 
         const contentSnapshot = getContentSnapshot();
-        reconcileActiveMissionFacts({
+        const activeMissionReconciliation = reconcileActiveMissionFactsWithResult({
             playerId,
             repository: contentSnapshot.repository,
             now: getServerTime() * 1000,
@@ -278,6 +278,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             const clientData = getClientSerializedData(playerId, {
                 viewerId: accountId,
                 summonComSeconds: options.summonComSeconds,
+                activeMissionsOverride: activeMissionReconciliation.activeMissions,
             }) as any;
             if (clientData === null) throw new Error("No player data.");
 

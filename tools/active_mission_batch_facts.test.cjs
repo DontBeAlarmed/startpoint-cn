@@ -198,7 +198,7 @@ for (const profile of profiles) {
 
 assert.deepEqual(measurements, [1, 6, 81].map(characterCount => ({
     characterCount,
-    characterClearReads: 1,
+    characterClearReads: 0,
     counterReads: 1,
     battleFactSqlReads: 2,
     characterGrowthReads: 1,
