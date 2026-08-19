@@ -228,6 +228,51 @@ test("resetBattleTuning applies defaults to later clients", () => {
     }
 })
 
+test("an old active timer cannot take ownership from a replacement connection", () => {
+    const captured = captureTimeouts()
+    const manager = new SessionManager({
+        battleTuning: { loadingLeaseMs: 30, heartbeatLeaseMs: 40 },
+    })
+    const roomNumber = "heartbeat-active-ownership"
+    const connectionId = "heartbeat-active-stable-cid"
+    let first
+    let second
+    try {
+        manager.setBattleExpectedCount(roomNumber, 1)
+        first = createBattleClient(manager, roomNumber, connectionId)
+        const firstLoadingTimer = captured.timers.at(-1)
+        assert.equal(manager.markSceneReady(connectionId, roomNumber), true)
+        const firstActiveTimer = captured.timers.at(-1)
+        assert.equal(firstLoadingTimer.cleared, true)
+        assert.equal(firstActiveTimer.delayMs, 40)
+
+        second = createBattleClient(manager, roomNumber, connectionId)
+        const secondLoadingTimer = captured.timers.at(-1)
+        assert.equal(firstActiveTimer.cleared, true)
+        assert.equal(manager.markSceneReady(connectionId, roomNumber), false)
+        const secondActiveTimer = captured.timers.at(-1)
+        assert.equal(secondLoadingTimer.cleared, true)
+        assert.equal(secondActiveTimer.delayMs, 40)
+
+        firstActiveTimer.callback()
+        assert.equal(second.socket.destroyed, false)
+
+        manager.removeClient(second.client)
+        assert.equal(secondActiveTimer.cleared, true)
+        secondActiveTimer.callback()
+        assert.equal(second.socket.destroyed, false)
+        assert.equal(manager.getBattleClient(connectionId), undefined)
+    } finally {
+        if (first && manager.getBattleClient(connectionId) === first.client) {
+            manager.removeClient(first.client)
+        }
+        if (second && manager.getBattleClient(connectionId) === second.client) {
+            manager.removeClient(second.client)
+        }
+        captured.restore()
+    }
+})
+
 test("battle tuning rejects non-positive, fractional, unsafe, and oversized durations", () => {
     const invalidValues = [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, 2_147_483_648]
 

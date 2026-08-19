@@ -125,7 +125,10 @@ export class SessionManager {
         delayMs: number,
     ): void {
         if (this.cidToBattleClient.get(client.connectionId) !== client || client.socket.destroyed) return
-        const timer = setTimeout(() => {
+        let timer: NodeJS.Timeout | undefined
+        timer = setTimeout(() => {
+            if (timer === undefined
+                || this.battleHeartbeatTimers.get(client.connectionId) !== timer) return
             this.battleHeartbeatTimers.delete(client.connectionId)
             if (this.cidToBattleClient.get(client.connectionId) !== client || client.socket.destroyed) return
             const inactiveMs = Date.now() - (this.battleLastActivityAt.get(client.connectionId) ?? 0)
@@ -145,7 +148,10 @@ export class SessionManager {
         const leaseMs = this.battleTuning.loadingLeaseMs
         this.battleConnectionPhase.set(client.connectionId, "loading")
         this.battleLastActivityAt.set(client.connectionId, Date.now())
-        const timer = setTimeout(() => {
+        let timer: NodeJS.Timeout | undefined
+        timer = setTimeout(() => {
+            if (timer === undefined
+                || this.battleHeartbeatTimers.get(client.connectionId) !== timer) return
             this.battleHeartbeatTimers.delete(client.connectionId)
             if (this.cidToBattleClient.get(client.connectionId) !== client || client.socket.destroyed) return
             if (this.battleConnectionPhase.get(client.connectionId) !== "loading") return

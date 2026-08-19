@@ -361,8 +361,10 @@ test("battle lease tuning follows server generations and retired timers stay cle
         assert.equal(first.destroyCalls, 1)
         assert.equal(second.destroyed, false)
 
+        assert.equal(sessionManager.removeClientBySocket(second), true)
+        assert.equal(secondLoadingTimer.cleared, true)
         secondLoadingTimer.callback()
-        assert.equal(second.destroyed, true)
+        assert.equal(second.destroyed, false)
         assert.equal(sessionManager.getBattleClientBySocket(second), undefined)
 
         await stopSessionServer()
