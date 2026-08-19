@@ -128,7 +128,14 @@ function seedNonMultiMixedFixture(dataApi, profile) {
                 VIEWER_SESSION_EXPIRES,
                 VIEWER_SESSION_TYPE,
             )
-            return Object.freeze({ accountId, playerId, viewerId, deviceId, entryName })
+            return Object.freeze({
+                accountId,
+                playerId,
+                viewerId,
+                deviceId,
+                entryName,
+                identityIndex: index,
+            })
         })
     })
 

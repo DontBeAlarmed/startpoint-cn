@@ -45,7 +45,7 @@ function summarizeEntries(results, rollbackVerification) {
         const errors = samples.filter(result => result.error !== null)
         const signatures = [...new Set(samples
             .map(result => result.behaviorSignature)
-            .filter(Boolean))]
+            .filter(Boolean))].sort()
         return {
             name,
             requests: samples.length,

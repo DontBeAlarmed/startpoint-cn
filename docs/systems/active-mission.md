@@ -91,6 +91,20 @@ pattern 13（`target_mission_clear`）的进度是已完成目标任务的数量
 
 这组状态事实只写入 `all_active_mission_list`，不会写入角色觉醒使用的 category 9 `active_mission_list`。
 
+### 运行时分层与性能边界
+
+Active Mission 的事实重算已拆为 Plan、FactSession、Evaluator、固定点 Runner 和 Reconciler 五层：Plan 按当前
+`ContentRepository` 快照缓存已解析定义；FactSession 只活在一次请求和现有事务内，并按候选任务需要加载事实；Evaluator
+保持纯计算；Runner 只在依赖进度真实变化时重算依赖任务；Reconciler 继续负责原顺序写入和兼容响应。
+
+该结构不增加数据库表，也不建立跨请求玩家缓存。一个 fact kind 在一次 Session 中最多成功加载一次；loader、结果应用或观察器
+失败时会回滚 Session 内存状态并允许重试，业务异常则继续交由外层 SQLite 事务整体回滚。`/load` 会把 reconcile 得到的最终
+Active Mission 状态直接交给玩家序列化，避免同一请求内再次读取任务表；空 stages 仍保持客户端原有的数组形状。
+
+运行时只为 86 条已有权威事实链建立 evaluator。其余 10 条定义没有 evaluator、不会加载无关事实，并继续返回 `null`；
+这与缺失定义、非法 selector 和回归资格未生产时的 fail-closed 语义一致。具体架构、验收负载和同机指标见
+[Active Mission 优化设计](./active-mission-optimization.md)。
+
 上述能力构成内容解释、首任务生产、状态事实校准、可用性判定、安全领奖和存储链。当前已接入 40 个实际使用的 pattern，
 对应 86 条定义；其中 15 条回归定义仍需资格回调才能生产。其余 10 条定义仍未接入服务端事实生产者，
 但它们并不都缺少客户端依据：CN 1.8.1 的战斗结算协议明确包含 `equipment_element`、分区统计中的

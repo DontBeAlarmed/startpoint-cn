@@ -107,7 +107,7 @@ function seedEventProgress(playerId, count) {
     for (const questId of EVENT_QUEST_IDS.slice(0, count)) insert.run(questId, playerId)
 }
 
-function seedProgress(playerId, scale) {
+function seedScenarioProgress(playerId, scale) {
     const db = getDb()
     db.prepare(`
         UPDATE players_characters
@@ -141,7 +141,7 @@ function createScenario(name, scale) {
         scale,
         create() {
             const playerId = createPlayer(name)
-            if (scale > 0) seedProgress(playerId, scale)
+            if (scale > 0) seedScenarioProgress(playerId, scale)
             return playerId
         },
     }
@@ -153,4 +153,4 @@ const SCENARIOS = Object.freeze([
     createScenario("high-completion-volume", 20),
 ])
 
-module.exports = { SCENARIOS }
+module.exports = { SCENARIOS, seedScenarioProgress }

@@ -178,6 +178,7 @@ test("seed creates independent persisted identities and frozen caller snapshots"
         "mail",
         null,
     ])
+    assert.deepEqual(values(pool.identities, "identityIndex"), [0, 1, 2, 3, 4, 5, 6, 7, 8])
 
     for (const field of ["accountId", "playerId", "viewerId", "deviceId"]) {
         assertUniquePositiveSafeIntegers(pool.identities, field)

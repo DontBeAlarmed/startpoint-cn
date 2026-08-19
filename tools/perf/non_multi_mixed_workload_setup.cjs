@@ -2,6 +2,10 @@
 
 const { seedNonMultiMixedFixture } = require("./non_multi_mixed_fixture.cjs")
 const {
+    assignActiveMissionScale,
+    seedActiveMissionState,
+} = require("./active-mission/workload-overlay.cjs")
+const {
     createNonMultiMixedWriteContext,
 } = require("./non_multi_mixed_write_fixture.cjs")
 
@@ -23,11 +27,17 @@ function prepareSeed(runtime, scenarioDependencies, seedDirectory, profile) {
     runtime.initializeDatabase({ paths })
     const pool = seedNonMultiMixedFixture(runtime, profile)
     const db = runtime.getDb()
+    const activeIdentities = assignActiveMissionScale(pool.activeIdentities)
+    for (const identity of activeIdentities) seedActiveMissionState(identity)
+    const preparedPool = Object.freeze({
+        ...pool,
+        activeIdentities: Object.freeze(activeIdentities),
+    })
     const writeContext = createNonMultiMixedWriteContext(db, {
         insertMail: runtime.insertMailSync,
     })
     const mailFixtureByIdentity = {}
-    for (const identity of pool.activeIdentities) {
+    for (const identity of preparedPool.activeIdentities) {
         if (identity.entryName === "single-battle") {
             scenarioDependencies.prepareSingleBattleIdentity(db, identity)
         }
@@ -40,10 +50,11 @@ function prepareSeed(runtime, scenarioDependencies, seedDirectory, profile) {
     }
     runtime.checkpointDatabase()
     runtime.closeDatabase()
-    return { pool, mailFixtureByIdentity }
+    return { pool: preparedPool, mailFixtureByIdentity }
 }
 
 function createStepContext(runtime, mailFixtureByIdentity, identities) {
+    const { getPlayerActiveMissionsSync } = require("../../src/data/domains/mission")
     return {
         skipPrepare: true,
         inspectAuthIdentity: identity => inspectAuthIdentity(runtime, identity),
@@ -51,6 +62,7 @@ function createStepContext(runtime, mailFixtureByIdentity, identities) {
             insertMail: runtime.insertMailSync,
         }),
         mailFixtureByIdentity,
+        inspectActiveMissionState: identity => getPlayerActiveMissionsSync(identity.playerId),
         singleBattlePeer: identities.find(identity => identity.entryName === "auth"),
     }
 }

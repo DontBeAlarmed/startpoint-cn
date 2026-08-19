@@ -45,7 +45,7 @@ function report({
         })),
         entryDistributionNote: "acceptance coverage; not production traffic proportions",
     }
-    return {
+    const result = {
         profile: {
             independentSaves,
             activeIdentities,
@@ -62,6 +62,18 @@ function report({
             entries: ENTRY_NAMES.map((name, index) => entry(name, entryRequests[index])),
         })),
     }
+    if (activeIdentities === FORMAL_ACTIVE_IDENTITIES) {
+        for (const step of result.steps) {
+            for (const name of ["load", "single-battle"]) {
+                step.entries.find(item => item.name === name).behaviorSignatures = [
+                    `${name}-large`,
+                    `${name}-new`,
+                    `${name}-small`,
+                ]
+            }
+        }
+    }
+    return result
 }
 
 function assertClosed(reportValue, label) {
@@ -363,6 +375,29 @@ test("admission rejects errors, unstable behavior, and failed write rollbacks", 
     multipleSignatures.steps[0].entries[0].behaviorSignatures.push("auth-alternate")
     assert.equal(validateReportStructure(multipleSignatures), true)
     assert.equal(createAdmissionGate(multipleSignatures).behaviorStable, false)
+
+    const stableMultipleSignatures = report()
+    for (const step of stableMultipleSignatures.steps) {
+        step.entries[1].behaviorSignatures = ["load-large", "load-new", "load-small"]
+    }
+    assert.equal(validateReportStructure(stableMultipleSignatures), true)
+    assert.equal(createAdmissionGate(stableMultipleSignatures).behaviorStable, true)
+
+    const missingOverlaySignature = report()
+    for (const step of missingOverlaySignature.steps) {
+        step.entries.find(item => item.name === "single-battle").behaviorSignatures = ["single-battle-new"]
+    }
+    assert.equal(createAdmissionGate(missingOverlaySignature).behaviorStable, true)
+    assert.equal(createAdmissionGate(missingOverlaySignature).loadProfileValid, false)
+    assert.equal(createAdmissionGate(missingOverlaySignature).admitted, false)
+
+    const unexpectedExtraSignature = report()
+    for (const step of unexpectedExtraSignature.steps) {
+        step.entries.find(item => item.name === "auth").behaviorSignatures = ["auth-stable", "auth-alternate"]
+    }
+    assert.equal(createAdmissionGate(unexpectedExtraSignature).behaviorStable, true)
+    assert.equal(createAdmissionGate(unexpectedExtraSignature).loadProfileValid, false)
+    assert.equal(createAdmissionGate(unexpectedExtraSignature).admitted, false)
 
     for (const name of WRITE_ENTRY_NAMES) {
         const failedRollback = report()

@@ -363,14 +363,17 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^tools\/perf\/active-mission\/(?:admission|fixture|observer|report)\.cjs$/,
+        pattern: /^tools\/perf\/active-mission\/(?:admission|fixture|observer|report|workload-overlay)\.cjs$/,
         groups: ["integration:mission"],
     },
     {
         pattern: /^(?:tools\/perf\/active-mission\/(?:baseline(?:\.test)?|scenarios-(?:finish|load|receive))\.cjs|tools\/perf\/__snapshots__\/active_mission_focused_baseline\.json)$/,
         groups: ["integration:mission"],
     },
-    { pattern: /^tools\/perf\/active_mission_metrics\.test\.cjs$/, groups: ["integration:mission"] },
+    {
+        pattern: /^tools\/perf\/active_mission_(?:metrics|workload_overlay)\.test\.cjs$/,
+        groups: ["integration:mission"],
+    },
     {
         pattern: /^(?:tools\/perf\/mission_entry_(?:base_oracle|layered_load|load_metrics|load_scenarios)(?:\.test)?\.cjs|tools\/perf\/__snapshots__\/mission_entry_layered_load_reference\.json)$/,
         groups: ["integration:mission"],

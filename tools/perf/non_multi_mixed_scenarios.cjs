@@ -13,6 +13,9 @@ const {
 const { executeGachaScenario } = require("./non_multi_mixed_gacha.cjs")
 const { executeMailScenario } = require("./non_multi_mixed_mail.cjs")
 const { executeShopScenario } = require("./non_multi_mixed_shop.cjs")
+const {
+    createActiveMissionBehaviorSummary,
+} = require("./active-mission/workload-overlay.cjs")
 
 const LOAD_RES_VERSION = "1.4.54"
 const VIEWER_SESSION_TYPE = 2
@@ -158,6 +161,9 @@ async function executeLoad(app, identity) {
         itemCount: countCollection(itemList),
         unfinishedQuestCount: countCollection(unfinishedQuestList),
         unfinishedMultiQuestCount: countCollection(unfinishedMultiQuestList),
+        ...(identity.activeMissionFixture
+            ? createActiveMissionBehaviorSummary("load", data.all_active_mission_list)
+            : {}),
     }
 }
 
@@ -198,7 +204,18 @@ async function executeScenario(app, identity, context = {}) {
     if (entry === "auth") return executeAuth(app, identity, context)
     if (entry === "load") return executeLoad(app, identity)
     if (entry === "mission-progress") return executeMissionProgress(app, identity)
-    if (entry === "single-battle") return executeSingleBattleScenario(app, identity, context)
+    if (entry === "single-battle") {
+        const behavior = await executeSingleBattleScenario(app, identity, context)
+        if (!identity.activeMissionFixture
+            || typeof context.inspectActiveMissionState !== "function") return behavior
+        return {
+            ...behavior,
+            ...createActiveMissionBehaviorSummary(
+                "single-battle",
+                context.inspectActiveMissionState(identity),
+            ),
+        }
+    }
     if (entry === "shop") return executeShopScenario(app, identity, context)
     if (entry === "mail") return executeMailScenario(app, identity, context)
     if (entry === "gacha") return executeGachaScenario(app, identity, context)

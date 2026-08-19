@@ -273,10 +273,10 @@ function hasStableBehavior(report) {
         const step = report.steps[stepIndex]
         for (let entryIndex = 0; entryIndex < step.entries.length; entryIndex++) {
             const entry = step.entries[entryIndex]
-            if (entry.behaviorSignatures.length !== 1) return false
-            const signature = entry.behaviorSignatures[0]
-            if (expected.has(entry.name) && expected.get(entry.name) !== signature) return false
-            expected.set(entry.name, signature)
+            const signatures = entry.behaviorSignatures
+            const previous = expected.get(entry.name)
+            if (previous !== undefined && !arraysEqual(previous, signatures)) return false
+            expected.set(entry.name, signatures)
         }
     }
     return expected.size === ENTRY_NAMES.length
@@ -296,7 +296,10 @@ function isFormalLoadProfile(report) {
             return false
         }
         for (let entryIndex = 0; entryIndex < ENTRY_NAMES.length; entryIndex++) {
-            if (step.entries[entryIndex].requests !== FORMAL_ENTRY_REQUESTS[entryIndex]) {
+            const entry = step.entries[entryIndex]
+            const expectedSignatureCount = entry.name === "load" || entry.name === "single-battle" ? 3 : 1
+            if (entry.requests !== FORMAL_ENTRY_REQUESTS[entryIndex]
+                || entry.behaviorSignatures.length !== expectedSignatureCount) {
                 return false
             }
         }
