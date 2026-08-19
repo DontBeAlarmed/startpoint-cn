@@ -218,6 +218,57 @@ test("multiplayer transport tuning rejects a buffer smaller than one frame", () 
     }), error => error?.code === "INVALID_RUNTIME_CONFIG")
 })
 
+test("multiplayer frame byte tuning preserves the 1024 byte minimum", () => {
+    assert.throws(() => parseCnRuntimeConfig({
+        projectRoot,
+        env: {
+            ASSET_MODE: "client-owned",
+            SESSION_MAX_FRAME_BYTES: "1023",
+        },
+    }), error => error?.code === "INVALID_RUNTIME_CONFIG")
+
+    const config = parseCnRuntimeConfig({
+        projectRoot,
+        env: {
+            ASSET_MODE: "client-owned",
+            SESSION_MAX_FRAME_BYTES: "1024",
+        },
+    })
+    assert.equal(config.multiTuning.transport.maxFrameBytes, 1024)
+})
+
+test("multiplayer timer tuning enforces the signed 32-bit maximum", () => {
+    for (const variable of [
+        "SESSION_HANDSHAKE_TIMEOUT_MS",
+        "MULTI_SEND_QUEUE_MAX_AGE_MS",
+        "BATTLE_LOADING_LEASE_MS",
+        "BATTLE_HEARTBEAT_LEASE_MS",
+    ]) {
+        assert.throws(() => parseCnRuntimeConfig({
+            projectRoot,
+            env: {
+                ASSET_MODE: "client-owned",
+                [variable]: "2147483648",
+            },
+        }), error => error?.code === "INVALID_RUNTIME_CONFIG")
+    }
+
+    const config = parseCnRuntimeConfig({
+        projectRoot,
+        env: {
+            ASSET_MODE: "client-owned",
+            SESSION_HANDSHAKE_TIMEOUT_MS: "2147483647",
+            MULTI_SEND_QUEUE_MAX_AGE_MS: "2147483647",
+            BATTLE_LOADING_LEASE_MS: "2147483647",
+            BATTLE_HEARTBEAT_LEASE_MS: "2147483647",
+        },
+    })
+    assert.equal(config.multiTuning.transport.handshakeTimeoutMs, 2147483647)
+    assert.equal(config.multiTuning.transport.sendQueueMaxAgeMs, 2147483647)
+    assert.equal(config.multiTuning.battle.loadingLeaseMs, 2147483647)
+    assert.equal(config.multiTuning.battle.heartbeatLeaseMs, 2147483647)
+})
+
 test("multiplayer lifecycle tuning rejects malformed millisecond values", () => {
     for (const value of ["", "-1", "1.5", "9007199254740992"]) {
         assert.throws(() => parseCnRuntimeConfig({

@@ -170,11 +170,14 @@ function parsePositiveSafeInteger(
     value: string | undefined,
     fallback: number,
     minimum = 1,
+    maximum = Number.MAX_SAFE_INTEGER,
 ): number {
     if (value === undefined) return fallback
     if (!/^\d+$/.test(value)) throw new RuntimeConfigError()
     const parsed = Number(value)
-    if (!Number.isSafeInteger(parsed) || parsed < minimum) throw new RuntimeConfigError()
+    if (!Number.isSafeInteger(parsed) || parsed < minimum || parsed > maximum) {
+        throw new RuntimeConfigError()
+    }
     return parsed
 }
 
@@ -374,9 +377,11 @@ function parseMultiRuntimeConfig(
 }
 
 function parseMultiRuntimeTuning(env: RuntimeEnvironment): MultiRuntimeTuningConfig {
+    const maximumTimerMs = 2_147_483_647
     const maxFrameBytes = parsePositiveSafeInteger(
         env.SESSION_MAX_FRAME_BYTES,
         DEFAULT_MULTI_TRANSPORT_TUNING.maxFrameBytes,
+        1024,
     )
     const maxBufferBytes = parsePositiveSafeInteger(
         env.SESSION_MAX_BUFFER_BYTES,
@@ -389,6 +394,8 @@ function parseMultiRuntimeTuning(env: RuntimeEnvironment): MultiRuntimeTuningCon
             handshakeTimeoutMs: parsePositiveSafeInteger(
                 env.SESSION_HANDSHAKE_TIMEOUT_MS,
                 DEFAULT_MULTI_TRANSPORT_TUNING.handshakeTimeoutMs,
+                1,
+                maximumTimerMs,
             ),
             maxFrameBytes,
             maxBufferBytes,
@@ -408,16 +415,22 @@ function parseMultiRuntimeTuning(env: RuntimeEnvironment): MultiRuntimeTuningCon
             sendQueueMaxAgeMs: parsePositiveSafeInteger(
                 env.MULTI_SEND_QUEUE_MAX_AGE_MS,
                 DEFAULT_MULTI_TRANSPORT_TUNING.sendQueueMaxAgeMs,
+                1,
+                maximumTimerMs,
             ),
         }),
         battle: Object.freeze({
             loadingLeaseMs: parsePositiveSafeInteger(
                 env.BATTLE_LOADING_LEASE_MS,
                 DEFAULT_MULTI_BATTLE_TUNING.loadingLeaseMs,
+                1,
+                maximumTimerMs,
             ),
             heartbeatLeaseMs: parsePositiveSafeInteger(
                 env.BATTLE_HEARTBEAT_LEASE_MS,
                 DEFAULT_MULTI_BATTLE_TUNING.heartbeatLeaseMs,
+                1,
+                maximumTimerMs,
             ),
         }),
         roomCleanup: Object.freeze({
