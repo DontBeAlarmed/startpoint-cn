@@ -92,7 +92,7 @@ export function handleBattleMessage(socket: net.Socket, data: unknown): void {
             const client = findBattleClientBySocket(socket)
             if (client) {
                 const bcData = data[1]
-                relayToBattleRoom(String(client.roomNumber), String(client.connectionId), [2, client.connectionId, bcData])
+                relayToBattleRoom(client, [2, client.connectionId, bcData])
                 sessionManager.sendJson(socket, [1, [3, 0, 0, Date.now()]])
             }
             break
@@ -102,7 +102,7 @@ export function handleBattleMessage(socket: net.Socket, data: unknown): void {
             if (client) {
                 const sendMsg = data[2]
                 if (sendMsg) {
-                    relayToBattleRoom(String(client.roomNumber), String(client.connectionId), [3, client.connectionId, sendMsg])
+                    relayToBattleRoom(client, [3, client.connectionId, sendMsg])
                 }
                 sessionManager.sendJson(socket, [1, [3, 0, 0, Date.now()]])
             }

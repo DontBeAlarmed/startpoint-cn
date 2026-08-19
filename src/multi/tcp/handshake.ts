@@ -101,7 +101,10 @@ export async function handleHandshake(
         )
         battleClient.participant = participant.participant
         battleClient.isBattle = true
-        sessionManager.addBattleClient(normalizedConnectionId, battleClient)
+        if (!sessionManager.addBattleClient(normalizedConnectionId, battleClient)) {
+            deny(socket)
+            return
+        }
         sessionManager.sendJson(socket, [0, roomNumber, ""])
         console.log(`[TCP] battle handshake accepted: room=${normalizedRoomNumber}`)
         return

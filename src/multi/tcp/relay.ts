@@ -1,9 +1,9 @@
 import { sessionManager } from "../state/SessionManager"
+import type { SessionClient } from "../state/SessionManager"
 
-export function relayToBattleRoom(roomNumber: string, sourceCid: string, data: unknown): void {
-    for (const client of sessionManager.getBattleClientsInRoom(roomNumber)) {
-        if (client.connectionId !== sourceCid) {
-            sessionManager.sendJson(client.socket, data)
-        }
-    }
+export function relayToBattleRoom(source: SessionClient, data: unknown): void {
+    const recipients = sessionManager.snapshotBattleRelayRecipients(source)
+    if (recipients.length === 0) return
+    const frame = JSON.stringify(data) + "\0"
+    for (const client of recipients) sessionManager.sendFrame(client.socket, frame)
 }

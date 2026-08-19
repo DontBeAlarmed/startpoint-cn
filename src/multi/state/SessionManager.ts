@@ -223,6 +223,10 @@ export class SessionManager {
 
     removeClient(client: SessionClient): Result<void> {
         if (client.isBattle) {
+            if (!this.isCurrentBattleClient(client)) {
+                this.removeSocketIndex(client)
+                return { ok: true, value: undefined }
+            }
             const bSet = this.battleClients.get(client.roomNumber)
             if (bSet) {
                 for (const cid of bSet) {
@@ -288,15 +292,27 @@ export class SessionManager {
         return this.getUniqueRoomClientByViewerId(viewerId, roomNumber) !== undefined
     }
 
-    addBattleClient(connectionId: string, client: SessionClient): void {
+    addBattleClient(connectionId: string, client: SessionClient): boolean {
+        const previous = this.cidToBattleClient.get(connectionId)
+        // A connection id is room-scoped. Cross-room moves would require
+        // migrating barriers, participant snapshots, and settlement facts;
+        // reject them until the room lifecycle explicitly supports that.
+        if (previous && previous !== client && previous.roomNumber !== client.roomNumber) {
+            return false
+        }
         let set = this.battleClients.get(client.roomNumber)
         if (!set) {
             set = new Set()
             this.battleClients.set(client.roomNumber, set)
         }
+        if (previous && previous !== client) {
+            this.removeSocketIndex(previous)
+        }
         set.add(connectionId)
         this.cidToBattleClient.set(connectionId, client)
         this.socketToClient.set(client.socket, client)
+        if (previous && previous !== client) this.closeClientSocket(previous.socket)
+        return true
     }
 
     closeRoomClients(roomNumber: string): number {
@@ -334,11 +350,36 @@ export class SessionManager {
         return this.cidToBattleClient.get(connectionId)
     }
 
+    isCurrentBattleClient(client: SessionClient): boolean {
+        return this.cidToBattleClient.get(client.connectionId) === client
+            && this.socketToClient.get(client.socket) === client
+    }
+
+    snapshotBattleRelayRecipients(
+        source: SessionClient,
+        includeSource = false,
+    ): SessionClient[] {
+        if (!this.isCurrentBattleClient(source)) return []
+        const set = this.battleClients.get(source.roomNumber)
+        if (!set) return []
+        const recipients: SessionClient[] = []
+        for (const connectionId of [...set]) {
+            if (!includeSource && connectionId === source.connectionId) continue
+            const client = this.cidToBattleClient.get(connectionId)
+            if (!client
+                || client.roomNumber !== source.roomNumber
+                || client.socket.destroyed
+                || !client.socket.writable) continue
+            recipients.push(client)
+        }
+        return recipients
+    }
+
     getBattleClientsInRoom(roomNumber: string): SessionClient[] {
         const clients: SessionClient[] = []
         for (const connectionId of this.battleClients.get(roomNumber) ?? []) {
             const client = this.cidToBattleClient.get(connectionId)
-            if (client) clients.push(client)
+            if (client?.roomNumber === roomNumber) clients.push(client)
         }
         return clients
     }
@@ -713,7 +754,11 @@ export class SessionManager {
     }
 
     sendJson(socket: net.Socket, data: any): boolean {
-        return sendFrameReliably(socket, JSON.stringify(data) + "\0") !== "closed"
+        return this.sendFrame(socket, JSON.stringify(data) + "\0")
+    }
+
+    sendFrame(socket: net.Socket, frame: string): boolean {
+        return sendFrameReliably(socket, frame) !== "closed"
     }
 
     broadcastToRoom(roomNumber: string, data: any, excludeClient?: SessionClient): void {
