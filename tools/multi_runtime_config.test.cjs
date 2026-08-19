@@ -578,6 +578,15 @@ test("runtime service forwards multiplayer tuning to the TCP lifecycle", async (
     assert.deepEqual(received, [tuning])
 })
 
+test("production runtime service forwards the transport snapshot to the session server", () => {
+    const source = fs.readFileSync(
+        path.join(projectRoot, "src/multi/runtime/service.ts"),
+        "utf8",
+    )
+
+    assert.match(source, /startSessionServer\(\{[\s\S]*?transportTuning:\s*tuning\?\.transport/)
+})
+
 test("embedded runtime context exposes its configured TCP endpoint", async () => {
     let tcpListening = false
     const service = createMultiRuntimeService({

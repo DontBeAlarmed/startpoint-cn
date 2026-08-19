@@ -26,35 +26,23 @@ import {
     embeddedAdmissionRegistry,
     type AdmissionProvider,
 } from "../admission/registry"
-import { clearReliableSendState } from "./reliable-send"
+import {
+    clearReliableSendState,
+    configureReliableSendTuning,
+    resetReliableSendTuning,
+} from "./reliable-send"
+import {
+    DEFAULT_MULTI_TRANSPORT_TUNING,
+    type MultiTransportTuning,
+} from "../runtime/tuning"
 
 export const SESSION_PORT = 8003
 export const SESSION_HOST = "127.0.0.1"
 export const DEFAULT_SESSION_SHUTDOWN_TIMEOUT_MS = 5000
-
-function positiveEnvironmentInteger(name: string, fallback: number, minimum = 1): number {
-    const parsed = Number.parseInt(process.env[name] ?? "", 10)
-    return Number.isFinite(parsed) ? Math.max(minimum, parsed) : fallback
-}
-
-export const DEFAULT_SESSION_HANDSHAKE_TIMEOUT_MS = positiveEnvironmentInteger(
-    "SESSION_HANDSHAKE_TIMEOUT_MS",
-    15_000,
-)
-export const DEFAULT_SESSION_MAX_FRAME_BYTES = positiveEnvironmentInteger(
-    "SESSION_MAX_FRAME_BYTES",
-    256 * 1024,
-    1024,
-)
-export const DEFAULT_SESSION_MAX_BUFFER_BYTES = positiveEnvironmentInteger(
-    "SESSION_MAX_BUFFER_BYTES",
-    1024 * 1024,
-    DEFAULT_SESSION_MAX_FRAME_BYTES,
-)
-export const DEFAULT_SESSION_KEEPALIVE_INITIAL_DELAY_MS = positiveEnvironmentInteger(
-    "SESSION_TCP_KEEPALIVE_MS",
-    10_000,
-)
+export const DEFAULT_SESSION_HANDSHAKE_TIMEOUT_MS = DEFAULT_MULTI_TRANSPORT_TUNING.handshakeTimeoutMs
+export const DEFAULT_SESSION_MAX_FRAME_BYTES = DEFAULT_MULTI_TRANSPORT_TUNING.maxFrameBytes
+export const DEFAULT_SESSION_MAX_BUFFER_BYTES = DEFAULT_MULTI_TRANSPORT_TUNING.maxBufferBytes
+export const DEFAULT_SESSION_KEEPALIVE_INITIAL_DELAY_MS = DEFAULT_MULTI_TRANSPORT_TUNING.keepAliveInitialDelayMs
 export const DEFAULT_SESSION_ADMISSION_PROVIDER: AdmissionProvider = embeddedAdmissionRegistry
 
 export type SessionServerPhase = "stopped" | "starting" | "listening" | "stopping" | "failed"
@@ -85,6 +73,7 @@ export interface SessionServerOptions {
     admissionProvider?: AdmissionProvider
     validateNodeSession?: (nodeSessionId: string) => boolean
     nodeSessionCheckIntervalMs?: number
+    transportTuning?: MultiTransportTuning
     handshakeTimeoutMs?: number
     maxFrameBytes?: number
     maxBufferBytes?: number
@@ -405,6 +394,7 @@ function stopSessionLifecycles(): void {
     stopRoomCleanup()
     stopLobbyLifecycle()
     resetNpcRecruitmentTiming()
+    resetReliableSendTuning()
 }
 
 function settleStart(context: ServerContext, error?: Error): void {
@@ -602,9 +592,22 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
         })
     ))
     const generation = ++generationSequence
+    const transportTuning = options.transportTuning ?? DEFAULT_MULTI_TRANSPORT_TUNING
+    try {
+        configureReliableSendTuning({
+            maxMessages: transportTuning.sendQueueMaxMessages,
+            maxBytes: transportTuning.sendQueueMaxBytes,
+            maxAgeMs: transportTuning.sendQueueMaxAgeMs,
+        })
+    } catch (error) {
+        recordFailure("startup", error)
+        resetReliableSendTuning()
+        phase = "failed"
+        return Promise.reject(error)
+    }
     const maxFrameBytes = positiveInteger(
         options.maxFrameBytes,
-        DEFAULT_SESSION_MAX_FRAME_BYTES,
+        transportTuning.maxFrameBytes,
     )
     let context!: ServerContext
     let createdServer: net.Server
@@ -612,6 +615,7 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
         createdServer = createServer(socket => handleConnection(context, socket, handshakeHandler))
     } catch (error) {
         recordFailure("startup", error)
+        resetReliableSendTuning()
         phase = "failed"
         return Promise.reject(error)
     }
@@ -627,17 +631,17 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
         nodeSessionCheckIntervalMs: options.nodeSessionCheckIntervalMs ?? 1_000,
         handshakeTimeoutMs: positiveInteger(
             options.handshakeTimeoutMs,
-            DEFAULT_SESSION_HANDSHAKE_TIMEOUT_MS,
+            transportTuning.handshakeTimeoutMs,
         ),
         maxFrameBytes,
         maxBufferBytes: positiveInteger(
             options.maxBufferBytes,
-            DEFAULT_SESSION_MAX_BUFFER_BYTES,
+            transportTuning.maxBufferBytes,
             maxFrameBytes,
         ),
         keepAliveInitialDelayMs: positiveInteger(
             options.keepAliveInitialDelayMs,
-            DEFAULT_SESSION_KEEPALIVE_INITIAL_DELAY_MS,
+            transportTuning.keepAliveInitialDelayMs,
         ),
         nodeSessionTimer: null,
         fatalStarted: false,
@@ -691,6 +695,7 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
     } catch (error) {
         recordFailure("startup", error)
         settleStart(context, error as Error)
+        resetReliableSendTuning()
         phase = "failed"
         finalizeContext(context)
     }

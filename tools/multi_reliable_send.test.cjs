@@ -4,13 +4,11 @@ const test = require("node:test")
 
 require("ts-node/register/transpile-only")
 
-process.env.MULTI_SEND_QUEUE_MAX_MESSAGES = "2"
-process.env.MULTI_SEND_QUEUE_MAX_BYTES = "64"
-process.env.MULTI_SEND_QUEUE_MAX_AGE_MS = "30"
-
 const {
     clearReliableSendState,
+    configureReliableSendTuning,
     getReliableSendQueueStats,
+    resetReliableSendTuning,
     sendFrameReliably,
 } = require("../src/multi/tcp/reliable-send")
 
@@ -55,10 +53,40 @@ class BackpressureSocket extends EventEmitter {
     }
 }
 
+test.beforeEach(() => {
+    configureReliableSendTuning({
+        maxMessages: 2,
+        maxBytes: 1024,
+        maxAgeMs: 30,
+    })
+})
+
 test.afterEach(() => {
-    delete process.env.MULTI_SEND_QUEUE_MAX_MESSAGES
-    delete process.env.MULTI_SEND_QUEUE_MAX_BYTES
-    delete process.env.MULTI_SEND_QUEUE_MAX_AGE_MS
+    resetReliableSendTuning()
+})
+
+test("reliable send tuning rejects unsafe queue limits", () => {
+    for (const maxMessages of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+        assert.throws(() => configureReliableSendTuning({
+            maxMessages,
+            maxBytes: 1024,
+            maxAgeMs: 30,
+        }), TypeError)
+    }
+    for (const maxAgeMs of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+        assert.throws(() => configureReliableSendTuning({
+            maxMessages: 2,
+            maxBytes: 1024,
+            maxAgeMs,
+        }), TypeError)
+    }
+    for (const maxBytes of [1023, 1024.5, Number.MAX_SAFE_INTEGER + 1]) {
+        assert.throws(() => configureReliableSendTuning({
+            maxMessages: 2,
+            maxBytes,
+            maxAgeMs: 30,
+        }), TypeError)
+    }
 })
 
 test("frames after backpressure wait for drain and preserve order", () => {

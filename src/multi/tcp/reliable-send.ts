@@ -1,6 +1,13 @@
 import * as net from "net"
+import { DEFAULT_MULTI_TRANSPORT_TUNING } from "../runtime/tuning"
 
 export type ReliableSendResult = "sent" | "queued" | "closed"
+
+export interface ReliableSendTuning {
+    readonly maxMessages: number
+    readonly maxBytes: number
+    readonly maxAgeMs: number
+}
 
 interface QueuedFrame {
     readonly frame: string
@@ -15,24 +22,34 @@ interface SocketSendState {
     timeout: NodeJS.Timeout | null
 }
 
-function positiveInteger(name: string, fallback: number, minimum = 1): number {
-    const parsed = Number.parseInt(process.env[name] ?? "", 10)
-    return Number.isFinite(parsed) ? Math.max(minimum, parsed) : fallback
+export const MULTI_SEND_QUEUE_MAX_MESSAGES = DEFAULT_MULTI_TRANSPORT_TUNING.sendQueueMaxMessages
+export const MULTI_SEND_QUEUE_MAX_BYTES = DEFAULT_MULTI_TRANSPORT_TUNING.sendQueueMaxBytes
+export const MULTI_SEND_QUEUE_MAX_AGE_MS = DEFAULT_MULTI_TRANSPORT_TUNING.sendQueueMaxAgeMs
+
+const DEFAULT_RELIABLE_SEND_TUNING: ReliableSendTuning = Object.freeze({
+    maxMessages: MULTI_SEND_QUEUE_MAX_MESSAGES,
+    maxBytes: MULTI_SEND_QUEUE_MAX_BYTES,
+    maxAgeMs: MULTI_SEND_QUEUE_MAX_AGE_MS,
+})
+
+let reliableSendTuning = DEFAULT_RELIABLE_SEND_TUNING
+
+function assertSafeInteger(name: string, value: number, minimum: number): void {
+    if (!Number.isSafeInteger(value) || value < minimum) {
+        throw new TypeError(`${name} must be a safe integer greater than or equal to ${minimum}`)
+    }
 }
 
-export const MULTI_SEND_QUEUE_MAX_MESSAGES = positiveInteger(
-    "MULTI_SEND_QUEUE_MAX_MESSAGES",
-    512,
-)
-export const MULTI_SEND_QUEUE_MAX_BYTES = positiveInteger(
-    "MULTI_SEND_QUEUE_MAX_BYTES",
-    4 * 1024 * 1024,
-    1024,
-)
-export const MULTI_SEND_QUEUE_MAX_AGE_MS = positiveInteger(
-    "MULTI_SEND_QUEUE_MAX_AGE_MS",
-    15_000,
-)
+export function configureReliableSendTuning(tuning: ReliableSendTuning): void {
+    assertSafeInteger("maxMessages", tuning.maxMessages, 1)
+    assertSafeInteger("maxBytes", tuning.maxBytes, 1024)
+    assertSafeInteger("maxAgeMs", tuning.maxAgeMs, 1)
+    reliableSendTuning = Object.freeze({ ...tuning })
+}
+
+export function resetReliableSendTuning(): void {
+    reliableSendTuning = DEFAULT_RELIABLE_SEND_TUNING
+}
 
 const socketStates = new WeakMap<net.Socket, SocketSendState>()
 const cleanupAttached = new WeakSet<net.Socket>()
@@ -90,7 +107,7 @@ function armTimeout(socket: net.Socket, state: SocketSendState): void {
     clearTimeoutFor(state)
     const remaining = Math.max(
         1,
-        MULTI_SEND_QUEUE_MAX_AGE_MS - (Date.now() - state.blockedSince),
+        reliableSendTuning.maxAgeMs - (Date.now() - state.blockedSince),
     )
     state.timeout = setTimeout(() => {
         if (socketStates.get(socket) !== state || socket.destroyed) return
@@ -152,8 +169,8 @@ export function sendFrameReliably(socket: net.Socket, frame: string): ReliableSe
     if (state.blockedSince !== 0 || state.queue.length > 0) {
         const bytes = Buffer.byteLength(frame)
         if (
-            state.queue.length + 1 > MULTI_SEND_QUEUE_MAX_MESSAGES
-            || state.queuedBytes + bytes > MULTI_SEND_QUEUE_MAX_BYTES
+            state.queue.length + 1 > reliableSendTuning.maxMessages
+            || state.queuedBytes + bytes > reliableSendTuning.maxBytes
         ) {
             retireSlowSocket(socket, state, "queue_limit")
             return "closed"

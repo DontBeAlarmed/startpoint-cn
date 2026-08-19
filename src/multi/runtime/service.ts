@@ -174,6 +174,7 @@ function defaultDependencies(): MultiRuntimeServiceDependencies {
     return {
         startTcp: (config, onFatalError, hostServices, tuning) => startSessionServer({
             ...config,
+            transportTuning: tuning?.transport,
             roomCleanup: tuning?.roomCleanup,
             npcRecruitment: tuning?.npcRecruitment,
             admissionProvider: hostServices?.admissionRegistry,

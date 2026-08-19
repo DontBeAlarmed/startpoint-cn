@@ -9,6 +9,20 @@ const {
     startSessionServer,
     stopSessionServer,
 } = require("../src/multi/tcp/server")
+const {
+    getReliableSendQueueStats,
+    sendFrameReliably,
+} = require("../src/multi/tcp/reliable-send")
+
+const TRANSPORT_TUNING = Object.freeze({
+    handshakeTimeoutMs: 40,
+    maxFrameBytes: 1024,
+    maxBufferBytes: 2048,
+    keepAliveInitialDelayMs: 4321,
+    sendQueueMaxMessages: 1,
+    sendQueueMaxBytes: 1024,
+    sendQueueMaxAgeMs: 30,
+})
 
 function waitFor(predicate, message, timeoutMs = 1_000) {
     const startedAt = Date.now()
@@ -29,13 +43,15 @@ function waitFor(predicate, message, timeoutMs = 1_000) {
 }
 
 class GuardrailSocket extends EventEmitter {
-    constructor() {
+    constructor(writeResults = []) {
         super()
         this.destroyed = false
         this.writable = true
         this.writableEnded = false
         this.noDelay = null
         this.keepAlive = null
+        this.writeResults = [...writeResults]
+        this.writes = []
     }
 
     setEncoding() {}
@@ -50,8 +66,9 @@ class GuardrailSocket extends EventEmitter {
         return this
     }
 
-    write() {
-        return true
+    write(frame) {
+        this.writes.push(frame)
+        return this.writeResults.length > 0 ? this.writeResults.shift() : true
     }
 
     pause() {
@@ -124,6 +141,69 @@ test("accepted sockets enable low-latency TCP settings", async () => {
 
     assert.equal(socket.noDelay, true)
     assert.deepEqual(socket.keepAlive, { enabled: true, initialDelay: 10_000 })
+})
+
+test("transport tuning configures guardrails and reliable send for one server generation", async () => {
+    let server
+    await startSessionServer({
+        transportTuning: TRANSPORT_TUNING,
+        createServer(connectionListener) {
+            server = new FakeServer(connectionListener)
+            return server
+        },
+    })
+    const accepted = new GuardrailSocket()
+    const slow = new GuardrailSocket([false])
+
+    server.accept(accepted)
+    assert.deepEqual(accepted.keepAlive, { enabled: true, initialDelay: 4321 })
+    accepted.emit("data", "x".repeat(1025))
+    assert.equal(accepted.destroyed, true)
+
+    assert.equal(sendFrameReliably(slow, "first\0"), "sent")
+    assert.equal(sendFrameReliably(slow, "second\0"), "queued")
+    assert.deepEqual(getReliableSendQueueStats(slow), {
+        messages: 1,
+        bytes: Buffer.byteLength("second\0"),
+        blocked: true,
+    })
+    assert.equal(sendFrameReliably(slow, "overflow\0"), "closed")
+
+    await stopSessionServer()
+    const afterStop = new GuardrailSocket([false])
+    assert.equal(sendFrameReliably(afterStop, "first\0"), "sent")
+    assert.equal(sendFrameReliably(afterStop, "second\0"), "queued")
+    assert.equal(sendFrameReliably(afterStop, "third\0"), "queued")
+    afterStop.destroy()
+})
+
+test("explicit low-level guardrails override transport tuning", async () => {
+    const server = await startFakeServer({ transportTuning: TRANSPORT_TUNING })
+    const oversized = new GuardrailSocket()
+    const idle = new GuardrailSocket()
+
+    server.accept(oversized)
+    server.accept(idle)
+    assert.deepEqual(oversized.keepAlive, { enabled: true, initialDelay: 10_000 })
+    oversized.emit("data", "x".repeat(65))
+
+    assert.equal(oversized.destroyed, true)
+    await waitFor(() => idle.destroyed, "explicit handshake timeout did not take priority")
+})
+
+test("a failed server start restores default reliable send tuning", async () => {
+    await assert.rejects(startSessionServer({
+        transportTuning: TRANSPORT_TUNING,
+        createServer() {
+            throw new Error("injected startup failure")
+        },
+    }), /injected startup failure/)
+    const socket = new GuardrailSocket([false])
+
+    assert.equal(sendFrameReliably(socket, "first\0"), "sent")
+    assert.equal(sendFrameReliably(socket, "second\0"), "queued")
+    assert.equal(sendFrameReliably(socket, "third\0"), "queued")
+    socket.destroy()
 })
 
 test("a connection that never sends a handshake is retired", async () => {
