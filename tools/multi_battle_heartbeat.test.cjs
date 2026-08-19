@@ -5,7 +5,6 @@ const test = require("node:test")
 require("ts-node/register/transpile-only")
 
 const { SessionManager } = require("../src/multi/state/SessionManager")
-const { DEFAULT_MULTI_BATTLE_TUNING } = require("../src/multi/runtime/tuning")
 
 const SHORT_BATTLE_TUNING = Object.freeze({
     loadingLeaseMs: 80,
@@ -143,31 +142,30 @@ test("clearing battle state cancels leases and rejects late SceneReady", async (
     manager.removeClient(client)
 })
 
-test("battle tuning is snapshotted and frozen by the constructor", () => {
-    const configured = { loadingLeaseMs: 90, heartbeatLeaseMs: 70 }
+test("constructor snapshots battle tuning and configure applies to later clients", async () => {
+    const configured = { loadingLeaseMs: 30, heartbeatLeaseMs: 30 }
     const manager = new SessionManager({ battleTuning: configured })
+    configured.loadingLeaseMs = 1_000
+    const first = createBattleClient(manager, "heartbeat-snapshot-a")
 
-    configured.loadingLeaseMs = 1
+    manager.configureBattleTuning({ loadingLeaseMs: 120, heartbeatLeaseMs: 120 })
+    const second = createBattleClient(manager, "heartbeat-snapshot-b")
 
-    assert.deepEqual(manager.battleTuning, {
-        loadingLeaseMs: 90,
-        heartbeatLeaseMs: 70,
-    })
-    assert.equal(Object.isFrozen(manager.battleTuning), true)
+    await waitFor(() => first.socket.destroyed, "constructor tuning was not snapshotted", 100)
+    assert.equal(second.socket.destroyed, false)
+    await waitFor(() => second.socket.destroyed, "configured tuning was not applied", 180)
 })
 
-test("battle tuning can be configured and reset to the frozen defaults", () => {
+test("resetBattleTuning applies defaults to later clients", async () => {
     const manager = new SessionManager()
 
-    manager.configureBattleTuning({ loadingLeaseMs: 90, heartbeatLeaseMs: 70 })
-    assert.deepEqual(manager.battleTuning, {
-        loadingLeaseMs: 90,
-        heartbeatLeaseMs: 70,
-    })
-    assert.equal(Object.isFrozen(manager.battleTuning), true)
-
+    manager.configureBattleTuning({ loadingLeaseMs: 30, heartbeatLeaseMs: 30 })
     manager.resetBattleTuning()
-    assert.equal(manager.battleTuning, DEFAULT_MULTI_BATTLE_TUNING)
+    const { client, socket } = createBattleClient(manager, "heartbeat-reset-default")
+
+    await new Promise(resolve => setTimeout(resolve, 60))
+    assert.equal(socket.destroyed, false)
+    manager.removeClient(client)
 })
 
 test("battle tuning rejects non-positive, fractional, unsafe, and oversized durations", () => {
@@ -193,5 +191,4 @@ test("battle tuning rejects non-positive, fractional, unsafe, and oversized dura
         () => manager.configureBattleTuning({ loadingLeaseMs: 0, heartbeatLeaseMs: 80 }),
         TypeError,
     )
-    assert.equal(manager.battleTuning, DEFAULT_MULTI_BATTLE_TUNING)
 })
