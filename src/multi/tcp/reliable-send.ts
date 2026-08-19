@@ -22,28 +22,29 @@ interface SocketSendState {
     timeout: NodeJS.Timeout | null
 }
 
-export const MULTI_SEND_QUEUE_MAX_MESSAGES = DEFAULT_MULTI_TRANSPORT_TUNING.sendQueueMaxMessages
-export const MULTI_SEND_QUEUE_MAX_BYTES = DEFAULT_MULTI_TRANSPORT_TUNING.sendQueueMaxBytes
-export const MULTI_SEND_QUEUE_MAX_AGE_MS = DEFAULT_MULTI_TRANSPORT_TUNING.sendQueueMaxAgeMs
-
 const DEFAULT_RELIABLE_SEND_TUNING: ReliableSendTuning = Object.freeze({
-    maxMessages: MULTI_SEND_QUEUE_MAX_MESSAGES,
-    maxBytes: MULTI_SEND_QUEUE_MAX_BYTES,
-    maxAgeMs: MULTI_SEND_QUEUE_MAX_AGE_MS,
+    maxMessages: DEFAULT_MULTI_TRANSPORT_TUNING.sendQueueMaxMessages,
+    maxBytes: DEFAULT_MULTI_TRANSPORT_TUNING.sendQueueMaxBytes,
+    maxAgeMs: DEFAULT_MULTI_TRANSPORT_TUNING.sendQueueMaxAgeMs,
 })
 
 let reliableSendTuning = DEFAULT_RELIABLE_SEND_TUNING
 
-function assertSafeInteger(name: string, value: number, minimum: number): void {
-    if (!Number.isSafeInteger(value) || value < minimum) {
-        throw new TypeError(`${name} must be a safe integer greater than or equal to ${minimum}`)
+function assertSafeInteger(
+    name: string,
+    value: number,
+    minimum: number,
+    maximum = Number.MAX_SAFE_INTEGER,
+): void {
+    if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
+        throw new TypeError(`${name} must be a safe integer between ${minimum} and ${maximum}`)
     }
 }
 
 export function configureReliableSendTuning(tuning: ReliableSendTuning): void {
     assertSafeInteger("maxMessages", tuning.maxMessages, 1)
     assertSafeInteger("maxBytes", tuning.maxBytes, 1024)
-    assertSafeInteger("maxAgeMs", tuning.maxAgeMs, 1)
+    assertSafeInteger("maxAgeMs", tuning.maxAgeMs, 1, 2_147_483_647)
     reliableSendTuning = Object.freeze({ ...tuning })
 }
 

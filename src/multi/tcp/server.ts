@@ -417,8 +417,48 @@ function failureCode(error: unknown): string | null {
     return typeof code === "string" && LOGGABLE_FAILURE_CODES.has(code) ? code : null
 }
 
-function positiveInteger(value: number | undefined, fallback: number, minimum = 1): number {
-    return Number.isFinite(value) ? Math.max(minimum, Math.trunc(value!)) : fallback
+function effectiveValue(value: number | undefined, fallback: number): number {
+    return value === undefined ? fallback : value
+}
+
+function assertSafeInteger(
+    name: string,
+    value: number,
+    minimum: number,
+    maximum = Number.MAX_SAFE_INTEGER,
+): void {
+    if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
+        throw new TypeError(`${name} must be a safe integer between ${minimum} and ${maximum}`)
+    }
+}
+
+function normalizeTransportTuning(options: SessionServerOptions): MultiTransportTuning {
+    const configured = options.transportTuning ?? DEFAULT_MULTI_TRANSPORT_TUNING
+    const handshakeTimeoutMs = effectiveValue(
+        options.handshakeTimeoutMs,
+        configured.handshakeTimeoutMs,
+    )
+    const maxFrameBytes = effectiveValue(options.maxFrameBytes, configured.maxFrameBytes)
+    const maxBufferBytes = effectiveValue(options.maxBufferBytes, configured.maxBufferBytes)
+    const keepAliveInitialDelayMs = effectiveValue(
+        options.keepAliveInitialDelayMs,
+        configured.keepAliveInitialDelayMs,
+    )
+
+    assertSafeInteger("handshakeTimeoutMs", handshakeTimeoutMs, 1, 2_147_483_647)
+    assertSafeInteger("maxFrameBytes", maxFrameBytes, 1024)
+    assertSafeInteger("maxBufferBytes", maxBufferBytes, maxFrameBytes)
+    assertSafeInteger("keepAliveInitialDelayMs", keepAliveInitialDelayMs, 1)
+
+    return Object.freeze({
+        handshakeTimeoutMs,
+        maxFrameBytes,
+        maxBufferBytes,
+        keepAliveInitialDelayMs,
+        sendQueueMaxMessages: configured.sendQueueMaxMessages,
+        sendQueueMaxBytes: configured.sendQueueMaxBytes,
+        sendQueueMaxAgeMs: configured.sendQueueMaxAgeMs,
+    })
 }
 
 function hasOversizedBufferedFrame(buffer: string, maxFrameBytes: number): boolean {
@@ -591,9 +631,9 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
             admissionProvider: options.admissionProvider ?? DEFAULT_SESSION_ADMISSION_PROVIDER,
         })
     ))
-    const generation = ++generationSequence
-    const transportTuning = options.transportTuning ?? DEFAULT_MULTI_TRANSPORT_TUNING
+    let transportTuning: MultiTransportTuning
     try {
+        transportTuning = normalizeTransportTuning(options)
         configureReliableSendTuning({
             maxMessages: transportTuning.sendQueueMaxMessages,
             maxBytes: transportTuning.sendQueueMaxBytes,
@@ -605,10 +645,7 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
         phase = "failed"
         return Promise.reject(error)
     }
-    const maxFrameBytes = positiveInteger(
-        options.maxFrameBytes,
-        transportTuning.maxFrameBytes,
-    )
+    const generation = ++generationSequence
     let context!: ServerContext
     let createdServer: net.Server
     try {
@@ -629,20 +666,10 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
         onFatalError: options.onFatalError,
         validateNodeSession: options.validateNodeSession,
         nodeSessionCheckIntervalMs: options.nodeSessionCheckIntervalMs ?? 1_000,
-        handshakeTimeoutMs: positiveInteger(
-            options.handshakeTimeoutMs,
-            transportTuning.handshakeTimeoutMs,
-        ),
-        maxFrameBytes,
-        maxBufferBytes: positiveInteger(
-            options.maxBufferBytes,
-            transportTuning.maxBufferBytes,
-            maxFrameBytes,
-        ),
-        keepAliveInitialDelayMs: positiveInteger(
-            options.keepAliveInitialDelayMs,
-            transportTuning.keepAliveInitialDelayMs,
-        ),
+        handshakeTimeoutMs: transportTuning.handshakeTimeoutMs,
+        maxFrameBytes: transportTuning.maxFrameBytes,
+        maxBufferBytes: transportTuning.maxBufferBytes,
+        keepAliveInitialDelayMs: transportTuning.keepAliveInitialDelayMs,
         nodeSessionTimer: null,
         fatalStarted: false,
         fatalSettled: false,

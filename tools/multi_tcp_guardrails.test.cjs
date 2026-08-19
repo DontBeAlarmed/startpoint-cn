@@ -24,6 +24,10 @@ const TRANSPORT_TUNING = Object.freeze({
     sendQueueMaxAgeMs: 30,
 })
 
+function transportTuning(overrides = {}) {
+    return Object.freeze({ ...TRANSPORT_TUNING, ...overrides })
+}
+
 function waitFor(predicate, message, timeoutMs = 1_000) {
     const startedAt = Date.now()
     return new Promise((resolve, reject) => {
@@ -46,6 +50,7 @@ class GuardrailSocket extends EventEmitter {
     constructor(writeResults = []) {
         super()
         this.destroyed = false
+        this.destroyCalls = 0
         this.writable = true
         this.writableEnded = false
         this.noDelay = null
@@ -80,6 +85,7 @@ class GuardrailSocket extends EventEmitter {
     }
 
     destroy() {
+        this.destroyCalls++
         if (this.destroyed) return this
         this.destroyed = true
         this.writable = false
@@ -116,8 +122,8 @@ async function startFakeServer(options = {}) {
     let server
     await startSessionServer({
         handshakeTimeoutMs: 25,
-        maxFrameBytes: 64,
-        maxBufferBytes: 128,
+        maxFrameBytes: 1024,
+        maxBufferBytes: 2048,
         keepAliveInitialDelayMs: 10_000,
         ...options,
         createServer(connectionListener) {
@@ -153,42 +159,157 @@ test("transport tuning configures guardrails and reliable send for one server ge
         },
     })
     const accepted = new GuardrailSocket()
-    const slow = new GuardrailSocket([false])
+    const limitSlow = new GuardrailSocket([false])
+    const activeSlow = new GuardrailSocket([false])
 
     server.accept(accepted)
+    server.accept(activeSlow)
     assert.deepEqual(accepted.keepAlive, { enabled: true, initialDelay: 4321 })
     accepted.emit("data", "x".repeat(1025))
     assert.equal(accepted.destroyed, true)
 
-    assert.equal(sendFrameReliably(slow, "first\0"), "sent")
-    assert.equal(sendFrameReliably(slow, "second\0"), "queued")
-    assert.deepEqual(getReliableSendQueueStats(slow), {
+    assert.equal(sendFrameReliably(limitSlow, "first\0"), "sent")
+    assert.equal(sendFrameReliably(limitSlow, "second\0"), "queued")
+    assert.deepEqual(getReliableSendQueueStats(limitSlow), {
         messages: 1,
         bytes: Buffer.byteLength("second\0"),
         blocked: true,
     })
-    assert.equal(sendFrameReliably(slow, "overflow\0"), "closed")
+    assert.equal(sendFrameReliably(limitSlow, "overflow\0"), "closed")
+    const originalSetTimeout = global.setTimeout
+    const originalClearTimeout = global.clearTimeout
+    let backpressureTimer
+    let backpressureTimerCleared = false
+    global.setTimeout = (callback, delay, ...args) => {
+        const timer = originalSetTimeout(callback, delay, ...args)
+        if (backpressureTimer === undefined && delay <= TRANSPORT_TUNING.sendQueueMaxAgeMs) {
+            backpressureTimer = timer
+        }
+        return timer
+    }
+    global.clearTimeout = timer => {
+        if (timer === backpressureTimer) backpressureTimerCleared = true
+        return originalClearTimeout(timer)
+    }
+    try {
+        assert.equal(sendFrameReliably(activeSlow, "first\0"), "sent")
+        assert.equal(sendFrameReliably(activeSlow, "second\0"), "queued")
+        await stopSessionServer()
+    } finally {
+        global.setTimeout = originalSetTimeout
+        global.clearTimeout = originalClearTimeout
+    }
+    assert.deepEqual(getReliableSendQueueStats(activeSlow), {
+        messages: 0,
+        bytes: 0,
+        blocked: false,
+    })
+    assert.ok(backpressureTimer)
+    assert.equal(backpressureTimerCleared, true)
+    await new Promise(resolve => setTimeout(resolve, 40))
+    assert.equal(activeSlow.destroyCalls, 1)
 
-    await stopSessionServer()
     const afterStop = new GuardrailSocket([false])
     assert.equal(sendFrameReliably(afterStop, "first\0"), "sent")
     assert.equal(sendFrameReliably(afterStop, "second\0"), "queued")
     assert.equal(sendFrameReliably(afterStop, "third\0"), "queued")
     afterStop.destroy()
+
+    let nextServer
+    await startSessionServer({
+        transportTuning: transportTuning({ sendQueueMaxMessages: 2 }),
+        createServer(connectionListener) {
+            nextServer = new FakeServer(connectionListener)
+            return nextServer
+        },
+    })
+    const nextSlow = new GuardrailSocket([false])
+    nextServer.accept(nextSlow)
+    assert.equal(sendFrameReliably(nextSlow, "first\0"), "sent")
+    assert.equal(sendFrameReliably(nextSlow, "second\0"), "queued")
+    assert.equal(sendFrameReliably(nextSlow, "third\0"), "queued")
+    assert.equal(sendFrameReliably(nextSlow, "overflow\0"), "closed")
 })
 
 test("explicit low-level guardrails override transport tuning", async () => {
-    const server = await startFakeServer({ transportTuning: TRANSPORT_TUNING })
-    const oversized = new GuardrailSocket()
+    let releaseHandshake
+    const pending = new Promise(resolve => { releaseHandshake = resolve })
+    const server = await startFakeServer({
+        transportTuning: transportTuning({
+            handshakeTimeoutMs: 1.5,
+            maxFrameBytes: 1023,
+            maxBufferBytes: 1023,
+            keepAliveInitialDelayMs: 0,
+        }),
+        maxFrameBytes: 1536,
+        maxBufferBytes: 3072,
+        async handleHandshake() {
+            await pending
+        },
+    })
+    const whitespace = new GuardrailSocket()
+    const buffered = new GuardrailSocket()
     const idle = new GuardrailSocket()
 
-    server.accept(oversized)
+    server.accept(whitespace)
+    server.accept(buffered)
     server.accept(idle)
-    assert.deepEqual(oversized.keepAlive, { enabled: true, initialDelay: 10_000 })
-    oversized.emit("data", "x".repeat(65))
+    assert.deepEqual(whitespace.keepAlive, { enabled: true, initialDelay: 10_000 })
+    whitespace.emit("data", `${" ".repeat(1200)}\0`)
+    buffered.emit("data", `${JSON.stringify({ socklet: "cooperation_room" })}\0`)
+    buffered.emit("data", `${JSON.stringify([0, ["x".repeat(1150)]])}\0`)
+    buffered.emit("data", `${JSON.stringify([0, ["y".repeat(1150)]])}\0`)
 
-    assert.equal(oversized.destroyed, true)
+    assert.equal(whitespace.destroyed, false)
+    assert.equal(buffered.destroyed, false)
     await waitFor(() => idle.destroyed, "explicit handshake timeout did not take priority")
+    releaseHandshake()
+    buffered.destroy()
+})
+
+test("invalid final transport values fail atomically before server creation", async () => {
+    const invalidOptions = [
+        { handshakeTimeoutMs: 0 },
+        { handshakeTimeoutMs: 1.5 },
+        { handshakeTimeoutMs: 2_147_483_648 },
+        { maxFrameBytes: 1023 },
+        { maxFrameBytes: Number.MAX_SAFE_INTEGER + 1 },
+        { maxFrameBytes: 1024, maxBufferBytes: 1023 },
+        { maxFrameBytes: 1024, maxBufferBytes: 2048.5 },
+        { maxBufferBytes: Number.MAX_SAFE_INTEGER + 1 },
+        { keepAliveInitialDelayMs: 0 },
+        { keepAliveInitialDelayMs: 1.5 },
+        { keepAliveInitialDelayMs: Number.MAX_SAFE_INTEGER + 1 },
+        { transportTuning: transportTuning({ maxFrameBytes: 1023 }) },
+        { transportTuning: transportTuning({ sendQueueMaxAgeMs: 2_147_483_648 }) },
+    ]
+
+    for (const options of invalidOptions) {
+        let createCalls = 0
+        const result = await startSessionServer({
+            ...options,
+            createServer(connectionListener) {
+                createCalls++
+                return new FakeServer(connectionListener)
+            },
+        }).then(
+            () => ({ status: "resolved" }),
+            error => ({ status: "rejected", error }),
+        )
+        const phase = getSessionServerStatus().phase
+        if (result.status === "resolved") await stopSessionServer()
+
+        assert.equal(result.status, "rejected")
+        assert.equal(result.error instanceof TypeError, true)
+        assert.equal(createCalls, 0)
+        assert.equal(phase, "failed")
+    }
+
+    const socket = new GuardrailSocket([false])
+    assert.equal(sendFrameReliably(socket, "first\0"), "sent")
+    assert.equal(sendFrameReliably(socket, "second\0"), "queued")
+    assert.equal(sendFrameReliably(socket, "third\0"), "queued")
+    socket.destroy()
 })
 
 test("a failed server start restores default reliable send tuning", async () => {
@@ -204,6 +325,66 @@ test("a failed server start restores default reliable send tuning", async () => 
     assert.equal(sendFrameReliably(socket, "second\0"), "queued")
     assert.equal(sendFrameReliably(socket, "third\0"), "queued")
     socket.destroy()
+})
+
+test("an asynchronous listen error restores default reliable send tuning", async () => {
+    let failedServer
+    const startPromise = startSessionServer({
+        transportTuning: TRANSPORT_TUNING,
+        createServer(connectionListener) {
+            failedServer = new FakeServer(connectionListener)
+            failedServer.listen = function failListen() {
+                queueMicrotask(() => this.emit("error", new Error("async listen failure")))
+                return this
+            }
+            return failedServer
+        },
+    })
+
+    await assert.rejects(startPromise, /async listen failure/)
+    await waitFor(
+        () => failedServer.listenerCount("error") === 0,
+        "failed startup server retained its error listener",
+    )
+    const socket = new GuardrailSocket([false])
+    assert.equal(sendFrameReliably(socket, "first\0"), "sent")
+    assert.equal(sendFrameReliably(socket, "second\0"), "queued")
+    assert.equal(sendFrameReliably(socket, "third\0"), "queued")
+    socket.destroy()
+})
+
+test("runtime fatal teardown clears active backpressure state and restores defaults", async () => {
+    let server
+    await startSessionServer({
+        transportTuning: TRANSPORT_TUNING,
+        createServer(connectionListener) {
+            server = new FakeServer(connectionListener)
+            return server
+        },
+    })
+    const active = new GuardrailSocket([false])
+    server.accept(active)
+    assert.equal(sendFrameReliably(active, "first\0"), "sent")
+    assert.equal(sendFrameReliably(active, "second\0"), "queued")
+
+    server.emit("error", new Error("runtime fatal failure"))
+    await waitFor(
+        () => !server.listening && server.listenerCount("error") === 0,
+        "fatal teardown did not finish",
+    )
+    assert.deepEqual(getReliableSendQueueStats(active), {
+        messages: 0,
+        bytes: 0,
+        blocked: false,
+    })
+    await new Promise(resolve => setTimeout(resolve, 40))
+    assert.equal(active.destroyCalls, 1)
+
+    const afterFatal = new GuardrailSocket([false])
+    assert.equal(sendFrameReliably(afterFatal, "first\0"), "sent")
+    assert.equal(sendFrameReliably(afterFatal, "second\0"), "queued")
+    assert.equal(sendFrameReliably(afterFatal, "third\0"), "queued")
+    afterFatal.destroy()
 })
 
 test("a connection that never sends a handshake is retired", async () => {
@@ -238,8 +419,8 @@ test("oversized complete and unterminated frames are rejected", async () => {
 
     server.accept(complete)
     server.accept(unterminated)
-    complete.emit("data", `${JSON.stringify({ socklet: "x".repeat(80) })}\0`)
-    unterminated.emit("data", "x".repeat(65))
+    complete.emit("data", `${JSON.stringify({ socklet: "x".repeat(1100) })}\0`)
+    unterminated.emit("data", "x".repeat(1025))
 
     assert.equal(complete.destroyed, true)
     assert.equal(unterminated.destroyed, true)
@@ -257,9 +438,9 @@ test("the accumulated receive buffer is bounded while a handshake is pending", a
 
     server.accept(socket)
     socket.emit("data", `${JSON.stringify({ socklet: "cooperation_room" })}\0`)
-    socket.emit("data", `${JSON.stringify([0, ["x".repeat(45)]])}\0`)
-    socket.emit("data", `${JSON.stringify([0, ["y".repeat(45)]])}\0`)
-    socket.emit("data", `${JSON.stringify([0, ["z".repeat(45)]])}\0`)
+    socket.emit("data", `${JSON.stringify([0, ["x".repeat(700)]])}\0`)
+    socket.emit("data", `${JSON.stringify([0, ["y".repeat(700)]])}\0`)
+    socket.emit("data", `${JSON.stringify([0, ["z".repeat(700)]])}\0`)
 
     assert.equal(socket.destroyed, true)
     releaseHandshake()
@@ -282,9 +463,9 @@ test("frame size is enforced before whitespace skipping and while handshake work
 
     server.accept(whitespace)
     server.accept(pendingFrame)
-    whitespace.emit("data", `${" ".repeat(65)}\0`)
+    whitespace.emit("data", `${" ".repeat(1025)}\0`)
     pendingFrame.emit("data", `${JSON.stringify({ socklet: "cooperation_room" })}\0`)
-    pendingFrame.emit("data", `${"x".repeat(65)}\0`)
+    pendingFrame.emit("data", `${"x".repeat(1025)}\0`)
 
     assert.equal(whitespace.destroyed, true)
     assert.equal(pendingFrame.destroyed, true)

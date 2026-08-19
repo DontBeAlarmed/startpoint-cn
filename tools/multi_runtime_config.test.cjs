@@ -550,6 +550,19 @@ function hostRuntimeConfig(label = "hub.internal") {
 test("runtime service forwards multiplayer tuning to the TCP lifecycle", async () => {
     const received = []
     const tuning = {
+        transport: {
+            handshakeTimeoutMs: 16000,
+            maxFrameBytes: 524288,
+            maxBufferBytes: 2097152,
+            keepAliveInitialDelayMs: 11000,
+            sendQueueMaxMessages: 768,
+            sendQueueMaxBytes: 8388608,
+            sendQueueMaxAgeMs: 17000,
+        },
+        battle: {
+            loadingLeaseMs: 70000,
+            heartbeatLeaseMs: 30000,
+        },
         roomCleanup: {
             incompleteExpiryMs: 120000,
             fullExpiryMs: 240000,
@@ -572,19 +585,17 @@ test("runtime service forwards multiplayer tuning to the TCP lifecycle", async (
         isHubListening: () => true,
     })
 
+    await service.start({
+        mode: "embedded",
+        tcp: { host: "127.0.0.1", port: 8003 },
+    }, undefined, tuning)
+    await service.stop()
     await service.start(hostRuntimeConfig(), undefined, tuning)
     await service.stop()
 
-    assert.deepEqual(received, [tuning])
-})
-
-test("production runtime service forwards the transport snapshot to the session server", () => {
-    const source = fs.readFileSync(
-        path.join(projectRoot, "src/multi/runtime/service.ts"),
-        "utf8",
-    )
-
-    assert.match(source, /startSessionServer\(\{[\s\S]*?transportTuning:\s*tuning\?\.transport/)
+    assert.equal(received.length, 2)
+    assert.equal(received[0], tuning)
+    assert.equal(received[1], tuning)
 })
 
 test("embedded runtime context exposes its configured TCP endpoint", async () => {

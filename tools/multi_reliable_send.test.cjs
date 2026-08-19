@@ -73,7 +73,13 @@ test("reliable send tuning rejects unsafe queue limits", () => {
             maxAgeMs: 30,
         }), TypeError)
     }
-    for (const maxAgeMs of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    for (const maxAgeMs of [
+        0,
+        -1,
+        1.5,
+        2_147_483_648,
+        Number.MAX_SAFE_INTEGER + 1,
+    ]) {
         assert.throws(() => configureReliableSendTuning({
             maxMessages: 2,
             maxBytes: 1024,

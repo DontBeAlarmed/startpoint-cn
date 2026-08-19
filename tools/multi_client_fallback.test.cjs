@@ -85,6 +85,7 @@ function createClientFixture(options = {}) {
     let tcpListening = false
     let tcpStarts = 0
     const tcpConfigs = []
+    const tcpTunings = []
     const remote = createCoordinator("remote")
     const local = createCoordinator("local")
     let controlAvailable = options.controlAvailable ?? true
@@ -112,9 +113,10 @@ function createClientFixture(options = {}) {
     }
 
     const service = createMultiRuntimeService({
-        startTcp: async config => {
+        startTcp: async (config, _onFatalError, _hostServices, tuning) => {
             tcpStarts++
             tcpConfigs.push(config)
+            tcpTunings.push(tuning)
             if (options.failTcp) throw new Error("fallback tcp unavailable")
             tcpListening = true
         },
@@ -138,6 +140,7 @@ function createClientFixture(options = {}) {
         local,
         activeOrigins,
         tcpConfigs,
+        tcpTunings,
         get tcpStarts() { return tcpStarts },
         setNow(value) { now = value },
         setControlAvailable(value) {
@@ -151,7 +154,7 @@ function createClientFixture(options = {}) {
                 token: "token",
             }
             if (options.tcpConfig) config.tcp = options.tcpConfig
-            await service.start(config)
+            await service.start(config, undefined, options.tuning)
         },
         async stop() {
             await service.stop()
@@ -208,6 +211,37 @@ test("Hub disconnect keeps an existing remote active quest remote and routes a n
     assert.equal(await context.resolveCoordinatorOrigin({ participant: participant(202) }), "local")
     assert.deepEqual(fixture.tcpConfigs[0], { host: "127.0.0.1", port: 8003 })
     assert.equal(fixture.service.getStatus().clientFallbackState, "local")
+})
+
+test("Client lazy fallback forwards the same runtime tuning snapshot", async t => {
+    const tuning = Object.freeze({
+        transport: Object.freeze({
+            handshakeTimeoutMs: 16000,
+            maxFrameBytes: 524288,
+            maxBufferBytes: 2097152,
+            keepAliveInitialDelayMs: 11000,
+            sendQueueMaxMessages: 768,
+            sendQueueMaxBytes: 8388608,
+            sendQueueMaxAgeMs: 17000,
+        }),
+        battle: Object.freeze({ loadingLeaseMs: 70000, heartbeatLeaseMs: 30000 }),
+        roomCleanup: Object.freeze({
+            incompleteExpiryMs: 120000,
+            fullExpiryMs: 240000,
+            intervalMs: 15000,
+            reconnectGraceMs: 18000,
+        }),
+        npcRecruitment: Object.freeze({ joinDelayMs: 250, readyDelayMs: 75 }),
+    })
+    const fixture = createClientFixture({ controlAvailable: false, tuning })
+    t.after(() => fixture.stop())
+    await fixture.start()
+
+    assert.deepEqual(fixture.tcpTunings, [])
+    await fixture.service.getHttpContext().resolveCoordinatorOrigin({ participant: participant(251) })
+
+    assert.equal(fixture.tcpTunings.length, 1)
+    assert.equal(fixture.tcpTunings[0], tuning)
 })
 
 test("local fallback TCP failure is degraded without tearing down HTTP or SQLite access", async t => {
