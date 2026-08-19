@@ -96,21 +96,126 @@ test("multiplayer lifecycle tuning is parsed into the startup snapshot", () => {
         },
     })
 
-    assert.deepEqual(config.multiTuning, {
-        roomCleanup: {
-            incompleteExpiryMs: 120000,
-            fullExpiryMs: 240000,
-            intervalMs: 15000,
-            reconnectGraceMs: 18000,
-        },
-        npcRecruitment: {
-            joinDelayMs: 250,
-            readyDelayMs: 75,
-        },
+    assert.deepEqual(config.multiTuning.roomCleanup, {
+        incompleteExpiryMs: 120000,
+        fullExpiryMs: 240000,
+        intervalMs: 15000,
+        reconnectGraceMs: 18000,
+    })
+    assert.deepEqual(config.multiTuning.npcRecruitment, {
+        joinDelayMs: 250,
+        readyDelayMs: 75,
     })
     assert.equal(Object.isFrozen(config.multiTuning), true)
     assert.equal(Object.isFrozen(config.multiTuning.roomCleanup), true)
     assert.equal(Object.isFrozen(config.multiTuning.npcRecruitment), true)
+})
+
+test("multiplayer transport and battle tuning defaults are frozen", () => {
+    const {
+        DEFAULT_MULTI_BATTLE_TUNING,
+        DEFAULT_MULTI_TRANSPORT_TUNING,
+    } = require("../src/multi/runtime/tuning")
+    const config = parseCnRuntimeConfig({
+        projectRoot,
+        env: { ASSET_MODE: "client-owned" },
+    })
+
+    assert.deepEqual(DEFAULT_MULTI_TRANSPORT_TUNING, {
+        handshakeTimeoutMs: 15000,
+        maxFrameBytes: 262144,
+        maxBufferBytes: 1048576,
+        keepAliveInitialDelayMs: 10000,
+        sendQueueMaxMessages: 512,
+        sendQueueMaxBytes: 4194304,
+        sendQueueMaxAgeMs: 15000,
+    })
+    assert.deepEqual(DEFAULT_MULTI_BATTLE_TUNING, {
+        loadingLeaseMs: 60000,
+        heartbeatLeaseMs: 25000,
+    })
+    assert.equal(Object.isFrozen(DEFAULT_MULTI_TRANSPORT_TUNING), true)
+    assert.equal(Object.isFrozen(DEFAULT_MULTI_BATTLE_TUNING), true)
+    assert.deepEqual(config.multiTuning.transport, DEFAULT_MULTI_TRANSPORT_TUNING)
+    assert.deepEqual(config.multiTuning.battle, DEFAULT_MULTI_BATTLE_TUNING)
+    assert.equal(Object.isFrozen(config.multiTuning.transport), true)
+    assert.equal(Object.isFrozen(config.multiTuning.battle), true)
+})
+
+test("multiplayer transport and battle tuning accept valid overrides", () => {
+    const config = parseCnRuntimeConfig({
+        projectRoot,
+        env: {
+            ASSET_MODE: "client-owned",
+            SESSION_HANDSHAKE_TIMEOUT_MS: "16000",
+            SESSION_MAX_FRAME_BYTES: "524288",
+            SESSION_MAX_BUFFER_BYTES: "2097152",
+            SESSION_TCP_KEEPALIVE_MS: "11000",
+            MULTI_SEND_QUEUE_MAX_MESSAGES: "768",
+            MULTI_SEND_QUEUE_MAX_BYTES: "8388608",
+            MULTI_SEND_QUEUE_MAX_AGE_MS: "17000",
+            BATTLE_LOADING_LEASE_MS: "70000",
+            BATTLE_HEARTBEAT_LEASE_MS: "30000",
+        },
+    })
+
+    assert.deepEqual(config.multiTuning.transport, {
+        handshakeTimeoutMs: 16000,
+        maxFrameBytes: 524288,
+        maxBufferBytes: 2097152,
+        keepAliveInitialDelayMs: 11000,
+        sendQueueMaxMessages: 768,
+        sendQueueMaxBytes: 8388608,
+        sendQueueMaxAgeMs: 17000,
+    })
+    assert.deepEqual(config.multiTuning.battle, {
+        loadingLeaseMs: 70000,
+        heartbeatLeaseMs: 30000,
+    })
+})
+
+test("multiplayer transport and battle tuning reject non-positive or unsafe integers", () => {
+    const variables = [
+        "SESSION_HANDSHAKE_TIMEOUT_MS",
+        "SESSION_MAX_FRAME_BYTES",
+        "SESSION_MAX_BUFFER_BYTES",
+        "SESSION_TCP_KEEPALIVE_MS",
+        "MULTI_SEND_QUEUE_MAX_MESSAGES",
+        "MULTI_SEND_QUEUE_MAX_BYTES",
+        "MULTI_SEND_QUEUE_MAX_AGE_MS",
+        "BATTLE_LOADING_LEASE_MS",
+        "BATTLE_HEARTBEAT_LEASE_MS",
+    ]
+
+    for (const variable of variables) {
+        for (const value of ["", "0", "-1", "1.5", "9007199254740992"]) {
+            assert.throws(() => parseCnRuntimeConfig({
+                projectRoot,
+                env: {
+                    ASSET_MODE: "client-owned",
+                    [variable]: value,
+                },
+            }), error => error?.code === "INVALID_RUNTIME_CONFIG")
+        }
+    }
+    assert.throws(() => parseCnRuntimeConfig({
+        projectRoot,
+        env: {
+            ASSET_MODE: "client-owned",
+            MULTI_SEND_QUEUE_MAX_BYTES: "1023",
+        },
+    }), error => error?.code === "INVALID_RUNTIME_CONFIG")
+})
+
+test("multiplayer transport tuning rejects a buffer smaller than one frame", () => {
+    assert.throws(() => parseCnRuntimeConfig({
+        projectRoot,
+        env: {
+            ASSET_MODE: "client-owned",
+            SESSION_MAX_FRAME_BYTES: "4096",
+            SESSION_MAX_BUFFER_BYTES: "4095",
+        },
+    }), error => error?.code === "INVALID_RUNTIME_CONFIG")
 })
 
 test("multiplayer lifecycle tuning rejects malformed millisecond values", () => {
@@ -449,14 +554,18 @@ test("embedded runtime context exposes its configured TCP endpoint", async () =>
 })
 
 test("multiplayer lifecycle modules do not read process.env directly", () => {
-    for (const relativePath of [
+    const directEnvironmentReaders = [
         "src/multi/room/manager.ts",
         "src/multi/tcp/lobby.ts",
         "src/multi/tcp/server.ts",
-    ]) {
+        "src/multi/state/SessionManager.ts",
+        "src/multi/tcp/reliable-send.ts",
+    ].filter(relativePath => {
         const source = fs.readFileSync(path.join(projectRoot, relativePath), "utf8")
-        assert.doesNotMatch(source, /process\.env/)
-    }
+        return /process\.env/.test(source)
+    })
+
+    assert.deepEqual(directEnvironmentReaders, [])
 })
 
 test("stop during TCP start prevents a late Host control listener", async () => {

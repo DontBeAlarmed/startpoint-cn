@@ -16,11 +16,26 @@ import {
     snapshotContentPathEnvironment,
     type ContentPathEnvironment,
 } from "../content/paths"
+import {
+    DEFAULT_MULTI_BATTLE_TUNING,
+    DEFAULT_MULTI_TRANSPORT_TUNING,
+    type MultiBattleTuning,
+    type MultiTransportTuning,
+} from "../multi/runtime/tuning"
 
 export interface RuntimeEnvironment extends AssetModeEnvironment {
     readonly SESSION_HOST?: string
     readonly SESSION_PORT?: string
     readonly SESSION_PUBLIC_HOST?: string
+    readonly SESSION_HANDSHAKE_TIMEOUT_MS?: string
+    readonly SESSION_MAX_FRAME_BYTES?: string
+    readonly SESSION_MAX_BUFFER_BYTES?: string
+    readonly SESSION_TCP_KEEPALIVE_MS?: string
+    readonly MULTI_SEND_QUEUE_MAX_MESSAGES?: string
+    readonly MULTI_SEND_QUEUE_MAX_BYTES?: string
+    readonly MULTI_SEND_QUEUE_MAX_AGE_MS?: string
+    readonly BATTLE_LOADING_LEASE_MS?: string
+    readonly BATTLE_HEARTBEAT_LEASE_MS?: string
     readonly IOS_COMPAT_ENABLED?: string
     readonly IOS_API_HOST?: string
     readonly IOS_API_SCHEME?: string
@@ -58,6 +73,8 @@ export interface RuntimeTcpServiceConfig extends RuntimeNetworkServiceConfig {
 }
 
 export interface MultiRuntimeTuningConfig {
+    readonly transport: MultiTransportTuning
+    readonly battle: MultiBattleTuning
     readonly roomCleanup: {
         readonly incompleteExpiryMs: number
         readonly fullExpiryMs: number
@@ -147,6 +164,18 @@ function parseMilliseconds(value: string | undefined, fallback: number): number 
     const milliseconds = Number(value)
     if (!Number.isSafeInteger(milliseconds)) throw new RuntimeConfigError()
     return milliseconds
+}
+
+function parsePositiveSafeInteger(
+    value: string | undefined,
+    fallback: number,
+    minimum = 1,
+): number {
+    if (value === undefined) return fallback
+    if (!/^\d+$/.test(value)) throw new RuntimeConfigError()
+    const parsed = Number(value)
+    if (!Number.isSafeInteger(parsed) || parsed < minimum) throw new RuntimeConfigError()
+    return parsed
 }
 
 function parseNonNegativeInteger(value: string | undefined, fallback: number): number {
@@ -345,7 +374,52 @@ function parseMultiRuntimeConfig(
 }
 
 function parseMultiRuntimeTuning(env: RuntimeEnvironment): MultiRuntimeTuningConfig {
+    const maxFrameBytes = parsePositiveSafeInteger(
+        env.SESSION_MAX_FRAME_BYTES,
+        DEFAULT_MULTI_TRANSPORT_TUNING.maxFrameBytes,
+    )
+    const maxBufferBytes = parsePositiveSafeInteger(
+        env.SESSION_MAX_BUFFER_BYTES,
+        DEFAULT_MULTI_TRANSPORT_TUNING.maxBufferBytes,
+    )
+    if (maxBufferBytes < maxFrameBytes) throw new RuntimeConfigError()
+
     return Object.freeze({
+        transport: Object.freeze({
+            handshakeTimeoutMs: parsePositiveSafeInteger(
+                env.SESSION_HANDSHAKE_TIMEOUT_MS,
+                DEFAULT_MULTI_TRANSPORT_TUNING.handshakeTimeoutMs,
+            ),
+            maxFrameBytes,
+            maxBufferBytes,
+            keepAliveInitialDelayMs: parsePositiveSafeInteger(
+                env.SESSION_TCP_KEEPALIVE_MS,
+                DEFAULT_MULTI_TRANSPORT_TUNING.keepAliveInitialDelayMs,
+            ),
+            sendQueueMaxMessages: parsePositiveSafeInteger(
+                env.MULTI_SEND_QUEUE_MAX_MESSAGES,
+                DEFAULT_MULTI_TRANSPORT_TUNING.sendQueueMaxMessages,
+            ),
+            sendQueueMaxBytes: parsePositiveSafeInteger(
+                env.MULTI_SEND_QUEUE_MAX_BYTES,
+                DEFAULT_MULTI_TRANSPORT_TUNING.sendQueueMaxBytes,
+                1024,
+            ),
+            sendQueueMaxAgeMs: parsePositiveSafeInteger(
+                env.MULTI_SEND_QUEUE_MAX_AGE_MS,
+                DEFAULT_MULTI_TRANSPORT_TUNING.sendQueueMaxAgeMs,
+            ),
+        }),
+        battle: Object.freeze({
+            loadingLeaseMs: parsePositiveSafeInteger(
+                env.BATTLE_LOADING_LEASE_MS,
+                DEFAULT_MULTI_BATTLE_TUNING.loadingLeaseMs,
+            ),
+            heartbeatLeaseMs: parsePositiveSafeInteger(
+                env.BATTLE_HEARTBEAT_LEASE_MS,
+                DEFAULT_MULTI_BATTLE_TUNING.heartbeatLeaseMs,
+            ),
+        }),
         roomCleanup: Object.freeze({
             incompleteExpiryMs: parseMilliseconds(env.MULTI_ROOM_INCOMPLETE_EXPIRY_MS, 900_000),
             fullExpiryMs: parseMilliseconds(env.MULTI_ROOM_FULL_EXPIRY_MS, 1_800_000),
