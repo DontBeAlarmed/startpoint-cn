@@ -61,6 +61,7 @@ import {
 import {
     ClientFallbackController,
 } from "./client-fallback"
+import { buildSessionServerOptions } from "./session-options"
 import { getPlayerActiveQuestSync } from "../../data/domains/quest_active"
 import { resolvePlayerIdSync } from "../../data/activeAccount"
 import { getSessionSync } from "../../data/domains/session"
@@ -172,19 +173,9 @@ function createClientHttpContext(
 function defaultDependencies(): MultiRuntimeServiceDependencies {
     const hub = new MultiHubControlServer()
     return {
-        startTcp: (config, onFatalError, hostServices, tuning) => startSessionServer({
-            ...config,
-            transportTuning: tuning?.transport,
-            battleTuning: tuning?.battle,
-            roomCleanup: tuning?.roomCleanup,
-            npcRecruitment: tuning?.npcRecruitment,
-            admissionProvider: hostServices?.admissionRegistry,
-            validateNodeSession: hostServices
-                ? nodeSessionId => nodeSessionId === EMBEDDED_NODE_SESSION_ID
-                    || hostServices.nodeSessions.isValid(nodeSessionId)
-                : undefined,
-            onFatalError: () => onFatalError(new Error("session server unavailable")),
-        }),
+        startTcp: (config, onFatalError, hostServices, tuning) => startSessionServer(
+            buildSessionServerOptions(config, onFatalError, hostServices, tuning),
+        ),
         stopTcp: stopSessionServer,
         isTcpListening: isSessionServerListening,
         startHub: (config, onFatalError, hostServices) => {

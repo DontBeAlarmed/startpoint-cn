@@ -49,6 +49,54 @@ function waitFor(predicate, message, timeoutMs = 1_000) {
     })
 }
 
+async function waitForImmediate(predicate, message, attempts = 20) {
+    for (let attempt = 0; attempt < attempts; attempt++) {
+        if (predicate()) return
+        await new Promise(resolve => setImmediate(resolve))
+    }
+    throw new Error(message)
+}
+
+function captureTimeouts() {
+    const originalSetTimeout = global.setTimeout
+    const originalClearTimeout = global.clearTimeout
+    const timers = []
+    const handles = new Set()
+
+    global.setTimeout = (callback, delayMs, ...args) => {
+        const timer = {
+            callback: () => callback(...args),
+            cleared: false,
+            delayMs,
+            unref() { return this },
+        }
+        timers.push(timer)
+        handles.add(timer)
+        return timer
+    }
+    global.clearTimeout = timer => {
+        if (handles.has(timer)) {
+            timer.cleared = true
+            return
+        }
+        originalClearTimeout(timer)
+    }
+
+    return {
+        mark: () => timers.length,
+        since: mark => timers.slice(mark),
+        oneSince(mark, delayMs, phase) {
+            const matches = timers.slice(mark).filter(timer => timer.delayMs === delayMs)
+            assert.equal(matches.length, 1, `${phase} expected one ${delayMs}ms timer`)
+            return matches[0]
+        },
+        restore() {
+            global.setTimeout = originalSetTimeout
+            global.clearTimeout = originalClearTimeout
+        },
+    }
+}
+
 class GuardrailSocket extends EventEmitter {
     constructor(writeResults = []) {
         super()
@@ -151,20 +199,35 @@ async function registerBattleClient(socket, data) {
     }
 }
 
-async function connectBattleClient(server, label) {
-    const socket = new GuardrailSocket()
-    const connectionId = `guardrail-battle-${label}-${++battleSequence}`
+async function connectBattleClient(
+    server,
+    label,
+    connectionId = `guardrail-battle-${label}-${++battleSequence}`,
+    writeResults = [],
+) {
+    const socket = new GuardrailSocket(writeResults)
     server.accept(socket)
     socket.emit("data", `${JSON.stringify({
         socklet: "cooperation_battle",
         room_number: `guardrail-room-${label}`,
         connection_id: connectionId,
     })}\0`)
-    await waitFor(
+    await waitForImmediate(
         () => sessionManager.getBattleClientBySocket(socket)?.connectionId === connectionId,
         "battle handshake did not register a session",
     )
     return socket
+}
+
+async function startDefaultBattleGeneration(captured, label, connectionId) {
+    const server = await startFakeServer({ handleHandshake: registerBattleClient })
+    const mark = captured.mark()
+    const socket = await connectBattleClient(server, label, connectionId)
+    const handshakeTimer = captured.oneSince(mark, 25, `${label} handshake`)
+    const loadingTimer = captured.oneSince(mark, 60_000, `${label} loading`)
+    assert.equal(handshakeTimer.cleared, true)
+    assert.equal(loadingTimer.cleared, false)
+    return { loadingTimer, server, socket }
 }
 
 test.afterEach(async () => {
@@ -265,27 +328,55 @@ test("transport tuning configures guardrails and reliable send for one server ge
 })
 
 test("battle lease tuning follows server generations and retired timers stay cleared", async () => {
-    const firstServer = await startFakeServer({
-        battleTuning: SHORT_BATTLE_TUNING,
-        handleHandshake: registerBattleClient,
-    })
-    const first = await connectBattleClient(firstServer, "generation-a")
+    const captured = captureTimeouts()
+    const connectionId = "guardrail-shared-generation-cid"
+    try {
+        const firstServer = await startFakeServer({
+            battleTuning: SHORT_BATTLE_TUNING,
+            handleHandshake: registerBattleClient,
+        })
+        const firstMark = captured.mark()
+        const first = await connectBattleClient(firstServer, "generation-a", connectionId)
+        const firstHandshakeTimer = captured.oneSince(firstMark, 25, "generation A handshake")
+        const firstLoadingTimer = captured.oneSince(firstMark, 35, "generation A loading")
+        assert.equal(firstHandshakeTimer.cleared, true)
+        assert.equal(firstLoadingTimer.cleared, false)
 
-    await stopSessionServer()
-    assert.equal(first.destroyCalls, 1)
+        await stopSessionServer()
+        assert.equal(firstLoadingTimer.cleared, true)
+        assert.equal(first.destroyCalls, 1)
 
-    const secondServer = await startFakeServer({
-        battleTuning: LONG_BATTLE_TUNING,
-        handleHandshake: registerBattleClient,
-    })
-    const second = await connectBattleClient(secondServer, "generation-b")
+        const secondServer = await startFakeServer({
+            battleTuning: LONG_BATTLE_TUNING,
+            handleHandshake: registerBattleClient,
+        })
+        const secondMark = captured.mark()
+        const second = await connectBattleClient(secondServer, "generation-b", connectionId)
+        const secondHandshakeTimer = captured.oneSince(secondMark, 25, "generation B handshake")
+        const secondLoadingTimer = captured.oneSince(secondMark, 120, "generation B loading")
+        assert.equal(secondHandshakeTimer.cleared, true)
+        assert.equal(secondLoadingTimer.cleared, false)
 
-    await new Promise(resolve => setTimeout(resolve, 60))
-    assert.equal(first.destroyCalls, 1)
-    assert.equal(second.destroyed, false)
+        firstLoadingTimer.callback()
+        assert.equal(first.destroyCalls, 1)
+        assert.equal(second.destroyed, false)
 
-    await waitFor(() => second.destroyed, "generation B loading lease did not expire", 180)
-    assert.equal(sessionManager.getBattleClientBySocket(second), undefined)
+        secondLoadingTimer.callback()
+        assert.equal(second.destroyed, true)
+        assert.equal(sessionManager.getBattleClientBySocket(second), undefined)
+
+        await stopSessionServer()
+        const defaultGeneration = await startDefaultBattleGeneration(
+            captured,
+            "generation-default-after-stop",
+            connectionId,
+        )
+        defaultGeneration.loadingTimer.callback()
+        assert.equal(defaultGeneration.socket.destroyed, true)
+    } finally {
+        await stopSessionServer()
+        captured.restore()
+    }
 })
 
 test("explicit low-level guardrails override transport tuning", async () => {
@@ -376,91 +467,144 @@ test("invalid final transport and battle values fail atomically before server cr
 })
 
 test("a failed server start restores default reliable send tuning", async () => {
-    await assert.rejects(startSessionServer({
-        transportTuning: TRANSPORT_TUNING,
-        battleTuning: SHORT_BATTLE_TUNING,
-        createServer() {
-            throw new Error("injected startup failure")
-        },
-    }), /injected startup failure/)
-    const socket = new GuardrailSocket([false])
+    const captured = captureTimeouts()
+    try {
+        await assert.rejects(startSessionServer({
+            transportTuning: TRANSPORT_TUNING,
+            battleTuning: SHORT_BATTLE_TUNING,
+            createServer() {
+                throw new Error("injected startup failure")
+            },
+        }), /injected startup failure/)
 
-    assert.equal(sendFrameReliably(socket, "first\0"), "sent")
-    assert.equal(sendFrameReliably(socket, "second\0"), "queued")
-    assert.equal(sendFrameReliably(socket, "third\0"), "queued")
-    socket.destroy()
+        const defaultGeneration = await startDefaultBattleGeneration(
+            captured,
+            "generation-default-after-startup-failure",
+            "guardrail-startup-failure-cid",
+        )
+        assert.equal(defaultGeneration.loadingTimer.delayMs, 60_000)
+
+        const socket = new GuardrailSocket([false])
+        const reliableMark = captured.mark()
+        assert.equal(sendFrameReliably(socket, "first\0"), "sent")
+        assert.equal(sendFrameReliably(socket, "second\0"), "queued")
+        assert.equal(sendFrameReliably(socket, "third\0"), "queued")
+        const reliableTimers = captured.since(reliableMark)
+        assert.equal(reliableTimers.length, 3)
+        assert.equal(reliableTimers.every(timer => timer.delayMs > 0 && timer.delayMs <= 15_000), true)
+        assert.deepEqual(reliableTimers.map(timer => timer.cleared), [true, true, false])
+        socket.destroy()
+        assert.equal(reliableTimers.at(-1).cleared, true)
+    } finally {
+        await stopSessionServer()
+        captured.restore()
+    }
 })
 
 test("an asynchronous listen error restores default reliable send tuning", async () => {
+    const captured = captureTimeouts()
     let failedServer
-    const startPromise = startSessionServer({
-        transportTuning: TRANSPORT_TUNING,
-        battleTuning: SHORT_BATTLE_TUNING,
-        createServer(connectionListener) {
-            failedServer = new FakeServer(connectionListener)
-            failedServer.listen = function failListen() {
-                queueMicrotask(() => this.emit("error", new Error("async listen failure")))
-                return this
-            }
-            return failedServer
-        },
-    })
+    try {
+        const startPromise = startSessionServer({
+            transportTuning: TRANSPORT_TUNING,
+            battleTuning: SHORT_BATTLE_TUNING,
+            createServer(connectionListener) {
+                failedServer = new FakeServer(connectionListener)
+                failedServer.listen = function failListen() {
+                    queueMicrotask(() => this.emit("error", new Error("async listen failure")))
+                    return this
+                }
+                return failedServer
+            },
+        })
 
-    await assert.rejects(startPromise, /async listen failure/)
-    await waitFor(
-        () => failedServer.listenerCount("error") === 0,
-        "failed startup server retained its error listener",
-    )
-    const socket = new GuardrailSocket([false])
-    assert.equal(sendFrameReliably(socket, "first\0"), "sent")
-    assert.equal(sendFrameReliably(socket, "second\0"), "queued")
-    assert.equal(sendFrameReliably(socket, "third\0"), "queued")
-    socket.destroy()
+        await assert.rejects(startPromise, /async listen failure/)
+        await waitForImmediate(
+            () => failedServer.listenerCount("error") === 0,
+            "failed startup server retained its error listener",
+        )
+        const defaultGeneration = await startDefaultBattleGeneration(
+            captured,
+            "generation-default-after-async-startup-failure",
+            "guardrail-async-startup-failure-cid",
+        )
+        assert.equal(defaultGeneration.loadingTimer.delayMs, 60_000)
+
+        const socket = new GuardrailSocket([false])
+        assert.equal(sendFrameReliably(socket, "first\0"), "sent")
+        assert.equal(sendFrameReliably(socket, "second\0"), "queued")
+        assert.equal(sendFrameReliably(socket, "third\0"), "queued")
+        socket.destroy()
+    } finally {
+        await stopSessionServer()
+        captured.restore()
+    }
 })
 
 test("runtime fatal teardown clears active backpressure state and restores defaults", async () => {
+    const captured = captureTimeouts()
+    const connectionId = "guardrail-fatal-shared-cid"
     let server
-    await startSessionServer({
-        transportTuning: TRANSPORT_TUNING,
-        battleTuning: SHORT_BATTLE_TUNING,
-        handleHandshake: registerBattleClient,
-        createServer(connectionListener) {
-            server = new FakeServer(connectionListener)
-            return server
-        },
-    })
-    const active = new GuardrailSocket([false])
-    server.accept(active)
-    active.emit("data", `${JSON.stringify({
-        socklet: "cooperation_battle",
-        room_number: "guardrail-room-fatal",
-        connection_id: `guardrail-fatal-${++battleSequence}`,
-    })}\0`)
-    await waitFor(
-        () => sessionManager.getBattleClientBySocket(active) !== undefined,
-        "fatal test battle handshake did not register",
-    )
-    assert.equal(sendFrameReliably(active, "first\0"), "sent")
-    assert.equal(sendFrameReliably(active, "second\0"), "queued")
+    try {
+        await startSessionServer({
+            transportTuning: TRANSPORT_TUNING,
+            battleTuning: SHORT_BATTLE_TUNING,
+            handleHandshake: registerBattleClient,
+            createServer(connectionListener) {
+                server = new FakeServer(connectionListener)
+                return server
+            },
+        })
+        const battleMark = captured.mark()
+        const active = await connectBattleClient(server, "fatal-a", connectionId, [false])
+        const loadingTimer = captured.oneSince(battleMark, 35, "fatal generation loading")
+        assert.equal(captured.oneSince(battleMark, 40, "fatal generation handshake").cleared, true)
 
-    server.emit("error", new Error("runtime fatal failure"))
-    await waitFor(
-        () => !server.listening && server.listenerCount("error") === 0,
-        "fatal teardown did not finish",
-    )
-    assert.deepEqual(getReliableSendQueueStats(active), {
-        messages: 0,
-        bytes: 0,
-        blocked: false,
-    })
-    await new Promise(resolve => setTimeout(resolve, 40))
-    assert.equal(active.destroyCalls, 1)
+        const reliableMark = captured.mark()
+        assert.deepEqual(active.writes, [])
+        assert.deepEqual(active.writeResults, [false])
+        assert.equal(sendFrameReliably(active, "first\0"), "sent")
+        assert.equal(sendFrameReliably(active, "second\0"), "queued")
+        const reliableTimers = captured.since(reliableMark)
+        assert.equal(reliableTimers.length, 2)
+        assert.equal(reliableTimers.every(timer => timer.delayMs > 0 && timer.delayMs <= 30), true)
+        assert.deepEqual(reliableTimers.map(timer => timer.cleared), [true, false])
 
-    const afterFatal = new GuardrailSocket([false])
-    assert.equal(sendFrameReliably(afterFatal, "first\0"), "sent")
-    assert.equal(sendFrameReliably(afterFatal, "second\0"), "queued")
-    assert.equal(sendFrameReliably(afterFatal, "third\0"), "queued")
-    afterFatal.destroy()
+        server.emit("error", new Error("runtime fatal failure"))
+        await waitForImmediate(
+            () => !server.listening && server.listenerCount("error") === 0,
+            "fatal teardown did not finish",
+        )
+        assert.equal(loadingTimer.cleared, true)
+        assert.equal(reliableTimers.at(-1).cleared, true)
+        assert.deepEqual(getReliableSendQueueStats(active), {
+            messages: 0,
+            bytes: 0,
+            blocked: false,
+        })
+        assert.equal(active.destroyCalls, 1)
+
+        const defaultGeneration = await startDefaultBattleGeneration(
+            captured,
+            "generation-default-after-fatal",
+            connectionId,
+        )
+        loadingTimer.callback()
+        assert.equal(active.destroyCalls, 1)
+        assert.equal(defaultGeneration.socket.destroyed, false)
+
+        defaultGeneration.loadingTimer.callback()
+        assert.equal(defaultGeneration.socket.destroyed, true)
+
+        const afterFatal = new GuardrailSocket([false])
+        assert.equal(sendFrameReliably(afterFatal, "first\0"), "sent")
+        assert.equal(sendFrameReliably(afterFatal, "second\0"), "queued")
+        assert.equal(sendFrameReliably(afterFatal, "third\0"), "queued")
+        afterFatal.destroy()
+    } finally {
+        await stopSessionServer()
+        captured.restore()
+    }
 })
 
 test("a connection that never sends a handshake is retired", async () => {

@@ -15,6 +15,40 @@ function createManager() {
     return new SessionManager({ battleTuning: SHORT_BATTLE_TUNING })
 }
 
+function captureTimeouts() {
+    const originalSetTimeout = global.setTimeout
+    const originalClearTimeout = global.clearTimeout
+    const timers = []
+    const handles = new Set()
+
+    global.setTimeout = (callback, delayMs, ...args) => {
+        const timer = {
+            callback: () => callback(...args),
+            cleared: false,
+            delayMs,
+            unref() { return this },
+        }
+        timers.push(timer)
+        handles.add(timer)
+        return timer
+    }
+    global.clearTimeout = timer => {
+        if (handles.has(timer)) {
+            timer.cleared = true
+            return
+        }
+        originalClearTimeout(timer)
+    }
+
+    return {
+        timers,
+        restore() {
+            global.setTimeout = originalSetTimeout
+            global.clearTimeout = originalClearTimeout
+        },
+    }
+}
+
 function waitFor(predicate, message, timeoutMs = 500) {
     const startedAt = Date.now()
     return new Promise((resolve, reject) => {
@@ -142,30 +176,56 @@ test("clearing battle state cancels leases and rejects late SceneReady", async (
     manager.removeClient(client)
 })
 
-test("constructor snapshots battle tuning and configure applies to later clients", async () => {
+test("constructor snapshots battle tuning and configure applies to later clients", () => {
+    const captured = captureTimeouts()
     const configured = { loadingLeaseMs: 30, heartbeatLeaseMs: 30 }
     const manager = new SessionManager({ battleTuning: configured })
-    configured.loadingLeaseMs = 1_000
-    const first = createBattleClient(manager, "heartbeat-snapshot-a")
+    let first
+    let second
+    try {
+        configured.loadingLeaseMs = 1_000
+        first = createBattleClient(manager, "heartbeat-snapshot-a")
+        const firstTimer = captured.timers.at(-1)
+        assert.equal(firstTimer.delayMs, 30)
 
-    manager.configureBattleTuning({ loadingLeaseMs: 120, heartbeatLeaseMs: 120 })
-    const second = createBattleClient(manager, "heartbeat-snapshot-b")
+        manager.configureBattleTuning({ loadingLeaseMs: 120, heartbeatLeaseMs: 120 })
+        second = createBattleClient(manager, "heartbeat-snapshot-b")
+        const secondTimer = captured.timers.at(-1)
+        assert.equal(secondTimer.delayMs, 120)
 
-    await waitFor(() => first.socket.destroyed, "constructor tuning was not snapshotted", 100)
-    assert.equal(second.socket.destroyed, false)
-    await waitFor(() => second.socket.destroyed, "configured tuning was not applied", 180)
+        firstTimer.callback()
+        assert.equal(first.socket.destroyed, true)
+        assert.equal(second.socket.destroyed, false)
+
+        secondTimer.callback()
+        assert.equal(second.socket.destroyed, true)
+    } finally {
+        if (first && !first.socket.destroyed) manager.removeClient(first.client)
+        if (second && !second.socket.destroyed) manager.removeClient(second.client)
+        captured.restore()
+    }
 })
 
-test("resetBattleTuning applies defaults to later clients", async () => {
+test("resetBattleTuning applies defaults to later clients", () => {
+    const captured = captureTimeouts()
     const manager = new SessionManager()
+    let battle
+    try {
+        manager.configureBattleTuning({ loadingLeaseMs: 30, heartbeatLeaseMs: 30 })
+        manager.resetBattleTuning()
+        battle = createBattleClient(manager, "heartbeat-reset-default")
+        const loadingTimer = captured.timers.at(-1)
 
-    manager.configureBattleTuning({ loadingLeaseMs: 30, heartbeatLeaseMs: 30 })
-    manager.resetBattleTuning()
-    const { client, socket } = createBattleClient(manager, "heartbeat-reset-default")
-
-    await new Promise(resolve => setTimeout(resolve, 60))
-    assert.equal(socket.destroyed, false)
-    manager.removeClient(client)
+        assert.equal(loadingTimer.delayMs, 60_000)
+        assert.equal(battle.socket.destroyed, false)
+        manager.removeClient(battle.client)
+        assert.equal(loadingTimer.cleared, true)
+    } finally {
+        if (battle && manager.getBattleClient(battle.client.connectionId) === battle.client) {
+            manager.removeClient(battle.client)
+        }
+        captured.restore()
+    }
 })
 
 test("battle tuning rejects non-positive, fractional, unsafe, and oversized durations", () => {
