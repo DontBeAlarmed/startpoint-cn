@@ -9,6 +9,8 @@ const {
     startSessionServer,
     stopSessionServer,
 } = require("../src/multi/tcp/server")
+const { sessionManager } = require("../src/multi/state/SessionManager")
+const { DEFAULT_MULTI_BATTLE_TUNING } = require("../src/multi/runtime/tuning")
 const {
     getReliableSendQueueStats,
     sendFrameReliably,
@@ -23,6 +25,7 @@ const TRANSPORT_TUNING = Object.freeze({
     sendQueueMaxBytes: 1024,
     sendQueueMaxAgeMs: 30,
 })
+const BATTLE_TUNING = Object.freeze({ loadingLeaseMs: 70, heartbeatLeaseMs: 60 })
 
 function transportTuning(overrides = {}) {
     return Object.freeze({ ...TRANSPORT_TUNING, ...overrides })
@@ -153,11 +156,14 @@ test("transport tuning configures guardrails and reliable send for one server ge
     let server
     await startSessionServer({
         transportTuning: TRANSPORT_TUNING,
+        battleTuning: BATTLE_TUNING,
         createServer(connectionListener) {
             server = new FakeServer(connectionListener)
             return server
         },
     })
+    assert.deepEqual(sessionManager.battleTuning, BATTLE_TUNING)
+    assert.equal(Object.isFrozen(sessionManager.battleTuning), true)
     const accepted = new GuardrailSocket()
     const limitSlow = new GuardrailSocket([false])
     const activeSlow = new GuardrailSocket([false])
@@ -199,6 +205,7 @@ test("transport tuning configures guardrails and reliable send for one server ge
         global.setTimeout = originalSetTimeout
         global.clearTimeout = originalClearTimeout
     }
+    assert.equal(sessionManager.battleTuning, DEFAULT_MULTI_BATTLE_TUNING)
     assert.deepEqual(getReliableSendQueueStats(activeSlow), {
         messages: 0,
         bytes: 0,
@@ -218,10 +225,15 @@ test("transport tuning configures guardrails and reliable send for one server ge
     let nextServer
     await startSessionServer({
         transportTuning: transportTuning({ sendQueueMaxMessages: 2 }),
+        battleTuning: { loadingLeaseMs: 90, heartbeatLeaseMs: 80 },
         createServer(connectionListener) {
             nextServer = new FakeServer(connectionListener)
             return nextServer
         },
+    })
+    assert.deepEqual(sessionManager.battleTuning, {
+        loadingLeaseMs: 90,
+        heartbeatLeaseMs: 80,
     })
     const nextSlow = new GuardrailSocket([false])
     nextServer.accept(nextSlow)
@@ -282,6 +294,12 @@ test("invalid final transport values fail atomically before server creation", as
         { keepAliveInitialDelayMs: Number.MAX_SAFE_INTEGER + 1 },
         { transportTuning: transportTuning({ maxFrameBytes: 1023 }) },
         { transportTuning: transportTuning({ sendQueueMaxAgeMs: 2_147_483_648 }) },
+        { battleTuning: { loadingLeaseMs: 0, heartbeatLeaseMs: 60 } },
+        { battleTuning: { loadingLeaseMs: 70, heartbeatLeaseMs: 2_147_483_648 } },
+        {
+            transportTuning: TRANSPORT_TUNING,
+            battleTuning: { loadingLeaseMs: 1.5, heartbeatLeaseMs: 60 },
+        },
     ]
 
     for (const options of invalidOptions) {
@@ -303,6 +321,7 @@ test("invalid final transport values fail atomically before server creation", as
         assert.equal(result.error instanceof TypeError, true)
         assert.equal(createCalls, 0)
         assert.equal(phase, "failed")
+        assert.equal(sessionManager.battleTuning, DEFAULT_MULTI_BATTLE_TUNING)
     }
 
     const socket = new GuardrailSocket([false])
@@ -315,10 +334,12 @@ test("invalid final transport values fail atomically before server creation", as
 test("a failed server start restores default reliable send tuning", async () => {
     await assert.rejects(startSessionServer({
         transportTuning: TRANSPORT_TUNING,
+        battleTuning: BATTLE_TUNING,
         createServer() {
             throw new Error("injected startup failure")
         },
     }), /injected startup failure/)
+    assert.equal(sessionManager.battleTuning, DEFAULT_MULTI_BATTLE_TUNING)
     const socket = new GuardrailSocket([false])
 
     assert.equal(sendFrameReliably(socket, "first\0"), "sent")
@@ -331,6 +352,7 @@ test("an asynchronous listen error restores default reliable send tuning", async
     let failedServer
     const startPromise = startSessionServer({
         transportTuning: TRANSPORT_TUNING,
+        battleTuning: BATTLE_TUNING,
         createServer(connectionListener) {
             failedServer = new FakeServer(connectionListener)
             failedServer.listen = function failListen() {
@@ -346,6 +368,7 @@ test("an asynchronous listen error restores default reliable send tuning", async
         () => failedServer.listenerCount("error") === 0,
         "failed startup server retained its error listener",
     )
+    assert.equal(sessionManager.battleTuning, DEFAULT_MULTI_BATTLE_TUNING)
     const socket = new GuardrailSocket([false])
     assert.equal(sendFrameReliably(socket, "first\0"), "sent")
     assert.equal(sendFrameReliably(socket, "second\0"), "queued")
@@ -357,6 +380,7 @@ test("runtime fatal teardown clears active backpressure state and restores defau
     let server
     await startSessionServer({
         transportTuning: TRANSPORT_TUNING,
+        battleTuning: BATTLE_TUNING,
         createServer(connectionListener) {
             server = new FakeServer(connectionListener)
             return server
@@ -372,6 +396,7 @@ test("runtime fatal teardown clears active backpressure state and restores defau
         () => !server.listening && server.listenerCount("error") === 0,
         "fatal teardown did not finish",
     )
+    assert.equal(sessionManager.battleTuning, DEFAULT_MULTI_BATTLE_TUNING)
     assert.deepEqual(getReliableSendQueueStats(active), {
         messages: 0,
         bytes: 0,

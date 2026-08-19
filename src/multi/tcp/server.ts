@@ -32,7 +32,9 @@ import {
     resetReliableSendTuning,
 } from "./reliable-send"
 import {
+    DEFAULT_MULTI_BATTLE_TUNING,
     DEFAULT_MULTI_TRANSPORT_TUNING,
+    type MultiBattleTuning,
     type MultiTransportTuning,
 } from "../runtime/tuning"
 
@@ -74,6 +76,7 @@ export interface SessionServerOptions {
     validateNodeSession?: (nodeSessionId: string) => boolean
     nodeSessionCheckIntervalMs?: number
     transportTuning?: MultiTransportTuning
+    battleTuning?: MultiBattleTuning
     handshakeTimeoutMs?: number
     maxFrameBytes?: number
     maxBufferBytes?: number
@@ -394,7 +397,12 @@ function stopSessionLifecycles(): void {
     stopRoomCleanup()
     stopLobbyLifecycle()
     resetNpcRecruitmentTiming()
+    resetGenerationTuning()
+}
+
+function resetGenerationTuning(): void {
     resetReliableSendTuning()
+    sessionManager.resetBattleTuning()
 }
 
 function settleStart(context: ServerContext, error?: Error): void {
@@ -459,6 +467,13 @@ function normalizeTransportTuning(options: SessionServerOptions): MultiTransport
         sendQueueMaxBytes: configured.sendQueueMaxBytes,
         sendQueueMaxAgeMs: configured.sendQueueMaxAgeMs,
     })
+}
+
+function normalizeBattleTuning(options: SessionServerOptions): MultiBattleTuning {
+    const configured = options.battleTuning ?? DEFAULT_MULTI_BATTLE_TUNING
+    assertSafeInteger("loadingLeaseMs", configured.loadingLeaseMs, 1, 2_147_483_647)
+    assertSafeInteger("heartbeatLeaseMs", configured.heartbeatLeaseMs, 1, 2_147_483_647)
+    return Object.freeze({ ...configured })
 }
 
 function hasOversizedBufferedFrame(buffer: string, maxFrameBytes: number): boolean {
@@ -632,16 +647,19 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
         })
     ))
     let transportTuning: MultiTransportTuning
+    let battleTuning: MultiBattleTuning
     try {
         transportTuning = normalizeTransportTuning(options)
+        battleTuning = normalizeBattleTuning(options)
         configureReliableSendTuning({
             maxMessages: transportTuning.sendQueueMaxMessages,
             maxBytes: transportTuning.sendQueueMaxBytes,
             maxAgeMs: transportTuning.sendQueueMaxAgeMs,
         })
+        sessionManager.configureBattleTuning(battleTuning)
     } catch (error) {
         recordFailure("startup", error)
-        resetReliableSendTuning()
+        resetGenerationTuning()
         phase = "failed"
         return Promise.reject(error)
     }
@@ -652,7 +670,7 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
         createdServer = createServer(socket => handleConnection(context, socket, handshakeHandler))
     } catch (error) {
         recordFailure("startup", error)
-        resetReliableSendTuning()
+        resetGenerationTuning()
         phase = "failed"
         return Promise.reject(error)
     }
@@ -722,7 +740,7 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
     } catch (error) {
         recordFailure("startup", error)
         settleStart(context, error as Error)
-        resetReliableSendTuning()
+        resetGenerationTuning()
         phase = "failed"
         finalizeContext(context)
     }

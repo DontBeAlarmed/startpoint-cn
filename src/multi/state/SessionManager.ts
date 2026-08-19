@@ -20,6 +20,14 @@ import type {
 import { BattleFactStore } from "../settlement/facts"
 import type { PlayerPartySnapshot, PlayerSnapshot } from "../snapshot/player-snapshot"
 import { sendFrameReliably } from "../tcp/reliable-send"
+import {
+    DEFAULT_MULTI_BATTLE_TUNING,
+    type MultiBattleTuning,
+} from "../runtime/tuning"
+
+export interface SessionManagerOptions {
+    readonly battleTuning?: MultiBattleTuning
+}
 
 export interface SessionMate {
     viewerId: number
@@ -80,10 +88,27 @@ export class SessionManager {
     private battleHeartbeatTimers = new Map<string, NodeJS.Timeout>()
     private battleLastActivityAt = new Map<string, number>()
     private battleConnectionPhase = new Map<string, "loading" | "active">()
+    private battleTuning: MultiBattleTuning
 
-    private parsePositiveDuration(name: string, fallback: number): number {
-        const parsed = Number.parseInt(process.env[name] ?? "", 10)
-        return Number.isFinite(parsed) ? Math.max(1, parsed) : fallback
+    constructor(options: SessionManagerOptions = {}) {
+        this.battleTuning = DEFAULT_MULTI_BATTLE_TUNING
+        if (options.battleTuning) this.configureBattleTuning(options.battleTuning)
+    }
+
+    configureBattleTuning(tuning: MultiBattleTuning): void {
+        this.assertBattleDuration("loadingLeaseMs", tuning.loadingLeaseMs)
+        this.assertBattleDuration("heartbeatLeaseMs", tuning.heartbeatLeaseMs)
+        this.battleTuning = Object.freeze({ ...tuning })
+    }
+
+    resetBattleTuning(): void {
+        this.battleTuning = DEFAULT_MULTI_BATTLE_TUNING
+    }
+
+    private assertBattleDuration(name: string, value: number): void {
+        if (!Number.isSafeInteger(value) || value < 1 || value > 2_147_483_647) {
+            throw new TypeError(`${name} must be a safe integer between 1 and 2147483647`)
+        }
     }
 
     private clearBattleHeartbeatLease(connectionId: string): void {
@@ -94,15 +119,18 @@ export class SessionManager {
         this.battleConnectionPhase.delete(connectionId)
     }
 
-    private scheduleActiveBattleHeartbeatLease(client: SessionClient, delayMs: number): void {
+    private scheduleActiveBattleHeartbeatLease(
+        client: SessionClient,
+        leaseMs: number,
+        delayMs: number,
+    ): void {
         if (this.cidToBattleClient.get(client.connectionId) !== client || client.socket.destroyed) return
-        const leaseMs = this.parsePositiveDuration("BATTLE_HEARTBEAT_LEASE_MS", 25_000)
         const timer = setTimeout(() => {
             this.battleHeartbeatTimers.delete(client.connectionId)
             if (this.cidToBattleClient.get(client.connectionId) !== client || client.socket.destroyed) return
             const inactiveMs = Date.now() - (this.battleLastActivityAt.get(client.connectionId) ?? 0)
             if (inactiveMs < leaseMs) {
-                this.scheduleActiveBattleHeartbeatLease(client, leaseMs - inactiveMs)
+                this.scheduleActiveBattleHeartbeatLease(client, leaseMs, leaseMs - inactiveMs)
                 return
             }
             console.warn(`[BATTLE] active connection lease expired: room=${client.roomNumber}`)
@@ -114,7 +142,7 @@ export class SessionManager {
 
     private armBattleLoadingLease(client: SessionClient): void {
         this.clearBattleHeartbeatLease(client.connectionId)
-        const leaseMs = this.parsePositiveDuration("BATTLE_LOADING_LEASE_MS", 60_000)
+        const leaseMs = this.battleTuning.loadingLeaseMs
         this.battleConnectionPhase.set(client.connectionId, "loading")
         this.battleLastActivityAt.set(client.connectionId, Date.now())
         const timer = setTimeout(() => {
@@ -130,12 +158,12 @@ export class SessionManager {
 
     private armActiveBattleHeartbeatLease(client: SessionClient): void {
         if (this.cidToBattleClient.get(client.connectionId) !== client || client.socket.destroyed) return
-        const leaseMs = this.parsePositiveDuration("BATTLE_HEARTBEAT_LEASE_MS", 25_000)
+        const leaseMs = this.battleTuning.heartbeatLeaseMs
         const previous = this.battleHeartbeatTimers.get(client.connectionId)
         if (previous) clearTimeout(previous)
         this.battleConnectionPhase.set(client.connectionId, "active")
         this.battleLastActivityAt.set(client.connectionId, Date.now())
-        this.scheduleActiveBattleHeartbeatLease(client, leaseMs)
+        this.scheduleActiveBattleHeartbeatLease(client, leaseMs, leaseMs)
     }
 
     private clearBattleHeartbeatLeasesForRoom(roomNumber: string): void {

@@ -639,6 +639,15 @@ test("multiplayer lifecycle modules do not read process.env directly", () => {
     assert.deepEqual(directEnvironmentReaders, [])
 })
 
+test("default runtime TCP startup forwards battle tuning to the session generation", () => {
+    const source = fs.readFileSync(
+        path.join(projectRoot, "src/multi/runtime/service.ts"),
+        "utf8",
+    )
+
+    assert.match(source, /battleTuning:\s*tuning\?\.battle/)
+})
+
 test("stop during TCP start prevents a late Host control listener", async () => {
     const tcpStarted = deferred()
     const calls = []

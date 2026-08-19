@@ -4,10 +4,17 @@ const test = require("node:test")
 
 require("ts-node/register/transpile-only")
 
-process.env.BATTLE_LOADING_LEASE_MS = "80"
-process.env.BATTLE_HEARTBEAT_LEASE_MS = "80"
-
 const { SessionManager } = require("../src/multi/state/SessionManager")
+const { DEFAULT_MULTI_BATTLE_TUNING } = require("../src/multi/runtime/tuning")
+
+const SHORT_BATTLE_TUNING = Object.freeze({
+    loadingLeaseMs: 80,
+    heartbeatLeaseMs: 80,
+})
+
+function createManager() {
+    return new SessionManager({ battleTuning: SHORT_BATTLE_TUNING })
+}
 
 function waitFor(predicate, message, timeoutMs = 500) {
     const startedAt = Date.now()
@@ -70,7 +77,7 @@ function createBattleClient(manager, roomNumber, connectionId = `heartbeat-${++s
 }
 
 test("a battle connection that never reaches SceneReady expires its loading lease", async () => {
-    const manager = new SessionManager()
+    const manager = createManager()
     const { client, socket } = createBattleClient(manager, "heartbeat-loading-room")
 
     await waitFor(() => socket.destroyed, "loading battle socket did not expire")
@@ -79,7 +86,7 @@ test("a battle connection that never reaches SceneReady expires its loading leas
 })
 
 test("battle activity extends the active lease without recreating the connection", async () => {
-    const manager = new SessionManager()
+    const manager = createManager()
     const roomNumber = "heartbeat-active-room"
     manager.setBattleExpectedCount(roomNumber, 1)
     const { client, socket } = createBattleClient(manager, roomNumber)
@@ -94,7 +101,7 @@ test("battle activity extends the active lease without recreating the connection
 })
 
 test("replacing a same-room battle socket cancels the old lease", async () => {
-    const manager = new SessionManager()
+    const manager = createManager()
     const first = createBattleClient(manager, "heartbeat-replace-room", "stable-cid")
     const second = createBattleClient(manager, "heartbeat-replace-room", "stable-cid")
 
@@ -105,7 +112,7 @@ test("replacing a same-room battle socket cancels the old lease", async () => {
 })
 
 test("a reconnect after the scene barrier is released enters the active lease", async () => {
-    const manager = new SessionManager()
+    const manager = createManager()
     const roomNumber = "heartbeat-reconnect-room"
     manager.setBattleExpectedCount(roomNumber, 1)
     const first = createBattleClient(manager, roomNumber, "reconnect-cid")
@@ -123,7 +130,7 @@ test("a reconnect after the scene barrier is released enters the active lease", 
 })
 
 test("clearing battle state cancels leases and rejects late SceneReady", async () => {
-    const manager = new SessionManager()
+    const manager = createManager()
     const roomNumber = "heartbeat-cleared-room"
     manager.setBattleExpectedCount(roomNumber, 1)
     const { client, socket } = createBattleClient(manager, roomNumber)
@@ -134,4 +141,57 @@ test("clearing battle state cancels leases and rejects late SceneReady", async (
 
     assert.equal(socket.destroyed, false)
     manager.removeClient(client)
+})
+
+test("battle tuning is snapshotted and frozen by the constructor", () => {
+    const configured = { loadingLeaseMs: 90, heartbeatLeaseMs: 70 }
+    const manager = new SessionManager({ battleTuning: configured })
+
+    configured.loadingLeaseMs = 1
+
+    assert.deepEqual(manager.battleTuning, {
+        loadingLeaseMs: 90,
+        heartbeatLeaseMs: 70,
+    })
+    assert.equal(Object.isFrozen(manager.battleTuning), true)
+})
+
+test("battle tuning can be configured and reset to the frozen defaults", () => {
+    const manager = new SessionManager()
+
+    manager.configureBattleTuning({ loadingLeaseMs: 90, heartbeatLeaseMs: 70 })
+    assert.deepEqual(manager.battleTuning, {
+        loadingLeaseMs: 90,
+        heartbeatLeaseMs: 70,
+    })
+    assert.equal(Object.isFrozen(manager.battleTuning), true)
+
+    manager.resetBattleTuning()
+    assert.equal(manager.battleTuning, DEFAULT_MULTI_BATTLE_TUNING)
+})
+
+test("battle tuning rejects non-positive, fractional, unsafe, and oversized durations", () => {
+    const invalidValues = [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, 2_147_483_648]
+
+    for (const value of invalidValues) {
+        assert.throws(
+            () => new SessionManager({
+                battleTuning: { loadingLeaseMs: value, heartbeatLeaseMs: 80 },
+            }),
+            TypeError,
+        )
+        assert.throws(
+            () => new SessionManager({
+                battleTuning: { loadingLeaseMs: 80, heartbeatLeaseMs: value },
+            }),
+            TypeError,
+        )
+    }
+
+    const manager = new SessionManager()
+    assert.throws(
+        () => manager.configureBattleTuning({ loadingLeaseMs: 0, heartbeatLeaseMs: 80 }),
+        TypeError,
+    )
+    assert.equal(manager.battleTuning, DEFAULT_MULTI_BATTLE_TUNING)
 })
