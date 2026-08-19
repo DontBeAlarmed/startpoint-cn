@@ -90,6 +90,7 @@ test("multiplayer lifecycle tuning is parsed into the startup snapshot", () => {
             MULTI_ROOM_INCOMPLETE_EXPIRY_MS: "120000",
             MULTI_ROOM_FULL_EXPIRY_MS: "240000",
             MULTI_ROOM_CLEAN_INTERVAL_MS: "15000",
+            MULTI_ROOM_RECONNECT_GRACE_MS: "18000",
             NPC_JOIN_DELAY_MS: "250",
             NPC_READY_DELAY_MS: "75",
         },
@@ -100,6 +101,7 @@ test("multiplayer lifecycle tuning is parsed into the startup snapshot", () => {
             incompleteExpiryMs: 120000,
             fullExpiryMs: 240000,
             intervalMs: 15000,
+            reconnectGraceMs: 18000,
         },
         npcRecruitment: {
             joinDelayMs: 250,
@@ -396,6 +398,7 @@ test("runtime service forwards multiplayer tuning to the TCP lifecycle", async (
             incompleteExpiryMs: 120000,
             fullExpiryMs: 240000,
             intervalMs: 15000,
+            reconnectGraceMs: 18000,
         },
         npcRecruitment: {
             joinDelayMs: 250,

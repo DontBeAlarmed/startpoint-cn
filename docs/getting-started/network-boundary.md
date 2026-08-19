@@ -27,6 +27,7 @@
 | `MULTI_ROOM_INCOMPLETE_EXPIRY_MS` | `900000` | 未满 3 人房间的过期时间 |
 | `MULTI_ROOM_FULL_EXPIRY_MS` | `1800000` | 满 3 人房间的过期时间 |
 | `MULTI_ROOM_CLEAN_INTERVAL_MS` | `60000` | 过期房间检查间隔 |
+| `MULTI_ROOM_RECONNECT_GRACE_MS` | `25000` | 战斗前网络断开后的成员重连宽限；明确 Bye 不使用该宽限 |
 | `NPC_JOIN_DELAY_MS` | `2000` | NPC 加入房间前的延迟 |
 | `NPC_READY_DELAY_MS` | `500` | NPC 加入后进入准备状态的额外延迟 |
 

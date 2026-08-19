@@ -23,6 +23,7 @@ export interface RoomCleanupOptions {
     incompleteExpiryMs?: number;
     fullExpiryMs?: number;
     intervalMs?: number;
+    reconnectGraceMs?: number;
     createInterval?: (callback: () => void, intervalMs: number) => RoomCleanupTimer;
     clearInterval?: (timer: RoomCleanupTimer) => void;
 }

@@ -296,7 +296,7 @@ Hub 可以在战斗结束后把房间恢复为可重赛状态，但旧 `battleSe
 - `prepare` 复核失败映射为现有通用 Failure 分支。
 - 只有房间实际不存在时才使用房间不存在响应。
 - TCP 直连但没有有效 admission 时拒绝握手。
-- `/start` 成功后在同一客户端进程内断线时保留本地 active quest，允许客户端隔离战斗或重试 finish；重新登录触发 `/load` 时，因国服客户端不能续接已经开始的多人场景，按中止事务清理并退款。
+- `/start` 成功后在同一客户端进程内断线时保留本地 active quest，允许客户端隔离战斗或重试 finish；重新登录触发 `/load` 时，因国服客户端不能续接已经开始的多人场景，按中止事务清理并退款。战斗前 lobby 的网络 close 只移除在线 socket，并保留成员资格至 `MULTI_ROOM_RECONNECT_GRACE_MS` 到期；客户端明确发送 `Bye` 时立即执行离开或解散。进入 `raising_state=4` 后的 lobby close/Bye 只关闭 lobby socket，不移除当局成员快照。
 - `/finish` 时 Hub 暂时不可达，不发奖、不删除 active quest，允许在完成记录 TTL 内重试。
 - Hub 已重启、暂时不可达或明确报告房间、战斗记录不存在时，重新登录均按联机中断处理，不推测战斗成功。
 - Host 的 Hub 控制端口或 TCP 故障只把多人状态标记为不可用，不关闭主 HTTP 或数据库。

@@ -41,6 +41,11 @@ const {
 const { sessionManager } = require("../src/multi/state/SessionManager")
 const { handleHandshake } = require("../src/multi/tcp/handshake")
 const { AdmissionRegistry } = require("../src/multi/admission/registry")
+const {
+    configureReconnectGraceMs,
+    handleSocketDisconnect,
+    resetReconnectGraceMs,
+} = require("../src/multi/tcp/lobby")
 const { handleMessage: handleLobbyMessage } = require("../src/multi/tcp/lobby")
 
 class FakeSocket extends EventEmitter {
@@ -298,6 +303,40 @@ test("the same node participant can reconnect without an identity conflict", asy
     assert.equal(sessionManager.getUniqueRoomClientByViewerId(117, room.room_number)?.socket, reconnected)
     assert.deepEqual(getRoom(room.room_number)?.member_participants, [participant])
     assert.equal(getRoom(room.room_number)?.room_number, room.room_number)
+})
+
+test("a TCP room reconnect cancels the pending network-disconnect cleanup", async t => {
+    configureReconnectGraceMs(25)
+    const registry = new AdmissionRegistry({ now: () => 1_000 })
+    const participant = { nodeSessionId: "node-reconnect", viewerId: 118 }
+    const room = createRoom(118, 1_118, 1, 1, 518, 0, 101, false, participant)
+    const issueAdmission = () => registry.issue({
+        roomNumber: room.room_number,
+        participant,
+        snapshot: snapshot(participant.viewerId),
+        expiresAt: 6_000,
+    })
+    issueAdmission()
+    const first = await handshake(room, participant.viewerId, { connectionId: "network-old" }, {
+        registry,
+        admit: false,
+    })
+    assert.equal(first.ended, false)
+    assert.equal(handleSocketDisconnect(first), true)
+
+    issueAdmission()
+    const reconnected = await handshake(room, participant.viewerId, { connectionId: "network-new" }, {
+        registry,
+        admit: false,
+    })
+    t.after(() => {
+        resetReconnectGraceMs()
+        sessionManager.removeClientBySocket(reconnected)
+        disbandRoom(room.room_number)
+    })
+    assert.equal(reconnected.ended, false)
+    await new Promise(resolve => setTimeout(resolve, 40))
+    assert.equal(isRoomMember(room, participant), true)
 })
 
 test("guest reconnect Enter makes the new connection authoritative for battle", async t => {

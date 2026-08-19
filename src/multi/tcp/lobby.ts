@@ -10,9 +10,11 @@ import {
     scheduleLobbyTask,
 } from "./lobby-lifecycle"
 import { updatePlayerSnapshotParty } from "../snapshot/player-snapshot"
+import { participantKey, type ParticipantIdentity } from "../coordinator/contracts"
 
 const DEFAULT_NPC_JOIN_DELAY_MS = 2_000
 const DEFAULT_NPC_READY_DELAY_MS = 500
+const DEFAULT_RECONNECT_GRACE_MS = 25_000
 
 export interface NpcRecruitmentTiming {
     readonly joinDelayMs: number
@@ -23,6 +25,92 @@ let npcRecruitmentTiming: NpcRecruitmentTiming = Object.freeze({
     joinDelayMs: DEFAULT_NPC_JOIN_DELAY_MS,
     readyDelayMs: DEFAULT_NPC_READY_DELAY_MS,
 })
+
+interface ReconnectLease {
+    readonly roomNumber: string
+    readonly participant: ParticipantIdentity
+    readonly timer: ReturnType<typeof setTimeout>
+}
+
+let reconnectGraceMs = DEFAULT_RECONNECT_GRACE_MS
+const reconnectLeases = new Map<string, ReconnectLease>()
+
+export function configureReconnectGraceMs(value = DEFAULT_RECONNECT_GRACE_MS): void {
+    if (!Number.isSafeInteger(value) || value <= 0) {
+        throw new TypeError("reconnect grace must be a positive safe integer")
+    }
+    reconnectGraceMs = value
+}
+
+export function resetReconnectGraceMs(): void {
+    for (const lease of reconnectLeases.values()) clearTimeout(lease.timer)
+    reconnectLeases.clear()
+    reconnectGraceMs = DEFAULT_RECONNECT_GRACE_MS
+}
+
+function reconnectKey(participant: ParticipantIdentity): string {
+    return participantKey(participant.nodeSessionId, participant.viewerId)
+}
+
+export function cancelReconnectLease(participant: ParticipantIdentity): void {
+    const key = reconnectKey(participant)
+    const lease = reconnectLeases.get(key)
+    if (!lease) return
+    clearTimeout(lease.timer)
+    reconnectLeases.delete(key)
+}
+
+function removeDisconnectedMate(roomNumber: string, viewerId: number): void {
+    const room = getRoom(roomNumber)
+    if (!room) return
+    const hostClient = findHostClient(roomNumber)
+    for (const connectedClient of sessionManager.getClientsInRoom(roomNumber)) {
+        connectedClient.mates = connectedClient.mates.filter(mate => mate.viewerId !== viewerId)
+    }
+    if (hostClient) {
+        room.mates = hostClient.mates.map(mate => ({
+            viewer_id: mate.viewerId ?? null,
+            com_id: mate.comId ?? 0,
+        }))
+        sessionManager.broadcastToRoom(roomNumber, [1, [1, hostClient.mates]])
+    } else {
+        room.mates = room.mates.filter(mate => mate.viewer_id !== viewerId)
+    }
+}
+
+function expireReconnectLease(key: string): void {
+    const lease = reconnectLeases.get(key)
+    if (!lease) return
+    reconnectLeases.delete(key)
+    const room = getRoom(lease.roomNumber)
+    if (!room || room.raising_state === 4) return
+
+    const isHost = sessionManager.isRoomHostParticipant(
+        lease.roomNumber,
+        lease.participant,
+    )
+    if (isHost) {
+        sessionManager.broadcastToRoom(lease.roomNumber, [1, [6, "multibattle_room_dismissed"]])
+        disbandRoom(lease.roomNumber)
+        return
+    }
+
+    if (removeRoomMember(lease.roomNumber, lease.participant)) {
+        removeDisconnectedMate(lease.roomNumber, lease.participant.viewerId)
+    }
+}
+
+function scheduleReconnectLease(roomNumber: string, participant: ParticipantIdentity): void {
+    cancelReconnectLease(participant)
+    const key = reconnectKey(participant)
+    const timer = setTimeout(() => expireReconnectLease(key), reconnectGraceMs)
+    timer.unref?.()
+    reconnectLeases.set(key, Object.freeze({
+        roomNumber,
+        participant: Object.freeze({ ...participant }),
+        timer,
+    }))
+}
 
 export function configureNpcRecruitmentTiming(
     options: Partial<NpcRecruitmentTiming> = {},
@@ -35,6 +123,10 @@ export function configureNpcRecruitmentTiming(
 
 export function resetNpcRecruitmentTiming(): void {
     configureNpcRecruitmentTiming()
+}
+
+export function handleParticipantReconnect(client: SessionClient): void {
+    if (client.participant) cancelReconnectLease(client.participant)
 }
 
 interface RoomRecruitmentState {
@@ -373,11 +465,28 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
     console.log(`[LOBBY] ${isHost ? "host" : "guest"} entered: room=${client.roomNumber}`)
 }
 
-function disconnectRoomClient(client: SessionClient): void {
+function disconnectRoomClient(client: SessionClient, reason: "network" | "explicit"): void {
     const isHost = !!client.participant
         && sessionManager.isRoomHostParticipant(client.roomNumber, client.participant)
     const room = getRoom(client.roomNumber)
     const preserveActiveBattle = room?.raising_state === 4
+
+    if (client.participant) cancelReconnectLease(client.participant)
+    if (preserveActiveBattle) {
+        sessionManager.removeClient(client)
+        try { client.socket.destroy() } catch {}
+        console.log(`[LOBBY] client left: role=${isHost ? "host" : "guest"} room=${client.roomNumber}`)
+        return
+    }
+
+    if (reason === "network") {
+        removeDisconnectedMate(client.roomNumber, client.viewerId)
+        sessionManager.removeClient(client)
+        if (client.participant) scheduleReconnectLease(client.roomNumber, client.participant)
+        console.log(`[LOBBY] client disconnected: role=${isHost ? "host" : "guest"} room=${client.roomNumber}`)
+        return
+    }
+
     if (isHost && !preserveActiveBattle) {
         sessionManager.broadcastToRoom(client.roomNumber, [1, [6, "multibattle_room_dismissed"]])
     }
@@ -405,12 +514,19 @@ function disconnectRoomClient(client: SessionClient): void {
 export function handleSocketDisconnect(socket: net.Socket): boolean {
     const client = findClientBySocket(socket)
     if (!client) return false
-    disconnectRoomClient(client)
+    disconnectRoomClient(client, "network")
+    return true
+}
+
+export function handleInvalidNodeSession(socket: net.Socket): boolean {
+    const client = findClientBySocket(socket)
+    if (!client) return false
+    disconnectRoomClient(client, "explicit")
     return true
 }
 
 function handleBye(_socket: net.Socket, client: SessionClient, _data: any[]): void {
-    disconnectRoomClient(client)
+    disconnectRoomClient(client, "explicit")
 }
 
 function handleChangeParty(_socket: net.Socket, client: SessionClient, data: any[]): void {

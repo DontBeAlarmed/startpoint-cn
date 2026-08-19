@@ -18,6 +18,7 @@ import {
 import { startLobbyLifecycle, stopLobbyLifecycle } from "./lobby-lifecycle"
 import {
     configureNpcRecruitmentTiming,
+    configureReconnectGraceMs,
     resetNpcRecruitmentTiming,
     type NpcRecruitmentTiming,
 } from "./lobby"
@@ -182,6 +183,14 @@ function hasValidNodeSession(context: ServerContext, socket: net.Socket): boolea
 
 function rejectInvalidNodeSession(context: ServerContext, socket: net.Socket): boolean {
     if (hasValidNodeSession(context, socket)) return false
+    try {
+        const lobby = require("./lobby") as {
+            handleInvalidNodeSession?: (candidate: net.Socket) => boolean
+        }
+        if (lobby.handleInvalidNodeSession?.(socket)) return true
+    } catch (error) {
+        console.error(`[TCP] invalid node session cleanup failed: code=${failureCode(error) ?? "UNKNOWN"}`)
+    }
     socket.destroy()
     return true
 }
@@ -657,6 +666,7 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
             if (activeContext !== context || phase !== "starting") return
             try {
                 startRoomCleanup(options.roomCleanup)
+                configureReconnectGraceMs(options.roomCleanup?.reconnectGraceMs)
                 configureNpcRecruitmentTiming(options.npcRecruitment)
                 startLobbyLifecycle()
                 startNodeSessionChecks(context)

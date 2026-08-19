@@ -17,7 +17,11 @@ try {
 const { getLobbyLifecycleStatus, startLobbyLifecycle, stopLobbyLifecycle } = lobbyLifecycle
 const {
     configureNpcRecruitmentTiming,
+    configureReconnectGraceMs,
+    handleParticipantReconnect,
     handleMessage,
+    handleSocketDisconnect,
+    resetReconnectGraceMs,
     resetNpcRecruitmentTiming,
 } = require("../src/multi/tcp/lobby")
 const { NpcMateProvider } = require("../src/multi/npc/controller")
@@ -128,6 +132,7 @@ function stubRecruitment(t, recruitedMates) {
 
 test.afterEach(() => {
     if (typeof stopLobbyLifecycle === "function") stopLobbyLifecycle()
+    if (typeof resetReconnectGraceMs === "function") resetReconnectGraceMs()
     if (typeof resetNpcRecruitmentTiming === "function") resetNpcRecruitmentTiming()
 })
 
@@ -249,6 +254,66 @@ test("a host Bye after StartBattle preserves the active battle room", t => {
 
     assert.equal(getRoom(room.room_number), room)
     assert.notEqual(sessionManager.getBattleParticipant(room.room_number, host.client.connectionId), undefined)
+})
+
+test("network disconnect keeps a pre-battle guest member during the reconnect grace", async t => {
+    configureReconnectGraceMs(25)
+    const { room, host, guests } = createLobbyRoom(t, 503, [603])
+    const guest = guests[0]
+    addRoomMember(room.room_number, guest.client.participant)
+
+    assert.equal(handleSocketDisconnect(guest.socket), true)
+    assert.equal(getRoom(room.room_number), room)
+    assert.equal(isRoomMember(room, guest.client.participant), true)
+    assert.equal(sessionManager.getClientBySocket(guest.socket), undefined)
+
+    await new Promise(resolve => setTimeout(resolve, 40))
+    assert.equal(isRoomMember(room, guest.client.participant), false)
+    assert.equal(getRoom(room.room_number), room)
+    void host
+})
+
+test("explicit Bye removes a pre-battle guest immediately", t => {
+    configureReconnectGraceMs(5_000)
+    const { room, guests } = createLobbyRoom(t, 504, [604])
+    const guest = guests[0]
+    addRoomMember(room.room_number, guest.client.participant)
+
+    handleMessage(guest.socket, [0, [1]])
+
+    assert.equal(isRoomMember(room, guest.client.participant), false)
+    assert.equal(getRoom(room.room_number), room)
+})
+
+test("a guest reconnect before the grace expires keeps the persistent member", async t => {
+    configureReconnectGraceMs(25)
+    const { room, host, guests } = createLobbyRoom(t, 505, [605])
+    const guest = guests[0]
+    addRoomMember(room.room_number, guest.client.participant)
+    assert.equal(handleSocketDisconnect(guest.socket), true)
+
+    const reconnected = createLobbyClient(
+        room,
+        guest.client.viewerId,
+        "guest-reconnected",
+        guest.client.participant.nodeSessionId,
+    )
+    handleParticipantReconnect(reconnected.client)
+    t.after(() => sessionManager.removeClientBySocket(reconnected.socket))
+    await new Promise(resolve => setTimeout(resolve, 40))
+
+    assert.equal(isRoomMember(room, guest.client.participant), true)
+    void host
+})
+
+test("a network-disconnected host is disbanded only after the reconnect grace", async t => {
+    configureReconnectGraceMs(25)
+    const { room, host } = createLobbyRoom(t, 506)
+
+    assert.equal(handleSocketDisconnect(host.socket), true)
+    assert.equal(getRoom(room.room_number), room)
+    await new Promise(resolve => setTimeout(resolve, 40))
+    assert.equal(getRoom(room.room_number), undefined)
 })
 
 test("lobby lifecycle logs retain role and room without client identity", async t => {

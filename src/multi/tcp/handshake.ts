@@ -200,6 +200,12 @@ export async function handleHandshake(
             deny(socket)
             return
         }
+        try {
+            const lobby = require("./lobby") as {
+                handleParticipantReconnect?: (candidate: SessionClient) => void
+            }
+            lobby.handleParticipantReconnect?.(client)
+        } catch {}
         sessionManager.sendJson(socket, [0, normalizedConnectionId, normalizedRoomNumber])
         return
     }
