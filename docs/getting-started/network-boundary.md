@@ -20,10 +20,19 @@
 
 绑定 `0.0.0.0` 表示监听所有本机网络接口，不等于服务端自动获得公网安全能力。`CDN_BASE_URL` 和 `SESSION_PUBLIC_HOST` 必须是客户端实际能够访问的地址，但项目不负责配置路由器、域名或外部网络。
 
-以下多人生命周期参数属于可选高级配置，普通部署应保留默认值：
+以下多人传输、战斗租约和生命周期参数属于可选高级配置，普通部署应保留默认值：
 
 | 变量 | 默认值 | 作用 |
 |---|---:|---|
+| `SESSION_HANDSHAKE_TIMEOUT_MS` | `15000` | TCP 首个握手帧的等待上限 |
+| `SESSION_MAX_FRAME_BYTES` | `262144` | 单个 TCP 帧的最大字节数 |
+| `SESSION_MAX_BUFFER_BYTES` | `1048576` | 单个连接未完成帧的累计接收缓冲上限，不能小于单帧上限 |
+| `SESSION_TCP_KEEPALIVE_MS` | `10000` | TCP keepalive 的初始延迟 |
+| `MULTI_SEND_QUEUE_MAX_MESSAGES` | `512` | 单个连接可靠发送队列的消息数上限 |
+| `MULTI_SEND_QUEUE_MAX_BYTES` | `4194304` | 单个连接可靠发送队列的累计字节上限 |
+| `MULTI_SEND_QUEUE_MAX_AGE_MS` | `15000` | 单个连接持续背压的最长等待时间 |
+| `BATTLE_LOADING_LEASE_MS` | `60000` | Battle 握手后等待 `SceneReady` 的连接租约 |
+| `BATTLE_HEARTBEAT_LEASE_MS` | `25000` | Battle active 阶段无业务帧时的连接租约 |
 | `MULTI_ROOM_INCOMPLETE_EXPIRY_MS` | `900000` | 未满 3 人房间的过期时间 |
 | `MULTI_ROOM_FULL_EXPIRY_MS` | `1800000` | 满 3 人房间的过期时间 |
 | `MULTI_ROOM_CLEAN_INTERVAL_MS` | `60000` | 过期房间检查间隔 |
@@ -31,7 +40,9 @@
 | `NPC_JOIN_DELAY_MS` | `2000` | NPC 加入房间前的延迟 |
 | `NPC_READY_DELAY_MS` | `500` | NPC 加入后进入准备状态的额外延迟 |
 
-这些值以毫秒为单位，仅在进程启动时解析并进入只读运行配置；修改后必须重启服务。管理后台不提供在线修改入口，运行过程中不会热更新；重启后的生命周期会使用新的配置。
+除消息数和字节数上限外，这些值均以毫秒为单位。它们仅在进程启动时解析并进入冻结的 `RuntimeConfig`；运行中修改 `.env` 不会生效，修改后必须重启服务。重启后，Embedded、Host 和 Client 本地 fallback TCP 都由同一份启动快照注入传输、战斗租约、房间清理和 NPC 招募配置。管理后台不提供在线修改入口。
+
+表中前九项传输与战斗调优值均须为正安全整数。`SESSION_MAX_FRAME_BYTES` 和 `MULTI_SEND_QUEUE_MAX_BYTES` 最低为 `1024`，`SESSION_MAX_BUFFER_BYTES` 不得小于 `SESSION_MAX_FRAME_BYTES`；`SESSION_HANDSHAKE_TIMEOUT_MS`、`MULTI_SEND_QUEUE_MAX_AGE_MS`、`BATTLE_LOADING_LEASE_MS` 和 `BATTLE_HEARTBEAT_LEASE_MS` 最高为 `2147483647`，`SESSION_TCP_KEEPALIVE_MS` 不受这一计时器上限约束。非法值会抛出 `INVALID_RUNTIME_CONFIG`，服务不会启动。
 
 `SUMMON_COM_SECONDS` 和 `DAILY_RESET_HOUR` 也属于同一份启动配置。后台 `/api/server/status` 使用启动时的 `RuntimeConfig` 与当前 `ContentSnapshot`，不会在每次请求时重新读取环境变量；客户端 `/load` 的抽卡演出和周期边界因此在同一进程内保持稳定。
 

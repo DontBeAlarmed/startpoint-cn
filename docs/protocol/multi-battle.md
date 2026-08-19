@@ -104,6 +104,15 @@ keepalive；发送方向每个 socket 单独排队，默认最多缓存 512 条�
 `SESSION_*` 与 `MULTI_SEND_QUEUE_*` 参数调整，调整应配合协议回归测试，不改变消息
 编码或房间权威归属。
 
+多人传输、战斗租约、房间清理和 NPC 招募参数统一由启动时解析并冻结的
+`RuntimeConfig.multiTuning` 提供。`MultiRuntimeService` 把同一份快照注入 Embedded、
+Host 和 Client 本地 fallback TCP，底层模块运行中不重新读取 `.env`。`startSessionServer()`
+只为测试或低层调试保留显式覆盖：`handshakeTimeoutMs`、`maxFrameBytes`、
+`maxBufferBytes` 和 `keepAliveInitialDelayMs` 四个标量可以独立覆盖 `transportTuning`
+中的对应字段；发送队列和 battle 租约则分别通过完整的 `transportTuning`、`battleTuning`
+对象注入。受支持的生产启动路径仍统一经过 `src/multi/runtime/session-options.ts`，把网络
+配置、调优快照、可选 Host 服务和 fatal 回调映射为 `SessionServerOptions`。
+
 ### 3.3 Battle 连接安全租约
 
 服务端把 battle socket 分为两个阶段：握手成功后等待 `SceneReady` 的 loading 阶段，
@@ -115,6 +124,16 @@ Leave、SceneReady 屏障和 battle fact 清理路径；重连保留窗口和 NP
 
 部署者可以通过 `BATTLE_LOADING_LEASE_MS` 与 `BATTLE_HEARTBEAT_LEASE_MS` 调整默认值，
 调整前应运行双服协议回归。
+
+每次连接布置或重置 battle timer 都形成新的 timer generation。超时回调只有在自己仍是
+该 connection ID 当前登记的 timer，且 client 仍是该 connection ID 当前连接时，才拥有
+清理和关闭连接的权利；连接被替换、租约被重置或 timer 被清除后，旧回调即使随后执行，
+也不能删除新 timer 或关闭替换后的连接。
+
+Session TCP 在正常 `stop`、fatal teardown 和 startup failure 路径都会把可靠发送与 battle
+租约调优恢复为默认值，后续 server generation 不继承前一代的临时状态。这些配置与
+生命周期防护只约束服务端资源使用，不改变 Typepacker 消息、Heartbeat 行为、房间状态或
+既有断线处理等协议语义。
 
 ## 4. HTTP 路由族
 
