@@ -51,6 +51,7 @@ export interface ParsedActiveMissionDefinition {
 
 export interface ParsedActiveMissionEventDefinition {
     readonly eventId: number
+    readonly stringId?: string
     readonly kind: number
     readonly maxPhase?: number
     readonly startTime: number
@@ -74,6 +75,11 @@ export interface PlannedActiveMissionRewardStage {
     readonly rewards: readonly ActiveMissionReward[]
 }
 
+export interface PlannedActiveMissionTargetRequirement {
+    readonly missionId: number
+    readonly completionProgress: number | null
+}
+
 export interface PlannedActiveMissionDefinition {
     readonly missionId: number
     readonly pattern: number
@@ -81,6 +87,7 @@ export interface PlannedActiveMissionDefinition {
     readonly row: readonly unknown[]
     readonly rewardStages: readonly PlannedActiveMissionRewardStage[]
     readonly questRange: ActiveMissionQuestRange | null
+    readonly targetMissionRequirements: readonly PlannedActiveMissionTargetRequirement[]
 }
 
 export interface ActiveMissionPlan {

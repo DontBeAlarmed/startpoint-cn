@@ -4,6 +4,7 @@ import type {
     ParsedActiveMissionEventDefinition,
     PlannedActiveMissionDefinition,
     PlannedActiveMissionRewardStage,
+    PlannedActiveMissionTargetRequirement,
 } from "./active-plan"
 import { parseActiveMissionQuestRange } from "./active-quest-range"
 import {
@@ -120,6 +121,7 @@ export function parseActiveMissionEventDefinition(
     eventId: number,
     row: readonly unknown[],
 ): ParsedActiveMissionEventDefinition {
+    const stringId = row[0]
     const maxPhase = parseOptionalInteger(row[3], "event max phase")
     const startTime = parseOptionalCnMasterDateTime(row[14], "event start time")
     if (startTime === undefined) throw new TypeError("Invalid Active Mission event start time.")
@@ -127,12 +129,42 @@ export function parseActiveMissionEventDefinition(
     const needQuestMultipliedId = parseOptionalInteger(row[22], "event prerequisite quest")
     return {
         eventId,
+        ...(typeof stringId === "string" ? { stringId } : {}),
         kind: parseRequiredInteger(row[2], "event kind"),
         ...(maxPhase !== undefined ? { maxPhase } : {}),
         startTime,
         ...(endTime !== undefined ? { endTime } : {}),
         ...(needQuestMultipliedId !== undefined ? { needQuestMultipliedId } : {}),
     }
+}
+
+function parseTargetMissionIds(value: unknown): readonly number[] {
+    if (NONE_VALUES.has(value)) return Object.freeze([])
+    if (typeof value !== "string" && typeof value !== "number") {
+        throw new TypeError("Invalid Active Mission target mission ids.")
+    }
+    return Object.freeze(String(value).split(",").map(item => {
+        const missionId = parseRequiredInteger(item, "target mission id")
+        if (missionId < 0) throw new TypeError("Invalid Active Mission target mission id.")
+        return missionId
+    }))
+}
+
+function buildTargetMissionRequirements(
+    pattern: number,
+    row: readonly unknown[],
+    rewardStages: ReadonlyMap<number, readonly PlannedActiveMissionRewardStage[]>,
+): readonly PlannedActiveMissionTargetRequirement[] {
+    if (pattern !== 13) return Object.freeze([])
+    return Object.freeze(parseTargetMissionIds(row[55]).map(missionId => {
+        const stages = rewardStages.get(missionId) ?? []
+        return Object.freeze({
+            missionId,
+            completionProgress: stages.length === 0
+                ? null
+                : Math.max(...stages.map(stage => stage.targetProgress)),
+        })
+    }))
 }
 
 function parseRewardInteger(value: unknown): number | undefined {
@@ -269,6 +301,11 @@ export function buildActiveMissionPlanSource(
                 row: entry.row,
                 rewardStages: missionRewardStages,
                 questRange: parseActiveMissionQuestRange(entry.row),
+                targetMissionRequirements: buildTargetMissionRequirements(
+                    pattern,
+                    entry.row,
+                    rewardStages,
+                ),
             }))
         } catch (error) {
             throw contextualError(missionTableName, entry.id, error)

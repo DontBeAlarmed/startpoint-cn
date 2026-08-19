@@ -87,6 +87,9 @@ assert.equal(computeActiveMissionFactProgress(65, practiceRow, state), 1)
 const unsupportedRow = []
 unsupportedRow[34] = "0"
 assert.equal(computeActiveMissionFactProgress(65, unsupportedRow, state), null)
+const emptyKindRow = []
+emptyKindRow[34] = ""
+assert.equal(computeActiveMissionFactProgress(65, emptyKindRow, state), null)
 
 const routeSource = fs.readFileSync(
     path.join(__dirname, "../src/routes/api/singleBattleQuest.ts"),

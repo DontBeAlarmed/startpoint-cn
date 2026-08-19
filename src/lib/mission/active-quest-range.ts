@@ -92,7 +92,7 @@ function matchesOptionalSelector(
     return selector === null || selector === undefined || selector.includes(value)
 }
 
-export function matchesPlannedActiveMissionQuestRange(
+export function matchesActiveMissionQuestRange(
     range: ActiveMissionQuestRange | null,
     category: number,
     questId: number,
@@ -115,4 +115,89 @@ export function matchesPlannedActiveMissionQuestRange(
     }
     return matchesOptionalSelector(range.eventIds, Math.floor(questId / 1_000))
         && matchesOptionalSelector(range.questNumbers, questId % 1_000)
+}
+
+/** 兼容 34.3 已发布的命名；新代码统一使用 matchesActiveMissionQuestRange。 */
+export const matchesPlannedActiveMissionQuestRange = matchesActiveMissionQuestRange
+
+/** Normalize only the legacy raw-row empty kind; the planned parser remains strict. */
+export function normalizeRawActiveMissionQuestRangeRow(
+    row: readonly unknown[],
+): readonly unknown[] {
+    if (row[34] !== "") return row
+    const normalizedRow = [...row]
+    normalizedRow[34] = "0"
+    return normalizedRow
+}
+
+/** 兼容仍接收 raw master row 的 collector。 */
+export function matchesRawActiveMissionQuestRange(
+    row: readonly unknown[],
+    category: number,
+    questId: number,
+): boolean {
+    const rawKind = row[34]
+    if (rawKind === undefined || rawKind === null || rawKind === "(None)") return true
+    const kind = Number(rawKind)
+    if (Number.isSafeInteger(kind) && kind >= 0 && QUEST_CATEGORY_BY_RANGE_KIND[kind] === undefined) {
+        return false
+    }
+    return matchesActiveMissionQuestRange(
+        parseActiveMissionQuestRange(normalizeRawActiveMissionQuestRangeRow(row)),
+        category,
+        questId,
+    )
+}
+
+function requireSelector(
+    selector: readonly number[] | null | undefined,
+    field: string,
+): readonly number[] {
+    if (!selector || selector.length === 0) {
+        throw new TypeError(`Missing Active Mission ${field}.`)
+    }
+    return selector
+}
+
+function cartesianQuestIds(
+    first: readonly number[],
+    second: readonly number[],
+    third: readonly number[],
+    base: number,
+): number[] {
+    const ids: number[] = []
+    for (const firstId of first) {
+        for (const secondId of second) {
+            for (const thirdId of third) {
+                ids.push(base + firstId * 1_000_000 + secondId * 1_000 + thirdId)
+            }
+        }
+    }
+    return ids
+}
+
+export function resolveActiveMissionQuestRangeIds(range: ActiveMissionQuestRange): number[] {
+    if (range.kind === 0 || range.kind === 1) {
+        return [...new Set(cartesianQuestIds(
+            requireSelector(range.first, "quest worlds"),
+            requireSelector(range.second, "quest chapters"),
+            requireSelector(range.third, "quest numbers"),
+            range.kind === 1 ? 10_000_000 : 0,
+        ))]
+    }
+    if (range.kind === 9) {
+        const eventIds = requireSelector(range.eventIds, "world story event id")
+        const questNumbers = requireSelector(range.questNumbers, "world story event quest numbers")
+        return [...new Set(eventIds.flatMap(eventId => (
+            questNumbers.map(questNumber => eventId * 1_000 + questNumber)
+        )))]
+    }
+    throw new TypeError(`Unsupported Active Mission quest range kind ${range.kind}.`)
+}
+
+/** 兼容旧调用方的 raw row Quest ID 解析入口。 */
+export function resolveRawActiveMissionQuestIds(row: readonly unknown[]): number[] {
+    const range = parseActiveMissionQuestRange(normalizeRawActiveMissionQuestRangeRow(row))
+    if (range === null) throw new TypeError("Missing Active Mission quest range kind.")
+    return resolveActiveMissionQuestRangeIds(range)
 }

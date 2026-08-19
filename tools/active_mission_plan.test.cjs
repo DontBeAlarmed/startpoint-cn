@@ -8,6 +8,7 @@ const bundledMissions = require("../assets/mission_active.json")
 const bundledEvents = require("../assets/mission_active_event.json")
 const bundledRewards = require("../assets/mission_active_reward.json")
 const { getActiveMissionPlan } = require("../src/lib/mission/active-plan")
+const { parseActiveMissionEventDefinition } = require("../src/lib/mission/active-plan")
 const { getActiveMissionRewards } = require("../src/lib/mission/rewards")
 
 function clone(value) {
@@ -45,6 +46,12 @@ assert.notEqual(first, other)
 assert.equal(first.getMission(11010).missionId, 11010)
 assert.equal(first.getDefinitionsByPattern(23).length, 19)
 assert.deepEqual(first.getUnsupportedMissionIds(), [21030, 25009, 25010, 25011, 25012, 25013, 25014, 25017, 25018, 25022])
+
+for (const stringId of ["", "(None)"]) {
+    const row = clone(bundledEvents["1"][0])
+    row[0] = stringId
+    assert.equal(parseActiveMissionEventDefinition(1, row).stringId, stringId)
+}
 
 const copiedRewards = getActiveMissionRewards(11010, 1, repositoryA)
 assert.equal(copiedRewards[0].amount, 5)

@@ -149,6 +149,9 @@ const tables = {
         })],
         90012: [missionRow({ eventId: 906, pattern: 0 })],
         90013: [missionRow({ eventId: 907, pattern: 0 })],
+        90014: [missionRow({ eventId: 902, pattern: 74 })],
+        90015: [missionRow({ eventId: 908, pattern: 0 })],
+        90016: [missionRow({ eventId: 909, pattern: 0 })],
     },
     "mission_active_event.json": {
         901: [eventRow({ maxPhase: 2 })],
@@ -158,6 +161,8 @@ const tables = {
         905: [eventRow({ end: "2024-08-14 19:59:59" })],
         906: [eventRow({ kind: 1, stringId: "come_back_mission_test" })],
         907: [eventRow({ kind: 1, stringId: "normal_mission_test" })],
+        908: [eventRow({ stringId: "" })],
+        909: [eventRow({ stringId: "(None)" })],
     },
     "mission_active_reward.json": {
         90001: { 1: [rewardRow()] },
@@ -173,6 +178,9 @@ const tables = {
         90011: { 1: [rewardRow()] },
         90012: { 1: [rewardRow()] },
         90013: { 1: [rewardRow()] },
+        90014: { 1: [rewardRow()] },
+        90015: { 1: [rewardRow(3)] },
+        90016: { 1: [rewardRow(3)] },
     },
 }
 
@@ -197,6 +205,20 @@ productionContentSnapshotProvider.snapshot = {
 }
 restoreSnapshot = () => {
     productionContentSnapshotProvider.snapshot = previousSnapshot
+}
+
+const {
+    getActiveMissionPlan: originalGetActiveMissionPlan,
+    ...activePlanExports
+} = require("../src/lib/mission/active-plan")
+const observedActiveMissionPlans = []
+require.cache[require.resolve("../src/lib/mission/active-plan")].exports = {
+    ...activePlanExports,
+    getActiveMissionPlan: (...args) => {
+        const plan = originalGetActiveMissionPlan(...args)
+        observedActiveMissionPlans.push(plan)
+        return plan
+    },
 }
 
 const {
@@ -272,11 +294,34 @@ async function main() {
     addQuest(500005001, true)
     addQuest(1008005, false)
     updatePlayerSync({ id: playerId, totalLoginDays: 3, totalStaminaUsed: 20 })
+    updatePlayerActiveMissionSync(playerId, 90014, 1)
+    db.exec(`
+        CREATE TRIGGER reject_pattern_74_reconcile_update
+        BEFORE UPDATE ON players_active_missions
+        WHEN OLD.player_id = ${playerId} AND OLD.id = 90014
+        BEGIN
+            SELECT RAISE(FAIL, 'pattern 74 must not update');
+        END;
+        CREATE TRIGGER reject_pattern_74_reconcile_stage
+        BEFORE INSERT ON players_active_missions_stages
+        WHEN NEW.player_id = ${playerId} AND NEW.mission_id = 90014
+        BEGIN
+            SELECT RAISE(FAIL, 'pattern 74 must not insert a stage');
+        END
+    `)
 
+    observedActiveMissionPlans.length = 0
     const first = reconcileActiveMissionFacts({ playerId, repository, now: serverNow })
+    assert.equal(
+        observedActiveMissionPlans.length,
+        1,
+        "同一次 reconcile 必须只取得一次 Active Mission Plan",
+    )
     const firstById = Object.fromEntries(first.map(delta => [delta.mission_id, delta]))
-    for (const missionId of [90001, 90002, 90003, 90004, 90005, 90006, 90007, 90013]) {
-        const expectedProgress = missionId === 90004 || missionId === 90013
+    for (const missionId of [
+        90001, 90002, 90003, 90004, 90005, 90006, 90007, 90013, 90015, 90016,
+    ]) {
+        const expectedProgress = [90004, 90013, 90015, 90016].includes(missionId)
             ? 3
             : missionId === 90005 ? 20
                 : missionId === 90006 ? 3
@@ -295,6 +340,8 @@ async function main() {
         "Comeback(kind 1) 缺少玩家回归资格生产者时不得只凭时间推进",
     )
     assert.equal(firstById[90013]?.progress_value, 3, "普通 kind 1 Normal 事件不得被误判为 Comeback")
+    assert.equal(firstById[90014], undefined, "pattern 74 必须保持 legacy no-op")
+    assert.deepEqual(getPlayerActiveMissionsSync(playerId)[90014], { progress: 1, stages: [] })
     assert.equal(
         getPlayerActiveMissionsSync(playerId)[90007].progress,
         6,

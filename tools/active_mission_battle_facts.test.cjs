@@ -88,6 +88,19 @@ assert.equal(computeActiveMissionFactProgress(23, row({
     third: "8,10",
 }), state), 0)
 
+assert.doesNotThrow(() => computeActiveMissionFactProgress(23, row({ rangeKind: 99 }), state))
+assert.equal(computeActiveMissionFactProgress(23, row({ rangeKind: 99 }), state), 0)
+const rawMainState = {
+    ...state,
+    questProgress: [{ category: 1, questId: 1_008_004, finished: true, multiClearCount: 0 }],
+}
+assert.equal(computeActiveMissionFactProgress(23, row({
+    rangeKind: "",
+    first: "1",
+    second: "8",
+    third: "4",
+}), rawMainState), 1)
+
 assert.equal(computeActiveMissionFactProgress(26, row({ battleKind: 1 }), state), 2)
 assert.equal(computeActiveMissionFactProgress(26, row({ battleKind: 2 }), state), 3)
 assert.equal(computeActiveMissionFactProgress(26, row({ battleKind: 3 }), state), 5)

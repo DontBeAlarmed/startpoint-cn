@@ -10,8 +10,10 @@ import {
     getActiveMissionPlan,
     type PlannedActiveMissionDefinition,
 } from "./active-plan"
-import { matchesPlannedActiveMissionQuestRange } from "./active-quest-range"
-import { matchesActiveMissionQuestRange } from "./active-reconciliation"
+import {
+    matchesActiveMissionQuestRange,
+    matchesRawActiveMissionQuestRange,
+} from "./active-quest-range"
 
 const LOADOUT_PATTERN = 89
 const SKILL_EFFECT_PATTERN = 90
@@ -65,8 +67,8 @@ function matchesDefinitionQuestRange(
     questId: number,
 ): boolean {
     return isPlannedDefinition(definition)
-        ? matchesPlannedActiveMissionQuestRange(definition.questRange, category, questId)
-        : matchesActiveMissionQuestRange(definition.row, category, questId)
+        ? matchesActiveMissionQuestRange(definition.questRange, category, questId)
+        : matchesRawActiveMissionQuestRange(definition.row, category, questId)
 }
 
 function parseTargetElement(value: unknown): number | null {

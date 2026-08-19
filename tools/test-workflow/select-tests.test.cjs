@@ -1125,6 +1125,15 @@ test("routes active mission focused metrics, baseline, and production boundaries
         "full",
         "integration:database",
     ])
+    for (const file of [
+        "tools/active_mission_evaluator_equivalence.test.cjs",
+        "tools/helpers/active-mission-legacy-evaluator.cjs",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["integration:mission"], file)
+        assert.ok(TEST_GROUPS["integration:mission"].tests.includes(
+            "tools/active_mission_evaluator_equivalence.test.cjs",
+        ))
+    }
 })
 
 test("keeps external data concerns out of self-contained runtime tests", () => {
@@ -1305,6 +1314,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_active_content.test.cjs",
         "tools/mission_active_core.test.cjs",
         "tools/active_mission_plan.test.cjs",
+        "tools/active_mission_evaluator_equivalence.test.cjs",
         "tools/active_mission_counter_storage.test.cjs",
         "tools/party_action_counter.test.cjs",
         "tools/expod_inject_exp_route.test.cjs",

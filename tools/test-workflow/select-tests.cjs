@@ -15,6 +15,10 @@ const HUB_AUTHENTICATION_GROUPS = [
 
 const SOURCE_RULES = [
     {
+        pattern: /^tools\/(?:active_mission_evaluator_equivalence\.test|helpers\/active-mission-legacy-evaluator)\.cjs$/,
+        groups: ["integration:mission"],
+    },
+    {
         pattern: /^tools\/helpers\/mission-degree-session-fixture\.cjs$/,
         groups: ["integration:mission"],
     },

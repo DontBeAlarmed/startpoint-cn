@@ -11,11 +11,13 @@ import {
     getActiveMissionPlan,
     type PlannedActiveMissionDefinition,
 } from "./active-plan"
-import { matchesPlannedActiveMissionQuestRange } from "./active-quest-range"
+import {
+    matchesActiveMissionQuestRange,
+    matchesRawActiveMissionQuestRange,
+} from "./active-quest-range"
 import {
     estimateActiveMissionCharacterLevel,
-    matchesActiveMissionQuestRange,
-} from "./active-reconciliation"
+} from "./active-fact-evaluator"
 
 const CONDITIONAL_PATTERNS = new Set([71, 72, 73])
 const SECOND_MANA_BOARD_ABILITY_SLOTS = new Set(["4", "5", "6"])
@@ -71,8 +73,8 @@ function matchesDefinitionQuestRange(
     questId: number,
 ): boolean {
     return isPlannedDefinition(definition)
-        ? matchesPlannedActiveMissionQuestRange(definition.questRange, category, questId)
-        : matchesActiveMissionQuestRange(definition.row, category, questId)
+        ? matchesActiveMissionQuestRange(definition.questRange, category, questId)
+        : matchesRawActiveMissionQuestRange(definition.row, category, questId)
 }
 
 export function collectActiveMissionConditionalBattleFacts(
