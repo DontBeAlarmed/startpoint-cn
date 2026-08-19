@@ -50,6 +50,14 @@ class RecordingSocket extends EventEmitter {
 
     setEncoding() {}
 
+    setNoDelay() {
+        return this
+    }
+
+    setKeepAlive() {
+        return this
+    }
+
     write(value) {
         this.writes.push(JSON.parse(String(value).replace(/\0$/, "")))
         return true

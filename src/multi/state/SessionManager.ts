@@ -19,6 +19,7 @@ import type {
 } from "../coordinator/interface"
 import { BattleFactStore } from "../settlement/facts"
 import type { PlayerPartySnapshot, PlayerSnapshot } from "../snapshot/player-snapshot"
+import { sendFrameReliably } from "../tcp/reliable-send"
 
 export interface SessionMate {
     viewerId: number
@@ -712,9 +713,7 @@ export class SessionManager {
     }
 
     sendJson(socket: net.Socket, data: any): boolean {
-        if (!socket.writable) return false
-        socket.write(JSON.stringify(data) + "\0")
-        return true
+        return sendFrameReliably(socket, JSON.stringify(data) + "\0") !== "closed"
     }
 
     broadcastToRoom(roomNumber: string, data: any, excludeClient?: SessionClient): void {

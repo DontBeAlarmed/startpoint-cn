@@ -25,10 +25,35 @@ import {
     embeddedAdmissionRegistry,
     type AdmissionProvider,
 } from "../admission/registry"
+import { clearReliableSendState } from "./reliable-send"
 
 export const SESSION_PORT = 8003
 export const SESSION_HOST = "127.0.0.1"
 export const DEFAULT_SESSION_SHUTDOWN_TIMEOUT_MS = 5000
+
+function positiveEnvironmentInteger(name: string, fallback: number, minimum = 1): number {
+    const parsed = Number.parseInt(process.env[name] ?? "", 10)
+    return Number.isFinite(parsed) ? Math.max(minimum, parsed) : fallback
+}
+
+export const DEFAULT_SESSION_HANDSHAKE_TIMEOUT_MS = positiveEnvironmentInteger(
+    "SESSION_HANDSHAKE_TIMEOUT_MS",
+    15_000,
+)
+export const DEFAULT_SESSION_MAX_FRAME_BYTES = positiveEnvironmentInteger(
+    "SESSION_MAX_FRAME_BYTES",
+    256 * 1024,
+    1024,
+)
+export const DEFAULT_SESSION_MAX_BUFFER_BYTES = positiveEnvironmentInteger(
+    "SESSION_MAX_BUFFER_BYTES",
+    1024 * 1024,
+    DEFAULT_SESSION_MAX_FRAME_BYTES,
+)
+export const DEFAULT_SESSION_KEEPALIVE_INITIAL_DELAY_MS = positiveEnvironmentInteger(
+    "SESSION_TCP_KEEPALIVE_MS",
+    10_000,
+)
 export const DEFAULT_SESSION_ADMISSION_PROVIDER: AdmissionProvider = embeddedAdmissionRegistry
 
 export type SessionServerPhase = "stopped" | "starting" | "listening" | "stopping" | "failed"
@@ -59,6 +84,10 @@ export interface SessionServerOptions {
     admissionProvider?: AdmissionProvider
     validateNodeSession?: (nodeSessionId: string) => boolean
     nodeSessionCheckIntervalMs?: number
+    handshakeTimeoutMs?: number
+    maxFrameBytes?: number
+    maxBufferBytes?: number
+    keepAliveInitialDelayMs?: number
     roomCleanup?: RoomCleanupOptions
     npcRecruitment?: NpcRecruitmentTiming
     /** Maximum shutdown wait for this generation's handshakes before sockets are retired. */
@@ -74,6 +103,10 @@ interface ServerContext {
     readonly onFatalError?: (failure: SessionServerFailure) => void
     readonly validateNodeSession?: (nodeSessionId: string) => boolean
     readonly nodeSessionCheckIntervalMs: number
+    readonly handshakeTimeoutMs: number
+    readonly maxFrameBytes: number
+    readonly maxBufferBytes: number
+    readonly keepAliveInitialDelayMs: number
     nodeSessionTimer: NodeJS.Timeout | null
     fatalStarted: boolean
     fatalSettled: boolean
@@ -130,6 +163,7 @@ function cleanupSession(socket: net.Socket): void {
 }
 
 function cleanupAcceptedSocket(socket: net.Socket): void {
+    clearReliableSendState(socket)
     if (!acceptedSockets.delete(socket)) return
     if (!socketHandshakes.has(socket)) cleanupSession(socket)
 }
@@ -225,24 +259,66 @@ function handleConnection(
     acceptedSockets.add(socket)
     console.log("[TCP] connection accepted")
 
+    socket.setNoDelay(true)
+    socket.setKeepAlive(true, context.keepAliveInitialDelayMs)
     socket.setEncoding("utf8")
     let buffer = ""
+    let bufferBytes = 0
     let handshakeDone = false
     let handshakePending: Promise<void> | null = null
     let isBattleSocket = false
+    let protocolClosed = false
+
+    const clearHandshakeTimer = (): void => clearTimeout(handshakeTimer)
+    const closeForProtocolViolation = (reason: string): void => {
+        if (protocolClosed) return
+        protocolClosed = true
+        buffer = ""
+        bufferBytes = 0
+        clearHandshakeTimer()
+        console.warn(`[TCP] protocol violation: reason=${reason}`)
+        socket.destroy()
+    }
+    const handshakeTimer = setTimeout(() => {
+        if (!handshakeDone) closeForProtocolViolation("handshake_timeout")
+    }, context.handshakeTimeoutMs)
+    handshakeTimer.unref()
 
     const processBuffer = (): void => {
-        if (handshakePending !== null || !isAccepting(context, socket)) return
+        if (protocolClosed || handshakePending !== null || !isAccepting(context, socket)) return
         while (isAccepting(context, socket) && buffer.includes("\0")) {
             const index = buffer.indexOf("\0")
             const raw = buffer.substring(0, index)
             buffer = buffer.substring(index + 1)
+            bufferBytes -= Buffer.byteLength(raw) + 1
+            if (Buffer.byteLength(raw) > context.maxFrameBytes) {
+                closeForProtocolViolation("frame_too_large")
+                return
+            }
             if (raw.trim().length === 0) continue
 
+            let data: any
             try {
-                const data = JSON.parse(raw)
-                if (!handshakeDone && data.socklet) {
+                data = JSON.parse(raw)
+            } catch {
+                closeForProtocolViolation("invalid_json")
+                return
+            }
+
+            try {
+                if (!handshakeDone) {
+                    if (
+                        data === null
+                        || typeof data !== "object"
+                        || Array.isArray(data)
+                        || typeof data.socklet !== "string"
+                        || data.socklet.length === 0
+                    ) {
+                        closeForProtocolViolation("invalid_handshake")
+                        return
+                    }
                     handshakeDone = true
+                    clearHandshakeTimer()
                     isBattleSocket = data.socklet === "cooperation_battle"
                     socket.pause()
                     const pending = trackHandshake(context, socket, data, handshakeHandler)
@@ -258,7 +334,7 @@ function handleConnection(
                         processBuffer()
                     })
                     return
-                } else if (handshakeDone) {
+                } else {
                     if (rejectInvalidNodeSession(context, socket)) break
                     if (isBattleSocket) {
                         handleBattleMessage(socket, data)
@@ -267,26 +343,42 @@ function handleConnection(
                         lobby.handleMessage(socket, data)
                     }
                 }
-            } catch (error) {
-                console.error(`[TCP] parse failed: code=${failureCode(error) ?? "UNKNOWN"}`)
+            } catch {
+                closeForProtocolViolation("message_rejected")
+                return
             }
+        }
+        if (hasOversizedBufferedFrame(buffer, context.maxFrameBytes)) {
+            closeForProtocolViolation("unterminated_frame_too_large")
         }
     }
 
     socket.on("data", (chunk: string) => {
-        if (!isAccepting(context, socket)) return
+        if (protocolClosed || !isAccepting(context, socket)) return
         buffer += chunk
+        bufferBytes += Buffer.byteLength(chunk)
+        if (bufferBytes > context.maxBufferBytes) {
+            closeForProtocolViolation("receive_buffer_too_large")
+            return
+        }
+        if (hasOversizedBufferedFrame(buffer, context.maxFrameBytes)) {
+            closeForProtocolViolation("frame_too_large")
+            return
+        }
         processBuffer()
     })
 
     socket.on("close", () => {
+        clearHandshakeTimer()
         buffer = ""
+        bufferBytes = 0
         handshakePending = null
         console.log("[TCP] connection closed")
         cleanupAcceptedSocket(socket)
     })
 
     socket.on("error", error => {
+        clearHandshakeTimer()
         console.error(`[TCP] socket error: code=${failureCode(error) ?? "UNKNOWN"}`)
         cleanupAcceptedSocket(socket)
         socket.destroy()
@@ -324,6 +416,21 @@ function finalizeContext(context: ServerContext): void {
 function failureCode(error: unknown): string | null {
     const code = (error as NodeJS.ErrnoException | null)?.code
     return typeof code === "string" && LOGGABLE_FAILURE_CODES.has(code) ? code : null
+}
+
+function positiveInteger(value: number | undefined, fallback: number, minimum = 1): number {
+    return Number.isFinite(value) ? Math.max(minimum, Math.trunc(value!)) : fallback
+}
+
+function hasOversizedBufferedFrame(buffer: string, maxFrameBytes: number): boolean {
+    let start = 0
+    while (true) {
+        const end = buffer.indexOf("\0", start)
+        const raw = end === -1 ? buffer.substring(start) : buffer.substring(start, end)
+        if (Buffer.byteLength(raw) > maxFrameBytes) return true
+        if (end === -1) return false
+        start = end + 1
+    }
 }
 
 function recordFailure(stage: SessionServerFailureStage, error: unknown): void {
@@ -486,6 +593,10 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
         })
     ))
     const generation = ++generationSequence
+    const maxFrameBytes = positiveInteger(
+        options.maxFrameBytes,
+        DEFAULT_SESSION_MAX_FRAME_BYTES,
+    )
     let context!: ServerContext
     let createdServer: net.Server
     try {
@@ -505,6 +616,20 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
         onFatalError: options.onFatalError,
         validateNodeSession: options.validateNodeSession,
         nodeSessionCheckIntervalMs: options.nodeSessionCheckIntervalMs ?? 1_000,
+        handshakeTimeoutMs: positiveInteger(
+            options.handshakeTimeoutMs,
+            DEFAULT_SESSION_HANDSHAKE_TIMEOUT_MS,
+        ),
+        maxFrameBytes,
+        maxBufferBytes: positiveInteger(
+            options.maxBufferBytes,
+            DEFAULT_SESSION_MAX_BUFFER_BYTES,
+            maxFrameBytes,
+        ),
+        keepAliveInitialDelayMs: positiveInteger(
+            options.keepAliveInitialDelayMs,
+            DEFAULT_SESSION_KEEPALIVE_INITIAL_DELAY_MS,
+        ),
         nodeSessionTimer: null,
         fatalStarted: false,
         fatalSettled: false,

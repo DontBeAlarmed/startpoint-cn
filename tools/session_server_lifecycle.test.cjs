@@ -89,6 +89,14 @@ class FakeSocket extends EventEmitter {
 
     setEncoding() {}
 
+    setNoDelay() {
+        return this
+    }
+
+    setKeepAlive() {
+        return this
+    }
+
     write() {
         return true
     }
@@ -313,7 +321,7 @@ test("socket error and close share exactly one session cleanup", async () => {
     }
 })
 
-test("TCP parse, socket error, and close logs omit addresses and raw errors", async () => {
+test("TCP protocol, socket error, and close logs omit addresses and raw errors", async () => {
     let fakeServer
     const socket = new FakeSocket()
     const maliciousSocket = new FakeSocket()
@@ -354,7 +362,7 @@ test("TCP parse, socket error, and close logs omit addresses and raw errors", as
         "TOKEN_SENTINEL_TCP_CODE",
     ]) assert.doesNotMatch(output, new RegExp(sentinel))
     assert.match(output, /\[TCP\] connection accepted/)
-    assert.match(output, /\[TCP\] parse failed: code=UNKNOWN/)
+    assert.match(output, /\[TCP\] protocol violation: reason=invalid_json/)
     assert.match(output, /\[TCP\] socket error: code=ECONNRESET/)
     assert.match(output, /\[TCP\] socket error: code=UNKNOWN/)
     assert.match(output, /\[TCP\] connection closed/)

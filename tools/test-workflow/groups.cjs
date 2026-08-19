@@ -135,6 +135,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/multi_player_context.test.cjs",
             "tools/multi_player_snapshot.test.cjs",
             "tools/multi_quest_availability.test.cjs",
+            "tools/multi_reliable_send.test.cjs",
             "tools/multi_remote_coordinator.test.cjs",
             "tools/multi_remote_settlement.test.cjs",
             "tools/multi_load_recovery.test.cjs",
@@ -145,6 +146,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/room_cleanup_lifecycle.test.cjs",
             "tools/session_frame_order.test.cjs",
             "tools/session_server_lifecycle.test.cjs",
+            "tools/multi_tcp_guardrails.test.cjs",
         ],
     },
     "quick:cdn": {
