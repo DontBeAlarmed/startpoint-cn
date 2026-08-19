@@ -141,11 +141,15 @@ nodeSessionId + viewerId
 
 该组合只用于 Hub 内部索引和把查询结果路由回正确节点，不进入客户端协议、玩家存档或服务器注册表。
 
+结算事实、授权 credential、finalized 集合、房主判断和成员移除都必须使用上述复合键；不能在这些状态容器中退回只按 `viewerId` 索引。客户端没有携带 `nodeSessionId` 的 TCP 握手仍使用 `roomNumber + viewerId` 作为一次性 admission 的传输定位键，但消费后必须确认 admission 返回的 `participant.viewerId` 与握手 viewer 一致，再按完整 participant 执行房间成员和 socket 校验。
+
+客户端服务在 Hub 会话过期、下一次控制请求尚未完成懒注册时，允许内部使用固定的 `remote-pending` 占位值。结算验证器只在该占位值下按 viewer 查找且要求结果中恰有一个成员；已有真实 `nodeSessionId` 时仍必须严格匹配 `nodeSessionId + viewerId`，不能把普通节点身份降级为裸 viewer。
+
 不同服务端的本地数据库 `playerId` 很容易重复，Hub 不以它作为跨节点身份，也不把它用于房主或结算判断。本地结算始终使用所属服务端的真实数据库 `playerId`。客户端请求中的 `mate_player_ids` 实际来自 mate 的 `viewerId` 列表，因此继续使用已经过同房唯一性检查的裸 `viewerId`。
 
 国服客户端会用裸 `viewerId` 在 mate 列表中查找自己，因此同一房间出现相同裸 `viewerId` 时无法仅靠服务端内部命名空间解决。Hub 必须在查房或准备阶段拒绝后加入者。不同房间可以存在相同 `viewerId`。
 
-冲突判断必须区分来源：同一 `nodeSessionId + viewerId` 的重复控制请求按幂等请求或同节点重连处理；不同 `nodeSessionId` 携带相同裸 `viewerId` 加入同一房间时返回内部 `VIEWER_ID_CONFLICT`。后加入者不会写入成员列表、不会取得 TCP admission、不会连接 TCP，也不会触发 active quest、扣费或存档写入。原房间和先加入者不受影响。
+冲突判断必须区分来源：房间成员表持久保存完整 `nodeSessionId + viewerId`，不能在 socket 断开后仅凭裸 `viewerId` 重建来源。同一 `nodeSessionId + viewerId` 的重复控制请求按幂等请求或同节点重连处理；不同 `nodeSessionId` 携带相同裸 `viewerId` 加入同一房间时返回内部 `VIEWER_ID_CONFLICT`。后加入者不会写入成员列表、不会取得 TCP admission、不会连接 TCP，也不会触发 active quest、扣费或存档写入。原房间和先加入者不受影响。
 
 ## 7. 兼容性身份
 

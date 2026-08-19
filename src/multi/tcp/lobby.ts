@@ -388,7 +388,7 @@ function disconnectRoomClient(client: SessionClient): void {
         }
     }
     const hostClient = findHostClient(client.roomNumber)
-    removeRoomMember(client.roomNumber, client.viewerId)
+    if (client.participant) removeRoomMember(client.roomNumber, client.participant)
     sessionManager.removeClient(client)
     if (isHost && !preserveActiveBattle) disbandRoom(client.roomNumber)
     // Only refresh the mate list if the room still exists AND a *different* client is the host (i.e. a

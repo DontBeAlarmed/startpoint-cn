@@ -2,6 +2,7 @@ import { randomBytes, randomInt } from "crypto";
 import { MultiRoom, QuestCategory, RoomState } from "../types";
 import { getServerTime } from "../../utils";
 import { sessionManager } from "../state/SessionManager";
+import type { ParticipantIdentity } from "../coordinator/contracts";
 
 const rooms = new Map<string, MultiRoom>();
 
@@ -135,8 +136,15 @@ export function createRoom(
     questId: number,
     acceptedType: number,
     hostMainCharacterId: number,
-    isNpcMode: boolean = false
+    isNpcMode: boolean = false,
+    hostParticipant: ParticipantIdentity = {
+        nodeSessionId: "embedded" as ParticipantIdentity["nodeSessionId"],
+        viewerId: hostViewerId,
+    },
 ): MultiRoom {
+    if (hostParticipant.viewerId !== hostViewerId) {
+        throw new TypeError("host participant viewer must match room host")
+    }
     const roomNumber = allocateRoomNumber();
     const room: MultiRoom = {
         room_number: roomNumber,
@@ -152,7 +160,7 @@ export function createRoom(
         raising_state: 2,
         room_sequence: roomSequence++,
         host_entry_time: getServerTime(),
-        member_viewer_ids: [hostViewerId],
+        member_participants: [{ ...hostParticipant }],
         mates: [],
         share_room_options: 0,
         is_npc_mode: isNpcMode,
@@ -191,23 +199,46 @@ export function getRooms(categoryId: number, eventId?: number): MultiRoom[] {
     return result;
 }
 
-export function isRoomMember(room: MultiRoom, viewerId: number): boolean {
-    return room.member_viewer_ids.includes(viewerId);
+export function isRoomViewerMember(room: MultiRoom, viewerId: number): boolean {
+    return room.member_participants.some(member => member.viewerId === viewerId);
 }
 
-export function addRoomMember(roomNumber: string, viewerId: number): boolean {
+export function isRoomMember(room: MultiRoom, participant: ParticipantIdentity): boolean {
+    return room.member_participants.some(member => (
+        member.viewerId === participant.viewerId
+        && member.nodeSessionId === participant.nodeSessionId
+    ));
+}
+
+export function hasRoomMemberViewerConflict(
+    room: MultiRoom,
+    participant: ParticipantIdentity,
+): boolean {
+    return room.member_participants.some(member => (
+        member.viewerId === participant.viewerId
+        && member.nodeSessionId !== participant.nodeSessionId
+    ));
+}
+
+export function addRoomMember(roomNumber: string, participant: ParticipantIdentity): boolean {
     const room = rooms.get(roomNumber);
     if (!room) return false;
-    if (!room.member_viewer_ids.includes(viewerId)) room.member_viewer_ids.push(viewerId);
+    if (hasRoomMemberViewerConflict(room, participant)) return false;
+    if (!isRoomMember(room, participant)) {
+        room.member_participants.push({ ...participant });
+    }
     return true;
 }
 
-export function removeRoomMember(roomNumber: string, viewerId: number): boolean {
+export function removeRoomMember(roomNumber: string, participant: ParticipantIdentity): boolean {
     const room = rooms.get(roomNumber);
-    if (!room || viewerId === room.host_viewer_id) return false;
-    const index = room.member_viewer_ids.indexOf(viewerId);
+    if (!room || participant.viewerId === room.host_viewer_id) return false;
+    const index = room.member_participants.findIndex(member => (
+        member.viewerId === participant.viewerId
+        && member.nodeSessionId === participant.nodeSessionId
+    ));
     if (index < 0) return false;
-    room.member_viewer_ids.splice(index, 1);
+    room.member_participants.splice(index, 1);
     return true;
 }
 

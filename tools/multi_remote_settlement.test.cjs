@@ -85,11 +85,35 @@ test("settlement verifier accepts a Hub-authorized rotated node session", async 
     })
 
     assert.deepEqual(await verifier.verify({
-        nodeSessionId: host.nodeSessionId,
-        viewerId: host.viewerId,
+        nodeSessionId: rotatedHost.nodeSessionId,
+        viewerId: rotatedHost.viewerId,
         roomNumber: "123456",
         battleSessionId: "battle-1",
     }), { ok: true, isHost: true })
+})
+
+test("settlement verifier does not confuse same viewer ids from different nodes", async () => {
+    const guestA = { nodeSessionId: "node-guest-a", viewerId: guest.viewerId }
+    const guestB = { nodeSessionId: "node-guest-b", viewerId: guest.viewerId }
+    const verifier = new MultiSettlementVerifier({
+        getBattleStatus: async () => ({
+            ok: true,
+            value: status({ participants: [host, guestA, guestB] }),
+        }),
+    })
+
+    assert.deepEqual(await verifier.verify({
+        nodeSessionId: guestA.nodeSessionId,
+        viewerId: guestA.viewerId,
+        roomNumber: "123456",
+        battleSessionId: "battle-1",
+    }), { ok: true, isHost: false })
+    assert.deepEqual(await verifier.verify({
+        nodeSessionId: "node-guest-forged",
+        viewerId: guest.viewerId,
+        roomNumber: "123456",
+        battleSessionId: "battle-1",
+    }), { ok: false })
 })
 
 test("settlement verifier fails closed for unavailable or forged Hub facts", async () => {
@@ -338,6 +362,61 @@ test("rotated guest session takes ownership before the old session is swept", ()
     assert.equal(retained.value.finalized, true)
 })
 
+test("Hub battle facts isolate same viewer ids by node session", () => {
+    const guestA = Object.freeze({ nodeSessionId: "node-guest-a", viewerId: guest.viewerId })
+    const guestB = Object.freeze({ nodeSessionId: "node-guest-b", viewerId: guest.viewerId })
+    const store = new BattleFactStore({ createBattleSessionId: () => "same-viewer-battle" })
+    const started = store.startBattle({
+        roomNumber: "same-viewer-room",
+        host,
+        participants: [host, guestA, guestB],
+    })
+
+    const authorize = participant => store.authorizeParticipant({
+        participant,
+        credentialId: `credential-${participant.nodeSessionId}`,
+        roomNumber: "same-viewer-room",
+        battleSessionId: started.battleSessionId,
+    })
+    assert.equal(authorize(guestA).ok, true)
+    assert.equal(authorize(guestB).ok, true)
+    assert.deepEqual(store.getBattleStatus({
+        participant: { nodeSessionId: guestB.nodeSessionId, viewerId: host.viewerId },
+        credentialId: "credential-node-guest-b",
+        roomNumber: "same-viewer-room",
+        battleSessionId: started.battleSessionId,
+    }), { ok: false, error: "ROOM_PERMISSION_DENIED" })
+    assert.deepEqual(store.getBattleStatus({
+        participant: guestA,
+        credentialId: "credential-node-guest-b",
+        roomNumber: "same-viewer-room",
+        battleSessionId: started.battleSessionId,
+    }), { ok: false, error: "ROOM_PERMISSION_DENIED" })
+
+    assert.equal(store.markFinalized({
+        participant: guestA,
+        roomNumber: "same-viewer-room",
+        battleSessionId: started.battleSessionId,
+    }).ok, true)
+    assert.equal(store.getBattleStatus({
+        participant: guestA,
+        roomNumber: "same-viewer-room",
+        battleSessionId: started.battleSessionId,
+    }).value.finalized, true)
+    assert.equal(store.getBattleStatus({
+        participant: guestB,
+        roomNumber: "same-viewer-room",
+        battleSessionId: started.battleSessionId,
+    }).value.finalized, false)
+
+    const removed = store.removeParticipant({
+        participant: guestB,
+        roomNumber: "same-viewer-room",
+    })
+    assert.equal(removed.ok, true)
+    assert.deepEqual(removed.value.participants, [host, guestA])
+})
+
 test("Hub coordinator exposes retained TCP completion facts without finalizing them", async t => {
     const { EmbeddedMultiCoordinator } = require("../src/multi/coordinator/embedded")
     const { addRoomMember, disbandRoom } = require("../src/multi/room/manager")
@@ -362,7 +441,7 @@ test("Hub coordinator exposes retained TCP completion facts without finalizing t
     })
     assert.equal(created.ok, true)
     const roomNumber = created.value.roomNumber
-    addRoomMember(roomNumber, guest.viewerId)
+    addRoomMember(roomNumber, guest)
     const guestClient = sessionManager.createClient({
         writable: false,
         end() {},
@@ -669,7 +748,8 @@ async function openProductionHome(label, participant, isHost, settlementVerifier
             ? { playerId, player: getPlayerSync(playerId) }
             : null,
         snapshotProvider: {
-            getParticipant: viewerId => ({ ...participant, viewerId }),
+            getParticipant: viewerId => options.getParticipant?.(viewerId)
+                ?? ({ ...participant, viewerId }),
             getCompatibility: () => ({ ok: true, value: compatibility }),
         },
         questAvailability: { check: () => ({ available: true }) },
@@ -941,7 +1021,14 @@ test("production /finish settles through a real HubClient session rotation", asy
             originalParticipant,
             true,
             new MultiSettlementVerifier(hub.coordinator),
-            { coordinator: hub.coordinator, roomNumber: remoteRoomNumber },
+            {
+                coordinator: hub.coordinator,
+                roomNumber: remoteRoomNumber,
+                getParticipant: viewerId => ({
+                    nodeSessionId: hub.client.getNodeSessionId() ?? "remote-pending",
+                    viewerId,
+                }),
+            },
         )
         const playId = "production-finish-rotation"
         const started = await home.app.inject({

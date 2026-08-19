@@ -490,7 +490,10 @@ test("embedded HTTP and default TCP admission wiring share one registry", () => 
 })
 
 test("host coordinator scopes viewer conflicts and room ownership by node session", async t => {
-    const { disbandRoom: disbandLocalRoom } = require("../src/multi/room/manager")
+    const {
+        addRoomMember,
+        disbandRoom: disbandLocalRoom,
+    } = require("../src/multi/room/manager")
     const coordinator = new EmbeddedMultiCoordinator({ allowRemoteParticipants: true })
     const host = { nodeSessionId: "node-a", viewerId: 707 }
     const created = await coordinator.createRoom({
@@ -519,6 +522,22 @@ test("host coordinator scopes viewer conflicts and room ownership by node sessio
     })
     assert.equal(compatible.ok, true)
     assert.deepEqual(compatible.value.host, host)
+
+    const guest = { nodeSessionId: "node-b", viewerId: 708 }
+    assert.equal(addRoomMember(created.value.roomNumber, guest), true)
+    const disconnectedStatus = await coordinator.getRoomStatus({
+        participant: host,
+        roomNumber: created.value.roomNumber,
+    })
+    assert.equal(disconnectedStatus.ok, true)
+    assert.deepEqual(disconnectedStatus.value.members, [host, guest])
+
+    const reconnectConflict = await coordinator.searchRoom({
+        participant: { nodeSessionId: "node-c", viewerId: guest.viewerId },
+        roomNumber: created.value.roomNumber,
+        compatibility,
+    })
+    assert.deepEqual(reconnectConflict, { ok: false, error: "VIEWER_ID_CONFLICT" })
 
     const forgedDisband = await coordinator.disbandRoom({
         participant: { nodeSessionId: "node-b", viewerId: host.viewerId },

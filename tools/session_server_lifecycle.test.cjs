@@ -376,7 +376,8 @@ test("revoked node sessions close only their current TCP socket on the next fram
     ])
     const checks = []
     const room = createRoom(91, 1_091, 1, 1, 501, 0, 101)
-    addRoomMember(room.room_number, 92)
+    const guestParticipant = { nodeSessionId: "node-guest", viewerId: 92 }
+    addRoomMember(room.room_number, guestParticipant)
 
     try {
         await startSessionServer({
@@ -435,7 +436,7 @@ test("revoked node sessions close only their current TCP socket on the next fram
             sessionManager.getUniqueRoomClientByViewerId(92, room.room_number),
             undefined,
         )
-        assert.equal(isRoomMember(room, 92), false)
+        assert.equal(isRoomMember(room, guestParticipant), false)
         assert.ok(getRoom(room.room_number))
 
         validity.set("node-host", false)

@@ -214,12 +214,12 @@ test("change-party rebuilds a deeply frozen snapshot isolated from client input"
 test("an explicit guest Bye releases the persistent room membership", t => {
     const { room, guests } = createLobbyRoom(t, 500, [600])
     const guest = guests[0]
-    addRoomMember(room.room_number, guest.client.viewerId)
-    assert.equal(isRoomMember(room, guest.client.viewerId), true)
+    addRoomMember(room.room_number, guest.client.participant)
+    assert.equal(isRoomMember(room, guest.client.participant), true)
 
     handleMessage(guest.socket, [0, [1]])
 
-    assert.equal(isRoomMember(room, guest.client.viewerId), false)
+    assert.equal(isRoomMember(room, guest.client.participant), false)
 })
 
 test("a transport disconnect preserves the room for restore", t => {

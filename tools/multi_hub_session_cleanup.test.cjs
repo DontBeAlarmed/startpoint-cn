@@ -104,7 +104,7 @@ async function createGuestInvalidationFixture(t, mode) {
         assert.equal(created.ok, true)
         const roomNumber = created.value.roomNumber
         const room = getRoom(roomNumber)
-        room.member_viewer_ids.push(guest.viewerId)
+        room.member_participants.push({ ...guest })
         const hostConnectionId = `invalidation-host-${mode}-${index}`
         const guestConnectionId = `invalidation-guest-${mode}-${index}`
         const hostLobbySocket = new FakeSocket()
@@ -196,7 +196,7 @@ for (const mode of ["expiry", "revoke"]) {
             assert.equal(sessionManager.getActiveBattleSessionId(room.roomNumber), null)
             assert.equal(room.guestLobbySocket.destroyed, true)
             assert.equal(room.guestBattleSocket.destroyed, true)
-            assert.deepEqual(getRoom(room.roomNumber).member_viewer_ids, [room.host.viewerId])
+            assert.deepEqual(getRoom(room.roomNumber).member_participants, [room.host])
             assert.deepEqual(getRoom(room.roomNumber).mates, [{
                 viewer_id: room.host.viewerId,
                 com_id: 0,

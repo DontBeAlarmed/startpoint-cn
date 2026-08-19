@@ -45,7 +45,7 @@ Hub 不代理游戏主 API、CDN 或后台，也不自动对齐资源与服务�
 
 房间与 TCP 会话只保存在 Node.js 进程内：
 
-- `room/manager.ts` 保存 room number、随机 access token、房主、成员资格、成员摘要和 `raising_state`；
+- `room/manager.ts` 保存 room number、随机 access token、房主、复合身份成员资格、成员摘要和 `raising_state`；
 - `SessionManager` 保存 lobby client、battle client、connection ID 和 SceneReady 状态；
 - 服务进程停止后，这些结构全部消失，不尝试恢复。
 
@@ -190,7 +190,7 @@ Leave、SceneReady 屏障和 battle fact 清理路径；重连保留窗口和 NP
 2. 新成员加入时按真人成员资格校验房间仍有空位；NPC 槽位可被真人替换，已记录成员也不受满员判断影响，可以断线重连；
 3. 通过 viewer session 解析当前玩家和存档；
 4. 从数据库构建真实玩家 party；
-5. 按 `room.host_viewer_id` 写入本连接的 `isHost`，并记录房间成员资格；
+5. 按 `room.host_viewer_id` 写入本连接的 `isHost`，并以 `nodeSessionId + viewerId` 记录房间成员资格；TCP admission 虽按 `roomNumber + viewerId` 一次性定位，但消费后必须确认返回 participant 的 viewer 与握手 viewer 相同；
 6. 注册 lobby client并返回 Accept 数组：
 
 ```text
@@ -205,7 +205,7 @@ Leave、SceneReady 屏障和 battle fact 清理路径；重连保留窗口和 NP
 
 客户端协议中的 `MeetingNotifyMessage.Bye`（Notify index 1）是客户端定义的无参数枚举消息，不是 HTTP 字段，也不等同于“玩家主动退出房间”。客户端停止使用当前 `cooperation_room` 连接时会发送它，主动离开和进入战斗时的连接切换都可能走同一消息；因此服务端必须结合 `raising_state` 解释，不能仅凭名称判断为解散。
 
-成员资格与 socket 在线状态分开保存：普通网络断开只移除连接，房间保留到恢复、主动解散或过期清理，因此成员仍有 `restore_room` 资格。战斗开始前，非房主发送 `Bye` 时释放自身成员资格，房主发送 `Bye` 时广播解散并销毁整个房间；进入 `raising_state=4` 后，切换 battle socket 产生的 `Bye` 只关闭 lobby 连接，必须保留房间、当局成员快照和 SceneReady 屏障，直到战斗结算或中止流程清理。
+成员资格在房间内保存完整 `nodeSessionId + viewerId`，不从当前在线 socket 反推，因此远程成员临时离线后不会退化成 `embedded + viewerId`。结算事实的授权、Finalize 和移除也使用相同复合键；服务端不能在这些状态中只用 viewer 区分成员。成员资格与 socket 在线状态分开保存：普通网络断开只移除连接，房间保留到恢复、主动解散或过期清理，因此成员仍有 `restore_room` 资格。战斗开始前，非房主发送 `Bye` 时释放自身成员资格，房主发送 `Bye` 时广播解散并销毁整个房间；进入 `raising_state=4` 后，切换 battle socket 产生的 `Bye` 只关闭 lobby 连接，必须保留房间、当局成员快照和 SceneReady 屏障，直到战斗结算或中止流程清理。
 
 ### 6.2 Battle socket 握手
 

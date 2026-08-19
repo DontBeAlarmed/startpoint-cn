@@ -18,6 +18,7 @@ import type {
     NodeSessionId,
     ParticipantIdentity,
 } from "../coordinator/contracts"
+import { REMOTE_PENDING_NODE_SESSION_ID } from "../coordinator/contracts"
 import type { RoomConnectionEndpoint } from "../room/serializer"
 import type { MultiCoordinator } from "../coordinator/interface"
 import {
@@ -65,8 +66,6 @@ import { resolvePlayerIdSync } from "../../data/activeAccount"
 import { getSessionSync } from "../../data/domains/session"
 
 type FatalHandler = (error: unknown) => void
-const REMOTE_PENDING_NODE_SESSION_ID = "remote-pending" as NodeSessionId
-
 export interface MultiRuntimeFatal {
     readonly mode: MultiRuntimeConfig["mode"]
     readonly component: "tcp" | "hub"

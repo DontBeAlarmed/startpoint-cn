@@ -222,8 +222,8 @@ test("later battle data waits for a pending handshake", async t => {
 test("coalesced room handshake and Enter preserve frame order", async t => {
     const viewerId = 97
     const connectionId = "coalesced-room-cid"
-    const room = createRoom(viewerId, 1_097, 1, 1, 503, 0, 103)
     const participant = { nodeSessionId: "coalesced-room-node", viewerId }
+    const room = createRoom(viewerId, 1_097, 1, 1, 503, 0, 103, false, participant)
     const party = {
         characters: [[1], [1], [1]],
         unison_characters: [[1], [1], [1]],

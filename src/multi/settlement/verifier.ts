@@ -2,6 +2,11 @@ import type {
     BattleSessionId,
     MultiCoordinatorOrigin,
     NodeSessionId,
+    ParticipantIdentity,
+} from "../coordinator/contracts"
+import {
+    participantKey,
+    REMOTE_PENDING_NODE_SESSION_ID,
 } from "../coordinator/contracts"
 import type { MultiCoordinator } from "../coordinator/interface"
 
@@ -46,9 +51,7 @@ export class MultiSettlementVerifier {
             }
             if (result.value.roomNumber !== input.roomNumber
                 || result.value.battleSessionId !== input.battleSessionId
-                || !result.value.participants.some(candidate => (
-                    candidate.viewerId === input.viewerId
-                ))) {
+                || resolveParticipant(result.value.participants, input) === null) {
                 return unavailable()
             }
             return { state: result.value.finalized ? "finalized" : "active" }
@@ -75,14 +78,19 @@ export class MultiSettlementVerifier {
                 || result.value.battleSessionId !== input.battleSessionId) {
                 return { ok: false }
             }
-            if (!result.value.participants.some(candidate => (
-                candidate.viewerId === input.viewerId
-            ))) {
+            const resolvedParticipant = resolveParticipant(result.value.participants, input)
+            if (resolvedParticipant === null) {
                 return { ok: false }
             }
             return {
                 ok: true,
-                isHost: result.value.host.viewerId === input.viewerId,
+                isHost: participantKey(
+                    result.value.host.nodeSessionId,
+                    result.value.host.viewerId,
+                ) === participantKey(
+                    resolvedParticipant.nodeSessionId,
+                    resolvedParticipant.viewerId,
+                ),
             }
         } catch {
             return { ok: false }
@@ -113,6 +121,19 @@ function isValidIdentity(input: MultiSettlementIdentity): boolean {
         && input.roomNumber.trim().length > 0
         && typeof input.battleSessionId === "string"
         && input.battleSessionId.trim().length > 0
+}
+
+function resolveParticipant(
+    participants: readonly ParticipantIdentity[],
+    input: MultiSettlementIdentity,
+): ParticipantIdentity | null {
+    const candidates = input.nodeSessionId === REMOTE_PENDING_NODE_SESSION_ID
+        ? participants.filter(candidate => candidate.viewerId === input.viewerId)
+        : participants.filter(candidate => participantKey(
+            candidate.nodeSessionId,
+            candidate.viewerId,
+        ) === participantKey(input.nodeSessionId, input.viewerId))
+    return candidates.length === 1 ? candidates[0] : null
 }
 
 function unavailable(): MultiBattleRecoveryInspection {

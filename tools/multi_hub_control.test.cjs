@@ -1435,17 +1435,17 @@ test("real RemoteCoordinator retains finalized facts across room reset and sessi
     assert.equal(created.ok, true)
     const roomNumber = created.value.roomNumber
     t.after(() => disbandRoom(roomNumber))
-    assert.equal(addRoomMember(roomNumber, 202), true)
     const guestRoom = await guestCoordinator.getRoomStatus({
         participant: { nodeSessionId: "pending", viewerId: 202 },
         roomNumber,
     })
     assert.equal(guestRoom.ok, true)
-    const hostParticipant = created.value.host
     const guestParticipant = {
         nodeSessionId: guestClient.getNodeSessionId(),
         viewerId: 202,
     }
+    assert.equal(addRoomMember(roomNumber, guestParticipant), true)
+    const hostParticipant = created.value.host
     const guestSessionClient = sessionManager.createClient({
         writable: false,
         end() {},
@@ -1555,7 +1555,6 @@ test("real RemoteCoordinator removes an aborted guest before host finalization",
     assert.equal(created.ok, true)
     const roomNumber = created.value.roomNumber
     t.after(() => disbandRoom(roomNumber))
-    assert.equal(addRoomMember(roomNumber, 404), true)
     assert.equal((await guestRemote.getRoomStatus({
         participant: { nodeSessionId: "pending", viewerId: 404 },
         roomNumber,
@@ -1564,6 +1563,7 @@ test("real RemoteCoordinator removes an aborted guest before host finalization",
         nodeSessionId: guestClient.getNodeSessionId(),
         viewerId: 404,
     }
+    assert.equal(addRoomMember(roomNumber, guestParticipant), true)
     const guestSessionClient = sessionManager.createClient({
         writable: false,
         end() {},
@@ -1650,7 +1650,6 @@ test("real RemoteCoordinator releases after a finalized host loses its guest", a
     assert.equal(created.ok, true)
     const roomNumber = created.value.roomNumber
     t.after(() => disbandRoom(roomNumber))
-    assert.equal(addRoomMember(roomNumber, 405), true)
     assert.equal((await guestRemote.getRoomStatus({
         participant: { nodeSessionId: "pending", viewerId: 405 },
         roomNumber,
@@ -1659,6 +1658,7 @@ test("real RemoteCoordinator releases after a finalized host loses its guest", a
         nodeSessionId: guestClient.getNodeSessionId(),
         viewerId: 405,
     }
+    assert.equal(addRoomMember(roomNumber, guestParticipant), true)
     const guestSessionClient = sessionManager.createClient({
         writable: false,
         end() {},
@@ -1756,8 +1756,8 @@ test("lost remote guest abort converges after its active session becomes idle", 
     assert.equal(created.ok, true)
     const roomNumber = created.value.roomNumber
     t.after(() => disbandRoom(roomNumber))
-    assert.equal(addRoomMember(roomNumber, 607), true)
     const guestParticipant = { nodeSessionId: guestNodeSessionId, viewerId: 607 }
+    assert.equal(addRoomMember(roomNumber, guestParticipant), true)
     const guestSessionClient = sessionManager.createClient({
         writable: false,
         end() {},

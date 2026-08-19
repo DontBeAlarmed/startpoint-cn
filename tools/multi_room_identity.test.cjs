@@ -786,14 +786,16 @@ test("each room receives an unguessable token that resolves only to that room", 
 
 test("room membership survives disconnect bookkeeping until an explicit leave", t => {
     const room = createRoom(111, 211, 1, 1, 311, 0, 411)
+    const host = { nodeSessionId: "embedded", viewerId: 111 }
+    const guest = { nodeSessionId: "embedded", viewerId: 222 }
     t.after(() => disbandRoom(room.room_number))
 
-    assert.equal(isRoomMember(room, 111), true)
-    assert.equal(isRoomMember(room, 222), false)
-    assert.equal(addRoomMember(room.room_number, 222), true)
-    assert.equal(isRoomMember(room, 222), true)
-    assert.equal(removeRoomMember(room.room_number, 222), true)
-    assert.equal(isRoomMember(room, 222), false)
+    assert.equal(isRoomMember(room, host), true)
+    assert.equal(isRoomMember(room, guest), false)
+    assert.equal(addRoomMember(room.room_number, guest), true)
+    assert.equal(isRoomMember(room, guest), true)
+    assert.equal(removeRoomMember(room.room_number, guest), true)
+    assert.equal(isRoomMember(room, guest), false)
 })
 
 test("random matching stays empty and access-token verification follows the CN parser contract", async t => {
@@ -853,7 +855,7 @@ test("random matching stays empty and access-token verification follows the CN p
 test("room mutations require an authenticated host while restore accepts recorded members only", async t => {
     const fastify = await createRouteServer()
     const room = createRoom(101, 201, 1, 1, 601, 0, 401)
-    addRoomMember(room.room_number, 202)
+    addRoomMember(room.room_number, { nodeSessionId: "embedded", viewerId: 202 })
     t.after(async () => {
         disbandRoom(room.room_number)
         await fastify.close()

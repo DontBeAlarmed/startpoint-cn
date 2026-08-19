@@ -7,6 +7,9 @@ export type NodeSessionId = string & { readonly __nodeSessionId: unique symbol }
 export type BattleSessionId = string & { readonly __battleSessionId: unique symbol }
 export type MultiCoordinatorOrigin = "remote" | "local"
 
+/** Used only before a client-side Hub call obtains its current session identity. */
+export const REMOTE_PENDING_NODE_SESSION_ID = "remote-pending" as NodeSessionId
+
 export interface ParticipantIdentity {
     readonly nodeSessionId: NodeSessionId
     readonly viewerId: number

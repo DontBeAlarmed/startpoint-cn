@@ -6,7 +6,12 @@
 // HandshakeResult: Accept=0, Denied=1, Reconnect=2, Exception=3, Complete=4
 
 import * as net from "net"
-import { addRoomMember, getRoom, isRoomMember } from "../room/manager"
+import {
+    addRoomMember,
+    getRoom,
+    hasRoomMemberViewerConflict,
+    isRoomViewerMember,
+} from "../room/manager"
 import { sessionManager } from "../state/SessionManager"
 import type { SessionClient } from "../state/SessionManager"
 import { ClientState } from "../types"
@@ -127,8 +132,8 @@ export async function handleHandshake(
             || (Number.isSafeInteger(data.questCategory) && data.questCategory === room?.category)
         const questMatches = data.questId === undefined
             || (Number.isSafeInteger(data.questId) && data.questId === room?.quest_id)
-        const occupiedRealPlayerSlots = room?.member_viewer_ids.length ?? 0
-        const existingMember = room ? isRoomMember(room, normalizedViewerId) : false
+        const occupiedRealPlayerSlots = room?.member_participants.length ?? 0
+        const existingMember = room ? isRoomViewerMember(room, normalizedViewerId) : false
         if (!room
             || (room.raising_state !== 1 && room.raising_state !== 2)
             || !categoryMatches
@@ -146,13 +151,17 @@ export async function handleHandshake(
             deny(socket)
             return
         }
+        if (admission.participant.viewerId !== normalizedViewerId) {
+            deny(socket)
+            return
+        }
 
         if (!lifecycle.isAccepting()) return
         const isRoomHost = normalizedViewerId === room.host_viewer_id
         if (sessionManager.hasActiveRoomViewerConflict(
             normalizedRoomNumber,
             admission.participant,
-        )) {
+        ) || hasRoomMemberViewerConflict(room, admission.participant)) {
             deny(socket)
             return
         }
@@ -186,7 +195,11 @@ export async function handleHandshake(
             deny(socket)
             return
         }
-        addRoomMember(normalizedRoomNumber, normalizedViewerId)
+        if (!addRoomMember(normalizedRoomNumber, admission.participant)) {
+            sessionManager.removeClient(client)
+            deny(socket)
+            return
+        }
         sessionManager.sendJson(socket, [0, normalizedConnectionId, normalizedRoomNumber])
         return
     }

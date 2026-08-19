@@ -41,6 +41,11 @@ export interface RoomNpcAssignment {
     name: string
 }
 
+export interface MultiRoomParticipant {
+    nodeSessionId: string
+    viewerId: number
+}
+
 
 export interface MultiRoom {
     room_number: string
@@ -56,7 +61,7 @@ export interface MultiRoom {
     raising_state: number
     room_sequence: number
     host_entry_time: number
-    member_viewer_ids: number[]
+    member_participants: MultiRoomParticipant[]
     mates: Array<{ viewer_id: number | null, com_id: number, player_id?: number }>
     share_room_options: number
     is_npc_mode: boolean

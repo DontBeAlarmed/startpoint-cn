@@ -155,6 +155,8 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
             input.questId,
             0,
             input.leaderCharacterId,
+            false,
+            input.participant,
         )
         compatibilityByRoom.set(room, Object.freeze({ ...input.compatibility }))
         hostIdentityByRoom.set(room, Object.freeze({ ...input.participant }))
@@ -396,7 +398,7 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         const removedViewerIds = new Set<number>()
         for (const participant of invalidatedParticipants) {
             if (survivingViewerIds.has(participant.viewerId)) continue
-            if (removeRoomMember(room.room_number, participant.viewerId)) {
+            if (removeRoomMember(room.room_number, participant)) {
                 removedViewerIds.add(participant.viewerId)
             }
         }
@@ -425,12 +427,6 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
             viewerId: room.host_viewer_id,
         })
         const battleSessionId = sessionManager.getActiveBattleSessionId(room.room_number)
-        const connected = sessionManager.getClientsInRoom(room.room_number)
-        const identity = (viewerId: number): ParticipantIdentity => {
-            if (viewerId === host.viewerId) return host
-            return connected.find(client => client.viewerId === viewerId)?.participant
-                ?? { nodeSessionId: EMBEDDED_NODE_SESSION_ID, viewerId }
-        }
         return Object.freeze({
             roomNumber: room.room_number,
             accessToken: room.access_token,
@@ -447,9 +443,10 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
                 room.room_number,
             ),
             host,
-            members: Object.freeze(room.member_viewer_ids.map(
-                viewerId => Object.freeze(identity(viewerId)),
-            )),
+            members: Object.freeze(room.member_participants.map(member => Object.freeze({
+                nodeSessionId: member.nodeSessionId as NodeSessionId,
+                viewerId: member.viewerId,
+            }))),
             compatibility: compatibilityByRoom.get(room) ?? EMBEDDED_COMPATIBILITY,
             ...(battleSessionId === null ? {} : { battleSessionId }),
         })

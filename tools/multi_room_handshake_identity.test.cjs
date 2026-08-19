@@ -137,8 +137,8 @@ test("room handshake rejects unknown, non-joinable, mismatched and full rooms", 
     disbandRoom(mismatchRoom.room_number)
 
     const fullRoom = createRoom(103, 1_103, 1, 1, 503, 0, 101)
-    addRoomMember(fullRoom.room_number, 204)
-    addRoomMember(fullRoom.room_number, 205)
+    addRoomMember(fullRoom.room_number, { nodeSessionId: "embedded", viewerId: 204 })
+    addRoomMember(fullRoom.room_number, { nodeSessionId: "embedded", viewerId: 205 })
     t.after(() => disbandRoom(fullRoom.room_number))
     const full = await handshake(fullRoom, 206)
     assert.equal(full.ended, true)
@@ -170,7 +170,7 @@ test("successful handshakes record membership and derive host role from the room
     assert.deepEqual(guest?.npcPartySnapshots, [{ marker: "npc-one" }, { marker: "npc-two" }])
     assert.equal("localPlayerId" in guest, false)
     assert.equal("playerId" in guest.yourself, false)
-    assert.equal(isRoomMember(room, 222), true)
+    assert.equal(isRoomMember(room, { nodeSessionId: "embedded", viewerId: 222 }), true)
 })
 
 test("room admission is required and consumed once", async t => {
@@ -194,11 +194,34 @@ test("room admission is required and consumed once", async t => {
     assert.deepEqual(missing.messages.at(-1), [3, "HANDSHAKE_DENIED"])
 })
 
+test("room handshake rejects an admission whose participant viewer differs from the TCP viewer", async t => {
+    const room = createRoom(114, 1_114, 1, 1, 514, 0, 101)
+    t.after(() => disbandRoom(room.room_number))
+    const socket = await handshake(room, 226, {}, {
+        registry: {
+            consume: () => ({
+                roomNumber: room.room_number,
+                participant: { nodeSessionId: "node-a", viewerId: 227 },
+                snapshot: snapshot(227),
+                expiresAt: 6_000,
+            }),
+        },
+        admit: false,
+    })
+
+    assert.equal(socket.ended, true)
+    assert.deepEqual(socket.messages.at(-1), [3, "HANDSHAKE_DENIED"])
+    assert.equal(sessionManager.getClientByParticipant(room.room_number, {
+        nodeSessionId: "node-a",
+        viewerId: 227,
+    }), undefined)
+})
+
 test("an active room participant rejects the same viewer id from a different node", async t => {
-    const room = createRoom(116, 1_116, 1, 1, 516, 0, 101)
     const registry = new AdmissionRegistry({ now: () => 1_000 })
     const nodeA = { nodeSessionId: "node-a", viewerId: 116 }
     const nodeB = { nodeSessionId: "node-b", viewerId: 116 }
+    const room = createRoom(116, 1_116, 1, 1, 516, 0, 101, false, nodeA)
     registry.issue({
         roomNumber: room.room_number,
         participant: nodeA,
@@ -242,9 +265,9 @@ test("an active room participant rejects the same viewer id from a different nod
 })
 
 test("the same node participant can reconnect without an identity conflict", async t => {
-    const room = createRoom(117, 1_117, 1, 1, 517, 0, 101)
     const registry = new AdmissionRegistry({ now: () => 1_000 })
     const participant = { nodeSessionId: "node-a", viewerId: 117 }
+    const room = createRoom(117, 1_117, 1, 1, 517, 0, 101, false, participant)
     const issueAdmission = () => registry.issue({
         roomNumber: room.room_number,
         participant,
@@ -273,6 +296,7 @@ test("the same node participant can reconnect without an identity conflict", asy
     assert.equal(sessionManager.removeClientBySocket(first), false)
     assert.equal(sessionManager.getClientByParticipant(room.room_number, participant)?.socket, reconnected)
     assert.equal(sessionManager.getUniqueRoomClientByViewerId(117, room.room_number)?.socket, reconnected)
+    assert.deepEqual(getRoom(room.room_number)?.member_participants, [participant])
     assert.equal(getRoom(room.room_number)?.room_number, room.room_number)
 })
 
@@ -404,9 +428,9 @@ test("guest reconnect preserves its three-player mate slot through battle handsh
 })
 
 test("remote participant completes room and battle handshakes without local player storage", async t => {
-    const room = createRoom(115, 1_115, 1, 1, 515, 0, 101)
     const registry = new AdmissionRegistry({ now: () => 1_000 })
     const remoteParticipant = { nodeSessionId: "remote-node-session", viewerId: 115 }
+    const room = createRoom(115, 1_115, 1, 1, 515, 0, 101, false, remoteParticipant)
     registry.issue({
         roomNumber: room.room_number,
         participant: remoteParticipant,
@@ -478,5 +502,5 @@ test("NPC slots remain replaceable by a real room member", async t => {
     t.after(() => sessionManager.removeClientBySocket(guestSocket))
 
     assert.equal(guestSocket.ended, false)
-    assert.equal(isRoomMember(room, 223), true)
+    assert.equal(isRoomMember(room, { nodeSessionId: "embedded", viewerId: 223 }), true)
 })

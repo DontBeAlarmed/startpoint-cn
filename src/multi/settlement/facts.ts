@@ -22,8 +22,8 @@ interface BattleFactRecord {
     host: ParticipantIdentity
     readonly participants: ParticipantIdentity[]
     readonly participantKeys: Set<string>
-    readonly credentialIdByViewerId: Map<number, string>
-    readonly finalizedViewerIds: Set<number>
+    readonly credentialIdByParticipantKey: Map<string, string>
+    readonly finalizedParticipantKeys: Set<string>
     readonly sequence: number
     expiresAt: number | null
 }
@@ -74,7 +74,7 @@ export class BattleFactStore {
         const activeId = this.activeBattleByRoom.get(input.roomNumber)
         const active = activeId ? this.records.get(activeId) : undefined
         if (active) {
-            if (active.finalizedViewerIds.size > 0) {
+            if (active.finalizedParticipantKeys.size > 0) {
                 throw new Error("battle session is finalized")
             }
             return this.toStatus(active, input.host)
@@ -108,8 +108,8 @@ export class BattleFactStore {
             host,
             participants,
             participantKeys,
-            credentialIdByViewerId: new Map(),
-            finalizedViewerIds: new Set(),
+            credentialIdByParticipantKey: new Map(),
+            finalizedParticipantKeys: new Set(),
             sequence: ++this.sequence,
             expiresAt: null,
         }
@@ -143,7 +143,10 @@ export class BattleFactStore {
             return { ok: false, error: "ROOM_PERMISSION_DENIED" }
         }
         if (input.credentialId !== undefined) {
-            record.credentialIdByViewerId.set(input.participant.viewerId, input.credentialId)
+            record.credentialIdByParticipantKey.set(
+                participantKey(input.participant.nodeSessionId, input.participant.viewerId),
+                input.credentialId,
+            )
         }
         return { ok: true, value: this.toStatus(record, input.participant) }
     }
@@ -153,7 +156,10 @@ export class BattleFactStore {
         if (!result.ok) return result
         const record = this.records.get(input.battleSessionId)
         if (!record) return { ok: false, error: "ROOM_NOT_FOUND" }
-        record.finalizedViewerIds.add(input.participant.viewerId)
+        record.finalizedParticipantKeys.add(participantKey(
+            input.participant.nodeSessionId,
+            input.participant.viewerId,
+        ))
         record.expiresAt ??= this.now() + this.retentionMs
         return { ok: true, value: this.toStatus(record, input.participant) }
     }
@@ -163,8 +169,12 @@ export class BattleFactStore {
         const battleSessionId = this.activeBattleByRoom.get(input.roomNumber)
         const record = battleSessionId ? this.records.get(battleSessionId) : undefined
         if (!record) return { ok: true, value: null }
+        const requestedKey = participantKey(
+            input.participant.nodeSessionId,
+            input.participant.viewerId,
+        )
         const participantIndex = record.participants.findIndex(candidate => (
-            candidate.viewerId === input.participant.viewerId
+            participantKey(candidate.nodeSessionId, candidate.viewerId) === requestedKey
         ))
         if (participantIndex < 0) return { ok: true, value: null }
         if (!this.isAuthorized(record, {
@@ -197,14 +207,14 @@ export class BattleFactStore {
     hasAnyFinalized(input: Pick<BattleSessionInput, "roomNumber" | "battleSessionId">): boolean {
         this.prune()
         const record = this.records.get(input.battleSessionId)
-        return record?.roomNumber === input.roomNumber && record.finalizedViewerIds.size > 0
+        return record?.roomNumber === input.roomNumber && record.finalizedParticipantKeys.size > 0
     }
 
     isFullyFinalized(input: Pick<BattleSessionInput, "roomNumber" | "battleSessionId">): boolean {
         this.prune()
         const record = this.records.get(input.battleSessionId)
         return record?.roomNumber === input.roomNumber
-            && record.finalizedViewerIds.size === record.participants.length
+            && record.finalizedParticipantKeys.size === record.participants.length
     }
 
     getActiveBattleSessionId(roomNumber: string): BattleSessionId | null {
@@ -217,7 +227,7 @@ export class BattleFactStore {
         let active = 0
         let finalized = 0
         for (const record of this.records.values()) {
-            if (record.finalizedViewerIds.size > 0) finalized++
+            if (record.finalizedParticipantKeys.size > 0) finalized++
             else active++
         }
         return Object.freeze({ active, finalized })
@@ -228,7 +238,7 @@ export class BattleFactStore {
         this.activeBattleByRoom.delete(roomNumber)
         if (battleSessionId !== undefined) {
             const record = this.records.get(battleSessionId)
-            if (record?.finalizedViewerIds.size === 0) {
+            if (record?.finalizedParticipantKeys.size === 0) {
                 this.records.delete(battleSessionId)
             }
         }
@@ -236,12 +246,13 @@ export class BattleFactStore {
     }
 
     private toStatus(record: BattleFactRecord, participant: ParticipantIdentity): BattleStatus {
+        const requestedKey = participantKey(participant.nodeSessionId, participant.viewerId)
         const participants = record.participants.map(candidate => (
-            candidate.viewerId === participant.viewerId
+            participantKey(candidate.nodeSessionId, candidate.viewerId) === requestedKey
                 ? Object.freeze({ ...participant })
                 : candidate
         ))
-        const host = record.host.viewerId === participant.viewerId
+        const host = participantKey(record.host.nodeSessionId, record.host.viewerId) === requestedKey
             ? Object.freeze({ ...participant })
             : record.host
         return Object.freeze({
@@ -249,51 +260,76 @@ export class BattleFactStore {
             roomNumber: record.roomNumber,
             host,
             participants: Object.freeze(participants),
-            finalized: record.finalizedViewerIds.has(participant.viewerId),
+            finalized: record.finalizedParticipantKeys.has(requestedKey),
         })
     }
 
     private isAuthorized(record: BattleFactRecord, input: BattleSessionInput): boolean {
-        const credentialId = record.credentialIdByViewerId.get(input.participant.viewerId)
-        if (credentialId !== undefined && input.credentialId !== undefined) {
-            if (credentialId !== input.credentialId) return false
-            this.rebindParticipant(record, input.participant)
-            return true
-        }
-        return record.participantKeys.has(participantKey(
+        const requestedKey = participantKey(
             input.participant.nodeSessionId,
             input.participant.viewerId,
-        ))
+        )
+        const credentialId = record.credentialIdByParticipantKey.get(requestedKey)
+        if (credentialId !== undefined
+            && input.credentialId !== undefined
+            && credentialId !== input.credentialId) {
+            return false
+        }
+        if (record.participantKeys.has(requestedKey)) return true
+        if (input.credentialId === undefined) return false
+
+        const reboundKey = [...record.credentialIdByParticipantKey.entries()]
+            .find(([candidateKey, candidateCredentialId]) => (
+                candidateCredentialId === input.credentialId
+                && record.participants.some(candidate => (
+                    participantKey(candidate.nodeSessionId, candidate.viewerId) === candidateKey
+                    && candidate.viewerId === input.participant.viewerId
+                ))
+            ))?.[0]
+        if (reboundKey === undefined) return false
+        this.rebindParticipant(record, reboundKey, input.participant)
+        return true
     }
 
     private rebindParticipant(
         record: BattleFactRecord,
+        previousKey: string,
         participant: ParticipantIdentity,
     ): void {
         const index = record.participants.findIndex(candidate => (
-            candidate.viewerId === participant.viewerId
+            participantKey(candidate.nodeSessionId, candidate.viewerId) === previousKey
         ))
         if (index < 0) return
-        const previous = record.participants[index]
-        const previousKey = participantKey(previous.nodeSessionId, previous.viewerId)
         const nextKey = participantKey(participant.nodeSessionId, participant.viewerId)
         if (previousKey === nextKey) return
+        if (record.participantKeys.has(nextKey)) return
 
         const rebound = Object.freeze({ ...participant })
         record.participants[index] = rebound
         record.participantKeys.delete(previousKey)
         record.participantKeys.add(nextKey)
-        if (record.host.viewerId === participant.viewerId) record.host = rebound
+        const credentialId = record.credentialIdByParticipantKey.get(previousKey)
+        record.credentialIdByParticipantKey.delete(previousKey)
+        if (credentialId !== undefined) {
+            record.credentialIdByParticipantKey.set(nextKey, credentialId)
+        }
+        if (record.finalizedParticipantKeys.delete(previousKey)) {
+            record.finalizedParticipantKeys.add(nextKey)
+        }
+        if (participantKey(record.host.nodeSessionId, record.host.viewerId) === previousKey) {
+            record.host = rebound
+        }
     }
 
     private removeRecordParticipant(record: BattleFactRecord, index: number): void {
         const [participant] = record.participants.splice(index, 1)
-        record.participantKeys.delete(participantKey(
+        const removedKey = participantKey(
             participant.nodeSessionId,
             participant.viewerId,
-        ))
-        record.credentialIdByViewerId.delete(participant.viewerId)
-        record.finalizedViewerIds.delete(participant.viewerId)
+        )
+        record.participantKeys.delete(removedKey)
+        record.credentialIdByParticipantKey.delete(removedKey)
+        record.finalizedParticipantKeys.delete(removedKey)
     }
 
     private prune(): void {
@@ -317,7 +353,7 @@ export class BattleFactStore {
     }
 
     private isRetained(record: BattleFactRecord): boolean {
-        return record.finalizedViewerIds.size > 0
+        return record.finalizedParticipantKeys.size > 0
             && record.expiresAt !== null
             && this.activeBattleByRoom.get(record.roomNumber) !== record.battleSessionId
     }
