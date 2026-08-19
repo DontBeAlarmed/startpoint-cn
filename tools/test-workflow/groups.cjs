@@ -127,6 +127,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/multi_admission.test.cjs",
             "tools/multi_battle_relay_snapshot.test.cjs",
             "tools/multi_battle_multiscene.test.cjs",
+            "tools/multi_battle_heartbeat.test.cjs",
             "tools/multi_compatibility.test.cjs",
             "tools/multi_coordinator_contract.test.cjs",
             "tools/multi_coordinator_embedded.test.cjs",

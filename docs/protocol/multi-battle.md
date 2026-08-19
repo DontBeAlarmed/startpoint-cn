@@ -104,6 +104,18 @@ keepalive；发送方向每个 socket 单独排队，默认最多缓存 512 条�
 `SESSION_*` 与 `MULTI_SEND_QUEUE_*` 参数调整，调整应配合协议回归测试，不改变消息
 编码或房间权威归属。
 
+### 3.3 Battle 连接安全租约
+
+服务端把 battle socket 分为两个阶段：握手成功后等待 `SceneReady` 的 loading 阶段，
+以及收到 `SceneReady` 后的 active 阶段。loading 默认 60 秒没有完成 `SceneReady` 就
+关闭该 socket；active 默认 25 秒没有收到任何 battle 业务帧就关闭该 socket。Heartbeat
+（Notify 索引 5）会刷新 active 活动时间，但沿用当前 CN 行为不额外回包；其他 battle
+帧也会刷新活动时间。租约是服务端资源保护，不宣称为官方客户端倒计时。断开仍走现有
+Leave、SceneReady 屏障和 battle fact 清理路径；重连保留窗口和 NPC 补位不在本节实现。
+
+部署者可以通过 `BATTLE_LOADING_LEASE_MS` 与 `BATTLE_HEARTBEAT_LEASE_MS` 调整默认值，
+调整前应运行双服协议回归。
+
 ## 4. HTTP 路由族
 
 当前插件共注册 16 个多人 HTTP 路由，按职责分为四组。

@@ -77,6 +77,72 @@ export class SessionManager {
     private roomHostParticipants = new Map<string, ParticipantIdentity>()
     private roomStates = new Map<string, RoomStateMachine>()
     private battleFacts = new BattleFactStore()
+    private battleHeartbeatTimers = new Map<string, NodeJS.Timeout>()
+    private battleLastActivityAt = new Map<string, number>()
+    private battleConnectionPhase = new Map<string, "loading" | "active">()
+
+    private parsePositiveDuration(name: string, fallback: number): number {
+        const parsed = Number.parseInt(process.env[name] ?? "", 10)
+        return Number.isFinite(parsed) ? Math.max(1, parsed) : fallback
+    }
+
+    private clearBattleHeartbeatLease(connectionId: string): void {
+        const timer = this.battleHeartbeatTimers.get(connectionId)
+        if (timer) clearTimeout(timer)
+        this.battleHeartbeatTimers.delete(connectionId)
+        this.battleLastActivityAt.delete(connectionId)
+        this.battleConnectionPhase.delete(connectionId)
+    }
+
+    private scheduleActiveBattleHeartbeatLease(client: SessionClient, delayMs: number): void {
+        if (this.cidToBattleClient.get(client.connectionId) !== client || client.socket.destroyed) return
+        const leaseMs = this.parsePositiveDuration("BATTLE_HEARTBEAT_LEASE_MS", 25_000)
+        const timer = setTimeout(() => {
+            this.battleHeartbeatTimers.delete(client.connectionId)
+            if (this.cidToBattleClient.get(client.connectionId) !== client || client.socket.destroyed) return
+            const inactiveMs = Date.now() - (this.battleLastActivityAt.get(client.connectionId) ?? 0)
+            if (inactiveMs < leaseMs) {
+                this.scheduleActiveBattleHeartbeatLease(client, leaseMs - inactiveMs)
+                return
+            }
+            console.warn(`[BATTLE] active connection lease expired: room=${client.roomNumber}`)
+            client.socket.destroy()
+        }, Math.max(1, delayMs))
+        timer.unref()
+        this.battleHeartbeatTimers.set(client.connectionId, timer)
+    }
+
+    private armBattleLoadingLease(client: SessionClient): void {
+        this.clearBattleHeartbeatLease(client.connectionId)
+        const leaseMs = this.parsePositiveDuration("BATTLE_LOADING_LEASE_MS", 60_000)
+        this.battleConnectionPhase.set(client.connectionId, "loading")
+        this.battleLastActivityAt.set(client.connectionId, Date.now())
+        const timer = setTimeout(() => {
+            this.battleHeartbeatTimers.delete(client.connectionId)
+            if (this.cidToBattleClient.get(client.connectionId) !== client || client.socket.destroyed) return
+            if (this.battleConnectionPhase.get(client.connectionId) !== "loading") return
+            console.warn(`[BATTLE] loading connection lease expired: room=${client.roomNumber}`)
+            client.socket.destroy()
+        }, leaseMs)
+        timer.unref()
+        this.battleHeartbeatTimers.set(client.connectionId, timer)
+    }
+
+    private armActiveBattleHeartbeatLease(client: SessionClient): void {
+        if (this.cidToBattleClient.get(client.connectionId) !== client || client.socket.destroyed) return
+        const leaseMs = this.parsePositiveDuration("BATTLE_HEARTBEAT_LEASE_MS", 25_000)
+        const previous = this.battleHeartbeatTimers.get(client.connectionId)
+        if (previous) clearTimeout(previous)
+        this.battleConnectionPhase.set(client.connectionId, "active")
+        this.battleLastActivityAt.set(client.connectionId, Date.now())
+        this.scheduleActiveBattleHeartbeatLease(client, leaseMs)
+    }
+
+    private clearBattleHeartbeatLeasesForRoom(roomNumber: string): void {
+        for (const [connectionId, client] of this.cidToBattleClient) {
+            if (client.roomNumber === roomNumber) this.clearBattleHeartbeatLease(connectionId)
+        }
+    }
 
     private roomClientKey(roomNumber: string, participant: ParticipantIdentity): string {
         return JSON.stringify([roomNumber, participant.nodeSessionId, participant.viewerId])
@@ -227,6 +293,7 @@ export class SessionManager {
                 this.removeSocketIndex(client)
                 return { ok: true, value: undefined }
             }
+            this.clearBattleHeartbeatLease(client.connectionId)
             const bSet = this.battleClients.get(client.roomNumber)
             if (bSet) {
                 for (const cid of bSet) {
@@ -306,12 +373,14 @@ export class SessionManager {
             this.battleClients.set(client.roomNumber, set)
         }
         if (previous && previous !== client) {
+            this.clearBattleHeartbeatLease(previous.connectionId)
             this.removeSocketIndex(previous)
         }
         set.add(connectionId)
         this.cidToBattleClient.set(connectionId, client)
         this.socketToClient.set(client.socket, client)
         if (previous && previous !== client) this.closeClientSocket(previous.socket)
+        this.armBattleLoadingLease(client)
         return true
     }
 
@@ -338,6 +407,7 @@ export class SessionManager {
     removeBattleClient(connectionId: string): void {
         const client = this.cidToBattleClient.get(connectionId)
         if (client) {
+            this.clearBattleHeartbeatLease(connectionId)
             this.battleClients.get(client.roomNumber)?.delete(connectionId)
             this.removeSocketIndex(client)
             this.sceneReadyClients.get(client.roomNumber)?.delete(connectionId)
@@ -558,10 +628,18 @@ export class SessionManager {
     }
 
     markSceneReady(connectionId: string, roomNumber: string): boolean {
-        const expected = this.battleExpectedCount.get(roomNumber) ?? 0
-        if (expected <= 0) return false
+        const expected = this.battleExpectedCount.get(roomNumber)
+        if (expected === undefined) return false
+        const client = this.cidToBattleClient.get(connectionId)
+        if (expected <= 0) {
+            if (expected === 0 && client?.roomNumber === roomNumber) {
+                this.armActiveBattleHeartbeatLease(client)
+            }
+            return false
+        }
         if ((this.battleSceneGeneration.get(roomNumber) ?? 0) === 1
             && !this.sceneTransitionClients.get(roomNumber)?.has(connectionId)) return false
+        if (client?.roomNumber === roomNumber) this.armActiveBattleHeartbeatLease(client)
         let readySet = this.sceneReadyClients.get(roomNumber)
         if (!readySet) {
             readySet = new Set()
@@ -574,6 +652,12 @@ export class SessionManager {
         const complete = this.isSceneBarrierComplete(roomNumber)
         console.log(`[BATTLE] SceneReady: room=${roomNumber} generation=${generation} expected=${expected} ready=${ready} connected=${connected} complete=${complete}`)
         return complete
+    }
+
+    noteBattleActivity(connectionId: string): void {
+        if (this.battleConnectionPhase.get(connectionId) !== "active") return
+        if (!this.cidToBattleClient.has(connectionId)) return
+        this.battleLastActivityAt.set(connectionId, Date.now())
     }
 
     beginNextBattleScene(connectionId: string, roomNumber: string): boolean {
@@ -723,6 +807,7 @@ export class SessionManager {
     }
 
     clearBattleSceneState(roomNumber: string): void {
+        this.clearBattleHeartbeatLeasesForRoom(roomNumber)
         this.battleFacts.releaseRoom(roomNumber)
         this.battleExpectedCount.delete(roomNumber)
         this.sceneReadyClients.delete(roomNumber)

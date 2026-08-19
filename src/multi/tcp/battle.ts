@@ -83,6 +83,8 @@ function handleBattleNotify(socket: net.Socket, data: unknown): void {
 export function handleBattleMessage(socket: net.Socket, data: unknown): void {
     if (!Array.isArray(data)) return
     const tag = data[0] as number
+    const activityClient = findBattleClientBySocket(socket)
+    if (activityClient) sessionManager.noteBattleActivity(activityClient.connectionId)
 
     switch (tag) {
         case 0: // Notify
