@@ -5,6 +5,7 @@ import { getAccountSync, insertAccountSync, updateAccountSync } from "../../data
 import { getPlayerSync, insertDefaultPlayerSync } from "../../data/domains/player"
 import { SessionType } from "../../data/types";
 import { saveAccountDefaultPlayer } from "../../data/activeAccount";
+import { getAccountIdentityProvider } from "../../lib/account-identity-provider";
 
 interface CnSignupBody {
     device_id: number;
@@ -36,6 +37,7 @@ interface GetHeaderResponseBody {
 }
 
 const routes = async (fastify: FastifyInstance) => {
+    const identityProvider = getAccountIdentityProvider()
     fastify.post("/get_header_response", (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as GetHeaderResponseBody;
         reply.header("content-type", "application/x-msgpack");
@@ -89,8 +91,9 @@ const routes = async (fastify: FastifyInstance) => {
             } else {
                 // Account was deleted — clean up stale binding and create new account
                 deleteDeviceBindingSync(deviceId)
+                const identity = identityProvider.resolveCnSignup({ appId: "wf_cn" })
                 const account = insertAccountSync({
-                    appId: "wf_cn", idpAlias: "", idpCode: "leiting", idpId: "", status: "normal"
+                    appId: "wf_cn", ...identity, status: "normal"
                 })
                 accountId = account.id
                 const player = insertDefaultPlayerSync(accountId)
@@ -99,8 +102,9 @@ const routes = async (fastify: FastifyInstance) => {
             }
         } else {
             // New device → create account
+            const identity = identityProvider.resolveCnSignup({ appId: "wf_cn" })
             const account = insertAccountSync({
-                appId: "wf_cn", idpAlias: "", idpCode: "leiting", idpId: "", status: "normal"
+                appId: "wf_cn", ...identity, status: "normal"
             })
             accountId = account.id
             const player = insertDefaultPlayerSync(accountId)

@@ -3,7 +3,7 @@ import { SessionType } from "../data/types";
 import { deleteAccountSessionsOfType, deleteSession, getSession, insertSession } from "../data/domains/session"
 import { getAccount, getAccountFromIdpIdSync, insertAccount, updateAccount } from "../data/domains/account"
 import { getAccountFromPlayerIdSync } from "../data/domains/player"
-import { generateIdpAlias } from "../utils";
+import { getAccountIdentityProvider } from "../lib/account-identity-provider";
 
 interface CreateDeviceAccessTokenBody {
     adid: string
@@ -118,6 +118,7 @@ interface AndroidAuthLoginDeviceBody extends AuthLoginDeviceBody {
 }
 
 const routes = async (fastify: FastifyInstance) => {
+    const identityProvider = getAccountIdentityProvider()
 
     fastify.post("/v3/util/country/get", (_, reply: FastifyReply) => {
         reply.status(200).send({ 
@@ -146,7 +147,12 @@ const routes = async (fastify: FastifyInstance) => {
         let session = await getSession(clientZat)
         if (session === null) {
             // attempt to generate a new session
-            const idpAlias = generateIdpAlias(body.appId, body.deviceId, body.os)
+            const idpAlias = identityProvider.resolveDeviceLogin({
+                appId: body.appId,
+                deviceId: body.deviceId,
+                serialNo: body.os,
+                whiteKey: body.whiteKey,
+            }).idpAlias
             const accountId = Number.parseInt(body.playerId)
             const account = isNaN(accountId) ? null : await getAccount(accountId)
             if (account && account.idpAlias === idpAlias) {
@@ -284,16 +290,21 @@ const routes = async (fastify: FastifyInstance) => {
         const rawAccountId = request.headers['playerid'] as string | undefined
         const accountId = rawAccountId ? Number.parseInt(rawAccountId) : undefined
 
-        const idpAlias = generateIdpAlias(appId, deviceId, serialNo)
-        const idpId = body.whiteKey
+        const identity = identityProvider.resolveDeviceLogin({
+            appId,
+            deviceId,
+            serialNo,
+            whiteKey: body.whiteKey,
+        })
+        const { idpAlias, idpId } = identity
 
         // create account
         const existingAccount = accountId === undefined ? getAccountFromIdpIdSync(idpId) : await getAccount(accountId)
         const account = existingAccount === null ? await insertAccount({
             appId: body.appId,
             idpAlias: idpAlias,
-            idpCode: "zd3",
-            idpId: idpId,
+            idpCode: identity.idpCode,
+            idpId,
             status: "normal",
         }) : existingAccount
 
