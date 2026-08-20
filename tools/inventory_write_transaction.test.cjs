@@ -222,6 +222,26 @@ test("equipment protection batch rolls earlier updates back", async t => {
     assert.equal(getPlayerEquipmentSync(playerId, 3020003).protection, false)
 })
 
+test("equipment protection returns the updated equipment projection", async () => {
+    const { playerId, viewerId } = await createPlayer("protection-response")
+    addEquipment(playerId, 3010006)
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/equipment/set_protection",
+        payload: {
+            viewer_id: viewerId,
+            protection: true,
+            equipment_ids: [3010006],
+        },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    const returned = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
+    const equipment = returned.data.equipment_list.find(entry => entry.equipment_id === 3010006)
+    assert.equal(equipment.protection, true)
+})
+
 for (const scenario of [
     { name: "sell_equipment", payload: equipmentId => ({ equipment_list: [{ equipment_id: equipmentId }] }) },
     { name: "sell_stack", payload: equipmentId => ({ equipment_list: [{ equipment_id: equipmentId, number: 1 }] }) },
