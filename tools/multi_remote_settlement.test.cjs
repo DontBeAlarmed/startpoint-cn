@@ -1563,22 +1563,70 @@ for (const corruption of ["missing", "battle-session-mismatch", "coordinator-ori
 }
 
 test("multi routes verify Hub state before opening local write transactions", () => {
-    const source = fs.readFileSync(
+    const routeSource = fs.readFileSync(
         path.join(__dirname, "../src/multi/http/battle.ts"),
         "utf8",
     )
-    const availability = source.indexOf("context.questAvailability.check(category, quest_id)")
-    const roomStatus = source.indexOf("context.coordinator.getRoomStatus(", availability)
-    const battleStart = source.indexOf("context.coordinator.startBattle(", roomStatus)
-    const entryTransaction = source.indexOf("runStartEntryTransaction({", battleStart)
-    const settlementVerification = source.indexOf("context.settlementVerifier.verify(")
-    const settlementTransaction = source.indexOf("runMultiActiveQuestSettlementTransaction(")
+    const orchestratorSource = fs.readFileSync(
+        path.join(__dirname, "../src/multi/settlement/orchestrator.ts"),
+        "utf8",
+    )
+    const availability = routeSource.indexOf("context.questAvailability.check(category, quest_id)")
+    const roomStatus = routeSource.indexOf("context.coordinator.getRoomStatus(", availability)
+    const battleStart = routeSource.indexOf("context.coordinator.startBattle(", roomStatus)
+    const entryTransaction = routeSource.indexOf("runStartEntryTransaction({", battleStart)
+    const settlementPreparation = routeSource.indexOf("await prepareMultiplayerSettlement({")
+    const settlementOrchestration = routeSource.indexOf("runMultiplayerSettlementOrchestration(")
+    const settlementVerification = orchestratorSource.indexOf("context.settlementVerifier.verify(")
+    const settlementFinalization = orchestratorSource.indexOf("context.coordinator.finalizeBattle(")
+    const settlementTransaction = orchestratorSource.indexOf("runMultiActiveQuestSettlementTransaction(")
 
     assert.ok(availability >= 0)
     assert.ok(roomStatus > availability)
     assert.ok(battleStart > roomStatus)
     assert.ok(entryTransaction > battleStart)
-    assert.ok(settlementVerification >= 0 && settlementVerification < settlementTransaction)
-    assert.match(source, /battleSessionId:\s*battle\.value\.battleSessionId/)
-    assert.doesNotMatch(source, /consumeParticipantFinalizedBattle/)
+    assert.ok(settlementPreparation >= 0 && settlementPreparation < settlementOrchestration)
+    assert.ok(settlementVerification >= 0 && settlementVerification < settlementFinalization)
+    assert.ok(settlementFinalization < settlementTransaction)
+    assert.doesNotMatch(routeSource, /runMultiActiveQuestSettlementTransaction\(/)
+    assert.match(routeSource, /battleSessionId:\s*battle\.value\.battleSessionId/)
+    assert.doesNotMatch(routeSource, /consumeParticipantFinalizedBattle/)
+})
+
+test("multi finish delegates preparation, settlement writes, and response projection", () => {
+    const routeSource = fs.readFileSync(
+        path.join(__dirname, "../src/multi/http/battle.ts"),
+        "utf8",
+    )
+    const orchestratorSource = fs.readFileSync(
+        path.join(__dirname, "../src/multi/settlement/orchestrator.ts"),
+        "utf8",
+    )
+    const responseSource = fs.readFileSync(
+        path.join(__dirname, "../src/multi/settlement/response.ts"),
+        "utf8",
+    )
+    const finishRouteSource = routeSource.slice(
+        routeSource.indexOf("// ---- finish ----"),
+        routeSource.indexOf("// ---- abort ----"),
+    )
+
+    const preparation = finishRouteSource.indexOf("await prepareMultiplayerSettlement({")
+    const orchestration = finishRouteSource.indexOf("runMultiplayerSettlementOrchestration(")
+    assert.ok(preparation >= 0 && orchestration > preparation)
+    assert.match(finishRouteSource, /projectMultiplayerFinishResponse\(/)
+    assert.doesNotMatch(finishRouteSource, /getQuestFromCategorySync/)
+    assert.doesNotMatch(finishRouteSource, /validateMultiFinishRequest/)
+    assert.doesNotMatch(finishRouteSource, /settlementVerifier\.verify/)
+    assert.doesNotMatch(finishRouteSource, /coordinator\.finalizeBattle/)
+    assert.doesNotMatch(finishRouteSource, /const executeFinishWrites/)
+    assert.doesNotMatch(finishRouteSource, /givePlayerScoreRewardsSync/)
+    assert.doesNotMatch(finishRouteSource, /const responseData/)
+
+    assert.match(orchestratorSource, /export async function prepareMultiplayerSettlement/)
+    assert.match(orchestratorSource, /export function runMultiplayerSettlementOrchestration/)
+    assert.match(orchestratorSource, /runMultiActiveQuestSettlementTransaction\(/)
+    assert.match(orchestratorSource, /const player = getPlayerSync\(input\.playerId\)/)
+    assert.match(responseSource, /export async function projectMultiplayerFinishResponse/)
+    assert.match(responseSource, /mergeMissionSettlementResponse\(/)
 })

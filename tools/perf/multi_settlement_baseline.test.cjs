@@ -8,6 +8,15 @@ const {
     createMultiSettlementReport,
     runMultiSettlementBaseline,
 } = require("./multi_settlement_baseline.cjs")
+require("ts-node/register/transpile-only")
+const settlementOrchestrator = require("../../src/multi/settlement/orchestrator")
+const settlementResponse = require("../../src/multi/settlement/response")
+
+test("settlement baseline targets the focused production module boundary", () => {
+    assert.equal(typeof settlementOrchestrator.prepareMultiplayerSettlement, "function")
+    assert.equal(typeof settlementOrchestrator.runMultiplayerSettlementOrchestration, "function")
+    assert.equal(typeof settlementResponse.projectMultiplayerFinishResponse, "function")
+})
 
 test("normalizes a deterministic multiplayer settlement report", () => {
     assert.deepEqual(createMultiSettlementReport({
