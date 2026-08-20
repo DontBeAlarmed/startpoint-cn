@@ -10,14 +10,17 @@ test("validates Hub baseline arguments", () => {
     assert.deepEqual(parseArgs([
         "--rooms", "25",
         "--timeout-ms", "1000",
+        "--fault-mode", "client-disconnect",
         "--output", "/tmp/hub-report.json",
     ]), {
+        faultMode: "client-disconnect",
         output: "/tmp/hub-report.json",
         rooms: 25,
         timeoutMs: 1000,
     })
     assert.throws(() => parseArgs(["--rooms", "0"]), /rooms must be a positive integer/)
     assert.throws(() => parseArgs(["--rooms", "9007199254740992"]), /rooms must be a positive integer/)
+    assert.throws(() => parseArgs(["--fault-mode", "invalid"]), /unknown fault mode/)
     assert.throws(() => parseArgs(["--unknown", "1"]), /unknown argument/)
 })
 
@@ -36,6 +39,7 @@ test("runs one remote room through Host, Client, and Hub", { timeout: 120_000 },
     const result = await runHubBaseline({ rooms: 1, timeoutMs: 5_000 })
 
     assert.deepEqual(result.workload, {
+        faultMode: "none",
         rooms: 1,
         timeoutMs: 5_000,
         totalPeers: 2,
@@ -55,4 +59,27 @@ test("runs one remote room through Host, Client, and Hub", { timeout: 120_000 },
     assert.equal(result.summary.peakPeers, 2)
     assert.equal(result.summary.activePeersAfterCleanup, 0)
     assert.equal(result.summary.remainingRooms, 0)
+})
+
+test("cleans multiple remote rooms after abrupt Client disconnects", { timeout: 120_000 }, async () => {
+    const result = await runHubBaseline({
+        faultMode: "client-disconnect",
+        rooms: 2,
+        timeoutMs: 5_000,
+    })
+
+    assert.deepEqual(result.workload, {
+        faultMode: "client-disconnect",
+        rooms: 2,
+        timeoutMs: 5_000,
+        totalPeers: 4,
+    })
+    assert.equal(result.summary.completedRooms, 2)
+    assert.equal(result.summary.errors, 0)
+    assert.equal(result.summary.faultsInjected, 2)
+    assert.equal(result.summary.peakPeers, 4)
+    assert.equal(result.summary.activePeersAfterCleanup, 0)
+    assert.equal(result.summary.remainingRooms, 0)
+    assert.equal(result.summary.activeProcessesAfterCleanup, 0)
+    assert.equal(result.summary.temporaryRootExistsAfterCleanup, false)
 })

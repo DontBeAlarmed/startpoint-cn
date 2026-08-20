@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "scenarios": {
+    "finish": {
+      "activeQuestCleared": true,
+      "observations": {
+        "eventLoopDelayMs": 353.107967,
+        "latencyMs": 352.87139900000057
+      },
+      "outputSignature": "sha256:e6ff36c5abce6cd5aaa0dc610c9d713d8f855540e69bdf20ecbb5b6857a6afb5",
+      "sql": {
+        "selectStatements": 55,
+        "statements": 91,
+        "transactionStatements": 12,
+        "writeStatements": 24,
+        "byTable": {
+          "players": { "reads": 9, "statements": 14, "writes": 5 },
+          "players_active_mission_battle_facts": { "reads": 0, "statements": 1, "writes": 1 },
+          "players_active_quests": { "reads": 1, "statements": 2, "writes": 1 },
+          "players_category_mission_stages": { "reads": 4, "statements": 5, "writes": 1 },
+          "players_category_missions": { "reads": 5, "statements": 8, "writes": 3 },
+          "players_character_awake_unlocks": { "reads": 2, "statements": 2, "writes": 0 },
+          "players_character_quest_clears": { "reads": 1, "statements": 3, "writes": 2 },
+          "players_characters": { "reads": 4, "statements": 5, "writes": 1 },
+          "players_characters_bond_tokens": { "reads": 4, "statements": 4, "writes": 0 },
+          "players_characters_mana_nodes": { "reads": 5, "statements": 5, "writes": 0 },
+          "players_collected_items": { "reads": 2, "statements": 3, "writes": 1 },
+          "players_degree_battle_stats": { "reads": 1, "statements": 2, "writes": 1 },
+          "players_equipment": { "reads": 1, "statements": 1, "writes": 0 },
+          "players_items": { "reads": 1, "statements": 2, "writes": 1 },
+          "players_mails": { "reads": 1, "statements": 1, "writes": 0 },
+          "players_mission_battle_counters": { "reads": 1, "statements": 2, "writes": 1 },
+          "players_party_member_co_clears": { "reads": 1, "statements": 1, "writes": 0 },
+          "players_party_race_clears": { "reads": 0, "statements": 1, "writes": 1 },
+          "players_pass_cards": { "reads": 1, "statements": 4, "writes": 3 },
+          "players_periodic_snapshots": { "reads": 4, "statements": 4, "writes": 0 },
+          "players_quest_progress": { "reads": 5, "statements": 7, "writes": 2 },
+          "server_gameplay_settings": { "reads": 2, "statements": 2, "writes": 0 }
+        }
+      },
+      "statusCode": 200,
+      "verificationBeforeTransaction": true
+    }
+  }
+}

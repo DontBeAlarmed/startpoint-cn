@@ -21,6 +21,8 @@ const {
 } = require("./hub_baseline_helpers.cjs")
 const DEFAULT_ROOMS = 1
 const DEFAULT_TIMEOUT_MS = 5_000
+const DEFAULT_FAULT_MODE = "none"
+const FAULT_MODES = new Set([DEFAULT_FAULT_MODE, "client-disconnect"])
 
 function positiveInteger(value, name) {
     const parsed = Number(value)
@@ -31,7 +33,12 @@ function positiveInteger(value, name) {
 }
 
 function parseArgs(argv) {
-    const parsed = { output: null, rooms: DEFAULT_ROOMS, timeoutMs: DEFAULT_TIMEOUT_MS }
+    const parsed = {
+        faultMode: DEFAULT_FAULT_MODE,
+        output: null,
+        rooms: DEFAULT_ROOMS,
+        timeoutMs: DEFAULT_TIMEOUT_MS,
+    }
     for (let index = 0; index < argv.length; index++) {
         const argument = argv[index]
         const value = argv[++index]
@@ -39,6 +46,10 @@ function parseArgs(argv) {
         if (argument === "--rooms") parsed.rooms = positiveInteger(value, "rooms")
         else if (argument === "--timeout-ms") parsed.timeoutMs = positiveInteger(value, "timeout-ms")
         else if (argument === "--output") parsed.output = value
+        else if (argument === "--fault-mode") {
+            if (!FAULT_MODES.has(value)) throw new Error(`unknown fault mode: ${value}`)
+            parsed.faultMode = value
+        }
         else throw new Error(`unknown argument: ${argument}`)
     }
     return parsed
@@ -59,8 +70,10 @@ function buildSummary(records, cleanup) {
     ]
     return {
         activePeersAfterCleanup: cleanup.activePeers,
+        activeProcessesAfterCleanup: cleanup.activeProcesses,
         completedRooms: completed.length,
         errors: errors.length,
+        faultsInjected: cleanup.faultsInjected,
         p50HandshakeMs: percentile(completed.map(record => record.handshakeMs), 0.5),
         p50HeartbeatMs: percentile(completed.map(record => record.heartbeatMs), 0.5),
         p50PrepareMs: percentile(completed.map(record => record.prepareMs), 0.5),
@@ -72,18 +85,22 @@ function buildSummary(records, cleanup) {
         p99PrepareMs: percentile(completed.map(record => record.prepareMs), 0.99),
         peakPeers: cleanup.peakPeers,
         remainingRooms: cleanup.remainingRooms,
+        temporaryRootExistsAfterCleanup: cleanup.temporaryRootExists,
         totalRooms: cleanup.totalRooms,
         errorDetails: errors,
     }
 }
 
 async function runHubBaseline({
+    faultMode = DEFAULT_FAULT_MODE,
     rooms = DEFAULT_ROOMS,
     timeoutMs = DEFAULT_TIMEOUT_MS,
 } = {}) {
     const normalizedRooms = positiveInteger(rooms, "rooms")
     const normalizedTimeout = positiveInteger(timeoutMs, "timeout-ms")
+    if (!FAULT_MODES.has(faultMode)) throw new Error(`unknown fault mode: ${faultMode}`)
     const workload = {
+        faultMode,
         rooms: normalizedRooms,
         timeoutMs: normalizedTimeout,
         totalPeers: normalizedRooms * 2,
@@ -92,21 +109,22 @@ async function runHubBaseline({
     const createdRooms = []
     const records = []
     let peakPeers = 0
+    let faultsInjected = 0
     let cleanup = null
     const cleanupErrors = []
 
-    const host = { dataKey: "host" }
-    const client = { dataKey: "client-b" }
+    const hostRuntimeNode = { dataKey: "host" }
+    const clientRuntimeNode = { dataKey: "client-b" }
     try {
         harness.installRuntimeTables()
         const credential = harness.createCredential("hub-baseline-client")
         const [hostHttp, hubPort, tcpPort, clientHttp] = await reserveLoopbackPorts(4)
-        host.url = `http://127.0.0.1:${hostHttp}`
-        client.url = `http://127.0.0.1:${clientHttp}`
+        hostRuntimeNode.url = `http://127.0.0.1:${hostHttp}`
+        clientRuntimeNode.url = `http://127.0.0.1:${clientHttp}`
 
         const hostRuntime = harness.spawnRuntime("hub-host", {
             CN_LISTEN_PORT: String(hostHttp),
-            DATA_DIR: harness.dataDir(host.dataKey),
+            DATA_DIR: harness.dataDir(hostRuntimeNode.dataKey),
             MULTI_HUB_HOST: "127.0.0.1",
             MULTI_HUB_PORT: String(hubPort),
             MULTI_MODE: "host",
@@ -116,31 +134,44 @@ async function runHubBaseline({
         }, [hostHttp, hubPort, tcpPort])
         const clientRuntime = harness.spawnRuntime("hub-client", {
             CN_LISTEN_PORT: String(clientHttp),
-            DATA_DIR: harness.dataDir(client.dataKey),
+            DATA_DIR: harness.dataDir(clientRuntimeNode.dataKey),
             MULTI_HUB_TOKEN: credential.token,
             MULTI_HUB_URL: `http://127.0.0.1:${hubPort}/`,
             MULTI_MODE: "client",
         }, [clientHttp])
         await Promise.all([
-            harness.waitForHealth(host.url, hostRuntime),
-            harness.waitForHealth(client.url, clientRuntime),
+            harness.waitForHealth(hostRuntimeNode.url, hostRuntime),
+            harness.waitForHealth(clientRuntimeNode.url, clientRuntime),
         ])
 
         const deviceSuffix = Date.now() % 1_000_000
-        await signUp(harness, host, 810_000_000 + deviceSuffix)
-        await signUp(harness, client, 820_000_000 + deviceSuffix)
+        const roomParticipants = []
+        for (let index = 0; index < normalizedRooms; index++) {
+            const host = { ...hostRuntimeNode }
+            const client = { ...clientRuntimeNode }
+            await signUp(harness, host, 810_000_000 + deviceSuffix + index)
+            await signUp(harness, client, 820_000_000 + deviceSuffix + index)
+            roomParticipants.push({ client, host })
+        }
 
         const preparedRooms = []
         for (let index = 0; index < normalizedRooms; index++) {
+            const { client, host } = roomParticipants[index]
             let roomNumber = null
             try {
                 roomNumber = await createRoom(harness, host, index + 1)
-                createdRooms.push(roomNumber)
+                createdRooms.push({ host, roomNumber })
                 const hostEndpoint = await prepareRoom(harness, host, roomNumber)
                 const startedAt = performance.now()
                 const endpoint = await prepareRoom(harness, client, roomNumber)
                 assertSameEndpoint(hostEndpoint, endpoint)
-                preparedRooms.push({ endpoint, prepareMs: performance.now() - startedAt, roomNumber })
+                preparedRooms.push({
+                    client,
+                    endpoint,
+                    host,
+                    prepareMs: performance.now() - startedAt,
+                    roomNumber,
+                })
             } catch (error) {
                 records.push({
                     error: `room ${roomNumber ?? index + 1}: ${String(error?.message ?? error)}`,
@@ -152,8 +183,8 @@ async function runHubBaseline({
         }
 
         const peerResults = await Promise.all(preparedRooms.flatMap(room => [
-            openPeer(harness, host, room.endpoint, room.roomNumber, "host", normalizedTimeout),
-            openPeer(harness, client, room.endpoint, room.roomNumber, "client", normalizedTimeout),
+            openPeer(harness, room.host, room.endpoint, room.roomNumber, "host", normalizedTimeout),
+            openPeer(harness, room.client, room.endpoint, room.roomNumber, "client", normalizedTimeout),
         ]))
         peakPeers = Math.max(peakPeers, harness.peers.filter(peer => !peer.closed).length)
         const byRoom = new Map()
@@ -176,7 +207,16 @@ async function runHubBaseline({
             byRoom.set(room.roomNumber, [hostPeer.peer, clientPeer.peer])
         }
 
-        for (const roomNumber of createdRooms) {
+        if (faultMode === "client-disconnect") {
+            for (const [, clientPeer] of byRoom.values()) {
+                if (!clientPeer || clientPeer.closed || clientPeer.socket.destroyed) continue
+                clientPeer.socket.destroy()
+                await clientPeer.closedPromise
+                faultsInjected++
+            }
+        }
+
+        for (const { host, roomNumber } of createdRooms) {
             const [hostPeer, clientPeer] = byRoom.get(roomNumber) ?? []
             if (clientPeer) await clientPeer.close()
             try {
@@ -192,7 +232,7 @@ async function runHubBaseline({
             }
             if (hostPeer) await hostPeer.close()
         }
-        const remainingRooms = (await Promise.all(createdRooms.map(async roomNumber => {
+        const remainingRooms = (await Promise.all(createdRooms.map(async ({ host, roomNumber }) => {
             try {
                 return await roomStillExists(harness, host, roomNumber)
             } catch (error) {
@@ -202,9 +242,12 @@ async function runHubBaseline({
         }))).filter(Boolean).length
         cleanup = {
             activePeers: harness.peers.filter(peer => !peer.closed).length,
+            activeProcesses: null,
             errors: cleanupErrors,
+            faultsInjected,
             peakPeers,
             remainingRooms,
+            temporaryRootExists: null,
             totalRooms: normalizedRooms,
         }
     } finally {
@@ -217,11 +260,18 @@ async function runHubBaseline({
         if (cleanup) cleanup.activePeers = activePeers
         else cleanup = {
             activePeers,
+            activeProcesses: null,
             errors: cleanupErrors,
+            faultsInjected,
             peakPeers,
             remainingRooms: createdRooms.length,
+            temporaryRootExists: null,
             totalRooms: normalizedRooms,
         }
+        cleanup.activeProcesses = harness.processes.filter(runtime => (
+            runtime.child.exitCode === null && runtime.child.signalCode === null
+        )).length
+        cleanup.temporaryRootExists = fs.existsSync(harness.root)
     }
 
     return {
@@ -240,6 +290,7 @@ async function main() {
         report = {
             startedAt: new Date().toISOString(),
             workload: {
+                faultMode: options.faultMode,
                 rooms: options.rooms,
                 timeoutMs: options.timeoutMs,
                 totalPeers: options.rooms * 2,
