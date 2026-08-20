@@ -417,6 +417,41 @@ test("valid viewers cannot leak missing room lookups through the coordinator", a
     )
 })
 
+test("room mutations do not map Hub outages to missing rooms or permission errors", async t => {
+    const baseContext = createEmbeddedMultiHttpContext({
+        compatibility: TEST_COMPATIBILITY,
+        resolvePlayerContext: async viewerId => players.get(viewerId) ?? null,
+    })
+    const context = {
+        ...baseContext,
+        coordinator: {
+            ...baseContext.coordinator,
+            getRoomStatus: async () => ({ ok: false, error: "HUB_UNAVAILABLE" }),
+            disbandRoom: async () => ({ ok: false, error: "HUB_UNAVAILABLE" }),
+        },
+    }
+    const fastify = await createRouteServer({ context })
+    t.after(async () => fastify.close())
+
+    for (const [url, payload] of [
+        ["/summon", { category_id: 1, quest_id: 701 }],
+        ["/share_room", {}],
+        ["/disband_room", {}],
+    ]) {
+        const response = await fastify.inject({
+            method: "POST",
+            url,
+            payload: { viewer_id: 101, room_number: "123456", api_count: 1, ...payload },
+        })
+        assert.equal(response.statusCode, 503, url)
+        assert.deepEqual(response.json(), {
+            error: "Service Unavailable",
+            code: "HUB_UNAVAILABLE",
+            message: "Multiplayer service is unavailable.",
+        })
+    }
+})
+
 test("stateless social routes reject invalid viewer ids without resolving player context", async t => {
     let resolverCalls = 0
     const fastify = await createRouteServer({

@@ -17,6 +17,14 @@ function forbidden(reply: FastifyReply): FastifyReply {
     return reply.status(403).send({ "error": "Forbidden", "message": "Room permission denied." });
 }
 
+function hubUnavailable(reply: FastifyReply): FastifyReply {
+    return reply.status(503).send({
+        "error": "Service Unavailable",
+        "code": "HUB_UNAVAILABLE",
+        "message": "Multiplayer service is unavailable.",
+    });
+}
+
 function prepareFailure(
     reply: FastifyReply,
     viewerId: number,
@@ -130,6 +138,8 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             roomNumber: body.room_number,
         });
         if (!room.ok) {
+            if (room.error === "HUB_UNAVAILABLE") return hubUnavailable(reply);
+            if (room.error === "ROOM_PERMISSION_DENIED") return forbidden(reply);
             return reply.status(400).send({
                 "error": "Bad Request", "message": "Room doesn't exist."
             });
@@ -239,7 +249,11 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             participant: context.snapshotProvider.getParticipant(viewerId),
             roomNumber: body.room_number,
         });
-        if (!room.ok || viewerId !== room.value.host.viewerId) return forbidden(reply);
+        if (!room.ok) {
+            if (room.error === "HUB_UNAVAILABLE") return hubUnavailable(reply);
+            return forbidden(reply);
+        }
+        if (viewerId !== room.value.host.viewerId) return forbidden(reply);
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
@@ -264,6 +278,7 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
             participant: context.snapshotProvider.getParticipant(viewerId),
             roomNumber: body.room_number,
         });
+        if (!result.ok && result.error === "HUB_UNAVAILABLE") return hubUnavailable(reply);
         if (!result.ok && result.error !== "ROOM_NOT_FOUND") return forbidden(reply);
         console.log(result.ok ? "[MULTI] room disbanded" : "[MULTI] room already absent");
 

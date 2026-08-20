@@ -240,6 +240,8 @@ modeDigest
 - `prepare` 复核时才发现兼容性、身份或关卡资格失败则返回现有错误码 `4507`，进入客户端通用 Failure 分支；
 - 只有房间实际不存在时才返回 `room_exists: false`、`raising_state=9` 或对应的 RoomDataNotFound。
 
+`summon`、`share_room` 和 `disband_room` 等房间辅助操作也遵守同一边界：真实不存在或权限不足继续使用各自的既有响应；Hub 网络/控制面不可用时返回服务不可用状态和内部 `HUB_UNAVAILABLE`，不伪装成房间不存在或权限拒绝。
+
 不得向 `prepare` 返回 `raising_state=7`，因为国服客户端的 Prepare 解析器不接受该状态并会抛出客户端错误。
 
 ### 8.3 准备与 TCP admission
