@@ -75,6 +75,23 @@ CN 客户端不能正确处理部分 `uint32` 标记，响应层会把安全范�
 
 时间由 `src/runtime/time/game-time.ts` 提供轻量 `GameTimeContext`：卡池、活动期限、商店周期、经验池增长等依赖客户端服务器时钟的游戏业务使用虚拟服务器时间；体力自然恢复等按现实经过时间增长的资源使用真实运行时间。真实时间字段在发送给客户端时转换为虚拟时间，虚拟时间字段则在同一虚拟时间基准下读写。TCP 心跳、连接超时和战斗租约属于基础设施计时，不受游戏时间偏移影响。存档中的 `time_offset` 只为数据库兼容保留。
 
+```text
+server-time.json -> ServerTimeService -> timeOffset
+                                      |
+                                      v
+                              GameTimeContext
+                       /          |          \
+                      v           v           v
+                 realNow     virtualNow   client conversion
+                    |            |              |
+             stamina recovery  gacha/event   real DB date <-> client timestamp
+             offline elapsed   shop/exp pool
+
+TCP heartbeat / lease / reconnect -> infrastructure runtime clock
+```
+
+业务模块应通过命名后的时间入口选择策略，不直接把 `Date.now()`、虚拟 `Date` 和客户端时间戳混在同一段计算中。
+
 ## 6. 业务模块
 
 HTTP 路由分为三组：
