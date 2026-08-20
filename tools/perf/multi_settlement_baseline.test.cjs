@@ -11,11 +11,71 @@ const {
 require("ts-node/register/transpile-only")
 const settlementOrchestrator = require("../../src/multi/settlement/orchestrator")
 const settlementResponse = require("../../src/multi/settlement/response")
+const { createSettlementProtocolSignature } = require("./multi_settlement_scenarios.cjs")
 
 test("settlement baseline targets the focused production module boundary", () => {
     assert.equal(typeof settlementOrchestrator.prepareMultiplayerSettlement, "function")
     assert.equal(typeof settlementOrchestrator.runMultiplayerSettlementOrchestration, "function")
     assert.equal(typeof settlementResponse.projectMultiplayerFinishResponse, "function")
+})
+
+test("protocol signature preserves dynamic time fields while normalizing their values", () => {
+    const response = {
+        body: {
+            data: {
+                exp_pooled_time: 1_723_636_800,
+                nested: {
+                    start_date: "2024-08-14",
+                    update_timestamp: 1_723_636_800_000,
+                },
+                stamina_heal_time: 1_723_636_800,
+            },
+            data_headers: { result_code: 0 },
+        },
+        contentType: "application/x-msgpack",
+    }
+    const later = structuredClone(response)
+    later.body.data.exp_pooled_time += 3_600
+    later.body.data.nested.start_date = "2024-08-15"
+    later.body.data.nested.update_timestamp += 3_600_000
+    later.body.data.stamina_heal_time += 3_600
+
+    assert.equal(
+        createSettlementProtocolSignature(later),
+        createSettlementProtocolSignature(response),
+    )
+
+    const missingField = structuredClone(response)
+    delete missingField.body.data.stamina_heal_time
+    assert.notEqual(
+        createSettlementProtocolSignature(missingField),
+        createSettlementProtocolSignature(response),
+    )
+})
+
+test("protocol signature covers the response envelope and content type", () => {
+    const response = {
+        body: {
+            data: { rewards: [] },
+            data_headers: { result_code: 0 },
+        },
+        contentType: "application/x-msgpack",
+    }
+    const changedHeaders = structuredClone(response)
+    changedHeaders.body.data_headers.result_code = 1
+    const changedContentType = {
+        ...structuredClone(response),
+        contentType: "application/json",
+    }
+
+    assert.notEqual(
+        createSettlementProtocolSignature(changedHeaders),
+        createSettlementProtocolSignature(response),
+    )
+    assert.notEqual(
+        createSettlementProtocolSignature(changedContentType),
+        createSettlementProtocolSignature(response),
+    )
 })
 
 test("normalizes a deterministic multiplayer settlement report", () => {

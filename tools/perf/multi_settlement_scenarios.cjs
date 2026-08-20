@@ -75,18 +75,34 @@ function finishPayload(playId) {
     }
 }
 
+const DYNAMIC_TIME_FIELD_PATTERN = /(?:^|_)(?:time|timestamp|date)(?:$|_)/i
+
 function normalizeForSignature(value) {
     if (Array.isArray(value)) return value.map(normalizeForSignature)
     if (value === null || typeof value !== "object") return value
     return Object.fromEntries(Object.keys(value).sort()
-        .filter(key => !/(?:^|_)(?:time|timestamp|date)(?:$|_)/i.test(key))
-        .map(key => [key, normalizeForSignature(value[key])]))
+        .map(key => [
+            key,
+            DYNAMIC_TIME_FIELD_PATTERN.test(key)
+                ? "__dynamic_time__"
+                : normalizeForSignature(value[key]),
+        ]))
 }
 
 function outputSignature(value) {
     return `sha256:${createHash("sha256")
         .update(JSON.stringify(normalizeForSignature(value)))
         .digest("hex")}`
+}
+
+function createSettlementProtocolSignature({ body, contentType }) {
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+        throw new TypeError("settlement response body must be an object")
+    }
+    if (typeof contentType !== "string" || contentType.length === 0) {
+        throw new TypeError("settlement response contentType must be a non-empty string")
+    }
+    return outputSignature({ body, contentType })
 }
 
 async function runFinishScenario() {
@@ -228,7 +244,10 @@ async function runFinishScenario() {
             activeQuestCleared: getPlayerActiveQuestSync(playerId) === null,
             eventLoopDelayMs: Math.max(0, histogram.percentile(95) / 1_000_000),
             latencyMs,
-            outputSignature: outputSignature(body.data),
+            outputSignature: createSettlementProtocolSignature({
+                body,
+                contentType: String(finished.headers["content-type"] ?? ""),
+            }),
             sql: counter.snapshot(),
             statusCode: finished.statusCode,
             verificationBeforeTransaction: verifyIndex >= 0
@@ -261,4 +280,4 @@ const SCENARIOS = Object.freeze([
     Object.freeze({ name: "finish", run: runFinishScenario }),
 ])
 
-module.exports = { SCENARIOS }
+module.exports = { SCENARIOS, createSettlementProtocolSignature }
