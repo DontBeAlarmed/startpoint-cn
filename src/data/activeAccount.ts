@@ -104,6 +104,15 @@ export function saveAccountDefaultPlayer(accountId: number, playerId: number): v
     writeState(state);
 }
 
+export function removeAccountFromAdminState(accountId: number, playerIds: number[] = []): void {
+    const state = readState()
+    delete state.defaultPlayers[accountId]
+    if (state.activePlayerId !== null && playerIds.includes(state.activePlayerId)) {
+        state.activePlayerId = null
+    }
+    writeState(state)
+}
+
 /**
  * Resolves the active player ID for an account.
  * Uses per-account defaultPlayers, falls back to first player.

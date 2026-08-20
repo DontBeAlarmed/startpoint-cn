@@ -31,6 +31,7 @@ import { registerAdminUi } from "./runtime/admin";
 import versionCheckPlugin from "./routes/cn/versionCheck";
 import iosLeitingPlugin from "./routes/cn/ios-leiting";
 import leitingAuthPlugin from "./routes/cn/leitingAuth";
+import cnTakeOverPlugin from "./routes/cn/takeOver";
 import cnToolPlugin from "./routes/cn/tool";
 import cnLoadPlugin from "./routes/cn/load";
 import { registerCnAssetProviderRoutes } from "./routes/cn/asset-provider";
@@ -82,6 +83,8 @@ import comicApiPlugin from "./routes/api/comic";
 import questUnlockApiPlugin from "./routes/api/questUnlock";
 import itemApiPlugin from "./routes/api/item";
 import characterElectionApiPlugin from "./routes/api/characterElection";
+import { installTakeoverUdidGuard } from "./lib/takeover-access";
+import { AccountCleanupService } from "./lib/account-cleanup";
 const fastify = Fastify({
     logger: {
         level: "info"
@@ -95,6 +98,7 @@ let startupRuntimeConfig: ReturnType<typeof parseCnRuntimeConfig> | null = null;
 let multiManagementService: MultiManagementService | null = null;
 const serverTimeService = new ServerTimeService();
 const gachaSeedQuarantine = getDefaultGachaSeedQuarantine();
+const accountCleanupService = new AccountCleanupService();
 
 // Simple in-memory rate limiter for /crash endpoint only.
 // /debug is excluded — game client sends heavy beacon traffic during normal startup.
@@ -117,6 +121,7 @@ fastify.addHook("onRequest", async (request, reply) => {
 
 registerCnMsgpackOnSend(fastify);
 registerRuntimeHealthRoute(fastify, () => runtimeCoordinator.getHealthSnapshot());
+installTakeoverUdidGuard(fastify);
 
 function jsonParser(_: FastifyRequest, body: string, done: ContentTypeParserDoneFunction) {
     try {
@@ -142,6 +147,7 @@ fastify.addContentTypeParser("application/x-www-form-urlencoded", { parseAs: "st
 fastify.addContentTypeParser("application/json", { parseAs: "string" }, jsonParser);
 
 fastify.register(leitingAuthPlugin, { prefix: "/api/index.php" });
+fastify.register(cnTakeOverPlugin, { prefix: "/api/index.php" });
 
 const apiPrefix = "/api/index.php";
 
@@ -391,9 +397,15 @@ runtimeCoordinator = createRuntimeCoordinator({
             contentEnvironment: config.contentEnvironment,
         }),
     }),
-    readyHttp: async () => { await fastify.ready(); },
+    readyHttp: async () => {
+        await fastify.ready();
+        accountCleanupService.start();
+    },
     listenHttp: config => fastify.listen({ ...config.http }),
-    closeHttp: () => fastify.close(),
+    closeHttp: async () => {
+        accountCleanupService.stop();
+        await fastify.close();
+    },
     forceCloseHttp: () => {
         fastify.server.closeIdleConnections?.();
         fastify.server.closeAllConnections?.();

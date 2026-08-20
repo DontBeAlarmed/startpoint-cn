@@ -11,6 +11,12 @@ export interface RawAccount {
     status: string
     username: string | null
     password_hash: string | null
+    admin_note: string | null
+    cleanup_policy: "retain" | "delete_after_timeout"
+    cleanup_due_at: string | null
+    cleanup_state: "active" | "orphaned" | "deleted"
+    takeover_password_hash: string | null
+    takeover_udid: string | null
 }
 
 export interface Account {
@@ -25,6 +31,12 @@ export interface Account {
     status: string
     username?: string | null
     passwordHash?: string | null
+    adminNote?: string | null
+    cleanupPolicy?: "retain" | "delete_after_timeout"
+    cleanupDueAt?: Date | null
+    cleanupState?: "active" | "orphaned" | "deleted"
+    takeoverPasswordHash?: string | null
+    takeoverUdid?: string | null
 }
 
 // zat session

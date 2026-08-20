@@ -9,7 +9,7 @@ import {
     getAllAdminPlayerSummariesSync,
     type AdminPlayerSummary,
 } from "../../data/domains/admin-player"
-import { getAllDeviceBindingsSync, updateDeviceBindingNameSync } from "../../data/domains/session"
+import { getAllDeviceBindingsSync, getDeviceBindingSync, updateDeviceBindingNameSync } from "../../data/domains/session"
 import { getPlayerCharactersSync } from "../../data/domains/character"
 import { getActivePlayerId, getAdminPlayerSelectionState, setActivePlayerId, saveAccountDefaultPlayer, getAccountDefaultPlayer } from "../../data/activeAccount";
 import { saveDefaultSaveTemplate, loadDefaultSaveTemplate, clearDefaultSaveTemplate, getDefaultSaveMeta } from "../../data/defaultSave";
@@ -31,6 +31,17 @@ import {
     exportPlayerSaveV2Sync,
     validatePlayerSaveTemplateSync,
 } from "../../data/player-save";
+import {
+    deleteAccountForCleanupSync,
+    getAccountCleanupSettingsSync,
+    getAccountCleanupSummarySync,
+    listAccountCleanupSummariesSync,
+    runDueAccountCleanupSync,
+    setAccountAdminNoteSync,
+    setAccountCleanupPolicySync,
+    updateAccountCleanupSettingsSync,
+    type AccountCleanupPolicy,
+} from "../../lib/account-cleanup";
 
 interface TimeQuery {
     time: string | undefined
@@ -222,6 +233,10 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
             const defaultPlayer = players.find(player => player.id === defaultPid)
             return {
                 id: acc.id,
+                adminNote: acc.adminNote ?? null,
+                cleanupPolicy: acc.cleanupPolicy ?? "retain",
+                cleanupDueAt: acc.cleanupDueAt?.toISOString() ?? null,
+                cleanupState: acc.cleanupState ?? "active",
                 saveCount: playerIds.length,
                 defaultPlayerId: defaultPid,
                 defaultPlayerName: defaultPlayer?.name ?? null,
@@ -241,6 +256,76 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
             }
         })
         return reply.send(result)
+    })
+
+    fastify.get("/accountCleanup", async (_request: FastifyRequest, reply: FastifyReply) => {
+        return reply.send({
+            settings: getAccountCleanupSettingsSync(),
+            accounts: listAccountCleanupSummariesSync().map(account => ({
+                ...account,
+                cleanupDueAt: account.cleanupDueAt?.toISOString() ?? null,
+            })),
+        })
+    })
+
+    fastify.post("/accountCleanup/settings", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = (request.body ?? {}) as { defaultPolicy?: unknown; timeoutMs?: unknown }
+        const defaultPolicy = body.defaultPolicy === "delete_after_timeout"
+            ? "delete_after_timeout"
+            : body.defaultPolicy === "retain"
+                ? "retain"
+                : null
+        const timeoutMs = typeof body.timeoutMs === "number" ? body.timeoutMs : Number(body.timeoutMs)
+        if (!defaultPolicy || !Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
+            return reply.status(400).send({ error: "Invalid account cleanup settings" })
+        }
+        return reply.send({ ok: true, settings: updateAccountCleanupSettingsSync(defaultPolicy, timeoutMs) })
+    })
+
+    fastify.post("/accountCleanup/account", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = (request.body ?? {}) as { accountId?: unknown; note?: unknown; policy?: unknown }
+        const accountId = Number(body.accountId)
+        if (!Number.isSafeInteger(accountId) || accountId <= 0) {
+            return reply.status(400).send({ error: "Invalid accountId" })
+        }
+        if (body.note !== undefined && typeof body.note !== "string" && body.note !== null) {
+            return reply.status(400).send({ error: "Invalid account note" })
+        }
+        if (body.policy !== undefined && body.policy !== "retain" && body.policy !== "delete_after_timeout") {
+            return reply.status(400).send({ error: "Invalid cleanup policy" })
+        }
+        if (body.note !== undefined && !setAccountAdminNoteSync(accountId, body.note as string | null)) {
+            return reply.status(404).send({ error: "Account not found" })
+        }
+        if (body.policy !== undefined && !setAccountCleanupPolicySync(accountId, body.policy as AccountCleanupPolicy)) {
+            return reply.status(404).send({ error: "Account not found" })
+        }
+        const summary = getAccountCleanupSummarySync(accountId)
+        if (!summary) return reply.status(404).send({ error: "Account not found" })
+        return reply.send({
+            ok: true,
+            account: { ...summary, cleanupDueAt: summary.cleanupDueAt?.toISOString() ?? null },
+        })
+    })
+
+    fastify.post("/accountCleanup/run", async (_request: FastifyRequest, reply: FastifyReply) => {
+        return reply.send({ ok: true, deleted: runDueAccountCleanupSync() })
+    })
+
+    fastify.post("/accountCleanup/delete", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = (request.body ?? {}) as { accountId?: unknown; reason?: unknown }
+        const accountId = Number(body.accountId)
+        if (!Number.isSafeInteger(accountId) || accountId <= 0) {
+            return reply.status(400).send({ error: "Invalid accountId" })
+        }
+        const deleted = deleteAccountForCleanupSync(
+            accountId,
+            typeof body.reason === "string" && body.reason.trim() !== ""
+                ? body.reason.trim()
+                : "manual_cleanup",
+        )
+        if (!deleted) return reply.status(404).send({ error: "Account not found" })
+        return reply.send({ ok: true, accountId, deletedSaves: deleted.playerIds.length })
     })
 
     // === Default save template (admin-uploaded, applied when a new save is created) ===
@@ -276,7 +361,7 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
         return reply.send({ ok: true, removed })
     })
 
-    // === Account & Save management (device-binding based) ===
+    // === Account, save, and lifecycle management ===
 
     // Switch active save
     fastify.post("/activateSave", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -443,9 +528,11 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
         if (name !== null && name.length > 64) {
             return reply.status(400).send({ error: "Device name must not exceed 64 characters" })
         }
-        if (!updateDeviceBindingNameSync(deviceId as number, name)) {
+        const binding = getDeviceBindingSync(deviceId as number)
+        if (!binding || !updateDeviceBindingNameSync(deviceId as number, name)) {
             return reply.status(404).send({ error: "Device binding not found" })
         }
+        setAccountAdminNoteSync(binding.account_id, name)
         return reply.status(200).send({ ok: true, deviceId, name })
     })
 }

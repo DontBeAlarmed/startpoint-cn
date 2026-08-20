@@ -21,9 +21,24 @@ function buildAccount(
         idpId: rawAccount.idp_id,
         regTime: new Date(rawAccount.reg_time),
         lastLoginTime: new Date(rawAccount.last_login_time),
-        status: rawAccount.status
+        status: rawAccount.status,
+        username: rawAccount.username,
+        passwordHash: rawAccount.password_hash,
+        adminNote: rawAccount.admin_note,
+        cleanupPolicy: rawAccount.cleanup_policy,
+        cleanupDueAt: rawAccount.cleanup_due_at ? new Date(rawAccount.cleanup_due_at) : null,
+        cleanupState: rawAccount.cleanup_state,
+        takeoverPasswordHash: rawAccount.takeover_password_hash,
+        takeoverUdid: rawAccount.takeover_udid,
     }
 }
+
+const accountColumns = `
+    id, app_id, first_login_time, idp_alias, idp_code, idp_id,
+    reg_time, last_login_time, status, username, password_hash,
+    admin_note, cleanup_policy, cleanup_due_at, cleanup_state,
+    takeover_password_hash, takeover_udid
+`
 
 /**
  * Asynchronously gets an Account from their id.
@@ -36,7 +51,7 @@ export function getAccountSync(
 ): Account | null {
     const db = getDb();
     const raw = db.prepare(`
-    SELECT id, app_id, first_login_time, idp_alias, idp_code, idp_id, reg_time, last_login_time, status
+    SELECT ${accountColumns}
     FROM accounts
     WHERE id = ?
     `).get(accountId) as RawAccount | undefined
@@ -57,7 +72,7 @@ export function getAccountFromIdpIdSync(
 ): Account | null {
     const db = getDb();
     const raw = db.prepare(`
-    SELECT id, app_id, first_login_time, idp_alias, idp_code, idp_id, reg_time, last_login_time, status
+    SELECT ${accountColumns}
     FROM accounts
     WHERE idp_id = ?
     `).get(idpId) as RawAccount | undefined
@@ -91,7 +106,7 @@ export function getAccount(
 export function getAllAccountsSync(): Account[] {
     const db = getDb();
     const raw = db.prepare(`
-    SELECT id, app_id, first_login_time, idp_alias, idp_code, idp_id, reg_time, last_login_time, status
+    SELECT ${accountColumns}
     FROM accounts
     ORDER BY id DESC
     `).all() as RawAccount[]
@@ -157,9 +172,30 @@ export function insertAccountSync(
     const dateNow = new Date()
     const dateNowISO = dateNow.toISOString()
 
+    const settings = db.prepare(`
+        SELECT default_policy, timeout_ms
+        FROM account_cleanup_settings
+        WHERE id = 1
+    `).get() as { default_policy?: string; timeout_ms?: number } | undefined
+    const cleanupPolicy = account.cleanupPolicy
+        ?? (settings?.default_policy === "delete_after_timeout" ? "delete_after_timeout" : "retain")
+    const timeoutMs = Number.isSafeInteger(settings?.timeout_ms) && (settings?.timeout_ms ?? 0) > 0
+        ? Number(settings!.timeout_ms)
+        : 259200000
+    const cleanupDueAt = account.cleanupDueAt !== undefined
+        ? account.cleanupDueAt
+        : cleanupPolicy === "delete_after_timeout"
+            ? new Date(dateNow.getTime() + timeoutMs)
+            : null
+
     const result = db.prepare(`
-    INSERT INTO accounts (app_id, first_login_time, idp_alias, idp_code, idp_id, reg_time, last_login_time, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO accounts (
+        app_id, first_login_time, idp_alias, idp_code, idp_id,
+        reg_time, last_login_time, status, username, password_hash,
+        admin_note, cleanup_policy, cleanup_due_at, cleanup_state,
+        takeover_password_hash, takeover_udid
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
         account.appId,
         dateNowISO,
@@ -168,7 +204,15 @@ export function insertAccountSync(
         account.idpId,
         dateNowISO,
         dateNowISO,
-        account.status
+        account.status,
+        account.username ?? null,
+        account.passwordHash ?? null,
+        account.adminNote ?? null,
+        cleanupPolicy,
+        cleanupDueAt?.toISOString() ?? null,
+        account.cleanupState ?? "active",
+        account.takeoverPasswordHash ?? null,
+        account.takeoverUdid ?? null,
     )
 
     const id = result.lastInsertRowid
@@ -220,7 +264,15 @@ export function updateAccountSync(
         'idpId': 'idp_id',
         'regTime': 'reg_time',
         'lastLoginTime': 'last_login_time',
-        'status': 'status'
+        'status': 'status',
+        'username': 'username',
+        'passwordHash': 'password_hash',
+        'adminNote': 'admin_note',
+        'cleanupPolicy': 'cleanup_policy',
+        'cleanupDueAt': 'cleanup_due_at',
+        'cleanupState': 'cleanup_state',
+        'takeoverPasswordHash': 'takeover_password_hash',
+        'takeoverUdid': 'takeover_udid',
     }
 
     const sets: string[] = []
@@ -232,6 +284,8 @@ export function updateAccountSync(
             sets.push(`${mapped} = ?`)
             if (value instanceof Date) {
                 values.push(value.toISOString())
+            } else if (value === null) {
+                values.push(null)
             } else {
                 values.push(value)
             }

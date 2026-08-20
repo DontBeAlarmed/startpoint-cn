@@ -160,7 +160,7 @@ manifest 核心字段如下：
     "node": ">=20.12.0",
     "dependencyLock": "sha256:<package-lock digest>",
     "minDataSchema": 0,
-    "targetDataSchema": 15
+    "targetDataSchema": 17
   },
   "admin": {
     "path": "web/dist",

@@ -42,17 +42,17 @@ test("ios .dis falls back to the android response when iOS compatibility is disa
 
 test("ios .dis matches the real-device-verified fixture bytes (structure, no trailing newline)", async () => {
     // 实机验证过的精确字节（iPhone 成功进入游戏时服务器实际下发，与 launcher 作者实机取证结构一致）：
-    // "// 用于官服正式用\r\n{\"default\":{\"apiPath\":\"8.133.209.122:7001\",\"apiScheme\":\"http\"}}"
+    // "// 用于官服正式用\r\n{\"default\":{\"apiPath\":\"198.51.100.7:7001\",\"apiScheme\":\"http\"}}"
     // 结构要点：// 注释行 + 单个 CRLF 分隔 + 第二行 JSON 对象，无尾部换行。
     const response = await loadDis(
-        { ios: { enabled: true, apiHost: "8.133.209.122:7001", apiScheme: "http" } },
+        { ios: { enabled: true, apiHost: "198.51.100.7:7001", apiScheme: "http" } },
         "/shijtswy/version/client_release_ios.dis",
     )
     assert.equal(response.statusCode, 200)
     assert.match(response.headers["content-type"], /text\/plain/)
     assert.equal(
         response.body,
-        "// 用于官服正式用\r\n{\"default\":{\"apiPath\":\"8.133.209.122:7001\",\"apiScheme\":\"http\"}}",
+        "// 用于官服正式用\r\n{\"default\":{\"apiPath\":\"198.51.100.7:7001\",\"apiScheme\":\"http\"}}",
     )
     assert.equal(response.body.endsWith("\r\n"), false) // 无尾部换行
 })

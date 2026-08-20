@@ -8,7 +8,7 @@ v3 在 v2 的必需依赖锁身份上增加 `startup.localPrepareEntry`，使宿
 npm run build:bundle
 npm run verify:bundle
 npm run pack:bundle
-npm run verify:bundle -- /path/to/server-bundle --data-schema 16
+npm run verify:bundle -- /path/to/server-bundle --data-schema 17
 npm run verify:bundle -- /path/to/server-bundle --dependency-lock sha256:<runtime-pack-lock>
 ```
 

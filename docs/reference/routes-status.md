@@ -17,7 +17,7 @@
 
 | 路由族 | 状态 | 当前边界 | 注册或源码入口 | Current 文档 |
 |---|---|---|---|---|
-| 账号与认证 | **Partial** | 设备绑定、账号、会话和存档选择已实现；雷霆登录、防沉迷及部分平台响应属于兼容实现，不是真实 OAuth 或官方账号服务 | `src/routes/cn/leitingAuth.ts`、`src/routes/openapi.ts`、`src/data/domains/account.ts`、`src/data/domains/session.ts` | [存档与输入校验](../systems/save-validation.md) |
+| 账号与认证 | **Partial** | 当前以设备码作为默认身份入口；账号生命周期清理、客户端已有继承协议和审计已实现，但不提供官方 OAuth 或自制账号登录 | `src/routes/cn/leitingAuth.ts`、`src/routes/cn/takeOver.ts`、`src/routes/openapi.ts`、`src/data/domains/account.ts`、`src/data/domains/session.ts` | [账号管理与继承码](../systems/account-management-and-takeover.md) |
 | `load` | **Partial** | 可以校验会话并序列化玩家主要领域；登录前处理后的玩家快照会复用到序列化阶段，避免重复读取 players；新增领域仍需同步 load、导入导出和恢复契约 | `src/routes/cn/load.ts`、`src/data/utils.ts` | [当前架构](../architecture.md)、[存档与输入校验](../systems/save-validation.md) |
 | Asset 与 CDN | **Partial** | `local`、`remote`、`client-owned` 三种资源模式及版本、路径、Range 下载已接线；完整客户端断点续传和部署组合仍需专项验收 | `src/routes/cn/asset-provider.ts`、`src/routes/cn/asset.ts`、`src/routes/cn/cdnFiles.ts` | [CDN 与内容](../cdn/README.md) |
 | 角色与装备养成 | **Partial** | 玛纳节点、觉醒、信赖证、开板、突破、角色/装备保护、EX 抽取、装备强化/分解、体力道具及 effectKind 22 养成素材资源箱已有事务回滚；角色批量分解遵守保护状态，装备分解拒绝锁定对象；资源箱支持六选一、同箱同选聚合与累计事实写入，其他未明确支持的 item effect kind 仍拒绝，其他养成路由仍按审计清单逐批覆盖 | `src/routes/api/character.ts`、`src/routes/api/character/`、`src/routes/api/item.ts`、`src/routes/api/equipment.ts`、`src/routes/api/sell.ts`、`src/routes/api/exBoost.ts` | [角色养成事务](../systems/character-growth-transactions.md)、[EX 能力](../systems/ex-boost.md)、[小型状态写入](../systems/small-write-boundaries.md)、[背包与装备事务](../systems/inventory-write-transactions.md)、[角色分解审计](../systems/character-stack-audit.md)、[装备强化审计](../systems/equipment-upgrade-audit.md) |
@@ -39,7 +39,7 @@
 
 | 路由族 | 状态 | 当前边界 | 注册或源码入口 | Current 文档 |
 |---|---|---|---|---|
-| 管理 Web API | **Partial** | 玩家、存档、设备备注、邮件、查询、服务状态、抽卡种子、服务器时间包和多人凭据/Hub probe 接口已接入；管理写接口可远程调用，服务端不提供后台账号鉴权，服主自行负责网络暴露与访问控制；Client 模式不提供 Host 凭据管理；EX 能力清除有持久化契约测试，每日/每周任务强制重置明确不支持；破坏性操作和完整浏览器矩阵尚未验收 | `src/routes/web_api/`、`src/multi/management/`、`src/runtime/server-time/` | [管理后台](../admin/README.md)、[多人 Hub 设置](../protocol/multi-hub-setup.md) |
+| 管理 Web API | **Partial** | 玩家、存档、账号清理、设备来源备注、邮件、查询、服务状态、抽卡种子、服务器时间包和多人凭据/Hub probe 接口已接入；管理写接口可远程调用，服务端不提供后台账号鉴权，服主自行负责网络暴露与访问控制；Client 模式不提供 Host 凭据管理；EX 能力清除有持久化契约测试，每日/每周任务强制重置明确不支持；破坏性操作和完整浏览器矩阵尚未验收 | `src/routes/web_api/`、`src/multi/management/`、`src/runtime/server-time/` | [管理后台](../admin/README.md)、[账号管理与继承码](../systems/account-management-and-takeover.md)、[多人 Hub 设置](../protocol/multi-hub-setup.md) |
 | React 管理后台 | **Partial** | 服务端唯一管理界面；`build:server`、运行时和 Bundle 均强制要求 `/admin/` 产物，入口引用资源会在启动时校验，旧路径只做 SPA 兼容重定向；手机、平板和真实破坏性操作仍处于人工验收阶段 | `admin/`、`web/dist/`、`src/runtime/admin.ts` | [管理后台](../admin/README.md) |
 
 ## 使用规则

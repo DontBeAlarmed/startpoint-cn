@@ -71,6 +71,36 @@ const schemaColumns = {
         column: "name",
         definition: "TEXT DEFAULT NULL",
     },
+    "accounts.admin_note": {
+        table: "accounts",
+        column: "admin_note",
+        definition: "TEXT DEFAULT NULL",
+    },
+    "accounts.cleanup_policy": {
+        table: "accounts",
+        column: "cleanup_policy",
+        definition: "TEXT NOT NULL DEFAULT 'retain'",
+    },
+    "accounts.cleanup_due_at": {
+        table: "accounts",
+        column: "cleanup_due_at",
+        definition: "TEXT DEFAULT NULL",
+    },
+    "accounts.cleanup_state": {
+        table: "accounts",
+        column: "cleanup_state",
+        definition: "TEXT NOT NULL DEFAULT 'active'",
+    },
+    "accounts.takeover_password_hash": {
+        table: "accounts",
+        column: "takeover_password_hash",
+        definition: "TEXT DEFAULT NULL",
+    },
+    "accounts.takeover_udid": {
+        table: "accounts",
+        column: "takeover_udid",
+        definition: "TEXT DEFAULT NULL",
+    },
     "players_characters_mana_nodes.awake_level": {
         table: "players_characters_mana_nodes",
         column: "awake_level",

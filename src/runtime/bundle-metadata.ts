@@ -77,7 +77,7 @@ function readDefaultServerManifest(
         || typeof value.requires?.dependencyLock !== "string"
         || !BUNDLE_ID.test(value.requires.dependencyLock)
         || value.requires?.minDataSchema !== 0
-        || value.requires?.targetDataSchema !== 15) return null
+        || value.requires?.targetDataSchema !== 17) return null
     return {
         version: value.serverVersion,
         bundleId: value.bundleId,

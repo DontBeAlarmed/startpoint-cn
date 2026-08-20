@@ -11,7 +11,7 @@ schema 14 新增 `players_ex_boost_pending_draws`，每个玩家最多一条，�
 - 通过角色复合外键保证候选只能指向玩家已持有角色；
 - 登记在存档 V2 的 `core` 领域，导出、恢复、克隆均覆盖；
 - schema 13 存档缺少该表时按空候选兼容，schema 14 存档缺表则拒绝恢复；
-- Server Bundle 目标数据版本同步为 14。
+- Server Bundle 目标数据版本同步为 17。
 
 ## 事务边界
 

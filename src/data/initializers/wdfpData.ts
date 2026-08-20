@@ -55,7 +55,49 @@ export default function init(
         last_login_time DATE NOT NULL,
         status TEXT NOT NULL,
         username TEXT UNIQUE,
-        password_hash TEXT
+        password_hash TEXT,
+        admin_note TEXT DEFAULT NULL,
+        cleanup_policy TEXT NOT NULL DEFAULT 'retain',
+        cleanup_due_at DATE DEFAULT NULL,
+        cleanup_state TEXT NOT NULL DEFAULT 'active',
+        takeover_password_hash TEXT DEFAULT NULL,
+        takeover_udid TEXT DEFAULT NULL
+    )`).run()
+
+    ensureSchemaColumn(database, "accounts.admin_note")
+    ensureSchemaColumn(database, "accounts.cleanup_policy")
+    ensureSchemaColumn(database, "accounts.cleanup_due_at")
+    ensureSchemaColumn(database, "accounts.cleanup_state")
+    ensureSchemaColumn(database, "accounts.takeover_password_hash")
+    ensureSchemaColumn(database, "accounts.takeover_udid")
+
+    database.prepare(`CREATE TABLE IF NOT EXISTS account_cleanup_settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        default_policy TEXT NOT NULL DEFAULT 'retain',
+        timeout_ms INTEGER NOT NULL DEFAULT 259200000,
+        updated_at DATE NOT NULL
+    )`).run()
+    database.prepare(`
+        INSERT OR IGNORE INTO account_cleanup_settings (id, default_policy, timeout_ms, updated_at)
+        VALUES (1, 'retain', 259200000, ?)
+    `).run(new Date().toISOString())
+    database.prepare(`CREATE TABLE IF NOT EXISTS account_cleanup_audit (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        account_id INTEGER NOT NULL,
+        reason TEXT NOT NULL,
+        cleanup_policy TEXT NOT NULL,
+        player_count INTEGER NOT NULL,
+        deleted_at DATE NOT NULL
+    )`).run()
+    database.prepare(`CREATE TABLE IF NOT EXISTS account_transfer_audit (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_account_id INTEGER,
+        source_viewer_id TEXT,
+        target_account_id INTEGER NOT NULL,
+        target_viewer_id TEXT NOT NULL,
+        source_player_count INTEGER NOT NULL,
+        source_deleted INTEGER NOT NULL,
+        transferred_at DATE NOT NULL
     )`).run()
 
     // create zat session table
@@ -264,6 +306,30 @@ export default function init(
 
     // migration: device_bindings.name for admin panel identification
     ensureSchemaColumn(database, "device_bindings.name")
+
+    // Existing deployments used the device name as the only administrator-visible
+    // retention marker. Preserve the most recently seen non-empty marker when the
+    // account-level cleanup fields are introduced.
+    database.prepare(`
+        UPDATE accounts
+        SET admin_note = (
+            SELECT name
+            FROM device_bindings
+            WHERE device_bindings.account_id = accounts.id
+              AND name IS NOT NULL
+              AND TRIM(name) <> ''
+            ORDER BY last_seen DESC
+            LIMIT 1
+        )
+        WHERE admin_note IS NULL
+          AND EXISTS (
+              SELECT 1
+              FROM device_bindings
+              WHERE device_bindings.account_id = accounts.id
+                AND name IS NOT NULL
+                AND TRIM(name) <> ''
+          )
+    `).run()
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_options (
         key TEXT NOT NULL,

@@ -16,7 +16,7 @@
   "playerId": 1,
   "producer": {
     "serverVersion": "1.0.1",
-    "dbSchemaVersion": 16,
+    "dbSchemaVersion": 17,
     "contentVersion": "1.4.54"
   },
   "domains": {
@@ -34,7 +34,7 @@
 
 ## 覆盖范围
 
-schema 16 共有 60 张可从 `players` 外键图发现的玩家关联表：
+schema 17 共有 60 张可从 `players` 外键图发现的玩家关联表：
 
 - 59 张登记到 `core`、`missions`、`events`、`economy`、`mailbox`；
 - `players_active_quests` 是唯一排除的玩家表；
