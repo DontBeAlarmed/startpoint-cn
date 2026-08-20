@@ -235,7 +235,7 @@ stubModule("../src/data/domains/player", {
 })
 stubModule("../src/data/domains/item", {
     getPlayerItemSync(playerId, itemId) {
-        return db.prepare("SELECT count FROM item_state WHERE player_id = ? AND item_id = ?").get(playerId, itemId)?.count ?? 0
+        return db.prepare("SELECT count FROM item_state WHERE player_id = ? AND item_id = ?").get(playerId, itemId)?.count ?? null
     },
     givePlayerItemSync(playerId, itemId, count) {
         writeAttempts++
@@ -245,6 +245,17 @@ stubModule("../src/data/domains/item", {
         `).run(playerId, itemId, count)
         return db.prepare("SELECT count FROM item_state WHERE player_id = ? AND item_id = ?").get(playerId, itemId).count
     },
+    setPlayerItemWithinTransactionSync(playerId, itemId, amount, hasExistingRow) {
+        writeAttempts++
+        if (hasExistingRow) {
+            db.prepare("UPDATE item_state SET count = ? WHERE player_id = ? AND item_id = ?")
+                .run(amount, playerId, itemId)
+        } else {
+            db.prepare("INSERT INTO item_state (player_id, item_id, count) VALUES (?, ?, ?)")
+                .run(playerId, itemId, amount)
+        }
+    },
+    recordPlayerCollectedItemWithinTransactionSync() {},
     updatePlayerItemSync() {},
 })
 stubModule("../src/data/domains/mail", { getPlayerMailCountSync: () => 0 })
