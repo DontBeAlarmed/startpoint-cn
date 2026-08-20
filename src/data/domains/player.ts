@@ -1204,11 +1204,14 @@ export function collectPlayerDataPooledExpSync(
 
     if (60 > diff) return;
 
+    const expPool = player.expPool + Math.min(expPoolMax, Math.floor(diff / 60))
     updatePlayerSync({
         id: player.id,
         expPooledTime: dateNow,
-        expPool: player.expPool + Math.min(expPoolMax, Math.floor(diff / 60))
+        expPool,
     })
+    player.expPooledTime = dateNow
+    player.expPool = expPool
 }
 
 /**
@@ -1245,7 +1248,7 @@ export function dailyResetPlayerDataSync(
     const crossedWeek = isNewWeek(loginDate, lastLoginTime, resetHour)
 
     if (crossedDay) {
-        return getDb().transaction(() => {
+        const resetPerformed = getDb().transaction(() => {
             updatePlayerSync({
                 id: playerId,
                 lastLoginTime: loginDate,
@@ -1338,11 +1341,17 @@ export function dailyResetPlayerDataSync(
 
             return true
         })()
+        player.lastLoginTime = loginDate
+        player.bossBoostPoint = 3
+        player.boostPoint = 3
+        player.totalLoginDays = (player.totalLoginDays ?? 0) + 1
+        return resetPerformed
     } else {
         updatePlayerSync({
             id: playerId,
             lastLoginTime: loginDate,
         })
+        player.lastLoginTime = loginDate
         return false
     }
 }

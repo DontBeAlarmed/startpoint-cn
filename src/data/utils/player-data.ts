@@ -26,6 +26,7 @@ export { getDefaultPlayerData } from "./default-player"
 
 export interface GetClientSerializedDataOptions extends SerializePlayerDataOptions {
     readonly activeMissionsOverride?: ReturnType<typeof getPlayerActiveMissionsSync>
+    readonly playerOverride?: NonNullable<ReturnType<typeof getPlayerSync>>
 }
 
 function restoreActiveMissionPayloadShape(
@@ -51,8 +52,7 @@ export function getClientSerializedData(
     options: GetClientSerializedDataOptions
 ): ClientPlayerData | null {
 
-    reconcileInterruptedStartTutorialSync(playerId)
-    const playerData = getPlayerSync(playerId)
+    const playerData = reconcileInterruptedStartTutorialSync(playerId, options.playerOverride)
     if (playerData === null) return null
 
     const doSerializeRushEventData = options.serializeRushEventData ?? false

@@ -1,5 +1,6 @@
 import { getDb } from "../data/db"
 import { getPlayerSync } from "../data/domains/player"
+import type { Player } from "../data/types"
 
 export const TUTORIAL_GACHA_CHARACTER_IDS = [
     251001,
@@ -32,8 +33,11 @@ export function isStartTutorialActive(
     return step !== null && getTutorialEffectiveStep(step, skip) < TUTORIAL_END_EFFECTIVE_STEP
 }
 
-export function reconcileInterruptedStartTutorialSync(playerId: number): void {
-    const player = getPlayerSync(playerId)
+export function reconcileInterruptedStartTutorialSync(
+    playerId: number,
+    playerOverride?: Player,
+): Player | null {
+    const player = playerOverride ?? getPlayerSync(playerId)
     if (
         player === null
         || player.tutorialStep === null
@@ -41,10 +45,10 @@ export function reconcileInterruptedStartTutorialSync(playerId: number): void {
         || getTutorialEffectiveStep(player.tutorialStep, player.tutorialSkipFlag)
             !== TUTORIAL_GACHA_EFFECTIVE_STEP
     ) {
-        return
+        return player
     }
 
-    getDb().prepare(`
+    const result = getDb().prepare(`
         UPDATE players
         SET tutorial_step = ?
         WHERE id = ?
@@ -55,4 +59,6 @@ export function reconcileInterruptedStartTutorialSync(playerId: number): void {
         playerId,
         player.tutorialStep,
     )
+    if (result.changes > 0) player.tutorialStep = Math.max(0, player.tutorialStep - 1)
+    return player
 }

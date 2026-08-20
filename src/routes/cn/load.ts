@@ -196,7 +196,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             return reply.status(400).send({ error: "Bad Request", message: "No player found" });
         }
 
-        const player = getPlayerSync(playerId);
+        let player = getPlayerSync(playerId);
         if (player === null) {
             return reply.status(500).send({ error: "Internal Server Error", message: "No player data." });
         }
@@ -206,11 +206,19 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
         collectPlayerDataPooledExpSync(player, now);
 
         // Run save validators (permanent fixes: max_level, etc.)
-        runPermanentValidators(playerId);
+        const validatorFixes = runPermanentValidators(playerId);
+        if (validatorFixes > 0) {
+            const refreshedPlayer = getPlayerSync(playerId);
+            if (refreshedPlayer === null) {
+                return reply.status(500).send({ error: "Internal Server Error", message: "No player data." });
+            }
+            player = refreshedPlayer;
+        }
 
         // 若自定义时间与 lastLogin 不同步，强制对齐（防止客户端弹"日期变了"）
         if (now.toDateString() !== player.lastLoginTime.toDateString()) {
             updatePlayerSync({ id: player.id, lastLoginTime: now });
+            player.lastLoginTime = now;
         }
 
         let activeQuest: ActiveQuest | null = getPlayerActiveQuestSync(playerId);
@@ -279,6 +287,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                 viewerId: accountId,
                 summonComSeconds: options.summonComSeconds,
                 activeMissionsOverride: activeMissionReconciliation.activeMissions,
+                playerOverride: player,
             }) as any;
             if (clientData === null) throw new Error("No player data.");
 
