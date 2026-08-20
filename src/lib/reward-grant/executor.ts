@@ -2,7 +2,6 @@ import { getDb } from "../../data/db"
 import {
     getPlayerItemSync,
     givePlayerItemSync,
-    givePlayerItemWithinTransactionSync,
 } from "../../data/domains/item"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { givePlayerCharacterSync, givePlayerCharacterWithinTransactionSync } from "../character"
@@ -28,6 +27,7 @@ import {
     RewardGrantResult,
     RewardGrantReward,
 } from "./types"
+import { OwnerInventoryWriteCache } from "./owner-inventory"
 
 export { RewardGrantKnownPlayerValidationError } from "./known-player"
 
@@ -121,6 +121,7 @@ function grantEntrySync(
     grantCurrency: typeof grantCurrencySync = grantCurrencySync,
     grantItem: typeof givePlayerItemSync = givePlayerItemSync,
     grantCharacter: typeof givePlayerCharacterSync = givePlayerCharacterSync,
+    getGrantedItemCount: typeof getPlayerItemSync = getPlayerItemSync,
 ): RewardGrantEntryExecution {
     const result = emptyPlayerRewardResult()
     switch (reward.type) {
@@ -146,7 +147,7 @@ function grantEntrySync(
             result.character_list.push(granted.character)
             if (granted.isNew) result.joined_character_id_list.push(reward.id)
             if (granted.item !== undefined) {
-                const finalCount = getPlayerItemSync(playerId, granted.item.id)
+                const finalCount = getGrantedItemCount(playerId, granted.item.id)
                 if (finalCount === null) {
                     throw new RewardGrantExecutionError(
                         entryIndex,
@@ -237,6 +238,7 @@ export function executeNormalizedRewardGrantPlanAsTransactionOwnerInternalSync<T
 ): InternalRewardGrantResult<TSource> {
     const playerAfter = { ...knownPlayerBefore }
     const currencyDeltas = { freeMana: 0, freeVmoney: 0, expPool: 0 }
+    const itemCache = new OwnerInventoryWriteCache()
     const entries = plan.entries.map((entry, entryIndex) => createRewardGrantEntryResult(
         entry,
         grantEntrySync(
@@ -244,10 +246,12 @@ export function executeNormalizedRewardGrantPlanAsTransactionOwnerInternalSync<T
             entry.reward,
             entryIndex,
             (pid, reward) => grantOwnerCurrency(reward, playerAfter, currencyDeltas),
-            givePlayerItemWithinTransactionSync,
+            (pid, itemId, amount) => itemCache.giveItem(pid, Number(itemId), amount),
             givePlayerCharacterWithinTransactionSync,
+            (pid, itemId) => itemCache.getItemCount(Number(itemId)) ?? getPlayerItemSync(pid, itemId),
         ),
     ))
+    itemCache.flush(playerId)
     persistOwnerCurrency(playerId, playerAfter, currencyDeltas, playerUpdate)
     return { aggregate: aggregateEntryResults(entries), entries, playerAfter }
 }

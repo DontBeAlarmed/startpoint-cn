@@ -187,6 +187,40 @@ test("transaction-owner execution uses known currency state without player reads
     })
 })
 
+test("transaction-owner execution coalesces repeated item writes", () => {
+    const playerId = createPlayer("owner-item-cache")
+    const before = playerState(playerId)
+    const plan = createRewardGrantPlan([
+        { source: { index: 0 }, reward: { type: RewardType.ITEM, id: ITEM_ID, count: 2 } },
+        { source: { index: 1 }, reward: { type: RewardType.ITEM, id: ITEM_ID, count: 3 } },
+        { source: { index: 2 }, reward: { type: RewardType.ITEM, id: ITEM_ID, count: 4 } },
+    ])
+
+    let measured
+    database.transaction(() => {
+        measured = captureSql(() => executeRewardGrantPlanInTransactionOwnerSync(
+            playerId,
+            plan,
+            before,
+        ))
+    })()
+
+    assert.equal(
+        measured.statements.filter(sql => /SELECT[\s\S]*FROM\s+players_items/i.test(sql)).length,
+        1,
+    )
+    assert.equal(
+        measured.statements.filter(sql => /INSERT INTO players_items/i.test(sql)).length,
+        1,
+    )
+    assert.equal(
+        measured.statements.filter(sql => /INSERT INTO players_collected_items/i.test(sql)).length,
+        1,
+    )
+    assert.equal(measured.result.aggregate.items[ITEM_ID], 9)
+    assert.equal(getPlayerItemSync(playerId, ITEM_ID), 9)
+})
+
 test("character grants report ownership transition and RewardGrant reuses it without a pre-read", () => {
     const directPlayerId = createPlayer("character-ownership-fact")
     const first = givePlayerCharacterSync(directPlayerId, CHARACTER_ID)

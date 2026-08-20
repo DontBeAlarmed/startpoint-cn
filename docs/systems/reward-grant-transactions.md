@@ -57,6 +57,8 @@ Player/item 投影并删除数据库 active，提交后再删除内存 active；
 
 owner 返回的 item、角色、装备最终状态与货币后态直接用于商店响应，不再为最终 `user_info` 查询玩家；同一 item 多次奖励及重复角色补偿均返回数据库最终库存。purchase count、mana mission fact、pass-card point 或奖励执行失败必须离开事务回调，使成本、奖励和后续写入由同一个外层事务回滚。`TREASURE_EQUIPMENT` 强化商店继续执行专用装备成长事务，不经过 shop reward adapter。
 
+事务拥有者路径对同一请求内重复发放的道具使用 `OwnerInventoryWriteCache`：每个物品 ID 只读取一次，在内存中累计最终数量和 `total_obtained`，事务末尾再写入一次库存和一次收集总量。它只作用于已经由外层事务拥有的奖励计划；独立旧 writer 的行为不变，角色逐抽响应仍读取缓存中的当前数量。
+
 ## 邮件标准奖励
 
 `mail-reward-grant.ts` 将 `ITEM`、`FREE_VMONEY`、`CHARACTER`、`EQUIPMENT`、`FREE_MANA`、`EXP_POOL` 分别映射为 RewardGrant 的 `ITEM`、`BEADS`、`CHARACTER`、`EQUIPMENT`、`MANA`、`EXP`。角色邮件按 `number` 展开；source 为 `{ mailId, attachmentIndex }`，保持请求中有效邮件和附件的顺序。`PAID_VMONEY`、`STAR_CRUMB`、`BOND_TOKEN`、`BOSS_BOOST_POINT`、`BOOST_POINT`、`RANK_POINT` 不进入 plan，也不增加 RewardGrant 公共类型。
