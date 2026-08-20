@@ -11,6 +11,7 @@ const {
     resetReliableSendTuning,
     sendFrameReliably,
 } = require("../src/multi/tcp/reliable-send")
+const { SessionManager } = require("../src/multi/state/SessionManager")
 
 function waitFor(predicate, message, timeoutMs = 1_000) {
     const startedAt = Date.now()
@@ -133,6 +134,33 @@ test("queue overflow disconnects only the slow socket", () => {
     assert.equal(sendFrameReliably(healthy, "healthy\0"), "sent")
     assert.deepEqual(healthy.writes, ["healthy\0"])
     clearReliableSendState(healthy)
+})
+
+test("a room broadcast removes a retired slow client while healthy peers continue", () => {
+    const manager = new SessionManager()
+    const roomNumber = "reliable-room-broadcast"
+    const slowSocket = new BackpressureSocket([false])
+    const healthySocket = new BackpressureSocket()
+    const slow = manager.createClient(slowSocket, 901, roomNumber, "slow-cid")
+    const healthy = manager.createClient(healthySocket, 902, roomNumber, "healthy-cid")
+    slow.participant = { nodeSessionId: "reliable-node", viewerId: 901 }
+    healthy.participant = { nodeSessionId: "reliable-node", viewerId: 902 }
+    slowSocket.on("close", () => manager.removeClient(slow))
+    healthySocket.on("close", () => manager.removeClient(healthy))
+    assert.equal(manager.addClientToRoom(slow).ok, true)
+    assert.equal(manager.addClientToRoom(healthy).ok, true)
+
+    manager.broadcastToRoom(roomNumber, [1, [1]])
+    manager.broadcastToRoom(roomNumber, [1, [2]])
+    manager.broadcastToRoom(roomNumber, [1, [3]])
+    manager.broadcastToRoom(roomNumber, [1, [4]])
+
+    assert.equal(slowSocket.destroyed, true)
+    assert.equal(manager.getClientBySocket(slowSocket), undefined)
+    assert.deepEqual(manager.getClientsInRoom(roomNumber), [healthy])
+    assert.equal(healthySocket.writes.length, 4)
+
+    manager.removeClient(healthy)
 })
 
 test("a socket that never drains is retired without affecting peers", async () => {

@@ -84,6 +84,7 @@ function createClientFixture(options = {}) {
     let now = options.now ?? 10_000
     let tcpListening = false
     let tcpStarts = 0
+    let stopTcpFailures = options.stopTcpFailures ?? 0
     const tcpConfigs = []
     const tcpTunings = []
     const remote = createCoordinator("remote")
@@ -121,6 +122,10 @@ function createClientFixture(options = {}) {
             tcpListening = true
         },
         stopTcp: async () => {
+            if (stopTcpFailures > 0) {
+                stopTcpFailures--
+                throw new Error("fallback tcp stop unavailable")
+            }
             tcpListening = false
         },
         isTcpListening: () => tcpListening,
@@ -255,6 +260,30 @@ test("local fallback TCP failure is degraded without tearing down HTTP or SQLite
     assert.equal(fixture.service.getStatus().clientFallbackState, "degraded")
     assert.equal(fixture.service.getHttpContext(), context)
     assert.equal(context.coordinator !== undefined, true)
+})
+
+test("Client fallback stop failure is retryable before a clean restart", async t => {
+    const fixture = createClientFixture({ controlAvailable: false, stopTcpFailures: 1 })
+    t.after(async () => {
+        try {
+            await fixture.stop()
+        } catch {
+            // The test already exercises the first failed cleanup; final cleanup retries it.
+            await fixture.stop()
+        }
+    })
+    await fixture.start()
+    const context = fixture.service.getHttpContext()
+    assert.equal(await context.resolveCoordinatorOrigin({ participant: participant(326) }), "local")
+    assert.equal(fixture.tcpStarts, 1)
+
+    await assert.rejects(fixture.stop(), /fallback tcp stop unavailable/)
+    await fixture.stop()
+
+    await fixture.start()
+    const restartedContext = fixture.service.getHttpContext()
+    assert.equal(await restartedContext.resolveCoordinatorOrigin({ participant: participant(327) }), "local")
+    assert.equal(fixture.tcpStarts, 2)
 })
 
 test("shared Client fallback listens locally and advertises its public TCP endpoint", async t => {
