@@ -1,4 +1,5 @@
 import {
+    getPlayerCategoryMissionsByCategoriesSync,
     getPlayerCategoryMissionsByIdsSync,
     getPlayerCategoryMissionsSync,
 } from "../../data/domains/mission"
@@ -107,6 +108,20 @@ export function evaluateMissionCandidates(
     const player = getPlayerSync(prepared.playerId)
     if (!player) throw new Error(`Player ${prepared.playerId} not found during mission settlement.`)
     const persistedByCategory = new Map<number, ReturnType<typeof getPlayerCategoryMissionsSync>>()
+    const standardCategories = [...new Set(
+        prepared.candidates
+            .map(candidate => candidate.category)
+            .filter(category => category !== 9),
+    )]
+    if (standardCategories.length > 1) {
+        const byCategory = getPlayerCategoryMissionsByCategoriesSync(
+            prepared.playerId,
+            standardCategories,
+        )
+        for (const category of standardCategories) {
+            persistedByCategory.set(category, byCategory[String(category)] ?? {})
+        }
+    }
     for (const category of new Set(prepared.candidates.map(candidate => candidate.category))) {
         if (category === 9) {
             const missionIds = new Set<number>()
@@ -127,6 +142,7 @@ export function evaluateMissionCandidates(
             )
             continue
         }
+        if (standardCategories.length > 1) continue
         persistedByCategory.set(
             category,
             getPlayerCategoryMissionsSync(prepared.playerId, category),

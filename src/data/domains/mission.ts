@@ -278,6 +278,57 @@ export function getPlayerCategoryMissionsSync(
     return result
 }
 
+/**
+ * Reads several category mission maps with one query for progress and one for
+ * stages. Category 9 keeps its candidate-ID path because Awake is intentionally
+ * selective rather than a full category scan.
+ */
+export function getPlayerCategoryMissionsByCategoriesSync(
+    playerId: number,
+    categories: readonly number[],
+): Record<string, Record<string, PlayerActiveMission>> {
+    const normalizedCategories = [...new Set(categories)]
+        .filter(category => Number.isSafeInteger(category) && category > 0)
+        .sort((left, right) => left - right)
+    if (normalizedCategories.length === 0) return {}
+    const placeholders = normalizedCategories.map(() => "?").join(", ")
+    const missions = getDb().prepare(`
+        SELECT category, id, progress
+        FROM players_category_missions
+        WHERE player_id = ? AND category IN (${placeholders})
+    `).all(playerId, ...normalizedCategories) as {
+        category: number
+        id: number
+        progress: number
+    }[]
+    const stages = getDb().prepare(`
+        SELECT category, id, status, mission_id
+        FROM players_category_mission_stages
+        WHERE player_id = ? AND category IN (${placeholders})
+    `).all(playerId, ...normalizedCategories) as {
+        category: number
+        id: number
+        status: number
+        mission_id: number
+    }[]
+    const stageBuckets = new Map<string, Record<string, boolean>>()
+    for (const stage of stages) {
+        const key = `${stage.category}:${stage.mission_id}`
+        const bucket = stageBuckets.get(key) ?? {}
+        bucket[String(stage.id)] = deserializeBoolean(stage.status)
+        stageBuckets.set(key, bucket)
+    }
+    const result: Record<string, Record<string, PlayerActiveMission>> = {}
+    for (const category of normalizedCategories) result[String(category)] = {}
+    for (const mission of missions) {
+        result[String(mission.category)][String(mission.id)] = {
+            progress: mission.progress,
+            stages: stageBuckets.get(`${mission.category}:${mission.id}`) ?? [],
+        }
+    }
+    return result
+}
+
 export function getPlayerCategoryMissionProgressByIdsSync(
     playerId: number,
     category: number,
