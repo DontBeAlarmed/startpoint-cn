@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { RawPlayerMail, getPlayerMailCountSync, getPlayerMailsSync, receiveMailSync } from "../../data/domains/mail"
+import { RawPlayerMail, getPlayerMailCountSync, getPlayerMailSync, getPlayerMailsByIdsSync, getPlayerMailsSync, receiveMailSync } from "../../data/domains/mail"
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -113,13 +113,12 @@ const routes = async (fastify: FastifyInstance) => {
         }
         try {
             settlement = getDb().transaction(() => {
-                const mail = getPlayerMailsSync(playerId, 1, 1000, true)
-                    .find(candidate => candidate.id === mailId)
+                const mail = getPlayerMailSync(playerId, mailId, true)
                 if (!mail) throw new MailNotAvailableError()
                 const player = getPlayerSync(playerId)
                 if (!player) throw new Error(`Mail player ${playerId} no longer exists.`)
                 const reward = settleMailRewardsInTransactionOwnerSync(playerId, [mail], player)
-                if (receiveMailSync(playerId, mailId) === null) {
+                if (receiveMailSync(playerId, mailId, mail) === null) {
                     throw new Error(`Mail ${mailId} changed while it was being received.`)
                 }
                 return {
@@ -191,14 +190,16 @@ const routes = async (fastify: FastifyInstance) => {
         }
         try {
             settlement = getDb().transaction(() => {
-                const unreceivedMails = getPlayerMailsSync(playerId, 1, 1000, true)
+                const unreceivedMails = getPlayerMailsByIdsSync(playerId, uniqueMailIds, true)
                 const mailMap = new Map(unreceivedMails.map(mail => [mail.id, mail]))
                 const validMailIds = uniqueMailIds.filter(mailId => mailMap.has(mailId))
                 const validMails = validMailIds.map(mailId => mailMap.get(mailId)!)
                 const player = getPlayerSync(playerId)
                 if (!player) throw new Error(`Mail player ${playerId} no longer exists.`)
                 const reward = settleMailRewardsInTransactionOwnerSync(playerId, validMails, player)
-                const claimed = validMailIds.filter(mailId => receiveMailSync(playerId, mailId) !== null)
+                const claimed = validMailIds.filter(mailId => (
+                    receiveMailSync(playerId, mailId, mailMap.get(mailId)) !== null
+                ))
                 if (claimed.length !== validMailIds.length) {
                     throw new Error("Mail state changed while mails were being received.")
                 }

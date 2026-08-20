@@ -173,6 +173,11 @@ test("single receive owns one player snapshot without nested reward transaction 
     assert.equal(measured.result.statusCode, 200, measured.result.body)
     assert.equal(playerSnapshots(measured.statements).length, 2, measured.statements.join("\n---\n"))
     assert.equal(nestedTransactionStatements(measured.statements).length, 2, measured.statements.join("\n---\n"))
+    assert.equal(
+        measured.statements.filter(statement => /SELECT \* FROM players_mails WHERE player_id = \?/i.test(statement)).length,
+        0,
+        measured.statements.join("\n---\n"),
+    )
 })
 
 test("receive_all reads one authoritative player snapshot for the whole standard batch", async () => {
@@ -190,6 +195,11 @@ test("receive_all reads one authoritative player snapshot for the whole standard
     assert.equal(measured.result.statusCode, 200, measured.result.body)
     assert.equal(playerSnapshots(measured.statements).length, 2, measured.statements.join("\n---\n"))
     assert.equal(nestedTransactionStatements(measured.statements).length, 2, measured.statements.join("\n---\n"))
+    assert.equal(
+        measured.statements.filter(statement => /LIMIT \? OFFSET \?/i.test(statement)).length,
+        0,
+        measured.statements.join("\n---\n"),
+    )
 })
 
 test("single receive rolls reward and history back when marking the mail fails", async t => {

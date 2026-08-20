@@ -91,6 +91,36 @@ export function getPlayerMailsSync(
 }
 
 /**
+ * Reads one mail without materializing the player's mailbox page.
+ * The receive routes use this for a targeted claim; list pagination remains
+ * unchanged for the mailbox screen.
+ */
+export function getPlayerMailSync(
+    playerId: number,
+    mailId: number,
+    unreceivedOnly: boolean = false,
+): RawPlayerMail | null {
+    let query = `SELECT * FROM players_mails WHERE id = ? AND player_id = ?`
+    if (unreceivedOnly) query += ` AND receive_time = '0000-00-00 00:00:00'`
+    const mail = getDb().prepare(query).get(mailId, playerId) as RawPlayerMail | undefined
+    return mail ?? null
+}
+
+/** Reads the requested unreceived mails in one bounded query for receive_all. */
+export function getPlayerMailsByIdsSync(
+    playerId: number,
+    mailIds: readonly number[],
+    unreceivedOnly: boolean = false,
+): RawPlayerMail[] {
+    const ids = [...new Set(mailIds)]
+    if (ids.length === 0) return []
+    const placeholders = ids.map(() => "?").join(", ")
+    let query = `SELECT * FROM players_mails WHERE player_id = ? AND id IN (${placeholders})`
+    if (unreceivedOnly) query += ` AND receive_time = '0000-00-00 00:00:00'`
+    return getDb().prepare(query).all(playerId, ...ids) as RawPlayerMail[]
+}
+
+/**
  * Gets total mail count for a player.
  */
 export function getPlayerMailCountSync(
@@ -111,16 +141,26 @@ export function getPlayerMailCountSync(
  */
 export function receiveMailSync(
     playerId: number,
-    mailId: number
+    mailId: number,
+    knownMail?: RawPlayerMail,
 ): MailAttachment | null {
-    const mail = getDb().prepare(`
-        SELECT * FROM players_mails WHERE id = ? AND player_id = ? AND receive_time = '0000-00-00 00:00:00'
-    `).get(mailId, playerId) as RawPlayerMail | undefined
+    const mail = knownMail === undefined
+        ? getPlayerMailSync(playerId, mailId, true)
+        : knownMail.player_id === playerId
+            && knownMail.id === mailId
+            && knownMail.receive_time === '0000-00-00 00:00:00'
+            ? knownMail
+            : null
 
-    if (!mail) return null
+    if (mail === null) return null
 
     const now = new Date().toISOString().replace('T', ' ').substring(0, 19)
-    getDb().prepare(`UPDATE players_mails SET receive_time = ? WHERE id = ?`).run(now, mailId)
+    const result = getDb().prepare(`
+        UPDATE players_mails
+        SET receive_time = ?
+        WHERE id = ? AND player_id = ? AND receive_time = '0000-00-00 00:00:00'
+    `).run(now, mailId, playerId)
+    if (result.changes !== 1) return null
 
     return {
         mail_id: mail.id,
