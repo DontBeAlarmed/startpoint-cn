@@ -235,7 +235,7 @@
     },
     "get-progress-no-invalidation": {
       "sqlReads": 14,
-      "sqlWrites": 4,
+      "sqlWrites": 1,
       "missionComputes": 110,
       "behavior": {
         "characterIds": [],
@@ -250,8 +250,8 @@
       "behaviorSha256": "63b798e8b698886123d421b48dfea8c50f5ef23b6a767fa24802dce118602e38"
     },
     "get-progress-item-invalidation": {
-      "sqlReads": 26,
-      "sqlWrites": 20,
+      "sqlReads": 22,
+      "sqlWrites": 4,
       "missionComputes": 1269,
       "behavior": {
         "characterIds": [],
@@ -277,8 +277,8 @@
       "behaviorSha256": "70743d804ff5f75364f094d775e65ea9bb41b632a0dd8851624616fe11a9bdf1"
     },
     "get-progress-character-invalidation": {
-      "sqlReads": 25,
-      "sqlWrites": 13,
+      "sqlReads": 23,
+      "sqlWrites": 5,
       "missionComputes": 1208,
       "behavior": {
         "characterIds": [
@@ -305,8 +305,8 @@
       "behaviorSha256": "a3b22b37aa5187f24c4b9917d36dd7fec72405b7b1cd44911bb6652b49e34c1b"
     },
     "get-progress-equipment-invalidation": {
-      "sqlReads": 26,
-      "sqlWrites": 19,
+      "sqlReads": 22,
+      "sqlWrites": 3,
       "missionComputes": 1271,
       "behavior": {
         "characterIds": [],
@@ -332,8 +332,8 @@
       "behaviorSha256": "fcfaa0ae0d6a931536f2c9e413da6b7a44ed7e5fd6e57f513aa49a341328ef34"
     },
     "single-battle-finish": {
-      "sqlReads": 45,
-      "sqlWrites": 80,
+      "sqlReads": 31,
+      "sqlWrites": 31,
       "missionComputes": 425,
       "behavior": {
         "adapter": "mission-finish-boundary",
@@ -427,8 +427,8 @@
       "behaviorSha256": "4659b8cdcf1384c70f787fba12d4d42b74c3680d7b446330c9e7f06abb6a6ce4"
     },
     "multi-battle-finish": {
-      "sqlReads": 46,
-      "sqlWrites": 91,
+      "sqlReads": 32,
+      "sqlWrites": 37,
       "missionComputes": 425,
       "behavior": {
         "adapter": "mission-finish-boundary",

@@ -25,7 +25,7 @@ const EXPECTED_SCENARIO_KEYS = [
     "multi-battle-finish",
 ]
 const HISTORICAL_SETTLEMENT_SHA256 =
-    "9002af63864ef3e999563c39ce5bbd366a013073f3f076c1c9bfbea56e441d96"
+    "6004cc8a57bd6341f7c0ddf960bdf4a735523a7c3913fa4ccf06aefb3eed9843"
 const snapshotPath = path.join(
     __dirname,
     "__snapshots__",
@@ -96,9 +96,9 @@ test("snapshot pins the completed mission engine structural performance values",
         },
     }, {
         awakeCharacterPage: { sqlReads: 11, sqlWrites: 0, missionComputes: 7 },
-        getProgressNoInvalidation: { sqlReads: 14, sqlWrites: 4, missionComputes: 110 },
-        singleBattleFinish: { sqlReads: 45, sqlWrites: 80, missionComputes: 425 },
-        multiBattleFinish: { sqlReads: 46, sqlWrites: 91, missionComputes: 425 },
+        getProgressNoInvalidation: { sqlReads: 14, sqlWrites: 1, missionComputes: 110 },
+        singleBattleFinish: { sqlReads: 31, sqlWrites: 31, missionComputes: 425 },
+        multiBattleFinish: { sqlReads: 32, sqlWrites: 37, missionComputes: 425 },
     })
 })
 
