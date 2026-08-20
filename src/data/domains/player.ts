@@ -1195,7 +1195,7 @@ export function deletePlayerSync(
 
 export function collectPlayerDataPooledExpSync(
     player: Player,
-    dateNow: Date = new Date()
+    dateNow: Date = getServerDate()
 ) {
     const serverTimeNow = getServerTime(dateNow)
     const poolTime = getServerTime(player.expPooledTime)

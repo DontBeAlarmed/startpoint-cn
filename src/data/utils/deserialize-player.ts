@@ -1,6 +1,6 @@
 import { deserializeClientDate } from "./date"
 import { getCharacterDataSync } from "../../lib/assets"
-import { getDateFromServerTime, getServerTime, getServerDate, realToVirtual } from "../../utils"
+import { getDateFromServerTime, getServerTime, getServerDate, realDateFromServerTime, realToVirtual } from "../../utils"
 import { ClientPlayerData, DailyChallengePointListEntry, MergedPlayerData, PartyCategory, Player, PlayerBoxGacha, PlayerCharacter, PlayerCharacterBondToken, PlayerDrawnQuest, PlayerEquipment, PlayerGachaCampaign, PlayerGachaInfo, PlayerMultiSpecialExchangeCampaign, PlayerParty, PlayerPartyGroup, PlayerQuestProgress, PlayerRushEvent, PlayerRushEventPlayedParty, PlayerStartDashExchangeCampaign, RushEventBattleType, UserBoxGacha, UserCharacter, UserCharacterBondTokenStatus, UserEquipment, UserGachaCampaign, UserPartyGroup, UserPartyGroupTeam, UserQuestProgress, UserRushEvent, UserRushEventPlayedParty, UserRushEventPlayedPartyList, UserTutorial } from "../types"
 import { deserializePlayerRushEventPlayedParty, deserializeRushEvent, getPlayerRushEventListClearedFoldersSync, getPlayerRushEventListPlayedPartiesSync, getPlayerRushEventListSync, serializePlayerRushEventPlayedParty } from "../domains/rushEvent"
 import { getPlayerActiveMissionsSync, getPlayerClearedRegularMissionListSync } from "../domains/mission"
@@ -37,7 +37,7 @@ export function deserializePlayerData(
         const player: Player = {
             id: playerId,
             stamina: userInfo.stamina,
-            staminaHealTime: getDateFromServerTime(userInfo.stamina_heal_time),
+            staminaHealTime: realDateFromServerTime(userInfo.stamina_heal_time),
             boostPoint: userInfo.boost_point,
             bossBoostPoint: userInfo.boss_boost_point,
             transitionState: userInfo.transition_state,

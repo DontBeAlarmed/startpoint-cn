@@ -71,6 +71,11 @@ export function getDateFromServerTime(serverTime: number): Date {
     return new Date(serverTime * 1000)
 }
 
+/** Convert a client-visible virtual server timestamp to a real DB timestamp. */
+export function realDateFromServerTime(serverTime: number): Date {
+    return new Date(serverTime * 1000 - (timeOffset ?? 0))
+}
+
 /**
  * Generates an IdpAlias to identify a particular device.
  * 
