@@ -7,7 +7,15 @@ const test = require("node:test")
 require("ts-node/register/transpile-only")
 
 const { sessionManager } = require("../src/multi/state/SessionManager")
-const { addRoomMember, createRoom, disbandRoom, getRoom, isRoomMember } = require("../src/multi/room/manager")
+const {
+    addRoomMember,
+    createRoom,
+    disbandRoom,
+    getRoom,
+    isRoomMember,
+    removeRoomMember,
+    updateRoomState,
+} = require("../src/multi/room/manager")
 let lobbyLifecycle = {}
 try {
     lobbyLifecycle = require("../src/multi/tcp/lobby-lifecycle")
@@ -97,6 +105,7 @@ function createLobbyClient(room, viewerId, connectionId, nodeSessionId = "embedd
     }
     client.mates = [client.yourself]
     sessionManager.addClientToRoom(client)
+    addRoomMember(room.room_number, client.participant)
     return { client, socket }
 }
 
@@ -107,7 +116,17 @@ function createLobbyRoom(
     hostNodeSessionId = "embedded",
     hostConnectionId = `host-${hostViewerId}`,
 ) {
-    const room = createRoom(hostViewerId, hostViewerId + 1000, 1, 1, hostViewerId + 2000, 1, hostViewerId + 3000)
+    const room = createRoom(
+        hostViewerId,
+        hostViewerId + 1000,
+        1,
+        1,
+        hostViewerId + 2000,
+        1,
+        hostViewerId + 3000,
+        false,
+        { nodeSessionId: hostNodeSessionId, viewerId: hostViewerId },
+    )
     const host = createLobbyClient(room, hostViewerId, hostConnectionId, hostNodeSessionId)
     sessionManager.claimRoomHostParticipant(room.room_number, host.client.participant)
     const guests = guestViewerIds.map(viewerId => createLobbyClient(room, viewerId, `guest-${viewerId}`))
@@ -161,6 +180,14 @@ test("a host entering after a guest receives Welcome before excluded mate update
 
     assert.deepEqual(hostInitializationTags, [0])
     assert.deepEqual(guestInitializationTags, [0, 1])
+})
+
+test("authoritative composite identity retains a connected host", t => {
+    const { host } = createLobbyRoom(t, 495, [], "custom-host-node")
+
+    handleMessage(host.socket, [0, [0, { party: {} }]])
+
+    assert.deepEqual(host.client.mates.map(mate => mate.viewerId), [495])
 })
 
 test("change-party rebuilds a deeply frozen snapshot isolated from client input", t => {
@@ -640,6 +667,284 @@ test("automatic rematch recruitment restores contributor names without hardcoded
         host.client.mates.filter(mate => mate.comId).map(mate => mate.name),
         ["重赛甲", "重赛乙"],
     )
+})
+
+test("rematch slot reconciliation rejects a pending recruitment from the previous battle", async t => {
+    const timers = startCapturedLobbyLifecycle()
+    const { room, host } = createLobbyRoom(t, 525)
+    room.npc_count = 2
+    room.npc_roster = [
+        { com_id: 1, name: "当前甲" },
+        { com_id: 2, name: "当前乙" },
+    ]
+    const previousRecruitment = deferred()
+    const originalOnRecruit = NpcMateProvider.prototype.onRecruit
+    let recruitCalls = 0
+    NpcMateProvider.prototype.onRecruit = () => {
+        recruitCalls++
+        if (recruitCalls === 1) return previousRecruitment.promise
+        return Promise.resolve({
+            recruitedMates: [
+                { viewer_id: 961000001, com_id: 1 },
+                { viewer_id: 961000002, com_id: 2 },
+            ],
+        })
+    }
+    t.after(() => { NpcMateProvider.prototype.onRecruit = originalOnRecruit })
+
+    handleMessage(host.socket, [0, [10, []]])
+    assert.equal(recruitCalls, 1)
+
+    handleMessage(host.socket, [0, [0, { party: {} }]])
+    assert.equal(timers.length, 1)
+    assert.deepEqual(host.client.mates.map(mate => mate.viewerId), [525])
+
+    previousRecruitment.resolve({
+        recruitedMates: [
+            { viewer_id: 960000001, com_id: 1 },
+            { viewer_id: 960000002, com_id: 2 },
+        ],
+    })
+    await flushPromises()
+    assert.deepEqual(host.client.mates.map(mate => mate.viewerId), [525])
+
+    timers[0].callback()
+    await flushPromises()
+    assert.equal(recruitCalls, 2)
+    assert.deepEqual(
+        host.client.mates.map(mate => ({ viewerId: mate.viewerId, comId: mate.comId ?? 0 })),
+        [
+            { viewerId: 525, comId: 0 },
+            { viewerId: 961000001, comId: 1 },
+            { viewerId: 961000002, comId: 2 },
+        ],
+    )
+})
+
+test("rematch recruitment preserves a disconnected authoritative real-player seat", async t => {
+    const timers = startCapturedLobbyLifecycle()
+    const { room, host } = createLobbyRoom(t, 526)
+    addRoomMember(room.room_number, { nodeSessionId: "embedded", viewerId: 626 })
+    room.npc_count = 2
+    room.npc_roster = [
+        { com_id: 1, name: "保留席位甲" },
+        { com_id: 2, name: "保留席位乙" },
+    ]
+    stubRecruitment(t, [
+        { viewer_id: 962000001, com_id: 1 },
+        { viewer_id: 962000002, com_id: 2 },
+    ])
+
+    handleMessage(host.socket, [0, [0, { party: {} }]])
+    assert.equal(timers.length, 1)
+    timers[0].callback()
+    await flushPromises()
+
+    assert.deepEqual(
+        host.client.mates.map(mate => ({ viewerId: mate.viewerId, comId: mate.comId ?? 0 })),
+        [
+            { viewerId: 526, comId: 0 },
+            { viewerId: 962000002, comId: 2 },
+        ],
+    )
+})
+
+test("rematch fills a seat after its authoritative reconnect lease expires", async t => {
+    const timers = startCapturedLobbyLifecycle()
+    configureReconnectGraceMs(25)
+    const { room, host, guests } = createLobbyRoom(t, 528, [628])
+    const guest = guests[0]
+    addRoomMember(room.room_number, guest.client.participant)
+    room.npc_count = 2
+    room.npc_roster = [
+        { com_id: 1, name: "释放后甲" },
+        { com_id: 2, name: "释放后乙" },
+    ]
+    const getRecruitCalls = stubRecruitment(t, [
+        { viewer_id: 964000001, com_id: 1 },
+        { viewer_id: 964000002, com_id: 2 },
+    ])
+
+    assert.equal(handleSocketDisconnect(guest.socket), true)
+    handleMessage(host.socket, [0, [0, { party: {} }]])
+    assert.equal(isRoomMember(room, guest.client.participant), true)
+    const initialRematchTimer = timers.find(timer => timer.delayMs === 500)
+    assert.ok(initialRematchTimer)
+    initialRematchTimer.callback()
+    await flushPromises()
+    assert.equal(getRecruitCalls(), 1)
+    assert.equal(host.client.mates.length, 2)
+
+    await new Promise(resolve => setTimeout(resolve, 40))
+    assert.equal(isRoomMember(room, guest.client.participant), false)
+
+    const rematchTimers = timers.filter(timer => timer.delayMs === 500)
+    assert.equal(rematchTimers.length, 2)
+    rematchTimers[1].callback()
+    await flushPromises()
+
+    assert.equal(getRecruitCalls(), 2)
+    assert.deepEqual(
+        host.client.mates.map(mate => ({ viewerId: mate.viewerId, comId: mate.comId ?? 0 })),
+        [
+            { viewerId: 528, comId: 0 },
+            { viewerId: 964000001, comId: 1 },
+            { viewerId: 964000002, comId: 2 },
+        ],
+    )
+})
+
+test("an expired guest lease waits for the host to enter before rematch recruitment", async t => {
+    const timers = startCapturedLobbyLifecycle()
+    configureReconnectGraceMs(25)
+    const { room, host, guests } = createLobbyRoom(t, 530, [630])
+    const guest = guests[0]
+    room.npc_count = 2
+
+    assert.equal(handleSocketDisconnect(guest.socket), true)
+    await new Promise(resolve => setTimeout(resolve, 40))
+    assert.equal(isRoomMember(room, guest.client.participant), false)
+    assert.equal(timers.filter(timer => timer.delayMs === 500).length, 0)
+
+    handleMessage(host.socket, [0, [0, { party: {} }]])
+    assert.equal(timers.filter(timer => timer.delayMs === 500).length, 1)
+})
+
+test("a previous-round host Enter cannot authorize the next rematch generation", async t => {
+    const timers = startCapturedLobbyLifecycle()
+    configureReconnectGraceMs(25)
+    const { room, host, guests } = createLobbyRoom(t, 532, [632])
+    const guest = guests[0]
+    room.npc_count = 2
+    room.npc_roster = [
+        { com_id: 1, name: "新代次甲" },
+        { com_id: 2, name: "新代次乙" },
+    ]
+    const getRecruitCalls = stubRecruitment(t, [
+        { viewer_id: 967000001, com_id: 1 },
+        { viewer_id: 967000002, com_id: 2 },
+    ])
+
+    handleMessage(host.socket, [0, [0, { party: {} }]])
+    assert.equal(timers.filter(timer => timer.delayMs === 500).length, 1)
+    handleMessage(host.socket, [0, [6]])
+    assert.equal(room.raising_state, 4)
+
+    updateRoomState(room.room_number, 1)
+    assert.equal(handleSocketDisconnect(guest.socket), true)
+    await new Promise(resolve => setTimeout(resolve, 40))
+    assert.equal(isRoomMember(room, guest.client.participant), false)
+
+    const beforeRematchEnter = timers.filter(timer => timer.delayMs === 500)
+    assert.equal(beforeRematchEnter.length, 1)
+    beforeRematchEnter[0].callback()
+    await flushPromises()
+    assert.equal(getRecruitCalls(), 0)
+
+    handleMessage(host.socket, [0, [0, { party: {} }]])
+    const afterRematchEnter = timers.filter(timer => timer.delayMs === 500)
+    assert.equal(afterRematchEnter.length, 2)
+    afterRematchEnter[1].callback()
+    await flushPromises()
+    assert.equal(getRecruitCalls(), 1)
+})
+
+test("a released real member with a stale TCP client cannot occupy a rematch seat", async t => {
+    const timers = startCapturedLobbyLifecycle()
+    const { room, host, guests } = createLobbyRoom(t, 529, [629])
+    const releasedGuest = guests[0]
+    addRoomMember(room.room_number, releasedGuest.client.participant)
+    assert.equal(removeRoomMember(room.room_number, releasedGuest.client.participant), true)
+    room.npc_count = 2
+    room.npc_roster = [
+        { com_id: 1, name: "权威甲" },
+        { com_id: 2, name: "权威乙" },
+    ]
+    stubRecruitment(t, [
+        { viewer_id: 965000001, com_id: 1 },
+        { viewer_id: 965000002, com_id: 2 },
+    ])
+
+    handleMessage(host.socket, [0, [0, { party: {} }]])
+    const rematchTimer = timers.find(timer => timer.delayMs === 500)
+    assert.ok(rematchTimer)
+    rematchTimer.callback()
+    await flushPromises()
+
+    assert.deepEqual(
+        host.client.mates.map(mate => ({ viewerId: mate.viewerId, comId: mate.comId ?? 0 })),
+        [
+            { viewerId: 529, comId: 0 },
+            { viewerId: 965000001, comId: 1 },
+            { viewerId: 965000002, comId: 2 },
+        ],
+    )
+})
+
+test("a released guest TCP cannot re-enter and displace an authoritative NPC", async t => {
+    const timers = startCapturedLobbyLifecycle()
+    const { room, host, guests } = createLobbyRoom(t, 531, [631])
+    const releasedGuest = guests[0]
+    assert.equal(removeRoomMember(room.room_number, releasedGuest.client.participant), true)
+    room.npc_count = 2
+    room.npc_roster = [
+        { com_id: 1, name: "防回流甲" },
+        { com_id: 2, name: "防回流乙" },
+    ]
+    stubRecruitment(t, [
+        { viewer_id: 966000001, com_id: 1 },
+        { viewer_id: 966000002, com_id: 2 },
+    ])
+
+    handleMessage(host.socket, [0, [0, { party: {} }]])
+    const rematchTimer = timers.find(timer => timer.delayMs === 500)
+    assert.ok(rematchTimer)
+    rematchTimer.callback()
+    await flushPromises()
+    const authoritativeMates = host.client.mates.map(mate => ({
+        viewerId: mate.viewerId,
+        comId: mate.comId ?? 0,
+    }))
+
+    handleMessage(releasedGuest.socket, [0, [0, { party: { stale: true } }]])
+
+    assert.deepEqual(
+        host.client.mates.map(mate => ({ viewerId: mate.viewerId, comId: mate.comId ?? 0 })),
+        authoritativeMates,
+    )
+    assert.deepEqual(room.mates, [
+        { viewer_id: 531, com_id: 0 },
+        { viewer_id: 966000001, com_id: 1 },
+        { viewer_id: 966000002, com_id: 2 },
+    ])
+})
+
+test("a superseded rematch recruitment timer cannot occupy lobby slots", async t => {
+    const timers = startCapturedLobbyLifecycle()
+    const { room, host } = createLobbyRoom(t, 527)
+    room.npc_count = 2
+    room.npc_roster = [
+        { com_id: 1, name: "定时器甲" },
+        { com_id: 2, name: "定时器乙" },
+    ]
+    const getRecruitCalls = stubRecruitment(t, [
+        { viewer_id: 963000001, com_id: 1 },
+        { viewer_id: 963000002, com_id: 2 },
+    ])
+
+    handleMessage(host.socket, [0, [0, { party: {} }]])
+    handleMessage(host.socket, [0, [0, { party: {} }]])
+    assert.equal(timers.length, 2)
+
+    timers[0].callback()
+    await flushPromises()
+    assert.equal(getRecruitCalls(), 0)
+    assert.deepEqual(host.client.mates.map(mate => mate.viewerId), [527])
+
+    timers[1].callback()
+    await flushPromises()
+    assert.equal(getRecruitCalls(), 1)
+    assert.equal(host.client.mates.length, 3)
 })
 
 test("first EnterComs assigns one stable roster synchronously before recruitment awaits", async t => {

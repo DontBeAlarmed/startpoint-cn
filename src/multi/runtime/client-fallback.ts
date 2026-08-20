@@ -110,12 +110,9 @@ export class ClientFallbackController {
             this.state = "local"
             return
         }
-        if (this.tcpFailed) {
-            this.state = "degraded"
-            return
-        }
 
         this.tcpAttempted = true
+        this.tcpFailed = false
         try {
             await this.dependencies.startTcp(
                 this.tcpConfig,

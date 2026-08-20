@@ -84,6 +84,7 @@ function createClientFixture(options = {}) {
     let now = options.now ?? 10_000
     let tcpListening = false
     let tcpStarts = 0
+    let failTcpStarts = options.failTcpStarts ?? (options.failTcp ? Infinity : 0)
     let stopTcpFailures = options.stopTcpFailures ?? 0
     const tcpConfigs = []
     const tcpTunings = []
@@ -118,7 +119,10 @@ function createClientFixture(options = {}) {
             tcpStarts++
             tcpConfigs.push(config)
             tcpTunings.push(tuning)
-            if (options.failTcp) throw new Error("fallback tcp unavailable")
+            if (failTcpStarts > 0) {
+                failTcpStarts--
+                throw new Error("fallback tcp unavailable")
+            }
             tcpListening = true
         },
         stopTcp: async () => {
@@ -369,4 +373,30 @@ test("failed Hub probes are cooldown bounded", async t => {
     fixture.setNow(11_001)
     assert.equal(await context.resolveCoordinatorOrigin({ participant: participant(603) }), "local")
     assert.equal(probes, 2)
+})
+
+test("a transient fallback TCP start failure retries once after cooldown", async t => {
+    const fixture = createClientFixture({
+        controlAvailable: false,
+        failTcpStarts: 1,
+    })
+    t.after(() => fixture.stop())
+    await fixture.start()
+    const context = fixture.service.getHttpContext()
+
+    assert.deepEqual(await Promise.all([
+        context.resolveCoordinatorOrigin({ participant: participant(701) }),
+        context.resolveCoordinatorOrigin({ participant: participant(702) }),
+    ]), ["local", "local"])
+    assert.equal(fixture.tcpStarts, 1)
+    assert.equal(fixture.service.getStatus().clientFallbackState, "degraded")
+
+    fixture.setNow(10_999)
+    assert.equal(await context.resolveCoordinatorOrigin({ participant: participant(703) }), "local")
+    assert.equal(fixture.tcpStarts, 1)
+
+    fixture.setNow(11_001)
+    assert.equal(await context.resolveCoordinatorOrigin({ participant: participant(704) }), "local")
+    assert.equal(fixture.tcpStarts, 2)
+    assert.equal(fixture.service.getStatus().clientFallbackState, "local")
 })

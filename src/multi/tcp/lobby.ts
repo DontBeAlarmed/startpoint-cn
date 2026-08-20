@@ -1,6 +1,12 @@
 import * as net from "net"
 import { sessionManager, SessionClient } from "../state/SessionManager"
-import { disbandRoom, getRoom, removeRoomMember, updateRoomState } from "../room/manager"
+import {
+    disbandRoom,
+    getRoom,
+    isRoomMember,
+    removeRoomMember,
+    updateRoomState,
+} from "../room/manager"
 import { NpcMateProvider } from "../npc/controller"
 import { ensureNpcRoster, getActiveNpcRoster } from "../npc/nickname-pool"
 import type { MultiRoom } from "../../lib/types"
@@ -97,6 +103,8 @@ function expireReconnectLease(key: string): void {
 
     if (removeRoomMember(lease.roomNumber, lease.participant)) {
         removeDisconnectedMate(lease.roomNumber, lease.participant.viewerId)
+        const hostClient = findHostClient(lease.roomNumber)
+        if (hostClient?.enterData) reconcileRematchSlots(hostClient, room)
     }
 }
 
@@ -160,6 +168,10 @@ function commitRecruitmentRequest(room: MultiRoom, requestId: number): number | 
     return state.revision
 }
 
+function advanceRecruitmentGeneration(room: MultiRoom): number | null {
+    return commitRecruitmentRequest(room, beginRecruitmentRequest(room))
+}
+
 function isCommittedRecruitment(roomNumber: string, room: MultiRoom, revision: number): boolean {
     return getRoom(roomNumber) === room && getRoomRecruitmentState(room).revision === revision
 }
@@ -191,9 +203,19 @@ function selectRealMates(mates: any[], hostViewerId: number): any[] {
 
 function getConnectedRealMates(client: SessionClient, room: MultiRoom): any[] {
     const connectedMates = sessionManager.getClientsInRoom(client.roomNumber)
+        .filter(connectedClient => room.member_participants.some(member => (
+            member.nodeSessionId === connectedClient.participant?.nodeSessionId
+            && member.viewerId === connectedClient.participant.viewerId
+        )))
         .map(connectedClient => connectedClient.yourself)
         .filter(mate => mate !== undefined)
-    return selectRealMates([...client.mates, ...connectedMates], room.host_viewer_id)
+    return selectRealMates(connectedMates, room.host_viewer_id)
+}
+
+function getAvailableNpcSlotCount(room: MultiRoom, realMates: any[]): number {
+    const authoritativeViewerIds = new Set(room.member_participants.map(member => member.viewerId))
+    for (const mate of realMates) authoritativeViewerIds.add(mate.viewerId)
+    return Math.max(0, Math.min(room.npc_count, 3 - authoritativeViewerIds.size))
 }
 
 function limitLobbyMates(mates: any[], hostViewerId: number): any[] {
@@ -210,6 +232,17 @@ function commitRoomMates(client: SessionClient, room: MultiRoom, mates: any[]): 
     const hostClient = findHostClient(client.roomNumber)
     if (hostClient) hostClient.mates = client.mates
     room.mates = client.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
+}
+
+function reconcileRematchSlots(client: SessionClient, room: MultiRoom): void {
+    const revision = advanceRecruitmentGeneration(room)
+    const realMates = getConnectedRealMates(client, room)
+    commitRoomMates(client, room, realMates)
+    if (revision === null || getAvailableNpcSlotCount(room, realMates) <= 0) return
+    scheduleLobbyTask(lifecycle => {
+        if (!isCommittedRecruitment(client.roomNumber, room, revision)) return
+        handleEnterComs(client, lifecycle).catch(() => console.error("[LOBBY] EnterComs timer failed"))
+    }, 500)
 }
 
 export function checkHostAutoReady(roomNumber: string): void {
@@ -298,7 +331,7 @@ async function handleEnterComs(
     }
     ensureNpcRoster(room, room.npc_count)
 
-    const initialActiveCount = Math.max(0, Math.min(room.npc_count, 3 - initialRealMates.length))
+    const initialActiveCount = getAvailableNpcSlotCount(room, initialRealMates)
     if (initialActiveCount <= 0) {
         commitRecruitmentRequest(room, requestId)
         commitRoomMates(client, room, initialRealMates)
@@ -313,7 +346,7 @@ async function handleEnterComs(
 
     // Real players may enter while the provider is pending. Rebuild from current room state.
     const currentRealMates = getConnectedRealMates(client, room)
-    const activeCount = Math.max(0, Math.min(room.npc_count, 3 - currentRealMates.length))
+    const activeCount = getAvailableNpcSlotCount(room, currentRealMates)
     const assignments = getActiveNpcRoster(room, activeCount)
 
     const npcMates: any[] = []
@@ -390,6 +423,11 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
     const ed = data[1]
     if (!ed?.party || !client.yourself) return
 
+    const room = getRoom(client.roomNumber)
+    const isHost = !!client.participant
+        && sessionManager.isRoomHostParticipant(client.roomNumber, client.participant)
+    if (!isHost && (!room || !client.participant || !isRoomMember(room, client.participant))) return
+
     client.yourself.party = ed.party
     if (ed.autoplayMode !== undefined) client.yourself.autoplayMode = ed.autoplayMode;
     if (ed.autoskillMode !== undefined) client.yourself.autoskillMode = ed.autoskillMode;
@@ -399,10 +437,6 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
     if (ed.dashBehaviorMode !== undefined) client.yourself.dashBehaviorMode = ed.dashBehaviorMode;
     if (ed.allowHealFromOtherPlayers !== undefined) client.yourself.allowHealFromOtherPlayers = ed.allowHealFromOtherPlayers;
     client.enterData = ed
-
-    const room = getRoom(client.roomNumber)
-    const isHost = !!client.participant
-        && sessionManager.isRoomHostParticipant(client.roomNumber, client.participant)
 
     if (isHost) {
         updateRoomState(client.roomNumber, 1)
@@ -419,19 +453,9 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
     }
 
     if (isHost) {
-        client.mates = [client.yourself!]
-        for (const connectedClient of sessionManager.getClientsInRoom(client.roomNumber)) {
-            if (connectedClient !== client && connectedClient.yourself) {
-                client.mates.push(connectedClient.yourself)
-            }
-        }
-        if (room) client.mates = selectRealMates(client.mates, room.host_viewer_id)
-        if (room) room.mates = client.mates.map(m => ({ viewer_id: m.viewerId ?? null, com_id: m.comId ?? 0 }))
+        if (room) reconcileRematchSlots(client, room)
         if (client.mates.length > 1) {
             sessionManager.broadcastToRoom(client.roomNumber, [1, [1, client.mates]], client)
-        }
-        if (room && room.npc_count > 0 && countRealPlayers(client.mates) < 3) {
-            scheduleLobbyTask(lifecycle => { handleEnterComs(client, lifecycle).catch(() => console.error("[LOBBY] EnterComs timer failed")); }, 500)
         }
     } else {
         if (hostClient && client.yourself) {
@@ -579,6 +603,9 @@ function handleStartBattle(_socket: net.Socket, client: SessionClient, _data: an
     if (!room || !client.participant
         || !sessionManager.isRoomHostParticipant(client.roomNumber, client.participant)) return
     if ((sessionManager as any).battleExpectedCount?.has?.(client.roomNumber)) return
+
+    advanceRecruitmentGeneration(room)
+    client.enterData = null
 
     const realMembers = client.mates.filter(mate => !mate.comId)
     sessionManager.setBattleParticipants(client.roomNumber, realMembers.flatMap(mate => {

@@ -89,10 +89,11 @@ export class RoutedMultiCoordinator implements MultiCoordinator, AdmissionIssuer
     }
 
     async createRoom(input: CreateRoomInput): Promise<CoordinatorResult<RoomStatus>> {
+        const generation = this.nextEntryGeneration()
         const activeOrigin = await this.options.resolveActiveQuestOrigin?.(input.participant)
         const origin = activeOrigin ?? await this.newRoomOrigin()
         const result = await this.coordinatorFor(origin).createRoom(input)
-        if (result.ok) this.remember(origin, input.participant, result.value, true)
+        if (result.ok) this.remember(origin, input.participant, result.value, true, generation)
         return result
     }
 
@@ -117,9 +118,10 @@ export class RoutedMultiCoordinator implements MultiCoordinator, AdmissionIssuer
     }
 
     async startBattle(input: StartBattleInput): Promise<CoordinatorResult<BattleStatus>> {
+        const generation = this.nextEntryGeneration()
         const origin = await this.resolveOrigin(input)
         const result = await this.coordinatorFor(origin).startBattle(input)
-        if (result.ok) this.rememberBattle(origin, input.participant, result.value.roomNumber)
+        if (result.ok) this.rememberBattle(origin, input.participant, result.value.roomNumber, generation)
         return result
     }
 
@@ -148,19 +150,20 @@ export class RoutedMultiCoordinator implements MultiCoordinator, AdmissionIssuer
         input: CompatibleRoomInput,
         rememberParticipant: boolean,
     ): Promise<CoordinatorResult<RoomStatus>> {
+        const generation = this.nextEntryGeneration()
         const activeOrigin = await this.options.resolveActiveQuestOrigin?.(input.participant)
         const cachedOrigin = this.cachedOrigin(input)
         const preferred = activeOrigin ?? cachedOrigin ?? await this.newRoomOrigin()
         const first = await this.coordinatorFor(preferred)[operation](input)
         if (first.ok) {
-            this.remember(preferred, input.participant, first.value, rememberParticipant)
+            this.remember(preferred, input.participant, first.value, rememberParticipant, generation)
             return first
         }
         if (activeOrigin || cachedOrigin || first.error !== "ROOM_NOT_FOUND") return first
 
         const alternate = preferred === "remote" ? "local" : "remote"
         const second = await this.coordinatorFor(alternate)[operation](input)
-        if (second.ok) this.remember(alternate, input.participant, second.value, rememberParticipant)
+        if (second.ok) this.remember(alternate, input.participant, second.value, rememberParticipant, generation)
         return second
     }
 
@@ -168,9 +171,10 @@ export class RoutedMultiCoordinator implements MultiCoordinator, AdmissionIssuer
         operation: "prepareRoom",
         input: CompatibleRoomInput,
     ): Promise<CoordinatorResult<RoomStatus>> {
+        const generation = this.nextEntryGeneration()
         const origin = await this.resolveOrigin(input)
         const result = await this.coordinatorFor(origin)[operation](input)
-        if (result.ok) this.remember(origin, input.participant, result.value, true)
+        if (result.ok) this.remember(origin, input.participant, result.value, true, generation)
         return result
     }
 
@@ -227,13 +231,20 @@ export class RoutedMultiCoordinator implements MultiCoordinator, AdmissionIssuer
         participant: ParticipantIdentity,
         room: RoomStatus,
         rememberParticipant: boolean,
+        generation: number,
     ): void {
         const previous = this.roomOrigins.get(room.roomNumber)
         const associatedParticipantKey = rememberParticipant
             ? this.participantKey(participant)
             : previous?.participantKey
+                && this.isCurrentEntry(
+                    this.participantOrigins.get(previous.participantKey),
+                    previous,
+                )
+                ? previous.participantKey
+                : undefined
         this.installEntry({
-            generation: this.nextEntryGeneration(),
+            generation,
             origin,
             roomNumber: room.roomNumber,
             accessToken: room.accessToken,
@@ -245,10 +256,11 @@ export class RoutedMultiCoordinator implements MultiCoordinator, AdmissionIssuer
         origin: MultiCoordinatorOrigin,
         participant: ParticipantIdentity,
         roomNumber: string,
+        generation: number,
     ): void {
         const previous = this.roomOrigins.get(roomNumber)
         this.installEntry({
-            generation: this.nextEntryGeneration(),
+            generation,
             origin,
             roomNumber,
             accessToken: previous?.accessToken,
@@ -258,10 +270,21 @@ export class RoutedMultiCoordinator implements MultiCoordinator, AdmissionIssuer
 
     private installEntry(entry: RoomOriginEntry): void {
         const previous = this.roomOrigins.get(entry.roomNumber)
+        if (previous && previous.generation > entry.generation) return
         if (previous) this.detachEntryAssociations(previous)
         this.roomOrigins.set(entry.roomNumber, entry)
-        if (entry.accessToken) this.accessTokenOrigins.set(entry.accessToken, entry)
-        if (entry.participantKey) this.participantOrigins.set(entry.participantKey, entry)
+        if (entry.accessToken) {
+            const current = this.accessTokenOrigins.get(entry.accessToken)
+            if (!current || current.generation <= entry.generation) {
+                this.accessTokenOrigins.set(entry.accessToken, entry)
+            }
+        }
+        if (entry.participantKey) {
+            const current = this.participantOrigins.get(entry.participantKey)
+            if (!current || current.generation <= entry.generation) {
+                this.participantOrigins.set(entry.participantKey, entry)
+            }
+        }
     }
 
     private detachEntryAssociations(entry: RoomOriginEntry): void {
@@ -280,7 +303,8 @@ export class RoutedMultiCoordinator implements MultiCoordinator, AdmissionIssuer
     }
 
     private isCurrentEntry(current: RoomOriginEntry | undefined, expected: RoomOriginEntry): boolean {
-        return current?.generation === expected.generation
+        return current?.roomNumber === expected.roomNumber
+            && current.generation === expected.generation
     }
 
     private nextEntryGeneration(): number {
