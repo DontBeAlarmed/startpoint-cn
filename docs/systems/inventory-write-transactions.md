@@ -19,6 +19,7 @@
 ## 装备保护与分解
 
 - `/equipment/set_protection` 的批量保护更新同成同败；不存在的装备仍按原兼容语义跳过；
+- 三个装备分解入口都会拒绝 `protection=true` 的装备，避免绕过锁定直接清空 stack；批量请求遇到已锁定装备时整体拒绝，不执行部分出售；
 - `/equipment/sell_equipment` 先去重并完整校验，再一次写入全部 stack 和奖励；
 - `/equipment/sell_stack` 先按装备 ID 合并出售数，拒绝零、负数、小数，并一次提交 stack 与奖励；
 - `/equipment/bulk_sell_stack` 的全部 stack、锻造石、星之粒和能力魂共享事务。
@@ -29,4 +30,4 @@
 
 `tools/inventory_write_transaction.test.cjs` 与 `tools/item_use_cultivate_pack.test.cjs` 使用真实 Fastify 路由和 SQLite
 trigger，覆盖重复体力道具、计划态最终库存写入、体力更新失败、道具售出玛纳失败、三种装备分解奖励失败以及批量保护
-第二项失败。所有故障都要求请求前后存档快照一致；同道具扣返场景还锁定结算阶段只读取一次 `players_items`。
+第二项失败，以及保护装备拒绝。所有故障都要求请求前后存档快照一致；同道具扣返场景还锁定结算阶段只读取一次 `players_items`。

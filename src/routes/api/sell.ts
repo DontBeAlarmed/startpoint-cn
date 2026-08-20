@@ -72,6 +72,9 @@ const routes = async (fastify: FastifyInstance) => {
             if (!equipment) {
                 return reply.status(400).send({ "error": "Bad Request", "message": "Player does not own equipment." })
             }
+            if (equipment.protection) {
+                return reply.status(400).send({ "error": "Bad Request", "message": "Protected equipment cannot be sold." })
+            }
 
             const stack = equipment.stack
             if (stack <= 0) continue
@@ -160,6 +163,9 @@ const routes = async (fastify: FastifyInstance) => {
             if (!equipment) {
                 return reply.status(400).send({ "error": "Bad Request", "message": "Player does not own equipment." })
             }
+            if (equipment.protection) {
+                return reply.status(400).send({ "error": "Bad Request", "message": "Protected equipment cannot be sold." })
+            }
 
             const newStack = equipment.stack - sellCount
             if (newStack < 0) {
@@ -239,6 +245,9 @@ const routes = async (fastify: FastifyInstance) => {
 
             const equipment = getPlayerEquipmentSync(playerId, equipmentId)
             if (!equipment) continue
+            if (equipment.protection) {
+                return reply.status(400).send({ "error": "Bad Request", "message": "Protected equipment cannot be sold." })
+            }
 
             const stack = equipment.stack
             if (stack <= 0) continue

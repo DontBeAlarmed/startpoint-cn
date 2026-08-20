@@ -54,11 +54,11 @@ async function createPlayer(label) {
     return { playerId, viewerId }
 }
 
-function addEquipment(playerId, equipmentId, stack = 1) {
+function addEquipment(playerId, equipmentId, stack = 1, protection = false) {
     insertPlayerEquipmentSync(playerId, equipmentId, {
         level: 1,
         enhancementLevel: 0,
-        protection: false,
+        protection,
         stack,
     })
 }
@@ -221,3 +221,25 @@ test("equipment protection batch rolls earlier updates back", async t => {
     assert.equal(getPlayerEquipmentSync(playerId, 3010006).protection, false)
     assert.equal(getPlayerEquipmentSync(playerId, 3020003).protection, false)
 })
+
+for (const scenario of [
+    { name: "sell_equipment", payload: equipmentId => ({ equipment_list: [{ equipment_id: equipmentId }] }) },
+    { name: "sell_stack", payload: equipmentId => ({ equipment_list: [{ equipment_id: equipmentId, number: 1 }] }) },
+    { name: "bulk_sell_stack", payload: equipmentId => ({ equipment_ids: [equipmentId] }) },
+]) {
+    test(`${scenario.name} rejects protected equipment`, async () => {
+        const { playerId, viewerId } = await createPlayer(`${scenario.name}-protected`)
+        const equipmentId = scenario.name === "bulk_sell_stack" ? 3020003 : 3010006
+        addEquipment(playerId, equipmentId, 1, true)
+
+        const response = await app.inject({
+            method: "POST",
+            url: `/equipment/${scenario.name}`,
+            payload: { viewer_id: viewerId, ...scenario.payload(equipmentId) },
+        })
+
+        assert.equal(response.statusCode, 400, response.body)
+        assert.equal(getPlayerEquipmentSync(playerId, equipmentId).stack, 1)
+        assert.equal(getPlayerEquipmentSync(playerId, equipmentId).protection, true)
+    })
+}
