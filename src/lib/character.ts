@@ -230,7 +230,8 @@ export function givePlayerCharactersExpSync(
     playerId: number,
     characterIds: number[],
     expAmount: number,
-    ignoreUpdate: boolean
+    ignoreUpdate: boolean,
+    knownExpPool?: number,
 ): RewardPlayerCharacterExpResult {
 
     const addExpList: AddExpList = []
@@ -305,9 +306,11 @@ export function givePlayerCharactersExpSync(
         }
     }
 
-    // get player data
-    const playerData = getPlayerSync(playerId)
-    const currentExpPool = playerData ? playerData.expPool : null
+    // Reuse a caller-owned settlement snapshot when available. Standalone
+    // callers retain the legacy database read.
+    const currentExpPool = knownExpPool === undefined
+        ? getPlayerSync(playerId)?.expPool ?? null
+        : knownExpPool
     const afterExpPool = currentExpPool === null ? null : currentExpPool + addToExpPool
     
     if (afterExpPool !== null && addToExpPool > 0) {

@@ -1090,14 +1090,14 @@
       },
       "behaviorSha256": "72e2c2ade754a2fb54b94f2fe04dce20bc2799198461f0d1f2a49ff1baf3287f",
       "sql": {
-        "statements": 138,
-        "selectStatements": 80,
+        "statements": 137,
+        "selectStatements": 79,
         "writeStatements": 48,
         "transactionStatements": 10,
         "byTable": {
           "players": {
-            "statements": 14,
-            "reads": 8,
+            "statements": 13,
+            "reads": 7,
             "writes": 6
           },
           "players_active_mission_counters": {
@@ -1371,14 +1371,14 @@
       },
       "behaviorSha256": "ece93a5759d57939832dd018021034f586638e6c14584eb71c241c6f4ff00a9e",
       "sql": {
-        "statements": 137,
-        "selectStatements": 79,
+        "statements": 136,
+        "selectStatements": 78,
         "writeStatements": 48,
         "transactionStatements": 10,
         "byTable": {
           "players": {
-            "statements": 14,
-            "reads": 8,
+            "statements": 13,
+            "reads": 7,
             "writes": 6
           },
           "players_active_mission_counters": {
@@ -2083,14 +2083,14 @@
       },
       "behaviorSha256": "462252424112a5e57dcd4d1e50d3d7f905dac2209b8a00fdecfe357369a894f2",
       "sql": {
-        "statements": 117,
-        "selectStatements": 77,
+        "statements": 116,
+        "selectStatements": 76,
         "writeStatements": 28,
         "transactionStatements": 12,
         "byTable": {
           "players": {
-            "statements": 13,
-            "reads": 8,
+            "statements": 12,
+            "reads": 7,
             "writes": 5
           },
           "players_active_mission_battle_facts": {
@@ -3900,14 +3900,14 @@
       },
       "behaviorSha256": "c21386221dbfc1363e143d394a84c6557e24625b2722e16b3c4ac283eae469e2",
       "sql": {
-        "statements": 111,
-        "selectStatements": 76,
+        "statements": 110,
+        "selectStatements": 75,
         "writeStatements": 25,
         "transactionStatements": 10,
         "byTable": {
           "players": {
-            "statements": 12,
-            "reads": 8,
+            "statements": 11,
+            "reads": 7,
             "writes": 4
           },
           "players_active_mission_counters": {

@@ -190,7 +190,11 @@ export function executeSingleSettlementWrites(
         : { dropAdditionalRewardIds: [], rewardResult: null }
     const missionBattleFacts = recordMissionBattleFacts(finishCtx, settlementTime)
     const rewardCharacterExpResult = givePlayerCharactersExpSync(
-        playerId, partyCharacterIds, addExpAmount, questData.fixedParty !== undefined,
+        playerId,
+        partyCharacterIds,
+        addExpAmount,
+        questData.fixedParty !== undefined,
+        responseState.playerState.expPool,
     )
     responseState.setExpPool(rewardCharacterExpResult.exp_pool)
 
