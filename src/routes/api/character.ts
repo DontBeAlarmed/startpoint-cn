@@ -31,6 +31,13 @@ interface SetIllustrationSettingsBody {
     viewer_id: number
 }
 
+interface SetProtectionBody {
+    character_ids: number[]
+    protection: boolean
+    viewer_id: number
+    api_count: number
+}
+
 export const characterMaxOverLimits: Record<number, number> = {
     [1]: 12, // 1* max over limit count
     [2]: 10, // 2* max over limit count
@@ -40,6 +47,87 @@ export const characterMaxOverLimits: Record<number, number> = {
 }
 
 const routes = async (fastify: FastifyInstance) => {
+    fastify.post("/set_protection", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = request.body as SetProtectionBody
+        const viewerId = body.viewer_id
+        const characterIds = body.character_ids
+
+        if (!Number.isSafeInteger(viewerId) || viewerId <= 0
+            || !Array.isArray(characterIds)
+            || characterIds.some(id => !Number.isSafeInteger(id) || id <= 0)
+            || typeof body.protection !== "boolean") {
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Invalid request body."
+            })
+        }
+
+        const viewerIdSession = await getSession(viewerId.toString())
+        if (!viewerIdSession) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Invalid viewer id."
+        })
+
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
+        if (playerId === null || getPlayerSync(playerId) === null) return reply.status(500).send({
+            "error": "Internal Server Error",
+            "message": "No players bound to account."
+        })
+
+        const uniqueCharacterIds = [...new Set(characterIds)]
+        getDb().transaction(() => {
+            for (const characterId of uniqueCharacterIds) {
+                if (getPlayerCharacterSync(playerId, characterId) !== null) {
+                    updatePlayerCharacterSync(playerId, characterId, {
+                        protection: body.protection
+                    })
+                }
+            }
+        })()
+
+        const characterList = uniqueCharacterIds.flatMap(characterId => {
+            const character = getPlayerCharacterSync(playerId, characterId)
+            if (!character) return []
+            return [{
+                "viewer_id": viewerId,
+                "character_id": characterId,
+                "entry_count": character.entryCount,
+                "evolution_level": character.evolutionLevel,
+                "evolution_img_level": character.evolutionLevel,
+                "over_limit_step": character.overLimitStep,
+                "protection": character.protection,
+                "exp": character.exp,
+                "stack": character.stack,
+                "mana_board_index": character.manaBoardIndex,
+                "bond_token_list": character.bondTokenList.map(entry => ({
+                    "mana_board_index": entry.manaBoardIndex,
+                    "status": entry.status,
+                })),
+                ...(character.exBoost ? {
+                    "ex_boost": {
+                        "status_id": character.exBoost.statusId,
+                        "ability_id_list": character.exBoost.abilityIdList,
+                    },
+                } : {}),
+                ...(character.illustrationSettings ? {
+                    "illustration_settings": character.illustrationSettings,
+                } : {}),
+                "create_time": clientSerializeDate(character.joinTime),
+                "update_time": clientSerializeDate(character.updateTime),
+                "join_time": clientSerializeDate(character.joinTime),
+            }]
+        })
+
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+            "data": {
+                "character_list": characterList,
+                "mail_arrived": getMailArrivedSync(playerId),
+            }
+        })
+    })
+
     fastify.post("/set_illustration_settings", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as SetIllustrationSettingsBody
 

@@ -3,6 +3,7 @@
 require("ts-node/register/transpile-only")
 
 const assert = require("node:assert/strict")
+const { unpack } = require("msgpackr")
 const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")
 const os = require("node:os")
@@ -32,6 +33,7 @@ const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
 const exchangeRoutes = require("../src/routes/api/exchange").default
 const expodRoutes = require("../src/routes/api/expod").default
+const characterRoutes = require("../src/routes/api/character").default
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 
 let database
@@ -63,6 +65,7 @@ test.before(async () => {
     registerCnMsgpackOnSend(app)
     await app.register(exchangeRoutes, { prefix: "/exchange" })
     await app.register(expodRoutes, { prefix: "/expod" })
+    await app.register(characterRoutes, { prefix: "/character" })
     await app.ready()
 })
 
@@ -190,4 +193,47 @@ test("bulk stack conversion commits the complete planned result", async () => {
     assert.equal(getPlayerSync(playerId).expPool, beforeExpPool + 26000)
     assert.equal(getPlayerItemSync(playerId, 990008), 90)
     assert.equal(getPlayerCollectedItemTotalSync(playerId, 990008), 90)
+})
+
+test("character protection can be changed and is returned in the response", async () => {
+    const { playerId, viewerId } = await createPlayer("character-protection")
+    insertDefaultPlayerCharacterSync(playerId, 111001)
+    insertDefaultPlayerCharacterSync(playerId, 211001)
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/character/set_protection",
+        payload: {
+            viewer_id: viewerId,
+            protection: true,
+            character_ids: [111001, 211001, 999999999],
+        },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    assert.equal(getPlayerCharacterSync(playerId, 111001).protection, true)
+    assert.equal(getPlayerCharacterSync(playerId, 211001).protection, true)
+    const returned = unpack(Buffer.from(response.body, "base64"))
+    assert.deepEqual(
+        returned.data.character_list.map(entry => [entry.character_id, entry.protection]),
+        [[111001, true], [211001, true]],
+    )
+})
+
+test("bulk stack conversion skips protected characters", async () => {
+    const { playerId, viewerId } = await createPlayer("bulk-stack-exp-protection")
+    insertDefaultPlayerCharacterSync(playerId, 111001)
+    insertDefaultPlayerCharacterSync(playerId, 211001)
+    updatePlayerCharacterSync(playerId, 111001, { overLimitStep: 99, stack: 2, protection: true })
+    updatePlayerCharacterSync(playerId, 211001, { overLimitStep: 99, stack: 3 })
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/expod/bulk_stack_to_exp",
+        payload: { viewer_id: viewerId, api_count: 1 },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    assert.equal(getPlayerCharacterSync(playerId, 111001).stack, 2)
+    assert.equal(getPlayerCharacterSync(playerId, 211001).stack, 0)
 })

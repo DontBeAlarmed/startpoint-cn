@@ -190,7 +190,9 @@ const routes = async (fastify: FastifyInstance) => {
 
         for (const [characterIdStr, character] of Object.entries(allCharacters)) {
             const characterId = parseInt(characterIdStr)
-            if (character.stack <= 0) continue
+            // Bulk conversion follows the same protection rule as stack_to_exp.
+            // Locked characters remain in the inventory until explicitly unlocked.
+            if (character.protection || character.stack <= 0) continue
 
             const charAsset = getCharacterDataSync(characterId)
             if (!charAsset) continue
