@@ -12,7 +12,7 @@ import {
     selectPlayerShopCampaignLineupSync,
 } from "../../data/domains/shop-campaign-lineup"
 import { getAccountPlayers } from "../../data/domains/account"
-import { getPlayerEquipmentSync, playerOwnsEquipmentSync, updatePlayerEquipmentSync } from "../../data/domains/equipment"
+import { getPlayerEquipmentListSync, getPlayerEquipmentSync, updatePlayerEquipmentSync } from "../../data/domains/equipment"
 import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
 import { incrementActiveMissionUsedManaCountSync } from "../../data/domains/active_mission_counters";
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
@@ -409,6 +409,9 @@ const routes = async (fastify: FastifyInstance) => {
 
         const nowMs = getServerTime() * 1000
         const campaignLineups = getPlayerShopCampaignLineupsSync(playerId)
+        const equipmentSnapshot = shopTypes.includes(ShopType.TREASURE_EQUIPMENT)
+            ? getPlayerEquipmentListSync(playerId)
+            : null
         const { salesList, filteredGeneralCount } = buildShopSalesListSync({
             playerId,
             itemsByType: toParseShopItems,
@@ -420,9 +423,9 @@ const routes = async (fastify: FastifyInstance) => {
         }, {
             getPurchaseCountsBulk: getPlayerShopPurchaseCountsByTypeBulkSync,
             getEquipmentEnhancementLevel: (ownerId, equipmentId) => (
-                playerOwnsEquipmentSync(ownerId, equipmentId)
-                    ? (getPlayerEquipmentSync(ownerId, equipmentId)?.enhancementLevel ?? 0)
-                    : -1
+                equipmentSnapshot === null
+                    ? -1
+                    : (equipmentSnapshot[String(equipmentId)]?.enhancementLevel ?? -1)
             ),
         })
 

@@ -34,6 +34,8 @@ GeneralShop 额外通过 `cdn_general_shop_whitelist.json` 过滤客户端主数
 
 追忆装备强化不是普通堆叠购买。列表按 `groupId` 汇总阶段，并根据玩家当前 `enhancementLevel` 返回下一可购买阶段、剩余级数和 group 信息；满级时仍返回组信息，但库存为 0。
 
+当列表请求包含追忆装备强化类型时，路由会一次读取玩家装备快照，所有装备组从该快照取得持有状态和强化等级；不再对每个装备组分别执行“是否持有”和“读取等级”两次查询。普通商店列表不触发这次装备快照读取。
+
 ## 通用购买事务
 
 `/shop/buy` 先校验 viewer、商品、正整数购买数量、库存与余额。普通购买由 `executeGenericShopPurchaseSync()` 在单一 SQLite 事务内完成：
