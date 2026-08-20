@@ -1219,6 +1219,8 @@ test("keeps isolated test groups parallel while infrastructure groups stay seria
 
 test("splits isolated integration tests into focused domains", () => {
     assert.deepEqual(TEST_GROUPS["integration:database"].tests, [
+        "tools/account_cleanup_admin.test.cjs",
+        "tools/account_cleanup_takeover.test.cjs",
         "tools/admin_player_actions.test.cjs",
         "tools/history_receive_route.test.cjs",
         "tools/mail_receive_transaction.test.cjs",
@@ -1407,6 +1409,8 @@ test("splits isolated integration tests into focused domains", () => {
     ])
     assert.deepEqual(TEST_GROUPS["integration:party"].tests, [
         "tools/multi_battle_lifecycle.test.cjs",
+        "tools/perf/multi_settlement_baseline.test.cjs",
+        "tools/perf/multi_snapshot_baseline.test.cjs",
         "tools/special_quest_party.test.cjs",
     ])
 })
