@@ -70,14 +70,14 @@
             "writes": 0
           },
           "players_category_mission_stages": {
-            "reads": 7,
-            "statements": 8,
+            "reads": 1,
+            "statements": 2,
             "writes": 1
           },
           "players_category_missions": {
-            "reads": 7,
-            "statements": 13,
-            "writes": 6
+            "reads": 1,
+            "statements": 2,
+            "writes": 1
           },
           "players_characters": {
             "reads": 1,
@@ -130,10 +130,10 @@
             "writes": 0
           }
         },
-        "selectStatements": 30,
-        "statements": 41,
+        "selectStatements": 18,
+        "statements": 24,
         "transactionStatements": 2,
-        "writeStatements": 9
+        "writeStatements": 4
       }
     },
     {
@@ -196,14 +196,14 @@
             "writes": 1
           },
           "players_category_mission_stages": {
-            "reads": 7,
-            "statements": 46,
-            "writes": 39
+            "reads": 1,
+            "statements": 2,
+            "writes": 1
           },
           "players_category_missions": {
-            "reads": 7,
-            "statements": 34,
-            "writes": 27
+            "reads": 1,
+            "statements": 2,
+            "writes": 1
           },
           "players_characters": {
             "reads": 1,
@@ -261,10 +261,10 @@
             "writes": 0
           }
         },
-        "selectStatements": 38,
-        "statements": 140,
+        "selectStatements": 26,
+        "statements": 64,
         "transactionStatements": 16,
-        "writeStatements": 86
+        "writeStatements": 22
       }
     },
     {
@@ -327,14 +327,14 @@
             "writes": 1
           },
           "players_category_mission_stages": {
-            "reads": 7,
-            "statements": 140,
-            "writes": 133
+            "reads": 1,
+            "statements": 2,
+            "writes": 1
           },
           "players_category_missions": {
-            "reads": 7,
-            "statements": 61,
-            "writes": 54
+            "reads": 1,
+            "statements": 2,
+            "writes": 1
           },
           "players_characters": {
             "reads": 1,
@@ -392,13 +392,13 @@
             "writes": 0
           }
         },
-        "selectStatements": 65,
-        "statements": 382,
+        "selectStatements": 53,
+        "statements": 185,
         "transactionStatements": 60,
-        "writeStatements": 257
+        "writeStatements": 72
       }
     }
   ],
   "version": 2,
-  "sha256": "9002af63864ef3e999563c39ce5bbd366a013073f3f076c1c9bfbea56e441d96"
+  "sha256": "6004cc8a57bd6341f7c0ddf960bdf4a735523a7c3913fa4ccf06aefb3eed9843"
 }

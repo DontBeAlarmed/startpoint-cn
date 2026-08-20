@@ -792,6 +792,9 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/multi_hub_token.test.cjs",
             "tools/multi_runtime_config.test.cjs",
             "tools/multi_client_fallback.test.cjs",
+            "tools/account_identity_provider.test.cjs",
+            "tools/multi_runtime_session_options.test.cjs",
+            "tools/time_semantics.test.cjs",
             "tools/comic_route.test.cjs",
             "tools/admin_server_status_runtime_config.test.cjs",
             "tools/cn_tool_capabilities.test.cjs",
@@ -1491,7 +1494,9 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
         "tools/lobby_lifecycle.test.cjs",
         "tools/msgpack_compat.test.cjs",
         "tools/multi_admission.test.cjs",
+        "tools/multi_battle_relay_snapshot.test.cjs",
         "tools/multi_battle_multiscene.test.cjs",
+        "tools/multi_battle_heartbeat.test.cjs",
         "tools/multi_compatibility.test.cjs",
         "tools/multi_coordinator_contract.test.cjs",
         "tools/multi_coordinator_embedded.test.cjs",
@@ -1501,6 +1506,7 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
         "tools/multi_player_context.test.cjs",
         "tools/multi_player_snapshot.test.cjs",
         "tools/multi_quest_availability.test.cjs",
+        "tools/multi_reliable_send.test.cjs",
         "tools/multi_remote_coordinator.test.cjs",
         "tools/multi_remote_settlement.test.cjs",
         "tools/multi_load_recovery.test.cjs",
@@ -1511,6 +1517,7 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
         "tools/room_cleanup_lifecycle.test.cjs",
         "tools/session_frame_order.test.cjs",
         "tools/session_server_lifecycle.test.cjs",
+        "tools/multi_tcp_guardrails.test.cjs",
     ])
 })
 

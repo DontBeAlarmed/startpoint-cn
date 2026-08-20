@@ -34,9 +34,9 @@ test("start uses only the transaction-owned Player read", async () => {
         if (measured.error) throw measured.error
         assert.equal(measured.value.statusCode, 200)
         assertSql(measured.sql, {
-            statements: 34,
-            selectStatements: 22,
-            writeStatements: 8,
+            statements: 25,
+            selectStatements: 18,
+            writeStatements: 3,
             transactionStatements: 4,
             playerReads: 3,
             activeReads: 1,

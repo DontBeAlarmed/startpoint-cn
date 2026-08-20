@@ -143,9 +143,9 @@ async function runTcpBaseline({
         )
     } finally {
         const activeSocketsBeforeStop = getSessionServerStatus().activeSockets
+        disposeTcpFixtures(fixtures)
         const remainingRooms = listActiveRooms()
             .filter(room => fixtureRoomNumbers.has(room.room_number)).length
-        disposeTcpFixtures(fixtures)
         await stopSessionServer()
         cleanup = {
             activeSockets: activeSocketsBeforeStop,
