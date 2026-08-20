@@ -7,12 +7,18 @@ const path = require("node:path")
 require("ts-node/register/transpile-only")
 
 const utils = require("../src/utils")
+const gameTime = require("../src/runtime/time/game-time")
 const originalOffset = utils.getTimeOffset()
 const realDate = new Date("2026-08-20T00:00:00.000Z")
 const offsetMs = -24 * 60 * 60 * 1000
 
 try {
     utils.setServerTimeOffset(offsetMs)
+    const context = gameTime.getGameTimeContext(realDate.getTime())
+    assert.equal(context.realNowMs, realDate.getTime())
+    assert.equal(context.virtualNowMs, realDate.getTime() + offsetMs)
+    assert.equal(gameTime.getVirtualElapsedSeconds(realDate.getTime() + offsetMs - 120_000, context.virtualNowMs), 120)
+    assert.equal(gameTime.getRealElapsedSeconds(realDate.getTime() - 120_000, context.realNowMs), 120)
     const virtualSeconds = utils.realToVirtual(realDate)
     assert.equal(
         utils.realDateFromServerTime(virtualSeconds).getTime(),
@@ -24,7 +30,7 @@ try {
         path.join(__dirname, "../src/lib/stamina.ts"),
         "utf8",
     )
-    assert.match(staminaSource, /Date\.now\(\)/)
+    assert.match(staminaSource, /getRealNowMs\(\)/)
     assert.doesNotMatch(staminaSource, /getServerTime\(|getServerDate\(/)
 
     const playerSource = fs.readFileSync(
@@ -33,7 +39,7 @@ try {
     )
     assert.match(
         playerSource,
-        /collectPlayerDataPooledExpSync\([\s\S]*?dateNow: Date = getServerDate\(\)/,
+        /collectPlayerDataPooledExpSync\([\s\S]*?dateNow: Date = getVirtualNow\(\)/,
     )
 
     const clientSource = fs.readFileSync(

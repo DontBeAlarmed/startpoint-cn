@@ -11,6 +11,7 @@ import { getMissionMasterDefinitions, isMissionDefinitionEnabledAt } from "../..
 import { ensurePlayerPassCardLoginProgressSync } from "./pass-card";
 import bundledDailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
+import { getVirtualNow } from "../../runtime/time/game-time";
 
 type DailyChallengePointLookup = Record<string, { maxPoint: number, isRecovery: boolean, name: string }>
 
@@ -1195,7 +1196,7 @@ export function deletePlayerSync(
 
 export function collectPlayerDataPooledExpSync(
     player: Player,
-    dateNow: Date = getServerDate()
+    dateNow: Date = getVirtualNow()
 ) {
     const serverTimeNow = getServerTime(dateNow)
     const poolTime = getServerTime(player.expPooledTime)

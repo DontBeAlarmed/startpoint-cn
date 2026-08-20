@@ -1,5 +1,6 @@
 import playerRankTable from "../../assets/cdndata/player_rank_full.json";
 import { getConfigSync } from "./assets";
+import { getRealNowMs } from "../runtime/time/game-time";
 
 const STAMINA_OVERFLOW_MAX = 999;
 
@@ -34,7 +35,7 @@ export function computeRealTimeStamina(player: { stamina: number; staminaHealTim
     const healRate = getHealRate(degree);
     const recoverySeconds = config.stamina_recovery_seconds * (1 - healRate);
     const healSec = player.staminaHealTime.getTime() / 1000;
-    const nowSec = Math.floor(Date.now() / 1000);
+    const nowSec = Math.floor(getRealNowMs() / 1000);
     const elapsed = (nowSec - healSec) / recoverySeconds;
     const maxStamina = Math.max(getMaxStamina(degree), player.stamina);
     return Math.min(Math.max(0, player.stamina + Math.floor(elapsed)), maxStamina, STAMINA_OVERFLOW_MAX);
