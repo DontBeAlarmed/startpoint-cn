@@ -199,6 +199,36 @@ export function getPlayerCharactersSync(
     return out
 }
 
+export function getPlayerCharactersByIdsSync(
+    playerId: number,
+    ids: readonly number[],
+): Record<string, PlayerCharacter> {
+    const characterIds = normalizeCharacterFactIds(ids)
+    if (characterIds.length === 0) return {}
+    const placeholders = characterIds.map(() => "?").join(", ")
+    const rawCharacters = getDb().prepare(`
+    SELECT id, entry_count, evolution_level, over_limit_step, protection,
+        join_time, update_time, exp, stack, mana_board_index, ex_boost_status_id,
+        ex_boost_ability_id_list, illustration_settings
+    FROM players_characters
+    WHERE player_id = ? AND id IN (${placeholders})
+    `).all(playerId, ...characterIds) as RawPlayerCharacter[]
+    const rawBondTokens = getDb().prepare(`
+    SELECT mana_board_index, status, character_id
+    FROM players_characters_bond_tokens
+    WHERE player_id = ? AND character_id IN (${placeholders})
+    `).all(playerId, ...characterIds) as RawPlayerCharacterBondToken[]
+    const bondBuckets: Record<string, PlayerCharacterBondToken[]> = {}
+    for (const raw of rawBondTokens) {
+        const id = String(raw.character_id)
+        ;(bondBuckets[id] ??= []).push(buildCharacterBondToken(raw))
+    }
+    return Object.fromEntries(rawCharacters.map(raw => [String(raw.id), buildPlayerCharacter(
+        raw,
+        bondBuckets[String(raw.id)] ?? [],
+    )]))
+}
+
 /**
  * Inserts a single character's bond token into a player's data.
  * 
@@ -586,6 +616,26 @@ export function getPlayerCharactersManaNodeAwakeLevelsSync(
         const charId = rawNode.character_id.toString()
         if (!result[charId]) result[charId] = {}
         result[charId][rawNode.value] = rawNode.awake_level ?? 0
+    }
+    return result
+}
+
+export function getPlayerCharactersManaNodeAwakeLevelsByIdsSync(
+    playerId: number,
+    ids: readonly number[],
+): Record<string, Record<number, number>> {
+    const characterIds = normalizeCharacterFactIds(ids)
+    if (characterIds.length === 0) return {}
+    const placeholders = characterIds.map(() => "?").join(", ")
+    const rawNodes = getDb().prepare(`
+    SELECT value, character_id, awake_level
+    FROM players_characters_mana_nodes
+    WHERE player_id = ? AND character_id IN (${placeholders})
+    `).all(playerId, ...characterIds) as RawPlayerCharacterManaNode[]
+    const result: Record<string, Record<number, number>> = {}
+    for (const rawNode of rawNodes) {
+        const characterId = String(rawNode.character_id)
+        ;(result[characterId] ??= {})[rawNode.value] = rawNode.awake_level ?? 0
     }
     return result
 }

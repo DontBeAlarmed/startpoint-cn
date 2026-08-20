@@ -29,6 +29,27 @@ export function getPlayerEquipmentListSync(playerId: number): Record<string, Pla
     return final
 }
 
+export function getPlayerEquipmentsByIdsSync(
+    playerId: number,
+    ids: readonly number[],
+): Record<string, PlayerEquipment> {
+    const equipmentIds = [...new Set(ids)]
+    for (const id of equipmentIds) {
+        if (!Number.isSafeInteger(id) || id <= 0) {
+            throw new TypeError("equipment IDs must be positive safe integers")
+        }
+    }
+    equipmentIds.sort((left, right) => left - right)
+    if (equipmentIds.length === 0) return {}
+    const placeholders = equipmentIds.map(() => "?").join(", ")
+    const rows = getDb().prepare(`
+    SELECT id, level, enhancement_level, protection, stack
+    FROM players_equipment
+    WHERE player_id = ? AND id IN (${placeholders})
+    `).all(playerId, ...equipmentIds) as RawPlayerEquipment[]
+    return Object.fromEntries(rows.map(raw => [String(raw.id), buildPlayerEquipment(raw)]))
+}
+
 export function getPlayerEquipmentSync(playerId: number, equipmentId: number | string): PlayerEquipment | null {
     const db = getDb();
     const rawEquipment = db.prepare(`

@@ -15,39 +15,39 @@
     },
     "repeated_assets": {
       "calls": {
-        "character": 18,
-        "equipment": 9,
-        "manaNode": 18,
+        "character": 1,
+        "equipment": 1,
+        "manaNode": 1,
         "partyGroup": 2,
         "playerContext": 1,
-        "total": 48
+        "total": 6
       },
       "outputSignature": "sha256:2633937899589c9134e8c1868f204786a2444748d9c22990d7852f0edbc8581b",
       "sqlSelectStatements": 0
     },
     "sqlite_full_unique": {
       "calls": {
-        "character": 18,
-        "equipment": 9,
-        "manaNode": 18,
-        "partyGroup": 2,
+        "character": 1,
+        "equipment": 1,
+        "manaNode": 1,
+        "partyGroup": 1,
         "playerContext": 1,
-        "total": 48
+        "total": 5
       },
       "outputSignature": "sha256:7bf99a3a71f20c986b773976d659f11cd0965964597697dd322d4c11e87a2e32",
-      "sqlSelectStatements": 68
+      "sqlSelectStatements": 7
     },
     "sqlite_repeated_assets": {
       "calls": {
-        "character": 18,
-        "equipment": 9,
-        "manaNode": 18,
-        "partyGroup": 2,
+        "character": 1,
+        "equipment": 1,
+        "manaNode": 1,
+        "partyGroup": 1,
         "playerContext": 1,
-        "total": 48
+        "total": 5
       },
       "outputSignature": "sha256:bb00aa6f9ecfb9750af8fe4d80ffdc8e62dbda70678c7e680a5592350ec0075f",
-      "sqlSelectStatements": 68
+      "sqlSelectStatements": 7
     }
   }
 }

@@ -3,6 +3,12 @@ const test = require("node:test")
 
 require("ts-node/register/transpile-only")
 
+const {
+    getPlayerCharactersByIdsSync,
+    getPlayerCharactersManaNodeAwakeLevelsByIdsSync,
+} = require("../src/data/domains/character")
+const { getPlayerEquipmentsByIdsSync } = require("../src/data/domains/equipment")
+const { getPlayerPartyGroupListsSync } = require("../src/data/domains/party")
 const { PartyCategory } = require("../src/data/types")
 const { buildPlayerSnapshot } = require("../src/multi/snapshot/player-snapshot")
 
@@ -161,9 +167,46 @@ test("missing current party assets use Option.None without inventing values", as
     assert.deepEqual(snapshot.party.abilitySoulIds, [[0, 601001], [1], [1]])
 })
 
+test("deduplicates repeated character, mana-node, and equipment reads across NPC parties", async () => {
+    const { dependencies } = fixture()
+    const sharedCurrent = party("Current", 101001, 101002, 501001, 601001)
+    const sharedNpc = party("NPC Alpha", 101001, 101002, 501001, 601001)
+    const sharedEventNpc = party("NPC Beta", 101001, 101002, 501001, 601001)
+    sharedEventNpc.category = PartyCategory.EVENT
+    dependencies.getPartyGroups = (_playerId, category) => category === PartyCategory.NORMAL
+        ? { 1: { category, colorId: 1, list: { 1: sharedCurrent, 2: sharedNpc } } }
+        : { 1: { category, colorId: 2, list: { 1: sharedEventNpc } } }
+
+    const calls = { character: 0, equipment: 0, manaNode: 0 }
+    for (const [name, field] of [
+        ["getCharacter", "character"],
+        ["getEquipment", "equipment"],
+        ["getManaNodeAwakeLevels", "manaNode"],
+    ]) {
+        const original = dependencies[name]
+        dependencies[name] = (...args) => {
+            calls[field]++
+            return original(...args)
+        }
+    }
+
+    const snapshot = await buildPlayerSnapshot(101, 1, dependencies)
+
+    assert.deepEqual(calls, { character: 2, equipment: 1, manaNode: 2 })
+    assert.deepEqual(snapshot.party.characters[0][1].id, 101001)
+    assert.deepEqual(snapshot.npcParties.map(value => value.characters[0][1].id), [101001, 101001])
+})
+
 test("returns null when the viewer has no local player context", async () => {
     const { dependencies } = fixture()
     dependencies.resolvePlayerContext = async () => null
 
     assert.equal(await buildPlayerSnapshot(101, 12, dependencies), null)
+})
+
+test("empty batch snapshot reads do not require a database", () => {
+    assert.deepEqual(getPlayerCharactersByIdsSync(77, []), {})
+    assert.deepEqual(getPlayerCharactersManaNodeAwakeLevelsByIdsSync(77, []), {})
+    assert.deepEqual(getPlayerEquipmentsByIdsSync(77, []), {})
+    assert.deepEqual(getPlayerPartyGroupListsSync(77, []), {})
 })

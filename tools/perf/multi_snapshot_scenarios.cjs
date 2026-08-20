@@ -12,17 +12,17 @@ const BetterSqlite3 = require("better-sqlite3")
 const { closeDatabase, initializeDatabase } = require("../../src/data")
 const { insertAccountSync } = require("../../src/data/domains/account")
 const {
-    getPlayerCharacterManaNodeAwakeLevelsSync,
-    getPlayerCharacterSync,
+    getPlayerCharactersByIdsSync,
+    getPlayerCharactersManaNodeAwakeLevelsByIdsSync,
     insertPlayerCharactersManaNodesSync,
     insertPlayerCharactersSync,
 } = require("../../src/data/domains/character")
 const {
-    getPlayerEquipmentSync,
+    getPlayerEquipmentsByIdsSync,
     insertPlayerEquipmentListSync,
 } = require("../../src/data/domains/equipment")
 const {
-    getPlayerPartyGroupListSync,
+    getPlayerPartyGroupListsSync,
     insertPlayerPartyGroupListSync,
 } = require("../../src/data/domains/party")
 const {
@@ -302,21 +302,21 @@ function sqliteScenario(name, repeated) {
                 })()
 
                 const dependencies = {
-                    getCharacter: (id, characterId) => {
+                    getCharactersByIds: (id, characterIds) => {
                         calls.character++
-                        return getPlayerCharacterSync(id, characterId)
+                        return getPlayerCharactersByIdsSync(id, characterIds)
                     },
-                    getEquipment: (id, equipmentId) => {
+                    getEquipmentsByIds: (id, equipmentIds) => {
                         calls.equipment++
-                        return getPlayerEquipmentSync(id, equipmentId)
+                        return getPlayerEquipmentsByIdsSync(id, equipmentIds)
                     },
-                    getManaNodeAwakeLevels: (id, characterId) => {
+                    getManaNodeAwakeLevelsByIds: (id, characterIds) => {
                         calls.manaNode++
-                        return getPlayerCharacterManaNodeAwakeLevelsSync(id, characterId)
+                        return getPlayerCharactersManaNodeAwakeLevelsByIdsSync(id, characterIds)
                     },
-                    getPartyGroups: (id, category) => {
+                    getPartyGroupLists: (id, categories) => {
                         calls.partyGroup++
-                        return getPlayerPartyGroupListSync(id, category)
+                        return getPlayerPartyGroupListsSync(id, categories)
                     },
                     getRankLevel: () => 42,
                     resolvePlayerContext: async viewerId => {

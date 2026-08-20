@@ -7,12 +7,32 @@ export function getPlayerPartyGroupListSync(
     playerId: number,
     category: PartyCategory = PartyCategory.NORMAL
 ): Record<string, PlayerPartyGroup> {
+    const final = getPlayerPartyGroupListsSync(playerId, [category])[category] ?? {}
+    const totalParties = Object.values(final)
+        .reduce((total, group) => total + Object.keys(group.list).length, 0)
+    console.log(`[PARTY-READ] player=${playerId} groups=${Object.keys(final).length} totalParties=${totalParties}`)
+    return final
+}
+
+export function getPlayerPartyGroupListsSync(
+    playerId: number,
+    categories: readonly PartyCategory[],
+): Partial<Record<PartyCategory, Record<string, PlayerPartyGroup>>> {
+    const normalizedCategories = [...new Set(categories)]
+    for (const category of normalizedCategories) {
+        if (!Number.isInteger(category) || category < PartyCategory.NORMAL || category > PartyCategory.RUSH) {
+            throw new TypeError("party categories must be valid non-empty categories")
+        }
+    }
+    normalizedCategories.sort((left, right) => left - right)
+    if (normalizedCategories.length === 0) return {}
     const db = getDb();
+    const placeholders = normalizedCategories.map(() => "?").join(", ")
     const rawPartyGroups = db.prepare(`
     SELECT id, color_id, category
     FROM players_party_groups
-    WHERE player_id = ? AND category = ?
-    `).all(playerId, category) as RawPlayerPartyGroup[]
+    WHERE player_id = ? AND category IN (${placeholders})
+    `).all(playerId, ...normalizedCategories) as RawPlayerPartyGroup[]
 
     const rawParties = db.prepare(`
     SELECT slot, name, character_id_1, character_id_2, character_id_3, unison_character_1,
@@ -20,16 +40,16 @@ export function getPlayerPartyGroupListSync(
         ability_soul_1, ability_soul_2, ability_soul_3, edited, group_id, category,
         current_battle_power, before_battle_power
     FROM players_parties
-    WHERE player_id = ? AND category = ?
-    `).all(playerId, category) as RawPlayerParty[]
+    WHERE player_id = ? AND category IN (${placeholders})
+    `).all(playerId, ...normalizedCategories) as RawPlayerParty[]
 
     const groupLists: Record<string, Record<string, PlayerParty>> = {}
     for (const rawParty of rawParties) {
-        const groupId = rawParty.group_id.toString()
-        let bucket: Record<string, PlayerParty> = groupLists[groupId]
+        const groupKey = `${rawParty.category}:${rawParty.group_id}`
+        let bucket: Record<string, PlayerParty> = groupLists[groupKey]
         if (!bucket) {
             bucket = {}
-            groupLists[groupId] = bucket
+            groupLists[groupKey] = bucket
         }
         bucket[rawParty.slot.toString()] = {
             name: rawParty.name,
@@ -47,17 +67,16 @@ export function getPlayerPartyGroupListSync(
         }
     }
 
-    const final: Record<string, PlayerPartyGroup> = {}
+    const final: Partial<Record<PartyCategory, Record<string, PlayerPartyGroup>>> = {}
     for (const rawPartyGroup of rawPartyGroups) {
+        const categoryGroups = final[rawPartyGroup.category] ??= {}
         const id = rawPartyGroup.id.toString()
-        final[id] = {
-            list: groupLists[id] || [],
+        categoryGroups[id] = {
+            list: groupLists[`${rawPartyGroup.category}:${id}`] || {},
             colorId: rawPartyGroup.color_id,
             category: rawPartyGroup.category
         }
     }
-    // Log group summary
-    console.log(`[PARTY-READ] player=${playerId} groups=${Object.keys(final).length} totalParties=${rawParties.length}`)
     return final
 }
 

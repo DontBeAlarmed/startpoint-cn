@@ -6,6 +6,7 @@ const test = require("node:test")
 const {
     admitMultiSnapshotReport,
     createMultiSnapshotReport,
+    readSnapshot,
     runMultiSnapshotBaseline,
 } = require("./multi_snapshot_baseline.cjs")
 
@@ -119,20 +120,37 @@ test("runs dependency and production SQLite snapshot scenarios", async () => {
         "sqlite_repeated_assets",
     ])
     for (const scenario of Object.values(report.scenarios)) {
-        assert.deepEqual(scenario.calls, {
-            character: 18,
-            equipment: 9,
-            manaNode: 18,
-            partyGroup: 2,
-            playerContext: 1,
-            total: 48,
-        })
         assert.match(scenario.outputSignature, /^sha256:[a-f0-9]{64}$/)
+    }
+    assert.deepEqual(report.scenarios.full_unique.calls, {
+        character: 18,
+        equipment: 9,
+        manaNode: 18,
+        partyGroup: 2,
+        playerContext: 1,
+        total: 48,
+    })
+    assert.deepEqual(report.scenarios.repeated_assets.calls, {
+        character: 1,
+        equipment: 1,
+        manaNode: 1,
+        partyGroup: 2,
+        playerContext: 1,
+        total: 6,
+    })
+    for (const name of ["sqlite_full_unique", "sqlite_repeated_assets"]) {
+        assert.deepEqual(report.scenarios[name].calls, {
+            character: 1,
+            equipment: 1,
+            manaNode: 1,
+            partyGroup: 1,
+            playerContext: 1,
+            total: 5,
+        })
+        assert.equal(report.scenarios[name].sqlSelectStatements, 7)
     }
     assert.equal(report.scenarios.full_unique.sqlSelectStatements, 0)
     assert.equal(report.scenarios.repeated_assets.sqlSelectStatements, 0)
-    assert.ok(report.scenarios.sqlite_full_unique.sqlSelectStatements > 0)
-    assert.ok(report.scenarios.sqlite_repeated_assets.sqlSelectStatements > 0)
     assert.notEqual(
         report.scenarios.full_unique.outputSignature,
         report.scenarios.repeated_assets.outputSignature,
@@ -158,4 +176,8 @@ test("admits stable or lower read counts and rejects output or query regressions
     regressed.scenarios.full_unique.calls.character++
     regressed.scenarios.full_unique.calls.total++
     assert.equal(admitMultiSnapshotReport(regressed).admitted, false)
+})
+
+test("checked-in snapshot records the optimized query upper bounds", async () => {
+    assert.deepEqual(await runMultiSnapshotBaseline(), readSnapshot())
 })

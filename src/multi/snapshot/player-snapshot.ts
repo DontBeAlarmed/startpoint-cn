@@ -1,9 +1,17 @@
 import {
+    getPlayerCharactersByIdsSync,
+    getPlayerCharactersManaNodeAwakeLevelsByIdsSync,
     getPlayerCharacterManaNodeAwakeLevelsSync,
     getPlayerCharacterSync,
 } from "../../data/domains/character"
-import { getPlayerEquipmentSync } from "../../data/domains/equipment"
-import { getPlayerPartyGroupListSync } from "../../data/domains/party"
+import {
+    getPlayerEquipmentsByIdsSync,
+    getPlayerEquipmentSync,
+} from "../../data/domains/equipment"
+import {
+    getPlayerPartyGroupListsSync,
+    getPlayerPartyGroupListSync,
+} from "../../data/domains/party"
 import {
     PartyCategory,
     type PlayerCharacter,
@@ -11,12 +19,16 @@ import {
     type PlayerParty,
     type PlayerPartyGroup,
 } from "../../data/types"
-import { parseGlobalPartyId } from "../../lib/special-event-parties"
 import {
     getPlayerRankLevel,
     resolveMultiPlayerContext,
     type MultiPlayerContext,
 } from "../player-context"
+import {
+    createLegacySnapshotReaderDependencies,
+    readMultiplayerSnapshot,
+    type MultiplayerSnapshotRead,
+} from "./player-snapshot-reader"
 
 export type MultiOption<T> = readonly [0, T] | readonly [1]
 
@@ -66,6 +78,22 @@ export interface PlayerSnapshotDependencies {
     getManaNodeAwakeLevels(playerId: number, characterId: number): Record<number, number>
     getEquipment(playerId: number, equipmentId: number): PlayerEquipment | null
     getRankLevel(rankPoint: number): number
+    getCharactersByIds?(
+        playerId: number,
+        characterIds: readonly number[],
+    ): Record<string, PlayerCharacter>
+    getManaNodeAwakeLevelsByIds?(
+        playerId: number,
+        characterIds: readonly number[],
+    ): Record<string, Record<number, number>>
+    getEquipmentsByIds?(
+        playerId: number,
+        equipmentIds: readonly number[],
+    ): Record<string, PlayerEquipment>
+    getPartyGroupLists?(
+        playerId: number,
+        categories: readonly PartyCategory[],
+    ): Partial<Record<PartyCategory, Record<string, PlayerPartyGroup>>>
 }
 
 const defaultDependencies: PlayerSnapshotDependencies = {
@@ -75,7 +103,18 @@ const defaultDependencies: PlayerSnapshotDependencies = {
     getManaNodeAwakeLevels: getPlayerCharacterManaNodeAwakeLevelsSync,
     getEquipment: getPlayerEquipmentSync,
     getRankLevel: getPlayerRankLevel,
+    getCharactersByIds: getPlayerCharactersByIdsSync,
+    getManaNodeAwakeLevelsByIds: getPlayerCharactersManaNodeAwakeLevelsByIdsSync,
+    getEquipmentsByIds: getPlayerEquipmentsByIdsSync,
+    getPartyGroupLists: getPlayerPartyGroupListsSync,
 }
+
+const LEGACY_ASSET_DEPENDENCIES = Object.freeze([
+    "getPartyGroups",
+    "getCharacter",
+    "getManaNodeAwakeLevels",
+    "getEquipment",
+] as const)
 
 function deepFreeze<T>(value: T): T {
     if (value === null || typeof value !== "object" || Object.isFrozen(value)) return value
@@ -142,6 +181,64 @@ function buildCharacter(
     }]
 }
 
+function buildReadCharacter(
+    characterId: number | null,
+    read: MultiplayerSnapshotRead,
+): MultiOption<PlayerCharacterSnapshot> {
+    if (!characterId) return none()
+    const character = read.characters[String(characterId)]
+    if (!character) return none()
+    const manaNodeIds = Object.fromEntries(Object.entries(
+        read.manaNodeAwakeLevels[String(characterId)] ?? {},
+    ).map(([nodeId, awakeLevel]) => [String(nodeId), awakeLevel]))
+    const exBoost = character.exBoost?.abilityIdList.length
+        ? [0, {
+            ability_id_list: [...character.exBoost.abilityIdList],
+            status_id: character.exBoost.statusId,
+        }] as const
+        : none<{ readonly ability_id_list: readonly number[], readonly status_id: number }>()
+    return [0, {
+        id: characterId,
+        evolution_level: character.evolutionLevel,
+        exp: character.exp,
+        over_limit_step: character.overLimitStep,
+        mana_node_ids: manaNodeIds,
+        ex_boost: exBoost,
+        illustration_settings: none(),
+    }]
+}
+
+function buildReadPartySnapshot(
+    party: PlayerParty | null | undefined,
+    read: MultiplayerSnapshotRead,
+): PlayerPartySnapshot {
+    const characters: MultiOption<PlayerCharacterSnapshot>[] = []
+    const unisonCharacters: MultiOption<PlayerCharacterSnapshot>[] = []
+    const equipments: MultiOption<PlayerEquipmentSnapshot>[] = []
+    const abilitySoulIds: MultiOption<number>[] = []
+    for (let index = 0; index < 3; index++) {
+        characters.push(buildReadCharacter(party?.characterIds[index] ?? null, read))
+        unisonCharacters.push(buildReadCharacter(party?.unisonCharacterIds[index] ?? null, read))
+        const equipmentId = party?.equipmentIds[index] ?? null
+        const equipment = equipmentId ? read.equipments[String(equipmentId)] : undefined
+        equipments.push(equipmentId && equipment
+            ? [0, {
+                equipmentId,
+                level: equipment.level,
+                enhancementLevel: equipment.enhancementLevel,
+            }]
+            : none())
+        const soulId = party?.abilitySoulIds[index] ?? null
+        abilitySoulIds.push(soulId ? [0, soulId] : none())
+    }
+    return deepFreeze({
+        characters,
+        unison_characters: unisonCharacters,
+        equipments,
+        abilitySoulIds,
+    })
+}
+
 export function buildPartySnapshot(
     playerId: number,
     party: PlayerParty | null | undefined,
@@ -188,30 +285,6 @@ export function buildPartySnapshot(
     })
 }
 
-function findCurrentParty(
-    groups: Record<string, PlayerPartyGroup>,
-    currentPartyId: number,
-): PlayerParty | null {
-    const parsed = parseGlobalPartyId(currentPartyId)
-    if (!parsed) return null
-    return groups[String(parsed.groupId)]?.list[String(parsed.slot)] ?? null
-}
-
-function findNpcParties(
-    groupsByCategory: readonly Record<string, PlayerPartyGroup>[],
-): PlayerParty[] {
-    const parties: PlayerParty[] = []
-    for (const groups of groupsByCategory) {
-        for (const group of Object.values(groups)) {
-            for (const party of Object.values(group.list)) {
-                if (party.name.includes("NPC")) parties.push(party)
-                if (parties.length === 2) return parties
-            }
-        }
-    }
-    return parties
-}
-
 export async function buildPlayerSnapshot(
     viewerId: number,
     currentPartyId?: number,
@@ -221,15 +294,34 @@ export async function buildPlayerSnapshot(
         throw new TypeError("viewerId must be a positive safe integer")
     }
     const dependencies = { ...defaultDependencies, ...dependencyOverrides }
-    const context = await dependencies.resolvePlayerContext(viewerId)
-    if (!context) return null
-
-    const selectedPartyId = currentPartyId ?? context.player.partySlot
-    const normalGroups = dependencies.getPartyGroups(context.playerId, PartyCategory.NORMAL)
-    const eventGroups = dependencies.getPartyGroups(context.playerId, PartyCategory.EVENT)
-    const currentParty = findCurrentParty(normalGroups, selectedPartyId)
-    const npcParties = findNpcParties([normalGroups, eventGroups])
-        .map(party => buildPartySnapshot(context.playerId, party, dependencies))
+    const useLegacyAssets = LEGACY_ASSET_DEPENDENCIES.some(name => (
+        Object.prototype.hasOwnProperty.call(dependencyOverrides, name)
+    ))
+    const readerDependencies = useLegacyAssets
+        ? createLegacySnapshotReaderDependencies(dependencies)
+        : {
+            resolvePlayerContext: dependencies.resolvePlayerContext,
+            getPartyGroups: (playerId: number) => {
+                const groups = dependencies.getPartyGroupLists!(playerId, [
+                    PartyCategory.NORMAL,
+                    PartyCategory.EVENT,
+                ])
+                return {
+                    event: groups[PartyCategory.EVENT] ?? {},
+                    normal: groups[PartyCategory.NORMAL] ?? {},
+                }
+            },
+            getCharacters: dependencies.getCharactersByIds!,
+            getManaNodeAwakeLevels: dependencies.getManaNodeAwakeLevelsByIds!,
+            getEquipments: dependencies.getEquipmentsByIds!,
+        }
+    const read = await readMultiplayerSnapshot(
+        viewerId,
+        currentPartyId,
+        readerDependencies,
+    )
+    if (!read) return null
+    const { context } = read
 
     return normalizePlayerSnapshot({
         viewerId,
@@ -239,9 +331,9 @@ export async function buildPlayerSnapshot(
         mainCharacterId: context.player.leaderCharacterId,
         playerRoleKind: context.player.role || 1,
         isNewbie: !!context.player.tutorialStep,
-        currentPartyId: selectedPartyId,
-        party: buildPartySnapshot(context.playerId, currentParty, dependencies),
-        npcParties,
+        currentPartyId: read.selectedPartyId,
+        party: buildReadPartySnapshot(read.currentParty, read),
+        npcParties: read.npcParties.map(party => buildReadPartySnapshot(party, read)),
     })
 }
 
