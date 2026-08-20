@@ -389,6 +389,40 @@ export function updatePlayerCategoryMissionSync(
     `).run(category, Number(missionId), progress, playerId)
 }
 
+export interface CategoryMissionProgressUpdate {
+    readonly category: number
+    readonly missionId: number | string
+    readonly progress: number
+}
+
+const CATEGORY_MISSION_WRITE_BATCH_SIZE = 200
+
+/**
+ * Upserts several category mission progress rows without changing their
+ * individual conflict semantics. The caller owns the surrounding transaction.
+ */
+export function updatePlayerCategoryMissionsSync(
+    playerId: number,
+    updates: readonly CategoryMissionProgressUpdate[],
+): void {
+    if (updates.length === 0) return
+    for (let offset = 0; offset < updates.length; offset += CATEGORY_MISSION_WRITE_BATCH_SIZE) {
+        const batch = updates.slice(offset, offset + CATEGORY_MISSION_WRITE_BATCH_SIZE)
+        const values = batch.map(() => "(?, ?, ?, ?)").join(", ")
+        const parameters = batch.flatMap(update => [
+            update.category,
+            Number(update.missionId),
+            update.progress,
+            playerId,
+        ])
+        getDb().prepare(`
+            INSERT INTO players_category_missions (category, id, progress, player_id)
+            VALUES ${values}
+            ON CONFLICT(category, id, player_id) DO UPDATE SET progress = excluded.progress
+        `).run(...parameters)
+    }
+}
+
 export function incrementPlayerCategoryMissionSync(
     playerId: number,
     category: number,
@@ -491,6 +525,40 @@ export function updatePlayerCategoryMissionStageSync(
     VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(category, id, mission_id, player_id) DO UPDATE SET status = excluded.status
     `).run(category, Number(stageId), serializeBoolean(status), playerId, Number(missionId))
+}
+
+export interface CategoryMissionStageUpdate {
+    readonly category: number
+    readonly stageId: number | string
+    readonly missionId: number | string
+    readonly status: boolean
+}
+
+/**
+ * Upserts several category mission stage rows. The caller owns the
+ * surrounding transaction so a failed batch rolls back the whole settlement.
+ */
+export function updatePlayerCategoryMissionStagesSync(
+    playerId: number,
+    updates: readonly CategoryMissionStageUpdate[],
+): void {
+    if (updates.length === 0) return
+    for (let offset = 0; offset < updates.length; offset += CATEGORY_MISSION_WRITE_BATCH_SIZE) {
+        const batch = updates.slice(offset, offset + CATEGORY_MISSION_WRITE_BATCH_SIZE)
+        const values = batch.map(() => "(?, ?, ?, ?, ?)").join(", ")
+        const parameters = batch.flatMap(update => [
+            update.category,
+            Number(update.stageId),
+            serializeBoolean(update.status),
+            playerId,
+            Number(update.missionId),
+        ])
+        getDb().prepare(`
+            INSERT INTO players_category_mission_stages (category, id, status, player_id, mission_id)
+            VALUES ${values}
+            ON CONFLICT(category, id, mission_id, player_id) DO UPDATE SET status = excluded.status
+        `).run(...parameters)
+    }
 }
 
 export function deletePlayerCategoryMissionsSync(playerId: number, category: number) {

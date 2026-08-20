@@ -66,6 +66,16 @@ Carnival、mission 等来源继续按实际执行顺序推进。Carnival `new_de
 - 每日挑战点、任务战斗事实、任务领奖结算与角色觉醒解锁校准；
 - 数据库中的 active quest 删除。
 
+任务进度与阶段状态的写入仍由任务引擎负责，但单人结算不再为每条变化的任务各执行一次 SQL。`settlement-write.ts`
+先在求值结果中收集本次变化的 category mission progress 和新领取 stage，再分别使用
+`updatePlayerCategoryMissionsSync()`、`updatePlayerCategoryMissionStagesSync()` 批量 upsert；批次上限为 200 行，超出时仍在同一个
+外层事务中分批提交。阶段状态批量落库后才按原顺序发放 stage 奖励，因此奖励顺序、重复领取保护和失败整体回滚边界不变。
+这不是新的跨请求缓存，也不会把任务事实移出结算事务。
+
+在确定性单人结算基线中，首次通关 + S+ 场景从 197 条 SQL（107 条写入）降为 138 条 SQL（48 条写入）；其中
+`players_category_missions` 的写入从 54 条降为 1 条，`players_category_mission_stages` 的写入从 16 条降为 1 条。
+该数字是隔离 SQLite 场景的结构指标，不代表公网部署的固定延迟承诺；行为摘要、奖励、进度和回滚测试保持一致。
+
 以下分类在通用结算上增加专用写入，但仍处于同一个外层事务：
 
 | 分类 | 专用状态 |

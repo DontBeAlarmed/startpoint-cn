@@ -1,6 +1,6 @@
 import {
-    updatePlayerCategoryMissionStageSync,
-    updatePlayerCategoryMissionSync,
+    updatePlayerCategoryMissionStagesSync,
+    updatePlayerCategoryMissionsSync,
 } from "../../data/domains/mission"
 import { MissionRewardGranter, type MissionRewardGrantContext } from "./grants"
 import { getMissionMasterDefinition } from "./master-data"
@@ -38,17 +38,28 @@ export function settleMissionEvaluationWithInvalidations(
     const granter = new MissionRewardGranter(evaluation.playerId, evaluation.player)
     const missionInfo: MissionSettlementInfo[] = []
 
-    for (const mission of evaluation.missions) {
-        if (mission.finalProgress === mission.dbProgress) continue
-        observer?.onMissionProgressChanged?.(mission.category, mission.missionId)
-        updatePlayerCategoryMissionSync(
-            evaluation.playerId,
-            mission.category,
-            mission.missionId,
-            mission.finalProgress,
-        )
+    const progressUpdates = evaluation.missions
+        .filter(mission => mission.finalProgress !== mission.dbProgress)
+        .map(mission => ({
+            category: mission.category,
+            missionId: mission.missionId,
+            progress: mission.finalProgress,
+        }))
+    if (progressUpdates.length > 0) {
+        for (const mission of evaluation.missions) {
+            if (mission.finalProgress !== mission.dbProgress) {
+                observer?.onMissionProgressChanged?.(mission.category, mission.missionId)
+            }
+        }
+        updatePlayerCategoryMissionsSync(evaluation.playerId, progressUpdates)
     }
 
+    const stageUpdates: {
+        readonly category: number
+        readonly stageId: number
+        readonly missionId: number
+        readonly definition: NonNullable<ReturnType<typeof getCategoryMissionRewardStageDefinition>>
+    }[] = []
     for (const mission of evaluation.missions) {
         for (const stage of getCompletedStageNumbers(
             mission.category,
@@ -62,27 +73,36 @@ export function settleMissionEvaluationWithInvalidations(
                 stage,
             )
             if (!definition) continue
-            updatePlayerCategoryMissionStageSync(
-                evaluation.playerId,
-                mission.category,
-                stage,
-                mission.missionId,
-                true,
-            )
-            const passCardEventId = mission.category >= 6 && mission.category <= 8
-                ? getMissionMasterDefinition(mission.category, mission.missionId)?.eventId
-                : undefined
-            granter.grant(definition.rewards, {
-                definitionId: definition.missionRewardId,
-                passCardEventId,
-                standardRewardGrant: dependencies.standardRewardGrant,
-            })
-            missionInfo.push({
-                mission_category_id: mission.category,
-                mission_id: mission.missionId,
-                mission_reward_id: definition.missionRewardId,
+            stageUpdates.push({
+                category: mission.category,
+                stageId: stage,
+                missionId: mission.missionId,
+                definition,
             })
         }
+    }
+    updatePlayerCategoryMissionStagesSync(evaluation.playerId, stageUpdates.map(stage => ({
+        category: stage.category,
+        stageId: stage.stageId,
+        missionId: stage.missionId,
+        status: true,
+    })))
+
+    for (const stage of stageUpdates) {
+        const { category, missionId, definition } = stage
+        const passCardEventId = category >= 6 && category <= 8
+            ? getMissionMasterDefinition(category, missionId)?.eventId
+            : undefined
+        granter.grant(definition.rewards, {
+            definitionId: definition.missionRewardId,
+            passCardEventId,
+            standardRewardGrant: dependencies.standardRewardGrant,
+        })
+        missionInfo.push({
+            mission_category_id: category,
+            mission_id: missionId,
+            mission_reward_id: definition.missionRewardId,
+        })
     }
 
     granter.persistPlayer()
