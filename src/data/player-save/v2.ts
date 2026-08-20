@@ -64,10 +64,6 @@ interface SqliteColumn {
     pk: number
 }
 
-interface SqliteForeignKey {
-    table: string
-}
-
 function isPlainObject(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === "object" && !Array.isArray(value)
 }
@@ -101,6 +97,16 @@ function getTableColumns(database: Database, tableName: string): SqliteColumn[] 
     ).all() as SqliteColumn[]
 }
 
+function getMetadataColumns(
+    database: Database,
+    tableName: string,
+    metadata?: ReadonlyMap<string, PlayerSaveTableMetadata>,
+): SqliteColumn[] {
+    const cachedColumns = metadata?.get(tableName)?.columns
+    if (cachedColumns !== undefined) return cachedColumns as SqliteColumn[]
+    return getTableColumns(database, tableName)
+}
+
 function getPrimaryKeyOrder(
     database: Database,
     tableName: string,
@@ -113,7 +119,7 @@ function getPrimaryKeyOrder(
             .sort((left, right) => left.pk - right.pk)
             .map(column => column.name)
     }
-    return getTableColumns(database, tableName)
+    return getMetadataColumns(database, tableName, metadata)
         .filter(column => column.pk > 0)
         .sort((left, right) => left.pk - right.pk)
         .map(column => column.name)
@@ -229,6 +235,7 @@ export function parsePlayerSaveSnapshot(input: unknown): ParsedPlayerSaveSnapsho
 function flattenAndValidateV2Snapshot(
     snapshot: PlayerSaveV2Snapshot,
     database: Database,
+    metadata: ReadonlyMap<string, PlayerSaveTableMetadata>,
 ): Map<string, PlayerSaveRow[]> {
     const currentSchema = getCurrentSchemaVersion(database)
     if (!isPlainObject(snapshot.producer)) throw new Error("Player save producer metadata is missing")
@@ -276,7 +283,7 @@ function flattenAndValidateV2Snapshot(
             if (tables.has(tableName)) throw new Error(`Duplicate player save table: ${tableName}`)
             if (!Array.isArray(rows)) throw new Error(`Player save table ${tableName} rows must be an array`)
 
-            const tableColumns = getTableColumns(database, tableName)
+            const tableColumns = getMetadataColumns(database, tableName, metadata)
             const columns = new Set(tableColumns.map(column => column.name))
             const regenerated = new Set(definition.regenerateColumns ?? [])
             for (const [rowIndex, row] of rows.entries()) {
@@ -330,7 +337,9 @@ function flattenAndValidateV2Snapshot(
     return tables
 }
 
-function getInsertionOrder(database: Database): PlayerSaveTableDefinition[] {
+function getInsertionOrder(
+    metadata: ReadonlyMap<string, PlayerSaveTableMetadata>,
+): PlayerSaveTableDefinition[] {
     const childDefinitions = PLAYER_SAVE_TABLES.filter(definition => definition.name !== "players")
     const pending = new Map(childDefinitions.map(definition => [definition.name, definition]))
     const inserted = new Set<string>(["players"])
@@ -339,10 +348,7 @@ function getInsertionOrder(database: Database): PlayerSaveTableDefinition[] {
     while (pending.size > 0) {
         let progressed = false
         for (const [tableName, definition] of pending) {
-            const dependencies = (database.prepare(
-                `PRAGMA foreign_key_list(${quotePlayerSaveIdentifier(tableName)})`,
-            ).all() as SqliteForeignKey[])
-                .map(foreignKey => foreignKey.table)
+            const dependencies = (metadata.get(tableName)?.parents ?? [])
                 .filter(parent => pending.has(parent) || inserted.has(parent))
             if (dependencies.every(parent => inserted.has(parent))) {
                 result.push(definition)
@@ -362,8 +368,9 @@ function updatePlayerRoot(
     database: Database,
     sourceRow: PlayerSaveRow,
     targetPlayerId: number,
+    metadata: ReadonlyMap<string, PlayerSaveTableMetadata>,
 ): void {
-    const currentColumns = getTableColumns(database, "players").map(column => column.name)
+    const currentColumns = getMetadataColumns(database, "players", metadata).map(column => column.name)
     const columns = currentColumns.filter(column => column !== "id" && column !== "account_id")
     const availableColumns = columns.filter(
         column => Object.prototype.hasOwnProperty.call(sourceRow, column) || column === "time_offset",
@@ -380,9 +387,10 @@ function insertSnapshotRows(
     rows: PlayerSaveRow[],
     targetPlayerId: number,
     mode: "restore" | "clone",
+    metadata: ReadonlyMap<string, PlayerSaveTableMetadata>,
 ): void {
     if (mode === "clone" && definition.clonePolicy === "clear") return
-    const currentColumns = new Set(getTableColumns(database, definition.name).map(column => column.name))
+    const currentColumns = new Set(getMetadataColumns(database, definition.name, metadata).map(column => column.name))
     const regenerated = new Set(definition.regenerateColumns ?? [])
     const identifier = quotePlayerSaveIdentifier(definition.name)
 
@@ -405,11 +413,11 @@ function applyV2SnapshotSync(
     database: Database,
 ): void {
     requireSafePositiveInteger(targetPlayerId, "targetPlayerId")
-    assertRegistryMatchesDatabase(database)
-    const tables = flattenAndValidateV2Snapshot(snapshot, database)
+    const schemaMetadata = assertRegistryMatchesDatabase(database)
+    const tables = flattenAndValidateV2Snapshot(snapshot, database, schemaMetadata)
     const target = database.prepare("SELECT account_id FROM players WHERE id = ?").get(targetPlayerId)
     if (target === undefined) throw new Error(`Target player ${targetPlayerId} was not found`)
-    const insertionOrder = getInsertionOrder(database)
+    const insertionOrder = getInsertionOrder(schemaMetadata)
 
     database.transaction(() => {
         database.pragma("defer_foreign_keys = ON")
@@ -423,9 +431,9 @@ function applyV2SnapshotSync(
                 `DELETE FROM ${quotePlayerSaveIdentifier(definition.name)} WHERE player_id = ?`,
             ).run(targetPlayerId)
         }
-        updatePlayerRoot(database, tables.get("players")![0], targetPlayerId)
+        updatePlayerRoot(database, tables.get("players")![0], targetPlayerId, schemaMetadata)
         for (const definition of insertionOrder) {
-            insertSnapshotRows(database, definition, tables.get(definition.name)!, targetPlayerId, mode)
+            insertSnapshotRows(database, definition, tables.get(definition.name)!, targetPlayerId, mode, schemaMetadata)
         }
     })()
     clearPublishedActiveQuest(targetPlayerId)
@@ -448,8 +456,8 @@ export function validatePlayerSaveSnapshotSync(
 ): ParsedPlayerSaveSnapshot {
     const parsed = parsePlayerSaveSnapshot(input)
     if (parsed.kind === "v2") {
-        assertRegistryMatchesDatabase(database)
-        flattenAndValidateV2Snapshot(parsed.snapshot, database)
+        const schemaMetadata = assertRegistryMatchesDatabase(database)
+        flattenAndValidateV2Snapshot(parsed.snapshot, database, schemaMetadata)
     }
     return parsed
 }
@@ -462,12 +470,12 @@ function restoreLegacyV1SaveSync(
     const parsed = parsePlayerSaveSnapshot(input)
     if (parsed.kind !== "legacy-v1") throw new Error("Expected a legacy v1 player save")
     requireSafePositiveInteger(targetPlayerId, "targetPlayerId")
-    assertRegistryMatchesDatabase(database)
+    const schemaMetadata = assertRegistryMatchesDatabase(database)
     if (database.prepare("SELECT id FROM players WHERE id = ?").get(targetPlayerId) === undefined) {
         throw new Error(`Target player ${targetPlayerId} was not found`)
     }
 
-    const definitions = getInsertionOrder(database).filter(definition => (
+    const definitions = getInsertionOrder(schemaMetadata).filter(definition => (
         LEGACY_V1_UNMANAGED_TABLES.has(definition.name)
     ))
     const preserved = new Map(definitions.map(definition => [
@@ -487,7 +495,7 @@ function restoreLegacyV1SaveSync(
             ).run(targetPlayerId)
         }
         for (const definition of definitions) {
-            insertSnapshotRows(database, definition, preserved.get(definition.name)!, targetPlayerId, "restore")
+            insertSnapshotRows(database, definition, preserved.get(definition.name)!, targetPlayerId, "restore", schemaMetadata)
         }
     })()
     clearPublishedActiveQuest(targetPlayerId)

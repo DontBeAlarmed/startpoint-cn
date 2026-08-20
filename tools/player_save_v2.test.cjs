@@ -342,7 +342,23 @@ test("restore preserves target identity, replaces all domains, and clears active
 
     const sourceMailId = db.prepare("SELECT id FROM players_mails WHERE player_id = ?").get(sourceId).id
     const snapshot = exportPlayerSaveV2Sync(sourceId)
+    sqlStatements.length = 0
     const result = restorePlayerSaveV2Sync(snapshot, targetId)
+
+    const currentTableCount = db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM sqlite_master
+        WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+    `).get().count
+    assert.equal(
+        sqlStatements.filter(sql => /^PRAGMA table_info/i.test(sql)).length,
+        currentTableCount,
+    )
+    assert.equal(
+        sqlStatements.filter(sql => /^PRAGMA foreign_key_list/i.test(sql)).length,
+        currentTableCount,
+    )
+
     const restored = db.prepare("SELECT id, account_id, name, free_mana FROM players WHERE id = ?").get(targetId)
 
     assert.deepEqual(result, { playerId: targetId, legacyPartial: false })

@@ -42,8 +42,10 @@ schema 16 共有 60 张可从 `players` 外键图发现的玩家关联表：
 
 注册表位于 `src/data/player-save/registry.ts`。测试会动态遍历当前 SQLite 外键图，并要求发现结果与“已登记 + 明确排除”完全相等。以后新增玩家表但未登记时，CI 会失败，不再静默漏出快照。
 
-导出时，外键图检查产生的表列元数据会复用于各表主键排序，不会为同一张表再次执行 `PRAGMA table_info`。这只减少
-schema introspection，不改变行排序、快照字段或跨版本规则；真实数据行仍按每张登记表独立查询。
+导出时，外键图检查产生的表列元数据会复用于各表主键排序，不会为同一张表再次执行 `PRAGMA table_info`。
+恢复、克隆和模板校验也复用同一次 schema inspection：列校验、外键插入顺序、目标列筛选都不再重复执行
+`PRAGMA table_info` 或 `PRAGMA foreign_key_list`。这只减少 schema introspection，不改变行排序、快照字段、
+外键顺序或跨版本规则；真实数据行仍按每张登记表独立查询，事务和失败回滚语义不变。
 
 以下状态不属于单玩家存档：
 

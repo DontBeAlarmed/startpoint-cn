@@ -100,7 +100,13 @@ function listTableNames(database: Database): string[] {
 }
 
 export interface PlayerSaveTableMetadata {
-    readonly columns: readonly { name: string, pk: number }[]
+    readonly columns: readonly {
+        name: string
+        type: string
+        notnull: 0 | 1
+        dflt_value: unknown
+        pk: number
+    }[]
     readonly parents: readonly string[]
 }
 
@@ -114,12 +120,15 @@ export function inspectPlayerSaveSchemaSync(database: Database): PlayerSaveSchem
     const metadata = new Map(tableNames.map(name => {
         const identifier = quoteIdentifier(name)
         const columns = database.prepare(`PRAGMA table_info(${identifier})`).all() as Array<{
+            type: string
             name: string
+            notnull: 0 | 1
+            dflt_value: unknown
             pk: number
         }>
         const foreignKeys = database.prepare(`PRAGMA foreign_key_list(${identifier})`).all() as Array<{ table: string }>
         return [name, {
-            columns: columns.map(column => ({ name: column.name, pk: column.pk })),
+            columns,
             parents: foreignKeys.map(foreignKey => foreignKey.table),
         }] as const
     }))
