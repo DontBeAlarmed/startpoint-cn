@@ -207,6 +207,7 @@ export function givePlayerCharacterSync(
 export function givePlayerCharacterWithinTransactionSync(
     playerId: number,
     characterId: number,
+    giveItem: typeof givePlayerItemWithinTransactionSync = givePlayerItemWithinTransactionSync,
 ): GivePlayerCharacterResult | null {
     if (!getDb().inTransaction) {
         throw new Error("givePlayerCharacterWithinTransactionSync requires an active caller transaction")
@@ -214,7 +215,7 @@ export function givePlayerCharacterWithinTransactionSync(
     return givePlayerCharacterWithItemWriterSync(
         playerId,
         characterId,
-        givePlayerItemWithinTransactionSync,
+        giveItem,
     )
 }
 

@@ -422,6 +422,14 @@ test("character owner plan preserves per-draw source movies duplicate deltas and
     })
     assert.equal(measured.result.items[existingCompensationItemId], 27)
     assert.equal(measured.result.items[newCharacterCompensationItemId], 6)
+    assert.equal(
+        measured.statements.filter(sql => /^\s*SELECT[\s\S]*\bFROM\s+players_items\b/i.test(sql)).length,
+        2,
+    )
+    assert.equal(
+        measured.statements.filter(sql => /^\s*UPDATE\s+players_items\b/i.test(sql)).length,
+        2,
+    )
     assert.deepEqual(measured.result.characters.map(character => character.character_id), [
         existingCharacterId,
         newCharacterId,
