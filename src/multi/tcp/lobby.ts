@@ -394,8 +394,13 @@ async function handleEnterComs(
     scheduleLobbyTask(() => {
         try {
             if (!isCommittedRecruitment(client.roomNumber, room, committedRevision)) return
-            // Send Mates only to triggering client — others get theirs via handleEnter
-            sessionManager.sendJson(client.socket, [1, [1, client.mates]])
+            const currentHostClient = findHostClient(client.roomNumber)
+            if (!currentHostClient) return
+            for (const enteredClient of sessionManager.getClientsInRoom(client.roomNumber)) {
+                if (!enteredClient.enterData) continue
+                enteredClient.mates = currentHostClient.mates
+                sessionManager.sendJson(enteredClient.socket, [1, [1, currentHostClient.mates]])
+            }
         } catch { console.error("[LOBBY] EnterComs send-mates failed") }
     }, npcRecruitmentTiming.joinDelayMs)
 

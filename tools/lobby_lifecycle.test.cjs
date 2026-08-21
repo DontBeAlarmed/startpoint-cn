@@ -794,6 +794,71 @@ test("rematch fills a seat after its authoritative reconnect lease expires", asy
     )
 })
 
+test("rematch NPC recruitment syncs the committed roster to every entered real client", async t => {
+    const timers = startCapturedLobbyLifecycle()
+    configureReconnectGraceMs(25)
+    const { room, host, guests } = createLobbyRoom(t, 534, [634, 635])
+    const survivingGuest = guests[0]
+    const expiringGuest = guests[1]
+    room.npc_count = 2
+    room.npc_roster = [
+        { com_id: 1, name: "广播甲" },
+        { com_id: 2, name: "广播乙" },
+    ]
+    stubRecruitment(t, [
+        { viewer_id: 968000001, com_id: 1 },
+        { viewer_id: 968000002, com_id: 2 },
+    ])
+
+    handleMessage(host.socket, [0, [0, { party: { source: "host" } }]])
+    handleMessage(survivingGuest.socket, [0, [0, { party: { source: "survivor" } }]])
+    handleMessage(expiringGuest.socket, [0, [0, { party: { source: "expiring" } }]])
+    assert.equal(handleSocketDisconnect(expiringGuest.socket), true)
+
+    await new Promise(resolve => setTimeout(resolve, 40))
+    assert.equal(isRoomMember(room, expiringGuest.client.participant), false)
+
+    const rematchTimer = timers.find(timer => timer.delayMs === 500)
+    assert.ok(rematchTimer)
+    rematchTimer.callback()
+    await flushPromises()
+
+    const pending = createLobbyClient(room, 636, "pending-636")
+    removeRoomMember(room.room_number, pending.client.participant)
+    guests.push(pending)
+
+    host.socket.writes.length = 0
+    survivingGuest.socket.writes.length = 0
+    pending.socket.writes.length = 0
+
+    const npcJoinTimer = timers.find(timer => timer.delayMs === 2_000)
+    assert.ok(npcJoinTimer)
+    npcJoinTimer.callback()
+
+    const hostMates = host.socket.writes.filter(message => message?.[1]?.[0] === 1)
+    const survivingMates = survivingGuest.socket.writes.filter(message => message?.[1]?.[0] === 1)
+    const pendingMates = pending.socket.writes.filter(message => message?.[1]?.[0] === 1)
+    const expectedRoster = [
+        { viewerId: 534, comId: 0 },
+        { viewerId: 634, comId: 0 },
+        { viewerId: 968000002, comId: 2 },
+    ]
+
+    assert.equal(hostMates.length, 1)
+    assert.equal(survivingMates.length, 1)
+    assert.equal(pendingMates.length, 0)
+    assert.deepEqual(
+        hostMates[0][1][1].map(mate => ({ viewerId: mate.viewerId, comId: mate.comId ?? 0 })),
+        expectedRoster,
+    )
+    assert.deepEqual(survivingMates[0], hostMates[0])
+    assert.deepEqual(
+        host.client.mates.map(mate => ({ viewerId: mate.viewerId, comId: mate.comId ?? 0 })),
+        expectedRoster,
+    )
+    assert.deepEqual(survivingGuest.client.mates, host.client.mates)
+})
+
 test("an expired guest lease waits for the host to enter before rematch recruitment", async t => {
     const timers = startCapturedLobbyLifecycle()
     configureReconnectGraceMs(25)
@@ -1018,6 +1083,7 @@ test("a guest entering while recruitment awaits survives the current NPC commit"
 test("repeated EnterComs only lets the latest recruitment timers broadcast", async t => {
     const timers = startCapturedLobbyLifecycle()
     const { room, host } = createLobbyRoom(t, 517)
+    host.client.enterData = { party: {} }
     room.npc_count = 2
     room.npc_roster = [
         { com_id: 1, name: "并发甲" },
@@ -1198,6 +1264,7 @@ test("a fourth real guest cannot expand an already full real-player lobby", asyn
 test("a pending newer EnterComs request does not invalidate committed NPC timers", async t => {
     const timers = startCapturedLobbyLifecycle()
     const { room, host } = createLobbyRoom(t, 523)
+    host.client.enterData = { party: {} }
     room.npc_count = 2
     room.npc_roster = [
         { com_id: 1, name: "已提交甲" },
