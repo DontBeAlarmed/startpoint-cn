@@ -11,12 +11,26 @@ const {
 require("ts-node/register/transpile-only")
 const settlementOrchestrator = require("../../src/multi/settlement/orchestrator")
 const settlementResponse = require("../../src/multi/settlement/response")
-const { createSettlementProtocolSignature } = require("./multi_settlement_scenarios.cjs")
+const {
+    createHardMultiEventQuestFixture,
+    createSettlementProtocolSignature,
+} = require("./multi_settlement_scenarios.cjs")
 
 test("settlement baseline targets the focused production module boundary", () => {
     assert.equal(typeof settlementOrchestrator.prepareMultiplayerSettlement, "function")
     assert.equal(typeof settlementOrchestrator.runMultiplayerSettlementOrchestration, "function")
     assert.equal(typeof settlementResponse.projectMultiplayerFinishResponse, "function")
+})
+
+test("settlement fixture removes only quest 2001 common reward counts", () => {
+    const bundled = require("../../assets/hard_multi_event_quest.json")
+    const fixture = createHardMultiEventQuestFixture()
+
+    assert.equal(fixture["2001"].commonRewardCounts, undefined)
+    assert.deepEqual(fixture["2001"].scoreRewardGroupId, bundled["2001"].scoreRewardGroupId)
+    assert.deepEqual(fixture["2001"].name, bundled["2001"].name)
+    assert.deepEqual(fixture["1002001"], bundled["1002001"])
+    assert.notEqual(fixture, bundled)
 })
 
 test("protocol signature preserves dynamic time fields while normalizing their values", () => {

@@ -31,6 +31,12 @@ const ROOM_NUMBER = "123456"
 const BATTLE_SESSION_ID = "123e4567-e89b-42d3-a456-426614174002"
 const FIXED_TIME = Date.parse("2024-08-14T12:00:00.000Z")
 
+function createHardMultiEventQuestFixture() {
+    const quests = structuredClone(require("../../assets/hard_multi_event_quest.json"))
+    delete quests[String(QUEST.questId)].commonRewardCounts
+    return quests
+}
+
 function startPayload(playId) {
     return {
         api_count: 1,
@@ -126,6 +132,7 @@ async function runFinishScenario() {
                 "mission_active_event.json",
             ],
             tableOverrides: {
+                "hard_multi_event_quest.json": createHardMultiEventQuestFixture(),
                 "rare_score_reward.json": {},
             },
         })
@@ -280,4 +287,8 @@ const SCENARIOS = Object.freeze([
     Object.freeze({ name: "finish", run: runFinishScenario }),
 ])
 
-module.exports = { SCENARIOS, createSettlementProtocolSignature }
+module.exports = {
+    SCENARIOS,
+    createHardMultiEventQuestFixture,
+    createSettlementProtocolSignature,
+}
