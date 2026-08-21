@@ -33,9 +33,9 @@
 - 服务器名称、持久化服务器注册表或服主协商的 ID 段。
 - 联机时自动修改参与节点的服务器时间，或把时间对齐作为房间准入条件。
 
-## 3. 当前耦合事实
+## 3. 改造前耦合背景
 
-当前 `src/multi/` 已按 HTTP、TCP、房间、状态机和 NPC 分目录，但仍是单进程实现：
+Hub 改造前的 `src/multi/` 虽已按 HTTP、TCP、房间、状态机和 NPC 分目录，但仍是单进程实现：
 
 - `room/manager.ts` 的房间保存在模块级 `Map`；
 - `SessionManager` 保存 lobby、battle socket、准备状态和多场景屏障；
@@ -45,13 +45,13 @@
 - `/start` 和 `/finish` 依赖进程内房间与最终场景状态完成本地结算；
 - 生命周期把本地 TCP 视为主服务 ready 的必需条件。
 
-因此，只把 `SESSION_PUBLIC_HOST` 指向另一台服务端无法运行。远端 TCP 没有创建房间的内存状态，也无法读取玩家所属服务端的 SQLite。
+因此，当时只把 `SESSION_PUBLIC_HOST` 指向另一台服务端无法运行。当前多人 HTTP 已统一通过 Coordinator，玩家快照仍由所属服务端生成，远端 Hub 不读取玩家 SQLite。
 
 客户端协议允许主 HTTP 和 TCP 位于不同地址：多人 HTTP 始终使用游戏主 API，`select_room` 或 `prepare` 响应中的 `ip_address`、`port` 决定 TCP 连接地址。这是本设计无需修改客户端的基础。
 
 ## 4. 运行模式
 
-新增一个配置项：
+当前运行配置为：
 
 ```text
 MULTI_MODE=embedded | host | client
@@ -104,9 +104,9 @@ Hub 不可用后的新房间：
 
 多人 HTTP 路由不再直接访问全局 `rooms` 或 `SessionManager`。
 
-### 5.2 LocalPlayerSnapshotProvider
+### 5.2 MultiSnapshotProvider
 
-该组件只在玩家所属服务端读取 SQLite，生成 Hub 所需的最小临时资料：
+`MultiSnapshotProvider` 通过 `buildPlayerSnapshot()` 只在玩家所属服务端读取 SQLite，生成 Hub 所需的最小临时资料：
 
 - `viewerId`、昵称、等级、称号和主角色；
 - 当前配队的角色、合击角色、装备、能力魂和养成数据；
@@ -115,13 +115,17 @@ Hub 不可用后的新房间：
 
 它不得发送登录 token、设备 ID、完整角色或装备仓库、货币、库存、邮件、任务、进度或数据库文件。
 
-### 5.3 RemoteCoordinatorAdapter
+### 5.3 RemoteMultiCoordinator
 
 该组件在 `client` 模式下把本地多人 HTTP 操作转换为 Hub 控制调用，并把 Hub 内部结果映射回现有国服客户端协议。它不得代理主游戏 API、管理后台或 CDN。
 
 ### 5.4 MultiSettlementVerifier
 
 本地 `/start`、`/finish`、`abort` 和恢复流程通过该组件查询 Hub 的成员、房主、关卡、战斗和最终场景事实。所有玩家数据写入仍在本地数据库事务中完成。
+
+### 5.5 多人结算编排函数
+
+多人 finish 先由 `prepareMultiplayerSettlement()` 在事务外取得并验证 Coordinator BattleFact，再由 `runMultiplayerSettlementOrchestration()` 在所属服务端的单个 SQLite 事务内重新读取玩家权威状态，执行奖励、经验、任务、觉醒与 active quest 清理，最后由 `projectMultiplayerFinishResponse()` 投影响应。Hub 不参与发奖或数据库事务。
 
 ## 6. 节点与玩家身份
 
@@ -302,9 +306,10 @@ Hub 可以在战斗结束后把房间恢复为可重赛状态，但旧 `battleSe
 - `/finish` 时 Hub 暂时不可达，不发奖、不删除 active quest，允许在完成记录 TTL 内重试。
 - Hub 已重启、暂时不可达或明确报告房间、战斗记录不存在时，重新登录均按联机中断处理，不推测战斗成功。
 - Host 的 Hub 控制端口或 TCP 故障只把多人状态标记为不可用，不关闭主 HTTP 或数据库。
-- Client 对没有 active quest 的新多人操作执行有冷却的控制探测；Hub 不可用时按需启动本地 TCP，并把后续新房间固定为 `local`。
+- Client 对没有 active quest 的新多人操作执行单飞控制探测；Hub 不可用时按需启动本地 TCP，并把后续新房间固定为 `local`。本地 TCP 瞬时启动失败后按默认 1 秒冷却有界重试，不形成并发启动循环。
 - Hub 恢复后只让后续新房间重新使用 `remote`；已存在的 `local`、`remote` 房间不迁移，重新登录时残留多人 active quest 按中止事务收敛。
 - 自动降级不会改写 `MULTI_MODE`、`.env`、数据库模式或客户端资源，也不会把响应不确定的远程写请求重试到本地。
+- Coordinator 房间来源缓存带请求代次所有权；旧异步回调不得覆盖或清理复用后的新来源。
 
 Hub 或主机服务重启后所有房间、节点会话、admission、socket 和战斗记录失效。首期不恢复原房间。
 
@@ -470,6 +475,10 @@ Hub 以固定长度和 timing-safe 比较校验会话凭据，并把请求中的
 - finish 暂时无法查询 Hub 时不发奖、不删除 active quest；
 - 普通战斗和超级猫头鹰最终多场景状态都能被各本地服务验证；
 - 写控制调用的幂等请求 ID 不会重复创建房间或参战记录。
+- 玩家快照保持四个行为签名；检入的完整快照 fixture 从 68 次 SQLite 查询降到 7 次，重复资源不再产生 N+1；
+- 多人 finish 完整响应、`data_headers` 与 Content-Type 进入稳定签名，授权先于事务；检入的完整成功路径 fixture 以 91 条 SQL 语句作为结构上界；
+- fallback 启动失败、来源缓存旧代次、断线宽限和重赛 NPC roster 均有故障注入覆盖；
+- Hub 基线覆盖正常房间与 Client 断线，结束后 peer、房间、子进程和临时目录归零。
 
 ### 12.2 本机集成测试
 

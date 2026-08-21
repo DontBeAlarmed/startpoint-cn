@@ -32,7 +32,7 @@
 
 Hub 不代理游戏主 API、CDN 或后台，也不自动对齐资源与服务器时间。多人协议版本、`APP_VER`、多人战斗内容摘要或 Mod 摘要不兼容时，`search_room`/`verify_access_token` 映射为 `4020` NotPlayable，`select_room` 返回 `raising_state=7`，`prepare` 返回 `4507`；`RES_VER` 与 CDN 目标版本参与比较，但不记录为拒绝，也不单独阻断同房。只有真实缺房才使用 `room_exists=false` 或 `raising_state=9`。
 
-多人联机由六类组件组成：
+多人联机由八类组件组成：
 
 | 组件 | 位置 | 职责 |
 |---|---|---|
@@ -42,6 +42,8 @@ Hub 不代理游戏主 API、CDN 或后台，也不自动对齐资源与服务�
 | 会话状态 | `src/multi/state/` | lobby/battle socket、连接索引、准备状态和 SceneReady 屏障 |
 | NPC 提供方 | `src/multi/npc/` | NPC 模板、昵称、房间 roster 和招募结果 |
 | 玩家上下文 | `src/multi/player-context.ts` | 从 viewer session 解析账号、存档和玩家 |
+| 玩家快照 | `src/multi/snapshot/` | 一次读取 NORMAL/EVENT 编队组，选择目标与 NPC 编队后按去重 ID 批量读取角色、玛纳节点和装备，并生成冻结 session party |
+| 结算编排 | `src/multi/settlement/` | 事务外授权、单事务奖励与任务结算、finish 响应投影 |
 
 房间与 TCP 会话只保存在 Node.js 进程内：
 
@@ -309,6 +311,8 @@ session party 的角色、合击角色、装备和能力魂槽位都必须按 Op
 - 真实玩家角色不得把 `mana_node_ids` 序列化为数组；
 - 空的真实玩家 mana node 集合也应表达为空对象，而不是 `[]`；
 - `illustration_settings` 必须随 session character 一起提供。
+- NORMAL 与 EVENT 编队组各一次读取，再选择目标普通编队和最多两个 NPC 编队；角色、玛纳节点和装备按去重 ID 集合批量查询，能力魂沿用配队中的 `abilitySoulIds`。
+- 检入的完整快照基线执行 7 次 `SELECT`；重复角色或装备引用不增加查询数。该数字是固定 fixture 的结构门禁，不是所有请求形态的全局常量。
 
 `src/multi/npc/builder.ts` 的静态 HTTP NPC 模板是另一条数据路径，当前允许 `mana_node_ids: []`。它不构成真实玩家 session party 使用数组的依据。
 
@@ -331,10 +335,10 @@ session party 的角色、合击角色、装备和能力魂槽位都必须按 Op
 
 - lobby socket 由 `SessionManager` 管理；
 - viewer 通过 session 映射到真实 player；
-- party 由 `buildRealParty()` 从数据库读取；
+- party 由 `readMultiplayerSnapshot()` 批量读取，并由 `buildPlayerSnapshot()` 投影；
 - 已连接真人与 NPC 一起组成最多三人的 Mates 列表。
 
-这只提供真人连接和广播的服务端基础。随机匹配、成员发现、真实双客户端验收和完整离线处理仍未完成，不能标记为真人联机完成。
+服务端已实现 25 秒断线重连宽限、权威席位释放、重赛 NPC 幂等补位和已 Enter 客户端 roster 同步。仍未完成的是随机匹配、公开成员发现、完整客户端异常矩阵和真实双客户端验收，不能据此标记为真人联机已完成。
 
 NPC 昵称与贡献规则见[NPC 昵称贡献](../systems/npc-contributor-names.md)。
 
@@ -359,6 +363,8 @@ create_room
 - 通过 coordinator 处理权威房间生命周期；全部真人已 Finalize 时释放当局 battle 状态并把房间恢复为 Ready；
 - 在玩家自己的 SQLite 事务内重新比对并消费 active quest，同时结算奖励、关卡进度和任务 tracker；
 - 本地事务失败时整体回滚，active quest 与 Hub 限时保留的完成事实可供重试。
+
+实现分为三个明确边界：`prepareMultiplayerSettlement()` 在事务前完成 BattleFact/finalize 授权；`runMultiplayerSettlementOrchestration()` 在单个 SQLite 事务内重新读取权威玩家状态并执行奖励、任务与 active quest 清理；`projectMultiplayerFinishResponse()` 只构造现有客户端协议响应。
 
 `finish` 不直接解散房间，也没有专用的 60 秒回房定时器。client 模式不读取或重置节点本地 room manager；embedded、host 和 client 都经同一 coordinator 契约处理房间。只要 lobby 连接仍在，完成后的房间可以继续用于重赛；否则由连接断开规则和通用非战斗空闲清理决定房间寿命。
 
@@ -433,7 +439,7 @@ CN Notify 索引已经按 `SceneReady=0`、`LevelNext=1`、`Finalize=2`、`Measu
 
 ## 13. 源码与测试入口
 
-主要源码入口为 `src/multi/http/register.ts`、`src/multi/http/`、`src/multi/tcp/`、`src/multi/room/`、`src/multi/state/` 和 `src/multi/npc/`。真实 party 构建位于 `src/multi/tcp/handshake.ts`，viewer 到存档的解析位于 `src/multi/player-context.ts`。
+主要源码入口为 `src/multi/http/register.ts`、`src/multi/http/`、`src/multi/tcp/`、`src/multi/room/`、`src/multi/state/`、`src/multi/npc/`、`src/multi/snapshot/` 和 `src/multi/settlement/`。握手负责调用快照提供方；真实 party 的读取与投影核心位于 `src/multi/snapshot/player-snapshot-reader.ts` 和 `src/multi/snapshot/player-snapshot.ts`，viewer 到存档的解析位于 `src/multi/player-context.ts`。
 
 主要自动测试：
 
@@ -443,6 +449,10 @@ CN Notify 索引已经按 `SceneReady=0`、`LevelNext=1`、`Finalize=2`、`Measu
 | `tools/multi_room_handshake_identity.test.cjs` | room socket 的存在性、状态、满员、关卡和房主身份边界 |
 | `tools/multi_room_identity.test.cjs` | 随机 token、HTTP 权限、成员恢复和外部社区关闭响应 |
 | `tools/lobby_lifecycle.test.cjs` | NPC 招募、成员、准备和重赛状态 |
+| `tools/multi_lifecycle_faults.test.cjs` | fallback 重试、来源缓存代次与重赛故障注入 |
+| `tools/perf/multi_snapshot_baseline.test.cjs` | 快照行为签名、依赖调用与 SQLite SELECT 上界 |
+| `tools/perf/multi_settlement_baseline.test.cjs` | 完整 finish 响应签名、授权顺序、事务与 SQL 上界 |
+| `tools/perf/hub_baseline.test.cjs` | 动态端口双服房间、心跳、故障注入与资源归零 |
 | `tools/room_cleanup_lifecycle.test.cjs` | 15/30 分钟清理与 `raising_state=4` 跳过 |
 | `tools/session_frame_order.test.cjs` | Room/Battle 握手后同包首帧顺序与拒绝清理 |
 | `tools/session_server_lifecycle.test.cjs` | TCP 启停和会话生命周期 |
