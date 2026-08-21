@@ -10,6 +10,10 @@ const SOURCE_SUFFIXES = [".ts", ".tsx", ".cts", ".mts"]
 
 function processStatus(result, stage, stderr) {
     if (result?.error) {
+        if (result.error.code === "ETIMEDOUT") {
+            stderr.write(`CN build ${stage} timed out\n`)
+            return 1
+        }
         stderr.write(`CN build ${stage} process failed: ${result.error.message}\n`)
         return 1
     }
@@ -68,6 +72,13 @@ function runCnBuild(dependencies = {}) {
     const npmExecutable = dependencies.npmExecutable ?? (platform === "win32" ? "npm.cmd" : "npm")
     const spawn = dependencies.spawnSync ?? spawnSync
     const stderr = dependencies.stderr ?? process.stderr
+    const stdio = dependencies.stdio ?? "inherit"
+    const timeoutMs = dependencies.timeoutMs
+    if (timeoutMs !== undefined
+        && (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0)) {
+        throw new TypeError("timeoutMs must be a positive safe integer")
+    }
+    const deadline = timeoutMs === undefined ? null : Date.now() + timeoutMs
     const removeBuildInfo = dependencies.removeBuildInfo
         ?? (filePath => fs.rmSync(filePath, { force: true }))
     const cleanOrphanCompiledFiles = dependencies.cleanOrphanCompiledFiles
@@ -80,7 +91,7 @@ function runCnBuild(dependencies = {}) {
     const spawnOptions = {
         cwd: projectRoot,
         shell: false,
-        stdio: "inherit",
+        stdio,
     }
     const tscArgs = [
         "--max-old-space-size=4096",
@@ -95,9 +106,18 @@ function runCnBuild(dependencies = {}) {
 
     const run = (stage, args, command = executable) => {
         const useShell = platform === "win32" && /\.(cmd|bat)$/i.test(command)
+        const remainingMs = deadline === null ? undefined : deadline - Date.now()
+        if (remainingMs !== undefined && remainingMs <= 0) {
+            stderr.write(`CN build ${stage} timed out\n`)
+            return 1
+        }
         try {
             return processStatus(
-                spawn(command, args, { ...spawnOptions, shell: useShell }),
+                spawn(command, args, {
+                    ...spawnOptions,
+                    shell: useShell,
+                    ...(remainingMs === undefined ? {} : { timeout: remainingMs }),
+                }),
                 stage,
                 stderr,
             )

@@ -66,7 +66,7 @@ const CHECK_FAILURES = Object.freeze({
     completionValid: "rooms, players, or step errors did not complete cleanly",
     coexistenceValid: "HTTP coexistence coverage did not complete cleanly",
     settlementValid: "multiplayer settlement did not complete cleanly",
-    signaturesStable: "behavior signatures are missing, multiple, or unstable",
+    signaturesStable: "behavior signatures did not match the expected successful multiplayer outcomes",
     cleanupValid: "multiplayer processes, peers, rooms, ports, or temporary files leaked",
 })
 

@@ -15,9 +15,32 @@ const defaultCompatibilityHeaders = Object.freeze({
     APP_VER: "1.8.1",
     RES_VER: "1.4.54",
 })
+const defaultPeerCleanupTimeoutMs = 5_000
+const defaultCredentialTimeoutMs = 15_000
+const defaultRequestTimeoutMs = 15_000
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function settleWithinTimeout(action, timeoutMs, timeoutMessage) {
+    let timer
+    const operation = Promise.resolve().then(action).then(
+        value => ({ status: "fulfilled", value }),
+        reason => ({ status: "rejected", reason }),
+    )
+    const timeout = new Promise(resolve => {
+        timer = setTimeout(() => resolve({
+            status: "rejected",
+            reason: new Error(timeoutMessage),
+        }), timeoutMs)
+    })
+    return Promise.race([operation, timeout]).finally(() => clearTimeout(timer))
+}
+
+function finiteRequestSignal(signal, timeoutMs) {
+    const timeoutSignal = AbortSignal.timeout(timeoutMs)
+    return signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal
 }
 
 function preparedTcpEndpoint(response, expectedRoomNumber) {
@@ -237,33 +260,80 @@ class TcpPeer {
 
 class MultiHubProcessHarness {
     constructor(dependencies = {}) {
+        const peerCleanupTimeoutMs = dependencies.peerCleanupTimeoutMs
+            ?? defaultPeerCleanupTimeoutMs
+        const credentialTimeoutMs = dependencies.credentialTimeoutMs
+            ?? defaultCredentialTimeoutMs
+        const requestTimeoutMs = dependencies.requestTimeoutMs ?? defaultRequestTimeoutMs
+        for (const [name, timeoutMs] of [
+            ["peerCleanupTimeoutMs", peerCleanupTimeoutMs],
+            ["credentialTimeoutMs", credentialTimeoutMs],
+            ["requestTimeoutMs", requestTimeoutMs],
+        ]) {
+            if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
+                throw new TypeError(`${name} must be a positive safe integer`)
+            }
+        }
         this.root = fs.mkdtempSync(path.join(os.tmpdir(), "multi-hub-process-"))
         this.runtimeRoot = path.join(this.root, "runtime")
         this.processes = []
         this.peers = []
+        this.pendingSockets = new Set()
+        this.lifecycleCleanupTasks = new Set()
+        this.lifecycleCleanupErrors = []
+        this.cleanupStarted = false
         this.cleanupPromise = null
         this.compiledRuntimeReady = false
-        this.buildCompiledRuntime = dependencies.buildCompiledRuntime ?? runCnBuild
+        this.buildCompiledRuntime = dependencies.buildCompiledRuntime ?? (options => runCnBuild({
+            ...options,
+            stdio: ["ignore", process.stderr, process.stderr],
+        }))
         this.loadCompiledTableRegistry = dependencies.loadCompiledTableRegistry ?? (() => (
             require(path.join(projectRoot, "out/content/sync/table-registry.js"))
         ))
+        this.peerCleanupTimeoutMs = peerCleanupTimeoutMs
+        this.credentialTimeoutMs = credentialTimeoutMs
+        this.requestTimeoutMs = requestTimeoutMs
+        this.spawnSync = dependencies.spawnSync ?? spawnSync
+        this.spawnProcess = dependencies.spawnProcess ?? spawn
+        this.createConnection = dependencies.createConnection ?? net.createConnection
     }
 
     dataDir(label) {
         return path.join(this.root, label)
     }
 
-    ensureCompiledRuntime() {
+    assertLifecycleActive() {
+        if (this.cleanupStarted) throw new Error("harness cleanup has started")
+    }
+
+    trackLifecycleCleanup(action, message) {
+        const task = settleWithinTimeout(
+            action,
+            this.peerCleanupTimeoutMs,
+            message,
+        ).then(result => {
+            if (result.status === "rejected") this.lifecycleCleanupErrors.push(result.reason)
+        })
+        this.lifecycleCleanupTasks.add(task)
+        task.then(() => this.lifecycleCleanupTasks.delete(task))
+    }
+
+    ensureCompiledRuntime(options = {}) {
         if (this.compiledRuntimeReady) return
-        const status = this.buildCompiledRuntime()
+        this.assertLifecycleActive()
+        const status = this.buildCompiledRuntime(options)
         if (status !== 0) {
             throw new Error(`compiled CN build failed with exit code ${status}`)
         }
+        this.assertLifecycleActive()
         this.compiledRuntimeReady = true
     }
 
-    installRuntimeTables() {
-        this.ensureCompiledRuntime()
+    installRuntimeTables(options = {}) {
+        this.assertLifecycleActive()
+        this.ensureCompiledRuntime(options)
+        this.assertLifecycleActive()
         const { TABLE_SOURCES } = this.loadCompiledTableRegistry()
         fs.mkdirSync(this.runtimeRoot, { recursive: true })
         for (const definition of TABLE_SOURCES) {
@@ -288,26 +358,42 @@ class MultiHubProcessHarness {
         }
     }
 
-    createCredential(label) {
+    createCredential(label, { timeoutMs = this.credentialTimeoutMs } = {}) {
+        this.assertLifecycleActive()
+        if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
+            throw new TypeError("credential timeoutMs must be a positive safe integer")
+        }
         const dataDir = this.dataDir("host")
         fs.mkdirSync(dataDir, { recursive: true })
-        const result = spawnSync(
+        const result = this.spawnSync(
             process.execPath,
             [path.join(projectRoot, "tools/manage_multi_hub_token.cjs"), "create", label],
             {
                 cwd: projectRoot,
                 encoding: "utf8",
                 env: { ...process.env, DATA_DIR: dataDir, MULTI_MODE: "host" },
+                timeout: Math.min(this.credentialTimeoutMs, timeoutMs),
             },
         )
-        if (result.status !== 0) {
-            throw new Error(`credential creation failed\n${result.stdout}\n${result.stderr}`)
+        if (result.error?.code === "ETIMEDOUT") {
+            throw new Error("credential creation timed out")
         }
-        return JSON.parse(result.stdout)
+        if (result.status !== 0) {
+            const status = Number.isInteger(result.status) ? result.status : "unknown"
+            throw new Error(`credential creation failed with exit code ${status}`)
+        }
+        this.assertLifecycleActive()
+        try {
+            return JSON.parse(result.stdout)
+        } catch {
+            throw new Error("credential creation returned invalid output")
+        }
     }
 
     spawnRuntime(label, env, ports) {
+        this.assertLifecycleActive()
         this.ensureCompiledRuntime()
+        this.assertLifecycleActive()
         const runtimeEnv = {
             ...process.env,
             ASSET_MODE: "client-owned",
@@ -326,26 +412,41 @@ class MultiHubProcessHarness {
         ]) {
             if (!Object.prototype.hasOwnProperty.call(env, name)) delete runtimeEnv[name]
         }
-        const child = spawn(process.execPath, [path.join(projectRoot, "out/cn-server.js")], {
+        const child = this.spawnProcess(process.execPath, [path.join(projectRoot, "out/cn-server.js")], {
             cwd: projectRoot,
             env: runtimeEnv,
             stdio: ["ignore", "pipe", "pipe"],
         })
         const runtime = new RuntimeProcess(label, child, ports)
         this.processes.push(runtime)
+        if (this.cleanupStarted) {
+            this.trackLifecycleCleanup(
+                () => runtime.stop(),
+                "late runtime cleanup timed out",
+            )
+            throw new Error("harness cleanup started during runtime spawn")
+        }
         return runtime
     }
 
-    async waitForHealth(baseUrl, runtime, timeoutMs = 60_000) {
+    async waitForHealth(baseUrl, runtime, timeoutMs = 60_000, signal) {
         const deadline = Date.now() + timeoutMs
         while (Date.now() < deadline) {
+            signal?.throwIfAborted()
             if (runtime.child.exitCode !== null || runtime.child.signalCode !== null) {
                 throw new Error(`server exited before health became available\n${runtime.output()}`)
             }
             try {
-                const response = await fetch(`${baseUrl}/healthz`)
+                const remainingMs = Math.max(1, deadline - Date.now())
+                const response = await fetch(`${baseUrl}/healthz`, {
+                    signal: finiteRequestSignal(
+                        signal,
+                        Math.min(this.requestTimeoutMs, remainingMs),
+                    ),
+                })
                 if (response.status === 200 || response.status === 503) return response.json()
-            } catch {
+            } catch (error) {
+                if (signal?.aborted) signal.throwIfAborted()
                 // Listener is not ready yet.
             }
             await delay(50)
@@ -353,7 +454,7 @@ class MultiHubProcessHarness {
         throw new Error(`timed out waiting for health\n${runtime.output()}`)
     }
 
-    async gamePost(baseUrl, route, payload, headers = defaultCompatibilityHeaders) {
+    async gamePost(baseUrl, route, payload, headers = defaultCompatibilityHeaders, options = {}) {
         const response = await fetch(`${baseUrl}${route}`, {
             method: "POST",
             headers: {
@@ -361,6 +462,7 @@ class MultiHubProcessHarness {
                 ...headers,
             },
             body: pack(payload).toString("base64"),
+            signal: finiteRequestSignal(options.signal, this.requestTimeoutMs),
         })
         const text = await response.text()
         const contentType = response.headers.get("content-type") ?? ""
@@ -374,41 +476,59 @@ class MultiHubProcessHarness {
     }
 
     async json(baseUrl, route, init = {}) {
-        const response = await fetch(`${baseUrl}${route}`, init)
+        const response = await fetch(`${baseUrl}${route}`, {
+            ...init,
+            signal: finiteRequestSignal(init.signal, this.requestTimeoutMs),
+        })
         const body = await response.json()
         return { status: response.status, body }
     }
 
     async openTcp(label, host, port, handshake, timeoutMs = 0) {
-        const socket = net.createConnection({ host, port })
-        await new Promise((resolve, reject) => {
-            let timer = null
-            let settled = false
-            const finish = callback => {
-                if (settled) return
-                settled = true
-                if (timer) clearTimeout(timer)
-                socket.off("connect", onConnect)
-                socket.off("error", onError)
-                callback()
-            }
-            const onConnect = () => {
-                finish(resolve)
-            }
-            const onError = error => {
-                socket.off("connect", onConnect)
-                socket.destroy()
-                finish(() => reject(error))
-            }
-            socket.once("connect", onConnect)
-            socket.once("error", onError)
-            if (timeoutMs > 0) {
-                timer = setTimeout(() => {
+        this.assertLifecycleActive()
+        const socket = this.createConnection({ host, port })
+        this.pendingSockets.add(socket)
+        try {
+            await new Promise((resolve, reject) => {
+                let timer = null
+                let settled = false
+                const finish = callback => {
+                    if (settled) return
+                    settled = true
+                    if (timer) clearTimeout(timer)
+                    socket.off("connect", onConnect)
+                    socket.off("error", onError)
+                    socket.off("close", onClose)
+                    callback()
+                }
+                const onConnect = () => {
+                    finish(resolve)
+                }
+                const onError = error => {
+                    socket.off("connect", onConnect)
                     socket.destroy()
-                    finish(() => reject(new Error(`${label} TCP connect timed out after ${timeoutMs}ms`)))
-                }, timeoutMs)
-            }
-        })
+                    finish(() => reject(error))
+                }
+                const onClose = () => {
+                    finish(() => reject(new Error("harness cleanup closed a connecting socket")))
+                }
+                socket.once("connect", onConnect)
+                socket.once("error", onError)
+                socket.once("close", onClose)
+                if (timeoutMs > 0) {
+                    timer = setTimeout(() => {
+                        socket.destroy()
+                        finish(() => reject(new Error(`${label} TCP connect timed out after ${timeoutMs}ms`)))
+                    }, timeoutMs)
+                }
+            })
+        } finally {
+            this.pendingSockets.delete(socket)
+        }
+        if (this.cleanupStarted) {
+            if (!socket.destroyed) socket.destroy()
+            throw new Error("harness cleanup started during TCP connect")
+        }
         const peer = new TcpPeer(label, socket)
         this.peers.push(peer)
         peer.send(handshake)
@@ -425,25 +545,42 @@ class MultiHubProcessHarness {
     }
 
     async cleanup() {
+        this.cleanupStarted = true
         if (!this.cleanupPromise) this.cleanupPromise = this.performCleanup()
         return this.cleanupPromise
     }
 
     async performCleanup() {
-        const peerResults = await Promise.allSettled(this.peers.map(peer => peer.close()))
+        for (const socket of this.pendingSockets) {
+            if (!socket.destroyed) socket.destroy()
+        }
+        const peerResults = await Promise.all(this.peers.map((peer, index) => settleWithinTimeout(
+            () => peer.close(),
+            this.peerCleanupTimeoutMs,
+            `peer cleanup timed out at index ${index}`,
+        )))
         const processResults = await Promise.allSettled(
-            [...this.processes].reverse().map(runtime => runtime.stop()),
+            [...this.processes].reverse().map(runtime => Promise.resolve().then(() => runtime.stop())),
         )
+        await Promise.allSettled([...this.lifecycleCleanupTasks])
         let removeFailure
         try {
             fs.rmSync(this.root, { recursive: true, force: true })
         } catch (error) {
             removeFailure = error
         }
-        const failure = [...peerResults, ...processResults]
-            .find(result => result.status === "rejected")
-        if (failure?.status === "rejected") throw failure.reason
-        if (removeFailure) throw removeFailure
+        const failures = [...peerResults, ...processResults]
+            .filter(result => result.status === "rejected")
+            .map(result => result.reason)
+        failures.push(...this.lifecycleCleanupErrors)
+        if (removeFailure) failures.push(removeFailure)
+        if (failures.length > 0) {
+            throw new AggregateError(
+                failures,
+                "multi-hub process harness cleanup failed",
+                { cause: failures[0] },
+            )
+        }
     }
 }
 

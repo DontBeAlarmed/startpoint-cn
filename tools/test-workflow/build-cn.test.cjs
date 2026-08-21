@@ -143,6 +143,19 @@ test("spawnSync 启动错误会输出具体原因而不是静默返回 1", () =>
     assert.match(harness.stderr.join(""), /CN build admin process failed: spawnSync npm\.cmd EINVAL/)
 })
 
+test("同步构建把总上限传给子进程并在 timeout 后停止后续阶段", () => {
+    const { runCnBuild } = loadOrchestrator()
+    const timeout = Object.assign(new Error("build timed out"), { code: "ETIMEDOUT" })
+    const harness = createHarness([result(null, timeout)])
+
+    assert.equal(runCnBuild({ ...harness.dependencies, timeoutMs: 25 }), 1)
+    assert.equal(harness.calls.length, 1)
+    assert.equal(Number.isSafeInteger(harness.calls[0].options.timeout), true)
+    assert.ok(harness.calls[0].options.timeout > 0)
+    assert.ok(harness.calls[0].options.timeout <= 25)
+    assert.match(harness.stderr.join(""), /CN build admin timed out/)
+})
+
 test("admin 构建未生成 index.html 时整体失败", () => {
     const { runCnBuild } = loadOrchestrator()
     const harness = createHarness([0], { adminReady: false })

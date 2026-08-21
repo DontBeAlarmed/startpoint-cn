@@ -204,7 +204,8 @@ function requireHttpSuccess(response, stage) {
     throw limitedError(`${stage} failed: HTTP ${status}${resultCode}`)
 }
 
-async function signUp(harness, node, deviceId) {
+async function signUp(harness, node, deviceId, { signal } = {}) {
+    signal?.throwIfAborted()
     const response = await runStage("signup request", () => harness.gamePost(
         node.url,
         "/api/index.php/tool/signup",
@@ -213,12 +214,15 @@ async function signUp(harness, node, deviceId) {
             channelNo: "multi-hub-process",
         },
         {},
+        { signal },
     ))
+    signal?.throwIfAborted()
     requireHttpSuccess(response, "signup")
     const viewerId = response?.body?.data_headers?.viewer_id
     if (viewerId === undefined || viewerId === null) {
         throw stageError("signup response")
     }
+    signal?.throwIfAborted()
     const players = runStageSync("signup player lookup", () => harness.withDatabase(
         node.dataKey,
         database => database.prepare(`
@@ -232,6 +236,7 @@ async function signUp(harness, node, deviceId) {
     if (players.length !== 1) {
         throw stageError("signup player lookup")
     }
+    signal?.throwIfAborted()
     node.viewerId = viewerId
     node.playerId = players[0].id
 }

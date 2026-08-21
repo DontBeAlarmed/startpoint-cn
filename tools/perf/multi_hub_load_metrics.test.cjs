@@ -277,7 +277,11 @@ test("stable failure behavior signatures cannot be admitted", () => {
         duplicateFinishRejected: 0,
     })
     for (const step of report.steps) step.behaviorSignatures = [...failures]
+    const admission = createMultiHubAdmission(report)
     assertSignatureRejection(report)
+    assert.deepEqual(admission.failures, [
+        "behavior signatures did not match the expected successful multiplayer outcomes",
+    ])
 })
 
 test("zero duplicate rejection signatures conflict with successful settlement aggregate", () => {

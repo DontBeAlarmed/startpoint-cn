@@ -1,9 +1,11 @@
 "use strict"
 
 const assert = require("node:assert/strict")
+const { EventEmitter } = require("node:events")
 const fs = require("node:fs")
 const net = require("node:net")
 const path = require("node:path")
+const { PassThrough } = require("node:stream")
 const test = require("node:test")
 
 const {
@@ -216,6 +218,229 @@ test("prepare endpoint validation rejects incomplete or unsafe TCP destinations"
         )
     }
     assert.throws(() => preparedTcpEndpoint(response, "654321"), /prepare room number/)
+})
+
+test("cleanup times out stuck peers before stopping runtimes and removing its root", async t => {
+    const harness = new MultiHubProcessHarness({ peerCleanupTimeoutMs: 10 })
+    const root = harness.root
+    let rejectLateClose
+    let runtimeStopCalls = 0
+    const unhandled = []
+    const onUnhandled = error => unhandled.push(error)
+    process.on("unhandledRejection", onUnhandled)
+    t.after(() => {
+        process.off("unhandledRejection", onUnhandled)
+        fs.rmSync(root, { recursive: true, force: true })
+    })
+    harness.peers.push(
+        { close: () => new Promise(() => {}) },
+        { close: () => new Promise((resolve, reject) => { rejectLateClose = reject }) },
+    )
+    harness.processes.push({
+        async stop() {
+            runtimeStopCalls += 1
+        },
+    })
+
+    const cleanupOutcome = harness.cleanup().then(
+        () => ({ status: "fulfilled" }),
+        error => ({ status: "rejected", error }),
+    )
+    const outcome = await Promise.race([
+        cleanupOutcome,
+        delay(100).then(() => ({ status: "test-timeout" })),
+    ])
+
+    assert.equal(runtimeStopCalls, 1)
+    assert.equal(outcome.status, "rejected")
+    assert.equal(outcome.error instanceof AggregateError, true)
+    assert.equal(
+        outcome.error.errors.every(error => /peer cleanup timed out/.test(error.message)),
+        true,
+    )
+    assert.equal(fs.existsSync(root), false)
+    rejectLateClose(new Error("late peer close failure"))
+    await delay(20)
+    assert.deepEqual(unhandled, [])
+})
+
+test("cleanup closes peers, stops runtimes, and removes its root normally", async () => {
+    const harness = new MultiHubProcessHarness({ peerCleanupTimeoutMs: 50 })
+    const root = harness.root
+    const calls = []
+    harness.peers.push({ close: async () => calls.push("peer") })
+    harness.processes.push({ stop: async () => calls.push("runtime") })
+
+    await harness.cleanup()
+
+    assert.deepEqual(calls, ["peer", "runtime"])
+    assert.equal(fs.existsSync(root), false)
+})
+
+test("cleanup owns a runtime created during spawn and stops it before rejecting", async () => {
+    const child = new EventEmitter()
+    child.exitCode = null
+    child.signalCode = null
+    child.stdout = new PassThrough()
+    child.stderr = new PassThrough()
+    const kills = []
+    child.kill = signal => {
+        kills.push(signal)
+        child.signalCode = signal
+        queueMicrotask(() => child.emit("close"))
+        return true
+    }
+    let cleanupPromise
+    let spawnCalls = 0
+    const harness = new MultiHubProcessHarness({
+        buildCompiledRuntime: () => 0,
+        spawnProcess: () => {
+            spawnCalls++
+            cleanupPromise = harness.cleanup()
+            return child
+        },
+    })
+    let returnedRuntime
+    let caught
+    try {
+        returnedRuntime = harness.spawnRuntime("late-runtime", {}, [])
+    } catch (error) {
+        caught = error
+    } finally {
+        if (returnedRuntime) await returnedRuntime.stop()
+        if (!cleanupPromise) cleanupPromise = harness.cleanup()
+        await cleanupPromise
+    }
+    assert.equal(spawnCalls, 1)
+    assert.match(caught?.message ?? "", /cleanup/)
+    assert.deepEqual(kills, ["SIGTERM"])
+    assert.equal(harness.processes.filter(runtime => !runtime.stopped).length, 0)
+})
+
+test("cleanup destroys a connecting socket and openTcp rejects at the lifecycle boundary", async () => {
+    const socket = new EventEmitter()
+    socket.destroyed = false
+    socket.setEncoding = () => {}
+    socket.write = () => true
+    socket.destroy = () => {
+        if (socket.destroyed) return
+        socket.destroyed = true
+        queueMicrotask(() => socket.emit("close"))
+    }
+    const harness = new MultiHubProcessHarness({ createConnection: () => socket })
+    const opening = harness.openTcp("late-peer", "127.0.0.1", 1, {})
+
+    await harness.cleanup()
+
+    await assert.rejects(opening, /cleanup/)
+    assert.equal(socket.destroyed, true)
+    assert.equal(harness.peers.length, 0)
+})
+
+test("spawnRuntime rejects after cleanup without creating another process", async () => {
+    let spawnCalls = 0
+    const harness = new MultiHubProcessHarness({
+        buildCompiledRuntime: () => 0,
+        spawnProcess: () => {
+            spawnCalls++
+            throw new Error("spawn must not run after cleanup")
+        },
+    })
+    await harness.cleanup()
+
+    let returnedRuntime
+    let caught
+    try {
+        returnedRuntime = harness.spawnRuntime("late-runtime", {}, [])
+    } catch (error) {
+        caught = error
+    } finally {
+        if (returnedRuntime) await returnedRuntime.stop()
+    }
+    assert.match(caught?.message ?? "", /cleanup/)
+    assert.equal(spawnCalls, 0)
+})
+
+test("compiled runtime receives its caller-owned timeout", async () => {
+    let buildOptions
+    const harness = new MultiHubProcessHarness({
+        buildCompiledRuntime: options => {
+            buildOptions = options
+            return 7
+        },
+    })
+    try {
+        assert.throws(
+            () => harness.installRuntimeTables({ timeoutMs: 25 }),
+            /compiled CN build failed with exit code 7/,
+        )
+        assert.deepEqual(buildOptions, { timeoutMs: 25 })
+    } finally {
+        await harness.cleanup()
+    }
+})
+
+test("credential creation has a finite timeout and redacts failed process output", async () => {
+    const calls = []
+    const harness = new MultiHubProcessHarness({
+        credentialTimeoutMs: 25,
+        spawnSync: (...args) => {
+            calls.push(args)
+            return {
+                error: Object.assign(new Error("timed out"), { code: "ETIMEDOUT" }),
+                signal: "SIGTERM",
+                status: null,
+                stderr: "token-device-path-raw",
+                stdout: "token-device-path-raw",
+            }
+        },
+    })
+    try {
+        assert.throws(
+            () => harness.createCredential("finite-label"),
+            error => {
+                assert.match(error.message, /credential creation timed out/)
+                assert.doesNotMatch(error.message, /token|device|path|raw/)
+                return true
+            },
+        )
+        assert.equal(calls.length, 1)
+        assert.equal(calls[0][2].timeout, 25)
+    } finally {
+        await harness.cleanup()
+    }
+})
+
+test("HTTP helpers attach a finite AbortSignal to health, game, and JSON requests", async t => {
+    const harness = new MultiHubProcessHarness({ requestTimeoutMs: 50 })
+    const originalFetch = global.fetch
+    const signals = []
+    global.fetch = async (url, init = {}) => {
+        signals.push(init.signal)
+        if (url.endsWith("/healthz")) {
+            return { status: 200, json: async () => ({ status: "ok" }) }
+        }
+        if (url.endsWith("/game")) {
+            return {
+                headers: new Headers({ "content-type": "application/json" }),
+                status: 200,
+                text: async () => "{}",
+            }
+        }
+        return { status: 200, json: async () => ({ ok: true }) }
+    }
+    t.after(async () => {
+        global.fetch = originalFetch
+        await harness.cleanup()
+    })
+    const runtime = { child: { exitCode: null, signalCode: null } }
+
+    await harness.waitForHealth("http://runtime.test", runtime, 50)
+    await harness.gamePost("http://runtime.test", "/game", {})
+    await harness.json("http://runtime.test", "/json")
+
+    assert.equal(signals.length, 3)
+    assert.equal(signals.every(signal => signal instanceof AbortSignal), true)
 })
 
 test("openTcp connects to the host returned by the prepared endpoint", async t => {
