@@ -81,10 +81,18 @@ function finishPayload(playId) {
     }
 }
 
-const DYNAMIC_TIME_FIELD_PATTERN = /(?:^|_)(?:time|timestamp|date)(?:$|_)/i
+const DYNAMIC_WALL_CLOCK_FIELDS = new Set([
+    "create_time",
+    "exp_pooled_time",
+    "join_time",
+    "servertime",
+    "stamina_heal_time",
+    "start_time",
+    "update_time",
+])
 
 function isDynamicTimeField(key) {
-    return key === "servertime" || DYNAMIC_TIME_FIELD_PATTERN.test(key)
+    return DYNAMIC_WALL_CLOCK_FIELDS.has(key)
 }
 
 function normalizeForSignature(value) {

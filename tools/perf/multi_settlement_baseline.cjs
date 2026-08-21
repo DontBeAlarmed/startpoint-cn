@@ -133,17 +133,15 @@ function admitMultiSettlementReport(report, {
         }
         const actualTables = Object.keys(actualScenario.sql.byTable)
         const expectedTables = Object.keys(expectedScenario.sql.byTable)
-        if (JSON.stringify(actualTables) !== JSON.stringify(expectedTables)) {
+        const unexpectedTables = actualTables.filter(table => !expectedTables.includes(table))
+        if (unexpectedTables.length > 0) {
             failures.push(
-                `${name}.sql.byTable set changed: expected=${expectedTables.join(",")} actual=${actualTables.join(",")}`,
+                `${name}.sql.byTable added: ${unexpectedTables.join(",")}`,
             )
         }
         for (const [table, expectedCounts] of Object.entries(expectedScenario.sql.byTable)) {
             const actualCounts = actualScenario.sql.byTable[table]
-            if (!actualCounts) {
-                failures.push(`${name}.sql.byTable.${table} missing`)
-                continue
-            }
+            if (!actualCounts) continue
             for (const field of ["reads", "statements", "writes"]) {
                 if (actualCounts[field] > expectedCounts[field]) {
                     failures.push(

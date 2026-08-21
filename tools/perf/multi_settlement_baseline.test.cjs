@@ -24,35 +24,46 @@ test("settlement baseline targets the focused production module boundary", () =>
 
 test("settlement fixture removes only quest 2001 common reward counts", () => {
     const bundled = require("../../assets/hard_multi_event_quest.json")
+    const bundledBefore = structuredClone(bundled)
+    const bundledQuest = bundled["2001"]
+    const bundledQuestBefore = structuredClone(bundledQuest)
+    const expected = structuredClone(bundled)
+    delete expected["2001"].commonRewardCounts
+
     const fixture = createHardMultiEventQuestFixture()
 
-    assert.equal(fixture["2001"].commonRewardCounts, undefined)
-    assert.deepEqual(fixture["2001"].scoreRewardGroupId, bundled["2001"].scoreRewardGroupId)
-    assert.deepEqual(fixture["2001"].name, bundled["2001"].name)
-    assert.deepEqual(fixture["1002001"], bundled["1002001"])
+    assert.deepEqual(fixture, expected)
+    assert.deepEqual(bundled, bundledBefore)
+    assert.deepEqual(bundled["2001"], bundledQuestBefore)
+    assert.strictEqual(require("../../assets/hard_multi_event_quest.json"), bundled)
+    assert.strictEqual(bundled["2001"], bundledQuest)
     assert.notEqual(fixture, bundled)
 })
 
-test("protocol signature preserves dynamic time fields while normalizing their values", () => {
+test("protocol signature normalizes the settlement wall-clock fields", () => {
     const response = {
         body: {
             data: {
+                character_list: [{
+                    create_time: "2024-08-14 12:00:00",
+                    join_time: "2024-08-14 12:00:00",
+                    update_time: "2024-08-14 12:00:00",
+                }],
                 exp_pooled_time: 1_723_636_800,
-                nested: {
-                    start_date: "2024-08-14",
-                    update_timestamp: 1_723_636_800_000,
-                },
                 stamina_heal_time: 1_723_636_800,
+                start_time: 1_723_636_800,
             },
             data_headers: { result_code: 0, servertime: 1_723_636_800 },
         },
         contentType: "application/x-msgpack",
     }
     const later = structuredClone(response)
+    later.body.data.character_list[0].create_time = "2024-08-14 13:00:00"
+    later.body.data.character_list[0].join_time = "2024-08-14 13:00:00"
+    later.body.data.character_list[0].update_time = "2024-08-14 13:00:00"
     later.body.data.exp_pooled_time += 3_600
-    later.body.data.nested.start_date = "2024-08-15"
-    later.body.data.nested.update_timestamp += 3_600_000
     later.body.data.stamina_heal_time += 3_600
+    later.body.data.start_time += 3_600
     later.body.data_headers.servertime += 3_600
 
     assert.equal(
@@ -66,6 +77,33 @@ test("protocol signature preserves dynamic time fields while normalizing their v
         createSettlementProtocolSignature(missingField),
         createSettlementProtocolSignature(response),
     )
+})
+
+test("protocol signature preserves battle timing and non-whitelisted time-like fields", () => {
+    const response = {
+        body: {
+            data: {
+                best_elapsed_time_ms: 1_000,
+                clear_time: 1_000,
+                elapsed_time_ms: 1_000,
+                start_date: "2024-08-14",
+                time_bonus: 5_000,
+                update_timestamp: 1_723_636_800_000,
+            },
+            data_headers: { result_code: 0 },
+        },
+        contentType: "application/x-msgpack",
+    }
+
+    for (const [field, value] of Object.entries(response.body.data)) {
+        const changed = structuredClone(response)
+        changed.body.data[field] = typeof value === "number" ? value + 1 : `${value}-changed`
+        assert.notEqual(
+            createSettlementProtocolSignature(changed),
+            createSettlementProtocolSignature(response),
+            `${field} must remain part of the protocol signature`,
+        )
+    }
 })
 
 test("protocol signature covers the response envelope and content type", () => {
@@ -193,6 +231,38 @@ test("admits stable settlement structure without comparing wall-clock observatio
         writes: 0,
     }
     assert.equal(admitMultiSettlementReport(unexpectedTable, { snapshot }).admitted, false)
+})
+
+test("admits SQL optimizations that eliminate an expected table", () => {
+    const snapshot = createMultiSettlementReport({
+        finish: {
+            activeQuestCleared: true,
+            eventLoopDelayMs: 1,
+            latencyMs: 1,
+            outputSignature: `sha256:${"a".repeat(64)}`,
+            sql: {
+                byTable: {
+                    players: { reads: 1, statements: 1, writes: 0 },
+                    players_equipment: { reads: 1, statements: 1, writes: 0 },
+                },
+                selectStatements: 2,
+                statements: 2,
+                transactionStatements: 0,
+                writeStatements: 0,
+            },
+            statusCode: 200,
+            verificationBeforeTransaction: true,
+        },
+    })
+    const current = structuredClone(snapshot)
+    delete current.scenarios.finish.sql.byTable.players_equipment
+    current.scenarios.finish.sql.selectStatements--
+    current.scenarios.finish.sql.statements--
+
+    assert.deepEqual(admitMultiSettlementReport(current, { snapshot }), {
+        admitted: true,
+        failures: [],
+    })
 })
 
 test("rejects malformed settlement metrics", () => {
