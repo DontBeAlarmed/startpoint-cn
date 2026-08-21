@@ -7,7 +7,7 @@
         "eventLoopDelayMs": 353.107967,
         "latencyMs": 352.87139900000057
       },
-      "outputSignature": "sha256:3e68261fa602670d1374d6cbd5ec585189a8b984fcdf4b19b211fb3937441d39",
+      "outputSignature": "sha256:6251057102cadbbc480793acf2f3a111f18d9844c9210191b3b71a013d0cce0e",
       "sql": {
         "selectStatements": 55,
         "statements": 91,

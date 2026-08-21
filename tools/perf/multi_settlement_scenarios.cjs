@@ -83,13 +83,17 @@ function finishPayload(playId) {
 
 const DYNAMIC_TIME_FIELD_PATTERN = /(?:^|_)(?:time|timestamp|date)(?:$|_)/i
 
+function isDynamicTimeField(key) {
+    return key === "servertime" || DYNAMIC_TIME_FIELD_PATTERN.test(key)
+}
+
 function normalizeForSignature(value) {
     if (Array.isArray(value)) return value.map(normalizeForSignature)
     if (value === null || typeof value !== "object") return value
     return Object.fromEntries(Object.keys(value).sort()
         .map(key => [
             key,
-            DYNAMIC_TIME_FIELD_PATTERN.test(key)
+            isDynamicTimeField(key)
                 ? "__dynamic_time__"
                 : normalizeForSignature(value[key]),
         ]))

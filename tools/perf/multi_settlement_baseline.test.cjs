@@ -44,7 +44,7 @@ test("protocol signature preserves dynamic time fields while normalizing their v
                 },
                 stamina_heal_time: 1_723_636_800,
             },
-            data_headers: { result_code: 0 },
+            data_headers: { result_code: 0, servertime: 1_723_636_800 },
         },
         contentType: "application/x-msgpack",
     }
@@ -53,6 +53,7 @@ test("protocol signature preserves dynamic time fields while normalizing their v
     later.body.data.nested.start_date = "2024-08-15"
     later.body.data.nested.update_timestamp += 3_600_000
     later.body.data.stamina_heal_time += 3_600
+    later.body.data_headers.servertime += 3_600
 
     assert.equal(
         createSettlementProtocolSignature(later),
