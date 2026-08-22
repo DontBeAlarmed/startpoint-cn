@@ -83,7 +83,7 @@ test("Degree Session loads each requested fact family once and merges selected f
         [[12000], ["questProgress:15", "player"]],
         [[46000], ["shopPurchases:2", "player"]],
         [[43000], ["equipment", "player"]],
-        [[8000, 3000], ["player"]],
+        [[8000, 3000], ["characters", "player"]],
         [[11010, 57010, 58000, 68000, 61040, 62330], [
             "questProgress:2,7,18,21,22,26", "player",
         ]],

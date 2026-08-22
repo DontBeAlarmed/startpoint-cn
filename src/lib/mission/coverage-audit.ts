@@ -60,7 +60,6 @@ function eventFallbackReason(row: readonly unknown[]): string {
 }
 
 const DEFERRED_DEGREE_REASON_BY_MISSION_ID: ReadonlyMap<number, string> = new Map([
-    [3000, "character-level-curve-incomplete"],
     [25000, "attention-source-unavailable"],
     [25010, "attention-source-unavailable"],
     [25020, "attention-source-unavailable"],

@@ -211,9 +211,9 @@ const fallbackContext = DegreeComputer.buildContext(
     playerId,
     5,
     evaluationTime,
-    [3000, 25000, 70004, 999999],
+    [25000, 70004, 999999],
 )
-for (const missionId of [3000, 25000, 70004, 999999]) {
+for (const missionId of [25000, 70004, 999999]) {
     assert.equal(DegreeComputer.compute(missionId, fallbackContext, 7), 7)
 }
 assertUntouched([

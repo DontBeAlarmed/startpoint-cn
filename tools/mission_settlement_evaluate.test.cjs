@@ -126,13 +126,13 @@ test("evaluate records normalized declared fact dependencies for every mission",
     ]))
 
     assert.deepEqual(byMissionId, {
-        3000: [],
+        3000: [{ kind: "characters" }],
         8000: [],
         9000: [{ kind: "questProgress", sections: [1, 4] }],
     })
     assert.ok(result.observer.loaderCalls.some(key => key.kind === "player"))
     assert.deepEqual(byMissionId[8000], [])
-    assert.deepEqual(byMissionId[3000], [])
+    assert.deepEqual(byMissionId[3000], [{ kind: "characters" }])
     for (const mission of result.missions) {
         assertDeepFrozen(mission.declaredFactDependencies)
     }

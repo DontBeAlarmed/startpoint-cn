@@ -494,7 +494,7 @@ assert.equal(DegreeComputer.compute(4000, context, 0), 5)
 assert.equal(DegreeComputer.compute(5000, context, 0), 42)
 assert.equal(DegreeComputer.compute(6000, context, 0), 4)
 assert.equal(DegreeComputer.compute(13000, context, 0), 1, "多人 SS 不得计入单人 SS 称号")
-assert.equal(DegreeComputer.compute(3000, context, 7), 7, "缺少完整等级曲线时保留已有进度")
+assert.equal(DegreeComputer.compute(3000, context, 7), 7, "角色未达到 Lv60 时应保留历史进度")
 assert.equal(DegreeComputer.compute(52000, context, 0), 5000, "应读取玩家累计消耗体力")
 assert.equal(DegreeComputer.compute(52010, context, 9000), 9000, "体力称号旧进度不得倒退")
 assert.equal(DegreeComputer.compute(53000, context, 0), 30, "应读取玩家累计登录天数")
@@ -668,7 +668,7 @@ insertPlayerCharacterBondTokenSync(levelPlayerId, 111001, {
     status: 1,
 })
 const level80Context = DegreeComputer.buildContext(levelPlayerId, 5)
-assert.equal(DegreeComputer.compute(3000, level80Context, 7), 7, "Lv60 缺少完整曲线时必须继续保留 fallback")
+assert.equal(DegreeComputer.compute(3000, level80Context, 7), 80, "角色等级称号应返回当前已证明的最高等级")
 assert.equal(DegreeComputer.compute(3010, level80Context, 0), 80, "五星角色达到官方 Lv80 EXP 阈值时应完成称号")
 assert.equal(DegreeComputer.compute(3020, level80Context, 7), 80, "Lv100 称号应显示当前已证明的最高等级")
 assert.equal(DegreeComputer.compute(111001, level80Context, 0), 0, "第二板信赖记录不得代替第一板信赖之证")
@@ -689,11 +689,11 @@ assert.equal(getExactDegreeQuestClearRuleCount(), 84)
 assert.equal(getDegreeOperationRuleCount(), 9)
 assert.deepEqual(coverage, {
     total: 1288,
-    serverComputed: 1281,
-    unsupported: 7,
+    serverComputed: 1282,
+    unsupported: 6,
     supportedFamilies: {
         playerRank: 8,
-        characterLevel: 2,
+        characterLevel: 3,
         companionCount: 3,
         overLimitCount: 3,
         manaBoardCount: 3,

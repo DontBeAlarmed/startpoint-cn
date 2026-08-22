@@ -6,9 +6,21 @@ const test = require("node:test")
 const reference = require("./__snapshots__/mission_entry_layered_load_reference.json")
 const summary = require("./__snapshots__/mission_entry_layered_load_summary.json")
 const {
+    APPROVED_BEHAVIOR_SIGNATURES,
     evaluateReport,
     runMissionEntryLayeredLoad,
 } = require("./mission_entry_layered_load.cjs")
+
+test("keeps fixed BASE structure separate from approved Lv60 behavior", () => {
+    assert.notEqual(
+        APPROVED_BEHAVIOR_SIGNATURES["single-finish"],
+        reference.entries["single-finish"].behaviorSignature,
+    )
+    assert.notEqual(
+        APPROVED_BEHAVIOR_SIGNATURES["multi-finish"],
+        reference.entries["multi-finish"].behaviorSignature,
+    )
+})
 
 test("layered mission entry smoke verifies boundaries without formal admission", async () => {
     assert.equal(reference.runtimeCommit, "f85a01c1eb730afa3ff9e6de00fd7b7a9d992c32")

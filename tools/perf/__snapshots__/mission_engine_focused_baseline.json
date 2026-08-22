@@ -279,7 +279,7 @@
     "get-progress-character-invalidation": {
       "sqlReads": 23,
       "sqlWrites": 5,
-      "missionComputes": 1208,
+      "missionComputes": 1209,
       "behavior": {
         "characterIds": [
           231003
@@ -333,7 +333,7 @@
     },
     "single-battle-finish": {
       "sqlReads": 31,
-      "sqlWrites": 31,
+      "sqlWrites": 32,
       "missionComputes": 425,
       "behavior": {
         "adapter": "mission-finish-boundary",
@@ -384,6 +384,7 @@
         "standard": {
           "characterIds": [],
           "degreeIds": [
+            3000,
             15000
           ],
           "equipmentIds": [],
@@ -406,6 +407,11 @@
             ],
             [
               5,
+              3000,
+              3000001
+            ],
+            [
+              5,
               15000,
               15000001
             ],
@@ -421,14 +427,14 @@
             ]
           ],
           "missionProgressCount": 418,
-          "missionProgressSha256": "c7a5d64a582b41d9944f0a8eeb010834655416a73eeb0ca515ccfba92d576b08"
+          "missionProgressSha256": "f6311f0737acac33b313b508f8dad5598e9b3fa0d580d04099f3d8db42be2459"
         }
       },
-      "behaviorSha256": "4659b8cdcf1384c70f787fba12d4d42b74c3680d7b446330c9e7f06abb6a6ce4"
+      "behaviorSha256": "3b3423c7e43c35e179f875b5b0cc945a7872fde393425e33bb051e0f2f8bde77"
     },
     "multi-battle-finish": {
       "sqlReads": 32,
-      "sqlWrites": 37,
+      "sqlWrites": 38,
       "missionComputes": 425,
       "behavior": {
         "adapter": "mission-finish-boundary",
@@ -478,7 +484,9 @@
         "mode": "multi",
         "standard": {
           "characterIds": [],
-          "degreeIds": [],
+          "degreeIds": [
+            3000
+          ],
           "equipmentIds": [],
           "itemIds": [
             100000
@@ -520,6 +528,11 @@
               13001
             ],
             [
+              5,
+              3000,
+              3000001
+            ],
+            [
               6,
               31,
               31001
@@ -531,10 +544,10 @@
             ]
           ],
           "missionProgressCount": 418,
-          "missionProgressSha256": "850bd7f0b2f43fc6db5c28afb1126079ce140c12e7e2c3c7edb70f6964492987"
+          "missionProgressSha256": "ce2f947bcbfbbfdc3cf0897798c1e4e670f629518e119298b1d12bc63443886b"
         }
       },
-      "behaviorSha256": "ad5705fbacde23e851d93e9559ba095e94615811760b64e883e3c748a7c03514"
+      "behaviorSha256": "b64c2118c6ab8fba2d7714ed7205814b11cacad618861d677f9af647ec870d98"
     }
   }
 }

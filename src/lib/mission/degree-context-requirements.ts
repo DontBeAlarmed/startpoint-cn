@@ -51,6 +51,7 @@ const AUTHORITATIVE_CHARACTER_LEVEL_MISSIONS: ReadonlyMap<number, {
     readonly pattern: string
     readonly target: number
 }> = new Map([
+    [3000, { pattern: "degree_character_lv_growth_1", target: 60 }],
     [3010, { pattern: "degree_character_lv_growth_2", target: 80 }],
     [3020, { pattern: "degree_character_lv_growth_3", target: 100 }],
 ] as const)

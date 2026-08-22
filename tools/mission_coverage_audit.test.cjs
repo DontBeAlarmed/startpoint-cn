@@ -112,14 +112,14 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
     assertPartition(report.degree)
     assert.deepEqual(
         { total: report.degree.total, automated: report.degree.automated, fallback: report.degree.fallback },
-        { total: 1288, automated: 1281, fallback: 7 },
+        { total: 1288, automated: 1282, fallback: 6 },
     )
     assert.deepEqual(
         report.degree.automatedMissions
-            .filter(entry => [3010, 3020].includes(entry.missionId))
+            .filter(entry => [3000, 3010, 3020].includes(entry.missionId))
             .map(entry => entry.missionId),
-        [3010, 3020],
-        "Lv80/Lv100 角色等级称号必须进入权威自动覆盖",
+        [3000, 3010, 3020],
+        "Lv60/Lv80/Lv100 角色等级称号必须进入权威自动覆盖",
     )
     assert.deepEqual(
         report.degree.automatedMissions
@@ -128,15 +128,13 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
         [47000, 48000, 49000, 50000],
         "四条 Degree 客户端进度必须全部进入权威自动覆盖",
     )
-    assert.equal(report.degree.fallbackMissions.find(entry => entry.missionId === 3000)?.patternType, 5)
-    assert.equal(report.degree.fallbackMissions.some(entry => [3010, 3020].includes(entry.missionId)), false)
+    assert.equal(report.degree.fallbackMissions.some(entry => [3000, 3010, 3020].includes(entry.missionId)), false)
     assert.deepEqual(
         report.degree.fallbackMissions.reduce((counts, entry) => {
             counts[entry.reason] = (counts[entry.reason] ?? 0) + 1
             return counts
         }, {}),
         {
-            "character-level-curve-incomplete": 1,
             "attention-source-unavailable": 3,
             "newbie-classification-unavailable": 3,
         },
@@ -145,7 +143,6 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
     assert.deepEqual(
         report.degree.fallbackMissions.map(entry => [entry.missionId, entry.reason]),
         [
-            [3000, "character-level-curve-incomplete"],
             [25000, "attention-source-unavailable"],
             [25010, "attention-source-unavailable"],
             [25020, "attention-source-unavailable"],
@@ -153,7 +150,7 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
             [70005, "newbie-classification-unavailable"],
             [70006, "newbie-classification-unavailable"],
         ],
-        "7 条延期称号必须按精确 ID 固定，不能因文案相似被误归类",
+        "6 条延期称号必须按精确 ID 固定，不能因文案相似被误归类",
     )
 
     assert.equal(report.awake.total, 144)

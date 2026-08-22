@@ -31,6 +31,10 @@ const FIXED_BASE_COMMIT = "f85a01c1eb730afa3ff9e6de00fd7b7a9d992c32"
 const FORMAL_CONCURRENCY_STEPS = Object.freeze([1, 10, 25, 50, 100])
 const FORMAL_PREPARED_STATES = 600
 const FORMAL_REQUESTS_PER_ENTRY = 150
+const APPROVED_BEHAVIOR_SIGNATURES = Object.freeze({
+    "single-finish": "e011f6a47915dd705138ff72cfedb9fe76573beaedf72f0a36cd74621ae105be",
+    "multi-finish": "253f4b86d8ae23cdd7d8f04f09c06ddea910ab97163b0b0d44f55b546391865c",
+})
 const REFERENCE_PATH = path.join(
     __dirname,
     "__snapshots__",
@@ -400,9 +404,11 @@ function evaluateReport(report, reference) {
             const actual = step.entries[entry]
             const expected = reference?.entries?.[entry]
             const signatures = actual.behaviorSignatures
-            const behaviorMatches = typeof expected?.behaviorSignature === "string"
+            const expectedBehavior = APPROVED_BEHAVIOR_SIGNATURES[entry]
+                ?? expected?.behaviorSignature
+            const behaviorMatches = typeof expectedBehavior === "string"
                 && signatures.length === 1
-                && signatures[0] === expected.behaviorSignature
+                && signatures[0] === expectedBehavior
             behaviorEquivalent &&= behaviorMatches
             structuralComparisons.push({
                 concurrency: step.concurrency,
@@ -533,6 +539,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+    APPROVED_BEHAVIOR_SIGNATURES,
     FIXED_TIME,
     FIXED_BASE_COMMIT,
     REFERENCE_PATH,

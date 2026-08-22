@@ -27,8 +27,8 @@ test("all 1288 Degree rules build and compute without post-context external acce
     const rules = buildDegreeRuleCatalog(catalog).rules
     assert.equal(rules.size, 1288)
     assert.equal([...rules.values()].filter(rule => rule.kind === "persisted").length, 100)
-    assert.equal([...rules.values()].filter(rule => rule.kind === "unsupported").length, 7)
-    assert.equal([...rules.values()].filter(rule => !["persisted", "unsupported"].includes(rule.kind)).length, 1181)
+    assert.equal([...rules.values()].filter(rule => rule.kind === "unsupported").length, 6)
+    assert.equal([...rules.values()].filter(rule => !["persisted", "unsupported"].includes(rule.kind)).length, 1182)
 
     const loaderCalls = []
     const session = createSession(catalog, missionIds, allFacts(), loaderCalls)

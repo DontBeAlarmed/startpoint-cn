@@ -97,8 +97,8 @@ test("snapshot pins the completed mission engine structural performance values",
     }, {
         awakeCharacterPage: { sqlReads: 11, sqlWrites: 0, missionComputes: 7 },
         getProgressNoInvalidation: { sqlReads: 14, sqlWrites: 1, missionComputes: 110 },
-        singleBattleFinish: { sqlReads: 31, sqlWrites: 31, missionComputes: 425 },
-        multiBattleFinish: { sqlReads: 32, sqlWrites: 37, missionComputes: 425 },
+        singleBattleFinish: { sqlReads: 31, sqlWrites: 32, missionComputes: 425 },
+        multiBattleFinish: { sqlReads: 32, sqlWrites: 38, missionComputes: 425 },
     })
 })
 

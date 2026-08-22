@@ -143,7 +143,7 @@ test("keeps computed, persisted, and unsupported meanings distinct", () => {
     assert.equal(registry.getRequirement(3, 1200).mode, "persisted")
     assert.equal(registry.getRequirement(3, 1402).mode, "unsupported")
     assert.equal(registry.getRequirement(5, 8000).mode, "persisted")
-    assert.equal(registry.getRequirement(5, 3000).mode, "unsupported")
+    assert.equal(registry.getRequirement(5, 3000).mode, "computed")
     assert.deepEqual(registry.getRequirement(3, 1200).facts, [])
     assert.deepEqual(registry.getRequirement(3, 1402).facts, [])
 })
@@ -271,14 +271,14 @@ test("keeps exact bundled Category 5 classification counts and unsupported IDs",
         .filter(entry => entry.category === 5)
     const count = mode => entries.filter(entry => entry.requirement.mode === mode).length
 
-    assert.equal(count("computed"), 1181)
+    assert.equal(count("computed"), 1182)
     assert.equal(count("persisted"), 100)
-    assert.equal(count("unsupported"), 7)
+    assert.equal(count("unsupported"), 6)
     assert.deepEqual(
         entries
             .filter(entry => entry.requirement.mode === "unsupported")
             .map(entry => entry.missionId),
-        [3000, 25000, 25010, 25020, 70004, 70005, 70006],
+        [25000, 25010, 25020, 70004, 70005, 70006],
     )
 })
 
