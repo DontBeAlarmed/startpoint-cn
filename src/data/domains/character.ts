@@ -565,18 +565,29 @@ export function hasPlayerUnlockedCharacterManaNodeSync(
 export function insertPlayerCharacterManaNodesSync(
     playerId: number,
     characterId: number | string,
-    manaNodes: number[]
+    manaNodes: readonly number[]
 ) {
-    for (const node of manaNodes) {
-        getDb().prepare(`
-        INSERT INTO players_characters_mana_nodes (value, character_id, player_id)
-        VALUES (?, ?, ?)
-        `).run(
-            node,
-            Number(characterId),
-            playerId
-        )
+    if (!Number.isSafeInteger(playerId) || playerId <= 0) {
+        throw new TypeError("playerId must be a positive safe integer.")
     }
+    const normalizedCharacterId = Number(characterId)
+    if (!Number.isSafeInteger(normalizedCharacterId) || normalizedCharacterId <= 0) {
+        throw new TypeError("characterId must be a positive safe integer.")
+    }
+    const nodes = [...new Set(manaNodes)]
+    for (const nodeId of nodes) {
+        if (!Number.isSafeInteger(nodeId) || nodeId <= 0) {
+            throw new TypeError("nodeId must be a positive safe integer.")
+        }
+    }
+    if (nodes.length === 0) return
+
+    const values = nodes.map(() => "(?, ?, ?)").join(", ")
+    const parameters = nodes.flatMap(nodeId => [nodeId, normalizedCharacterId, playerId])
+    getDb().prepare(`
+        INSERT INTO players_characters_mana_nodes (value, character_id, player_id)
+        VALUES ${values}
+    `).run(...parameters)
 }
 
 /**
@@ -686,6 +697,61 @@ export function updatePlayerCharacterManaNodeAwakeLevelSync(
     SET awake_level = ?
     WHERE value = ? AND character_id = ? AND player_id = ?
     `).run(awakeLevel, manaNodeId, characterId, playerId).changes > 0
+}
+
+export interface PlayerCharacterManaNodeAwakeUpdate {
+    readonly nodeId: number
+    readonly awakeLevel: number
+}
+
+export function updatePlayerCharacterManaNodeAwakeLevelsBatchSync(
+    playerId: number,
+    characterId: number,
+    updates: readonly PlayerCharacterManaNodeAwakeUpdate[],
+): void {
+    if (!Number.isSafeInteger(playerId) || playerId <= 0) {
+        throw new TypeError("playerId must be a positive safe integer.")
+    }
+    if (!Number.isSafeInteger(characterId) || characterId <= 0) {
+        throw new TypeError("characterId must be a positive safe integer.")
+    }
+
+    const uniqueUpdates = new Map<number, number>()
+    for (const update of updates) {
+        if (!Number.isSafeInteger(update?.nodeId) || update.nodeId <= 0) {
+            throw new TypeError("nodeId must be a positive safe integer.")
+        }
+        if (!Number.isSafeInteger(update.awakeLevel) || update.awakeLevel < 0) {
+            throw new TypeError("awakeLevel must be a non-negative safe integer.")
+        }
+        const existingAwakeLevel = uniqueUpdates.get(update.nodeId)
+        if (existingAwakeLevel !== undefined && existingAwakeLevel !== update.awakeLevel) {
+            throw new TypeError(`nodeId ${update.nodeId} has conflicting awake levels.`)
+        }
+        uniqueUpdates.set(update.nodeId, update.awakeLevel)
+    }
+    if (uniqueUpdates.size === 0) return
+
+    const values = [...uniqueUpdates].map(() => "(?, ?)").join(", ")
+    const parameters = [...uniqueUpdates].flatMap(([nodeId, awakeLevel]) => [nodeId, awakeLevel])
+    const result = getDb().prepare(`
+        WITH node_updates(node_id, awake_level) AS (
+            VALUES ${values}
+        )
+        UPDATE players_characters_mana_nodes
+        SET awake_level = (
+            SELECT node_updates.awake_level
+            FROM node_updates
+            WHERE node_updates.node_id = players_characters_mana_nodes.value
+        )
+        WHERE player_id = ? AND character_id = ?
+            AND value IN (SELECT node_id FROM node_updates)
+    `).run(...parameters, playerId, characterId)
+    if (result.changes !== uniqueUpdates.size) {
+        throw new Error(
+            `awake mana node batch updated ${result.changes} of ${uniqueUpdates.size} persisted nodes`,
+        )
+    }
 }
 
 export function updatePlayerCharactersManaNodeAwakeLevelsSync(

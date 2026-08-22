@@ -1480,6 +1480,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
     ])
     assert.deepEqual(TEST_GROUPS["integration:rules"].tests, [
         "tools/additional_reward.test.cjs",
+        "tools/character_mana_batch_writes.test.cjs",
         "tools/character_stack.test.cjs",
         "tools/database_hot_path_indexes.test.cjs",
         "tools/equipment_batch_reads.test.cjs",
@@ -1591,10 +1592,24 @@ test("quick character includes growth transaction rollback coverage", () => {
     )
     assert.deepEqual(
         selectTestGroups(["src/routes/api/character/mana-awake.ts"]),
-        ["full", "quick:character", "quick:content"],
+        ["full", "integration:rules", "quick:character", "quick:content"],
     )
     assert.deepEqual(
         selectTestGroups(["assets/mana_node.json"]),
         ["quick:character", "quick:content"],
+    )
+})
+
+test("registers mana batch write coverage in integration rules", () => {
+    assert.ok(TEST_GROUPS["integration:rules"].tests.includes(
+        "tools/character_mana_batch_writes.test.cjs",
+    ))
+    assert.deepEqual(
+        selectTestGroups(["tools/character_mana_batch_writes.test.cjs"]),
+        ["integration:rules"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/data/domains/character.ts"]),
+        ["full", "integration:database", "integration:rules"],
     )
 })

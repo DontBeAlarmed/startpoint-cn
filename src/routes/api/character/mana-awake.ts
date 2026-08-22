@@ -2,11 +2,11 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 
 import {
     getPlayerCharactersManaNodeAwakeLevelsSync,
-    updatePlayerCharacterManaNodeAwakeLevelSync,
+    updatePlayerCharacterManaNodeAwakeLevelsBatchSync,
     updatePlayerCharacterSync,
 } from "../../../data/domains/character"
 import { getPlayerCharacterAwakeUnlocksSync } from "../../../data/domains/character_awake"
-import { getPlayerItemsSync, setPlayerItemSync } from "../../../data/domains/item"
+import { getPlayerItemsSync, setPlayerItemWithinTransactionSync } from "../../../data/domains/item"
 import { updatePlayerSync } from "../../../data/domains/player"
 import { getDb } from "../../../data/db"
 import { incrementActiveMissionUsedManaCountSync } from "../../../data/domains/active_mission_counters"
@@ -214,16 +214,18 @@ export function registerAwakeManaNodeRoute(fastify: FastifyInstance): void {
                 updatePlayerSync({ id: playerId, freeMana: newFreeMana, paidMana: newPaidMana })
                 incrementActiveMissionUsedManaCountSync(playerId, plan.totalManaCost)
                 for (const [itemId, newAmount] of Object.entries(newItemAmounts)) {
-                    setPlayerItemSync(playerId, itemId, newAmount)
-                }
-                for (const update of plan.nodeUpdates) {
-                    if (!updatePlayerCharacterManaNodeAwakeLevelSync(
+                    setPlayerItemWithinTransactionSync(
                         playerId,
-                        characterId,
-                        update.nodeId,
-                        update.awakeLevel,
-                    )) throw new Error(`awake node ${update.nodeId} is not persisted`)
+                        itemId,
+                        newAmount,
+                        Object.prototype.hasOwnProperty.call(playerItems, itemId),
+                    )
                 }
+                updatePlayerCharacterManaNodeAwakeLevelsBatchSync(
+                    playerId,
+                    characterId,
+                    plan.nodeUpdates,
+                )
             }
             if (characterEvolutionLevel !== characterData.evolutionLevel) {
                 updatePlayerCharacterSync(playerId, characterId, {

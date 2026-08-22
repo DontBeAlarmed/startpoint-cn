@@ -2,7 +2,7 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { insertPlayerCharacterManaNodesSync, getPlayerCharactersManaNodeAwakeLevelsSync, updatePlayerCharacterSync } from "../../../data/domains/character"
-import { getPlayerItemsSync, setPlayerItemSync } from "../../../data/domains/item"
+import { getPlayerItemsSync, setPlayerItemWithinTransactionSync } from "../../../data/domains/item"
 import { updatePlayerSync } from "../../../data/domains/player"
 import { getDb } from "../../../data/db";
 import { incrementActiveMissionUsedManaCountSync } from "../../../data/domains/active_mission_counters"
@@ -189,7 +189,12 @@ const routes = async (fastify: FastifyInstance) => {
             updatePlayerSync({ id: playerId, freeMana: newFreeMana, paidMana: newPaidMana })
             incrementActiveMissionUsedManaCountSync(playerId, plan.totalManaCost)
             for (const [itemId, newAmount] of Object.entries(newItemAmounts)) {
-                setPlayerItemSync(playerId, itemId, newAmount)
+                setPlayerItemWithinTransactionSync(
+                    playerId,
+                    itemId,
+                    newAmount,
+                    Object.prototype.hasOwnProperty.call(playerItems, itemId),
+                )
             }
 
             insertPlayerCharacterManaNodesSync(

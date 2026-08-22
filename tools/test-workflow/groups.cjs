@@ -274,6 +274,7 @@ const TEST_GROUPS = Object.freeze({
         timeoutMs: 60_000,
         tests: [
             "tools/additional_reward.test.cjs",
+            "tools/character_mana_batch_writes.test.cjs",
             "tools/character_stack.test.cjs",
             "tools/database_hot_path_indexes.test.cjs",
             "tools/equipment_batch_reads.test.cjs",

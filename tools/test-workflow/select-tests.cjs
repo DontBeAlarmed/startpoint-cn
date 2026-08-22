@@ -299,6 +299,10 @@ const SOURCE_RULES = [
         groups: ["quick:character", "quick:content"],
     },
     {
+        pattern: /^(?:src\/data\/domains\/character\.ts|src\/routes\/api\/character\/(?:mana|mana-awake)\.ts|tools\/character_mana_batch_writes\.test\.cjs)$/,
+        groups: ["integration:rules"],
+    },
+    {
         pattern: /^(?:src\/routes\/api\/(?:character|exBoost)\.ts|src\/data\/domains\/ex_boost\.ts)$/,
         groups: ["quick:character", "integration:database"],
     },
