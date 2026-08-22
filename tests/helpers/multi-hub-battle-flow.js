@@ -1,6 +1,6 @@
 "use strict"
 
-const { types: { isProxy } } = require("node:util")
+const { isDeepStrictEqual, types: { isProxy } } = require("node:util")
 
 const {
     defaultCompatibilityHeaders,
@@ -260,6 +260,123 @@ function playerState(harness, node, { ticketItemId } = {}) {
         `).get(node.playerId, ticketItemId)?.amount ?? 0
         return { ...player, ticket, activeQuests }
     }, { readonly: true }))
+}
+
+function settlementState(harness, node, stage) {
+    return runStageSync(stage, () => harness.withDatabase(node.dataKey, database => ({
+        player: database.prepare(`
+            SELECT stamina, boost_point AS boostPoint,
+                boss_boost_point AS bossBoostPoint, vmoney,
+                free_vmoney AS freeVmoney, free_mana AS freeMana,
+                paid_mana AS paidMana, rank_point AS rankPoint,
+                star_crumb AS starCrumb, bond_token AS bondToken,
+                exp_pool AS expPool, degree_id AS degreeId,
+                total_stamina_used AS totalStaminaUsed,
+                total_powerflips AS totalPowerflips,
+                total_dashes AS totalDashes,
+                total_mana_obtained AS totalManaObtained,
+                max_combo_achieved AS maxComboAchieved
+            FROM players
+            WHERE id = ?
+        `).get(node.playerId),
+        items: database.prepare(`
+            SELECT id, amount
+            FROM players_items
+            WHERE player_id = ?
+            ORDER BY id
+        `).all(node.playerId),
+        questProgress: database.prepare(`
+            SELECT section, quest_id AS questId, finished, unlocked,
+                high_score AS highScore, clear_rank AS clearRank,
+                best_elapsed_time_ms AS bestElapsedTimeMs,
+                leader_character_id AS leaderCharacterId,
+                multi_clear_count AS multiClearCount,
+                host_finished AS hostFinished
+            FROM players_quest_progress
+            WHERE player_id = ?
+            ORDER BY section, quest_id
+        `).all(node.playerId),
+        missionBattleCounters: database.prepare(`
+            SELECT single_play_count AS singlePlayCount,
+                single_clear_count AS singleClearCount,
+                multi_play_count AS multiPlayCount,
+                multi_clear_count AS multiClearCount,
+                multi_host_clear_count AS multiHostClearCount,
+                multi_guest_clear_count AS multiGuestClearCount,
+                single_rank_ss_count AS singleRankSsCount,
+                rank_ss_count AS rankSsCount,
+                rank_s_count AS rankSCount,
+                rank_a_count AS rankACount,
+                rank_b_count AS rankBCount,
+                challenge_dungeon_clear_count AS challengeDungeonClearCount,
+                single_score_max AS singleScoreMax,
+                single_clear_time_min AS singleClearTimeMin,
+                boss_battle_clear_count AS bossBattleClearCount,
+                skill_use_count AS skillUseCount
+            FROM players_mission_battle_counters
+            WHERE player_id = ?
+        `).get(node.playerId) ?? null,
+        activeMissions: database.prepare(`
+            SELECT id, progress
+            FROM players_active_missions
+            WHERE player_id = ?
+            ORDER BY id
+        `).all(node.playerId),
+        activeMissionStages: database.prepare(`
+            SELECT mission_id AS missionId, id, status
+            FROM players_active_missions_stages
+            WHERE player_id = ?
+            ORDER BY mission_id, id
+        `).all(node.playerId),
+        activeQuests: database.prepare(`
+            SELECT play_id AS playId, quest_id AS questId, category,
+                use_boss_boost_point AS useBossBoostPoint,
+                use_boost_point AS useBoostPoint,
+                is_auto_start_mode AS isAutoStartMode, is_multi AS isMulti,
+                coordinator_origin AS coordinatorOrigin,
+                room_number AS roomNumber,
+                battle_session_id AS battleSessionId,
+                entry_item_id AS entryItemId,
+                entry_item_count AS entryItemCount, event_id AS eventId,
+                continue_count AS continueCount
+            FROM players_active_quests
+            WHERE player_id = ?
+            ORDER BY play_id
+        `).all(node.playerId),
+    }), { readonly: true }))
+}
+
+function isSuccessfulFinish(response) {
+    return response?.status === 200
+        && response.body?.data_headers?.result_code === 1
+}
+
+async function finishPlayer(harness, node, {
+    roomNumber,
+    quest,
+    playId,
+    timeoutMs = DEFAULT_TASK_TIMEOUT_MS,
+}) {
+    validateTimeout(timeoutMs, "finish")
+    const payload = buildFinishPayload(node, roomNumber, quest, playId)
+    const first = await runTaskWithinTimeout(
+        () => harness.gamePost(node.url, `${API_PREFIX}/finish`, payload),
+        "finish request",
+        timeoutMs,
+    )
+    if (!isSuccessfulFinish(first)) throw stageError("finish response")
+    const settledState = settlementState(harness, node, "finish state")
+    const duplicate = await runTaskWithinTimeout(
+        () => harness.gamePost(node.url, `${API_PREFIX}/finish`, payload),
+        "duplicate finish request",
+        timeoutMs,
+    )
+    const duplicateState = settlementState(harness, node, "duplicate finish state")
+    if (!isDeepStrictEqual(duplicateState, settledState)) {
+        throw stageError("duplicate finish state")
+    }
+    if (isSuccessfulFinish(duplicate)) throw stageError("duplicate finish response")
+    return settledState
 }
 
 async function createRoom(harness, host, quest, apiCount) {
@@ -537,6 +654,7 @@ module.exports = {
     completeScene,
     createRoom,
     disbandRoom,
+    finishPlayer,
     leaveLobbyForBattle,
     normalizedRoomOutcome,
     openBattlePeers,

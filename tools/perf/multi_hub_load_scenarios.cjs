@@ -2,12 +2,14 @@
 
 const crypto = require("node:crypto")
 const { performance } = require("node:perf_hooks")
+const questEntryCosts = require("../../assets/quest_entry_costs.json")
 
 const {
     API_PREFIX,
     BOSS_QUEST,
     buildFinishPayload,
     completeScene,
+    finishPlayer,
     leaveLobbyForBattle,
     normalizedRoomOutcome,
     openBattlePeers,
@@ -19,6 +21,9 @@ const {
 } = require("../../tests/helpers/multi-hub-battle-flow")
 
 const STAGE_TIMEOUT_MS = 15_000
+const BOSS_ENTRY_COST = Object.freeze({
+    ...questEntryCosts[`${BOSS_QUEST.category}_${BOSS_QUEST.questId}`],
+})
 
 function isPlainObject(value) {
     if (value === null || typeof value !== "object" || Array.isArray(value)) return false
@@ -71,6 +76,20 @@ async function setStamina(harness, node, signal) {
     })
     throwIfAborted(signal)
     if (response.status !== 200) throw new Error("stamina setup failed")
+    harness.withDatabase(node.dataKey, database => {
+        const stored = database.prepare(`
+            SELECT stamina_heal_time AS staminaHealTime
+            FROM players
+            WHERE id = ?
+        `).get(node.playerId)?.staminaHealTime
+        const anchorMs = new Date(stored).getTime()
+        if (!Number.isFinite(anchorMs)) throw new Error("stamina setup failed")
+        database.prepare(`
+            UPDATE players
+            SET stamina_heal_time = ?
+            WHERE id = ?
+        `).run(new Date(anchorMs - 1_000).toISOString(), node.playerId)
+    })
 }
 
 function accountIdFor(harness, node) {
@@ -242,33 +261,21 @@ function isSuccessful(response) {
     return response?.status === 200 && response.body?.data_headers?.result_code === 1
 }
 
-async function finishPlayer(harness, node, party, playIds) {
-    const payload = buildFinishPayload(
-        node,
-        party.roomNumber,
-        BOSS_QUEST,
-        playIds.get(node.dataKey),
-    )
-    const response = await harness.gamePost(node.url, `${API_PREFIX}/finish`, payload)
-    requireHttpSuccess(response, "finish")
-    return payload
-}
-
-function requireStarted(before, after, gameHost) {
-    if (!(after[0].stamina < before[0].stamina)
+function requireStarted(before, after) {
+    if (after[0].stamina !== before[0].stamina - BOSS_ENTRY_COST.stamina
         || after[1].stamina !== before[1].stamina
         || after.some(state => state.activeQuests !== 1)) throw new Error("start state failed")
-    if (!gameHost) throw new Error("game host missing")
 }
 
-function requireRewarded(before, after) {
+function requireRewarded(before, afterStart, after) {
     if (after.rankPoint !== before.rankPoint + 399
         || after.freeMana < before.freeMana + 1290
+        || after.stamina < afterStart.stamina
         || after.activeQuests !== 0) throw new Error("finish state failed")
 }
 
 async function executeBattle(harness, entry) {
-    const [gameHost, guest] = entry.scenario.nodes
+    const [gameHost] = entry.scenario.nodes
     const before = entry.scenario.nodes.map(node => playerState(harness, node))
     entry.stage = "start"
     const playLabel = `scenario-${entry.scenario.scenarioIndex}`
@@ -282,7 +289,8 @@ async function executeBattle(harness, entry) {
         BOSS_QUEST,
         playLabel,
     )
-    requireStarted(before, entry.scenario.nodes.map(node => playerState(harness, node)), gameHost)
+    const afterStart = entry.scenario.nodes.map(node => playerState(harness, node))
+    requireStarted(before, afterStart)
 
     entry.stage = "battle open"
     entry.battle = await openBattlePeers(
@@ -320,24 +328,24 @@ async function executeBattle(harness, entry) {
     )))
 
     entry.stage = "finish"
-    const payloads = []
-    for (const node of entry.scenario.nodes) payloads.push(await finishPlayer(
-        harness,
-        node,
-        entry.party,
-        entry.playIds,
-    ))
-    const firstStates = entry.scenario.nodes.map(node => playerState(harness, node))
-    firstStates.forEach((state, index) => requireRewarded(before[index], state))
-
-    entry.stage = "duplicate finish"
-    for (const [index, node] of entry.scenario.nodes.entries()) {
-        const duplicate = await harness.gamePost(node.url, `${API_PREFIX}/finish`, payloads[index])
-        if (isSuccessful(duplicate)
-            || !require("node:util").isDeepStrictEqual(playerState(harness, node), firstStates[index])) {
-            throw new Error("duplicate finish state failed")
-        }
+    const settledStates = []
+    for (const node of entry.scenario.nodes) {
+        settledStates.push(await finishPlayer(harness, node, {
+            roomNumber: entry.party.roomNumber,
+            quest: BOSS_QUEST,
+            playId: entry.playIds.get(node.dataKey),
+            timeoutMs: STAGE_TIMEOUT_MS,
+        }))
     }
+    const firstStates = settledStates.map(state => ({
+        ...state.player,
+        activeQuests: state.activeQuests.length,
+    }))
+    firstStates.forEach((state, index) => requireRewarded(
+        before[index],
+        afterStart[index],
+        state,
+    ))
     return normalizedRoomOutcome({
         ownerSide: entry.scenario.ownerSide,
         hostRewarded: true,
@@ -588,10 +596,13 @@ async function runScenarioBatch({
 }
 
 module.exports = {
+    BOSS_ENTRY_COST,
     cleanupEntry,
     countActiveQuests,
     createParticipants,
     runCoexistence,
     runScenarioBatch,
+    requireRewarded,
+    requireStarted,
     settleEntry,
 }

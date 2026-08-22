@@ -114,6 +114,56 @@ test("scenario plan locks host-owned rooms before client-owned rooms", () => {
     assert.ok(plan.every(item => Object.keys(item).sort().join(",") === "ownerSide,scenarioIndex"))
 })
 
+test("boss scenario locks official no-ticket cost and exact one-time host stamina", () => {
+    assert.deepEqual(scenariosModule.BOSS_ENTRY_COST, {
+        itemId: 0,
+        itemCount: 0,
+        stamina: 16,
+    })
+    for (const ownerSide of ["host", "client"]) {
+        const before = [
+            { stamina: 100, freeMana: 1000, rankPoint: 40, activeQuests: 0 },
+            { stamina: 100, freeMana: 1000, rankPoint: 40, activeQuests: 0 },
+        ]
+        const afterStart = [
+            { stamina: 84, freeMana: 1000, rankPoint: 40, activeQuests: 1 },
+            { stamina: 100, freeMana: 1000, rankPoint: 40, activeQuests: 1 },
+        ]
+        const afterFinish = [
+            { stamina: 113, freeMana: 2290, rankPoint: 439, activeQuests: 0 },
+            { stamina: 129, freeMana: 2290, rankPoint: 439, activeQuests: 0 },
+        ]
+        assert.doesNotThrow(
+            () => scenariosModule.requireStarted(before, afterStart),
+            ownerSide,
+        )
+        afterFinish.forEach((state, index) => assert.doesNotThrow(
+            () => scenariosModule.requireRewarded(before[index], afterStart[index], state),
+            ownerSide,
+        ))
+    }
+
+    assert.throws(() => scenariosModule.requireStarted([
+        { stamina: 100 },
+        { stamina: 100 },
+    ], [
+        { stamina: 83, activeQuests: 1 },
+        { stamina: 100, activeQuests: 1 },
+    ]), /start state failed/)
+    assert.throws(() => scenariosModule.requireStarted([
+        { stamina: 100 },
+        { stamina: 100 },
+    ], [
+        { stamina: 84, activeQuests: 1 },
+        { stamina: 99, activeQuests: 1 },
+    ]), /start state failed/)
+    assert.throws(() => scenariosModule.requireRewarded(
+        { stamina: 100, freeMana: 1000, rankPoint: 40 },
+        { stamina: 84 },
+        { stamina: 83, freeMana: 2290, rankPoint: 439, activeQuests: 0 },
+    ), /finish state failed/)
+})
+
 test("finiteScenarioError removes runtime identifiers and raw protocol data", () => {
     const secret = "viewer-token-device-room-port-path-raw"
     const source = new AggregateError([new Error(secret), new Error("HTTP 503 result_code 4507")], secret)
@@ -656,8 +706,11 @@ test("real locked smoke CLI writes only its admitted JSON report to stdout", {
     } finally {
         await owner.cleanup()
     }
-    assert.equal(result.code, 0, result.stderr)
     const report = JSON.parse(result.stdout)
+    assert.equal(result.code, 0, [
+        result.stderr,
+        ...report.steps.flatMap(step => step.errors),
+    ].filter(Boolean).join("\n"))
     assert.equal(result.stdout, `${JSON.stringify(report, null, 2)}\n`)
     assert.equal(report.profile.activeIdentities, 2)
     const step = report.steps[0]
@@ -696,7 +749,11 @@ test("real step completes host-owned and client-owned rooms in one runtime", {
         totalRooms: 2,
     }
     const step = await workload.runMultiHubStep({ profile, concurrency: 2 })
-    assert.deepEqual(step.rooms, { attempted: 2, completed: 2, hostOwned: 1, clientOwned: 1 })
+    assert.deepEqual(
+        step.rooms,
+        { attempted: 2, completed: 2, hostOwned: 1, clientOwned: 1 },
+        step.errors.join("\n"),
+    )
     assert.equal(step.rooms.hostOwned + step.rooms.clientOwned, step.rooms.completed)
     assert.deepEqual(step.players, { attempted: 4, completed: 4 })
     assert.deepEqual(step.coexistence, { attempted: 6, completed: 6, errors: 0, routes: { auth: 2, load: 2, mission: 2 } })

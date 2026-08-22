@@ -47,7 +47,9 @@ function behaviorSignatures({ hostRewarded, guestRewarded, duplicateFinishReject
 }
 
 function createStep(profile, concurrency, overrides = {}) {
-    const coexistenceAttempts = Math.max(3, profile.activeIdentities)
+    const coexistenceBatches = Math.ceil(profile.totalRooms / concurrency)
+    const coexistenceAttempts = coexistenceBatches * 6
+    const coexistenceRoutes = coexistenceBatches * 2
     const step = {
         concurrency,
         rooms: {
@@ -65,9 +67,9 @@ function createStep(profile, concurrency, overrides = {}) {
             completed: coexistenceAttempts,
             errors: 0,
             routes: {
-                auth: 1,
-                load: 1,
-                mission: coexistenceAttempts - 2,
+                auth: coexistenceRoutes,
+                load: coexistenceRoutes,
+                mission: coexistenceRoutes,
             },
         },
         settlement: {
@@ -243,6 +245,44 @@ test("admission rejects HTTP coexistence errors and route coverage mismatches", 
     for (const admission of [httpError, missingRoute, routeTotalMismatch]) {
         assert.equal(admission.admitted, false)
         assert.equal(admission.checks.coexistenceValid, false)
+    }
+})
+
+test("coexistence admission requires exactly six requests per room batch", () => {
+    const formal = createReport()
+    assert.deepEqual(formal.steps.map(step => step.coexistence), [
+        { attempted: 72, completed: 72, errors: 0, routes: { auth: 24, load: 24, mission: 24 } },
+        { attempted: 36, completed: 36, errors: 0, routes: { auth: 12, load: 12, mission: 12 } },
+        { attempted: 18, completed: 18, errors: 0, routes: { auth: 6, load: 6, mission: 6 } },
+    ])
+    const smoke = createReport(SMOKE_MULTI_PROFILE)
+    assert.deepEqual(smoke.steps[0].coexistence, {
+        attempted: 6,
+        completed: 6,
+        errors: 0,
+        routes: { auth: 2, load: 2, mission: 2 },
+    })
+
+    const routeImbalance = admissionForMutation(report => {
+        report.steps[0].coexistence.routes.auth++
+        report.steps[0].coexistence.routes.load--
+    })
+    const missingBatch = admissionForMutation(report => {
+        report.steps[0].coexistence.attempted -= 6
+        report.steps[0].coexistence.completed -= 6
+        for (const route of ["auth", "load", "mission"]) {
+            report.steps[0].coexistence.routes[route] -= 2
+        }
+    })
+    const extraBatch = admissionForMutation(report => {
+        report.steps[0].coexistence.attempted += 6
+        report.steps[0].coexistence.completed += 6
+        for (const route of ["auth", "load", "mission"]) {
+            report.steps[0].coexistence.routes[route] += 2
+        }
+    })
+    for (const admission of [routeImbalance, missingBatch, extraBatch]) {
+        assertOnlyCheckFailed(admission, "coexistenceValid")
     }
 })
 

@@ -358,8 +358,10 @@ function completedCleanly(report) {
 
 function coexistenceCompleted(report) {
     const steps = getAdmissionSteps(report)
-    if (steps === null) return false
-    return steps.every(step => {
+    if (steps === null
+        || !hasOwnDataField(report, "profile")
+        || !validProfile(report.profile)) return false
+    return steps.every((step, index) => {
         if (!hasOwnDataField(step, "coexistence")) return false
         const coexistence = step.coexistence
         if (!hasExactDataFields(coexistence, COEXISTENCE_FIELDS)
@@ -368,14 +370,17 @@ function coexistenceCompleted(report) {
             || !isNonNegativeSafeInteger(coexistence.errors)
             || !validCounterObject(coexistence.routes, ROUTE_FIELDS)) return false
         const routes = coexistence.routes
-        return coexistence.attempted > 0
-            && coexistence.completed === coexistence.attempted
+        const concurrency = report.profile.concurrencySteps[index]
+        if (step.concurrency !== concurrency) return false
+        const batches = Math.ceil(report.profile.totalRooms / concurrency)
+        const expectedPerRoute = batches * 2
+        const expectedTotal = batches * 6
+        return coexistence.attempted === expectedTotal
+            && coexistence.completed === expectedTotal
             && coexistence.errors === 0
-            && routes.auth > 0
-            && routes.load > 0
-            && routes.mission > 0
-            && Number.isSafeInteger(routes.auth + routes.load + routes.mission)
-            && routes.auth + routes.load + routes.mission === coexistence.attempted
+            && routes.auth === expectedPerRoute
+            && routes.load === expectedPerRoute
+            && routes.mission === expectedPerRoute
     })
 }
 

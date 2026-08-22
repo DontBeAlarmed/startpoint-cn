@@ -86,41 +86,46 @@ function multiReport({ formal = true, p95 = 50 } = {}) {
     const core = {
         schemaVersion: 1,
         profile,
-        steps: profile.concurrencySteps.map((concurrency, stepIndex) => ({
-            concurrency,
-            rooms: {
-                attempted: profile.totalRooms,
-                completed: profile.totalRooms,
-                hostOwned: profile.hostOwnedRooms,
-                clientOwned: profile.clientOwnedRooms,
-            },
-            players: { attempted: profile.activeIdentities, completed: profile.activeIdentities },
-            coexistence: {
-                attempted: Math.max(3, profile.activeIdentities),
-                completed: Math.max(3, profile.activeIdentities),
-                errors: 0,
-                routes: {
-                    auth: 1,
-                    load: 1,
-                    mission: Math.max(3, profile.activeIdentities) - 2,
+        steps: profile.concurrencySteps.map((concurrency, stepIndex) => {
+            const coexistenceBatches = Math.ceil(profile.totalRooms / concurrency)
+            const coexistenceAttempts = coexistenceBatches * 6
+            const coexistenceRoutes = coexistenceBatches * 2
+            return {
+                concurrency,
+                rooms: {
+                    attempted: profile.totalRooms,
+                    completed: profile.totalRooms,
+                    hostOwned: profile.hostOwnedRooms,
+                    clientOwned: profile.clientOwnedRooms,
                 },
-            },
-            settlement: {
-                duplicateFinishRejected: profile.activeIdentities,
-                activeQuestsAfter: 0,
-                errors: 0,
-            },
-            cleanup: {
-                activePeers: 0,
-                activeProcesses: 0,
-                remainingRooms: 0,
-                portsReleased: true,
-                temporaryRootExists: false,
-            },
-            behaviorSignatures: signatures,
-            latencyMs: { p50: p95 / 2, p95: p95 - stepIndex, p99: p95 + 1 },
-            errors: [],
-        })),
+                players: { attempted: profile.activeIdentities, completed: profile.activeIdentities },
+                coexistence: {
+                    attempted: coexistenceAttempts,
+                    completed: coexistenceAttempts,
+                    errors: 0,
+                    routes: {
+                        auth: coexistenceRoutes,
+                        load: coexistenceRoutes,
+                        mission: coexistenceRoutes,
+                    },
+                },
+                settlement: {
+                    duplicateFinishRejected: profile.activeIdentities,
+                    activeQuestsAfter: 0,
+                    errors: 0,
+                },
+                cleanup: {
+                    activePeers: 0,
+                    activeProcesses: 0,
+                    remainingRooms: 0,
+                    portsReleased: true,
+                    temporaryRootExists: false,
+                },
+                behaviorSignatures: signatures,
+                latencyMs: { p50: p95 / 2, p95: p95 - stepIndex, p99: p95 + 1 },
+                errors: [],
+            }
+        }),
     }
     return { ...core, gate: createMultiHubAdmission(core) }
 }

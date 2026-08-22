@@ -11,6 +11,7 @@ const {
     buildRoomParty,
     buildStartPayload,
     completeScene,
+    finishPlayer,
     leaveLobbyForBattle,
     normalizedRoomOutcome,
     openBattlePeers,
@@ -35,6 +36,149 @@ function signupHarness(database, response) {
         withDatabase(_dataKey, operation) {
             return operation(database)
         },
+    }
+}
+
+function createSettlementDatabase() {
+    const database = new Database(":memory:")
+    database.exec(`
+        CREATE TABLE players (
+            id INTEGER PRIMARY KEY,
+            stamina INTEGER NOT NULL,
+            boost_point INTEGER NOT NULL,
+            boss_boost_point INTEGER NOT NULL,
+            vmoney INTEGER NOT NULL,
+            free_vmoney INTEGER NOT NULL,
+            free_mana INTEGER NOT NULL,
+            paid_mana INTEGER NOT NULL,
+            rank_point INTEGER NOT NULL,
+            star_crumb INTEGER NOT NULL,
+            bond_token INTEGER NOT NULL,
+            exp_pool INTEGER NOT NULL,
+            degree_id INTEGER NOT NULL,
+            total_stamina_used INTEGER NOT NULL,
+            total_powerflips INTEGER NOT NULL,
+            total_dashes INTEGER NOT NULL,
+            total_mana_obtained INTEGER NOT NULL,
+            max_combo_achieved INTEGER NOT NULL
+        );
+        CREATE TABLE players_items (
+            id INTEGER NOT NULL,
+            amount INTEGER NOT NULL,
+            player_id INTEGER NOT NULL,
+            PRIMARY KEY (id, player_id)
+        );
+        CREATE TABLE players_quest_progress (
+            section INTEGER NOT NULL,
+            quest_id INTEGER NOT NULL,
+            finished INTEGER NOT NULL,
+            unlocked INTEGER NOT NULL,
+            high_score INTEGER,
+            clear_rank INTEGER,
+            best_elapsed_time_ms INTEGER,
+            leader_character_id INTEGER,
+            multi_clear_count INTEGER NOT NULL,
+            host_finished INTEGER,
+            player_id INTEGER NOT NULL,
+            PRIMARY KEY (section, quest_id, player_id)
+        );
+        CREATE TABLE players_mission_battle_counters (
+            player_id INTEGER PRIMARY KEY,
+            single_play_count INTEGER NOT NULL,
+            single_clear_count INTEGER NOT NULL,
+            multi_play_count INTEGER NOT NULL,
+            multi_clear_count INTEGER NOT NULL,
+            multi_host_clear_count INTEGER NOT NULL,
+            multi_guest_clear_count INTEGER NOT NULL,
+            single_rank_ss_count INTEGER NOT NULL,
+            rank_ss_count INTEGER NOT NULL,
+            rank_s_count INTEGER NOT NULL,
+            rank_a_count INTEGER NOT NULL,
+            rank_b_count INTEGER NOT NULL,
+            challenge_dungeon_clear_count INTEGER NOT NULL,
+            single_score_max INTEGER NOT NULL,
+            single_clear_time_min INTEGER NOT NULL,
+            boss_battle_clear_count INTEGER NOT NULL,
+            skill_use_count INTEGER NOT NULL
+        );
+        CREATE TABLE players_active_missions (
+            id INTEGER NOT NULL,
+            progress INTEGER NOT NULL,
+            player_id INTEGER NOT NULL,
+            PRIMARY KEY (id, player_id)
+        );
+        CREATE TABLE players_active_missions_stages (
+            id INTEGER NOT NULL,
+            status INTEGER NOT NULL,
+            player_id INTEGER NOT NULL,
+            mission_id INTEGER NOT NULL,
+            PRIMARY KEY (id, mission_id, player_id)
+        );
+        CREATE TABLE players_active_quests (
+            player_id INTEGER PRIMARY KEY,
+            play_id TEXT NOT NULL,
+            quest_id INTEGER NOT NULL,
+            category INTEGER NOT NULL,
+            use_boss_boost_point INTEGER NOT NULL,
+            use_boost_point INTEGER NOT NULL,
+            is_auto_start_mode INTEGER NOT NULL,
+            is_multi INTEGER NOT NULL,
+            coordinator_origin TEXT,
+            room_number TEXT,
+            battle_session_id TEXT,
+            entry_item_id INTEGER,
+            entry_item_count INTEGER,
+            event_id INTEGER,
+            continue_count INTEGER NOT NULL
+        );
+        INSERT INTO players (
+            id, stamina, boost_point, boss_boost_point, vmoney, free_vmoney,
+            free_mana, paid_mana, rank_point, star_crumb, bond_token, exp_pool,
+            degree_id, total_stamina_used, total_powerflips, total_dashes,
+            total_mana_obtained, max_combo_achieved
+        ) VALUES (2, 64, 3, 2, 11, 12, 2290, 17, 439, 13, 14, 15, 16, 18, 19, 20, 21, 22);
+        INSERT INTO players_items (id, amount, player_id) VALUES (10, 4, 2), (20, 7, 2);
+        INSERT INTO players_quest_progress (
+            section, quest_id, finished, unlocked, high_score, clear_rank,
+            best_elapsed_time_ms, leader_character_id, multi_clear_count,
+            host_finished, player_id
+        ) VALUES (2, 1001002, 1, 1, 0, 1, 1000, 1, 1, 1, 2);
+        INSERT INTO players_mission_battle_counters VALUES (
+            2, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+        );
+        INSERT INTO players_active_missions (id, progress, player_id) VALUES (7, 1, 2);
+        INSERT INTO players_active_missions_stages (id, status, player_id, mission_id)
+            VALUES (1, 2, 2, 7);
+    `)
+    return database
+}
+
+function settlementHarness(database, { mutateDuplicate, responses, neverAt } = {}) {
+    const requests = []
+    let calls = 0
+    return {
+        requests,
+        async gamePost(url, route, payload) {
+            calls++
+            requests.push({ url, route, payload })
+            if (calls === neverAt) return new Promise(() => {})
+            if (calls === 2) mutateDuplicate?.(database)
+            return responses?.[calls - 1] ?? (calls === 1
+                ? { status: 200, body: { data_headers: { result_code: 1 } } }
+                : { status: 400, body: { data_headers: { result_code: 4 } } })
+        },
+        withDatabase(_dataKey, operation) {
+            return operation(database)
+        },
+    }
+}
+
+function finishOptions(timeoutMs = 50) {
+    return {
+        roomNumber: 123456,
+        quest: BOSS_QUEST,
+        playId: "play-1",
+        timeoutMs,
     }
 }
 
@@ -401,6 +545,181 @@ test("playerState queries tickets only when a valid ticketItemId option is provi
         assert.throws(
             () => playerState(harness, node, { ticketItemId }),
             /player state validation failed/,
+        )
+    }
+})
+
+test("finishPlayer requires first success, rejects duplicate, and reuses one payload", async t => {
+    const database = createSettlementDatabase()
+    t.after(() => database.close())
+    const harness = settlementHarness(database)
+    const node = {
+        dataKey: "identity",
+        playerId: 2,
+        url: "http://game.invalid",
+        viewerId: "viewer-1",
+    }
+
+    const state = await finishPlayer(harness, node, finishOptions())
+
+    assert.deepEqual(state.player, {
+        stamina: 64,
+        boostPoint: 3,
+        bossBoostPoint: 2,
+        vmoney: 11,
+        freeVmoney: 12,
+        freeMana: 2290,
+        paidMana: 17,
+        rankPoint: 439,
+        starCrumb: 13,
+        bondToken: 14,
+        expPool: 15,
+        degreeId: 16,
+        totalStaminaUsed: 18,
+        totalPowerflips: 19,
+        totalDashes: 20,
+        totalManaObtained: 21,
+        maxComboAchieved: 22,
+    })
+    assert.deepEqual(state.activeQuests, [])
+    assert.equal(harness.requests.length, 2)
+    assert.equal(harness.requests[0].route, "/api/index.php/multi_battle_quest/finish")
+    assert.strictEqual(harness.requests[1].payload, harness.requests[0].payload)
+    assert.deepEqual(harness.requests[0].payload, buildFinishPayload(
+        node,
+        123456,
+        BOSS_QUEST,
+        "play-1",
+    ))
+})
+
+test("finishPlayer rejects an unsuccessful first finish and successful duplicate", async t => {
+    const cases = [
+        [
+            { status: 200, body: { data_headers: { result_code: 4 } } },
+            { status: 400, body: { data_headers: { result_code: 4 } } },
+            "finish response failed",
+        ],
+        [
+            { status: 200, body: { data_headers: { result_code: 1 } } },
+            { status: 200, body: { data_headers: { result_code: 1 } } },
+            "duplicate finish response failed",
+        ],
+    ]
+    for (const [first, duplicate, expected] of cases) {
+        const database = createSettlementDatabase()
+        t.after(() => database.close())
+        const harness = settlementHarness(database, { responses: [first, duplicate] })
+        await assert.rejects(
+            finishPlayer(harness, {
+                dataKey: "identity",
+                playerId: 2,
+                url: "http://game.invalid",
+                viewerId: "viewer-1",
+            }, finishOptions()),
+            error => error.message === expected,
+        )
+    }
+})
+
+test("finishPlayer detects duplicate-only settlement fact mutations", async t => {
+    const mutations = [
+        database => database.prepare(`
+            UPDATE players_items SET amount = amount + 1 WHERE player_id = 2 AND id = 10
+        `).run(),
+        database => database.prepare(`
+            UPDATE players_active_missions SET progress = progress + 1
+            WHERE player_id = 2 AND id = 7
+        `).run(),
+        database => database.prepare(`
+            UPDATE players_quest_progress SET multi_clear_count = multi_clear_count + 1
+            WHERE player_id = 2 AND section = 2 AND quest_id = 1001002
+        `).run(),
+        database => database.prepare(`
+            UPDATE players SET exp_pool = exp_pool + 1 WHERE id = 2
+        `).run(),
+        database => database.prepare(`
+            UPDATE players SET boost_point = boost_point + 1 WHERE id = 2
+        `).run(),
+        database => database.prepare(`
+            UPDATE players SET boss_boost_point = boss_boost_point + 1 WHERE id = 2
+        `).run(),
+        database => database.prepare(`
+            UPDATE players SET total_mana_obtained = total_mana_obtained + 1 WHERE id = 2
+        `).run(),
+    ]
+    for (const mutateDuplicate of mutations) {
+        const database = createSettlementDatabase()
+        t.after(() => database.close())
+        const harness = settlementHarness(database, { mutateDuplicate })
+        await assert.rejects(
+            finishPlayer(harness, {
+                dataKey: "identity",
+                playerId: 2,
+                url: "http://game.invalid",
+                viewerId: "viewer-1",
+            }, finishOptions()),
+            error => error.message === "duplicate finish state failed",
+        )
+    }
+})
+
+test("finishPlayer bounds first and duplicate requests", async t => {
+    for (const neverAt of [1, 2]) {
+        const database = createSettlementDatabase()
+        t.after(() => database.close())
+        const harness = settlementHarness(database, { neverAt })
+        await assert.rejects(
+            Promise.race([
+                finishPlayer(harness, {
+                    dataKey: "identity",
+                    playerId: 2,
+                    url: "http://game.invalid",
+                    viewerId: "viewer-1",
+                }, finishOptions(10)),
+                new Promise((_, reject) => setTimeout(
+                    () => reject(new Error("test observed unbounded finish")),
+                    50,
+                )),
+            ]),
+            error => error.message === (neverAt === 1
+                ? "finish request timed out"
+                : "duplicate finish request timed out"),
+        )
+    }
+})
+
+test("finishPlayer sanitizes raw request errors", async t => {
+    for (const failureAt of [1, 2]) {
+        const database = createSettlementDatabase()
+        t.after(() => database.close())
+        let calls = 0
+        const harness = settlementHarness(database, {
+            responses: [
+                { status: 200, body: { data_headers: { result_code: 1 } } },
+                { status: 400, body: { data_headers: { result_code: 4 } } },
+            ],
+        })
+        const original = harness.gamePost
+        harness.gamePost = (...args) => {
+            calls++
+            if (calls === failureAt) throw rawProtocolError()
+            return original(...args)
+        }
+        await assert.rejects(
+            finishPlayer(harness, {
+                dataKey: "identity",
+                playerId: 2,
+                url: "http://game.invalid",
+                viewerId: SENSITIVE_PROTOCOL_VALUES[0],
+            }, finishOptions()),
+            error => {
+                assertSanitizedErrorGraph(error)
+                assert.equal(error.message, failureAt === 1
+                    ? "finish request failed"
+                    : "duplicate finish request failed")
+                return true
+            },
         )
     }
 })
