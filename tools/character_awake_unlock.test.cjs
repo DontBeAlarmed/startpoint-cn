@@ -310,6 +310,9 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     const shopReadOnlyBlock = shopSource.split('fastify.post("/get_sales_list"')[1]
         .split('fastify.post("/bulk_buy"')[0]
     const shopBulkBuyBlock = shopSource.split('fastify.post("/bulk_buy"')[1]
+    const genericShopPurchaseBlock = shopPurchaseSource
+        .split("export function executeGenericShopPurchaseSync(")[1]
+        .split("export function executeGenericShopBatchPurchaseSync(")[0]
     assert.equal(countOccurrences(shopSource, "reconcileAwakeUnlockCharacterList("), 2)
     assert.equal(enhancementBlock.includes("reconcileAwakeUnlockCharacterList("), false)
     assert.equal(
@@ -318,8 +321,8 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
         true
     )
     assert.equal(
-        shopPurchaseSource.indexOf("dependencies.addPurchaseCounts(")
-            > shopPurchaseSource.indexOf("dependencies.grantRewards("),
+        genericShopPurchaseBlock.indexOf("dependencies.addPurchaseCounts(")
+            > genericShopPurchaseBlock.indexOf("dependencies.grantRewards("),
         true
     )
     assert.deepEqual(

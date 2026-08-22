@@ -448,6 +448,11 @@
             },
             {
               "category": 5,
+              "id": 3000,
+              "progress": 60
+            },
+            {
+              "category": 5,
               "id": 3010,
               "progress": 60
             },
@@ -632,6 +637,12 @@
             },
             {
               "category": 5,
+              "mission_id": 3000,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 5,
               "mission_id": 15000,
               "stage": 1,
               "status": 1
@@ -788,6 +799,11 @@
             },
             {
               "mission_category_id": 5,
+              "mission_id": 3000,
+              "mission_reward_id": 3000001
+            },
+            {
+              "mission_category_id": 5,
               "mission_id": 15000,
               "mission_reward_id": 15000001
             },
@@ -927,6 +943,10 @@
             "clear_rank": 5,
             "degree_list": [
               {
+                "degree_id": 3000,
+                "viewer_id": 800000018
+              },
+              {
                 "degree_id": 15000,
                 "viewer_id": 800000018
               },
@@ -1002,6 +1022,11 @@
                 "mission_category_id": 1,
                 "mission_id": 37,
                 "mission_reward_id": 37003
+              },
+              {
+                "mission_category_id": 5,
+                "mission_id": 3000,
+                "mission_reward_id": 3000001
               },
               {
                 "mission_category_id": 5,
@@ -1088,11 +1113,11 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "72e2c2ade754a2fb54b94f2fe04dce20bc2799198461f0d1f2a49ff1baf3287f",
+      "behaviorSha256": "f986576cd30d0ab1a447d185530e1ea7b1d2c3363df3d313e0b75ec34a2194a3",
       "sql": {
-        "statements": 123,
+        "statements": 124,
         "selectStatements": 65,
-        "writeStatements": 48,
+        "writeStatements": 49,
         "transactionStatements": 10,
         "byTable": {
           "players": {
@@ -1166,9 +1191,9 @@
             "writes": 1
           },
           "players_degrees": {
-            "statements": 3,
+            "statements": 4,
             "reads": 0,
-            "writes": 3
+            "writes": 4
           },
           "players_equipment": {
             "statements": 2,
@@ -1371,9 +1396,9 @@
       },
       "behaviorSha256": "ece93a5759d57939832dd018021034f586638e6c14584eb71c241c6f4ff00a9e",
       "sql": {
-        "statements": 122,
+        "statements": 123,
         "selectStatements": 64,
-        "writeStatements": 48,
+        "writeStatements": 49,
         "transactionStatements": 10,
         "byTable": {
           "players": {
@@ -1447,9 +1472,9 @@
             "writes": 1
           },
           "players_degrees": {
-            "statements": 3,
+            "statements": 4,
             "reads": 0,
-            "writes": 3
+            "writes": 4
           },
           "players_equipment": {
             "statements": 2,
@@ -2419,6 +2444,11 @@
             },
             {
               "category": 5,
+              "id": 3000,
+              "progress": 60
+            },
+            {
+              "category": 5,
               "id": 3010,
               "progress": 60
             },
@@ -2599,6 +2629,12 @@
               "category": 1,
               "mission_id": 37,
               "stage": 3,
+              "status": 1
+            },
+            {
+              "category": 5,
+              "mission_id": 3000,
+              "stage": 1,
               "status": 1
             },
             {
@@ -2843,6 +2879,11 @@
               },
               {
                 "category": 5,
+                "id": 3000,
+                "progress": 60
+              },
+              {
+                "category": 5,
                 "id": 3010,
                 "progress": 60
               },
@@ -3027,6 +3068,12 @@
               },
               {
                 "category": 5,
+                "mission_id": 3000,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 5,
                 "mission_id": 15000,
                 "stage": 1,
                 "status": 1
@@ -3177,6 +3224,11 @@
                 "mission_category_id": 1,
                 "mission_id": 37,
                 "mission_reward_id": 37003
+              },
+              {
+                "mission_category_id": 5,
+                "mission_id": 3000,
+                "mission_reward_id": 3000001
               },
               {
                 "mission_category_id": 5,
@@ -3409,6 +3461,11 @@
               },
               {
                 "category": 5,
+                "id": 3000,
+                "progress": 60
+              },
+              {
+                "category": 5,
                 "id": 3010,
                 "progress": 60
               },
@@ -3606,6 +3663,12 @@
               {
                 "category": 2,
                 "mission_id": 14,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 5,
+                "mission_id": 3000,
                 "stage": 1,
                 "status": 1
               },
@@ -3898,7 +3961,7 @@
           }
         }
       },
-      "behaviorSha256": "c21386221dbfc1363e143d394a84c6557e24625b2722e16b3c4ac283eae469e2",
+      "behaviorSha256": "fd4065b26542248c03268f017e59d4e95d2c0be6b7bd74d8efd679d0e10c5082",
       "sql": {
         "statements": 96,
         "selectStatements": 61,
