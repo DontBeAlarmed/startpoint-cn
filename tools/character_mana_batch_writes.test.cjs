@@ -242,6 +242,36 @@ test("mana node batch limit reserves three SQLite variables per inserted node", 
     )
 })
 
+test("mana node insert executes the exact 10922-node SQLite boundary", async () => {
+    const { playerId } = await createPlayer("batch-insert-exact-boundary")
+    const boundaryNodeIds = Array.from(
+        { length: EXPECTED_MAX_MANA_NODE_BATCH_SIZE },
+        (_, index) => index + 1,
+    )
+
+    const { statements } = await captureSql(() => {
+        insertPlayerCharacterManaNodesSync(playerId, CHARACTER_ID, boundaryNodeIds)
+    })
+
+    const inserts = manaNodeInserts(statements)
+    assert.equal(inserts.length, 1, inserts.join("\n---\n"))
+    const valuesSql = inserts[0].slice(inserts[0].search(/\bVALUES\b/i))
+    assert.equal(
+        (valuesSql.match(/\(/g) ?? []).length,
+        EXPECTED_MAX_MANA_NODE_BATCH_SIZE,
+        inserts[0],
+    )
+    assert.deepEqual(database.prepare(`
+        SELECT COUNT(*) AS count, MIN(value) AS first, MAX(value) AS last
+        FROM players_characters_mana_nodes
+        WHERE player_id = ? AND character_id = ?
+    `).get(playerId, CHARACTER_ID), {
+        count: EXPECTED_MAX_MANA_NODE_BATCH_SIZE,
+        first: 1,
+        last: EXPECTED_MAX_MANA_NODE_BATCH_SIZE,
+    })
+})
+
 test("mana node insert rejects unique IDs above the placeholder boundary before SQL", async () => {
     const { playerId } = await createPlayer("batch-boundary")
     const oversizedNodeIds = Array.from(

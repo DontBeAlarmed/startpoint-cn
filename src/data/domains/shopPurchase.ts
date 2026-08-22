@@ -172,11 +172,45 @@ export function getPlayerShopPurchaseCountsByTypeBulkSync(
 ): ReadonlyMap<string, ShopPurchaseCountSnapshot> {
     if (queries.length === 0) return new Map()
 
+    const counterRequests = new Map<string, readonly [number, number, string, string]>()
+    const legacyItemIds = new Set<number>()
+    for (const query of queries) {
+        const addCounterRequest = (
+            shopType: number,
+            periodType: "daily" | "monthly" | "total",
+            periodKey: string,
+        ) => {
+            counterRequests.set(
+                getCounterKey(shopType, query.shopItemId, periodType, periodKey),
+                [shopType, query.shopItemId, periodType, periodKey],
+            )
+        }
+        addCounterRequest(query.shopType, "daily", query.keys.daily)
+        addCounterRequest(query.shopType, "monthly", query.keys.monthly)
+        addCounterRequest(query.shopType, "total", "")
+        addCounterRequest(-1, "total", "")
+        legacyItemIds.add(query.shopItemId)
+    }
+
     const rows = getDb().prepare(`
-        SELECT shop_type, shop_item_id, period_type, period_key, count
-        FROM players_shop_purchase_counters
-        WHERE player_id = ?
-    `).all(playerId) as Array<{
+        WITH requested(shop_type, shop_item_id, period_type, period_key) AS (
+            SELECT
+                json_extract(value, '$[0]'),
+                json_extract(value, '$[1]'),
+                json_extract(value, '$[2]'),
+                json_extract(value, '$[3]')
+            FROM json_each(?)
+        )
+        SELECT counters.shop_type, counters.shop_item_id,
+            counters.period_type, counters.period_key, counters.count
+        FROM requested
+        CROSS JOIN players_shop_purchase_counters AS counters
+        WHERE counters.player_id = ?
+          AND counters.shop_type = requested.shop_type
+          AND counters.shop_item_id = requested.shop_item_id
+          AND counters.period_type = requested.period_type
+          AND counters.period_key = requested.period_key
+    `).all(JSON.stringify([...counterRequests.values()]), playerId) as Array<{
         shop_type: number
         shop_item_id: number
         period_type: "daily" | "monthly" | "total"
@@ -191,10 +225,15 @@ export function getPlayerShopPurchaseCountsByTypeBulkSync(
         )
     }
     const legacyRows = getDb().prepare(`
-        SELECT shop_item_id, count
-        FROM players_shop_purchases
-        WHERE player_id = ?
-    `).all(playerId) as Array<{ shop_item_id: number, count: unknown }>
+        SELECT purchases.shop_item_id, purchases.count
+        FROM json_each(?) AS requested
+        CROSS JOIN players_shop_purchases AS purchases
+        WHERE purchases.player_id = ?
+          AND purchases.shop_item_id = requested.value
+    `).all(JSON.stringify([...legacyItemIds]), playerId) as Array<{
+        shop_item_id: number
+        count: unknown
+    }>
     const legacyPurchases = new Map(
         legacyRows.map(row => [row.shop_item_id, row.count]),
     )

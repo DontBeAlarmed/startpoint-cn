@@ -21,6 +21,7 @@ const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snaps
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const {
+    getPlayerEquipmentsByIdsSync,
     getPlayerEquipmentSync,
     insertPlayerEquipmentSync,
     MAX_EQUIPMENT_BATCH_IDS,
@@ -171,6 +172,33 @@ test.after(async () => {
     fs.rmSync(databaseDirectory, { recursive: true, force: true })
     if (previousDataDirectory === undefined) delete process.env.DATA_DIR
     else process.env.DATA_DIR = previousDataDirectory
+})
+
+test("equipment batch reader executes the exact 32765-ID SQLite boundary", async () => {
+    const { playerId } = await createPlayer("batch-read-exact-boundary")
+    addEquipment(playerId, EXPECTED_MAX_EQUIPMENT_BATCH_IDS, {
+        level: 7,
+        stack: 2,
+        protection: true,
+    })
+
+    const { result, statements } = await captureSql(() => (
+        getPlayerEquipmentsByIdsSync(playerId, BOUNDARY_EQUIPMENT_IDS)
+    ))
+
+    const selects = equipmentSelects(statements)
+    assert.equal(selects.length, 1, selects.join("\n---\n"))
+    const inValues = selects[0].match(/\bid\s+IN\s*\(([^)]*)\)/i)?.[1]
+    assert.ok(inValues, selects[0])
+    assert.equal(inValues.split(",").length, EXPECTED_MAX_EQUIPMENT_BATCH_IDS)
+    assert.deepEqual(result, {
+        [EXPECTED_MAX_EQUIPMENT_BATCH_IDS]: {
+            level: 7,
+            enhancementLevel: 0,
+            protection: true,
+            stack: 2,
+        },
+    })
 })
 
 test("bulk_upgrade reads unique requested equipment once and returns the full inventory", async () => {

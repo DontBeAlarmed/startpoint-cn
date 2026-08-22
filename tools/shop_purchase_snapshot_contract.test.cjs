@@ -180,6 +180,131 @@ collectCheck(failures, "snapshot counters 查询计划", () => {
     )
 })
 
+const bulkItemId = 300030
+const secondBulkItemId = 300031
+const bulkQueries = [
+    { shopType: 4, shopItemId: bulkItemId, keys },
+    { shopType: 4, shopItemId: bulkItemId, keys },
+    {
+        shopType: 4,
+        shopItemId: bulkItemId,
+        keys: { daily: "2024-01-31", monthly: "2024-01" },
+    },
+    { shopType: 5, shopItemId: bulkItemId, keys },
+    { shopType: 4, shopItemId: secondBulkItemId, keys },
+]
+db.prepare(`
+    INSERT INTO players_shop_purchase_counters (
+        player_id, shop_type, shop_item_id, period_type, period_key, count
+    ) VALUES
+        (?, 4, ?, 'daily', '2024-02-01', 2),
+        (?, 4, ?, 'daily', '2024-01-31', 3),
+        (?, 4, ?, 'monthly', '2024-02', 5),
+        (?, 4, ?, 'monthly', '2024-01', 7),
+        (?, 4, ?, 'total', '', 11),
+        (?, 5, ?, 'daily', '2024-02-01', 13),
+        (?, 5, ?, 'monthly', '2024-02', 17),
+        (?, 5, ?, 'total', '', 19),
+        (?, -1, ?, 'total', '', 23),
+        (?, 4, ?, 'daily', '2024-02-01', 29),
+        (?, 4, ?, 'monthly', '2024-02', 31),
+        (?, 4, ?, 'total', '', 37),
+        (?, -1, ?, 'total', '', 41),
+        (?, 4, ?, 'daily', '1999-12-31', 1000),
+        (?, 4, ?, 'monthly', '1999-12', 1000),
+        (?, 6, ?, 'total', '', 1000)
+`).run(
+    playerId, bulkItemId,
+    playerId, bulkItemId,
+    playerId, bulkItemId,
+    playerId, bulkItemId,
+    playerId, bulkItemId,
+    playerId, bulkItemId,
+    playerId, bulkItemId,
+    playerId, bulkItemId,
+    playerId, bulkItemId,
+    playerId, secondBulkItemId,
+    playerId, secondBulkItemId,
+    playerId, secondBulkItemId,
+    playerId, secondBulkItemId,
+    playerId, bulkItemId,
+    playerId, bulkItemId,
+    playerId, bulkItemId,
+)
+db.prepare(`
+    INSERT INTO players_shop_purchases (player_id, shop_item_id, count)
+    VALUES (?, ?, 43), (?, ?, 47)
+`).run(playerId, bulkItemId, playerId, secondBulkItemId)
+db.prepare(`
+    WITH RECURSIVE unrelated(value) AS (
+        VALUES (1)
+        UNION ALL
+        SELECT value + 1 FROM unrelated WHERE value < 1000
+    )
+    INSERT INTO players_shop_purchases (player_id, shop_item_id, count)
+    SELECT ?, 500000 + value, value
+    FROM unrelated
+`).run(playerId)
+
+const emptyBulkRead = captureSql(() => getPlayerShopPurchaseCountsByTypeBulkSync(playerId, []))
+collectCheck(failures, "空 bulk query", () => {
+    assert.equal(emptyBulkRead.result.size, 0)
+    assert.deepEqual(emptyBulkRead.statements, [])
+})
+
+const bulkRead = captureSql(() => (
+    getPlayerShopPurchaseCountsByTypeBulkSync(playerId, bulkQueries)
+))
+const bulkTableReads = bulkRead.statements.filter(statement => (
+    /\b(?:FROM|JOIN)\s+players_shop_purchase(?:_counters|s)\b/i.test(statement)
+))
+const bulkCountersSelect = bulkTableReads.find(statement => (
+    /\b(?:FROM|JOIN)\s+players_shop_purchase_counters\b/i.test(statement)
+))
+const bulkLegacySelect = bulkTableReads.find(statement => (
+    /\b(?:FROM|JOIN)\s+players_shop_purchases\b/i.test(statement)
+))
+assert.notEqual(bulkCountersSelect, undefined, "必须捕获 bulk counters 查询")
+assert.notEqual(bulkLegacySelect, undefined, "必须捕获 bulk legacy 查询")
+const bulkCountersPlan = db.prepare(`EXPLAIN QUERY PLAN ${bulkCountersSelect}`).all()
+    .map(row => row.detail)
+const bulkLegacyPlan = db.prepare(`EXPLAIN QUERY PLAN ${bulkLegacySelect}`).all()
+    .map(row => row.detail)
+console.log(`shop purchase bulk counters query plan: ${bulkCountersPlan.join(" | ")}`)
+console.log(`shop purchase bulk legacy query plan: ${bulkLegacyPlan.join(" | ")}`)
+
+collectCheck(failures, "bulk 精确范围与结果", () => {
+    assert.equal(bulkRead.statements.length, 2, bulkRead.statements.join("\n---\n"))
+    assert.equal(bulkTableReads.length, 2, bulkRead.statements.join("\n---\n"))
+    assert.match(
+        bulkCountersPlan.join("\n"),
+        /\(player_id=\? AND shop_type=\? AND shop_item_id=\? AND period_type=\? AND period_key=\?\)/,
+        `counters 查询必须按完整目标键定位，实际为 ${bulkCountersPlan.join(" | ")}`,
+    )
+    assert.match(
+        bulkLegacyPlan.join("\n"),
+        /\(player_id=\? AND shop_item_id=\?\)/,
+        `legacy 查询必须按目标 item 定位，实际为 ${bulkLegacyPlan.join(" | ")}`,
+    )
+    assert.equal(bulkRead.result.size, 4, "重复 query 必须折叠为同一 snapshot key")
+    assert.deepEqual(
+        bulkRead.result.get(getShopPurchaseQueryKey(bulkQueries[0])),
+        { daily: 2, monthly: 5, total: 54 },
+    )
+    assert.deepEqual(
+        bulkRead.result.get(getShopPurchaseQueryKey(bulkQueries[2])),
+        { daily: 3, monthly: 7, total: 54 },
+    )
+    assert.deepEqual(
+        bulkRead.result.get(getShopPurchaseQueryKey(bulkQueries[3])),
+        { daily: 13, monthly: 17, total: 62 },
+    )
+    assert.deepEqual(
+        bulkRead.result.get(getShopPurchaseQueryKey(bulkQueries[4])),
+        { daily: 29, monthly: 31, total: 84 },
+    )
+})
+
 const plainCountsItemId = 300021
 db.prepare(`
     INSERT INTO players_shop_purchase_counters (

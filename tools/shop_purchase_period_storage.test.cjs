@@ -32,7 +32,10 @@ function captureSql(operation) {
 
 function summarizePurchaseCountSql(statements) {
     return {
-        selects: statements.filter(statement => /^\s*SELECT\b/i.test(statement)).length,
+        selects: statements.filter(statement => (
+            /^\s*(?:SELECT|WITH)\b/i.test(statement)
+            && /\b(?:FROM|JOIN)\s+players_shop_purchase(?:_counters|s)\b/i.test(statement)
+        )).length,
         upserts: statements.filter(statement => (
             /^\s*INSERT\s+INTO\s+players_shop_purchase_counters\b/i.test(statement)
         )).length,
