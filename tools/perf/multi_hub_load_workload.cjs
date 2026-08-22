@@ -15,6 +15,7 @@ const {
     createBehaviorSignature,
     createMultiHubAdmission,
 } = require("./multi_hub_load_metrics.cjs")
+const { atomicWriteFile } = require("./safe_output.cjs")
 
 const FIXED_TIME = "2024-08-14T12:00:00.000Z"
 const DEFAULT_CLEANUP_TIMEOUT_MS = 30_000
@@ -406,11 +407,12 @@ async function runCli({
     argv = process.argv.slice(2),
     runWorkload = runMultiHubLoadWorkload,
     writeStdout = value => process.stdout.write(value),
+    fileSystem = fs,
 } = {}) {
     const options = parseArgs(argv)
     const report = await runWorkload({ profile: options.profile })
     const output = `${JSON.stringify(report, null, 2)}\n`
-    if (options.output) fs.writeFileSync(options.output, output, "utf8")
+    if (options.output) atomicWriteFile(options.output, output, fileSystem)
     writeStdout(output)
     return report.gate?.admitted === true ? 0 : 1
 }

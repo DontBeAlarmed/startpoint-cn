@@ -18,6 +18,7 @@ const defaultCompatibilityHeaders = Object.freeze({
 const defaultPeerCleanupTimeoutMs = 5_000
 const defaultCredentialTimeoutMs = 15_000
 const defaultRequestTimeoutMs = 15_000
+const defaultPeerMaxBufferBytes = 1024 * 1024
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms))
@@ -173,7 +174,7 @@ class RuntimeProcess {
 }
 
 class TcpPeer {
-    constructor(label, socket) {
+    constructor(label, socket, maxBufferBytes = defaultPeerMaxBufferBytes) {
         this.label = label
         this.socket = socket
         this.messages = []
@@ -181,6 +182,7 @@ class TcpPeer {
         this.buffer = ""
         this.closed = false
         this.terminalError = null
+        this.maxBufferBytes = maxBufferBytes
         this.closedPromise = new Promise(resolve => {
             this.resolveClosed = resolve
         })
@@ -198,14 +200,36 @@ class TcpPeer {
     }
 
     onData(chunk) {
-        this.buffer += chunk
-        while (this.buffer.includes("\0")) {
-            const index = this.buffer.indexOf("\0")
-            const raw = this.buffer.slice(0, index)
-            this.buffer = this.buffer.slice(index + 1)
-            if (raw.trim()) this.messages.push(JSON.parse(raw))
+        if (this.terminalError) return
+        try {
+            let remaining = chunk
+            while (remaining.length > 0) {
+                const delimiter = remaining.indexOf("\0")
+                const fragment = delimiter < 0 ? remaining : remaining.slice(0, delimiter)
+                if (Buffer.byteLength(this.buffer) + Buffer.byteLength(fragment)
+                    > this.maxBufferBytes) {
+                    this.failProtocol("receive limit exceeded")
+                    return
+                }
+                this.buffer += fragment
+                if (delimiter < 0) break
+                const raw = this.buffer
+                this.buffer = ""
+                remaining = remaining.slice(delimiter + 1)
+                if (raw.trim()) this.messages.push(JSON.parse(raw))
+            }
+            this.flushWaiters()
+        } catch {
+            this.failProtocol("malformed TCP frame")
         }
-        this.flushWaiters()
+    }
+
+    failProtocol(reason) {
+        const error = new Error(`${this.label} ${reason}`)
+        this.buffer = ""
+        this.messages.length = 0
+        this.terminate(error)
+        if (!this.socket.destroyed) this.socket.destroy()
     }
 
     flushWaiters() {
@@ -265,10 +289,13 @@ class MultiHubProcessHarness {
         const credentialTimeoutMs = dependencies.credentialTimeoutMs
             ?? defaultCredentialTimeoutMs
         const requestTimeoutMs = dependencies.requestTimeoutMs ?? defaultRequestTimeoutMs
+        const peerMaxBufferBytes = dependencies.peerMaxBufferBytes
+            ?? defaultPeerMaxBufferBytes
         for (const [name, timeoutMs] of [
             ["peerCleanupTimeoutMs", peerCleanupTimeoutMs],
             ["credentialTimeoutMs", credentialTimeoutMs],
             ["requestTimeoutMs", requestTimeoutMs],
+            ["peerMaxBufferBytes", peerMaxBufferBytes],
         ]) {
             if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
                 throw new TypeError(`${name} must be a positive safe integer`)
@@ -294,6 +321,7 @@ class MultiHubProcessHarness {
         this.peerCleanupTimeoutMs = peerCleanupTimeoutMs
         this.credentialTimeoutMs = credentialTimeoutMs
         this.requestTimeoutMs = requestTimeoutMs
+        this.peerMaxBufferBytes = peerMaxBufferBytes
         this.spawnSync = dependencies.spawnSync ?? spawnSync
         this.spawnProcess = dependencies.spawnProcess ?? spawn
         this.createConnection = dependencies.createConnection ?? net.createConnection
@@ -529,7 +557,7 @@ class MultiHubProcessHarness {
             if (!socket.destroyed) socket.destroy()
             throw new Error("harness cleanup started during TCP connect")
         }
-        const peer = new TcpPeer(label, socket)
+        const peer = new TcpPeer(label, socket, this.peerMaxBufferBytes)
         this.peers.push(peer)
         peer.send(handshake)
         return peer

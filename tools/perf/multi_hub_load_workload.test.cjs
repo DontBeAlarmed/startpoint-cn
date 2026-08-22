@@ -667,6 +667,63 @@ test("runCli writes identical JSON and returns one for a rejected gate", async (
     }
 })
 
+test("runCli rejects symlink and hard-link output targets without emitting JSON", {
+    skip: process.platform === "win32" ? "link creation requires elevated privileges" : false,
+}, async t => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "multi-workload-output-links-"))
+    const target = path.join(directory, "target.json")
+    fs.writeFileSync(target, "original", "utf8")
+    const candidates = []
+    try {
+        const symlink = path.join(directory, "symlink.json")
+        fs.symlinkSync("target.json", symlink)
+        candidates.push(symlink)
+        const hardlink = path.join(directory, "hardlink.json")
+        try {
+            fs.linkSync(target, hardlink)
+            candidates.push(hardlink)
+        } catch (error) {
+            if (!["EACCES", "ENOSYS", "EPERM"].includes(error?.code)) throw error
+            t.diagnostic(`hard links unavailable: ${error.code}`)
+        }
+        for (const output of candidates) {
+            let stdout = ""
+            await assert.rejects(workload.runCli({
+                argv: ["--output", output],
+                runWorkload: async () => ({ gate: { admitted: true } }),
+                writeStdout: value => { stdout += value },
+            }), /symbolic|symlink|hard.?link|regular/i)
+            assert.equal(stdout, "")
+            assert.equal(fs.readFileSync(target, "utf8"), "original")
+        }
+    } finally {
+        fs.rmSync(directory, { recursive: true, force: true })
+    }
+})
+
+test("runCli preserves output and removes its temporary file when rename fails", async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "multi-workload-output-rename-"))
+    const output = path.join(directory, "report.json")
+    fs.writeFileSync(output, "original", { mode: 0o640 })
+    const fileSystem = Object.create(fs)
+    fileSystem.renameSync = () => { throw new Error("injected rename failure") }
+    let stdout = ""
+    try {
+        await assert.rejects(workload.runCli({
+            argv: ["--output", output],
+            runWorkload: async () => ({ gate: { admitted: true } }),
+            writeStdout: value => { stdout += value },
+            fileSystem,
+        }), /rename failure/)
+        assert.equal(stdout, "")
+        assert.equal(fs.readFileSync(output, "utf8"), "original")
+        assert.equal(fs.statSync(output).mode & 0o777, 0o640)
+        assert.deepEqual(fs.readdirSync(directory), ["report.json"])
+    } finally {
+        fs.rmSync(directory, { recursive: true, force: true })
+    }
+})
+
 test("runCli defaults to smoke and returns zero for its admitted gate", async () => {
     let observedProfile
     let stdout = ""

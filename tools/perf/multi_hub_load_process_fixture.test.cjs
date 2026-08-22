@@ -1,7 +1,8 @@
 "use strict"
 
 const assert = require("node:assert/strict")
-const { EventEmitter } = require("node:events")
+const { spawn } = require("node:child_process")
+const { EventEmitter, once } = require("node:events")
 const { PassThrough } = require("node:stream")
 const test = require("node:test")
 
@@ -38,6 +39,44 @@ function emergencyKillProcess(pid) {
         return true
     } catch (error) {
         if (error?.code === "ESRCH") return false
+        throw error
+    }
+}
+
+async function probeNegativeProcessGroupSignals(t) {
+    const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+        detached: true,
+        stdio: "ignore",
+    })
+    const closed = once(child, "close")
+    const stopDirectChild = async () => {
+        if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL")
+        await Promise.race([
+            closed,
+            new Promise((_, reject) => setTimeout(
+                () => reject(new Error("process-group capability probe child did not stop")),
+                1_000,
+            )),
+        ])
+    }
+    try {
+        await once(child, "spawn")
+        process.kill(-child.pid, 0)
+        process.kill(-child.pid, "SIGTERM")
+        await Promise.race([
+            closed,
+            new Promise((_, reject) => setTimeout(
+                () => reject(new Error("process-group capability probe TERM did not stop child")),
+                1_000,
+            )),
+        ])
+        return true
+    } catch (error) {
+        await stopDirectChild()
+        if (error?.code === "EPERM") {
+            t.skip("negative process-group signals are not permitted")
+            return false
+        }
         throw error
     }
 }
@@ -152,6 +191,7 @@ test("real POSIX cleanup kills a TERM-resistant descendant after its parent exit
     timeout: 10_000,
     skip: process.platform === "win32" ? "POSIX process-group coverage" : false,
 }, async t => {
+    if (!await probeNegativeProcessGroupSignals(t)) return
     const descendantScript = "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)"
     const parentScript = [
         "const { spawn } = require('node:child_process')",

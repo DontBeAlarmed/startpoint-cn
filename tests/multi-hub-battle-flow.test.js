@@ -17,6 +17,7 @@ const {
     openBattlePeers,
     openRoomParty,
     playerState,
+    settlementSnapshotAudit,
     signUp,
 } = require("./helpers/multi-hub-battle-flow")
 const { createBehaviorSignature } = require("../tools/perf/multi_hub_load_metrics.cjs")
@@ -45,6 +46,7 @@ function createSettlementDatabase() {
         CREATE TABLE players (
             id INTEGER PRIMARY KEY,
             stamina INTEGER NOT NULL,
+            stamina_heal_time TEXT NOT NULL,
             boost_point INTEGER NOT NULL,
             boss_boost_point INTEGER NOT NULL,
             vmoney INTEGER NOT NULL,
@@ -131,12 +133,35 @@ function createSettlementDatabase() {
             event_id INTEGER,
             continue_count INTEGER NOT NULL
         );
+        CREATE TABLE players_characters (
+            id INTEGER NOT NULL,
+            exp INTEGER NOT NULL,
+            update_time TEXT NOT NULL,
+            opaque_state BLOB,
+            player_id INTEGER NOT NULL,
+            PRIMARY KEY (id, player_id)
+        );
+        CREATE TABLE players_character_quest_clears (
+            player_id INTEGER NOT NULL,
+            character_id INTEGER NOT NULL,
+            clear_count INTEGER NOT NULL,
+            multi_count INTEGER NOT NULL,
+            PRIMARY KEY (player_id, character_id)
+        );
+        CREATE TABLE sessions (
+            token TEXT NOT NULL,
+            account_id INTEGER NOT NULL
+        );
+        CREATE TABLE global_rewards (
+            id INTEGER PRIMARY KEY,
+            amount INTEGER NOT NULL
+        );
         INSERT INTO players (
-            id, stamina, boost_point, boss_boost_point, vmoney, free_vmoney,
+            id, stamina, stamina_heal_time, boost_point, boss_boost_point, vmoney, free_vmoney,
             free_mana, paid_mana, rank_point, star_crumb, bond_token, exp_pool,
             degree_id, total_stamina_used, total_powerflips, total_dashes,
             total_mana_obtained, max_combo_achieved
-        ) VALUES (2, 64, 3, 2, 11, 12, 2290, 17, 439, 13, 14, 15, 16, 18, 19, 20, 21, 22);
+        ) VALUES (2, 64, '2026-08-22T00:00:00.000Z', 3, 2, 11, 12, 2290, 17, 439, 13, 14, 15, 16, 18, 19, 20, 21, 22);
         INSERT INTO players_items (id, amount, player_id) VALUES (10, 4, 2), (20, 7, 2);
         INSERT INTO players_quest_progress (
             section, quest_id, finished, unlocked, high_score, clear_rank,
@@ -149,11 +174,24 @@ function createSettlementDatabase() {
         INSERT INTO players_active_missions (id, progress, player_id) VALUES (7, 1, 2);
         INSERT INTO players_active_missions_stages (id, status, player_id, mission_id)
             VALUES (1, 2, 2, 7);
+        INSERT INTO players_characters (id, exp, update_time, opaque_state, player_id)
+            VALUES (1, 100, '2026-08-22T00:00:00.000Z', x'00ff10', 2);
+        INSERT INTO players_character_quest_clears (
+            player_id, character_id, clear_count, multi_count
+        ) VALUES (2, 1, 3, 4);
+        INSERT INTO sessions (token, account_id) VALUES ('session-fixture', 2);
+        INSERT INTO global_rewards (id, amount) VALUES (1, 99);
     `)
     return database
 }
 
-function settlementHarness(database, { mutateDuplicate, responses, neverAt } = {}) {
+function settlementHarness(database, {
+    mutateDuplicate,
+    mutateFirst,
+    observeSql,
+    responses,
+    neverAt,
+} = {}) {
     const requests = []
     let calls = 0
     return {
@@ -162,13 +200,20 @@ function settlementHarness(database, { mutateDuplicate, responses, neverAt } = {
             calls++
             requests.push({ url, route, payload })
             if (calls === neverAt) return new Promise(() => {})
+            if (calls === 1) mutateFirst?.(database)
             if (calls === 2) mutateDuplicate?.(database)
             return responses?.[calls - 1] ?? (calls === 1
                 ? { status: 200, body: { data_headers: { result_code: 1 } } }
                 : { status: 400, body: { data_headers: { result_code: 4 } } })
         },
         withDatabase(_dataKey, operation) {
-            return operation(database)
+            if (!observeSql) return operation(database)
+            return operation({
+                prepare(sql) {
+                    observeSql(String(sql))
+                    return database.prepare(sql)
+                },
+            })
         },
     }
 }
@@ -582,6 +627,27 @@ test("finishPlayer requires first success, rejects duplicate, and reuses one pay
         maxComboAchieved: 22,
     })
     assert.deepEqual(state.activeQuests, [])
+    assert.deepEqual(state.ownershipTables.players_characters[0].opaque_state, {
+        type: "blob",
+        base64: "AP8Q",
+    })
+    assert.equal(Object.hasOwn(state.ownershipTables, "sessions"), false)
+    assert.equal(Object.hasOwn(state.ownershipTables, "global_rewards"), false)
+    const audit = settlementSnapshotAudit(node.dataKey)
+    assert.equal(audit.snapshotQueries, 9)
+    assert.equal(audit.introspectionQueries, 11)
+    assert.deepEqual(audit.dynamicColumnsExcluded, [])
+    assert.deepEqual(audit.tables.map(table => table.name), [
+        "players",
+        "players_active_missions",
+        "players_active_missions_stages",
+        "players_active_quests",
+        "players_character_quest_clears",
+        "players_characters",
+        "players_items",
+        "players_mission_battle_counters",
+        "players_quest_progress",
+    ])
     assert.equal(harness.requests.length, 2)
     assert.equal(harness.requests[0].route, "/api/index.php/multi_battle_quest/finish")
     assert.strictEqual(harness.requests[1].payload, harness.requests[0].payload)
@@ -622,6 +688,69 @@ test("finishPlayer rejects an unsuccessful first finish and successful duplicate
     }
 })
 
+test("finishPlayer caches schema metadata and only snapshots player-owned tables", async t => {
+    const database = createSettlementDatabase()
+    t.after(() => database.close())
+    const statements = []
+    const node = {
+        dataKey: "metadata-cache-fixture",
+        playerId: 2,
+        url: "http://game.invalid",
+        viewerId: "viewer-1",
+    }
+    const state = await finishPlayer(
+        settlementHarness(database, { observeSql: sql => statements.push(sql) }),
+        node,
+        finishOptions(),
+    )
+
+    assert.equal(statements.filter(sql => /FROM sqlite_schema/.test(sql)).length, 1)
+    assert.equal(statements.filter(sql => /^PRAGMA table_info/.test(sql)).length, 10)
+    assert.equal(statements.filter(sql => /^SELECT .* FROM /s.test(sql)).length, 18)
+    assert.equal(Object.hasOwn(state.ownershipTables, "sessions"), false)
+    assert.equal(Object.hasOwn(state.ownershipTables, "global_rewards"), false)
+})
+
+test("finishPlayer permits first-settlement level-up state but rejects no later player write", async t => {
+    const database = createSettlementDatabase()
+    t.after(() => database.close())
+    const state = await finishPlayer(settlementHarness(database, {
+        mutateFirst: db => db.prepare(`
+            UPDATE players
+            SET stamina = stamina + 50,
+                stamina_heal_time = '2026-08-22T00:01:00.000Z'
+            WHERE id = 2
+        `).run(),
+    }), {
+        dataKey: "legal-first-level-up",
+        playerId: 2,
+        url: "http://game.invalid",
+        viewerId: "viewer-1",
+    }, finishOptions())
+
+    assert.equal(state.player.stamina, 114)
+    assert.equal(
+        state.ownershipTables.players[0].stamina_heal_time,
+        "2026-08-22T00:01:00.000Z",
+    )
+})
+
+test("finishPlayer excludes session and global-only writes from player ownership", async t => {
+    const database = createSettlementDatabase()
+    t.after(() => database.close())
+    await assert.doesNotReject(finishPlayer(settlementHarness(database, {
+        mutateDuplicate: db => db.exec(`
+            UPDATE sessions SET token = 'rotated-session';
+            UPDATE global_rewards SET amount = amount + 1 WHERE id = 1;
+        `),
+    }), {
+        dataKey: "excluded-global-writes",
+        playerId: 2,
+        url: "http://game.invalid",
+        viewerId: "viewer-1",
+    }, finishOptions()))
+})
+
 test("finishPlayer detects duplicate-only settlement fact mutations", async t => {
     const mutations = [
         database => database.prepare(`
@@ -646,6 +775,22 @@ test("finishPlayer detects duplicate-only settlement fact mutations", async t =>
         `).run(),
         database => database.prepare(`
             UPDATE players SET total_mana_obtained = total_mana_obtained + 1 WHERE id = 2
+        `).run(),
+        database => database.prepare(`
+            UPDATE players_characters SET exp = exp + 1
+            WHERE player_id = 2 AND id = 1
+        `).run(),
+        database => database.prepare(`
+            UPDATE players_character_quest_clears SET multi_count = multi_count + 1
+            WHERE player_id = 2 AND character_id = 1
+        `).run(),
+        database => database.prepare(`
+            UPDATE players_mission_battle_counters
+            SET multi_clear_count = multi_clear_count + 1 WHERE player_id = 2
+        `).run(),
+        database => database.prepare(`
+            UPDATE players_active_missions_stages SET status = status + 1
+            WHERE player_id = 2 AND mission_id = 7 AND id = 1
         `).run(),
     ]
     for (const mutateDuplicate of mutations) {

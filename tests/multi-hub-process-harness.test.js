@@ -96,8 +96,8 @@ async function assertTrackedHandlesClosed(tracked) {
     )
 }
 
-async function openTestPeer(t, label) {
-    const harness = new MultiHubProcessHarness()
+async function openTestPeer(t, label, dependencies = {}) {
+    const harness = new MultiHubProcessHarness(dependencies)
     const acceptedSockets = new Set()
     const server = net.createServer(socket => {
         acceptedSockets.add(socket)
@@ -122,7 +122,7 @@ async function openTestPeer(t, label) {
             { label },
         )
         await waitFor(() => acceptedSockets.size === 1, "测试 TCP 服务未接受连接")
-        return { cleanup, peer, server, serverSocket: [...acceptedSockets][0] }
+        return { cleanup, harness, peer, server, serverSocket: [...acceptedSockets][0] }
     } catch (error) {
         await cleanup()
         throw error
@@ -499,4 +499,51 @@ test("socket error deterministically settles concurrent waiters only once", asyn
         await cleanup()
     }
     await assertTrackedHandlesClosed(tracked)
+})
+
+test("malformed TCP JSON becomes one terminal peer error without unhandled rejection", async t => {
+    const unhandled = []
+    const onUnhandled = error => unhandled.push(error)
+    process.on("unhandledRejection", onUnhandled)
+    t.after(() => process.off("unhandledRejection", onUnhandled))
+    const { cleanup, harness, peer, serverSocket } = await openTestPeer(t, "malformed-json")
+    let runtimeStops = 0
+    const root = harness.root
+    harness.processes.push({ stop: async () => { runtimeStops++ } })
+    try {
+        peer.waiters.length = 0
+        const pending = peer.waitFor(() => false, 500)
+        serverSocket.write("{not-json}\0")
+        await assert.rejects(settleWithin(pending, 100), /malformed TCP frame/)
+        await assert.rejects(peer.waitFor(() => true), /malformed TCP frame/)
+        assert.equal(peer.socket.destroyed, true)
+        assert.equal(peer.waiters.length, 0)
+        await delay(20)
+        assert.deepEqual(unhandled, [])
+    } finally {
+        serverSocket.destroy()
+        await cleanup()
+    }
+    assert.equal(runtimeStops, 1)
+    assert.equal(fs.existsSync(root), false)
+})
+
+test("unterminated TCP input over the receive limit terminates pending and late waiters", async t => {
+    const { cleanup, peer, serverSocket } = await openTestPeer(
+        t,
+        "oversized-frame",
+        { peerMaxBufferBytes: 32 },
+    )
+    try {
+        const pending = peer.waitFor(() => false, 500)
+        serverSocket.write("x".repeat(33))
+        await assert.rejects(settleWithin(pending, 100), /receive limit/)
+        await assert.rejects(peer.waitFor(() => true), /receive limit/)
+        assert.equal(peer.buffer.length <= 32, true)
+        assert.equal(peer.socket.destroyed, true)
+        assert.equal(peer.waiters.length, 0)
+    } finally {
+        serverSocket.destroy()
+        await cleanup()
+    }
 })
