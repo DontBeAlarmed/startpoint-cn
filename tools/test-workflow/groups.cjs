@@ -329,6 +329,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/player_save_v2.test.cjs",
             "tools/server_gameplay_settings.test.cjs",
             "tools/shop_purchase_period_storage.test.cjs",
+            "tools/shop_purchase_snapshot_contract.test.cjs",
             "tools/test-workflow/database-isolation.test.cjs",
             "tools/test-workflow/database-lifecycle.test.cjs",
             "tools/test-workflow/runtime-data-paths.test.cjs",

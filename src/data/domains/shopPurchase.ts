@@ -31,8 +31,8 @@ interface LegacyPurchaseMetadata {
 
 const legacyPurchaseMetadata = Symbol("legacyPurchaseMetadata")
 
-interface ShopPurchaseCountSnapshot extends ShopPurchasePeriodCounts {
-    readonly [legacyPurchaseMetadata]?: LegacyPurchaseMetadata
+export interface ShopPurchaseCountSnapshot extends ShopPurchasePeriodCounts {
+    readonly [legacyPurchaseMetadata]: LegacyPurchaseMetadata
 }
 
 export function getShopPurchaseQueryKey(query: ShopPurchaseQuery): string {
@@ -49,24 +49,55 @@ function getCounterKey(
 }
 
 function createPurchaseCountSnapshot(
-    daily: number,
-    monthly: number,
-    typedTotal: number,
-    legacyCounter: number | undefined,
-    legacyPurchase: number | undefined,
+    daily: unknown,
+    monthly: unknown,
+    typedTotal: unknown,
+    legacyCounter: unknown,
+    legacyPurchase: unknown,
 ): ShopPurchaseCountSnapshot {
-    const snapshot: ShopPurchaseCountSnapshot = {
-        daily,
-        monthly,
-        total: typedTotal + resolveLegacyPurchaseTotal(legacyCounter, legacyPurchase),
-    }
+    const validDaily = requireNonNegativeSafeInteger(daily, "daily count")
+    const validMonthly = requireNonNegativeSafeInteger(monthly, "monthly count")
+    const validTypedTotal = requireNonNegativeSafeInteger(typedTotal, "typed total count")
+    const validLegacyCounter = legacyCounter === undefined
+        ? undefined
+        : requireNonNegativeSafeInteger(legacyCounter, "legacy counter")
+    const validLegacyPurchase = legacyPurchase === undefined
+        ? undefined
+        : requireNonNegativeSafeInteger(legacyPurchase, "legacy purchase count")
+    const legacyTotal = Math.max(validLegacyCounter ?? 0, validLegacyPurchase ?? 0)
+    const snapshot = {
+        daily: validDaily,
+        monthly: validMonthly,
+        total: addPurchaseCountValues(validTypedTotal, legacyTotal, "total count"),
+    } as ShopPurchaseCountSnapshot
     Object.defineProperty(snapshot, legacyPurchaseMetadata, {
         value: {
-            counterExists: legacyCounter !== undefined,
-            purchaseExists: legacyPurchase !== undefined,
+            counterExists: validLegacyCounter !== undefined,
+            purchaseExists: validLegacyPurchase !== undefined,
         } satisfies LegacyPurchaseMetadata,
     })
     return snapshot
+}
+
+function requireNonNegativeSafeInteger(value: unknown, subject: string): number {
+    if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+        throw new TypeError(`Shop purchase ${subject} must be a non-negative safe integer.`)
+    }
+    return value
+}
+
+function addPurchaseCountValues(left: number, right: number, subject: string): number {
+    const result = left + right
+    if (!Number.isSafeInteger(result) || result < 0) {
+        throw new RangeError(`Shop purchase ${subject} overflowed the safe integer range.`)
+    }
+    return result
+}
+
+function requirePositivePurchaseIncrement(amount: number): void {
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
+        throw new Error("Shop purchase count increment must be a positive integer.")
+    }
 }
 
 function getPlayerShopPurchaseCountSnapshotSync(
@@ -78,7 +109,7 @@ function getPlayerShopPurchaseCountSnapshotSync(
     const rows = getDb().prepare(`
         SELECT shop_type, period_type, period_key, count
         FROM players_shop_purchase_counters
-        WHERE player_id = ? AND shop_item_id = ? AND (
+        WHERE player_id = ? AND shop_type IN (?, -1) AND shop_item_id = ? AND (
             (shop_type = ? AND (
                 (period_type = 'daily' AND period_key = ?)
                 OR (period_type = 'monthly' AND period_key = ?)
@@ -86,17 +117,17 @@ function getPlayerShopPurchaseCountSnapshotSync(
             ))
             OR (shop_type = -1 AND period_type = 'total' AND period_key = '')
         )
-    `).all(playerId, shopItemId, shopType, keys.daily, keys.monthly) as Array<{
+    `).all(playerId, shopType, shopItemId, shopType, keys.daily, keys.monthly) as Array<{
         shop_type: number
         period_type: "daily" | "monthly" | "total"
         period_key: string
-        count: number
+        count: unknown
     }>
 
-    let daily = 0
-    let monthly = 0
-    let typedTotal = 0
-    let legacyCounter: number | undefined
+    let daily: unknown = 0
+    let monthly: unknown = 0
+    let typedTotal: unknown = 0
+    let legacyCounter: unknown = undefined
     for (const row of rows) {
         if (row.shop_type === -1) legacyCounter = row.count
         else if (row.period_type === "daily") daily = row.count
@@ -106,7 +137,7 @@ function getPlayerShopPurchaseCountSnapshotSync(
     const legacyPurchase = getDb().prepare(`
         SELECT count FROM players_shop_purchases
         WHERE player_id = ? AND shop_item_id = ?
-    `).get(playerId, shopItemId) as { count: number } | undefined
+    `).get(playerId, shopItemId) as { count: unknown } | undefined
     return createPurchaseCountSnapshot(
         daily,
         monthly,
@@ -114,13 +145,6 @@ function getPlayerShopPurchaseCountSnapshotSync(
         legacyCounter,
         legacyPurchase?.count,
     )
-}
-
-function resolveLegacyPurchaseTotal(
-    legacyCounter: number | null | undefined,
-    legacyPurchase: number | null | undefined,
-): number {
-    return Math.max(legacyCounter ?? 0, legacyPurchase ?? 0)
 }
 
 export function getPlayerShopPurchaseCountsByTypeSync(
@@ -145,7 +169,7 @@ export function getPlayerShopPurchaseCountsByTypeSync(
 export function getPlayerShopPurchaseCountsByTypeBulkSync(
     playerId: number,
     queries: readonly ShopPurchaseQuery[],
-): ReadonlyMap<string, ShopPurchasePeriodCounts> {
+): ReadonlyMap<string, ShopPurchaseCountSnapshot> {
     if (queries.length === 0) return new Map()
 
     const rows = getDb().prepare(`
@@ -157,9 +181,9 @@ export function getPlayerShopPurchaseCountsByTypeBulkSync(
         shop_item_id: number
         period_type: "daily" | "monthly" | "total"
         period_key: string
-        count: number
+        count: unknown
     }>
-    const counters = new Map<string, number>()
+    const counters = new Map<string, unknown>()
     for (const row of rows) {
         counters.set(
             getCounterKey(row.shop_type, row.shop_item_id, row.period_type, row.period_key),
@@ -170,7 +194,7 @@ export function getPlayerShopPurchaseCountsByTypeBulkSync(
         SELECT shop_item_id, count
         FROM players_shop_purchases
         WHERE player_id = ?
-    `).all(playerId) as Array<{ shop_item_id: number, count: number }>
+    `).all(playerId) as Array<{ shop_item_id: number, count: unknown }>
     const legacyPurchases = new Map(
         legacyRows.map(row => [row.shop_item_id, row.count]),
     )
@@ -196,23 +220,27 @@ function writePlayerShopPurchaseCountSnapshotSync(
     shopItemId: number,
     amount: number,
     keys: ShopPurchasePeriodKeys,
-    currentCounts: ShopPurchasePeriodCounts,
+    currentCounts: ShopPurchaseCountSnapshot,
 ): ShopPurchasePeriodCounts {
+    requirePositivePurchaseIncrement(amount)
+    const metadata = getLegacyPurchaseMetadata(currentCounts)
+    const daily = requireNonNegativeSafeInteger(currentCounts.daily, "snapshot daily count")
+    const monthly = requireNonNegativeSafeInteger(currentCounts.monthly, "snapshot monthly count")
+    const total = requireNonNegativeSafeInteger(currentCounts.total, "snapshot total count")
     const finalCounts = {
-        daily: currentCounts.daily + amount,
-        monthly: currentCounts.monthly + amount,
-        total: currentCounts.total + amount,
+        daily: addPurchaseCountValues(daily, amount, "daily count"),
+        monthly: addPurchaseCountValues(monthly, amount, "monthly count"),
+        total: addPurchaseCountValues(total, amount, "total count"),
     }
     const database = getDb()
-    const metadata = (currentCounts as ShopPurchaseCountSnapshot)[legacyPurchaseMetadata]
-    if (metadata?.counterExists) {
+    if (metadata.counterExists) {
         database.prepare(`
             DELETE FROM players_shop_purchase_counters
             WHERE player_id = ? AND shop_type = -1 AND shop_item_id = ?
               AND period_type = 'total' AND period_key = ''
         `).run(playerId, shopItemId)
     }
-    if (metadata?.purchaseExists) {
+    if (metadata.purchaseExists) {
         database.prepare(`
             DELETE FROM players_shop_purchases
             WHERE player_id = ? AND shop_item_id = ?
@@ -236,6 +264,20 @@ function writePlayerShopPurchaseCountSnapshotSync(
     return finalCounts
 }
 
+function getLegacyPurchaseMetadata(currentCounts: unknown): LegacyPurchaseMetadata {
+    if (typeof currentCounts !== "object" || currentCounts === null
+        || !Object.prototype.hasOwnProperty.call(currentCounts, legacyPurchaseMetadata)) {
+        throw new TypeError("Shop purchase count writer requires a purchase count snapshot.")
+    }
+    const metadata = (currentCounts as ShopPurchaseCountSnapshot)[legacyPurchaseMetadata]
+    if (typeof metadata !== "object" || metadata === null
+        || typeof metadata.counterExists !== "boolean"
+        || typeof metadata.purchaseExists !== "boolean") {
+        throw new TypeError("Shop purchase count snapshot metadata is invalid.")
+    }
+    return metadata
+}
+
 export function addPlayerShopPurchaseCountsByTypeSync(
     playerId: number,
     shopType: number,
@@ -243,9 +285,7 @@ export function addPlayerShopPurchaseCountsByTypeSync(
     amount: number,
     keys: ShopPurchasePeriodKeys,
 ): ShopPurchasePeriodCounts {
-    if (!Number.isSafeInteger(amount) || amount <= 0) {
-        throw new Error("Shop purchase count increment must be a positive integer.")
-    }
+    requirePositivePurchaseIncrement(amount)
     const snapshot = getPlayerShopPurchaseCountSnapshotSync(
         playerId,
         shopType,
@@ -268,11 +308,9 @@ export function addPlayerShopPurchaseCountsByTypeFromSnapshotSync(
     shopItemId: number,
     amount: number,
     keys: ShopPurchasePeriodKeys,
-    currentCounts: ShopPurchasePeriodCounts,
+    currentCounts: ShopPurchaseCountSnapshot,
 ): ShopPurchasePeriodCounts {
-    if (!Number.isSafeInteger(amount) || amount <= 0) {
-        throw new Error("Shop purchase count increment must be a positive integer.")
-    }
+    requirePositivePurchaseIncrement(amount)
     return writePlayerShopPurchaseCountSnapshotSync(
         playerId,
         shopType,

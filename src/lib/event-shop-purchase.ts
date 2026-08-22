@@ -14,6 +14,9 @@ import {
 } from "./types"
 import {
     getShopPurchaseQueryKey,
+} from "../data/domains/shopPurchase"
+import type {
+    ShopPurchaseCountSnapshot,
     ShopPurchaseQuery,
 } from "../data/domains/shopPurchase"
 
@@ -74,14 +77,14 @@ export interface GenericShopBatchPurchaseDependencies
     getPurchaseCountsBulk(
         playerId: number,
         queries: readonly ShopPurchaseQuery[],
-    ): ReadonlyMap<string, ShopPurchaseCounts>
+    ): ReadonlyMap<string, ShopPurchaseCountSnapshot>
     addPurchaseCountsFromSnapshot(
         playerId: number,
         shopType: number,
         shopItemId: number,
         amount: number,
         keys: ShopPurchasePeriodKeys,
-        currentCounts: ShopPurchaseCounts,
+        currentCounts: ShopPurchaseCountSnapshot,
     ): ShopPurchaseCounts
 }
 
@@ -511,7 +514,7 @@ export function executeGenericShopBatchPurchaseSync(
         const nextPlayer = { ...player }
         const itemCosts = new Map<number, number>()
         const rewards: Reward[] = []
-        const currentCountsByItem = new Map<number, ShopPurchaseCounts>()
+        const currentCountsByItem = new Map<number, ShopPurchaseCountSnapshot>()
         let manaSpent = 0
 
         for (const entry of purchasesWithQueries) {
