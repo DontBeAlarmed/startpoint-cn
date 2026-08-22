@@ -69,7 +69,9 @@ FullServerAcceptance
 - `sha256:0e4c3c3182af0f022c9b58b3a8f9ecb182782a15904ed1266a4e037d7c019cfe`
 - `sha256:574691a3eb0659697ff8db0537a767d683d71862680527bd760a2db38521ed7c`
 
-三轮各子报告最大 step p95 的中位数为：非多人 `6321.681 ms`，多人 `2882.386435 ms`。同机器且 formal profile 完全一致时，后续正式报告相对参考中位数的任一比值超过 `1.2` 即拒绝；机器或 profile 不同则只记录比值，不执行延迟硬门禁。结构门禁不因不可比较而放宽。
+三轮各子报告最大 step p95 的中位数为：非多人 `6069.633 ms`，多人 `3294.842018 ms`。同机器且 formal profile 完全一致时，后续正式报告相对参考中位数的任一比值超过 `1.2` 即拒绝；机器或 profile 不同则只记录比值，不执行延迟硬门禁。结构门禁不因不可比较而放宽。
+
+多人 duplicate finish 使用全面玩家所有权快照。当前生产 schema 审计纳入 `players` 和全部含 `player_id` 的 59 张业务表，共 60 张表；每次快照固定执行 60 条数据查询。每个 data key 首次执行 1 条表清单查询和 67 条列元数据查询，随后复用缓存，duplicate 前不重复执行 `PRAGMA`。所有玩家列均参与严格比较，没有排除动态时间列；session、迁移记账、SQLite 内部表和无玩家归属的纯全局表不进入玩家所有权快照。BLOB 使用带类型的 base64 稳定表示，列按 schema 顺序、行按主键顺序比较。
 
 ## 非多人负载
 
@@ -166,7 +168,7 @@ npm run benchmark:full-server-acceptance -- --formal
 
 正式模式默认运行三轮。每轮使用 1000 份非多人存档、600 个活跃身份和并发档 `10/25/50/100`；多人部分使用 120 个独立身份组成 60 个双人房间，Host A 与 Client B 各担任 30 个游戏房主，并发档为 `5/10/20`。120 个多人身份是 600 个活跃身份的 20% 验收覆盖参数，不表示两层负载合计为 720 人同时在线。
 
-完整总报告始终写入标准输出，子报告完整嵌入 `rounds[].nonMulti` 与 `rounds[].multi`，不会默认创建报告文件。需要留存时使用 `--output <report.json>`；相对路径从命令执行目录解析，父目录必须已经存在，目标必须是普通文件且不能是符号链接。写入文件与标准输出的 JSON 内容一致。
+完整总报告始终写入标准输出，子报告完整嵌入 `rounds[].nonMulti` 与 `rounds[].multi`，不会默认创建报告文件。需要留存时使用 `--output <report.json>`；相对路径从命令执行目录解析，父目录必须已经存在，目标必须是单链接普通文件，不能是符号链接、hard link 或其他文件类型。写入文件与标准输出的 JSON 内容一致。
 
 同机延迟门禁默认读取 `tools/perf/__snapshots__/full_server_acceptance_reference.json`。只有显式 `--formal`、恰好三轮且三轮结构门禁全部通过时，才允许使用 `--write-reference <reference.json>` 写出参考；`--output` 与 `--write-reference` 必须指向不同的物理文件。正式报告与同机器、同 profile 的参考比较，任一子负载 p95 中位数退化超过 20% 即拒绝；机器或 profile 不同则只记录比值，不作为硬门禁。正式参考已由上述三轮通过结果建立，日常 smoke 和 full/integration 测试不得重写该参考。
 
@@ -188,6 +190,8 @@ npm run benchmark:full-server-acceptance -- --formal
 - `tools/perf/multi_hub_load_workload.test.cjs`：runner、清理和小 profile 集成测试；
 - `tools/perf/full_server_acceptance.cjs`：组合非多人和多人子报告；
 - `tools/perf/full_server_acceptance.test.cjs`：总报告结构与失败传播。
+- `tools/perf/safe_output.cjs`：为多人 runner 与总 runner 提供同一套安全原子输出语义；
+- `tests/helpers/multi-hub-settlement-state.js`：全面玩家所有权快照与 duplicate finish 协议断言。
 
 可以提取现有 `tests/multi-hub-process.test.js` 中稳定的战斗阶段帮助函数，但不得把测试流程复制成多个互相漂移的大文件。生产 `src/` 不因 Task 9 增加测试开关、IPC、路由或指标端点。
 
