@@ -99,6 +99,9 @@ async function runScenario(scenario, suiteDirectory, runtime) {
     let database = null
     let computeCounter = null
     let measureSql = false
+    let measureTargetCalls = 0
+    let measuredSql = null
+    let measuredMissionComputes = null
     let primaryError = null
     let result
     try {
@@ -111,18 +114,36 @@ async function runScenario(scenario, suiteDirectory, runtime) {
         })
         const fixture = await scenario.prepare()
         computeCounter = installComputeCounter(runtime.getComputer)
-        sqlCounter.reset()
-        measureSql = true
-        const outcome = await scenario.execute(fixture)
-        measureSql = false
-        const sql = sqlCounter.snapshot()
-        const missionComputes = computeCounter.count
+        function measureTarget(operation) {
+            measureTargetCalls++
+            if (measureTargetCalls !== 1 || typeof operation !== "function") {
+                throw new Error(`${scenario.name} must call measureTarget exactly once`)
+            }
+            const computesBefore = computeCounter.count
+            sqlCounter.reset()
+            measureSql = true
+            try {
+                const outcome = operation()
+                if (outcome && typeof outcome.then === "function") {
+                    throw new TypeError(`${scenario.name} measureTarget operation must be synchronous`)
+                }
+                return outcome
+            } finally {
+                measureSql = false
+                measuredSql = sqlCounter.snapshot()
+                measuredMissionComputes = computeCounter.count - computesBefore
+            }
+        }
+        const outcome = await scenario.execute(fixture, measureTarget)
+        if (measureTargetCalls !== 1 || measuredSql === null || measuredMissionComputes === null) {
+            throw new Error(`${scenario.name} must call measureTarget exactly once`)
+        }
         const behavior = await scenario.summarize(outcome, fixture)
         result = {
-            sqlReads: sql.selectStatements,
-            sqlWrites: sql.writeStatements,
-            missionComputes,
-            sqlByTable: sql.byTable,
+            sqlReads: measuredSql.selectStatements,
+            sqlWrites: measuredSql.writeStatements,
+            missionComputes: measuredMissionComputes,
+            sqlByTable: measuredSql.byTable,
             behavior,
         }
     } catch (error) {

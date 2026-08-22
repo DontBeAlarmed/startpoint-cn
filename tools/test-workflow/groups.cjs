@@ -468,6 +468,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/mission_response_merge.test.cjs",
             "tools/perf/awake_request_context_admission.test.cjs",
             "tools/perf/awake_request_context_baseline.test.cjs",
+            "tools/perf/awake_request_context_runner.test.cjs",
             "tools/perf/mission_engine_focused_admission.test.cjs",
             "tools/perf/mission_engine_focused_baseline.test.cjs",
             "tools/perf/mission_engine_focused_runner.test.cjs",

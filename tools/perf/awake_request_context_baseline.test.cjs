@@ -177,7 +177,11 @@ test("runner restores database, Content, time, console, and temporary files afte
     const scenarioFactory = () => AWAKE_REQUEST_CONTEXT_SCENARIO_KEYS.map(name => ({
         name,
         prepare: () => 1,
-        execute() { throw new Error("injected Awake scenario failure") },
+        execute(_fixture, measureTarget) {
+            return measureTarget(() => {
+                throw new Error("injected Awake scenario failure")
+            })
+        },
         summarize: () => ({}),
     }))
 
@@ -236,6 +240,16 @@ test("current publication and reconcile baseline matches the checked snapshot", 
         [[341005, [[1, 1]]]],
     )
     assert.deepEqual(
+        report.scenarios["full-publication"].behavior.characterList.map(character => ({
+            join_time: character.join_time,
+            update_time: character.update_time,
+        })),
+        [{
+            join_time: "2025-01-01 12:00:00",
+            update_time: "2025-01-01 12:00:00",
+        }],
+    )
+    assert.deepEqual(
         report.scenarios["candidate-one"].behavior.first.changed,
         [[341005, [[1, 1]]]],
     )
@@ -261,6 +275,15 @@ test("current publication and reconcile baseline matches the checked snapshot", 
         staleUnlockPreserved: true,
         unlockCount: 1,
     })
+    for (const name of ["strict-failure-rollback", "best-effort-failure"]) {
+        assert.equal(report.scenarios[name].sqlWrites, 2, name)
+        assert.equal(report.scenarios[name].sqlByTable.players.writes, 0, name)
+        assert.equal(
+            report.scenarios[name].sqlByTable.players.statements,
+            report.scenarios[name].sqlByTable.players.reads,
+            name,
+        )
+    }
     const admission = admitAwakeRequestContextReport(report, {
         snapshotPath,
         write: false,

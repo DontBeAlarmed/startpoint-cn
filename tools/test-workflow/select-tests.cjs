@@ -367,7 +367,7 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^(?:tools\/awake_reconcile_callsite_matrix\.test\.cjs|tools\/perf\/awake_request_context_(?:admission|baseline|report|scenarios)(?:\.test)?\.cjs|tools\/perf\/__snapshots__\/awake_request_context_baseline\.json)$/,
+        pattern: /^(?:tools\/awake_reconcile_callsite_matrix\.test\.cjs|tools\/perf\/awake_request_context_(?:admission|baseline|report|runner|scenarios)(?:\.test)?\.cjs|tools\/perf\/__snapshots__\/awake_request_context_baseline\.json)$/,
         groups: ["integration:mission"],
     },
     {

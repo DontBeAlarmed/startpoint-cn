@@ -11,7 +11,9 @@ const sourceRoot = path.join(projectRoot, "src")
 const CALLEES = new Map([
     ["reconcileAwakeUnlockCharacterList", "default"],
     ["reconcileAwakeUnlockCharacterListStrict", "strict"],
+    ["reconcileAwakeUnlockCharacterListBestEffort", "best-effort"],
 ])
+const AWAKE_CALLEE_PREFIX = "reconcileAwakeUnlockCharacterList"
 const ROUTE_OWNERS = Object.freeze({
     "src/routes/api/activeMission.ts": { "/receive": "active_mission/receive" },
     "src/routes/api/boxGacha.ts": { "/exec": "box_gacha/exec" },
@@ -194,8 +196,62 @@ const EXPECTED_MATRIX = Object.freeze([
     },
 ])
 
-function calleeIdentifier(node) {
-    return ts.isIdentifier(node.expression) ? node.expression.text : null
+function isMissionModuleSpecifier(specifier) {
+    return /(?:^|\/)mission(?:\/|$)/.test(specifier)
+}
+
+function collectImportedAwakeCalls(source, fileName) {
+    const sourceFile = ts.createSourceFile(
+        fileName,
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+    )
+    const namedImports = new Map()
+    const namespaceImports = new Set()
+
+    for (const statement of sourceFile.statements) {
+        if (!ts.isImportDeclaration(statement)
+            || !ts.isStringLiteral(statement.moduleSpecifier)
+            || !isMissionModuleSpecifier(statement.moduleSpecifier.text)) continue
+        const bindings = statement.importClause?.namedBindings
+        if (bindings && ts.isNamedImports(bindings)) {
+            for (const element of bindings.elements) {
+                const exportedName = element.propertyName?.text ?? element.name.text
+                if (exportedName.startsWith(AWAKE_CALLEE_PREFIX)) {
+                    namedImports.set(element.name.text, exportedName)
+                }
+            }
+        } else if (bindings && ts.isNamespaceImport(bindings)) {
+            namespaceImports.add(bindings.name.text)
+        }
+    }
+
+    const calls = []
+    function visit(node) {
+        if (ts.isCallExpression(node)) {
+            let exportedName = null
+            if (ts.isIdentifier(node.expression)) {
+                exportedName = namedImports.get(node.expression.text) ?? null
+            } else if (ts.isPropertyAccessExpression(node.expression)
+                && ts.isIdentifier(node.expression.expression)
+                && namespaceImports.has(node.expression.expression.text)
+                && node.expression.name.text.startsWith(AWAKE_CALLEE_PREFIX)) {
+                exportedName = node.expression.name.text
+            }
+            if (exportedName !== null) {
+                const callee = CALLEES.get(exportedName)
+                if (callee === undefined) {
+                    throw new Error(`${fileName} calls unknown Awake publication helper ${exportedName}`)
+                }
+                calls.push({ callee, call: node, exportedName, sourceFile })
+            }
+        }
+        ts.forEachChild(node, visit)
+    }
+    visit(sourceFile)
+    return calls
 }
 
 function isTransactionCallback(node) {
@@ -267,19 +323,6 @@ function classifyOwner(relativeFile, call, sourceFile) {
     return ownerLabel
 }
 
-function assertImportedProductionCallee(sourceFile, calleeName) {
-    let found = false
-    for (const statement of sourceFile.statements) {
-        if (!ts.isImportDeclaration(statement)
-            || !ts.isStringLiteral(statement.moduleSpecifier)
-            || !statement.moduleSpecifier.text.includes("mission")) continue
-        const bindings = statement.importClause?.namedBindings
-        if (!bindings || !ts.isNamedImports(bindings)) continue
-        if (bindings.elements.some(element => element.name.text === calleeName)) found = true
-    }
-    assert.equal(found, true, `${sourceFile.fileName} must import ${calleeName} from mission code`)
-}
-
 function classifyBoundary(relativeFile, callee, call, source) {
     if (relativeFile === "src/lib/quest/finish/single-settlement-writes.ts") {
         const ownerSource = fs.readFileSync(
@@ -308,37 +351,22 @@ function collectProductionCalls() {
         const relativeFile = path.relative(projectRoot, file).split(path.sep).join("/")
         if (relativeFile === "src/lib/mission/awake-unlock-response.ts") continue
         const source = fs.readFileSync(file, "utf8")
-        const sourceFile = ts.createSourceFile(
-            relativeFile,
-            source,
-            ts.ScriptTarget.Latest,
-            true,
-            ts.ScriptKind.TS,
-        )
-        function visit(node) {
-            if (ts.isCallExpression(node)) {
-                const identifier = calleeIdentifier(node)
-                const callee = CALLEES.get(identifier)
-                if (callee !== undefined) {
-                    assertImportedProductionCallee(sourceFile, identifier)
-                    assert.equal(
-                        node.arguments.length,
-                        2,
-                        `${relativeFile} publication no longer uses the legacy-unscoped signature`,
-                    )
-                    calls.push({
-                        relativeFile,
-                        callee,
-                        ownerLabel: classifyOwner(relativeFile, node, sourceFile),
-                        boundary: classifyBoundary(relativeFile, callee, node, source),
-                        candidateSource: "legacy-unscoped",
-                        position: node.getStart(sourceFile),
-                    })
-                }
-            }
-            ts.forEachChild(node, visit)
+        for (const importedCall of collectImportedAwakeCalls(source, relativeFile)) {
+            const { call, callee, sourceFile } = importedCall
+            assert.equal(
+                call.arguments.length,
+                2,
+                `${relativeFile} publication no longer uses the legacy-unscoped signature`,
+            )
+            calls.push({
+                relativeFile,
+                callee,
+                ownerLabel: classifyOwner(relativeFile, call, sourceFile),
+                boundary: classifyBoundary(relativeFile, callee, call, source),
+                candidateSource: "legacy-unscoped",
+                position: call.getStart(sourceFile),
+            })
         }
-        visit(sourceFile)
     }
     return calls.sort((left, right) => (
         left.relativeFile.localeCompare(right.relativeFile) || left.position - right.position
@@ -395,4 +423,75 @@ test("Awake reconcile audit matrix freezes owner, policy, and planned candidate 
     ]) {
         assert.equal(pair.every(owner => EXPECTED_MATRIX.some(entry => entry.ownerLabel === owner)), true)
     }
+})
+
+test("AST collector resolves explicit BestEffort, named aliases, and namespace helpers", () => {
+    const source = `
+        import {
+            reconcileAwakeUnlockCharacterListBestEffort,
+            reconcileAwakeUnlockCharacterList as publishDefault,
+        } from "./mission"
+        import * as missionApi from "./mission/index"
+
+        reconcileAwakeUnlockCharacterListBestEffort(1, [])
+        publishDefault(1, [])
+        missionApi.reconcileAwakeUnlockCharacterList(1, [])
+        missionApi.reconcileAwakeUnlockCharacterListStrict(1, [])
+        missionApi.reconcileAwakeUnlockCharacterListBestEffort(1, [])
+    `
+
+    const calls = collectImportedAwakeCalls(source, "synthetic.ts")
+
+    assert.deepEqual(calls.map(call => ({
+        callee: call.callee,
+        exportedName: call.exportedName,
+    })), [
+        {
+            callee: "best-effort",
+            exportedName: "reconcileAwakeUnlockCharacterListBestEffort",
+        },
+        {
+            callee: "default",
+            exportedName: "reconcileAwakeUnlockCharacterList",
+        },
+        {
+            callee: "default",
+            exportedName: "reconcileAwakeUnlockCharacterList",
+        },
+        {
+            callee: "strict",
+            exportedName: "reconcileAwakeUnlockCharacterListStrict",
+        },
+        {
+            callee: "best-effort",
+            exportedName: "reconcileAwakeUnlockCharacterListBestEffort",
+        },
+    ])
+})
+
+test("AST collector fails closed on unknown imported Awake publication suffixes", () => {
+    for (const source of [
+        `
+            import { reconcileAwakeUnlockCharacterListUnexpected } from "./mission"
+            reconcileAwakeUnlockCharacterListUnexpected(1, [])
+        `,
+        `
+            import * as missionApi from "./mission"
+            missionApi.reconcileAwakeUnlockCharacterListUnexpected(1, [])
+        `,
+    ]) {
+        assert.throws(
+            () => collectImportedAwakeCalls(source, "synthetic.ts"),
+            /unknown Awake publication helper/,
+        )
+    }
+})
+
+test("AST collector ignores ordinary local functions with an Awake helper-like name", () => {
+    const source = `
+        function reconcileAwakeUnlockCharacterList() { return [] }
+        reconcileAwakeUnlockCharacterList(1, [])
+    `
+
+    assert.deepEqual(collectImportedAwakeCalls(source, "synthetic.ts"), [])
 })

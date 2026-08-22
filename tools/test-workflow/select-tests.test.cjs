@@ -1138,6 +1138,7 @@ test("routes Awake request-context baseline and callsite audit files to the miss
         "tools/perf/awake_request_context_baseline.cjs",
         "tools/perf/awake_request_context_baseline.test.cjs",
         "tools/perf/awake_request_context_report.cjs",
+        "tools/perf/awake_request_context_runner.test.cjs",
         "tools/perf/awake_request_context_scenarios.cjs",
         "tools/perf/__snapshots__/awake_request_context_baseline.json",
     ]) {
@@ -1407,6 +1408,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_response_merge.test.cjs",
         "tools/perf/awake_request_context_admission.test.cjs",
         "tools/perf/awake_request_context_baseline.test.cjs",
+        "tools/perf/awake_request_context_runner.test.cjs",
         "tools/perf/mission_engine_focused_admission.test.cjs",
         "tools/perf/mission_engine_focused_baseline.test.cjs",
         "tools/perf/mission_engine_focused_runner.test.cjs",

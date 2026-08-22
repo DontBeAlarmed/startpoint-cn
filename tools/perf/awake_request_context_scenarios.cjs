@@ -31,10 +31,7 @@ function summarizeReconciliation(result) {
 function normalizeCharacterList(characterList) {
     return characterList.map(entry => Object.fromEntries(Object.entries(entry)
         .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, value]) => [
-            key,
-            key === "join_time" || key === "update_time" ? "fixed-server-time" : value,
-        ])))
+        .map(([key, value]) => [key, value])))
 }
 
 function createPlayer(runtime) {
@@ -115,12 +112,14 @@ function createAwakeRequestContextScenarios(runtime) {
         {
             name: "full-publication",
             prepare: () => prepareReadyFixture(runtime),
-            execute(playerId) {
-                return runtime.reconcileAwakeUnlockCharacterListStrict(playerId, [{
-                    character_id: CHARACTER_ID,
-                    owner_projection: true,
-                    mana_board_awake: { 2: 2 },
-                }])
+            execute(playerId, measureTarget) {
+                return measureTarget(() => (
+                    runtime.reconcileAwakeUnlockCharacterListStrict(playerId, [{
+                        character_id: CHARACTER_ID,
+                        owner_projection: true,
+                        mana_board_awake: { 2: 2 },
+                    }])
+                ))
             },
             summarize(characterList, playerId) {
                 const category9Progress = runtime.getDb().prepare(`
@@ -144,11 +143,11 @@ function createAwakeRequestContextScenarios(runtime) {
         {
             name: "candidate-one",
             prepare: () => prepareReadyFixture(runtime),
-            execute(playerId) {
-                return {
+            execute(playerId, measureTarget) {
+                return measureTarget(() => ({
                     first: runtime.reconcileAwakeUnlocks(playerId, [CHARACTER_ID]),
                     second: runtime.reconcileAwakeUnlocks(playerId, [CHARACTER_ID]),
-                }
+                }))
             },
             summarize(result, playerId) {
                 return {
@@ -168,7 +167,9 @@ function createAwakeRequestContextScenarios(runtime) {
                 runtime.updatePlayerCharacterSync(playerId, CHARACTER_ID, { exp: 0 })
                 return playerId
             },
-            execute: playerId => runtime.reconcileAwakeUnlocks(playerId, []),
+            execute: (playerId, measureTarget) => (
+                measureTarget(() => runtime.reconcileAwakeUnlocks(playerId, []))
+            ),
             summarize(result, playerId) {
                 return {
                     ...summarizeReconciliation(result),
@@ -181,14 +182,16 @@ function createAwakeRequestContextScenarios(runtime) {
         {
             name: "strict-failure-rollback",
             prepare: () => prepareFailureFixture(runtime),
-            execute(fixture) {
+            execute(fixture, measureTarget) {
                 let threw = false
                 try {
                     runtime.getDb().transaction(() => {
                         runtime.getDb().prepare(`
                             UPDATE players SET free_mana = free_mana + 7 WHERE id = ?
                         `).run(fixture.playerId)
-                        runtime.reconcileAwakeUnlockCharacterListStrict(fixture.playerId, [])
+                        measureTarget(() => (
+                            runtime.reconcileAwakeUnlockCharacterListStrict(fixture.playerId, [])
+                        ))
                     })()
                 } catch {
                     threw = true
@@ -206,7 +209,7 @@ function createAwakeRequestContextScenarios(runtime) {
         {
             name: "best-effort-failure",
             prepare: () => prepareFailureFixture(runtime),
-            execute(fixture) {
+            execute(fixture, measureTarget) {
                 const existing = [{ character_id: CHARACTER_ID, owner_projection: true }]
                 let returned
                 let errorLogged = false
@@ -217,10 +220,12 @@ function createAwakeRequestContextScenarios(runtime) {
                         runtime.getDb().prepare(`
                             UPDATE players SET free_mana = free_mana + 7 WHERE id = ?
                         `).run(fixture.playerId)
-                        returned = runtime.reconcileAwakeUnlockCharacterListBestEffort(
-                            fixture.playerId,
-                            existing,
-                        )
+                        returned = measureTarget(() => (
+                            runtime.reconcileAwakeUnlockCharacterListBestEffort(
+                                fixture.playerId,
+                                existing,
+                            )
+                        ))
                     })()
                 } finally {
                     console.error = previousError

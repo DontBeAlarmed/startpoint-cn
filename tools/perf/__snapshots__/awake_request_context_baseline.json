@@ -81,13 +81,13 @@
           {
             "character_id": 341005,
             "exp": 37241,
-            "join_time": "fixed-server-time",
+            "join_time": "2025-01-01 12:00:00",
             "mana_board_awake": {
               "1": 1,
               "2": 2
             },
             "owner_projection": true,
-            "update_time": "fixed-server-time"
+            "update_time": "2025-01-01 12:00:00"
           }
         ],
         "manaNodeCount": 23,
@@ -103,7 +103,7 @@
           ]
         ]
       },
-      "behaviorSha256": "bdb40d369bf0ad2025e76b7df8f047e6ac390433d6968a4b464e098ee5b765e3"
+      "behaviorSha256": "6968f3ca45d53d4e9e96e8d307db067ef4a7fde04baa7fb3b8b15386e8dbb481"
     },
     "candidate-one": {
       "sqlReads": 28,
@@ -262,13 +262,13 @@
     },
     "strict-failure-rollback": {
       "sqlReads": 13,
-      "sqlWrites": 3,
+      "sqlWrites": 2,
       "missionComputes": 7,
       "sqlByTable": {
         "players": {
           "reads": 1,
-          "writes": 1,
-          "statements": 2
+          "writes": 0,
+          "statements": 1
         },
         "players_category_mission_stages": {
           "reads": 2,
@@ -328,13 +328,13 @@
     },
     "best-effort-failure": {
       "sqlReads": 13,
-      "sqlWrites": 3,
+      "sqlWrites": 2,
       "missionComputes": 7,
       "sqlByTable": {
         "players": {
           "reads": 1,
-          "writes": 1,
-          "statements": 2
+          "writes": 0,
+          "statements": 1
         },
         "players_category_mission_stages": {
           "reads": 2,
