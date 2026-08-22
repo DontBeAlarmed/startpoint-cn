@@ -258,6 +258,8 @@ SceneReady 只统计已登记的 battle client。
 | 3 | Ready | 更新准备状态并广播 StateChanged |
 | 4 | Heartbeat | 回 AckHeartbeat |
 | 6 | StartBattle | 设置预期 battle client 数量、`raising_state=4`，并广播 Start |
+| 7 | ChangeAutoplayMode | 更新发送方的 `autoplayMode`；第二参数为 `true` 时同时把 `autoSpeedLevel` 重置为 1，并广播最新 Mates |
+| 8 | ChangeAutoStart | 更新发送方的 `autoStart` 并广播最新 Mates |
 | 10 | EnterComs | 调用 NPC 招募流程 |
 
 服务端关键消息：

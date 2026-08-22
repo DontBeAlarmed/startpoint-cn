@@ -190,6 +190,51 @@ test("authoritative composite identity retains a connected host", t => {
     assert.deepEqual(host.client.mates.map(mate => mate.viewerId), [495])
 })
 
+test("a guest autoplay change updates the authoritative mate snapshot", t => {
+    const { room, host, guests } = createLobbyRoom(t, 498, [598])
+    const guest = guests[0]
+
+    handleMessage(host.socket, [0, [0, { party: { source: "host" } }]])
+    handleMessage(guest.socket, [0, [0, { party: { source: "guest" } }]])
+    host.socket.writes.length = 0
+    guest.socket.writes.length = 0
+
+    handleMessage(guest.socket, [0, [7, true, true]])
+
+    const authoritativeGuest = host.client.mates.find(mate => mate.viewerId === 598)
+    assert.equal(authoritativeGuest.autoplayMode, true)
+    assert.equal(authoritativeGuest.autoSpeedLevel, 1)
+    assert.equal(guest.client.yourself.autoplayMode, true)
+    assert.equal(guest.client.yourself.autoSpeedLevel, 1)
+    assert.deepEqual(
+        host.socket.writes.at(-1),
+        [1, [1, host.client.mates]],
+    )
+    assert.deepEqual(guest.socket.writes.at(-1), [1, [1, host.client.mates]])
+    assert.equal(getRoom(room.room_number).mates[1].viewer_id, 598)
+})
+
+test("a player auto-start change updates the authoritative mate snapshot", t => {
+    const { host, guests } = createLobbyRoom(t, 499, [599])
+    const guest = guests[0]
+
+    handleMessage(host.socket, [0, [0, { party: { source: "host" } }]])
+    handleMessage(guest.socket, [0, [0, { party: { source: "guest" } }]])
+    host.socket.writes.length = 0
+    guest.socket.writes.length = 0
+
+    handleMessage(guest.socket, [0, [8, true]])
+
+    const authoritativeGuest = host.client.mates.find(mate => mate.viewerId === 599)
+    assert.equal(authoritativeGuest.autoStart, true)
+    assert.equal(guest.client.yourself.autoStart, true)
+    assert.deepEqual(
+        host.socket.writes.at(-1),
+        [1, [1, host.client.mates]],
+    )
+    assert.deepEqual(guest.socket.writes.at(-1), [1, [1, host.client.mates]])
+})
+
 test("change-party rebuilds a deeply frozen snapshot isolated from client input", t => {
     const { host } = createLobbyRoom(t, 497)
     const originalParty = {

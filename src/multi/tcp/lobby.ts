@@ -1,5 +1,5 @@
 import * as net from "net"
-import { sessionManager, SessionClient } from "../state/SessionManager"
+import { sessionManager, SessionClient, SessionMate } from "../state/SessionManager"
 import {
     disbandRoom,
     getRoom,
@@ -585,6 +585,48 @@ function handleChangeParty(_socket: net.Socket, client: SessionClient, data: any
     console.log(`[LOBBY] party changed: room=${client.roomNumber}`)
 }
 
+function updateCurrentMateSettings(
+    client: SessionClient,
+    settings: Partial<SessionMate>,
+): void {
+    const hostClient = findHostClient(client.roomNumber)
+    const authoritativeMates = hostClient?.mates ?? client.mates
+    const updatedMates = authoritativeMates.map(mate => (
+        !mate.comId && mate.viewerId === client.viewerId
+            ? { ...mate, ...settings }
+            : mate
+    ))
+    const updatedMate = updatedMates.find(mate => (
+        !mate.comId && mate.viewerId === client.viewerId
+    ))
+    if (!updatedMate) return
+
+    for (const roomClient of sessionManager.getClientsInRoom(client.roomNumber)) {
+        roomClient.mates = updatedMates
+        if (roomClient.viewerId === client.viewerId) roomClient.yourself = updatedMate
+    }
+    const room = getRoom(client.roomNumber)
+    if (room) {
+        room.mates = updatedMates.map(mate => ({
+            viewer_id: mate.viewerId ?? null,
+            com_id: mate.comId ?? 0,
+        }))
+    }
+    sessionManager.broadcastToRoom(client.roomNumber, [1, [1, updatedMates]])
+}
+
+function handleChangeAutoplay(client: SessionClient, data: any[]): void {
+    if (typeof data[1] !== "boolean") return
+    const settings: Partial<SessionMate> = { autoplayMode: data[1] }
+    if (data[2] === true) settings.autoSpeedLevel = 1
+    updateCurrentMateSettings(client, settings)
+}
+
+function handleChangeAutoStart(client: SessionClient, data: any[]): void {
+    if (typeof data[1] !== "boolean") return
+    updateCurrentMateSettings(client, { autoStart: data[1] })
+}
+
 function handleReady(_socket: net.Socket, client: SessionClient, data: any[]): void {
     const readyState = Array.isArray(data[1]) ? data[1][0] : data[1]
     client.isReady = readyState === 1
@@ -643,7 +685,10 @@ function handleNotify(socket: net.Socket, client: SessionClient, data: any[]): v
         case 2: handleChangeParty(socket, client, notifyData); break
         case 3: handleReady(socket, client, notifyData); break
         case 4: handleHeartbeat(socket, client, notifyData); break
-        case 5: case 7: case 8: case 9: break  // Suspend/ChangeAutoplay/ChangeAutoStart/Log — silently ignored
+        case 5: break  // Suspend
+        case 7: handleChangeAutoplay(client, notifyData); break
+        case 8: handleChangeAutoStart(client, notifyData); break
+        case 9: break  // Log
         case 6: handleStartBattle(socket, client, notifyData); break
         case 10: handleEnterComs(client).catch(() => console.error("[LOBBY] EnterComs failed")); break
         default:
