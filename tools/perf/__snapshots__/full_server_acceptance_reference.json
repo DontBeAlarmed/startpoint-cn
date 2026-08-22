@@ -1,0 +1,23 @@
+{
+  "fingerprint": {
+    "platform": "darwin",
+    "arch": "x64",
+    "nodeMajor": 22,
+    "cpuModel": "Intel(R) Core(TM) i5-8259U CPU @ 2.30GHz",
+    "logicalCpuCount": 8
+  },
+  "profiles": {
+    "nonMulti": {
+      "version": 1,
+      "name": "non-multi-mixed-formal-v1"
+    },
+    "multi": {
+      "version": 1,
+      "name": "multi-hub-load-formal-v1"
+    }
+  },
+  "mediansMs": {
+    "nonMultiP95": 6102.594,
+    "multiP95": 2883.015518
+  }
+}

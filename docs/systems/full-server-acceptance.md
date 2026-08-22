@@ -1,6 +1,6 @@
 # 全服务端混合负载验收设计
 
-状态：已实施，待正式基线验收
+状态：已通过自动验收，客户端人工验收待执行
 
 日期：2026-08-22
 
@@ -41,6 +41,35 @@ FullServerAcceptance
 - 多人房间并发档为 `5/10/20`。每档均从干净的隔离运行数据启动并完成 60 个房间，不复用上一档房间、socket、active quest 或数据库写入。
 - 60 个房间中 30 个由 Host A 所属玩家担任游戏房主，30 个由 Client B 所属玩家担任游戏房主。基础设施 Host 与游戏房主身份必须分开验证。
 - 本设计不宣称生产环境固定有 20% 玩家处于多人房间；该比例是经用户确认的验收覆盖参数。
+
+## 正式基线结果
+
+2026-08-22 的三轮正式自动验收已通过。三轮均满足以下稳定规模和结构门禁：
+
+| 子负载 | 稳定规模 | 结构结果 |
+|---|---|---|
+| 非多人 | 1000 份隔离存档、600 个活跃身份、并发 `10/25/50/100` | 每档 600/600 请求完成；错误、active quest 与清理资源均为 0 |
+| 多人 | 120 个独立身份、60 个双人房间、并发 `5/10/20` | 每档 60/60 房间、120/120 身份完成；30 个 Host-owned + 30 个 Client-owned；错误、active quest 与清理资源均为 0 |
+| HTTP 共存 | 每个存活房间批次固定执行 6 次请求 | auth、load、mission 在 Host 与 Client 各执行一次，全部完成且不改变房间权威状态 |
+
+非多人三轮实测 SQL 结构上界如下。行为签名在四档并发和三轮之间保持稳定；`load` 与 `single-battle` 各保留三种预期状态签名，其他入口各保留一种：
+
+| 入口 | reads 上界 | writes 上界 | 稳定签名数 |
+|---|---:|---:|---:|
+| auth | 8 | 3 | 1 |
+| load | 50 | 9 | 3 |
+| mission-progress | 14 | 1 | 1 |
+| single-battle | 146 | 101 | 3 |
+| shop | 44 | 5 | 1 |
+| gacha | 82 | 9 | 1 |
+| mail | 31 | 4 | 1 |
+
+多人两种房主归属的稳定行为签名为：
+
+- `sha256:0e4c3c3182af0f022c9b58b3a8f9ecb182782a15904ed1266a4e037d7c019cfe`
+- `sha256:574691a3eb0659697ff8db0537a767d683d71862680527bd760a2db38521ed7c`
+
+三轮各子报告最大 step p95 的中位数为：非多人 `6102.594 ms`，多人 `2883.015518 ms`。同机器且 formal profile 完全一致时，后续正式报告相对参考中位数的任一比值超过 `1.2` 即拒绝；机器或 profile 不同则只记录比值，不执行延迟硬门禁。结构门禁不因不可比较而放宽。
 
 ## 非多人负载
 
@@ -139,7 +168,7 @@ npm run benchmark:full-server-acceptance -- --formal
 
 完整总报告始终写入标准输出，子报告完整嵌入 `rounds[].nonMulti` 与 `rounds[].multi`，不会默认创建报告文件。需要留存时使用 `--output <report.json>`；相对路径从命令执行目录解析，父目录必须已经存在，目标必须是普通文件且不能是符号链接。写入文件与标准输出的 JSON 内容一致。
 
-同机延迟门禁默认读取 `tools/perf/__snapshots__/full_server_acceptance_reference.json`。只有显式 `--formal`、恰好三轮且三轮结构门禁全部通过时，才允许使用 `--write-reference <reference.json>` 写出参考；`--output` 与 `--write-reference` 必须指向不同的物理文件。正式报告与同机器、同 profile 的参考比较，任一子负载 p95 中位数退化超过 20% 即拒绝；机器或 profile 不同则只记录比值，不作为硬门禁。当前任务不运行 formal，也不创建或更新该 reference snapshot。
+同机延迟门禁默认读取 `tools/perf/__snapshots__/full_server_acceptance_reference.json`。只有显式 `--formal`、恰好三轮且三轮结构门禁全部通过时，才允许使用 `--write-reference <reference.json>` 写出参考；`--output` 与 `--write-reference` 必须指向不同的物理文件。正式报告与同机器、同 profile 的参考比较，任一子负载 p95 中位数退化超过 20% 即拒绝；机器或 profile 不同则只记录比值，不作为硬门禁。正式参考已由上述三轮通过结果建立，日常 smoke 和 full/integration 测试不得重写该参考。
 
 ## 错误与清理
 
