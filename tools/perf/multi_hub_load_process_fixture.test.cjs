@@ -163,8 +163,44 @@ test("owned process cleanup also sweeps a POSIX group after normal exit", async 
     )
 })
 
+test("process-group cleanup retries transient EPERM before accepting ESRCH", async () => {
+    const child = fakeChild(5678)
+    const killCalls = []
+    let probeCount = 0
+    let clock = 0
+    const transientPermission = Object.assign(new Error("transient group permission"), { code: "EPERM" })
+    const owner = startOwnedProcess({
+        command: "/runtime/node",
+        timeoutMs: 50,
+        terminationTimeoutMs: 100,
+        platform: "darwin",
+        now: () => clock,
+        sleep: async milliseconds => { clock += milliseconds },
+        spawnProcess: () => child,
+        killProcess(pid, signal) {
+            killCalls.push({ pid, signal })
+            if (signal === 0) {
+                probeCount++
+                if (probeCount <= 2) throw transientPermission
+                throw processMissingError()
+            }
+        },
+    })
+    queueMicrotask(() => child.emit("close", 0, null))
+
+    await owner.result
+    await owner.cleanup()
+
+    assert.deepEqual(
+        killCalls.filter(call => call.signal !== 0),
+        [{ pid: -5678, signal: "SIGTERM" }],
+    )
+    assert.equal(probeCount, 3)
+})
+
 test("process-group probe errors fail closed and retain their cause", async () => {
     const child = fakeChild(6543)
+    const killCalls = []
     const permissionError = Object.assign(new Error("probe denied"), { code: "EPERM" })
     const owner = startOwnedProcess({
         command: "/runtime/node",
@@ -172,7 +208,8 @@ test("process-group probe errors fail closed and retain their cause", async () =
         terminationTimeoutMs: 5,
         platform: "darwin",
         spawnProcess: () => child,
-        killProcess(_pid, signal) {
+        killProcess(pid, signal) {
+            killCalls.push({ pid, signal })
             if (signal === 0) throw permissionError
         },
     })
@@ -183,8 +220,36 @@ test("process-group probe errors fail closed and retain their cause", async () =
         assert.equal(error instanceof AggregateError, true)
         assert.equal(error.cause, permissionError)
         assert.equal(error.errors.includes(permissionError), true)
+        assert.equal(killCalls.some(call => call.signal === "SIGKILL"), false)
         return true
     })
+})
+
+test("unstable process-group permission falls back to direct-child cleanup without group KILL", async () => {
+    const child = fakeChild(7655)
+    const groupCalls = []
+    const directCalls = []
+    const permissionError = Object.assign(new Error("group permission unstable"), { code: "EPERM" })
+    child.kill = signal => {
+        directCalls.push(signal)
+        queueMicrotask(() => child.emit("close", null, signal))
+        return true
+    }
+    const owner = startOwnedProcess({
+        command: "/runtime/node",
+        timeoutMs: 5,
+        terminationTimeoutMs: 10,
+        platform: "darwin",
+        spawnProcess: () => child,
+        killProcess(pid, signal) {
+            groupCalls.push({ pid, signal })
+            throw permissionError
+        },
+    })
+
+    await assert.rejects(owner.result, /owned process timed out|owned process cleanup failed/)
+    assert.equal(groupCalls.some(call => call.signal === "SIGKILL"), false)
+    assert.deepEqual(directCalls, ["SIGTERM"])
 })
 
 test("real POSIX cleanup kills a TERM-resistant descendant after its parent exits", {
@@ -199,30 +264,32 @@ test("real POSIX cleanup kills a TERM-resistant descendant after its parent exit
         "process.stdout.write(String(child.pid))",
         "setTimeout(() => process.exit(0), 50)",
     ].join(";")
-    const owner = startOwnedProcess({
-        command: process.execPath,
-        args: ["-e", parentScript],
-        timeoutMs: 2_000,
-        terminationTimeoutMs: 100,
-    })
-    let descendantPid
-    t.after(() => {
-        let groupError
-        try {
-            emergencyKillGroup(owner.child.pid)
-        } catch (error) {
-            groupError = error
-        }
-        emergencyKillProcess(descendantPid)
-        if (groupError && groupError.code !== "EPERM") throw groupError
-    })
-    const result = await owner.result
-    descendantPid = Number(result.stdout)
-    assert.equal(result.code, 0)
-    assert.equal(Number.isSafeInteger(descendantPid), true)
+    for (let attempt = 0; attempt < 8; attempt++) {
+        const owner = startOwnedProcess({
+            command: process.execPath,
+            args: ["-e", parentScript],
+            timeoutMs: 2_000,
+            terminationTimeoutMs: 100,
+        })
+        let descendantPid
+        t.after(() => {
+            let groupError
+            try {
+                emergencyKillGroup(owner.child.pid)
+            } catch (error) {
+                groupError = error
+            }
+            emergencyKillProcess(descendantPid)
+            if (groupError && groupError.code !== "EPERM") throw groupError
+        })
+        const result = await owner.result
+        descendantPid = Number(result.stdout)
+        assert.equal(result.code, 0)
+        assert.equal(Number.isSafeInteger(descendantPid), true)
 
-    await owner.cleanup()
+        await owner.cleanup()
 
-    assert.throws(() => process.kill(-owner.child.pid, 0), { code: "ESRCH" })
-    assert.throws(() => process.kill(descendantPid, 0), { code: "ESRCH" })
+        assert.throws(() => process.kill(-owner.child.pid, 0), { code: "ESRCH" })
+        assert.throws(() => process.kill(descendantPid, 0), { code: "ESRCH" })
+    }
 })

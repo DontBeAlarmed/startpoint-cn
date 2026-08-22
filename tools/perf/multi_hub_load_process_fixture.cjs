@@ -96,15 +96,78 @@ function startOwnedProcess({
         }
     }
 
-    const waitForGroupGone = async waitMs => {
+    const isPermissionError = error => error?.code === "EPERM"
+
+    const retryGroupSignal = async (signal, waitMs, { requireAlive = false } = {}) => {
         const deadline = now() + waitMs
+        let permissionError = null
+        let firstAttempt = true
         while (true) {
-            const probe = signalGroup(0)
-            if (probe.gone || probe.error) return probe
+            if (requireAlive || !firstAttempt) {
+                const probe = signalGroup(0)
+                if (probe.gone) return probe
+                if (probe.error && !isPermissionError(probe.error)) return probe
+                if (probe.error) permissionError = probe.error
+            }
+
+            const sent = signalGroup(signal)
+            firstAttempt = false
+            if (sent.gone) return sent
+            if (!sent.error) return { ...sent, permissionDenied: false }
+            if (!isPermissionError(sent.error)) return sent
+            permissionError = sent.error
+
             const remainingMs = deadline - now()
-            if (remainingMs <= 0) return { error: null, gone: false }
+            if (remainingMs <= 0) {
+                return {
+                    error: permissionError,
+                    gone: false,
+                    permissionDenied: true,
+                }
+            }
             await sleep(Math.min(probeIntervalMs, remainingMs))
         }
+    }
+
+    const waitForGroupGone = async waitMs => {
+        const deadline = now() + waitMs
+        let permissionError = null
+        while (true) {
+            const probe = signalGroup(0)
+            if (probe.gone) return probe
+            if (probe.error && !isPermissionError(probe.error)) return probe
+            if (probe.error) permissionError = probe.error
+            const remainingMs = deadline - now()
+            if (remainingMs <= 0) {
+                return {
+                    error: permissionError,
+                    gone: false,
+                    permissionDenied: permissionError !== null,
+                }
+            }
+            await sleep(Math.min(probeIntervalMs, remainingMs))
+        }
+    }
+
+    const stopDirectProcess = async waitMs => {
+        const errors = []
+        if (terminal) return errors
+        try {
+            child.kill("SIGTERM")
+        } catch (error) {
+            errors.push(error)
+        }
+        if (!await waitForTerminal(waitMs)) {
+            try {
+                child.kill("SIGKILL")
+            } catch (error) {
+                errors.push(error)
+            }
+        }
+        if (!terminal && !await waitForTerminal(waitMs)) {
+            errors.push(new Error("owned direct process did not stop"))
+        }
+        return errors
     }
 
     const cleanup = () => {
@@ -112,13 +175,19 @@ function startOwnedProcess({
         cleanupPromise = (async () => {
             const errors = []
             if (detached) {
-                const term = signalGroup("SIGTERM")
+                const term = await retryGroupSignal("SIGTERM", terminationTimeoutMs)
                 let groupState = term.gone
                     ? term
                     : await waitForGroupGone(terminationTimeoutMs)
                 let groupError = term.error ?? groupState.error
-                if (!groupState.gone) {
-                    const kill = signalGroup("SIGKILL")
+                const groupPermissionUnstable = term.permissionDenied === true
+                    || groupState.permissionDenied === true
+                if (!groupState.gone && !groupPermissionUnstable) {
+                    const kill = await retryGroupSignal(
+                        "SIGKILL",
+                        terminationTimeoutMs,
+                        { requireAlive: true },
+                    )
                     groupError ??= kill.error
                     groupState = kill.gone
                         ? kill
@@ -126,6 +195,7 @@ function startOwnedProcess({
                     groupError ??= groupState.error
                 }
                 if (!groupState.gone) {
+                    errors.push(...await stopDirectProcess(terminationTimeoutMs))
                     if (groupError) errors.push(groupError)
                     errors.push(new Error("owned process group did not stop"))
                 }
