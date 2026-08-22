@@ -1,10 +1,11 @@
 "use strict"
 
 const assert = require("node:assert/strict")
-const { EventEmitter } = require("node:events")
+const { EventEmitter, once } = require("node:events")
 const fs = require("node:fs")
 const net = require("node:net")
 const path = require("node:path")
+const { spawn } = require("node:child_process")
 const { PassThrough } = require("node:stream")
 const test = require("node:test")
 
@@ -87,6 +88,21 @@ async function waitFor(condition, message, timeoutMs = 500) {
 
 function activeTrackedHandles(tracked) {
     return process._getActiveHandles().filter(handle => tracked.has(handle))
+}
+
+function fakeRuntimeChild(pid = 4321) {
+    const child = new EventEmitter()
+    child.pid = pid
+    child.exitCode = null
+    child.signalCode = null
+    child.stdout = new PassThrough()
+    child.stderr = new PassThrough()
+    child.kill = signal => {
+        child.signalCode = signal
+        queueMicrotask(() => child.emit("close"))
+        return true
+    }
+    return child
 }
 
 async function assertTrackedHandlesClosed(tracked) {
@@ -275,6 +291,74 @@ test("cleanup closes peers, stops runtimes, and removes its root normally", asyn
 
     assert.deepEqual(calls, ["peer", "runtime"])
     assert.equal(fs.existsSync(root), false)
+})
+
+test("POSIX runtime cleanup owns and terminates the detached process group", async () => {
+    const child = fakeRuntimeChild(7654)
+    const spawnOptions = []
+    const killCalls = []
+    const harness = new MultiHubProcessHarness({
+        buildCompiledRuntime: () => 0,
+        platform: "darwin",
+        spawnProcess(_command, _args, options) {
+            spawnOptions.push(options)
+            return child
+        },
+        killProcess(pid, signal) {
+            killCalls.push({ pid, signal })
+            if (signal === "SIGTERM") {
+                child.signalCode = signal
+                queueMicrotask(() => child.emit("close"))
+            }
+            if (signal === 0) {
+                const error = new Error("process group gone")
+                error.code = "ESRCH"
+                throw error
+            }
+        },
+    })
+
+    harness.spawnRuntime("detached-runtime", {}, [])
+    await harness.cleanup()
+
+    assert.equal(spawnOptions[0].detached, true)
+    assert.deepEqual(killCalls, [
+        { pid: -7654, signal: "SIGTERM" },
+        { pid: -7654, signal: 0 },
+    ])
+})
+
+test("POSIX runtime cleanup removes a TERM-resistant descendant", {
+    skip: process.platform === "win32",
+}, async t => {
+    const harness = new MultiHubProcessHarness({
+        buildCompiledRuntime: () => 0,
+        spawnProcess(_command, _args, options) {
+            const parentScript = [
+                "const { spawn } = require('node:child_process')",
+                "const child = spawn(process.execPath, ['-e', \"process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)\"], { stdio: 'ignore' })",
+                "process.stdout.write(String(child.pid))",
+                "setTimeout(() => process.exit(0), 50)",
+            ].join(";")
+            return spawn(process.execPath, ["-e", parentScript], options)
+        },
+    })
+    t.after(() => harness.cleanup())
+
+    const runtime = harness.spawnRuntime("descendant-runtime", {}, [])
+    const descendantPid = Number((await Promise.race([
+        new Promise(resolve => runtime.child.stdout.once("data", resolve)),
+        delay(1_000).then(() => { throw new Error("descendant pid was not reported") }),
+    ])).toString())
+    assert.equal(Number.isSafeInteger(descendantPid), true)
+
+    await Promise.race([
+        once(runtime.child, "close"),
+        delay(1_000).then(() => { throw new Error("runtime parent did not exit") }),
+    ])
+    await harness.cleanup()
+
+    assert.throws(() => process.kill(descendantPid, 0), error => error?.code === "ESRCH")
 })
 
 test("cleanup owns a runtime created during spawn and stops it before rejecting", async () => {

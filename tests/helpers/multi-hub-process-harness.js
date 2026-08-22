@@ -19,6 +19,8 @@ const defaultPeerCleanupTimeoutMs = 5_000
 const defaultCredentialTimeoutMs = 15_000
 const defaultRequestTimeoutMs = 15_000
 const defaultPeerMaxBufferBytes = 1024 * 1024
+const defaultRuntimeTerminationTimeoutMs = 7_500
+const processGroupProbeIntervalMs = 25
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms))
@@ -135,14 +137,99 @@ function waitForExit(child, timeoutMs) {
     })
 }
 
+function groupSignal(killProcess, pid, signal) {
+    try {
+        killProcess(-pid, signal)
+        return { gone: false, error: null }
+    } catch (error) {
+        if (error?.code === "ESRCH") return { gone: true, error: null }
+        return { gone: false, error }
+    }
+}
+
+async function waitForGroupGone(killProcess, pid, timeoutMs, childExitPromise = null) {
+    const deadline = Date.now() + timeoutMs
+    let permissionError = null
+    let childExited = false
+    if (childExitPromise) {
+        Promise.resolve(childExitPromise).then(exited => {
+            childExited = exited === true
+        })
+    }
+    while (true) {
+        const probe = groupSignal(killProcess, pid, 0)
+        if (probe.gone) return probe
+        if (probe.error && probe.error.code !== "EPERM") return probe
+        if (childExited) return { gone: false, error: null, childExited: true }
+        if (probe.error) permissionError = probe.error
+        const remainingMs = deadline - Date.now()
+        if (remainingMs <= 0) {
+            return {
+                gone: false,
+                error: permissionError,
+                permissionDenied: permissionError !== null,
+            }
+        }
+        await delay(Math.min(processGroupProbeIntervalMs, remainingMs))
+    }
+}
+
+async function retryGroupSignal(killProcess, pid, signal, timeoutMs) {
+    const deadline = Date.now() + timeoutMs
+    let permissionError = null
+    while (true) {
+        const sent = groupSignal(killProcess, pid, signal)
+        if (sent.gone) return sent
+        if (!sent.error) return { ...sent, permissionDenied: false }
+        if (sent.error.code !== "EPERM") return sent
+        permissionError = sent.error
+        const remainingMs = deadline - Date.now()
+        if (remainingMs <= 0) {
+            return { gone: false, error: permissionError, permissionDenied: true }
+        }
+        await delay(Math.min(processGroupProbeIntervalMs, remainingMs))
+    }
+}
+
+async function stopDirectProcess(child, timeoutMs, output) {
+    const errors = []
+    if (child.exitCode === null && child.signalCode === null) {
+        try {
+            child.kill("SIGTERM")
+        } catch (error) {
+            errors.push(error)
+        }
+        if (!await waitForExit(child, timeoutMs)) {
+            try {
+                child.kill("SIGKILL")
+            } catch (error) {
+                errors.push(error)
+            }
+        }
+    }
+    if (child.exitCode === null
+        && child.signalCode === null
+        && !await waitForExit(child, timeoutMs)) {
+        errors.push(new Error(`process did not stop\n${output()}`))
+    }
+    return errors
+}
+
 class RuntimeProcess {
-    constructor(label, child, ports) {
+    constructor(label, child, ports, {
+        platform = process.platform,
+        killProcess = process.kill,
+        terminationTimeoutMs = defaultRuntimeTerminationTimeoutMs,
+    } = {}) {
         this.label = label
         this.child = child
         this.ports = ports
         this.stdout = ""
         this.stderr = ""
         this.stopped = false
+        this.platform = platform
+        this.killProcess = killProcess
+        this.terminationTimeoutMs = terminationTimeoutMs
         child.stdout.on("data", chunk => {
             this.stdout = (this.stdout + chunk).slice(-64_000)
         })
@@ -157,18 +244,76 @@ class RuntimeProcess {
 
     async stop() {
         if (this.stopped) return
-        if (this.child.exitCode === null && this.child.signalCode === null) {
-            this.child.kill("SIGTERM")
-            if (!await waitForExit(this.child, 7_500)) {
-                this.child.kill("SIGKILL")
-                if (!await waitForExit(this.child, 5_000)) {
-                    throw new Error(`process did not stop\n${this.output()}`)
-                }
+        const cleanupErrors = []
+        const useProcessGroup = this.platform !== "win32"
+            && Number.isSafeInteger(this.child.pid)
+            && this.child.pid > 0
+        if (useProcessGroup) {
+            const childExitPromise = this.child.exitCode !== null
+                || this.child.signalCode !== null
+                ? Promise.resolve(true)
+                : waitForExit(this.child, this.terminationTimeoutMs)
+            const term = await retryGroupSignal(
+                this.killProcess,
+                this.child.pid,
+                "SIGTERM",
+                this.terminationTimeoutMs,
+            )
+            let groupState = term.gone
+                ? term
+                : await waitForGroupGone(
+                    this.killProcess,
+                    this.child.pid,
+                    this.terminationTimeoutMs,
+                    childExitPromise,
+                )
+            let groupError = term.error ?? groupState.error
+            const permissionUnstable = term.permissionDenied === true
+                || groupState.permissionDenied === true
+            if (!groupState.gone && !permissionUnstable) {
+                const kill = await retryGroupSignal(
+                    this.killProcess,
+                    this.child.pid,
+                    "SIGKILL",
+                    this.terminationTimeoutMs,
+                )
+                groupError ??= kill.error
+                groupState = kill.gone
+                    ? kill
+                    : await waitForGroupGone(
+                        this.killProcess,
+                        this.child.pid,
+                        this.terminationTimeoutMs,
+                    )
+                groupError ??= groupState.error
             }
+            if (!groupState.gone) {
+                cleanupErrors.push(...await stopDirectProcess(
+                    this.child,
+                    this.terminationTimeoutMs,
+                    () => this.output(),
+                ))
+                if (groupError) cleanupErrors.push(groupError)
+                cleanupErrors.push(new Error("owned runtime process group did not stop"))
+            } else if (!await childExitPromise
+                && !await waitForExit(this.child, this.terminationTimeoutMs)) {
+                cleanupErrors.push(new Error(`process did not stop\n${this.output()}`))
+            }
+        } else if (this.child.exitCode === null && this.child.signalCode === null) {
+            cleanupErrors.push(...await stopDirectProcess(
+                this.child,
+                this.terminationTimeoutMs,
+                () => this.output(),
+            ))
         }
         this.child.stdout.destroy()
         this.child.stderr.destroy()
         await waitForPortsReleased(this.ports)
+        if (cleanupErrors.length > 0) {
+            throw new AggregateError(cleanupErrors, "runtime process cleanup failed", {
+                cause: cleanupErrors[0],
+            })
+        }
         this.stopped = true
     }
 }
@@ -324,6 +469,8 @@ class MultiHubProcessHarness {
         this.peerMaxBufferBytes = peerMaxBufferBytes
         this.spawnSync = dependencies.spawnSync ?? spawnSync
         this.spawnProcess = dependencies.spawnProcess ?? spawn
+        this.platform = dependencies.platform ?? process.platform
+        this.killProcess = dependencies.killProcess ?? process.kill
         this.createConnection = dependencies.createConnection ?? net.createConnection
     }
 
@@ -443,9 +590,13 @@ class MultiHubProcessHarness {
         const child = this.spawnProcess(process.execPath, [path.join(projectRoot, "out/cn-server.js")], {
             cwd: projectRoot,
             env: runtimeEnv,
+            detached: this.platform !== "win32",
             stdio: ["ignore", "pipe", "pipe"],
         })
-        const runtime = new RuntimeProcess(label, child, ports)
+        const runtime = new RuntimeProcess(label, child, ports, {
+            platform: this.platform,
+            killProcess: this.killProcess,
+        })
         this.processes.push(runtime)
         if (this.cleanupStarted) {
             this.trackLifecycleCleanup(
