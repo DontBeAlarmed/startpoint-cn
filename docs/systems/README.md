@@ -12,6 +12,7 @@
 - [账号管理与继承码](./account-management-and-takeover.md)
 - [多人联机与 Hub 优化架构](./multiplayer-hub-optimization.md)
 - [全服务端混合负载验收](./full-server-acceptance.md)
+- [数据库热路径第一阶段优化](./database-hot-path-optimization.md)
 - [配队装备与魂珠校验](./party-loadout-validation.md)
 - [经验池边界](./exp-pool.md)
 - [背包与装备写入事务](./inventory-write-transactions.md)
