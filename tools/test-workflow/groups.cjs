@@ -275,6 +275,7 @@ const TEST_GROUPS = Object.freeze({
         tests: [
             "tools/additional_reward.test.cjs",
             "tools/character_stack.test.cjs",
+            "tools/database_hot_path_indexes.test.cjs",
             "tools/equipment_dissolve.test.cjs",
             "tools/equipment_enhancement.test.cjs",
             "tools/economy_write_transaction.test.cjs",

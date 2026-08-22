@@ -381,6 +381,14 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
 
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_players_mails_player_id
+        ON players_mails (player_id, id DESC)
+    `).run()
+
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_players_mails_player_unreceived
+        ON players_mails (player_id, receive_time, id DESC)
+    `).run()
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_receive_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         player_id INTEGER NOT NULL,
@@ -391,6 +399,10 @@ export default function init(
         create_time TEXT NOT NULL,
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
+
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_receive_history_player_created
+        ON players_receive_history (player_id, create_time DESC, id DESC)
+    `).run()
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_cleared_regular_missions (
         id INTEGER NOT NULL,
@@ -407,6 +419,10 @@ export default function init(
         PRIMARY KEY (id, player_id),
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
+
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_players_items_player_id
+        ON players_items (player_id, id)
+    `).run()
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_collected_items (
         player_id INTEGER NOT NULL,
@@ -453,6 +469,10 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
 
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_players_characters_player_id
+        ON players_characters (player_id, id)
+    `).run()
+
     // migration: ex_boost / illustration columns were added to CREATE TABLE only
     ensureSchemaColumn(database, "players_characters.ex_boost_status_id")
     ensureSchemaColumn(database, "players_characters.ex_boost_ability_id_list")
@@ -477,6 +497,10 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
 
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_player_bond_tokens_player_character
+        ON players_characters_bond_tokens (player_id, character_id, mana_board_index)
+    `).run()
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_characters_mana_nodes (
         value INTEGER NOT NULL,
         awake_level INTEGER NOT NULL DEFAULT 0,
@@ -486,6 +510,10 @@ export default function init(
         FOREIGN KEY (character_id, player_id) REFERENCES players_characters (id, player_id) ON DELETE CASCADE,
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
+
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_player_mana_nodes_player_character
+        ON players_characters_mana_nodes (player_id, character_id, value)
+    `).run()
 
     // migration: add awake_level for character awakening system
     ensureSchemaColumn(database, "players_characters_mana_nodes.awake_level")
@@ -561,6 +589,10 @@ export default function init(
         PRIMARY KEY (id, player_id),
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
+
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_players_equipment_player_id
+        ON players_equipment (player_id, id)
+    `).run()
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_quest_progress (
         section INTEGER NOT NULL,
@@ -772,6 +804,10 @@ export default function init(
         PRIMARY KEY (category, id, player_id),
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
+
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_category_missions_player_category
+        ON players_category_missions (player_id, category, id)
+    `).run()
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_category_mission_stages (
         category INTEGER NOT NULL,
