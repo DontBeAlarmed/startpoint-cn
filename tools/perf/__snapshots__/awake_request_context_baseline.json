@@ -1,0 +1,396 @@
+{
+  "version": 1,
+  "fixedTime": "2025-01-01T12:00:00.000Z",
+  "scenarios": {
+    "full-publication": {
+      "sqlReads": 14,
+      "sqlWrites": 1,
+      "missionComputes": 7,
+      "sqlByTable": {
+        "players": {
+          "reads": 1,
+          "writes": 0,
+          "statements": 1
+        },
+        "players_category_mission_stages": {
+          "reads": 2,
+          "writes": 0,
+          "statements": 2
+        },
+        "players_category_missions": {
+          "reads": 2,
+          "writes": 0,
+          "statements": 2
+        },
+        "players_character_awake_unlocks": {
+          "reads": 2,
+          "writes": 1,
+          "statements": 3
+        },
+        "players_character_quest_clears": {
+          "reads": 1,
+          "writes": 0,
+          "statements": 1
+        },
+        "players_characters": {
+          "reads": 1,
+          "writes": 0,
+          "statements": 1
+        },
+        "players_characters_bond_tokens": {
+          "reads": 1,
+          "writes": 0,
+          "statements": 1
+        },
+        "players_characters_mana_nodes": {
+          "reads": 2,
+          "writes": 0,
+          "statements": 2
+        },
+        "players_party_member_co_clears": {
+          "reads": 1,
+          "writes": 0,
+          "statements": 1
+        },
+        "players_quest_progress": {
+          "reads": 1,
+          "writes": 0,
+          "statements": 1
+        }
+      },
+      "behavior": {
+        "category9Progress": [
+          [
+            3410051,
+            1
+          ],
+          [
+            3410052,
+            5
+          ],
+          [
+            3410053,
+            5
+          ],
+          [
+            3410054,
+            3
+          ]
+        ],
+        "characterList": [
+          {
+            "character_id": 341005,
+            "exp": 37241,
+            "join_time": "fixed-server-time",
+            "mana_board_awake": {
+              "1": 1,
+              "2": 2
+            },
+            "owner_projection": true,
+            "update_time": "fixed-server-time"
+          }
+        ],
+        "manaNodeCount": 23,
+        "persistedUnlocks": [
+          [
+            341005,
+            [
+              [
+                1,
+                1
+              ]
+            ]
+          ]
+        ]
+      },
+      "behaviorSha256": "bdb40d369bf0ad2025e76b7df8f047e6ac390433d6968a4b464e098ee5b765e3"
+    },
+    "candidate-one": {
+      "sqlReads": 28,
+      "sqlWrites": 2,
+      "missionComputes": 14,
+      "sqlByTable": {
+        "players": {
+          "reads": 2,
+          "writes": 0,
+          "statements": 2
+        },
+        "players_category_mission_stages": {
+          "reads": 4,
+          "writes": 0,
+          "statements": 4
+        },
+        "players_category_missions": {
+          "reads": 4,
+          "writes": 0,
+          "statements": 4
+        },
+        "players_character_awake_unlocks": {
+          "reads": 4,
+          "writes": 2,
+          "statements": 6
+        },
+        "players_character_quest_clears": {
+          "reads": 2,
+          "writes": 0,
+          "statements": 2
+        },
+        "players_characters": {
+          "reads": 2,
+          "writes": 0,
+          "statements": 2
+        },
+        "players_characters_bond_tokens": {
+          "reads": 2,
+          "writes": 0,
+          "statements": 2
+        },
+        "players_characters_mana_nodes": {
+          "reads": 4,
+          "writes": 0,
+          "statements": 4
+        },
+        "players_party_member_co_clears": {
+          "reads": 2,
+          "writes": 0,
+          "statements": 2
+        },
+        "players_quest_progress": {
+          "reads": 2,
+          "writes": 0,
+          "statements": 2
+        }
+      },
+      "behavior": {
+        "finalUnlocks": [
+          [
+            341005,
+            [
+              [
+                1,
+                1
+              ]
+            ]
+          ]
+        ],
+        "first": {
+          "all": [
+            [
+              341005,
+              [
+                [
+                  1,
+                  1
+                ]
+              ]
+            ]
+          ],
+          "changed": [
+            [
+              341005,
+              [
+                [
+                  1,
+                  1
+                ]
+              ]
+            ]
+          ],
+          "removed": []
+        },
+        "second": {
+          "all": [
+            [
+              341005,
+              [
+                [
+                  1,
+                  1
+                ]
+              ]
+            ]
+          ],
+          "changed": [],
+          "removed": []
+        }
+      },
+      "behaviorSha256": "3ee3ee50e4a7d1372448eefa2e0d6b3d40b5d1d56b78f2ca9035b1f09cc2c8b1"
+    },
+    "empty-candidate-cleanup": {
+      "sqlReads": 6,
+      "sqlWrites": 1,
+      "missionComputes": 0,
+      "sqlByTable": {
+        "players_character_awake_unlocks": {
+          "reads": 2,
+          "writes": 1,
+          "statements": 3
+        },
+        "players_characters": {
+          "reads": 1,
+          "writes": 0,
+          "statements": 1
+        },
+        "players_characters_bond_tokens": {
+          "reads": 1,
+          "writes": 0,
+          "statements": 1
+        },
+        "players_characters_mana_nodes": {
+          "reads": 2,
+          "writes": 0,
+          "statements": 2
+        }
+      },
+      "behavior": {
+        "all": [],
+        "changed": [],
+        "finalUnlocks": [],
+        "removed": [
+          [
+            341005,
+            [
+              [
+                1,
+                1
+              ]
+            ]
+          ]
+        ]
+      },
+      "behaviorSha256": "bbbcbc055cad69b216b3b1d2ff14bb7bdabd7abcb9be4ef622c9eb22fbc92b3b"
+    },
+    "strict-failure-rollback": {
+      "sqlReads": 13,
+      "sqlWrites": 3,
+      "missionComputes": 7,
+      "sqlByTable": {
+        "players": {
+          "reads": 1,
+          "writes": 1,
+          "statements": 2
+        },
+        "players_category_mission_stages": {
+          "reads": 2,
+          "writes": 0,
+          "statements": 2
+        },
+        "players_category_missions": {
+          "reads": 2,
+          "writes": 0,
+          "statements": 2
+        },
+        "players_character_awake_unlocks": {
+          "reads": 1,
+          "writes": 2,
+          "statements": 3
+        },
+        "players_character_quest_clears": {
+          "reads": 1,
+          "writes": 0,
+          "statements": 1
+        },
+        "players_characters": {
+          "reads": 1,
+          "writes": 0,
+          "statements": 1
+        },
+        "players_characters_bond_tokens": {
+          "reads": 1,
+          "writes": 0,
+          "statements": 1
+        },
+        "players_characters_mana_nodes": {
+          "reads": 2,
+          "writes": 0,
+          "statements": 2
+        },
+        "players_party_member_co_clears": {
+          "reads": 1,
+          "writes": 0,
+          "statements": 1
+        },
+        "players_quest_progress": {
+          "reads": 1,
+          "writes": 0,
+          "statements": 1
+        }
+      },
+      "behavior": {
+        "candidateUnlockPresent": false,
+        "errorCategory": "database-write-failure",
+        "ownerDelta": 0,
+        "staleUnlockPreserved": true,
+        "threw": true,
+        "unlockCount": 1
+      },
+      "behaviorSha256": "ddd3543bf083c36587a83f69288ac8730dd5a56ae011ec35fb94d84129cd9cfc"
+    },
+    "best-effort-failure": {
+      "sqlReads": 13,
+      "sqlWrites": 3,
+      "missionComputes": 7,
+      "sqlByTable": {
+        "players": {
+          "reads": 1,
+          "writes": 1,
+          "statements": 2
+        },
+        "players_category_mission_stages": {
+          "reads": 2,
+          "writes": 0,
+          "statements": 2
+        },
+        "players_category_missions": {
+          "reads": 2,
+          "writes": 0,
+          "statements": 2
+        },
+        "players_character_awake_unlocks": {
+          "reads": 1,
+          "writes": 2,
+          "statements": 3
+        },
+        "players_character_quest_clears": {
+          "reads": 1,
+          "writes": 0,
+          "statements": 1
+        },
+        "players_characters": {
+          "reads": 1,
+          "writes": 0,
+          "statements": 1
+        },
+        "players_characters_bond_tokens": {
+          "reads": 1,
+          "writes": 0,
+          "statements": 1
+        },
+        "players_characters_mana_nodes": {
+          "reads": 2,
+          "writes": 0,
+          "statements": 2
+        },
+        "players_party_member_co_clears": {
+          "reads": 1,
+          "writes": 0,
+          "statements": 1
+        },
+        "players_quest_progress": {
+          "reads": 1,
+          "writes": 0,
+          "statements": 1
+        }
+      },
+      "behavior": {
+        "candidateUnlockPresent": false,
+        "errorLogged": true,
+        "ownerDelta": 7,
+        "returnedExistingIdentity": true,
+        "staleUnlockPreserved": true,
+        "unlockCount": 1
+      },
+      "behaviorSha256": "2840497cb82aec620d40c85e640af36be564c99443da632d752b895fc429f29d"
+    }
+  }
+}

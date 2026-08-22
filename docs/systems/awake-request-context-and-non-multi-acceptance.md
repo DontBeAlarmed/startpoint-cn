@@ -1,6 +1,6 @@
 # 觉醒请求上下文与非多人总验收架构
 
-状态：设计已讨论确认，尚未实施
+状态：35.0 基线已固化，35.1 请求上下文尚未实施
 
 日期：2026-08-23
 
@@ -156,6 +156,37 @@ best-effort publication 用于主业务已经可以独立成立、觉醒只负�
 上述分组依次包含 1 个事务内 strict、9 个事务内 best-effort 和 9 个提交后 best-effort 表达式。单人/多人 finish 虽共同使用结算抽象，静态审计中仍按两个生产表达式分别锁定；tutorial 15/16、邮件单领/全领、shop 单购/批购和 gacha 兑换/执行同理。
 
 ## 性能与行为门禁
+
+### 35.0 publication/reconcile reference
+
+35.0 使用 bundled gameplay snapshot 和固定服务器虚拟时间
+`2025-01-01T12:00:00.000Z`，在五个互相独立的临时 SQLite 数据库中固化当前
+publication/reconcile 行为。计量窗口只覆盖目标调用；fixture 准备和行为摘要读取不计入
+SQL 或 mission compute。reference 位于
+`tools/perf/__snapshots__/awake_request_context_baseline.json`，只能由
+`npm run benchmark:awake-request-context -- --write` 在结构、行为 hash 和场景集合自洽后原子更新。
+
+| 场景 | SQL reads | SQL writes | mission computes | behavior SHA-256 |
+|---|---:|---:|---:|---|
+| `full-publication` | 14 | 1 | 7 | `bdb40d369bf0ad2025e76b7df8f047e6ac390433d6968a4b464e098ee5b765e3` |
+| `candidate-one` | 28 | 2 | 14 | `3ee3ee50e4a7d1372448eefa2e0d6b3d40b5d1d56b78f2ca9035b1f09cc2c8b1` |
+| `empty-candidate-cleanup` | 6 | 1 | 0 | `bbbcbc055cad69b216b3b1d2ff14bb7bdabd7abcb9be4ef622c9eb22fbc92b3b` |
+| `strict-failure-rollback` | 13 | 3 | 7 | `ddd3543bf083c36587a83f69288ac8730dd5a56ae011ec35fb94d84129cd9cfc` |
+| `best-effort-failure` | 13 | 3 | 7 | `2840497cb82aec620d40c85e640af36be564c99443da632d752b895fc429f29d` |
+
+实测行为同时固定了以下现状：full publication 返回角色 341005 的完整响应投影并持久化
+board 1 / awake level 1；候选 API 首次返回 `changed`，第二次幂等且两次均返回完整
+`all`；空候选会删除不再 ready 且没有正 awake level 支撑的历史 unlock；strict 写故障使
+owner 的 Mana 写和 reconcile 写全部回滚；best-effort 同类故障返回原
+`character_list`，保留 owner 的 7 Mana 写入，并回滚 reconcile 的历史删除和候选插入。
+snapshot 还逐场景固定了稳定表名及 `reads`、`writes`、`statements`；新增业务表或任一既有
+结构指标上升均拒绝准入。
+
+TypeScript AST 静态审计固定了 19 个生产 `CallExpression`：1 个事务内 strict、9 个事务内
+best-effort、9 个提交后 best-effort。审计不统计
+`awake-unlock-response.ts` 的定义和内部调用，并逐表达式固定 relative file、callee、owner、
+事务边界、当前 `legacy-unscoped` 来源与后续候选来源短标识。35.0 不把旧链路 loader
+次数记为相对门禁；“每请求最多一次”由 35.1 的显式 Session observer 验收。
 
 ### Focused 门禁
 

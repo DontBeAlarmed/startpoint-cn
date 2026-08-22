@@ -135,6 +135,10 @@ test("exposes the workflow benchmark command", () => {
         "node tools/perf/mission_engine_focused_baseline.cjs",
     )
     assert.equal(
+        scripts["benchmark:awake-request-context"],
+        "node tools/perf/awake_request_context_baseline.cjs",
+    )
+    assert.equal(
         scripts["benchmark:active-mission-focused"],
         "node tools/perf/active-mission/baseline.cjs",
     )

@@ -1130,6 +1130,21 @@ test("routes focused mission performance admission files to the mission group", 
     }
 })
 
+test("routes Awake request-context baseline and callsite audit files to the mission group", () => {
+    for (const file of [
+        "tools/awake_reconcile_callsite_matrix.test.cjs",
+        "tools/perf/awake_request_context_admission.cjs",
+        "tools/perf/awake_request_context_admission.test.cjs",
+        "tools/perf/awake_request_context_baseline.cjs",
+        "tools/perf/awake_request_context_baseline.test.cjs",
+        "tools/perf/awake_request_context_report.cjs",
+        "tools/perf/awake_request_context_scenarios.cjs",
+        "tools/perf/__snapshots__/awake_request_context_baseline.json",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["integration:mission"], file)
+    }
+})
+
 test("routes active mission focused metrics, baseline, and production boundaries precisely", () => {
     for (const file of [
         "tools/perf/active-mission/fixture.cjs",
@@ -1296,6 +1311,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/character_awake_route.test.cjs",
         "tools/character_awake_settlement.test.cjs",
         "tools/character_awake_unlock.test.cjs",
+        "tools/awake_reconcile_callsite_matrix.test.cjs",
         "tools/mission_awake_evaluation_settlement.test.cjs",
         "tools/mission_awake_reward_owner.test.cjs",
         "tools/mission_awake_session.test.cjs",
@@ -1389,6 +1405,8 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_regular_session_settlement.test.cjs",
         "tools/mission_regular_state_derivation.test.cjs",
         "tools/mission_response_merge.test.cjs",
+        "tools/perf/awake_request_context_admission.test.cjs",
+        "tools/perf/awake_request_context_baseline.test.cjs",
         "tools/perf/mission_engine_focused_admission.test.cjs",
         "tools/perf/mission_engine_focused_baseline.test.cjs",
         "tools/perf/mission_engine_focused_runner.test.cjs",
