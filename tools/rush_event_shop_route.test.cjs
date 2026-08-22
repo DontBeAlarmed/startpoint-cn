@@ -1,6 +1,8 @@
 const assert = require("node:assert/strict")
 const Database = require("better-sqlite3")
 const Fastify = require("fastify")
+const fs = require("node:fs")
+const path = require("node:path")
 const { pack, unpack } = require("msgpackr")
 
 require("ts-node/register/transpile-only")
@@ -9,6 +11,26 @@ const { after } = require("node:test")
 const { installBundledShopSnapshot } = require("./helpers/install-bundled-shop-snapshot.cjs")
 const restoreBundledShopSnapshot = installBundledShopSnapshot()
 after(restoreBundledShopSnapshot)
+
+const shopRouteSource = fs.readFileSync(
+    path.join(__dirname, "../src/routes/api/shop.ts"),
+    "utf8",
+)
+assert.doesNotMatch(
+    shopRouteSource,
+    /getBulkPurchaseCountsForRoute|getPlayerShopPurchasesMapSync/,
+    "shop route must not retain a bulk purchase-count compatibility fallback",
+)
+assert.match(
+    shopRouteSource,
+    /getPurchaseCountsBulk:\s*getPlayerShopPurchaseCountsByTypeBulkSync/,
+    "bulk_buy route must directly inject the typed bulk reader",
+)
+assert.match(
+    shopRouteSource,
+    /addPurchaseCountsFromSnapshot:\s*addPlayerShopPurchaseCountsByTypeFromSnapshotSync/,
+    "bulk_buy route must directly inject the snapshot-owned writer",
+)
 
 function stubModule(relativePath, exports) {
     const modulePath = require.resolve(relativePath)
@@ -117,9 +139,13 @@ function getUsedManaCount(playerId) {
 let globalNowSeconds = Date.parse("2023-12-01T00:00:00+08:00") / 1000
 let failRewardAfterWrite = false
 let shopRewardGrantCalls = 0
+let bulkPurchaseCountReads = 0
 
 stubModule("../src/data/db", { getDb: () => db })
 stubModule("../src/data/domains/shopPurchase", {
+    getShopPurchaseQueryKey(query) {
+        return `${query.shopType}:${query.shopItemId}:${query.keys.daily}:${query.keys.monthly}`
+    },
     getPlayerShopPurchasesMapSync(playerId) {
         return Object.fromEntries(db.prepare(
             "SELECT shop_item_id, count FROM purchase_state WHERE player_id = ?",
@@ -128,6 +154,27 @@ stubModule("../src/data/domains/shopPurchase", {
     getPlayerShopPurchaseCountSync: getPurchaseCount,
     getPlayerShopPurchaseCountsByTypeSync(playerId, _shopType, shopItemId) {
         return { daily: 0, monthly: 0, total: getPurchaseCount(playerId, shopItemId) }
+    },
+    getPlayerShopPurchaseCountsByTypeBulkSync(playerId, queries) {
+        bulkPurchaseCountReads++
+        return new Map(queries.map(query => [
+            `${query.shopType}:${query.shopItemId}:${query.keys.daily}:${query.keys.monthly}`,
+            { daily: 0, monthly: 0, total: getPurchaseCount(playerId, query.shopItemId) },
+        ]))
+    },
+    addPlayerShopPurchaseCountsByTypeFromSnapshotSync(
+        playerId, _shopType, shopItemId, amount, _keys, currentCounts,
+    ) {
+        const finalCounts = {
+            daily: currentCounts.daily + amount,
+            monthly: currentCounts.monthly + amount,
+            total: currentCounts.total + amount,
+        }
+        db.prepare(`
+            INSERT INTO purchase_state VALUES (?, ?, ?)
+            ON CONFLICT(player_id, shop_item_id) DO UPDATE SET count = excluded.count
+        `).run(playerId, shopItemId, finalCounts.total)
+        return finalCounts
     },
     addPlayerShopPurchaseCountsByTypeSync(playerId, _shopType, shopItemId, amount) {
         db.prepare(`
@@ -543,6 +590,7 @@ async function main() {
 
         db.prepare("UPDATE item_state SET amount = 2000 WHERE player_id = ? AND item_id = ?")
             .run(17, 2370001)
+        const bulkReadsBeforeSuccess = bulkPurchaseCountReads
         const bulkSuccess = await fastify.inject({
             method: "POST",
             url: "/bulk_buy",
@@ -558,6 +606,11 @@ async function main() {
         assert.equal(getPurchaseCount(17, 700001), 1)
         assert.equal(getPurchaseCount(17, 700002), 1)
         assert.equal(bulkBody.data.mail_arrived, true)
+        assert.equal(
+            bulkPurchaseCountReads,
+            bulkReadsBeforeSuccess + 1,
+            "bulk_buy route must call the typed bulk purchase-count stub exactly once",
+        )
 
         const beforeInsufficientBulk = snapshot()
         const insufficientBulk = await fastify.inject({

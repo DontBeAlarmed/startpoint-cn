@@ -72,11 +72,32 @@ function createHarness(failAt) {
             const count = state.purchaseCounts[shopItemId] ?? 0
             return { daily: count, monthly: count, total: count }
         },
+        getPurchaseCountsBulk(_playerId, queries) {
+            return new Map(queries.map(query => {
+                const count = state.purchaseCounts[query.shopItemId] ?? 0
+                return [
+                    `${query.shopType}:${query.shopItemId}:${query.keys.daily}:${query.keys.monthly}`,
+                    { daily: count, monthly: count, total: count },
+                ]
+            }))
+        },
         addPurchaseCounts(_playerId, _shopType, shopItemId, amount) {
             state.purchaseCounts[shopItemId] = (state.purchaseCounts[shopItemId] ?? 0) + amount
             if (failAt === "purchase-count") throw new Error("injected purchase-count failure")
             const count = state.purchaseCounts[shopItemId]
             return { daily: count, monthly: count, total: count }
+        },
+        addPurchaseCountsFromSnapshot(
+            _playerId, _shopType, shopItemId, amount, _keys, currentCounts,
+        ) {
+            state.purchaseCounts[shopItemId] = currentCounts.total + amount
+            if (failAt === "purchase-count") throw new Error("injected purchase-count failure")
+            const count = state.purchaseCounts[shopItemId]
+            return {
+                daily: currentCounts.daily + amount,
+                monthly: currentCounts.monthly + amount,
+                total: count,
+            }
         },
         recordManaSpent(_playerId, amount) {
             state.manaSpent += amount

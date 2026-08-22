@@ -1,5 +1,7 @@
 const assert = require("node:assert/strict")
 const Database = require("better-sqlite3")
+const fs = require("node:fs")
+const path = require("node:path")
 
 require("ts-node/register/transpile-only")
 
@@ -14,6 +16,49 @@ const {
     ShopItemUserCostType,
     ShopType,
 } = require("../src/lib/types")
+
+const eventShopPurchaseSource = fs.readFileSync(
+    path.join(__dirname, "../src/lib/event-shop-purchase.ts"),
+    "utf8",
+)
+assert.match(
+    eventShopPurchaseSource,
+    /interface GenericShopBatchPurchaseDependencies\s+extends Omit<\s*GenericShopPurchaseDependencies,\s*"getPurchaseCounts"\s*\|\s*"addPurchaseCounts"\s*>/,
+    "batch dependencies must omit individual reads and the rereading add writer",
+)
+assert.doesNotMatch(
+    eventShopPurchaseSource,
+    /typeof getShopPurchaseQueryKey|getGenericShopPurchaseQueryKey/,
+    "shop purchase query keys must use the required domain import without a fallback",
+)
+const batchImplementationSource = eventShopPurchaseSource.slice(
+    eventShopPurchaseSource.indexOf("export function executeGenericShopBatchPurchaseSync"),
+)
+assert.equal(
+    (batchImplementationSource.match(/dependencies\.getPurchaseCountsBulk\(/g) ?? []).length,
+    1,
+    "each non-empty batch must directly call the required bulk reader once",
+)
+assert.doesNotMatch(
+    batchImplementationSource,
+    /getPurchaseCountsBulk\s*\?\?/,
+    "batch purchase must not keep an optional bulk-reader fallback",
+)
+assert.doesNotMatch(
+    batchImplementationSource,
+    /dependencies\.getPurchaseCounts\(/,
+    "batch purchase must not call the individual purchase-count reader",
+)
+assert.equal(
+    (batchImplementationSource.match(/dependencies\.addPurchaseCountsFromSnapshot\(/g) ?? []).length,
+    1,
+    "batch commits must use the snapshot-owned writer",
+)
+assert.doesNotMatch(
+    batchImplementationSource,
+    /dependencies\.addPurchaseCounts\(/,
+    "batch commits must not use the rereading single-purchase writer",
+)
 
 function createHarness(itemBalance = 20) {
     const db = new Database(":memory:")
@@ -46,6 +91,9 @@ function createHarness(itemBalance = 20) {
 
     let failGrant = false
     let manaSpent = 0
+    let individualPurchaseCountReads = 0
+    const bulkPurchaseCountRequests = []
+    const purchaseCountAdds = []
     const getPlayer = playerId => {
         const row = db.prepare("SELECT * FROM player_state WHERE id = ?").get(playerId)
         return row === undefined ? null : {
@@ -59,7 +107,7 @@ function createHarness(itemBalance = 20) {
     const getItem = (playerId, itemId) => db.prepare(
         "SELECT amount FROM item_state WHERE player_id = ? AND item_id = ?",
     ).get(playerId, itemId)?.amount ?? 0
-    const getPurchaseCounts = (playerId, shopType, shopItemId, keys) => {
+    const readPurchaseCounts = (playerId, shopType, shopItemId, keys) => {
         const get = (periodType, periodKey) => db.prepare(`
             SELECT count FROM purchase_state
             WHERE player_id = ? AND shop_type = ? AND shop_item_id = ?
@@ -71,16 +119,24 @@ function createHarness(itemBalance = 20) {
             total: get("total", ""),
         }
     }
-    const addPurchaseCounts = (playerId, shopType, shopItemId, amount, keys) => {
-        const add = (periodType, periodKey) => db.prepare(`
+    const addPurchaseCountsFromSnapshot = (
+        playerId, shopType, shopItemId, amount, keys, currentCounts,
+    ) => {
+        purchaseCountAdds.push({ playerId, shopType, shopItemId, amount, keys, currentCounts })
+        const finalCounts = {
+            daily: currentCounts.daily + amount,
+            monthly: currentCounts.monthly + amount,
+            total: currentCounts.total + amount,
+        }
+        const set = (periodType, periodKey, count) => db.prepare(`
             INSERT INTO purchase_state VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(player_id, shop_type, shop_item_id, period_type, period_key)
-            DO UPDATE SET count = count + excluded.count
-        `).run(playerId, shopType, shopItemId, periodType, periodKey, amount)
-        add("daily", keys.daily)
-        add("monthly", keys.monthly)
-        add("total", "")
-        return getPurchaseCounts(playerId, shopType, shopItemId, keys)
+            DO UPDATE SET count = excluded.count
+        `).run(playerId, shopType, shopItemId, periodType, periodKey, count)
+        set("daily", keys.daily, finalCounts.daily)
+        set("monthly", keys.monthly, finalCounts.monthly)
+        set("total", "", finalCounts.total)
+        return finalCounts
     }
 
     return {
@@ -102,8 +158,23 @@ function createHarness(itemBalance = 20) {
                     ON CONFLICT(player_id, item_id) DO UPDATE SET amount = excluded.amount
                 `).run(playerId, itemId, amount)
             },
-            getPurchaseCounts,
-            addPurchaseCounts,
+            getPurchaseCounts() {
+                individualPurchaseCountReads++
+                throw new Error("batch prevalidation must not use individual purchase-count reads")
+            },
+            getPurchaseCountsBulk(playerId, queries) {
+                bulkPurchaseCountRequests.push(queries)
+                return new Map(queries.map(query => [
+                    `${query.shopType}:${query.shopItemId}:${query.keys.daily}:${query.keys.monthly}`,
+                    readPurchaseCounts(
+                        playerId,
+                        query.shopType,
+                        query.shopItemId,
+                        query.keys,
+                    ),
+                ]))
+            },
+            addPurchaseCountsFromSnapshot,
             recordManaSpent(_playerId, amount) { manaSpent += amount },
             grantRewards(playerId, rewards, knownPlayerBefore) {
                 if (failGrant) throw new Error("injected reward failure")
@@ -133,7 +204,10 @@ function createHarness(itemBalance = 20) {
         },
         getPlayer,
         getItem,
-        getPurchaseCounts,
+        getPurchaseCounts: readPurchaseCounts,
+        getIndividualPurchaseCountReads: () => individualPurchaseCountReads,
+        getBulkPurchaseCountRequests: () => bulkPurchaseCountRequests,
+        getPurchaseCountAdds: () => purchaseCountAdds,
         getManaSpent: () => manaSpent,
         failGrant: () => { failGrant = true },
     }
@@ -163,6 +237,39 @@ assert.equal(calculateShopStockQuantity(itemB, { daily: 0, monthly: 0, total: 0 
 
 {
     const harness = createHarness()
+    const unlimitedItem = {
+        costs: [],
+        rewards: [],
+        availableFrom: "2024-01-01 00:00:00",
+        availableUntil: null,
+        stock: -1,
+    }
+    executeGenericShopBatchPurchaseSync({
+        playerId: 7,
+        shopType: ShopType.EVENT_ITEM,
+        purchases: [
+            { shopItemId: 201, purchaseAmount: 1, shopItem: unlimitedItem },
+            { shopItemId: 202, purchaseAmount: 1, shopItem: unlimitedItem },
+        ],
+        nowMs: Date.parse("2024-02-01T00:00:00Z"),
+        enforcePeriod: true,
+    }, harness.dependencies)
+
+    assert.equal(
+        harness.getBulkPurchaseCountRequests().length,
+        1,
+        "无库存限制的非空批次仍必须读取一次计数快照",
+    )
+    assert.equal(harness.getIndividualPurchaseCountReads(), 0)
+    assert.deepEqual(
+        harness.getBulkPurchaseCountRequests()[0].map(query => query.shopItemId),
+        [201, 202],
+    )
+    harness.db.close()
+}
+
+{
+    const harness = createHarness()
     const result = executeGenericShopBatchPurchaseSync({
         playerId: 7,
         shopType: ShopType.EVENT_ITEM,
@@ -180,6 +287,34 @@ assert.equal(calculateShopStockQuantity(itemB, { daily: 0, monthly: 0, total: 0 
     assert.deepEqual(result.itemList, { 10: 101, 20: 4 })
     assert.deepEqual(result.purchaseCounts, { 101: 2, 102: 1 })
     assert.equal(harness.getManaSpent(), 100)
+    assert.equal(harness.getIndividualPurchaseCountReads(), 0)
+    assert.equal(harness.getBulkPurchaseCountRequests().length, 1)
+    assert.deepEqual(
+        harness.getBulkPurchaseCountRequests()[0].map(query => [
+            query.shopType,
+            query.shopItemId,
+            query.keys.daily,
+            query.keys.monthly,
+        ]),
+        [
+            [ShopType.EVENT_ITEM, 101, "2024-02-01", "2024-02"],
+            [ShopType.EVENT_ITEM, 102, "2024-02-01", "2024-02"],
+        ],
+    )
+    assert.equal(
+        harness.getPurchaseCountAdds()[0].keys,
+        harness.getBulkPurchaseCountRequests()[0][0].keys,
+        "commit must reuse the period keys built for bulk prevalidation",
+    )
+    assert.equal(
+        harness.getPurchaseCountAdds()[1].keys,
+        harness.getBulkPurchaseCountRequests()[0][1].keys,
+        "each batch entry must calculate period keys only once",
+    )
+    assert.deepEqual(harness.getPurchaseCountAdds().map(call => call.currentCounts), [
+        { daily: 0, monthly: 0, total: 0 },
+        { daily: 0, monthly: 0, total: 0 },
+    ])
     harness.db.close()
 }
 

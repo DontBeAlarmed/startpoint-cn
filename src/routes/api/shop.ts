@@ -2,6 +2,7 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
+    addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
     addPlayerShopPurchaseCountsByTypeSync,
     getPlayerShopPurchaseCountsByTypeBulkSync,
     getPlayerShopPurchaseCountsByTypeSync,
@@ -31,6 +32,7 @@ import {
     executeGenericShopBatchPurchaseSync,
     executeGenericShopPurchaseSync,
     getShopPurchasePeriodKeys,
+    recordEquipmentEnhancementPurchaseSync,
     ShopPeriodError,
     ShopPurchaseError,
     validateShopPurchaseAmount,
@@ -239,15 +241,17 @@ const routes = async (fastify: FastifyInstance) => {
                 })
                 updatePlayerEquipmentSync(playerId, equipmentId, { enhancementLevel: newLevel })
                 incrementActiveMissionUsedManaCountSync(playerId, manaSpent)
-                for (let i = 0; i < purchaseAmount; i++) {
-                    addPlayerShopPurchaseCountsByTypeSync(
-                        playerId,
-                        shopType,
-                        shopItemId,
-                        1,
-                        getShopPurchasePeriodKeys(getServerTime() * 1000, shopItemData.specifiedMonths),
-                    )
-                }
+                recordEquipmentEnhancementPurchaseSync({
+                    playerId,
+                    shopType,
+                    shopItemId,
+                    purchaseAmount,
+                    nowMs: getServerTime() * 1000,
+                    specifiedMonths: shopItemData.specifiedMonths,
+                }, {
+                    getShopPurchasePeriodKeys,
+                    addPurchaseCounts: addPlayerShopPurchaseCountsByTypeSync,
+                })
             })()
 
             const currentEquipment = getPlayerEquipmentSync(playerId, equipmentId)!
@@ -596,8 +600,8 @@ const routes = async (fastify: FastifyInstance) => {
                 updatePlayer: nextPlayer => updatePlayerSync(nextPlayer),
                 getItem: (id, itemId) => getPlayerItemSync(id, itemId) ?? 0,
                 setItem: updatePlayerItemSync,
-                getPurchaseCounts: getPlayerShopPurchaseCountsByTypeSync,
-                addPurchaseCounts: addPlayerShopPurchaseCountsByTypeSync,
+                getPurchaseCountsBulk: getPlayerShopPurchaseCountsByTypeBulkSync,
+                addPurchaseCountsFromSnapshot: addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
                 recordManaSpent: incrementActiveMissionUsedManaCountSync,
                 grantRewards: grantShopRewardsInTransactionOwnerSync,
             })

@@ -21,7 +21,9 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerItemSync, givePlayerItemSync, updatePlayerItemSync } = require("../src/data/domains/item")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const {
+    addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
     addPlayerShopPurchaseCountsByTypeSync,
+    getPlayerShopPurchaseCountsByTypeBulkSync,
     getPlayerShopPurchaseCountsByTypeSync,
 } = require("../src/data/domains/shopPurchase")
 const { givePlayerCharacterSync } = require("../src/lib/character")
@@ -92,7 +94,9 @@ function dependencies() {
         getItem: (playerId, itemId) => getPlayerItemSync(playerId, itemId) ?? 0,
         setItem: updatePlayerItemSync,
         getPurchaseCounts: getPlayerShopPurchaseCountsByTypeSync,
+        getPurchaseCountsBulk: getPlayerShopPurchaseCountsByTypeBulkSync,
         addPurchaseCounts: addPlayerShopPurchaseCountsByTypeSync,
+        addPurchaseCountsFromSnapshot: addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
         recordManaSpent: () => {},
         grantRewards: grantShopRewardsInTransactionOwnerSync,
     }
@@ -251,6 +255,78 @@ test("bulk shop rewards cannot pay its costs and final duplicate item equals dat
     assert.equal(result.itemList[COST_ITEM_ID], 107)
     assert.equal(result.itemList[REWARD_ITEM_ID], getPlayerItemSync(playerId, REWARD_ITEM_ID))
     assert.equal(result.itemList[REWARD_ITEM_ID], 5)
+})
+
+test("batch purchase writes count snapshots without per-item rereads", () => {
+    assert.equal(
+        typeof addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
+        "function",
+        "snapshot-owned shop count writer must exist",
+    )
+    const playerId = createPlayer("snapshot-counts")
+    const keys = { daily: "2024-02-01", monthly: "2024-02" }
+    addPlayerShopPurchaseCountsByTypeSync(playerId, ShopType.EVENT_ITEM, 9301, 2, keys)
+    addPlayerShopPurchaseCountsByTypeSync(playerId, ShopType.EVENT_ITEM, 9302, 4, keys)
+
+    let bulkReads = 0
+    let individualReads = 0
+    const writerCalls = []
+    const batchDependencies = dependencies()
+    batchDependencies.getPurchaseCounts = () => {
+        individualReads++
+        throw new Error("batch must not use individual count reads")
+    }
+    batchDependencies.getPurchaseCountsBulk = (ownerId, queries) => {
+        bulkReads++
+        return getPlayerShopPurchaseCountsByTypeBulkSync(ownerId, queries)
+    }
+    batchDependencies.addPurchaseCountsFromSnapshot = (...args) => {
+        const statementStart = sqlTrace.length
+        const result = addPlayerShopPurchaseCountsByTypeFromSnapshotSync(...args)
+        writerCalls.push({
+            currentCounts: args[5],
+            statements: sqlTrace.slice(statementStart),
+        })
+        return result
+    }
+    const item = {
+        costs: [],
+        rewards: [],
+        availableFrom: "2024-01-01 00:00:00",
+        availableUntil: null,
+        stock: -1,
+    }
+    const measured = captureSql(() => executeGenericShopBatchPurchaseSync({
+        playerId,
+        shopType: ShopType.EVENT_ITEM,
+        purchases: [
+            { shopItemId: 9301, purchaseAmount: 3, shopItem: item },
+            { shopItemId: 9302, purchaseAmount: 2, shopItem: item },
+        ],
+        nowMs: NOW_MS,
+        enforcePeriod: true,
+    }, batchDependencies))
+
+    assert.equal(bulkReads, 1)
+    assert.equal(individualReads, 0)
+    assert.deepEqual(measured.result.purchaseCounts, { 9301: 5, 9302: 6 })
+    assert.deepEqual(writerCalls.map(call => call.currentCounts), [
+        { daily: 2, monthly: 2, total: 2 },
+        { daily: 4, monthly: 4, total: 4 },
+    ])
+    const writerStatements = writerCalls.flatMap(call => call.statements)
+    assert.equal(
+        writerStatements.some(statement => /^\s*SELECT\b/i.test(statement)),
+        false,
+        "snapshot writer must not issue SELECT statements",
+    )
+    assert.equal(
+        writerStatements.filter(statement => (
+            /^\s*INSERT\s+INTO\s+players_shop_purchase_counters\b/i.test(statement)
+        )).length,
+        6,
+        "each item must write daily, monthly, and total with three UPSERTs",
+    )
 })
 
 test("invalid reward rolls the shop cost back before purchase counts", () => {

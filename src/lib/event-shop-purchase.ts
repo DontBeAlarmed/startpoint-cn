@@ -12,6 +12,10 @@ import {
     ShopItemRewardType,
     ShopItemUserCostType,
 } from "./types"
+import {
+    getShopPurchaseQueryKey,
+    ShopPurchaseQuery,
+} from "../data/domains/shopPurchase"
 
 export const ITEM_SHOP_PERIOD_ERROR_CODE = 2053
 
@@ -60,6 +64,25 @@ export interface GenericShopPurchaseDependencies {
         knownPlayerBefore: GenericShopPlayerState,
     ): GenericShopRewardGrantResult
     grantPassCardPoints?(playerId: number, amount: number): void
+}
+
+export interface GenericShopBatchPurchaseDependencies
+    extends Omit<
+        GenericShopPurchaseDependencies,
+        "getPurchaseCounts" | "addPurchaseCounts"
+    > {
+    getPurchaseCountsBulk(
+        playerId: number,
+        queries: readonly ShopPurchaseQuery[],
+    ): ReadonlyMap<string, ShopPurchaseCounts>
+    addPurchaseCountsFromSnapshot(
+        playerId: number,
+        shopType: number,
+        shopItemId: number,
+        amount: number,
+        keys: ShopPurchasePeriodKeys,
+        currentCounts: ShopPurchaseCounts,
+    ): ShopPurchaseCounts
 }
 
 export interface GenericShopRewardGrantResult {
@@ -136,6 +159,46 @@ export interface ShopPurchaseCounts {
 export interface ShopPurchasePeriodKeys {
     readonly daily: string
     readonly monthly: string
+}
+
+export interface EquipmentEnhancementPurchaseCountInput {
+    readonly playerId: number
+    readonly shopType: number
+    readonly shopItemId: number
+    readonly purchaseAmount: number
+    readonly nowMs: number
+    readonly specifiedMonths: readonly number[] | undefined
+}
+
+export interface EquipmentEnhancementPurchaseCountDependencies {
+    getShopPurchasePeriodKeys(
+        nowMs: number,
+        specifiedMonths: readonly number[] | undefined,
+    ): ShopPurchasePeriodKeys
+    addPurchaseCounts(
+        playerId: number,
+        shopType: number,
+        shopItemId: number,
+        amount: number,
+        keys: ShopPurchasePeriodKeys,
+    ): ShopPurchaseCounts
+}
+
+export function recordEquipmentEnhancementPurchaseSync(
+    input: EquipmentEnhancementPurchaseCountInput,
+    dependencies: EquipmentEnhancementPurchaseCountDependencies,
+): ShopPurchaseCounts {
+    const periodKeys = dependencies.getShopPurchasePeriodKeys(
+        input.nowMs,
+        input.specifiedMonths,
+    )
+    return dependencies.addPurchaseCounts(
+        input.playerId,
+        input.shopType,
+        input.shopItemId,
+        input.purchaseAmount,
+        periodKeys,
+    )
 }
 
 function pad2(value: number): string {
@@ -402,7 +465,7 @@ export function executeGenericShopPurchaseSync(
 
 export function executeGenericShopBatchPurchaseSync(
     input: GenericShopBatchPurchaseInput,
-    dependencies: GenericShopPurchaseDependencies,
+    dependencies: GenericShopBatchPurchaseDependencies,
 ): GenericShopBatchPurchaseResult {
     if (!Array.isArray(input.purchases) || input.purchases.length === 0) {
         throw new ShopPurchaseError("Shop batch must contain at least one item.")
@@ -423,22 +486,43 @@ export function executeGenericShopBatchPurchaseSync(
             throw new ShopPeriodError()
         }
     }
+    const purchasesWithQueries = normalized.map(entry => {
+        const periodKeys = getShopPurchasePeriodKeys(
+            input.nowMs,
+            entry.shopItem.specifiedMonths,
+        )
+        const query: ShopPurchaseQuery = {
+            shopType: input.shopType,
+            shopItemId: entry.shopItemId,
+            keys: periodKeys,
+        }
+        return { ...entry, periodKeys, query }
+    })
 
     return dependencies.transaction(() => {
         const player = dependencies.getPlayer(input.playerId)
         if (player === null) throw new ShopPurchaseError("Player not found.")
 
+        const purchaseCountsByKey = dependencies.getPurchaseCountsBulk(
+            input.playerId,
+            purchasesWithQueries.map(entry => entry.query),
+        )
+
         const nextPlayer = { ...player }
         const itemCosts = new Map<number, number>()
         const rewards: Reward[] = []
+        const currentCountsByItem = new Map<number, ShopPurchaseCounts>()
         let manaSpent = 0
 
-        for (const entry of normalized) {
-            const periodKeys = getShopPurchasePeriodKeys(input.nowMs, entry.shopItem.specifiedMonths)
-            const counts = dependencies.getPurchaseCounts(
-                input.playerId, input.shopType, entry.shopItemId, periodKeys,
-            )
+        for (const entry of purchasesWithQueries) {
+            const counts = purchaseCountsByKey.get(getShopPurchaseQueryKey(entry.query))
+            if (counts === undefined) {
+                throw new ShopPurchaseError(
+                    `Missing bulk purchase counts for shop item ${entry.shopItemId}.`,
+                )
+            }
             validateShopStock(entry.shopItem, entry.purchaseAmount, counts)
+            currentCountsByItem.set(entry.shopItemId, counts)
 
             const userCost = entry.shopItem.userCost
             if (userCost !== undefined) {
@@ -485,14 +569,14 @@ export function executeGenericShopBatchPurchaseSync(
         const rewardResult = rewardGrant.rewardResult
 
         const purchaseCounts: Record<string, number> = {}
-        for (const entry of normalized) {
-            const periodKeys = getShopPurchasePeriodKeys(input.nowMs, entry.shopItem.specifiedMonths)
-            purchaseCounts[String(entry.shopItemId)] = dependencies.addPurchaseCounts(
+        for (const entry of purchasesWithQueries) {
+            purchaseCounts[String(entry.shopItemId)] = dependencies.addPurchaseCountsFromSnapshot(
                 input.playerId,
                 input.shopType,
                 entry.shopItemId,
                 entry.purchaseAmount,
-                periodKeys,
+                entry.periodKeys,
+                currentCountsByItem.get(entry.shopItemId)!,
             ).total
         }
         if (manaSpent > 0) dependencies.recordManaSpent(input.playerId, manaSpent)
