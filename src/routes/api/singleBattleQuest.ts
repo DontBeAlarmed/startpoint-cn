@@ -6,6 +6,7 @@ import { getPlayerMailCountSync } from "../../data/domains/mail"
 import { getQuestConfigurationErrorResponse, getQuestFromCategorySync } from "../../lib/assets"
 import type { BattleQuest } from "../../lib/types"
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils"
+import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time"
 import { computeRealTimeStamina } from "../../lib/stamina"
 import { getStaminaCost } from "../../lib/stamina-cost"
 import { dispatchModeQuestStart } from "../../modes/registry"
@@ -150,7 +151,7 @@ const routes = async (fastify: FastifyInstance) => {
             player: {
                 freeMana: finishResult.finalPlayerProjection.freeMana,
                 expPool: finishResult.finalPlayerProjection.expPool,
-                expPooledTime: getServerTime(finishResult.finalPlayerProjection.expPooledTime),
+                expPooledTime: expPoolRealDateToClientTimestamp(finishResult.finalPlayerProjection.expPooledTime),
                 freeVmoney: finishResult.finalPlayerProjection.freeVmoney,
                 rankPoint: finishResult.finalPlayerProjection.rankPoint,
                 degreeId: finishResult.finalPlayerProjection.degreeId,

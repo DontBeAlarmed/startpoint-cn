@@ -11,6 +11,7 @@ import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { reconcileAwakeUnlockCharacterList, validateMissionRewardClaims } from "../../lib/mission/index";
 import { MissionRewardGranter } from "../../lib/mission/grants";
 import { getContentSnapshot } from "../../content/runtime/content-snapshot";
+import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time";
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/receive", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -91,7 +92,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "active_mission_list": resultList,
                 "user_info": {
                     ...granter.getUserInfo(),
-                    "exp_pooled_time": getServerTime(player.expPooledTime)
+                    "exp_pooled_time": expPoolRealDateToClientTimestamp(player.expPooledTime)
                 },
                 "character_list": characterList,
                 "equipment_list": granter.equipmentList,

@@ -51,7 +51,7 @@ export function deserializePlayerData(
             starCrumb: userInfo.star_crumb,
             bondToken: userInfo.bond_token,
             expPool: userInfo.exp_pool,
-            expPooledTime: getDateFromServerTime(userInfo.exp_pooled_time),
+            expPooledTime: realDateFromServerTime(userInfo.exp_pooled_time),
             leaderCharacterId: userInfo.leader_character_id,
             partySlot: userInfo.party_slot,
             degreeId: userInfo.degree_id,

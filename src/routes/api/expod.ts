@@ -8,7 +8,8 @@ import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { characterMaxOverLimits } from "./character";
 import { givePlayerCharactersExpSync } from "../../lib/character";
-import { generateDataHeaders, getServerTime } from "../../utils";
+import { generateDataHeaders } from "../../utils";
+import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time";
 import { getCharacterDataSync } from "../../lib/assets";
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -136,7 +137,7 @@ const routes = async (fastify: FastifyInstance) => {
             "data": {
                 "user_info": {
                     "exp_pool": afterExp,
-                    "exp_pooled_time": getServerTime(player.expPooledTime)
+                    "exp_pooled_time": expPoolRealDateToClientTimestamp(player.expPooledTime)
                 },
                 "character_list": [
                     {
@@ -220,7 +221,7 @@ const routes = async (fastify: FastifyInstance) => {
                     "item_list": getPlayerItemsSync(playerId),
                     "user_info": {
                         "exp_pool": player.expPool,
-                        "exp_pooled_time": getServerTime(player.expPooledTime)
+                        "exp_pooled_time": expPoolRealDateToClientTimestamp(player.expPooledTime)
                     },
                     "mail_arrived": getMailArrivedSync(playerId)
                 }
@@ -266,7 +267,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "item_list": items,
                 "user_info": {
                     "exp_pool": newExpPool,
-                    "exp_pooled_time": getServerTime(player.expPooledTime)
+                    "exp_pooled_time": expPoolRealDateToClientTimestamp(player.expPooledTime)
                 },
                 "mail_arrived": getMailArrivedSync(playerId)
             }
@@ -342,7 +343,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "character_list": rewardResult.character_list,
                 "user_info": {
                     "exp_pool": rewardResult.exp_pool,
-                    "exp_pooled_time": getServerTime(player.expPooledTime)
+                    "exp_pooled_time": expPoolRealDateToClientTimestamp(player.expPooledTime)
                 },
                 "mail_arrived": getMailArrivedSync(playerId)
             }

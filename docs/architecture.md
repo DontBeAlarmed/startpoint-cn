@@ -73,7 +73,7 @@ CN 客户端不能正确处理部分 `uint32` 标记，响应层会把安全范�
 
 设备绑定以 `device_id` 关联账号；运行时没有全局活动账号。账号登录的默认身份来源仍是设备绑定，`src/lib/account-identity-provider.ts` 将外部身份解析与账号、会话、玩家存储分开。未来接入官方或自制账号提供者时，只替换身份提供者，不改变现有玩家业务和客户端会话协议。
 
-时间由 `src/runtime/time/game-time.ts` 提供轻量 `GameTimeContext`：卡池、活动期限、商店周期、经验池增长等依赖客户端服务器时钟的游戏业务使用虚拟服务器时间；体力自然恢复等按现实经过时间增长的资源使用真实运行时间。真实时间字段在发送给客户端时转换为虚拟时间，虚拟时间字段则在同一虚拟时间基准下读写。TCP 心跳、连接超时和战斗租约属于基础设施计时，不受游戏时间偏移影响。存档中的 `time_offset` 只为数据库兼容保留。
+时间由 `src/runtime/time/game-time.ts` 提供轻量 `GameTimeContext`：卡池、活动期限和商店周期等依赖客户端服务器时钟的游戏业务使用虚拟服务器时间；体力自然恢复和经验池增长等按现实经过时间增长的资源使用真实运行时间。真实时间字段在发送给客户端时转换为虚拟时间，虚拟时间字段则在同一虚拟时间基准下读写。TCP 心跳、连接超时和战斗租约属于基础设施计时，不受游戏时间偏移影响。存档中的 `time_offset` 只为数据库兼容保留。
 
 ```text
 server-time.json -> ServerTimeService -> timeOffset
@@ -85,7 +85,7 @@ server-time.json -> ServerTimeService -> timeOffset
                  realNow     virtualNow   client conversion
                     |            |              |
              stamina recovery  gacha/event   real DB date <-> client timestamp
-             offline elapsed   shop/exp pool
+             offline elapsed   shop            exp pool real elapsed
 
 TCP heartbeat / lease / reconnect -> infrastructure runtime clock
 ```

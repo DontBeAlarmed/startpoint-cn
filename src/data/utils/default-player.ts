@@ -1,10 +1,12 @@
 import { getServerDate } from "../../utils"
 import { getMaxStamina } from "../../lib/stamina"
 import type { Player } from "../types"
+import { getRealNow } from "../../runtime/time/game-time"
 
 /** Build the persisted defaults for a newly-created player. */
 export function getDefaultPlayerData(): Omit<Player, "id"> {
     const now = getServerDate()
+    const realNow = getRealNow()
     return {
         stamina: getMaxStamina(1),
         staminaHealTime: new Date(),
@@ -21,7 +23,7 @@ export function getDefaultPlayerData(): Omit<Player, "id"> {
         starCrumb: 2,
         bondToken: 10,
         expPool: 0,
-        expPooledTime: now,
+        expPooledTime: realNow,
         leaderCharacterId: 1,
         partySlot: 1,
         degreeId: 1,

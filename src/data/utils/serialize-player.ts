@@ -2,6 +2,7 @@ import { clientSerializeDate } from "./date"
 import { resolveSerializedAssetVersion } from "./serialized-asset-version"
 import { serializeBondTokenStatuses, serializePartyGroupList, serializeGachaCampaign, serializeRushEvent } from "./serialize-entities"
 import { getDateFromServerTime, getServerTime, getServerDate, realToVirtual } from "../../utils"
+import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time"
 import { ClientPlayerData, DailyChallengePointListEntry, MergedPlayerData, PartyCategory, Player, PlayerBoxGacha, PlayerCharacter, PlayerCharacterBondToken, PlayerDrawnQuest, PlayerEquipment, PlayerGachaCampaign, PlayerGachaInfo, PlayerMultiSpecialExchangeCampaign, PlayerParty, PlayerPartyGroup, PlayerQuestProgress, PlayerRushEvent, PlayerRushEventPlayedParty, PlayerStartDashExchangeCampaign, RushEventBattleType, UserBoxGacha, UserCharacter, UserCharacterBondTokenStatus, UserEquipment, UserGachaCampaign, UserPartyGroup, UserPartyGroupTeam, UserQuestProgress, UserRushEvent, UserRushEventPlayedParty, UserRushEventPlayedPartyList, UserTutorial } from "../types"
 import { deserializePlayerRushEventPlayedParty, deserializeRushEvent, getPlayerRushEventListClearedFoldersSync, getPlayerRushEventListPlayedPartiesSync, getPlayerRushEventListSync, serializePlayerRushEventPlayedParty } from "../domains/rushEvent"
 import { getPlayerActiveMissionsSync, getPlayerClearedCollectItemEventMissionListSync, getPlayerClearedRegularMissionListSync } from "../domains/mission"
@@ -177,7 +178,7 @@ export function serializePlayerData(
             "star_crumb": playerData.starCrumb,
             "bond_token": playerData.bondToken,
             "exp_pool": playerData.expPool,
-            "exp_pooled_time": getServerTime(playerData.expPooledTime),
+            "exp_pooled_time": expPoolRealDateToClientTimestamp(playerData.expPooledTime),
             "leader_character_id": playerData.leaderCharacterId != null ? kIdToBusinessCode(playerData.leaderCharacterId) : 0,
             "party_slot": playerData.partySlot,
             "degree_id": playerData.degreeId,

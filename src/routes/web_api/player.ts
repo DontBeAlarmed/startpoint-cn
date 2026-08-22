@@ -10,7 +10,7 @@ import { getPlayerItemsSync, setPlayerItemSync, updatePlayerItemSync } from "../
 import { getPlayerQuestProgressSync, getPlayerDrawnQuestsSync } from "../../data/domains/quest"
 import { insertPlayerPartyGroupListSync } from "../../data/domains/party"
 import { PartyCategory } from "../../data/types";
-import { getVirtualNow } from "../../runtime/time/game-time";
+import { getRealNow } from "../../runtime/time/game-time";
 import bundledDailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 import {
@@ -219,7 +219,7 @@ const routes = async (fastify: FastifyInstance) => {
             extra.staminaHealTime = new Date()
         }
         if (field === 'expPool') {
-            extra.expPooledTime = getVirtualNow()
+            extra.expPooledTime = getRealNow()
         }
 
         try {

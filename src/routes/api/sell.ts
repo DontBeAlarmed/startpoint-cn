@@ -3,7 +3,7 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
-    getPlayerEquipmentSync, updatePlayerEquipmentSync,
+    deletePlayerEquipmentSync, getPlayerEquipmentSync, updatePlayerEquipmentSync,
 } from "../../data/domains/equipment";
 import { givePlayerItemSync } from "../../data/domains/item";
 import { getSession } from "../../data/domains/session";
@@ -76,11 +76,11 @@ const routes = async (fastify: FastifyInstance) => {
                 return reply.status(400).send({ "error": "Bad Request", "message": "Protected equipment cannot be sold." })
             }
 
-            const stack = equipment.stack
-            if (stack <= 0) continue
+            // `stack` is the duplicate count; the base equipment is always one
+            // additional unit and is also sold by this endpoint.
+            const sellCount = equipment.stack + 1
 
-            // 1 unit, not × stack (client Expected sell_equipment gives 1 ability soul per unit)
-            const rewards = calculateDissolveRewards(equipmentId, 1)
+            const rewards = calculateDissolveRewards(equipmentId, sellCount)
             totalCraftPoints += rewards.craftPoints
             totalStarGrains += rewards.starGrains
             for (const [soulId, count] of Object.entries(rewards.abilitySouls)) {
@@ -90,10 +90,10 @@ const routes = async (fastify: FastifyInstance) => {
             soldIds.push(equipmentId)
         }
 
-        const returnItemList: Record<number, number> = {}
+            const returnItemList: Record<number, number> = {}
         getDb().transaction(() => {
             for (const equipmentId of soldIds) {
-                updatePlayerEquipmentSync(playerId, equipmentId, { stack: 0 })
+                deletePlayerEquipmentSync(playerId, equipmentId)
             }
             if (totalCraftPoints > 0) {
                 returnItemList[wrightpieceItemId()] = givePlayerItemSync(playerId, wrightpieceItemId(), totalCraftPoints)

@@ -203,7 +203,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
 
         const now = getServerDate();
         dailyResetPlayerDataSync(player, now, options.dailyResetHour);
-        collectPlayerDataPooledExpSync(player, now);
+        collectPlayerDataPooledExpSync(player);
 
         // Run save validators (permanent fixes: max_level, etc.)
         const validatorFixes = runPermanentValidators(playerId);

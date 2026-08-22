@@ -39,8 +39,9 @@ try {
     )
     assert.match(
         playerSource,
-        /collectPlayerDataPooledExpSync\([\s\S]*?dateNow: Date = getVirtualNow\(\)/,
+        /collectPlayerDataPooledExpSync\([\s\S]*?dateNow: Date = getRealNow\(\)/,
     )
+    assert.match(playerSource, /calculatePooledExpAtRealTime\(/)
 
     const clientSource = fs.readFileSync(
         path.join(

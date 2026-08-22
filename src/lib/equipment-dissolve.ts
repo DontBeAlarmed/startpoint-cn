@@ -36,7 +36,8 @@ export function calculateDissolveRewards(
             ? (craftEntry?.dissolve_star ?? 0) * count
             : 0;
 
-    // Ability souls: only if generate_ability_soul == true
+    // All three dissolve paths follow the CDN flag; `count` is the number of
+    // equipment units actually removed by the request.
     const abilitySouls: Record<number, number> = {};
     if (cdn && cdn.generate_ability_soul) {
         const soulId = cdn.ability_soul_id;

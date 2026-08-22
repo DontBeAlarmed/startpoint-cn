@@ -5,6 +5,7 @@ const assert = require("assert");
 const {
   computeEquipmentGachaMovieEffects,
   computeEquipmentGachaMovieEffectsForGacha,
+  drawEquipmentTreasureUpType,
   getEquipmentGachaMovieProbabilitySync,
 } = require("../src/lib/gacha-equipment-movie.ts");
 
@@ -53,15 +54,65 @@ assert.deepStrictEqual(
       { id: 3050002, rank: 3, isGuarantee: false },
     ],
     normalProbability,
-    rolls([0.19]),
+    rolls([0.19, 0.21, 0.26]),
   ),
   {
     isErupt: false,
     draws: [
-      { equipmentId: 4030003, treasureUpType: 1 },
+      { equipmentId: 4030003, treasureUpType: 2 },
       { equipmentId: 3050002, treasureUpType: 0 },
     ],
   },
+);
+
+assert.deepStrictEqual(
+  computeEquipmentGachaMovieEffects(
+    [{ id: 3050002, rank: 3, isGuarantee: false }],
+    normalProbability,
+    rolls([0.19]),
+  ),
+  {
+    isErupt: false,
+    draws: [{ equipmentId: 3050002, treasureUpType: 1 }],
+  },
+);
+
+assert.deepStrictEqual(
+  computeEquipmentGachaMovieEffects(
+    [{ id: 3050002, rank: 3, isGuarantee: false }],
+    normalProbability,
+    rolls([0.21, 0.24]),
+  ),
+  {
+    isErupt: false,
+    draws: [{ equipmentId: 3050002, treasureUpType: 3 }],
+  },
+);
+
+assert.deepStrictEqual(
+  computeEquipmentGachaMovieEffects(
+    [{ id: 5020008, rank: 5, isGuarantee: false }],
+    { ...normalProbability, probabilityEruption: 0 },
+    rolls([0]),
+  ),
+  {
+    isErupt: false,
+    draws: [{ equipmentId: 5020008, treasureUpType: 0 }],
+  },
+);
+
+assert.equal(
+  drawEquipmentTreasureUpType(
+    3,
+    {
+      ...normalProbability,
+      probabilityTreasureUp3To5: 0,
+      probabilityTreasureUp3To4: 0,
+    },
+    false,
+    rolls([0, 0]),
+  ),
+  0,
 );
 
 assert.deepStrictEqual(
@@ -88,7 +139,7 @@ assert.deepStrictEqual(
       { id: 4030003, rank: 4, isGuarantee: true },
     ],
     normalProbability,
-    rolls([0.5, 0.3]),
+    rolls([0.3]),
   ),
   {
     isErupt: false,

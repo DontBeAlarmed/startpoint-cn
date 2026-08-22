@@ -40,15 +40,17 @@ function buildEnhancementSalesList(
 ): Object[] {
     if (Object.keys(items).length === 0) return []
 
-    const groups = new Map<number, { items: { id: string, item: ShopItem, stage: number }[], equipmentId: number }>()
+    const groups = new Map<string, { items: { id: string, item: ShopItem, stage: number }[], equipmentId: number }>()
     for (const [itemId, item] of Object.entries(items)) {
         const groupId = item.groupId ?? 0
-        const group = groups.get(groupId) ?? {
+        const equipmentId = item.equipmentId ?? 0
+        const groupKey = `${item.shopCategoryId ?? 0}:${groupId}:${equipmentId}`
+        const group = groups.get(groupKey) ?? {
             items: [],
-            equipmentId: item.equipmentId ?? 0,
+            equipmentId,
         }
         group.items.push({ id: itemId, item, stage: item.stage ?? 0 })
-        groups.set(groupId, group)
+        groups.set(groupKey, group)
     }
 
     const result: Object[] = []

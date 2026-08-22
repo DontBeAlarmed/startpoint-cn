@@ -46,12 +46,12 @@ export function getEquipmentGachaMovieProbabilitySync(
     return table[String(id)] ?? null
 }
 
-function treasureUpTargetRank(treasureUpType: number): number | null {
+function treasureUpSourceRank(treasureUpType: number): number | null {
     switch (treasureUpType) {
         case 1:
-        case 2:
-            return 5
         case 3:
+            return 3
+        case 2:
             return 4
         default:
             return null
@@ -88,10 +88,10 @@ export function drawEquipmentTreasureUpType(
     roll: Roll = Math.random
 ): number {
     for (const treasureUpType of [1, 2, 3]) {
-        const targetRank = treasureUpTargetRank(treasureUpType)
-        if (targetRank === rank) continue
+        const sourceRank = treasureUpSourceRank(treasureUpType)
+        if (sourceRank !== rank) continue
 
-        if (roll() <= treasureUpProbability(treasureUpType, probability, isGuarantee)) {
+        if (roll() < treasureUpProbability(treasureUpType, probability, isGuarantee)) {
             return treasureUpType
         }
     }
@@ -105,13 +105,13 @@ export function computeEquipmentGachaMovieEffects(
     roll: Roll = Math.random
 ): EquipmentGachaMovieEffects {
     const hasRankFive = drawInputs.some((draw) => draw.rank === 5)
-    const isErupt = hasRankFive ? roll() <= probability.probabilityEruption : false
+    const isErupt = hasRankFive ? roll() < probability.probabilityEruption : false
 
     return {
         isErupt,
         draws: drawInputs.map((draw) => ({
             equipmentId: draw.id,
-            treasureUpType: !isErupt && draw.rank > 3
+            treasureUpType: !isErupt && draw.rank >= 3
                 ? drawEquipmentTreasureUpType(draw.rank, probability, draw.isGuarantee, roll)
                 : 0,
         })),

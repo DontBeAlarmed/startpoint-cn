@@ -2,6 +2,7 @@ import { getPlayerMailCountSync } from "../../data/domains/mail"
 import { mergeMissionSettlementResponse } from "../../lib/mission"
 import { buildFinishFollowInfo } from "../../lib/quest/finish/follow-info"
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils"
+import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time"
 import type { ActiveQuest } from "../../lib/quest/active-quest-service"
 import type { MultiFinishBody } from "../types"
 import type { MultiplayerSettlementResult } from "./orchestrator"
@@ -56,7 +57,7 @@ export async function projectMultiplayerFinishResponse(input: MultiplayerFinishR
             "exp_pool": rewardCharacterExpResult.exp_pool
                 + (clearReward?.user_info.exp_pool || 0)
                 + scoreRewardsResult.user_info.exp_pool,
-            "exp_pooled_time": getServerTime(playerData.expPooledTime),
+            "exp_pooled_time": expPoolRealDateToClientTimestamp(playerData.expPooledTime),
             "free_vmoney": playerData.freeVmoney
                 + (clearReward?.user_info.free_vmoney || 0)
                 + (sPlusClearReward?.user_info.free_vmoney || 0)

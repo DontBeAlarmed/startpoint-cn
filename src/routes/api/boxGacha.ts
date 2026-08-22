@@ -18,6 +18,7 @@ import { drawBoxGachaSync, rewardPlayerBoxGachaResultSync } from "../../lib/gach
 import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
 import { BoxGachaBoxes } from "../../lib/types";
 import { getMailArrivedSync } from "../../lib/mail-notification";
+import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time";
 
 interface GetBoxListBody {
     box_gacha_id: number
@@ -448,7 +449,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "user_info": {
                     "free_mana": settlement.player.freeMana + (settlement.rewardResult?.user_info.free_mana ?? 0),
                     "exp_pool": settlement.player.expPool + (settlement.rewardResult?.user_info.exp_pool ?? 0),
-                    "exp_pooled_time": getServerTime(settlement.player.expPooledTime),
+                    "exp_pooled_time": expPoolRealDateToClientTimestamp(settlement.player.expPooledTime),
                 },
                 "drawn_reward_list": settlement.drawnRewards.map(reward => {
                     return {

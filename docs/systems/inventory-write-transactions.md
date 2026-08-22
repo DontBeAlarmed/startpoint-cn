@@ -24,6 +24,14 @@
 - `/equipment/sell_stack` 先按装备 ID 合并出售数，拒绝零、负数、小数，并一次提交 stack 与奖励；
 - `/equipment/bulk_sell_stack` 的全部 stack、锻造石、星之粒和能力魂共享事务。
 
+三条装备分解接口都遵循 CDN 的 `generate_ability_soul` 标记；区别只在于分解数量：
+
+- `/equipment/sell_equipment` 会出售并删除选中的装备记录；由于客户端的 `stack` 只表示重复数，因此实际出售数量为 `stack + 1`；
+- `/equipment/sell_stack` 按请求中的 `number` 发放；
+- `/equipment/bulk_sell_stack` 按每件装备被清零前的完整 `stack` 发放。
+
+因此，装备是否在分解后消失与是否获得魂珠是两个独立判断：前者由出售数量决定，后者由 CDN 标记和实际分解数量共同决定。
+
 奖励计算公式没有在本轮改变。任何奖励 INSERT/UPDATE 失败都会回滚装备扣除。
 
 ## 回归

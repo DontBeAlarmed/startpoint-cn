@@ -11,7 +11,8 @@ import { getMissionMasterDefinitions, isMissionDefinitionEnabledAt } from "../..
 import { ensurePlayerPassCardLoginProgressSync } from "./pass-card";
 import bundledDailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
-import { getVirtualNow } from "../../runtime/time/game-time";
+import { getRealNow } from "../../runtime/time/game-time";
+import { calculatePooledExpAtRealTime } from "../../lib/exp-pool-time";
 
 type DailyChallengePointLookup = Record<string, { maxPoint: number, isRecovery: boolean, name: string }>
 
@@ -85,8 +86,6 @@ import { insertPlayerRushEventListSync, insertPlayerRushEventClearedFolderListSy
 import { deletePlayerCategoryMissionsSync, insertPlayerCategoryMissionListSync, insertPlayerClearedRegularMissionListSync, insertPlayerActiveMissionsSync } from "./mission";
 import { ensureActivityPeriodicRewardPointsSync, insertPlayerPeriodicRewardPointsListSync, insertPlayerStartDashExchangeCampaignsSync, insertPlayerMultiSpecialExchangeCampaignsSync, recoverActivityPeriodicRewardPointsSync } from "./campaign";
 import { insertCarnivalSaveStateSync } from "../../lib/carnival-save-state";
-
-const expPoolMax = 100000;
 
 function assertValidExpPool(expPool: number, context: string): void {
     if (!Number.isSafeInteger(expPool) || expPool < 0) {
@@ -1196,22 +1195,17 @@ export function deletePlayerSync(
 
 export function collectPlayerDataPooledExpSync(
     player: Player,
-    dateNow: Date = getVirtualNow()
+    dateNow: Date = getRealNow()
 ) {
-    const serverTimeNow = getServerTime(dateNow)
-    const poolTime = getServerTime(player.expPooledTime)
-    const diff = Math.max(0, serverTimeNow - poolTime)
-
-    if (60 > diff) return;
-
-    const expPool = player.expPool + Math.min(expPoolMax, Math.floor(diff / 60))
+    const result = calculatePooledExpAtRealTime(player.expPool, player.expPooledTime, dateNow)
+    if (result.earned === 0 && !result.repaired) return
     updatePlayerSync({
         id: player.id,
-        expPooledTime: dateNow,
-        expPool,
+        expPooledTime: result.expPooledTime,
+        expPool: result.expPool,
     })
-    player.expPooledTime = dateNow
-    player.expPool = expPool
+    player.expPooledTime = result.expPooledTime
+    player.expPool = result.expPool
 }
 
 /**

@@ -5,6 +5,8 @@ import { clearPublishedActiveQuest } from "../../lib/quest/active-quest-service"
 import { loadCurrentBundleMetadata } from "../../runtime/bundle-metadata"
 import { getDb } from "../db"
 import { insertDefaultPlayerSync, replacePlayerDataSync } from "../domains/player"
+import { getRealNow } from "../../runtime/time/game-time"
+import { normalizeImportedExpPoolAnchor } from "../../lib/exp-pool-time"
 import { reviveMergedPlayerDates } from "../utils/date"
 import {
     PLAYER_SAVE_EXCLUDED_TABLES,
@@ -376,7 +378,16 @@ function updatePlayerRoot(
         column => Object.prototype.hasOwnProperty.call(sourceRow, column) || column === "time_offset",
     )
     if (availableColumns.length === 0) throw new Error("Player save root row has no restorable columns")
-    const values = availableColumns.map(column => column === "time_offset" ? null : sourceRow[column])
+    const values = availableColumns.map(column => {
+        if (column === "time_offset") return null
+        if (column === "exp_pooled_time") {
+            return normalizeImportedExpPoolAnchor(
+                new Date(sourceRow[column] as string),
+                getRealNow(),
+            ).toISOString()
+        }
+        return sourceRow[column]
+    })
     const assignments = availableColumns.map(column => `${quotePlayerSaveIdentifier(column)} = ?`).join(", ")
     database.prepare(`UPDATE players SET ${assignments} WHERE id = ?`).run(...values, targetPlayerId)
 }
@@ -485,6 +496,10 @@ function restoreLegacyV1SaveSync(
     const legacyData = reviveMergedPlayerDates(parsed.snapshot.data as any)
     legacyData.player.id = targetPlayerId
     legacyData.player.timeOffset = null
+    legacyData.player.expPooledTime = normalizeImportedExpPoolAnchor(
+        legacyData.player.expPooledTime,
+        getRealNow(),
+    )
 
     database.transaction(() => {
         database.pragma("defer_foreign_keys = ON")

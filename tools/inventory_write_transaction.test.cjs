@@ -160,6 +160,23 @@ test("item sale rolls item deduction back when mana update fails", async t => {
     assert.equal(getPlayerSync(playerId).freeMana, beforeMana)
 })
 
+test("sell_equipment sells the base equipment when duplicate stack is zero", async () => {
+    const { playerId, viewerId } = await createPlayer("sell-equipment-base-copy")
+    const equipmentId = 4050030
+    addEquipment(playerId, equipmentId, 0)
+    const beforeSoul = getPlayerItemSync(playerId, equipmentId) ?? 0
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/equipment/sell_equipment",
+        payload: { viewer_id: viewerId, equipment_list: [{ equipment_id: equipmentId }] },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    assert.equal(getPlayerEquipmentSync(playerId, equipmentId), null)
+    assert.equal(getPlayerItemSync(playerId, equipmentId), beforeSoul + 1)
+})
+
 for (const scenario of [
     {
         name: "sell_equipment",

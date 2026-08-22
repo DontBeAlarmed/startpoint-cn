@@ -5,6 +5,7 @@ require("ts-node/register/transpile-only")
 const assert = require("node:assert/strict")
 const test = require("node:test")
 const { buildShopSalesListSync } = require("../src/lib/shop-sales-list")
+const { ShopType } = require("../src/lib/types")
 
 const AVAILABLE_FROM = "1970-01-01 00:00:00"
 const SHOP_TYPE = 2
@@ -57,5 +58,42 @@ test("shop sales list uses one bulk purchase-count read for visible items", () =
     assert.deepEqual(
         result.salesList.map(sale => [sale.shop_item_id, sale.stock_quantity, sale.total_purchase_num]),
         [[101, 2, 4], [102, 3, 2]],
+    )
+})
+
+test("equipment enhancement groups remain isolated across shop categories", () => {
+    const result = buildShopSalesListSync({
+        playerId: 7,
+        nowMs: Date.parse("2024-10-15T18:02:19.000Z"),
+        equipmentEnhancementCategoryIds: [1, 3],
+        itemsByType: {
+            [ShopType.TREASURE_EQUIPMENT]: {
+                101: item({
+                    shopCategoryId: 1,
+                    groupId: 21,
+                    stage: 1,
+                    equipmentId: 5020040,
+                    enhancementMaxLevel: 1,
+                }),
+                301: item({
+                    shopCategoryId: 3,
+                    groupId: 21,
+                    stage: 1,
+                    equipmentId: 5020042,
+                    enhancementMaxLevel: 1,
+                }),
+            },
+        },
+        isItemVisible: () => true,
+    }, {
+        getEquipmentEnhancementLevel(_playerId, equipmentId) {
+            return equipmentId === 5020042 ? 0 : -1
+        },
+    })
+
+    assert.deepEqual(
+        result.salesList.map(sale => sale.shop_item_id).sort((left, right) => left - right),
+        [101, 301],
+        "the same groupId in another category must not replace or merge a different equipment",
     )
 })
