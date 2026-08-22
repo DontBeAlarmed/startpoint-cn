@@ -24,6 +24,17 @@ export interface ShopPurchaseQuery {
     readonly keys: ShopPurchasePeriodKeys
 }
 
+interface LegacyPurchaseMetadata {
+    readonly counterExists: boolean
+    readonly purchaseExists: boolean
+}
+
+const legacyPurchaseMetadata = Symbol("legacyPurchaseMetadata")
+
+interface ShopPurchaseCountSnapshot extends ShopPurchasePeriodCounts {
+    readonly [legacyPurchaseMetadata]?: LegacyPurchaseMetadata
+}
+
 export function getShopPurchaseQueryKey(query: ShopPurchaseQuery): string {
     return `${query.shopType}:${query.shopItemId}:${query.keys.daily}:${query.keys.monthly}`
 }
@@ -37,19 +48,72 @@ function getCounterKey(
     return `${shopType}:${shopItemId}:${periodType}:${periodKey}`
 }
 
-function getCounterSync(
+function createPurchaseCountSnapshot(
+    daily: number,
+    monthly: number,
+    typedTotal: number,
+    legacyCounter: number | undefined,
+    legacyPurchase: number | undefined,
+): ShopPurchaseCountSnapshot {
+    const snapshot: ShopPurchaseCountSnapshot = {
+        daily,
+        monthly,
+        total: typedTotal + resolveLegacyPurchaseTotal(legacyCounter, legacyPurchase),
+    }
+    Object.defineProperty(snapshot, legacyPurchaseMetadata, {
+        value: {
+            counterExists: legacyCounter !== undefined,
+            purchaseExists: legacyPurchase !== undefined,
+        } satisfies LegacyPurchaseMetadata,
+    })
+    return snapshot
+}
+
+function getPlayerShopPurchaseCountSnapshotSync(
     playerId: number,
     shopType: number,
     shopItemId: number,
-    periodType: "daily" | "monthly" | "total",
-    periodKey: string,
-): number | null {
-    const row = getDb().prepare(`
-        SELECT count FROM players_shop_purchase_counters
-        WHERE player_id = ? AND shop_type = ? AND shop_item_id = ?
-          AND period_type = ? AND period_key = ?
-    `).get(playerId, shopType, shopItemId, periodType, periodKey) as { count: number } | undefined
-    return row?.count ?? null
+    keys: ShopPurchasePeriodKeys,
+): ShopPurchaseCountSnapshot {
+    const rows = getDb().prepare(`
+        SELECT shop_type, period_type, period_key, count
+        FROM players_shop_purchase_counters
+        WHERE player_id = ? AND shop_item_id = ? AND (
+            (shop_type = ? AND (
+                (period_type = 'daily' AND period_key = ?)
+                OR (period_type = 'monthly' AND period_key = ?)
+                OR (period_type = 'total' AND period_key = '')
+            ))
+            OR (shop_type = -1 AND period_type = 'total' AND period_key = '')
+        )
+    `).all(playerId, shopItemId, shopType, keys.daily, keys.monthly) as Array<{
+        shop_type: number
+        period_type: "daily" | "monthly" | "total"
+        period_key: string
+        count: number
+    }>
+
+    let daily = 0
+    let monthly = 0
+    let typedTotal = 0
+    let legacyCounter: number | undefined
+    for (const row of rows) {
+        if (row.shop_type === -1) legacyCounter = row.count
+        else if (row.period_type === "daily") daily = row.count
+        else if (row.period_type === "monthly") monthly = row.count
+        else typedTotal = row.count
+    }
+    const legacyPurchase = getDb().prepare(`
+        SELECT count FROM players_shop_purchases
+        WHERE player_id = ? AND shop_item_id = ?
+    `).get(playerId, shopItemId) as { count: number } | undefined
+    return createPurchaseCountSnapshot(
+        daily,
+        monthly,
+        typedTotal,
+        legacyCounter,
+        legacyPurchase?.count,
+    )
 }
 
 function resolveLegacyPurchaseTotal(
@@ -59,27 +123,22 @@ function resolveLegacyPurchaseTotal(
     return Math.max(legacyCounter ?? 0, legacyPurchase ?? 0)
 }
 
-function getLegacyPurchaseTotalSync(playerId: number, shopItemId: number): number {
-    const legacyCounter = getCounterSync(playerId, -1, shopItemId, "total", "")
-    const legacyPurchase = getDb().prepare(`
-        SELECT count FROM players_shop_purchases
-        WHERE player_id = ? AND shop_item_id = ?
-    `).get(playerId, shopItemId) as { count: number } | undefined
-    return resolveLegacyPurchaseTotal(legacyCounter, legacyPurchase?.count)
-}
-
 export function getPlayerShopPurchaseCountsByTypeSync(
     playerId: number,
     shopType: number,
     shopItemId: number,
     keys: ShopPurchasePeriodKeys,
 ): ShopPurchasePeriodCounts {
-    const exactTotal = getCounterSync(playerId, shopType, shopItemId, "total", "")
-    const legacyTotal = getLegacyPurchaseTotalSync(playerId, shopItemId)
+    const snapshot = getPlayerShopPurchaseCountSnapshotSync(
+        playerId,
+        shopType,
+        shopItemId,
+        keys,
+    )
     return {
-        daily: getCounterSync(playerId, shopType, shopItemId, "daily", keys.daily) ?? 0,
-        monthly: getCounterSync(playerId, shopType, shopItemId, "monthly", keys.monthly) ?? 0,
-        total: (exactTotal ?? 0) + legacyTotal,
+        daily: snapshot.daily,
+        monthly: snapshot.monthly,
+        total: snapshot.total,
     }
 }
 
@@ -117,23 +176,64 @@ export function getPlayerShopPurchaseCountsByTypeBulkSync(
     )
 
     return new Map(queries.map(query => {
-        const exactTotal = counters.get(
-            getCounterKey(query.shopType, query.shopItemId, "total", ""),
-        )
-        const legacyTotal = resolveLegacyPurchaseTotal(
-            counters.get(getCounterKey(-1, query.shopItemId, "total", "")),
-            legacyPurchases.get(query.shopItemId),
-        )
-        return [getShopPurchaseQueryKey(query), {
-            daily: counters.get(
+        return [getShopPurchaseQueryKey(query), createPurchaseCountSnapshot(
+            counters.get(
                 getCounterKey(query.shopType, query.shopItemId, "daily", query.keys.daily),
             ) ?? 0,
-            monthly: counters.get(
+            counters.get(
                 getCounterKey(query.shopType, query.shopItemId, "monthly", query.keys.monthly),
             ) ?? 0,
-            total: (exactTotal ?? 0) + legacyTotal,
-        }]
+            counters.get(getCounterKey(query.shopType, query.shopItemId, "total", "")) ?? 0,
+            counters.get(getCounterKey(-1, query.shopItemId, "total", "")),
+            legacyPurchases.get(query.shopItemId),
+        )]
     }))
+}
+
+function writePlayerShopPurchaseCountSnapshotSync(
+    playerId: number,
+    shopType: number,
+    shopItemId: number,
+    amount: number,
+    keys: ShopPurchasePeriodKeys,
+    currentCounts: ShopPurchasePeriodCounts,
+): ShopPurchasePeriodCounts {
+    const finalCounts = {
+        daily: currentCounts.daily + amount,
+        monthly: currentCounts.monthly + amount,
+        total: currentCounts.total + amount,
+    }
+    const database = getDb()
+    const metadata = (currentCounts as ShopPurchaseCountSnapshot)[legacyPurchaseMetadata]
+    if (metadata?.counterExists) {
+        database.prepare(`
+            DELETE FROM players_shop_purchase_counters
+            WHERE player_id = ? AND shop_type = -1 AND shop_item_id = ?
+              AND period_type = 'total' AND period_key = ''
+        `).run(playerId, shopItemId)
+    }
+    if (metadata?.purchaseExists) {
+        database.prepare(`
+            DELETE FROM players_shop_purchases
+            WHERE player_id = ? AND shop_item_id = ?
+        `).run(playerId, shopItemId)
+    }
+    const setCounter = (
+        periodType: "daily" | "monthly" | "total",
+        periodKey: string,
+        count: number,
+    ) => database.prepare(`
+        INSERT INTO players_shop_purchase_counters (
+            player_id, shop_type, shop_item_id, period_type, period_key, count
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(player_id, shop_type, shop_item_id, period_type, period_key)
+        DO UPDATE SET count = excluded.count
+    `).run(playerId, shopType, shopItemId, periodType, periodKey, count)
+
+    setCounter("daily", keys.daily, finalCounts.daily)
+    setCounter("monthly", keys.monthly, finalCounts.monthly)
+    setCounter("total", "", finalCounts.total)
+    return finalCounts
 }
 
 export function addPlayerShopPurchaseCountsByTypeSync(
@@ -146,34 +246,20 @@ export function addPlayerShopPurchaseCountsByTypeSync(
     if (!Number.isSafeInteger(amount) || amount <= 0) {
         throw new Error("Shop purchase count increment must be a positive integer.")
     }
-    const database = getDb()
-    const addCounter = (
-        periodType: "daily" | "monthly" | "total",
-        periodKey: string,
-        increment: number,
-    ) => database.prepare(`
-        INSERT INTO players_shop_purchase_counters (
-            player_id, shop_type, shop_item_id, period_type, period_key, count
-        ) VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(player_id, shop_type, shop_item_id, period_type, period_key)
-        DO UPDATE SET count = count + excluded.count
-    `).run(playerId, shopType, shopItemId, periodType, periodKey, increment)
-
-    const legacyTotal = getLegacyPurchaseTotalSync(playerId, shopItemId)
-    if (legacyTotal > 0) addCounter("total", "", legacyTotal)
-    database.prepare(`
-        DELETE FROM players_shop_purchase_counters
-        WHERE player_id = ? AND shop_type = -1 AND shop_item_id = ?
-          AND period_type = 'total' AND period_key = ''
-    `).run(playerId, shopItemId)
-    database.prepare(`
-        DELETE FROM players_shop_purchases
-        WHERE player_id = ? AND shop_item_id = ?
-    `).run(playerId, shopItemId)
-    addCounter("daily", keys.daily, amount)
-    addCounter("monthly", keys.monthly, amount)
-    addCounter("total", "", amount)
-    return getPlayerShopPurchaseCountsByTypeSync(playerId, shopType, shopItemId, keys)
+    const snapshot = getPlayerShopPurchaseCountSnapshotSync(
+        playerId,
+        shopType,
+        shopItemId,
+        keys,
+    )
+    return writePlayerShopPurchaseCountSnapshotSync(
+        playerId,
+        shopType,
+        shopItemId,
+        amount,
+        keys,
+        snapshot,
+    )
 }
 
 export function addPlayerShopPurchaseCountsByTypeFromSnapshotSync(
@@ -187,37 +273,14 @@ export function addPlayerShopPurchaseCountsByTypeFromSnapshotSync(
     if (!Number.isSafeInteger(amount) || amount <= 0) {
         throw new Error("Shop purchase count increment must be a positive integer.")
     }
-    const finalCounts = {
-        daily: currentCounts.daily + amount,
-        monthly: currentCounts.monthly + amount,
-        total: currentCounts.total + amount,
-    }
-    const database = getDb()
-    const setCounter = (
-        periodType: "daily" | "monthly" | "total",
-        periodKey: string,
-        count: number,
-    ) => database.prepare(`
-        INSERT INTO players_shop_purchase_counters (
-            player_id, shop_type, shop_item_id, period_type, period_key, count
-        ) VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(player_id, shop_type, shop_item_id, period_type, period_key)
-        DO UPDATE SET count = excluded.count
-    `).run(playerId, shopType, shopItemId, periodType, periodKey, count)
-
-    database.prepare(`
-        DELETE FROM players_shop_purchase_counters
-        WHERE player_id = ? AND shop_type = -1 AND shop_item_id = ?
-          AND period_type = 'total' AND period_key = ''
-    `).run(playerId, shopItemId)
-    database.prepare(`
-        DELETE FROM players_shop_purchases
-        WHERE player_id = ? AND shop_item_id = ?
-    `).run(playerId, shopItemId)
-    setCounter("daily", keys.daily, finalCounts.daily)
-    setCounter("monthly", keys.monthly, finalCounts.monthly)
-    setCounter("total", "", finalCounts.total)
-    return finalCounts
+    return writePlayerShopPurchaseCountSnapshotSync(
+        playerId,
+        shopType,
+        shopItemId,
+        amount,
+        keys,
+        currentCounts,
+    )
 }
 
 export function getPlayerShopPurchasesSync(playerId: number): ShopPurchaseCount[] {

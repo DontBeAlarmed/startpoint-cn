@@ -1,6 +1,7 @@
 require("ts-node/register/transpile-only")
 
 const assert = require("node:assert/strict")
+const BetterSqlite3 = require("better-sqlite3")
 const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
@@ -9,6 +10,45 @@ const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "shop-period-db-
 const previousDataDirectory = process.env.DATA_DIR
 process.env.DATA_DIR = databaseDirectory
 let db
+let sqlTrace = null
+
+function databaseFactory(databasePath) {
+    return new BetterSqlite3(databasePath, {
+        verbose: statement => {
+            if (sqlTrace !== null) sqlTrace.push(statement)
+        },
+    })
+}
+
+function captureSql(operation) {
+    const statements = []
+    sqlTrace = statements
+    try {
+        return { result: operation(), statements }
+    } finally {
+        sqlTrace = null
+    }
+}
+
+function summarizePurchaseCountSql(statements) {
+    return {
+        selects: statements.filter(statement => /^\s*SELECT\b/i.test(statement)).length,
+        upserts: statements.filter(statement => (
+            /^\s*INSERT\s+INTO\s+players_shop_purchase_counters\b/i.test(statement)
+        )).length,
+        deletes: statements.filter(statement => /^\s*DELETE\b/i.test(statement)).length,
+    }
+}
+
+function summarizeLegacyDeletes(statements) {
+    return statements
+        .filter(statement => /^\s*DELETE\b/i.test(statement))
+        .map(statement => {
+            if (/players_shop_purchase_counters/i.test(statement)) return "counter"
+            if (/players_shop_purchases/i.test(statement)) return "purchase"
+            return "unknown"
+        })
+}
 
 function cleanup() {
     if (db?.open) db.close()
@@ -36,7 +76,7 @@ const {
     ShopStockError,
 } = require("../src/lib/event-shop-purchase")
 
-initializeDatabase()
+initializeDatabase({ databaseFactory })
 db = getDb()
 const account = insertAccountSync({
     appId: "wf_cn",
@@ -48,6 +88,103 @@ const account = insertAccountSync({
 const playerId = insertDefaultPlayerSync(account.id).id
 const first = { daily: "2024-02-01", monthly: "2024-02" }
 const nextDay = { daily: "2024-02-02", monthly: "2024-02" }
+
+const singleSql = captureSql(() => (
+    addPlayerShopPurchaseCountsByTypeSync(playerId, 4, 300010, 1, first)
+))
+const bulkQueries = [300011, 300012].map(shopItemId => ({
+    shopType: 4,
+    shopItemId,
+    keys: first,
+}))
+const bulkSql = captureSql(() => {
+    const snapshots = getPlayerShopPurchaseCountsByTypeBulkSync(playerId, bulkQueries)
+    for (const query of bulkQueries) {
+        addPlayerShopPurchaseCountsByTypeFromSnapshotSync(
+            playerId,
+            query.shopType,
+            query.shopItemId,
+            1,
+            query.keys,
+            snapshots.get(getShopPurchaseQueryKey(query)),
+        )
+    }
+})
+
+db.prepare(`
+    INSERT INTO players_shop_purchase_counters (
+        player_id, shop_type, shop_item_id, period_type, period_key, count
+    ) VALUES (?, -1, 300013, 'total', '', 3)
+`).run(playerId)
+const counterOnlySql = captureSql(() => (
+    addPlayerShopPurchaseCountsByTypeSync(playerId, 4, 300013, 1, first)
+))
+
+db.prepare(`
+    INSERT INTO players_shop_purchases (player_id, shop_item_id, count)
+    VALUES (?, 300014, 4)
+`).run(playerId)
+const purchaseOnlySql = captureSql(() => (
+    addPlayerShopPurchaseCountsByTypeSync(playerId, 4, 300014, 1, first)
+))
+
+db.prepare(`
+    INSERT INTO players_shop_purchase_counters (
+        player_id, shop_type, shop_item_id, period_type, period_key, count
+    ) VALUES
+        (?, 4, 300015, 'total', '', 2),
+        (?, -1, 300015, 'total', '', 3)
+`).run(playerId, playerId)
+db.prepare(`
+    INSERT INTO players_shop_purchases (player_id, shop_item_id, count)
+    VALUES (?, 300015, 5)
+`).run(playerId)
+const overlappingSql = captureSql(() => (
+    addPlayerShopPurchaseCountsByTypeSync(playerId, 4, 300015, 1, first)
+))
+const migratedAgainSql = captureSql(() => (
+    addPlayerShopPurchaseCountsByTypeSync(playerId, 4, 300015, 1, first)
+))
+
+assert.deepEqual({
+    single: summarizePurchaseCountSql(singleSql.statements),
+    bulk: summarizePurchaseCountSql(bulkSql.statements),
+    counterOnly: {
+        counts: counterOnlySql.result,
+        deletes: summarizeLegacyDeletes(counterOnlySql.statements),
+    },
+    purchaseOnly: {
+        counts: purchaseOnlySql.result,
+        deletes: summarizeLegacyDeletes(purchaseOnlySql.statements),
+    },
+    overlapping: {
+        counts: overlappingSql.result,
+        deletes: summarizeLegacyDeletes(overlappingSql.statements),
+    },
+    migratedAgain: {
+        counts: migratedAgainSql.result,
+        deletes: summarizeLegacyDeletes(migratedAgainSql.statements),
+    },
+}, {
+    single: { selects: 2, upserts: 3, deletes: 0 },
+    bulk: { selects: 2, upserts: 6, deletes: 0 },
+    counterOnly: {
+        counts: { daily: 1, monthly: 1, total: 4 },
+        deletes: ["counter"],
+    },
+    purchaseOnly: {
+        counts: { daily: 1, monthly: 1, total: 5 },
+        deletes: ["purchase"],
+    },
+    overlapping: {
+        counts: { daily: 1, monthly: 1, total: 8 },
+        deletes: ["counter", "purchase"],
+    },
+    migratedAgain: {
+        counts: { daily: 2, monthly: 2, total: 9 },
+        deletes: [],
+    },
+}, "计数 snapshot 应消除固定成本并只迁移实际存在的 legacy 来源")
 
 assert.deepEqual(getPlayerShopPurchaseCountsByTypeSync(playerId, 4, 300001, first), {
     daily: 0,
@@ -85,7 +222,7 @@ db.prepare(`
     VALUES (?, ?, ?)
 `).run(playerId, 300002, 3)
 closeDatabase()
-db = initializeDatabase()
+db = initializeDatabase({ databaseFactory })
 assert.equal(
     getPlayerShopPurchaseCountsByTypeSync(playerId, 4, 300002, first).total,
     3,
@@ -96,7 +233,7 @@ assert.equal(
     4,
 )
 closeDatabase()
-db = initializeDatabase()
+db = initializeDatabase({ databaseFactory })
 assert.equal(
     getPlayerShopPurchaseCountsByTypeSync(playerId, 7, 300002, first).total,
     0,
