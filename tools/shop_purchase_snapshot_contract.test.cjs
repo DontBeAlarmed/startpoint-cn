@@ -276,6 +276,9 @@ console.log(`shop purchase bulk legacy query plan: ${bulkLegacyPlan.join(" | ")}
 collectCheck(failures, "bulk 精确范围与结果", () => {
     assert.equal(bulkRead.statements.length, 2, bulkRead.statements.join("\n---\n"))
     assert.equal(bulkTableReads.length, 2, bulkRead.statements.join("\n---\n"))
+    for (const statement of [bulkCountersSelect, bulkLegacySelect]) {
+        assert.match(statement, /^\s*SELECT\b/i, statement)
+    }
     assert.match(
         bulkCountersPlan.join("\n"),
         /\(player_id=\? AND shop_type=\? AND shop_item_id=\? AND period_type=\? AND period_key=\?\)/,

@@ -15,7 +15,11 @@ function unsupported(sql) {
 }
 
 function maskStringsAndRejectComments(sql) {
-    const masked = sql.replace(/'(?:''|[^'])*'/gs, match => " ".repeat(match.length))
+    const maskedStrings = sql.replace(/'(?:''|[^'])*'/gs, match => " ".repeat(match.length))
+    const masked = maskedStrings.replace(
+        /\/\*\+[1-9][0-9]* bytes\*\//g,
+        match => " ".repeat(match.length),
+    )
     if (masked.includes("'") || /--|\/\*/.test(masked)) throw unsupported(sql)
     return masked
 }

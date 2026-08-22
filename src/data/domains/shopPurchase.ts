@@ -193,23 +193,15 @@ export function getPlayerShopPurchaseCountsByTypeBulkSync(
     }
 
     const rows = getDb().prepare(`
-        WITH requested(shop_type, shop_item_id, period_type, period_key) AS (
-            SELECT
-                json_extract(value, '$[0]'),
-                json_extract(value, '$[1]'),
-                json_extract(value, '$[2]'),
-                json_extract(value, '$[3]')
-            FROM json_each(?)
-        )
         SELECT counters.shop_type, counters.shop_item_id,
             counters.period_type, counters.period_key, counters.count
-        FROM requested
+        FROM json_each(?) AS requested
         CROSS JOIN players_shop_purchase_counters AS counters
         WHERE counters.player_id = ?
-          AND counters.shop_type = requested.shop_type
-          AND counters.shop_item_id = requested.shop_item_id
-          AND counters.period_type = requested.period_type
-          AND counters.period_key = requested.period_key
+          AND counters.shop_type = json_extract(requested.value, '$[0]')
+          AND counters.shop_item_id = json_extract(requested.value, '$[1]')
+          AND counters.period_type = json_extract(requested.value, '$[2]')
+          AND counters.period_key = json_extract(requested.value, '$[3]')
     `).all(JSON.stringify([...counterRequests.values()]), playerId) as Array<{
         shop_type: number
         shop_item_id: number

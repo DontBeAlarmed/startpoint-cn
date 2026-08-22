@@ -126,6 +126,53 @@ test("rejects CTEs, leading comments, and unknown SQL instead of silently counti
     })
 })
 
+test("accepts only SQLite trace truncation markers while classifying SELECT reads", () => {
+    const counter = createSqlCounter()
+    counter.observe(`
+        SELECT counters.count
+        FROM json_each('[[8,100001,"daily","2024-08-14"]'/*+2885 bytes*/) AS requested
+        JOIN players_shop_purchase_counters AS counters
+          ON counters.shop_item_id = json_extract(requested.value, '$[1]')
+    `)
+
+    assert.deepEqual(counter.snapshot(), {
+        statements: 1,
+        selectStatements: 1,
+        writeStatements: 0,
+        transactionStatements: 0,
+        byTable: {
+            json_each: { statements: 1, reads: 1, writes: 0 },
+            players_shop_purchase_counters: { statements: 1, reads: 1, writes: 0 },
+        },
+    })
+})
+
+test("rejects comments that are not exact positive SQLite trace truncation markers", () => {
+    const counter = createSqlCounter()
+    for (const comment of [
+        "/* comment */",
+        "/*+ bytes*/",
+        "/*+0 bytes*/",
+        "/*+12 byte*/",
+        "/*+12 BYTES*/",
+        "/*++12 bytes*/",
+        "-- trace truncation",
+    ]) {
+        assert.throws(
+            () => counter.observe(`SELECT id FROM players ${comment}`),
+            /unsupported SQL/i,
+            comment,
+        )
+    }
+    assert.deepEqual(counter.snapshot(), {
+        statements: 0,
+        selectStatements: 0,
+        writeStatements: 0,
+        transactionStatements: 0,
+        byTable: {},
+    })
+})
+
 test("stable summaries publish their complete payload and ignore run configuration", () => {
     const base = {
         version: 2,
