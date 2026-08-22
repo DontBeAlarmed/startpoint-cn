@@ -3,7 +3,8 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
-    deletePlayerEquipmentSync, getPlayerEquipmentSync, updatePlayerEquipmentSync,
+    deletePlayerEquipmentSync, getPlayerEquipmentSync, getPlayerEquipmentsByIdsSync,
+    normalizeEquipmentBatchIds, updatePlayerEquipmentSync,
 } from "../../data/domains/equipment";
 import { givePlayerItemSync } from "../../data/domains/item";
 import { getSession } from "../../data/domains/session";
@@ -131,8 +132,27 @@ const routes = async (fastify: FastifyInstance) => {
 
         const viewerId = body.viewer_id
         const toSellEquipmentList = body.equipment_list
-        if (isNaN(viewerId) || !toSellEquipmentList) {
+        if (isNaN(viewerId) || !Array.isArray(toSellEquipmentList)) {
             return reply.status(400).send({ "error": "Bad Request", "message": "Invalid request body." })
+        }
+        const uniqueEquipmentIds = normalizeEquipmentBatchIds(
+            toSellEquipmentList.map(toSell => toSell?.equipment_id),
+        )
+        if (uniqueEquipmentIds === null) {
+            return reply.status(400).send({ "error": "Bad Request", "message": "Invalid request body." })
+        }
+
+        const requestedCounts = new Map<number, number>()
+        for (const toSell of toSellEquipmentList) {
+            const sellCount = (toSell as SellStackEquipmentListItem).number
+            if (!Number.isSafeInteger(sellCount) || sellCount <= 0) {
+                return reply.status(400).send({ "error": "Bad Request", "message": "Invalid sell count." })
+            }
+            const requestedCount = (requestedCounts.get(toSell.equipment_id) ?? 0) + sellCount
+            if (!Number.isSafeInteger(requestedCount)) {
+                return reply.status(400).send({ "error": "Bad Request", "message": "Invalid sell count." })
+            }
+            requestedCounts.set(toSell.equipment_id, requestedCount)
         }
 
         const session = await getSession(viewerId.toString())
@@ -145,21 +165,11 @@ const routes = async (fastify: FastifyInstance) => {
         let totalCraftPoints = 0
         let totalStarGrains = 0
         const totalAbilitySouls: Record<number, number> = {}
-        const requestedCounts = new Map<number, number>()
-        for (const toSell of toSellEquipmentList) {
-            const sellCount = (toSell as SellStackEquipmentListItem).number
-            if (!Number.isInteger(sellCount) || sellCount <= 0) {
-                return reply.status(400).send({ "error": "Bad Request", "message": "Invalid sell count." })
-            }
-            requestedCounts.set(
-                toSell.equipment_id,
-                (requestedCounts.get(toSell.equipment_id) ?? 0) + sellCount,
-            )
-        }
+        const equipmentSnapshot = getPlayerEquipmentsByIdsSync(playerId, uniqueEquipmentIds)
         const stackUpdates: Array<{ equipmentId: number, newStack: number }> = []
 
         for (const [equipmentId, sellCount] of requestedCounts) {
-            const equipment = getPlayerEquipmentSync(playerId, equipmentId)
+            const equipment = equipmentSnapshot[equipmentId]
             if (!equipment) {
                 return reply.status(400).send({ "error": "Bad Request", "message": "Player does not own equipment." })
             }
@@ -224,6 +234,10 @@ const routes = async (fastify: FastifyInstance) => {
         if (isNaN(viewerId) || !equipmentIds || !Array.isArray(equipmentIds) || equipmentIds.length === 0) {
             return reply.status(400).send({ "error": "Bad Request", "message": "Invalid request body." })
         }
+        const uniqueEquipmentIds = normalizeEquipmentBatchIds(equipmentIds)
+        if (uniqueEquipmentIds === null) {
+            return reply.status(400).send({ "error": "Bad Request", "message": "Invalid request body." })
+        }
 
         const session = await getSession(viewerId.toString())
         if (!session) return reply.status(400).send({ "error": "Bad Request", "message": "Invalid viewer id." })
@@ -237,13 +251,10 @@ const routes = async (fastify: FastifyInstance) => {
         let totalStarGrains = 0
         const totalAbilitySouls: Record<number, number> = {}
         const toSell: number[] = []
-        const seen = new Set<number>()
+        const equipmentSnapshot = getPlayerEquipmentsByIdsSync(playerId, uniqueEquipmentIds)
 
-        for (const equipmentId of equipmentIds) {
-            if (seen.has(equipmentId)) continue
-            seen.add(equipmentId)
-
-            const equipment = getPlayerEquipmentSync(playerId, equipmentId)
+        for (const equipmentId of uniqueEquipmentIds) {
+            const equipment = equipmentSnapshot[equipmentId]
             if (!equipment) continue
             if (equipment.protection) {
                 return reply.status(400).send({ "error": "Bad Request", "message": "Protected equipment cannot be sold." })

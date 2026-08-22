@@ -3,7 +3,8 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
-    getPlayerEquipmentSync, playerOwnsEquipmentSync, updatePlayerEquipmentSync,
+    getPlayerEquipmentSync, getPlayerEquipmentsByIdsSync, playerOwnsEquipmentSync,
+    normalizeEquipmentBatchIds, updatePlayerEquipmentSync,
 } from "../../data/domains/equipment";
 import {
     getPlayerItemSync, givePlayerItemSync, updatePlayerItemSync,
@@ -140,6 +141,10 @@ const routes = async (fastify: FastifyInstance) => {
         if (isNaN(viewerId) || !equipmentIds || !Array.isArray(equipmentIds) || equipmentIds.length === 0) {
             return reply.status(400).send({ "error": "Bad Request", "message": "Invalid request body." })
         }
+        const uniqueEquipmentIds = normalizeEquipmentBatchIds(equipmentIds)
+        if (uniqueEquipmentIds === null) {
+            return reply.status(400).send({ "error": "Bad Request", "message": "Invalid request body." })
+        }
 
         const session = await getSession(viewerId.toString())
         if (!session) return reply.status(400).send({ "error": "Bad Request", "message": "Invalid viewer id." })
@@ -151,23 +156,36 @@ const routes = async (fastify: FastifyInstance) => {
         const player = getPlayerSync(playerId)
         if (!player) return reply.status(500).send({ "error": "Internal Server Error", "message": "Player not found." })
 
-        const upgrades: Array<{ equipmentId: number; upgradeCount: number }> = []
+        const equipmentSnapshot = getPlayerEquipmentsByIdsSync(playerId, uniqueEquipmentIds)
+        const upgrades: Array<{
+            equipmentId: number
+            upgradeCount: number
+            newLevel: number
+            newStack: number
+            abilitySoulId: number | null
+        }> = []
         let totalCraftPointCost = 0
-        const seen = new Set<number>()
 
-        for (const equipmentId of equipmentIds) {
-            if (seen.has(equipmentId)) continue
-            seen.add(equipmentId)
-            const equipment = getPlayerEquipmentSync(playerId, equipmentId)
+        for (const equipmentId of uniqueEquipmentIds) {
+            const equipment = equipmentSnapshot[equipmentId]
             if (!equipment) continue
 
-            const maxLvl = getEquipmentDissolveSync(equipmentId)?.max_level ?? 5
+            const dissolveInfo = getEquipmentDissolveSync(equipmentId)
+            const maxLvl = dissolveInfo?.max_level ?? 5
             const upgradeCount = Math.min(maxLvl - equipment.level, equipment.stack)
             if (upgradeCount <= 0) continue
 
             const rarity = Math.floor(equipmentId / 1000000)  // 1-indexed
             totalCraftPointCost += getUpgradeCost(rarity) * upgradeCount
-            upgrades.push({ equipmentId, upgradeCount })
+            upgrades.push({
+                equipmentId,
+                upgradeCount,
+                newLevel: equipment.level + upgradeCount,
+                newStack: equipment.stack - upgradeCount,
+                abilitySoulId: dissolveInfo?.generate_ability_soul
+                    ? dissolveInfo.ability_soul_id
+                    : null,
+            })
         }
 
         if (upgrades.length === 0) {
@@ -187,14 +205,17 @@ const routes = async (fastify: FastifyInstance) => {
 
         const newCraftPoints = currentCraftPoints - totalCraftPointCost
         getDb().transaction(() => {
-            for (const { equipmentId, upgradeCount } of upgrades) {
-                const equipment = getPlayerEquipmentSync(playerId, equipmentId)!
-                equipment.level += upgradeCount
-                equipment.stack -= upgradeCount
-                updatePlayerEquipmentSync(playerId, equipmentId, { level: equipment.level, stack: equipment.stack })
-                const dissolveInfo = getEquipmentDissolveSync(equipmentId)
-                if (dissolveInfo && dissolveInfo.generate_ability_soul) {
-                    returnItemList[dissolveInfo.ability_soul_id] = givePlayerItemSync(playerId, dissolveInfo.ability_soul_id, upgradeCount)
+            for (const upgrade of upgrades) {
+                updatePlayerEquipmentSync(playerId, upgrade.equipmentId, {
+                    level: upgrade.newLevel,
+                    stack: upgrade.newStack,
+                })
+                if (upgrade.abilitySoulId !== null) {
+                    returnItemList[upgrade.abilitySoulId] = givePlayerItemSync(
+                        playerId,
+                        upgrade.abilitySoulId,
+                        upgrade.upgradeCount,
+                    )
                 }
             }
             updatePlayerItemSync(playerId, wrightpieceItemId(), newCraftPoints)

@@ -1482,6 +1482,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/additional_reward.test.cjs",
         "tools/character_stack.test.cjs",
         "tools/database_hot_path_indexes.test.cjs",
+        "tools/equipment_batch_reads.test.cjs",
         "tools/equipment_dissolve.test.cjs",
         "tools/equipment_enhancement.test.cjs",
         "tools/economy_write_transaction.test.cjs",
@@ -1510,6 +1511,10 @@ test("keeps compiled-output and external-data tests out of quick", () => {
     )
     assert.deepEqual(
         selectTestGroups(["tools/item_use_cultivate_pack.test.cjs"]),
+        ["integration:rules"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/equipment_batch_reads.test.cjs"]),
         ["integration:rules"],
     )
     assert.deepEqual(TEST_GROUPS.generator.tests, [

@@ -2,6 +2,22 @@ import { getDb } from "../db";
 import { PlayerEquipment, RawPlayerEquipment } from "../types";
 import { deserializeBoolean, serializeBoolean } from "../utils/primitives";
 
+// SQLite allows 32766 variables; reserve one for player_id in equipment IN queries.
+export const MAX_EQUIPMENT_BATCH_IDS = 32765
+
+export function normalizeEquipmentBatchIds(ids: readonly unknown[]): number[] | null {
+    const equipmentIds: number[] = []
+    const seen = new Set<number>()
+    for (const id of ids) {
+        if (typeof id !== "number" || !Number.isSafeInteger(id) || id <= 0) return null
+        if (seen.has(id)) continue
+        if (equipmentIds.length >= MAX_EQUIPMENT_BATCH_IDS) return null
+        seen.add(id)
+        equipmentIds.push(id)
+    }
+    return equipmentIds
+}
+
 /**
  * Converts a RawPlayerEquipment object into a PlayerEquipment object.
  */
@@ -33,11 +49,9 @@ export function getPlayerEquipmentsByIdsSync(
     playerId: number,
     ids: readonly number[],
 ): Record<string, PlayerEquipment> {
-    const equipmentIds = [...new Set(ids)]
-    for (const id of equipmentIds) {
-        if (!Number.isSafeInteger(id) || id <= 0) {
-            throw new TypeError("equipment IDs must be positive safe integers")
-        }
+    const equipmentIds = normalizeEquipmentBatchIds(ids)
+    if (equipmentIds === null) {
+        throw new TypeError("equipment IDs must be positive safe integers within the batch limit")
     }
     equipmentIds.sort((left, right) => left - right)
     if (equipmentIds.length === 0) return {}

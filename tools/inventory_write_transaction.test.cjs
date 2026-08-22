@@ -74,6 +74,15 @@ function rejectNextRewardInsert(playerId, triggerName) {
     `)
 }
 
+function categoryMissionState(playerId) {
+    return database.prepare(`
+        SELECT category, id, progress
+        FROM players_category_missions
+        WHERE player_id = ?
+        ORDER BY category, id
+    `).all(playerId)
+}
+
 test.before(async () => {
     database = data.initializeDatabase()
     app = Fastify({ logger: false })
@@ -175,6 +184,75 @@ test("sell_equipment sells the base equipment when duplicate stack is zero", asy
     assert.equal(response.statusCode, 200, response.body)
     assert.equal(getPlayerEquipmentSync(playerId, equipmentId), null)
     assert.equal(getPlayerItemSync(playerId, equipmentId), beforeSoul + 1)
+})
+
+test("bulk_upgrade rolls equipment rewards and mission facts back on a late mission failure", async t => {
+    const { playerId, viewerId } = await createPlayer("bulk-upgrade-late-rollback")
+    const equipmentIds = [3010006, 4050030]
+    for (const equipmentId of equipmentIds) addEquipment(playerId, equipmentId, 1)
+    givePlayerItemSync(playerId, 100000, 1000)
+
+    const beforeEquipment = Object.fromEntries(equipmentIds.map(equipmentId => [
+        equipmentId,
+        getPlayerEquipmentSync(playerId, equipmentId),
+    ]))
+    const beforeItems = Object.fromEntries([100000, ...equipmentIds].map(itemId => [
+        itemId,
+        getPlayerItemSync(playerId, itemId),
+    ]))
+    const beforeMissionState = categoryMissionState(playerId)
+    const observedWrites = []
+    database.function("observe_bulk_upgrade_write", value => observedWrites.push(String(value)))
+    database.exec(`
+        CREATE TRIGGER observe_bulk_upgrade_equipment
+        AFTER UPDATE OF level, stack ON players_equipment
+        WHEN OLD.player_id = ${playerId}
+        BEGIN SELECT observe_bulk_upgrade_write('equipment:' || NEW.id); END;
+
+        CREATE TRIGGER observe_bulk_upgrade_item_insert
+        AFTER INSERT ON players_items
+        WHEN NEW.player_id = ${playerId}
+        BEGIN SELECT observe_bulk_upgrade_write('item-insert:' || NEW.id); END;
+
+        CREATE TRIGGER observe_bulk_upgrade_item_update
+        AFTER UPDATE ON players_items
+        WHEN OLD.player_id = ${playerId}
+        BEGIN SELECT observe_bulk_upgrade_write('item-update:' || NEW.id); END;
+
+        CREATE TRIGGER reject_bulk_upgrade_mission_fact
+        BEFORE INSERT ON players_category_missions
+        WHEN NEW.player_id = ${playerId}
+        BEGIN SELECT RAISE(ABORT, 'forced bulk upgrade mission failure'); END;
+    `)
+    t.after(() => database.exec(`
+        DROP TRIGGER IF EXISTS observe_bulk_upgrade_equipment;
+        DROP TRIGGER IF EXISTS observe_bulk_upgrade_item_insert;
+        DROP TRIGGER IF EXISTS observe_bulk_upgrade_item_update;
+        DROP TRIGGER IF EXISTS reject_bulk_upgrade_mission_fact;
+    `))
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/equipment/bulk_upgrade",
+        payload: { viewer_id: viewerId, equipment_ids: equipmentIds },
+    })
+
+    assert.equal(response.statusCode, 500, response.body)
+    assert.match(response.body, /forced bulk upgrade mission failure/)
+    assert.deepEqual(
+        observedWrites.filter(write => write.startsWith("equipment:")).sort(),
+        equipmentIds.map(equipmentId => `equipment:${equipmentId}`),
+        "both equipment updates must execute before the injected mission failure",
+    )
+    for (const equipmentId of equipmentIds) {
+        assert.ok(observedWrites.includes(`item-insert:${equipmentId}`))
+        assert.deepEqual(getPlayerEquipmentSync(playerId, equipmentId), beforeEquipment[equipmentId])
+    }
+    assert.ok(observedWrites.includes("item-update:100000"))
+    for (const [itemId, count] of Object.entries(beforeItems)) {
+        assert.equal(getPlayerItemSync(playerId, Number(itemId)), count)
+    }
+    assert.deepEqual(categoryMissionState(playerId), beforeMissionState)
 })
 
 for (const scenario of [
