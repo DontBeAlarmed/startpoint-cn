@@ -237,11 +237,19 @@ const TEST_GROUPS = Object.freeze({
     },
     "integration:multi-hub": {
         execution: "serial",
-        timeoutMs: 240_000,
+        timeoutMs: 120_000,
         tests: [
+            "tests/multi-hub-battle-flow.test.js",
             "tests/multi-hub-process-harness.test.js",
+            "tools/perf/multi_hub_load_metrics.test.cjs",
+            "tools/perf/multi_hub_load_signature.test.cjs",
+            "tools/perf/multi_hub_load_process_fixture.test.cjs",
+            "tools/perf/multi_hub_load_workload_resilience.test.cjs",
+            "tools/perf/full_server_acceptance_safety.test.cjs",
+            "tools/perf/full_server_acceptance.test.cjs",
             "tests/multi-hub-process.test.js",
             "tools/perf/hub_baseline.test.cjs",
+            "tools/perf/multi_hub_load_workload.test.cjs",
         ],
     },
     "integration:content": {

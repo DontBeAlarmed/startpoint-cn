@@ -855,32 +855,64 @@ test("routes multiplayer management adapters to the runtime regressions", () => 
     )
 })
 
-test("registers the trusted multi-hub process suite as a bounded serial group", () => {
+test("registers the full server acceptance smoke suite as one bounded serial group", () => {
+    const group = "integration:multi-hub"
+    const tests = [
+        "tests/multi-hub-battle-flow.test.js",
+        "tests/multi-hub-process-harness.test.js",
+        "tools/perf/multi_hub_load_metrics.test.cjs",
+        "tools/perf/multi_hub_load_signature.test.cjs",
+        "tools/perf/multi_hub_load_process_fixture.test.cjs",
+        "tools/perf/multi_hub_load_workload_resilience.test.cjs",
+        "tools/perf/full_server_acceptance_safety.test.cjs",
+        "tools/perf/full_server_acceptance.test.cjs",
+        "tests/multi-hub-process.test.js",
+        "tools/perf/hub_baseline.test.cjs",
+        "tools/perf/multi_hub_load_workload.test.cjs",
+    ]
+
     assert.deepEqual(TEST_GROUPS["integration:multi-hub"], {
         execution: "serial",
-        timeoutMs: 240_000,
-        tests: [
-            "tests/multi-hub-process-harness.test.js",
-            "tests/multi-hub-process.test.js",
-            "tools/perf/hub_baseline.test.cjs",
-        ],
+        timeoutMs: 120_000,
+        tests,
     })
+    for (const file of tests) {
+        const memberships = Object.entries(TEST_GROUPS)
+            .filter(([, definition]) => definition.tests.includes(file))
+            .map(([name]) => name)
+        assert.deepEqual(memberships, [group], file)
+        assert.deepEqual(selectTestGroups([file]), [group], file)
+    }
+
+    const implementationToRegression = new Map([
+        ["tests/helpers/multi-hub-battle-flow.js", "tests/multi-hub-battle-flow.test.js"],
+        ["tests/helpers/multi-hub-process-harness.js", "tests/multi-hub-process-harness.test.js"],
+        ["tools/perf/multi_hub_load_metrics.cjs", "tools/perf/multi_hub_load_metrics.test.cjs"],
+        ["tools/perf/multi_hub_load_process_fixture.cjs", "tools/perf/multi_hub_load_process_fixture.test.cjs"],
+        ["tools/perf/multi_hub_load_scenarios.cjs", "tools/perf/multi_hub_load_workload.test.cjs"],
+        ["tools/perf/multi_hub_load_workload.cjs", "tools/perf/multi_hub_load_workload.test.cjs"],
+        ["tools/perf/multi_hub_load_workload_test_helpers.cjs", "tools/perf/multi_hub_load_workload_resilience.test.cjs"],
+        ["tools/perf/full_server_acceptance.cjs", "tools/perf/full_server_acceptance.test.cjs"],
+        ["tools/perf/full_server_acceptance_safety.cjs", "tools/perf/full_server_acceptance_safety.test.cjs"],
+        ["tools/perf/full_server_acceptance_test_helpers.cjs", "tools/perf/full_server_acceptance.test.cjs"],
+    ])
+    for (const [file, regression] of implementationToRegression) {
+        assert.deepEqual(selectTestGroups([file]), [group], file)
+        assert.ok(TEST_GROUPS[group].tests.includes(regression), `${file} -> ${regression}`)
+    }
+
     assert.deepEqual(
-        selectTestGroups(["tests/multi-hub-process-harness.test.js"]),
-        ["integration:multi-hub"],
-    )
-    assert.deepEqual(
-        selectTestGroups(["tests/multi-hub-process.test.js"]),
-        ["integration:multi-hub"],
-    )
-    assert.deepEqual(
-        selectTestGroups(["tests/helpers/multi-hub-process-harness.js"]),
-        ["integration:multi-hub"],
+        selectTestGroups(["docs/systems/full-server-acceptance.md"]),
+        [group],
     )
     assert.deepEqual(
         selectTestGroups(["tools/fixtures/multi-hub/README.md"]),
-        ["integration:multi-hub"],
+        [group],
     )
+    assert.equal(tests.some(file => file.includes("--formal")), false)
+    const fullTests = AGGREGATE_GROUPS.full
+        .flatMap(name => TEST_GROUPS[name].tests)
+    assert.equal(fullTests.some(file => file.includes("--formal")), false)
 })
 
 test("routes multiplayer runtime and private credential changes to focused groups", () => {

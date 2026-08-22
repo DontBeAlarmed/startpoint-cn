@@ -99,6 +99,11 @@ test("runs legacy CDN tools only after compilation completes", () => {
 
 test("defines the full verification pipeline", () => {
     assert.equal(
+        scripts["test:full"],
+        "node tools/test-workflow/run.cjs --group full",
+    )
+    assert.doesNotMatch(scripts["test:full"], /--formal/)
+    assert.equal(
         scripts["docs:check"],
         "node tools/docs_check.cjs",
     )
@@ -140,6 +145,10 @@ test("exposes the workflow benchmark command", () => {
     assert.equal(
         scripts["benchmark:single-battle-settlement"],
         "node tools/perf/single_battle_settlement_baseline.cjs",
+    )
+    assert.equal(
+        scripts["benchmark:full-server-acceptance"],
+        "node tools/perf/full_server_acceptance.cjs",
     )
 })
 

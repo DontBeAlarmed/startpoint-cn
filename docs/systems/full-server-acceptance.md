@@ -1,6 +1,6 @@
 # 全服务端混合负载验收设计
 
-状态：设计已确认，书面规格待审阅
+状态：已实施，待正式基线验收
 
 日期：2026-08-22
 
@@ -119,6 +119,28 @@ Client B:
 
 结构 SQL 上界继续引用现有快照，不在总报告中复制第二套上界。墙钟延迟只用于同机三轮观察；若与同一 runner 的检入参考相比中位数退化超过 20%，总门禁拒绝。跨机器数据不作为硬门槛。
 
+## 运行方式与产物路径
+
+默认命令只运行锁定的小规模 smoke：
+
+```bash
+npm run benchmark:full-server-acceptance
+```
+
+smoke 使用 7 份非多人存档、7 个活跃身份、并发档 2，以及 2 个多人身份、1 个 Host A 房主房间、并发档 1。它用于真实进程、协议、结算与清理回归，不产生正式容量基线，也不满足正式准入规模。
+
+正式验收必须显式执行：
+
+```bash
+npm run benchmark:full-server-acceptance -- --formal
+```
+
+正式模式默认运行三轮。每轮使用 1000 份非多人存档、600 个活跃身份和并发档 `10/25/50/100`；多人部分使用 120 个独立身份组成 60 个双人房间，Host A 与 Client B 各担任 30 个游戏房主，并发档为 `5/10/20`。120 个多人身份是 600 个活跃身份的 20% 验收覆盖参数，不表示两层负载合计为 720 人同时在线。
+
+完整总报告始终写入标准输出，子报告完整嵌入 `rounds[].nonMulti` 与 `rounds[].multi`，不会默认创建报告文件。需要留存时使用 `--output <report.json>`；相对路径从命令执行目录解析，父目录必须已经存在，目标必须是普通文件且不能是符号链接。写入文件与标准输出的 JSON 内容一致。
+
+同机延迟门禁默认读取 `tools/perf/__snapshots__/full_server_acceptance_reference.json`。只有显式 `--formal`、恰好三轮且三轮结构门禁全部通过时，才允许使用 `--write-reference <reference.json>` 写出参考；`--output` 与 `--write-reference` 必须指向不同的物理文件。正式报告与同机器、同 profile 的参考比较，任一子负载 p95 中位数退化超过 20% 即拒绝；机器或 profile 不同则只记录比值，不作为硬门禁。当前任务不运行 formal，也不创建或更新该 reference snapshot。
+
 ## 错误与清理
 
 - 任一请求、socket、子进程或状态断言失败时，当前房间记录失败并进入统一清理；不能因为一个慢连接阻塞其他房间清理。
@@ -142,7 +164,9 @@ Client B:
 
 ## 最终验证
 
-Task 9 runner 通过后继续执行：
+`npm run test:full` 展开 `integration:multi-hub` 时只执行 smoke 和真实小规模回归，不附加 `--formal`。正式规模只允许通过上述显式 benchmark 命令或直接执行 `node tools/perf/full_server_acceptance.cjs --formal` 触发。
+
+工作流接入完成后继续执行：
 
 - 多人专项、快照、结算、Hub 和故障注入回归；
 - `npm run test:full`；

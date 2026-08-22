@@ -432,6 +432,10 @@ const SOURCE_RULES = [
         pattern: /^(?:assets\/server\/npc_contributor_names\.json|tools\/npc_contributor_names(?:\.test)?\.cjs)$/,
         groups: ["quick:protocol"],
     },
+    {
+        pattern: /^(?:docs\/systems\/full-server-acceptance\.md|tests\/helpers\/multi-hub-(?:battle-flow|process-harness)\.js|tools\/perf\/(?:full_server_acceptance(?:_safety|_test_helpers)?|multi_hub_load_(?:metrics|process_fixture|scenarios|workload|workload_test_helpers))\.cjs)$/,
+        groups: ["integration:multi-hub"],
+    },
     { pattern: /^tools\/perf\/hub_baseline(?:_helpers)?\.cjs$/, groups: ["integration:multi-hub"] },
     { pattern: /^src\/multi\//, groups: ["quick:protocol", "integration:multi-hub"] },
     { pattern: /^src\/multi\/tcp\/server\.ts$/, groups: ["integration:runtime"] },

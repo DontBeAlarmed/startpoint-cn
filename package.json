@@ -52,6 +52,7 @@
     "benchmark:mission-entry-load": "node tools/perf/mission_entry_layered_load.cjs",
     "benchmark:non-multi-mixed": "node tools/perf/non_multi_mixed_workload.cjs",
     "benchmark:single-battle-settlement": "node tools/perf/single_battle_settlement_baseline.cjs",
+    "benchmark:full-server-acceptance": "node tools/perf/full_server_acceptance.cjs",
     "docs:check": "node tools/docs_check.cjs",
     "hygiene": "bash scripts/check-hygiene.sh --all",
     "verify:full": "npm run typecheck && npm run docs:check && npm run test:full && npm run hygiene && npm run build:server"
