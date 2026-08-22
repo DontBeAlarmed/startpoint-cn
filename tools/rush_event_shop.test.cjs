@@ -244,13 +244,18 @@ function createPurchaseHarness(options = {}) {
             ).get(playerId, shopItemId)?.count ?? 0
             return { daily: 0, monthly: 0, total }
         },
-        addPurchaseCounts(playerId, _shopType, shopItemId, amount, keys) {
+        addPurchaseCounts(playerId, _shopType, shopItemId, amount, _keys, currentCounts) {
+            const finalCounts = {
+                daily: currentCounts.daily + amount,
+                monthly: currentCounts.monthly + amount,
+                total: currentCounts.total + amount,
+            }
             db.prepare(`
                 INSERT INTO purchase_state VALUES (?, ?, ?)
-                ON CONFLICT(player_id, shop_item_id) DO UPDATE SET count = count + excluded.count
-            `).run(playerId, shopItemId, amount)
+                ON CONFLICT(player_id, shop_item_id) DO UPDATE SET count = excluded.count
+            `).run(playerId, shopItemId, finalCounts.total)
             maybeFail("purchase")
-            return this.getPurchaseCounts(playerId, 0, shopItemId, keys)
+            return finalCounts
         },
         recordManaSpent(playerId, amount) {
             db.prepare(`

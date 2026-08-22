@@ -66,6 +66,7 @@ const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const {
     addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
     addPlayerShopPurchaseCountsByTypeSync,
+    getPlayerShopPurchaseCountSnapshotSync,
     getPlayerShopPurchaseCountsByTypeBulkSync,
     getPlayerShopPurchaseCountsByTypeSync,
     getShopPurchaseQueryKey,
@@ -423,8 +424,8 @@ const singleResult = executeGenericShopPurchaseSync({
     enforcePeriod: true,
 }, {
     ...batchDependencies,
-    getPurchaseCounts: getPlayerShopPurchaseCountsByTypeSync,
-    addPurchaseCounts: addPlayerShopPurchaseCountsByTypeSync,
+    getPurchaseCounts: getPlayerShopPurchaseCountSnapshotSync,
+    addPurchaseCounts: addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
 })
 assert.equal(singleResult.purchaseCount, 6, "单品购买也必须保留交叠 legacy 累计")
 assert.equal(db.prepare(`

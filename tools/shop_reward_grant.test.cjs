@@ -23,6 +23,7 @@ const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("..
 const {
     addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
     addPlayerShopPurchaseCountsByTypeSync,
+    getPlayerShopPurchaseCountSnapshotSync,
     getPlayerShopPurchaseCountsByTypeBulkSync,
     getPlayerShopPurchaseCountsByTypeSync,
 } = require("../src/data/domains/shopPurchase")
@@ -93,9 +94,9 @@ function dependencies() {
         updatePlayer: updatePlayerSync,
         getItem: (playerId, itemId) => getPlayerItemSync(playerId, itemId) ?? 0,
         setItem: updatePlayerItemSync,
-        getPurchaseCounts: getPlayerShopPurchaseCountsByTypeSync,
+        getPurchaseCounts: getPlayerShopPurchaseCountSnapshotSync,
         getPurchaseCountsBulk: getPlayerShopPurchaseCountsByTypeBulkSync,
-        addPurchaseCounts: addPlayerShopPurchaseCountsByTypeSync,
+        addPurchaseCounts: addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
         addPurchaseCountsFromSnapshot: addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
         recordManaSpent: () => {},
         grantRewards: grantShopRewardsInTransactionOwnerSync,

@@ -4,8 +4,8 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
     addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
     addPlayerShopPurchaseCountsByTypeSync,
+    getPlayerShopPurchaseCountSnapshotSync,
     getPlayerShopPurchaseCountsByTypeBulkSync,
-    getPlayerShopPurchaseCountsByTypeSync,
 } from "../../data/domains/shopPurchase"
 import {
     getPlayerShopCampaignLineupSync,
@@ -291,8 +291,8 @@ const routes = async (fastify: FastifyInstance) => {
                 updatePlayer: nextPlayer => updatePlayerSync(nextPlayer),
                 getItem: (id, itemId) => getPlayerItemSync(id, itemId) ?? 0,
                 setItem: updatePlayerItemSync,
-                getPurchaseCounts: getPlayerShopPurchaseCountsByTypeSync,
-                addPurchaseCounts: addPlayerShopPurchaseCountsByTypeSync,
+                getPurchaseCounts: getPlayerShopPurchaseCountSnapshotSync,
+                addPurchaseCounts: addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
                 recordManaSpent: (id, amount) => {
                     incrementActiveMissionUsedManaCountSync(id, amount)
                     if (shopType === ShopType.TREASURE) {

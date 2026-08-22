@@ -81,8 +81,8 @@ function createHarness(failAt) {
                 ]
             }))
         },
-        addPurchaseCounts(_playerId, _shopType, shopItemId, amount) {
-            state.purchaseCounts[shopItemId] = (state.purchaseCounts[shopItemId] ?? 0) + amount
+        addPurchaseCounts(_playerId, _shopType, shopItemId, amount, _keys, currentCounts) {
+            state.purchaseCounts[shopItemId] = currentCounts.total + amount
             if (failAt === "purchase-count") throw new Error("injected purchase-count failure")
             const count = state.purchaseCounts[shopItemId]
             return { daily: count, monthly: count, total: count }

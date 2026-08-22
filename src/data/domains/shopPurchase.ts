@@ -100,7 +100,7 @@ function requirePositivePurchaseIncrement(amount: number): void {
     }
 }
 
-function getPlayerShopPurchaseCountSnapshotSync(
+export function getPlayerShopPurchaseCountSnapshotSync(
     playerId: number,
     shopType: number,
     shopItemId: number,

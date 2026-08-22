@@ -23,6 +23,16 @@ assert.doesNotMatch(
 )
 assert.match(
     shopRouteSource,
+    /getPurchaseCounts:\s*getPlayerShopPurchaseCountSnapshotSync/,
+    "buy route must directly inject the typed single-item snapshot reader",
+)
+assert.match(
+    shopRouteSource,
+    /addPurchaseCounts:\s*addPlayerShopPurchaseCountsByTypeFromSnapshotSync/,
+    "buy route must reuse the validated single-item snapshot",
+)
+assert.match(
+    shopRouteSource,
     /getPurchaseCountsBulk:\s*getPlayerShopPurchaseCountsByTypeBulkSync/,
     "bulk_buy route must directly inject the typed bulk reader",
 )
@@ -153,6 +163,9 @@ stubModule("../src/data/domains/shopPurchase", {
     },
     getPlayerShopPurchaseCountSync: getPurchaseCount,
     getPlayerShopPurchaseCountsByTypeSync(playerId, _shopType, shopItemId) {
+        return { daily: 0, monthly: 0, total: getPurchaseCount(playerId, shopItemId) }
+    },
+    getPlayerShopPurchaseCountSnapshotSync(playerId, _shopType, shopItemId) {
         return { daily: 0, monthly: 0, total: getPurchaseCount(playerId, shopItemId) }
     },
     getPlayerShopPurchaseCountsByTypeBulkSync(playerId, queries) {

@@ -52,13 +52,14 @@ export interface GenericShopPurchaseDependencies {
         shopType: number,
         shopItemId: number,
         keys: ShopPurchasePeriodKeys,
-    ): ShopPurchaseCounts
+    ): ShopPurchaseCountSnapshot
     addPurchaseCounts(
         playerId: number,
         shopType: number,
         shopItemId: number,
         amount: number,
         keys: ShopPurchasePeriodKeys,
+        currentCounts: ShopPurchaseCountSnapshot,
     ): ShopPurchaseCounts
     recordManaSpent(playerId: number, amount: number): void
     grantRewards(
@@ -442,6 +443,7 @@ export function executeGenericShopPurchaseSync(
             input.shopItemId,
             purchaseAmount,
             periodKeys,
+            counts,
         ).total
         if (userCost?.type === ShopItemUserCostType.MANA) {
             dependencies.recordManaSpent(

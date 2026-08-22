@@ -78,10 +78,12 @@ const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const {
     addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
     addPlayerShopPurchaseCountsByTypeSync,
+    getPlayerShopPurchaseCountSnapshotSync,
     getPlayerShopPurchaseCountsByTypeBulkSync,
     getPlayerShopPurchaseCountsByTypeSync,
     getShopPurchaseQueryKey,
 } = require("../src/data/domains/shopPurchase")
+const { executeGenericShopPurchaseSync } = require("../src/lib/event-shop-purchase")
 
 initializeDatabase({ databaseFactory })
 db = getDb()
@@ -94,6 +96,56 @@ const account = insertAccountSync({
 })
 const playerId = insertDefaultPlayerSync(account.id).id
 const keys = { daily: "2024-02-01", monthly: "2024-02" }
+
+const completeSinglePurchaseSql = captureSql(() => executeGenericShopPurchaseSync({
+    playerId,
+    shopType: 4,
+    shopItemId: 300027,
+    purchaseAmount: 1,
+    shopItem: {
+        costs: [],
+        rewards: [],
+        availableFrom: "2024-01-01 00:00:00",
+        availableUntil: null,
+        stock: -1,
+    },
+    nowMs: Date.parse("2024-02-01T00:00:00Z"),
+    enforcePeriod: true,
+}, {
+    transaction: operation => db.transaction(operation)(),
+    getPlayer: id => ({
+        id,
+        vmoney: 0,
+        freeMana: 0,
+        freeVmoney: 0,
+        bondToken: 0,
+        expPool: 0,
+    }),
+    updatePlayer() {},
+    getItem() { return 0 },
+    setItem() {},
+    getPurchaseCounts: getPlayerShopPurchaseCountSnapshotSync,
+    addPurchaseCounts: addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
+    recordManaSpent() {},
+    grantRewards(_id, _rewards, knownPlayerBefore) {
+        return {
+            rewardResult: {
+                user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
+                character_list: [],
+                joined_character_id_list: [],
+                equipment_list: [],
+                items: {},
+            },
+            playerAfter: knownPlayerBefore,
+        }
+    },
+}))
+assert.equal(completeSinglePurchaseSql.result.purchaseCount, 1)
+assert.deepEqual(summarizePurchaseCountSql(completeSinglePurchaseSql.statements), {
+    selects: 2,
+    upserts: 3,
+    deletes: 0,
+}, "完整单购计数链必须复用库存校验 snapshot")
 
 db.prepare(`
     WITH RECURSIVE unrelated(value) AS (
