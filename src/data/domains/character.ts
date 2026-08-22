@@ -562,6 +562,8 @@ export function hasPlayerUnlockedCharacterManaNodeSync(
  * @param characterId The ID of the character to insert the mana nodes of.
  * @param manaNodes The mana nodes values to insert.
  */
+export const MAX_MANA_NODE_BATCH_SIZE = Math.floor(32766 / 3)
+
 export function insertPlayerCharacterManaNodesSync(
     playerId: number,
     characterId: number | string,
@@ -579,6 +581,11 @@ export function insertPlayerCharacterManaNodesSync(
         if (!Number.isSafeInteger(nodeId) || nodeId <= 0) {
             throw new TypeError("nodeId must be a positive safe integer.")
         }
+    }
+    if (nodes.length > MAX_MANA_NODE_BATCH_SIZE) {
+        throw new RangeError(
+            `mana node batch cannot exceed ${MAX_MANA_NODE_BATCH_SIZE} unique nodes.`,
+        )
     }
     if (nodes.length === 0) return
 
@@ -730,28 +737,36 @@ export function updatePlayerCharacterManaNodeAwakeLevelsBatchSync(
         }
         uniqueUpdates.set(update.nodeId, update.awakeLevel)
     }
+    if (uniqueUpdates.size > MAX_MANA_NODE_BATCH_SIZE) {
+        throw new RangeError(
+            `mana node batch cannot exceed ${MAX_MANA_NODE_BATCH_SIZE} unique nodes.`,
+        )
+    }
     if (uniqueUpdates.size === 0) return
 
     const values = [...uniqueUpdates].map(() => "(?, ?)").join(", ")
     const parameters = [...uniqueUpdates].flatMap(([nodeId, awakeLevel]) => [nodeId, awakeLevel])
-    const result = getDb().prepare(`
-        WITH node_updates(node_id, awake_level) AS (
-            VALUES ${values}
-        )
-        UPDATE players_characters_mana_nodes
-        SET awake_level = (
-            SELECT node_updates.awake_level
-            FROM node_updates
-            WHERE node_updates.node_id = players_characters_mana_nodes.value
-        )
-        WHERE player_id = ? AND character_id = ?
-            AND value IN (SELECT node_id FROM node_updates)
-    `).run(...parameters, playerId, characterId)
-    if (result.changes !== uniqueUpdates.size) {
-        throw new Error(
-            `awake mana node batch updated ${result.changes} of ${uniqueUpdates.size} persisted nodes`,
-        )
-    }
+    const db = getDb()
+    db.transaction(() => {
+        const result = db.prepare(`
+            WITH node_updates(node_id, awake_level) AS (
+                VALUES ${values}
+            )
+            UPDATE players_characters_mana_nodes
+            SET awake_level = (
+                SELECT node_updates.awake_level
+                FROM node_updates
+                WHERE node_updates.node_id = players_characters_mana_nodes.value
+            )
+            WHERE player_id = ? AND character_id = ?
+                AND value IN (SELECT node_id FROM node_updates)
+        `).run(...parameters, playerId, characterId)
+        if (result.changes !== uniqueUpdates.size) {
+            throw new Error(
+                `awake mana node batch updated ${result.changes} of ${uniqueUpdates.size} persisted nodes`,
+            )
+        }
+    })()
 }
 
 export function updatePlayerCharactersManaNodeAwakeLevelsSync(

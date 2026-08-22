@@ -20,11 +20,12 @@ const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snaps
     .installBundledGameplaySnapshot()
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
+const characterDomain = require("../src/data/domains/character")
 const {
     insertPlayerCharacterManaNodesSync,
     updatePlayerCharacterManaNodeAwakeLevelsBatchSync,
     updatePlayerCharacterSync,
-} = require("../src/data/domains/character")
+} = characterDomain
 const { upsertPlayerCharacterAwakeUnlockSync } = require("../src/data/domains/character_awake")
 const {
     getPlayerItemsSync,
@@ -45,6 +46,7 @@ const CHARACTER_ID = 1
 const LEARN_NODE_IDS = [2201, 2202, 2203, 2204, 2205, 2206, 2207]
 const AWAKE_NODE_IDS = [2201, 2202]
 const ROLLBACK_AWAKE_NODE_IDS = [2201, 2219]
+const EXPECTED_MAX_MANA_NODE_BATCH_SIZE = Math.floor(32766 / 3)
 
 let database
 let app
@@ -233,6 +235,63 @@ test("mana node insert validates, deduplicates, and emits one multi-value INSERT
     )
 })
 
+test("mana node batch limit reserves three SQLite variables per inserted node", () => {
+    assert.equal(
+        characterDomain.MAX_MANA_NODE_BATCH_SIZE,
+        EXPECTED_MAX_MANA_NODE_BATCH_SIZE,
+    )
+})
+
+test("mana node insert rejects unique IDs above the placeholder boundary before SQL", async () => {
+    const { playerId } = await createPlayer("batch-boundary")
+    const oversizedNodeIds = Array.from(
+        { length: EXPECTED_MAX_MANA_NODE_BATCH_SIZE + 1 },
+        (_, index) => index + 1,
+    )
+
+    const { statements } = await captureSql(() => {
+        assert.throws(
+            () => insertPlayerCharacterManaNodesSync(
+                playerId,
+                CHARACTER_ID,
+                oversizedNodeIds,
+            ),
+            /cannot exceed 10922 unique nodes/i,
+        )
+    })
+
+    assert.equal(manaNodeInserts(statements).length, 0, statements.join("\n---\n"))
+    assert.equal(database.prepare(`
+        SELECT COUNT(*) AS count FROM players_characters_mana_nodes
+        WHERE player_id = ? AND character_id = ?
+    `).get(playerId, CHARACTER_ID).count, 0)
+})
+
+test("mana node awake rejects unique IDs above the placeholder boundary before SQL", async () => {
+    const { playerId } = await createPlayer("awake-batch-boundary")
+    const oversizedUpdates = Array.from(
+        { length: EXPECTED_MAX_MANA_NODE_BATCH_SIZE + 1 },
+        (_, index) => ({ nodeId: index + 1, awakeLevel: 0 }),
+    )
+
+    const { statements } = await captureSql(() => {
+        assert.throws(
+            () => updatePlayerCharacterManaNodeAwakeLevelsBatchSync(
+                playerId,
+                CHARACTER_ID,
+                oversizedUpdates,
+            ),
+            /cannot exceed 10922 unique nodes/i,
+        )
+    })
+
+    assert.equal(manaNodeAwakeUpdates(statements).length, 0, statements.join("\n---\n"))
+    assert.equal(database.prepare(`
+        SELECT COUNT(*) AS count FROM players_characters_mana_nodes
+        WHERE player_id = ? AND character_id = ?
+    `).get(playerId, CHARACTER_ID).count, 0)
+})
+
 test("empty mana node batches perform no INSERT or UPDATE", async () => {
     const { playerId } = await createPlayer("empty-batches")
     const { statements } = await captureSql(() => {
@@ -247,14 +306,16 @@ test("empty mana node batches perform no INSERT or UPDATE", async () => {
 test("awake batch validates, deduplicates, and emits one UPDATE", async () => {
     const { playerId } = await createPlayer("batch-awake")
     database.prepare(`
-        INSERT INTO players_characters_mana_nodes (value, character_id, player_id)
-        VALUES (2201, ?, ?), (2202, ?, ?)
+        INSERT INTO players_characters_mana_nodes
+            (value, awake_level, character_id, player_id)
+        VALUES (2201, 1, ?, ?), (2202, 0, ?, ?)
     `).run(CHARACTER_ID, playerId, CHARACTER_ID, playerId)
 
     const { statements } = await captureSql(() => {
         updatePlayerCharacterManaNodeAwakeLevelsBatchSync(playerId, CHARACTER_ID, [
-            { nodeId: 2201, awakeLevel: 1 },
-            { nodeId: 2201, awakeLevel: 1 },
+            // Level 0 means learned but not awakened and is a valid persisted state.
+            { nodeId: 2201, awakeLevel: 0 },
+            { nodeId: 2201, awakeLevel: 0 },
             { nodeId: 2202, awakeLevel: 2 },
         ])
     })
@@ -266,7 +327,7 @@ test("awake batch validates, deduplicates, and emits one UPDATE", async () => {
         SELECT value, awake_level FROM players_characters_mana_nodes
         WHERE player_id = ? AND character_id = ? ORDER BY value
     `).all(playerId, CHARACTER_ID), [
-        { value: 2201, awake_level: 1 },
+        { value: 2201, awake_level: 0 },
         { value: 2202, awake_level: 2 },
     ])
 
@@ -307,12 +368,14 @@ test("awake batch rejects affected-row mismatches and rolls back its partial UPD
     `).run(CHARACTER_ID, playerId)
 
     assert.throws(
-        () => database.transaction(() => {
-            updatePlayerCharacterManaNodeAwakeLevelsBatchSync(playerId, CHARACTER_ID, [
+        () => updatePlayerCharacterManaNodeAwakeLevelsBatchSync(
+            playerId,
+            CHARACTER_ID,
+            [
                 { nodeId: 2201, awakeLevel: 1 },
                 { nodeId: 2202, awakeLevel: 1 },
-            ])
-        })(),
+            ],
+        ),
         /updated 1 of 2/i,
     )
     assert.equal(database.prepare(`
