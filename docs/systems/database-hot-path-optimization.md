@@ -114,11 +114,11 @@
 | load | 50 | 6 |
 | mission-progress | 14 | 1 |
 | single-battle | 116 | 29 |
-| shop | 41 | 5 |
+| shop | 39 | 5 |
 | gacha | 82 | 8 |
 | mail | 31 | 4 |
 
-与本阶段前的稳定轻量结果相比，`load` 保持 `50/6`，`mail` 保持 `31/4`，`shop` 从 `44/5` 降至 `41/5`。七个场景均为零错误、行为签名稳定、回滚验证通过。轻量报告的 `loadProfileValid=false` 和 `admitted=false` 仅表示未使用 formal profile。
+与本阶段前的稳定轻量结果相比，`load` 保持 `50/6`，`mail` 保持 `31/4`，`shop` 从 `44/5` 降至 `39/5`。七个场景均为零错误、行为签名稳定、回滚验证通过。轻量报告的 `loadProfileValid=false` 和 `admitted=false` 仅表示未使用 formal profile。
 
 ## 最终门禁
 
