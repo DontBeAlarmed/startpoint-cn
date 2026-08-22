@@ -795,6 +795,7 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/account_identity_provider.test.cjs",
             "tools/multi_runtime_session_options.test.cjs",
             "tools/time_semantics.test.cjs",
+            "tools/exp_pool_time.test.cjs",
             "tools/comic_route.test.cjs",
             "tools/admin_server_status_runtime_config.test.cjs",
             "tools/cn_tool_capabilities.test.cjs",
@@ -1480,6 +1481,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
     assert.deepEqual(TEST_GROUPS["integration:rules"].tests, [
         "tools/additional_reward.test.cjs",
         "tools/character_stack.test.cjs",
+        "tools/equipment_dissolve.test.cjs",
         "tools/equipment_enhancement.test.cjs",
         "tools/economy_write_transaction.test.cjs",
         "tools/event_currency.test.cjs",

@@ -90,6 +90,7 @@ stubModule("../src/lib/character-stack", { validateCharacterStackConversion: () 
 stubModule("../src/utils", {
     generateDataHeaders: values => ({ viewer_id: values.viewer_id, result_code: values.result_code ?? 1 }),
     getServerTime: () => 0,
+    getTimeOffset: () => 0,
 })
 stubModule("../src/lib/character", {
     givePlayerCharactersExpSync(playerId, characterIds, amount) {

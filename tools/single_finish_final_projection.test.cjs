@@ -82,7 +82,7 @@ function assertFinalUserInfo(userInfo, persisted) {
     assert.deepEqual(userInfo, {
         free_mana: persisted.freeMana,
         exp_pool: persisted.expPool,
-        exp_pooled_time: getServerTime(persisted.expPooledTime),
+        exp_pooled_time: realToVirtual(persisted.expPooledTime),
         free_vmoney: persisted.freeVmoney,
         rank_point: persisted.rankPoint,
         degree_id: persisted.degreeId,
