@@ -252,24 +252,19 @@ test("single and multi production finish routes call the shared Awake battle sea
     assert.equal(singleSettleBinding > singleTransactionCall, true, "single transaction callback")
     assert.equal(singleWritesCall > singleSettleBinding, true, "single writes inside transaction callback")
 
-    for (const routePath of ["src/multi/http/battle.ts"]) {
-        const source = fs.readFileSync(path.join(__dirname, "..", routePath), "utf8")
-        const finishStart = source.indexOf('fastify.post("/finish"')
-        const finishEnd = source.indexOf('fastify.post("/abort"', finishStart)
-        const finishSource = source.slice(finishStart, finishEnd)
-        const transactionBody = finishSource.indexOf("const executeFinishWrites = () => {")
-        const seamCall = finishSource.indexOf("settleAwakeBattleMissions({", transactionBody)
-        const transactionCall = finishSource.indexOf(
-            "finishWrites = runMultiActiveQuestSettlementTransaction(",
-            seamCall,
-        )
-        const settleBinding = finishSource.indexOf("executeFinishWrites,", transactionCall)
-        assert.equal(finishStart >= 0 && finishEnd > finishStart, true, `${routePath} finish block`)
-        assert.equal(transactionBody >= 0, true, `${routePath} transaction body`)
-        assert.equal(seamCall > transactionBody, true, `${routePath} shared Awake seam call`)
-        assert.equal(transactionCall > seamCall, true, `${routePath} transaction call`)
-        assert.equal(settleBinding >= transactionCall, true, `${routePath} transaction callback`)
-    }
+    const multiPath = "src/multi/settlement/orchestrator.ts"
+    const multiSource = fs.readFileSync(path.join(__dirname, "..", multiPath), "utf8")
+    const transactionBody = multiSource.indexOf("const executeFinishWrites = () => {")
+    const seamCall = multiSource.indexOf("settleAwakeBattleMissions({", transactionBody)
+    const transactionCall = multiSource.indexOf(
+        "const writes = runMultiActiveQuestSettlementTransaction(",
+        seamCall,
+    )
+    const settleBinding = multiSource.indexOf("executeFinishWrites,", transactionCall)
+    assert.equal(transactionBody >= 0, true, `${multiPath} transaction body`)
+    assert.equal(seamCall > transactionBody, true, `${multiPath} shared Awake seam call`)
+    assert.equal(transactionCall > seamCall, true, `${multiPath} transaction call`)
+    assert.equal(settleBinding >= transactionCall, true, `${multiPath} transaction callback`)
 })
 
 test.after(() => {

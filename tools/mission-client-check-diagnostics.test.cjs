@@ -55,7 +55,10 @@ assert.equal(
     null,
 )
 
-const battleSource = fs.readFileSync(path.join(__dirname, "../src/multi/http/battle.ts"), "utf8")
+const battleSource = fs.readFileSync(
+    path.join(__dirname, "../src/multi/settlement/orchestrator.ts"),
+    "utf8",
+)
 assert.match(
     battleSource,
     /if \(questCategory === 26\) \{\s*sampledLog\("hard-multi-mission-diagnostic", \(\) =>\s*formatHardMultiMissionDiagnostic\(/,

@@ -173,13 +173,6 @@ assert.deepEqual(calls, [
     ["powerflip", 1001],
 ])
 
-function finishRouteSource(source) {
-    const start = source.indexOf('fastify.post("/finish"')
-    const end = source.indexOf('fastify.post("/abort"', start)
-    assert.equal(start >= 0 && end > start, true, "finish route source block")
-    return source.slice(start, end)
-}
-
 const singleBattleSource = fs.readFileSync(
     path.join(__dirname, "../src/lib/quest/finish/single-settlement-writes.ts"),
     "utf8",
@@ -252,10 +245,14 @@ assert.equal(singleTransactionCall >= 0, true, "单人写入闭包必须交给 f
 assert.equal(singleTransactionBinding > singleTransactionCall, true, "所有单人同步结算写入必须共享事务")
 assert.equal(singleWritesBinding > singleTransactionBinding, true, "单人写入必须在事务回调内执行")
 
-const multiBattleSource = finishRouteSource(fs.readFileSync(
-    path.join(__dirname, "../src/multi/http/battle.ts"),
+const multiBattleSource = fs.readFileSync(
+    path.join(__dirname, "../src/multi/settlement/orchestrator.ts"),
     "utf8",
-))
+)
+const multiResponseSource = fs.readFileSync(
+    path.join(__dirname, "../src/multi/settlement/response.ts"),
+    "utf8",
+)
 const multiTransactionStart = multiBattleSource.indexOf("const executeFinishWrites = () => {")
 const multiEvaluationTime = multiBattleSource.indexOf(
     "const settlementTime = new Date(getServerTime() * 1000)",
@@ -270,22 +267,22 @@ const multiCharacterExp = multiBattleSource.indexOf(
     multiFactCall,
 )
 const multiSettlementTime = multiBattleSource.indexOf(
-    "buildBattleMissionSettlementScopes(partyCharacterIdsArray),\n                settlementTime,",
+    "buildBattleMissionSettlementScopes(partyCharacterIdsArray),\n            settlementTime,",
     multiFactCall,
 )
 const multiAwakeSettlement = multiBattleSource.indexOf(
     "settleAwakeBattleMissions({",
     multiSettlementTime,
 )
-const multiGeneralMerge = multiBattleSource.indexOf(
+const multiGeneralMerge = multiResponseSource.indexOf(
     "mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)",
 )
-const multiAwakeMerge = multiBattleSource.indexOf(
+const multiAwakeMerge = multiResponseSource.indexOf(
     "mergeMissionSettlementResponse(responseData, awakeMissionSettlement, viewerId)",
     multiGeneralMerge,
 )
 const multiTransactionCall = multiBattleSource.indexOf("runMultiActiveQuestSettlementTransaction(")
-const multiActiveDelete = multiBattleSource.indexOf("delete activeQuests[playerId]", multiTransactionCall)
+const multiActiveDelete = multiBattleSource.indexOf("delete activeQuests[input.playerId]", multiTransactionCall)
 const multiCoordinatorFinalize = multiBattleSource.indexOf("context.coordinator.finalizeBattle({")
 assert.equal(multiTransactionStart >= 0, true, "多人 finish 必须定义同步结算事务体")
 assert.equal(multiEvaluationTime > multiTransactionStart, true, "多人 finish 必须在事务体内固定任务时间")
@@ -297,7 +294,7 @@ assert.equal(multiAwakeSettlement > multiSettlementTime, true, "多人觉醒 sea
 assert.equal(multiGeneralMerge >= 0 && multiAwakeMerge > multiGeneralMerge, true, "多人响应必须先合并通用结算再合并觉醒结算")
 assert.match(
     multiBattleSource,
-    /reconcileAwakeUnlockCharacterList\(playerId, \[[\s\S]*?\.\.\.awakeMissionSettlement\.characterList/,
+    /reconcileAwakeUnlockCharacterList\(input\.playerId, \[[\s\S]*?\.\.\.awakeMissionSettlement\.characterList/,
     "多人 character_list 必须在 reconcile 前包含觉醒奖励与解锁更新",
 )
 assert.equal(multiTransactionCall > multiFactCall, true, "任务事实必须在事务体执行后统一提交")

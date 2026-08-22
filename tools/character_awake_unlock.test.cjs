@@ -348,23 +348,24 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
 testAuthoritativeMutationRoutesPublishAwakeUnlocks()
 
 function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
-    const multiSource = readProjectSource("src/multi/http/battle.ts")
+    const multiRouteSource = readProjectSource("src/multi/http/battle.ts")
+    const multiSettlementSource = readProjectSource("src/multi/settlement/orchestrator.ts")
+    const multiResponseSource = readProjectSource("src/multi/settlement/response.ts")
     const activeMissionSource = readRouteSource("activeMission.ts")
     const boxGachaSource = readRouteSource("boxGacha.ts")
 
-    const multiStartBlock = getRouteBlock(multiSource, "/start", "/finish")
-    const multiFinishBlock = getRouteBlock(multiSource, "/finish", "/abort")
-    const multiAbortBlock = getRouteBlock(multiSource, "/abort", "/play_continue")
-    const multiContinueBlock = getRouteBlock(multiSource, "/play_continue")
-    const multiCall = getOnlyCall(multiFinishBlock, "reconcileAwakeUnlockCharacterList")
-    assert.equal(findCalls(multiSource, "reconcileAwakeUnlockCharacterList").length, 1)
-    assert.deepEqual(multiCall.arguments.slice(0, 1), ["playerId"])
+    const multiStartBlock = getRouteBlock(multiRouteSource, "/start", "/finish")
+    const multiFinishBlock = getRouteBlock(multiRouteSource, "/finish", "/abort")
+    const multiAbortBlock = getRouteBlock(multiRouteSource, "/abort", "/play_continue")
+    const multiContinueBlock = getRouteBlock(multiRouteSource, "/play_continue")
+    const multiCall = getOnlyCall(multiSettlementSource, "reconcileAwakeUnlockCharacterList")
+    assert.equal(findCalls(multiSettlementSource, "reconcileAwakeUnlockCharacterList").length, 1)
+    assert.deepEqual(multiCall.arguments.slice(0, 1), ["input.playerId"])
     assert.equal(multiCall.arguments[1].includes("rewardCharacterExpResult.character_list"), true)
     assert.equal(multiCall.arguments[1].includes("clearReward?.character_list"), true)
     assert.equal(multiCall.arguments[1].includes("sPlusClearReward?.character_list"), true)
     assert.equal(multiCall.arguments[1].includes("scoreRewardsResult.character_list"), true)
-    assert.equal(multiCall.position > multiFinishBlock.indexOf("if (activeQuestData === undefined)"), true)
-    assert.equal(multiCall.position > multiFinishBlock.indexOf("if (questData === null"), true)
+    assert.equal(multiCall.position > multiSettlementSource.indexOf("const executeFinishWrites = () =>"), true)
     for (const persistenceCall of [
         "insertPlayerQuestProgressSync",
         "updatePlayerQuestProgressSync",
@@ -373,9 +374,14 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
         "recordMissionBattleFacts",
         "givePlayerCharactersExpSync",
     ]) {
-        assert.equal(multiCall.position > getLastCallPosition(multiFinishBlock, persistenceCall), true)
+        assert.equal(multiCall.position > getLastCallPosition(multiSettlementSource, persistenceCall), true)
     }
-    assert.deepEqual(findPropertyAssignmentValues(multiFinishBlock, "character_list"), ["characterList"])
+    assert.equal(
+        multiSettlementSource.indexOf("runMultiActiveQuestSettlementTransaction(") > multiCall.position,
+        true,
+    )
+    assert.deepEqual(findPropertyAssignmentValues(multiResponseSource, "character_list"), ["characterList"])
+    assert.match(multiFinishBlock, /runMultiplayerSettlementOrchestration\(/)
     assert.equal(findCalls(multiStartBlock, "reconcileAwakeUnlockCharacterList").length, 0)
     assert.equal(findCalls(multiAbortBlock, "reconcileAwakeUnlockCharacterList").length, 0)
     assert.equal(findCalls(multiContinueBlock, "reconcileAwakeUnlockCharacterList").length, 0)
@@ -418,7 +424,7 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     assert.equal(findCalls(boxCloseBlock, "reconcileAwakeUnlockCharacterList").length, 0)
     assert.equal(findCalls(boxReadOnlyBlock, "reconcileAwakeUnlockCharacterList").length, 0)
 
-    for (const source of [multiSource, activeMissionSource, boxGachaSource]) {
+    for (const source of [multiSettlementSource, activeMissionSource, boxGachaSource]) {
         assert.equal(findCalls(source, "settleAwakeMissionRewards").length, 0)
     }
 }

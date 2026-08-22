@@ -138,13 +138,19 @@ test("multi battle routes use the shared lifecycle boundaries", () => {
         path.resolve(__dirname, "../src/multi/http/battle.ts"),
         "utf8",
     )
+    const settlementOrchestrator = fs.readFileSync(
+        path.resolve(__dirname, "../src/multi/settlement/orchestrator.ts"),
+        "utf8",
+    )
     const activeQuestService = fs.readFileSync(
         path.resolve(__dirname, "../src/lib/quest/active-quest-service.ts"),
         "utf8",
     )
     assert.match(source, /validateMultiStartRequest\(/)
     assert.match(source, /runStartEntryTransaction\(/)
-    assert.match(source, /validateMultiFinishRequest\(/)
+    assert.match(source, /await prepareMultiplayerSettlement\(/)
+    assert.match(source, /runMultiplayerSettlementOrchestration\(/)
+    assert.match(settlementOrchestrator, /validateMultiFinishRequest\(/)
     assert.match(source, /runContinueActiveQuestTransaction\(/)
     assert.ok(
         source.indexOf("context.coordinator.startBattle(")
@@ -152,8 +158,8 @@ test("multi battle routes use the shared lifecycle boundaries", () => {
         "Hub battle identity must be fixed before the local entry transaction",
     )
     assert.ok(
-        source.indexOf("context.settlementVerifier.verify(")
-            < source.indexOf("runMultiActiveQuestSettlementTransaction("),
+        settlementOrchestrator.indexOf("context.settlementVerifier.verify(")
+            < settlementOrchestrator.indexOf("runMultiActiveQuestSettlementTransaction("),
         "Hub finalization must be verified before the local settlement transaction",
     )
     const settlementTransaction = activeQuestService.indexOf(

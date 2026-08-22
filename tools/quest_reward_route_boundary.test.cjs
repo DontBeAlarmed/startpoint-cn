@@ -8,7 +8,11 @@ const path = require("node:path")
 const Fastify = require("fastify")
 
 const multiBattleSource = fs.readFileSync(
-    path.join(__dirname, "../src/multi/http/battle.ts"),
+    path.join(__dirname, "../src/multi/settlement/orchestrator.ts"),
+    "utf8",
+)
+const multiResponseSource = fs.readFileSync(
+    path.join(__dirname, "../src/multi/settlement/response.ts"),
     "utf8",
 )
 const singleBattleSource = fs.readFileSync(
@@ -16,7 +20,7 @@ const singleBattleSource = fs.readFileSync(
     "utf8",
 )
 assert.match(multiBattleSource, /settleActivityPeriodicRewardsSync/)
-assert.match(multiBattleSource, /user_periodic_reward_point_list/)
+assert.match(multiResponseSource, /user_periodic_reward_point_list/)
 assert.doesNotMatch(singleBattleSource, /settleActivityPeriodicRewardsSync/)
 assert.match(singleBattleSource, /"drop_periodic_reward_ids": \[\]/)
 

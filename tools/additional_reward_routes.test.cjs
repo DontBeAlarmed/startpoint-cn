@@ -51,19 +51,20 @@ test("single finish grants and publishes additional rewards atomically", () => {
 })
 
 test("multi finish enables multi-only rules and publishes additional rewards atomically", () => {
-    const source = readSource("src/multi/http/battle.ts")
+    const orchestrator = readSource("src/multi/settlement/orchestrator.ts")
+    const response = readSource("src/multi/settlement/response.ts")
     assertSettlementInsideFinishTransaction(
-        source,
+        orchestrator,
         "multi finish",
         "runMultiActiveQuestSettlementTransaction(",
     )
-    assert.match(source, /settleAdditionalRewardsSync\([\s\S]*?isMulti: true,/)
+    assert.match(orchestrator, /settleAdditionalRewardsSync\([\s\S]*?isMulti: true,/)
     assert.match(
-        source,
+        response,
         /"item_list": \{[\s\S]*?additionalRewardSettlement\.rewardResult\?\.items/,
     )
     assert.match(
-        source,
+        response,
         /"drop_additional_reward_ids": additionalRewardSettlement\.dropAdditionalRewardIds/,
     )
 })

@@ -481,7 +481,7 @@ test("single settlement migrates score while preserving multiplayer, Carnival an
     assert.match(writes, /\bsettleSingleBattleMissionCategories\s*\(/)
     assert.match(writes, /\bsettleAwakeBattleMissions\s*\(/)
 
-    const multiplayer = readSource("src/multi/http/battle.ts")
+    const multiplayer = readSource("src/multi/settlement/orchestrator.ts")
     assert.match(multiplayer, /import \{[^}]*givePlayerScoreRewardsSync[^}]*\} from "\.\.\/\.\.\/lib\/quest"/s)
     assert.match(multiplayer, /\bgivePlayerScoreRewardsSync\s*\(/)
     assert.doesNotMatch(multiplayer, /grantSingleSettlementScoreRewardsWithinTransactionSync/)

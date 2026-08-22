@@ -9,7 +9,7 @@ function routeSource(relativePath) {
 
 for (const [name, settlementPath, responsePath] of [
     ["单人", "src/lib/quest/finish/single-settlement-writes.ts", "src/lib/quest/finish/single-response-projector.ts"],
-    ["联机", "src/multi/http/battle.ts", "src/multi/http/battle.ts"],
+    ["联机", "src/multi/settlement/orchestrator.ts", "src/multi/settlement/response.ts"],
 ]) {
     test(`${name}结算复用同一服务器时间并接入奖励活动倍率`, () => {
         const source = routeSource(settlementPath)
