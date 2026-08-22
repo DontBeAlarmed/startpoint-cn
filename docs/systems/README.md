@@ -52,6 +52,7 @@
 - [任务与关卡映射](./mission-quest-mapping.md)
 - [角色觉醒任务](./character-awake-missions.md)
 - [角色觉醒刷新](./character-awake-refresh.md)
+- [觉醒请求上下文与非多人总验收架构](./awake-request-context-and-non-multi-acceptance.md)
 - [第二玛纳板开放期](./mana-board-availability.md)
 - [角色养成事务边界](./character-growth-transactions.md)
 - [EX 能力抽取状态](./ex-boost.md)
