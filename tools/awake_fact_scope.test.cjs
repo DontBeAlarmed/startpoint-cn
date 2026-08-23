@@ -19,8 +19,10 @@ const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snaps
     .installBundledGameplaySnapshot()
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { insertDefaultPlayerCharacterSync } = require("../src/data/domains/character")
+const characterDomain = require("../src/data/domains/character")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
+const characterAssets = require("../src/lib/assets")
+const { characterExpCaps } = require("../src/lib/character")
 const { publishAwakeCharacterListBestEffort } = require(
     "../src/lib/mission/awake-best-effort-context",
 )
@@ -33,12 +35,12 @@ const {
 
 let database
 
-function registryEntry(category, missionId, dependencies = []) {
+function registryEntry(category, missionId, dependencies = [], mode = "computed") {
     return {
         category,
         missionId,
         requirement: {
-            mode: "computed",
+            mode,
             facts: [],
             missionDependencies: dependencies.map(([dependencyCategory, dependencyMissionId]) => ({
                 category: dependencyCategory,
@@ -75,9 +77,21 @@ function createPlayer(label, characterIds = []) {
     })
     const playerId = insertDefaultPlayerSync(account.id).id
     for (const characterId of characterIds) {
-        insertDefaultPlayerCharacterSync(playerId, characterId)
+        characterDomain.insertDefaultPlayerCharacterSync(playerId, characterId)
     }
     return playerId
+}
+
+function makeBaseReady(playerId, characterId) {
+    const asset = characterAssets.getCharacterDataSync(characterId)
+    characterDomain.updatePlayerCharacterSync(playerId, characterId, {
+        exp: characterExpCaps[asset.rarity][0],
+    })
+    characterDomain.insertPlayerCharacterManaNodesSync(
+        playerId,
+        characterId,
+        Object.keys(characterAssets.getCharacterManaNodesSync(characterId, 1)).map(Number),
+    )
 }
 
 test.before(() => {
@@ -140,6 +154,7 @@ test("adds parents without adding unrelated siblings or following cross-category
     const entries = [
         registryEntry(9, 100),
         registryEntry(9, 250, [[9, 100], [9, 999]]),
+        registryEntry(9, 999),
         registryEntry(9, 500, [[9, 999]]),
         registryEntry(5, 600, [[9, 100]]),
         registryEntry(9, 601, [[5, 100]]),
@@ -151,7 +166,7 @@ test("adds parents without adding unrelated siblings or following cross-category
     }, customRegistry(entries)), [100, 250])
 })
 
-test("terminates cycles with stable deduplicated results independent of entry order", () => {
+test("rejects dependency cycles stably independent of entry order", () => {
     const entries = [
         registryEntry(9, 100),
         registryEntry(9, 200, [[9, 100]]),
@@ -162,25 +177,56 @@ test("terminates cycles with stable deduplicated results independent of entry or
         invalidatedFactKeys: [{ kind: "player" }, { kind: "player" }],
         directMissionIds: [100, 100],
     }
-    const forward = scope.collectAwakeMissionIdsFromSeeds(
+    const reverseRefs = [
+        { category: 9, missionId: 100 },
+        { category: 9, missionId: 100 },
+    ]
+    const collect = registryEntries => scope.collectAwakeMissionIdsFromSeeds(
         seeds,
-        customRegistry(entries, [
-            { category: 9, missionId: 100 },
-            { category: 9, missionId: 100 },
-        ]),
-    )
-    const reversed = scope.collectAwakeMissionIdsFromSeeds(
-        seeds,
-        customRegistry([...entries].reverse(), [
-            { category: 9, missionId: 100 },
-            { category: 9, missionId: 100 },
-        ]),
+        customRegistry(registryEntries, reverseRefs),
     )
 
-    assert.deepEqual(forward, [100, 200, 300, 400])
-    assert.deepEqual(reversed, forward)
-    assert.equal(Object.isFrozen(forward), true)
-    assert.equal(Object.isFrozen(reversed), true)
+    assert.throws(
+        () => collect(entries),
+        /Awake mission seeds.*300.*400.*unknown or unsupported/i,
+    )
+    assert.throws(
+        () => collect([...entries].reverse()),
+        /Awake mission seeds.*300.*400.*unknown or unsupported/i,
+    )
+})
+
+test("rejects unsupported expanded parents and direct dependency closures", () => {
+    const unsupportedParentRegistry = customRegistry([
+        registryEntry(9, 100),
+        registryEntry(9, 200, [[9, 100]], "unsupported"),
+    ], [])
+    const unsupportedDependencyRegistry = customRegistry([
+        registryEntry(9, 300, [[9, 301]]),
+        registryEntry(9, 301, [], "unsupported"),
+    ], [])
+
+    assert.throws(
+        () => scope.collectAwakeMissionIdsFromSeeds(
+            { directMissionIds: [100] },
+            unsupportedParentRegistry,
+        ),
+        /Awake mission seeds.*200.*unknown or unsupported/i,
+    )
+    assert.throws(
+        () => scope.collectAwakeMissionIdsFromSeeds(
+            { directMissionIds: [300] },
+            unsupportedDependencyRegistry,
+        ),
+        /Awake mission seeds.*300.*unknown or unsupported/i,
+    )
+})
+
+test("keeps a valid supported direct mission seed unchanged", () => {
+    assert.deepEqual(scope.collectAwakeMissionIdsFromSeeds(
+        { directMissionIds: [100] },
+        customRegistry([registryEntry(9, 100)], []),
+    ), [100])
 })
 
 test("normalizes, deduplicates, and freezes FactKeys while sorting direct mission seeds", () => {
@@ -209,7 +255,10 @@ test("normalizes, deduplicates, and freezes FactKeys while sorting direct missio
 })
 
 test("ignores non-Category-9 reverse references and deduplicates direct hits", () => {
-    const registry = customRegistry([], [
+    const registry = customRegistry([
+        registryEntry(9, 2630022),
+        registryEntry(9, 3410054),
+    ], [
         { category: 5, missionId: 7000 },
         { category: 9, missionId: 2630022 },
         { category: 9, missionId: 2630022 },
@@ -265,6 +314,7 @@ test("rejects sparse or malformed FactKey and direct mission seed inputs", () =>
 
 test("FactKey-derived mission characters enter the effective scoped snapshot", () => {
     const playerId = createPlayer("derived-character", [341005, 263002])
+    makeBaseReady(playerId, 263002)
     const context = createAwakeRequestContext({
         playerId,
         evaluationTime: new Date("2025-01-01T12:00:00.000Z"),
@@ -276,6 +326,54 @@ test("FactKey-derived mission characters enter the effective scoped snapshot", (
         Object.keys(context.resolver.characters).map(Number).sort((left, right) => left - right),
         [263002, 341005],
     )
+    const evaluatedMissionIds = context.evaluate().map(entry => entry.missionId)
+    assert.equal(evaluatedMissionIds.includes(2630022), true)
+    assert.equal(evaluatedMissionIds.includes(2630024), true)
+})
+
+test("rejects an unknown direct mission before reading a derived character snapshot", () => {
+    const playerId = createPlayer("unknown-direct", [341005])
+    const originalPrepare = database.prepare.bind(database)
+    let characterSnapshotReads = 0
+    database.prepare = sql => {
+        const normalized = String(sql).replace(/\s+/g, " ").trim()
+        if (normalized.includes("FROM players_characters ")
+            && !normalized.includes("players_characters_mana_nodes")) {
+            characterSnapshotReads++
+        }
+        return originalPrepare(sql)
+    }
+    try {
+        assert.throws(
+            () => createAwakeRequestContext({
+                playerId,
+                candidateCharacterIds: [],
+                directMissionIds: [3410059],
+            }),
+            /Awake mission seeds.*3410059.*unknown or unsupported/i,
+        )
+    } finally {
+        database.prepare = originalPrepare
+    }
+    assert.equal(characterSnapshotReads, 0)
+})
+
+test("keeps Awake seed normalizers internal to the scope module", () => {
+    const missionApi = require("../src/lib/mission")
+    const scopeSource = fs.readFileSync(
+        path.join(__dirname, "../src/lib/mission/awake-request-context-scope.ts"),
+        "utf8",
+    )
+
+    assert.equal(missionApi.collectAwakeMissionIdsFromSeeds, scope.collectAwakeMissionIdsFromSeeds)
+    for (const exportName of [
+        "normalizeAwakeCandidateCharacterIds",
+        "normalizeAwakeDirectMissionIds",
+        "normalizeAwakeInvalidatedFactKeys",
+    ]) {
+        assert.equal(missionApi[exportName], undefined, exportName)
+    }
+    assert.doesNotMatch(scopeSource, /AwakePublicationScope/)
 })
 
 test("best-effort scope creation failure preserves the original flattened character list", () => {

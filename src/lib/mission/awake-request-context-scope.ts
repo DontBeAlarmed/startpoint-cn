@@ -13,10 +13,6 @@ export interface AwakeMissionSeeds {
     readonly directMissionIds?: readonly number[]
 }
 
-export interface AwakePublicationScope extends AwakeMissionSeeds {
-    readonly candidateCharacterIds: readonly number[]
-}
-
 function assertCompleteArray(value: unknown, field: string): asserts value is readonly unknown[] {
     if (!Array.isArray(value)) {
         throw new TypeError(`Awake ${field} must be an array`)
@@ -81,7 +77,18 @@ export function collectAwakeMissionIdsFromSeeds(
             }
         }
     }
-    return Object.freeze([...missionIds].sort((left, right) => left - right))
+    const normalizedMissionIds = [...missionIds].sort((left, right) => left - right)
+    const supported = new Set(
+        collectSupportedAwakeMissionIds(normalizedMissionIds, requirementRegistry).candidates,
+    )
+    const rejectedMissionIds = normalizedMissionIds.filter(missionId => !supported.has(missionId))
+    if (rejectedMissionIds.length > 0) {
+        throw new Error(
+            `Awake mission seeds ${rejectedMissionIds.join(", ")} are unknown or unsupported `
+                + "Category 9 missions",
+        )
+    }
+    return Object.freeze(normalizedMissionIds)
 }
 
 function normalizeScopedCharacterIds(ids: readonly number[]): number[] {
