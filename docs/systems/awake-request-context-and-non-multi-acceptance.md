@@ -246,7 +246,7 @@ formal profile 使用 1000 份互相独立的存档、600 个活跃身份，并�
 | 35.1 核心 context | 实现 scope 收集/冻结、fresh context、Session、scoped evaluator/reader、seed 校验和生命周期清理 | 已完成；请求 context 与专项回归已通过 |
 | 35.2 事务内 owner | 迁移 learn strict，以及 finish、story、bond、mail、Active Mission、tutorial 的事务内 best-effort owner | 已完成；事务边界与 savepoint 专项回归已通过 |
 | 35.3 提交后 owner 与 `/load` | 迁移 mission、item、shop、gacha、boxGacha、exchange、character/town；保留 `/load` full recovery | 已完成；提交后故障注入、独立 full recovery、active mission fixture 兼容和 workflow 精确分组回归通过 |
-| 35.4 分层验收 | 运行 focused、7/7 轻量回归和一轮 formal 预飞 | 已完成；行为、SQL/loader、回滚、清理和 profile 结构均准入，详见下方实测证据 |
+| 35.4 分层验收 | 运行 focused、7/7 轻量回归和一轮 formal 预飞 | 已完成；focused 准入通过，smoke 符合既定非 formal 预期，formal 单轮预飞结构准入 |
 | 35.5 终审与正式验收 | 独立终审；只运行一次 `npm run verify:full`；随后执行带多人/Hub 哨兵的连续三轮正式验收并回填结果 | 尚未执行；不得据当前证据标记通过 |
 
 35.0 至 35.5 每个阶段完成后各自创建本地 commit，均不 push。任一阶段未满足自己的证据要求时不得标记完成，也不得把后续阶段的测试结果回填到前一阶段冒充通过。
@@ -268,9 +268,12 @@ formal profile 使用 1000 份互相独立的存档、600 个活跃身份，并�
 
 ### 35.4 实测证据（2026-08-24）
 
-验收环境为 Node.js `v22.23.1`、Darwin x64、8 个逻辑 CPU。以下命令均从
-`starpoint-cn` 仓库根目录执行；本轮没有运行 `verify:full`，没有使用 `--write` 或
-`--write-reference`，也没有执行 35.5 的连续三轮 formal 验收。
+实际被测完整 commit SHA 为 `10f66f442213bbca230b577a3077c8d909963272`，即运行验收前的
+HEAD；后续用于回填证据的文档提交不属于被测 revision。验收环境为 Node.js `v22.23.1`、
+Darwin x64、CPU model `Intel(R) Core(TM) i5-8259U CPU @ 2.30GHz`、8 个逻辑 CPU；验收运行
+前后 `git status --porcelain` 均无输出。以下命令均从 `starpoint-cn` 仓库根目录执行；
+本轮没有运行 `verify:full`，没有使用 `--write` 或 `--write-reference`，也没有执行 35.5
+的连续三轮 formal 验收。
 
 focused 使用 `npm run benchmark:awake-request-context`，退出码为 0，用时 6.33 秒。
 固定场景集合 `full-publication`、`candidate-one`、`empty-candidate-cleanup`、
