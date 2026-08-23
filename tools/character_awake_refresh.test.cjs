@@ -76,12 +76,14 @@ function testLoadReconcilesFromComputedAwakeSummary() {
 
     assert.notEqual(reconcileIndex, -1)
     assert.equal(summaryIndex < reconcileIndex, true)
-    assert.equal(loadBlock.includes("reconcileAwakeUnlocks(playerId)"), false)
+    assert.equal(loadBlock.includes("reconcileAwakeUnlocksFromProgress("), true)
     assert.equal(
         loadBlock.includes("awakeSummary.manaBoardAwakeMap = reconcileAwakeUnlocksFromProgress("),
         true
     )
-    assert.equal(loadBlock.includes("createAwakeRequestContext("), false)
+    assert.equal(loadBlock.includes("const awakeContext = createAwakeRequestContext({"), true)
+    assert.equal(loadBlock.includes("computeAwakeSummary(playerId, awakeContext)"), true)
+    assert.equal(loadBlock.includes("awakeContext.resolver"), true)
 }
 
 function testAwakeSummaryAcceptsRequestContextWithoutMigratingLoadOwner() {

@@ -27,7 +27,7 @@ import { grantShopRewardsInTransactionOwnerSync } from "../../lib/shop-reward-gr
 import { computeRealTimeStamina } from "../../lib/stamina";
 import { clientSerializeEquipment } from "../../lib/equipment";
 import { planEquipmentEnhancementPurchase } from "../../lib/equipment-enhancement";
-import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
+import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context";
 import {
     executeGenericShopBatchPurchaseSync,
     executeGenericShopPurchaseSync,
@@ -327,9 +327,10 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         const rewardResult = purchaseResult.rewardResult
-        const characterList = reconcileAwakeUnlockCharacterList(
+        const characterList = publishAwakeCharacterListBestEffort(
             playerId,
-            rewardResult.character_list as Record<string, unknown>[]
+            rewardResult.joined_character_id_list ?? [],
+            [rewardResult.character_list as Record<string, unknown>[]],
         )
 
         const afterPlayer = purchaseResult.player
@@ -624,9 +625,10 @@ const routes = async (fastify: FastifyInstance) => {
 
         const afterPlayer = purchaseResult.player
         const rewardResult = purchaseResult.rewardResult
-        const characterList = reconcileAwakeUnlockCharacterList(
+        const characterList = publishAwakeCharacterListBestEffort(
             playerId,
-            rewardResult.character_list as Record<string, unknown>[],
+            rewardResult.joined_character_id_list ?? [],
+            [rewardResult.character_list as Record<string, unknown>[]],
         )
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

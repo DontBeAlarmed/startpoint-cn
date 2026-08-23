@@ -11,7 +11,7 @@ import { characterExpCaps, givePlayerCharacterSync } from "../../lib/character";
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDb } from "../../data/db";
-import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
+import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { canClaimTownStoryCharacter } from "../../lib/story-join-character";
 
@@ -414,9 +414,11 @@ const routes = async (fastify: FastifyInstance) => {
         const itemList = giveResult?.item
             ? { [giveResult.item.id]: giveResult.item.count }
             : {}
-        const characterList = existingCharacterList.length > 0
-            ? reconcileAwakeUnlockCharacterList(playerId, existingCharacterList)
-            : existingCharacterList
+        const characterList = publishAwakeCharacterListBestEffort(
+            playerId,
+            [characterId],
+            [existingCharacterList],
+        )
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

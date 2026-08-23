@@ -191,8 +191,8 @@ snapshot 还逐场景固定了稳定表名及 `reads`、`writes`、`statements`�
 TypeScript AST 静态审计固定了 19 个生产 `CallExpression`：1 个事务内 strict、9 个事务内
 best-effort、9 个提交后 best-effort。审计不统计
 `awake-unlock-response.ts` 的定义和内部调用，并逐表达式固定 relative file、callee、owner、
-事务边界、当前 `legacy-unscoped` 来源与后续候选来源短标识。35.0 不把旧链路 loader
-次数记为相对门禁；“每请求最多一次”由 35.1 的显式 Session observer 验收。
+事务边界、当前 publication 的 `scoped-context` 来源与候选来源短标识。35.0 不把旧链路
+loader 次数记为相对门禁；“每请求最多一次”由 35.1 的显式 Session observer 验收。
 
 ### Focused 门禁
 

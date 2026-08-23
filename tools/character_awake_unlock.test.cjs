@@ -56,6 +56,7 @@ function readProjectSource(relativePath) {
 
 function readRouteSource(relativePath) {
     return readProjectSource(path.join("src/routes/api", relativePath))
+        .replaceAll("publishAwakeCharacterListBestEffort", "reconcileAwakeUnlockCharacterList")
 }
 
 function countOccurrences(source, value) {
@@ -439,7 +440,11 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     const boxReadOnlyBlock = getRouteBlock(boxGachaSource, "/get_box_list")
     const boxGachaCall = getOnlyCall(boxExecBlock, "reconcileAwakeUnlockCharacterList")
     assert.equal(findCalls(boxGachaSource, "reconcileAwakeUnlockCharacterList").length, 1)
-    assert.deepEqual(boxGachaCall.arguments, ["playerId", "existingCharacterList"])
+    assert.deepEqual(boxGachaCall.arguments, [
+        "playerId",
+        "settlement.rewardResult?.joined_character_id_list ?? []",
+        "[existingCharacterList]",
+    ])
     assert.equal(boxGachaCall.position > boxExecBlock.indexOf("if (playerBoxData !== null && playerBoxData.isClosed)"), true)
     for (const persistenceCall of [
         "rewardPlayerBoxGachaResultSync",
@@ -451,7 +456,7 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     ]) {
         assert.equal(boxGachaCall.position > getLastCallPosition(boxExecBlock, persistenceCall), true)
     }
-    assert.deepEqual(boxGachaCall.conditionalConditions, ["settlement.drawnRewards.length > 0"])
+    assert.deepEqual(boxGachaCall.conditionalConditions, [])
     assert.deepEqual(boxGachaCall.enclosingLoops, [])
     assert.deepEqual(findPropertyAssignmentValues(boxExecBlock, "character_list"), ["characterList"])
     assert.equal(findCalls(boxCloseBlock, "reconcileAwakeUnlockCharacterList").length, 0)
@@ -477,8 +482,8 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
     assert.equal(findCalls(gachaEquipmentBlock, "reconcileAwakeUnlockCharacterList").length, 0)
 
     const gachaExchangeCall = getOnlyCall(gachaCharacterBlock, "reconcileAwakeUnlockCharacterList")
-    assert.deepEqual(gachaExchangeCall.arguments, ["playerId", "existingCharacterList"])
-    assert.deepEqual(gachaExchangeCall.conditionalConditions, ["existingCharacterList.length > 0"])
+    assert.deepEqual(gachaExchangeCall.arguments, ["playerId", "[characterId]", "[existingCharacterList]"])
+    assert.deepEqual(gachaExchangeCall.conditionalConditions, [])
     assert.equal(gachaExchangeCall.position > getLastCallPosition(gachaCharacterBlock, "givePlayerCharacterSync"), true)
     assert.equal(gachaExchangeCall.position > getLastCallPosition(gachaCharacterBlock, "updatePlayerGachaInfoSync"), true)
     const gachaExchangeExistingList = findVariableInitializers(gachaCharacterBlock, "existingCharacterList")
@@ -489,8 +494,8 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
     assert.deepEqual(findPropertyAssignmentValues(gachaCharacterBlock, "character_list"), ["characterList"])
 
     const gachaExecCall = getOnlyCall(gachaExecBlock, "reconcileAwakeUnlockCharacterList")
-    assert.deepEqual(gachaExecCall.arguments, ["playerId", "existingCharacterList"])
-    assert.deepEqual(gachaExecCall.conditionalConditions, ["existingCharacterList.length > 0"])
+    assert.deepEqual(gachaExecCall.arguments, ["playerId", "[]", "[existingCharacterList]"])
+    assert.deepEqual(gachaExecCall.conditionalConditions, [])
     for (const persistenceCall of [
         "rewardPlayerGachaDrawResultSync",
         "insertReceiveHistorySync",
@@ -512,8 +517,12 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
     const starCrumbBlock = getRouteBlock(exchangeSource, "/star_crumb")
     const starCrumbCall = getOnlyCall(starCrumbBlock, "reconcileAwakeUnlockCharacterList")
     assert.equal(findCalls(exchangeSource, "reconcileAwakeUnlockCharacterList").length, 1)
-    assert.deepEqual(starCrumbCall.arguments, ["playerId", "characterList"])
-    assert.deepEqual(starCrumbCall.conditionalConditions, ["characterList.length > 0"])
+    assert.deepEqual(starCrumbCall.arguments, [
+        "playerId",
+        "kind === 0 ? [targetId] : []",
+        "[settlement.characterList]",
+    ])
+    assert.deepEqual(starCrumbCall.conditionalConditions, [])
     assert.equal(starCrumbCall.position > getLastCallPosition(starCrumbBlock, "givePlayerCharacterSync"), true)
     assert.equal(starCrumbCall.position > getLastCallPosition(starCrumbBlock, "updatePlayerSync"), true)
     assert.equal(starCrumbBlock.includes("if (result.character) characterList.push(result.character"), true)
@@ -525,8 +534,8 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
     const townGrantBlock = getRouteBlock(characterSource, "/add_character_from_town")
     const townCall = getOnlyCall(townGrantBlock, "reconcileAwakeUnlockCharacterList")
     assert.equal(findCalls(characterSource, "reconcileAwakeUnlockCharacterList").length, 1)
-    assert.deepEqual(townCall.arguments, ["playerId", "existingCharacterList"])
-    assert.deepEqual(townCall.conditionalConditions, ["existingCharacterList.length > 0"])
+    assert.deepEqual(townCall.arguments, ["playerId", "[characterId]", "[existingCharacterList]"])
+    assert.deepEqual(townCall.conditionalConditions, [])
     assert.equal(townCall.position > getLastCallPosition(townGrantBlock, "givePlayerCharacterSync"), true)
     assert.equal(findCalls(townGrantBlock, "getPlayerCharacterSync").length, 0)
     const townExistingList = findVariableInitializers(townGrantBlock, "existingCharacterList")

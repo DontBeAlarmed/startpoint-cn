@@ -11,7 +11,7 @@ import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders } from "../../utils";
 import { givePlayerCharacterSync } from "../../lib/character";
 import { givePlayerEquipmentSync } from "../../lib/equipment";
-import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
+import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import bundledStarCrumbExchange from "../../../assets/star_crumb_exchange.json";
 import bundledStarCrumbExchangeCost from "../../../assets/star_crumb_exchange_cost.json";
@@ -158,10 +158,11 @@ const routes = async (fastify: FastifyInstance) => {
             throw error
         }
 
-        let characterList = settlement.characterList
-        characterList = characterList.length > 0
-            ? reconcileAwakeUnlockCharacterList(playerId, characterList)
-            : characterList;
+        const characterList = publishAwakeCharacterListBestEffort(
+            playerId,
+            kind === 0 ? [targetId] : [],
+            [settlement.characterList],
+        )
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({

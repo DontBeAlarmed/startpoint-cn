@@ -91,18 +91,18 @@ const EXPECTED_MATRIX = Object.freeze([
     },
     {
         relativeFile: "src/routes/api/boxGacha.ts",
-        callee: "default",
+        callee: "best-effort",
         ownerLabel: "box_gacha/exec",
         boundary: "best-effort-post-commit",
-        candidateSource: "legacy-unscoped",
+        candidateSource: "scoped-context",
         plannedCandidateSource: "drawn-reward-characters",
     },
     {
         relativeFile: "src/routes/api/character.ts",
-        callee: "default",
+        callee: "best-effort",
         ownerLabel: "character/add_character_from_town",
         boundary: "best-effort-post-commit",
-        candidateSource: "legacy-unscoped",
+        candidateSource: "scoped-context",
         plannedCandidateSource: "town-granted-character",
     },
     {
@@ -123,34 +123,34 @@ const EXPECTED_MATRIX = Object.freeze([
     },
     {
         relativeFile: "src/routes/api/exchange.ts",
-        callee: "default",
+        callee: "best-effort",
         ownerLabel: "exchange/star_crumb",
         boundary: "best-effort-post-commit",
-        candidateSource: "legacy-unscoped",
+        candidateSource: "scoped-context",
         plannedCandidateSource: "exchange-reward-characters",
     },
     {
         relativeFile: "src/routes/api/gacha.ts",
-        callee: "default",
+        callee: "best-effort",
         ownerLabel: "gacha/exchange_character",
         boundary: "best-effort-post-commit",
-        candidateSource: "legacy-unscoped",
+        candidateSource: "scoped-context",
         plannedCandidateSource: "exchanged-character",
     },
     {
         relativeFile: "src/routes/api/gacha.ts",
-        callee: "default",
+        callee: "best-effort",
         ownerLabel: "gacha/exec",
         boundary: "best-effort-post-commit",
-        candidateSource: "legacy-unscoped",
+        candidateSource: "scoped-context",
         plannedCandidateSource: "drawn-characters",
     },
     {
         relativeFile: "src/routes/api/item.ts",
-        callee: "default",
+        callee: "best-effort",
         ownerLabel: "item/sell",
         boundary: "best-effort-post-commit",
-        candidateSource: "legacy-unscoped",
+        candidateSource: "scoped-context",
         plannedCandidateSource: "mana-item-fact",
     },
     {
@@ -171,26 +171,26 @@ const EXPECTED_MATRIX = Object.freeze([
     },
     {
         relativeFile: "src/routes/api/mission.ts",
-        callee: "default",
+        callee: "best-effort",
         ownerLabel: "mission/update_mission_progress",
         boundary: "best-effort-post-commit",
-        candidateSource: "legacy-unscoped",
+        candidateSource: "scoped-context",
         plannedCandidateSource: "category9-delta-missions",
     },
     {
         relativeFile: "src/routes/api/shop.ts",
-        callee: "default",
+        callee: "best-effort",
         ownerLabel: "shop/buy",
         boundary: "best-effort-post-commit",
-        candidateSource: "legacy-unscoped",
+        candidateSource: "scoped-context",
         plannedCandidateSource: "shop-reward-characters",
     },
     {
         relativeFile: "src/routes/api/shop.ts",
-        callee: "default",
+        callee: "best-effort",
         ownerLabel: "shop/bulk_buy",
         boundary: "best-effort-post-commit",
-        candidateSource: "legacy-unscoped",
+        candidateSource: "scoped-context",
         plannedCandidateSource: "shop-reward-characters",
     },
     {
@@ -682,17 +682,14 @@ function collectProductionCalls() {
             const { call, callee, exportedName, moduleSpecifier, sourceFile } = importedCall
             if (exportedName === SINGLE_AWAKE_WRAPPER) {
                 assert.equal(
-                    relativeFile,
-                    "src/lib/quest/finish/single-settlement-writes.ts",
-                    `${relativeFile} may not import the single Awake wrapper`,
-                )
-                assert.equal(
                     moduleSpecifier.endsWith("/awake-best-effort-context"),
                     true,
-                    `${relativeFile} single wrapper import must use awake-best-effort-context`,
+                    `${relativeFile} post-commit wrapper import must use awake-best-effort-context`,
                 )
                 assert.equal(call.arguments.length, 3, `${relativeFile} wrapper must receive scoped inputs`)
-                assertSingleAwakePublicationWrapper()
+                if (relativeFile === "src/lib/quest/finish/single-settlement-writes.ts") {
+                    assertSingleAwakePublicationWrapper()
+                }
             } else {
                 assert.ok(
                     call.arguments.length === 2 || call.arguments.length === 3,
@@ -780,7 +777,7 @@ test("Awake reconcile audit matrix freezes owner, policy, and planned candidate 
             entry.candidateSource,
             entry.boundary === "strict-in-tx" || entry.boundary === "best-effort-in-tx"
                 ? "scoped-context"
-                : "legacy-unscoped",
+                : "scoped-context",
         )
         assert.match(entry.plannedCandidateSource, /^[a-z0-9+:-]+$/)
     }

@@ -426,7 +426,7 @@ try {
         "utf8"
     )
     const silentUpdateBlock = missionRouteSource.split('fastify.post("/update_mission_progress"')[1]
-    assert.equal(silentUpdateBlock.includes("reconcileAwakeUnlockCharacterList"), true)
+    assert.equal(silentUpdateBlock.includes("publishAwakeCharacterListBestEffort"), true)
     assert.equal(silentUpdateBlock.includes("settleAwakeMissionRewards"), false)
     assert.equal(silentUpdateBlock.includes("computeAwakeSummary"), false)
 

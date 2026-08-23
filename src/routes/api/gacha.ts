@@ -19,7 +19,7 @@ import { givePlayerCharacterSync } from "../../lib/character";
 import { givePlayerEquipmentSync } from "../../lib/equipment";
 import { buildGachaExecPlan } from "../../lib/gacha-exec-plan";
 import { getExchangeableGachaItem } from "../../lib/gacha-rules";
-import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
+import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
 import { executeRewardGrantPlanInTransactionOwnerInternalSync } from "../../lib/reward-grant/owner-executor";
@@ -237,9 +237,11 @@ const routes = async (fastify: FastifyInstance) => {
         const existingCharacterList: Record<string, unknown>[] = giveResult.character
             ? [giveResult.character as Record<string, unknown>]
             : []
-        const characterList = existingCharacterList.length > 0
-            ? reconcileAwakeUnlockCharacterList(playerId, existingCharacterList)
-            : existingCharacterList
+        const characterList = publishAwakeCharacterListBestEffort(
+            playerId,
+            [characterId],
+            [existingCharacterList],
+        )
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -458,9 +460,11 @@ const routes = async (fastify: FastifyInstance) => {
                     && typeof character === "object"
                     && !Array.isArray(character)
             )
-            const characterList = existingCharacterList.length > 0
-                ? reconcileAwakeUnlockCharacterList(playerId, existingCharacterList)
-                : existingCharacterList
+            const characterList = publishAwakeCharacterListBestEffort(
+                playerId,
+                [],
+                [existingCharacterList],
+            )
 
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({

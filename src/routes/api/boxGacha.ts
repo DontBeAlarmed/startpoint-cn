@@ -15,7 +15,7 @@ import { getBoxGachaSync } from "../../lib/assets";
 import { parseBoxGachaResetRequest, sendBoxGachaResultCode } from "../../lib/box-gacha-protocol";
 import { BoxGachaInvalidPeriodError, BoxGachaResetError, resetBoxGachaSync, validateBoxGachaPeriod } from "../../lib/box-gacha-reset";
 import { drawBoxGachaSync, rewardPlayerBoxGachaResultSync } from "../../lib/gacha";
-import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
+import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context";
 import { BoxGachaBoxes } from "../../lib/types";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time";
@@ -436,9 +436,11 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         const existingCharacterList = (settlement.rewardResult?.character_list ?? []) as Record<string, unknown>[]
-        const characterList = settlement.drawnRewards.length > 0
-            ? reconcileAwakeUnlockCharacterList(playerId, existingCharacterList)
-            : existingCharacterList
+        const characterList = publishAwakeCharacterListBestEffort(
+            playerId,
+            settlement.rewardResult?.joined_character_id_list ?? [],
+            [existingCharacterList],
+        )
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

@@ -7,7 +7,8 @@ import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
 import { getPlayerMailCountSync } from "../../data/domains/mail"
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { createCharacterAwakeEligibilityResolver, evaluateMissionProgressStageB, getCharacterIdFromMission, getCurrentStage, getMissionCatalog, mergeMissionSettlementResponse, reconcileAwakeUnlockCharacterList, settleAwakeMissionCandidatesWithEvaluation, settleMissionCategoriesWithEvaluation } from "../../lib/mission/index";
+import { createCharacterAwakeEligibilityResolver, evaluateMissionProgressStageB, getCharacterIdFromMission, getCurrentStage, getMissionCatalog, mergeMissionSettlementResponse, settleAwakeMissionCandidatesWithEvaluation, settleMissionCategoriesWithEvaluation } from "../../lib/mission/index";
+import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context";
 import { resolveClientProgressTargets } from "../../lib/mission/client-progress";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { addMissionProgressDelta } from "../../lib/mission/progress";
@@ -223,6 +224,7 @@ const routes = async (fastify: FastifyInstance) => {
             : []
         let updatedCount = 0
         const evaluationTime = new Date(getServerTime() * 1000)
+        const awakeCandidateCharacterIds: number[] = []
 
         getDb().transaction(() => {
             for (const param of missionParams) {
@@ -239,12 +241,24 @@ const routes = async (fastify: FastifyInstance) => {
                         match.category,
                         match.missionId,
                         delta,
-                    )) updatedCount++
+                    )) {
+                        updatedCount++
+                        if (match.category === 9) {
+                            const characterId = Number(getCharacterIdFromMission(match.missionId))
+                            if (Number.isSafeInteger(characterId) && characterId > 0) {
+                                awakeCandidateCharacterIds.push(characterId)
+                            }
+                        }
+                    }
                 }
             }
         })()
 
-        const characterList = reconcileAwakeUnlockCharacterList(playerId, [])
+        const characterList = publishAwakeCharacterListBestEffort(
+            playerId,
+            awakeCandidateCharacterIds,
+            [[]],
+        )
         console.log(`[MISSION] update_progress viewer=${viewerId} params=${missionParams.length} db_updates=${updatedCount}`)
 
         reply.header("content-type", "application/x-msgpack")

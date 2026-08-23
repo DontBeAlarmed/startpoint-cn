@@ -15,7 +15,7 @@ import { getPlayerMultiSpecialExchangeCampaignsSync, getPlayerPeriodicRewardPoin
 import { getPlayerOptionsSync } from "../domains/option"
 import { getPlayerPartyGroupListSync } from "../domains/party"
 import { getPlayerTriggeredTutorialsSync } from "../domains/tutorial"
-import { computeAwakeSummary, createCharacterAwakeEligibilityResolver, filterToActiveMissions, reconcileAwakeUnlocksFromProgress } from "../../lib/mission/index"
+import { computeAwakeSummary, createAwakeRequestContext, filterToActiveMissions, reconcileAwakeUnlocksFromProgress } from "../../lib/mission/index"
 import { computeManaBoardAwakeFromNodes, mergeManaBoardAwakeMaps } from "../../lib/character-helpers"
 import { getDb } from "../db"
 import { getCarnivalSaveStateSync } from "../../lib/carnival-save-state"
@@ -58,19 +58,21 @@ export function getClientSerializedData(
     const doSerializeRushEventData = options.serializeRushEventData ?? false
 
     // Compute awake mission summary for /load injection
-    const awakeEligibility = createCharacterAwakeEligibilityResolver(playerId)
-    const awakeSummary = computeAwakeSummary(playerId, awakeEligibility)
+    const awakeContext = createAwakeRequestContext({ playerId })
+    const awakeSummary = computeAwakeSummary(playerId, awakeContext)
     awakeSummary.manaBoardAwakeMap = reconcileAwakeUnlocksFromProgress(
         playerId,
         awakeSummary.activeMissionList.map(mission => ({
             missionId: mission.mission_id,
             progress: mission.progress_value,
         })),
-        awakeEligibility,
+        awakeContext.resolver,
+        awakeContext,
     ).all
 
     // The client uses mana_board_awake both to unlock the Awake tab and as the
     // target node-awake level. Keep mission unlocks and persisted node state.
+    const awakeEligibility = awakeContext.resolver
     const nodeAwakeLevels = awakeEligibility.manaNodeAwakeLevels
     const manaBoardAwakeMap = mergeManaBoardAwakeMaps(
         awakeSummary.manaBoardAwakeMap,
