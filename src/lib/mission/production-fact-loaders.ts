@@ -90,6 +90,9 @@ export interface ProductionMissionFactDomains {
 
 export interface ProductionMissionFactSeeds {
     readonly player?: Player
+    readonly characters?: Record<string, PlayerCharacter>
+    readonly characterClears?: Record<string, PlayerCharacterClear>
+    readonly partyCoClearCounters?: readonly PlayerPartyCoClearCounter[]
     readonly categoryMissions?: ReadonlyMap<
         number,
         Readonly<Record<string, PlayerActiveMission>>
@@ -127,7 +130,9 @@ export function createProductionMissionFactLoaderRegistry(
             if (player === null) throw new Error(`Mission evaluation player ${playerId} not found`)
             return player
         })
-        .register("characters", ({ playerId }) => domains.getPlayerCharactersSync(playerId))
+        .register("characters", ({ playerId }) => (
+            seeds.characters ?? domains.getPlayerCharactersSync(playerId)
+        ))
         .register("characterManaNodes", ({ playerId }) => (
             domains.getPlayerCharactersManaNodesSync(playerId)
         ))
@@ -180,9 +185,9 @@ export function createProductionMissionFactLoaderRegistry(
             domains.getPlayerPassCardStateSync(playerId, key.eventId)
         ))
         .register("characterClearCounters", ({ playerId }) => (
-            domains.getPlayerCharacterClearsSync(playerId)
+            seeds.characterClears ?? domains.getPlayerCharacterClearsSync(playerId)
         ))
         .register("partyCoClearCounters", ({ playerId }) => (
-            domains.getPlayerPartyCoClearCountersSync(playerId)
+            seeds.partyCoClearCounters ?? domains.getPlayerPartyCoClearCountersSync(playerId)
         ))
 }

@@ -29,14 +29,57 @@ export interface CharacterAwakeEligibilitySnapshot {
     readonly evaluationTime: Date
 }
 
+function clonePlayerCharacter(character: PlayerCharacter): PlayerCharacter {
+    return {
+        ...character,
+        joinTime: new Date(character.joinTime.getTime()),
+        updateTime: new Date(character.updateTime.getTime()),
+        bondTokenList: character.bondTokenList.map(entry => ({ ...entry })),
+        ...(character.exBoost === undefined ? {} : {
+            exBoost: {
+                ...character.exBoost,
+                abilityIdList: [...character.exBoost.abilityIdList],
+            },
+        }),
+        ...(character.illustrationSettings === undefined ? {} : {
+            illustrationSettings: [...character.illustrationSettings],
+        }),
+    }
+}
+
+function cloneCharacters(
+    characters: Record<string, PlayerCharacter>,
+): Record<string, PlayerCharacter> {
+    return Object.fromEntries(Object.entries(characters).map(([characterId, character]) => (
+        [characterId, clonePlayerCharacter(character)]
+    )))
+}
+
+function cloneManaNodes(manaNodes: Record<string, number[]>): Record<string, number[]> {
+    return Object.fromEntries(Object.entries(manaNodes).map(([characterId, nodeIds]) => (
+        [characterId, [...nodeIds]]
+    )))
+}
+
+function cloneManaNodeAwakeLevels(
+    awakeLevels: Record<string, Record<number, number>>,
+): Record<string, Record<number, number>> {
+    return Object.fromEntries(Object.entries(awakeLevels).map(([characterId, levels]) => (
+        [characterId, { ...levels }]
+    )))
+}
+
 export function createCharacterAwakeEligibilityResolverFromSnapshot(
     snapshot: CharacterAwakeEligibilitySnapshot,
 ): CharacterAwakeEligibilityResolver {
-    const evaluationTime = new Date(snapshot.evaluationTime)
-    if (!Number.isFinite(evaluationTime.getTime())) {
+    const evaluationTimeMs = snapshot.evaluationTime.getTime()
+    if (!Number.isFinite(evaluationTimeMs)) {
         throw new TypeError("Awake eligibility evaluationTime must be a valid Date")
     }
-    const { characters, manaNodes, manaNodeAwakeLevels } = snapshot
+    const characters = cloneCharacters(snapshot.characters)
+    const manaNodes = cloneManaNodes(snapshot.manaNodes)
+    const manaNodeAwakeLevels = cloneManaNodeAwakeLevels(snapshot.manaNodeAwakeLevels)
+    const evaluationTime = new Date(evaluationTimeMs)
     const readinessCache = new Map<number, CharacterAwakeBaseReadiness>()
 
     function getBaseReadiness(characterId: number): CharacterAwakeBaseReadiness {
@@ -70,10 +113,18 @@ export function createCharacterAwakeEligibilityResolverFromSnapshot(
     }
 
     return Object.freeze({
-        characters,
-        manaNodes,
-        manaNodeAwakeLevels,
-        evaluationTime,
+        get characters() {
+            return cloneCharacters(characters)
+        },
+        get manaNodes() {
+            return cloneManaNodes(manaNodes)
+        },
+        get manaNodeAwakeLevels() {
+            return cloneManaNodeAwakeLevels(manaNodeAwakeLevels)
+        },
+        get evaluationTime() {
+            return new Date(evaluationTimeMs)
+        },
         getBaseReadiness,
         hasPositiveManaNodeAwakeLevel(characterId: number): boolean {
             return Object.values(manaNodeAwakeLevels[String(characterId)] ?? {})

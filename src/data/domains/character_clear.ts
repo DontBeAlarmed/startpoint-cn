@@ -16,6 +16,22 @@ const EMPTY_CHARACTER_CLEAR: PlayerCharacterClear = {
     leader_power_flip_count: 0,
 }
 
+const MAX_CHARACTER_CLEAR_IDS = 32765
+
+function normalizeCharacterIds(ids: readonly number[]): number[] {
+    const normalized = new Set<number>()
+    for (const id of ids) {
+        if (!Number.isSafeInteger(id) || id <= 0) {
+            throw new TypeError("character clear IDs must be positive safe integers.")
+        }
+        normalized.add(id)
+    }
+    if (normalized.size > MAX_CHARACTER_CLEAR_IDS) {
+        throw new RangeError(`character clear query cannot exceed ${MAX_CHARACTER_CLEAR_IDS} IDs.`)
+    }
+    return [...normalized].sort((left, right) => left - right)
+}
+
 export function getPlayerCharacterClearSync(playerId: number, characterId: number) {
     const row = getDb().prepare(`
     SELECT clear_count, multi_count, leader_clear_count, leader_multi_count, leader_power_flip_count FROM players_character_quest_clears
@@ -34,6 +50,29 @@ export function getPlayerCharacterClearsSync(
     WHERE player_id = ?
     `).all(playerId) as (PlayerCharacterClear & { character_id: number })[]
 
+    return Object.fromEntries(rows.map(row => [String(row.character_id), {
+        clear_count: row.clear_count,
+        multi_count: row.multi_count,
+        leader_clear_count: row.leader_clear_count,
+        leader_multi_count: row.leader_multi_count,
+        leader_power_flip_count: row.leader_power_flip_count,
+    }]))
+}
+
+export function getPlayerCharacterClearsByIdsSync(
+    playerId: number,
+    ids: readonly number[],
+): Record<string, PlayerCharacterClear> {
+    const characterIds = normalizeCharacterIds(ids)
+    if (characterIds.length === 0) return {}
+    const placeholders = characterIds.map(() => "?").join(", ")
+    const rows = getDb().prepare(`
+        SELECT character_id, clear_count, multi_count, leader_clear_count,
+            leader_multi_count, leader_power_flip_count
+        FROM players_character_quest_clears
+        WHERE player_id = ? AND character_id IN (${placeholders})
+        ORDER BY character_id
+    `).all(playerId, ...characterIds) as (PlayerCharacterClear & { character_id: number })[]
     return Object.fromEntries(rows.map(row => [String(row.character_id), {
         clear_count: row.clear_count,
         multi_count: row.multi_count,

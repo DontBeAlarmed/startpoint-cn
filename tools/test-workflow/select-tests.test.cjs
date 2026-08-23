@@ -662,6 +662,22 @@ test("upgrades package and unknown source changes to full", () => {
 })
 
 test("selects mission regressions for awake finish settlement wiring", () => {
+    for (const file of [
+        "src/lib/mission/awake-request-context-scope.ts",
+        "src/lib/mission/awake-request-context-state.ts",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["integration:mission"], file)
+    }
+    for (const file of [
+        "src/data/domains/character_clear.ts",
+        "src/data/domains/party_co_clear.ts",
+    ]) {
+        assert.deepEqual(
+            selectTestGroups([file]),
+            ["full", "integration:database", "integration:mission"],
+            file,
+        )
+    }
     assert.deepEqual(
         selectTestGroups(["src/lib/mission/awake-settlement.ts"]),
         ["integration:mission"],

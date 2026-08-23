@@ -325,3 +325,43 @@ test("settlement category progress seed stays typed and filters to the Session s
         missionIds: [9999],
     }), /outside declared missionIds selection/)
 })
+
+test("production Awake fact seeds bypass full character and counter readers", () => {
+    const seededCharacters = Object.freeze({ 341005: Object.freeze({ exp: 123 }) })
+    const seededClears = Object.freeze({
+        341005: Object.freeze({
+            clear_count: 5,
+            multi_count: 2,
+            leader_clear_count: 3,
+            leader_multi_count: 1,
+            leader_power_flip_count: 0,
+        }),
+    })
+    const seededCoClears = Object.freeze([
+        Object.freeze({ char_id_a: 341005, char_id_b: 311002, co_clear_count: 4 }),
+    ])
+    const loaders = createProductionMissionFactLoaderRegistry({
+        getPlayerCharactersSync() {
+            throw new Error("seeded characters must not query the database")
+        },
+        getPlayerCharacterClearsSync() {
+            throw new Error("seeded character clears must not query the database")
+        },
+        getPlayerPartyCoClearCountersSync() {
+            throw new Error("seeded party co-clears must not query the database")
+        },
+    }, {
+        characters: seededCharacters,
+        characterClears: seededClears,
+        partyCoClearCounters: seededCoClears,
+    })
+    const session = createSession([
+        { kind: "characters" },
+        { kind: "characterClearCounters" },
+        { kind: "partyCoClearCounters" },
+    ], loaders)
+
+    assert.strictEqual(session.getFact({ kind: "characters" }), seededCharacters)
+    assert.strictEqual(session.getFact({ kind: "characterClearCounters" }), seededClears)
+    assert.strictEqual(session.getFact({ kind: "partyCoClearCounters" }), seededCoClears)
+})

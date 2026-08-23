@@ -20,10 +20,13 @@ const restoreContentSnapshot = installBundledGameplaySnapshot()
 const { initializeDatabase } = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const characterDomain = require("../src/data/domains/character")
+const characterAwakeDomain = require("../src/data/domains/character_awake")
+const characterClearDomain = require("../src/data/domains/character_clear")
+const partyCoClearDomain = require("../src/data/domains/party_co_clear")
 const {
     getPlayerCharacterAwakeUnlocksSync,
     upsertPlayerCharacterAwakeUnlockSync,
-} = require("../src/data/domains/character_awake")
+} = characterAwakeDomain
 const {
     updatePlayerCategoryMissionStageSync,
     updatePlayerCategoryMissionSync,
@@ -321,23 +324,452 @@ test("candidate zero keeps cleanup semantics while one and many stay scoped", ()
     assert.equal(many.length, 8)
 })
 
-test("unknown character master data remains fail closed", () => {
-    const playerId = createPlayer("unknown-master")
+test("resolver facts, time, and character master readiness stay frozen", () => {
+    const playerId = createPlayer("stable-resolver")
     makeBaseReady(playerId, CHARACTER_A)
+    const mutableEvaluationTime = new Date(evaluationTime)
+    const snapshot = {
+        characters: characterDomain.getPlayerCharactersSync(playerId),
+        manaNodes: characterDomain.getPlayerCharactersManaNodesSync(playerId),
+        manaNodeAwakeLevels: characterDomain
+            .getPlayerCharactersManaNodeAwakeLevelsSync(playerId),
+        evaluationTime: mutableEvaluationTime,
+    }
+    const resolver = missionApi().createCharacterAwakeEligibilityResolverFromSnapshot(snapshot)
+    const exposedCharacters = resolver.characters
+    const exposedManaNodes = resolver.manaNodes
+    const exposedAwakeLevels = resolver.manaNodeAwakeLevels
+    const exposedEvaluationTime = resolver.evaluationTime
+
+    snapshot.characters[String(CHARACTER_A)].exp = 0
+    snapshot.manaNodes[String(CHARACTER_A)].length = 0
+    snapshot.manaNodeAwakeLevels[String(CHARACTER_A)][999999] = 9
+    mutableEvaluationTime.setUTCFullYear(2035)
+    exposedCharacters[String(CHARACTER_A)].exp = 0
+    exposedManaNodes[String(CHARACTER_A)].length = 0
+    exposedAwakeLevels[String(CHARACTER_A)][999998] = 8
+    exposedEvaluationTime.setUTCFullYear(2036)
+
+    assert.equal(resolver.getBaseReadiness(CHARACTER_A), "ready")
+    assert.equal(resolver.hasPositiveManaNodeAwakeLevel(CHARACTER_A), false)
+    assert.equal(resolver.isNewUnlockEligible(CHARACTER_A, 3410051), true)
+    assert.equal(resolver.evaluationTime.toISOString(), evaluationTime.toISOString())
+
     const context = requestContextModule().createAwakeRequestContext({
         playerId,
         evaluationTime,
         candidateCharacterIds: [CHARACTER_A],
     })
     const originalGetCharacterDataSync = characterAssets.getCharacterDataSync
+    const originalGetCharacterManaNodesSync = characterAssets.getCharacterManaNodesSync
     characterAssets.getCharacterDataSync = characterId => (
         Number(characterId) === CHARACTER_A ? null : originalGetCharacterDataSync(characterId)
     )
+    characterAssets.getCharacterManaNodesSync = (characterId, boardIndex) => (
+        Number(characterId) === CHARACTER_A
+            ? null
+            : originalGetCharacterManaNodesSync(characterId, boardIndex)
+    )
     try {
-        assert.deepEqual(context.evaluate(), [])
+        assert.equal(context.evaluate().length, 4)
+    } finally {
+        characterAssets.getCharacterDataSync = originalGetCharacterDataSync
+        characterAssets.getCharacterManaNodesSync = originalGetCharacterManaNodesSync
+    }
+
+    characterAssets.getCharacterDataSync = characterId => (
+        Number(characterId) === CHARACTER_A ? null : originalGetCharacterDataSync(characterId)
+    )
+    let unknownContext
+    try {
+        unknownContext = requestContextModule().createAwakeRequestContext({
+            playerId,
+            evaluationTime,
+            candidateCharacterIds: [CHARACTER_A],
+        })
     } finally {
         characterAssets.getCharacterDataSync = originalGetCharacterDataSync
     }
+    assert.deepEqual(unknownContext.evaluate(), [])
+})
+
+test("publication projection failures roll back strict and best-effort unlock writes", () => {
+    const playerId = createPlayer("projection-rollback")
+    makeBaseReady(playerId, CHARACTER_A)
+    db.prepare(`
+        UPDATE players_characters
+        SET join_time = 'invalid-awake-projection-date'
+        WHERE player_id = ? AND id = ?
+    `).run(playerId, CHARACTER_A)
+    const existing = [{ character_id: CHARACTER_A, stack: 4 }]
+    const projectionError = new Error("invalid joinTime during Awake response projection")
+    const originalGetUTCFullYear = Date.prototype.getUTCFullYear
+    const originalConsoleError = console.error
+    let loggedError
+
+    Date.prototype.getUTCFullYear = function getUTCFullYearWithValidation() {
+        if (Number.isNaN(this.getTime())) throw projectionError
+        return originalGetUTCFullYear.call(this)
+    }
+    console.error = (...args) => {
+        loggedError = args
+    }
+    try {
+        assert.strictEqual(
+            missionApi().reconcileAwakeUnlockCharacterListBestEffort(
+                playerId,
+                existing,
+                { candidateCharacterIds: [CHARACTER_A] },
+            ),
+            existing,
+        )
+        assert.strictEqual(loggedError?.[1], projectionError)
+        assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has(String(CHARACTER_A)), false)
+
+        assert.throws(
+            () => missionApi().reconcileAwakeUnlockCharacterListStrict(
+                playerId,
+                existing,
+                { candidateCharacterIds: [CHARACTER_A] },
+            ),
+            error => error === projectionError,
+        )
+        assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has(String(CHARACTER_A)), false)
+    } finally {
+        Date.prototype.getUTCFullYear = originalGetUTCFullYear
+        console.error = originalConsoleError
+    }
+})
+
+test("context reconcile rejects out-of-scope progress and every second write attempt", () => {
+    const playerId = createPlayer("write-lifecycle")
+    makeBaseReady(playerId, CHARACTER_A)
+    const progress = [
+        { missionId: 3410051, progress: 1 },
+        { missionId: 3410052, progress: 5 },
+        { missionId: 3410053, progress: 5 },
+        { missionId: 3410054, progress: 3 },
+    ]
+    const emptyScope = requestContextModule().createAwakeRequestContext({
+        playerId,
+        evaluationTime,
+        candidateCharacterIds: [],
+    })
+    assert.throws(
+        () => missionApi().reconcileAwakeUnlocksFromProgress(
+            playerId,
+            progress,
+            emptyScope.resolver,
+            emptyScope,
+        ),
+        /outside.*scope/i,
+    )
+    assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).size, 0)
+
+    const context = requestContextModule().createAwakeRequestContext({
+        playerId,
+        evaluationTime,
+        candidateCharacterIds: [CHARACTER_A],
+    })
+    assert.equal(context.evaluate().length, 4)
+    assert.deepEqual(
+        missionApi().reconcileAwakeUnlocksFromProgress(
+            playerId,
+            progress,
+            context.resolver,
+            context,
+        ).all,
+        new Map([[String(CHARACTER_A), { 1: 1 }]]),
+    )
+    assert.throws(
+        () => missionApi().reconcileAwakeUnlocksFromProgress(
+            playerId,
+            progress,
+            context.resolver,
+            context,
+        ),
+        /already.*consumed|write.*once/i,
+    )
+    assert.deepEqual(
+        getPlayerCharacterAwakeUnlocksSync(playerId),
+        new Map([[String(CHARACTER_A), { 1: 1 }]]),
+    )
+})
+
+test("a failed context reconcile still consumes its write lifecycle", () => {
+    const playerId = createPlayer("failed-write-lifecycle")
+    makeBaseReady(playerId, CHARACTER_A)
+    const context = requestContextModule().createAwakeRequestContext({
+        playerId,
+        evaluationTime,
+        candidateCharacterIds: [CHARACTER_A],
+    })
+    const progress = [
+        { missionId: 3410051, progress: 1 },
+        { missionId: 3410052, progress: 5 },
+        { missionId: 3410053, progress: 5 },
+        { missionId: 3410054, progress: 3 },
+    ]
+    const writeError = new Error("synthetic Awake unlock write failure")
+    const originalUpsert = characterAwakeDomain.upsertPlayerCharacterAwakeUnlockSync
+    characterAwakeDomain.upsertPlayerCharacterAwakeUnlockSync = () => {
+        throw writeError
+    }
+    try {
+        assert.throws(
+            () => missionApi().reconcileAwakeUnlocksFromProgress(
+                playerId,
+                progress,
+                context.resolver,
+                context,
+            ),
+            error => error === writeError,
+        )
+    } finally {
+        characterAwakeDomain.upsertPlayerCharacterAwakeUnlockSync = originalUpsert
+    }
+    assert.throws(
+        () => missionApi().reconcileAwakeUnlocksFromProgress(
+            playerId,
+            progress,
+            context.resolver,
+            context,
+        ),
+        /already.*consumed|write.*once/i,
+    )
+    assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).size, 0)
+})
+
+test("legacy resolver compatibility does not rely on an evaluate-shaped context check", () => {
+    const playerId = createPlayer("legacy-resolver")
+    makeBaseReady(playerId, CHARACTER_A)
+    const resolver = missionApi().createCharacterAwakeEligibilityResolver(playerId, evaluationTime)
+    const reconciled = missionApi().reconcileAwakeUnlocks(playerId, [CHARACTER_A], resolver)
+    assert.deepEqual(reconciled.all, new Map([[String(CHARACTER_A), { 1: 1 }]]))
+
+    const resolverWithEvaluate = {
+        characters: resolver.characters,
+        manaNodes: resolver.manaNodes,
+        manaNodeAwakeLevels: resolver.manaNodeAwakeLevels,
+        evaluationTime: resolver.evaluationTime,
+        getBaseReadiness: resolver.getBaseReadiness,
+        hasPositiveManaNodeAwakeLevel: resolver.hasPositiveManaNodeAwakeLevel,
+        isNewUnlockEligible: resolver.isNewUnlockEligible,
+        evaluate() {
+            throw new Error("legacy resolver evaluate method must not be called")
+        },
+    }
+    const summary = missionApi().computeAwakeSummary(playerId, resolverWithEvaluate)
+    assert.equal(summary.activeMissionList.length, 4)
+})
+
+test("Awake requirement collection fails closed for facts its context does not consume", () => {
+    const unsupportedFactLists = [
+        [{ kind: "items" }],
+        [{ kind: "characterManaNodes" }],
+        [{ kind: "categoryMissionProgress", category: 8, missionIds: [9001] }],
+        [
+            { kind: "categoryMissionProgress", category: 9, missionIds: [3410052] },
+            { kind: "items" },
+        ],
+    ]
+    for (const facts of unsupportedFactLists) {
+        const registry = {
+            getRequirement(category, missionId) {
+                if (category !== 9 || missionId !== 3410051) return undefined
+                return {
+                    mode: "computed",
+                    facts,
+                    missionDependencies: [],
+                }
+            },
+        }
+        assert.deepEqual(
+            requestContextModule().collectSupportedAwakeMissionIds([3410051], registry),
+            { candidates: [], closure: [] },
+        )
+    }
+})
+
+test("character clear reader scopes rows by normalized character IDs and skips empty SQL", () => {
+    const playerId = createPlayer("scoped-clear-reader", [CHARACTER_A, CHARACTER_B])
+    db.prepare(`
+        INSERT INTO players_character_quest_clears (
+            player_id, character_id, clear_count, multi_count,
+            leader_clear_count, leader_multi_count, leader_power_flip_count
+        ) VALUES (?, 999901, 99, 98, 97, 96, 95)
+    `).run(playerId)
+    const originalPrepare = db.prepare.bind(db)
+    let prepareCalls = 0
+    db.prepare = sql => {
+        prepareCalls++
+        return originalPrepare(sql)
+    }
+    try {
+        assert.deepEqual(characterClearDomain.getPlayerCharacterClearsByIdsSync(playerId, []), {})
+        assert.equal(prepareCalls, 0)
+        assert.deepEqual(
+            characterClearDomain.getPlayerCharacterClearsByIdsSync(
+                playerId,
+                [CHARACTER_B, CHARACTER_A, CHARACTER_B],
+            ),
+            {
+                [CHARACTER_A]: {
+                    clear_count: 5,
+                    multi_count: 2,
+                    leader_clear_count: 3,
+                    leader_multi_count: 1,
+                    leader_power_flip_count: 0,
+                },
+                [CHARACTER_B]: {
+                    clear_count: 5,
+                    multi_count: 2,
+                    leader_clear_count: 3,
+                    leader_multi_count: 1,
+                    leader_power_flip_count: 0,
+                },
+            },
+        )
+        assert.equal(prepareCalls, 1)
+    } finally {
+        db.prepare = originalPrepare
+    }
+})
+
+test("party co-clear reader scopes rows when either character matches and skips empty SQL", () => {
+    const playerId = createPlayer("scoped-co-clear-reader")
+    db.prepare(`
+        INSERT INTO players_party_member_co_clears (
+            player_id, char_id_a, char_id_b, co_clear_count
+        ) VALUES (?, ?, 777701, 4), (?, 777702, ?, 5), (?, 777703, 777704, 99)
+    `).run(playerId, CHARACTER_A, playerId, CHARACTER_A, playerId)
+    const originalPrepare = db.prepare.bind(db)
+    let prepareCalls = 0
+    db.prepare = sql => {
+        prepareCalls++
+        return originalPrepare(sql)
+    }
+    try {
+        assert.deepEqual(
+            partyCoClearDomain.getPlayerPartyCoClearCountersByCharacterIdsSync(playerId, []),
+            [],
+        )
+        assert.equal(prepareCalls, 0)
+        assert.deepEqual(
+            partyCoClearDomain.getPlayerPartyCoClearCountersByCharacterIdsSync(
+                playerId,
+                [CHARACTER_A, CHARACTER_A],
+            ),
+            [
+                { char_id_a: CHARACTER_A, char_id_b: 777701, co_clear_count: 4 },
+                { char_id_a: 777702, char_id_b: CHARACTER_A, co_clear_count: 5 },
+            ],
+        )
+        assert.equal(prepareCalls, 1)
+    } finally {
+        db.prepare = originalPrepare
+    }
+})
+
+test("candidate context bounds database facts to candidates plus existing unlock characters", () => {
+    const candidateCharacterId = 211001
+    const playerId = createPlayer("bounded-candidate-rows", [CHARACTER_A, candidateCharacterId])
+    makeBaseReady(playerId, CHARACTER_A)
+    makeBaseReady(playerId, candidateCharacterId)
+    assert.equal(upsertPlayerCharacterAwakeUnlockSync(playerId, CHARACTER_A, 1, 1), true)
+
+    const insertCharacter = db.prepare(`
+        INSERT INTO players_characters (
+            id, entry_count, evolution_level, over_limit_step, protection,
+            join_time, update_time, exp, stack, mana_board_index, player_id
+        ) VALUES (?, 1, 0, 0, 0, ?, ?, 0, 0, 1, ?)
+    `)
+    const insertClear = db.prepare(`
+        INSERT INTO players_character_quest_clears (
+            player_id, character_id, clear_count, multi_count,
+            leader_clear_count, leader_multi_count, leader_power_flip_count
+        ) VALUES (?, ?, 99, 98, 97, 96, 95)
+    `)
+    const insertCoClear = db.prepare(`
+        INSERT INTO players_party_member_co_clears (
+            player_id, char_id_a, char_id_b, co_clear_count
+        ) VALUES (?, ?, ?, 99)
+    `)
+    for (let index = 0; index < 24; index++) {
+        const unrelatedId = 900000 + index
+        insertCharacter.run(
+            unrelatedId,
+            "2025-01-01T00:00:00.000Z",
+            "2025-01-01T00:00:00.000Z",
+            playerId,
+        )
+        insertClear.run(playerId, unrelatedId)
+        insertCoClear.run(playerId, unrelatedId, 910000 + index)
+    }
+    insertCoClear.run(playerId, candidateCharacterId, 220001)
+
+    const observed = []
+    const originalPrepare = db.prepare.bind(db)
+    db.prepare = sql => {
+        const statement = originalPrepare(sql)
+        const normalized = String(sql).replace(/\s+/g, " ").trim()
+        if (!/^SELECT /i.test(normalized)
+            || !/players_characters|players_character_quest_clears|players_party_member_co_clears/.test(
+                normalized,
+            )) return statement
+        return new Proxy(statement, {
+            get(target, property) {
+                const value = Reflect.get(target, property, target)
+                if (typeof value !== "function") return value
+                return (...args) => {
+                    if (property === "all") observed.push({ sql: normalized, args })
+                    return value.apply(target, args)
+                }
+            },
+        })
+    }
+    let context
+    try {
+        context = requestContextModule().createAwakeRequestContext({
+            playerId,
+            evaluationTime,
+            candidateCharacterIds: [candidateCharacterId],
+        })
+    } finally {
+        db.prepare = originalPrepare
+    }
+
+    assert.deepEqual(
+        Object.keys(context.resolver.characters).map(Number).sort((left, right) => left - right),
+        [candidateCharacterId, CHARACTER_A].sort((left, right) => left - right),
+    )
+    const boundedIds = new Set([candidateCharacterId, CHARACTER_A])
+    const scopedQueries = observed.filter(entry => (
+        entry.sql.includes("players_character_quest_clears")
+        || entry.sql.includes("players_party_member_co_clears")
+        || (entry.sql.includes("FROM players_characters ")
+            && !entry.sql.includes("players_characters_mana_nodes"))
+    ))
+    assert.equal(scopedQueries.length >= 2, true)
+    assert.equal(scopedQueries.every(entry => entry.sql.includes(" IN (")), true)
+    assert.equal(scopedQueries.every(entry => (
+        entry.args.slice(1).every(value => boundedIds.has(value))
+    )), true)
+    assert.equal(
+        scopedQueries.some(entry => entry.sql.includes("players_character_quest_clears")),
+        false,
+    )
+    assert.equal(
+        scopedQueries.some(entry => entry.sql.includes("players_party_member_co_clears")),
+        true,
+    )
+
+    const reconciled = missionApi().reconcileAwakeUnlocks(
+        playerId,
+        [candidateCharacterId],
+        context,
+    )
+    assert.deepEqual(reconciled.all.get(String(CHARACTER_A)), { 1: 1 })
 })
 
 test("summary and reconcile reuse Category 9 stages, progress, resolver, and unlock snapshot", () => {

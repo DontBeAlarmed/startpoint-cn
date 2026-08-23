@@ -13,6 +13,7 @@ import { buildAwakeContext } from "./computer-awake"
 import {
     assertAwakeRequestContext,
     createAwakeRequestContext,
+    isAwakeRequestContext,
     readAwakeRequestContextCategoryMissions,
     type AwakeRequestContext,
 } from "./awake-request-context"
@@ -32,7 +33,7 @@ export function computeAwakeSummary(
     playerId: number,
     resolverOrContext?: CharacterAwakeEligibilityResolver | AwakeRequestContext,
 ): AwakeSummary {
-    if (resolverOrContext === undefined || "evaluate" in resolverOrContext) {
+    if (resolverOrContext === undefined || isAwakeRequestContext(resolverOrContext)) {
         const context = resolverOrContext ?? createAwakeRequestContext({ playerId })
         assertAwakeRequestContext(context, playerId)
         const activeMissions = readAwakeRequestContextCategoryMissions(context)

@@ -86,7 +86,7 @@ export { getCharacterStoryQuestIds, getCharacterIdFromMission } from "./characte
 // Awake summary (for /load response)
 export { computeAwakeSummary } from "./compute-awake-summary"
 export type { AwakeRequestContext, CreateAwakeRequestContextOptions } from "./awake-request-context"
-export { createAwakeRequestContext } from "./awake-request-context"
+export { createAwakeRequestContext, isAwakeRequestContext } from "./awake-request-context"
 export type { AwakeBattleMissionSettlementParams, AwakeMissionComputedProgress, AwakeMissionInfo, AwakeMissionSettlementEvaluation, AwakeMissionSettlementResult } from "./awake-settlement"
 export { getAwakeBattleMissionIds, settleAwakeBattleMissions, settleAwakeMissionCandidates, settleAwakeMissionCandidatesWithEvaluation, settleAwakeMissionRewards } from "./awake-settlement"
 export type { AwakeUnlockProgress, AwakeUnlockReconciliationResult } from "./awake-unlock"
