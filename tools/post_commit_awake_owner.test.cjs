@@ -32,6 +32,28 @@ const {
 const { givePlayerCharacterSync } = require("../src/lib/character")
 const { publishAwakeCharacterListBestEffort } = require("../src/lib/mission/awake-best-effort-context")
 
+const POST_COMMIT_35_3_OWNER_INVENTORY = Object.freeze({
+    "src/routes/api/boxGacha.ts": ["drawn-reward-characters"],
+    "src/routes/api/character.ts": ["town-granted-character"],
+    "src/routes/api/exchange.ts": ["exchange-reward-characters"],
+    "src/routes/api/gacha.ts": ["exchanged-character", "drawn-characters"],
+    "src/routes/api/item.ts": ["mana-item-fact"],
+    "src/routes/api/mission.ts": ["category9-delta-missions"],
+    "src/routes/api/shop.ts": ["shop-reward-characters", "shop-reward-characters"],
+})
+
+const TRANSACTION_INTERNAL_35_2_OWNER_INVENTORY = Object.freeze({
+    "single/finish": ["src/lib/quest/finish/single-settlement-writes.ts"],
+    "multi/finish": ["src/multi/settlement/orchestrator.ts"],
+    story: ["src/routes/api/storyQuest.ts"],
+    bond: ["src/routes/api/character/bond.ts"],
+    "mail/receive": ["src/routes/api/mail.ts"],
+    "mail/receive_all": ["src/routes/api/mail.ts"],
+    active: ["src/routes/api/activeMission.ts"],
+    "tutorial/update_step:15": ["src/routes/api/tutorial.ts"],
+    "tutorial/update_step:16": ["src/routes/api/tutorial.ts"],
+})
+
 let database
 let sqlStatements = null
 
@@ -162,19 +184,36 @@ test("Mana item sell publishes the invalidated player fact without a character h
     assert.doesNotMatch(publicationCall, /263002|characterId|character_id/)
 })
 
-test("all nine post-commit owners use the fresh scoped wrapper after their owner write", () => {
-    const expected = {
-        "src/routes/api/boxGacha.ts": ["drawn-reward-characters"],
-        "src/routes/api/character.ts": ["town-granted-character"],
-        "src/routes/api/exchange.ts": ["exchange-reward-characters"],
-        "src/routes/api/gacha.ts": ["exchanged-character", "drawn-characters"],
-        "src/routes/api/item.ts": ["mana-item-fact"],
-        "src/routes/api/mission.ts": ["category9-delta-missions"],
-        "src/routes/api/shop.ts": ["shop-reward-characters", "shop-reward-characters"],
-    }
-    for (const [relativeFile, sources] of Object.entries(expected)) {
+test("35.3 has exactly nine post-commit owner expressions", () => {
+    const postCommitFiles = new Set(Object.keys(POST_COMMIT_35_3_OWNER_INVENTORY))
+    const transactionFiles = new Set(Object.values(TRANSACTION_INTERNAL_35_2_OWNER_INVENTORY).flat())
+    assert.equal(
+        Object.values(POST_COMMIT_35_3_OWNER_INVENTORY).flat().length,
+        9,
+        "35.3 post-commit owner expressions",
+    )
+    assert.equal(
+        Object.keys(TRANSACTION_INTERNAL_35_2_OWNER_INVENTORY).length,
+        9,
+        "35.2 transaction-internal owner expressions",
+    )
+    assert.equal(
+        [...postCommitFiles].some(relativeFile => transactionFiles.has(relativeFile)),
+        false,
+        "35.2 and 35.3 owner inventories must remain disjoint",
+    )
+
+    for (const [relativeFile, sources] of Object.entries(POST_COMMIT_35_3_OWNER_INVENTORY)) {
         const source = fs.readFileSync(path.join(__dirname, "..", relativeFile), "utf8")
         assert.equal((source.match(/publishAwakeCharacterListBestEffort\(/g) ?? []).length, sources.length, relativeFile)
         assert.doesNotMatch(source, /reconcileAwakeUnlockCharacterList\(/, relativeFile)
+    }
+})
+
+test("35.2 transaction-internal inventory remains separate from post-commit inventory", () => {
+    const postCommitOwners = new Set(Object.keys(POST_COMMIT_35_3_OWNER_INVENTORY))
+    for (const [owner, files] of Object.entries(TRANSACTION_INTERNAL_35_2_OWNER_INVENTORY)) {
+        assert.equal(files.length, 1, owner)
+        assert.equal(postCommitOwners.has(files[0]), false, `${owner} must not be counted as 35.3`)
     }
 })

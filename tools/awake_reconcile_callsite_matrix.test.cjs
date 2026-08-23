@@ -494,7 +494,7 @@ function assertSingleAwakePublicationWrapper() {
     assert.equal(contextCalls.length, 1, "single Awake wrapper must create context exactly once")
     assert.deepEqual(
         contextCalls[0].arguments.map(argument => argument.getText(sourceFile)),
-        ["playerId", "candidateCharacterIds"],
+        ["playerId", "candidateCharacterIds", "scope"],
     )
 
     const reconcileCalls = collectCallsForSymbol(wrapper, checker, reconcileSymbol)
@@ -504,7 +504,7 @@ function assertSingleAwakePublicationWrapper() {
         [
             "playerId",
             "existingCharacterList",
-            "{ context: awakeContext, candidateCharacterIds }",
+            "{ context: awakeContext }",
         ],
     )
 }
@@ -686,7 +686,11 @@ function collectProductionCalls() {
                     true,
                     `${relativeFile} post-commit wrapper import must use awake-best-effort-context`,
                 )
-                assert.equal(call.arguments.length, 3, `${relativeFile} wrapper must receive scoped inputs`)
+                assert.equal(
+                    call.arguments.length === 3 || call.arguments.length === 4,
+                    true,
+                    `${relativeFile} wrapper must receive scoped inputs`,
+                )
                 if (relativeFile === "src/lib/quest/finish/single-settlement-writes.ts") {
                     assertSingleAwakePublicationWrapper()
                 }
@@ -709,7 +713,6 @@ function collectProductionCalls() {
                     return []
                 }))
                 assert.equal(optionNames.has("context"), true, `${relativeFile} scoped publication must pass fresh context`)
-                assert.equal(optionNames.has("candidateCharacterIds"), true, `${relativeFile} scoped publication must pass candidates`)
             }
             const ownerLabel = classifyOwner(relativeFile, call, sourceFile)
             assert.equal(
@@ -722,7 +725,11 @@ function collectProductionCalls() {
                 callee,
                 ownerLabel,
                 boundary: classifyBoundary(relativeFile, callee, call),
-                candidateSource: call.arguments.length === 3 ? "scoped-context" : "legacy-unscoped",
+                candidateSource: (
+                    exportedName === SINGLE_AWAKE_WRAPPER
+                        ? call.arguments.length === 3 || call.arguments.length === 4
+                        : call.arguments.length === 3
+                ) ? "scoped-context" : "legacy-unscoped",
                 plannedCandidateSource: PLANNED_CANDIDATE_SOURCES[ownerLabel],
                 position: call.getStart(sourceFile),
             })

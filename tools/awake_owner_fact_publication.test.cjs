@@ -20,6 +20,22 @@ const {
     getAwakeFactKeysFromLegacyRewardResults,
 } = require("../src/lib/mission/awake-reward-facts")
 
+function loadMailAwakeFactKeyHelper() {
+    const source = fs.readFileSync(
+        path.join(__dirname, "../src/routes/api/mail.ts"),
+        "utf8",
+    )
+    const start = source.indexOf("function getMailAwakeInvalidatedFactKeys")
+    const end = source.indexOf("\n\nfunction unsupportedMailReply", start)
+    assert.ok(start >= 0 && end > start, "mail Awake helper must remain a local pure function")
+    const implementation = source
+        .slice(start, end)
+        .replace("mails: readonly RawPlayerMail[]", "mails")
+        .replaceAll(" as const", "")
+    const { MailType } = require("../src/data/domains/mail")
+    return Function("MailType", `${implementation}; return getMailAwakeInvalidatedFactKeys`)(MailType)
+}
+
 let fixture
 
 function assertAwakePublished(playerId, characterList) {
@@ -38,7 +54,11 @@ test.after(async () => {
     await closeAwakeOwnerFactPublicationFixture(fixture)
 })
 
-test("legacy reward fallback emits only a player fact for a positive Mana delta", () => {
+test("legacy reward fallback maps positive, zero, non-Mana, and mixed results exactly", () => {
+    assert.deepEqual(
+        getAwakeFactKeysFromLegacyRewardResults({ user_info: { free_mana: 5 } }),
+        [{ kind: "player" }],
+    )
     assert.deepEqual(
         getAwakeFactKeysFromLegacyRewardResults(
             { user_info: { free_mana: 0 } },
@@ -48,7 +68,32 @@ test("legacy reward fallback emits only a player fact for a positive Mana delta"
         [],
     )
     assert.deepEqual(
-        getAwakeFactKeysFromLegacyRewardResults({ user_info: { free_mana: 5 } }),
+        getAwakeFactKeysFromLegacyRewardResults({ user_info: { free_vmoney: 5 } }),
+        [],
+    )
+    assert.deepEqual(
+        getAwakeFactKeysFromLegacyRewardResults(
+            { user_info: { free_mana: 0 } },
+            { user_info: { free_vmoney: 9 } },
+            { user_info: { free_mana: 2 } },
+        ),
+        [{ kind: "player" }],
+    )
+})
+
+test("mail Awake helper maps FREE_MANA, zero, non-Mana, and mixed mail exactly", () => {
+    const getMailAwakeInvalidatedFactKeys = loadMailAwakeFactKeyHelper()
+    const { MailType } = require("../src/data/domains/mail")
+    const mail = type => ({ type })
+
+    assert.deepEqual(
+        getMailAwakeInvalidatedFactKeys([mail(MailType.FREE_MANA)]),
+        [{ kind: "player" }],
+    )
+    assert.deepEqual(getMailAwakeInvalidatedFactKeys([]), [])
+    assert.deepEqual(getMailAwakeInvalidatedFactKeys([mail(0), mail(MailType.ITEM)]), [])
+    assert.deepEqual(
+        getMailAwakeInvalidatedFactKeys([mail(MailType.ITEM), mail(MailType.FREE_MANA)]),
         [{ kind: "player" }],
     )
 })
@@ -185,4 +230,32 @@ test("all existing global-fact owners pass bounded invalidations into fresh publ
             > multi.indexOf("deleteActiveQuest?.()"),
         true,
     )
+})
+
+test("35.2 transaction-internal best-effort owners keep publication inside their owner boundary", () => {
+    const source = relativePath => fs.readFileSync(
+        path.join(__dirname, "..", relativePath),
+        "utf8",
+    )
+    const owners = [
+        ["single/finish", "src/lib/quest/finish/single-settlement-writes.ts", "publishAwakeCharacterListBestEffort(", 1, "transaction:"],
+        ["multi/finish", "src/multi/settlement/orchestrator.ts", "createAwakeRequestContextBestEffort(", 1, "const executeFinishWrites ="],
+        ["story", "src/routes/api/storyQuest.ts", "createAwakeRequestContextBestEffort(", 1, "getDb().transaction("],
+        ["bond", "src/routes/api/character/bond.ts", "createAwakeRequestContextBestEffort(", 1, "getDb().transaction("],
+        ["mail", "src/routes/api/mail.ts", "createAwakeRequestContextBestEffort(", 2, "getDb().transaction("],
+        ["active", "src/routes/api/activeMission.ts", "createAwakeRequestContextBestEffort(", 1, "getDb().transaction("],
+        ["tutorial", "src/routes/api/tutorial.ts", "createAwakeRequestContextBestEffort(", 2, "getDb().transaction("],
+    ]
+
+    assert.equal(owners.length, 7, "35.2 owner systems")
+    assert.equal(owners.reduce((total, [, , , count]) => total + count, 0), 9, "35.2 transaction-internal call expressions")
+    for (const [owner, relativeFile, publication, expectedCount, boundary] of owners) {
+        const text = source(relativeFile)
+        assert.equal((text.match(new RegExp(publication.replace("(", "\\("), "g")) ?? []).length, expectedCount, owner)
+        const publicationIndex = text.indexOf(publication)
+        assert.ok(publicationIndex >= 0, `${owner} must publish Awake facts`)
+        const transactionIndex = text.lastIndexOf(boundary, publicationIndex)
+        assert.ok(transactionIndex >= 0, `${owner} publication must stay under its owner transaction`)
+        assert.ok(transactionIndex < publicationIndex, `${owner} must publish after entering its transaction`)
+    }
 })

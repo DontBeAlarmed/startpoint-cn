@@ -194,6 +194,23 @@ best-effort、9 个提交后 best-effort。审计不统计
 事务边界、当前 publication 的 `scoped-context` 来源与候选来源短标识。35.0 不把旧链路
 loader 次数记为相对门禁；“每请求最多一次”由 35.1 的显式 Session observer 验收。
 
+35.2 与 35.3 的 owner inventory 是两套互斥的边界，不能把两个“9”合并解释。35.2 的 9 个
+事务内 best-effort 表达式为 `single/finish`、`multi/finish`、`story`、`bond`、
+`mail/receive`、`mail/receive_all`、`active`、`tutorial/update_step:15` 和
+`tutorial/update_step:16`；它们继续位于既有 owner 外层事务或 settlement callback 内。
+35.2 的 `learn_mana_node` 另为 1 个事务内 strict 表达式。35.3 的 9 个提交后 best-effort
+表达式为 `boxGacha`、`character/town`、`exchange`、`gacha/exchange_character`、
+`gacha/exec`、`item/sell`、`mission/update_mission_progress`、`shop/buy` 和
+`shop/bulk_buy`。`tools/post_commit_awake_owner.test.cjs` 固定两组的数量、成员和互斥性；
+`tools/awake_owner_fact_publication.test.cjs` 固定 35.2 owner 的 publication 仍在事务边界内。
+
+35.5C1 只把 owner 实际改变的 `FactKey` 透传到 fresh Awake publication，不迁移 35.2 的事务
+边界，也不把事务内 best-effort 改成 post-commit。publication 仍发生在 owner 最后一次权威
+写入之后；reconcile 自身仍只使用专用 nested savepoint，failure 语义保持不变。C1 不纳入
+`passCard` 或 `raidEvent`，也不把没有全局事实变化的 gacha、exchange、town 扩成全局事实
+publication。`boxGacha`、`shop` 和 `mail` 的完整真实四路 owner fixture 留给 35.5D 的
+owner-focused 范围；本阶段只保留最小的事实 helper、源级边界和已有 owner 证据。
+
 ### Focused 门禁
 
 focused 场景必须至少覆盖：
