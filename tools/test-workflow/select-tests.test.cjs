@@ -1532,6 +1532,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/economy_write_transaction.test.cjs",
         "tools/event_currency.test.cjs",
         "tools/gacha_write_transaction.test.cjs",
+        "tools/item_sell_awake_publication.test.cjs",
         "tools/item_use_cultivate_pack.test.cjs",
         "tools/inventory_write_transaction.test.cjs",
         "tools/inventory_rules.test.cjs",
@@ -1551,6 +1552,10 @@ test("keeps compiled-output and external-data tests out of quick", () => {
     ])
     assert.deepEqual(
         selectTestGroups(["src/lib/item-use-settlement.ts"]),
+        ["integration:rules"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/item_sell_awake_publication.test.cjs"]),
         ["integration:rules"],
     )
     assert.deepEqual(

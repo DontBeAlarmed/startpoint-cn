@@ -103,9 +103,9 @@ const routes = async (fastify: FastifyInstance) => {
             const code = 'errorCode' in result ? result.errorCode : undefined
             return reply.status(400).send({ "error": "Bad Request", "code": code, "message": result.error })
         }
-        // Mana sale changes player/item facts, but does not identify an affected
-        // character; publish only the cleanup portion of the post-commit owner.
-        const characterList = publishAwakeCharacterListBestEffort(playerId, [], [[]])
+        const characterList = publishAwakeCharacterListBestEffort(playerId, [], [[]], {
+            invalidatedFactKeys: [{ kind: "player" }],
+        })
 
         console.log(`[ITEM_SELL] account=${accountId} player=${playerId}: item ${itemId} ×${sellNumber} sold, mana +${result.manaGained} (${result.freeMana - result.manaGained} -> ${result.freeMana})`)
 

@@ -148,17 +148,18 @@ test("post-commit publication failure keeps a newly granted character candidate"
     assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId).get("1"), { 1: 1 })
 })
 
-test("Mana item sell uses cleanup-only candidate facts", () => {
+test("Mana item sell publishes the invalidated player fact without a character hardcode", () => {
     const itemSource = fs.readFileSync(path.join(__dirname, "../src/routes/api/item.ts"), "utf8")
     const sellBlock = itemSource.slice(itemSource.indexOf('fastify.post("/sell"'))
-    assert.match(sellBlock, /publishAwakeCharacterListBestEffort\(playerId, \[\], \[\[\]\]\)/)
-    const publicationLine = sellBlock.match(/const characterList = [^\n]+/)?.[0] ?? ""
-    assert.doesNotMatch(publicationLine, /characterId|character_id/)
     assert.match(
         sellBlock,
-        /Mana sale changes player\/item facts, but does not identify an affected\s*\/\/\s*character/,
-        "Mana sell has no proof tying the item fact to a character ID",
+        /publishAwakeCharacterListBestEffort\(playerId, \[\], \[\[\]\], \{\s*invalidatedFactKeys: \[\{ kind: ["']player["'] \}\],\s*\}\)/,
     )
+    const publicationCall = sellBlock.slice(
+        sellBlock.indexOf("publishAwakeCharacterListBestEffort("),
+        sellBlock.indexOf("console.log("),
+    )
+    assert.doesNotMatch(publicationCall, /263002|characterId|character_id/)
 })
 
 test("all nine post-commit owners use the fresh scoped wrapper after their owner write", () => {
