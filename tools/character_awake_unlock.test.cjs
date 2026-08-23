@@ -890,10 +890,13 @@ try {
         },
     )
     assert.equal(strictCharacterList.length, 0)
-    assert.strictEqual(
-        reconcileAwakeUnlocks(playerId, [341005], compatibilityContext).all,
-        compatibilityContext.readUnlocks(),
+    const compatibilityReconciliation = reconcileAwakeUnlocks(
+        playerId,
+        [341005],
+        compatibilityContext,
     )
+    assert.notStrictEqual(compatibilityReconciliation.all, compatibilityContext.readUnlocks())
+    assert.deepEqual(compatibilityReconciliation.all, compatibilityContext.readUnlocks())
 
     db.prepare(`
         DELETE FROM players_character_awake_unlocks

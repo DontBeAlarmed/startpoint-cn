@@ -361,7 +361,8 @@ test("summary and reconcile reuse Category 9 stages, progress, resolver, and unl
             context.resolver,
             context,
         )
-        assert.strictEqual(reconciled.all, context.readUnlocks())
+        assert.notStrictEqual(reconciled.all, context.readUnlocks())
+        assert.deepEqual(context.readUnlocks(), new Map())
         return firstSummary
     })
 
@@ -373,6 +374,92 @@ test("summary and reconcile reuse Category 9 stages, progress, resolver, and unl
     assert.equal(counts.unlocks, 0)
     const mission = summary.activeMissionList.find(entry => entry.mission_id === 3410051)
     assert.deepEqual(mission.stages, [{ stage: 1, received: true }])
+})
+
+test("outer rollback cannot refresh a context unlock snapshot", () => {
+    const playerId = createPlayer("outer-rollback-snapshot")
+    makeBaseReady(playerId, CHARACTER_A)
+    const context = requestContextModule().createAwakeRequestContext({
+        playerId,
+        evaluationTime,
+        candidateCharacterIds: [CHARACTER_A],
+    })
+    const rollback = new Error("rollback after awake reconcile")
+    let reconciledAll
+
+    assert.throws(() => db.transaction(() => {
+        reconciledAll = missionApi().reconcileAwakeUnlocksFromProgress(
+            playerId,
+            [
+                { missionId: 3410051, progress: 1 },
+                { missionId: 3410052, progress: 5 },
+                { missionId: 3410053, progress: 5 },
+                { missionId: 3410054, progress: 3 },
+            ],
+            context.resolver,
+            context,
+        ).all
+        assert.deepEqual(reconciledAll.get(String(CHARACTER_A)), { 1: 1 })
+        throw rollback
+    })(), error => error === rollback)
+
+    assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has(String(CHARACTER_A)), false)
+    assert.deepEqual(context.readUnlocks(), new Map())
+    assert.deepEqual(reconciledAll.get(String(CHARACTER_A)), { 1: 1 })
+})
+
+test("callers cannot mutate a context unlock snapshot through readUnlocks", () => {
+    const playerId = createPlayer("readonly-unlock-snapshot")
+    assert.equal(upsertPlayerCharacterAwakeUnlockSync(playerId, CHARACTER_A, 1, 1), true)
+    const context = requestContextModule().createAwakeRequestContext({
+        playerId,
+        evaluationTime,
+        candidateCharacterIds: [],
+    })
+    const exposed = context.readUnlocks()
+    exposed.set("999999", { 1: 9 })
+    exposed.get(String(CHARACTER_A))[1] = 7
+
+    assert.deepEqual(context.readUnlocks(), new Map([
+        [String(CHARACTER_A), { 1: 1 }],
+    ]))
+})
+
+test("legacy unlock snapshot is read inside the reconcile transaction", () => {
+    const playerId = createPlayer("legacy-unlock-read-boundary")
+    const resolver = missionApi().createCharacterAwakeEligibilityResolver(
+        playerId,
+        evaluationTime,
+    )
+    const originalPrepare = db.prepare.bind(db)
+    const originalTransactionMethod = db.transaction
+    const originalTransaction = db.transaction.bind(db)
+    const readDepths = []
+    let transactionDepth = 0
+
+    db.prepare = sql => {
+        const normalized = String(sql).replace(/\s+/g, " ").trim()
+        if (normalized.includes("FROM players_character_awake_unlocks")) {
+            readDepths.push(transactionDepth)
+        }
+        return originalPrepare(sql)
+    }
+    db.transaction = callback => originalTransaction((...args) => {
+        transactionDepth++
+        try {
+            return callback(...args)
+        } finally {
+            transactionDepth--
+        }
+    })
+    try {
+        missionApi().reconcileAwakeUnlocksFromProgress(playerId, [], resolver)
+    } finally {
+        db.prepare = originalPrepare
+        db.transaction = originalTransactionMethod
+    }
+
+    assert.deepEqual(readDepths, [1])
 })
 
 test.after(() => {

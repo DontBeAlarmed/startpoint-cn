@@ -38,21 +38,22 @@ export function reconcileAwakeUnlocksFromProgress(
     const effectiveResolver = context?.resolver
         ?? resolver
         ?? createCharacterAwakeEligibilityResolver(playerId)
-    const unlocks = context?.readUnlocks() ?? getPlayerCharacterAwakeUnlocksSync(playerId)
-    const nextUnlocks: CharacterAwakeUnlockMap = new Map(
-        [...unlocks].map(([characterId, levels]) => [characterId, { ...levels }]),
-    )
+    const contextUnlocks = context?.readUnlocks()
     const changed: CharacterAwakeUnlockMap = new Map()
     const removed: CharacterAwakeUnlockMap = new Map()
 
-    getDb().transaction(() => {
+    const nextUnlocks = getDb().transaction((): CharacterAwakeUnlockMap => {
+        const unlocks = contextUnlocks ?? getPlayerCharacterAwakeUnlocksSync(playerId)
+        const next: CharacterAwakeUnlockMap = new Map(
+            [...unlocks].map(([characterId, levels]) => [characterId, { ...levels }]),
+        )
         for (const [characterId, levels] of unlocks) {
             const numericCharacterId = Number(characterId)
             if (effectiveResolver.getBaseReadiness(numericCharacterId) !== "not-ready") continue
             if (effectiveResolver.hasPositiveManaNodeAwakeLevel(numericCharacterId)) continue
             if (deletePlayerCharacterAwakeUnlocksSync(playerId, numericCharacterId)) {
                 removed.set(characterId, { ...levels })
-                nextUnlocks.delete(characterId)
+                next.delete(characterId)
             }
         }
 
@@ -77,23 +78,19 @@ export function reconcileAwakeUnlocksFromProgress(
                 )
                 changed.set(characterId, levels)
 
-                const allLevels = nextUnlocks.get(characterId) ?? {}
+                const allLevels = next.get(characterId) ?? {}
                 allLevels[specialReward.boardIndex] = Math.max(
                     allLevels[specialReward.boardIndex] ?? 0,
                     specialReward.awakeLevel,
                 )
-                nextUnlocks.set(characterId, allLevels)
+                next.set(characterId, allLevels)
             }
         }
+        return next
     })()
 
-    unlocks.clear()
-    for (const [characterId, levels] of nextUnlocks) {
-        unlocks.set(characterId, levels)
-    }
-
     return {
-        all: unlocks,
+        all: nextUnlocks,
         changed,
         removed,
     }

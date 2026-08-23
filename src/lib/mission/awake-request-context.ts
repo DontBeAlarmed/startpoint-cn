@@ -48,6 +48,12 @@ interface InternalAwakeRequestContext extends AwakeRequestContext {
     readonly [INTERNAL_STATE]: AwakeRequestContextState
 }
 
+function cloneAwakeUnlocks(unlocks: CharacterAwakeUnlockMap): CharacterAwakeUnlockMap {
+    return new Map(
+        [...unlocks].map(([characterId, levels]) => [characterId, { ...levels }]),
+    )
+}
+
 function normalizePlayerId(playerId: number): number {
     if (!Number.isSafeInteger(playerId) || playerId <= 0) {
         throw new TypeError("Awake context playerId must be a positive safe integer")
@@ -161,7 +167,7 @@ class DefaultAwakeRequestContext implements InternalAwakeRequestContext {
         this.#categoryContext = categoryContext
         this.resolver = resolver
         this[INTERNAL_STATE] = Object.freeze({ categoryMissions })
-        this.#unlocks = unlocks
+        this.#unlocks = cloneAwakeUnlocks(unlocks)
         Object.freeze(this)
     }
 
@@ -215,7 +221,7 @@ class DefaultAwakeRequestContext implements InternalAwakeRequestContext {
     }
 
     readUnlocks(): CharacterAwakeUnlockMap {
-        return this.#unlocks
+        return cloneAwakeUnlocks(this.#unlocks)
     }
 }
 
