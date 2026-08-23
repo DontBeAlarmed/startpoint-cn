@@ -127,15 +127,21 @@ function matchesMultiSettlementIdentity(
 export function runMultiActiveQuestSettlementTransaction<T>(
     playerId: number,
     identity: MultiSettlementActiveQuestIdentity,
-    settle: () => T,
+    settle: (deleteActiveQuest?: () => void) => T,
 ): T {
     return getDb().transaction(() => {
         const storedQuest = getPlayerActiveQuestSync(playerId)
         if (!storedQuest || !matchesMultiSettlementIdentity(storedQuest, identity)) {
             throw new ActiveQuestSettlementConflictError()
         }
-        const result = settle()
-        deletePlayerActiveQuestSync(playerId)
+        let deleted = false
+        const deleteOnce = () => {
+            if (deleted) return
+            deletePlayerActiveQuestSync(playerId)
+            deleted = true
+        }
+        const result = settle(deleteOnce)
+        deleteOnce()
         return result
     })()
 }

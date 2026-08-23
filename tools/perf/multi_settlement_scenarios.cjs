@@ -128,7 +128,7 @@ async function runFinishScenario() {
     const originalOffset = getTimeOffset()
     const originalConsole = { error: console.error, log: console.log, warn: console.warn }
     const counter = createSqlCounter()
-    const measurement = { active: false, beganTransaction: false, events: [] }
+    const measurement = { active: false, beganTransaction: false, events: [], sqlTrace: [] }
     let app
     let restoreContent = () => {}
     let primaryError = null
@@ -154,6 +154,7 @@ async function runFinishScenario() {
                 verbose: sql => {
                     if (!measurement.active) return
                     counter.observe(sql)
+                    measurement.sqlTrace.push(String(sql))
                     if (!measurement.beganTransaction && /^BEGIN\b/i.test(String(sql).trim())) {
                         measurement.beganTransaction = true
                         measurement.events.push("transaction")
@@ -268,6 +269,7 @@ async function runFinishScenario() {
                 contentType: String(finished.headers["content-type"] ?? ""),
             }),
             sql: counter.snapshot(),
+            sqlTrace: measurement.sqlTrace,
             statusCode: finished.statusCode,
             verificationBeforeTransaction: verifyIndex >= 0
                 && transactionIndex >= 0

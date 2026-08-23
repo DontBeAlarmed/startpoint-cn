@@ -254,7 +254,7 @@ test("single and multi production finish routes call the shared Awake battle sea
 
     const multiPath = "src/multi/settlement/orchestrator.ts"
     const multiSource = fs.readFileSync(path.join(__dirname, "..", multiPath), "utf8")
-    const transactionBody = multiSource.indexOf("const executeFinishWrites = () => {")
+    const transactionBody = multiSource.indexOf("const executeFinishWrites = (")
     const seamCall = multiSource.indexOf("settleAwakeBattleMissions({", transactionBody)
     const transactionCall = multiSource.indexOf(
         "const writes = runMultiActiveQuestSettlementTransaction(",

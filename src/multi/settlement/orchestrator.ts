@@ -194,7 +194,7 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             && characterId > 0) partyCharacterIdsArray.push(characterId)
     }
 
-    const executeFinishWrites = () => {
+    const executeFinishWrites = (deleteActiveQuest?: () => void) => {
         const player = getPlayerSync(input.playerId)
         if (!player) throw new PlayerNotFoundError(input.playerId)
         const freshValidation = validateMultiFinishRequest(
@@ -390,6 +390,7 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             directlyChangedMissionIds: missionBattleFacts.awakeMissionIds,
             evaluationTime: settlementTime,
         })
+        deleteActiveQuest?.()
         const existingCharacterList = [
             ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
             ...((clearReward?.character_list || []) as Record<string, unknown>[]),

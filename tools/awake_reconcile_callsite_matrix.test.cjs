@@ -16,6 +16,27 @@ const CALLEES = new Map([
 ])
 const AWAKE_CALLEE_PREFIX = "reconcileAwakeUnlockCharacterList"
 const SINGLE_AWAKE_WRAPPER = "publishAwakeCharacterListBestEffort"
+const PLANNED_CANDIDATE_SOURCES = Object.freeze({
+    "single/finish": "battle-party+direct-missions",
+    "multi/finish": "battle-party+direct-missions",
+    "active_mission/receive": "claimed-reward-characters",
+    "box_gacha/exec": "drawn-reward-characters",
+    "character/add_character_from_town": "town-granted-character",
+    "character/receive_bond_token": "bond-character",
+    "character/learn_mana_node": "target-character",
+    "exchange/star_crumb": "exchange-reward-characters",
+    "gacha/exchange_character": "exchanged-character",
+    "gacha/exec": "drawn-characters",
+    "item/sell": "mana-item-fact",
+    "mail/receive": "mail-reward-characters",
+    "mail/receive_all": "mail-reward-characters",
+    "mission/update_mission_progress": "category9-delta-missions",
+    "shop/buy": "shop-reward-characters",
+    "shop/bulk_buy": "shop-reward-characters",
+    "story_quest/finish": "story-reward-characters",
+    "tutorial/update_step:15": "tutorial-gacha-characters",
+    "tutorial/update_step:16": "tutorial-present-character",
+})
 const ROUTE_OWNERS = Object.freeze({
     "src/routes/api/activeMission.ts": { "/receive": "active_mission/receive" },
     "src/routes/api/boxGacha.ts": { "/exec": "box_gacha/exec" },
@@ -203,35 +224,27 @@ function isMissionModuleSpecifier(specifier) {
 }
 
 function collectImportedAwakeCalls(source, fileName) {
-    const sourceFile = ts.createSourceFile(
-        fileName,
-        source,
-        ts.ScriptTarget.Latest,
-        true,
-        ts.ScriptKind.TS,
-    )
-    const namedImports = new Map()
-    const namespaceImports = new Map()
+    const { checker, sourceFile } = createTypeCheckedSource(source, fileName)
+    const namedImports = []
+    const namespaceImports = []
 
     for (const statement of sourceFile.statements) {
         if (!ts.isImportDeclaration(statement)
-            || !ts.isStringLiteral(statement.moduleSpecifier)
-            || !isMissionModuleSpecifier(statement.moduleSpecifier.text)) continue
+            || !ts.isStringLiteral(statement.moduleSpecifier)) continue
+        const moduleSpecifier = statement.moduleSpecifier.text
         const bindings = statement.importClause?.namedBindings
         if (bindings && ts.isNamedImports(bindings)) {
             for (const element of bindings.elements) {
                 const exportedName = element.propertyName?.text ?? element.name.text
-                if (exportedName.startsWith(AWAKE_CALLEE_PREFIX)
-                    || (exportedName === SINGLE_AWAKE_WRAPPER
-                        && statement.moduleSpecifier.text.endsWith("/awake-best-effort-context"))) {
-                    namedImports.set(element.name.text, {
-                        exportedName,
-                        moduleSpecifier: statement.moduleSpecifier.text,
-                    })
-                }
+                if (!exportedName.startsWith(AWAKE_CALLEE_PREFIX)
+                    && exportedName !== SINGLE_AWAKE_WRAPPER) continue
+                const symbol = checker.getSymbolAtLocation(element.name)
+                if (symbol === undefined) continue
+                namedImports.push({ symbol, exportedName, moduleSpecifier })
             }
         } else if (bindings && ts.isNamespaceImport(bindings)) {
-            namespaceImports.set(bindings.name.text, statement.moduleSpecifier.text)
+            const symbol = checker.getSymbolAtLocation(bindings.name)
+            if (symbol !== undefined) namespaceImports.push({ symbol, moduleSpecifier })
         }
     }
 
@@ -241,22 +254,36 @@ function collectImportedAwakeCalls(source, fileName) {
             let exportedName = null
             let moduleSpecifier = null
             if (ts.isIdentifier(node.expression)) {
-                const imported = namedImports.get(node.expression.text)
+                const symbol = checker.getSymbolAtLocation(node.expression)
+                const imported = namedImports.find(entry => entry.symbol === symbol)
                 exportedName = imported?.exportedName ?? null
                 moduleSpecifier = imported?.moduleSpecifier ?? null
             } else if (ts.isPropertyAccessExpression(node.expression)
                 && ts.isIdentifier(node.expression.expression)
-                && namespaceImports.has(node.expression.expression.text)) {
-                const namespaceSpecifier = namespaceImports.get(node.expression.expression.text)
+            ) {
+                const namespaceSymbol = checker.getSymbolAtLocation(node.expression.expression)
+                const imported = namespaceImports.find(entry => entry.symbol === namespaceSymbol)
+                if (imported === undefined) {
+                    ts.forEachChild(node, visit)
+                    return
+                }
+                const namespaceSpecifier = imported.moduleSpecifier
                 const name = node.expression.name.text
-                if (name.startsWith(AWAKE_CALLEE_PREFIX)
-                    || (name === SINGLE_AWAKE_WRAPPER
-                        && namespaceSpecifier.endsWith("/awake-best-effort-context"))) {
+                if (name.startsWith(AWAKE_CALLEE_PREFIX) || name === SINGLE_AWAKE_WRAPPER) {
                     exportedName = name
                     moduleSpecifier = namespaceSpecifier
                 }
             }
             if (exportedName !== null) {
+                if (exportedName === SINGLE_AWAKE_WRAPPER
+                    && !moduleSpecifier.endsWith("/awake-best-effort-context")) {
+                    throw new Error(`${fileName} single Awake wrapper import must use awake-best-effort-context`)
+                }
+                if (exportedName !== SINGLE_AWAKE_WRAPPER
+                    && !isMissionModuleSpecifier(moduleSpecifier)) {
+                    ts.forEachChild(node, visit)
+                    return
+                }
                 const callee = CALLEES.get(exportedName)
                 if (callee === undefined) {
                     throw new Error(`${fileName} calls unknown Awake publication helper ${exportedName}`)
@@ -687,12 +714,19 @@ function collectProductionCalls() {
                 assert.equal(optionNames.has("context"), true, `${relativeFile} scoped publication must pass fresh context`)
                 assert.equal(optionNames.has("candidateCharacterIds"), true, `${relativeFile} scoped publication must pass candidates`)
             }
+            const ownerLabel = classifyOwner(relativeFile, call, sourceFile)
+            assert.equal(
+                typeof PLANNED_CANDIDATE_SOURCES[ownerLabel],
+                "string",
+                `${relativeFile} Awake owner must have a planned candidate source`,
+            )
             calls.push({
                 relativeFile,
                 callee,
-                ownerLabel: classifyOwner(relativeFile, call, sourceFile),
+                ownerLabel,
                 boundary: classifyBoundary(relativeFile, callee, call),
                 candidateSource: call.arguments.length === 3 ? "scoped-context" : "legacy-unscoped",
+                plannedCandidateSource: PLANNED_CANDIDATE_SOURCES[ownerLabel],
                 position: call.getStart(sourceFile),
             })
         }
@@ -706,19 +740,21 @@ test("Awake reconcile production call expressions match the fixed 19-entry audit
     const calls = collectProductionCalls()
     assert.equal(calls.length, 19)
     assert.deepEqual(
-        calls.map(({ relativeFile, callee, ownerLabel, boundary, candidateSource }) => ({
+        calls.map(({ relativeFile, callee, ownerLabel, boundary, candidateSource, plannedCandidateSource }) => ({
             relativeFile,
             callee,
             ownerLabel,
             boundary,
             candidateSource,
+            plannedCandidateSource,
         })),
-        EXPECTED_MATRIX.map(({ relativeFile, callee, ownerLabel, boundary, candidateSource }) => ({
+        EXPECTED_MATRIX.map(({ relativeFile, callee, ownerLabel, boundary, candidateSource, plannedCandidateSource }) => ({
             relativeFile,
             callee,
             ownerLabel,
             boundary,
             candidateSource,
+            plannedCandidateSource,
         })),
     )
     assert.equal(new Set(calls.map(call => `${call.relativeFile}:${call.position}`)).size, 19)
@@ -828,6 +864,35 @@ test("AST collector ignores ordinary local functions with an Awake helper-like n
     `
 
     assert.deepEqual(collectImportedAwakeCalls(source, "synthetic.ts"), [])
+})
+
+test("AST collector fails closed on local and namespace shadowing", () => {
+    const localShadow = `
+        import { reconcileAwakeUnlockCharacterListBestEffort } from "./mission"
+        export function run() {
+            function reconcileAwakeUnlockCharacterListBestEffort() { return [] }
+            return reconcileAwakeUnlockCharacterListBestEffort(1, [])
+        }
+    `
+    const namespaceShadow = `
+        import * as missionApi from "./mission"
+        export function run(missionApi) {
+            return missionApi.reconcileAwakeUnlockCharacterListBestEffort(1, [])
+        }
+    `
+    assert.deepEqual(collectImportedAwakeCalls(localShadow, "synthetic.ts"), [])
+    assert.deepEqual(collectImportedAwakeCalls(namespaceShadow, "synthetic.ts"), [])
+})
+
+test("AST collector enforces the single wrapper module contract", () => {
+    const wrongModule = `
+        import { publishAwakeCharacterListBestEffort } from "./mission"
+        publishAwakeCharacterListBestEffort(1, [], [])
+    `
+    assert.throws(
+        () => collectImportedAwakeCalls(wrongModule, "synthetic.ts"),
+        /single Awake wrapper import must use awake-best-effort-context/i,
+    )
 })
 
 test("single settlement ownership requires writes inside the settle callback", () => {

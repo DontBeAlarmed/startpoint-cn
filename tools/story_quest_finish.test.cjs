@@ -32,6 +32,7 @@ restoreContentSnapshot = installBundledGameplaySnapshot()
 const { initializeDatabase } = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerCharacterSync } = require("../src/data/domains/character")
+const { insertPlayerCharacterManaNodesSync, updatePlayerCharacterSync } = require("../src/data/domains/character")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getPlayerSingleQuestProgressSync } = require("../src/data/domains/quest")
 const { getPlayerActiveMissionsSync } = require("../src/data/domains/mission")
@@ -109,6 +110,74 @@ async function main() {
     assert.deepEqual(repeatedData.story_join_character_id_list, [])
     assert.deepEqual(repeatedData.character_list, [])
     assert.equal(getPlayerCharacterSync(direct.playerId, 10).stack, 0)
+
+    const ownedStoryCharacter = await createPlayer(7)
+    const { givePlayerCharacterSync } = require("../src/lib/character")
+    assert.ok(givePlayerCharacterSync(ownedStoryCharacter.playerId, 10)?.character)
+    const { getCharacterDataSync, getCharacterManaNodesSync } = require("../src/lib/assets")
+    const { characterExpCaps } = require("../src/lib/character")
+    const ownedAsset = getCharacterDataSync(10)
+    const ownedManaNodes = getCharacterManaNodesSync(10, 1)
+    assert.ok(ownedAsset && ownedManaNodes)
+    updatePlayerCharacterSync(
+        ownedStoryCharacter.playerId,
+        10,
+        { exp: characterExpCaps[ownedAsset.rarity][0] },
+    )
+    insertPlayerCharacterManaNodesSync(
+        ownedStoryCharacter.playerId,
+        10,
+        Object.keys(ownedManaNodes).map(Number),
+    )
+    const defaultStoryCharacter = getCharacterDataSync(1)
+    const defaultStoryManaNodes = getCharacterManaNodesSync(1, 1)
+    assert.ok(defaultStoryCharacter && defaultStoryManaNodes)
+    updatePlayerCharacterSync(
+        ownedStoryCharacter.playerId,
+        1,
+        { exp: characterExpCaps[defaultStoryCharacter.rarity][0] },
+    )
+    insertPlayerCharacterManaNodesSync(
+        ownedStoryCharacter.playerId,
+        1,
+        Object.keys(defaultStoryManaNodes).map(Number),
+    )
+    for (const characterStoryQuestId of [101, 102]) {
+        const response = await finish(
+            app,
+            ownedStoryCharacter.viewerId,
+            characterStoryQuestId,
+            "/story/finish",
+            3,
+        )
+        assert.equal(response.statusCode, 200, response.body)
+    }
+    const awakeContextModule = require("../src/lib/mission/awake-best-effort-context")
+    const originalCreateAwakeRequestContextBestEffort = awakeContextModule.createAwakeRequestContextBestEffort
+    let observedCandidateCharacterIds
+    awakeContextModule.createAwakeRequestContextBestEffort = (playerId, candidateCharacterIds) => {
+        observedCandidateCharacterIds = [...candidateCharacterIds]
+        return originalCreateAwakeRequestContextBestEffort(playerId, candidateCharacterIds)
+    }
+    const ownedStoryFinish = await finish(app, ownedStoryCharacter.viewerId, 2009007)
+    awakeContextModule.createAwakeRequestContextBestEffort = originalCreateAwakeRequestContextBestEffort
+    assert.equal(ownedStoryFinish.statusCode, 200, ownedStoryFinish.body)
+    const ownedStoryData = decode(ownedStoryFinish).data
+    const { createAwakeRequestContext } = require("../src/lib/mission/awake-request-context")
+    const debugContext = createAwakeRequestContext({
+        playerId: ownedStoryCharacter.playerId,
+        candidateCharacterIds: [1],
+    })
+    assert.deepEqual(observedCandidateCharacterIds, [10])
+    assert.deepEqual(
+        debugContext.evaluate([1]).find(entry => entry.missionId === 11),
+        { missionId: 11, progress: 2 },
+    )
+    assert.deepEqual(
+        ownedStoryData.story_join_character_id_list,
+        [],
+        "already-owned story character must remain absent from the response grant list",
+    )
 
     const characterEpisode = await createPlayer(5)
     const characterEpisodeFinish = await finish(

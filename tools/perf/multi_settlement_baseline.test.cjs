@@ -186,6 +186,20 @@ test("runs production multiplayer finish with SQL and ordering observations", as
     assert.ok(finish.observations.eventLoopDelayMs >= 0)
 })
 
+test("deletes the persisted active quest exactly once before Awake publication", async () => {
+    const scenario = require("./multi_settlement_scenarios.cjs").SCENARIOS
+        .find(entry => entry.name === "finish")
+    const result = await scenario.run()
+    const trace = result.sqlTrace
+    const deleteIndexes = trace
+        .map((sql, index) => /^DELETE FROM players_active_quests\b/i.test(sql.trim()) ? index : -1)
+        .filter(index => index >= 0)
+    const publicationIndex = trace.findIndex(sql => /\bplayers_character_awake_unlocks\b/i.test(sql))
+    assert.deepEqual(deleteIndexes.length, 1, trace.join("\n"))
+    assert.ok(publicationIndex >= 0, trace.join("\n"))
+    assert.ok(deleteIndexes[0] < publicationIndex, trace.join("\n"))
+})
+
 test("production settlement baseline is deterministic across consecutive runs", async () => {
     const first = await runMultiSettlementBaseline()
     const second = await runMultiSettlementBaseline()

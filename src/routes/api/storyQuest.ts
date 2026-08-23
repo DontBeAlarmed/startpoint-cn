@@ -56,10 +56,11 @@ function processStoryQuestFinish(playerId: number, questSection: number, questId
             ? givePlayerRewardSync(playerId, questData.clearReward)
             : null
         const storyJoinCharacterIds: number[] = []
+        const storyCandidateCharacterIds = getQuestJoinCharacterIds(questSection, questId)
         const storyCharacterList: Record<string, unknown>[] = []
 
         if (firstClear) {
-            for (const characterId of getQuestJoinCharacterIds(questSection, questId)) {
+            for (const characterId of storyCandidateCharacterIds) {
                 if (getPlayerCharacterSync(playerId, characterId) !== null) continue
                 const giveResult = givePlayerCharacterSync(playerId, characterId)
                 if (!giveResult?.character) {
@@ -96,7 +97,7 @@ function processStoryQuestFinish(playerId: number, questSection: number, questId
             now: getServerTime() * 1000,
         })
         const candidateCharacterIds = collectAwakeCandidateCharacterIds(
-            storyJoinCharacterIds,
+            storyCandidateCharacterIds,
             [existingCharacterList],
         )
         const awakeContext = createAwakeRequestContextBestEffort(playerId, candidateCharacterIds)
