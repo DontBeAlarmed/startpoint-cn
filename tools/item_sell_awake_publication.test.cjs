@@ -12,41 +12,107 @@ const Fastify = require("fastify")
 const BetterSqlite3 = require("better-sqlite3")
 const { unpack } = require("msgpackr")
 
-const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "item-sell-awake-"))
-const previousDataDirectory = process.env.DATA_DIR
-const previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR
-process.env.DATA_DIR = databaseDirectory
-delete process.env.WDFP_DATABASE_DIR
-
-const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
-    .installBundledGameplaySnapshot()
-const data = require("../src/data")
-const { insertAccountSync } = require("../src/data/domains/account")
-const {
-    insertDefaultPlayerCharacterSync,
-    insertPlayerCharacterManaNodesSync,
-    updatePlayerCharacterSync,
-} = require("../src/data/domains/character")
-const {
-    getPlayerCharacterAwakeUnlocksSync,
-} = require("../src/data/domains/character_awake")
-const { givePlayerItemSync, getPlayerItemSync } = require("../src/data/domains/item")
-const { updatePlayerCategoryMissionSync } = require("../src/data/domains/mission")
-const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
-const { insertSessionWithToken } = require("../src/data/domains/session")
-const { SessionType } = require("../src/data/types")
-const characterAssets = require("../src/lib/assets")
-const { characterExpCaps } = require("../src/lib/character")
-const itemRoutes = require("../src/routes/api/item").default
-const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
-
 const AWAKE_CHARACTER_ID = 263002
 const ITEM_ID = 1
 const MANA_THRESHOLD = 604800
+const NO_ERROR = Symbol("no error")
 
-let app
-let database
+let app = null
+let database = null
+let databaseDirectory = null
+let previousDataDirectory
+let previousDatabaseDirectory
+let environmentCaptured = false
+let restoreContentSnapshot = null
+let cleanupComplete = false
+let data
+let insertAccountSync
+let insertDefaultPlayerCharacterSync
+let insertPlayerCharacterManaNodesSync
+let updatePlayerCharacterSync
+let getPlayerCharacterAwakeUnlocksSync
+let givePlayerItemSync
+let getPlayerItemSync
+let updatePlayerCategoryMissionSync
+let getPlayerSync
+let insertDefaultPlayerSync
+let updatePlayerSync
+let insertSessionWithToken
+let SessionType
+let characterAssets
+let characterExpCaps
+let itemRoutes
+let registerCnMsgpackOnSend
 let nextViewerId = 860000000
+
+function cleanupActions() {
+    return [
+        async () => {
+            const instance = app
+            app = null
+            if (instance !== null) await instance.close()
+        },
+        () => {
+            database = null
+            if (data !== undefined) data.closeDatabase()
+        },
+        () => {
+            const restore = restoreContentSnapshot
+            restoreContentSnapshot = null
+            if (restore !== null) restore()
+        },
+        () => {
+            const directory = databaseDirectory
+            databaseDirectory = null
+            if (directory !== null) fs.rmSync(directory, { recursive: true, force: true })
+        },
+        () => {
+            if (!environmentCaptured) return
+            environmentCaptured = false
+            if (previousDataDirectory === undefined) delete process.env.DATA_DIR
+            else process.env.DATA_DIR = previousDataDirectory
+            if (previousDatabaseDirectory === undefined) delete process.env.WDFP_DATABASE_DIR
+            else process.env.WDFP_DATABASE_DIR = previousDatabaseDirectory
+        },
+    ]
+}
+
+async function completeCleanup(primaryError, actions) {
+    if (cleanupComplete) {
+        if (primaryError !== NO_ERROR) throw primaryError
+        return
+    }
+
+    const cleanupErrors = []
+    for (const action of actions) {
+        try {
+            await action()
+        } catch (error) {
+            cleanupErrors.push(error instanceof Error
+                ? error
+                : new Error("Item sell Awake cleanup threw a non-Error value", { cause: error }))
+        }
+    }
+    cleanupComplete = true
+
+    if (primaryError !== NO_ERROR) {
+        const normalizedPrimary = primaryError instanceof Error
+            ? primaryError
+            : new Error("Item sell Awake initialization threw a non-Error value", {
+                cause: primaryError,
+            })
+        if (cleanupErrors.length > 0) {
+            throw new AggregateError(
+                [normalizedPrimary, ...cleanupErrors],
+                `Item sell Awake cleanup failed after: ${normalizedPrimary.message}`,
+            )
+        }
+        throw normalizedPrimary
+    }
+    if (cleanupErrors.length > 0) {
+        throw new AggregateError(cleanupErrors, "Item sell Awake cleanup failed")
+    }
+}
 
 async function createAwakeReadyPlayer(label, itemCount = 1) {
     const account = insertAccountSync({
@@ -108,25 +174,53 @@ function getAwakeCharacter(responseData) {
 }
 
 test.before(async () => {
-    database = data.initializeDatabase({
-        databaseFactory: databasePath => new BetterSqlite3(databasePath),
-    })
-    app = Fastify({ logger: false })
-    registerCnMsgpackOnSend(app)
-    await app.register(itemRoutes, { prefix: "/item" })
-    await app.ready()
+    try {
+        previousDataDirectory = process.env.DATA_DIR
+        previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR
+        environmentCaptured = true
+        databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "item-sell-awake-"))
+        process.env.DATA_DIR = databaseDirectory
+        delete process.env.WDFP_DATABASE_DIR
+
+        restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+            .installBundledGameplaySnapshot()
+        data = require("../src/data")
+        ;({ insertAccountSync } = require("../src/data/domains/account"))
+        ;({
+            insertDefaultPlayerCharacterSync,
+            insertPlayerCharacterManaNodesSync,
+            updatePlayerCharacterSync,
+        } = require("../src/data/domains/character"))
+        ;({
+            getPlayerCharacterAwakeUnlocksSync,
+        } = require("../src/data/domains/character_awake"))
+        ;({ givePlayerItemSync, getPlayerItemSync } = require("../src/data/domains/item"))
+        ;({ updatePlayerCategoryMissionSync } = require("../src/data/domains/mission"))
+        ;({
+            getPlayerSync,
+            insertDefaultPlayerSync,
+            updatePlayerSync,
+        } = require("../src/data/domains/player"))
+        ;({ insertSessionWithToken } = require("../src/data/domains/session"))
+        ;({ SessionType } = require("../src/data/types"))
+        characterAssets = require("../src/lib/assets")
+        ;({ characterExpCaps } = require("../src/lib/character"))
+        itemRoutes = require("../src/routes/api/item").default
+        ;({ registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack"))
+
+        database = data.initializeDatabase({
+            databaseFactory: databasePath => new BetterSqlite3(databasePath),
+        })
+        app = Fastify({ logger: false })
+        registerCnMsgpackOnSend(app)
+        await app.register(itemRoutes, { prefix: "/item" })
+        await app.ready()
+    } catch (error) {
+        await completeCleanup(error, cleanupActions())
+    }
 })
 
-test.after(async () => {
-    await app.close()
-    data.closeDatabase()
-    restoreContentSnapshot()
-    fs.rmSync(databaseDirectory, { recursive: true, force: true })
-    if (previousDataDirectory === undefined) delete process.env.DATA_DIR
-    else process.env.DATA_DIR = previousDataDirectory
-    if (previousDatabaseDirectory === undefined) delete process.env.WDFP_DATABASE_DIR
-    else process.env.WDFP_DATABASE_DIR = previousDatabaseDirectory
-})
+test.after(async () => completeCleanup(NO_ERROR, cleanupActions()))
 
 test("item sale publishes the 263002 Awake unlock after crossing lifetime Mana", async () => {
     const { playerId, viewerId } = await createAwakeReadyPlayer("threshold")
@@ -192,4 +286,8 @@ test("Awake publication failure preserves the committed item sale", async t => {
     assert.equal(responseData.character_list, undefined)
     assert.equal(publicationErrors.length, 1)
     assert.match(String(publicationErrors[0][0]), /Failed to publish character unlocks/)
+    const publicationError = publicationErrors[0][1]
+    assert.ok(publicationError instanceof Error)
+    assert.equal(publicationError.message, "injected item sale Awake publication failure")
+    assert.equal(publicationError.code, "SQLITE_CONSTRAINT_TRIGGER")
 })
