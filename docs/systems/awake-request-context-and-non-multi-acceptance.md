@@ -1,6 +1,6 @@
 # 觉醒请求上下文与非多人总验收架构
 
-状态：35.3 已完成提交后 owner 与 `/load` full recovery；35.4/35.5 尚未验收
+状态：35.4 已完成分层验收；35.5 尚未验收
 
 日期：2026-08-24
 
@@ -246,7 +246,7 @@ formal profile 使用 1000 份互相独立的存档、600 个活跃身份，并�
 | 35.1 核心 context | 实现 scope 收集/冻结、fresh context、Session、scoped evaluator/reader、seed 校验和生命周期清理 | 已完成；请求 context 与专项回归已通过 |
 | 35.2 事务内 owner | 迁移 learn strict，以及 finish、story、bond、mail、Active Mission、tutorial 的事务内 best-effort owner | 已完成；事务边界与 savepoint 专项回归已通过 |
 | 35.3 提交后 owner 与 `/load` | 迁移 mission、item、shop、gacha、boxGacha、exchange、character/town；保留 `/load` full recovery | 已完成；提交后故障注入、独立 full recovery、active mission fixture 兼容和 workflow 精确分组回归通过 |
-| 35.4 分层验收 | 运行 focused、7/7 轻量回归和一轮 formal 预飞 | 尚未执行；不得据当前证据标记通过 |
+| 35.4 分层验收 | 运行 focused、7/7 轻量回归和一轮 formal 预飞 | 已完成；行为、SQL/loader、回滚、清理和 profile 结构均准入，详见下方实测证据 |
 | 35.5 终审与正式验收 | 独立终审；只运行一次 `npm run verify:full`；随后执行带多人/Hub 哨兵的连续三轮正式验收并回填结果 | 尚未执行；不得据当前证据标记通过 |
 
 35.0 至 35.5 每个阶段完成后各自创建本地 commit，均不 push。任一阶段未满足自己的证据要求时不得标记完成，也不得把后续阶段的测试结果回填到前一阶段冒充通过。
@@ -261,8 +261,57 @@ formal profile 使用 1000 份互相独立的存档、600 个活跃身份，并�
 
 ## 文档回填规则
 
-本文件当前记录已确认设计、35.0--35.3 的实现状态和后续门禁，不声称最终性能收益。35.3 的实现提交为
-`59c131ca refactor(mission): scope post-commit awake owners`；当前专项证据包括：
+本文件记录已确认设计、35.0--35.4 的实现与验收状态，不声称最终性能收益。35.3 的实现提交为
+`59c131ca refactor(mission): scope post-commit awake owners`；对应专项证据包括
 `tools/active_mission_reconciliation.test.cjs`、`tools/load_awake_full_recovery.test.cjs`、
-`tools/post_commit_awake_owner.test.cjs` 和 `tools/test-workflow/select-tests.test.cjs` 已通过。
-本次记录未运行 `verify:full`，也未执行 formal 预飞或连续三轮正式验收；只有后续真实命令输出与报告支持的结论才能写为“通过”。
+`tools/post_commit_awake_owner.test.cjs` 和 `tools/test-workflow/select-tests.test.cjs`。
+
+### 35.4 实测证据（2026-08-24）
+
+验收环境为 Node.js `v22.23.1`、Darwin x64、8 个逻辑 CPU。以下命令均从
+`starpoint-cn` 仓库根目录执行；本轮没有运行 `verify:full`，没有使用 `--write` 或
+`--write-reference`，也没有执行 35.5 的连续三轮 formal 验收。
+
+focused 使用 `npm run benchmark:awake-request-context`，退出码为 0，用时 6.33 秒。
+固定场景集合 `full-publication`、`candidate-one`、`empty-candidate-cleanup`、
+`strict-failure-rollback`、`best-effort-failure` 全部准入，行为 payload/hash 与检入
+snapshot 一致；五个场景的 `SQL reads/writes/mission computes` 分别为 `11/1/7`、
+`18/2/14`、`5/1/0`、`11/2/7`、`11/2/7`。两个故障场景均实际命中注入点，strict
+保持 owner 与 unlock 整体回滚，best-effort 保留 owner 的 7 Mana 写入并回滚 reconcile
+savepoint。随后运行
+`node --test tools/awake_request_context.test.cjs tools/mission_awake_session.test.cjs`，
+30/30 通过，用时 8.03 秒，复核候选 0/1/多、请求 context 生命周期、Category 9
+快照复用以及每种已使用事实 loader 每个 Session 最多调用一次。
+
+轻量回归使用
+`npm run benchmark:non-multi-mixed -- --output <WORKSPACE_ROOT>/docs/reports/task-35.4/non-multi-mixed-smoke.json`，
+退出码为 0，用时 10.28 秒。profile 为 7 份独立存档、7 个活跃身份、并发 `[2]`；
+auth、load、mission-progress、single-battle、shop、gacha、mail 各完成 1 个请求且错误为 0。
+各入口 `readsMax/writesMax` 依次为 `8/3`、`46/6`、`14/1`、`111/29`、`26/5`、
+`69/8`、`18/4`，行为签名稳定且写入口回滚验证全部通过。轻量报告的
+`loadProfileValid:false` 和 `admitted:false` 是其不冒充 formal profile 的既定结果；
+结构、零错误、行为稳定和回滚四项检查均为 `true`。本地报告 SHA-256 为
+`73af1ae10b304876eab50ca7cc8a4209a4f6c25891b6344891e9b221e1e5a843`。
+
+单轮 formal 预飞使用
+`npm run benchmark:full-server-acceptance -- --formal --rounds 1 --output <WORKSPACE_ROOT>/docs/reports/task-35.4/full-server-formal-preflight-round-1.json`，
+退出码为 0，用时 235.83 秒。非多人 profile 为 1000 份独立存档、600 个活跃身份、
+并发 `[10,25,50,100]`，每档均完成 600 个请求且错误为 0；四档 p95 分别为
+`680.738`、`1643.004`、`3216.023`、`5943.13` 毫秒。跨四档各入口最大
+`readsMax/writesMax` 为 auth `8/3`、load `46/9`、mission-progress `14/1`、
+single-battle `141/102`、shop `26/5`、gacha `74/9`、mail `18/4`；非多人报告的结构、
+零错误、行为稳定、回滚和 formal profile 检查全部通过。
+
+现有 full-server runner 将 formal 多人/Hub 哨兵作为不可分割子流程，因此本次预飞也按其
+既有职责运行了 120 个身份、60 个双人房间和并发 `[5,10,20]`。每档均完成 60 个房间和
+120 个玩家，双向房主各 30 个房间，协议/HTTP 共存、重复结算拒绝、行为签名与清理检查均
+通过；每档结束后的 active quest、peer、子进程和剩余房间均为 0，端口已释放且临时根目录
+不存在。整轮 `structuralAdmitted:true`、`admitted:true`，报告 SHA-256 为
+`1da2b86c51e8fdeb5851d324556fecceaf7d6b861ae5a4d4afa0fbd5af3fe6ca`。
+
+该 formal 结果只是一轮预飞，不计入 35.5 的连续三轮。`referenceComparable:false` 是
+单轮报告的既定状态，因此本节不据 observed ratio 或墙钟声明最终 p95 门禁、容量收益或生产
+性能改善。验收前后 `awake_request_context_baseline.json` 与
+`full_server_acceptance_reference.json` 的 SHA-256 分别保持
+`a4fabbed0d5dcc8e822aa8cc48b41e7f10c60af0d77e30a8591bdb4c93a7dcc4` 和
+`05f06ff9f3c7d4dfb6f113eabb2a7f42c6bb04d97eae03c95500ac4aff639299`，未写入 reference。
