@@ -241,6 +241,7 @@ const routes = async (fastify: FastifyInstance) => {
             playerId,
             [characterId],
             [existingCharacterList],
+            {},
         )
 
         reply.header("content-type", "application/x-msgpack")
@@ -464,6 +465,7 @@ const routes = async (fastify: FastifyInstance) => {
                 playerId,
                 [],
                 [existingCharacterList],
+                {},
             )
 
             return reply.status(200).send({

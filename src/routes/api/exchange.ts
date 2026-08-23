@@ -162,6 +162,7 @@ const routes = async (fastify: FastifyInstance) => {
             playerId,
             kind === 0 ? [targetId] : [],
             [settlement.characterList],
+            {},
         )
 
         reply.header("content-type", "application/x-msgpack");

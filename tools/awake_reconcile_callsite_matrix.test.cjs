@@ -686,10 +686,11 @@ function collectProductionCalls() {
                     true,
                     `${relativeFile} post-commit wrapper import must use awake-best-effort-context`,
                 )
+                assert.equal(call.arguments.length, 4, `${relativeFile} wrapper must receive explicit scope`)
                 assert.equal(
-                    call.arguments.length === 3 || call.arguments.length === 4,
+                    ts.isObjectLiteralExpression(call.arguments[3]),
                     true,
-                    `${relativeFile} wrapper must receive scoped inputs`,
+                    `${relativeFile} wrapper fourth argument must be an object expression`,
                 )
                 if (relativeFile === "src/lib/quest/finish/single-settlement-writes.ts") {
                     assertSingleAwakePublicationWrapper()
@@ -727,7 +728,7 @@ function collectProductionCalls() {
                 boundary: classifyBoundary(relativeFile, callee, call),
                 candidateSource: (
                     exportedName === SINGLE_AWAKE_WRAPPER
-                        ? call.arguments.length === 3 || call.arguments.length === 4
+                        ? call.arguments.length === 4
                         : call.arguments.length === 3
                 ) ? "scoped-context" : "legacy-unscoped",
                 plannedCandidateSource: PLANNED_CANDIDATE_SOURCES[ownerLabel],

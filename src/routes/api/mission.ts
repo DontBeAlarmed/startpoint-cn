@@ -258,6 +258,7 @@ const routes = async (fastify: FastifyInstance) => {
             playerId,
             awakeCandidateCharacterIds,
             [[]],
+            {},
         )
         console.log(`[MISSION] update_progress viewer=${viewerId} params=${missionParams.length} db_updates=${updatedCount}`)
 

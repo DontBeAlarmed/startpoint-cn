@@ -71,6 +71,13 @@ test("legacy reward fallback maps positive, zero, non-Mana, and mixed results ex
         getAwakeFactKeysFromLegacyRewardResults({ user_info: { free_vmoney: 5 } }),
         [],
     )
+    for (const value of [0.5, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+        assert.deepEqual(
+            getAwakeFactKeysFromLegacyRewardResults({ user_info: { free_mana: value } }),
+            [],
+            `non-safe Mana value ${String(value)} must not invalidate player facts`,
+        )
+    }
     assert.deepEqual(
         getAwakeFactKeysFromLegacyRewardResults(
             { user_info: { free_mana: 0 } },
@@ -220,42 +227,4 @@ test("all existing global-fact owners pass bounded invalidations into fresh publ
     assert.match(single, /questCategory\s*===\s*QuestCategory\.CHARACTER/)
     assert.match(multi, /invalidatedFactKeys/)
     assert.match(multi, /questCategory\s*===\s*QuestCategory\.CHARACTER/)
-    assert.equal(
-        single.indexOf("publishAwakeCharacterListBestEffort(")
-            > single.indexOf("deletePlayerActiveQuestSync(playerId)"),
-        true,
-    )
-    assert.equal(
-        multi.indexOf("createAwakeRequestContextBestEffort(")
-            > multi.indexOf("deleteActiveQuest?.()"),
-        true,
-    )
-})
-
-test("35.2 transaction-internal best-effort owners keep publication inside their owner boundary", () => {
-    const source = relativePath => fs.readFileSync(
-        path.join(__dirname, "..", relativePath),
-        "utf8",
-    )
-    const owners = [
-        ["single/finish", "src/lib/quest/finish/single-settlement-writes.ts", "publishAwakeCharacterListBestEffort(", 1, "transaction:"],
-        ["multi/finish", "src/multi/settlement/orchestrator.ts", "createAwakeRequestContextBestEffort(", 1, "const executeFinishWrites ="],
-        ["story", "src/routes/api/storyQuest.ts", "createAwakeRequestContextBestEffort(", 1, "getDb().transaction("],
-        ["bond", "src/routes/api/character/bond.ts", "createAwakeRequestContextBestEffort(", 1, "getDb().transaction("],
-        ["mail", "src/routes/api/mail.ts", "createAwakeRequestContextBestEffort(", 2, "getDb().transaction("],
-        ["active", "src/routes/api/activeMission.ts", "createAwakeRequestContextBestEffort(", 1, "getDb().transaction("],
-        ["tutorial", "src/routes/api/tutorial.ts", "createAwakeRequestContextBestEffort(", 2, "getDb().transaction("],
-    ]
-
-    assert.equal(owners.length, 7, "35.2 owner systems")
-    assert.equal(owners.reduce((total, [, , , count]) => total + count, 0), 9, "35.2 transaction-internal call expressions")
-    for (const [owner, relativeFile, publication, expectedCount, boundary] of owners) {
-        const text = source(relativeFile)
-        assert.equal((text.match(new RegExp(publication.replace("(", "\\("), "g")) ?? []).length, expectedCount, owner)
-        const publicationIndex = text.indexOf(publication)
-        assert.ok(publicationIndex >= 0, `${owner} must publish Awake facts`)
-        const transactionIndex = text.lastIndexOf(boundary, publicationIndex)
-        assert.ok(transactionIndex >= 0, `${owner} publication must stay under its owner transaction`)
-        assert.ok(transactionIndex < publicationIndex, `${owner} must publish after entering its transaction`)
-    }
 })

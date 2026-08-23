@@ -14,9 +14,10 @@ const PLAYER_INVALIDATION: readonly FactKey[] = Object.freeze([
 export function getAwakeFactKeysFromLegacyRewardResults(
     ...results: readonly (LegacyAwakeRewardResult | null | undefined)[]
 ): readonly FactKey[] {
-    return results.some(result => (
-        typeof result?.user_info?.free_mana === "number"
-        && Number.isFinite(result.user_info.free_mana)
-        && result.user_info.free_mana > 0
-    )) ? PLAYER_INVALIDATION : NO_INVALIDATIONS
+    return results.some(result => {
+        const value = result?.user_info?.free_mana
+        return typeof value === "number"
+            && Number.isSafeInteger(value)
+            && value > 0
+    }) ? PLAYER_INVALIDATION : NO_INVALIDATIONS
 }
