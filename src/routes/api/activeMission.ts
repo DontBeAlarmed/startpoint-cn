@@ -85,12 +85,16 @@ const routes = async (fastify: FastifyInstance) => {
             return validation.claims.length > 0
                 ? (() => {
                     const candidateCharacterIds = collectAwakeCandidateCharacterIds([], [existingCharacterList])
-                    const awakeContext = createAwakeRequestContextBestEffort(playerId, candidateCharacterIds)
+                    const awakeContext = createAwakeRequestContextBestEffort(
+                        playerId,
+                        candidateCharacterIds,
+                        { invalidatedFactKeys: granter.invalidatedFactKeys },
+                    )
                     if (awakeContext === null) return existingCharacterList
                     return reconcileAwakeUnlockCharacterListBestEffort(
                         playerId,
                         existingCharacterList,
-                        { context: awakeContext, candidateCharacterIds },
+                        { context: awakeContext },
                     )
                 })()
                 : existingCharacterList

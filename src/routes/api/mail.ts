@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { RawPlayerMail, getPlayerMailCountSync, getPlayerMailSync, getPlayerMailsByIdsSync, getPlayerMailsSync, receiveMailSync } from "../../data/domains/mail"
+import { MailType, RawPlayerMail, getPlayerMailCountSync, getPlayerMailSync, getPlayerMailsByIdsSync, getPlayerMailsSync, receiveMailSync } from "../../data/domains/mail"
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -32,6 +32,12 @@ interface ReceiveAllBody {
 }
 
 class MailNotAvailableError extends Error {}
+
+function getMailAwakeInvalidatedFactKeys(mails: readonly RawPlayerMail[]) {
+    return mails.some(mail => mail.type === MailType.FREE_MANA)
+        ? [{ kind: "player" as const }]
+        : []
+}
 
 function unsupportedMailReply(reply: FastifyReply, error: unknown): FastifyReply | null {
     if (!(error instanceof UnsupportedMailAttachmentError)) return null
@@ -124,7 +130,11 @@ const routes = async (fastify: FastifyInstance) => {
                     throw new Error(`Mail ${mailId} changed while it was being received.`)
                 }
                 const candidateCharacterIds = collectAwakeCandidateCharacterIds([], [reward.characterList])
-                const awakeContext = createAwakeRequestContextBestEffort(playerId, candidateCharacterIds)
+                const awakeContext = createAwakeRequestContextBestEffort(
+                    playerId,
+                    candidateCharacterIds,
+                    { invalidatedFactKeys: getMailAwakeInvalidatedFactKeys([mail]) },
+                )
                 return {
                     ...reward,
                     reconciledCharacterList: awakeContext === null
@@ -132,7 +142,7 @@ const routes = async (fastify: FastifyInstance) => {
                         : reconcileAwakeUnlockCharacterListBestEffort(
                             playerId,
                             reward.characterList,
-                            { context: awakeContext, candidateCharacterIds },
+                            { context: awakeContext },
                         ),
                 }
             })()
@@ -214,7 +224,11 @@ const routes = async (fastify: FastifyInstance) => {
                     throw new Error("Mail state changed while mails were being received.")
                 }
                 const candidateCharacterIds = collectAwakeCandidateCharacterIds([], [reward.characterList])
-                const awakeContext = createAwakeRequestContextBestEffort(playerId, candidateCharacterIds)
+                const awakeContext = createAwakeRequestContextBestEffort(
+                    playerId,
+                    candidateCharacterIds,
+                    { invalidatedFactKeys: getMailAwakeInvalidatedFactKeys(validMails) },
+                )
                 return {
                     alreadyCount: uniqueMailIds.length - validMailIds.length,
                     claimed,
@@ -223,7 +237,7 @@ const routes = async (fastify: FastifyInstance) => {
                         : reconcileAwakeUnlockCharacterListBestEffort(
                             playerId,
                             reward.characterList,
-                            { context: awakeContext, candidateCharacterIds },
+                            { context: awakeContext },
                         ),
                     equipmentList: reward.equipmentList,
                     itemList: reward.itemList,

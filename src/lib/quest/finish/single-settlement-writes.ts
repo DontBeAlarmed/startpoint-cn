@@ -22,9 +22,16 @@ import { getRuntimeContentTableSync } from "../../../content/runtime/table-acces
 import { getContentSnapshot } from "../../../content/runtime/content-snapshot"
 import { settleAdditionalRewardsSync, type AdditionalRewardTable } from "../../additional-reward"
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../rush"
-import { reconcileActiveMissionFacts, settleAwakeBattleMissions } from "../../mission"
+import {
+    getAwakeBattleMissionIds,
+    reconcileActiveMissionFacts,
+    settleAwakeMissionCandidatesWithEvaluation,
+    settleMissionCategoriesWithEvaluation,
+} from "../../mission"
 import { publishAwakeCharacterListBestEffort } from "../../mission/awake-best-effort-context"
-import { recordMissionBattleFacts } from "../../mission/battle-facts"
+import { buildBattleMissionSettlementScopes, recordMissionBattleFacts } from "../../mission/battle-facts"
+import { getAwakeFactKeysFromLegacyRewardResults } from "../../mission/awake-reward-facts"
+import type { FactKey } from "../../mission/facts/fact-key"
 import { getCarnivalRewardDefinitions, grantCarnivalRewards } from "../../carnival-rewards"
 import { givePlayerEquipmentSync } from "../../equipment"
 import { getRaidEventRequiredKillCount } from "../../raid-event-master"
@@ -49,7 +56,6 @@ import {
     grantSingleSettlementScoreRewardsWithinTransactionSync,
 } from "./single-settlement-reward-grant"
 import { createSingleSettlementStandardRewardGrant } from "./single-standard-reward-callbacks"
-import { settleSingleBattleMissionCategories } from "./single-mission-settlement"
 import { createSingleSettlementResponseState } from "./single-settlement-response-state"
 const settlementModeHost = createModeTransactionHost(message => console.log(message))
 export interface SingleSettlementWritesInput {
@@ -69,7 +75,7 @@ export function executeSingleSettlementWrites(
     const { body, questData, rewardEligibility, finishCtx,
         rushEventFolderMaxRound, scoreAttackBorderTiers } = input
     const { playerId, questCategory, questId, clearTime, clearRank,
-        questAccomplished, questProgress } = finishCtx
+        questAccomplished, questProgress, questPreviouslyCompleted } = finishCtx
     const isScoreAttackEvent = questCategory === QuestCategory.SCORE_ATTACK_EVENT
     const party = body.statistics.party
     const leaderId = party.characters[0]?.id
@@ -276,13 +282,31 @@ export function executeSingleSettlementWrites(
         deleteActiveQuest: pid => deletePlayerActiveQuestSync(pid),
     }) : null
     const scoreAttackRewardResult = scoreAttackFinishResult?.rewardResult
-    const missionSettlement = settleSingleBattleMissionCategories(playerId, partyCharacterIds, settlementTime, { standardRewardGrant: standardRewardGrant.forMission })
+    const missionEvaluation = settleMissionCategoriesWithEvaluation(
+        playerId,
+        buildBattleMissionSettlementScopes(partyCharacterIds),
+        settlementTime,
+        undefined,
+        { standardRewardGrant: standardRewardGrant.forMission },
+    )
+    const missionSettlement = missionEvaluation?.settlement ?? {
+        missionInfo: [], itemList: {}, characterList: [], equipmentList: [],
+        degreeIds: [], passCardPoints: {},
+    }
     responseState.observeResult(missionSettlement)
-    const awakeMissionSettlement = settleAwakeBattleMissions({
-        playerId, questAccomplished, characterIds: partyCharacterIds,
-        directlyChangedMissionIds: missionBattleFacts.awakeMissionIds,
-        evaluationTime: settlementTime,
-    }, { standardRewardGrant: standardRewardGrant.forMission })
+    const awakeMissionEvaluation = questAccomplished
+        ? settleAwakeMissionCandidatesWithEvaluation(
+            playerId,
+            getAwakeBattleMissionIds(partyCharacterIds, missionBattleFacts.awakeMissionIds),
+            settlementTime,
+            undefined,
+            { standardRewardGrant: standardRewardGrant.forMission },
+        )
+        : null
+    const awakeMissionSettlement = awakeMissionEvaluation?.settlement ?? {
+        missionInfo: [], itemList: {}, characterList: [], equipmentList: [],
+        degreeIds: [], passCardPoints: {},
+    }
     responseState.observeResult(awakeMissionSettlement)
     const activeMissionList = reconcileActiveMissionFacts({
         playerId, repository: getContentSnapshot().repository, now: settlementTime,
@@ -303,6 +327,25 @@ export function executeSingleSettlementWrites(
         bossBoostPoint: newBossBoostPoint,
     })
     if (!isScoreAttackEvent) deletePlayerActiveQuestSync(playerId)
+    const invalidatedFactKeys: FactKey[] = [
+        ...(missionEvaluation?.invalidatedFactKeys ?? []),
+        ...(awakeMissionEvaluation?.invalidatedFactKeys ?? []),
+        ...getAwakeFactKeysFromLegacyRewardResults(
+            clearReward,
+            sPlusClearReward,
+            scoreRewardsResult,
+            additionalRewardSettlement.rewardResult,
+            rushEventRewardsResult,
+            carnivalRewardResult,
+            scoreAttackRewardResult,
+        ),
+        ...(manaObtained > 0 ? [{ kind: "player" as const }] : []),
+        ...(questAccomplished
+            && questCategory === QuestCategory.CHARACTER
+            && !questPreviouslyCompleted
+            ? [{ kind: "questProgress" as const, sections: [QuestCategory.CHARACTER] }]
+            : []),
+    ]
     const characterList = publishAwakeCharacterListBestEffort(playerId, partyCharacterIds, [
         rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
         (clearReward?.character_list || []) as Record<string, unknown>[],
@@ -310,7 +353,7 @@ export function executeSingleSettlementWrites(
         scoreRewardsResult.character_list as Record<string, unknown>[],
         (scoreAttackRewardResult?.character_list ?? []) as Record<string, unknown>[],
         missionSettlement.characterList as Record<string, unknown>[], awakeMissionSettlement.characterList,
-    ])
+    ], { invalidatedFactKeys })
 
     return {
         afterStamina, afterStaminaHealTime, dailyChallengePointList,

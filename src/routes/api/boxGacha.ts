@@ -19,6 +19,7 @@ import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-bes
 import { BoxGachaBoxes } from "../../lib/types";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time";
+import { getAwakeFactKeysFromLegacyRewardResults } from "../../lib/mission/awake-reward-facts";
 
 interface GetBoxListBody {
     box_gacha_id: number
@@ -440,6 +441,11 @@ const routes = async (fastify: FastifyInstance) => {
             playerId,
             settlement.rewardResult?.joined_character_id_list ?? [],
             [existingCharacterList],
+            {
+                invalidatedFactKeys: getAwakeFactKeysFromLegacyRewardResults(
+                    settlement.rewardResult,
+                ),
+            },
         )
 
         reply.header("content-type", "application/x-msgpack")

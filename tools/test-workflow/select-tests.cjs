@@ -323,7 +323,7 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^(?:src\/lib\/mission\/(?:awake-eligibility|awake-evaluation-settlement|awake-request-context(?:-scope|-state)?|awake-settlement|awake-unlock|awake-unlock-response|compute-awake-summary|evaluation-session|fact-loaders|index|mission-catalog|mission-catalog-source|production-fact-loaders)\.ts|src\/data\/domains\/(?:character_clear|party_co_clear)\.ts|tools\/mission_awake_reward_owner\.test\.cjs)$/,
+        pattern: /^(?:src\/lib\/mission\/(?:awake-eligibility|awake-evaluation-settlement|awake-request-context(?:-scope|-state)?|awake-reward-facts|awake-settlement|awake-unlock|awake-unlock-response|compute-awake-summary|evaluation-session|fact-loaders|index|mission-catalog|mission-catalog-source|production-fact-loaders)\.ts|src\/data\/domains\/(?:character_clear|party_co_clear)\.ts|tools\/mission_awake_reward_owner\.test\.cjs)$/,
         groups: ["integration:mission"],
     },
     {

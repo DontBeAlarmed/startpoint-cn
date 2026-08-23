@@ -18,6 +18,8 @@ import { createAwakeRequestContextBestEffort } from "../../lib/mission/awake-bes
 import { getQuestJoinCharacterIds } from "../../lib/story-join-character";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { getContentSnapshot } from "../../content/runtime/content-snapshot";
+import { getAwakeFactKeysFromLegacyRewardResults } from "../../lib/mission/awake-reward-facts";
+import { QuestCategory } from "../../lib/types";
 
 interface FinishBody {
     party_id: number,
@@ -100,13 +102,24 @@ function processStoryQuestFinish(playerId: number, questSection: number, questId
             storyCandidateCharacterIds,
             [existingCharacterList],
         )
-        const awakeContext = createAwakeRequestContextBestEffort(playerId, candidateCharacterIds)
+        const awakeContext = createAwakeRequestContextBestEffort(
+            playerId,
+            candidateCharacterIds,
+            {
+                invalidatedFactKeys: [
+                    ...getAwakeFactKeysFromLegacyRewardResults(rewardResult),
+                    ...(firstClear && questSection === QuestCategory.CHARACTER
+                        ? [{ kind: "questProgress" as const, sections: [QuestCategory.CHARACTER] }]
+                        : []),
+                ],
+            },
+        )
         const characterList = awakeContext === null
             ? existingCharacterList
             : reconcileAwakeUnlockCharacterListBestEffort(
                 playerId,
                 existingCharacterList,
-                { context: awakeContext, candidateCharacterIds },
+                { context: awakeContext },
             )
         return {
             user_info: {

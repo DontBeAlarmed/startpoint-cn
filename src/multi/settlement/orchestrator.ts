@@ -12,12 +12,15 @@ import {
 import { givePlayerCharactersExpSync } from "../../lib/character"
 import { buildBattleMissionSettlementScopes, recordMissionBattleFacts } from "../../lib/mission/battle-facts"
 import {
+    getAwakeBattleMissionIds,
     reconcileAwakeUnlockCharacterListBestEffort,
-    settleAwakeBattleMissions,
-    settleMissionCategories,
+    settleAwakeMissionCandidatesWithEvaluation,
+    settleMissionCategoriesWithEvaluation,
 } from "../../lib/mission"
 import { collectAwakeCandidateCharacterIds } from "../../lib/mission/awake-candidate-character-ids"
 import { createAwakeRequestContextBestEffort } from "../../lib/mission/awake-best-effort-context"
+import { getAwakeFactKeysFromLegacyRewardResults } from "../../lib/mission/awake-reward-facts"
+import type { FactKey } from "../../lib/mission/facts/fact-key"
 import {
     ActiveQuestSettlementConflictError,
     activeQuests,
@@ -39,7 +42,7 @@ import {
 import { getCommonScoreRewardCount } from "../../lib/score-reward-lottery"
 import { getMaxStamina, getRankDegree } from "../../lib/stamina"
 import { PlayerNotFoundError } from "../../lib/quest/start-entry"
-import type { BattleQuest } from "../../lib/types"
+import { QuestCategory, type BattleQuest } from "../../lib/types"
 import { formatHardMultiMissionDiagnostic } from "../../lib/mission/client-check-diagnostics"
 import { sampledLog } from "../../lib/sampled-log"
 import { getServerTime } from "../../utils"
@@ -378,18 +381,29 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             characterBattleExp,
             questData.fixedParty !== undefined,
         )
-        const missionSettlement = settleMissionCategories(
+        const missionEvaluation = settleMissionCategoriesWithEvaluation(
             input.playerId,
             buildBattleMissionSettlementScopes(partyCharacterIdsArray),
             settlementTime,
         )
-        const awakeMissionSettlement = settleAwakeBattleMissions({
-            playerId: input.playerId,
-            questAccomplished,
-            characterIds: partyCharacterIdsArray,
-            directlyChangedMissionIds: missionBattleFacts.awakeMissionIds,
-            evaluationTime: settlementTime,
-        })
+        const missionSettlement = missionEvaluation?.settlement ?? {
+            missionInfo: [], itemList: {}, characterList: [], equipmentList: [],
+            degreeIds: [], passCardPoints: {},
+        }
+        const awakeMissionEvaluation = questAccomplished
+            ? settleAwakeMissionCandidatesWithEvaluation(
+                input.playerId,
+                getAwakeBattleMissionIds(
+                    partyCharacterIdsArray,
+                    missionBattleFacts.awakeMissionIds,
+                ),
+                settlementTime,
+            )
+            : null
+        const awakeMissionSettlement = awakeMissionEvaluation?.settlement ?? {
+            missionInfo: [], itemList: {}, characterList: [], equipmentList: [],
+            degreeIds: [], passCardPoints: {},
+        }
         deleteActiveQuest?.()
         const existingCharacterList = [
             ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
@@ -403,16 +417,33 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             partyCharacterIdsArray,
             [existingCharacterList],
         )
+        const invalidatedFactKeys: FactKey[] = [
+            ...(missionEvaluation?.invalidatedFactKeys ?? []),
+            ...(awakeMissionEvaluation?.invalidatedFactKeys ?? []),
+            ...getAwakeFactKeysFromLegacyRewardResults(
+                clearReward,
+                sPlusClearReward,
+                scoreRewardsResult,
+                additionalRewardSettlement.rewardResult,
+            ),
+            ...(manaObtained > 0 ? [{ kind: "player" as const }] : []),
+            ...(questAccomplished
+                && questCategory === QuestCategory.CHARACTER
+                && !questPreviouslyCompleted
+                ? [{ kind: "questProgress" as const, sections: [QuestCategory.CHARACTER] }]
+                : []),
+        ]
         const awakeContext = createAwakeRequestContextBestEffort(
             input.playerId,
             candidateCharacterIds,
+            { invalidatedFactKeys },
         )
         const characterList = awakeContext === null
             ? existingCharacterList
             : reconcileAwakeUnlockCharacterListBestEffort(
                 input.playerId,
                 existingCharacterList,
-                { context: awakeContext, candidateCharacterIds },
+                { context: awakeContext },
             )
         return {
             characterList,

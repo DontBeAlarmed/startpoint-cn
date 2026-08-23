@@ -28,6 +28,7 @@ import { computeRealTimeStamina } from "../../lib/stamina";
 import { clientSerializeEquipment } from "../../lib/equipment";
 import { planEquipmentEnhancementPurchase } from "../../lib/equipment-enhancement";
 import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context";
+import { getAwakeFactKeysFromLegacyRewardResults } from "../../lib/mission/awake-reward-facts";
 import {
     executeGenericShopBatchPurchaseSync,
     executeGenericShopPurchaseSync,
@@ -331,6 +332,7 @@ const routes = async (fastify: FastifyInstance) => {
             playerId,
             rewardResult.joined_character_id_list ?? [],
             [rewardResult.character_list as Record<string, unknown>[]],
+            { invalidatedFactKeys: getAwakeFactKeysFromLegacyRewardResults(rewardResult) },
         )
 
         const afterPlayer = purchaseResult.player
@@ -629,6 +631,7 @@ const routes = async (fastify: FastifyInstance) => {
             playerId,
             rewardResult.joined_character_id_list ?? [],
             [rewardResult.character_list as Record<string, unknown>[]],
+            { invalidatedFactKeys: getAwakeFactKeysFromLegacyRewardResults(rewardResult) },
         )
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
