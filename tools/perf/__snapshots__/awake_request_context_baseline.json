@@ -319,12 +319,13 @@
       "behavior": {
         "candidateUnlockPresent": false,
         "errorCategory": "database-write-failure",
+        "injectedFailureObserved": true,
         "ownerDelta": 0,
         "staleUnlockPreserved": true,
         "threw": true,
         "unlockCount": 1
       },
-      "behaviorSha256": "ddd3543bf083c36587a83f69288ac8730dd5a56ae011ec35fb94d84129cd9cfc"
+      "behaviorSha256": "85c0693a4e815a0ddebe51ce6f91d7334fc69c25a6561222cc4d790431ec6c84"
     },
     "best-effort-failure": {
       "sqlReads": 13,
@@ -385,12 +386,13 @@
       "behavior": {
         "candidateUnlockPresent": false,
         "errorLogged": true,
+        "injectedFailureObserved": true,
         "ownerDelta": 7,
         "returnedExistingIdentity": true,
         "staleUnlockPreserved": true,
         "unlockCount": 1
       },
-      "behaviorSha256": "2840497cb82aec620d40c85e640af36be564c99443da632d752b895fc429f29d"
+      "behaviorSha256": "0469485bfdf8cb1d6b7f05fe94873b960e14d3baacf0f7440698a98cdd71ef31"
     }
   }
 }

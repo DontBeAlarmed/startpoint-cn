@@ -323,17 +323,115 @@ function classifyOwner(relativeFile, call, sourceFile) {
     return ownerLabel
 }
 
-function classifyBoundary(relativeFile, callee, call, source) {
+function collectIdentifierCalls(root, calleeName) {
+    const calls = []
+    function visit(node) {
+        if (ts.isCallExpression(node)
+            && ts.isIdentifier(node.expression)
+            && node.expression.text === calleeName) calls.push(node)
+        ts.forEachChild(node, visit)
+    }
+    visit(root)
+    return calls
+}
+
+function assertSingleSettlementTransactionOwnership(source, fileName) {
+    const sourceFile = ts.createSourceFile(
+        fileName,
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+    )
+    const transactionCalls = collectIdentifierCalls(
+        sourceFile,
+        "runSingleFinishSettlementTransaction",
+    )
+    assert.equal(
+        transactionCalls.length,
+        1,
+        `${fileName} must contain exactly one runSingleFinishSettlementTransaction call`,
+    )
+    const options = transactionCalls[0].arguments[0]
+    assert.equal(
+        options !== undefined && ts.isObjectLiteralExpression(options),
+        true,
+        `${fileName} transaction must receive an object argument`,
+    )
+    const settleProperties = options.properties.filter(property => (
+        ts.isPropertyAssignment(property)
+        && ((ts.isIdentifier(property.name) && property.name.text === "settle")
+            || (ts.isStringLiteral(property.name) && property.name.text === "settle"))
+    ))
+    assert.equal(
+        settleProperties.length,
+        1,
+        `${fileName} transaction must define one settle callback`,
+    )
+    const settleCallback = settleProperties[0].initializer
+    assert.equal(
+        ts.isArrowFunction(settleCallback) || ts.isFunctionExpression(settleCallback),
+        true,
+        `${fileName} settle must be an inline callback`,
+    )
+    assert.equal(
+        collectIdentifierCalls(settleCallback, "executeSingleSettlementWrites").length > 0,
+        true,
+        `${fileName} settle callback must contain executeSingleSettlementWrites`,
+    )
+}
+
+function assertMultiSettlementTransactionOwnership(sourceFile, awakeCall) {
+    let executeDeclaration = null
+    for (let parent = awakeCall.parent; parent; parent = parent.parent) {
+        if (ts.isVariableDeclaration(parent)
+            && ts.isIdentifier(parent.name)
+            && parent.name.text === "executeFinishWrites"
+            && parent.initializer
+            && (ts.isArrowFunction(parent.initializer)
+                || ts.isFunctionExpression(parent.initializer))) {
+            executeDeclaration = parent
+            break
+        }
+    }
+    assert.notEqual(
+        executeDeclaration,
+        null,
+        `${sourceFile.fileName} Awake call must belong to the executeFinishWrites initializer`,
+    )
+    const transactionCalls = collectIdentifierCalls(
+        sourceFile,
+        "runMultiActiveQuestSettlementTransaction",
+    )
+    assert.equal(
+        transactionCalls.length,
+        1,
+        `${sourceFile.fileName} must contain exactly one runMultiActiveQuestSettlementTransaction call`,
+    )
+    const writesArgument = transactionCalls[0].arguments[2]
+    assert.equal(
+        writesArgument !== undefined
+            && ts.isIdentifier(writesArgument)
+            && writesArgument.text === "executeFinishWrites",
+        true,
+        `${sourceFile.fileName} transaction third argument must reference executeFinishWrites`,
+    )
+}
+
+function classifyBoundary(relativeFile, callee, call) {
     if (relativeFile === "src/lib/quest/finish/single-settlement-writes.ts") {
         const ownerSource = fs.readFileSync(
             path.join(projectRoot, "src/lib/quest/finish/single-orchestrator.ts"),
             "utf8",
         )
-        assert.match(ownerSource, /runSingleFinishSettlementTransaction\([\s\S]*executeSingleSettlementWrites\(/)
+        assertSingleSettlementTransactionOwnership(
+            ownerSource,
+            "src/lib/quest/finish/single-orchestrator.ts",
+        )
         return "best-effort-in-tx"
     }
     if (relativeFile === "src/multi/settlement/orchestrator.ts") {
-        assert.match(source, /runMultiActiveQuestSettlementTransaction\([\s\S]*executeFinishWrites,/)
+        assertMultiSettlementTransactionOwnership(call.getSourceFile(), call)
         return "best-effort-in-tx"
     }
     const inTransaction = isInsideDirectTransaction(call)
@@ -362,7 +460,7 @@ function collectProductionCalls() {
                 relativeFile,
                 callee,
                 ownerLabel: classifyOwner(relativeFile, call, sourceFile),
-                boundary: classifyBoundary(relativeFile, callee, call, source),
+                boundary: classifyBoundary(relativeFile, callee, call),
                 candidateSource: "legacy-unscoped",
                 position: call.getStart(sourceFile),
             })
@@ -494,4 +592,45 @@ test("AST collector ignores ordinary local functions with an Awake helper-like n
     `
 
     assert.deepEqual(collectImportedAwakeCalls(source, "synthetic.ts"), [])
+})
+
+test("single settlement ownership requires writes inside the settle callback", () => {
+    const owned = `
+        runSingleFinishSettlementTransaction({
+            settle: () => executeSingleSettlementWrites({}),
+        })
+    `
+    const movedOutside = `
+        executeSingleSettlementWrites({})
+        runSingleFinishSettlementTransaction({ settle: () => ({}) })
+    `
+
+    assert.doesNotThrow(() => assertSingleSettlementTransactionOwnership(owned, "single.ts"))
+    assert.throws(
+        () => assertSingleSettlementTransactionOwnership(movedOutside, "single.ts"),
+        /settle callback.*executeSingleSettlementWrites/i,
+    )
+})
+
+test("multi settlement ownership requires executeFinishWrites as the third argument", () => {
+    const owned = `
+        import { reconcileAwakeUnlockCharacterList } from "./mission"
+        const executeFinishWrites = () => reconcileAwakeUnlockCharacterList(1, [])
+        const otherWrites = () => true
+        runMultiActiveQuestSettlementTransaction(1, {}, executeFinishWrites)
+    `
+    const replaced = owned.replace(
+        "runMultiActiveQuestSettlementTransaction(1, {}, executeFinishWrites)",
+        "runMultiActiveQuestSettlementTransaction(1, {}, otherWrites)",
+    )
+
+    for (const [source, expectedFailure] of [[owned, false], [replaced, true]]) {
+        const [awakeCall] = collectImportedAwakeCalls(source, "multi.ts")
+        const assertion = () => assertMultiSettlementTransactionOwnership(
+            awakeCall.sourceFile,
+            awakeCall.call,
+        )
+        if (expectedFailure) assert.throws(assertion, /third argument.*executeFinishWrites/i)
+        else assert.doesNotThrow(assertion)
+    }
 })

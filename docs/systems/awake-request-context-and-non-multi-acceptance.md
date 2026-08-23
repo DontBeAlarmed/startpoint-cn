@@ -171,8 +171,8 @@ SQL 或 mission compute。reference 位于
 | `full-publication` | 14 | 1 | 7 | `6968f3ca45d53d4e9e96e8d307db067ef4a7fde04baa7fb3b8b15386e8dbb481` |
 | `candidate-one` | 28 | 2 | 14 | `3ee3ee50e4a7d1372448eefa2e0d6b3d40b5d1d56b78f2ca9035b1f09cc2c8b1` |
 | `empty-candidate-cleanup` | 6 | 1 | 0 | `bbbcbc055cad69b216b3b1d2ff14bb7bdabd7abcb9be4ef622c9eb22fbc92b3b` |
-| `strict-failure-rollback` | 13 | 2 | 7 | `ddd3543bf083c36587a83f69288ac8730dd5a56ae011ec35fb94d84129cd9cfc` |
-| `best-effort-failure` | 13 | 2 | 7 | `2840497cb82aec620d40c85e640af36be564c99443da632d752b895fc429f29d` |
+| `strict-failure-rollback` | 13 | 2 | 7 | `85c0693a4e815a0ddebe51ce6f91d7334fc69c25a6561222cc4d790431ec6c84` |
+| `best-effort-failure` | 13 | 2 | 7 | `0469485bfdf8cb1d6b7f05fe94873b960e14d3baacf0f7440698a98cdd71ef31` |
 
 实测行为同时固定了以下现状：full publication 返回角色 341005 的完整响应投影，其中
 `join_time` / `update_time` 均为 `2025-01-01 12:00:00`，并持久化 board 1 / awake level 1；
@@ -180,6 +180,8 @@ SQL 或 mission compute。reference 位于
 `all`；空候选会删除不再 ready 且没有正 awake level 支撑的历史 unlock；strict 写故障使
 owner 的 Mana 写和 reconcile 写全部回滚；best-effort 同类故障返回原
 `character_list`，保留 owner 的 7 Mana 写入，并回滚 reconcile 的历史删除和候选插入。
+两个故障场景均以 `injectedFailureObserved: true` 固定实际命中了预期 unlock 写故障，其他异常
+或不含该目标 `Error` 的 best-effort 日志会使 runner 失败。
 snapshot 还逐场景固定了稳定表名及 `reads`、`writes`、`statements`；新增业务表或任一既有
 结构指标上升均拒绝准入。故障场景中的 owner `players` 更新处于同一个外层事务，但不在
 `measureTarget` 窗口内；reference 中的 `players` 仅记录 publication 自身的 1 次读取和 0 次写入。

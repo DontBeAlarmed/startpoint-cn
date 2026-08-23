@@ -18,6 +18,9 @@ const {
     runAwakeRequestContextBaseline,
     writeAwakeRequestContextSnapshotAtomic,
 } = require("./awake_request_context_baseline.cjs")
+const {
+    createAwakeRequestContextScenarios,
+} = require("./awake_request_context_scenarios.cjs")
 
 const snapshotPath = path.join(
     __dirname,
@@ -145,6 +148,128 @@ test("snapshot writer replaces atomically and removes failed temporary files", (
     }
 })
 
+test("snapshot writer rejects a forged canonical marker", () => {
+    const temporaryParent = fs.mkdtempSync(path.join(os.tmpdir(), "awake-context-forged-"))
+    const target = path.join(temporaryParent, "snapshot.json")
+    try {
+        const report = createReport()
+        const marker = Reflect.ownKeys(report).find(key => typeof key === "symbol")
+        const forged = { version: report.version }
+        Object.defineProperty(forged, marker, { value: true })
+
+        assert.throws(
+            () => writeAwakeRequestContextSnapshotAtomic(forged, target),
+            /snapshot-write|fields|scenario/i,
+        )
+        assert.equal(fs.existsSync(target), false)
+    } finally {
+        fs.rmSync(temporaryParent, { recursive: true, force: true })
+    }
+})
+
+test("snapshot writer revalidates a canonical report modified after creation", () => {
+    const temporaryParent = fs.mkdtempSync(path.join(os.tmpdir(), "awake-context-mutated-"))
+    const target = path.join(temporaryParent, "snapshot.json")
+    try {
+        const report = createReport()
+        report.scenarios[AWAKE_REQUEST_CONTEXT_SCENARIO_KEYS[0]].behavior.stable = false
+
+        assert.throws(
+            () => writeAwakeRequestContextSnapshotAtomic(report, target),
+            /behavior hash|hash mismatch/i,
+        )
+        assert.equal(fs.existsSync(target), false)
+    } finally {
+        fs.rmSync(temporaryParent, { recursive: true, force: true })
+    }
+})
+
+test("snapshot writer rejects getters without invoking them", () => {
+    const temporaryParent = fs.mkdtempSync(path.join(os.tmpdir(), "awake-context-getter-"))
+    const target = path.join(temporaryParent, "snapshot.json")
+    let getterCalls = 0
+    try {
+        const report = createReport()
+        Object.defineProperty(
+            report.scenarios[AWAKE_REQUEST_CONTEXT_SCENARIO_KEYS[0]],
+            "sqlReads",
+            {
+                enumerable: true,
+                get() {
+                    getterCalls++
+                    return 2
+                },
+            },
+        )
+
+        assert.throws(
+            () => writeAwakeRequestContextSnapshotAtomic(report, target),
+            /enumerable data value/i,
+        )
+        assert.equal(getterCalls, 0)
+        assert.equal(fs.existsSync(target), false)
+    } finally {
+        fs.rmSync(temporaryParent, { recursive: true, force: true })
+    }
+})
+
+test("snapshot writer rejects Proxy reports", () => {
+    const temporaryParent = fs.mkdtempSync(path.join(os.tmpdir(), "awake-context-proxy-"))
+    const target = path.join(temporaryParent, "snapshot.json")
+    try {
+        const report = new Proxy(createReport(), {})
+
+        assert.throws(
+            () => writeAwakeRequestContextSnapshotAtomic(report, target),
+            /Proxy/,
+        )
+        assert.equal(fs.existsSync(target), false)
+    } finally {
+        fs.rmSync(temporaryParent, { recursive: true, force: true })
+    }
+})
+
+function createFailureScenarioRuntime(overrides) {
+    return {
+        getDb: () => ({
+            prepare: () => ({ run() {} }),
+            transaction: operation => () => operation(),
+        }),
+        ...overrides,
+    }
+}
+
+test("strict failure scenario rethrows errors outside the injected unlock write", () => {
+    const runtime = createFailureScenarioRuntime({
+        reconcileAwakeUnlockCharacterListStrict() {
+            throw new Error("unexpected strict publication failure")
+        },
+    })
+    const scenario = createAwakeRequestContextScenarios(runtime)
+        .find(entry => entry.name === "strict-failure-rollback")
+
+    assert.throws(
+        () => scenario.execute({ playerId: 1 }, operation => operation()),
+        /unexpected strict publication failure/,
+    )
+})
+
+test("best-effort failure scenario requires the injected Error in console output", () => {
+    const runtime = createFailureScenarioRuntime({
+        reconcileAwakeUnlockCharacterListBestEffort(_playerId, existing) {
+            console.error("unexpected publication log", new Error("different failure"))
+            return existing
+        },
+    })
+    const scenario = createAwakeRequestContextScenarios(runtime)
+        .find(entry => entry.name === "best-effort-failure")
+
+    assert.throws(
+        () => scenario.execute({ playerId: 1 }, operation => operation()),
+        /injected awake unlock write failure/i,
+    )
+})
+
 test("runner restores database, Content, time, console, and temporary files after failure", async () => {
     const temporaryParent = fs.mkdtempSync(path.join(os.tmpdir(), "awake-context-cleanup-"))
     const originalLog = console.log
@@ -262,6 +387,7 @@ test("current publication and reconcile baseline matches the checked snapshot", 
     assert.deepEqual(report.scenarios["strict-failure-rollback"].behavior, {
         candidateUnlockPresent: false,
         errorCategory: "database-write-failure",
+        injectedFailureObserved: true,
         ownerDelta: 0,
         staleUnlockPreserved: true,
         threw: true,
@@ -270,6 +396,7 @@ test("current publication and reconcile baseline matches the checked snapshot", 
     assert.deepEqual(report.scenarios["best-effort-failure"].behavior, {
         candidateUnlockPresent: false,
         errorLogged: true,
+        injectedFailureObserved: true,
         ownerDelta: 7,
         returnedExistingIdentity: true,
         staleUnlockPreserved: true,

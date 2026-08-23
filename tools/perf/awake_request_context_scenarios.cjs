@@ -2,6 +2,7 @@
 
 const CHARACTER_ID = 341005
 const STALE_CHARACTER_ID = 1
+const INJECTED_UNLOCK_WRITE_FAILURE = "injected awake unlock write failure"
 const AWAKE_PROGRESS = Object.freeze([
     [3410051, 1],
     [3410052, 5],
@@ -193,15 +194,18 @@ function createAwakeRequestContextScenarios(runtime) {
                             runtime.reconcileAwakeUnlockCharacterListStrict(fixture.playerId, [])
                         ))
                     })()
-                } catch {
+                } catch (error) {
+                    if (!(error instanceof Error)
+                        || !error.message.includes(INJECTED_UNLOCK_WRITE_FAILURE)) throw error
                     threw = true
                 }
-                return { fixture, threw }
+                return { fixture, injectedFailureObserved: threw, threw }
             },
-            summarize({ fixture, threw }) {
+            summarize({ fixture, injectedFailureObserved, threw }) {
                 return {
                     ...readFailureBehavior(runtime, fixture),
                     errorCategory: threw ? "database-write-failure" : "none",
+                    injectedFailureObserved,
                     threw,
                 }
             },
@@ -212,9 +216,9 @@ function createAwakeRequestContextScenarios(runtime) {
             execute(fixture, measureTarget) {
                 const existing = [{ character_id: CHARACTER_ID, owner_projection: true }]
                 let returned
-                let errorLogged = false
+                const errorCalls = []
                 const previousError = console.error
-                console.error = () => { errorLogged = true }
+                console.error = (...args) => { errorCalls.push(args) }
                 try {
                     runtime.getDb().transaction(() => {
                         runtime.getDb().prepare(`
@@ -230,16 +234,32 @@ function createAwakeRequestContextScenarios(runtime) {
                 } finally {
                     console.error = previousError
                 }
+                const injectedFailureObserved = errorCalls.some(args => args.some(value => (
+                    value instanceof Error
+                    && value.message.includes(INJECTED_UNLOCK_WRITE_FAILURE)
+                )))
+                if (!injectedFailureObserved) {
+                    throw new Error(
+                        `best-effort scenario did not observe ${INJECTED_UNLOCK_WRITE_FAILURE}`,
+                    )
+                }
                 return {
-                    errorLogged,
+                    errorLogged: errorCalls.length > 0,
                     fixture,
+                    injectedFailureObserved,
                     returnedExistingIdentity: returned === existing,
                 }
             },
-            summarize({ errorLogged, fixture, returnedExistingIdentity }) {
+            summarize({
+                errorLogged,
+                fixture,
+                injectedFailureObserved,
+                returnedExistingIdentity,
+            }) {
                 return {
                     ...readFailureBehavior(runtime, fixture),
                     errorLogged,
+                    injectedFailureObserved,
                     returnedExistingIdentity,
                 }
             },

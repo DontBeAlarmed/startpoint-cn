@@ -16,7 +16,7 @@ const {
 const {
     AWAKE_REQUEST_CONTEXT_FIXED_TIME,
     AWAKE_REQUEST_CONTEXT_SCENARIO_KEYS,
-    assertCanonicalAwakeRequestContextReport,
+    canonicalizeCheckedReport,
     createAwakeRequestContextReport,
 } = require("./awake_request_context_report.cjs")
 const { createAwakeRequestContextScenarios } = require("./awake_request_context_scenarios.cjs")
@@ -28,6 +28,7 @@ const SNAPSHOT_PATH = path.join(
     "__snapshots__",
     "awake_request_context_baseline.json",
 )
+const NO_ERROR = Symbol("no-awake-request-context-error")
 let runtimeDependencies
 
 function getRuntimeDependencies() {
@@ -74,18 +75,33 @@ function completeCleanup(primaryError, actions) {
         try {
             action()
         } catch (error) {
-            cleanupErrors.push(error)
+            cleanupErrors.push(error instanceof Error
+                ? error
+                : new Error("Awake request-context cleanup threw a non-Error value", {
+                    cause: error,
+                }))
         }
     }
-    if (primaryError !== null) {
-        if (cleanupErrors.length > 0 && primaryError instanceof Error) {
+    if (primaryError !== NO_ERROR) {
+        const normalizedPrimary = primaryError instanceof Error
+            ? primaryError
+            : new Error("Awake request-context caught a non-Error failure", {
+                cause: primaryError,
+            })
+        if (cleanupErrors.length > 0 && !(primaryError instanceof Error)) {
+            throw new AggregateError(
+                [normalizedPrimary, ...cleanupErrors],
+                "Awake request-context failed and cleanup also failed",
+            )
+        }
+        if (cleanupErrors.length > 0) {
             const cleanupCause = cleanupErrors.length === 1
                 ? cleanupErrors[0]
                 : new AggregateError(cleanupErrors, "Awake request-context cleanup failed")
-            if (primaryError.cause === undefined) primaryError.cause = cleanupCause
-            else primaryError.cleanupCause = cleanupCause
+            if (normalizedPrimary.cause === undefined) normalizedPrimary.cause = cleanupCause
+            else normalizedPrimary.cleanupCause = cleanupCause
         }
-        throw primaryError
+        throw normalizedPrimary
     }
     if (cleanupErrors.length === 1) throw cleanupErrors[0]
     if (cleanupErrors.length > 1) {
@@ -102,7 +118,7 @@ async function runScenario(scenario, suiteDirectory, runtime) {
     let measureTargetCalls = 0
     let measuredSql = null
     let measuredMissionComputes = null
-    let primaryError = null
+    let primaryError = NO_ERROR
     let result
     try {
         runtime.setServerTimeOffset(Date.parse(AWAKE_REQUEST_CONTEXT_FIXED_TIME) - Date.now())
@@ -172,7 +188,7 @@ async function runAwakeRequestContextBaseline({
     let runtime
     let restoreContent = null
     let originalTimeOffset
-    let primaryError = null
+    let primaryError = NO_ERROR
     let report
     try {
         console.log = () => {}
@@ -233,12 +249,17 @@ function writeAwakeRequestContextSnapshotAtomic(report, snapshotPath, {
         `.${path.basename(targetPath)}.${process.pid}.${randomUUID()}.tmp`,
     ),
 } = {}) {
-    assertCanonicalAwakeRequestContextReport(report)
+    const checked = canonicalizeCheckedReport(report, "snapshot-write")
+    if (checked.hashMismatches.length > 0) {
+        throw new TypeError(
+            `snapshot-write behavior hash mismatch: ${checked.hashMismatches.join(",")}`,
+        )
+    }
     const temporaryPath = temporaryPathFactory(snapshotPath)
     try {
         fileSystem.writeFileSync(
             temporaryPath,
-            serializeAwakeRequestContextReport(report),
+            serializeAwakeRequestContextReport(checked.report),
             { encoding: "utf8", flag: "wx" },
         )
         fileSystem.renameSync(temporaryPath, snapshotPath)

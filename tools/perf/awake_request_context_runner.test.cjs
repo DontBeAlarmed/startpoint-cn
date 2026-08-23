@@ -15,12 +15,13 @@ const {
     runAwakeRequestContextBaseline,
 } = require("./awake_request_context_baseline.cjs")
 
-function createRuntimeHarness() {
+function createRuntimeHarness({ closeError = null } = {}) {
     let database = null
     let contentRestored = false
     const computer = { compute: () => 7 }
     const runtime = {
         closeDatabase() {
+            if (closeError !== null) throw closeError
             if (database?.open) database.close()
         },
         getComputer: () => computer,
@@ -111,6 +112,39 @@ test("runner rejects zero or repeated measureTarget calls and still cleans resou
             assert.equal(harness.contentRestored, true, `callCount=${callCount}`)
             assert.equal(harness.database.open, false, `callCount=${callCount}`)
             assert.deepEqual(fs.readdirSync(temporaryParent), [], `callCount=${callCount}`)
+        } finally {
+            fs.rmSync(temporaryParent, { recursive: true, force: true })
+        }
+    }
+})
+
+test("runner preserves non-Error primary failures together with cleanup failures", async () => {
+    for (const primaryFailure of ["string primary failure", { kind: "object-primary" }]) {
+        const temporaryParent = fs.mkdtempSync(path.join(os.tmpdir(), "awake-non-error-"))
+        const cleanupFailure = new Error("injected non-Error cleanup failure")
+        const harness = createRuntimeHarness({ closeError: cleanupFailure })
+        let caught
+        try {
+            try {
+                await runAwakeRequestContextBaseline({
+                    runtimeLoader: () => harness.runtime,
+                    scenarioFactory: () => createScenarios((_fixture, measureTarget) => (
+                        measureTarget(() => { throw primaryFailure })
+                    )),
+                    temporaryParent,
+                })
+            } catch (error) {
+                caught = error
+            }
+
+            assert.equal(caught instanceof AggregateError, true)
+            assert.equal(caught.errors.some(error => (
+                error instanceof Error && error.cause === primaryFailure
+            )), true)
+            assert.equal(caught.errors.includes(cleanupFailure), true)
+            assert.equal(harness.contentRestored, true)
+            assert.equal(harness.database.open, false)
+            assert.deepEqual(fs.readdirSync(temporaryParent), [])
         } finally {
             fs.rmSync(temporaryParent, { recursive: true, force: true })
         }

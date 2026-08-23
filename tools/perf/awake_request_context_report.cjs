@@ -254,12 +254,6 @@ function canonicalizeCheckedReport(report, source) {
     }
 }
 
-function assertCanonicalAwakeRequestContextReport(report) {
-    if (report?.[CANONICAL_REPORT] !== true) {
-        throw new TypeError("snapshot writer requires a validated canonical Awake request-context report")
-    }
-}
-
 module.exports = {
     AWAKE_REQUEST_CONTEXT_FIXED_TIME,
     AWAKE_REQUEST_CONTEXT_REPORT_VERSION,
@@ -267,7 +261,6 @@ module.exports = {
     SCENARIO_FIELDS,
     STRUCTURAL_METRICS,
     TABLE_FIELDS,
-    assertCanonicalAwakeRequestContextReport,
     canonicalizeCheckedReport,
     createAwakeRequestContextReport,
     createBehaviorSummary,
