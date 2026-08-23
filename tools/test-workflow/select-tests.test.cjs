@@ -1148,6 +1148,7 @@ test("routes focused mission performance admission files to the mission group", 
 
 test("routes Awake request-context core, baseline, and callsite files to the mission group", () => {
     for (const file of [
+        "tools/awake_fact_scope.test.cjs",
         "tools/awake_request_context.test.cjs",
         "tools/awake_reconcile_callsite_matrix.test.cjs",
         "tools/perf/awake_request_context_admission.cjs",
@@ -1329,6 +1330,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/character_awake_route.test.cjs",
         "tools/character_awake_settlement.test.cjs",
         "tools/character_awake_unlock.test.cjs",
+        "tools/awake_fact_scope.test.cjs",
         "tools/awake_request_context.test.cjs",
         "tools/awake_reconcile_callsite_matrix.test.cjs",
         "tools/load_awake_full_recovery.test.cjs",

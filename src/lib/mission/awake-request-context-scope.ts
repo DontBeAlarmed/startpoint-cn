@@ -1,4 +1,4 @@
-import type { FactKey } from "./facts/fact-key"
+import { getFactKeyId, normalizeFactKey, type FactKey } from "./facts/fact-key"
 import type { MissionFactRequirementRegistry } from "./requirements/types"
 
 const CATEGORY = 9
@@ -7,6 +7,94 @@ const CATEGORY = 9
 // The co-clear reader repeats the IDs for its two IN clauses, so the context
 // budget is intentionally lower than the per-reader ceiling.
 export const MAX_SCOPED_CHARACTER_IDS = 10000
+
+export interface AwakeMissionSeeds {
+    readonly invalidatedFactKeys?: readonly FactKey[]
+    readonly directMissionIds?: readonly number[]
+}
+
+export interface AwakePublicationScope extends AwakeMissionSeeds {
+    readonly candidateCharacterIds: readonly number[]
+}
+
+function assertCompleteArray(value: unknown, field: string): asserts value is readonly unknown[] {
+    if (!Array.isArray(value)) {
+        throw new TypeError(`Awake ${field} must be an array`)
+    }
+    for (let index = 0; index < value.length; index++) {
+        if (!Object.prototype.hasOwnProperty.call(value, index)) {
+            throw new TypeError(`Awake ${field} array must be complete`)
+        }
+    }
+}
+
+export function normalizeAwakeInvalidatedFactKeys(
+    invalidatedFactKeys: readonly FactKey[] | undefined,
+): readonly FactKey[] {
+    if (invalidatedFactKeys === undefined) return Object.freeze([])
+    assertCompleteArray(invalidatedFactKeys, "invalidatedFactKeys")
+    const normalized = new Map<string, FactKey>()
+    for (const fact of invalidatedFactKeys) {
+        const normalizedFact = normalizeFactKey(fact)
+        normalized.set(getFactKeyId(normalizedFact), normalizedFact)
+    }
+    return Object.freeze([...normalized.values()])
+}
+
+export function normalizeAwakeDirectMissionIds(
+    directMissionIds: readonly number[] | undefined,
+): readonly number[] {
+    if (directMissionIds === undefined) return Object.freeze([])
+    assertCompleteArray(directMissionIds, "directMissionIds")
+    const normalized = new Set<number>()
+    for (const missionId of directMissionIds) {
+        if (!Number.isSafeInteger(missionId) || missionId <= 0) {
+            throw new TypeError("Awake direct mission IDs must be positive safe integers")
+        }
+        normalized.add(missionId)
+    }
+    return Object.freeze([...normalized].sort((left, right) => left - right))
+}
+
+function resolveAwakeFactSeedMissionId(
+    fact: FactKey,
+    missionId: number,
+    requirementRegistry: MissionFactRequirementRegistry,
+): number {
+    if (fact.kind === "player") return missionId
+
+    for (const entry of requirementRegistry.entries) {
+        if (entry.category !== CATEGORY
+            || !entry.requirement.missionDependencies.some(dependency => (
+                dependency.category === CATEGORY && dependency.missionId === missionId
+            ))) continue
+        const hasPlayerDependency = entry.requirement.missionDependencies.some(dependency => (
+            requirementRegistry.getRequirement(dependency.category, dependency.missionId)?.facts
+                .some(dependencyFact => dependencyFact.kind === "player") === true
+        ))
+        if (hasPlayerDependency) return entry.missionId
+    }
+    return missionId
+}
+
+export function collectAwakeMissionIdsFromSeeds(
+    seeds: AwakeMissionSeeds,
+    requirementRegistry: MissionFactRequirementRegistry,
+): readonly number[] {
+    const missionIds = new Set(normalizeAwakeDirectMissionIds(seeds.directMissionIds))
+    for (const fact of normalizeAwakeInvalidatedFactKeys(seeds.invalidatedFactKeys)) {
+        for (const ref of requirementRegistry.getMissionsForFact(fact)) {
+            if (ref.category === CATEGORY) {
+                missionIds.add(resolveAwakeFactSeedMissionId(
+                    fact,
+                    ref.missionId,
+                    requirementRegistry,
+                ))
+            }
+        }
+    }
+    return Object.freeze([...missionIds].sort((left, right) => left - right))
+}
 
 function normalizeScopedCharacterIds(ids: readonly number[]): number[] {
     const normalized = new Set<number>()
@@ -44,14 +132,7 @@ export function normalizeAwakeCandidateCharacterIds(
     candidateCharacterIds: readonly number[] | undefined,
 ): readonly number[] | undefined {
     if (candidateCharacterIds === undefined) return undefined
-    if (!Array.isArray(candidateCharacterIds)) {
-        throw new TypeError("Awake candidateCharacterIds must be an array")
-    }
-    for (let index = 0; index < candidateCharacterIds.length; index++) {
-        if (!Object.prototype.hasOwnProperty.call(candidateCharacterIds, index)) {
-            throw new TypeError("Awake candidateCharacterIds array must be complete")
-        }
-    }
+    assertCompleteArray(candidateCharacterIds, "candidateCharacterIds")
     const normalized = candidateCharacterIds.map(characterId => {
         if (!Number.isSafeInteger(characterId) || characterId <= 0) {
             throw new TypeError("Awake candidate character IDs must be positive safe integers")

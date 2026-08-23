@@ -30,9 +30,11 @@ import { getMissionFactRequirementRegistry } from "./requirements/registry"
 import { getComputer } from "./registry"
 import type { AwakeUnlockProgress } from "./awake-unlock"
 import {
+    collectAwakeMissionIdsFromSeeds,
     collectSupportedAwakeMissionIds,
     mergeAwakeScopedCharacterIds,
     normalizeAwakeCandidateCharacterIds,
+    type AwakeMissionSeeds,
 } from "./awake-request-context-scope"
 import {
     assertAwakeRequestContext,
@@ -50,7 +52,7 @@ export interface AwakeRequestContext {
     readUnlocks(): CharacterAwakeUnlockMap
 }
 
-export interface CreateAwakeRequestContextOptions {
+export interface CreateAwakeRequestContextOptions extends AwakeMissionSeeds {
     readonly playerId: number
     readonly evaluationTime?: Date
     readonly candidateCharacterIds?: readonly number[]
@@ -198,23 +200,38 @@ export function createAwakeRequestContext(
         throw new TypeError("Awake context evaluationTime must be a valid Date")
     }
     const scopeCharacterIds = normalizeAwakeCandidateCharacterIds(options.candidateCharacterIds)
-    const unlocks = getPlayerCharacterAwakeUnlocksSync(playerId)
-    const scopedFactCharacterIds = scopeCharacterIds === undefined
-        ? undefined
-        : mergeAwakeScopedCharacterIds(scopeCharacterIds, [...unlocks.keys()].map(Number))
     const catalog = getMissionCatalog()
     const requirementRegistry = getMissionFactRequirementRegistry(catalog)
-    const requestedMissionIds = scopeCharacterIds === undefined
+    const seededMissionIds = collectAwakeMissionIdsFromSeeds(options, requirementRegistry)
+    const derivedCharacterIds = seededMissionIds.map(missionId => (
+        Number(getCharacterIdFromMission(missionId))
+    ))
+    const effectiveScopeCharacterIds = scopeCharacterIds === undefined
+        ? undefined
+        : mergeAwakeScopedCharacterIds(scopeCharacterIds, derivedCharacterIds)
+    const unlocks = getPlayerCharacterAwakeUnlocksSync(playerId)
+    const scopedFactCharacterIds = effectiveScopeCharacterIds === undefined
+        ? undefined
+        : mergeAwakeScopedCharacterIds(
+            effectiveScopeCharacterIds,
+            [...unlocks.keys()].map(Number),
+        )
+    const requestedMissionIds = effectiveScopeCharacterIds === undefined
         ? [...catalog.getMissionIds(CATEGORY)]
-        : scopeCharacterIds.flatMap(characterId => {
-            const missionIds = catalog.getAwakeMissionIdsByCharacter(characterId)
-            for (const missionId of missionIds) {
-                if (getCharacterIdFromMission(missionId) !== String(characterId)) {
-                    throw new Error(`Conflicting Awake Catalog index for character ${characterId}`)
+        : [
+            ...seededMissionIds,
+            ...effectiveScopeCharacterIds.flatMap(characterId => {
+                const missionIds = catalog.getAwakeMissionIdsByCharacter(characterId)
+                for (const missionId of missionIds) {
+                    if (getCharacterIdFromMission(missionId) !== String(characterId)) {
+                        throw new Error(
+                            `Conflicting Awake Catalog index for character ${characterId}`,
+                        )
+                    }
                 }
-            }
-            return missionIds
-        })
+                return missionIds
+            }),
+        ]
     const normalizedMissionIds = [...new Set(requestedMissionIds)].sort((left, right) => left - right)
     const collected = collectSupportedAwakeMissionIds(normalizedMissionIds, requirementRegistry)
     const categoryMissions = cloneCategoryMissions(
@@ -295,7 +312,7 @@ export function createAwakeRequestContext(
     return new DefaultAwakeRequestContext(
         playerId,
         evaluationTime,
-        scopeCharacterIds,
+        effectiveScopeCharacterIds,
         Object.keys(characters).map(Number),
         collected.candidates,
         missionIdsByCharacter,
