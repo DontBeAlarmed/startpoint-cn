@@ -33,6 +33,38 @@ const {
 
 let database
 
+function registryEntry(category, missionId, dependencies = []) {
+    return {
+        category,
+        missionId,
+        requirement: {
+            mode: "computed",
+            facts: [],
+            missionDependencies: dependencies.map(([dependencyCategory, dependencyMissionId]) => ({
+                category: dependencyCategory,
+                missionId: dependencyMissionId,
+            })),
+        },
+    }
+}
+
+function customRegistry(entries, reverseRefs = [{ category: 9, missionId: 100 }]) {
+    const requirements = new Map(entries.map(entry => [
+        `${entry.category}:${entry.missionId}`,
+        entry.requirement,
+    ]))
+    return {
+        size: entries.length,
+        entries,
+        getRequirement(category, missionId) {
+            return requirements.get(`${category}:${missionId}`)
+        },
+        getMissionsForFact() {
+            return reverseRefs
+        },
+    }
+}
+
 function createPlayer(label, characterIds = []) {
     const account = insertAccountSync({
         appId: "wf_cn",
@@ -64,6 +96,10 @@ test.after(() => {
 
 test("reverse FactKey seeds select only bounded Category 9 Awake missions", () => {
     const registry = getMissionFactRequirementRegistry(getMissionCatalog())
+    const directStoryMissions = registry.getMissionsForFact({
+        kind: "questProgress",
+        sections: [3],
+    }).filter(ref => ref.category === 9).map(ref => ref.missionId)
     const playerMissions = scope.collectAwakeMissionIdsFromSeeds({
         invalidatedFactKeys: [{ kind: "player" }],
         directMissionIds: [],
@@ -73,11 +109,78 @@ test("reverse FactKey seeds select only bounded Category 9 Awake missions", () =
         directMissionIds: [],
     }, registry)
 
-    assert.deepEqual(playerMissions, [2630022])
+    assert.deepEqual(playerMissions, [2630022, 2630024])
+    assert.equal(directStoryMissions.length, 19)
+    assert.equal(directStoryMissions.includes(2630021), true)
+    assert.equal(directStoryMissions.every(missionId => storyMissions.includes(missionId)), true)
     assert.equal(storyMissions.includes(2630024), true)
-    assert.equal(storyMissions.length, 19)
+    assert.equal(storyMissions.length, 37)
+    assert.equal(storyMissions.length - directStoryMissions.length, 18)
     assert.equal(Object.isFrozen(playerMissions), true)
     assert.equal(Object.isFrozen(storyMissions), true)
+})
+
+test("walks upward through multiple and nested Category 9 parents for all seed kinds", () => {
+    const entries = [
+        registryEntry(9, 100),
+        registryEntry(9, 200, [[9, 100]]),
+        registryEntry(9, 300, [[9, 100]]),
+        registryEntry(9, 400, [[9, 200]]),
+        registryEntry(9, 900),
+        registryEntry(9, 901, [[9, 900]]),
+    ]
+
+    assert.deepEqual(scope.collectAwakeMissionIdsFromSeeds({
+        invalidatedFactKeys: [{ kind: "player" }],
+        directMissionIds: [900],
+    }, customRegistry(entries)), [100, 200, 300, 400, 900, 901])
+})
+
+test("adds parents without adding unrelated siblings or following cross-category edges", () => {
+    const entries = [
+        registryEntry(9, 100),
+        registryEntry(9, 250, [[9, 100], [9, 999]]),
+        registryEntry(9, 500, [[9, 999]]),
+        registryEntry(5, 600, [[9, 100]]),
+        registryEntry(9, 601, [[5, 100]]),
+    ]
+
+    assert.deepEqual(scope.collectAwakeMissionIdsFromSeeds({
+        invalidatedFactKeys: [{ kind: "player" }],
+        directMissionIds: [],
+    }, customRegistry(entries)), [100, 250])
+})
+
+test("terminates cycles with stable deduplicated results independent of entry order", () => {
+    const entries = [
+        registryEntry(9, 100),
+        registryEntry(9, 200, [[9, 100]]),
+        registryEntry(9, 300, [[9, 200], [9, 400]]),
+        registryEntry(9, 400, [[9, 300]]),
+    ]
+    const seeds = {
+        invalidatedFactKeys: [{ kind: "player" }, { kind: "player" }],
+        directMissionIds: [100, 100],
+    }
+    const forward = scope.collectAwakeMissionIdsFromSeeds(
+        seeds,
+        customRegistry(entries, [
+            { category: 9, missionId: 100 },
+            { category: 9, missionId: 100 },
+        ]),
+    )
+    const reversed = scope.collectAwakeMissionIdsFromSeeds(
+        seeds,
+        customRegistry([...entries].reverse(), [
+            { category: 9, missionId: 100 },
+            { category: 9, missionId: 100 },
+        ]),
+    )
+
+    assert.deepEqual(forward, [100, 200, 300, 400])
+    assert.deepEqual(reversed, forward)
+    assert.equal(Object.isFrozen(forward), true)
+    assert.equal(Object.isFrozen(reversed), true)
 })
 
 test("normalizes, deduplicates, and freezes FactKeys while sorting direct mission seeds", () => {
@@ -106,15 +209,11 @@ test("normalizes, deduplicates, and freezes FactKeys while sorting direct missio
 })
 
 test("ignores non-Category-9 reverse references and deduplicates direct hits", () => {
-    const registry = {
-        getMissionsForFact() {
-            return [
-                { category: 5, missionId: 7000 },
-                { category: 9, missionId: 2630022 },
-                { category: 9, missionId: 2630022 },
-            ]
-        },
-    }
+    const registry = customRegistry([], [
+        { category: 5, missionId: 7000 },
+        { category: 9, missionId: 2630022 },
+        { category: 9, missionId: 2630022 },
+    ])
 
     assert.deepEqual(scope.collectAwakeMissionIdsFromSeeds({
         invalidatedFactKeys: [{ kind: "player" }],

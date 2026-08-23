@@ -56,27 +56,6 @@ export function normalizeAwakeDirectMissionIds(
     return Object.freeze([...normalized].sort((left, right) => left - right))
 }
 
-function resolveAwakeFactSeedMissionId(
-    fact: FactKey,
-    missionId: number,
-    requirementRegistry: MissionFactRequirementRegistry,
-): number {
-    if (fact.kind === "player") return missionId
-
-    for (const entry of requirementRegistry.entries) {
-        if (entry.category !== CATEGORY
-            || !entry.requirement.missionDependencies.some(dependency => (
-                dependency.category === CATEGORY && dependency.missionId === missionId
-            ))) continue
-        const hasPlayerDependency = entry.requirement.missionDependencies.some(dependency => (
-            requirementRegistry.getRequirement(dependency.category, dependency.missionId)?.facts
-                .some(dependencyFact => dependencyFact.kind === "player") === true
-        ))
-        if (hasPlayerDependency) return entry.missionId
-    }
-    return missionId
-}
-
 export function collectAwakeMissionIdsFromSeeds(
     seeds: AwakeMissionSeeds,
     requirementRegistry: MissionFactRequirementRegistry,
@@ -84,12 +63,21 @@ export function collectAwakeMissionIdsFromSeeds(
     const missionIds = new Set(normalizeAwakeDirectMissionIds(seeds.directMissionIds))
     for (const fact of normalizeAwakeInvalidatedFactKeys(seeds.invalidatedFactKeys)) {
         for (const ref of requirementRegistry.getMissionsForFact(fact)) {
-            if (ref.category === CATEGORY) {
-                missionIds.add(resolveAwakeFactSeedMissionId(
-                    fact,
-                    ref.missionId,
-                    requirementRegistry,
-                ))
+            if (ref.category === CATEGORY) missionIds.add(ref.missionId)
+        }
+    }
+    let addedParent = true
+    while (addedParent) {
+        addedParent = false
+        for (const entry of requirementRegistry.entries) {
+            if (entry.category !== CATEGORY || missionIds.has(entry.missionId)) continue
+            const hasSelectedDependency = entry.requirement.missionDependencies.some(
+                dependency => dependency.category === CATEGORY
+                    && missionIds.has(dependency.missionId),
+            )
+            if (hasSelectedDependency) {
+                missionIds.add(entry.missionId)
+                addedParent = true
             }
         }
     }
