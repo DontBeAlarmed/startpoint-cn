@@ -372,6 +372,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/character_awake_route.test.cjs",
             "tools/character_awake_settlement.test.cjs",
             "tools/character_awake_unlock.test.cjs",
+            "tools/awake_request_context.test.cjs",
             "tools/awake_reconcile_callsite_matrix.test.cjs",
             "tools/mission_awake_evaluation_settlement.test.cjs",
             "tools/mission_awake_reward_owner.test.cjs",

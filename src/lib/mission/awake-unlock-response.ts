@@ -1,6 +1,15 @@
 import { buildManaBoardAwakeCharacterList } from "../character-helpers"
 import { reconcileAwakeUnlocks } from "./awake-unlock"
-import { createCharacterAwakeEligibilityResolver } from "./awake-eligibility"
+import {
+    assertAwakeRequestContext,
+    createAwakeRequestContext,
+    type AwakeRequestContext,
+} from "./awake-request-context"
+
+export interface ReconcileAwakeUnlockCharacterListOptions {
+    readonly candidateCharacterIds?: readonly number[]
+    readonly context?: AwakeRequestContext
+}
 
 function mergeManaBoardAwake(...values: unknown[]): Record<number, number> {
     const merged: Record<number, number> = {}
@@ -23,13 +32,22 @@ function mergeManaBoardAwake(...values: unknown[]): Record<number, number> {
 
 function reconcileAwakeUnlockCharacterListCore(
     playerId: number,
-    existing: Record<string, unknown>[]
+    existing: Record<string, unknown>[],
+    options: ReconcileAwakeUnlockCharacterListOptions = {},
 ): Record<string, unknown>[] {
-    const resolver = createCharacterAwakeEligibilityResolver(playerId)
-    const { changed, removed } = reconcileAwakeUnlocks(playerId, undefined, resolver)
+    const context = options.context ?? createAwakeRequestContext({
+        playerId,
+        candidateCharacterIds: options.candidateCharacterIds,
+    })
+    assertAwakeRequestContext(context, playerId)
+    const { changed, removed } = reconcileAwakeUnlocks(
+        playerId,
+        options.candidateCharacterIds,
+        context,
+    )
 
     const updates = buildManaBoardAwakeCharacterList(
-        resolver.characters,
+        context.resolver.characters,
         changed
     )
     const merged: Record<string, unknown>[] = []
@@ -104,17 +122,19 @@ function reconcileAwakeUnlockCharacterListCore(
 
 export function reconcileAwakeUnlockCharacterListStrict(
     playerId: number,
-    existing: Record<string, unknown>[]
+    existing: Record<string, unknown>[],
+    options?: ReconcileAwakeUnlockCharacterListOptions,
 ): Record<string, unknown>[] {
-    return reconcileAwakeUnlockCharacterListCore(playerId, existing)
+    return reconcileAwakeUnlockCharacterListCore(playerId, existing, options)
 }
 
 export function reconcileAwakeUnlockCharacterListBestEffort(
     playerId: number,
-    existing: Record<string, unknown>[]
+    existing: Record<string, unknown>[],
+    options?: ReconcileAwakeUnlockCharacterListOptions,
 ): Record<string, unknown>[] {
     try {
-        return reconcileAwakeUnlockCharacterListCore(playerId, existing)
+        return reconcileAwakeUnlockCharacterListCore(playerId, existing, options)
     } catch (cause) {
         const error = cause instanceof Error
             ? cause

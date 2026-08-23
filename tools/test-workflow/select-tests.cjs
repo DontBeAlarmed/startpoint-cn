@@ -323,7 +323,7 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^(?:src\/lib\/mission\/(?:awake-evaluation-settlement|awake-settlement|awake-unlock-response|evaluation-session|fact-loaders|index|mission-catalog|mission-catalog-source|production-fact-loaders)\.ts|tools\/mission_awake_reward_owner\.test\.cjs)$/,
+        pattern: /^(?:src\/lib\/mission\/(?:awake-eligibility|awake-evaluation-settlement|awake-request-context|awake-settlement|awake-unlock|awake-unlock-response|compute-awake-summary|evaluation-session|fact-loaders|index|mission-catalog|mission-catalog-source|production-fact-loaders)\.ts|tools\/mission_awake_reward_owner\.test\.cjs)$/,
         groups: ["integration:mission"],
     },
     {
@@ -367,7 +367,7 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^(?:tools\/awake_reconcile_callsite_matrix\.test\.cjs|tools\/perf\/awake_request_context_(?:admission|baseline|report|runner|scenarios)(?:\.test)?\.cjs|tools\/perf\/__snapshots__\/awake_request_context_baseline\.json)$/,
+        pattern: /^(?:tools\/awake_request_context\.test\.cjs|tools\/awake_reconcile_callsite_matrix\.test\.cjs|tools\/perf\/awake_request_context_(?:admission|baseline|report|runner|scenarios)(?:\.test)?\.cjs|tools\/perf\/__snapshots__\/awake_request_context_baseline\.json)$/,
         groups: ["integration:mission"],
     },
     {

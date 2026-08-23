@@ -22,13 +22,21 @@ export interface CharacterAwakeEligibilityResolver {
     isNewUnlockEligible(characterId: number, missionId: number): boolean
 }
 
-export function createCharacterAwakeEligibilityResolver(
-    playerId: number,
-    evaluationTime: Date = getServerDate(),
+export interface CharacterAwakeEligibilitySnapshot {
+    readonly characters: Record<string, PlayerCharacter>
+    readonly manaNodes: Record<string, number[]>
+    readonly manaNodeAwakeLevels: Record<string, Record<number, number>>
+    readonly evaluationTime: Date
+}
+
+export function createCharacterAwakeEligibilityResolverFromSnapshot(
+    snapshot: CharacterAwakeEligibilitySnapshot,
 ): CharacterAwakeEligibilityResolver {
-    const characters = getPlayerCharactersSync(playerId)
-    const manaNodes = getPlayerCharactersManaNodesSync(playerId)
-    const manaNodeAwakeLevels = getPlayerCharactersManaNodeAwakeLevelsSync(playerId)
+    const evaluationTime = new Date(snapshot.evaluationTime)
+    if (!Number.isFinite(evaluationTime.getTime())) {
+        throw new TypeError("Awake eligibility evaluationTime must be a valid Date")
+    }
+    const { characters, manaNodes, manaNodeAwakeLevels } = snapshot
     const readinessCache = new Map<number, CharacterAwakeBaseReadiness>()
 
     function getBaseReadiness(characterId: number): CharacterAwakeBaseReadiness {
@@ -61,7 +69,7 @@ export function createCharacterAwakeEligibilityResolver(
         return readiness
     }
 
-    return {
+    return Object.freeze({
         characters,
         manaNodes,
         manaNodeAwakeLevels,
@@ -76,7 +84,19 @@ export function createCharacterAwakeEligibilityResolver(
                 && isMissionEnabledAt(9, missionId, evaluationTime)
                 && getBaseReadiness(characterId) === "ready"
         },
-    }
+    })
+}
+
+export function createCharacterAwakeEligibilityResolver(
+    playerId: number,
+    evaluationTime: Date = getServerDate(),
+): CharacterAwakeEligibilityResolver {
+    return createCharacterAwakeEligibilityResolverFromSnapshot({
+        characters: getPlayerCharactersSync(playerId),
+        manaNodes: getPlayerCharactersManaNodesSync(playerId),
+        manaNodeAwakeLevels: getPlayerCharactersManaNodeAwakeLevelsSync(playerId),
+        evaluationTime,
+    })
 }
 
 export function getCharacterAwakeBaseReadiness(

@@ -10,6 +10,12 @@ import type { CategoryContext } from "./types"
 import { createCharacterAwakeEligibilityResolver } from "./awake-eligibility"
 import type { CharacterAwakeEligibilityResolver } from "./awake-eligibility"
 import { buildAwakeContext } from "./computer-awake"
+import {
+    assertAwakeRequestContext,
+    createAwakeRequestContext,
+    readAwakeRequestContextCategoryMissions,
+    type AwakeRequestContext,
+} from "./awake-request-context"
 
 export interface AwakeMissionEntry {
     mission_id: number
@@ -24,8 +30,31 @@ export interface AwakeSummary {
 
 export function computeAwakeSummary(
     playerId: number,
-    resolver: CharacterAwakeEligibilityResolver = createCharacterAwakeEligibilityResolver(playerId),
+    resolverOrContext?: CharacterAwakeEligibilityResolver | AwakeRequestContext,
 ): AwakeSummary {
+    if (resolverOrContext === undefined || "evaluate" in resolverOrContext) {
+        const context = resolverOrContext ?? createAwakeRequestContext({ playerId })
+        assertAwakeRequestContext(context, playerId)
+        const activeMissions = readAwakeRequestContextCategoryMissions(context)
+        const activeMissionList = context.evaluate().map(entry => {
+            const persistedStages = activeMissions[String(entry.missionId)]?.stages
+            return {
+                mission_id: entry.missionId,
+                progress_value: entry.progress,
+                stages: getMissionStageIds(9, entry.missionId).map(stage => ({
+                    stage,
+                    received: !Array.isArray(persistedStages)
+                        && persistedStages?.[String(stage)] === true,
+                })),
+            }
+        })
+        return {
+            activeMissionList,
+            manaBoardAwakeMap: context.readUnlocks(),
+        }
+    }
+
+    const resolver = resolverOrContext
     const activeMissions = getPlayerCategoryMissionsSync(playerId, 9)
     const playerChars = resolver.characters
     const awakeMissionIds = getMissionIdsByCategory(9)

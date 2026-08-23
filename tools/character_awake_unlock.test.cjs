@@ -681,7 +681,9 @@ const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getCharacterDataSync, getCharacterManaNodesSync } = require("../src/lib/assets")
 const { characterExpCaps, givePlayerCharacterSync } = require("../src/lib/character")
 const {
+    createAwakeRequestContext,
     reconcileAwakeUnlockCharacterList,
+    reconcileAwakeUnlockCharacterListStrict,
     reconcileAwakeUnlocks,
     reconcileAwakeUnlocksFromProgress,
 } = require("../src/lib/mission")
@@ -873,6 +875,25 @@ try {
     const fullReconciliation = reconcileAwakeUnlocks(playerId)
     assert.deepEqual(fullReconciliation.changed, expectedUnlocks)
     assert.deepEqual(fullReconciliation.all, expectedUnlocks)
+
+    const compatibilityContext = createAwakeRequestContext({
+        playerId,
+        evaluationTime: new Date("2025-01-01T12:00:00.000Z"),
+        candidateCharacterIds: [341005],
+    })
+    const strictCharacterList = reconcileAwakeUnlockCharacterListStrict(
+        playerId,
+        [],
+        {
+            candidateCharacterIds: [341005],
+            context: compatibilityContext,
+        },
+    )
+    assert.equal(strictCharacterList.length, 0)
+    assert.strictEqual(
+        reconcileAwakeUnlocks(playerId, [341005], compatibilityContext).all,
+        compatibilityContext.readUnlocks(),
+    )
 
     db.prepare(`
         DELETE FROM players_character_awake_unlocks

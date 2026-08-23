@@ -81,6 +81,16 @@ function testLoadReconcilesFromComputedAwakeSummary() {
         loadBlock.includes("awakeSummary.manaBoardAwakeMap = reconcileAwakeUnlocksFromProgress("),
         true
     )
+    assert.equal(loadBlock.includes("createAwakeRequestContext("), false)
+}
+
+function testAwakeSummaryAcceptsRequestContextWithoutMigratingLoadOwner() {
+    const summarySource = fs.readFileSync(
+        path.join(__dirname, "../src/lib/mission/compute-awake-summary.ts"),
+        "utf8"
+    )
+    assert.match(summarySource, /AwakeRequestContext/)
+    assert.match(summarySource, /readAwakeRequestContextCategoryMissions/)
 }
 
 function testAwakeRequestGate() {
@@ -133,6 +143,7 @@ try {
     testIndependentUnlockAndNodeStateAreMergedByMaximum()
     testAwakeAuthorizationUsesIndependentUnlockState()
     testLoadReconcilesFromComputedAwakeSummary()
+    testAwakeSummaryAcceptsRequestContextWithoutMigratingLoadOwner()
     testAwakeUnlockUsesCommonCharacterResponseShape()
     testAwakeRequestGate()
     console.log("character awake refresh tests passed")
