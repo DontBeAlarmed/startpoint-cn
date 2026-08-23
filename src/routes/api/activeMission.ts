@@ -8,7 +8,12 @@ import { getPlayerMailCountSync } from "../../data/domains/mail"
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { reconcileAwakeUnlockCharacterList, validateMissionRewardClaims } from "../../lib/mission/index";
+import {
+    reconcileAwakeUnlockCharacterListBestEffort,
+    validateMissionRewardClaims,
+} from "../../lib/mission/index";
+import { collectAwakeCandidateCharacterIds } from "../../lib/mission/awake-candidate-character-ids";
+import { createAwakeRequestContextBestEffort } from "../../lib/mission/awake-best-effort-context";
 import { MissionRewardGranter } from "../../lib/mission/grants";
 import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time";
@@ -78,7 +83,16 @@ const routes = async (fastify: FastifyInstance) => {
             granter.persistPlayer()
             const existingCharacterList = granter.characterList as unknown as Record<string, unknown>[]
             return validation.claims.length > 0
-                ? reconcileAwakeUnlockCharacterList(playerId, existingCharacterList)
+                ? (() => {
+                    const candidateCharacterIds = collectAwakeCandidateCharacterIds([], [existingCharacterList])
+                    const awakeContext = createAwakeRequestContextBestEffort(playerId, candidateCharacterIds)
+                    if (awakeContext === null) return existingCharacterList
+                    return reconcileAwakeUnlockCharacterListBestEffort(
+                        playerId,
+                        existingCharacterList,
+                        { context: awakeContext, candidateCharacterIds },
+                    )
+                })()
                 : existingCharacterList
         })()
 

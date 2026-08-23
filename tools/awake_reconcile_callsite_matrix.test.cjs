@@ -12,8 +12,10 @@ const CALLEES = new Map([
     ["reconcileAwakeUnlockCharacterList", "default"],
     ["reconcileAwakeUnlockCharacterListStrict", "strict"],
     ["reconcileAwakeUnlockCharacterListBestEffort", "best-effort"],
+    ["publishAwakeCharacterListBestEffort", "best-effort"],
 ])
 const AWAKE_CALLEE_PREFIX = "reconcileAwakeUnlockCharacterList"
+const SINGLE_AWAKE_WRAPPER = "publishAwakeCharacterListBestEffort"
 const ROUTE_OWNERS = Object.freeze({
     "src/routes/api/activeMission.ts": { "/receive": "active_mission/receive" },
     "src/routes/api/boxGacha.ts": { "/exec": "box_gacha/exec" },
@@ -44,26 +46,26 @@ const ROUTE_OWNERS = Object.freeze({
 const EXPECTED_MATRIX = Object.freeze([
     {
         relativeFile: "src/lib/quest/finish/single-settlement-writes.ts",
-        callee: "default",
+        callee: "best-effort",
         ownerLabel: "single/finish",
         boundary: "best-effort-in-tx",
-        candidateSource: "legacy-unscoped",
+        candidateSource: "scoped-context",
         plannedCandidateSource: "battle-party+direct-missions",
     },
     {
         relativeFile: "src/multi/settlement/orchestrator.ts",
-        callee: "default",
+        callee: "best-effort",
         ownerLabel: "multi/finish",
         boundary: "best-effort-in-tx",
-        candidateSource: "legacy-unscoped",
+        candidateSource: "scoped-context",
         plannedCandidateSource: "battle-party+direct-missions",
     },
     {
         relativeFile: "src/routes/api/activeMission.ts",
-        callee: "default",
+        callee: "best-effort",
         ownerLabel: "active_mission/receive",
         boundary: "best-effort-in-tx",
-        candidateSource: "legacy-unscoped",
+        candidateSource: "scoped-context",
         plannedCandidateSource: "claimed-reward-characters",
     },
     {
@@ -84,10 +86,10 @@ const EXPECTED_MATRIX = Object.freeze([
     },
     {
         relativeFile: "src/routes/api/character/bond.ts",
-        callee: "default",
+        callee: "best-effort",
         ownerLabel: "character/receive_bond_token",
         boundary: "best-effort-in-tx",
-        candidateSource: "legacy-unscoped",
+        candidateSource: "scoped-context",
         plannedCandidateSource: "bond-character",
     },
     {
@@ -95,7 +97,7 @@ const EXPECTED_MATRIX = Object.freeze([
         callee: "strict",
         ownerLabel: "character/learn_mana_node",
         boundary: "strict-in-tx",
-        candidateSource: "legacy-unscoped",
+        candidateSource: "scoped-context",
         plannedCandidateSource: "target-character",
     },
     {
@@ -132,18 +134,18 @@ const EXPECTED_MATRIX = Object.freeze([
     },
     {
         relativeFile: "src/routes/api/mail.ts",
-        callee: "default",
+        callee: "best-effort",
         ownerLabel: "mail/receive",
         boundary: "best-effort-in-tx",
-        candidateSource: "legacy-unscoped",
+        candidateSource: "scoped-context",
         plannedCandidateSource: "mail-reward-characters",
     },
     {
         relativeFile: "src/routes/api/mail.ts",
-        callee: "default",
+        callee: "best-effort",
         ownerLabel: "mail/receive_all",
         boundary: "best-effort-in-tx",
-        candidateSource: "legacy-unscoped",
+        candidateSource: "scoped-context",
         plannedCandidateSource: "mail-reward-characters",
     },
     {
@@ -172,26 +174,26 @@ const EXPECTED_MATRIX = Object.freeze([
     },
     {
         relativeFile: "src/routes/api/storyQuest.ts",
-        callee: "default",
+        callee: "best-effort",
         ownerLabel: "story_quest/finish",
         boundary: "best-effort-in-tx",
-        candidateSource: "legacy-unscoped",
+        candidateSource: "scoped-context",
         plannedCandidateSource: "story-reward-characters",
     },
     {
         relativeFile: "src/routes/api/tutorial.ts",
-        callee: "default",
+        callee: "best-effort",
         ownerLabel: "tutorial/update_step:15",
         boundary: "best-effort-in-tx",
-        candidateSource: "legacy-unscoped",
+        candidateSource: "scoped-context",
         plannedCandidateSource: "tutorial-gacha-characters",
     },
     {
         relativeFile: "src/routes/api/tutorial.ts",
-        callee: "default",
+        callee: "best-effort",
         ownerLabel: "tutorial/update_step:16",
         boundary: "best-effort-in-tx",
-        candidateSource: "legacy-unscoped",
+        candidateSource: "scoped-context",
         plannedCandidateSource: "tutorial-present-character",
     },
 ])
@@ -209,7 +211,7 @@ function collectImportedAwakeCalls(source, fileName) {
         ts.ScriptKind.TS,
     )
     const namedImports = new Map()
-    const namespaceImports = new Set()
+    const namespaceImports = new Map()
 
     for (const statement of sourceFile.statements) {
         if (!ts.isImportDeclaration(statement)
@@ -219,12 +221,17 @@ function collectImportedAwakeCalls(source, fileName) {
         if (bindings && ts.isNamedImports(bindings)) {
             for (const element of bindings.elements) {
                 const exportedName = element.propertyName?.text ?? element.name.text
-                if (exportedName.startsWith(AWAKE_CALLEE_PREFIX)) {
-                    namedImports.set(element.name.text, exportedName)
+                if (exportedName.startsWith(AWAKE_CALLEE_PREFIX)
+                    || (exportedName === SINGLE_AWAKE_WRAPPER
+                        && statement.moduleSpecifier.text.endsWith("/awake-best-effort-context"))) {
+                    namedImports.set(element.name.text, {
+                        exportedName,
+                        moduleSpecifier: statement.moduleSpecifier.text,
+                    })
                 }
             }
         } else if (bindings && ts.isNamespaceImport(bindings)) {
-            namespaceImports.add(bindings.name.text)
+            namespaceImports.set(bindings.name.text, statement.moduleSpecifier.text)
         }
     }
 
@@ -232,20 +239,29 @@ function collectImportedAwakeCalls(source, fileName) {
     function visit(node) {
         if (ts.isCallExpression(node)) {
             let exportedName = null
+            let moduleSpecifier = null
             if (ts.isIdentifier(node.expression)) {
-                exportedName = namedImports.get(node.expression.text) ?? null
+                const imported = namedImports.get(node.expression.text)
+                exportedName = imported?.exportedName ?? null
+                moduleSpecifier = imported?.moduleSpecifier ?? null
             } else if (ts.isPropertyAccessExpression(node.expression)
                 && ts.isIdentifier(node.expression.expression)
-                && namespaceImports.has(node.expression.expression.text)
-                && node.expression.name.text.startsWith(AWAKE_CALLEE_PREFIX)) {
-                exportedName = node.expression.name.text
+                && namespaceImports.has(node.expression.expression.text)) {
+                const namespaceSpecifier = namespaceImports.get(node.expression.expression.text)
+                const name = node.expression.name.text
+                if (name.startsWith(AWAKE_CALLEE_PREFIX)
+                    || (name === SINGLE_AWAKE_WRAPPER
+                        && namespaceSpecifier.endsWith("/awake-best-effort-context"))) {
+                    exportedName = name
+                    moduleSpecifier = namespaceSpecifier
+                }
             }
             if (exportedName !== null) {
                 const callee = CALLEES.get(exportedName)
                 if (callee === undefined) {
                     throw new Error(`${fileName} calls unknown Awake publication helper ${exportedName}`)
                 }
-                calls.push({ callee, call: node, exportedName, sourceFile })
+                calls.push({ callee, call: node, exportedName, moduleSpecifier, sourceFile })
             }
         }
         ts.forEachChild(node, visit)
@@ -411,6 +427,61 @@ function findExportedFunctionDeclaration(sourceFile, checker, exportedName) {
     return declarations[0]
 }
 
+function assertSingleAwakePublicationWrapper() {
+    const relativeFile = "src/lib/mission/awake-best-effort-context.ts"
+    const source = fs.readFileSync(path.join(projectRoot, relativeFile), "utf8")
+    const { checker, sourceFile } = createTypeCheckedSource(source, relativeFile)
+    const wrapper = findExportedFunctionDeclaration(
+        sourceFile,
+        checker,
+        SINGLE_AWAKE_WRAPPER,
+    )
+    const candidateSymbol = findNamedImportSymbol(
+        sourceFile,
+        checker,
+        "collectAwakeCandidateCharacterIds",
+        specifier => specifier.endsWith("/awake-candidate-character-ids"),
+    )
+    const reconcileSymbol = findNamedImportSymbol(
+        sourceFile,
+        checker,
+        "reconcileAwakeUnlockCharacterListBestEffort",
+        specifier => specifier.endsWith("/awake-unlock-response"),
+    )
+    const contextDeclaration = findExportedFunctionDeclaration(
+        sourceFile,
+        checker,
+        "createAwakeRequestContextBestEffort",
+    )
+    const contextSymbol = checker.getSymbolAtLocation(contextDeclaration.name)
+    assert.notEqual(contextSymbol, undefined)
+
+    const candidateCalls = collectCallsForSymbol(wrapper, checker, candidateSymbol)
+    assert.equal(candidateCalls.length, 1, "single Awake wrapper must collect candidates exactly once")
+    assert.deepEqual(
+        candidateCalls[0].arguments.map(argument => argument.getText(sourceFile)),
+        ["explicitCharacterIds", "characterLists"],
+    )
+
+    const contextCalls = collectCallsForSymbol(wrapper, checker, contextSymbol)
+    assert.equal(contextCalls.length, 1, "single Awake wrapper must create context exactly once")
+    assert.deepEqual(
+        contextCalls[0].arguments.map(argument => argument.getText(sourceFile)),
+        ["playerId", "candidateCharacterIds"],
+    )
+
+    const reconcileCalls = collectCallsForSymbol(wrapper, checker, reconcileSymbol)
+    assert.equal(reconcileCalls.length, 1, "single Awake wrapper must reconcile exactly once")
+    assert.deepEqual(
+        reconcileCalls[0].arguments.map(argument => argument.getText(sourceFile)),
+        [
+            "playerId",
+            "existingCharacterList",
+            "{ context: awakeContext, candidateCharacterIds }",
+        ],
+    )
+}
+
 function assertSingleSettlementTransactionOwnership(source, fileName) {
     const { checker, sourceFile } = createTypeCheckedSource(source, fileName)
     const owner = findExportedFunctionDeclaration(
@@ -485,7 +556,9 @@ function assertMultiSettlementTransactionOwnership(source, fileName) {
     const awakeImportSymbol = findNamedImportSymbol(
         sourceFile,
         checker,
-        "reconcileAwakeUnlockCharacterList",
+        source.includes("reconcileAwakeUnlockCharacterListBestEffort")
+            ? "reconcileAwakeUnlockCharacterListBestEffort"
+            : "reconcileAwakeUnlockCharacterList",
         isMissionModuleSpecifier,
     )
     const awakeCalls = collectCallsForSymbol(sourceFile, checker, awakeImportSymbol)
@@ -579,18 +652,47 @@ function collectProductionCalls() {
         if (relativeFile === "src/lib/mission/awake-unlock-response.ts") continue
         const source = fs.readFileSync(file, "utf8")
         for (const importedCall of collectImportedAwakeCalls(source, relativeFile)) {
-            const { call, callee, sourceFile } = importedCall
-            assert.equal(
-                call.arguments.length,
-                2,
-                `${relativeFile} publication no longer uses the legacy-unscoped signature`,
-            )
+            const { call, callee, exportedName, moduleSpecifier, sourceFile } = importedCall
+            if (exportedName === SINGLE_AWAKE_WRAPPER) {
+                assert.equal(
+                    relativeFile,
+                    "src/lib/quest/finish/single-settlement-writes.ts",
+                    `${relativeFile} may not import the single Awake wrapper`,
+                )
+                assert.equal(
+                    moduleSpecifier.endsWith("/awake-best-effort-context"),
+                    true,
+                    `${relativeFile} single wrapper import must use awake-best-effort-context`,
+                )
+                assert.equal(call.arguments.length, 3, `${relativeFile} wrapper must receive scoped inputs`)
+                assertSingleAwakePublicationWrapper()
+            } else {
+                assert.ok(
+                    call.arguments.length === 2 || call.arguments.length === 3,
+                    `${relativeFile} publication must use the supported signature`,
+                )
+            }
+            if (call.arguments.length === 3 && exportedName !== SINGLE_AWAKE_WRAPPER) {
+                const options = call.arguments[2]
+                assert.equal(
+                    ts.isObjectLiteralExpression(options),
+                    true,
+                    `${relativeFile} scoped publication must pass an options object`,
+                )
+                const optionNames = new Set(options.properties.flatMap(property => {
+                    if (ts.isShorthandPropertyAssignment(property)) return [property.name.text]
+                    if (ts.isPropertyAssignment(property) && ts.isIdentifier(property.name)) return [property.name.text]
+                    return []
+                }))
+                assert.equal(optionNames.has("context"), true, `${relativeFile} scoped publication must pass fresh context`)
+                assert.equal(optionNames.has("candidateCharacterIds"), true, `${relativeFile} scoped publication must pass candidates`)
+            }
             calls.push({
                 relativeFile,
                 callee,
                 ownerLabel: classifyOwner(relativeFile, call, sourceFile),
                 boundary: classifyBoundary(relativeFile, callee, call),
-                candidateSource: "legacy-unscoped",
+                candidateSource: call.arguments.length === 3 ? "scoped-context" : "legacy-unscoped",
                 position: call.getStart(sourceFile),
             })
         }
@@ -638,7 +740,12 @@ test("Awake reconcile audit matrix freezes owner, policy, and planned candidate 
     )
     assert.equal(new Set(EXPECTED_MATRIX.map(entry => entry.ownerLabel)).size, 19)
     for (const entry of EXPECTED_MATRIX) {
-        assert.equal(entry.candidateSource, "legacy-unscoped")
+        assert.equal(
+            entry.candidateSource,
+            entry.boundary === "strict-in-tx" || entry.boundary === "best-effort-in-tx"
+                ? "scoped-context"
+                : "legacy-unscoped",
+        )
         assert.match(entry.plannedCandidateSource, /^[a-z0-9+:-]+$/)
     }
     for (const pair of [

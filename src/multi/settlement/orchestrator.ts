@@ -11,7 +11,13 @@ import {
 } from "../../lib/assets"
 import { givePlayerCharactersExpSync } from "../../lib/character"
 import { buildBattleMissionSettlementScopes, recordMissionBattleFacts } from "../../lib/mission/battle-facts"
-import { reconcileAwakeUnlockCharacterList, settleAwakeBattleMissions, settleMissionCategories } from "../../lib/mission"
+import {
+    reconcileAwakeUnlockCharacterListBestEffort,
+    settleAwakeBattleMissions,
+    settleMissionCategories,
+} from "../../lib/mission"
+import { collectAwakeCandidateCharacterIds } from "../../lib/mission/awake-candidate-character-ids"
+import { createAwakeRequestContextBestEffort } from "../../lib/mission/awake-best-effort-context"
 import {
     ActiveQuestSettlementConflictError,
     activeQuests,
@@ -384,14 +390,29 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             directlyChangedMissionIds: missionBattleFacts.awakeMissionIds,
             evaluationTime: settlementTime,
         })
-        const characterList = reconcileAwakeUnlockCharacterList(input.playerId, [
+        const existingCharacterList = [
             ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
             ...((clearReward?.character_list || []) as Record<string, unknown>[]),
             ...((sPlusClearReward?.character_list || []) as Record<string, unknown>[]),
             ...(scoreRewardsResult.character_list as Record<string, unknown>[]),
             ...(missionSettlement.characterList as Record<string, unknown>[]),
             ...awakeMissionSettlement.characterList,
-        ])
+        ]
+        const candidateCharacterIds = collectAwakeCandidateCharacterIds(
+            partyCharacterIdsArray,
+            [existingCharacterList],
+        )
+        const awakeContext = createAwakeRequestContextBestEffort(
+            input.playerId,
+            candidateCharacterIds,
+        )
+        const characterList = awakeContext === null
+            ? existingCharacterList
+            : reconcileAwakeUnlockCharacterListBestEffort(
+                input.playerId,
+                existingCharacterList,
+                { context: awakeContext, candidateCharacterIds },
+            )
         return {
             characterList,
             clearReward,

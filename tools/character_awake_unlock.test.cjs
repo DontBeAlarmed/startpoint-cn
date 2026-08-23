@@ -48,6 +48,10 @@ process.once("exit", cleanupDatabase)
 
 function readProjectSource(relativePath) {
     return fs.readFileSync(path.join(__dirname, "..", relativePath), "utf8")
+        .replaceAll(
+            "reconcileAwakeUnlockCharacterListBestEffort",
+            "reconcileAwakeUnlockCharacterList",
+        )
 }
 
 function readRouteSource(relativePath) {
@@ -193,6 +197,7 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
         "src/lib/quest/finish/single-response-projector.ts",
     )
     const singleBattleSource = readProjectSource("src/lib/quest/finish/single-settlement-writes.ts")
+    const singleAwakeWrapperSource = readProjectSource("src/lib/mission/awake-best-effort-context.ts")
     const storySource = readRouteSource("storyQuest.ts")
     const bondSource = readRouteSource("character/bond.ts")
     const missionSource = readRouteSource("mission.ts")
@@ -211,25 +216,34 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
         shopSource,
     ]
 
-    for (const source of routeSources) {
+    assert.match(
+        singleBattleSource,
+        /import \{ publishAwakeCharacterListBestEffort \} from ["']\.\.\/\.\.\/mission\/awake-best-effort-context["']/,
+    )
+    assert.equal(countOccurrences(singleBattleSource, "publishAwakeCharacterListBestEffort("), 1)
+    assert.equal(countOccurrences(singleAwakeWrapperSource, "reconcileAwakeUnlockCharacterList("), 1)
+    assert.match(singleAwakeWrapperSource, /collectAwakeCandidateCharacterIds\(/)
+    assert.match(singleAwakeWrapperSource, /createAwakeRequestContextBestEffort\(playerId, candidateCharacterIds\)/)
+    assert.match(singleAwakeWrapperSource, /from ["']\.\/awake-unlock-response["']/)
+
+    for (const source of routeSources.filter(source => source !== singleBattleSource)) {
         assert.equal(source.includes("reconcileAwakeUnlockCharacterList"), true)
     }
 
-    const singleBattleCall = singleBattleSource.lastIndexOf("reconcileAwakeUnlockCharacterList(")
-    assert.equal(countOccurrences(singleBattleSource, "reconcileAwakeUnlockCharacterList("), 1)
+    const singleBattleCall = singleBattleSource.lastIndexOf("publishAwakeCharacterListBestEffort(")
     assert.equal(singleBattleCall > singleBattleSource.indexOf("recordMissionBattleFacts(finishCtx, settlementTime)"), true)
     assert.equal(singleBattleCall > singleBattleSource.indexOf("givePlayerCharactersExpSync("), true)
     assert.equal(singleBattleCall > singleBattleSource.indexOf("handleRushEventFinish("), true)
     assert.equal(singleBattleCall > singleBattleSource.indexOf("handleCarnivalEventFinish({"), true)
     const singleBattleMergeBlock = singleBattleSource.slice(
-        singleBattleSource.indexOf("const characterList = reconcileAwakeUnlockCharacterList("),
-        singleBattleSource.indexOf("if (!isScoreAttackEvent)", singleBattleCall)
+        singleBattleCall,
+        singleBattleSource.indexOf("\n\n    return", singleBattleCall),
     )
     for (const existingSegment of [
-        "...rewardCharacterExpResult.character_list",
-        "...((clearReward?.character_list || [])",
-        "...((sPlusClearReward?.character_list || [])",
-        "...(scoreRewardsResult.character_list",
+        "rewardCharacterExpResult.character_list",
+        "(clearReward?.character_list || [])",
+        "(sPlusClearReward?.character_list || [])",
+        "scoreRewardsResult.character_list",
     ]) {
         assert.equal(singleBattleMergeBlock.includes(existingSegment), true)
     }
@@ -364,10 +378,22 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     const multiCall = getOnlyCall(multiSettlementSource, "reconcileAwakeUnlockCharacterList")
     assert.equal(findCalls(multiSettlementSource, "reconcileAwakeUnlockCharacterList").length, 1)
     assert.deepEqual(multiCall.arguments.slice(0, 1), ["input.playerId"])
-    assert.equal(multiCall.arguments[1].includes("rewardCharacterExpResult.character_list"), true)
-    assert.equal(multiCall.arguments[1].includes("clearReward?.character_list"), true)
-    assert.equal(multiCall.arguments[1].includes("sPlusClearReward?.character_list"), true)
-    assert.equal(multiCall.arguments[1].includes("scoreRewardsResult.character_list"), true)
+    assert.deepEqual(multiCall.arguments.slice(1), [
+        "existingCharacterList",
+        "{ context: awakeContext, candidateCharacterIds }",
+    ])
+    const multiCharacterListSource = multiSettlementSource.slice(
+        multiSettlementSource.indexOf("const existingCharacterList = ["),
+        multiCall.position,
+    )
+    for (const existingSegment of [
+        "...rewardCharacterExpResult.character_list",
+        "...((clearReward?.character_list || [])",
+        "...((sPlusClearReward?.character_list || [])",
+        "...(scoreRewardsResult.character_list",
+    ]) {
+        assert.equal(multiCharacterListSource.includes(existingSegment), true)
+    }
     assert.equal(multiCall.position > multiSettlementSource.indexOf("const executeFinishWrites = () =>"), true)
     for (const persistenceCall of [
         "insertPlayerQuestProgressSync",
@@ -392,7 +418,11 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     const activeReceiveBlock = getRouteBlock(activeMissionSource, "/receive")
     const activeMissionCall = getOnlyCall(activeReceiveBlock, "reconcileAwakeUnlockCharacterList")
     assert.equal(findCalls(activeMissionSource, "reconcileAwakeUnlockCharacterList").length, 1)
-    assert.deepEqual(activeMissionCall.arguments, ["playerId", "existingCharacterList"])
+    assert.deepEqual(activeMissionCall.arguments, [
+        "playerId",
+        "existingCharacterList",
+        "{ context: awakeContext, candidateCharacterIds }",
+    ])
     assert.equal(activeMissionCall.position > activeReceiveBlock.indexOf("if (!validation.ok)"), true)
     assert.equal(activeMissionCall.position > getLastCallPosition(activeReceiveBlock, "updatePlayerActiveMissionStageSync"), true)
     assert.equal(activeMissionCall.position > getLastCallPosition(activeReceiveBlock, "grant"), true)
@@ -532,7 +562,11 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
     assert.equal(findCalls(tutorialOtherStepBlock, "reconcileAwakeUnlockCharacterList").length, 0)
 
     const tutorialStep15Call = getOnlyCall(tutorialStep15Block, "reconcileAwakeUnlockCharacterList")
-    assert.deepEqual(tutorialStep15Call.arguments, ["playerId", "existingCharacterList"])
+    assert.deepEqual(tutorialStep15Call.arguments, [
+        "playerId",
+        "existingCharacterList",
+        "{ context: awakeContext, candidateCharacterIds }",
+    ])
     assert.deepEqual(tutorialStep15Call.conditionalConditions, ["existingCharacterList.length > 0"])
     assert.equal(tutorialStep15Call.position > getLastCallPosition(tutorialStep15Block, "rewardPlayerGachaDrawResultSync"), true)
     assert.equal(tutorialStep15Call.position > getLastCallPosition(tutorialStep15Block, "insertReceiveHistorySync"), true)
@@ -547,7 +581,11 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
     assert.deepEqual(findPropertyAssignmentValues(tutorialStep15Block, "character_list"), ["characterList"])
 
     const tutorialStep16Call = getOnlyCall(tutorialStep16Block, "reconcileAwakeUnlockCharacterList")
-    assert.deepEqual(tutorialStep16Call.arguments, ["playerId", "existingCharacterList"])
+    assert.deepEqual(tutorialStep16Call.arguments, [
+        "playerId",
+        "existingCharacterList",
+        "{ context: awakeContext, candidateCharacterIds }",
+    ])
     assert.deepEqual(tutorialStep16Call.conditionalConditions, ["existingCharacterList.length > 0"])
     assert.equal(tutorialStep16Call.position > getLastCallPosition(tutorialStep16Block, "givePlayerCharacterSync"), true)
     assert.equal(tutorialStep16Call.position > getLastCallPosition(tutorialStep16Block, "insertReceiveHistorySync"), true)
@@ -996,10 +1034,10 @@ try {
     const fallbackItemAmountsBefore = Object.fromEntries(
         [13, 14, 15, 16].map(itemId => [itemId, getPlayerItemSync(playerId, itemId) ?? 0])
     )
-    const originalReconcileAwakeUnlocks = awakeUnlockModule.reconcileAwakeUnlocks
+    const originalReconcileAwakeUnlocksCore = awakeUnlockModule.reconcileAwakeUnlocksFromProgressCore
     const originalConsoleError = console.error
     let loggedFallbackError = null
-    awakeUnlockModule.reconcileAwakeUnlocks = () => {
+    awakeUnlockModule.reconcileAwakeUnlocksFromProgressCore = () => {
         throw fallbackError
     }
     console.error = (...args) => {
@@ -1016,7 +1054,7 @@ try {
         ])
     } finally {
         console.error = originalConsoleError
-        awakeUnlockModule.reconcileAwakeUnlocks = originalReconcileAwakeUnlocks
+        awakeUnlockModule.reconcileAwakeUnlocksFromProgressCore = originalReconcileAwakeUnlocksCore
     }
     assert.equal(db.prepare(`
         SELECT COUNT(*) AS count
@@ -1037,7 +1075,7 @@ try {
         DELETE FROM players_character_awake_unlocks
         WHERE player_id = ? AND character_id = 341005
     `).run(playerId)
-    awakeUnlockModule.reconcileAwakeUnlocks = () => ({
+    awakeUnlockModule.reconcileAwakeUnlocksFromProgressCore = () => ({
         all: new Map(),
         changed: new Map([
             ["341006", { 1: 1 }],
@@ -1048,7 +1086,7 @@ try {
     try {
         assert.deepEqual(reconcileAwakeUnlockCharacterList(playerId, []), [])
     } finally {
-        awakeUnlockModule.reconcileAwakeUnlocks = originalReconcileAwakeUnlocks
+        awakeUnlockModule.reconcileAwakeUnlocksFromProgressCore = originalReconcileAwakeUnlocksCore
     }
 
     assert.equal(db.prepare(`

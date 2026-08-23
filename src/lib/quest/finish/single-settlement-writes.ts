@@ -22,7 +22,8 @@ import { getRuntimeContentTableSync } from "../../../content/runtime/table-acces
 import { getContentSnapshot } from "../../../content/runtime/content-snapshot"
 import { settleAdditionalRewardsSync, type AdditionalRewardTable } from "../../additional-reward"
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../rush"
-import { reconcileActiveMissionFacts, reconcileAwakeUnlockCharacterList, settleAwakeBattleMissions } from "../../mission"
+import { reconcileActiveMissionFacts, settleAwakeBattleMissions } from "../../mission"
+import { publishAwakeCharacterListBestEffort } from "../../mission/awake-best-effort-context"
 import { recordMissionBattleFacts } from "../../mission/battle-facts"
 import { getCarnivalRewardDefinitions, grantCarnivalRewards } from "../../carnival-rewards"
 import { givePlayerEquipmentSync } from "../../equipment"
@@ -301,16 +302,15 @@ export function executeSingleSettlementWrites(
         boostPoint: newBoostPoint,
         bossBoostPoint: newBossBoostPoint,
     })
-    const characterList = reconcileAwakeUnlockCharacterList(playerId, [
-        ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
-        ...((clearReward?.character_list || []) as Record<string, unknown>[]),
-        ...((sPlusClearReward?.character_list || []) as Record<string, unknown>[]),
-        ...(scoreRewardsResult.character_list as Record<string, unknown>[]),
-        ...((scoreAttackRewardResult?.character_list ?? []) as Record<string, unknown>[]),
-        ...(missionSettlement.characterList as Record<string, unknown>[]),
-        ...awakeMissionSettlement.characterList,
-    ])
     if (!isScoreAttackEvent) deletePlayerActiveQuestSync(playerId)
+    const characterList = publishAwakeCharacterListBestEffort(playerId, partyCharacterIds, [
+        rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
+        (clearReward?.character_list || []) as Record<string, unknown>[],
+        (sPlusClearReward?.character_list || []) as Record<string, unknown>[],
+        scoreRewardsResult.character_list as Record<string, unknown>[],
+        (scoreAttackRewardResult?.character_list ?? []) as Record<string, unknown>[],
+        missionSettlement.characterList as Record<string, unknown>[], awakeMissionSettlement.characterList,
+    ])
 
     return {
         afterStamina, afterStaminaHealTime, dailyChallengePointList,

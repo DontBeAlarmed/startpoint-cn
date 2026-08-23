@@ -9,7 +9,12 @@ import { getQuestFromCategorySync } from "../../lib/assets";
 import { givePlayerCharacterSync } from "../../lib/character";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { givePlayerRewardSync } from "../../lib/quest";
-import { reconcileActiveMissionFacts, reconcileAwakeUnlockCharacterList } from "../../lib/mission";
+import {
+    reconcileActiveMissionFacts,
+    reconcileAwakeUnlockCharacterListBestEffort,
+} from "../../lib/mission";
+import { collectAwakeCandidateCharacterIds } from "../../lib/mission/awake-candidate-character-ids";
+import { createAwakeRequestContextBestEffort } from "../../lib/mission/awake-best-effort-context";
 import { getQuestJoinCharacterIds } from "../../lib/story-join-character";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { getContentSnapshot } from "../../content/runtime/content-snapshot";
@@ -81,15 +86,27 @@ function processStoryQuestFinish(playerId: number, questSection: number, questId
 
         const playerAfter = getPlayerSync(playerId)
         if (playerAfter === null) throw new Error(`Player ${playerId} disappeared during story settlement.`)
-        const characterList = reconcileAwakeUnlockCharacterList(playerId, [
+        const existingCharacterList = [
             ...((rewardResult?.character_list ?? []) as Record<string, unknown>[]),
             ...storyCharacterList,
-        ])
+        ]
         const activeMissionList = reconcileActiveMissionFacts({
             playerId,
             repository: getContentSnapshot().repository,
             now: getServerTime() * 1000,
         })
+        const candidateCharacterIds = collectAwakeCandidateCharacterIds(
+            storyJoinCharacterIds,
+            [existingCharacterList],
+        )
+        const awakeContext = createAwakeRequestContextBestEffort(playerId, candidateCharacterIds)
+        const characterList = awakeContext === null
+            ? existingCharacterList
+            : reconcileAwakeUnlockCharacterListBestEffort(
+                playerId,
+                existingCharacterList,
+                { context: awakeContext, candidateCharacterIds },
+            )
         return {
             user_info: {
                 free_vmoney: playerAfter.freeVmoney,

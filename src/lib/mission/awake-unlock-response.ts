@@ -1,6 +1,6 @@
 import { buildManaBoardAwakeCharacterList } from "../character-helpers"
 import { getDb } from "../../data/db"
-import { reconcileAwakeUnlocks } from "./awake-unlock"
+import { reconcileAwakeUnlocksFromProgressCore } from "./awake-unlock"
 import {
     assertAwakeRequestContext,
     createAwakeRequestContext,
@@ -42,9 +42,10 @@ function reconcileAwakeUnlockCharacterListCore(
     })
     assertAwakeRequestContext(context, playerId)
     return getDb().transaction(() => {
-        const { changed, removed } = reconcileAwakeUnlocks(
+        const { changed, removed } = reconcileAwakeUnlocksFromProgressCore(
             playerId,
-            options.candidateCharacterIds,
+            context.evaluate(options.candidateCharacterIds),
+            context.resolver,
             context,
         )
         const updates = buildManaBoardAwakeCharacterList(

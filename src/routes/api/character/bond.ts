@@ -9,10 +9,15 @@ import { getCharacterDataSync, getCharacterManaBoardCountSync, getCharacterManaN
 import { resolvePlayerIdSync } from "../../../data/activeAccount";
 import { validateSessionAndPlayer, validateCharacterOwnership, buildCharacterListEntry, sendCharacterResponse } from "../../../lib/character-helpers";
 import { characterExpCaps } from "../../../lib/character";
-import { mergeMissionSettlementResponse, reconcileAwakeUnlockCharacterList, settleMissionCategories } from "../../../lib/mission";
+import {
+    mergeMissionSettlementResponse,
+    reconcileAwakeUnlockCharacterListBestEffort,
+    settleMissionCategories,
+} from "../../../lib/mission";
 import { getMailArrivedSync } from "../../../lib/mail-notification";
 import { isCharacterSecondManaBoardAvailable } from "../../../lib/mana-board-availability";
 import { getDb } from "../../../data/db";
+import { createAwakeRequestContextBestEffort } from "../../../lib/mission/awake-best-effort-context";
 
 interface ReceiveBondTokenBody {
     character_id: number,
@@ -84,9 +89,18 @@ const routes = async (fastify: FastifyInstance) => {
         const characterList = getDb().transaction(() => {
             updatePlayerSync({ id: playerId, bondToken: newBondTokens })
             updatePlayerCharacterBondTokenSync(playerId, characterId, { manaBoardIndex, status: 2 })
-            return reconcileAwakeUnlockCharacterList(playerId, [
-                buildCharacterListEntry(characterId, characterData, { bond_token_list: bondTokenList })
-            ])
+            const candidateCharacterIds = [characterId]
+            const awakeContext = createAwakeRequestContextBestEffort(playerId, candidateCharacterIds)
+            const existingCharacterList = [
+                buildCharacterListEntry(characterId, characterData, { bond_token_list: bondTokenList }),
+            ]
+            return awakeContext === null
+                ? existingCharacterList
+                : reconcileAwakeUnlockCharacterListBestEffort(
+                    playerId,
+                    existingCharacterList,
+                    { context: awakeContext, candidateCharacterIds },
+                )
         })()
 
         return sendCharacterResponse(reply, viewerId, {

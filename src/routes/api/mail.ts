@@ -4,7 +4,9 @@ import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders } from "../../utils";
-import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
+import { reconcileAwakeUnlockCharacterListBestEffort } from "../../lib/mission";
+import { collectAwakeCandidateCharacterIds } from "../../lib/mission/awake-candidate-character-ids";
+import { createAwakeRequestContextBestEffort } from "../../lib/mission/awake-best-effort-context";
 import { getDb } from "../../data/db";
 import {
     settleMailRewardsInTransactionOwnerSync,
@@ -121,9 +123,17 @@ const routes = async (fastify: FastifyInstance) => {
                 if (receiveMailSync(playerId, mailId, mail) === null) {
                     throw new Error(`Mail ${mailId} changed while it was being received.`)
                 }
+                const candidateCharacterIds = collectAwakeCandidateCharacterIds([], [reward.characterList])
+                const awakeContext = createAwakeRequestContextBestEffort(playerId, candidateCharacterIds)
                 return {
                     ...reward,
-                    reconciledCharacterList: reconcileAwakeUnlockCharacterList(playerId, reward.characterList),
+                    reconciledCharacterList: awakeContext === null
+                        ? reward.characterList
+                        : reconcileAwakeUnlockCharacterListBestEffort(
+                            playerId,
+                            reward.characterList,
+                            { context: awakeContext, candidateCharacterIds },
+                        ),
                 }
             })()
         } catch (error) {
@@ -203,10 +213,18 @@ const routes = async (fastify: FastifyInstance) => {
                 if (claimed.length !== validMailIds.length) {
                     throw new Error("Mail state changed while mails were being received.")
                 }
+                const candidateCharacterIds = collectAwakeCandidateCharacterIds([], [reward.characterList])
+                const awakeContext = createAwakeRequestContextBestEffort(playerId, candidateCharacterIds)
                 return {
                     alreadyCount: uniqueMailIds.length - validMailIds.length,
                     claimed,
-                    reconciledCharacterList: reconcileAwakeUnlockCharacterList(playerId, reward.characterList),
+                    reconciledCharacterList: awakeContext === null
+                        ? reward.characterList
+                        : reconcileAwakeUnlockCharacterListBestEffort(
+                            playerId,
+                            reward.characterList,
+                            { context: awakeContext, candidateCharacterIds },
+                        ),
                     equipmentList: reward.equipmentList,
                     itemList: reward.itemList,
                     userInfo: reward.userInfo,

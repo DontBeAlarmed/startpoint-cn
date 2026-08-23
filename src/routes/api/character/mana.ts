@@ -9,6 +9,7 @@ import { incrementActiveMissionUsedManaCountSync } from "../../../data/domains/a
 import { validateSessionAndPlayer, validateCharacterOwnership, computeManaDeduction, buildCharacterListEntry, sendCharacterResponse, updateBondTokenForCompletedBoard } from "../../../lib/character-helpers";
 import { getMailArrivedSync } from "../../../lib/mail-notification";
 import { reconcileAwakeUnlockCharacterListStrict } from "../../../lib/mission";
+import { createAwakeRequestContext } from "../../../lib/mission";
 import { isCharacterSecondManaBoardAvailable } from "../../../lib/mana-board-availability";
 import { buildCharacterEvolutionNodes, buildCharacterEvolutionResponse, computeCharacterEvolutionLevel } from "../../../lib/character-evolution";
 import { registerAwakeManaNodeRoute } from "./mana-awake";
@@ -210,13 +211,20 @@ const routes = async (fastify: FastifyInstance) => {
                     evolutionLevel: plannedCharacterEvolutionLevel,
                 })
             }
+            const awakeContext = createAwakeRequestContext({
+                playerId,
+                candidateCharacterIds: [characterId],
+            })
             const characterList = reconcileAwakeUnlockCharacterListStrict(playerId, [
                 buildCharacterListEntry(characterId, characterData, {
                     evolution_level: plannedCharacterEvolutionLevel,
                     evolution_img_level: plannedCharacterEvolutionLevel,
                     bond_token_list: bond.bondTokenList,
                 }),
-            ])
+            ], {
+                context: awakeContext,
+                candidateCharacterIds: [characterId],
+            })
 
             return {
                 ...bond,

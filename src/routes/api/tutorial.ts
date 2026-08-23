@@ -20,7 +20,9 @@ import { rewardPlayerGachaDrawResultSync } from "../../lib/gacha";
 import { givePlayerCharacterSync } from "../../lib/character";
 import { randomInt } from "crypto";
 import { GachaCharacterDraw } from "../../lib/types";
-import { reconcileAwakeUnlockCharacterList } from "../../lib/mission";
+import { reconcileAwakeUnlockCharacterListBestEffort } from "../../lib/mission";
+import { collectAwakeCandidateCharacterIds } from "../../lib/mission/awake-candidate-character-ids";
+import { createAwakeRequestContextBestEffort } from "../../lib/mission/awake-best-effort-context";
 import {
     getTutorialEffectiveNextStep,
     TUTORIAL_END_EFFECTIVE_STEP,
@@ -364,7 +366,19 @@ const routes = async (fastify: FastifyInstance) => {
                         && !Array.isArray(character)
                 )
                 const characterList = existingCharacterList.length > 0
-                    ? reconcileAwakeUnlockCharacterList(playerId, existingCharacterList)
+                    ? (() => {
+                        const candidateCharacterIds = collectAwakeCandidateCharacterIds(
+                            [randomCharacterId],
+                            [existingCharacterList],
+                        )
+                        const awakeContext = createAwakeRequestContextBestEffort(playerId, candidateCharacterIds)
+                        if (awakeContext === null) return existingCharacterList
+                        return reconcileAwakeUnlockCharacterListBestEffort(
+                            playerId,
+                            existingCharacterList,
+                            { context: awakeContext, candidateCharacterIds },
+                        )
+                    })()
                     : existingCharacterList
 
                 const data = {
@@ -438,7 +452,19 @@ const routes = async (fastify: FastifyInstance) => {
                 })
 
                 const characterList = existingCharacterList.length > 0
-                    ? reconcileAwakeUnlockCharacterList(playerId, existingCharacterList)
+                    ? (() => {
+                        const candidateCharacterIds = collectAwakeCandidateCharacterIds(
+                            [freeTutorialCharacterId],
+                            [existingCharacterList],
+                        )
+                        const awakeContext = createAwakeRequestContextBestEffort(playerId, candidateCharacterIds)
+                        if (awakeContext === null) return existingCharacterList
+                        return reconcileAwakeUnlockCharacterListBestEffort(
+                            playerId,
+                            existingCharacterList,
+                            { context: awakeContext, candidateCharacterIds },
+                        )
+                    })()
                     : existingCharacterList
 
                 const data = {

@@ -930,6 +930,33 @@ test("legacy unlock snapshot is read inside the reconcile transaction", () => {
     assert.deepEqual(readDepths, [1])
 })
 
+test("response publication reuses its own savepoint for context reconciliation", () => {
+    const playerId = createPlayer("response-savepoint")
+    const context = requestContextModule().createAwakeRequestContext({
+        playerId,
+        evaluationTime,
+        candidateCharacterIds: [],
+    })
+    const originalTransactionMethod = db.transaction
+    const originalTransaction = db.transaction.bind(db)
+    let transactionCalls = 0
+
+    db.transaction = callback => {
+        transactionCalls++
+        return originalTransaction(callback)
+    }
+    try {
+        missionApi().reconcileAwakeUnlockCharacterListStrict(playerId, [], {
+            candidateCharacterIds: [],
+            context,
+        })
+    } finally {
+        db.transaction = originalTransactionMethod
+    }
+
+    assert.equal(transactionCalls, 1)
+})
+
 test.after(() => {
     if (db.open) db.close()
     restoreContentSnapshot()
