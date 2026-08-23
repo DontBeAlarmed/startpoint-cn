@@ -178,6 +178,7 @@ function getBundledStandardMissionTables(overrides = {}) {
 }
 
 module.exports = {
+    QUEST_TABLE_NAMES,
     getBundledStandardMissionTables,
     installBundledGameplaySnapshot,
 }

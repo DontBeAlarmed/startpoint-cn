@@ -100,9 +100,18 @@ function rewardRow(targetProgress = 1) {
     return row
 }
 
+const {
+    QUEST_TABLE_NAMES,
+    getBundledStandardMissionTables,
+} = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+const bundledQuestTables = Object.fromEntries(QUEST_TABLE_NAMES.map(tableName => [
+    tableName,
+    require(`../assets/${tableName}`),
+]))
+
 const tables = {
-    ...require("./helpers/install-bundled-gameplay-snapshot.cjs")
-        .getBundledStandardMissionTables(),
+    ...getBundledStandardMissionTables(),
+    ...bundledQuestTables,
     "daily_challenge_point_lookup.json": require("../assets/daily_challenge_point_lookup.json"),
     "hard_multi_event.json": {},
     "hard_multi_event_quest.json": {},
@@ -119,7 +128,6 @@ const tables = {
     "mission_pass_event.json": require("../assets/mission_pass_event.json"),
     "character_quest_lookup.json": require("../assets/character_quest_lookup.json"),
     "mission_char_awake_reward.json": require("../assets/mission_char_awake_reward.json"),
-    "main_quest.json": require("../assets/main_quest.json"),
     "character.json": require("../assets/character.json"),
     "mana_node.json": {},
     "mana_board2_open_condition.json": {},

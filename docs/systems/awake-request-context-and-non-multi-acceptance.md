@@ -1,8 +1,8 @@
 # 觉醒请求上下文与非多人总验收架构
 
-状态：35.0 基线已固化，35.1 请求上下文尚未实施
+状态：35.3 已完成提交后 owner 与 `/load` full recovery；35.4/35.5 尚未验收
 
-日期：2026-08-23
+日期：2026-08-24
 
 ## 背景
 
@@ -242,12 +242,12 @@ formal profile 使用 1000 份互相独立的存档、600 个活跃身份，并�
 
 | 阶段 | 范围 | 完成证据 |
 |---|---|---|
-| 35.0 规格与基线 | 固化本规格、约 19 个生产调用表达式静态审计矩阵、focused/轻量/formal profile 与同机 reference | 文档自审、现状 payload/hash、SQL/loader、回滚和机器/profile 指纹均可复核 |
-| 35.1 核心 context | 实现 scope 收集/冻结、fresh context、Session、scoped evaluator/reader、seed 校验和生命周期清理 | 候选 0/1/多、依赖闭包、身份错配、seed 不完整、unknown 主数据和空候选清理专项通过 |
-| 35.2 事务内 owner | 迁移 learn strict，以及 finish、story、bond、mail、Active Mission、tutorial 的事务内 best-effort owner | 外层事务与 reconcile savepoint 故障注入、payload/hash、SQL/loader 上界通过 |
-| 35.3 提交后 owner 与 `/load` | 迁移 mission、item、shop、gacha、boxGacha、exchange、character/town；保留 `/load` full recovery | 提交时点不变、best-effort 回退、全量恢复与静态调用矩阵通过 |
-| 35.4 分层验收 | 运行 focused、7/7 轻量回归和一轮 formal 预飞 | 行为、SQL/loader、回滚、清理和 profile 结构全部准入 |
-| 35.5 终审与正式验收 | 独立终审；只运行一次 `npm run verify:full`；随后执行带多人/Hub 哨兵的连续三轮正式验收并回填结果 | 全部硬门禁、同机 20% p95 门禁和结果文档通过，不写入未经验证的收益 |
+| 35.0 规格与基线 | 固化本规格、约 19 个生产调用表达式静态审计矩阵、focused/轻量/formal profile 与同机 reference | 已完成；基线与矩阵提交在前序本地 commit 中 |
+| 35.1 核心 context | 实现 scope 收集/冻结、fresh context、Session、scoped evaluator/reader、seed 校验和生命周期清理 | 已完成；请求 context 与专项回归已通过 |
+| 35.2 事务内 owner | 迁移 learn strict，以及 finish、story、bond、mail、Active Mission、tutorial 的事务内 best-effort owner | 已完成；事务边界与 savepoint 专项回归已通过 |
+| 35.3 提交后 owner 与 `/load` | 迁移 mission、item、shop、gacha、boxGacha、exchange、character/town；保留 `/load` full recovery | 已完成；提交后故障注入、独立 full recovery、active mission fixture 兼容和 workflow 精确分组回归通过 |
+| 35.4 分层验收 | 运行 focused、7/7 轻量回归和一轮 formal 预飞 | 尚未执行；不得据当前证据标记通过 |
+| 35.5 终审与正式验收 | 独立终审；只运行一次 `npm run verify:full`；随后执行带多人/Hub 哨兵的连续三轮正式验收并回填结果 | 尚未执行；不得据当前证据标记通过 |
 
 35.0 至 35.5 每个阶段完成后各自创建本地 commit，均不 push。任一阶段未满足自己的证据要求时不得标记完成，也不得把后续阶段的测试结果回填到前一阶段冒充通过。
 
@@ -261,4 +261,8 @@ formal profile 使用 1000 份互相独立的存档、600 个活跃身份，并�
 
 ## 文档回填规则
 
-本文件当前只记录已确认设计和后续门禁，不声称实现完成或获得最终性能收益。35.0 之后按阶段回填实际 commit、focused 与 formal 报告摘要、reference 比较和失败处置；只有真实命令输出与报告支持的结论才能写为“通过”。
+本文件当前记录已确认设计、35.0--35.3 的实现状态和后续门禁，不声称最终性能收益。35.3 的实现提交为
+`59c131ca refactor(mission): scope post-commit awake owners`；当前专项证据包括：
+`tools/active_mission_reconciliation.test.cjs`、`tools/load_awake_full_recovery.test.cjs`、
+`tools/post_commit_awake_owner.test.cjs` 和 `tools/test-workflow/select-tests.test.cjs` 已通过。
+本次记录未运行 `verify:full`，也未执行 formal 预飞或连续三轮正式验收；只有后续真实命令输出与报告支持的结论才能写为“通过”。
