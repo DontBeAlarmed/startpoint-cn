@@ -335,47 +335,83 @@ function collectIdentifierCalls(root, calleeName) {
     return calls
 }
 
-function collectImmediateFunctionCalls(root, calleeName) {
+function createTypeCheckedSource(source, fileName) {
+    const compilerOptions = {
+        module: ts.ModuleKind.CommonJS,
+        noEmit: true,
+        noLib: true,
+        noResolve: true,
+        target: ts.ScriptTarget.Latest,
+    }
+    const parsedSourceFile = ts.createSourceFile(
+        fileName,
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+    )
+    const defaultHost = ts.createCompilerHost(compilerOptions)
+    const host = {
+        ...defaultHost,
+        fileExists: requested => requested === fileName,
+        getSourceFile: requested => requested === fileName ? parsedSourceFile : undefined,
+        readFile: requested => requested === fileName ? source : undefined,
+        writeFile() {},
+    }
+    const program = ts.createProgram({
+        rootNames: [fileName],
+        options: compilerOptions,
+        host,
+    })
+    return {
+        checker: program.getTypeChecker(),
+        sourceFile: program.getSourceFile(fileName),
+    }
+}
+
+function findNamedImportSymbol(sourceFile, checker, exportedName, moduleMatches) {
+    const symbols = []
+    for (const statement of sourceFile.statements) {
+        if (!ts.isImportDeclaration(statement)
+            || !ts.isStringLiteral(statement.moduleSpecifier)
+            || !moduleMatches(statement.moduleSpecifier.text)) continue
+        const bindings = statement.importClause?.namedBindings
+        if (!bindings || !ts.isNamedImports(bindings)) continue
+        for (const element of bindings.elements) {
+            if ((element.propertyName?.text ?? element.name.text) !== exportedName) continue
+            const symbol = checker.getSymbolAtLocation(element.name)
+            if (symbol !== undefined) symbols.push(symbol)
+        }
+    }
+    assert.equal(
+        symbols.length,
+        1,
+        `${sourceFile.fileName} must import ${exportedName} exactly once`,
+    )
+    return symbols[0]
+}
+
+function collectCallsForSymbol(root, checker, symbol, { stopAtNestedFunctions = false } = {}) {
     const calls = []
     function visit(node) {
-        if (node !== root && ts.isFunctionLike(node)) return
+        if (stopAtNestedFunctions && node !== root && ts.isFunctionLike(node)) return
         if (ts.isCallExpression(node)
             && ts.isIdentifier(node.expression)
-            && node.expression.text === calleeName) calls.push(node)
+            && checker.getSymbolAtLocation(node.expression) === symbol) calls.push(node)
         ts.forEachChild(node, visit)
     }
     visit(root)
     return calls
 }
 
-function findDirectVariableDeclaration(scope, name) {
-    for (const statement of scope.statements) {
-        if (!ts.isVariableStatement(statement)) continue
-        for (const declaration of statement.declarationList.declarations) {
-            if (ts.isIdentifier(declaration.name) && declaration.name.text === name) {
-                return declaration
-            }
-        }
-    }
-    return null
-}
-
-function resolveVariableDeclaration(identifier) {
-    for (let parent = identifier.parent; parent; parent = parent.parent) {
-        if (!ts.isBlock(parent) && !ts.isSourceFile(parent)) continue
-        const declaration = findDirectVariableDeclaration(parent, identifier.text)
-        if (declaration !== null) return declaration
-    }
-    return null
-}
-
 function assertSingleSettlementTransactionOwnership(source, fileName) {
-    const sourceFile = ts.createSourceFile(
-        fileName,
-        source,
-        ts.ScriptTarget.Latest,
-        true,
-        ts.ScriptKind.TS,
+    const { checker, sourceFile } = createTypeCheckedSource(source, fileName)
+    const writesImportSymbol = findNamedImportSymbol(
+        sourceFile,
+        checker,
+        "executeSingleSettlementWrites",
+        specifier => specifier.endsWith("/single-settlement-writes")
+            || specifier === "./single-settlement-writes",
     )
     const transactionCalls = collectIdentifierCalls(
         sourceFile,
@@ -409,13 +445,29 @@ function assertSingleSettlementTransactionOwnership(source, fileName) {
         `${fileName} settle must be an inline callback`,
     )
     assert.equal(
-        collectImmediateFunctionCalls(settleCallback, "executeSingleSettlementWrites").length > 0,
+        collectCallsForSymbol(settleCallback, checker, writesImportSymbol, {
+            stopAtNestedFunctions: true,
+        }).length > 0,
         true,
-        `${fileName} settle callback must contain executeSingleSettlementWrites`,
+        `${fileName} settle callback must call production import executeSingleSettlementWrites`,
     )
 }
 
-function assertMultiSettlementTransactionOwnership(sourceFile, awakeCall) {
+function assertMultiSettlementTransactionOwnership(source, fileName) {
+    const { checker, sourceFile } = createTypeCheckedSource(source, fileName)
+    const awakeImportSymbol = findNamedImportSymbol(
+        sourceFile,
+        checker,
+        "reconcileAwakeUnlockCharacterList",
+        isMissionModuleSpecifier,
+    )
+    const awakeCalls = collectCallsForSymbol(sourceFile, checker, awakeImportSymbol)
+    assert.equal(
+        awakeCalls.length,
+        1,
+        `${fileName} must contain exactly one imported Awake publication call`,
+    )
+    const awakeCall = awakeCalls[0]
     let executeDeclaration = null
     for (let parent = awakeCall.parent; parent; parent = parent.parent) {
         if (ts.isVariableDeclaration(parent)
@@ -433,6 +485,12 @@ function assertMultiSettlementTransactionOwnership(sourceFile, awakeCall) {
         null,
         `${sourceFile.fileName} Awake call must belong to the executeFinishWrites initializer`,
     )
+    const executeSymbol = checker.getSymbolAtLocation(executeDeclaration.name)
+    assert.notEqual(
+        executeSymbol,
+        undefined,
+        `${sourceFile.fileName} executeFinishWrites declaration must have a symbol`,
+    )
     const transactionCalls = collectIdentifierCalls(
         sourceFile,
         "runMultiActiveQuestSettlementTransaction",
@@ -446,7 +504,7 @@ function assertMultiSettlementTransactionOwnership(sourceFile, awakeCall) {
     assert.equal(
         writesArgument !== undefined
             && ts.isIdentifier(writesArgument)
-            && resolveVariableDeclaration(writesArgument) === executeDeclaration,
+            && checker.getSymbolAtLocation(writesArgument) === executeSymbol,
         true,
         `${sourceFile.fileName} transaction third argument must reference the Awake executeFinishWrites declaration`,
     )
@@ -465,7 +523,7 @@ function classifyBoundary(relativeFile, callee, call) {
         return "best-effort-in-tx"
     }
     if (relativeFile === "src/multi/settlement/orchestrator.ts") {
-        assertMultiSettlementTransactionOwnership(call.getSourceFile(), call)
+        assertMultiSettlementTransactionOwnership(call.getSourceFile().text, relativeFile)
         return "best-effort-in-tx"
     }
     const inTransaction = isInsideDirectTransaction(call)
@@ -630,19 +688,31 @@ test("AST collector ignores ordinary local functions with an Awake helper-like n
 
 test("single settlement ownership requires writes inside the settle callback", () => {
     const owned = `
+        import { executeSingleSettlementWrites } from "./single-settlement-writes"
         runSingleFinishSettlementTransaction({
             settle: () => executeSingleSettlementWrites({}),
         })
     `
     const movedOutside = `
+        import { executeSingleSettlementWrites } from "./single-settlement-writes"
         executeSingleSettlementWrites({})
         runSingleFinishSettlementTransaction({ settle: () => ({}) })
     `
     const nestedOnly = `
+        import { executeSingleSettlementWrites } from "./single-settlement-writes"
         runSingleFinishSettlementTransaction({
             settle: () => {
                 const deferred = () => executeSingleSettlementWrites({})
                 return {}
+            },
+        })
+    `
+    const locallyShadowed = `
+        import { executeSingleSettlementWrites } from "./single-settlement-writes"
+        runSingleFinishSettlementTransaction({
+            settle: () => {
+                function executeSingleSettlementWrites() { return true }
+                return executeSingleSettlementWrites({})
             },
         })
     `
@@ -655,6 +725,10 @@ test("single settlement ownership requires writes inside the settle callback", (
     assert.throws(
         () => assertSingleSettlementTransactionOwnership(nestedOnly, "single.ts"),
         /settle callback.*executeSingleSettlementWrites/i,
+    )
+    assert.throws(
+        () => assertSingleSettlementTransactionOwnership(locallyShadowed, "single.ts"),
+        /production import.*executeSingleSettlementWrites/i,
     )
 })
 
@@ -677,17 +751,21 @@ test("multi settlement ownership requires executeFinishWrites as the third argum
             runMultiActiveQuestSettlementTransaction(1, {}, executeFinishWrites)
         }
     `
+    const parameterShadowed = `
+        import { reconcileAwakeUnlockCharacterList } from "./mission"
+        const executeFinishWrites = () => reconcileAwakeUnlockCharacterList(1, [])
+        function invoke(executeFinishWrites) {
+            runMultiActiveQuestSettlementTransaction(1, {}, executeFinishWrites)
+        }
+    `
 
     for (const [source, expectedFailure] of [
         [owned, false],
         [replaced, true],
         [shadowed, true],
+        [parameterShadowed, true],
     ]) {
-        const [awakeCall] = collectImportedAwakeCalls(source, "multi.ts")
-        const assertion = () => assertMultiSettlementTransactionOwnership(
-            awakeCall.sourceFile,
-            awakeCall.call,
-        )
+        const assertion = () => assertMultiSettlementTransactionOwnership(source, "multi.ts")
         if (expectedFailure) assert.throws(assertion, /third argument.*executeFinishWrites/i)
         else assert.doesNotThrow(assertion)
     }
