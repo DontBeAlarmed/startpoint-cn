@@ -3,6 +3,8 @@
 const CHARACTER_ID = 341005
 const STALE_CHARACTER_ID = 1
 const INJECTED_UNLOCK_WRITE_FAILURE = "injected awake unlock write failure"
+const INJECTED_UNLOCK_WRITE_FAILURE_CODE = "SQLITE_CONSTRAINT_TRIGGER"
+const BEST_EFFORT_ERROR_PREFIX = "[awake-unlock] Failed to publish character unlocks."
 const AWAKE_PROGRESS = Object.freeze([
     [3410051, 1],
     [3410052, 5],
@@ -108,6 +110,12 @@ function readFailureBehavior(runtime, fixture) {
     }
 }
 
+function isInjectedUnlockWriteFailure(error) {
+    return error instanceof Error
+        && error.message === INJECTED_UNLOCK_WRITE_FAILURE
+        && error.code === INJECTED_UNLOCK_WRITE_FAILURE_CODE
+}
+
 function createAwakeRequestContextScenarios(runtime) {
     return [
         {
@@ -195,8 +203,7 @@ function createAwakeRequestContextScenarios(runtime) {
                         ))
                     })()
                 } catch (error) {
-                    if (!(error instanceof Error)
-                        || !error.message.includes(INJECTED_UNLOCK_WRITE_FAILURE)) throw error
+                    if (!isInjectedUnlockWriteFailure(error)) throw error
                     threw = true
                 }
                 return { fixture, injectedFailureObserved: threw, threw }
@@ -234,10 +241,10 @@ function createAwakeRequestContextScenarios(runtime) {
                 } finally {
                     console.error = previousError
                 }
-                const injectedFailureObserved = errorCalls.some(args => args.some(value => (
-                    value instanceof Error
-                    && value.message.includes(INJECTED_UNLOCK_WRITE_FAILURE)
-                )))
+                const injectedFailureObserved = errorCalls.length === 1
+                    && errorCalls[0].length === 2
+                    && errorCalls[0][0] === BEST_EFFORT_ERROR_PREFIX
+                    && isInjectedUnlockWriteFailure(errorCalls[0][1])
                 if (!injectedFailureObserved) {
                     throw new Error(
                         `best-effort scenario did not observe ${INJECTED_UNLOCK_WRITE_FAILURE}`,

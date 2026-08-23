@@ -88,18 +88,11 @@ function completeCleanup(primaryError, actions) {
             : new Error("Awake request-context caught a non-Error failure", {
                 cause: primaryError,
             })
-        if (cleanupErrors.length > 0 && !(primaryError instanceof Error)) {
+        if (cleanupErrors.length > 0) {
             throw new AggregateError(
                 [normalizedPrimary, ...cleanupErrors],
-                "Awake request-context failed and cleanup also failed",
+                `Awake request-context cleanup failed after: ${normalizedPrimary.message}`,
             )
-        }
-        if (cleanupErrors.length > 0) {
-            const cleanupCause = cleanupErrors.length === 1
-                ? cleanupErrors[0]
-                : new AggregateError(cleanupErrors, "Awake request-context cleanup failed")
-            if (normalizedPrimary.cause === undefined) normalizedPrimary.cause = cleanupCause
-            else normalizedPrimary.cleanupCause = cleanupCause
         }
         throw normalizedPrimary
     }

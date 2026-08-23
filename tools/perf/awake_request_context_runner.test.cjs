@@ -15,7 +15,7 @@ const {
     runAwakeRequestContextBaseline,
 } = require("./awake_request_context_baseline.cjs")
 
-function createRuntimeHarness({ closeError = null } = {}) {
+function createRuntimeHarness({ closeError = null, contentRestoreError = null } = {}) {
     let database = null
     let contentRestored = false
     const computer = { compute: () => 7 }
@@ -32,7 +32,10 @@ function createRuntimeHarness({ closeError = null } = {}) {
             return database
         },
         installBundledGameplaySnapshot() {
-            return () => { contentRestored = true }
+            return () => {
+                contentRestored = true
+                if (contentRestoreError !== null) throw contentRestoreError
+            }
         },
         resolveRuntimeDataPaths: () => ({}),
         setServerTimeOffset() {},
@@ -148,5 +151,58 @@ test("runner preserves non-Error primary failures together with cleanup failures
         } finally {
             fs.rmSync(temporaryParent, { recursive: true, force: true })
         }
+    }
+})
+
+function collectObservedErrors(error, observed = new Set()) {
+    if (!(error instanceof Error) || observed.has(error)) return observed
+    observed.add(error)
+    if (error instanceof AggregateError) {
+        for (const nested of error.errors) collectObservedErrors(nested, observed)
+    }
+    collectObservedErrors(error.cause, observed)
+    return observed
+}
+
+test("runner aggregates frozen primary and multi-layer cleanup errors without mutation", async () => {
+    const temporaryParent = fs.mkdtempSync(path.join(os.tmpdir(), "awake-frozen-error-"))
+    const originalCause = new Error("original primary cause")
+    const primaryFailure = new Error("frozen scenario primary failure", { cause: originalCause })
+    Object.freeze(primaryFailure)
+    const scenarioCleanupFailure = new Error("scenario cleanup failure")
+    const suiteCleanupFailure = new Error("suite cleanup failure")
+    const harness = createRuntimeHarness({
+        closeError: scenarioCleanupFailure,
+        contentRestoreError: suiteCleanupFailure,
+    })
+    let caught
+    try {
+        try {
+            await runAwakeRequestContextBaseline({
+                runtimeLoader: () => harness.runtime,
+                scenarioFactory: () => createScenarios((_fixture, measureTarget) => (
+                    measureTarget(() => { throw primaryFailure })
+                )),
+                temporaryParent,
+            })
+        } catch (error) {
+            caught = error
+        }
+
+        assert.equal(caught instanceof AggregateError, true)
+        const observed = collectObservedErrors(caught)
+        for (const error of [
+            primaryFailure,
+            originalCause,
+            scenarioCleanupFailure,
+            suiteCleanupFailure,
+        ]) assert.equal(observed.has(error), true, error.message)
+        assert.equal(primaryFailure.cause, originalCause)
+        assert.deepEqual(Reflect.ownKeys(primaryFailure), ["stack", "message", "cause"])
+        assert.equal(harness.contentRestored, true)
+        assert.equal(harness.database.open, false)
+        assert.deepEqual(fs.readdirSync(temporaryParent), [])
+    } finally {
+        fs.rmSync(temporaryParent, { recursive: true, force: true })
     }
 })

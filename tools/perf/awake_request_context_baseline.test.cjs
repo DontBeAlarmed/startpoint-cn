@@ -239,6 +239,12 @@ function createFailureScenarioRuntime(overrides) {
     }
 }
 
+function createSqliteTriggerError(message, code = "SQLITE_CONSTRAINT_TRIGGER") {
+    const error = new Error(message)
+    error.code = code
+    return error
+}
+
 test("strict failure scenario rethrows errors outside the injected unlock write", () => {
     const runtime = createFailureScenarioRuntime({
         reconcileAwakeUnlockCharacterListStrict() {
@@ -268,6 +274,59 @@ test("best-effort failure scenario requires the injected Error in console output
         () => scenario.execute({ playerId: 1 }, operation => operation()),
         /injected awake unlock write failure/i,
     )
+})
+
+test("strict failure scenario requires the exact trigger message and SQLite code", () => {
+    for (const error of [
+        createSqliteTriggerError("prefix injected awake unlock write failure suffix"),
+        createSqliteTriggerError("injected awake unlock write failure", "SQLITE_CONSTRAINT_CHECK"),
+    ]) {
+        const runtime = createFailureScenarioRuntime({
+            reconcileAwakeUnlockCharacterListStrict() { throw error },
+        })
+        const scenario = createAwakeRequestContextScenarios(runtime)
+            .find(entry => entry.name === "strict-failure-rollback")
+
+        assert.throws(
+            () => scenario.execute({ playerId: 1 }, operation => operation()),
+            caught => caught === error,
+        )
+    }
+})
+
+test("best-effort failure scenario requires exact error fields and log shape", () => {
+    const cases = [
+        [
+            createSqliteTriggerError("prefix injected awake unlock write failure suffix"),
+            (error) => console.error("[awake-unlock] Failed to publish character unlocks.", error),
+        ],
+        [
+            createSqliteTriggerError(
+                "injected awake unlock write failure",
+                "SQLITE_CONSTRAINT_CHECK",
+            ),
+            (error) => console.error("[awake-unlock] Failed to publish character unlocks.", error),
+        ],
+        [
+            createSqliteTriggerError("injected awake unlock write failure"),
+            (error) => console.error(error),
+        ],
+    ]
+    for (const [error, log] of cases) {
+        const runtime = createFailureScenarioRuntime({
+            reconcileAwakeUnlockCharacterListBestEffort(_playerId, existing) {
+                log(error)
+                return existing
+            },
+        })
+        const scenario = createAwakeRequestContextScenarios(runtime)
+            .find(entry => entry.name === "best-effort-failure")
+
+        assert.throws(
+            () => scenario.execute({ playerId: 1 }, operation => operation()),
+            /did not observe injected awake unlock write failure/i,
+        )
+    }
 })
 
 test("runner restores database, Content, time, console, and temporary files after failure", async () => {

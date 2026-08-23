@@ -180,8 +180,10 @@ SQL 或 mission compute。reference 位于
 `all`；空候选会删除不再 ready 且没有正 awake level 支撑的历史 unlock；strict 写故障使
 owner 的 Mana 写和 reconcile 写全部回滚；best-effort 同类故障返回原
 `character_list`，保留 owner 的 7 Mana 写入，并回滚 reconcile 的历史删除和候选插入。
-两个故障场景均以 `injectedFailureObserved: true` 固定实际命中了预期 unlock 写故障，其他异常
-或不含该目标 `Error` 的 best-effort 日志会使 runner 失败。
+两个故障场景均以 `injectedFailureObserved: true` 固定实际命中了预期 unlock 写故障；目标
+`Error` 必须同时具有精确 message `injected awake unlock write failure` 和 code
+`SQLITE_CONSTRAINT_TRIGGER`，best-effort 还必须通过固定前缀加该 `Error` 的双参数日志形状，
+否则 runner 失败。
 snapshot 还逐场景固定了稳定表名及 `reads`、`writes`、`statements`；新增业务表或任一既有
 结构指标上升均拒绝准入。故障场景中的 owner `players` 更新处于同一个外层事务，但不在
 `measureTarget` 窗口内；reference 中的 `players` 仅记录 publication 自身的 1 次读取和 0 次写入。
