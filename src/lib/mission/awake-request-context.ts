@@ -31,6 +31,7 @@ import { getComputer } from "./registry"
 import type { AwakeUnlockProgress } from "./awake-unlock"
 import {
     collectSupportedAwakeMissionIds,
+    mergeAwakeScopedCharacterIds,
     normalizeAwakeCandidateCharacterIds,
 } from "./awake-request-context-scope"
 import {
@@ -200,10 +201,7 @@ export function createAwakeRequestContext(
     const unlocks = getPlayerCharacterAwakeUnlocksSync(playerId)
     const scopedFactCharacterIds = scopeCharacterIds === undefined
         ? undefined
-        : Object.freeze([...new Set([
-            ...scopeCharacterIds,
-            ...[...unlocks.keys()].map(Number),
-        ])].sort((left, right) => left - right))
+        : mergeAwakeScopedCharacterIds(scopeCharacterIds, [...unlocks.keys()].map(Number))
     const catalog = getMissionCatalog()
     const requirementRegistry = getMissionFactRequirementRegistry(catalog)
     const requestedMissionIds = scopeCharacterIds === undefined

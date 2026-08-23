@@ -3,6 +3,43 @@ import type { MissionFactRequirementRegistry } from "./requirements/types"
 
 const CATEGORY = 9
 
+// Keep one scoped IN query comfortably below SQLite's 32766-variable limit.
+// The co-clear reader repeats the IDs for its two IN clauses, so the context
+// budget is intentionally lower than the per-reader ceiling.
+export const MAX_SCOPED_CHARACTER_IDS = 10000
+
+function normalizeScopedCharacterIds(ids: readonly number[]): number[] {
+    const normalized = new Set<number>()
+    for (const characterId of ids) {
+        if (!Number.isSafeInteger(characterId) || characterId <= 0) {
+            throw new TypeError("Awake scoped character IDs must be positive safe integers")
+        }
+        normalized.add(characterId)
+    }
+    return [...normalized].sort((left, right) => left - right)
+}
+
+function assertAwakeScopedCharacterIdBudget(characterIds: readonly number[]): void {
+    if (characterIds.length > MAX_SCOPED_CHARACTER_IDS) {
+        throw new RangeError(
+            "Awake candidate scope exceeds bounded character-id budget "
+                + `(max ${MAX_SCOPED_CHARACTER_IDS})`,
+        )
+    }
+}
+
+export function mergeAwakeScopedCharacterIds(
+    candidateCharacterIds: readonly number[],
+    existingUnlockCharacterIds: readonly number[],
+): readonly number[] {
+    const merged = normalizeScopedCharacterIds([
+        ...candidateCharacterIds,
+        ...existingUnlockCharacterIds,
+    ])
+    assertAwakeScopedCharacterIdBudget(merged)
+    return Object.freeze(merged)
+}
+
 export function normalizeAwakeCandidateCharacterIds(
     candidateCharacterIds: readonly number[] | undefined,
 ): readonly number[] | undefined {
@@ -21,7 +58,9 @@ export function normalizeAwakeCandidateCharacterIds(
         }
         return characterId
     })
-    return Object.freeze([...new Set(normalized)].sort((left, right) => left - right))
+    const normalizedUnique = [...new Set(normalized)].sort((left, right) => left - right)
+    assertAwakeScopedCharacterIdBudget(normalizedUnique)
+    return Object.freeze(normalizedUnique)
 }
 
 function isSupportedAwakeFact(fact: FactKey): boolean {

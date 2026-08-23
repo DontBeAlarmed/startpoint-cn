@@ -50,6 +50,10 @@ function missionApi() {
     return require("../src/lib/mission")
 }
 
+function requestContextScopeModule() {
+    return require("../src/lib/mission/awake-request-context-scope")
+}
+
 function createPlayer(label, characterIds = [CHARACTER_A]) {
     const account = insertAccountSync({
         appId: "wf_cn",
@@ -322,6 +326,38 @@ test("candidate zero keeps cleanup semantics while one and many stay scoped", ()
         candidateCharacterIds: [CHARACTER_A, CHARACTER_B, CHARACTER_A],
     }).evaluate()
     assert.equal(many.length, 8)
+})
+
+test("oversized candidate scope fails closed before scoped SQL readers", () => {
+    const playerId = createPlayer("oversized-candidate-scope")
+    const oversizedCandidates = Array.from({ length: 10001 }, (_, index) => 900000 + index)
+
+    assert.throws(
+        () => requestContextModule().createAwakeRequestContext({
+            playerId,
+            evaluationTime,
+            candidateCharacterIds: oversizedCandidates,
+        }),
+        /Awake candidate scope exceeds bounded character-id budget/i,
+    )
+})
+
+test("candidate and existing unlock IDs share one bounded scope budget after deduplication", () => {
+    const scope = requestContextScopeModule()
+    const candidateIds = Array.from({ length: 5001 }, (_, index) => 100000 + index)
+    const existingUnlockIds = Array.from({ length: 5001 }, (_, index) => 105000 + index)
+    existingUnlockIds[0] = candidateIds[0]
+
+    assert.throws(
+        () => scope.mergeAwakeScopedCharacterIds(candidateIds, existingUnlockIds),
+        /Awake candidate scope exceeds bounded character-id budget/i,
+    )
+
+    const withinBudget = scope.mergeAwakeScopedCharacterIds(
+        [1, 2, 2, 3],
+        [3, 4, 4],
+    )
+    assert.deepEqual(withinBudget, [1, 2, 3, 4])
 })
 
 test("resolver facts, time, and character master readiness stay frozen", () => {
