@@ -323,18 +323,6 @@ function classifyOwner(relativeFile, call, sourceFile) {
     return ownerLabel
 }
 
-function collectIdentifierCalls(root, calleeName) {
-    const calls = []
-    function visit(node) {
-        if (ts.isCallExpression(node)
-            && ts.isIdentifier(node.expression)
-            && node.expression.text === calleeName) calls.push(node)
-        ts.forEachChild(node, visit)
-    }
-    visit(root)
-    return calls
-}
-
 function createTypeCheckedSource(source, fileName) {
     const compilerOptions = {
         module: ts.ModuleKind.CommonJS,
@@ -413,14 +401,22 @@ function assertSingleSettlementTransactionOwnership(source, fileName) {
         specifier => specifier.endsWith("/single-settlement-writes")
             || specifier === "./single-settlement-writes",
     )
-    const transactionCalls = collectIdentifierCalls(
+    const transactionImportSymbol = findNamedImportSymbol(
         sourceFile,
+        checker,
         "runSingleFinishSettlementTransaction",
+        specifier => specifier.endsWith("/single-finish-settlement")
+            || specifier === "./single-finish-settlement",
+    )
+    const transactionCalls = collectCallsForSymbol(
+        sourceFile,
+        checker,
+        transactionImportSymbol,
     )
     assert.equal(
         transactionCalls.length,
         1,
-        `${fileName} must contain exactly one runSingleFinishSettlementTransaction call`,
+        `${fileName} must call production import runSingleFinishSettlementTransaction exactly once`,
     )
     const options = transactionCalls[0].arguments[0]
     assert.equal(
@@ -491,14 +487,22 @@ function assertMultiSettlementTransactionOwnership(source, fileName) {
         undefined,
         `${sourceFile.fileName} executeFinishWrites declaration must have a symbol`,
     )
-    const transactionCalls = collectIdentifierCalls(
+    const transactionImportSymbol = findNamedImportSymbol(
         sourceFile,
+        checker,
         "runMultiActiveQuestSettlementTransaction",
+        specifier => specifier.endsWith("/active-quest-service")
+            || specifier === "./active-quest-service",
+    )
+    const transactionCalls = collectCallsForSymbol(
+        sourceFile,
+        checker,
+        transactionImportSymbol,
     )
     assert.equal(
         transactionCalls.length,
         1,
-        `${sourceFile.fileName} must contain exactly one runMultiActiveQuestSettlementTransaction call`,
+        `${sourceFile.fileName} must call production import runMultiActiveQuestSettlementTransaction exactly once`,
     )
     const writesArgument = transactionCalls[0].arguments[2]
     assert.equal(
@@ -689,17 +693,20 @@ test("AST collector ignores ordinary local functions with an Awake helper-like n
 test("single settlement ownership requires writes inside the settle callback", () => {
     const owned = `
         import { executeSingleSettlementWrites } from "./single-settlement-writes"
+        import { runSingleFinishSettlementTransaction } from "./single-finish-settlement"
         runSingleFinishSettlementTransaction({
             settle: () => executeSingleSettlementWrites({}),
         })
     `
     const movedOutside = `
         import { executeSingleSettlementWrites } from "./single-settlement-writes"
+        import { runSingleFinishSettlementTransaction } from "./single-finish-settlement"
         executeSingleSettlementWrites({})
         runSingleFinishSettlementTransaction({ settle: () => ({}) })
     `
     const nestedOnly = `
         import { executeSingleSettlementWrites } from "./single-settlement-writes"
+        import { runSingleFinishSettlementTransaction } from "./single-finish-settlement"
         runSingleFinishSettlementTransaction({
             settle: () => {
                 const deferred = () => executeSingleSettlementWrites({})
@@ -709,12 +716,23 @@ test("single settlement ownership requires writes inside the settle callback", (
     `
     const locallyShadowed = `
         import { executeSingleSettlementWrites } from "./single-settlement-writes"
+        import { runSingleFinishSettlementTransaction } from "./single-finish-settlement"
         runSingleFinishSettlementTransaction({
             settle: () => {
                 function executeSingleSettlementWrites() { return true }
                 return executeSingleSettlementWrites({})
             },
         })
+    `
+    const singleLocalFakeTransactionHelper = `
+        import { executeSingleSettlementWrites } from "./single-settlement-writes"
+        import { runSingleFinishSettlementTransaction } from "./single-finish-settlement"
+        function invoke() {
+            function runSingleFinishSettlementTransaction(options) { return options.settle() }
+            return runSingleFinishSettlementTransaction({
+                settle: () => executeSingleSettlementWrites({}),
+            })
+        }
     `
 
     assert.doesNotThrow(() => assertSingleSettlementTransactionOwnership(owned, "single.ts"))
@@ -730,11 +748,19 @@ test("single settlement ownership requires writes inside the settle callback", (
         () => assertSingleSettlementTransactionOwnership(locallyShadowed, "single.ts"),
         /production import.*executeSingleSettlementWrites/i,
     )
+    assert.throws(
+        () => assertSingleSettlementTransactionOwnership(
+            singleLocalFakeTransactionHelper,
+            "single.ts",
+        ),
+        /production import.*runSingleFinishSettlementTransaction/i,
+    )
 })
 
 test("multi settlement ownership requires executeFinishWrites as the third argument", () => {
     const owned = `
         import { reconcileAwakeUnlockCharacterList } from "./mission"
+        import { runMultiActiveQuestSettlementTransaction } from "./active-quest-service"
         const executeFinishWrites = () => reconcileAwakeUnlockCharacterList(1, [])
         const otherWrites = () => true
         runMultiActiveQuestSettlementTransaction(1, {}, executeFinishWrites)
@@ -745,6 +771,7 @@ test("multi settlement ownership requires executeFinishWrites as the third argum
     )
     const shadowed = `
         import { reconcileAwakeUnlockCharacterList } from "./mission"
+        import { runMultiActiveQuestSettlementTransaction } from "./active-quest-service"
         const executeFinishWrites = () => reconcileAwakeUnlockCharacterList(1, [])
         {
             const executeFinishWrites = () => true
@@ -753,9 +780,23 @@ test("multi settlement ownership requires executeFinishWrites as the third argum
     `
     const parameterShadowed = `
         import { reconcileAwakeUnlockCharacterList } from "./mission"
+        import { runMultiActiveQuestSettlementTransaction } from "./active-quest-service"
         const executeFinishWrites = () => reconcileAwakeUnlockCharacterList(1, [])
         function invoke(executeFinishWrites) {
             runMultiActiveQuestSettlementTransaction(1, {}, executeFinishWrites)
+        }
+    `
+    const multiLocalFakeTransactionHelper = `
+        import { reconcileAwakeUnlockCharacterList } from "./mission"
+        import {
+            runMultiActiveQuestSettlementTransaction,
+        } from "./active-quest-service"
+        const executeFinishWrites = () => reconcileAwakeUnlockCharacterList(1, [])
+        function invoke() {
+            function runMultiActiveQuestSettlementTransaction(_id, _request, writes) {
+                return writes()
+            }
+            return runMultiActiveQuestSettlementTransaction(1, {}, executeFinishWrites)
         }
     `
 
@@ -769,4 +810,40 @@ test("multi settlement ownership requires executeFinishWrites as the third argum
         if (expectedFailure) assert.throws(assertion, /third argument.*executeFinishWrites/i)
         else assert.doesNotThrow(assertion)
     }
+    assert.throws(
+        () => assertMultiSettlementTransactionOwnership(
+            multiLocalFakeTransactionHelper,
+            "multi.ts",
+        ),
+        /production import.*runMultiActiveQuestSettlementTransaction/i,
+    )
+})
+
+test("transaction ownership symbol checks support named aliases", () => {
+    const singleAliased = `
+        import { executeSingleSettlementWrites } from "./single-settlement-writes"
+        import {
+            runSingleFinishSettlementTransaction as runSingleTransaction,
+        } from "./single-finish-settlement"
+        runSingleTransaction({
+            settle: () => executeSingleSettlementWrites({}),
+        })
+    `
+    const multiAliased = `
+        import { reconcileAwakeUnlockCharacterList } from "./mission"
+        import {
+            runMultiActiveQuestSettlementTransaction as runMultiTransaction,
+        } from "./active-quest-service"
+        const executeFinishWrites = () => reconcileAwakeUnlockCharacterList(1, [])
+        runMultiTransaction(1, {}, executeFinishWrites)
+    `
+
+    assert.doesNotThrow(() => assertSingleSettlementTransactionOwnership(
+        singleAliased,
+        "single.ts",
+    ))
+    assert.doesNotThrow(() => assertMultiSettlementTransactionOwnership(
+        multiAliased,
+        "multi.ts",
+    ))
 })
