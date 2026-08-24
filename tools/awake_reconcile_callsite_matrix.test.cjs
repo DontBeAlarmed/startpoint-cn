@@ -1050,7 +1050,7 @@ function callTerminalName(call) {
     return null
 }
 
-function findContextCreation(call, sourceFile, checker) {
+function findContextCreation(call, sourceFile, checker, ownerRoot) {
     const options = call.arguments[2]
     const contextReference = getObjectProperty(options, "context")
     assert.equal(
@@ -1074,7 +1074,11 @@ function findContextCreation(call, sourceFile, checker) {
         `${sourceFile.fileName} publication context must have exactly one binding declaration`,
     )
     const declaration = declarations[0]
-    const ownerRoot = findOwnerRoot(call)
+    assert.notEqual(
+        findAncestor(declaration, node => node === ownerRoot),
+        null,
+        `${sourceFile.fileName} context binding declaration is outside the exact owner root`,
+    )
     let declarationScope = null
     for (let node = declaration.parent; node && node !== ownerRoot.parent; node = node.parent) {
         if (ts.isBlock(node) || ts.isSourceFile(node)) {
@@ -1116,7 +1120,7 @@ function classifyFactSeeds(scope, sourceFile) {
     assert.fail(`${sourceFile.fileName} has an unclassified Awake FactKey seed expression: ${text}`)
 }
 
-function extractScopeEvidence(importedCall) {
+function extractScopeEvidence(importedCall, ownerRoot = findOwnerRoot(importedCall.call)) {
     const { call, checker, exportedName, sourceFile } = importedCall
     let actualCharacterSeed
     let scope
@@ -1126,7 +1130,7 @@ function extractScopeEvidence(importedCall) {
         scope = call.arguments[3]
         contextStart = call.getStart(sourceFile)
     } else {
-        const creation = findContextCreation(call, sourceFile, checker)
+        const creation = findContextCreation(call, sourceFile, checker, ownerRoot)
         contextStart = creation.getStart(sourceFile)
         if (callTerminalName(creation) === "createAwakeRequestContext") {
             scope = creation.arguments[0]
@@ -1674,7 +1678,7 @@ function collectProductionCalls() {
                     finalHelper,
                 )
             }
-            const scopeEvidence = extractScopeEvidence(importedCall)
+            const scopeEvidence = extractScopeEvidence(importedCall, ownerRoot)
             const dominanceEvidence = assertFinalWritePrecedesContext(
                 call,
                 scopeEvidence.contextStart,
@@ -2040,6 +2044,31 @@ test("context creation binds to the publication context symbol in its visible ow
     assert.throws(
         () => extractScopeEvidence(importedCall),
         /context.*symbol|binding declaration|visible owner scope/i,
+    )
+})
+
+test("context creation rejects a file-scoped binding outside the Fastify owner root", () => {
+    const source = `
+        import {
+            createAwakeRequestContextBestEffort,
+            reconcileAwakeUnlockCharacterListBestEffort,
+        } from "./mission"
+        const awakeContext = createAwakeRequestContextBestEffort(1, [], {})
+        export function routes(fastify) {
+            fastify.post("/owner", () => {
+                return reconcileAwakeUnlockCharacterListBestEffort(
+                    1,
+                    [],
+                    { context: awakeContext },
+                )
+            })
+        }
+    `
+    const importedCall = collectImportedAwakeCalls(source, "synthetic.ts")[0]
+
+    assert.throws(
+        () => extractScopeEvidence(importedCall),
+        /context binding declaration.*owner root|visible owner scope/i,
     )
 })
 
