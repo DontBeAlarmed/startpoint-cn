@@ -67,6 +67,13 @@ export interface SingleSettlementWritesInput {
     scoreAttackBorderTiers: ScoreAttackBorderTier[]
 }
 
+function finalizeSingleAwakePublicationWrites(
+    playerId: number,
+    isScoreAttackEvent: boolean,
+): void {
+    if (!isScoreAttackEvent) deletePlayerActiveQuestSync(playerId)
+}
+
 export function executeSingleSettlementWrites(
     input: SingleSettlementWritesInput,
     settlementActiveQuest: ActiveQuest,
@@ -326,7 +333,7 @@ export function executeSingleSettlementWrites(
         boostPoint: newBoostPoint,
         bossBoostPoint: newBossBoostPoint,
     })
-    if (!isScoreAttackEvent) deletePlayerActiveQuestSync(playerId)
+    finalizeSingleAwakePublicationWrites(playerId, isScoreAttackEvent)
     const invalidatedFactKeys: FactKey[] = [
         ...(missionEvaluation?.invalidatedFactKeys ?? []),
         ...(awakeMissionEvaluation?.invalidatedFactKeys ?? []),

@@ -141,7 +141,8 @@ best-effort publication 用于主业务已经可以独立成立、觉醒只负�
 | 边界 | 现有调用表达式 | 目标 owner 与上下文来源 | 失败语义 |
 |---|---|---|---|
 | 事务内 strict | `src/routes/api/character/mana.ts` 的 `character/learn_mana_node` | 玛纳节点、材料、角色进化、bond 与任务事实完成最终写入后冻结；注入目标角色、节点及 owner 已知写后状态 | 任一 context、求值、unlock 或投影错误回滚整个 learn 事务 |
-| 事务内 best-effort | `src/lib/quest/finish/single-settlement-writes.ts` 的单人 finish、`src/multi/settlement/orchestrator.ts` 的多人 finish | 结算奖励、角色经验、关卡履历和任务事实完成后，以本场主副角色、direct mission IDs 和写后事实冻结 | 只回滚 reconcile savepoint，主结算保留 |
+| 事务内 best-effort | `src/lib/quest/finish/single-settlement-writes.ts` 的单人 finish | 结算奖励、角色经验、关卡履历和任务事实完成后，以本场主副角色和 invalidated facts 建立最终 publication context；当前不注入 direct mission IDs | 只回滚 reconcile savepoint，主结算保留 |
+| 事务内 best-effort | `src/multi/settlement/orchestrator.ts` 的多人 finish | 先由本场主副角色派生 direct mission IDs 完成 Awake mission settlement，再以实际 candidate characters 和 invalidated facts 建立最终 publication context | 只回滚 reconcile savepoint，主结算保留 |
 | 事务内 best-effort | `src/routes/api/storyQuest.ts` 的 story finish、`src/routes/api/character/bond.ts` 的 `character/receive_bond_token` | story 加入角色或 bond 写入后，以实际变化角色和任务事实冻结 | 只回滚 reconcile savepoint，story/bond 主业务保留 |
 | 事务内 best-effort | `src/routes/api/mail.ts` 的 `mail/receive`、`mail/receive_all` | 所有附件、领取历史和邮件状态写入后，以实际角色奖励和 FactKey 失效冻结 | 只回滚 reconcile savepoint，邮件领取事务继续提交 |
 | 事务内 best-effort | `src/routes/api/activeMission.ts` 的 Active Mission 领奖 | stage、奖励和 player 持久化后，以实际角色奖励和 FactKey 失效冻结 | 只回滚 reconcile savepoint，Active Mission 领奖保留 |

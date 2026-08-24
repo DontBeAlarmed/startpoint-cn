@@ -296,7 +296,8 @@ Awake 保留独立 eligibility、角色候选和奖励解锁语义，但接入�
 
 状态：第 13～15 项已实施；Task 33.6 已完成最终全量回归与独立审查。
 
-- Awake 候选已接入 snapshot-scoped Catalog；指定角色页和战斗 main/Sub 只建立请求范围内候选，并合并本场 direct mission IDs；
+- Awake 候选已接入 snapshot-scoped Catalog；指定角色页只建立请求范围内候选；single finish 的最终 publication 使用 battle-party characters 与 invalidated facts，当前不合并 direct mission IDs；
+- multi finish 仍由 battle-party characters 派生本场 direct mission IDs 完成 Awake mission settlement，再以实际 candidate characters 与 invalidated facts 建立最终 publication context；
 - Category 9 已通过只读 Session 声明并加载角色、玩家、任务履历、角色 clear、同队 clear 和 scoped persisted mission facts；all-complete 显式声明三个子任务及其 facts；
 - AwakeComputer 已使用 Session context，Category 9 persisted progress/stages 按候选及依赖 ID 单次批量读取，EvaluationResult 不再依赖 legacy `categoryMissionStates`；
 - Awake 专用写入器只消费 EvaluationResult，写入 progress/stage、普通奖励和 mana board awake unlock，保留 eligibility、幂等与原响应结构；

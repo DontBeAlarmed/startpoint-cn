@@ -30,6 +30,19 @@ interface LearnManaNodeBody {
     mana_node_multiplied_id_list: number[]
 }
 
+function finalizeLearnManaAwakePublicationWrites(
+    playerId: number,
+    characterId: number,
+    currentEvolutionLevel: number,
+    plannedEvolutionLevel: number,
+): void {
+    if (plannedEvolutionLevel !== currentEvolutionLevel) {
+        updatePlayerCharacterSync(playerId, characterId, {
+            evolutionLevel: plannedEvolutionLevel,
+        })
+    }
+}
+
 const routes = async (fastify: FastifyInstance) => {
 
     fastify.post("/learn_mana_node", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -206,11 +219,12 @@ const routes = async (fastify: FastifyInstance) => {
             const bond = updateBondTokenForCompletedBoard(
                 playerId, characterId, characterData, currentManaNodeIndex, isBoardComplete
             )
-            if (plannedCharacterEvolutionLevel !== characterData.evolutionLevel) {
-                updatePlayerCharacterSync(playerId, characterId, {
-                    evolutionLevel: plannedCharacterEvolutionLevel,
-                })
-            }
+            finalizeLearnManaAwakePublicationWrites(
+                playerId,
+                characterId,
+                characterData.evolutionLevel,
+                plannedCharacterEvolutionLevel,
+            )
             const awakeContext = createAwakeRequestContext({
                 playerId,
                 candidateCharacterIds: [characterId],

@@ -57,14 +57,15 @@ const AUTHORITATIVE_WRITE_SETS = Object.freeze({
         "insertPlayerScoreAttackBattleHistorySync", "insertPlayerPracticeBattleHistorySync",
         "handleScoreAttackEventFinish", "settleMissionCategoriesWithEvaluation",
         "settleAwakeMissionCandidatesWithEvaluation", "reconcileActiveMissionFacts", "setExpPool",
-        "observeGrant", "observeItems", "observeResult", "finalize", "deletePlayerActiveQuestSync",
+        "observeGrant", "observeItems", "observeResult", "finalize",
+        "finalizeSingleAwakePublicationWrites",
     ]),
     "multi/finish": Object.freeze([
         "givePlayerRewardSync", "updatePlayerQuestProgressSync", "insertPlayerQuestProgressSync",
         "updatePlayerSync", "givePlayerScoreRewardsSync", "settleAdditionalRewardsSync",
         "settleActivityPeriodicRewardsSync", "recordMissionBattleFacts",
         "givePlayerCharactersExpSync", "settleMissionCategoriesWithEvaluation",
-        "settleAwakeMissionCandidatesWithEvaluation", "deleteActiveQuest",
+        "settleAwakeMissionCandidatesWithEvaluation", "finalizeMultiAwakePublicationWrites",
     ]),
     "active_mission/receive": Object.freeze([
         "updatePlayerActiveMissionStageSync", "grant", "persistPlayer",
@@ -77,17 +78,17 @@ const AUTHORITATIVE_WRITE_SETS = Object.freeze({
     "character/learn_mana_node": Object.freeze([
         "updatePlayerSync", "incrementActiveMissionUsedManaCountSync",
         "setPlayerItemWithinTransactionSync", "insertPlayerCharacterManaNodesSync",
-        "updateBondTokenForCompletedBoard", "updatePlayerCharacterSync",
+        "updateBondTokenForCompletedBoard", "finalizeLearnManaAwakePublicationWrites",
     ]),
     "exchange/star_crumb": Object.freeze(["transaction"]),
     "gacha/exchange_character": Object.freeze(["transaction"]),
     "gacha/exec": Object.freeze(["transaction"]),
     "item/sell": Object.freeze(["sellItemSync"]),
     "mail/receive": Object.freeze([
-        "settleMailRewardsInTransactionOwnerSync", "receiveMailSync",
+        "settleMailRewardsInTransactionOwnerSync", "finalizeMailReceiveAwakePublicationWrites",
     ]),
     "mail/receive_all": Object.freeze([
-        "settleMailRewardsInTransactionOwnerSync", "receiveMailSync",
+        "settleMailRewardsInTransactionOwnerSync", "finalizeMailReceiveAllAwakePublicationWrites",
     ]),
     "mission/update_mission_progress": Object.freeze(["transaction"]),
     "pass_card/receive_all": Object.freeze(["transaction"]),
@@ -113,6 +114,54 @@ const OWNER_TRANSACTION_ANCHORS = Object.freeze({
     "shop/buy": "executeGenericShopPurchaseSync",
     "shop/bulk_buy": "executeGenericShopBatchPurchaseSync",
 })
+const FINAL_WRITE_HELPERS = Object.freeze({
+    "single/finish": Object.freeze({
+        helperName: "finalizeSingleAwakePublicationWrites",
+        callInventory: Object.freeze([
+            "import:../../../data/domains/quest_active#deletePlayerActiveQuestSync=1",
+        ]),
+        internalWrites: Object.freeze([
+            Object.freeze({ kind: "import", name: "deletePlayerActiveQuestSync" }),
+        ]),
+    }),
+    "multi/finish": Object.freeze({
+        helperName: "finalizeMultiAwakePublicationWrites",
+        callInventory: Object.freeze(["parameter:deleteActiveQuest=1"]),
+        internalWrites: Object.freeze([
+            Object.freeze({ kind: "parameter", name: "deleteActiveQuest" }),
+        ]),
+    }),
+    "character/learn_mana_node": Object.freeze({
+        helperName: "finalizeLearnManaAwakePublicationWrites",
+        callInventory: Object.freeze([
+            "import:../../../data/domains/character#updatePlayerCharacterSync=1",
+        ]),
+        internalWrites: Object.freeze([
+            Object.freeze({ kind: "import", name: "updatePlayerCharacterSync" }),
+        ]),
+    }),
+    "mail/receive": Object.freeze({
+        helperName: "finalizeMailReceiveAwakePublicationWrites",
+        callInventory: Object.freeze([
+            "import:../../data/domains/mail#receiveMailSync=1",
+        ]),
+        internalWrites: Object.freeze([
+            Object.freeze({ kind: "import", name: "receiveMailSync" }),
+        ]),
+    }),
+    "mail/receive_all": Object.freeze({
+        helperName: "finalizeMailReceiveAllAwakePublicationWrites",
+        callInventory: Object.freeze([
+            "import:../../data/domains/mail#receiveMailSync=1",
+            "member:mailMap#get=1",
+            "member:validMailIds#filter=1",
+        ]),
+        internalWrites: Object.freeze([
+            Object.freeze({ kind: "import", name: "receiveMailSync" }),
+        ]),
+    }),
+})
+const OWNER_CALL_INVENTORIES = require("./awake_reconcile_owner_call_inventory.json")
 const ROUTE_OWNERS = Object.freeze({
     "src/routes/api/activeMission.ts": { "/receive": "active_mission/receive" },
     "src/routes/api/boxGacha.ts": { "/exec": "box_gacha/exec" },
@@ -210,19 +259,19 @@ function matrixRow({
 }
 
 const EXPECTED_MATRIX = Object.freeze([
-    matrixRow({ relativeFile: "src/lib/quest/finish/single-settlement-writes.ts", owner: "single/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "partyCharacterIds", actualFactSeeds: "invalidatedFactKeys", finalAuthoritativeWrite: "finalize", runtimeEvidenceKey: "single-finish", changesGlobalFacts: true, rereadReason: SINGLE_REREAD_REASON }),
-    matrixRow({ relativeFile: "src/multi/settlement/orchestrator.ts", owner: "multi/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "invalidatedFactKeys", finalAuthoritativeWrite: "settleMissionCategoriesWithEvaluation", runtimeEvidenceKey: "multi-finish", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/lib/quest/finish/single-settlement-writes.ts", owner: "single/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "partyCharacterIds", actualFactSeeds: "invalidatedFactKeys", finalAuthoritativeWrite: "finalizeSingleAwakePublicationWrites", runtimeEvidenceKey: "single-finish", changesGlobalFacts: true, rereadReason: SINGLE_REREAD_REASON }),
+    matrixRow({ relativeFile: "src/multi/settlement/orchestrator.ts", owner: "multi/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "invalidatedFactKeys", finalAuthoritativeWrite: "finalizeMultiAwakePublicationWrites", runtimeEvidenceKey: "multi-finish", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/activeMission.ts", owner: "active_mission/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "granter.invalidatedFactKeys", finalAuthoritativeWrite: "persistPlayer", runtimeEvidenceKey: "active-mission-receive", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/boxGacha.ts", owner: "box_gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "settlement.rewardResult?.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "box-gacha-exec", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/character.ts", owner: "character/add_character_from_town", boundary: "best-effort-post-commit", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "character-town-grant" }),
     matrixRow({ relativeFile: "src/routes/api/character/bond.ts", owner: "character/receive_bond_token", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", finalAuthoritativeWrite: "updatePlayerCharacterBondTokenSync", runtimeEvidenceKey: "bond-success" }),
-    matrixRow({ relativeFile: "src/routes/api/character/mana.ts", callee: "strict", owner: "character/learn_mana_node", boundary: "strict-in-tx", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "updateBondTokenForCompletedBoard", runtimeEvidenceKey: "learn-mana-final-node" }),
+    matrixRow({ relativeFile: "src/routes/api/character/mana.ts", callee: "strict", owner: "character/learn_mana_node", boundary: "strict-in-tx", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "finalizeLearnManaAwakePublicationWrites", runtimeEvidenceKey: "learn-mana-final-node" }),
     matrixRow({ relativeFile: "src/routes/api/exchange.ts", owner: "exchange/star_crumb", boundary: "best-effort-post-commit", actualCharacterSeed: "kind === 0 ? [targetId] : []", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "exchange-star-crumb" }),
     matrixRow({ relativeFile: "src/routes/api/gacha.ts", owner: "gacha/exchange_character", boundary: "best-effort-post-commit", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "gacha-exchange-character" }),
     matrixRow({ relativeFile: "src/routes/api/gacha.ts", owner: "gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "gacha-exec" }),
     matrixRow({ relativeFile: "src/routes/api/item.ts", owner: "item/sell", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "player", finalAuthoritativeWrite: "sellItemSync", runtimeEvidenceKey: "mana-item-sell", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "mail", finalAuthoritativeWrite: "settleMailRewardsInTransactionOwnerSync", runtimeEvidenceKey: "mail-receive", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive_all", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "mail", finalAuthoritativeWrite: "settleMailRewardsInTransactionOwnerSync", runtimeEvidenceKey: "mail-receive-all", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "mail", finalAuthoritativeWrite: "finalizeMailReceiveAwakePublicationWrites", runtimeEvidenceKey: "mail-receive", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive_all", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "mail", finalAuthoritativeWrite: "finalizeMailReceiveAllAwakePublicationWrites", runtimeEvidenceKey: "mail-receive-all", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/mission.ts", owner: "mission/update_mission_progress", boundary: "best-effort-post-commit", actualCharacterSeed: "awakeCandidateCharacterIds", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "category9-update-progress" }),
     matrixRow({ relativeFile: "src/routes/api/passCard.ts", owner: "pass_card/receive_all", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "result.invalidatedFactKeys", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "pass-card-receive-all", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/raidEvent.ts", owner: "raid_event/summary", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "raid-event-summary", changesGlobalFacts: true }),
@@ -302,7 +351,7 @@ function collectImportedAwakeCalls(source, fileName) {
                 if (callee === undefined) {
                     throw new Error(`${fileName} calls unknown Awake publication helper ${exportedName}`)
                 }
-                calls.push({ callee, call: node, exportedName, moduleSpecifier, sourceFile })
+                calls.push({ callee, call: node, checker, exportedName, moduleSpecifier, sourceFile })
             }
         }
         ts.forEachChild(node, visit)
@@ -447,6 +496,199 @@ function collectCallsForSymbol(root, checker, symbol, { stopAtNestedFunctions = 
     }
     visit(root)
     return calls
+}
+
+function findNamedFunctionDeclaration(sourceFile, name) {
+    const declarations = []
+    function visit(node) {
+        if (ts.isFunctionDeclaration(node) && node.name?.text === name) declarations.push(node)
+        ts.forEachChild(node, visit)
+    }
+    visit(sourceFile)
+    assert.equal(
+        declarations.length,
+        1,
+        `${sourceFile.fileName} must declare final-write helper ${name} exactly once`,
+    )
+    return declarations[0]
+}
+
+function assertFinalWriteHelperOwnershipInSource(sourceFile, checker, ownerRoot, contract) {
+    const helper = findNamedFunctionDeclaration(sourceFile, contract.helperName)
+    const helperSymbol = checker.getSymbolAtLocation(helper.name)
+    assert.notEqual(helperSymbol, undefined, `${contract.helperName} helper symbol is missing`)
+    assert.equal(
+        collectCallsForSymbol(ownerRoot, checker, helperSymbol).length,
+        1,
+        `${sourceFile.fileName} owner must call ${contract.helperName} exactly once`,
+    )
+    assert.deepEqual(
+        collectOwnerCallInventory(helper, checker, sourceFile),
+        contract.callInventory,
+        `${contract.helperName} helper complete call inventory contains an unreviewed call`,
+    )
+    for (const write of contract.internalWrites) {
+        let writeSymbol
+        if (write.kind === "import") {
+            writeSymbol = findNamedImportSymbol(
+                sourceFile,
+                checker,
+                write.name,
+                () => true,
+            )
+        } else {
+            const parameters = helper.parameters.filter(parameter => (
+                ts.isIdentifier(parameter.name) && parameter.name.text === write.name
+            ))
+            assert.equal(
+                parameters.length,
+                1,
+                `${contract.helperName} must own parameter ${write.name} exactly once`,
+            )
+            writeSymbol = checker.getSymbolAtLocation(parameters[0].name)
+        }
+        assert.notEqual(writeSymbol, undefined, `${contract.helperName}.${write.name} symbol is missing`)
+        assert.equal(
+            collectCallsForSymbol(helper, checker, writeSymbol).length,
+            1,
+            `${contract.helperName} must call owned ${write.kind} ${write.name} exactly once`,
+        )
+    }
+}
+
+function assertFinalWriteHelperOwnership(source, fileName, contract) {
+    const { checker, sourceFile } = createTypeCheckedSource(source, fileName)
+    const ownerRoot = findExportedFunctionDeclaration(
+        sourceFile,
+        checker,
+        contract.ownerFunctionName,
+    )
+    assertFinalWriteHelperOwnershipInSource(sourceFile, checker, ownerRoot, contract)
+}
+
+function findAncestor(node, predicate) {
+    for (let current = node; current; current = current.parent) {
+        if (predicate(current)) return current
+    }
+    return null
+}
+
+function importIdentity(symbol) {
+    for (const declaration of symbol?.getDeclarations() ?? []) {
+        if (!ts.isImportSpecifier(declaration)) continue
+        const importDeclaration = findAncestor(declaration, ts.isImportDeclaration)
+        if (!importDeclaration || !ts.isStringLiteral(importDeclaration.moduleSpecifier)) continue
+        return `import:${importDeclaration.moduleSpecifier.text}#${
+            declaration.propertyName?.text ?? declaration.name.text
+        }`
+    }
+    return null
+}
+
+function namespaceImportModule(symbol) {
+    for (const declaration of symbol?.getDeclarations() ?? []) {
+        if (!ts.isNamespaceImport(declaration)) continue
+        const importDeclaration = findAncestor(declaration, ts.isImportDeclaration)
+        if (importDeclaration && ts.isStringLiteral(importDeclaration.moduleSpecifier)) {
+            return importDeclaration.moduleSpecifier.text
+        }
+    }
+    return null
+}
+
+function identifierCallIdentity(identifier, checker) {
+    const symbol = checker.getSymbolAtLocation(identifier)
+    const imported = importIdentity(symbol)
+    if (imported !== null) return imported
+    const declaration = symbol?.getDeclarations()?.[0]
+    if (declaration && ts.isFunctionDeclaration(declaration)) return `local-function:${identifier.text}`
+    if (declaration && ts.isVariableDeclaration(declaration)) return `local-variable:${identifier.text}`
+    if (declaration && ts.isParameter(declaration)) return `parameter:${identifier.text}`
+    return `identifier:${identifier.text}`
+}
+
+function callExpressionIdentity(call, checker, sourceFile) {
+    const expression = call.expression
+    if (ts.isIdentifier(expression)) return identifierCallIdentity(expression, checker)
+    if (ts.isPropertyAccessExpression(expression)) {
+        if (ts.isIdentifier(expression.expression)) {
+            const moduleSpecifier = namespaceImportModule(
+                checker.getSymbolAtLocation(expression.expression),
+            )
+            if (moduleSpecifier !== null) {
+                return `import-namespace:${moduleSpecifier}#${expression.name.text}`
+            }
+        }
+        return `member:${compactExpression(expression.expression, sourceFile)}#${expression.name.text}`
+    }
+    if (ts.isCallExpression(expression)) {
+        return `call-result:${callExpressionIdentity(expression, checker, sourceFile)}`
+    }
+    return `expression:${ts.SyntaxKind[expression.kind]}:${compactExpression(expression, sourceFile)}`
+}
+
+function collectOwnerCallInventory(ownerRoot, checker, sourceFile) {
+    const counts = new Map()
+    function visit(node) {
+        if (ts.isCallExpression(node)) {
+            const identity = callExpressionIdentity(node, checker, sourceFile)
+            counts.set(identity, (counts.get(identity) ?? 0) + 1)
+        }
+        ts.forEachChild(node, visit)
+    }
+    visit(ownerRoot)
+    return [...counts].sort(([left], [right]) => left.localeCompare(right))
+        .map(([identity, count]) => `${identity}=${count}`)
+}
+
+function assertOwnerCallInventory(source, fileName, ownerFunctionName, expected) {
+    const { checker, sourceFile } = createTypeCheckedSource(source, fileName)
+    const ownerRoot = findExportedFunctionDeclaration(sourceFile, checker, ownerFunctionName)
+    assert.deepEqual(
+        collectOwnerCallInventory(ownerRoot, checker, sourceFile),
+        expected,
+        `${fileName} owner call inventory drifted`,
+    )
+}
+
+function assertAuthoritativeWriteSetInventorySubset(
+    ownerRoot,
+    checker,
+    sourceFile,
+    authoritativeWriteNames,
+    expectedInventory,
+) {
+    const actualInventory = collectOwnerCallInventory(ownerRoot, checker, sourceFile)
+    const expectedEntries = new Set(expectedInventory)
+    const identitiesByTerminal = new Map()
+    function visit(node) {
+        if (ts.isCallExpression(node)) {
+            const terminalName = callTerminalName(node)
+            if (terminalName !== null) {
+                const identities = identitiesByTerminal.get(terminalName) ?? new Set()
+                identities.add(callExpressionIdentity(node, checker, sourceFile))
+                identitiesByTerminal.set(terminalName, identities)
+            }
+        }
+        ts.forEachChild(node, visit)
+    }
+    visit(ownerRoot)
+    for (const writeName of authoritativeWriteNames) {
+        const identities = identitiesByTerminal.get(writeName)
+        assert.equal(
+            identities !== undefined && identities.size > 0,
+            true,
+            `${sourceFile.fileName} write set is not an inventory symbol subset: ${writeName}`,
+        )
+        for (const identity of identities ?? []) {
+            const inventoryEntry = actualInventory.find(entry => entry.startsWith(`${identity}=`))
+            assert.equal(
+                inventoryEntry !== undefined && expectedEntries.has(inventoryEntry),
+                true,
+                `${sourceFile.fileName} write set inventory symbol drifted: ${writeName}:${identity}`,
+            )
+        }
+    }
 }
 
 function findExportedFunctionDeclaration(sourceFile, checker, exportedName) {
@@ -856,12 +1098,13 @@ function catchAlwaysExits(tryStatement) {
     return statements.length > 0 && ts.isThrowStatement(statements.at(-1))
 }
 
-function collectExecutableCallsAfter(statement, position, authoritativeWrites) {
+function collectExecutableCallsInRange(statement, start, end, authoritativeWrites) {
     const calls = []
     function visit(node) {
         if (node !== statement && ts.isFunctionLike(node) && !isImmediatelyInvokedFunction(node)) return
         if (ts.isCallExpression(node)
-            && node.getStart() > position
+            && node.getStart() > start
+            && node.getStart() < end
             && authoritativeWrites.has(callTerminalName(node))) calls.push(node)
         ts.forEachChild(node, visit)
     }
@@ -909,13 +1152,26 @@ function assertFinalWritePrecedesContext(
         ))
         if (publicationStatement === undefined) continue
         const publicationIndex = block.statements.indexOf(publicationStatement)
-        const writeStatement = block.statements.find(statement => anchorMatches.some(match => (
-            match.end <= contextStart
-                && isDirectUnconditionalCallInStatement(match, statement)
-        )))
-        if (writeStatement !== undefined
-            && block.statements.indexOf(writeStatement) < publicationIndex) {
-            dominanceEvidence = { block, publicationIndex, publicationStatement }
+        let directAnchor = null
+        for (const [index, statement] of block.statements.entries()) {
+            if (index >= publicationIndex) break
+            const match = anchorMatches.find(candidate => (
+                candidate.end <= contextStart
+                    && isDirectUnconditionalCallInStatement(candidate, statement)
+            ))
+            if (match !== undefined) {
+                directAnchor = { match, statementIndex: index }
+                break
+            }
+        }
+        if (directAnchor !== null) {
+            dominanceEvidence = {
+                anchorMatch: directAnchor.match,
+                anchorStatementIndex: directAnchor.statementIndex,
+                block,
+                publicationIndex,
+                publicationStatement,
+            }
             break
         }
         if (finalWriteRule !== "owner-transaction-statement" || ownerLabel === null) continue
@@ -924,21 +1180,32 @@ function assertFinalWritePrecedesContext(
             anchor,
             `${ownerLabel} lacks an exact outer transaction anchor rule for ${anchor}`,
         )
-        const tryStatement = block.statements.find((statement, index) => (
-            index < publicationIndex
-                && ts.isTryStatement(statement)
-                && catchAlwaysExits(statement)
-                && statement.tryBlock.statements.length > 0
-                && anchorMatches.some(match => (
-                    match.end <= contextStart
-                        && isDirectUnconditionalCallInStatement(
-                            match,
-                            statement.tryBlock.statements.at(-1),
-                        )
-                ))
-        ))
-        if (tryStatement !== undefined) {
-            dominanceEvidence = { block, publicationIndex, publicationStatement }
+        let transactionAnchor = null
+        for (const [index, statement] of block.statements.entries()) {
+            if (index >= publicationIndex) break
+            if (!ts.isTryStatement(statement)
+                || !catchAlwaysExits(statement)
+                || statement.tryBlock.statements.length === 0) continue
+            const match = anchorMatches.find(candidate => (
+                candidate.end <= contextStart
+                    && isDirectUnconditionalCallInStatement(
+                        candidate,
+                        statement.tryBlock.statements.at(-1),
+                    )
+            ))
+            if (match !== undefined) {
+                transactionAnchor = { match, statementIndex: index }
+                break
+            }
+        }
+        if (transactionAnchor !== null) {
+            dominanceEvidence = {
+                anchorMatch: transactionAnchor.match,
+                anchorStatementIndex: transactionAnchor.statementIndex,
+                block,
+                publicationIndex,
+                publicationStatement,
+            }
             break
         }
     }
@@ -947,11 +1214,26 @@ function assertFinalWritePrecedesContext(
         true,
         `${sourceFile.fileName} final authoritative write ${anchor} does not dominate publication on the same control-flow path`,
     )
+    const between = dominanceEvidence.block.statements
+        .slice(dominanceEvidence.anchorStatementIndex, dominanceEvidence.publicationIndex + 1)
+        .flatMap(statement => collectExecutableCallsInRange(
+            statement,
+            dominanceEvidence.anchorMatch.end,
+            call.getStart(sourceFile),
+            authoritativeWrites,
+        ))
+    assert.equal(
+        between.length,
+        0,
+        `${sourceFile.fileName} has authoritative write ${between
+            .map(match => callTerminalName(match)).join(", ")} between final anchor and publication`,
+    )
     const later = dominanceEvidence.block.statements
         .slice(dominanceEvidence.publicationIndex)
-        .flatMap(statement => collectExecutableCallsAfter(
+        .flatMap(statement => collectExecutableCallsInRange(
             statement,
             call.end,
+            Number.POSITIVE_INFINITY,
             authoritativeWrites,
         ))
     assert.equal(
@@ -970,7 +1252,7 @@ function collectProductionCalls() {
         if (relativeFile === "src/lib/mission/awake-unlock-response.ts") continue
         const source = fs.readFileSync(file, "utf8")
         for (const importedCall of collectImportedAwakeCalls(source, relativeFile)) {
-            const { call, callee, exportedName, moduleSpecifier, sourceFile } = importedCall
+            const { call, callee, checker, exportedName, moduleSpecifier, sourceFile } = importedCall
             if (exportedName === SINGLE_AWAKE_WRAPPER) {
                 assert.equal(
                     moduleSpecifier.endsWith("/awake-best-effort-context"),
@@ -1009,6 +1291,28 @@ function collectProductionCalls() {
             const ownerLabel = classifyOwner(relativeFile, call, sourceFile)
             const expected = EXPECTED_MATRIX.filter(entry => entry.owner === ownerLabel)
             assert.equal(expected.length, 1, `${ownerLabel} must have exactly one matrix row`)
+            const ownerRoot = findOwnerRoot(call)
+            assertAuthoritativeWriteSetInventorySubset(
+                ownerRoot,
+                checker,
+                sourceFile,
+                expected[0].authoritativeWriteSet,
+                OWNER_CALL_INVENTORIES[ownerLabel],
+            )
+            const finalHelper = FINAL_WRITE_HELPERS[ownerLabel]
+            if (finalHelper !== undefined) {
+                assert.equal(
+                    finalHelper.helperName,
+                    expected[0].finalAuthoritativeWrite,
+                    `${ownerLabel} final helper drifted from its matrix anchor`,
+                )
+                assertFinalWriteHelperOwnershipInSource(
+                    sourceFile,
+                    checker,
+                    ownerRoot,
+                    finalHelper,
+                )
+            }
             const scopeEvidence = extractScopeEvidence(importedCall)
             assertFinalWritePrecedesContext(
                 call,
@@ -1045,6 +1349,7 @@ function collectProductionCalls() {
                 rereadReason: expected[0].rereadReason,
                 sqlUpperBoundKey: expected[0].sqlUpperBoundKey,
                 runtimeEvidenceKey: expected[0].runtimeEvidenceKey,
+                ownerCallInventory: collectOwnerCallInventory(ownerRoot, checker, sourceFile),
                 position: call.getStart(sourceFile),
             })
         }
@@ -1149,6 +1454,14 @@ test("Awake reconcile production call expressions match the fixed 21-entry evide
     )
     assert.equal(new Set(calls.map(call => `${call.relativeFile}:${call.position}`)).size, 21)
     assertEvidenceContract(EXPECTED_MATRIX)
+})
+
+test("production owner call inventories freeze every reviewed symbol and count", () => {
+    const actual = Object.fromEntries(collectProductionCalls().map(call => [
+        call.owner,
+        call.ownerCallInventory,
+    ]))
+    assert.deepEqual(actual, OWNER_CALL_INVENTORIES, "production owner call inventory drifted")
 })
 
 test("Awake reconcile audit matrix freezes owner, policy, and planned candidate source", () => {
@@ -1401,6 +1714,48 @@ test("final-write evidence rejects a differently named authoritative write after
     )
 })
 
+test("final-write evidence rejects the same authoritative write between anchor and publication", () => {
+    const source = `
+        import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
+        export function owner() {
+            persistPlayer()
+            persistPlayer()
+            publishAwakeCharacterListBestEffort(1, [], [], {})
+        }
+    `
+    const importedCall = collectImportedAwakeCalls(source, "synthetic.ts")[0]
+    const scope = extractScopeEvidence(importedCall)
+
+    assert.throws(
+        () => assertFinalWritePrecedesContext(importedCall.call, scope.contextStart, "persistPlayer"),
+        /between.*anchor.*publication|after.*final.*anchor/i,
+    )
+})
+
+test("final-write evidence rejects a differently named write between anchor and publication", () => {
+    const source = `
+        import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
+        export function owner() {
+            persistPlayer()
+            updatePlayerSync()
+            publishAwakeCharacterListBestEffort(1, [], [], {})
+        }
+    `
+    const importedCall = collectImportedAwakeCalls(source, "synthetic.ts")[0]
+    const scope = extractScopeEvidence(importedCall)
+
+    assert.throws(
+        () => assertFinalWritePrecedesContext(
+            importedCall.call,
+            scope.contextStart,
+            "persistPlayer",
+            null,
+            ["persistPlayer", "updatePlayerSync"],
+        ),
+        /between.*anchor.*publication|after.*final.*anchor.*updatePlayerSync/i,
+    )
+})
+
 test("outer transaction anchors require an exact owner-specific rule", () => {
     const source = `
         import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
@@ -1438,6 +1793,101 @@ test("outer transaction anchors require an exact owner-specific rule", () => {
             "owner-transaction-statement",
         ),
         /exact outer transaction anchor rule/i,
+    )
+})
+
+test("final-write helper ownership binds the owner call and internal production write symbols", () => {
+    const source = `
+        import { persistPlayer } from "./player-domain"
+        import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
+        function finalizePublication(condition) {
+            if (condition) persistPlayer()
+        }
+        export function owner(condition) {
+            finalizePublication(condition)
+            publishAwakeCharacterListBestEffort(1, [], [], {})
+        }
+    `
+
+    assert.doesNotThrow(() => assertFinalWriteHelperOwnership(source, "synthetic.ts", {
+        helperName: "finalizePublication",
+        ownerFunctionName: "owner",
+        callInventory: ["import:./player-domain#persistPlayer=1"],
+        internalWrites: [{ kind: "import", name: "persistPlayer" }],
+    }))
+    const extraCall = source.replace(
+        'import { persistPlayer }',
+        'import { loadPlayer, persistPlayer }',
+    ).replace("if (condition) persistPlayer()", "loadPlayer()\nif (condition) persistPlayer()")
+    assert.throws(
+        () => assertFinalWriteHelperOwnership(extraCall, "synthetic.ts", {
+            helperName: "finalizePublication",
+            ownerFunctionName: "owner",
+            callInventory: ["import:./player-domain#persistPlayer=1"],
+            internalWrites: [{ kind: "import", name: "persistPlayer" }],
+        }),
+        /helper.*unreviewed call|complete call inventory/i,
+    )
+})
+
+test("owner call inventory fails closed on an unreviewed production symbol", () => {
+    const expected = [
+        "import:./awake-best-effort-context#publishAwakeCharacterListBestEffort=1",
+        "import:./player-domain#persistPlayer=1",
+    ]
+    const source = `
+        import { persistPlayer } from "./player-domain"
+        import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
+        export function owner() {
+            persistPlayer()
+            publishAwakeCharacterListBestEffort(1, [], [], {})
+        }
+    `
+    const changed = source.replace(
+        "import { persistPlayer }",
+        "import { loadPlayer, persistPlayer }",
+    ).replace("persistPlayer()", "loadPlayer()\npersistPlayer()")
+
+    assert.doesNotThrow(() => assertOwnerCallInventory(
+        source,
+        "synthetic.ts",
+        "owner",
+        expected,
+    ))
+    assert.throws(
+        () => assertOwnerCallInventory(changed, "synthetic.ts", "owner", expected),
+        /call inventory.*drift/i,
+    )
+})
+
+test("authoritative write set must be a real symbol subset of the frozen inventory", () => {
+    const source = `
+        import { persistPlayer } from "./player-domain"
+        export function owner() {
+            persistPlayer()
+        }
+    `
+    const { checker, sourceFile } = createTypeCheckedSource(source, "synthetic.ts")
+    const ownerRoot = findExportedFunctionDeclaration(sourceFile, checker, "owner")
+    const inventory = ["import:./player-domain#persistPlayer=1"]
+
+    assert.doesNotThrow(() => assertAuthoritativeWriteSetInventorySubset(
+        ownerRoot,
+        checker,
+        sourceFile,
+        ["persistPlayer"],
+        inventory,
+    ))
+
+    assert.throws(
+        () => assertAuthoritativeWriteSetInventorySubset(
+            ownerRoot,
+            checker,
+            sourceFile,
+            ["persistPlayer", "missingWrite"],
+            inventory,
+        ),
+        /write set.*inventory.*missingWrite/i,
     )
 })
 

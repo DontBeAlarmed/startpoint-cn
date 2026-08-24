@@ -220,6 +220,45 @@ test("admission rejects any behavior, seed, loader, compute, or per-table SQL dr
     }
 })
 
+test("owner-focused report rejects duplicate behavior hashes", () => {
+    const input = Object.fromEntries(AWAKE_OWNER_FOCUSED_SCENARIO_KEYS.map(key => [
+        key,
+        syntheticScenario(key),
+    ]))
+    input["exchange-star-crumb"].request = structuredClone(input["gacha-exchange-character"].request)
+    input["exchange-star-crumb"].response = structuredClone(input["gacha-exchange-character"].response)
+
+    assert.throws(
+        () => createAwakeOwnerFocusedReport(input),
+        /behaviorSha256.*unique|duplicate behavior/i,
+    )
+})
+
+test("explicit snapshot write rejects a checked report with duplicate behavior hashes", () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "awake-owner-duplicate-hash-"))
+    const snapshotPath = path.join(directory, "snapshot.json")
+    const input = Object.fromEntries(AWAKE_OWNER_FOCUSED_SCENARIO_KEYS.map(key => [
+        key,
+        syntheticScenario(key),
+    ]))
+    const report = createAwakeOwnerFocusedReport(input)
+    report.scenarios["exchange-star-crumb"].request = structuredClone(
+        report.scenarios["gacha-exchange-character"].request,
+    )
+    report.scenarios["exchange-star-crumb"].response = structuredClone(
+        report.scenarios["gacha-exchange-character"].response,
+    )
+    report.scenarios["exchange-star-crumb"].behaviorSha256 =
+        report.scenarios["gacha-exchange-character"].behaviorSha256
+    try {
+        const admission = admitAwakeOwnerFocusedReport(report, { snapshotPath, write: true })
+        assert.equal(admission.admitted, false)
+        assert.equal(fs.existsSync(snapshotPath), false)
+    } finally {
+        fs.rmSync(directory, { recursive: true, force: true })
+    }
+})
+
 test("CLI and admission require an explicit snapshot write", () => {
     assert.deepEqual(parseArgs([]), { write: false })
     assert.deepEqual(parseArgs(["--write"]), { write: true })

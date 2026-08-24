@@ -44,6 +44,30 @@ function unsupportedMailReply(reply: FastifyReply, error: unknown): FastifyReply
     return reply.status(400).send({ error: "Unsupported mail attachment", message: error.message })
 }
 
+function finalizeMailReceiveAwakePublicationWrites(
+    playerId: number,
+    mailId: number,
+    mail: RawPlayerMail,
+): void {
+    if (receiveMailSync(playerId, mailId, mail) === null) {
+        throw new Error(`Mail ${mailId} changed while it was being received.`)
+    }
+}
+
+function finalizeMailReceiveAllAwakePublicationWrites(
+    playerId: number,
+    validMailIds: readonly number[],
+    mailMap: ReadonlyMap<number, RawPlayerMail>,
+): number[] {
+    const claimed = validMailIds.filter(mailId => (
+        receiveMailSync(playerId, mailId, mailMap.get(mailId)) !== null
+    ))
+    if (claimed.length !== validMailIds.length) {
+        throw new Error("Mail state changed while mails were being received.")
+    }
+    return claimed
+}
+
 function formatMailResponse(mail: RawPlayerMail) {
     return {
         id: mail.id,
@@ -126,9 +150,7 @@ const routes = async (fastify: FastifyInstance) => {
                 const player = getPlayerSync(playerId)
                 if (!player) throw new Error(`Mail player ${playerId} no longer exists.`)
                 const reward = settleMailRewardsInTransactionOwnerSync(playerId, [mail], player)
-                if (receiveMailSync(playerId, mailId, mail) === null) {
-                    throw new Error(`Mail ${mailId} changed while it was being received.`)
-                }
+                finalizeMailReceiveAwakePublicationWrites(playerId, mailId, mail)
                 const candidateCharacterIds = collectAwakeCandidateCharacterIds([], [reward.characterList])
                 const awakeContext = createAwakeRequestContextBestEffort(
                     playerId,
@@ -217,12 +239,11 @@ const routes = async (fastify: FastifyInstance) => {
                 const player = getPlayerSync(playerId)
                 if (!player) throw new Error(`Mail player ${playerId} no longer exists.`)
                 const reward = settleMailRewardsInTransactionOwnerSync(playerId, validMails, player)
-                const claimed = validMailIds.filter(mailId => (
-                    receiveMailSync(playerId, mailId, mailMap.get(mailId)) !== null
-                ))
-                if (claimed.length !== validMailIds.length) {
-                    throw new Error("Mail state changed while mails were being received.")
-                }
+                const claimed = finalizeMailReceiveAllAwakePublicationWrites(
+                    playerId,
+                    validMailIds,
+                    mailMap,
+                )
                 const candidateCharacterIds = collectAwakeCandidateCharacterIds([], [reward.characterList])
                 const awakeContext = createAwakeRequestContextBestEffort(
                     playerId,

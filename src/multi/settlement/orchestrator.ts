@@ -78,6 +78,10 @@ export interface MultiplayerSettlementInput {
     readonly questData: BattleQuest
 }
 
+function finalizeMultiAwakePublicationWrites(deleteActiveQuest?: () => void): void {
+    deleteActiveQuest?.()
+}
+
 export async function prepareMultiplayerSettlement(
     input: MultiplayerSettlementPreparationInput,
 ): Promise<MultiplayerSettlementPreparation> {
@@ -404,7 +408,7 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             missionInfo: [], itemList: {}, characterList: [], equipmentList: [],
             degreeIds: [], passCardPoints: {},
         }
-        deleteActiveQuest?.()
+        finalizeMultiAwakePublicationWrites(deleteActiveQuest)
         const existingCharacterList = [
             ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
             ...((clearReward?.character_list || []) as Record<string, unknown>[]),

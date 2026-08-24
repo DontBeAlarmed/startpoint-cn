@@ -268,6 +268,21 @@ function assertSingleContract(scenarios, path) {
     }
 }
 
+function assertUniqueBehaviorHashes(scenarios, path) {
+    const ownersByHash = new Map()
+    for (const [name, scenario] of Object.entries(scenarios)) {
+        const owners = ownersByHash.get(scenario.behaviorSha256) ?? []
+        owners.push(name)
+        ownersByHash.set(scenario.behaviorSha256, owners)
+    }
+    const duplicates = [...ownersByHash.entries()]
+        .filter(([, owners]) => owners.length > 1)
+        .map(([hash, owners]) => `${hash}:${owners.join(",")}`)
+    if (duplicates.length > 0) {
+        throw new TypeError(`${path}.behaviorSha256 values must be unique: ${duplicates.join("; ")}`)
+    }
+}
+
 function registryView() {
     return canonicalize(AWAKE_OWNER_RUNTIME_EVIDENCE_REGISTRY, "evidenceRegistry")
 }
@@ -283,6 +298,7 @@ function createAwakeOwnerFocusedReport(scenarios) {
         canonicalizeScenario(scenarios[name], `scenarios.${name}`, false),
     ]))
     assertSingleContract(canonicalScenarios, "scenarios")
+    assertUniqueBehaviorHashes(canonicalScenarios, "scenarios")
     assertOwnerRuntimeEvidenceCoverage(
         AWAKE_OWNER_RUNTIME_EVIDENCE_REGISTRY,
         canonicalScenarios,
@@ -313,6 +329,7 @@ function canonicalizeCheckedAwakeOwnerFocusedReport(report, source) {
         canonicalizeScenario(report.scenarios[name], `${source}.scenarios.${name}`, true),
     ]))
     assertSingleContract(scenarios, `${source}.scenarios`)
+    assertUniqueBehaviorHashes(scenarios, `${source}.scenarios`)
     assertOwnerRuntimeEvidenceCoverage(
         AWAKE_OWNER_RUNTIME_EVIDENCE_REGISTRY,
         scenarios,
