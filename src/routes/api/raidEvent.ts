@@ -30,6 +30,9 @@ import { getRaidEventRequiredKillCount } from "../../lib/raid-event-master";
 import { getRaidBossHpPercentage } from "../../lib/quest/finish/raid-handler";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { recordRaidSummaryMissionFactFailSoftSync } from "../../lib/mission/event-entry-facts";
+import { collectAwakeCandidateCharacterIds } from "../../lib/mission/awake-candidate-character-ids";
+import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context";
+import { getAwakeFactKeysFromLegacyRewardResults } from "../../lib/mission/awake-reward-facts";
 
 interface EventIdBody {
     event_id: number,
@@ -118,6 +121,24 @@ const routes = async (fastify: FastifyInstance) => {
             }
         })()
         if (!summary.player) throw new Error(`player ${playerId} disappeared during raid summary`)
+        const rewardResult = summary.settlement.rewardResult
+        const rewardCharacterList = (rewardResult?.character_list ?? []) as Record<string, unknown>[]
+        const candidateCharacterIds = collectAwakeCandidateCharacterIds(
+            [],
+            [rewardCharacterList],
+        )
+        const characterList = rewardResult === undefined
+            ? undefined
+            : publishAwakeCharacterListBestEffort(
+                playerId,
+                candidateCharacterIds,
+                [rewardCharacterList],
+                {
+                    invalidatedFactKeys: getAwakeFactKeysFromLegacyRewardResults(
+                        rewardResult,
+                    ),
+                },
+            )
         const questList = Object.fromEntries(Object.entries(summary.questCounts).map(([questId, killCount]) => [
             questId,
             { kill_count: killCount },
@@ -138,16 +159,16 @@ const routes = async (fastify: FastifyInstance) => {
                     "hp_percentage": getRaidBossHpPercentage(summary.raidBossState, requiredKillCount),
                     "total_kill_count": summary.raidBossState.totalKillCount,
                 },
-                ...(summary.settlement.rewardResult ? {
+                ...(rewardResult ? {
                     "user_info": {
                         "free_mana": summary.player.freeMana,
                         "free_vmoney": summary.player.freeVmoney,
                         "exp_pool": summary.player.expPool,
                     },
-                    "character_list": summary.settlement.rewardResult.character_list,
-                    "joined_character_id_list": summary.settlement.rewardResult.joined_character_id_list,
-                    "equipment_list": summary.settlement.rewardResult.equipment_list,
-                    "item_list": summary.settlement.rewardResult.items,
+                    "character_list": characterList,
+                    "joined_character_id_list": rewardResult.joined_character_id_list,
+                    "equipment_list": rewardResult.equipment_list,
+                    "item_list": rewardResult.items,
                 } : {}),
                 "mail_arrived": getMailArrivedSync(playerId),
                 "endless_battle_next_round": rushEventData.endlessBattleNextRound,

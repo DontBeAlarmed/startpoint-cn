@@ -20,6 +20,12 @@ const {
     getAwakeFactKeysFromLegacyRewardResults,
 } = require("../src/lib/mission/awake-reward-facts")
 
+const PASS_CARD_EVENT_ID = 3
+const PASS_CARD_REWARD_ID = 124
+const PASS_CARD_MANA_REWARD = 20_000
+const RAID_EVENT_ID = 4
+const RAID_MANA_REWARD = 500
+
 function loadMailAwakeFactKeyHelper() {
     const source = fs.readFileSync(
         path.join(__dirname, "../src/routes/api/mail.ts"),
@@ -44,6 +50,34 @@ function assertAwakePublished(playerId, characterList) {
         fixture.awakeCharacter(characterList)?.mana_board_awake,
         { 1: 1 },
     )
+}
+
+function awakeUnlockCount(playerId) {
+    return fixture.database.prepare(`
+        SELECT COUNT(*) AS count
+        FROM players_character_awake_unlocks
+        WHERE player_id = ? AND character_id = ? AND board_index = 1
+    `).get(playerId, AWAKE_CHARACTER_ID).count
+}
+
+function rejectAwakePublication(playerId, triggerName) {
+    fixture.database.exec(`
+        CREATE TRIGGER ${triggerName}
+        BEFORE INSERT ON players_character_awake_unlocks
+        WHEN NEW.player_id = ${playerId} AND NEW.character_id = ${AWAKE_CHARACTER_ID}
+        BEGIN SELECT RAISE(ABORT, 'injected ${triggerName} failure'); END;
+    `)
+}
+
+async function withCapturedPublicationErrors(operation) {
+    const errors = []
+    const originalConsoleError = console.error
+    console.error = (...args) => errors.push(args)
+    try {
+        return { result: await operation(), errors }
+    } finally {
+        console.error = originalConsoleError
+    }
 }
 
 test.before(async () => {
@@ -210,6 +244,126 @@ test("multi orchestration publishes player invalidation in a runnable settlement
     assertAwakePublished(playerId, result.characterList)
 })
 
+test("pass-card receive_all publishes a Mana Awake unlock after committing its reward record", async () => {
+    const { playerId, viewerId } = await fixture.createPlayer("pass-card")
+    fixture.prepareForManaUnlock(playerId, AWAKE_MANA_THRESHOLD - PASS_CARD_MANA_REWARD)
+    fixture.passCardDomain.addPlayerPassCardPointSync(playerId, PASS_CARD_EVENT_ID, 400)
+
+    const payload = {
+        viewer_id: viewerId,
+        pass_card_id: PASS_CARD_EVENT_ID,
+        all_receive: [],
+        reward1_receive: [PASS_CARD_REWARD_ID],
+        reward2_receive: [],
+    }
+    const first = await fixture.post("/pass-card", "receive_all", payload)
+
+    assert.equal(first.response.statusCode, 200, first.response.body)
+    assert.equal(fixture.playerDomain.getPlayerSync(playerId).totalManaObtained, AWAKE_MANA_THRESHOLD)
+    assert.deepEqual(
+        fixture.passCardDomain.getPlayerPassCardRewardRecordsSync(playerId, PASS_CARD_EVENT_ID),
+        [{ rewardId: PASS_CARD_REWARD_ID, isReceived1: 1, isReceived2: 0 }],
+    )
+    assertAwakePublished(playerId, first.body.data.character_list)
+
+    const repeated = await fixture.post("/pass-card", "receive_all", payload)
+    assert.equal(repeated.response.statusCode, 200, repeated.response.body)
+    assert.equal(fixture.playerDomain.getPlayerSync(playerId).totalManaObtained, AWAKE_MANA_THRESHOLD)
+    assert.deepEqual(repeated.body.data.character_list, [])
+    assert.equal(awakeUnlockCount(playerId), 1)
+})
+
+test("pass-card publication failure preserves the committed reward and original response", async t => {
+    const { playerId, viewerId } = await fixture.createPlayer("pass-card-publication-failure")
+    fixture.prepareForManaUnlock(playerId, AWAKE_MANA_THRESHOLD - PASS_CARD_MANA_REWARD)
+    fixture.passCardDomain.addPlayerPassCardPointSync(playerId, PASS_CARD_EVENT_ID, 400)
+    const triggerName = "reject_pass_card_awake_publication"
+    rejectAwakePublication(playerId, triggerName)
+    t.after(() => fixture.database.exec(`DROP TRIGGER IF EXISTS ${triggerName}`))
+
+    const { result, errors } = await withCapturedPublicationErrors(() => fixture.post(
+        "/pass-card",
+        "receive_all",
+        {
+            viewer_id: viewerId,
+            pass_card_id: PASS_CARD_EVENT_ID,
+            all_receive: [],
+            reward1_receive: [PASS_CARD_REWARD_ID],
+            reward2_receive: [],
+        },
+    ))
+
+    assert.equal(result.response.statusCode, 200, result.response.body)
+    assert.equal(fixture.playerDomain.getPlayerSync(playerId).totalManaObtained, AWAKE_MANA_THRESHOLD)
+    assert.deepEqual(
+        fixture.passCardDomain.getPlayerPassCardRewardRecordsSync(playerId, PASS_CARD_EVENT_ID),
+        [{ rewardId: PASS_CARD_REWARD_ID, isReceived1: 1, isReceived2: 0 }],
+    )
+    assert.deepEqual(result.body.data.character_list, [])
+    assert.equal(result.body.data.user_info.free_mana, fixture.playerDomain.getPlayerSync(playerId).freeMana)
+    assert.equal(fixture.awakeUnlock(playerId), undefined)
+    assert.equal(errors.length, 1)
+    assert.match(String(errors[0][0]), /Failed to publish character unlocks/)
+})
+
+test("raid summary publishes a Mana Awake unlock after committing its reward cursor", async () => {
+    const { playerId, viewerId } = await fixture.createPlayer("raid-summary")
+    fixture.prepareForManaUnlock(playerId, AWAKE_MANA_THRESHOLD - RAID_MANA_REWARD)
+    fixture.raidEventDomain.upsertRaidEventBossStateSync(RAID_EVENT_ID, {
+        weightedKillCount: 0,
+        totalKillCount: 1,
+    })
+
+    const payload = { viewer_id: viewerId, event_id: RAID_EVENT_ID, api_count: 1 }
+    const first = await fixture.post("/raid", "summary", payload)
+
+    assert.equal(first.response.statusCode, 200, first.response.body)
+    assert.equal(fixture.playerDomain.getPlayerSync(playerId).totalManaObtained, AWAKE_MANA_THRESHOLD)
+    assert.equal(fixture.raidEventDomain.getPlayerRaidEventSync(playerId, RAID_EVENT_ID).receivedUpTo, 1)
+    assert.equal(fixture.itemDomain.getPlayerItemSync(playerId, 100000), 25)
+    assertAwakePublished(playerId, first.body.data.character_list)
+
+    const repeated = await fixture.post("/raid", "summary", { ...payload, api_count: 2 })
+    assert.equal(repeated.response.statusCode, 200, repeated.response.body)
+    assert.deepEqual(repeated.body.data.kill_count_reward_data.reward_list, [])
+    assert.equal("character_list" in repeated.body.data, false)
+    assert.equal(fixture.playerDomain.getPlayerSync(playerId).totalManaObtained, AWAKE_MANA_THRESHOLD)
+    assert.equal(fixture.itemDomain.getPlayerItemSync(playerId, 100000), 25)
+    assert.equal(awakeUnlockCount(playerId), 1)
+})
+
+test("raid summary publication failure preserves the committed cursor and original reward response", async t => {
+    const { playerId, viewerId } = await fixture.createPlayer("raid-summary-publication-failure")
+    fixture.prepareForManaUnlock(playerId, AWAKE_MANA_THRESHOLD - RAID_MANA_REWARD)
+    fixture.raidEventDomain.upsertRaidEventBossStateSync(RAID_EVENT_ID, {
+        weightedKillCount: 0,
+        totalKillCount: 1,
+    })
+    const triggerName = "reject_raid_summary_awake_publication"
+    rejectAwakePublication(playerId, triggerName)
+    t.after(() => fixture.database.exec(`DROP TRIGGER IF EXISTS ${triggerName}`))
+
+    const { result, errors } = await withCapturedPublicationErrors(() => fixture.post(
+        "/raid",
+        "summary",
+        { viewer_id: viewerId, event_id: RAID_EVENT_ID, api_count: 1 },
+    ))
+
+    assert.equal(result.response.statusCode, 200, result.response.body)
+    assert.equal(fixture.playerDomain.getPlayerSync(playerId).totalManaObtained, AWAKE_MANA_THRESHOLD)
+    assert.equal(fixture.raidEventDomain.getPlayerRaidEventSync(playerId, RAID_EVENT_ID).receivedUpTo, 1)
+    assert.equal(fixture.itemDomain.getPlayerItemSync(playerId, 100000), 25)
+    assert.equal(
+        result.body.data.user_info.free_mana,
+        fixture.playerDomain.getPlayerSync(playerId).freeMana,
+    )
+    assert.deepEqual(result.body.data.item_list, { 100000: 25 })
+    assert.deepEqual(result.body.data.character_list, [])
+    assert.equal(fixture.awakeUnlock(playerId), undefined)
+    assert.equal(errors.length, 1)
+    assert.match(String(errors[0][0]), /Failed to publish character unlocks/)
+})
+
 test("all existing global-fact owners pass bounded invalidations into fresh publication", () => {
     const source = relativePath => fs.readFileSync(
         path.join(__dirname, "..", relativePath),
@@ -220,6 +374,8 @@ test("all existing global-fact owners pass bounded invalidations into fresh publ
 
     assert.match(source("src/routes/api/storyQuest.ts"), /invalidatedFactKeys:[\s\S]*questProgress/)
     assert.match(source("src/routes/api/activeMission.ts"), /invalidatedFactKeys:\s*granter\.invalidatedFactKeys/)
+    assert.match(source("src/routes/api/passCard.ts"), /invalidatedFactKeys:\s*result\.invalidatedFactKeys/)
+    assert.match(source("src/routes/api/raidEvent.ts"), /invalidatedFactKeys:[\s\S]*rewardResult/)
     assert.match(source("src/routes/api/boxGacha.ts"), /invalidatedFactKeys:[\s\S]*rewardResult/)
     assert.equal((source("src/routes/api/shop.ts").match(/invalidatedFactKeys:/g) ?? []).length, 2)
     assert.equal((source("src/routes/api/mail.ts").match(/invalidatedFactKeys:/g) ?? []).length, 2)

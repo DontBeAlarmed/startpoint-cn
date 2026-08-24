@@ -97,6 +97,7 @@ async function createAwakeOwnerFactPublicationFixture() {
 
     let app = null
     let restoreContent = () => {}
+    let restoreTimeOffset = () => {}
     let initialized = false
     try {
         restoreContent = require("./install-bundled-gameplay-snapshot.cjs")
@@ -105,6 +106,7 @@ async function createAwakeOwnerFactPublicationFixture() {
                     "event_item_shop.json",
                     "event_item_shop_id_map.json",
                     "general_shop.json",
+                    "raid_event_overall_reward.json",
                 ],
                 tableOverrides: contentOverrides(),
             })
@@ -114,8 +116,11 @@ async function createAwakeOwnerFactPublicationFixture() {
         const characterDomain = require("../../src/data/domains/character")
         const awakeDomain = require("../../src/data/domains/character_awake")
         const missionDomain = require("../../src/data/domains/mission")
+        const itemDomain = require("../../src/data/domains/item")
+        const passCardDomain = require("../../src/data/domains/pass-card")
         const playerDomain = require("../../src/data/domains/player")
         const questDomain = require("../../src/data/domains/quest")
+        const raidEventDomain = require("../../src/data/domains/raidEvent")
         const { insertSessionWithToken } = require("../../src/data/domains/session")
         const { SessionType } = require("../../src/data/types")
         const characterAssets = require("../../src/lib/assets")
@@ -130,6 +135,11 @@ async function createAwakeOwnerFactPublicationFixture() {
             runMultiplayerSettlementOrchestration,
         } = require("../../src/multi/settlement/orchestrator")
         const { registerCnMsgpackOnSend } = require("../../src/routes/cn/msgpack")
+        const { getTimeOffset, setServerTimeOffset } = require("../../src/utils")
+
+        const previousTimeOffset = getTimeOffset()
+        restoreTimeOffset = () => setServerTimeOffset(previousTimeOffset)
+        setServerTimeOffset(Date.parse("2024-08-14T12:00:00.000Z") - Date.now())
 
         const database = data.initializeDatabase({
             databaseFactory: databasePath => new BetterSqlite3(databasePath),
@@ -139,6 +149,8 @@ async function createAwakeOwnerFactPublicationFixture() {
         registerCnMsgpackOnSend(app)
         await app.register(require("../../src/routes/api/storyQuest").default, { prefix: "/story" })
         await app.register(require("../../src/routes/api/activeMission").default, { prefix: "/active" })
+        await app.register(require("../../src/routes/api/passCard").default, { prefix: "/pass-card" })
+        await app.register(require("../../src/routes/api/raidEvent").default, { prefix: "/raid" })
         await app.register(require("../../src/routes/api/singleBattleQuest").default, { prefix: "/single" })
         await app.ready()
 
@@ -323,9 +335,13 @@ async function createAwakeOwnerFactPublicationFixture() {
             previousDataDirectory,
             previousDatabaseDirectory,
             restoreContent,
+            restoreTimeOffset,
+            itemDomain,
+            passCardDomain,
             playerDomain,
             missionDomain,
             questDomain,
+            raidEventDomain,
             ACTIVE_MANA_REWARD,
             ACTIVE_MISSION_ID,
             AWAKE_CHARACTER_ID,
@@ -348,6 +364,7 @@ async function createAwakeOwnerFactPublicationFixture() {
         if (app !== null) await app.close().catch(() => {})
         if (initialized) require("../../src/data").closeDatabase()
         restoreContent()
+        restoreTimeOffset()
         fs.rmSync(directory, { recursive: true, force: true })
         if (previousDataDirectory === undefined) delete process.env.DATA_DIR
         else process.env.DATA_DIR = previousDataDirectory
@@ -364,6 +381,7 @@ async function closeAwakeOwnerFactPublicationFixture(fixture) {
         () => { for (const playerId of Object.keys(fixture.activeQuests)) delete fixture.activeQuests[playerId] },
         () => require("../../src/data").closeDatabase(),
         () => fixture.restoreContent?.(),
+        () => fixture.restoreTimeOffset?.(),
         () => fs.rmSync(fixture.directory, { recursive: true, force: true }),
         () => {
             if (fixture.previousDataDirectory === undefined) delete process.env.DATA_DIR

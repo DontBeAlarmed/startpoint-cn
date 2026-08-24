@@ -205,6 +205,10 @@ test("maps representative source files to focused groups", () => {
         ["full", "integration:event", "integration:mission"],
     )
     assert.deepEqual(
+        selectTestGroups(["src/routes/api/passCard.ts"]),
+        ["full", "integration:mission"],
+    )
+    assert.deepEqual(
         selectTestGroups(["src/routes/api/party.ts"]),
         ["full", "integration:mission", "integration:party"],
     )

@@ -407,7 +407,10 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     { pattern: /^src\/data\/domains\/(?:item|shopPurchase)\.ts$/, groups: ["integration:mission"] },
-    { pattern: /^src\/data\/domains\/pass-card\.ts$/, groups: ["integration:mission"] },
+    {
+        pattern: /^(?:src\/data\/domains\/pass-card|src\/routes\/api\/passCard)\.ts$/,
+        groups: ["integration:mission"],
+    },
     { pattern: /^src\/routes\/api\/profile\.ts$/, groups: ["quick:character"] },
     {
         pattern: /^src\/routes\/api\/raidEvent\.ts$/,

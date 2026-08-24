@@ -11,6 +11,8 @@ import {
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { MissionRewardGranter } from "../../lib/mission/grants"
+import { collectAwakeCandidateCharacterIds } from "../../lib/mission/awake-candidate-character-ids"
+import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context"
 import { getPassCardEventDefinition, getPassCardRewardDefinition, isPassCardEventActiveAt } from "../../lib/pass-card"
 import { generateDataHeaders, getServerTime } from "../../utils"
 
@@ -157,6 +159,17 @@ export default async function passCardRoutes(fastify: FastifyInstance): Promise<
             granter.persistPlayer()
             return granter
         })()
+        const rewardCharacterList = result.characterList as Record<string, unknown>[]
+        const candidateCharacterIds = collectAwakeCandidateCharacterIds(
+            [],
+            [rewardCharacterList],
+        )
+        const characterList = publishAwakeCharacterListBestEffort(
+            playerId,
+            candidateCharacterIds,
+            [rewardCharacterList],
+            { invalidatedFactKeys: result.invalidatedFactKeys },
+        )
 
         reply.header("content-type", "application/x-msgpack")
         return reply.send({
@@ -164,7 +177,7 @@ export default async function passCardRoutes(fastify: FastifyInstance): Promise<
             data: {
                 all_received_record: responseRecords(playerId, body.pass_card_id),
                 item_list: result.itemList,
-                character_list: result.characterList,
+                character_list: characterList,
                 equipment_list: result.equipmentList,
                 degree_list: result.degreeList.map(degreeId => ({
                     viewer_id: body.viewer_id,
