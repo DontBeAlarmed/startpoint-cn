@@ -180,7 +180,7 @@ test("single receive owns one player snapshot without nested reward transaction 
     )
 })
 
-test("receive_all reads one authoritative player snapshot for the whole standard batch", async () => {
+test("receive_all reads one owner reward snapshot plus one bounded Awake player fact reread", async () => {
     const { playerId, viewerId } = await createPlayer("batch-owner-sql")
     const firstMailId = addMail(playerId, MailType.FREE_MANA, null, 2)
     const secondMailId = addMail(playerId, MailType.EXP_POOL, null, 3)
@@ -193,7 +193,22 @@ test("receive_all reads one authoritative player snapshot for the whole standard
     }))
 
     assert.equal(measured.result.statusCode, 200, measured.result.body)
-    assert.equal(playerSnapshots(measured.statements).length, 1, measured.statements.join("\n---\n"))
+    const playerSnapshotIndexes = measured.statements
+        .map((statement, index) => playerSnapshots([statement]).length === 1 ? index : -1)
+        .filter(index => index !== -1)
+    const playerWriteIndexes = measured.statements
+        .map((statement, index) => /^\s*UPDATE\s+players\s+SET\b/i.test(statement) ? index : -1)
+        .filter(index => index !== -1)
+    const mailWriteIndexes = measured.statements
+        .map((statement, index) => /^\s*UPDATE\s+players_mails\s+SET\s+receive_time\b/i.test(statement) ? index : -1)
+        .filter(index => index !== -1)
+    const authoritativeWriteIndexes = [...playerWriteIndexes, ...mailWriteIndexes].sort((left, right) => left - right)
+
+    assert.equal(playerSnapshotIndexes.length, 2, measured.statements.join("\n---\n"))
+    assert.ok(playerWriteIndexes.length > 0, measured.statements.join("\n---\n"))
+    assert.ok(mailWriteIndexes.length > 0, measured.statements.join("\n---\n"))
+    assert.ok(playerSnapshotIndexes[0] < authoritativeWriteIndexes[0], measured.statements.join("\n---\n"))
+    assert.ok(playerSnapshotIndexes[1] > authoritativeWriteIndexes.at(-1), measured.statements.join("\n---\n"))
     assert.equal(nestedTransactionStatements(measured.statements).length, 2, measured.statements.join("\n---\n"))
     assert.equal(
         measured.statements.filter(statement => /LIMIT \? OFFSET \?/i.test(statement)).length,
