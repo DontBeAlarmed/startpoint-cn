@@ -1151,6 +1151,10 @@ test("routes focused mission performance admission files to the mission group", 
 })
 
 test("routes Awake request-context core, baseline, and callsite files to the mission group", () => {
+    assert.deepEqual(
+        selectTestGroups(["tools/helpers/awake-owner-fact-publication-fixture.cjs"]),
+        ["integration:mission"],
+    )
     for (const file of [
         "tools/awake_fact_scope.test.cjs",
         "tools/awake_owner_fact_publication.test.cjs",

@@ -15,6 +15,7 @@ const {
     CHARACTER_QUEST_IDS,
     closeAwakeOwnerFactPublicationFixture,
     createAwakeOwnerFactPublicationFixture,
+    runAwakeOwnerFactPublicationCleanup,
 } = require("./helpers/awake-owner-fact-publication-fixture.cjs")
 const {
     getAwakeFactKeysFromLegacyRewardResults,
@@ -86,6 +87,31 @@ test.before(async () => {
 
 test.after(async () => {
     await closeAwakeOwnerFactPublicationFixture(fixture)
+})
+
+test("fixture cleanup continues after failure and retains the original setup error", async () => {
+    assert.equal(typeof runAwakeOwnerFactPublicationCleanup, "function")
+    const setupError = new Error("injected fixture setup failure")
+    const cleanupError = new Error("injected fixture cleanup failure")
+    const cleanupSteps = []
+
+    await assert.rejects(
+        runAwakeOwnerFactPublicationCleanup([
+            () => {
+                cleanupSteps.push("failing cleanup")
+                throw cleanupError
+            },
+            () => cleanupSteps.push("later cleanup"),
+        ], { primaryError: setupError }),
+        error => {
+            assert.ok(error instanceof AggregateError)
+            assert.equal(error.errors.length, 2)
+            assert.strictEqual(error.errors[0], setupError)
+            assert.strictEqual(error.errors[1], cleanupError)
+            return true
+        },
+    )
+    assert.deepEqual(cleanupSteps, ["failing cleanup", "later cleanup"])
 })
 
 test("legacy reward fallback maps positive, zero, non-Mana, and mixed results exactly", () => {
@@ -304,6 +330,10 @@ test("pass-card publication failure preserves the committed reward and original 
     assert.equal(fixture.awakeUnlock(playerId), undefined)
     assert.equal(errors.length, 1)
     assert.match(String(errors[0][0]), /Failed to publish character unlocks/)
+    const publicationError = errors[0][1]
+    assert.ok(publicationError instanceof Error)
+    assert.match(publicationError.message, new RegExp(triggerName))
+    assert.equal(publicationError.code, "SQLITE_CONSTRAINT_TRIGGER")
 })
 
 test("raid summary publishes a Mana Awake unlock after committing its reward cursor", async () => {
@@ -362,6 +392,10 @@ test("raid summary publication failure preserves the committed cursor and origin
     assert.equal(fixture.awakeUnlock(playerId), undefined)
     assert.equal(errors.length, 1)
     assert.match(String(errors[0][0]), /Failed to publish character unlocks/)
+    const publicationError = errors[0][1]
+    assert.ok(publicationError instanceof Error)
+    assert.match(publicationError.message, new RegExp(triggerName))
+    assert.equal(publicationError.code, "SQLITE_CONSTRAINT_TRIGGER")
 })
 
 test("all existing global-fact owners pass bounded invalidations into fresh publication", () => {

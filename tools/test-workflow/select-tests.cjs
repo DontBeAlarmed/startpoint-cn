@@ -331,6 +331,10 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
+        pattern: /^tools\/helpers\/awake-owner-fact-publication-fixture\.cjs$/,
+        groups: ["integration:mission"],
+    },
+    {
         pattern: /^src\/lib\/mission\/facts\/.*\.ts$/,
         groups: ["integration:mission"],
     },

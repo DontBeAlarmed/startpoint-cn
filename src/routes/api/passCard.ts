@@ -11,7 +11,6 @@ import {
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { MissionRewardGranter } from "../../lib/mission/grants"
-import { collectAwakeCandidateCharacterIds } from "../../lib/mission/awake-candidate-character-ids"
 import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context"
 import { getPassCardEventDefinition, getPassCardRewardDefinition, isPassCardEventActiveAt } from "../../lib/pass-card"
 import { generateDataHeaders, getServerTime } from "../../utils"
@@ -160,13 +159,9 @@ export default async function passCardRoutes(fastify: FastifyInstance): Promise<
             return granter
         })()
         const rewardCharacterList = result.characterList as Record<string, unknown>[]
-        const candidateCharacterIds = collectAwakeCandidateCharacterIds(
-            [],
-            [rewardCharacterList],
-        )
         const characterList = publishAwakeCharacterListBestEffort(
             playerId,
-            candidateCharacterIds,
+            [],
             [rewardCharacterList],
             { invalidatedFactKeys: result.invalidatedFactKeys },
         )

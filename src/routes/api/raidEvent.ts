@@ -30,7 +30,6 @@ import { getRaidEventRequiredKillCount } from "../../lib/raid-event-master";
 import { getRaidBossHpPercentage } from "../../lib/quest/finish/raid-handler";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { recordRaidSummaryMissionFactFailSoftSync } from "../../lib/mission/event-entry-facts";
-import { collectAwakeCandidateCharacterIds } from "../../lib/mission/awake-candidate-character-ids";
 import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context";
 import { getAwakeFactKeysFromLegacyRewardResults } from "../../lib/mission/awake-reward-facts";
 
@@ -123,15 +122,11 @@ const routes = async (fastify: FastifyInstance) => {
         if (!summary.player) throw new Error(`player ${playerId} disappeared during raid summary`)
         const rewardResult = summary.settlement.rewardResult
         const rewardCharacterList = (rewardResult?.character_list ?? []) as Record<string, unknown>[]
-        const candidateCharacterIds = collectAwakeCandidateCharacterIds(
-            [],
-            [rewardCharacterList],
-        )
         const characterList = rewardResult === undefined
             ? undefined
             : publishAwakeCharacterListBestEffort(
                 playerId,
-                candidateCharacterIds,
+                [],
                 [rewardCharacterList],
                 {
                     invalidatedFactKeys: getAwakeFactKeysFromLegacyRewardResults(

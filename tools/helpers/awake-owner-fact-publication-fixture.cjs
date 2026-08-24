@@ -88,6 +88,27 @@ function decodeResponse(response) {
     return unpack(Buffer.from(response.body, "base64"))
 }
 
+async function runAwakeOwnerFactPublicationCleanup(cleanupActions, options = {}) {
+    const hasPrimaryError = Object.prototype.hasOwnProperty.call(options, "primaryError")
+    const errors = hasPrimaryError ? [options.primaryError] : []
+    for (const cleanup of cleanupActions) {
+        try {
+            await cleanup()
+        } catch (error) {
+            errors.push(error)
+        }
+    }
+    if (errors.length === 1) throw errors[0]
+    if (errors.length > 1) {
+        throw new AggregateError(
+            errors,
+            hasPrimaryError
+                ? "Awake owner fixture cleanup failed after setup error"
+                : "Awake owner fixture cleanup failed",
+        )
+    }
+}
+
 async function createAwakeOwnerFactPublicationFixture() {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "awake-owner-facts-"))
     const previousDataDirectory = process.env.DATA_DIR
@@ -361,22 +382,24 @@ async function createAwakeOwnerFactPublicationFixture() {
             singleFinishPayload,
         }
     } catch (error) {
-        if (app !== null) await app.close().catch(() => {})
-        if (initialized) require("../../src/data").closeDatabase()
-        restoreContent()
-        restoreTimeOffset()
-        fs.rmSync(directory, { recursive: true, force: true })
-        if (previousDataDirectory === undefined) delete process.env.DATA_DIR
-        else process.env.DATA_DIR = previousDataDirectory
-        if (previousDatabaseDirectory === undefined) delete process.env.WDFP_DATABASE_DIR
-        else process.env.WDFP_DATABASE_DIR = previousDatabaseDirectory
-        throw error
+        await runAwakeOwnerFactPublicationCleanup([
+            async () => { if (app !== null) await app.close() },
+            () => { if (initialized) require("../../src/data").closeDatabase() },
+            () => restoreContent(),
+            () => restoreTimeOffset(),
+            () => fs.rmSync(directory, { recursive: true, force: true }),
+            () => {
+                if (previousDataDirectory === undefined) delete process.env.DATA_DIR
+                else process.env.DATA_DIR = previousDataDirectory
+                if (previousDatabaseDirectory === undefined) delete process.env.WDFP_DATABASE_DIR
+                else process.env.WDFP_DATABASE_DIR = previousDatabaseDirectory
+            },
+        ], { primaryError: error })
     }
 }
 
 async function closeAwakeOwnerFactPublicationFixture(fixture) {
-    const errors = []
-    for (const cleanup of [
+    await runAwakeOwnerFactPublicationCleanup([
         async () => fixture.app?.close(),
         () => { for (const playerId of Object.keys(fixture.activeQuests)) delete fixture.activeQuests[playerId] },
         () => require("../../src/data").closeDatabase(),
@@ -389,11 +412,7 @@ async function closeAwakeOwnerFactPublicationFixture(fixture) {
             if (fixture.previousDatabaseDirectory === undefined) delete process.env.WDFP_DATABASE_DIR
             else process.env.WDFP_DATABASE_DIR = fixture.previousDatabaseDirectory
         },
-    ]) {
-        try { await cleanup() } catch (error) { errors.push(error) }
-    }
-    if (errors.length === 1) throw errors[0]
-    if (errors.length > 1) throw new AggregateError(errors, "Awake owner fixture cleanup failed")
+    ])
 }
 
 module.exports = {
@@ -405,4 +424,5 @@ module.exports = {
     MAIN_QUEST_ID,
     closeAwakeOwnerFactPublicationFixture,
     createAwakeOwnerFactPublicationFixture,
+    runAwakeOwnerFactPublicationCleanup,
 }
