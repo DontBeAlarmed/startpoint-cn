@@ -136,7 +136,7 @@ best-effort publication 用于主业务已经可以独立成立、觉醒只负�
 
 ## 生产调用边界
 
-当前生产代码约有 19 个 `reconcileAwakeUnlockCharacterList*` 调用表达式。实施前必须建立并锁定静态审计矩阵，逐表达式记录 owner、事务位置、候选来源、注入快照、策略和 SQL 上界；迁移后不得保留未登记的 legacy 调用。无法证明候选范围的入口允许暂时使用全量 scope，但必须记录具体理由，不能以“兼容”为笼统说明。
+当前生产代码有 21 个 `reconcileAwakeUnlockCharacterList*` 调用表达式。静态审计矩阵逐表达式锁定 owner、事务位置、候选来源、注入快照、策略和 SQL 上界；不得保留未登记的 legacy 调用。无法证明候选范围的入口允许暂时使用全量 scope，但必须记录具体理由，不能以“兼容”为笼统说明。
 
 | 边界 | 现有调用表达式 | 目标 owner 与上下文来源 | 失败语义 |
 |---|---|---|---|
@@ -152,9 +152,10 @@ best-effort publication 用于主业务已经可以独立成立、觉醒只负�
 | 提交后 best-effort | `src/routes/api/gacha.ts` 的 `gacha/exchange_character`、`gacha/exec` | 兑换或抽卡提交及延迟日志边界完成后，以实际角色结果冻结 | publication 失败不撤销兑换、抽卡或日志所有权 |
 | 提交后 best-effort | `src/routes/api/boxGacha.ts` 的 `boxGacha/exec`、`src/routes/api/exchange.ts` 的 `exchange/star_crumb` | 主业务提交后，以实际抽中或兑换角色及奖励失效冻结 | publication 失败不撤销箱状态或兑换 |
 | 提交后 best-effort | `src/routes/api/character.ts` 的 `character/add_character_from_town` | town 角色发放提交后，以实际新增角色及写后快照冻结 | publication 失败不撤销角色发放 |
+| 提交后 best-effort | `src/routes/api/passCard.ts` 的 `pass_card/receive_all`、`src/routes/api/raidEvent.ts` 的 `raid_event/summary` | Pass 或 Raid 奖励事务提交后，以实际奖励失效事实建立短生命周期 context | publication 失败不撤销已提交的奖励与进度 |
 | 独立全量恢复 | `/load` | 从当前数据库和 Content snapshot 创建独立 full-recovery context，不接受其他请求 seed | 任一恢复错误沿既有 `/load` 错误边界失败，不降级为局部视图 |
 
-上述分组依次包含 1 个事务内 strict、9 个事务内 best-effort 和 9 个提交后 best-effort 表达式。单人/多人 finish 虽共同使用结算抽象，静态审计中仍按两个生产表达式分别锁定；tutorial 15/16、邮件单领/全领、shop 单购/批购和 gacha 兑换/执行同理。
+上述分组依次包含 1 个事务内 strict、9 个事务内 best-effort 和 11 个提交后 best-effort 表达式。单人/多人 finish 虽共同使用结算抽象，静态审计中仍按两个生产表达式分别锁定；tutorial 15/16、邮件单领/全领、shop 单购/批购和 gacha 兑换/执行同理。
 
 ## 性能与行为门禁
 
@@ -189,20 +190,20 @@ snapshot 还逐场景固定了稳定表名及 `reads`、`writes`、`statements`�
 结构指标上升均拒绝准入。故障场景中的 owner `players` 更新处于同一个外层事务，但不在
 `measureTarget` 窗口内；reference 中的 `players` 仅记录 publication 自身的 1 次读取和 0 次写入。
 
-TypeScript AST 静态审计固定了 19 个生产 `CallExpression`：1 个事务内 strict、9 个事务内
-best-effort、9 个提交后 best-effort。审计不统计
+TypeScript AST 静态审计固定了 21 个生产 `CallExpression`：1 个事务内 strict、9 个事务内
+best-effort、11 个提交后 best-effort。审计不统计
 `awake-unlock-response.ts` 的定义和内部调用，并逐表达式固定 relative file、callee、owner、
 事务边界、当前 publication 的 `scoped-context` 来源与候选来源短标识。35.0 不把旧链路
 loader 次数记为相对门禁；“每请求最多一次”由 35.1 的显式 Session observer 验收。
 
-35.2 与 35.3 的 owner inventory 是两套互斥的边界，不能把两个“9”合并解释。35.2 的 9 个
+事务内和提交后的 owner inventory 是两套互斥边界。事务内的 9 个
 事务内 best-effort 表达式为 `single/finish`、`multi/finish`、`story`、`bond`、
 `mail/receive`、`mail/receive_all`、`active`、`tutorial/update_step:15` 和
 `tutorial/update_step:16`；它们继续位于既有 owner 外层事务或 settlement callback 内。
-35.2 的 `learn_mana_node` 另为 1 个事务内 strict 表达式。35.3 的 9 个提交后 best-effort
+`learn_mana_node` 另为 1 个事务内 strict 表达式。提交后的 11 个 best-effort
 表达式为 `boxGacha`、`character/town`、`exchange`、`gacha/exchange_character`、
-`gacha/exec`、`item/sell`、`mission/update_mission_progress`、`shop/buy` 和
-`shop/bulk_buy`。`tools/post_commit_awake_owner.test.cjs` 固定两组的数量、成员和互斥性；
+`gacha/exec`、`item/sell`、`mission/update_mission_progress`、`shop/buy`、
+`shop/bulk_buy`、`pass_card/receive_all` 和 `raid_event/summary`。静态矩阵固定两组的数量、成员和互斥性；
 `tools/awake_reconcile_callsite_matrix.test.cjs` 固定 35.2 owner 的 publication 仍在事务边界内。
 
 35.5C1 只把 owner 实际改变的 `FactKey` 透传到 fresh Awake publication，不迁移 35.2 的事务
@@ -260,7 +261,7 @@ formal profile 使用 1000 份互相独立的存档、600 个活跃身份，并�
 
 | 阶段 | 范围 | 完成证据 |
 |---|---|---|
-| 35.0 规格与基线 | 固化本规格、约 19 个生产调用表达式静态审计矩阵、focused/轻量/formal profile 与同机 reference | 已完成；基线与矩阵提交在前序本地 commit 中 |
+| 35.0 规格与基线 | 固化本规格、21 个生产调用表达式静态审计矩阵、focused/轻量/formal profile 与同机 reference | 已完成；基线与矩阵提交在前序本地 commit 中 |
 | 35.1 核心 context | 实现 scope 收集/冻结、fresh context、Session、scoped evaluator/reader、seed 校验和生命周期清理 | 已完成；请求 context 与专项回归已通过 |
 | 35.2 事务内 owner | 迁移 learn strict，以及 finish、story、bond、mail、Active Mission、tutorial 的事务内 best-effort owner | 已完成；事务边界与 savepoint 专项回归已通过 |
 | 35.3 提交后 owner 与 `/load` | 迁移 mission、item、shop、gacha、boxGacha、exchange、character/town；保留 `/load` full recovery | 已完成；提交后故障注入、独立 full recovery、active mission fixture 兼容和 workflow 精确分组回归通过 |
