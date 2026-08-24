@@ -1050,7 +1050,7 @@ function callTerminalName(call) {
     return null
 }
 
-function findContextCreation(call, sourceFile) {
+function findContextCreation(call, sourceFile, checker) {
     const options = call.arguments[2]
     const contextReference = getObjectProperty(options, "context")
     assert.equal(
@@ -1058,22 +1058,49 @@ function findContextCreation(call, sourceFile) {
         true,
         `${sourceFile.fileName} scoped reconcile must reference a context variable`,
     )
-    let creation = null
-    function visit(node) {
-        if (node.getStart(sourceFile) >= call.getStart(sourceFile)) return
-        if (ts.isVariableDeclaration(node)
-            && ts.isIdentifier(node.name)
-            && node.name.text === contextReference.text
-            && node.initializer
-            && ts.isCallExpression(node.initializer)
-            && callTerminalName(node.initializer)?.startsWith("createAwakeRequestContext")) {
-            creation = node.initializer
+    assert.notEqual(checker, undefined, `${sourceFile.fileName} context binding requires TypeChecker evidence`)
+    const contextSymbol = ts.isShorthandPropertyAssignment(contextReference.parent)
+        ? checker.getShorthandAssignmentValueSymbol(contextReference.parent)
+        : checker.getSymbolAtLocation(contextReference)
+    assert.notEqual(
+        contextSymbol,
+        undefined,
+        `${sourceFile.fileName} publication context symbol is not statically bound`,
+    )
+    const declarations = (contextSymbol?.getDeclarations() ?? []).filter(ts.isVariableDeclaration)
+    assert.equal(
+        declarations.length,
+        1,
+        `${sourceFile.fileName} publication context must have exactly one binding declaration`,
+    )
+    const declaration = declarations[0]
+    const ownerRoot = findOwnerRoot(call)
+    let declarationScope = null
+    for (let node = declaration.parent; node && node !== ownerRoot.parent; node = node.parent) {
+        if (ts.isBlock(node) || ts.isSourceFile(node)) {
+            declarationScope = node
+            break
         }
-        ts.forEachChild(node, visit)
     }
-    visit(sourceFile)
-    assert.notEqual(creation, null, `${sourceFile.fileName} context creation is not statically traceable`)
-    return creation
+    assert.notEqual(
+        declarationScope,
+        null,
+        `${sourceFile.fileName} context binding declaration lacks a visible owner scope`,
+    )
+    assert.notEqual(
+        findAncestor(call, node => node === declarationScope),
+        null,
+        `${sourceFile.fileName} context binding declaration is outside the visible owner scope`,
+    )
+    assert.equal(
+        declaration.getStart(sourceFile) < call.getStart(sourceFile)
+            && declaration.initializer !== undefined
+            && ts.isCallExpression(declaration.initializer)
+            && callTerminalName(declaration.initializer)?.startsWith("createAwakeRequestContext"),
+        true,
+        `${sourceFile.fileName} context binding declaration is not a visible context creation`,
+    )
+    return declaration.initializer
 }
 
 function classifyFactSeeds(scope, sourceFile) {
@@ -1090,7 +1117,7 @@ function classifyFactSeeds(scope, sourceFile) {
 }
 
 function extractScopeEvidence(importedCall) {
-    const { call, exportedName, sourceFile } = importedCall
+    const { call, checker, exportedName, sourceFile } = importedCall
     let actualCharacterSeed
     let scope
     let contextStart
@@ -1099,7 +1126,7 @@ function extractScopeEvidence(importedCall) {
         scope = call.arguments[3]
         contextStart = call.getStart(sourceFile)
     } else {
-        const creation = findContextCreation(call, sourceFile)
+        const creation = findContextCreation(call, sourceFile, checker)
         contextStart = creation.getStart(sourceFile)
         if (callTerminalName(creation) === "createAwakeRequestContext") {
             scope = creation.arguments[0]
@@ -1210,6 +1237,31 @@ function findTutorialConstantSymbol(sourceFile, checker, contract) {
     return symbol
 }
 
+function isExactEffectiveNextStepReference(reference, call, checker) {
+    if (!ts.isIdentifier(reference)) return false
+    const symbol = checker.getSymbolAtLocation(reference)
+    const declarations = (symbol?.getDeclarations() ?? []).filter(ts.isVariableDeclaration)
+    if (declarations.length !== 1) return false
+    const declaration = declarations[0]
+    if (!ts.isIdentifier(declaration.name)
+        || declaration.name.text !== "effectiveNextStep"
+        || declaration.getStart(call.getSourceFile()) >= call.getStart(call.getSourceFile())
+        || declaration.initializer === undefined
+        || !ts.isCallExpression(declaration.initializer)
+        || callTerminalName(declaration.initializer) !== "getTutorialEffectiveNextStep") {
+        return false
+    }
+    let declarationScope = null
+    for (let node = declaration.parent; node; node = node.parent) {
+        if (ts.isBlock(node) || ts.isSourceFile(node)) {
+            declarationScope = node
+            break
+        }
+    }
+    return declarationScope !== null
+        && findAncestor(call, node => node === declarationScope) !== null
+}
+
 function findTutorialOwnerBranch(call, ownerLabel, checker, required = true) {
     const contract = TUTORIAL_OWNER_SCOPE_CONTRACTS[ownerLabel]
     assert.notEqual(contract, undefined, `${ownerLabel} lacks a tutorial scope contract`)
@@ -1219,9 +1271,15 @@ function findTutorialOwnerBranch(call, ownerLabel, checker, required = true) {
         if (!ts.isIfStatement(parent) || !ts.isBinaryExpression(parent.expression)) continue
         if (parent.expression.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken) continue
         const operands = [parent.expression.left, parent.expression.right]
-        if (!operands.some(operand => (
+        const constantIndex = operands.findIndex(operand => (
             ts.isIdentifier(operand) && checker.getSymbolAtLocation(operand) === symbol
-        ))) continue
+        ))
+        if (constantIndex === -1) continue
+        assert.equal(
+            isExactEffectiveNextStepReference(operands[1 - constantIndex], call, checker),
+            true,
+            `${ownerLabel} branch discriminator must reference the exact effectiveNextStep symbol`,
+        )
         assert.equal(
             call.getStart() >= parent.thenStatement.getStart()
                 && call.end <= parent.thenStatement.end,
@@ -1958,6 +2016,33 @@ test("AST collector enforces the single wrapper module contract", () => {
     )
 })
 
+test("context creation binds to the publication context symbol in its visible owner scope", () => {
+    const source = `
+        import {
+            createAwakeRequestContextBestEffort,
+            reconcileAwakeUnlockCharacterListBestEffort,
+        } from "./mission"
+        function unrelated() {
+            const awakeContext = createAwakeRequestContextBestEffort(99, [999], {})
+            return awakeContext
+        }
+        export function owner() {
+            const awakeContext = loadUnrelatedContext()
+            return reconcileAwakeUnlockCharacterListBestEffort(
+                1,
+                [],
+                { context: awakeContext },
+            )
+        }
+    `
+    const importedCall = collectImportedAwakeCalls(source, "synthetic.ts")[0]
+
+    assert.throws(
+        () => extractScopeEvidence(importedCall),
+        /context.*symbol|binding declaration|visible owner scope/i,
+    )
+})
+
 test("final-write evidence rejects a same-name write confined to a sibling branch", () => {
     const source = `
         import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
@@ -2422,11 +2507,12 @@ test("tutorial owner scopes isolate step 15 and step 16 sibling branches", () =>
         const TUTORIAL_PRESENT_EFFECTIVE_STEP = 16
         export function routes(fastify) {
             fastify.post("/update_step", () => {
+                const effectiveNextStep = getTutorialEffectiveNextStep()
                 if (effectiveNextStep === TUTORIAL_GACHA_EFFECTIVE_STEP) {
                     persistStep15()
                     reconcileAwakeUnlockCharacterListBestEffort(1, [], {})
                 }
-                if (effectiveNextStep === TUTORIAL_PRESENT_EFFECTIVE_STEP) {
+                if (TUTORIAL_PRESENT_EFFECTIVE_STEP === effectiveNextStep) {
                     persistStep16()
                     reconcileAwakeUnlockCharacterListBestEffort(1, [], {})
                 }
@@ -2450,6 +2536,29 @@ test("tutorial owner scopes isolate step 15 and step 16 sibling branches", () =>
     assert.doesNotMatch(step15Scope.getText(calls[0].sourceFile), /persistStep16/)
     assert.match(step16Scope.getText(calls[1].sourceFile), /persistStep16/)
     assert.doesNotMatch(step16Scope.getText(calls[1].sourceFile), /persistStep15/)
+})
+
+test("tutorial owner scopes reject storedNextStep as the branch discriminator", () => {
+    const source = `
+        import { reconcileAwakeUnlockCharacterListBestEffort } from "./mission"
+        const TUTORIAL_GACHA_EFFECTIVE_STEP = 15
+        const TUTORIAL_PRESENT_EFFECTIVE_STEP = 16
+        export function routes(fastify) {
+            fastify.post("/update_step", () => {
+                const effectiveNextStep = getTutorialEffectiveNextStep()
+                const storedNextStep = getStoredNextStep()
+                if (storedNextStep === TUTORIAL_GACHA_EFFECTIVE_STEP) {
+                    reconcileAwakeUnlockCharacterListBestEffort(1, [], {})
+                }
+            })
+        }
+    `
+    const call = collectImportedAwakeCalls(source, "src/routes/api/tutorial.ts")[0]
+
+    assert.throws(
+        () => findOwnerRoot(call.call, "tutorial/update_step:15", call.checker),
+        /effectiveNextStep.*symbol|branch discriminator/i,
+    )
 })
 
 test("tutorial owner scopes reject constants aliased to the sibling step", () => {

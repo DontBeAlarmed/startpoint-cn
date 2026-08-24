@@ -198,7 +198,7 @@ test("all matrix owners require owner-matched runtime observations", () => {
     )
 })
 
-test("admission rejects any behavior, seed, loader, compute, or per-table SQL drift", () => {
+test("admission keeps non-structural owner evidence exact", () => {
     const input = Object.fromEntries(AWAKE_OWNER_FOCUSED_SCENARIO_KEYS.map(key => [
         key,
         syntheticScenario(key),
@@ -206,17 +206,92 @@ test("admission rejects any behavior, seed, loader, compute, or per-table SQL dr
     const snapshot = createAwakeOwnerFocusedReport(input)
     for (const mutate of [
         report => { report.scenarios["exchange-star-crumb"].response.changed = true },
+        report => { report.scenarios["exchange-star-crumb"].request.changed = true },
+        report => { report.scenarios["exchange-star-crumb"].behaviorSha256 = "0".repeat(64) },
         report => { report.scenarios["exchange-star-crumb"].characterSeeds.push(1) },
         report => { report.scenarios["exchange-star-crumb"].loaderCalls.push("player") },
-        report => { report.scenarios["exchange-star-crumb"].missionComputes++ },
         report => { report.scenarios["exchange-star-crumb"].dbAfter.unlocks.push([1, []]) },
-        report => { report.scenarios["exchange-star-crumb"].sqlReads-- },
-        report => { report.scenarios["exchange-star-crumb"].sqlByTable.players_character_awake_unlocks.reads++ },
         report => { report.scenarios["exchange-star-crumb"].publicationObservation.kind = "publish-wrapper" },
+        report => { report.scenarios["exchange-star-crumb"].owner = "other/owner" },
+        report => { report.scenarios["exchange-star-crumb"].boundary = "best-effort-in-tx" },
     ]) {
         const current = structuredClone(snapshot)
         mutate(current)
         assert.equal(evaluateAwakeOwnerFocusedAdmission(current, snapshot).admitted, false)
+    }
+})
+
+test("admission treats compute and SQL metrics as per-scenario upper bounds", () => {
+    const input = Object.fromEntries(AWAKE_OWNER_FOCUSED_SCENARIO_KEYS.map(key => [
+        key,
+        syntheticScenario(key),
+    ]))
+    const scenarioName = "exchange-star-crumb"
+    const measured = input[scenarioName]
+    measured.missionComputes = 2
+    measured.sqlReads = 2
+    measured.sqlWrites = 2
+    measured.sqlByTable.players_character_awake_unlocks = {
+        reads: 2,
+        statements: 4,
+        writes: 2,
+    }
+    const snapshot = createAwakeOwnerFocusedReport(input)
+    const metricCases = [
+        {
+            metric: "missionComputes",
+            decrease: report => { report.scenarios[scenarioName].missionComputes-- },
+            increase: report => { report.scenarios[scenarioName].missionComputes++ },
+        },
+        {
+            metric: "sqlReads",
+            decrease: report => { report.scenarios[scenarioName].sqlReads-- },
+            increase: report => {
+                const scenario = report.scenarios[scenarioName]
+                scenario.sqlReads++
+                scenario.sqlByTable.players_character_awake_unlocks.reads++
+                scenario.sqlByTable.players_character_awake_unlocks.statements++
+            },
+        },
+        {
+            metric: "sqlWrites",
+            decrease: report => {
+                const scenario = report.scenarios[scenarioName]
+                scenario.sqlWrites--
+                scenario.sqlByTable.players_character_awake_unlocks.writes--
+                scenario.sqlByTable.players_character_awake_unlocks.statements--
+            },
+            increase: report => {
+                const scenario = report.scenarios[scenarioName]
+                scenario.sqlWrites++
+                scenario.sqlByTable.players_character_awake_unlocks.writes++
+                scenario.sqlByTable.players_character_awake_unlocks.statements++
+            },
+        },
+    ]
+
+    for (const { metric, decrease, increase } of metricCases) {
+        const decreased = structuredClone(snapshot)
+        decrease(decreased)
+        assert.equal(
+            evaluateAwakeOwnerFocusedAdmission(decreased, snapshot).admitted,
+            true,
+            `${scenarioName}.${metric} decrease must be admitted`,
+        )
+
+        const increased = structuredClone(snapshot)
+        increase(increased)
+        const admission = evaluateAwakeOwnerFocusedAdmission(increased, snapshot)
+        assert.equal(admission.admitted, false, `${scenarioName}.${metric} increase must fail`)
+        assert.equal(
+            admission.failures.some(failure => (
+                failure.scenario === scenarioName
+                    && failure.metric === metric
+                    && failure.reason.includes(`${scenarioName}.${metric}`)
+            )),
+            true,
+            `${scenarioName}.${metric} failure must identify its scenario and metric`,
+        )
     }
 })
 
