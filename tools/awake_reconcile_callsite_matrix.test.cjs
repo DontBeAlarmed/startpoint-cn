@@ -627,12 +627,30 @@ function callExpressionIdentity(call, checker, sourceFile) {
     return `expression:${ts.SyntaxKind[expression.kind]}:${compactExpression(expression, sourceFile)}`
 }
 
-function collectOwnerCallInventory(ownerRoot, checker, sourceFile) {
+function inventoryCallPhase(call, sourceFile, dominanceEvidence) {
+    if (dominanceEvidence === undefined || dominanceEvidence === null) return null
+    const { anchorMatch, publicationCall } = dominanceEvidence
+    if (call === anchorMatch) return "final-anchor"
+    if (call === publicationCall) return "publication"
+    if (findAncestor(call.parent, node => node === anchorMatch) !== null) {
+        return "inside-final-anchor"
+    }
+    if (findAncestor(call.parent, node => node === publicationCall) !== null) {
+        return "inside-publication"
+    }
+    if (call.end <= anchorMatch.getStart(sourceFile)) return "before-anchor"
+    if (call.getStart(sourceFile) >= publicationCall.end) return "after-publication"
+    return "anchor-to-publication"
+}
+
+function collectOwnerCallInventory(ownerRoot, checker, sourceFile, dominanceEvidence = null) {
     const counts = new Map()
     function visit(node) {
         if (ts.isCallExpression(node)) {
             const identity = callExpressionIdentity(node, checker, sourceFile)
-            counts.set(identity, (counts.get(identity) ?? 0) + 1)
+            const phase = inventoryCallPhase(node, sourceFile, dominanceEvidence)
+            const key = phase === null ? identity : `${phase}:${identity}`
+            counts.set(key, (counts.get(key) ?? 0) + 1)
         }
         ts.forEachChild(node, visit)
     }
@@ -656,10 +674,14 @@ function assertAuthoritativeWriteSetInventorySubset(
     checker,
     sourceFile,
     authoritativeWriteNames,
-    expectedInventory,
+    dominanceEvidence = null,
 ) {
-    const actualInventory = collectOwnerCallInventory(ownerRoot, checker, sourceFile)
-    const expectedEntries = new Set(expectedInventory)
+    const actualInventory = collectOwnerCallInventory(
+        ownerRoot,
+        checker,
+        sourceFile,
+        dominanceEvidence,
+    )
     const identitiesByTerminal = new Map()
     function visit(node) {
         if (ts.isCallExpression(node)) {
@@ -681,9 +703,13 @@ function assertAuthoritativeWriteSetInventorySubset(
             `${sourceFile.fileName} write set is not an inventory symbol subset: ${writeName}`,
         )
         for (const identity of identities ?? []) {
-            const inventoryEntry = actualInventory.find(entry => entry.startsWith(`${identity}=`))
+            const identityMarker = dominanceEvidence === null ? identity : `:${identity}`
+            const inventoryEntries = actualInventory.filter(entry => (
+                entry.startsWith(`${identityMarker}=`)
+                    || entry.includes(`${identityMarker}=`)
+            ))
             assert.equal(
-                inventoryEntry !== undefined && expectedEntries.has(inventoryEntry),
+                inventoryEntries.length > 0,
                 true,
                 `${sourceFile.fileName} write set inventory symbol drifted: ${writeName}:${identity}`,
             )
@@ -1031,7 +1057,27 @@ function extractScopeEvidence(importedCall) {
     }
 }
 
-function findOwnerRoot(call) {
+function findOwnerRoot(call, ownerLabel = null) {
+    const tutorialStepConstant = {
+        "tutorial/update_step:15": "TUTORIAL_GACHA_EFFECTIVE_STEP",
+        "tutorial/update_step:16": "TUTORIAL_PRESENT_EFFECTIVE_STEP",
+    }[ownerLabel]
+    if (tutorialStepConstant !== undefined) {
+        for (let parent = call.parent; parent; parent = parent.parent) {
+            if (!ts.isIfStatement(parent)
+                || !parent.expression.getText(call.getSourceFile()).includes(tutorialStepConstant)) {
+                continue
+            }
+            assert.equal(
+                call.getStart() >= parent.thenStatement.getStart()
+                    && call.end <= parent.thenStatement.end,
+                true,
+                `${ownerLabel} publication must remain in its exact tutorial branch`,
+            )
+            return parent.thenStatement
+        }
+        assert.fail(`${ownerLabel} publication owner branch is not traceable`)
+    }
     for (let parent = call.parent; parent; parent = parent.parent) {
         if (ts.isCallExpression(parent)
             && ts.isPropertyAccessExpression(parent.expression)
@@ -1101,7 +1147,6 @@ function catchAlwaysExits(tryStatement) {
 function collectExecutableCallsInRange(statement, start, end, authoritativeWrites) {
     const calls = []
     function visit(node) {
-        if (node !== statement && ts.isFunctionLike(node) && !isImmediatelyInvokedFunction(node)) return
         if (ts.isCallExpression(node)
             && node.getStart() > start
             && node.getStart() < end
@@ -1121,7 +1166,7 @@ function assertFinalWritePrecedesContext(
     finalWriteRule = "same-block-direct",
 ) {
     const sourceFile = call.getSourceFile()
-    const ownerRoot = findOwnerRoot(call)
+    const ownerRoot = findOwnerRoot(call, ownerLabel)
     const authoritativeWrites = new Set(authoritativeWriteNames)
     assert.equal(authoritativeWrites.has(anchor), true, `${anchor} must belong to the authoritative write set`)
     const anchorMatches = []
@@ -1141,8 +1186,9 @@ function assertFinalWritePrecedesContext(
         `${sourceFile.fileName} authoritative write set does not resolve to owner calls`,
     )
     const publicationBlocks = []
-    for (let node = call.parent; node && node !== ownerRoot; node = node.parent) {
+    for (let node = call.parent; node; node = node.parent) {
         if (ts.isBlock(node)) publicationBlocks.push(node)
+        if (node === ownerRoot) break
     }
     let dominanceEvidence = null
     for (const block of publicationBlocks) {
@@ -1214,34 +1260,35 @@ function assertFinalWritePrecedesContext(
         true,
         `${sourceFile.fileName} final authoritative write ${anchor} does not dominate publication on the same control-flow path`,
     )
-    const between = dominanceEvidence.block.statements
-        .slice(dominanceEvidence.anchorStatementIndex, dominanceEvidence.publicationIndex + 1)
-        .flatMap(statement => collectExecutableCallsInRange(
-            statement,
-            dominanceEvidence.anchorMatch.end,
-            call.getStart(sourceFile),
-            authoritativeWrites,
-        ))
+    const between = collectExecutableCallsInRange(
+        ownerRoot,
+        dominanceEvidence.anchorMatch.end,
+        call.getStart(sourceFile),
+        authoritativeWrites,
+    )
     assert.equal(
         between.length,
         0,
         `${sourceFile.fileName} has authoritative write ${between
             .map(match => callTerminalName(match)).join(", ")} between final anchor and publication`,
     )
-    const later = dominanceEvidence.block.statements
-        .slice(dominanceEvidence.publicationIndex)
-        .flatMap(statement => collectExecutableCallsInRange(
-            statement,
-            call.end,
-            Number.POSITIVE_INFINITY,
-            authoritativeWrites,
-        ))
+    const later = collectExecutableCallsInRange(
+        ownerRoot,
+        call.end,
+        Number.POSITIVE_INFINITY,
+        authoritativeWrites,
+    )
     assert.equal(
         later.length,
         0,
         `${sourceFile.fileName} has a later authoritative write ${later
             .map(match => callTerminalName(match)).join(", ")} after publication`,
     )
+    return {
+        ...dominanceEvidence,
+        ownerRoot,
+        publicationCall: call,
+    }
 }
 
 function collectProductionCalls() {
@@ -1291,14 +1338,7 @@ function collectProductionCalls() {
             const ownerLabel = classifyOwner(relativeFile, call, sourceFile)
             const expected = EXPECTED_MATRIX.filter(entry => entry.owner === ownerLabel)
             assert.equal(expected.length, 1, `${ownerLabel} must have exactly one matrix row`)
-            const ownerRoot = findOwnerRoot(call)
-            assertAuthoritativeWriteSetInventorySubset(
-                ownerRoot,
-                checker,
-                sourceFile,
-                expected[0].authoritativeWriteSet,
-                OWNER_CALL_INVENTORIES[ownerLabel],
-            )
+            const ownerRoot = findOwnerRoot(call, ownerLabel)
             const finalHelper = FINAL_WRITE_HELPERS[ownerLabel]
             if (finalHelper !== undefined) {
                 assert.equal(
@@ -1314,13 +1354,20 @@ function collectProductionCalls() {
                 )
             }
             const scopeEvidence = extractScopeEvidence(importedCall)
-            assertFinalWritePrecedesContext(
+            const dominanceEvidence = assertFinalWritePrecedesContext(
                 call,
                 scopeEvidence.contextStart,
                 expected[0].finalAuthoritativeWrite,
                 ownerLabel,
                 expected[0].authoritativeWriteSet,
                 expected[0].finalWriteRule,
+            )
+            assertAuthoritativeWriteSetInventorySubset(
+                ownerRoot,
+                checker,
+                sourceFile,
+                expected[0].authoritativeWriteSet,
+                dominanceEvidence,
             )
             assert.equal(
                 typeof PLANNED_CANDIDATE_SOURCES[ownerLabel],
@@ -1349,7 +1396,12 @@ function collectProductionCalls() {
                 rereadReason: expected[0].rereadReason,
                 sqlUpperBoundKey: expected[0].sqlUpperBoundKey,
                 runtimeEvidenceKey: expected[0].runtimeEvidenceKey,
-                ownerCallInventory: collectOwnerCallInventory(ownerRoot, checker, sourceFile),
+                ownerCallInventory: collectOwnerCallInventory(
+                    ownerRoot,
+                    checker,
+                    sourceFile,
+                    dominanceEvidence,
+                ),
                 position: call.getStart(sourceFile),
             })
         }
@@ -1456,11 +1508,18 @@ test("Awake reconcile production call expressions match the fixed 21-entry evide
     assertEvidenceContract(EXPECTED_MATRIX)
 })
 
-test("production owner call inventories freeze every reviewed symbol and count", () => {
+test("production owner call inventories freeze every reviewed symbol, count, and phase", () => {
     const actual = Object.fromEntries(collectProductionCalls().map(call => [
         call.owner,
         call.ownerCallInventory,
     ]))
+    if (process.argv.includes("--write-owner-inventory")) {
+        fs.writeFileSync(
+            path.join(__dirname, "awake_reconcile_owner_call_inventory.json"),
+            `${JSON.stringify(actual, null, 2)}\n`,
+        )
+        return
+    }
     assert.deepEqual(actual, OWNER_CALL_INVENTORIES, "production owner call inventory drifted")
 })
 
@@ -1756,6 +1815,80 @@ test("final-write evidence rejects a differently named write between anchor and 
     )
 })
 
+test("final-write evidence rejects an authoritative write hidden in a deferred callback before publication", () => {
+    const source = `
+        import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
+        export function owner() {
+            persistPlayer()
+            queue(() => updatePlayerSync())
+            publishAwakeCharacterListBestEffort(1, [], [], {})
+        }
+    `
+    const importedCall = collectImportedAwakeCalls(source, "synthetic.ts")[0]
+    const scope = extractScopeEvidence(importedCall)
+
+    assert.throws(
+        () => assertFinalWritePrecedesContext(
+            importedCall.call,
+            scope.contextStart,
+            "persistPlayer",
+            null,
+            ["persistPlayer", "updatePlayerSync"],
+        ),
+        /between.*anchor.*publication|updatePlayerSync/i,
+    )
+})
+
+test("final-write evidence rejects an authoritative write hidden in a deferred callback after publication", () => {
+    const source = `
+        import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
+        export function owner() {
+            persistPlayer()
+            publishAwakeCharacterListBestEffort(1, [], [], {})
+            queue(() => updatePlayerSync())
+        }
+    `
+    const importedCall = collectImportedAwakeCalls(source, "synthetic.ts")[0]
+    const scope = extractScopeEvidence(importedCall)
+
+    assert.throws(
+        () => assertFinalWritePrecedesContext(
+            importedCall.call,
+            scope.contextStart,
+            "persistPlayer",
+            null,
+            ["persistPlayer", "updatePlayerSync"],
+        ),
+        /after.*publication|updatePlayerSync/i,
+    )
+})
+
+test("final-write evidence rejects an outer-block authoritative write after an inner publication", () => {
+    const source = `
+        import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
+        export function owner() {
+            {
+                persistPlayer()
+                publishAwakeCharacterListBestEffort(1, [], [], {})
+            }
+            updatePlayerSync()
+        }
+    `
+    const importedCall = collectImportedAwakeCalls(source, "synthetic.ts")[0]
+    const scope = extractScopeEvidence(importedCall)
+
+    assert.throws(
+        () => assertFinalWritePrecedesContext(
+            importedCall.call,
+            scope.contextStart,
+            "persistPlayer",
+            null,
+            ["persistPlayer", "updatePlayerSync"],
+        ),
+        /after.*publication|updatePlayerSync/i,
+    )
+})
+
 test("outer transaction anchors require an exact owner-specific rule", () => {
     const source = `
         import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
@@ -1860,6 +1993,77 @@ test("owner call inventory fails closed on an unreviewed production symbol", () 
     )
 })
 
+test("owner call inventory rejects moving the same persistent symbol outside its final transaction", () => {
+    function inventoryFor(source) {
+        const importedCall = collectImportedAwakeCalls(source, "synthetic.ts")[0]
+        const scope = extractScopeEvidence(importedCall)
+        const ownerRoot = findOwnerRoot(importedCall.call)
+        const dominance = assertFinalWritePrecedesContext(
+            importedCall.call,
+            scope.contextStart,
+            "transaction",
+        )
+        return collectOwnerCallInventory(
+            ownerRoot,
+            importedCall.checker,
+            importedCall.sourceFile,
+            dominance,
+        )
+    }
+    const owned = `
+        import { updatePlayerSync } from "./player-domain"
+        import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
+        export function owner() {
+            transaction(() => {
+                updatePlayerSync()
+            })
+            publishAwakeCharacterListBestEffort(1, [], [], {})
+        }
+    `
+    const movedAfterPublication = `
+        import { updatePlayerSync } from "./player-domain"
+        import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
+        export function owner() {
+            transaction(() => {})
+            publishAwakeCharacterListBestEffort(1, [], [], {})
+            updatePlayerSync()
+        }
+    `
+
+    assert.notDeepEqual(
+        inventoryFor(owned),
+        inventoryFor(movedAfterPublication),
+        "inventory roles must expose writes moved across the transaction/publication boundary",
+    )
+})
+
+test("tutorial owner scopes isolate step 15 and step 16 sibling branches", () => {
+    const source = `
+        import { reconcileAwakeUnlockCharacterListBestEffort } from "./mission"
+        export function routes(fastify) {
+            fastify.post("/update_step", () => {
+                if (effectiveNextStep === TUTORIAL_GACHA_EFFECTIVE_STEP) {
+                    persistStep15()
+                    reconcileAwakeUnlockCharacterListBestEffort(1, [], {})
+                }
+                if (effectiveNextStep === TUTORIAL_PRESENT_EFFECTIVE_STEP) {
+                    persistStep16()
+                    reconcileAwakeUnlockCharacterListBestEffort(1, [], {})
+                }
+            })
+        }
+    `
+    const calls = collectImportedAwakeCalls(source, "src/routes/api/tutorial.ts")
+    const step15Scope = findOwnerRoot(calls[0].call, "tutorial/update_step:15")
+    const step16Scope = findOwnerRoot(calls[1].call, "tutorial/update_step:16")
+
+    assert.notEqual(step15Scope, step16Scope, "tutorial owners must not share the route callback root")
+    assert.match(step15Scope.getText(calls[0].sourceFile), /persistStep15/)
+    assert.doesNotMatch(step15Scope.getText(calls[0].sourceFile), /persistStep16/)
+    assert.match(step16Scope.getText(calls[1].sourceFile), /persistStep16/)
+    assert.doesNotMatch(step16Scope.getText(calls[1].sourceFile), /persistStep15/)
+})
+
 test("authoritative write set must be a real symbol subset of the frozen inventory", () => {
     const source = `
         import { persistPlayer } from "./player-domain"
@@ -1869,14 +2073,12 @@ test("authoritative write set must be a real symbol subset of the frozen invento
     `
     const { checker, sourceFile } = createTypeCheckedSource(source, "synthetic.ts")
     const ownerRoot = findExportedFunctionDeclaration(sourceFile, checker, "owner")
-    const inventory = ["import:./player-domain#persistPlayer=1"]
 
     assert.doesNotThrow(() => assertAuthoritativeWriteSetInventorySubset(
         ownerRoot,
         checker,
         sourceFile,
         ["persistPlayer"],
-        inventory,
     ))
 
     assert.throws(
@@ -1885,7 +2087,6 @@ test("authoritative write set must be a real symbol subset of the frozen invento
             checker,
             sourceFile,
             ["persistPlayer", "missingWrite"],
-            inventory,
         ),
         /write set.*inventory.*missingWrite/i,
     )
