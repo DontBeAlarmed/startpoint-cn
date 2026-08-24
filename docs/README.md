@@ -18,7 +18,7 @@
 
 适合实现路由、业务规则、数据库状态或后台功能：
 
-1. 先读[当前运行时架构](./architecture.md)，确认模块边界和协议管线。
+1. 先读[当前运行时架构](./architecture.md)，再从[当前架构图集](./architecture/README.md)确认模块、事务和协议边界。
 2. 从[游戏系统索引](./systems/README.md)查找已有语义、已知约束和对应代码。
 3. 使用[路由族覆盖矩阵](./reference/routes-status.md)判断业务边界，再以注册源码和测试确认单端点状态。
 4. 按[开发验证工作流](./development/verification-workflow.md)运行相关测试和提交前验证。
@@ -56,7 +56,7 @@
 
 文档按用途分为三类：
 
-- **current**：`architecture.md`、`embedded-runtime-contract.md`、`admin/`、`development/`、`getting-started/`、`systems/`、`protocol/`、`cdn/` 和 `runtime/`。描述当前代码支持的行为；代码变更时必须同步更新。
+- **current**：`architecture.md`、`architecture/`、`embedded-runtime-contract.md`、`admin/`、`development/`、`getting-started/`、`systems/`、`protocol/`、`cdn/` 和 `runtime/`。描述当前代码支持的行为；代码变更时必须同步更新。
 - **reference**：`reference/`。保存路由族覆盖等当前参考入口；原始抓包和含设备、令牌形态的数据不进入公共仓库。
 - **status**：`status/`。记录当前实现覆盖、未解决问题和客户端验收结果；状态变化时更新，不复制架构细节。
 
@@ -66,6 +66,7 @@
 
 - [运行服务](./getting-started/README.md)
 - [当前架构](./architecture.md)
+- [当前架构图集](./architecture/README.md)
 - [管理后台](./admin/README.md)
 - [开发与验证](./development/README.md)
 - [游戏系统](./systems/README.md)

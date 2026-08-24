@@ -1,6 +1,6 @@
 # StarPoint CN 当前运行时架构
 
-本文描述 `dev` 分支当前有效的服务端结构和运行边界。业务路由覆盖见[参考资料](./reference/README.md)，功能完成度见[状态文档](./status/README.md)。
+本文是 `dev` 分支当前服务端结构和运行边界的文字摘要；可维护的 Mermaid 图以[当前架构图集](./architecture/README.md)为真源。业务路由覆盖见[参考资料](./reference/README.md)，功能完成度见[状态文档](./status/README.md)。
 
 ## 1. 系统边界
 
@@ -8,17 +8,7 @@ StarPoint CN 连接官方 CN 1.8.1 客户端与官方 CN 1.4.54 CDN。服务端�
 
 主要技术栈为 Node.js、TypeScript、Fastify、SQLite（`better-sqlite3`）和 `msgpackr`。TypeScript 使用 CommonJS，源码位于 `src/`，构建产物位于 `out/`。
 
-```text
-local CDN -> Content Sync -> Content Release -> Content snapshot -> 业务模块
-     |                                                        |
-     +--------------------- 资源归档 -------------------------> CN 客户端
-remote CDN --------------------------------------------------> CN 客户端
-
-CN 客户端 -> HTTP API -> 业务规则 -> SQLite 玩家状态
-CN 客户端 -> TCP 会话 -> 进程内房间与联机状态机
-管理后台 -> Web API -> 业务规则 -> SQLite 玩家状态
-嵌入式宿主 -> 进程、数据目录与健康检查契约
-```
+组件、协议和状态所有权见[D1 当前系统总览](./architecture/system-overview.md#d1-当前系统总览)。该图区分只读 Content Snapshot、SQLite 玩家状态和进程内多人会话，不按文件展开路由注册。
 
 ## 2. 启动链
 
@@ -29,11 +19,13 @@ CN 客户端 -> TCP 会话 -> 进程内房间与联机状态机
 3. `local` 模式先执行 `content:sync`，成功后启动 `out/cn-server.js`；同步失败则不启动。
 4. `remote` 和 `client-owned` 模式跳过本地 `content:sync`，直接启动 `out/cn-server.js`。
 5. 运行时一次解析并冻结网络、资源模式及 Content 路径环境，然后初始化 SQLite。
-6. 按冻结的资源模式和路径环境加载本次进程固定使用的 Content snapshot。
+6. 按冻结的资源模式和路径环境加载本次进程固定使用的 Content Snapshot。
 7. 启动多人运行时并取得多人 HTTP 上下文；默认 `embedded` 模式在此监听 TCP，`host`/`client` 模式故障时进入降级状态。
 8. Fastify 注册依赖运行时上下文的路由并监听 HTTP，随后进入 `ready`。
 
 SIGINT 或 SIGTERM 会进入统一关闭流程：停止接收 HTTP、停止 TCP、checkpoint SQLite 并关闭数据库。`node out/cn-server.js` 是不执行内容同步的低级入口，只用于明确知道当前 Release 已准备好的调试场景。
+
+启动失败、多人 degraded 与关闭顺序见[D9 当前启动与关闭生命周期](./architecture/runtime-lifecycle.md#d9-当前启动与关闭生命周期)。
 
 ## 3. 网络协议
 
@@ -53,6 +45,8 @@ CN 客户端不能正确处理部分 `uint32` 标记，响应层会把安全范�
 
 默认 `embedded` 使用本地 Coordinator 和 TCP。可选 `host` 在保留本地路径的同时提供可信 Hub 控制面；`client` 为新房间优先使用远程 Hub，远程不可用时按需启动自己的本地 TCP。每个多人 active quest 在 SQLite 中只持久化 `remote` 或 `local` 协调来源，已有房间不随探测结果迁移。管理、配置与玩家操作见[多人 Hub 设置教程](./protocol/multi-hub-setup.md)，协议和故障边界见[可信多人 Hub 架构](./protocol/trusted-multi-hub.md)。
 
+Host/Client 两节点拓扑、建房开战和所属节点结算授权见[多人联机与 Hub 当前架构图](./architecture/multiplayer-current.md)。
+
 ## 4. Content Runtime
 
 `src/content/` 将 CDN 读取与业务代码隔开：
@@ -60,10 +54,10 @@ CN 客户端不能正确处理部分 `uint32` 标记，响应层会把安全范�
 - `sync/` 扫描受支持输入、生成或复用 Content Release；
 - `converters/` 把 CDN 源表转换为服务端运行表；
 - `cdn/` 建立归档 Catalog、版本图和下载计划；
-- `runtime/` 加载并冻结当前 Content snapshot；
+- `runtime/` 加载并冻结当前 Content Snapshot；
 - `startup/` 保证本地资源模式先同步、后启动。
 
-同一进程中的资产版本、下载清单和业务表来自同一 snapshot，不在请求期间重新扫描 CDN。Snapshot 初始化使用 `RuntimeConfig` 保存的 Content 路径环境，不会在配置解析后再次读取可能变化的进程环境。当前转换器只覆盖已接入的表，其余 `assets/` 数据仍作为版本内置数据使用。职责与支持边界见[CDN 与内容索引](./cdn/README.md)。
+同一进程中的资产版本、下载清单和业务表来自同一 Content Snapshot，不在请求期间重新扫描 CDN。Snapshot 初始化使用 `RuntimeConfig` 保存的 Content 路径环境，不会在配置解析后再次读取可能变化的进程环境。当前转换器只覆盖已接入的表，其余 `assets/` 数据仍作为版本内置数据使用。职责与支持边界见[CDN 与内容索引](./cdn/README.md)。
 
 ## 5. SQLite 状态
 
@@ -75,20 +69,7 @@ CN 客户端不能正确处理部分 `uint32` 标记，响应层会把安全范�
 
 时间由 `src/runtime/time/game-time.ts` 提供轻量 `GameTimeContext`：卡池、活动期限和商店周期等依赖客户端服务器时钟的游戏业务使用虚拟服务器时间；体力自然恢复和经验池增长等按现实经过时间增长的资源使用真实运行时间。真实时间字段在发送给客户端时转换为虚拟时间，虚拟时间字段则在同一虚拟时间基准下读写。TCP 心跳、连接超时和战斗租约属于基础设施计时，不受游戏时间偏移影响。存档中的 `time_offset` 只为数据库兼容保留。
 
-```text
-server-time.json -> ServerTimeService -> timeOffset
-                                      |
-                                      v
-                              GameTimeContext
-                       /          |          \
-                      v           v           v
-                 realNow     virtualNow   client conversion
-                    |            |              |
-             stamina recovery  gacha/event   real DB date <-> client timestamp
-             offline elapsed   shop            exp pool real elapsed
-
-TCP heartbeat / lease / reconnect -> infrastructure runtime clock
-```
+完整数据流见[D7 当前全局服务器时间与双时钟](./architecture/identity-time-and-load.md#d7-当前全局服务器时间与双时钟)。
 
 业务模块应通过命名后的时间入口选择策略，不直接把 `Date.now()`、虚拟 `Date` 和客户端时间戳混在同一段计算中。
 
@@ -100,7 +81,7 @@ HTTP 路由分为三组：
 - `src/routes/api/`：角色、装备、抽卡、关卡、任务、商店、邮件等业务端点；
 - `src/routes/web_api/`：管理后台使用的结构化管理接口。
 
-复杂规则下沉到 `src/lib/`。任务位于 `src/lib/mission/`，关卡结算位于 `src/lib/quest/finish/`，抽卡、体力、装备和校验各有独立模块。路由负责协议边界和事务编排，不应重复实现业务计算。任务模块下一阶段的 Catalog、阶段内事实共享和求值结果复用边界见[任务引擎演进架构](./systems/mission-engine-architecture.md)。
+复杂规则下沉到 `src/lib/`。任务位于 `src/lib/mission/`，关卡结算位于 `src/lib/quest/finish/`，抽卡、体力、装备和校验各有独立模块。路由负责协议边界和事务编排，不应重复实现业务计算。任务模块当前的 Catalog、阶段内事实共享和求值结果复用边界见[任务引擎演进架构](./systems/mission-engine-architecture.md)与[任务和单人战斗架构图](./architecture/mission-and-single-battle.md)。
 
 ## 7. 管理后台
 
@@ -126,6 +107,6 @@ Android 启动器、桌面壳、容器和 Supervisor 通过稳定的外部契约
 
 - 协议字段以 CN 1.8.1 客户端反编译和实际请求为依据，不猜测字段。
 - 当前行为写入 architecture、systems、protocol、cdn 或 runtime；原始样本写入 reference；完成度写入 status。
-- 业务状态写入 SQLite，内容定义来自固定 snapshot，二者不得在请求中隐式互换。
+- 业务状态写入 SQLite，内容定义来自固定 Content Snapshot，二者不得在请求中隐式互换。
 - 生产模块不得形成任何长度的运行时循环导入；`tools/architecture_dependencies.test.cjs` 检查完整依赖图中的循环。
 - 每个功能模块完成后运行对应测试和类型检查，并同步更新其权威文档。
