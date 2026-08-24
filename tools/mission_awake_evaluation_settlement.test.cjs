@@ -226,7 +226,7 @@ test("unaccomplished and empty battles return before Catalog Session or database
     }
 })
 
-test("single and multi production finish routes call the shared Awake battle seam inside finish writes", () => {
+test("single and multi production finish routes call the shared Awake evaluation seam inside finish writes", () => {
     const singleWrites = fs.readFileSync(
         path.join(__dirname, "../src/lib/quest/finish/single-settlement-writes.ts"),
         "utf8",
@@ -236,7 +236,10 @@ test("single and multi production finish routes call the shared Awake battle sea
         "utf8",
     )
     const singleTransactionBody = singleWrites.indexOf("export function executeSingleSettlementWrites(")
-    const singleSeamCall = singleWrites.indexOf("settleAwakeBattleMissions({", singleTransactionBody)
+    const singleSeamCall = singleWrites.indexOf(
+        "settleAwakeMissionCandidatesWithEvaluation(",
+        singleTransactionBody,
+    )
     const singleTransactionCall = singleOrchestrator.indexOf("runSingleFinishSettlementTransaction({")
     const singleSettleBinding = singleOrchestrator.indexOf(
         "settle: ({ activeQuest, player, questProgress }) => {",
@@ -247,7 +250,7 @@ test("single and multi production finish routes call the shared Awake battle sea
         singleSettleBinding,
     )
     assert.equal(singleTransactionBody >= 0, true, "single settlement writes function")
-    assert.equal(singleSeamCall > singleTransactionBody, true, "single shared Awake seam call")
+    assert.equal(singleSeamCall > singleTransactionBody, true, "single shared Awake evaluation seam call")
     assert.equal(singleTransactionCall >= 0, true, "single transaction call")
     assert.equal(singleSettleBinding > singleTransactionCall, true, "single transaction callback")
     assert.equal(singleWritesCall > singleSettleBinding, true, "single writes inside transaction callback")
@@ -255,14 +258,17 @@ test("single and multi production finish routes call the shared Awake battle sea
     const multiPath = "src/multi/settlement/orchestrator.ts"
     const multiSource = fs.readFileSync(path.join(__dirname, "..", multiPath), "utf8")
     const transactionBody = multiSource.indexOf("const executeFinishWrites = (")
-    const seamCall = multiSource.indexOf("settleAwakeBattleMissions({", transactionBody)
+    const seamCall = multiSource.indexOf(
+        "settleAwakeMissionCandidatesWithEvaluation(",
+        transactionBody,
+    )
     const transactionCall = multiSource.indexOf(
         "const writes = runMultiActiveQuestSettlementTransaction(",
         seamCall,
     )
     const settleBinding = multiSource.indexOf("executeFinishWrites,", transactionCall)
     assert.equal(transactionBody >= 0, true, `${multiPath} transaction body`)
-    assert.equal(seamCall > transactionBody, true, `${multiPath} shared Awake seam call`)
+    assert.equal(seamCall > transactionBody, true, `${multiPath} shared Awake evaluation seam call`)
     assert.equal(transactionCall > seamCall, true, `${multiPath} transaction call`)
     assert.equal(settleBinding >= transactionCall, true, `${multiPath} transaction callback`)
 })
