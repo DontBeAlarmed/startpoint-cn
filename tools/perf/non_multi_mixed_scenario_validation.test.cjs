@@ -297,7 +297,7 @@ test("gacha rejects null draw entries even when response counts match", async ()
     await assert.rejects(
         () => executeScenario(responseSequenceApp([{
             data_headers: { result_code: 1, viewer_id: identity.accountId },
-            data: { gacha_info_list: [] },
+            data: { gacha_info_list: [], user_info: { free_vmoney: 1000 } },
         }, {
             data_headers: { result_code: 1, viewer_id: identity.viewerId },
             data: {

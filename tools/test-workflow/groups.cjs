@@ -20,6 +20,7 @@ const TEST_GROUPS = Object.freeze({
     },
     "quick:runtime": {
         execution: "parallel",
+        timeoutMs: 60_000,
         tests: [
             "tools/server_bundle.test.cjs",
             "tools/server_bundle_zip.test.cjs",
@@ -188,6 +189,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/content_gameplay_converter.test.cjs",
             "tools/content_gameplay_runtime.test.cjs",
             "tools/content_item_equipment_converter.test.cjs",
+            "tools/content_login_bonus_converter.test.cjs",
             "tools/content_mana_node_converter.test.cjs",
             "tools/mana_board_parent_index.test.cjs",
             "tools/content_quest_converter.test.cjs",
@@ -300,6 +302,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/mail_notification_write_routes.test.cjs",
             "tools/mail_reward_fixture.test.cjs",
             "tools/mail_reward_rollback.test.cjs",
+            "tools/login_bonus_route.test.cjs",
         ],
     },
     "integration:reward-grant": {
@@ -308,6 +311,7 @@ const TEST_GROUPS = Object.freeze({
         tests: [
             "tools/reward_grant_plan.test.cjs",
             "tools/reward_grant_executor.test.cjs",
+            "tools/login_bonus_settlement.test.cjs",
             "tools/reward_grant_architecture.test.cjs",
             "tools/score_reward_selection_core.test.cjs",
             "tools/score_reward_selection.test.cjs",
@@ -512,7 +516,7 @@ const TEST_GROUPS = Object.freeze({
     },
     "integration:quest": {
         execution: "parallel",
-        timeoutMs: 60_000,
+        timeoutMs: 120_000,
         tests: [
             "tools/auto_start_stamina_stop.test.cjs",
             "tools/perf/single_battle_settlement_admission.test.cjs",

@@ -224,7 +224,10 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     assert.equal(countOccurrences(singleBattleSource, "publishAwakeCharacterListBestEffort("), 1)
     assert.equal(countOccurrences(singleAwakeWrapperSource, "reconcileAwakeUnlockCharacterList("), 1)
     assert.match(singleAwakeWrapperSource, /collectAwakeCandidateCharacterIds\(/)
-    assert.match(singleAwakeWrapperSource, /createAwakeRequestContextBestEffort\(playerId, candidateCharacterIds\)/)
+    assert.match(
+        singleAwakeWrapperSource,
+        /createAwakeRequestContextBestEffort\(\s*playerId,\s*candidateCharacterIds,\s*scope,\s*\)/,
+    )
     assert.match(singleAwakeWrapperSource, /from ["']\.\/awake-unlock-response["']/)
 
     for (const source of routeSources.filter(source => source !== singleBattleSource)) {
@@ -236,8 +239,12 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     assert.equal(singleBattleCall > singleBattleSource.indexOf("givePlayerCharactersExpSync("), true)
     assert.equal(singleBattleCall > singleBattleSource.indexOf("handleRushEventFinish("), true)
     assert.equal(singleBattleCall > singleBattleSource.indexOf("handleCarnivalEventFinish({"), true)
-    const singleBattleMergeBlock = singleBattleSource.slice(
+    const singleBattlePublicationPreparation = singleBattleSource.lastIndexOf(
+        "prepareSingleAwakePublication({",
         singleBattleCall,
+    )
+    const singleBattleMergeBlock = singleBattleSource.slice(
+        singleBattlePublicationPreparation,
         singleBattleSource.indexOf("\n\n    return", singleBattleCall),
     )
     for (const existingSegment of [
@@ -381,7 +388,7 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     assert.deepEqual(multiCall.arguments.slice(0, 1), ["input.playerId"])
     assert.deepEqual(multiCall.arguments.slice(1), [
         "existingCharacterList",
-        "{ context: awakeContext, candidateCharacterIds }",
+        "{ context: awakeContext }",
     ])
     const multiCharacterListSource = multiSettlementSource.slice(
         multiSettlementSource.indexOf("const existingCharacterList = ["),
@@ -395,7 +402,7 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     ]) {
         assert.equal(multiCharacterListSource.includes(existingSegment), true)
     }
-    assert.equal(multiCall.position > multiSettlementSource.indexOf("const executeFinishWrites = () =>"), true)
+    assert.equal(multiCall.position > multiSettlementSource.indexOf("const executeFinishWrites ="), true)
     for (const persistenceCall of [
         "insertPlayerQuestProgressSync",
         "updatePlayerQuestProgressSync",
@@ -422,7 +429,7 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     assert.deepEqual(activeMissionCall.arguments, [
         "playerId",
         "existingCharacterList",
-        "{ context: awakeContext, candidateCharacterIds }",
+        "{ context: awakeContext }",
     ])
     assert.equal(activeMissionCall.position > activeReceiveBlock.indexOf("if (!validation.ok)"), true)
     assert.equal(activeMissionCall.position > getLastCallPosition(activeReceiveBlock, "updatePlayerActiveMissionStageSync"), true)
@@ -440,11 +447,12 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     const boxReadOnlyBlock = getRouteBlock(boxGachaSource, "/get_box_list")
     const boxGachaCall = getOnlyCall(boxExecBlock, "reconcileAwakeUnlockCharacterList")
     assert.equal(findCalls(boxGachaSource, "reconcileAwakeUnlockCharacterList").length, 1)
-    assert.deepEqual(boxGachaCall.arguments, [
+    assert.deepEqual(boxGachaCall.arguments.slice(0, 3), [
         "playerId",
         "settlement.rewardResult?.joined_character_id_list ?? []",
         "[existingCharacterList]",
     ])
+    assert.match(boxGachaCall.arguments[3], /invalidatedFactKeys: getAwakeFactKeysFromLegacyRewardResults/)
     assert.equal(boxGachaCall.position > boxExecBlock.indexOf("if (playerBoxData !== null && playerBoxData.isClosed)"), true)
     for (const persistenceCall of [
         "rewardPlayerBoxGachaResultSync",
@@ -482,7 +490,7 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
     assert.equal(findCalls(gachaEquipmentBlock, "reconcileAwakeUnlockCharacterList").length, 0)
 
     const gachaExchangeCall = getOnlyCall(gachaCharacterBlock, "reconcileAwakeUnlockCharacterList")
-    assert.deepEqual(gachaExchangeCall.arguments, ["playerId", "[characterId]", "[existingCharacterList]"])
+    assert.deepEqual(gachaExchangeCall.arguments, ["playerId", "[characterId]", "[existingCharacterList]", "{}"])
     assert.deepEqual(gachaExchangeCall.conditionalConditions, [])
     assert.equal(gachaExchangeCall.position > getLastCallPosition(gachaCharacterBlock, "givePlayerCharacterSync"), true)
     assert.equal(gachaExchangeCall.position > getLastCallPosition(gachaCharacterBlock, "updatePlayerGachaInfoSync"), true)
@@ -494,7 +502,7 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
     assert.deepEqual(findPropertyAssignmentValues(gachaCharacterBlock, "character_list"), ["characterList"])
 
     const gachaExecCall = getOnlyCall(gachaExecBlock, "reconcileAwakeUnlockCharacterList")
-    assert.deepEqual(gachaExecCall.arguments, ["playerId", "[]", "[existingCharacterList]"])
+    assert.deepEqual(gachaExecCall.arguments, ["playerId", "[]", "[existingCharacterList]", "{}"])
     assert.deepEqual(gachaExecCall.conditionalConditions, [])
     for (const persistenceCall of [
         "rewardPlayerGachaDrawResultSync",
@@ -521,6 +529,7 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
         "playerId",
         "kind === 0 ? [targetId] : []",
         "[settlement.characterList]",
+        "{}",
     ])
     assert.deepEqual(starCrumbCall.conditionalConditions, [])
     assert.equal(starCrumbCall.position > getLastCallPosition(starCrumbBlock, "givePlayerCharacterSync"), true)
@@ -534,7 +543,7 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
     const townGrantBlock = getRouteBlock(characterSource, "/add_character_from_town")
     const townCall = getOnlyCall(townGrantBlock, "reconcileAwakeUnlockCharacterList")
     assert.equal(findCalls(characterSource, "reconcileAwakeUnlockCharacterList").length, 1)
-    assert.deepEqual(townCall.arguments, ["playerId", "[characterId]", "[existingCharacterList]"])
+    assert.deepEqual(townCall.arguments, ["playerId", "[characterId]", "[existingCharacterList]", "{}"])
     assert.deepEqual(townCall.conditionalConditions, [])
     assert.equal(townCall.position > getLastCallPosition(townGrantBlock, "givePlayerCharacterSync"), true)
     assert.equal(findCalls(townGrantBlock, "getPlayerCharacterSync").length, 0)

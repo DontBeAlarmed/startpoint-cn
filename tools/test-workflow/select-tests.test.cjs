@@ -560,6 +560,7 @@ test("maps the public reward grant layer and its regressions to one focused leaf
     const tests = [
         "tools/reward_grant_plan.test.cjs",
         "tools/reward_grant_executor.test.cjs",
+        "tools/login_bonus_settlement.test.cjs",
         "tools/reward_grant_architecture.test.cjs",
         "tools/score_reward_selection_core.test.cjs",
         "tools/score_reward_selection.test.cjs",
@@ -794,6 +795,7 @@ test("registers mission fact requirements in the mission integration suite", () 
 test("registers focused runtime state and socket smoke groups", () => {
     assert.deepEqual(TEST_GROUPS["quick:runtime"], {
         execution: "parallel",
+        timeoutMs: 60_000,
         tests: [
             "tools/server_bundle.test.cjs",
             "tools/server_bundle_zip.test.cjs",
@@ -1299,6 +1301,7 @@ test("keeps isolated test groups parallel while infrastructure groups stay seria
     for (const group of AGGREGATE_GROUPS.quick) {
         assert.equal(TEST_GROUPS[group].execution, "parallel")
     }
+    assert.equal(TEST_GROUPS["quick:runtime"].timeoutMs, 60_000)
     assert.equal(TEST_GROUPS["integration:compiled"].execution, "parallel")
     assert.equal(TEST_GROUPS["integration:runtime"].execution, "serial")
     assert.equal(TEST_GROUPS["integration:mission-compiled"].execution, "parallel")
@@ -1309,7 +1312,7 @@ test("keeps isolated test groups parallel while infrastructure groups stay seria
     assert.equal(TEST_GROUPS["integration:mission"].timeoutMs, 120_000)
     assert.equal(TEST_GROUPS["integration:party"].execution, "parallel")
     assert.equal(TEST_GROUPS["integration:quest"].execution, "parallel")
-    assert.equal(TEST_GROUPS["integration:quest"].timeoutMs, 60_000)
+    assert.equal(TEST_GROUPS["integration:quest"].timeoutMs, 120_000)
     assert.equal(TEST_GROUPS["integration:cdn"].execution, "serial")
 })
 
@@ -1580,6 +1583,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/mail_notification_write_routes.test.cjs",
         "tools/mail_reward_fixture.test.cjs",
         "tools/mail_reward_rollback.test.cjs",
+        "tools/login_bonus_route.test.cjs",
     ])
     assert.deepEqual(
         selectTestGroups(["src/lib/item-use-settlement.ts"]),

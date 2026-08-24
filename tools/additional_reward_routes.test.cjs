@@ -15,7 +15,7 @@ function assertSettlementInsideFinishTransaction(
     source,
     label,
     transactionCall,
-    transactionBodyCall = "const executeFinishWrites = () => {",
+    transactionBodyCall = "const executeFinishWrites =",
 ) {
     const transactionBody = source.indexOf(transactionBodyCall)
     const settlement = source.indexOf("settleAdditionalRewardsSync(", transactionBody)

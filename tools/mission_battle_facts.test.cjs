@@ -185,6 +185,10 @@ const singleProjectorSource = fs.readFileSync(
     path.join(__dirname, "../src/lib/quest/finish/single-response-projector.ts"),
     "utf8",
 )
+const singleMissionPublicationSource = fs.readFileSync(
+    path.join(__dirname, "../src/lib/quest/finish/single-mission-publication.ts"),
+    "utf8",
+)
 const singleTransactionStart = singleBattleSource.indexOf("export function executeSingleSettlementWrites(")
 const singleEvaluationTime = singleBattleSource.indexOf(
     "const settlementTime = new Date(getServerTime() * 1000)",
@@ -198,13 +202,24 @@ const singleCharacterExp = singleBattleSource.indexOf(
     "givePlayerCharactersExpSync(",
     singleFactCall,
 )
-const singleSettlementTime = singleBattleSource.indexOf(
-    "settleSingleBattleMissionCategories(playerId, partyCharacterIds, settlementTime,",
-    singleFactCall,
+const singleMissionEvaluationCall = singleBattleSource.indexOf(
+    "settleSingleMissionEvaluations({",
+    singleCharacterExp,
 )
-const singleAwakeSettlement = singleBattleSource.indexOf(
-    "settleAwakeBattleMissions({",
+const singleSettlementTime = singleMissionPublicationSource.indexOf(
+    "settleMissionCategoriesWithEvaluation(",
+)
+const singleAwakeSettlement = singleMissionPublicationSource.indexOf(
+    "settleAwakeMissionCandidatesWithEvaluation(",
     singleSettlementTime,
+)
+const singleAwakeFinalization = singleBattleSource.indexOf(
+    "finalizeSingleAwakePublicationWrites(playerId, isScoreAttackEvent)",
+    singleMissionEvaluationCall,
+)
+const singleAwakePublication = singleBattleSource.indexOf(
+    "publishAwakeCharacterListBestEffort(",
+    singleAwakeFinalization,
 )
 const singleGeneralMerge = singleProjectorSource.indexOf(
     "...missionSettlement,",
@@ -227,13 +242,16 @@ const singleWritesBinding = singleOrchestratorSource.indexOf(
 assert.equal(singleEvaluationTime > singleTransactionStart, true, "单人 finish 必须在事务体内固定任务时间")
 assert.equal(singleFactCall > singleEvaluationTime, true, "单人任务事实必须使用事务时间")
 assert.equal(singleCharacterExp > singleFactCall, true, "单人角色经验必须在任务事实后写入")
-assert.equal(singleSettlementTime > singleCharacterExp, true, "单人称号结算必须看到本场角色经验")
-assert.equal(singleAwakeSettlement > singleFactCall, true, "单人 finish 必须把本场 facts 传入觉醒 seam")
+assert.equal(singleMissionEvaluationCall > singleCharacterExp, true, "单人称号结算必须看到本场角色经验")
+assert.equal(singleSettlementTime >= 0, true, "单人 finish 必须调用通用任务结算")
+assert.equal(singleAwakeSettlement >= 0, true, "单人 finish 必须把本场 facts 传入觉醒 seam")
 assert.equal(singleAwakeSettlement > singleSettlementTime, true, "单人觉醒 seam 必须位于通用结算之后")
+assert.equal(singleAwakeFinalization > singleMissionEvaluationCall, true, "单人 finish 必须在任务结算后清理 active quest")
+assert.equal(singleAwakePublication > singleAwakeFinalization, true, "单人 character_list 必须在 active quest 清理后发布")
 assert.equal(singleGeneralMerge >= 0 && singleAwakeMerge > singleGeneralMerge, true, "单人响应必须先合并通用结算再合并觉醒结算")
 assert.match(
     singleBattleSource,
-    /reconcileAwakeUnlockCharacterList\(playerId, \[[\s\S]*?\.\.\.awakeMissionSettlement\.characterList/,
+    /publishAwakeCharacterListBestEffort\(\s*playerId,\s*partyCharacterIds,[\s\S]*?awakePublication\.characterLists/,
     "单人 character_list 必须在 reconcile 前包含觉醒奖励与解锁更新",
 )
 assert.match(
@@ -253,7 +271,7 @@ const multiResponseSource = fs.readFileSync(
     path.join(__dirname, "../src/multi/settlement/response.ts"),
     "utf8",
 )
-const multiTransactionStart = multiBattleSource.indexOf("const executeFinishWrites = () => {")
+const multiTransactionStart = multiBattleSource.indexOf("const executeFinishWrites =")
 const multiEvaluationTime = multiBattleSource.indexOf(
     "const settlementTime = new Date(getServerTime() * 1000)",
     multiTransactionStart,
@@ -271,7 +289,7 @@ const multiSettlementTime = multiBattleSource.indexOf(
     multiFactCall,
 )
 const multiAwakeSettlement = multiBattleSource.indexOf(
-    "settleAwakeBattleMissions({",
+    "settleAwakeMissionCandidatesWithEvaluation(",
     multiSettlementTime,
 )
 const multiGeneralMerge = multiResponseSource.indexOf(
@@ -294,7 +312,7 @@ assert.equal(multiAwakeSettlement > multiSettlementTime, true, "多人觉醒 sea
 assert.equal(multiGeneralMerge >= 0 && multiAwakeMerge > multiGeneralMerge, true, "多人响应必须先合并通用结算再合并觉醒结算")
 assert.match(
     multiBattleSource,
-    /reconcileAwakeUnlockCharacterList\(input\.playerId, \[[\s\S]*?\.\.\.awakeMissionSettlement\.characterList/,
+    /const existingCharacterList = \[[\s\S]*?awakeMissionSettlement\.characterList[\s\S]*?reconcileAwakeUnlockCharacterListBestEffort\(\s*input\.playerId,\s*existingCharacterList,/,
     "多人 character_list 必须在 reconcile 前包含觉醒奖励与解锁更新",
 )
 assert.equal(multiTransactionCall > multiFactCall, true, "任务事实必须在事务体执行后统一提交")

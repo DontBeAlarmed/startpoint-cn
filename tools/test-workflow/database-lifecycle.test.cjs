@@ -281,12 +281,16 @@ test("default schema migration preserves v6 players and creates cascading Pass t
 
     data.initializeDatabase({ paths })
     const migrated = getDb()
-    assert.equal(migrated.pragma("user_version", { simple: true }), 17)
+    assert.equal(migrated.pragma("user_version", { simple: true }), 18)
     assert.deepEqual(
         migrated.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'players_character_election_votes'").get(),
         { name: "players_character_election_votes" },
     )
     assert.equal(migrated.prepare("SELECT name FROM players WHERE id = ?").get(playerId).name, "schema-v6-player")
+    assert.deepEqual(
+        migrated.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'players_login_bonus_progress'").get(),
+        { name: "players_login_bonus_progress" },
+    )
     assert.deepEqual(
         migrated.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'players_pass_card%'")
             .all().map(row => row.name).sort(),
@@ -356,7 +360,7 @@ test("default schema migrates schema 14 active quests to battle session and coor
 
     data.initializeDatabase({ paths })
 
-    assert.equal(getDb().pragma("user_version", { simple: true }), 17)
+    assert.equal(getDb().pragma("user_version", { simple: true }), 18)
     assert.equal(
         getDb().pragma("table_info(players_active_quests)")
             .some(column => column.name === "battle_session_id" && column.notnull === 0),
@@ -400,7 +404,7 @@ test("default schema migrates schema 15 databases to player history storage", t 
     fs.writeFileSync(paths.databaseVersionFile, "15")
 
     data.initializeDatabase({ paths })
-    assert.equal(getDb().pragma("user_version", { simple: true }), 17)
+    assert.equal(getDb().pragma("user_version", { simple: true }), 18)
     assert.deepEqual(
         getDb().prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'players_player_history_settings'").get(),
         { name: "players_player_history_settings" },

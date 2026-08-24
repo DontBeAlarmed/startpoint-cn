@@ -182,6 +182,16 @@ test("player save registry covers every current player-owned table", () => {
     assert.deepEqual([...new Set([...registered, ...excluded])].sort(), discovered)
     assert.equal(new Set([...registered, ...excluded]).size, discovered.length)
     assert.deepEqual(excluded, ["players_active_quests"])
+    assert.deepEqual(
+        PLAYER_SAVE_TABLES.find(table => table.name === "players_login_bonus_progress"),
+        {
+            name: "players_login_bonus_progress",
+            domain: "events",
+            introducedSchema: 18,
+            regenerateColumns: undefined,
+            clonePolicy: undefined,
+        },
+    )
 })
 
 test("player table discovery follows indirect foreign-key ownership", () => {
@@ -255,6 +265,12 @@ test("v2 export includes all registered domains and excludes transient battle st
             character_ids, unison_character_ids, topic_visibility
         ) VALUES (?, 1, 2, 1, '[1,null,null]', '[null,null,null]', '{"100":true}')
     `).run(playerId)
+    db.prepare(`
+        INSERT INTO players_login_bonus_progress (
+            player_id, group_id, last_granted_index,
+            last_granted_business_day, received_at, shown_at
+        ) VALUES (?, 'normal_2022', 3, '2026-08-24', 1787500000, NULL)
+    `).run(playerId)
 
     const snapshot = exportPlayerSaveV2Sync(playerId)
     const tables = allSnapshotTables(snapshot)
@@ -263,7 +279,7 @@ test("v2 export includes all registered domains and excludes transient battle st
     assert.equal(snapshot.formatVersion, 2)
     assert.equal(snapshot.version, 2)
     assert.equal(snapshot.mode, "backup")
-    assert.equal(snapshot.producer.dbSchemaVersion, 17)
+    assert.equal(snapshot.producer.dbSchemaVersion, 18)
     assert.equal(snapshot.playerId, playerId)
     assert.equal(tables.players_mails[0].subject, "backup-mail")
     assert.equal(tables.players_box_gacha_drawn_rewards[0].number, 3)
@@ -271,6 +287,14 @@ test("v2 export includes all registered domains and excludes transient battle st
     assert.equal(tables.players_shop_campaign_lineups[0].lineup_id, 1010)
     assert.equal(tables.players_score_attack_battle_history[0].play_id, "save-v2-play")
     assert.equal(tables.players_player_history_settings[0].background_card_id, 2)
+    assert.deepEqual(tables.players_login_bonus_progress, [{
+        player_id: playerId,
+        group_id: "normal_2022",
+        last_granted_index: 3,
+        last_granted_business_day: "2026-08-24",
+        received_at: 1787500000,
+        shown_at: null,
+    }])
     assert.equal(Object.hasOwn(tables, "players_active_quests"), false)
     assert.deepEqual(snapshot.excludedDomains, ["account", "session", "serverConfig", "activeQuest"])
 })
@@ -322,9 +346,21 @@ test("restore preserves target identity, replaces all domains, and clears active
             character_ids, unison_character_ids, topic_visibility
         ) VALUES (?, 1, 3, 1, '[1,null,null]', '[null,null,null]', '{"101":false}')
     `).run(sourceId)
+    db.prepare(`
+        INSERT INTO players_login_bonus_progress (
+            player_id, group_id, last_granted_index,
+            last_granted_business_day, received_at, shown_at
+        ) VALUES (?, 'normal_2022', 4, '2026-08-24', 1787500100, 1787500200)
+    `).run(sourceId)
 
     db.prepare("UPDATE players SET name = 'target-before' WHERE id = ?").run(targetId)
     db.prepare("INSERT INTO players_items (id, amount, player_id) VALUES (99999, 2, ?)").run(targetId)
+    db.prepare(`
+        INSERT INTO players_login_bonus_progress (
+            player_id, group_id, last_granted_index,
+            last_granted_business_day, received_at, shown_at
+        ) VALUES (?, 'stale', 1, '2026-08-23', 1787400000, NULL)
+    `).run(targetId)
     db.prepare(`
         INSERT INTO players_active_quests (player_id, play_id, quest_id, category)
         VALUES (?, 'must-clear', 1001, 1)
@@ -380,6 +416,20 @@ test("restore preserves target identity, replaces all domains, and clears active
         db.prepare("SELECT background_card_id FROM players_player_history_settings WHERE player_id = ?").get(targetId).background_card_id,
         3,
     )
+    assert.deepEqual(
+        db.prepare(`
+            SELECT group_id, last_granted_index, last_granted_business_day, received_at, shown_at
+            FROM players_login_bonus_progress
+            WHERE player_id = ?
+        `).get(targetId),
+        {
+            group_id: "normal_2022",
+            last_granted_index: 4,
+            last_granted_business_day: "2026-08-24",
+            received_at: 1787500100,
+            shown_at: 1787500200,
+        },
+    )
     assert.notEqual(db.prepare("SELECT id FROM players_mails WHERE player_id = ?").get(targetId).id, sourceMailId)
 })
 
@@ -389,7 +439,7 @@ test("v2 validation rejects future schemas and missing tables that existed in th
     const snapshot = exportPlayerSaveV2Sync(playerId)
 
     const future = cloneJson(snapshot)
-    future.producer.dbSchemaVersion = 18
+    future.producer.dbSchemaVersion = 19
     assert.throws(() => restorePlayerSaveV2Sync(future, playerId), /newer.*schema|future.*schema/i)
 
     const missingCurrent = cloneJson(snapshot)
@@ -431,6 +481,11 @@ test("v2 validation rejects future schemas and missing tables that existed in th
     delete schema15.domains.core.tables.players_player_history_settings
     assert.doesNotThrow(() => restorePlayerSaveV2Sync(schema15, playerId))
 
+    const schema17 = cloneJson(snapshot)
+    schema17.producer.dbSchemaVersion = 17
+    delete schema17.domains.events.tables.players_login_bonus_progress
+    assert.doesNotThrow(() => restorePlayerSaveV2Sync(schema17, playerId))
+
     const conflictingVersion = cloneJson(snapshot)
     conflictingVersion.version = 1
     assert.throws(() => validatePlayerSaveSnapshotSync(conflictingVersion), /version.*conflict/i)
@@ -458,6 +513,12 @@ test("clone creates a new save under the destination account and reallocates row
         INSERT INTO players_receive_history (player_id, type, type_id, number, reason_id, create_time)
         VALUES (?, 1, 30005, 1, 0, ?)
     `).run(sourceId, new Date().toISOString())
+    db.prepare(`
+        INSERT INTO players_login_bonus_progress (
+            player_id, group_id, last_granted_index,
+            last_granted_business_day, received_at, shown_at
+        ) VALUES (?, 'normal_2022', 2, '2026-08-24', 1787500300, NULL)
+    `).run(sourceId)
     const sourceRowId = db.prepare("SELECT id FROM players_receive_history WHERE player_id = ?").get(sourceId).id
 
     const result = clonePlayerSaveV2Sync(exportPlayerSaveV2Sync(sourceId), destinationAccount.id)
@@ -471,6 +532,20 @@ test("clone creates a new save under the destination account and reallocates row
         name: "clone-source",
     })
     assert.notEqual(clonedRowId, sourceRowId)
+    assert.deepEqual(
+        db.prepare(`
+            SELECT group_id, last_granted_index, last_granted_business_day, received_at, shown_at
+            FROM players_login_bonus_progress
+            WHERE player_id = ?
+        `).get(result.playerId),
+        {
+            group_id: "normal_2022",
+            last_granted_index: 2,
+            last_granted_business_day: "2026-08-24",
+            received_at: 1787500300,
+            shown_at: null,
+        },
+    )
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM players_active_quests WHERE player_id = ?").get(result.playerId).count, 0)
 })
 
@@ -580,6 +655,12 @@ test("legacy v1 restore updates legacy fields without deleting newer domains", (
             player_id, shop_type, campaign_id, lineup_id, selected_at
         ) VALUES (?, 4, 10, 1010, ?)
     `).run(playerId, new Date().toISOString())
+    db.prepare(`
+        INSERT INTO players_login_bonus_progress (
+            player_id, group_id, last_granted_index,
+            last_granted_business_day, received_at, shown_at
+        ) VALUES (?, 'normal_2022', 4, '2026-08-24', 1787500400, NULL)
+    `).run(playerId)
 
     const dataV1 = cloneJson(getMergedPlayerDataSync(playerId))
     dataV1.player.name = "legacy-name-restored"
@@ -598,6 +679,20 @@ test("legacy v1 restore updates legacy fields without deleting newer domains", (
     assert.equal(
         db.prepare("SELECT number FROM players_box_gacha_drawn_rewards WHERE player_id = ? AND gacha_id = 88").get(playerId).number,
         3,
+    )
+    assert.deepEqual(
+        db.prepare(`
+            SELECT group_id, last_granted_index, last_granted_business_day, received_at, shown_at
+            FROM players_login_bonus_progress
+            WHERE player_id = ?
+        `).get(playerId),
+        {
+            group_id: "normal_2022",
+            last_granted_index: 4,
+            last_granted_business_day: "2026-08-24",
+            received_at: 1787500400,
+            shown_at: null,
+        },
     )
 })
 

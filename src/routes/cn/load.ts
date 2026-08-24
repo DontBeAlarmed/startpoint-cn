@@ -23,6 +23,7 @@ import {
     type AssetProviderConfig,
 } from "../../content/cdn/asset-mode";
 import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json";
+import bundledNormalLoginBonuses from "../../../assets/login_bonus_normal.json";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 import { reconcileActiveMissionFactsWithResult } from "../../lib/mission/active-reconciliation";
 import { recordEventLoginMissionFactSync } from "../../lib/mission/event-entry-facts";
@@ -37,6 +38,11 @@ import type {
     MultiBattleRecoveryInspection,
     MultiSettlementIdentity,
 } from "../../multi/settlement/verifier";
+import {
+    settleNormalLoginBonusSync,
+    type NormalLoginBonusSettlement,
+} from "../../lib/login-bonus";
+import type { NormalLoginBonusCatalog } from "../../content/converters/login-bonus";
 
 interface CnLoadBody {
     device_id: number;
@@ -97,6 +103,8 @@ function wrapOptionFields(
     d.mission_tips = false;
     d.monthly_tip = false;
     d.simple_payment_item_list = [];
+    d.premium_bonus_index_list = [];
+    d.premium_bonus_mailed_item_list = [];
     d.ex_boost_draw_result = null;
     d.pass_force_reward = false;
     d.crazy_gacha_result_list = [];
@@ -215,6 +223,23 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             player = refreshedPlayer;
         }
 
+        const loginBonusSettlement: NormalLoginBonusSettlement = settleNormalLoginBonusSync({
+            playerId,
+            virtualNowMs: now.getTime(),
+            dailyResetHour: options.dailyResetHour ?? 5,
+            catalog: getRuntimeContentTableSync(
+                "login_bonus_normal.json",
+                bundledNormalLoginBonuses as NormalLoginBonusCatalog,
+            ),
+        });
+        if (loginBonusSettlement.status === "granted") {
+            const refreshedPlayer = getPlayerSync(playerId);
+            if (refreshedPlayer === null) {
+                return reply.status(500).send({ error: "Internal Server Error", message: "No player data." });
+            }
+            player = refreshedPlayer;
+        }
+
         // 若自定义时间与 lastLogin 不同步，强制对齐（防止客户端弹"日期变了"）
         if (now.toDateString() !== player.lastLoginTime.toDateString()) {
             updatePlayerSync({ id: player.id, lastLoginTime: now });
@@ -301,6 +326,17 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                 host: options.httpDisplayHost ?? "127.0.0.1",
                 port: options.httpPort ?? 8001,
             });
+            if (loginBonusSettlement.status === "none") {
+                clientData.bonus_index_list = [];
+                clientData.login_bonus_received_at = null;
+            } else {
+                clientData.bonus_index_list = [{
+                    bonus_group_id: loginBonusSettlement.bonus.groupId,
+                    bonus_group_type: "Normal",
+                    index: loginBonusSettlement.bonus.index,
+                }];
+                clientData.login_bonus_received_at = loginBonusSettlement.bonus.receivedAt;
+            }
 
             // Inject unfinished quest lists for battle recovery
             if (activeQuest) {

@@ -129,6 +129,7 @@ const tables = {
     "character_quest_lookup.json": require("../assets/character_quest_lookup.json"),
     "mission_char_awake_reward.json": require("../assets/mission_char_awake_reward.json"),
     "character.json": require("../assets/character.json"),
+    "login_bonus_normal.json": require("../assets/login_bonus_normal.json"),
     "mana_node.json": {},
     "mana_board2_open_condition.json": {},
     "mission_active.json": {

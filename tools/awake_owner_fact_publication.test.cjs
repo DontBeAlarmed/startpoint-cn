@@ -404,6 +404,7 @@ test("all existing global-fact owners pass bounded invalidations into fresh publ
         "utf8",
     )
     const single = source("src/lib/quest/finish/single-settlement-writes.ts")
+    const singlePublication = source("src/lib/quest/finish/single-mission-publication.ts")
     const multi = source("src/multi/settlement/orchestrator.ts")
 
     assert.match(source("src/routes/api/storyQuest.ts"), /invalidatedFactKeys:[\s\S]*questProgress/)
@@ -414,7 +415,7 @@ test("all existing global-fact owners pass bounded invalidations into fresh publ
     assert.equal((source("src/routes/api/shop.ts").match(/invalidatedFactKeys:/g) ?? []).length, 2)
     assert.equal((source("src/routes/api/mail.ts").match(/invalidatedFactKeys:/g) ?? []).length, 2)
     assert.match(single, /invalidatedFactKeys/)
-    assert.match(single, /questCategory\s*===\s*QuestCategory\.CHARACTER/)
+    assert.match(singlePublication, /input\.questCategory\s*===\s*QuestCategory\.CHARACTER/)
     assert.match(multi, /invalidatedFactKeys/)
     assert.match(multi, /questCategory\s*===\s*QuestCategory\.CHARACTER/)
 })

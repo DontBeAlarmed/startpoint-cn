@@ -354,7 +354,7 @@ test("all non-multi entries use isolated real CN HTTP journeys", async () => {
         resultCode: 1,
         gachaId: GACHA_ID,
         loadGachaInfoCount: 0,
-        currency: { before: 1000, after: 850, spent: 150 },
+        currency: { before: 1050, after: 900, spent: 150 },
         exchangePoint: { before: 0, after: 1, delta: 1 },
         receiveHistory: { before: 0, after: 1, delta: 1 },
         activeMissionGacha: { before: 0, after: 1, delta: 1 },

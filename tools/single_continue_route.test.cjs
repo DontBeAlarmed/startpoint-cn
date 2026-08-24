@@ -185,9 +185,9 @@ test("formal load restores persisted continue state before replay without a seco
     })
 
     assert.equal(replay.statusCode, 200, replay.body)
-    assert.deepEqual(decode(replay).data.user_info, { free_vmoney: 0, vmoney: 20 })
+    assert.deepEqual(decode(replay).data.user_info, { free_vmoney: 50, vmoney: 20 })
     assert.deepEqual(snapshotState(playerId), {
-        freeVmoney: 0,
+        freeVmoney: 50,
         vmoney: 20,
         storedContinueCount: 1,
         memoryContinueCount: 1,

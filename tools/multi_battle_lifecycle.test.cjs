@@ -169,15 +169,19 @@ test("multi battle routes use the shared lifecycle boundaries", () => {
         "getPlayerActiveQuestSync(playerId)",
         settlementTransaction,
     )
-    const settlementWrites = activeQuestService.indexOf("settle()", activeQuestRead)
+    const deleteFunction = activeQuestService.indexOf("const deleteOnce = () => {", activeQuestRead)
     const activeQuestDelete = activeQuestService.indexOf(
         "deletePlayerActiveQuestSync(playerId)",
-        settlementWrites,
+        deleteFunction,
     )
+    const settlementWrites = activeQuestService.indexOf("settle(deleteOnce)", activeQuestDelete)
+    const deleteAfterSettlement = activeQuestService.indexOf("deleteOnce()", settlementWrites)
     assert.ok(settlementTransaction >= 0)
     assert.ok(activeQuestRead > settlementTransaction)
-    assert.ok(settlementWrites > activeQuestRead)
-    assert.ok(activeQuestDelete > settlementWrites)
+    assert.ok(deleteFunction > activeQuestRead)
+    assert.ok(activeQuestDelete > deleteFunction)
+    assert.ok(settlementWrites > activeQuestDelete)
+    assert.ok(deleteAfterSettlement > settlementWrites)
     assert.match(source, /const entryCost = isRoomHost[\s\S]*?: undefined;/)
     assert.match(source, /const staminaCost = isRoomHost \? getStaminaCost\(questKey\)\.cost : 0;/)
     assert.doesNotMatch(source, /activeData\.continueCount\+\+/)

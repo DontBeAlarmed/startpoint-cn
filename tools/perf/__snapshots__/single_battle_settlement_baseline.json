@@ -1115,8 +1115,8 @@
       },
       "behaviorSha256": "f986576cd30d0ab1a447d185530e1ea7b1d2c3363df3d313e0b75ec34a2194a3",
       "sql": {
-        "statements": 124,
-        "selectStatements": 65,
+        "statements": 120,
+        "selectStatements": 61,
         "writeStatements": 49,
         "transactionStatements": 10,
         "byTable": {
@@ -1146,18 +1146,18 @@
             "writes": 1
           },
           "players_category_mission_stages": {
-            "statements": 9,
-            "reads": 4,
+            "statements": 8,
+            "reads": 3,
             "writes": 5
           },
           "players_category_missions": {
-            "statements": 10,
-            "reads": 4,
+            "statements": 9,
+            "reads": 3,
             "writes": 6
           },
           "players_character_awake_unlocks": {
-            "statements": 4,
-            "reads": 2,
+            "statements": 3,
+            "reads": 1,
             "writes": 2
           },
           "players_character_quest_clears": {
@@ -1214,11 +1214,6 @@
             "statements": 2,
             "reads": 1,
             "writes": 1
-          },
-          "players_party_member_co_clears": {
-            "statements": 1,
-            "reads": 1,
-            "writes": 0
           },
           "players_party_race_clears": {
             "statements": 1,
@@ -1396,14 +1391,14 @@
       },
       "behaviorSha256": "ece93a5759d57939832dd018021034f586638e6c14584eb71c241c6f4ff00a9e",
       "sql": {
-        "statements": 123,
-        "selectStatements": 64,
-        "writeStatements": 49,
-        "transactionStatements": 10,
+        "statements": 106,
+        "selectStatements": 50,
+        "writeStatements": 48,
+        "transactionStatements": 8,
         "byTable": {
           "players": {
-            "statements": 13,
-            "reads": 7,
+            "statements": 12,
+            "reads": 6,
             "writes": 6
           },
           "players_active_mission_counters": {
@@ -1427,38 +1422,38 @@
             "writes": 1
           },
           "players_category_mission_stages": {
-            "statements": 9,
-            "reads": 4,
+            "statements": 7,
+            "reads": 2,
             "writes": 5
           },
           "players_category_missions": {
-            "statements": 10,
-            "reads": 4,
+            "statements": 8,
+            "reads": 2,
             "writes": 6
           },
           "players_character_awake_unlocks": {
-            "statements": 4,
-            "reads": 2,
-            "writes": 2
+            "statements": 1,
+            "reads": 0,
+            "writes": 1
           },
           "players_character_quest_clears": {
-            "statements": 4,
-            "reads": 2,
+            "statements": 3,
+            "reads": 1,
             "writes": 2
           },
           "players_characters": {
-            "statements": 6,
-            "reads": 5,
+            "statements": 5,
+            "reads": 4,
             "writes": 1
           },
           "players_characters_bond_tokens": {
-            "statements": 5,
-            "reads": 5,
+            "statements": 4,
+            "reads": 4,
             "writes": 0
           },
           "players_characters_mana_nodes": {
-            "statements": 6,
-            "reads": 6,
+            "statements": 4,
+            "reads": 4,
             "writes": 0
           },
           "players_collected_items": {
@@ -1491,11 +1486,6 @@
             "reads": 1,
             "writes": 1
           },
-          "players_party_member_co_clears": {
-            "statements": 1,
-            "reads": 1,
-            "writes": 0
-          },
           "players_party_race_clears": {
             "statements": 1,
             "reads": 0,
@@ -1512,8 +1502,8 @@
             "writes": 0
           },
           "players_quest_progress": {
-            "statements": 6,
-            "reads": 5,
+            "statements": 5,
+            "reads": 4,
             "writes": 1
           },
           "server_gameplay_settings": {
@@ -2108,8 +2098,8 @@
       },
       "behaviorSha256": "462252424112a5e57dcd4d1e50d3d7f905dac2209b8a00fdecfe357369a894f2",
       "sql": {
-        "statements": 102,
-        "selectStatements": 62,
+        "statements": 97,
+        "selectStatements": 57,
         "writeStatements": 28,
         "transactionStatements": 12,
         "byTable": {
@@ -2144,23 +2134,23 @@
             "writes": 1
           },
           "players_category_mission_stages": {
-            "statements": 5,
-            "reads": 4,
+            "statements": 4,
+            "reads": 3,
             "writes": 1
           },
           "players_category_missions": {
-            "statements": 8,
-            "reads": 5,
+            "statements": 7,
+            "reads": 4,
             "writes": 3
           },
           "players_character_awake_unlocks": {
-            "statements": 2,
-            "reads": 2,
+            "statements": 1,
+            "reads": 1,
             "writes": 0
           },
           "players_character_quest_clears": {
-            "statements": 3,
-            "reads": 1,
+            "statements": 2,
+            "reads": 0,
             "writes": 2
           },
           "players_characters": {
@@ -2212,11 +2202,6 @@
             "statements": 2,
             "reads": 1,
             "writes": 1
-          },
-          "players_party_member_co_clears": {
-            "statements": 1,
-            "reads": 1,
-            "writes": 0
           },
           "players_party_race_clears": {
             "statements": 1,
@@ -3963,8 +3948,8 @@
       },
       "behaviorSha256": "fd4065b26542248c03268f017e59d4e95d2c0be6b7bd74d8efd679d0e10c5082",
       "sql": {
-        "statements": 96,
-        "selectStatements": 61,
+        "statements": 92,
+        "selectStatements": 57,
         "writeStatements": 25,
         "transactionStatements": 10,
         "byTable": {
@@ -3994,18 +3979,18 @@
             "writes": 1
           },
           "players_category_mission_stages": {
-            "statements": 5,
-            "reads": 4,
+            "statements": 4,
+            "reads": 3,
             "writes": 1
           },
           "players_category_missions": {
-            "statements": 9,
-            "reads": 4,
+            "statements": 8,
+            "reads": 3,
             "writes": 5
           },
           "players_character_awake_unlocks": {
-            "statements": 3,
-            "reads": 2,
+            "statements": 2,
+            "reads": 1,
             "writes": 1
           },
           "players_character_quest_clears": {
@@ -4057,11 +4042,6 @@
             "statements": 2,
             "reads": 1,
             "writes": 1
-          },
-          "players_party_member_co_clears": {
-            "statements": 1,
-            "reads": 1,
-            "writes": 0
           },
           "players_party_race_clears": {
             "statements": 1,

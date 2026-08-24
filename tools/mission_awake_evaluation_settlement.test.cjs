@@ -231,14 +231,21 @@ test("single and multi production finish routes call the shared Awake evaluation
         path.join(__dirname, "../src/lib/quest/finish/single-settlement-writes.ts"),
         "utf8",
     )
+    const singleMissionPublication = fs.readFileSync(
+        path.join(__dirname, "../src/lib/quest/finish/single-mission-publication.ts"),
+        "utf8",
+    )
     const singleOrchestrator = fs.readFileSync(
         path.join(__dirname, "../src/lib/quest/finish/single-orchestrator.ts"),
         "utf8",
     )
     const singleTransactionBody = singleWrites.indexOf("export function executeSingleSettlementWrites(")
-    const singleSeamCall = singleWrites.indexOf(
-        "settleAwakeMissionCandidatesWithEvaluation(",
+    const singleEvaluationCall = singleWrites.indexOf(
+        "settleSingleMissionEvaluations({",
         singleTransactionBody,
+    )
+    const singleSeamCall = singleMissionPublication.indexOf(
+        "settleAwakeMissionCandidatesWithEvaluation(",
     )
     const singleTransactionCall = singleOrchestrator.indexOf("runSingleFinishSettlementTransaction({")
     const singleSettleBinding = singleOrchestrator.indexOf(
@@ -250,7 +257,8 @@ test("single and multi production finish routes call the shared Awake evaluation
         singleSettleBinding,
     )
     assert.equal(singleTransactionBody >= 0, true, "single settlement writes function")
-    assert.equal(singleSeamCall > singleTransactionBody, true, "single shared Awake evaluation seam call")
+    assert.equal(singleEvaluationCall > singleTransactionBody, true, "single mission evaluation inside writes")
+    assert.equal(singleSeamCall >= 0, true, "single shared Awake evaluation seam call")
     assert.equal(singleTransactionCall >= 0, true, "single transaction call")
     assert.equal(singleSettleBinding > singleTransactionCall, true, "single transaction callback")
     assert.equal(singleWritesCall > singleSettleBinding, true, "single writes inside transaction callback")

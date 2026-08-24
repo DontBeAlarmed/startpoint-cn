@@ -47,6 +47,8 @@ async function executeGachaScenario(app, identity, context = {}) {
     assert.equal(loadPayload.data_headers?.viewer_id, identity.accountId)
     const loadGachaInfo = loadPayload.data?.gacha_info_list
     assert.ok(Array.isArray(loadGachaInfo), "gacha load gacha_info_list must be an array")
+    const balanceAfterLoad = loadPayload.data?.user_info?.free_vmoney
+    assert.ok(Number.isSafeInteger(balanceAfterLoad) && balanceAfterLoad >= 150, "gacha load free_vmoney")
 
     const execResponse = await postCnRequest(app, "/api/index.php/gacha/exec", {
         viewer_id: identity.viewerId,
@@ -59,7 +61,7 @@ async function executeGachaScenario(app, identity, context = {}) {
     const execPayload = requireSuccessfulCnResponse(execResponse, "gacha exec")
     assert.equal(execPayload.data_headers?.viewer_id, identity.viewerId)
     const after = requireGachaState(context, identity, "gacha after")
-    assert.equal(after.freeVmoney, before.freeVmoney - 150)
+    assert.equal(after.freeVmoney, balanceAfterLoad - 150)
     assert.equal(after.exchangePoint, before.exchangePoint + 1)
     assert.equal(after.receiveHistoryCount, before.receiveHistoryCount + 1)
     assert.equal(before.characterCount, 0)
@@ -99,9 +101,9 @@ async function executeGachaScenario(app, identity, context = {}) {
         gachaId: GACHA_ID,
         loadGachaInfoCount: loadGachaInfo.length,
         currency: {
-            before: before.freeVmoney,
+            before: balanceAfterLoad,
             after: after.freeVmoney,
-            spent: before.freeVmoney - after.freeVmoney,
+            spent: balanceAfterLoad - after.freeVmoney,
         },
         exchangePoint: {
             before: before.exchangePoint,

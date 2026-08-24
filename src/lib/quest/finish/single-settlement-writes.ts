@@ -19,19 +19,10 @@ import { calculateCharacterBattleExp, calculateFixedQuestMana, calculateFixedQue
 import { QuestCategory, type BattleQuest } from "../../types"
 import { getRankDegree, getMaxStamina } from "../../stamina"
 import { getRuntimeContentTableSync } from "../../../content/runtime/table-access"
-import { getContentSnapshot } from "../../../content/runtime/content-snapshot"
 import { settleAdditionalRewardsSync, type AdditionalRewardTable } from "../../additional-reward"
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../rush"
-import {
-    getAwakeBattleMissionIds,
-    reconcileActiveMissionFacts,
-    settleAwakeMissionCandidatesWithEvaluation,
-    settleMissionCategoriesWithEvaluation,
-} from "../../mission"
+import { recordMissionBattleFacts } from "../../mission/battle-facts"
 import { publishAwakeCharacterListBestEffort } from "../../mission/awake-best-effort-context"
-import { buildBattleMissionSettlementScopes, recordMissionBattleFacts } from "../../mission/battle-facts"
-import { getAwakeFactKeysFromLegacyRewardResults } from "../../mission/awake-reward-facts"
-import type { FactKey } from "../../mission/facts/fact-key"
 import { getCarnivalRewardDefinitions, grantCarnivalRewards } from "../../carnival-rewards"
 import { givePlayerEquipmentSync } from "../../equipment"
 import { getRaidEventRequiredKillCount } from "../../raid-event-master"
@@ -52,11 +43,10 @@ import { handleScoreAttackEventFinish, type ScoreAttackBorderTier } from "./scor
 import { handleDailyChallengePoint } from "./challenge-point"
 import type { FinishContext } from "./types"
 import { selectScoreRewardGrantPlan } from "../score-reward-selection"
-import {
-    grantSingleSettlementScoreRewardsWithinTransactionSync,
-} from "./single-settlement-reward-grant"
+import { grantSingleSettlementScoreRewardsWithinTransactionSync } from "./single-settlement-reward-grant"
 import { createSingleSettlementStandardRewardGrant } from "./single-standard-reward-callbacks"
 import { createSingleSettlementResponseState } from "./single-settlement-response-state"
+import { prepareSingleAwakePublication, settleSingleMissionEvaluations } from "./single-mission-publication"
 const settlementModeHost = createModeTransactionHost(message => console.log(message))
 export interface SingleSettlementWritesInput {
     body: ValidatedSingleFinishBody
@@ -67,10 +57,7 @@ export interface SingleSettlementWritesInput {
     scoreAttackBorderTiers: ScoreAttackBorderTier[]
 }
 
-function finalizeSingleAwakePublicationWrites(
-    playerId: number,
-    isScoreAttackEvent: boolean,
-): void {
+function finalizeSingleAwakePublicationWrites(playerId: number, isScoreAttackEvent: boolean): void {
     if (!isScoreAttackEvent) deletePlayerActiveQuestSync(playerId)
 }
 
@@ -289,89 +276,54 @@ export function executeSingleSettlementWrites(
         deleteActiveQuest: pid => deletePlayerActiveQuestSync(pid),
     }) : null
     const scoreAttackRewardResult = scoreAttackFinishResult?.rewardResult
-    const missionEvaluation = settleMissionCategoriesWithEvaluation(
-        playerId,
-        buildBattleMissionSettlementScopes(partyCharacterIds),
-        settlementTime,
-        undefined,
-        { standardRewardGrant: standardRewardGrant.forMission },
-    )
-    const missionSettlement = missionEvaluation?.settlement ?? {
-        missionInfo: [], itemList: {}, characterList: [], equipmentList: [],
-        degreeIds: [], passCardPoints: {},
-    }
-    responseState.observeResult(missionSettlement)
-    const awakeMissionEvaluation = questAccomplished
-        ? settleAwakeMissionCandidatesWithEvaluation(
-            playerId,
-            getAwakeBattleMissionIds(partyCharacterIds, missionBattleFacts.awakeMissionIds),
-            settlementTime,
-            undefined,
-            { standardRewardGrant: standardRewardGrant.forMission },
-        )
-        : null
-    const awakeMissionSettlement = awakeMissionEvaluation?.settlement ?? {
-        missionInfo: [], itemList: {}, characterList: [], equipmentList: [],
-        degreeIds: [], passCardPoints: {},
-    }
-    responseState.observeResult(awakeMissionSettlement)
-    const activeMissionList = reconcileActiveMissionFacts({
-        playerId, repository: getContentSnapshot().repository, now: settlementTime,
+    const { missionSettlement, awakeMissionSettlement, activeMissionList, invalidatedFactKeys } =
+        settleSingleMissionEvaluations({
+        playerId, partyCharacterIds, evaluationTime: settlementTime, questAccomplished,
+        directAwakeMissionIds: missionBattleFacts.awakeMissionIds,
+        rewardDependencies: { standardRewardGrant: standardRewardGrant.forMission },
     })
+    responseState.observeResult(missionSettlement)
+    responseState.observeResult(awakeMissionSettlement)
     if (settlementActiveQuest.entryItemId) {
         responseState.observeItems({
-            [settlementActiveQuest.entryItemId]: getPlayerItemSync(
-                playerId,
-                settlementActiveQuest.entryItemId,
-            ) ?? 0,
+            [settlementActiveQuest.entryItemId]: getPlayerItemSync(playerId,
+                settlementActiveQuest.entryItemId) ?? 0,
         })
     }
     const { itemList, finalPlayerProjection } = responseState.finalize({
-        rankPoint: newRankPoint,
-        stamina: afterStamina,
-        staminaHealTime: afterStaminaHealTime,
-        boostPoint: newBoostPoint,
-        bossBoostPoint: newBossBoostPoint,
+        rankPoint: newRankPoint, stamina: afterStamina, staminaHealTime: afterStaminaHealTime,
+        boostPoint: newBoostPoint, bossBoostPoint: newBossBoostPoint,
     })
     finalizeSingleAwakePublicationWrites(playerId, isScoreAttackEvent)
-    const invalidatedFactKeys: FactKey[] = [
-        ...(missionEvaluation?.invalidatedFactKeys ?? []),
-        ...(awakeMissionEvaluation?.invalidatedFactKeys ?? []),
-        ...getAwakeFactKeysFromLegacyRewardResults(
-            clearReward,
-            sPlusClearReward,
-            scoreRewardsResult,
+    const awakePublication = prepareSingleAwakePublication({
+        characterLists: [
+            rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
+            (clearReward?.character_list || []) as Record<string, unknown>[],
+            (sPlusClearReward?.character_list || []) as Record<string, unknown>[], scoreRewardsResult.character_list as Record<string, unknown>[],
+            (scoreAttackRewardResult?.character_list ?? []) as Record<string, unknown>[],
+            missionSettlement.characterList as Record<string, unknown>[],
+            awakeMissionSettlement.characterList as Record<string, unknown>[],
+        ],
+        invalidatedFactKeys,
+        legacyRewardResults: [
+            clearReward, sPlusClearReward, scoreRewardsResult,
             additionalRewardSettlement.rewardResult,
-            rushEventRewardsResult,
-            carnivalRewardResult,
-            scoreAttackRewardResult,
-        ),
-        ...(manaObtained > 0 ? [{ kind: "player" as const }] : []),
-        ...(questAccomplished
-            && questCategory === QuestCategory.CHARACTER
-            && !questPreviouslyCompleted
-            ? [{ kind: "questProgress" as const, sections: [QuestCategory.CHARACTER] }]
-            : []),
-    ]
-    const characterList = publishAwakeCharacterListBestEffort(playerId, partyCharacterIds, [
-        rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
-        (clearReward?.character_list || []) as Record<string, unknown>[],
-        (sPlusClearReward?.character_list || []) as Record<string, unknown>[],
-        scoreRewardsResult.character_list as Record<string, unknown>[],
-        (scoreAttackRewardResult?.character_list ?? []) as Record<string, unknown>[],
-        missionSettlement.characterList as Record<string, unknown>[], awakeMissionSettlement.characterList,
-    ], { invalidatedFactKeys })
+            rushEventRewardsResult, carnivalRewardResult, scoreAttackRewardResult,
+        ],
+        manaObtained, questCategory, questAccomplished, questPreviouslyCompleted,
+    })
+    const characterList = publishAwakeCharacterListBestEffort(playerId, partyCharacterIds,
+        awakePublication.characterLists, { invalidatedFactKeys: awakePublication.invalidatedFactKeys })
 
     return {
         afterStamina, afterStaminaHealTime, dailyChallengePointList,
-        scoreRewardSelection, scoreRewardsResult,
-        additionalRewardSettlement, rewardCharacterExpResult, rushEventData, rushEventRewardsResult,
+        scoreRewardSelection, scoreRewardsResult, additionalRewardSettlement,
+        rewardCharacterExpResult, rushEventData, rushEventRewardsResult,
         raidEventData, carnivalEventData, carnivalRewardResult, scoreAttackFinishResult,
         scoreAttackRewardResult, itemList, characterList, clearReward, sPlusClearReward,
         missionSettlement, awakeMissionSettlement, activeMissionList, fixedManaReward,
-        fixedPoolExpReward, newMana, beforeRankPoint, newRankPoint, newBoostPoint, newBossBoostPoint,
-        finalPlayerProjection,
+        fixedPoolExpReward, newMana, beforeRankPoint, newRankPoint, newBoostPoint,
+        newBossBoostPoint, finalPlayerProjection,
     }
 }
-
 export type SingleSettlementWritesResult = ReturnType<typeof executeSingleSettlementWrites>

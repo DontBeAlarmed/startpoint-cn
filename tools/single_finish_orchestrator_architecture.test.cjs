@@ -29,6 +29,7 @@ test("single finish route delegates preparation and settlement to the orchestrat
     const route = finishHandlerSource(readSource("src/routes/api/singleBattleQuest.ts"))
     const orchestrator = readSource("src/lib/quest/finish/single-orchestrator.ts")
     const writes = readSource("src/lib/quest/finish/single-settlement-writes.ts")
+    const missionPublication = readSource("src/lib/quest/finish/single-mission-publication.ts")
 
     assert.match(route, /settleSingleBattleQuest\s*\(\s*\{/)
     assert.match(route, /validateSessionIdentity\s*\(\s*viewerId\s*\)/)
@@ -63,7 +64,9 @@ test("single finish route delegates preparation and settlement to the orchestrat
         /getPlayerSingleQuestProgressSync\s*\(/,
     )
     assert.match(writes, /settleAdditionalRewardsSync\s*\(/)
-    assert.match(writes, /settleSingleBattleMissionCategories\s*\(/)
+    assert.match(writes, /settleSingleMissionEvaluations\s*\(/)
+    assert.match(missionPublication, /settleMissionCategoriesWithEvaluation\s*\(/)
+    assert.match(missionPublication, /settleAwakeMissionCandidatesWithEvaluation\s*\(/)
     assert.match(writes, /handleRushEventFinish\s*\(/)
     assert.match(writes, /handleRaidEventFinish\s*\(/)
     assert.match(writes, /handleCarnivalEventFinish\s*\(/)
@@ -139,6 +142,7 @@ test("single finish production files stay focused", () => {
         "src/lib/quest/finish/single-orchestrator.ts",
         "src/lib/quest/finish/single-response-projector.ts",
         "src/lib/quest/finish/single-settlement-response-state.ts",
+        "src/lib/quest/finish/single-mission-publication.ts",
         "src/lib/quest/finish/single-settlement-writes.ts",
     ]) {
         const lineCount = readSource(relativePath).split("\n").length

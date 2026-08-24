@@ -21,6 +21,7 @@ const {
 const {
     PERIODIC_REWARD_TABLE_SOURCES,
 } = require("../src/content/converters/periodic-reward")
+const { LOGIN_BONUS_SOURCE } = require("../src/content/converters/login-bonus")
 const {
     hashResourcePath,
     serializeNestedOrderedMap,
@@ -203,8 +204,28 @@ function characterQuestFixture() {
     return serializeOrderedMap([{ key: "1", row: columns.join(",") }])
 }
 
+function loginBonusFixture() {
+    const columns = Array.from({ length: 48 }, () => "")
+    columns[0] = "0"
+    columns[6] = "0"
+    columns[7] = "50"
+    columns[37] = "780"
+    columns[41] = "2023-08-25 05:00:00"
+    columns[42] = "2050-01-01 04:59:59"
+    columns[45] = "55"
+    columns[46] = "(None)"
+    columns[47] = "(None)"
+    return serializeNestedOrderedMap([{
+        key: "normal_2022",
+        row: serializeOrderedMap([{ key: "1", row: columns.join(",") }]),
+    }])
+}
+
 function inMemoryArchiveIndex(logicalEntries, reads, beforeRead = async () => {}) {
     logicalEntries = new Map(logicalEntries)
+    if (!logicalEntries.has(LOGIN_BONUS_SOURCE)) {
+        logicalEntries.set(LOGIN_BONUS_SOURCE, loginBonusFixture())
+    }
     if (!logicalEntries.has("master/campaign/reward_campaign.orderedmap")) {
         logicalEntries.set(
             "master/campaign/reward_campaign.orderedmap",
@@ -449,6 +470,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         gacha: 0,
         gameplay: 0,
         itemEquipment: 0,
+        loginBonus: 0,
         manaNode: 0,
         shop: 0,
         skillEffects: 0,
@@ -496,6 +518,10 @@ test("default release builder closes all registry tables and runs each CDN conve
         convertItemEquipmentTables: async () => {
             converterCalls.itemEquipment++
             return converterOutput("item-equipment")
+        },
+        convertLoginBonuses: async () => {
+            converterCalls.loginBonus++
+            return converterOutput("login-bonus")
         },
         convertManaNodes: async () => {
             converterCalls.manaNode++
@@ -547,6 +573,7 @@ test("default release builder closes all registry tables and runs each CDN conve
         gacha: 1,
         gameplay: 1,
         itemEquipment: 1,
+        loginBonus: 1,
         manaNode: 1,
         shop: 1,
         skillEffects: 1,

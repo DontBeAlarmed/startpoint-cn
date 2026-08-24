@@ -178,6 +178,12 @@ const EXPECTED_REWARD_CDN_TABLES = Object.freeze({
     "rush_event_ranking_reward.json": "master/quest/event/rush_event_ranking_reward.orderedmap",
 })
 
+const EXPECTED_LOGIN_BONUS_CDN_TABLE = Object.freeze({
+    tableName: "login_bonus_normal.json",
+    source: "master/bonus/login_bonus.orderedmap",
+    converterId: "login-bonus",
+})
+
 const EXPECTED_GAMEPLAY_CDN_TABLES = Object.freeze({
     "carnival_event_total_score_reward.json":
         "master/quest/event/carnival_event_total_score_reward.orderedmap",
@@ -487,6 +493,13 @@ test("registry derives reward tables from their official OrderedMap sources", ()
     }
 })
 
+test("registry derives Normal login bonuses from the official OrderedMap source", () => {
+    const entry = findTableSource(EXPECTED_LOGIN_BONUS_CDN_TABLE.tableName)
+    assert.equal(entry.scope, "cdn")
+    assert.equal(entry.converterId, EXPECTED_LOGIN_BONUS_CDN_TABLE.converterId)
+    assert.deepEqual(entry.sourceOrderedMaps, [EXPECTED_LOGIN_BONUS_CDN_TABLE.source])
+})
+
 test("registry derives gameplay tables from their official OrderedMap sources", () => {
     for (const [tableName, source] of Object.entries(EXPECTED_GAMEPLAY_CDN_TABLES)) {
         const entry = findTableSource(tableName)
@@ -671,7 +684,7 @@ test("registry independently covers static CN runtime JSON references", () => {
 })
 
 test("every registry table has an explicit existing bundled fallback", () => {
-    assert.equal(TABLE_SOURCES.length, 126)
+    assert.equal(TABLE_SOURCES.length, 127)
     for (const entry of TABLE_SOURCES) {
         const sourcePath = path.resolve(projectRoot, entry.bundledPath)
         assert.ok(fs.existsSync(sourcePath), `${entry.tableName} source must exist`)

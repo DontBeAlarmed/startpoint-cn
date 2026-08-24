@@ -395,8 +395,20 @@ stubModule("../src/lib/reward-campaign", {
 stubModule("../src/routes/api/rushEvent", { rushEventFolderMaxRounds: {} })
 stubModule("../src/lib/rush", { getSerializedPlayerRushEventPlayedPartiesSync: () => ({ folderParties: null, endlessParties: null }) })
 stubModule("../src/lib/mission", {
+    getAwakeBattleMissionIds: () => [],
     reconcileActiveMissionFacts: () => [],
     reconcileAwakeUnlockCharacterList: (_playerId, list) => list,
+    settleAwakeMissionCandidatesWithEvaluation: () => ({
+        settlement: {
+            missionInfo: [],
+            itemList: {},
+            characterList: [],
+            equipmentList: [],
+            degreeIds: [],
+            passCardPoints: {},
+        },
+        invalidatedFactKeys: [],
+    }),
     settleAwakeBattleMissions: () => ({
         missionInfo: [],
         itemList: {},
@@ -411,6 +423,17 @@ stubModule("../src/lib/mission", {
         characterList: [],
         equipmentList: [],
         degreeIds: [],
+    }),
+    settleMissionCategoriesWithEvaluation: () => ({
+        settlement: {
+            missionInfo: [],
+            itemList: {},
+            characterList: [],
+            equipmentList: [],
+            degreeIds: [],
+            passCardPoints: {},
+        },
+        invalidatedFactKeys: [],
     }),
     mergeMissionSettlementResponse() {},
 })

@@ -83,6 +83,7 @@ import comicApiPlugin from "./routes/api/comic";
 import questUnlockApiPlugin from "./routes/api/questUnlock";
 import itemApiPlugin from "./routes/api/item";
 import characterElectionApiPlugin from "./routes/api/characterElection";
+import bonusApiPlugin from "./routes/api/bonus";
 import { installTakeoverUdidGuard } from "./lib/takeover-access";
 import { AccountCleanupService } from "./lib/account-cleanup";
 const fastify = Fastify({
@@ -280,6 +281,7 @@ fastify.register(historyApiPlugin, { prefix: `${apiPrefix}/history` });
 fastify.register(questUnlockApiPlugin, { prefix: `${apiPrefix}/quest` });
 fastify.register(itemApiPlugin, { prefix: `${apiPrefix}/item` });
 fastify.register(characterElectionApiPlugin, { prefix: `${apiPrefix}/character_election` });
+fastify.register(bonusApiPlugin, { prefix: `${apiPrefix}/bonus` });
 
 fastify.register(indexWebApiPlugin, {
     prefix: "/api",

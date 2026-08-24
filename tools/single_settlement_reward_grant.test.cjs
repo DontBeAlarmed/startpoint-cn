@@ -453,6 +453,7 @@ test("a later owner reward failure rolls the real settlement state chain back", 
 test("single settlement migrates score while preserving multiplayer, Carnival and Mission boundaries", () => {
     const adapter = readSource("src/lib/quest/finish/single-settlement-reward-grant.ts")
     const writes = readSource("src/lib/quest/finish/single-settlement-writes.ts")
+    const missionPublication = readSource("src/lib/quest/finish/single-mission-publication.ts")
     const responseState = readSource("src/lib/quest/finish/single-settlement-response-state.ts")
 
     assert.match(adapter, /createRewardGrantPlan\s*\(/)
@@ -478,8 +479,11 @@ test("single settlement migrates score while preserving multiplayer, Carnival an
 
     assert.doesNotMatch(writes, /\bgivePlayerScoreRewardsSync\s*\(/)
     assert.match(writes, /\bgrantCarnivalRewards\s*\(/)
-    assert.match(writes, /\bsettleSingleBattleMissionCategories\s*\(/)
-    assert.match(writes, /\bsettleAwakeBattleMissions\s*\(/)
+    assert.match(writes, /\bsettleSingleMissionEvaluations\s*\(/)
+    assert.match(missionPublication, /\bsettleMissionCategoriesWithEvaluation\s*\(/)
+    assert.match(missionPublication, /\bsettleAwakeMissionCandidatesWithEvaluation\s*\(/)
+    assert.match(missionPublication, /input\.rewardDependencies/)
+    assert.match(writes, /standardRewardGrant: standardRewardGrant\.forMission/)
 
     const multiplayer = readSource("src/multi/settlement/orchestrator.ts")
     assert.match(multiplayer, /import \{[^}]*givePlayerScoreRewardsSync[^}]*\} from "\.\.\/\.\.\/lib\/quest"/s)

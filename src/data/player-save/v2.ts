@@ -47,6 +47,7 @@ const LEGACY_V1_UNMANAGED_TABLES = new Set([
     "players_character_election_votes",
     "players_pass_cards",
     "players_pass_card_rewards",
+    "players_login_bonus_progress",
     "players_raid_events",
     "players_raid_event_quests",
     "players_score_attack_battle_history",

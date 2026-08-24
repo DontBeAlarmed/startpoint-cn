@@ -32,7 +32,7 @@ function validManifest(schemaVersion) {
             node: ">=20.12.0",
             dependencyLock: `sha256:${"b".repeat(64)}`,
             minDataSchema: 0,
-            targetDataSchema: 17,
+            targetDataSchema: 18,
         },
         admin: { path: "web/dist", required: false },
         assets: {

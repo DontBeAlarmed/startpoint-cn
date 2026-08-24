@@ -63,6 +63,11 @@ import {
     type PeriodicRewardSourceReader,
 } from "../converters/periodic-reward"
 import {
+    convertLoginBonuses,
+    type LoginBonusConversionOutput,
+    type LoginBonusSourceReader,
+} from "../converters/login-bonus"
+import {
     convertRewards,
     type RewardConversionOutput,
     type RewardSourceReader,
@@ -104,6 +109,7 @@ const SUPPORTED_CONVERTER_IDS = new Set([
     "gacha",
     "gameplay",
     "item-equipment",
+    "login-bonus",
     "mana-node",
     "shop",
     "skill-effects",
@@ -186,6 +192,9 @@ export interface DefaultContentTableBuilderDependencies {
     readonly convertPeriodicRewards?: (
         reader: PeriodicRewardSourceReader,
     ) => PeriodicRewardConversionOutput | Promise<PeriodicRewardConversionOutput>
+    readonly convertLoginBonuses?: (
+        reader: LoginBonusSourceReader,
+    ) => LoginBonusConversionOutput | Promise<LoginBonusConversionOutput>
     readonly importBundledTable?: typeof importBundledTable
 }
 
@@ -212,7 +221,7 @@ function requireLogicalPath(logicalPath: string): string {
 class StrictOrderedMapReader implements BoxGachaSourceReader, GachaSourceReader, GameplaySourceReader,
     AdditionalRewardSourceReader, CharacterManaAdmissionSourceReader,
     ItemEquipmentSourceReader, ManaNodeSourceReader,
-    ShopSourceReader, RewardSourceReader,
+    LoginBonusSourceReader, ShopSourceReader, RewardSourceReader,
     QuestSourceReader, PeriodicRewardSourceReader {
     private readonly context: ContentTableBuildContext
     private readonly allowed = new Set<string>()
@@ -460,6 +469,7 @@ export function createDefaultContentTableBuilder(
     const rewardCampaignConverter = dependencies.convertRewardCampaigns ?? convertRewardCampaigns
     const questConverter = dependencies.convertQuests ?? convertQuests
     const periodicRewardConverter = dependencies.convertPeriodicRewards ?? convertPeriodicRewards
+    const loginBonusConverter = dependencies.convertLoginBonuses ?? convertLoginBonuses
     const bundledImporter = dependencies.importBundledTable ?? importBundledTable
 
     return Object.freeze({
@@ -480,6 +490,7 @@ export function createDefaultContentTableBuilder(
                     || definition.converterId === "gacha"
                     || definition.converterId === "gameplay"
                     || definition.converterId === "item-equipment"
+                    || definition.converterId === "login-bonus"
                     || definition.converterId === "mana-node"
                     || definition.converterId === "shop"
                     || definition.converterId === "skill-effects"
@@ -556,6 +567,9 @@ export function createDefaultContentTableBuilder(
                         >,
                     }),
                 )
+            }
+            if (converterIds.has("login-bonus")) {
+                addConverterOutput(values, "login-bonus", await loginBonusConverter(reader))
             }
             if (converterIds.has("mana-node")) {
                 addConverterOutput(values, "mana-node", await manaNodeConverter(reader))

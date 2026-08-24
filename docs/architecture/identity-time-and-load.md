@@ -99,6 +99,7 @@ sequenceDiagram
     participant L as CN /load
     participant ID as session / account / player
     participant PRE as 日切、经验池、永久校验
+    participant BONUS as Normal 登录奖励
     participant AQ as active quest 恢复或中止
     participant AM as Active Mission reconcile
     participant DB as SQLite 领域读取
@@ -109,6 +110,15 @@ sequenceDiagram
     L->>ID: session 优先；缺失时 viewer_id / keychain 兼容回退
     ID-->>L: player_id
     L->>PRE: 日切、真实经过时间资源结算、永久修复
+    L->>BONUS: 按虚拟业务日选择 CDN 有效组并结算
+    alt 已有 pending 批次
+        BONUS-->>L: 复用原 group / index / received_at
+    else 当日首次可领取
+        BONUS->>DB: 同一事务发奖、推进游标并写 pending
+        BONUS-->>L: 返回新批次并刷新玩家货币状态
+    else 当日不可领取或 CDN 空窗
+        BONUS-->>L: 空奖励状态
+    end
     L->>AQ: 检查数据库 active quest
     alt 可恢复记录
         AQ-->>L: 重建本次 unfinished quest 投影
@@ -124,6 +134,8 @@ sequenceDiagram
     R->>R: 响应成功编码
     R->>AM: 记录本次登录任务事实
     R-->>C: 返回 Base64(MsgPack)
+    C->>BONUS: /bonus/shown 幂等确认 pending
+    BONUS->>DB: 只写 shown_at，不再次发奖
     Note over L,R: /load 是恢复与完整快照聚合入口，不是所有任务完成时点的通用兜底
     Note over DB,SER: V2 存档恢复见 D8b：registry 校验与单事务替换
 ```
@@ -133,6 +145,7 @@ sequenceDiagram
 | 事实 | 证据 |
 |---|---|
 | 身份解析、登录维护和永久校验 | `src/routes/cn/load.ts` |
+| CDN Normal 选择、事务发奖和展示确认 | `src/content/converters/login-bonus.ts`、`src/lib/login-bonus.ts`、`src/routes/api/bonus.ts` |
 | active quest 检查、恢复或中止退款 | `src/routes/cn/load.ts` |
 | Active Mission 对账与完整玩家领域聚合 | `src/routes/cn/load.ts`、`src/data/utils/player-data.ts` |
 | 登录事实使用响应 pending commit | `src/routes/cn/load.ts`、`src/routes/cn/msgpack.ts` |

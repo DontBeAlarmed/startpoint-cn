@@ -55,8 +55,7 @@ const AUTHORITATIVE_WRITE_SETS = Object.freeze({
         "recordMissionBattleFacts", "givePlayerCharactersExpSync", "handleRushEventFinish",
         "dispatchModeRushFinish", "handleRaidEventFinish", "handleCarnivalEventFinish",
         "insertPlayerScoreAttackBattleHistorySync", "insertPlayerPracticeBattleHistorySync",
-        "handleScoreAttackEventFinish", "settleMissionCategoriesWithEvaluation",
-        "settleAwakeMissionCandidatesWithEvaluation", "reconcileActiveMissionFacts", "setExpPool",
+        "handleScoreAttackEventFinish", "settleSingleMissionEvaluations", "setExpPool",
         "observeGrant", "observeItems", "observeResult", "finalize",
         "finalizeSingleAwakePublicationWrites",
     ]),
@@ -293,7 +292,7 @@ function matrixRow({
 }
 
 const EXPECTED_MATRIX = Object.freeze([
-    matrixRow({ relativeFile: "src/lib/quest/finish/single-settlement-writes.ts", owner: "single/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "partyCharacterIds", actualFactSeeds: "invalidatedFactKeys", finalAuthoritativeWrite: "finalizeSingleAwakePublicationWrites", runtimeEvidenceKey: "single-finish", changesGlobalFacts: true, rereadReason: SINGLE_REREAD_REASON }),
+    matrixRow({ relativeFile: "src/lib/quest/finish/single-settlement-writes.ts", owner: "single/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "partyCharacterIds", actualFactSeeds: "awakePublication.invalidatedFactKeys", finalAuthoritativeWrite: "finalizeSingleAwakePublicationWrites", runtimeEvidenceKey: "single-finish", changesGlobalFacts: true, rereadReason: SINGLE_REREAD_REASON }),
     matrixRow({ relativeFile: "src/multi/settlement/orchestrator.ts", owner: "multi/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "invalidatedFactKeys", finalAuthoritativeWrite: "finalizeMultiAwakePublicationWrites", runtimeEvidenceKey: "multi-finish", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/activeMission.ts", owner: "active_mission/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "granter.invalidatedFactKeys", finalAuthoritativeWrite: "persistPlayer", runtimeEvidenceKey: "active-mission-receive", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/boxGacha.ts", owner: "box_gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "settlement.rewardResult?.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "box-gacha-exec", changesGlobalFacts: true }),

@@ -58,6 +58,8 @@ function prepareGachaIdentity(db, identity) {
         `).run(identity.playerId)
         db.prepare("DELETE FROM players_active_mission_counters WHERE player_id = ?")
             .run(identity.playerId)
+        db.prepare("DELETE FROM players_login_bonus_progress WHERE player_id = ?")
+            .run(identity.playerId)
     })()
 }
 

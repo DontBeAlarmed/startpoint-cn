@@ -91,6 +91,7 @@ const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
     "item_ids.json",
     "item_lookup.json",
     "item_sale.json",
+    "login_bonus_normal.json",
     "mana_board.json",
     "mana_board2_open_condition.json",
     "mana_node.json",

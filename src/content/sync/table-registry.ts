@@ -5,6 +5,7 @@ import {
 } from "../character-level-seed"
 import { ADDITIONAL_REWARD_PATHS } from "../converters/additional-reward"
 import { PERIODIC_REWARD_TABLE_SOURCES } from "../converters/periodic-reward"
+import { LOGIN_BONUS_SOURCE } from "../converters/login-bonus"
 import {
     QUEST_AUXILIARY_SOURCES,
     QUEST_TABLE_SOURCES,
@@ -436,6 +437,14 @@ const definitionInputs: TableSourceInput[] = [
         converterId: "reward-campaign",
         converterVersion: 2,
         outputShapeVersion: 2,
+    },
+    {
+        tableName: "login_bonus_normal.json",
+        scope: "cdn",
+        sourceOrderedMaps: [LOGIN_BONUS_SOURCE],
+        converterId: "login-bonus",
+        converterVersion: 1,
+        outputShapeVersion: 1,
     },
     {
         tableName: "cdndata/gacha.json",
