@@ -13,13 +13,51 @@ const {
 const AWAKE_OWNER_FOCUSED_FIXED_TIME = "2024-08-14T12:00:00.000Z"
 const AWAKE_OWNER_FOCUSED_REPORT_VERSION = 1
 const REPORT_FIELDS = ["evidenceRegistry", "fixedTime", "scenarios", "sqlUpperBounds", "version"]
+
+function assertOwnerRuntimeEvidenceCoverage(registry, scenarios, requiredOwners) {
+    for (const owner of requiredOwners) {
+        const matches = Object.entries(scenarios).filter(([, scenario]) => scenario.owner === owner)
+        if (matches.length !== 1) {
+            throw new TypeError(`${owner} is missing owner-matched runtime evidence`)
+        }
+        const [scenarioName, scenario] = matches[0]
+        const evidence = registry[scenario.runtimeEvidenceKey]
+        if (evidence === undefined
+            || !evidence.owners.includes(owner)
+            || !evidence.scenarios.includes(scenarioName)) {
+            throw new TypeError(`${owner} runtime evidence does not resolve through its registry scenario`)
+        }
+        if (scenario.boundary !== evidence.boundary) {
+            throw new TypeError(`${owner} runtime evidence boundary differs from its registry`)
+        }
+        const observed = scenario.publicationObservation
+        if (observed === undefined) {
+            throw new TypeError(`${owner} runtime evidence is missing a publication observation`)
+        }
+        for (const field of ["characterSeeds", "factSeeds", "directMissionSeeds"]) {
+            if (!isDeepStrictEqual(scenario[field], observed[field])) {
+                const label = field === "factSeeds" ? "fact seeds" : field
+                throw new TypeError(`${owner} declared seeds differ from observed ${label}`)
+            }
+            if (typeof evidence.seedContract === "object"
+                && !isDeepStrictEqual(evidence.seedContract[field], observed[field])) {
+                throw new TypeError(`${owner} runtime observed ${field} differs from its registry contract`)
+            }
+        }
+    }
+}
 const INPUT_SCENARIO_FIELDS = [
-    "characterSeeds", "dbAfter", "dbBefore", "directMissionSeeds", "factSeeds",
+    "boundary", "characterSeeds", "dbAfter", "dbBefore", "directMissionSeeds", "factSeeds",
     "freshPostWriteEvaluationRequired", "loaderCalls", "missionComputes", "rereadReason",
-    "request", "response", "snapshotSource", "sqlByTable", "sqlReads", "sqlWrites",
+    "owner", "publicationObservation", "request", "response", "runtimeEvidenceKey",
+    "snapshotSource", "sqlByTable", "sqlReads", "sqlWrites",
 ]
 const CHECKED_SCENARIO_FIELDS = [...INPUT_SCENARIO_FIELDS, "behaviorSha256"].sort()
 const TABLE_FIELDS = ["reads", "statements", "writes"]
+const OBSERVATION_FIELDS = [
+    "characterListSeeds", "characterSeeds", "contextCandidateCharacterSeeds",
+    "directMissionSeeds", "explicitCharacterSeeds", "factSeeds", "kind",
+]
 
 function assertDataObject(value, path) {
     if (value === null || typeof value !== "object" || Array.isArray(value)) {
@@ -134,6 +172,30 @@ function behaviorHash(request, response) {
         .digest("hex")
 }
 
+function canonicalizePublicationObservation(input, path) {
+    assertExactFields(input, OBSERVATION_FIELDS, path)
+    if (!["publish-wrapper", "best-effort-context", "strict-context"].includes(input.kind)) {
+        throw new TypeError(`${path}.kind is not a supported publication observation`)
+    }
+    return {
+        kind: input.kind,
+        explicitCharacterSeeds: sortedUniqueIds(
+            input.explicitCharacterSeeds, `${path}.explicitCharacterSeeds`,
+        ),
+        characterListSeeds: sortedUniqueIds(
+            input.characterListSeeds, `${path}.characterListSeeds`,
+        ),
+        contextCandidateCharacterSeeds: sortedUniqueIds(
+            input.contextCandidateCharacterSeeds, `${path}.contextCandidateCharacterSeeds`,
+        ),
+        characterSeeds: sortedUniqueIds(input.characterSeeds, `${path}.characterSeeds`),
+        factSeeds: sortedUniqueStrings(input.factSeeds, `${path}.factSeeds`),
+        directMissionSeeds: sortedUniqueIds(
+            input.directMissionSeeds, `${path}.directMissionSeeds`,
+        ),
+    }
+}
+
 function canonicalizeScenario(input, path, checked) {
     assertExactFields(input, checked ? CHECKED_SCENARIO_FIELDS : INPUT_SCENARIO_FIELDS, path)
     const request = canonicalize(input.request, `${path}.request`)
@@ -141,6 +203,11 @@ function canonicalizeScenario(input, path, checked) {
     const sqlReads = metric(input.sqlReads, `${path}.sqlReads`)
     const sqlWrites = metric(input.sqlWrites, `${path}.sqlWrites`)
     const missionComputes = metric(input.missionComputes, `${path}.missionComputes`)
+    if (typeof input.owner !== "string" || input.owner.length === 0
+        || typeof input.runtimeEvidenceKey !== "string" || input.runtimeEvidenceKey.length === 0
+        || !["strict-in-tx", "best-effort-in-tx", "best-effort-post-commit"].includes(input.boundary)) {
+        throw new TypeError(`${path} owner evidence identity is invalid`)
+    }
     if (input.snapshotSource !== "none") throw new TypeError(`${path}.snapshotSource must be none until a snapshot is injected`)
     if (typeof input.rereadReason !== "string" || input.rereadReason.length === 0) {
         throw new TypeError(`${path}.rereadReason must be specific`)
@@ -149,6 +216,9 @@ function canonicalizeScenario(input, path, checked) {
         throw new TypeError(`${path}.freshPostWriteEvaluationRequired must be boolean`)
     }
     const result = {
+        owner: input.owner,
+        boundary: input.boundary,
+        runtimeEvidenceKey: input.runtimeEvidenceKey,
         request,
         response,
         behaviorSha256: behaviorHash(request, response),
@@ -157,6 +227,10 @@ function canonicalizeScenario(input, path, checked) {
         characterSeeds: sortedUniqueIds(input.characterSeeds, `${path}.characterSeeds`),
         factSeeds: sortedUniqueStrings(input.factSeeds, `${path}.factSeeds`),
         directMissionSeeds: sortedUniqueIds(input.directMissionSeeds, `${path}.directMissionSeeds`),
+        publicationObservation: canonicalizePublicationObservation(
+            input.publicationObservation,
+            `${path}.publicationObservation`,
+        ),
         loaderCalls: stringList(input.loaderCalls, `${path}.loaderCalls`),
         missionComputes,
         snapshotSource: input.snapshotSource,
@@ -187,7 +261,10 @@ function assertSingleContract(scenarios, path) {
         throw new TypeError(`${path}.single-finish violates the fixed fresh post-write contract`)
     }
     if (single.response.category9Evaluations !== 2) {
-        throw new TypeError(`${path}.single-finish must record exactly two Category 9 evaluations`)
+        throw new TypeError(
+            `${path}.single-finish must record exactly two Category 9 evaluations; `
+                + `observed ${single.response.category9Evaluations}`,
+        )
     }
 }
 
@@ -206,6 +283,11 @@ function createAwakeOwnerFocusedReport(scenarios) {
         canonicalizeScenario(scenarios[name], `scenarios.${name}`, false),
     ]))
     assertSingleContract(canonicalScenarios, "scenarios")
+    assertOwnerRuntimeEvidenceCoverage(
+        AWAKE_OWNER_RUNTIME_EVIDENCE_REGISTRY,
+        canonicalScenarios,
+        Object.values(AWAKE_OWNER_RUNTIME_EVIDENCE_REGISTRY).flatMap(entry => entry.owners),
+    )
     return {
         version: AWAKE_OWNER_FOCUSED_REPORT_VERSION,
         fixedTime: AWAKE_OWNER_FOCUSED_FIXED_TIME,
@@ -231,6 +313,11 @@ function canonicalizeCheckedAwakeOwnerFocusedReport(report, source) {
         canonicalizeScenario(report.scenarios[name], `${source}.scenarios.${name}`, true),
     ]))
     assertSingleContract(scenarios, `${source}.scenarios`)
+    assertOwnerRuntimeEvidenceCoverage(
+        AWAKE_OWNER_RUNTIME_EVIDENCE_REGISTRY,
+        scenarios,
+        Object.values(AWAKE_OWNER_RUNTIME_EVIDENCE_REGISTRY).flatMap(entry => entry.owners),
+    )
     return {
         version: AWAKE_OWNER_FOCUSED_REPORT_VERSION,
         fixedTime: AWAKE_OWNER_FOCUSED_FIXED_TIME,
@@ -241,6 +328,7 @@ function canonicalizeCheckedAwakeOwnerFocusedReport(report, source) {
 }
 
 module.exports = {
+    assertOwnerRuntimeEvidenceCoverage,
     AWAKE_OWNER_FOCUSED_FIXED_TIME,
     AWAKE_OWNER_FOCUSED_REPORT_VERSION,
     canonicalizeCheckedAwakeOwnerFocusedReport,

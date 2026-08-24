@@ -24,9 +24,18 @@ const {
 const { installComputeCounter } = require("./mission_engine_focused_baseline.cjs")
 const { createSqlCounter } = require("./mission_settlement_sql.cjs")
 const {
+    assertObservedPublication,
+    installAwakeOwnerFocusedObserver,
+} = require("./awake_owner_focused_observer.cjs")
+const {
     closeAwakeOwnerFactPublicationFixture,
     createAwakeOwnerFactPublicationFixture,
 } = require("../helpers/awake-owner-fact-publication-fixture.cjs")
+const {
+    TABLE_OVERRIDES,
+    createAwakeOwnerFocusedRouteFixture,
+    installDeterministicRandomInt,
+} = require("./awake_owner_focused_fixture.cjs")
 
 const SNAPSHOT_PATH = path.join(
     __dirname,
@@ -106,6 +115,9 @@ function loadRuntime(fixture) {
     const characterDomain = require("../../src/data/domains/character")
     const awakeDomain = require("../../src/data/domains/character_awake")
     const missionDomain = require("../../src/data/domains/mission")
+    const gachaDomain = require("../../src/data/domains/gacha")
+    const mailDomain = require("../../src/data/domains/mail")
+    const tutorialDomain = require("../../src/data/domains/tutorial")
     const questDomain = require("../../src/data/domains/quest")
     const assets = require("../../src/lib/assets")
     const { characterExpCaps, givePlayerCharacterSync } = require("../../src/lib/character")
@@ -127,8 +139,10 @@ function loadRuntime(fixture) {
         characterExpCaps,
         createAwakeRequestContext,
         getDb,
+        gachaDomain,
         givePlayerCharacterSync,
         itemDomain: fixture.itemDomain,
+        mailDomain,
         missionDomain,
         passCardDomain: fixture.passCardDomain,
         playerDomain: fixture.playerDomain,
@@ -137,10 +151,11 @@ function loadRuntime(fixture) {
         raidEventDomain: fixture.raidEventDomain,
         reconcileAwakeUnlockCharacterListStrict,
         sellItemSync,
+        tutorialDomain,
     }
 }
 
-async function runScenario(scenario, runtime) {
+async function runScenario(scenario, runtime, publicationObserver) {
     const fixture = await scenario.prepare()
     const dbBefore = scenario.state(fixture)
     const request = scenario.request(fixture)
@@ -149,6 +164,7 @@ async function runScenario(scenario, runtime) {
     let computeCounter = null
     let evaluationCounter = null
     let result
+    let publicationObservation
     let primaryError = null
     try {
         sqlCounter = installSqlExecutionCounter(runtime.getDb())
@@ -157,9 +173,24 @@ async function runScenario(scenario, runtime) {
             require("../../src/lib/mission/registry").getComputer,
         )
         evaluationCounter = installAwakeEvaluationCounter()
+        publicationObserver.begin()
         result = await scenario.execute(fixture)
+        try {
+            publicationObservation = publicationObserver.end()
+        } catch (error) {
+            const routeDiagnostic = result?.response === undefined
+                ? ""
+                : ` status=${result.response.statusCode} body=${result.response.body}`
+            throw new Error(`${error.message}${routeDiagnostic}`, { cause: error })
+        }
+        assertObservedPublication(
+            scenario.publicationObservation,
+            publicationObservation,
+            scenario.owner,
+        )
     } catch (error) {
-        primaryError = error
+        publicationObserver.cancel()
+        primaryError = new Error(`${scenario.name}: ${error.message}`, { cause: error })
     }
     const sql = sqlCounter?.snapshot()
     const measurements = {
@@ -185,13 +216,17 @@ async function runScenario(scenario, runtime) {
     const response = scenario.response(result, measurements)
     const dbAfter = scenario.state(fixture)
     return {
+        owner: scenario.owner,
+        boundary: scenario.boundary,
+        runtimeEvidenceKey: scenario.runtimeEvidenceKey,
         request,
         response,
         dbBefore,
         dbAfter,
-        characterSeeds: scenario.characterSeeds,
-        factSeeds: scenario.factSeeds,
-        directMissionSeeds: scenario.directMissionSeeds,
+        publicationObservation,
+        characterSeeds: publicationObservation.characterSeeds,
+        factSeeds: publicationObservation.factSeeds,
+        directMissionSeeds: publicationObservation.directMissionSeeds,
         loaderCalls,
         missionComputes,
         snapshotSource: scenario.snapshotSource,
@@ -207,12 +242,26 @@ async function runAwakeOwnerFocusedBaseline() {
     const originalLog = console.log
     const originalError = console.error
     let fixture = null
+    let publicationObserver = null
+    let focusedFixture = null
+    let restoreRandomInt = null
     let primaryError = null
     let report
     try {
         console.log = () => {}
         console.error = () => {}
-        fixture = await createAwakeOwnerFactPublicationFixture()
+        restoreRandomInt = installDeterministicRandomInt()
+        publicationObserver = installAwakeOwnerFocusedObserver()
+        fixture = await createAwakeOwnerFactPublicationFixture({
+            additionalTableNames: [
+                "gacha.json",
+                "shop_item_campaign.json",
+                "shop_select_item_campaign.json",
+            ],
+            tableOverrides: TABLE_OVERRIDES,
+        })
+        focusedFixture = await createAwakeOwnerFocusedRouteFixture()
+        fixture.focused = focusedFixture
         const { setServerTimeOffset } = require("../../src/utils")
         setServerTimeOffset(Date.parse(AWAKE_OWNER_FOCUSED_FIXED_TIME) - Date.now())
         const runtime = loadRuntime(fixture)
@@ -222,17 +271,24 @@ async function runAwakeOwnerFocusedBaseline() {
             throw new Error("Unexpected Awake owner-focused scenario set")
         }
         const results = {}
-        for (const scenario of scenarios) results[scenario.name] = await runScenario(scenario, runtime)
+        for (const scenario of scenarios) {
+            results[scenario.name] = await runScenario(scenario, runtime, publicationObserver)
+        }
         report = createAwakeOwnerFocusedReport(results)
     } catch (error) {
         primaryError = error
     }
     const cleanupErrors = []
+    if (focusedFixture !== null) {
+        try { await focusedFixture.app.close() } catch (error) { cleanupErrors.push(error) }
+    }
     if (fixture !== null) {
         try { await closeAwakeOwnerFactPublicationFixture(fixture) } catch (error) {
             cleanupErrors.push(error)
         }
     }
+    try { publicationObserver?.restore() } catch (error) { cleanupErrors.push(error) }
+    try { restoreRandomInt?.() } catch (error) { cleanupErrors.push(error) }
     console.log = originalLog
     console.error = originalError
     if (primaryError !== null || cleanupErrors.length > 0) {
@@ -268,15 +324,16 @@ function writeSnapshotAtomic(report, snapshotPath = SNAPSHOT_PATH) {
 }
 
 function admitAwakeOwnerFocusedReport(report, { snapshotPath = SNAPSHOT_PATH, write = false } = {}) {
-    if (!fs.existsSync(snapshotPath)) {
-        if (!write) throw new Error(`Awake owner-focused snapshot does not exist: ${snapshotPath}`)
+    if (write) {
         const admission = evaluateAwakeOwnerFocusedAdmission(report, report)
         if (admission.admitted) writeSnapshotAtomic(admission.canonicalReport, snapshotPath)
         return admission
     }
+    if (!fs.existsSync(snapshotPath)) {
+        throw new Error(`Awake owner-focused snapshot does not exist: ${snapshotPath}`)
+    }
     const snapshot = JSON.parse(fs.readFileSync(snapshotPath, "utf8"))
     const admission = evaluateAwakeOwnerFocusedAdmission(report, snapshot)
-    if (write && admission.admitted) writeSnapshotAtomic(admission.canonicalReport, snapshotPath)
     return admission
 }
 

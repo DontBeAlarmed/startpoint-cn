@@ -375,7 +375,7 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^(?:tools\/perf\/awake_owner_focused_(?:admission|baseline(?:\.test)?|report|scenarios)\.cjs|tools\/perf\/__snapshots__\/awake_owner_focused_baseline\.json)$/,
+        pattern: /^(?:tools\/perf\/awake_owner_focused_(?:admission|baseline(?:\.test)?|fixture|observer|report|scenarios)\.cjs|tools\/perf\/__snapshots__\/awake_owner_focused_baseline\.json)$/,
         groups: ["integration:mission"],
     },
     {

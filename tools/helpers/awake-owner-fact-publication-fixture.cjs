@@ -54,7 +54,7 @@ function activeRewardRow() {
     return row
 }
 
-function contentOverrides() {
+function contentOverrides(overrides = {}) {
     const activeMissions = require("../../assets/mission_active.json")
     const activeEvents = require("../../assets/mission_active_event.json")
     const activeRewards = require("../../assets/mission_active_reward.json")
@@ -78,6 +78,7 @@ function contentOverrides() {
             [ACTIVE_MISSION_ID]: { 1: [activeRewardRow()] },
         },
         "rare_score_reward.json": {},
+        ...overrides,
     }
 }
 
@@ -109,7 +110,7 @@ async function runAwakeOwnerFactPublicationCleanup(cleanupActions, options = {})
     }
 }
 
-async function createAwakeOwnerFactPublicationFixture() {
+async function createAwakeOwnerFactPublicationFixture(options = {}) {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "awake-owner-facts-"))
     const previousDataDirectory = process.env.DATA_DIR
     const previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR
@@ -128,8 +129,9 @@ async function createAwakeOwnerFactPublicationFixture() {
                     "event_item_shop_id_map.json",
                     "general_shop.json",
                     "raid_event_overall_reward.json",
+                    ...(options.additionalTableNames ?? []),
                 ],
-                tableOverrides: contentOverrides(),
+                tableOverrides: contentOverrides(options.tableOverrides),
             })
         const data = require("../../src/data")
         const { getDb } = require("../../src/data/db")

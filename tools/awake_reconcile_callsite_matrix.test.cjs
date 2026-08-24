@@ -10,6 +10,9 @@ const {
     AWAKE_OWNER_SQL_UPPER_BOUND_REGISTRY,
     SINGLE_REREAD_REASON,
 } = require("./perf/awake_owner_focused_scenarios.cjs")
+const OWNER_FOCUSED_SNAPSHOT = require(
+    "./perf/__snapshots__/awake_owner_focused_baseline.json"
+)
 
 const projectRoot = path.resolve(__dirname, "..")
 const sourceRoot = path.join(projectRoot, "src")
@@ -136,27 +139,27 @@ function matrixRow({
 }
 
 const EXPECTED_MATRIX = Object.freeze([
-    matrixRow({ relativeFile: "src/lib/quest/finish/single-settlement-writes.ts", owner: "single/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "partyCharacterIds", actualFactSeeds: "invalidatedFactKeys", finalAuthoritativeWrite: "deletePlayerActiveQuestSync", runtimeEvidenceKey: "single-in-tx", changesGlobalFacts: true, rereadReason: SINGLE_REREAD_REASON }),
-    matrixRow({ relativeFile: "src/multi/settlement/orchestrator.ts", owner: "multi/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "invalidatedFactKeys", finalAuthoritativeWrite: "deleteActiveQuest", runtimeEvidenceKey: "candidate-multiple-in-tx", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/activeMission.ts", owner: "active_mission/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "granter.invalidatedFactKeys", finalAuthoritativeWrite: "persistPlayer", runtimeEvidenceKey: "reward-grant-in-tx", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/boxGacha.ts", owner: "box_gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "settlement.rewardResult?.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "updatePlayerItemSync", runtimeEvidenceKey: "reward-grant-post-commit", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/character.ts", owner: "character/add_character_from_town", boundary: "best-effort-post-commit", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "givePlayerCharacterSync", runtimeEvidenceKey: "character-grant-post-commit" }),
-    matrixRow({ relativeFile: "src/routes/api/character/bond.ts", owner: "character/receive_bond_token", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", finalAuthoritativeWrite: "updatePlayerCharacterBondTokenSync", runtimeEvidenceKey: "bond-in-tx" }),
-    matrixRow({ relativeFile: "src/routes/api/character/mana.ts", callee: "strict", owner: "character/learn_mana_node", boundary: "strict-in-tx", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "updatePlayerCharacterSync", runtimeEvidenceKey: "learn-mana-strict" }),
-    matrixRow({ relativeFile: "src/routes/api/exchange.ts", owner: "exchange/star_crumb", boundary: "best-effort-post-commit", actualCharacterSeed: "kind === 0 ? [targetId] : []", finalAuthoritativeWrite: "givePlayerCharacterSync", runtimeEvidenceKey: "candidate-zero-post-commit" }),
-    matrixRow({ relativeFile: "src/routes/api/gacha.ts", owner: "gacha/exchange_character", boundary: "best-effort-post-commit", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "updatePlayerGachaInfoSync", runtimeEvidenceKey: "candidate-one-post-commit" }),
-    matrixRow({ relativeFile: "src/routes/api/gacha.ts", owner: "gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", finalAuthoritativeWrite: "updatePlayerSync", runtimeEvidenceKey: "candidate-one-post-commit" }),
-    matrixRow({ relativeFile: "src/routes/api/item.ts", owner: "item/sell", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "player", finalAuthoritativeWrite: "sellItemSync", runtimeEvidenceKey: "mana-item-post-commit", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "mail", finalAuthoritativeWrite: "receiveMailSync", runtimeEvidenceKey: "reward-grant-in-tx", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive_all", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "mail", finalAuthoritativeWrite: "receiveMailSync", runtimeEvidenceKey: "reward-grant-in-tx", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/mission.ts", owner: "mission/update_mission_progress", boundary: "best-effort-post-commit", actualCharacterSeed: "awakeCandidateCharacterIds", finalAuthoritativeWrite: "incrementPlayerCategoryMissionIfSafeSync", runtimeEvidenceKey: "category9-post-commit" }),
-    matrixRow({ relativeFile: "src/routes/api/passCard.ts", owner: "pass_card/receive_all", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "result.invalidatedFactKeys", finalAuthoritativeWrite: "persistPlayer", runtimeEvidenceKey: "pass-card-post-commit", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/raidEvent.ts", owner: "raid_event/summary", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "settleRaidEventSummary", runtimeEvidenceKey: "raid-summary-post-commit", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/shop.ts", owner: "shop/buy", boundary: "best-effort-post-commit", actualCharacterSeed: "rewardResult.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "executeGenericShopPurchaseSync", runtimeEvidenceKey: "reward-grant-post-commit", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/shop.ts", owner: "shop/bulk_buy", boundary: "best-effort-post-commit", actualCharacterSeed: "rewardResult.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "executeGenericShopBatchPurchaseSync", runtimeEvidenceKey: "reward-grant-post-commit", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/storyQuest.ts", owner: "story_quest/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "story-reward+quest-progress", finalAuthoritativeWrite: "reconcileActiveMissionFacts", runtimeEvidenceKey: "story-in-tx", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/tutorial.ts", owner: "tutorial/update_step:15", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", finalAuthoritativeWrite: "updatePlayerSync", runtimeEvidenceKey: "candidate-multiple-in-tx" }),
-    matrixRow({ relativeFile: "src/routes/api/tutorial.ts", owner: "tutorial/update_step:16", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", finalAuthoritativeWrite: "updatePlayerSync", runtimeEvidenceKey: "candidate-multiple-in-tx" }),
+    matrixRow({ relativeFile: "src/lib/quest/finish/single-settlement-writes.ts", owner: "single/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "partyCharacterIds", actualFactSeeds: "invalidatedFactKeys", finalAuthoritativeWrite: "deletePlayerActiveQuestSync", runtimeEvidenceKey: "single-finish", changesGlobalFacts: true, rereadReason: SINGLE_REREAD_REASON }),
+    matrixRow({ relativeFile: "src/multi/settlement/orchestrator.ts", owner: "multi/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "invalidatedFactKeys", finalAuthoritativeWrite: "deleteActiveQuest", runtimeEvidenceKey: "multi-finish", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/activeMission.ts", owner: "active_mission/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "granter.invalidatedFactKeys", finalAuthoritativeWrite: "persistPlayer", runtimeEvidenceKey: "active-mission-receive", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/boxGacha.ts", owner: "box_gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "settlement.rewardResult?.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "box-gacha-exec", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/character.ts", owner: "character/add_character_from_town", boundary: "best-effort-post-commit", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "character-town-grant" }),
+    matrixRow({ relativeFile: "src/routes/api/character/bond.ts", owner: "character/receive_bond_token", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", finalAuthoritativeWrite: "updatePlayerCharacterBondTokenSync", runtimeEvidenceKey: "bond-success" }),
+    matrixRow({ relativeFile: "src/routes/api/character/mana.ts", callee: "strict", owner: "character/learn_mana_node", boundary: "strict-in-tx", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "updatePlayerCharacterSync", runtimeEvidenceKey: "learn-mana-final-node" }),
+    matrixRow({ relativeFile: "src/routes/api/exchange.ts", owner: "exchange/star_crumb", boundary: "best-effort-post-commit", actualCharacterSeed: "kind === 0 ? [targetId] : []", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "exchange-star-crumb" }),
+    matrixRow({ relativeFile: "src/routes/api/gacha.ts", owner: "gacha/exchange_character", boundary: "best-effort-post-commit", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "gacha-exchange-character" }),
+    matrixRow({ relativeFile: "src/routes/api/gacha.ts", owner: "gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "gacha-exec" }),
+    matrixRow({ relativeFile: "src/routes/api/item.ts", owner: "item/sell", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "player", finalAuthoritativeWrite: "sellItemSync", runtimeEvidenceKey: "mana-item-sell", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "mail", finalAuthoritativeWrite: "receiveMailSync", runtimeEvidenceKey: "mail-receive", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive_all", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "mail", finalAuthoritativeWrite: "receiveMailSync", runtimeEvidenceKey: "mail-receive-all", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/mission.ts", owner: "mission/update_mission_progress", boundary: "best-effort-post-commit", actualCharacterSeed: "awakeCandidateCharacterIds", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "category9-update-progress" }),
+    matrixRow({ relativeFile: "src/routes/api/passCard.ts", owner: "pass_card/receive_all", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "result.invalidatedFactKeys", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "pass-card-receive-all", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/raidEvent.ts", owner: "raid_event/summary", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "raid-event-summary", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/shop.ts", owner: "shop/buy", boundary: "best-effort-post-commit", actualCharacterSeed: "rewardResult.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "executeGenericShopPurchaseSync", runtimeEvidenceKey: "shop-buy", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/shop.ts", owner: "shop/bulk_buy", boundary: "best-effort-post-commit", actualCharacterSeed: "rewardResult.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "executeGenericShopBatchPurchaseSync", runtimeEvidenceKey: "shop-bulk-buy", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/storyQuest.ts", owner: "story_quest/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "story-reward+quest-progress", finalAuthoritativeWrite: "reconcileActiveMissionFacts", runtimeEvidenceKey: "story-finish", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/tutorial.ts", owner: "tutorial/update_step:15", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", finalAuthoritativeWrite: "updatePlayerSync", runtimeEvidenceKey: "tutorial-step-15" }),
+    matrixRow({ relativeFile: "src/routes/api/tutorial.ts", owner: "tutorial/update_step:16", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", finalAuthoritativeWrite: "updatePlayerSync", runtimeEvidenceKey: "tutorial-step-16" }),
 ])
 
 function isMissionModuleSpecifier(specifier) {
@@ -735,21 +738,72 @@ function findOwnerRoot(call) {
     assert.fail(`${call.getSourceFile().fileName} publication owner root is not traceable`)
 }
 
-function assertFinalWritePrecedesContext(call, contextStart, anchor) {
+function assertFinalWritePrecedesContext(call, contextStart, anchor, ownerLabel = null) {
     const sourceFile = call.getSourceFile()
     const ownerRoot = findOwnerRoot(call)
     const matches = []
     function visit(node) {
         if (ts.isCallExpression(node)
-            && callTerminalName(node) === anchor
-            && node.end <= contextStart) matches.push(node)
+            && callTerminalName(node) === anchor) matches.push(node)
         ts.forEachChild(node, visit)
     }
     visit(ownerRoot)
+    const publicationBlocks = []
+    for (let node = call.parent; node && node !== ownerRoot; node = node.parent) {
+        if (ts.isBlock(node)) publicationBlocks.push(node)
+    }
+    const belongsToBlockPath = (match, block) => {
+        for (let node = match.parent; node && node !== block; node = node.parent) {
+            if (ts.isFunctionLike(node)) {
+                const callExpression = node.parent
+                const synchronousMailFilter = ownerLabel === "mail/receive_all"
+                    && ts.isCallExpression(callExpression)
+                    && callExpression.arguments.includes(node)
+                    && ts.isPropertyAccessExpression(callExpression.expression)
+                    && callExpression.expression.name.text === "filter"
+                if (!synchronousMailFilter) return false
+            }
+        }
+        return true
+    }
+    let dominanceEvidence = null
+    for (const block of publicationBlocks) {
+        const publicationStatement = block.statements.find(statement => (
+            call.getStart(sourceFile) >= statement.getStart(sourceFile)
+                && call.end <= statement.end
+        ))
+        if (publicationStatement === undefined) continue
+        const publicationIndex = block.statements.indexOf(publicationStatement)
+        const writeStatement = block.statements.find(statement => matches.some(match => (
+            match.end <= contextStart
+                && belongsToBlockPath(match, block)
+                && match.getStart(sourceFile) >= statement.getStart(sourceFile)
+                && match.end <= statement.end
+        )))
+        if (writeStatement === undefined) continue
+        const writeIndex = block.statements.indexOf(writeStatement)
+        if (writeIndex < publicationIndex) {
+            dominanceEvidence = { block, publicationIndex }
+            break
+        }
+    }
     assert.equal(
-        matches.length > 0,
+        dominanceEvidence !== null,
         true,
-        `${sourceFile.fileName} context/publication precedes final authoritative write ${anchor}`,
+        `${sourceFile.fileName} final authoritative write ${anchor} does not dominate publication on the same control-flow path`,
+    )
+    const later = dominanceEvidence.block.statements.filter((statement, index) => (
+        index > dominanceEvidence.publicationIndex
+            && matches.some(match => (
+                belongsToBlockPath(match, dominanceEvidence.block)
+                    && match.getStart(sourceFile) >= statement.getStart(sourceFile)
+                    && match.end <= statement.end
+            ))
+    ))
+    assert.equal(
+        later.length,
+        0,
+        `${sourceFile.fileName} has a later authoritative write ${anchor} after publication`,
     )
 }
 
@@ -805,6 +859,7 @@ function collectProductionCalls() {
                 call,
                 scopeEvidence.contextStart,
                 expected[0].finalAuthoritativeWrite,
+                ownerLabel,
             )
             assert.equal(
                 typeof PLANNED_CANDIDATE_SOURCES[ownerLabel],
@@ -858,6 +913,24 @@ function assertEvidenceContract(matrix) {
         assert.notEqual(runtimeEvidence, undefined, `${entry.owner} runtime evidence key must resolve`)
         assert.equal(runtimeEvidence.boundary, entry.boundary, `${entry.owner} evidence boundary drifted`)
         assert.equal(runtimeEvidence.owners.includes(entry.owner), true, `${entry.owner} is absent from its evidence family`)
+        assert.equal(runtimeEvidence.scenarios.length > 0, true, `${entry.owner} has no runtime scenario`)
+        const ownerScenarios = runtimeEvidence.scenarios.map(name => (
+            OWNER_FOCUSED_SNAPSHOT.scenarios[name]
+        )).filter(scenario => scenario?.owner === entry.owner)
+        assert.equal(
+            ownerScenarios.length,
+            1,
+            `${entry.owner} lacks exactly one owner-matched runtime scenario`,
+        )
+        const runtimeScenario = ownerScenarios[0]
+        assert.equal(runtimeScenario.runtimeEvidenceKey, entry.runtimeEvidenceKey)
+        assert.equal(runtimeScenario.boundary, entry.boundary)
+        assert.deepEqual(runtimeScenario.characterSeeds, runtimeScenario.publicationObservation.characterSeeds)
+        assert.deepEqual(runtimeScenario.factSeeds, runtimeScenario.publicationObservation.factSeeds)
+        assert.deepEqual(runtimeScenario.directMissionSeeds, runtimeScenario.publicationObservation.directMissionSeeds)
+        assert.deepEqual(runtimeScenario.characterSeeds, runtimeEvidence.seedContract.characterSeeds)
+        assert.deepEqual(runtimeScenario.factSeeds, runtimeEvidence.seedContract.factSeeds)
+        assert.deepEqual(runtimeScenario.directMissionSeeds, runtimeEvidence.seedContract.directMissionSeeds)
         assert.notEqual(
             AWAKE_OWNER_SQL_UPPER_BOUND_REGISTRY[entry.sqlUpperBoundKey],
             undefined,
@@ -1059,6 +1132,44 @@ test("AST collector enforces the single wrapper module contract", () => {
     assert.throws(
         () => collectImportedAwakeCalls(wrongModule, "synthetic.ts"),
         /single Awake wrapper import must use awake-best-effort-context/i,
+    )
+})
+
+test("final-write evidence rejects a same-name write confined to a sibling branch", () => {
+    const source = `
+        import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
+        export function owner(condition) {
+            if (condition) {
+                persistPlayer()
+            } else {
+                publishAwakeCharacterListBestEffort(1, [], [], {})
+            }
+        }
+    `
+    const importedCall = collectImportedAwakeCalls(source, "synthetic.ts")[0]
+    const scope = extractScopeEvidence(importedCall)
+
+    assert.throws(
+        () => assertFinalWritePrecedesContext(importedCall.call, scope.contextStart, "persistPlayer"),
+        /same control-flow path|dominat/i,
+    )
+})
+
+test("final-write evidence rejects authoritative writes after publication", () => {
+    const source = `
+        import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
+        export function owner() {
+            persistPlayer()
+            publishAwakeCharacterListBestEffort(1, [], [], {})
+            persistPlayer()
+        }
+    `
+    const importedCall = collectImportedAwakeCalls(source, "synthetic.ts")[0]
+    const scope = extractScopeEvidence(importedCall)
+
+    assert.throws(
+        () => assertFinalWritePrecedesContext(importedCall.call, scope.contextStart, "persistPlayer"),
+        /after.*publication|later authoritative write/i,
     )
 })
 
