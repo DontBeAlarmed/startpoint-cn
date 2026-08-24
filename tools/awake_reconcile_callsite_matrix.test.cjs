@@ -25,7 +25,7 @@ const CALLEES = new Map([
 const AWAKE_CALLEE_PREFIX = "reconcileAwakeUnlockCharacterList"
 const SINGLE_AWAKE_WRAPPER = "publishAwakeCharacterListBestEffort"
 const PLANNED_CANDIDATE_SOURCES = Object.freeze({
-    "single/finish": "battle-party+direct-missions",
+    "single/finish": "battle-party+invalidated-facts",
     "multi/finish": "battle-party+direct-missions",
     "active_mission/receive": "claimed-reward-characters",
     "box_gacha/exec": "drawn-reward-characters",
@@ -46,6 +46,72 @@ const PLANNED_CANDIDATE_SOURCES = Object.freeze({
     "tutorial/update_step:16": "tutorial-present-character",
     "pass_card/receive_all": "pass-card-reward-facts",
     "raid_event/summary": "raid-summary-reward-facts",
+})
+const AUTHORITATIVE_WRITE_SETS = Object.freeze({
+    "single/finish": Object.freeze([
+        "updatePlayerQuestProgressSync", "insertPlayerQuestProgressSync", "updatePlayerSync",
+        "setPlayerState", "grantDirectRewards", "handleDailyChallengePoint",
+        "grantSingleSettlementScoreRewardsWithinTransactionSync", "settleAdditionalRewardsSync",
+        "recordMissionBattleFacts", "givePlayerCharactersExpSync", "handleRushEventFinish",
+        "dispatchModeRushFinish", "handleRaidEventFinish", "handleCarnivalEventFinish",
+        "insertPlayerScoreAttackBattleHistorySync", "insertPlayerPracticeBattleHistorySync",
+        "handleScoreAttackEventFinish", "settleMissionCategoriesWithEvaluation",
+        "settleAwakeMissionCandidatesWithEvaluation", "reconcileActiveMissionFacts", "setExpPool",
+        "observeGrant", "observeItems", "observeResult", "finalize", "deletePlayerActiveQuestSync",
+    ]),
+    "multi/finish": Object.freeze([
+        "givePlayerRewardSync", "updatePlayerQuestProgressSync", "insertPlayerQuestProgressSync",
+        "updatePlayerSync", "givePlayerScoreRewardsSync", "settleAdditionalRewardsSync",
+        "settleActivityPeriodicRewardsSync", "recordMissionBattleFacts",
+        "givePlayerCharactersExpSync", "settleMissionCategoriesWithEvaluation",
+        "settleAwakeMissionCandidatesWithEvaluation", "deleteActiveQuest",
+    ]),
+    "active_mission/receive": Object.freeze([
+        "updatePlayerActiveMissionStageSync", "grant", "persistPlayer",
+    ]),
+    "box_gacha/exec": Object.freeze(["transaction"]),
+    "character/add_character_from_town": Object.freeze(["transaction"]),
+    "character/receive_bond_token": Object.freeze([
+        "updatePlayerSync", "updatePlayerCharacterBondTokenSync",
+    ]),
+    "character/learn_mana_node": Object.freeze([
+        "updatePlayerSync", "incrementActiveMissionUsedManaCountSync",
+        "setPlayerItemWithinTransactionSync", "insertPlayerCharacterManaNodesSync",
+        "updateBondTokenForCompletedBoard", "updatePlayerCharacterSync",
+    ]),
+    "exchange/star_crumb": Object.freeze(["transaction"]),
+    "gacha/exchange_character": Object.freeze(["transaction"]),
+    "gacha/exec": Object.freeze(["transaction"]),
+    "item/sell": Object.freeze(["sellItemSync"]),
+    "mail/receive": Object.freeze([
+        "settleMailRewardsInTransactionOwnerSync", "receiveMailSync",
+    ]),
+    "mail/receive_all": Object.freeze([
+        "settleMailRewardsInTransactionOwnerSync", "receiveMailSync",
+    ]),
+    "mission/update_mission_progress": Object.freeze(["transaction"]),
+    "pass_card/receive_all": Object.freeze(["transaction"]),
+    "raid_event/summary": Object.freeze(["transaction"]),
+    "shop/buy": Object.freeze(["executeGenericShopPurchaseSync"]),
+    "shop/bulk_buy": Object.freeze(["executeGenericShopBatchPurchaseSync"]),
+    "story_quest/finish": Object.freeze([
+        "givePlayerRewardSync", "givePlayerCharacterSync", "insertPlayerQuestProgressSync",
+        "updatePlayerQuestProgressSync", "reconcileActiveMissionFacts",
+    ]),
+    "tutorial/update_step:15": Object.freeze([
+        "rewardPlayerGachaDrawResultSync", "executeRewardGrantPlanInTransactionOwnerInternalSync",
+        "insertReceiveHistorySync", "updatePlayerSync",
+    ]),
+    "tutorial/update_step:16": Object.freeze([
+        "givePlayerCharacterSync", "insertMailSync", "updatePlayerSync",
+    ]),
+})
+const OWNER_TRANSACTION_ANCHORS = Object.freeze({
+    "box_gacha/exec": "transaction",
+    "exchange/star_crumb": "transaction",
+    "gacha/exchange_character": "transaction",
+    "shop/buy": "executeGenericShopPurchaseSync",
+    "shop/bulk_buy": "executeGenericShopBatchPurchaseSync",
 })
 const ROUTE_OWNERS = Object.freeze({
     "src/routes/api/activeMission.ts": { "/receive": "active_mission/receive" },
@@ -83,6 +149,7 @@ const REQUIRED_OWNER_EVIDENCE_FIELDS = Object.freeze([
     "actualFactSeeds",
     "directMissionSeed",
     "finalAuthoritativeWrite",
+    "authoritativeWriteSet",
     "snapshotSource",
     "rereadReason",
     "sqlUpperBoundKey",
@@ -130,6 +197,10 @@ function matrixRow({
         actualFactSeeds,
         directMissionSeed,
         finalAuthoritativeWrite,
+        authoritativeWriteSet: AUTHORITATIVE_WRITE_SETS[owner],
+        finalWriteRule: OWNER_TRANSACTION_ANCHORS[owner] === undefined
+            ? "same-block-direct"
+            : "owner-transaction-statement",
         snapshotSource: "none",
         rereadReason,
         sqlUpperBoundKey: runtimeEvidenceKey,
@@ -139,19 +210,19 @@ function matrixRow({
 }
 
 const EXPECTED_MATRIX = Object.freeze([
-    matrixRow({ relativeFile: "src/lib/quest/finish/single-settlement-writes.ts", owner: "single/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "partyCharacterIds", actualFactSeeds: "invalidatedFactKeys", finalAuthoritativeWrite: "deletePlayerActiveQuestSync", runtimeEvidenceKey: "single-finish", changesGlobalFacts: true, rereadReason: SINGLE_REREAD_REASON }),
-    matrixRow({ relativeFile: "src/multi/settlement/orchestrator.ts", owner: "multi/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "invalidatedFactKeys", finalAuthoritativeWrite: "deleteActiveQuest", runtimeEvidenceKey: "multi-finish", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/lib/quest/finish/single-settlement-writes.ts", owner: "single/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "partyCharacterIds", actualFactSeeds: "invalidatedFactKeys", finalAuthoritativeWrite: "finalize", runtimeEvidenceKey: "single-finish", changesGlobalFacts: true, rereadReason: SINGLE_REREAD_REASON }),
+    matrixRow({ relativeFile: "src/multi/settlement/orchestrator.ts", owner: "multi/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "invalidatedFactKeys", finalAuthoritativeWrite: "settleMissionCategoriesWithEvaluation", runtimeEvidenceKey: "multi-finish", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/activeMission.ts", owner: "active_mission/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "granter.invalidatedFactKeys", finalAuthoritativeWrite: "persistPlayer", runtimeEvidenceKey: "active-mission-receive", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/boxGacha.ts", owner: "box_gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "settlement.rewardResult?.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "box-gacha-exec", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/character.ts", owner: "character/add_character_from_town", boundary: "best-effort-post-commit", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "character-town-grant" }),
     matrixRow({ relativeFile: "src/routes/api/character/bond.ts", owner: "character/receive_bond_token", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", finalAuthoritativeWrite: "updatePlayerCharacterBondTokenSync", runtimeEvidenceKey: "bond-success" }),
-    matrixRow({ relativeFile: "src/routes/api/character/mana.ts", callee: "strict", owner: "character/learn_mana_node", boundary: "strict-in-tx", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "updatePlayerCharacterSync", runtimeEvidenceKey: "learn-mana-final-node" }),
+    matrixRow({ relativeFile: "src/routes/api/character/mana.ts", callee: "strict", owner: "character/learn_mana_node", boundary: "strict-in-tx", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "updateBondTokenForCompletedBoard", runtimeEvidenceKey: "learn-mana-final-node" }),
     matrixRow({ relativeFile: "src/routes/api/exchange.ts", owner: "exchange/star_crumb", boundary: "best-effort-post-commit", actualCharacterSeed: "kind === 0 ? [targetId] : []", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "exchange-star-crumb" }),
     matrixRow({ relativeFile: "src/routes/api/gacha.ts", owner: "gacha/exchange_character", boundary: "best-effort-post-commit", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "gacha-exchange-character" }),
     matrixRow({ relativeFile: "src/routes/api/gacha.ts", owner: "gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "gacha-exec" }),
     matrixRow({ relativeFile: "src/routes/api/item.ts", owner: "item/sell", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "player", finalAuthoritativeWrite: "sellItemSync", runtimeEvidenceKey: "mana-item-sell", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "mail", finalAuthoritativeWrite: "receiveMailSync", runtimeEvidenceKey: "mail-receive", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive_all", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "mail", finalAuthoritativeWrite: "receiveMailSync", runtimeEvidenceKey: "mail-receive-all", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "mail", finalAuthoritativeWrite: "settleMailRewardsInTransactionOwnerSync", runtimeEvidenceKey: "mail-receive", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive_all", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "mail", finalAuthoritativeWrite: "settleMailRewardsInTransactionOwnerSync", runtimeEvidenceKey: "mail-receive-all", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/mission.ts", owner: "mission/update_mission_progress", boundary: "best-effort-post-commit", actualCharacterSeed: "awakeCandidateCharacterIds", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "category9-update-progress" }),
     matrixRow({ relativeFile: "src/routes/api/passCard.ts", owner: "pass_card/receive_all", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "result.invalidatedFactKeys", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "pass-card-receive-all", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/raidEvent.ts", owner: "raid_event/summary", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "raid-event-summary", changesGlobalFacts: true }),
@@ -738,33 +809,97 @@ function findOwnerRoot(call) {
     assert.fail(`${call.getSourceFile().fileName} publication owner root is not traceable`)
 }
 
-function assertFinalWritePrecedesContext(call, contextStart, anchor, ownerLabel = null) {
+function isShortCircuitExpression(node) {
+    return ts.isBinaryExpression(node) && [
+        ts.SyntaxKind.AmpersandAmpersandToken,
+        ts.SyntaxKind.BarBarToken,
+        ts.SyntaxKind.QuestionQuestionToken,
+    ].includes(node.operatorToken.kind)
+}
+
+function isConditionalExecutionNode(node) {
+    return ts.isIfStatement(node)
+        || ts.isSwitchStatement(node)
+        || ts.isTryStatement(node)
+        || ts.isCatchClause(node)
+        || ts.isCaseClause(node)
+        || ts.isDefaultClause(node)
+        || ts.isForStatement(node)
+        || ts.isForInStatement(node)
+        || ts.isForOfStatement(node)
+        || ts.isWhileStatement(node)
+        || ts.isDoStatement(node)
+        || ts.isConditionalExpression(node)
+        || isShortCircuitExpression(node)
+}
+
+function isImmediatelyInvokedFunction(node) {
+    return (ts.isArrowFunction(node) || ts.isFunctionExpression(node))
+        && ts.isCallExpression(node.parent)
+        && node.parent.expression === node
+}
+
+function isDirectUnconditionalCallInStatement(call, statement) {
+    if (call.questionDotToken) return false
+    for (let node = call.parent; node && node !== statement; node = node.parent) {
+        if (isConditionalExecutionNode(node)) return false
+        if (ts.isFunctionLike(node) && !isImmediatelyInvokedFunction(node)) return false
+    }
+    return call.getStart() >= statement.getStart()
+        && call.end <= statement.end
+        && !isConditionalExecutionNode(statement)
+}
+
+function catchAlwaysExits(tryStatement) {
+    if (tryStatement.finallyBlock || !tryStatement.catchClause) return false
+    const statements = tryStatement.catchClause.block.statements
+    return statements.length > 0 && ts.isThrowStatement(statements.at(-1))
+}
+
+function collectExecutableCallsAfter(statement, position, authoritativeWrites) {
+    const calls = []
+    function visit(node) {
+        if (node !== statement && ts.isFunctionLike(node) && !isImmediatelyInvokedFunction(node)) return
+        if (ts.isCallExpression(node)
+            && node.getStart() > position
+            && authoritativeWrites.has(callTerminalName(node))) calls.push(node)
+        ts.forEachChild(node, visit)
+    }
+    visit(statement)
+    return calls
+}
+
+function assertFinalWritePrecedesContext(
+    call,
+    contextStart,
+    anchor,
+    ownerLabel = null,
+    authoritativeWriteNames = [anchor],
+    finalWriteRule = "same-block-direct",
+) {
     const sourceFile = call.getSourceFile()
     const ownerRoot = findOwnerRoot(call)
-    const matches = []
+    const authoritativeWrites = new Set(authoritativeWriteNames)
+    assert.equal(authoritativeWrites.has(anchor), true, `${anchor} must belong to the authoritative write set`)
+    const anchorMatches = []
+    const observedAuthoritativeWrites = new Set()
     function visit(node) {
-        if (ts.isCallExpression(node)
-            && callTerminalName(node) === anchor) matches.push(node)
+        if (ts.isCallExpression(node)) {
+            const terminalName = callTerminalName(node)
+            if (terminalName === anchor) anchorMatches.push(node)
+            if (authoritativeWrites.has(terminalName)) observedAuthoritativeWrites.add(terminalName)
+        }
         ts.forEachChild(node, visit)
     }
     visit(ownerRoot)
+    assert.deepEqual(
+        [...observedAuthoritativeWrites].sort(),
+        [...authoritativeWrites].sort(),
+        `${sourceFile.fileName} authoritative write set does not resolve to owner calls`,
+    )
     const publicationBlocks = []
     for (let node = call.parent; node && node !== ownerRoot; node = node.parent) {
         if (ts.isBlock(node)) publicationBlocks.push(node)
-    }
-    const belongsToBlockPath = (match, block) => {
-        for (let node = match.parent; node && node !== block; node = node.parent) {
-            if (ts.isFunctionLike(node)) {
-                const callExpression = node.parent
-                const synchronousMailFilter = ownerLabel === "mail/receive_all"
-                    && ts.isCallExpression(callExpression)
-                    && callExpression.arguments.includes(node)
-                    && ts.isPropertyAccessExpression(callExpression.expression)
-                    && callExpression.expression.name.text === "filter"
-                if (!synchronousMailFilter) return false
-            }
-        }
-        return true
     }
     let dominanceEvidence = null
     for (const block of publicationBlocks) {
@@ -774,16 +909,36 @@ function assertFinalWritePrecedesContext(call, contextStart, anchor, ownerLabel 
         ))
         if (publicationStatement === undefined) continue
         const publicationIndex = block.statements.indexOf(publicationStatement)
-        const writeStatement = block.statements.find(statement => matches.some(match => (
+        const writeStatement = block.statements.find(statement => anchorMatches.some(match => (
             match.end <= contextStart
-                && belongsToBlockPath(match, block)
-                && match.getStart(sourceFile) >= statement.getStart(sourceFile)
-                && match.end <= statement.end
+                && isDirectUnconditionalCallInStatement(match, statement)
         )))
-        if (writeStatement === undefined) continue
-        const writeIndex = block.statements.indexOf(writeStatement)
-        if (writeIndex < publicationIndex) {
-            dominanceEvidence = { block, publicationIndex }
+        if (writeStatement !== undefined
+            && block.statements.indexOf(writeStatement) < publicationIndex) {
+            dominanceEvidence = { block, publicationIndex, publicationStatement }
+            break
+        }
+        if (finalWriteRule !== "owner-transaction-statement" || ownerLabel === null) continue
+        assert.equal(
+            OWNER_TRANSACTION_ANCHORS[ownerLabel],
+            anchor,
+            `${ownerLabel} lacks an exact outer transaction anchor rule for ${anchor}`,
+        )
+        const tryStatement = block.statements.find((statement, index) => (
+            index < publicationIndex
+                && ts.isTryStatement(statement)
+                && catchAlwaysExits(statement)
+                && statement.tryBlock.statements.length > 0
+                && anchorMatches.some(match => (
+                    match.end <= contextStart
+                        && isDirectUnconditionalCallInStatement(
+                            match,
+                            statement.tryBlock.statements.at(-1),
+                        )
+                ))
+        ))
+        if (tryStatement !== undefined) {
+            dominanceEvidence = { block, publicationIndex, publicationStatement }
             break
         }
     }
@@ -792,18 +947,18 @@ function assertFinalWritePrecedesContext(call, contextStart, anchor, ownerLabel 
         true,
         `${sourceFile.fileName} final authoritative write ${anchor} does not dominate publication on the same control-flow path`,
     )
-    const later = dominanceEvidence.block.statements.filter((statement, index) => (
-        index > dominanceEvidence.publicationIndex
-            && matches.some(match => (
-                belongsToBlockPath(match, dominanceEvidence.block)
-                    && match.getStart(sourceFile) >= statement.getStart(sourceFile)
-                    && match.end <= statement.end
-            ))
-    ))
+    const later = dominanceEvidence.block.statements
+        .slice(dominanceEvidence.publicationIndex)
+        .flatMap(statement => collectExecutableCallsAfter(
+            statement,
+            call.end,
+            authoritativeWrites,
+        ))
     assert.equal(
         later.length,
         0,
-        `${sourceFile.fileName} has a later authoritative write ${anchor} after publication`,
+        `${sourceFile.fileName} has a later authoritative write ${later
+            .map(match => callTerminalName(match)).join(", ")} after publication`,
     )
 }
 
@@ -860,6 +1015,8 @@ function collectProductionCalls() {
                 scopeEvidence.contextStart,
                 expected[0].finalAuthoritativeWrite,
                 ownerLabel,
+                expected[0].authoritativeWriteSet,
+                expected[0].finalWriteRule,
             )
             assert.equal(
                 typeof PLANNED_CANDIDATE_SOURCES[ownerLabel],
@@ -882,6 +1039,8 @@ function collectProductionCalls() {
                 actualFactSeeds: scopeEvidence.actualFactSeeds,
                 directMissionSeed: scopeEvidence.directMissionSeed,
                 finalAuthoritativeWrite: expected[0].finalAuthoritativeWrite,
+                authoritativeWriteSet: expected[0].authoritativeWriteSet,
+                finalWriteRule: expected[0].finalWriteRule,
                 snapshotSource: scopeEvidence.snapshotSource,
                 rereadReason: expected[0].rereadReason,
                 sqlUpperBoundKey: expected[0].sqlUpperBoundKey,
@@ -904,6 +1063,28 @@ function assertEvidenceContract(matrix) {
         { "strict-in-tx": 1, "best-effort-in-tx": 9, "best-effort-post-commit": 11 },
     )
     for (const entry of matrix) {
+        assert.equal(Array.isArray(entry.authoritativeWriteSet), true, `${entry.owner} lacks a write set`)
+        assert.equal(entry.authoritativeWriteSet.length > 0, true, `${entry.owner} has an empty write set`)
+        assert.equal(
+            new Set(entry.authoritativeWriteSet).size,
+            entry.authoritativeWriteSet.length,
+            `${entry.owner} has duplicate authoritative writes`,
+        )
+        assert.equal(
+            entry.authoritativeWriteSet.includes(entry.finalAuthoritativeWrite),
+            true,
+            `${entry.owner} final anchor is absent from its authoritative write set`,
+        )
+        if (entry.finalWriteRule === "owner-transaction-statement") {
+            assert.equal(
+                OWNER_TRANSACTION_ANCHORS[entry.owner],
+                entry.finalAuthoritativeWrite,
+                `${entry.owner} lacks its exact outer transaction anchor rule`,
+            )
+        } else {
+            assert.equal(entry.finalWriteRule, "same-block-direct")
+            assert.equal(OWNER_TRANSACTION_ANCHORS[entry.owner], undefined)
+        }
         assert.equal(
             entry.changesGlobalFacts,
             GLOBAL_FACT_OWNERS.has(entry.owner),
@@ -958,7 +1139,8 @@ test("Awake reconcile production call expressions match the fixed 21-entry evide
     const comparedFields = [
         "relativeFile", "callee", "owner", "boundary", "candidateSource",
         "plannedCandidateSource", "actualCharacterSeed", "actualFactSeeds",
-        "directMissionSeed", "finalAuthoritativeWrite", "snapshotSource",
+        "directMissionSeed", "finalAuthoritativeWrite", "authoritativeWriteSet",
+        "finalWriteRule", "snapshotSource",
         "rereadReason", "sqlUpperBoundKey", "runtimeEvidenceKey",
     ]
     assert.deepEqual(
@@ -984,6 +1166,9 @@ test("Awake reconcile audit matrix freezes owner, policy, and planned candidate 
         },
     )
     assert.equal(new Set(EXPECTED_MATRIX.map(entry => entry.ownerLabel)).size, 21)
+    const single = EXPECTED_MATRIX.find(entry => entry.owner === "single/finish")
+    assert.equal(single.plannedCandidateSource, "battle-party+invalidated-facts")
+    assert.equal(single.directMissionSeed, "none")
     for (const entry of EXPECTED_MATRIX) {
         assert.equal(
             entry.candidateSource,
@@ -1024,6 +1209,8 @@ test("35.5D matrix invariants fail closed on evidence omissions and grouping dri
         matrix => { matrix[0].actualFactSeeds = "none" },
         matrix => { matrix[0].runtimeEvidenceKey = "missing-runtime-evidence" },
         matrix => { matrix[0].sqlUpperBoundKey = "missing-sql-bound" },
+        matrix => { matrix[0].authoritativeWriteSet = [] },
+        matrix => { matrix[0].authoritativeWriteSet = ["deletePlayerActiveQuestSync"] },
         matrix => {
             matrix[0].actualCharacterSeed = "full-category9"
             matrix[0].rereadReason = "compatibility"
@@ -1155,6 +1342,23 @@ test("final-write evidence rejects a same-name write confined to a sibling branc
     )
 })
 
+test("final-write evidence rejects a write inside a preceding conditional statement", () => {
+    const source = `
+        import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
+        export function owner(condition) {
+            if (condition) persistPlayer()
+            publishAwakeCharacterListBestEffort(1, [], [], {})
+        }
+    `
+    const importedCall = collectImportedAwakeCalls(source, "synthetic.ts")[0]
+    const scope = extractScopeEvidence(importedCall)
+
+    assert.throws(
+        () => assertFinalWritePrecedesContext(importedCall.call, scope.contextStart, "persistPlayer"),
+        /same control-flow path|dominat/i,
+    )
+})
+
 test("final-write evidence rejects authoritative writes after publication", () => {
     const source = `
         import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
@@ -1170,6 +1374,70 @@ test("final-write evidence rejects authoritative writes after publication", () =
     assert.throws(
         () => assertFinalWritePrecedesContext(importedCall.call, scope.contextStart, "persistPlayer"),
         /after.*publication|later authoritative write/i,
+    )
+})
+
+test("final-write evidence rejects a differently named authoritative write after publication", () => {
+    const source = `
+        import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
+        export function owner() {
+            persistPlayer()
+            publishAwakeCharacterListBestEffort(1, [], [], {})
+            updatePlayerSync()
+        }
+    `
+    const importedCall = collectImportedAwakeCalls(source, "synthetic.ts")[0]
+    const scope = extractScopeEvidence(importedCall)
+
+    assert.throws(
+        () => assertFinalWritePrecedesContext(
+            importedCall.call,
+            scope.contextStart,
+            "persistPlayer",
+            null,
+            ["persistPlayer", "updatePlayerSync"],
+        ),
+        /after.*publication|later authoritative write.*updatePlayerSync/i,
+    )
+})
+
+test("outer transaction anchors require an exact owner-specific rule", () => {
+    const source = `
+        import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
+        export function owner() {
+            try {
+                transaction()
+            } catch (error) {
+                throw error
+            }
+            publishAwakeCharacterListBestEffort(1, [], [], {})
+        }
+    `
+    const importedCall = collectImportedAwakeCalls(source, "synthetic.ts")[0]
+    const scope = extractScopeEvidence(importedCall)
+
+    assert.throws(
+        () => assertFinalWritePrecedesContext(importedCall.call, scope.contextStart, "transaction"),
+        /same control-flow path|dominat/i,
+    )
+    assert.doesNotThrow(() => assertFinalWritePrecedesContext(
+        importedCall.call,
+        scope.contextStart,
+        "transaction",
+        "box_gacha/exec",
+        ["transaction"],
+        "owner-transaction-statement",
+    ))
+    assert.throws(
+        () => assertFinalWritePrecedesContext(
+            importedCall.call,
+            scope.contextStart,
+            "transaction",
+            "shop/buy",
+            ["transaction"],
+            "owner-transaction-statement",
+        ),
+        /exact outer transaction anchor rule/i,
     )
 })
 

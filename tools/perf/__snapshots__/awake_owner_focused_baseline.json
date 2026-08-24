@@ -294,8 +294,7 @@
         "factSeeds": [
           "passState:3",
           "player"
-        ],
-        "runtimeNote": "runtime observes no direct mission IDs; the matrix separately proves the static channel expression"
+        ]
       }
     },
     "story-finish": {
@@ -568,8 +567,7 @@
         "factSeeds": [
           "passState:3",
           "player"
-        ],
-        "runtimeNote": "runtime observes no direct mission IDs; the matrix separately proves the static channel expression"
+        ]
       }
     },
     "story-finish": {

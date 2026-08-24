@@ -289,9 +289,12 @@ test("current owner-focused evidence exactly matches the checked snapshot", asyn
     assert.equal(report.scenarios["single-finish"].response.category9Evaluations, 2)
     assert.deepEqual(report.scenarios["single-finish"].factSeeds, ["passState:3", "player"])
     assert.deepEqual(report.scenarios["single-finish"].directMissionSeeds, [])
-    assert.match(
-        AWAKE_OWNER_RUNTIME_EVIDENCE_REGISTRY["single-finish"].seedContract.runtimeNote,
-        /runtime observes no direct mission IDs/i,
+    assert.equal(
+        Object.hasOwn(
+            AWAKE_OWNER_RUNTIME_EVIDENCE_REGISTRY["single-finish"].seedContract,
+            "runtimeNote",
+        ),
+        false,
     )
     assert.equal(report.scenarios["single-finish"].loaderCalls.length > 1, true)
     assert.deepEqual(report.scenarios["exchange-star-crumb"].characterSeeds, [])

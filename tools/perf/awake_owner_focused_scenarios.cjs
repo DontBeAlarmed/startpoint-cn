@@ -33,7 +33,6 @@ const OWNER_CONTRACTS = Object.freeze({
         owner: "single/finish",
         boundary: "best-effort-in-tx",
         observation: wrapperObservation([1], [1], ["passState:3", "player"]),
-        seedNote: "runtime observes no direct mission IDs; the matrix separately proves the static channel expression",
     }),
     "multi-finish": Object.freeze({
         owner: "multi/finish",
