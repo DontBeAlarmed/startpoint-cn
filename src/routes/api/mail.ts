@@ -59,9 +59,12 @@ function finalizeMailReceiveAllAwakePublicationWrites(
     validMailIds: readonly number[],
     mailMap: ReadonlyMap<number, RawPlayerMail>,
 ): number[] {
-    const claimed = validMailIds.filter(mailId => (
-        receiveMailSync(playerId, mailId, mailMap.get(mailId)) !== null
-    ))
+    const claimed: number[] = []
+    for (const mailId of validMailIds) {
+        if (receiveMailSync(playerId, mailId, mailMap.get(mailId)) !== null) {
+            claimed.push(mailId)
+        }
+    }
     if (claimed.length !== validMailIds.length) {
         throw new Error("Mail state changed while mails were being received.")
     }

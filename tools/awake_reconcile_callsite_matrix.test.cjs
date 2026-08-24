@@ -114,11 +114,33 @@ const OWNER_TRANSACTION_ANCHORS = Object.freeze({
     "shop/buy": "executeGenericShopPurchaseSync",
     "shop/bulk_buy": "executeGenericShopBatchPurchaseSync",
 })
+const TUTORIAL_OWNER_SCOPE_CONTRACTS = Object.freeze({
+    "tutorial/update_step:15": Object.freeze({
+        constantName: "TUTORIAL_GACHA_EFFECTIVE_STEP",
+        literal: 15,
+    }),
+    "tutorial/update_step:16": Object.freeze({
+        constantName: "TUTORIAL_PRESENT_EFFECTIVE_STEP",
+        literal: 16,
+    }),
+})
+const SINGLE_SYNC_AUTHORITATIVE_CALLBACKS = Object.freeze({
+    grantRewards: Object.freeze(["grantDirectRewards"]),
+    giveRewards: Object.freeze(["grantDirectRewards"]),
+    updateProgress: Object.freeze(["updatePlayerQuestProgressSync"]),
+    insertProgress: Object.freeze(["insertPlayerQuestProgressSync"]),
+})
+const TUTORIAL_STEP_15_SYNC_AUTHORITATIVE_CALLBACKS = Object.freeze({
+    ownerGrant: Object.freeze(["executeRewardGrantPlanInTransactionOwnerInternalSync"]),
+})
 const FINAL_WRITE_HELPERS = Object.freeze({
     "single/finish": Object.freeze({
         helperName: "finalizeSingleAwakePublicationWrites",
         callInventory: Object.freeze([
             "import:../../../data/domains/quest_active#deletePlayerActiveQuestSync=1",
+        ]),
+        executionInventory: Object.freeze([
+            "sync:import:../../../data/domains/quest_active#deletePlayerActiveQuestSync=1",
         ]),
         internalWrites: Object.freeze([
             Object.freeze({ kind: "import", name: "deletePlayerActiveQuestSync" }),
@@ -127,6 +149,7 @@ const FINAL_WRITE_HELPERS = Object.freeze({
     "multi/finish": Object.freeze({
         helperName: "finalizeMultiAwakePublicationWrites",
         callInventory: Object.freeze(["parameter:deleteActiveQuest=1"]),
+        executionInventory: Object.freeze(["sync:parameter:deleteActiveQuest=1"]),
         internalWrites: Object.freeze([
             Object.freeze({ kind: "parameter", name: "deleteActiveQuest" }),
         ]),
@@ -135,6 +158,9 @@ const FINAL_WRITE_HELPERS = Object.freeze({
         helperName: "finalizeLearnManaAwakePublicationWrites",
         callInventory: Object.freeze([
             "import:../../../data/domains/character#updatePlayerCharacterSync=1",
+        ]),
+        executionInventory: Object.freeze([
+            "sync:import:../../../data/domains/character#updatePlayerCharacterSync=1",
         ]),
         internalWrites: Object.freeze([
             Object.freeze({ kind: "import", name: "updatePlayerCharacterSync" }),
@@ -145,6 +171,9 @@ const FINAL_WRITE_HELPERS = Object.freeze({
         callInventory: Object.freeze([
             "import:../../data/domains/mail#receiveMailSync=1",
         ]),
+        executionInventory: Object.freeze([
+            "sync:import:../../data/domains/mail#receiveMailSync=1",
+        ]),
         internalWrites: Object.freeze([
             Object.freeze({ kind: "import", name: "receiveMailSync" }),
         ]),
@@ -153,8 +182,13 @@ const FINAL_WRITE_HELPERS = Object.freeze({
         helperName: "finalizeMailReceiveAllAwakePublicationWrites",
         callInventory: Object.freeze([
             "import:../../data/domains/mail#receiveMailSync=1",
+            "member:claimed#push=1",
             "member:mailMap#get=1",
-            "member:validMailIds#filter=1",
+        ]),
+        executionInventory: Object.freeze([
+            "sync:import:../../data/domains/mail#receiveMailSync=1",
+            "sync:member:claimed#push=1",
+            "sync:member:mailMap#get=1",
         ]),
         internalWrites: Object.freeze([
             Object.freeze({ kind: "import", name: "receiveMailSync" }),
@@ -396,7 +430,7 @@ function findEnclosingFunctionName(call) {
     return null
 }
 
-function classifyOwner(relativeFile, call, sourceFile) {
+function classifyOwner(relativeFile, call, sourceFile, checker) {
     if (relativeFile === "src/lib/quest/finish/single-settlement-writes.ts") {
         assert.equal(findEnclosingFunctionName(call), "executeSingleSettlementWrites")
         return "single/finish"
@@ -411,17 +445,11 @@ function classifyOwner(relativeFile, call, sourceFile) {
     }
     if (relativeFile === "src/routes/api/tutorial.ts") {
         assert.equal(findRoutePath(call), "/update_step")
-        for (let parent = call.parent; parent; parent = parent.parent) {
-            if (!ts.isIfStatement(parent)) continue
-            const condition = parent.expression.getText(sourceFile)
-            if (condition.includes("TUTORIAL_GACHA_EFFECTIVE_STEP")) {
-                return "tutorial/update_step:15"
-            }
-            if (condition.includes("TUTORIAL_PRESENT_EFFECTIVE_STEP")) {
-                return "tutorial/update_step:16"
-            }
-        }
-        assert.fail("tutorial Awake publication left its audited step branch")
+        const owners = Object.keys(TUTORIAL_OWNER_SCOPE_CONTRACTS).filter(owner => (
+            findTutorialOwnerBranch(call, owner, checker, false) !== null
+        ))
+        assert.equal(owners.length, 1, "tutorial Awake publication left its exact audited step branch")
+        return owners[0]
     }
     const routePath = findRoutePath(call)
     const ownerLabel = ROUTE_OWNERS[relativeFile]?.[routePath]
@@ -513,6 +541,33 @@ function findNamedFunctionDeclaration(sourceFile, name) {
     return declarations[0]
 }
 
+function nonImmediateFunctionAncestors(node, root) {
+    const ancestors = []
+    for (let current = node.parent; current && current !== root; current = current.parent) {
+        if (ts.isFunctionLike(current) && !isImmediatelyInvokedFunction(current)) {
+            ancestors.push(current)
+        }
+    }
+    return ancestors
+}
+
+function collectHelperExecutionInventory(helper, checker, sourceFile) {
+    const counts = new Map()
+    function visit(node) {
+        if (ts.isCallExpression(node)) {
+            const execution = nonImmediateFunctionAncestors(node, helper).length === 0
+                ? "sync"
+                : "deferred"
+            const key = `${execution}:${callExpressionIdentity(node, checker, sourceFile)}`
+            counts.set(key, (counts.get(key) ?? 0) + 1)
+        }
+        ts.forEachChild(node, visit)
+    }
+    visit(helper)
+    return [...counts].sort(([left], [right]) => left.localeCompare(right))
+        .map(([identity, count]) => `${identity}=${count}`)
+}
+
 function assertFinalWriteHelperOwnershipInSource(sourceFile, checker, ownerRoot, contract) {
     const helper = findNamedFunctionDeclaration(sourceFile, contract.helperName)
     const helperSymbol = checker.getSymbolAtLocation(helper.name)
@@ -526,6 +581,11 @@ function assertFinalWriteHelperOwnershipInSource(sourceFile, checker, ownerRoot,
         collectOwnerCallInventory(helper, checker, sourceFile),
         contract.callInventory,
         `${contract.helperName} helper complete call inventory contains an unreviewed call`,
+    )
+    assert.deepEqual(
+        collectHelperExecutionInventory(helper, checker, sourceFile),
+        contract.executionInventory,
+        `${contract.helperName} helper execution inventory contains an unreviewed sync/deferred role`,
     )
     for (const write of contract.internalWrites) {
         let writeSymbol
@@ -548,10 +608,16 @@ function assertFinalWriteHelperOwnershipInSource(sourceFile, checker, ownerRoot,
             writeSymbol = checker.getSymbolAtLocation(parameters[0].name)
         }
         assert.notEqual(writeSymbol, undefined, `${contract.helperName}.${write.name} symbol is missing`)
+        const writeCalls = collectCallsForSymbol(helper, checker, writeSymbol)
         assert.equal(
-            collectCallsForSymbol(helper, checker, writeSymbol).length,
+            writeCalls.length,
             1,
             `${contract.helperName} must call owned ${write.kind} ${write.name} exactly once`,
+        )
+        assert.equal(
+            nonImmediateFunctionAncestors(writeCalls[0], helper).length,
+            0,
+            `${contract.helperName} helper authoritative write ${write.name} must be synchronous, not deferred in a nested non-IIFE function`,
         )
     }
 }
@@ -633,7 +699,11 @@ function inventoryCallPhase(call, sourceFile, dominanceEvidence) {
     if (call === anchorMatch) return "final-anchor"
     if (call === publicationCall) return "publication"
     if (findAncestor(call.parent, node => node === anchorMatch) !== null) {
-        return "inside-final-anchor"
+        return isExactFinalAnchorCallbackWrite(
+            call,
+            dominanceEvidence.ownerRoot,
+            anchorMatch,
+        ) ? "inside-final-anchor" : "final-anchor-evaluation"
     }
     if (findAncestor(call.parent, node => node === publicationCall) !== null) {
         return "inside-publication"
@@ -1057,26 +1127,117 @@ function extractScopeEvidence(importedCall) {
     }
 }
 
-function findOwnerRoot(call, ownerLabel = null) {
-    const tutorialStepConstant = {
-        "tutorial/update_step:15": "TUTORIAL_GACHA_EFFECTIVE_STEP",
-        "tutorial/update_step:16": "TUTORIAL_PRESENT_EFFECTIVE_STEP",
-    }[ownerLabel]
-    if (tutorialStepConstant !== undefined) {
-        for (let parent = call.parent; parent; parent = parent.parent) {
-            if (!ts.isIfStatement(parent)
-                || !parent.expression.getText(call.getSourceFile()).includes(tutorialStepConstant)) {
-                continue
-            }
-            assert.equal(
-                call.getStart() >= parent.thenStatement.getStart()
-                    && call.end <= parent.thenStatement.end,
-                true,
-                `${ownerLabel} publication must remain in its exact tutorial branch`,
-            )
-            return parent.thenStatement
+function assertProductionTutorialConstantLiteral(contract) {
+    const relativeFile = "src/lib/start-tutorial-state.ts"
+    const source = fs.readFileSync(path.join(projectRoot, relativeFile), "utf8")
+    const sourceFile = ts.createSourceFile(
+        relativeFile,
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+    )
+    const declarations = []
+    for (const statement of sourceFile.statements) {
+        if (!ts.isVariableStatement(statement)
+            || !statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)
+            || !(statement.declarationList.flags & ts.NodeFlags.Const)) continue
+        for (const declaration of statement.declarationList.declarations) {
+            if (ts.isIdentifier(declaration.name)
+                && declaration.name.text === contract.constantName) declarations.push(declaration)
         }
-        assert.fail(`${ownerLabel} publication owner branch is not traceable`)
+    }
+    assert.equal(
+        declarations.length,
+        1,
+        `${relativeFile} must export const ${contract.constantName} exactly once`,
+    )
+    assert.equal(
+        declarations[0].initializer !== undefined
+            && ts.isNumericLiteral(declarations[0].initializer)
+            && Number(declarations[0].initializer.text) === contract.literal,
+        true,
+        `${relativeFile} ${contract.constantName} must have direct literal ${contract.literal}`,
+    )
+}
+
+function findTutorialConstantSymbol(sourceFile, checker, contract) {
+    assert.notEqual(checker, null, `${contract.constantName} requires TypeChecker evidence`)
+    const imported = []
+    for (const statement of sourceFile.statements) {
+        if (!ts.isImportDeclaration(statement)
+            || !ts.isStringLiteral(statement.moduleSpecifier)
+            || !statement.moduleSpecifier.text.endsWith("/start-tutorial-state")) continue
+        const bindings = statement.importClause?.namedBindings
+        if (!bindings || !ts.isNamedImports(bindings)) continue
+        for (const element of bindings.elements) {
+            const exportedName = element.propertyName?.text ?? element.name.text
+            if (exportedName !== contract.constantName) continue
+            assert.equal(
+                element.propertyName,
+                undefined,
+                `${contract.constantName} tutorial constant aliases are not allowed`,
+            )
+            imported.push(checker.getSymbolAtLocation(element.name))
+        }
+    }
+    if (imported.length > 0) {
+        assert.equal(imported.length, 1, `${contract.constantName} must be imported exactly once`)
+        assert.notEqual(imported[0], undefined, `${contract.constantName} import symbol is missing`)
+        assertProductionTutorialConstantLiteral(contract)
+        return imported[0]
+    }
+
+    const declarations = []
+    for (const statement of sourceFile.statements) {
+        if (!ts.isVariableStatement(statement)
+            || !(statement.declarationList.flags & ts.NodeFlags.Const)) continue
+        for (const declaration of statement.declarationList.declarations) {
+            if (ts.isIdentifier(declaration.name)
+                && declaration.name.text === contract.constantName) declarations.push(declaration)
+        }
+    }
+    assert.equal(declarations.length, 1, `${contract.constantName} constant symbol is not exact`)
+    assert.equal(
+        declarations[0].initializer !== undefined
+            && ts.isNumericLiteral(declarations[0].initializer)
+            && Number(declarations[0].initializer.text) === contract.literal,
+        true,
+        `${contract.constantName} must have direct literal ${contract.literal}; aliases are not allowed`,
+    )
+    const symbol = checker.getSymbolAtLocation(declarations[0].name)
+    assert.notEqual(symbol, undefined, `${contract.constantName} constant symbol is missing`)
+    return symbol
+}
+
+function findTutorialOwnerBranch(call, ownerLabel, checker, required = true) {
+    const contract = TUTORIAL_OWNER_SCOPE_CONTRACTS[ownerLabel]
+    assert.notEqual(contract, undefined, `${ownerLabel} lacks a tutorial scope contract`)
+    const symbol = findTutorialConstantSymbol(call.getSourceFile(), checker, contract)
+    const matches = []
+    for (let parent = call.parent; parent; parent = parent.parent) {
+        if (!ts.isIfStatement(parent) || !ts.isBinaryExpression(parent.expression)) continue
+        if (parent.expression.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken) continue
+        const operands = [parent.expression.left, parent.expression.right]
+        if (!operands.some(operand => (
+            ts.isIdentifier(operand) && checker.getSymbolAtLocation(operand) === symbol
+        ))) continue
+        assert.equal(
+            call.getStart() >= parent.thenStatement.getStart()
+                && call.end <= parent.thenStatement.end,
+            true,
+            `${ownerLabel} publication must remain in its exact tutorial branch`,
+        )
+        matches.push(parent.thenStatement)
+    }
+    if (!required && matches.length === 0) return null
+    assert.equal(matches.length, 1, `${ownerLabel} publication owner branch is not traceable exactly once`)
+    return matches[0]
+}
+
+function findOwnerRoot(call, ownerLabel = null, checker = null) {
+    if (TUTORIAL_OWNER_SCOPE_CONTRACTS[ownerLabel] !== undefined) {
+        return findTutorialOwnerBranch(call, ownerLabel, checker)
     }
     for (let parent = call.parent; parent; parent = parent.parent) {
         if (ts.isCallExpression(parent)
@@ -1122,13 +1283,73 @@ function isConditionalExecutionNode(node) {
 }
 
 function isImmediatelyInvokedFunction(node) {
-    return (ts.isArrowFunction(node) || ts.isFunctionExpression(node))
-        && ts.isCallExpression(node.parent)
-        && node.parent.expression === node
+    if (!ts.isArrowFunction(node) && !ts.isFunctionExpression(node)) return false
+    let expression = node
+    let parent = node.parent
+    while (ts.isParenthesizedExpression(parent) && parent.expression === expression) {
+        expression = parent
+        parent = parent.parent
+    }
+    return ts.isCallExpression(parent) && parent.expression === expression
+}
+
+function hasOptionalCalleeChain(call) {
+    for (let node = call; node;) {
+        if (node.questionDotToken) return true
+        if (ts.isCallExpression(node)
+            || ts.isPropertyAccessExpression(node)
+            || ts.isElementAccessExpression(node)) {
+            node = node.expression
+            continue
+        }
+        return false
+    }
+    return false
+}
+
+function isExactFinalAnchorCallbackWrite(call, ownerRoot, anchorMatch) {
+    if (callTerminalName(anchorMatch) !== "transaction") return false
+    const callback = anchorMatch.arguments[0]
+    if (!callback || (!ts.isArrowFunction(callback) && !ts.isFunctionExpression(callback))) {
+        return false
+    }
+    const nestedFunctions = nonImmediateFunctionAncestors(call, ownerRoot)
+    return nestedFunctions.length === 1 && nestedFunctions[0] === callback
+}
+
+function isExactOwnerTransactionCallbackWrite(call, ownerRoot, publicationCall) {
+    const nestedFunctions = nonImmediateFunctionAncestors(call, ownerRoot)
+    if (nestedFunctions.length !== 1) return false
+    const callback = nestedFunctions[0]
+    const transactionCall = callback.parent
+    if (!ts.isCallExpression(transactionCall)
+        || callTerminalName(transactionCall) !== "transaction"
+        || transactionCall.arguments[0] !== callback
+        || hasOptionalCalleeChain(transactionCall)) return false
+    return publicationCall.getStart() >= callback.getStart()
+        && publicationCall.end <= callback.end
+}
+
+function isReviewedSyncCallbackWrite(call, ownerRoot, ownerLabel) {
+    const callbackContract = ownerLabel === "single/finish"
+        ? SINGLE_SYNC_AUTHORITATIVE_CALLBACKS
+        : ownerLabel === "tutorial/update_step:15"
+            ? TUTORIAL_STEP_15_SYNC_AUTHORITATIVE_CALLBACKS
+            : null
+    if (callbackContract === null) return false
+    const nestedFunctions = nonImmediateFunctionAncestors(call, ownerRoot)
+    if (nestedFunctions.length !== 1) return false
+    const callback = nestedFunctions[0]
+    if (!ts.isPropertyAssignment(callback.parent)) return false
+    const callbackName = propertyName(callback.parent)
+    const writeName = callTerminalName(call)
+    return callbackName !== null
+        && writeName !== null
+        && callbackContract[callbackName]?.includes(writeName) === true
 }
 
 function isDirectUnconditionalCallInStatement(call, statement) {
-    if (call.questionDotToken) return false
+    if (hasOptionalCalleeChain(call)) return false
     for (let node = call.parent; node && node !== statement; node = node.parent) {
         if (isConditionalExecutionNode(node)) return false
         if (ts.isFunctionLike(node) && !isImmediatelyInvokedFunction(node)) return false
@@ -1164,18 +1385,23 @@ function assertFinalWritePrecedesContext(
     ownerLabel = null,
     authoritativeWriteNames = [anchor],
     finalWriteRule = "same-block-direct",
+    checker = null,
 ) {
     const sourceFile = call.getSourceFile()
-    const ownerRoot = findOwnerRoot(call, ownerLabel)
+    const ownerRoot = findOwnerRoot(call, ownerLabel, checker)
     const authoritativeWrites = new Set(authoritativeWriteNames)
     assert.equal(authoritativeWrites.has(anchor), true, `${anchor} must belong to the authoritative write set`)
     const anchorMatches = []
     const observedAuthoritativeWrites = new Set()
+    const observedAuthoritativeCalls = []
     function visit(node) {
         if (ts.isCallExpression(node)) {
             const terminalName = callTerminalName(node)
             if (terminalName === anchor) anchorMatches.push(node)
-            if (authoritativeWrites.has(terminalName)) observedAuthoritativeWrites.add(terminalName)
+            if (authoritativeWrites.has(terminalName)) {
+                observedAuthoritativeWrites.add(terminalName)
+                observedAuthoritativeCalls.push(node)
+            }
         }
         ts.forEachChild(node, visit)
     }
@@ -1260,6 +1486,42 @@ function assertFinalWritePrecedesContext(
         true,
         `${sourceFile.fileName} final authoritative write ${anchor} does not dominate publication on the same control-flow path`,
     )
+    for (const writeCall of observedAuthoritativeCalls) {
+        if (writeCall === dominanceEvidence.anchorMatch) continue
+        const nestedFunctions = nonImmediateFunctionAncestors(writeCall, ownerRoot)
+        const inFinalCallback = isExactFinalAnchorCallbackWrite(
+            writeCall,
+            ownerRoot,
+            dominanceEvidence.anchorMatch,
+        )
+        const inReviewedSyncCallback = isReviewedSyncCallbackWrite(
+            writeCall,
+            ownerRoot,
+            ownerLabel,
+        )
+        const inOwnerTransactionCallback = isExactOwnerTransactionCallbackWrite(
+            writeCall,
+            ownerRoot,
+            call,
+        )
+        assert.equal(
+            nestedFunctions.length === 0
+                || inFinalCallback
+                || inOwnerTransactionCallback
+                || inReviewedSyncCallback,
+            true,
+            `${sourceFile.fileName} authoritative write ${callTerminalName(writeCall)} is deferred in an unreviewed non-immediate callback`,
+        )
+        const insideAnchor = findAncestor(
+            writeCall.parent,
+            node => node === dominanceEvidence.anchorMatch,
+        ) !== null
+        assert.equal(
+            !insideAnchor || inFinalCallback,
+            true,
+            `${sourceFile.fileName} authoritative write ${callTerminalName(writeCall)} is evaluated outside the final anchor callback argument`,
+        )
+    }
     const between = collectExecutableCallsInRange(
         ownerRoot,
         dominanceEvidence.anchorMatch.end,
@@ -1287,6 +1549,7 @@ function assertFinalWritePrecedesContext(
     return {
         ...dominanceEvidence,
         ownerRoot,
+        ownerLabel,
         publicationCall: call,
     }
 }
@@ -1335,10 +1598,10 @@ function collectProductionCalls() {
                 }))
                 assert.equal(optionNames.has("context"), true, `${relativeFile} scoped publication must pass fresh context`)
             }
-            const ownerLabel = classifyOwner(relativeFile, call, sourceFile)
+            const ownerLabel = classifyOwner(relativeFile, call, sourceFile, checker)
             const expected = EXPECTED_MATRIX.filter(entry => entry.owner === ownerLabel)
             assert.equal(expected.length, 1, `${ownerLabel} must have exactly one matrix row`)
-            const ownerRoot = findOwnerRoot(call, ownerLabel)
+            const ownerRoot = findOwnerRoot(call, ownerLabel, checker)
             const finalHelper = FINAL_WRITE_HELPERS[ownerLabel]
             if (finalHelper !== undefined) {
                 assert.equal(
@@ -1361,6 +1624,7 @@ function collectProductionCalls() {
                 ownerLabel,
                 expected[0].authoritativeWriteSet,
                 expected[0].finalWriteRule,
+                checker,
             )
             assertAuthoritativeWriteSetInventorySubset(
                 ownerRoot,
@@ -1731,6 +1995,23 @@ test("final-write evidence rejects a write inside a preceding conditional statem
     )
 })
 
+test("final-write evidence rejects an optional property anchor", () => {
+    const source = `
+        import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
+        export function owner(writer) {
+            writer?.persistPlayer()
+            publishAwakeCharacterListBestEffort(1, [], [], {})
+        }
+    `
+    const importedCall = collectImportedAwakeCalls(source, "synthetic.ts")[0]
+    const scope = extractScopeEvidence(importedCall)
+
+    assert.throws(
+        () => assertFinalWritePrecedesContext(importedCall.call, scope.contextStart, "persistPlayer"),
+        /same control-flow path|optional|dominat/i,
+    )
+})
+
 test("final-write evidence rejects authoritative writes after publication", () => {
     const source = `
         import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
@@ -1863,6 +2144,54 @@ test("final-write evidence rejects an authoritative write hidden in a deferred c
     )
 })
 
+test("final-write evidence rejects a deferred write declared before the anchor and invoked after publication", () => {
+    const source = `
+        import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
+        export function owner() {
+            const deferred = () => updatePlayerSync()
+            persistPlayer()
+            publishAwakeCharacterListBestEffort(1, [], [], {})
+            deferred()
+        }
+    `
+    const importedCall = collectImportedAwakeCalls(source, "synthetic.ts")[0]
+    const scope = extractScopeEvidence(importedCall)
+
+    assert.throws(
+        () => assertFinalWritePrecedesContext(
+            importedCall.call,
+            scope.contextStart,
+            "persistPlayer",
+            null,
+            ["persistPlayer", "updatePlayerSync"],
+        ),
+        /deferred|non-immediate|updatePlayerSync/i,
+    )
+})
+
+test("final-write evidence rejects writes evaluated in ordinary final-anchor arguments", () => {
+    const source = `
+        import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
+        export function owner() {
+            transaction(updatePlayerSync(), () => {})
+            publishAwakeCharacterListBestEffort(1, [], [], {})
+        }
+    `
+    const importedCall = collectImportedAwakeCalls(source, "synthetic.ts")[0]
+    const scope = extractScopeEvidence(importedCall)
+
+    assert.throws(
+        () => assertFinalWritePrecedesContext(
+            importedCall.call,
+            scope.contextStart,
+            "transaction",
+            null,
+            ["transaction", "updatePlayerSync"],
+        ),
+        /callback argument|outside.*final anchor|updatePlayerSync/i,
+    )
+})
+
 test("final-write evidence rejects an outer-block authoritative write after an inner publication", () => {
     const source = `
         import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
@@ -1946,6 +2275,7 @@ test("final-write helper ownership binds the owner call and internal production 
         helperName: "finalizePublication",
         ownerFunctionName: "owner",
         callInventory: ["import:./player-domain#persistPlayer=1"],
+        executionInventory: ["sync:import:./player-domain#persistPlayer=1"],
         internalWrites: [{ kind: "import", name: "persistPlayer" }],
     }))
     const extraCall = source.replace(
@@ -1957,10 +2287,58 @@ test("final-write helper ownership binds the owner call and internal production 
             helperName: "finalizePublication",
             ownerFunctionName: "owner",
             callInventory: ["import:./player-domain#persistPlayer=1"],
+            executionInventory: [
+                "sync:import:./player-domain#loadPlayer=1",
+                "sync:import:./player-domain#persistPlayer=1",
+            ],
             internalWrites: [{ kind: "import", name: "persistPlayer" }],
         }),
         /helper.*unreviewed call|complete call inventory/i,
     )
+})
+
+test("final-write helper ownership rejects writes hidden in returned callbacks", () => {
+    const source = `
+        import { persistPlayer } from "./player-domain"
+        import { publishAwakeCharacterListBestEffort } from "./awake-best-effort-context"
+        function finalizePublication() {
+            return () => persistPlayer()
+        }
+        export function owner() {
+            finalizePublication()
+            publishAwakeCharacterListBestEffort(1, [], [], {})
+        }
+    `
+
+    assert.throws(
+        () => assertFinalWriteHelperOwnership(source, "synthetic.ts", {
+            helperName: "finalizePublication",
+            ownerFunctionName: "owner",
+            callInventory: ["import:./player-domain#persistPlayer=1"],
+            executionInventory: ["deferred:import:./player-domain#persistPlayer=1"],
+            internalWrites: [{ kind: "import", name: "persistPlayer" }],
+        }),
+        /helper.*deferred|nested non-IIFE|synchronous/i,
+    )
+})
+
+test("parenthesized immediately invoked functions remain synchronous", () => {
+    const sourceFile = ts.createSourceFile(
+        "synthetic.ts",
+        `export function owner() { (() => persistPlayer())() }`,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS,
+    )
+    let callback = null
+    function visit(node) {
+        if (ts.isArrowFunction(node)) callback = node
+        ts.forEachChild(node, visit)
+    }
+    visit(sourceFile)
+
+    assert.notEqual(callback, null)
+    assert.equal(isImmediatelyInvokedFunction(callback), true)
 })
 
 test("owner call inventory fails closed on an unreviewed production symbol", () => {
@@ -2040,6 +2418,8 @@ test("owner call inventory rejects moving the same persistent symbol outside its
 test("tutorial owner scopes isolate step 15 and step 16 sibling branches", () => {
     const source = `
         import { reconcileAwakeUnlockCharacterListBestEffort } from "./mission"
+        const TUTORIAL_GACHA_EFFECTIVE_STEP = 15
+        const TUTORIAL_PRESENT_EFFECTIVE_STEP = 16
         export function routes(fastify) {
             fastify.post("/update_step", () => {
                 if (effectiveNextStep === TUTORIAL_GACHA_EFFECTIVE_STEP) {
@@ -2054,14 +2434,52 @@ test("tutorial owner scopes isolate step 15 and step 16 sibling branches", () =>
         }
     `
     const calls = collectImportedAwakeCalls(source, "src/routes/api/tutorial.ts")
-    const step15Scope = findOwnerRoot(calls[0].call, "tutorial/update_step:15")
-    const step16Scope = findOwnerRoot(calls[1].call, "tutorial/update_step:16")
+    const step15Scope = findOwnerRoot(
+        calls[0].call,
+        "tutorial/update_step:15",
+        calls[0].checker,
+    )
+    const step16Scope = findOwnerRoot(
+        calls[1].call,
+        "tutorial/update_step:16",
+        calls[1].checker,
+    )
 
     assert.notEqual(step15Scope, step16Scope, "tutorial owners must not share the route callback root")
     assert.match(step15Scope.getText(calls[0].sourceFile), /persistStep15/)
     assert.doesNotMatch(step15Scope.getText(calls[0].sourceFile), /persistStep16/)
     assert.match(step16Scope.getText(calls[1].sourceFile), /persistStep16/)
     assert.doesNotMatch(step16Scope.getText(calls[1].sourceFile), /persistStep15/)
+})
+
+test("tutorial owner scopes reject constants aliased to the sibling step", () => {
+    const source = `
+        import { reconcileAwakeUnlockCharacterListBestEffort } from "./mission"
+        const STEP_15 = 15
+        const STEP_16 = 16
+        const TUTORIAL_GACHA_EFFECTIVE_STEP = STEP_16
+        const TUTORIAL_PRESENT_EFFECTIVE_STEP = STEP_15
+        export function routes(fastify) {
+            fastify.post("/update_step", () => {
+                if (effectiveNextStep === TUTORIAL_GACHA_EFFECTIVE_STEP) {
+                    reconcileAwakeUnlockCharacterListBestEffort(1, [], {})
+                }
+                if (effectiveNextStep === TUTORIAL_PRESENT_EFFECTIVE_STEP) {
+                    reconcileAwakeUnlockCharacterListBestEffort(1, [], {})
+                }
+            })
+        }
+    `
+    const calls = collectImportedAwakeCalls(source, "src/routes/api/tutorial.ts")
+
+    assert.throws(
+        () => findOwnerRoot(calls[0].call, "tutorial/update_step:15", calls[0].checker),
+        /literal 15|constant symbol|alias/i,
+    )
+    assert.throws(
+        () => findOwnerRoot(calls[1].call, "tutorial/update_step:16", calls[1].checker),
+        /literal 16|constant symbol|alias/i,
+    )
 })
 
 test("authoritative write set must be a real symbol subset of the frozen inventory", () => {
