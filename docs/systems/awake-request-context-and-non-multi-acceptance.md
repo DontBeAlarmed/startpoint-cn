@@ -1,6 +1,6 @@
 # 觉醒请求上下文与非多人总验收架构
 
-状态：35.4 已完成分层验收；35.5 尚未验收
+状态：35.5E replacement repair evidence 已完成；35.5F 最终验收尚未执行
 
 日期：2026-08-24
 
@@ -265,8 +265,9 @@ formal profile 使用 1000 份互相独立的存档、600 个活跃身份，并�
 | 35.1 核心 context | 实现 scope 收集/冻结、fresh context、Session、scoped evaluator/reader、seed 校验和生命周期清理 | 已完成；请求 context 与专项回归已通过 |
 | 35.2 事务内 owner | 迁移 learn strict，以及 finish、story、bond、mail、Active Mission、tutorial 的事务内 best-effort owner | 已完成；事务边界与 savepoint 专项回归已通过 |
 | 35.3 提交后 owner 与 `/load` | 迁移 mission、item、shop、gacha、boxGacha、exchange、character/town；保留 `/load` full recovery | 已完成；提交后故障注入、独立 full recovery、active mission fixture 兼容和 workflow 精确分组回归通过 |
-| 35.4 分层验收 | 运行 focused、7/7 轻量回归和一轮 formal 预飞 | 已完成；focused 准入通过，smoke 符合既定非 formal 预期，formal 单轮预飞结构准入 |
-| 35.5 终审与正式验收 | 独立终审；只运行一次 `npm run verify:full`；随后执行带多人/Hub 哨兵的连续三轮正式验收并回填结果 | 尚未执行；不得据当前证据标记通过 |
+| 35.4 历史首次分层验收 | 运行 focused、7/7 轻量回归和一轮 formal 预飞 | 历史证据已生成，后被 global-fact/owner-proof 缺口阻塞，不能作为修复后准入证据 |
+| 35.5E replacement repair evidence | 在修复后 revision 重跑 focused、owner-focused、专项 admission、7/7 轻量回归和恰好一轮 replacement formal 预飞 | 已完成；结构、行为、回滚、SQL/compute 上界与资源清理证据均通过 |
+| 35.5F 终审与正式验收 | 独立终审；只运行一次 `npm run verify:full`；随后执行带多人/Hub 哨兵的连续三轮正式验收并回填结果 | 尚未执行；35.5E 单轮预飞不计入最终三轮，不得据此标记 35.5 最终通过 |
 
 35.0 至 35.5 每个阶段完成后各自创建本地 commit，均不 push。任一阶段未满足自己的证据要求时不得标记完成，也不得把后续阶段的测试结果回填到前一阶段冒充通过。
 
@@ -280,12 +281,16 @@ formal profile 使用 1000 份互相独立的存档、600 个活跃身份，并�
 
 ## 文档回填规则
 
-本文件记录已确认设计、35.0--35.4 的实现与验收状态，不声称最终性能收益。35.3 的实现提交为
+本文件记录已确认设计、35.0--35.5E 的实现与证据状态，不声称最终性能收益。35.3 的实现提交为
 `59c131ca refactor(mission): scope post-commit awake owners`；对应专项证据包括
 `tools/active_mission_reconciliation.test.cjs`、`tools/load_awake_full_recovery.test.cjs`、
 `tools/post_commit_awake_owner.test.cjs` 和 `tools/test-workflow/select-tests.test.cjs`。
 
-### 35.4 实测证据（2026-08-24）
+### 历史首次 35.4 实测证据（2026-08-24）
+
+本节是 `10f66f44` revision 上首次生成的 35.4 证据。后续审查发现 global-fact
+传播和 owner-proof 仍有缺口，因此该轮被阻塞，只保留为历史记录，不能作为修复后 revision 的
+准入依据，也不能据此声称 35.4 修复闭环或 35.5 最终通过。
 
 实际被测完整 commit SHA 为 `10f66f442213bbca230b577a3077c8d909963272`，即运行验收前的
 HEAD；后续用于回填证据的文档提交不属于被测 revision。验收环境为 Node.js `v22.23.1`、
@@ -337,3 +342,71 @@ single-battle `141/102`、shop `26/5`、gacha `74/9`、mail `18/4`；非多人�
 `full_server_acceptance_reference.json` 的 SHA-256 分别保持
 `a4fabbed0d5dcc8e822aa8cc48b41e7f10c60af0d77e30a8591bdb4c93a7dcc4` 和
 `05f06ff9f3c7d4dfb6f113eabb2a7f42c6bb04d97eae03c95500ac4aff639299`，未写入 reference。
+
+### 35.5E replacement repair evidence（2026-08-24）
+
+修复后实际被测完整 commit SHA 为 `d2dda711292c7fa1bdb82c9f8f8c4eecd9d9a3e4`；证据命令运行
+前后 `git status --porcelain` 均无输出。环境为 Node.js `v22.23.1`、Darwin x64、CPU model
+`Intel(R) Core(TM) i5-8259U CPU @ 2.30GHz`、8 个逻辑 CPU。runner 使用 bundled gameplay
+Content snapshot `1.4.54`，相关检入 `assets/cdn/catalog-cn-1.4.54.json` SHA-256 为
+`8b462cabc65b60603fa8aa88a69b0074c70607c8e41204e8dddddf54c6cef8d7`。以下命令均从
+`starpoint-cn` 仓库根目录执行，报告路径中的仓库外工作区统一记为 `<WORKSPACE_ROOT>`。
+
+`npm run benchmark:awake-request-context` 退出码为 0，用时 8.17 秒，五个固定场景全部
+admitted，行为、故障注入和回滚证据与检入 snapshot 一致；`SQL reads/writes/mission
+computes` 分别为 `11/1/7`、`18/2/14`、`5/1/0`、`11/2/7`、`11/2/7`。
+`npm run benchmark:awake-owner-focused` 退出码为 0，用时 12.44 秒，21 个 owner 场景全部
+admitted：`single-finish`、`multi-finish`、`active-mission-receive`、`box-gacha-exec`、
+`character-town-grant`、`bond-success`、`learn-mana-final-node`、`exchange-star-crumb`、
+`gacha-exchange-character`、`gacha-exec`、`mana-item-sell`、`mail-receive`、
+`mail-receive-all`、`category9-update-progress`、`pass-card-receive-all`、
+`raid-event-summary`、`shop-buy`、`shop-bulk-buy`、`story-finish`、`tutorial-step-15` 和
+`tutorial-step-16`。准入要求 owner、事务边界、seed、publication observation、loader、请求/响应
+与数据库状态精确一致，同时要求当前 SQL/compute 不超过检入上界。结算场景的关键上界为
+single `57/33/405`、multi `48/27/405`；其余场景中 story 为 `27/10/7`、raid 为
+`23/6/7`、shop bulk 为 `18/13/0`，剩余 owner 均不超过这些对应的按场景及按表上界。
+
+owner-focused 明确保留一个 single fresh reread 例外：`single-finish` 的早期 awake settlement
+之后仍有 reward、Active Mission、response state 和 active quest 权威写入，因此必须在最后写入后
+重新进行有界求值，并固定恰好两次 Category 9 evaluation；它不复用旧 Session，也不构成跨请求
+缓存。其余 owner 在没有注入 owner snapshot 时按各自冻结 seed 加载有界 post-write scope。
+随后运行
+`node --test tools/awake_fact_scope.test.cjs tools/item_sell_awake_publication.test.cjs tools/awake_owner_fact_publication.test.cjs tools/awake_reconcile_callsite_matrix.test.cjs`，
+65/65 通过、0 失败、0 取消、0 跳过，退出码为 0，用时 17.81 秒，覆盖 global-fact、
+item sell publication、固定 21-owner/final-write 矩阵及 fail-closed 约束。
+
+轻量回归使用
+`npm run benchmark:non-multi-mixed -- --output <WORKSPACE_ROOT>/docs/reports/task-35.4-repair/non-multi-mixed-smoke.json`，
+退出码为 0，用时 11.35 秒。实际 profile 为 7 份独立存档、7 个活跃身份、并发 `[2]`；
+auth、load、mission-progress、single-battle、shop、gacha、mail 各完成 1 个请求且错误为 0，
+`readsMax/writesMax` 依次为 `8/3`、`46/6`、`14/1`、`111/29`、`26/5`、`69/8`、
+`18/4`，结构、行为签名和全部写入口回滚检查通过。`loadProfileValid:false` 和
+`admitted:false` 是轻量 profile 不冒充 formal 的既定结果。报告 SHA-256 为
+`3ec2e62ebae36da63a9bf9266e5d00d1fd947725ac661672011335a98942fccd`。
+
+replacement formal 预飞严格使用
+`node tools/perf/full_server_acceptance.cjs --formal --rounds 1 --output <WORKSPACE_ROOT>/docs/reports/task-35.4-repair/full-server-formal-preflight-round-1.json`，
+只运行这一轮，退出码为 0，用时 180.01 秒。非多人实际 profile 为 1000 份独立存档、600 个
+活跃身份、并发 `[10,25,50,100]`，每档均完成 600 个请求且错误为 0，四档 p95 分别为
+`728.023`、`1707.393`、`3319.667`、`6140.801` 毫秒。跨四档各入口最大
+`readsMax/writesMax` 为 auth `8/3`、load `46/9`、mission-progress `14/1`、
+single-battle `141/102`、shop `26/5`、gacha `74/9`、mail `18/4`；结构、行为签名、
+回滚和 formal profile 检查全部通过。
+
+同一轮附带的多人/Hub 哨兵实际 profile 为 120 个独立身份、60 个双人房间、双向房主各 30 个
+房间、并发 `[5,10,20]`。每档均完成 60 个房间和 120 个玩家，协议/HTTP 共存、重复结算拒绝、
+行为签名与 settlement 检查通过；三档 p95 分别为 `1444.234`、`2194.816`、`3282.740`
+毫秒。每档结束后 active quest、peer、子进程和剩余房间均为 0，端口全部释放，临时根目录
+不存在；非多人 runner 也已关闭 app/数据库句柄、恢复 active quest 和 Content snapshot 并删除
+临时目录，未产生 cleanup error。整轮 `structuralAdmitted:true`、`admitted:true`、failures 为空，
+报告 SHA-256 为 `0f61023a03bcaa276480b6d31e61a6e901a566bd039d8343f87d559b154c69a7`。
+
+验收前后 `awake_request_context_baseline.json`、`awake_owner_focused_baseline.json` 和
+`full_server_acceptance_reference.json` 的 SHA-256 分别保持
+`a4fabbed0d5dcc8e822aa8cc48b41e7f10c60af0d77e30a8591bdb4c93a7dcc4`、
+`1fed4be1d157a8809eb97a11f8b9acff925020b5252b70196ea688f2091dbbe1` 和
+`05f06ff9f3c7d4dfb6f113eabb2a7f42c6bb04d97eae03c95500ac4aff639299`。本轮没有使用
+`--write` 或 `--write-reference`，没有更新任何 snapshot/reference，没有运行
+`npm run verify:full`，也没有运行或计入 35.5F 的最终连续三轮 formal。单轮报告的
+`referenceComparable:false` 为既定结果；本节不据墙钟、observed ratio 或单轮 p95 声称最终
+性能收益、生产改善或 35.5F 通过。
