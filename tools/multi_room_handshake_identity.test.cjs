@@ -202,6 +202,7 @@ test("room admission is required and consumed once", async t => {
 test("room handshake rejects an admission whose participant viewer differs from the TCP viewer", async t => {
     const room = createRoom(114, 1_114, 1, 1, 514, 0, 101)
     t.after(() => disbandRoom(room.room_number))
+    let released = 0
     const socket = await handshake(room, 226, {}, {
         registry: {
             consume: () => ({
@@ -210,11 +211,16 @@ test("room handshake rejects an admission whose participant viewer differs from 
                 snapshot: snapshot(227),
                 expiresAt: 6_000,
             }),
+            release: () => {
+                released++
+                return true
+            },
         },
         admit: false,
     })
 
     assert.equal(socket.ended, true)
+    assert.equal(released, 1)
     assert.deepEqual(socket.messages.at(-1), [3, "HANDSHAKE_DENIED"])
     assert.equal(sessionManager.getClientByParticipant(room.room_number, {
         nodeSessionId: "node-a",

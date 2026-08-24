@@ -132,6 +132,14 @@ export async function handleHandshake(
             || (Number.isSafeInteger(data.questCategory) && data.questCategory === room?.category)
         const questMatches = data.questId === undefined
             || (Number.isSafeInteger(data.questId) && data.questId === room?.quest_id)
+        const releaseAdmission = (): void => {
+            try {
+                dependencies.admissionProvider.release?.(
+                    normalizedRoomNumber,
+                    normalizedViewerId,
+                )
+            } catch {}
+        }
         const occupiedRealPlayerSlots = room?.member_participants.length ?? 0
         const existingMember = room ? isRoomViewerMember(room, normalizedViewerId) : false
         if (!room
@@ -139,6 +147,7 @@ export async function handleHandshake(
             || !categoryMatches
             || !questMatches
             || (!existingMember && occupiedRealPlayerSlots >= 3)) {
+            releaseAdmission()
             deny(socket)
             return
         }
@@ -152,16 +161,21 @@ export async function handleHandshake(
             return
         }
         if (admission.participant.viewerId !== normalizedViewerId) {
+            releaseAdmission()
             deny(socket)
             return
         }
 
-        if (!lifecycle.isAccepting()) return
+        if (!lifecycle.isAccepting()) {
+            releaseAdmission()
+            return
+        }
         const isRoomHost = normalizedViewerId === room.host_viewer_id
         if (sessionManager.hasActiveRoomViewerConflict(
             normalizedRoomNumber,
             admission.participant,
         ) || hasRoomMemberViewerConflict(room, admission.participant)) {
+            releaseAdmission()
             deny(socket)
             return
         }
@@ -187,15 +201,18 @@ export async function handleHandshake(
             normalizedRoomNumber,
             admission.participant,
         )) {
+            releaseAdmission()
             deny(socket)
             return
         }
         const added = sessionManager.addClientToRoom(client)
         if (!added.ok) {
+            releaseAdmission()
             deny(socket)
             return
         }
         if (!addRoomMember(normalizedRoomNumber, admission.participant)) {
+            releaseAdmission()
             sessionManager.removeClient(client)
             deny(socket)
             return

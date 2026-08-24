@@ -369,6 +369,7 @@ test("coordinator type contract stays narrow and node-scoped", () => {
             "HUB_UNAVAILABLE",
             "INCOMPATIBLE_ROOM",
             "QUEST_NOT_AVAILABLE",
+            "ROOM_FULL",
             "ROOM_NOT_FOUND",
             "ROOM_PERMISSION_DENIED",
             "VIEWER_ID_CONFLICT",

@@ -13,6 +13,7 @@ flowchart LR
     subgraph HOST["Host 服务节点（同一 Node.js 进程）"]
         HH["游戏 / 管理 HTTP :8001<br/>MultiHttpContext"]
         HE["EmbeddedMultiCoordinator"]
+        HA["AdmissionRegistry<br/>成员占用 + 待入场席位"]
         HUB["Hub Control :8004<br/>JSON 控制面"]
         HT["房间权威 TCP :8003<br/>Room / Session / BattleFact"]
         HDB[("Host SQLite<br/>所属玩家状态")]
@@ -27,6 +28,7 @@ flowchart LR
 
     HC -->|"多人 HTTP<br/>Base64(MsgPack)"| HH
     HH --> HE
+    HE --> HA
     HH -->|"本地 /start、/finish 事务"| HDB
 
     CC -->|"多人 HTTP<br/>Base64(MsgPack)"| CH
@@ -35,6 +37,7 @@ flowchart LR
     CH --> CR
     CR -->|"远程房间控制 JSON"| HUB
     HUB --> HE
+    HUB --> HA
     CH -->|"本地 /start、/finish 事务"| CDB
 
     HE -->|"房间与战斗事实"| HT
@@ -101,11 +104,11 @@ sequenceDiagram
     Note over A,T: Lobby 断线默认保留短暂重连宽限；明确 Bye 立即离开
 ```
 
-当前没有公开大厅；房间发现只表达六位房号或 access token。所属服务生成最小玩家与配队快照，Host 通过一次性 admission 约束 TCP 握手。双方分别向自己的服务调用 `/start`，只有游戏房主所属节点扣除房主入场成本。
+当前没有公开大厅；房间发现只表达六位房号或 access token。所属服务生成最小玩家与配队快照，Host 通过权威 `AdmissionRegistry` 预留真人席位并约束一次性 TCP 握手。房间最多 3 名真人，待入场 admission 与已登记成员共同计数；失败、过期、节点撤销和房间解散都会释放预留。双方分别向自己的服务调用 `/start`，只有游戏房主所属节点扣除房主入场成本。
 
 | 事实 | 证据 |
 |---|---|
-| 房间创建、房号选择和 admission | `src/multi/http/lobby.ts`、`src/multi/http/room-admission.ts` |
+| 房间创建、房号选择和 admission | `src/multi/http/lobby.ts`、`src/multi/http/room-admission.ts`、`src/multi/admission/registry.ts` |
 | TCP 握手消费 admission 并建立复合身份 | `src/multi/tcp/handshake.ts` |
 | StartBattle 冻结参与者并创建 battle session | `src/multi/tcp/lobby.ts`、`src/multi/settlement/facts.ts` |
 | Battle TCP 负责 SceneReady、中继和 Finalize | `src/multi/tcp/battle.ts` |

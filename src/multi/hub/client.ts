@@ -26,6 +26,7 @@ const COORDINATOR_ERRORS = new Set<CoordinatorErrorCode>([
     "QUEST_NOT_AVAILABLE",
     "ROOM_PERMISSION_DENIED",
     "ROOM_NOT_FOUND",
+    "ROOM_FULL",
     "HUB_UNAVAILABLE",
 ])
 

@@ -48,6 +48,7 @@ const hostIdentityByRoom = new WeakMap<MultiRoom, ParticipantIdentity>()
 
 export interface EmbeddedMultiCoordinatorOptions {
     readonly allowRemoteParticipants?: boolean
+    readonly onRoomDisband?: (roomNumber: string) => void
     readonly onCompatibilityRejection?: (input: {
         readonly code: "INCOMPATIBLE_ROOM"
         readonly differences: readonly {
@@ -128,10 +129,12 @@ function resolveCompatibleRoom(input: CompatibleRoomInput): MultiRoom | undefine
 
 export class EmbeddedMultiCoordinator implements MultiCoordinator {
     private readonly allowRemoteParticipants: boolean
+    private readonly onRoomDisband: EmbeddedMultiCoordinatorOptions["onRoomDisband"]
     private readonly onCompatibilityRejection: EmbeddedMultiCoordinatorOptions["onCompatibilityRejection"]
 
     constructor(options: EmbeddedMultiCoordinatorOptions = {}) {
         this.allowRemoteParticipants = options.allowRemoteParticipants === true
+        this.onRoomDisband = options.onRoomDisband
         this.onCompatibilityRejection = options.onCompatibilityRejection
     }
 
@@ -375,6 +378,7 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
         sessionManager.broadcastToRoom(room.room_number, [1, [6, "multibattle_room_dismissed"]])
         sessionManager.closeRoomClients(room.room_number)
         if (!disbandLocalRoom(room.room_number)) return false
+        this.onRoomDisband?.(room.room_number)
         compatibilityByRoom.delete(room)
         hostIdentityByRoom.delete(room)
         return true

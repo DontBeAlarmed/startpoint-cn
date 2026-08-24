@@ -12,6 +12,14 @@ export type RoomJoinResult =
     | { readonly kind: "missing"; readonly error: "ROOM_NOT_FOUND" }
     | { readonly kind: "unavailable"; readonly error: JoinUnavailableError }
 
+export function roomUnavailableRaisingState(
+    error: CoordinatorErrorCode,
+): 3 | 7 | 9 {
+    if (error === "ROOM_NOT_FOUND") return 9
+    if (error === "ROOM_FULL") return 3
+    return 7
+}
+
 export function classifyRoomJoin(
     questAvailability: MultiQuestAvailabilityProvider,
     result: CoordinatorResult<RoomStatus>,

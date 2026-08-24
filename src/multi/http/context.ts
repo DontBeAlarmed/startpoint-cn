@@ -102,10 +102,12 @@ export interface EmbeddedMultiHttpContextOptions {
 export function createEmbeddedMultiHttpContext(
     options: EmbeddedMultiHttpContextOptions = {},
 ): MultiHttpContext {
-    const coordinator = options.coordinator ?? new EmbeddedMultiCoordinator()
+    const admissionRegistry = options.admissionRegistry ?? embeddedAdmissionRegistry
+    const coordinator = options.coordinator ?? new EmbeddedMultiCoordinator({
+        onRoomDisband: roomNumber => admissionRegistry.clearRoom(roomNumber),
+    })
     const coordinatorOrigin = options.coordinatorOrigin ?? "local"
     const resolvePlayerContext = options.resolvePlayerContext ?? resolveMultiPlayerContext
-    const admissionRegistry = options.admissionRegistry ?? embeddedAdmissionRegistry
     const now = options.now ?? Date.now
     const fixedCompatibility = options.compatibility
         ? Object.freeze({ ...options.compatibility }) as MultiCompatibilityProfile

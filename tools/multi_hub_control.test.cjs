@@ -189,7 +189,10 @@ function fixture(t, options = {}) {
         "node-session-c", "session-credential-c".padEnd(43, "c"),
         "node-session-d", "session-credential-d".padEnd(43, "d"),
     ]
-    const admissions = new AdmissionRegistry({ now: () => now })
+    const admissions = new AdmissionRegistry({
+        now: () => now,
+        getOccupiedMemberCount: options.getOccupiedMemberCount,
+    })
     const coordinator = (options.coordinatorFactory ?? createCoordinator)()
     const sessions = new NodeSessionRegistry({
         now: () => now,
@@ -590,6 +593,35 @@ test("issues node-scoped admissions and removes them when the node session expir
     assert.equal(target.admissions.consume("123456", 303), null)
 })
 
+test("Host Hub admission round-trip enforces and releases ROOM_FULL", async t => {
+    const target = fixture(t, { getOccupiedMemberCount: () => 2 })
+    const registration = await register(target.app, target.first.token)
+    const issueAdmission = (viewerId, idempotencyKey) => target.app.inject({
+        method: "POST",
+        url: "/v1/multi/admissions/issue",
+        headers: sessionHeaders(registration, idempotencyKey),
+        payload: {
+            roomNumber: "123456",
+            participant: participantInput(registration, viewerId).participant,
+            snapshot: snapshot(viewerId),
+            expiresAt: 14_000,
+        },
+    })
+
+    const first = await issueAdmission(202, "admission-full-1")
+    assert.equal(first.statusCode, 200)
+    assert.deepEqual(first.json().ok, true)
+
+    const full = await issueAdmission(303, "admission-full-2")
+    assert.equal(full.statusCode, 200)
+    assert.deepEqual(full.json(), { ok: false, code: "ROOM_FULL" })
+
+    assert.equal(target.admissions.release("123456", 202), true)
+    const reusable = await issueAdmission(303, "admission-full-3")
+    assert.equal(reusable.statusCode, 200)
+    assert.deepEqual(reusable.json().ok, true)
+})
+
 test("requires bounded ASCII idempotency keys and isolates cached writes by node session and TTL", async t => {
     const target = fixture(t, { idempotencyTtlMs: 100 })
     const firstNode = await register(target.app, target.first.token)
@@ -798,6 +830,20 @@ test("returns bounded coordinator errors without paths, credentials or stack tra
     })
     assert.equal(incompatible.statusCode, 200)
     assert.deepEqual(incompatible.json(), { ok: false, code: "INCOMPATIBLE_ROOM" })
+
+    target.coordinator.results.set("searchRoom", { ok: false, error: "ROOM_FULL" })
+    const full = await target.app.inject({
+        method: "POST",
+        url: "/v1/multi/rooms/search",
+        headers: sessionHeaders(registration),
+        payload: {
+            ...participantInput(registration),
+            roomNumber: "123456",
+            compatibility,
+        },
+    })
+    assert.equal(full.statusCode, 200)
+    assert.deepEqual(full.json(), { ok: false, code: "ROOM_FULL" })
 
     target.coordinator.results.set("getRoomStatus", new Error(`secret ${target.first.token} ${target.credentialsPath}`))
     const unavailable = await target.app.inject({

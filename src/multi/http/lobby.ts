@@ -4,14 +4,14 @@ import { getQuestFromCategorySync } from "../../lib/assets"
 import { generateDataHeaders } from "../../utils"
 import { serializeRoomStatusConnection } from "../room/serializer"
 import { isValidMultiViewerId, type MultiHttpContext } from "./context"
-import { classifyRoomJoin } from "./join-result"
+import { classifyRoomJoin, roomUnavailableRaisingState } from "./join-result"
 import { issueRoomAdmission } from "./room-admission"
 
 function isPositiveSafeInteger(value: number): boolean {
     return Number.isSafeInteger(value) && value > 0
 }
 
-function unavailableConnection(roomNumber: string, raisingState: 7 | 9) {
+function unavailableConnection(roomNumber: string, raisingState: 3 | 7 | 9) {
     return {
         application_update_url: "",
         category_id: 0,
@@ -172,7 +172,9 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
                 "data": unavailableConnection(
                     body.room_number || "",
-                    room.kind === "missing" ? 9 : 7,
+                    room.kind === "missing"
+                        ? 9
+                        : roomUnavailableRaisingState(room.error),
                 ),
             })
         }

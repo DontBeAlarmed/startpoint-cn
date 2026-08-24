@@ -250,7 +250,11 @@ modeDigest
 
 ### 8.3 准备与 TCP admission
 
-`prepare` 必须再次执行兼容性、裸 `viewerId` 与本地关卡资格校验，防止查房后内容、身份或活动开放状态变化。成功后 Hub 创建短期、单房间的 TCP admission。由于官方 TCP 握手不携带额外认证 token，Hub 只接受已经由受信节点注册、且与 `roomNumber + viewerId` 匹配的下一次握手。
+`select_room` 与 `prepare` 必须再次执行兼容性、裸 `viewerId` 与本地关卡资格校验，防止查房后内容、身份或活动开放状态变化。成功后由房间所属 Coordinator 创建短期、单房间的 TCP admission，并在 Host Hub 的权威 registry 中预留一个真人席位。最多允许 3 名真人；已有成员和未过期待入场 admission 共同计入容量，NPC 不计入。
+
+由于官方 TCP 握手不携带额外认证 token，Hub 只接受已经由受信节点注册、且与 `roomNumber + viewerId` 匹配的下一次握手。握手成功消费 admission；身份、房间、关卡、兼容性校验失败，或节点会话撤销、房间解散、TTL 到期时，待入场席位必须释放。同一节点会话和 viewer 的重复准入请求保持幂等。
+
+准入结果投影为现有客户端状态：房间已满为 `raising_state=3`，战斗已开始为 `raising_state=4`，其他不可加入原因为 `raising_state=7`，明确缺房或已解散为 `raising_state=9`。Hub 网络失败不直接伪装成房间不存在。
 
 首期信任受信局域网或 VPN，不承诺抵抗同一网络中的恶意客户端冒充。
 
@@ -300,7 +304,8 @@ Hub 可以在战斗结束后把房间恢复为可重赛状态，但旧 `battleSe
 - 本地关卡资格失败使用内部 `QUEST_NOT_AVAILABLE`；只拒绝当前玩家的创建或加入，不删除其他节点已经创建的房间。
 - `search_room` 和直接 `select_room` 的兼容性失败映射为现有 NotPlayable 分支。
 - `prepare` 复核失败映射为现有通用 Failure 分支。
-- 只有房间实际不存在时才使用房间不存在响应。
+- 房间已满由 `select_room`/`prepare` 返回 `raising_state=3`，战斗已开始返回 `raising_state=4`；其他明确不可加入原因保持 `raising_state=7`。
+- 只有房间实际不存在或已解散时才使用房间不存在响应 `raising_state=9`。
 - TCP 直连但没有有效 admission 时拒绝握手。
 - `/start` 成功后在同一客户端进程内断线时保留本地 active quest，允许客户端隔离战斗或重试 finish；重新登录触发 `/load` 时，因国服客户端不能续接已经开始的多人场景，按中止事务清理并退款。战斗前 lobby 的网络 close 只移除在线 socket，并保留成员资格至 `MULTI_ROOM_RECONNECT_GRACE_MS` 到期；客户端明确发送 `Bye` 时立即执行离开或解散。进入 `raising_state=4` 后的 lobby close/Bye 只关闭 lobby socket，不移除当局成员快照。
 - `/finish` 时 Hub 暂时不可达，不发奖、不删除 active quest，允许在完成记录 TTL 内重试。

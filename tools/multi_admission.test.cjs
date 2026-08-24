@@ -131,3 +131,88 @@ test("admission contract has no hidden or exported local player metadata", () =>
     assert.equal("getEmbeddedAdmissionMetadata" in admissionModule, false)
     assert.equal(JSON.stringify(admission).includes("localPlayerId"), false)
 })
+
+test("rejects a third real-player admission while two seats are already occupied", () => {
+    const registry = new AdmissionRegistry({
+        now: () => 1_000,
+        getOccupiedMemberCount: () => 2,
+    })
+    assert.equal(issue(registry).ok, true)
+    assert.deepEqual(issue(registry, {
+        participant: { nodeSessionId: "node-b", viewerId: 202 },
+        snapshot: snapshotFixture(202, "Guest"),
+    }), { ok: false, error: "ROOM_FULL" })
+})
+
+test("releasing a pending admission makes the seat reusable", () => {
+    const registry = new AdmissionRegistry({
+        now: () => 1_000,
+        getOccupiedMemberCount: () => 2,
+    })
+    assert.equal(issue(registry).ok, true)
+    assert.equal(registry.release("123456", 101), true)
+    assert.equal(issue(registry).ok, true)
+})
+
+test("repeating the same participant does not consume another seat", () => {
+    const registry = new AdmissionRegistry({
+        now: () => 1_000,
+        getOccupiedMemberCount: () => 2,
+    })
+    const first = issue(registry)
+    const second = issue(registry, { snapshot: snapshotFixture(101, "Changed") })
+    assert.equal(second.ok, true)
+    assert.equal(second.value, first.value)
+})
+
+test("concurrent admissions reserve at most the two guest seats", () => {
+    const registry = new AdmissionRegistry({
+        now: () => 1_000,
+        getOccupiedMemberCount: () => 1,
+    })
+    const attempts = [202, 303, 404].map(viewerId => Promise.resolve().then(() => issue(registry, {
+        participant: { nodeSessionId: `node-${viewerId}`, viewerId },
+        snapshot: snapshotFixture(viewerId, `Guest ${viewerId}`),
+    })))
+
+    return Promise.all(attempts).then(results => {
+        assert.equal(results.filter(result => result.ok).length, 2)
+        assert.equal(results.filter(result => !result.ok && result.error === "ROOM_FULL").length, 1)
+    })
+})
+
+test("expired admissions release their reserved seat before a retry", () => {
+    let now = 1_000
+    const registry = new AdmissionRegistry({
+        now: () => now,
+        getOccupiedMemberCount: () => 2,
+    })
+    assert.equal(issue(registry).ok, true)
+    now = 6_000
+
+    assert.equal(issue(registry, {
+        participant: { nodeSessionId: "node-b", viewerId: 202 },
+        snapshot: snapshotFixture(202, "Guest"),
+        expiresAt: 7_000,
+    }).ok, true)
+})
+
+test("node-session and room teardown clear all pending admissions", () => {
+    const registry = new AdmissionRegistry({
+        now: () => 1_000,
+        getOccupiedMemberCount: () => 1,
+    })
+    assert.equal(issue(registry).ok, true)
+    assert.equal(issue(registry, {
+        participant: { nodeSessionId: "node-a", viewerId: 202 },
+        snapshot: snapshotFixture(202, "Guest A"),
+    }).ok, true)
+    assert.equal(registry.removeByNodeSession("node-a"), 2)
+    assert.equal(issue(registry).ok, true)
+
+    assert.equal(registry.clearRoom("123456"), 1)
+    assert.equal(issue(registry, {
+        participant: { nodeSessionId: "node-b", viewerId: 303 },
+        snapshot: snapshotFixture(303, "Guest B"),
+    }).ok, true)
+})

@@ -179,6 +179,12 @@ export function getRoom(roomNumber: string): MultiRoom | undefined {
     return room;
 }
 
+export function getRoomOccupiedMemberCount(roomNumber: string): number {
+    const room = rooms.get(roomNumber)
+    if (!room) return 0
+    return new Set(room.member_participants.map(member => member.viewerId)).size
+}
+
 export function listActiveRooms(): readonly MultiRoom[] {
     return Object.freeze([...rooms.values()]);
 }

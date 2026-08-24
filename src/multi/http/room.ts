@@ -6,6 +6,7 @@ import { buildNpcMates } from "../npc/builder";
 import { isValidMultiViewerId, type MultiHttpContext } from "./context";
 import type { CoordinatorErrorCode } from "../coordinator/contracts";
 import { classifyRoomJoin } from "./join-result";
+import { roomUnavailableRaisingState } from "./join-result";
 import { issueRoomAdmission } from "./room-admission";
 
 async function hasValidViewer(context: MultiHttpContext, viewerId: number): Promise<boolean> {
@@ -32,9 +33,9 @@ function prepareFailure(
     error: CoordinatorErrorCode,
 ): FastifyReply {
     reply.header("content-type", "application/x-msgpack");
-    if (error === "ROOM_NOT_FOUND") return reply.status(200).send({
+    if (error === "ROOM_NOT_FOUND" || error === "ROOM_FULL") return reply.status(200).send({
         "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-        "data": unavailableRoomData(roomNumber, 9),
+        "data": unavailableRoomData(roomNumber, roomUnavailableRaisingState(error)),
     });
     return reply.status(200).send({
         "data_headers": generateDataHeaders({ viewer_id: viewerId, result_code: 4507 }),

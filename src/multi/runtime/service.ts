@@ -45,7 +45,7 @@ import {
     createEmbeddedMultiHttpContext,
     type MultiHttpContext,
 } from "../http/context"
-import { listActiveRooms } from "../room/manager"
+import { getRoomOccupiedMemberCount, listActiveRooms } from "../room/manager"
 import { sessionManager } from "../state/SessionManager"
 import {
     isSessionServerListening,
@@ -249,9 +249,12 @@ class Service implements MultiRuntimeService {
         if (config.mode === "host") {
             this.remoteCoordinator = null
             const authenticationRejections = new AuthenticationRejectionBuffer()
-            const admissionRegistry = new AdmissionRegistry()
+            const admissionRegistry = new AdmissionRegistry({
+                getOccupiedMemberCount: getRoomOccupiedMemberCount,
+            })
             const coordinator = new EmbeddedMultiCoordinator({
                 allowRemoteParticipants: true,
+                onRoomDisband: roomNumber => admissionRegistry.clearRoom(roomNumber),
                 onCompatibilityRejection: recordMultiCompatibilityRejection,
             })
             const credentialReloader = new CredentialReloader({
@@ -298,6 +301,7 @@ class Service implements MultiRuntimeService {
                 const localCoordinator = this.dependencies.createLocalCoordinator?.()
                     ?? new EmbeddedMultiCoordinator({
                         allowRemoteParticipants: true,
+                        onRoomDisband: roomNumber => embeddedAdmissionRegistry.clearRoom(roomNumber),
                         onCompatibilityRejection: recordMultiCompatibilityRejection,
                     })
                 const fallback = new ClientFallbackController({

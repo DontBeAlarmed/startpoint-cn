@@ -1,5 +1,8 @@
 import type { CoordinatorErrorCode, ParticipantIdentity } from "../coordinator/contracts"
 import type { PlayerSnapshot } from "../snapshot/player-snapshot"
+import { getRoomOccupiedMemberCount } from "../room/manager"
+
+const MAX_REAL_ROOM_MEMBERS = 3
 
 export interface RoomAdmission {
     readonly roomNumber: string
@@ -10,6 +13,7 @@ export interface RoomAdmission {
 
 export interface AdmissionProvider {
     consume(roomNumber: string, viewerId: number): RoomAdmission | null
+    release?(roomNumber: string, viewerId: number): boolean
 }
 
 export interface AdmissionIssuer {
@@ -24,6 +28,7 @@ export type AdmissionIssueResult =
 
 export interface AdmissionRegistryOptions {
     readonly now?: () => number
+    readonly getOccupiedMemberCount?: (roomNumber: string) => number
 }
 
 function normalizeRoomNumber(value: unknown): string | null {
@@ -43,9 +48,11 @@ function key(roomNumber: string, viewerId: number): string {
 export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
     private readonly admissions = new Map<string, RoomAdmission>()
     private readonly now: () => number
+    private readonly getOccupiedMemberCount: (roomNumber: string) => number
 
     constructor(options: AdmissionRegistryOptions = {}) {
         this.now = options.now ?? Date.now
+        this.getOccupiedMemberCount = options.getOccupiedMemberCount ?? (() => 0)
     }
 
     issue(input: AdmissionIssueInput): AdmissionIssueResult {
@@ -75,6 +82,13 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
             return { ok: true, value: existing }
         }
 
+        const pendingMemberCount = [...this.admissions.values()]
+            .filter(admission => admission.roomNumber === roomNumber)
+            .length
+        if (this.getOccupiedMemberCount(roomNumber) + pendingMemberCount >= MAX_REAL_ROOM_MEMBERS) {
+            return { ok: false, error: "ROOM_FULL" }
+        }
+
         const admission = {
             roomNumber,
             participant: Object.freeze({ ...input.participant }),
@@ -101,6 +115,24 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
         return admission
     }
 
+    release(roomNumber: string, viewerId: number): boolean {
+        const normalizedRoomNumber = normalizeRoomNumber(roomNumber)
+        if (!normalizedRoomNumber || !isValidViewerId(viewerId)) return false
+        return this.admissions.delete(key(normalizedRoomNumber, viewerId))
+    }
+
+    clearRoom(roomNumber: string): number {
+        const normalizedRoomNumber = normalizeRoomNumber(roomNumber)
+        if (!normalizedRoomNumber) return 0
+        let removed = 0
+        for (const [admissionKey, admission] of this.admissions) {
+            if (admission.roomNumber !== normalizedRoomNumber) continue
+            this.admissions.delete(admissionKey)
+            removed++
+        }
+        return removed
+    }
+
     cleanup(): number {
         const now = this.now()
         let removed = 0
@@ -123,4 +155,6 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
     }
 }
 
-export const embeddedAdmissionRegistry = new AdmissionRegistry()
+export const embeddedAdmissionRegistry = new AdmissionRegistry({
+    getOccupiedMemberCount: getRoomOccupiedMemberCount,
+})

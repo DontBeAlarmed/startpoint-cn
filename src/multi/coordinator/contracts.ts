@@ -30,6 +30,7 @@ export type CoordinatorErrorCode =
     | "QUEST_NOT_AVAILABLE"
     | "ROOM_PERMISSION_DENIED"
     | "ROOM_NOT_FOUND"
+    | "ROOM_FULL"
     | "HUB_UNAVAILABLE"
 
 export type CoordinatorResult<T> =

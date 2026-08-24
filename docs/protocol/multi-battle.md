@@ -30,7 +30,18 @@
 
 默认 `embedded` 把游戏 HTTP、Coordinator 和 TCP 放在同一服务进程中，普通用户无需额外配置。可选 `host` 在自身 `8001` 游戏 HTTP 外提供 `8003` Hub TCP 和 `8004` Hub control；`client` 只保留自己的 `8001`，通过 `8004` 控制房间，游戏客户端按房间响应直连 Host `8003`。三种模式都保持玩家 SQLite 与结算在所属服务端本地。
 
-Hub 不代理游戏主 API、CDN 或后台，也不自动对齐资源与服务器时间。多人协议版本、`APP_VER`、多人战斗内容摘要或 Mod 摘要不兼容时，`search_room`/`verify_access_token` 映射为 `4020` NotPlayable，`select_room` 返回 `raising_state=7`，`prepare` 返回 `4507`；`RES_VER` 与 CDN 目标版本参与比较，但不记录为拒绝，也不单独阻断同房。只有真实缺房才使用 `room_exists=false` 或 `raising_state=9`。
+Hub 不代理游戏主 API、CDN 或后台，也不自动对齐资源与服务器时间。多人协议版本、`APP_VER`、多人战斗内容摘要或 Mod 摘要不兼容时，`search_room`/`verify_access_token` 映射为 `4020` NotPlayable，`select_room` 返回 `raising_state=7`，`prepare` 返回 `4507`；`RES_VER` 与 CDN 目标版本参与比较，但不记录为拒绝，也不单独阻断同房。房间已满由 `select_room`/`prepare` 返回 `raising_state=3`，战斗已开始返回 `raising_state=4`；只有真实缺房才使用 `room_exists=false` 或 `raising_state=9`。
+
+### 2.1 房间准入与席位预留
+
+`select_room` 和 `prepare` 是 TCP 握手前的准入入口。成功时，房间所属 Coordinator 的 `AdmissionRegistry` 会同时记录一份短期 admission，并预留一个真人席位；TCP 握手成功后消费该 admission，才把成员写入房间。房间容量按最多 3 名真人计算，NPC 不占用真人席位。
+
+- 已有房间成员数与未过期待入场 admission 一起参与容量判断；同一 `nodeSessionId + viewerId` 的重复请求复用原 admission，不重复占位。
+- admission 默认短期有效；过期、TCP 握手身份/房间/关卡校验失败、节点会话撤销和房间解散都会释放待入场席位。
+- `embedded` 和 Host 使用自己的房间成员统计；Client 不根据本地数据库猜测远程房间容量，远程房间由 Host Hub 的 admission registry 作最终判断。
+- admission 只携带当前多人握手所需的参与者身份和最小玩家快照，不携带完整存档、库存或奖励事实。
+
+这项预留只约束房间加入，不实现随机招募、公开大厅、跨重启恢复或新的房间迁移。
 
 多人联机由八类组件组成：
 
@@ -148,13 +159,13 @@ Session TCP 在正常 `stop`、fatal teardown 和 startup failure 路径都会�
 | `get_rooms` | 真人随机匹配未实现时返回合法空列表，不把自己的房间伪装成匹配结果 |
 | `create_room` | 校验玩家与关卡，创建进程内房间、room number 和房间级随机 access token |
 | `search_room` | 按 room number 返回房间是否存在及基础房主信息 |
-| `select_room` | 返回 TCP 地址、端口和房间状态；房间缺失时返回状态 9 |
+| `select_room` | 校验兼容性并预留真人席位，返回 TCP 地址、端口和房间状态；满员返回状态 3，战斗已开始返回状态 4，房间缺失时返回状态 9 |
 
 ### 4.2 准备、招募与解散
 
 | 路由 | 当前职责 |
 |---|---|
-| `prepare` | 校验 viewer session、房间和关卡后返回 TCP 连接信息；这是首次加入前入口，不要求已有成员资格 |
+| `prepare` | 校验 viewer session、房间和关卡并预留真人席位后返回 TCP 连接信息；这是首次加入前入口，不要求已有成员资格；满员返回状态 3 |
 | `summon` | 仅房主可请求静态 NPC mate 模板 |
 | `restore_room` | 已记录成员可恢复仍在进程内的房间；陌生玩家返回状态 13，缺失房间返回状态 9 |
 | `share_room` | 仅房主可提交，成功响应不含业务字段，也不提供真实分享或匹配队列 |
@@ -187,19 +198,20 @@ Session TCP 在正常 `stop`、fatal teardown 和 startup failure 路径都会�
 
 `raising_state` 是国服客户端 HTTP 响应解析器要求的字段。下表中的 Ready、Waiting、Battle 等名称来自客户端各数值分支对应的输入类型；“当前语义”描述的是服务端在这些客户端分支约束下采用的状态机行为。
 
-当前服务端只写入 1、2、4 三个房间状态；9 和 13 只用于 HTTP 返回。
+当前房间内存状态仍只写入 1、2、4；3、9 和 13 是 HTTP 加入/恢复响应的客户端投影，不会写入房间状态。
 
 | 值 | 当前语义 | 写入或返回时机 |
 |---:|---|---|
 | 1 | Ready | 房主进入 lobby；当局全部真人 Finalize 后由 coordinator 恢复为可重赛状态 |
 | 2 | Waiting | 新建房间初态；房主尚未进入时客人继续轮询 |
+| 3 | Full | `select_room` 或 `prepare` 发现真人成员与待入场 admission 已达到 3 人 |
 | 4 | Battle | TCP lobby 收到房主 StartBattle 并固化当局成员后进入战斗 |
 | 9 | Missing | `select_room`、`prepare` 或 `restore_room` 找不到房间时返回 |
 | 13 | NotMate | `restore_room` 的 viewer 不是该房间已记录成员时返回 |
 
 状态 9 不会存入房间。客户端收到它时应把目标房间视为不存在或已经过期。
 
-当前服务端不写入历史值 `raising_state=3`。NPC 招募不会把房间改为 3，而是保持 1，直到开始战斗时直接进入 4。
+`raising_state=3` 只表示本次加入请求没有获得真人席位；NPC 招募不会把房间改为 3，而是保持 1，直到开始战斗时直接进入 4。网络/Hub 故障不等同于房间不存在；只有 Coordinator 明确报告 `ROOM_NOT_FOUND` 时才投影为 9。
 
 ## 6. TCP 握手与 lobby 流程
 
@@ -208,11 +220,12 @@ Session TCP 在正常 `stop`、fatal teardown 和 startup failure 路径都会�
 客户端使用 `socklet=cooperation_room` 连接 TCP，并提供 viewer、room number 和 connection ID。服务端执行：
 
 1. 校验房间存在，状态为 Waiting/Ready，握手关卡与房间一致；
-2. 新成员加入时按真人成员资格校验房间仍有空位；NPC 槽位可被真人替换，已记录成员也不受满员判断影响，可以断线重连；
-3. 通过 viewer session 解析当前玩家和存档；
-4. 从数据库构建真实玩家 party；
-5. 按 `room.host_viewer_id` 写入本连接的 `isHost`，并以 `nodeSessionId + viewerId` 记录房间成员资格；TCP admission 虽按 `roomNumber + viewerId` 一次性定位，但消费后必须确认返回 participant 的 viewer 与握手 viewer 相同；
-6. 注册 lobby client并返回 Accept 数组：
+2. 新成员必须提供匹配的短期 TCP admission；服务端消费前再次校验房间、身份和关卡，失败时释放该 admission；
+3. 新成员加入时按真人成员资格校验房间仍有空位；NPC 槽位可被真人替换，已记录成员也不受满员判断影响，可以断线重连；
+4. 通过 viewer session 解析当前玩家和存档；
+5. 从数据库构建真实玩家 party；
+6. 按 `room.host_viewer_id` 写入本连接的 `isHost`，并以 `nodeSessionId + viewerId` 记录房间成员资格；TCP admission 虽按 `roomNumber + viewerId` 一次性定位，但消费后必须确认返回 participant 的 viewer 与握手 viewer 相同；
+7. 注册 lobby client并返回 Accept 数组：
 
 ```text
 [0, connectionId, roomNumber]

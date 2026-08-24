@@ -738,6 +738,65 @@ test("actual missing rooms keep only the existing missing-room branches", async 
     assert.equal(prepare.data.raising_state, 9)
 })
 
+test("full rooms use the client-native raising_state 3 for select and prepare", async t => {
+    const target = await routeServer({ result: { ok: false, error: "ROOM_FULL" } })
+    t.after(() => target.app.close())
+
+    const select = decode(await target.app.inject({
+        method: "POST", url: "/select_room",
+        payload: { viewer_id: 202, room_number: "123456" },
+    }))
+    const prepare = decode(await target.app.inject({
+        method: "POST", url: "/prepare",
+        payload: { viewer_id: 202, room_number: "123456", category: 1, quest_id: 701 },
+    }))
+
+    assert.equal(select.data.raising_state, 3)
+    assert.equal(prepare.data.raising_state, 3)
+})
+
+test("battle-started rooms use the client-native raising_state 4 for select and prepare", async t => {
+    const target = await routeServer({ result: {
+        ok: true,
+        value: {
+            roomNumber: "123456",
+            accessToken: "access-token",
+            category: 1,
+            questId: 701,
+            hostEntryTime: 1_725_000_000,
+            roomSequence: 1,
+            raisingState: 4,
+            shareRoomOptions: 0,
+            hostMainCharacterId: 401,
+            isNpcMode: false,
+            hostOnline: true,
+            host: { nodeSessionId: "node", viewerId: 101 },
+            members: [{ nodeSessionId: "node", viewerId: 101 }],
+            compatibility: {
+                multiProtocolVersion: 1,
+                APP_VER: "embedded",
+                RES_VER: "embedded",
+                cdnTargetVersion: "embedded",
+                contentDigest: `sha256:${"0".repeat(64)}`,
+                modeDigest: `sha256:${"0".repeat(64)}`,
+            },
+        },
+    } })
+    t.after(() => target.app.close())
+
+    const select = decode(await target.app.inject({
+        method: "POST", url: "/select_room",
+        payload: { viewer_id: 202, room_number: "123456" },
+    }))
+    const prepare = decode(await target.app.inject({
+        method: "POST", url: "/prepare",
+        payload: { viewer_id: 202, room_number: "123456", category: 1, quest_id: 701 },
+    }))
+
+    assert.equal(select.data.raising_state, 4)
+    assert.equal(prepare.data.raising_state, 4)
+})
+
 test("local QUEST_NOT_AVAILABLE uses endpoint-specific join mappings", async t => {
     const target = await routeServer({ questAvailable: false })
     t.after(() => target.app.close())
