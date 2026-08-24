@@ -1173,6 +1173,23 @@ test("routes Awake request-context core, baseline, and callsite files to the mis
     }
 })
 
+test("routes Awake owner-focused evidence files precisely to the mission group", () => {
+    for (const file of [
+        "tools/perf/awake_owner_focused_admission.cjs",
+        "tools/perf/awake_owner_focused_baseline.cjs",
+        "tools/perf/awake_owner_focused_baseline.test.cjs",
+        "tools/perf/awake_owner_focused_report.cjs",
+        "tools/perf/awake_owner_focused_scenarios.cjs",
+        "tools/perf/__snapshots__/awake_owner_focused_baseline.json",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["integration:mission"], file)
+    }
+    assert.ok(TEST_GROUPS["integration:mission"].tests.includes(
+        "tools/perf/awake_owner_focused_baseline.test.cjs",
+    ))
+    assert.deepEqual(selectTestGroups(["tools/perf/awake_owner_focused_unrelated.cjs"]), ["full"])
+})
+
 test("routes active mission focused metrics, baseline, and production boundaries precisely", () => {
     for (const file of [
         "tools/perf/active-mission/fixture.cjs",
@@ -1441,6 +1458,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/perf/awake_request_context_admission.test.cjs",
         "tools/perf/awake_request_context_baseline.test.cjs",
         "tools/perf/awake_request_context_runner.test.cjs",
+        "tools/perf/awake_owner_focused_baseline.test.cjs",
         "tools/perf/mission_engine_focused_admission.test.cjs",
         "tools/perf/mission_engine_focused_baseline.test.cjs",
         "tools/perf/mission_engine_focused_runner.test.cjs",

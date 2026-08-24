@@ -1,0 +1,2529 @@
+{
+  "version": 1,
+  "fixedTime": "2024-08-14T12:00:00.000Z",
+  "evidenceRegistry": {
+    "bond-in-tx": {
+      "boundary": "best-effort-in-tx",
+      "owners": [
+        "character/receive_bond_token"
+      ],
+      "scenarios": [
+        "bond-success"
+      ],
+      "seedContract": "target character after the bond-token write"
+    },
+    "candidate-multiple-in-tx": {
+      "boundary": "best-effort-in-tx",
+      "owners": [
+        "multi/finish",
+        "tutorial/update_step:15",
+        "tutorial/update_step:16"
+      ],
+      "scenarios": [
+        "candidate-multiple"
+      ],
+      "seedContract": "bounded actual owner characters at an in-transaction publication boundary"
+    },
+    "candidate-one-post-commit": {
+      "boundary": "best-effort-post-commit",
+      "owners": [
+        "gacha/exchange_character",
+        "gacha/exec"
+      ],
+      "scenarios": [
+        "candidate-one"
+      ],
+      "seedContract": "one actual reward character, no changed global facts"
+    },
+    "candidate-zero-post-commit": {
+      "boundary": "best-effort-post-commit",
+      "owners": [
+        "exchange/star_crumb"
+      ],
+      "scenarios": [
+        "candidate-zero"
+      ],
+      "seedContract": "empty actual character seed, no changed global facts"
+    },
+    "category9-post-commit": {
+      "boundary": "best-effort-post-commit",
+      "owners": [
+        "mission/update_mission_progress"
+      ],
+      "scenarios": [
+        "category9-update-progress"
+      ],
+      "seedContract": "characters derived from actually updated Category 9 missions"
+    },
+    "character-grant-post-commit": {
+      "boundary": "best-effort-post-commit",
+      "owners": [
+        "character/add_character_from_town"
+      ],
+      "scenarios": [
+        "character-grant-owner"
+      ],
+      "seedContract": "one actually granted character, no changed global facts"
+    },
+    "learn-mana-strict": {
+      "boundary": "strict-in-tx",
+      "owners": [
+        "character/learn_mana_node"
+      ],
+      "scenarios": [
+        "learn-mana-final-node"
+      ],
+      "seedContract": "target character after the final mana-node write"
+    },
+    "mana-item-post-commit": {
+      "boundary": "best-effort-post-commit",
+      "owners": [
+        "item/sell"
+      ],
+      "scenarios": [
+        "mana-item-sell"
+      ],
+      "seedContract": "empty character seed plus the changed player FactKey"
+    },
+    "pass-card-post-commit": {
+      "boundary": "best-effort-post-commit",
+      "owners": [
+        "pass_card/receive_all"
+      ],
+      "scenarios": [
+        "pass-card-receive-all"
+      ],
+      "seedContract": "empty character seed plus pass-card reward FactKey seeds"
+    },
+    "raid-summary-post-commit": {
+      "boundary": "best-effort-post-commit",
+      "owners": [
+        "raid_event/summary"
+      ],
+      "scenarios": [
+        "raid-event-summary"
+      ],
+      "seedContract": "empty character seed plus raid summary reward FactKey seeds"
+    },
+    "reward-grant-in-tx": {
+      "boundary": "best-effort-in-tx",
+      "owners": [
+        "active_mission/receive",
+        "mail/receive",
+        "mail/receive_all"
+      ],
+      "scenarios": [
+        "candidate-one"
+      ],
+      "seedContract": "actual reward characters plus reward-derived FactKey seeds"
+    },
+    "reward-grant-post-commit": {
+      "boundary": "best-effort-post-commit",
+      "owners": [
+        "box_gacha/exec",
+        "shop/buy",
+        "shop/bulk_buy"
+      ],
+      "scenarios": [
+        "reward-grant-post-commit"
+      ],
+      "seedContract": "actual reward characters plus reward-derived FactKey seeds"
+    },
+    "single-in-tx": {
+      "boundary": "best-effort-in-tx",
+      "owners": [
+        "single/finish"
+      ],
+      "scenarios": [
+        "single-finish"
+      ],
+      "seedContract": "battle party characters, direct missions and post-settlement changed facts"
+    },
+    "story-in-tx": {
+      "boundary": "best-effort-in-tx",
+      "owners": [
+        "story_quest/finish"
+      ],
+      "scenarios": [
+        "story-finish"
+      ],
+      "seedContract": "actual story/reward characters plus changed quest and reward facts"
+    }
+  },
+  "sqlUpperBounds": {
+    "bond-in-tx": {
+      "scenarios": [
+        "bond-success"
+      ],
+      "seedContract": "target character after the bond-token write"
+    },
+    "candidate-multiple-in-tx": {
+      "scenarios": [
+        "candidate-multiple"
+      ],
+      "seedContract": "bounded actual owner characters at an in-transaction publication boundary"
+    },
+    "candidate-one-post-commit": {
+      "scenarios": [
+        "candidate-one"
+      ],
+      "seedContract": "one actual reward character, no changed global facts"
+    },
+    "candidate-zero-post-commit": {
+      "scenarios": [
+        "candidate-zero"
+      ],
+      "seedContract": "empty actual character seed, no changed global facts"
+    },
+    "category9-post-commit": {
+      "scenarios": [
+        "category9-update-progress"
+      ],
+      "seedContract": "characters derived from actually updated Category 9 missions"
+    },
+    "character-grant-post-commit": {
+      "scenarios": [
+        "character-grant-owner"
+      ],
+      "seedContract": "one actually granted character, no changed global facts"
+    },
+    "learn-mana-strict": {
+      "scenarios": [
+        "learn-mana-final-node"
+      ],
+      "seedContract": "target character after the final mana-node write"
+    },
+    "mana-item-post-commit": {
+      "scenarios": [
+        "mana-item-sell"
+      ],
+      "seedContract": "empty character seed plus the changed player FactKey"
+    },
+    "pass-card-post-commit": {
+      "scenarios": [
+        "pass-card-receive-all"
+      ],
+      "seedContract": "empty character seed plus pass-card reward FactKey seeds"
+    },
+    "raid-summary-post-commit": {
+      "scenarios": [
+        "raid-event-summary"
+      ],
+      "seedContract": "empty character seed plus raid summary reward FactKey seeds"
+    },
+    "reward-grant-in-tx": {
+      "scenarios": [
+        "candidate-one"
+      ],
+      "seedContract": "actual reward characters plus reward-derived FactKey seeds"
+    },
+    "reward-grant-post-commit": {
+      "scenarios": [
+        "reward-grant-post-commit"
+      ],
+      "seedContract": "actual reward characters plus reward-derived FactKey seeds"
+    },
+    "single-in-tx": {
+      "scenarios": [
+        "single-finish"
+      ],
+      "seedContract": "battle party characters, direct missions and post-settlement changed facts"
+    },
+    "story-in-tx": {
+      "scenarios": [
+        "story-finish"
+      ],
+      "seedContract": "actual story/reward characters plus changed quest and reward facts"
+    }
+  },
+  "scenarios": {
+    "candidate-zero": {
+      "request": {
+        "characterSeeds": [],
+        "operation": "publish",
+        "playerId": 1
+      },
+      "response": {
+        "characterList": []
+      },
+      "behaviorSha256": "0a87173b37464780f0d4d18c75c2c0914257ab27fa605a4b727e39e842e9da1c",
+      "dbBefore": {
+        "category9": [],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          }
+        ],
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2000,
+          "totalManaObtained": 0
+        },
+        "unlocks": []
+      },
+      "dbAfter": {
+        "category9": [],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          }
+        ],
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2000,
+          "totalManaObtained": 0
+        },
+        "unlocks": []
+      },
+      "characterSeeds": [],
+      "factSeeds": [],
+      "directMissionSeeds": [],
+      "loaderCalls": [
+        "characters"
+      ],
+      "missionComputes": 0,
+      "snapshotSource": "none",
+      "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
+      "freshPostWriteEvaluationRequired": true,
+      "sqlReads": 1,
+      "sqlWrites": 0,
+      "sqlByTable": {
+        "players_character_awake_unlocks": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        }
+      }
+    },
+    "candidate-one": {
+      "request": {
+        "characterSeeds": [
+          263002
+        ],
+        "factSeeds": [
+          "player"
+        ],
+        "operation": "transactional-reward-publication",
+        "playerId": 2
+      },
+      "response": {
+        "characterList": [
+          {
+            "characterId": 263002,
+            "manaBoardAwake": {
+              "1": 1
+            }
+          }
+        ]
+      },
+      "behaviorSha256": "7fde8ae415c3cc3a6a200f04f34563da74e85d721e8350563e0fb04e8b8d7b14",
+      "dbBefore": {
+        "category9": [
+          [
+            2630021,
+            3
+          ],
+          [
+            2630023,
+            1
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          }
+        ],
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2000,
+          "totalManaObtained": 604800
+        },
+        "unlocks": []
+      },
+      "dbAfter": {
+        "category9": [
+          [
+            2630021,
+            3
+          ],
+          [
+            2630023,
+            1
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          }
+        ],
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2000,
+          "totalManaObtained": 604800
+        },
+        "unlocks": [
+          [
+            263002,
+            [
+              [
+                1,
+                1
+              ]
+            ]
+          ]
+        ]
+      },
+      "characterSeeds": [
+        263002
+      ],
+      "factSeeds": [
+        "player"
+      ],
+      "directMissionSeeds": [],
+      "loaderCalls": [
+        "player",
+        "questProgress:3",
+        "categoryMissionProgress:9:2630021,2630022,2630023",
+        "characters"
+      ],
+      "missionComputes": 7,
+      "snapshotSource": "none",
+      "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
+      "freshPostWriteEvaluationRequired": true,
+      "sqlReads": 9,
+      "sqlWrites": 1,
+      "sqlByTable": {
+        "players": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_category_mission_stages": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_category_missions": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_character_awake_unlocks": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_characters": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_characters_bond_tokens": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_characters_mana_nodes": {
+          "reads": 2,
+          "statements": 2,
+          "writes": 0
+        },
+        "players_quest_progress": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        }
+      }
+    },
+    "candidate-multiple": {
+      "request": {
+        "characterSeeds": [
+          263002,
+          341005
+        ],
+        "operation": "transactional-multi-owner-publication",
+        "playerId": 3
+      },
+      "response": {
+        "characterList": [
+          {
+            "characterId": 263002,
+            "manaBoardAwake": {
+              "1": 1
+            }
+          },
+          {
+            "characterId": 341005
+          }
+        ]
+      },
+      "behaviorSha256": "b2b417432fa5c12ecefa8490afbb90e22c3fb035d17149e0d75d1ddc140528d5",
+      "dbBefore": {
+        "category9": [
+          [
+            2630021,
+            3
+          ],
+          [
+            2630023,
+            1
+          ],
+          [
+            3410051,
+            1
+          ],
+          [
+            3410052,
+            5
+          ],
+          [
+            3410053,
+            5
+          ],
+          [
+            3410054,
+            3
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          },
+          {
+            "characterId": 341005,
+            "evolutionLevel": 0,
+            "exp": 37241,
+            "stack": 0
+          }
+        ],
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2000,
+          "totalManaObtained": 604800
+        },
+        "unlocks": []
+      },
+      "dbAfter": {
+        "category9": [
+          [
+            2630021,
+            3
+          ],
+          [
+            2630023,
+            1
+          ],
+          [
+            3410051,
+            1
+          ],
+          [
+            3410052,
+            5
+          ],
+          [
+            3410053,
+            5
+          ],
+          [
+            3410054,
+            3
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          },
+          {
+            "characterId": 341005,
+            "evolutionLevel": 0,
+            "exp": 37241,
+            "stack": 0
+          }
+        ],
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2000,
+          "totalManaObtained": 604800
+        },
+        "unlocks": [
+          [
+            263002,
+            [
+              [
+                1,
+                1
+              ]
+            ]
+          ]
+        ]
+      },
+      "characterSeeds": [
+        263002,
+        341005
+      ],
+      "factSeeds": [],
+      "directMissionSeeds": [],
+      "loaderCalls": [
+        "player",
+        "questProgress:3",
+        "characterClearCounters",
+        "categoryMissionProgress:9:2630021,2630022,2630023,3410051,3410052,3410053",
+        "characters"
+      ],
+      "missionComputes": 7,
+      "snapshotSource": "none",
+      "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
+      "freshPostWriteEvaluationRequired": true,
+      "sqlReads": 10,
+      "sqlWrites": 1,
+      "sqlByTable": {
+        "players": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_category_mission_stages": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_category_missions": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_character_awake_unlocks": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_character_quest_clears": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_characters": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_characters_bond_tokens": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_characters_mana_nodes": {
+          "reads": 2,
+          "statements": 2,
+          "writes": 0
+        },
+        "players_quest_progress": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        }
+      }
+    },
+    "learn-mana-final-node": {
+      "request": {
+        "characterId": 263002,
+        "nodeId": 526004223,
+        "operation": "learn-mana-final-node",
+        "playerId": 4
+      },
+      "response": {
+        "characterList": [
+          {
+            "characterId": 263002,
+            "manaBoardAwake": {
+              "1": 1
+            }
+          }
+        ]
+      },
+      "behaviorSha256": "06c7d377c3b8778838d733f7f6e9a2875c18d4ea77664a060457eef90ae30ab7",
+      "dbBefore": {
+        "category9": [
+          [
+            2630021,
+            3
+          ],
+          [
+            2630023,
+            1
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          }
+        ],
+        "learnedFinalNode": false,
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2000,
+          "totalManaObtained": 604800
+        },
+        "unlocks": []
+      },
+      "dbAfter": {
+        "category9": [
+          [
+            2630021,
+            3
+          ],
+          [
+            2630023,
+            1
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          }
+        ],
+        "learnedFinalNode": true,
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2000,
+          "totalManaObtained": 604800
+        },
+        "unlocks": [
+          [
+            263002,
+            [
+              [
+                1,
+                1
+              ]
+            ]
+          ]
+        ]
+      },
+      "characterSeeds": [
+        263002
+      ],
+      "factSeeds": [],
+      "directMissionSeeds": [],
+      "loaderCalls": [
+        "player",
+        "questProgress:3",
+        "categoryMissionProgress:9:2630021,2630022,2630023",
+        "characters"
+      ],
+      "missionComputes": 7,
+      "snapshotSource": "none",
+      "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
+      "freshPostWriteEvaluationRequired": true,
+      "sqlReads": 9,
+      "sqlWrites": 2,
+      "sqlByTable": {
+        "players": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_category_mission_stages": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_category_missions": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_character_awake_unlocks": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_characters": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_characters_bond_tokens": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_characters_mana_nodes": {
+          "reads": 2,
+          "statements": 3,
+          "writes": 1
+        },
+        "players_quest_progress": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        }
+      }
+    },
+    "bond-success": {
+      "request": {
+        "characterId": 263002,
+        "manaBoardIndex": 1,
+        "operation": "receive-bond-token",
+        "playerId": 5
+      },
+      "response": {
+        "characterList": [
+          {
+            "characterId": 263002,
+            "manaBoardAwake": {
+              "1": 1
+            }
+          }
+        ]
+      },
+      "behaviorSha256": "699a88b0846c76c7b3def9fe97516ba931895f2b87a6d14fca04c7e743b2c5a7",
+      "dbBefore": {
+        "bondTokens": [
+          {
+            "manaBoardIndex": 1,
+            "status": 1
+          },
+          {
+            "manaBoardIndex": 2,
+            "status": 0
+          }
+        ],
+        "category9": [
+          [
+            2630021,
+            3
+          ],
+          [
+            2630023,
+            1
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          }
+        ],
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2000,
+          "totalManaObtained": 604800
+        },
+        "unlocks": []
+      },
+      "dbAfter": {
+        "bondTokens": [
+          {
+            "manaBoardIndex": 1,
+            "status": 2
+          },
+          {
+            "manaBoardIndex": 2,
+            "status": 0
+          }
+        ],
+        "category9": [
+          [
+            2630021,
+            3
+          ],
+          [
+            2630023,
+            1
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          }
+        ],
+        "player": {
+          "bondToken": 11,
+          "freeMana": 2000,
+          "totalManaObtained": 604800
+        },
+        "unlocks": [
+          [
+            263002,
+            [
+              [
+                1,
+                1
+              ]
+            ]
+          ]
+        ]
+      },
+      "characterSeeds": [
+        263002
+      ],
+      "factSeeds": [],
+      "directMissionSeeds": [],
+      "loaderCalls": [
+        "player",
+        "questProgress:3",
+        "categoryMissionProgress:9:2630021,2630022,2630023",
+        "characters"
+      ],
+      "missionComputes": 7,
+      "snapshotSource": "none",
+      "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
+      "freshPostWriteEvaluationRequired": true,
+      "sqlReads": 10,
+      "sqlWrites": 3,
+      "sqlByTable": {
+        "players": {
+          "reads": 2,
+          "statements": 3,
+          "writes": 1
+        },
+        "players_category_mission_stages": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_category_missions": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_character_awake_unlocks": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_characters": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_characters_bond_tokens": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_characters_mana_nodes": {
+          "reads": 2,
+          "statements": 2,
+          "writes": 0
+        },
+        "players_quest_progress": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        }
+      }
+    },
+    "category9-update-progress": {
+      "request": {
+        "category": 9,
+        "missionId": 2630021,
+        "operation": "update-mission-progress",
+        "playerId": 6,
+        "progress": 3
+      },
+      "response": {
+        "characterList": [
+          {
+            "characterId": 263002,
+            "manaBoardAwake": {
+              "1": 1
+            }
+          }
+        ]
+      },
+      "behaviorSha256": "1338caf617fe454bb18f713d6680a622651b0dc26c97533afa959724c6982648",
+      "dbBefore": {
+        "category9": [
+          [
+            2630023,
+            1
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          }
+        ],
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2000,
+          "totalManaObtained": 604800
+        },
+        "unlocks": []
+      },
+      "dbAfter": {
+        "category9": [
+          [
+            2630021,
+            3
+          ],
+          [
+            2630023,
+            1
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          }
+        ],
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2000,
+          "totalManaObtained": 604800
+        },
+        "unlocks": [
+          [
+            263002,
+            [
+              [
+                1,
+                1
+              ]
+            ]
+          ]
+        ]
+      },
+      "characterSeeds": [
+        263002
+      ],
+      "factSeeds": [],
+      "directMissionSeeds": [],
+      "loaderCalls": [
+        "player",
+        "questProgress:3",
+        "categoryMissionProgress:9:2630021,2630022,2630023",
+        "characters"
+      ],
+      "missionComputes": 7,
+      "snapshotSource": "none",
+      "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
+      "freshPostWriteEvaluationRequired": true,
+      "sqlReads": 9,
+      "sqlWrites": 2,
+      "sqlByTable": {
+        "players": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_category_mission_stages": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_category_missions": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_character_awake_unlocks": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_characters": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_characters_bond_tokens": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_characters_mana_nodes": {
+          "reads": 2,
+          "statements": 2,
+          "writes": 0
+        },
+        "players_quest_progress": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        }
+      }
+    },
+    "story-finish": {
+      "request": {
+        "api_count": 1,
+        "category": 3,
+        "party_id": 1,
+        "quest_id": 26300203,
+        "viewer_id": 880000006
+      },
+      "response": {
+        "characterList": [
+          {
+            "characterId": 263002,
+            "manaBoardAwake": {
+              "1": 1
+            }
+          }
+        ],
+        "statusCode": 200,
+        "storyJoined": []
+      },
+      "behaviorSha256": "ca0afa7515d9dbb65a9f55823f3cee30250346a52205df56534f63e38d613a56",
+      "dbBefore": {
+        "category9": [
+          [
+            2630022,
+            604800
+          ],
+          [
+            2630023,
+            1
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          }
+        ],
+        "finalQuestFinished": false,
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2000,
+          "totalManaObtained": 0
+        },
+        "unlocks": []
+      },
+      "dbAfter": {
+        "category9": [
+          [
+            2630022,
+            604800
+          ],
+          [
+            2630023,
+            1
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          }
+        ],
+        "finalQuestFinished": true,
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2000,
+          "totalManaObtained": 0
+        },
+        "unlocks": [
+          [
+            263002,
+            [
+              [
+                1,
+                1
+              ]
+            ]
+          ]
+        ]
+      },
+      "characterSeeds": [],
+      "factSeeds": [
+        "questProgress:3"
+      ],
+      "directMissionSeeds": [],
+      "loaderCalls": [
+        "player",
+        "questProgress:2,3",
+        "characters",
+        "characterClearCounters",
+        "partyCoClearCounters",
+        "categoryMissionProgress:9:11,12,13,1110011,1110012,1110013,1210011,1210012,1210013,1310051,1310052,1310053,1410031,1410032,1410033,1510061,1510062,1510063,1610021,1610022,1610023,2110011,2110012,2110013,2210041,2210042,2210043,2310011,2310012,2310013,2410631,2410632,2410633,2510031,2510032,2510033,2510041,2510042,2510043,2610071,2610072,2610073,2630021,2630022,2630023,3210131,3210132,3210133,3310031,3310032,3310033,3410011,3410012,3410013"
+      ],
+      "missionComputes": 7,
+      "snapshotSource": "none",
+      "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
+      "freshPostWriteEvaluationRequired": true,
+      "sqlReads": 27,
+      "sqlWrites": 10,
+      "sqlByTable": {
+        "players": {
+          "reads": 6,
+          "statements": 7,
+          "writes": 1
+        },
+        "players_active_mission_counters": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_active_missions": {
+          "reads": 1,
+          "statements": 5,
+          "writes": 4
+        },
+        "players_active_missions_stages": {
+          "reads": 1,
+          "statements": 4,
+          "writes": 3
+        },
+        "players_category_mission_stages": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_category_missions": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_character_awake_unlocks": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_character_quest_clears": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_characters": {
+          "reads": 2,
+          "statements": 2,
+          "writes": 0
+        },
+        "players_characters_bond_tokens": {
+          "reads": 2,
+          "statements": 2,
+          "writes": 0
+        },
+        "players_characters_mana_nodes": {
+          "reads": 3,
+          "statements": 3,
+          "writes": 0
+        },
+        "players_equipment": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_mails": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_party_member_co_clears": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_quest_progress": {
+          "reads": 3,
+          "statements": 4,
+          "writes": 1
+        },
+        "sessions": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        }
+      }
+    },
+    "mana-item-sell": {
+      "request": {
+        "itemId": 1,
+        "operation": "sell-item",
+        "playerId": 8,
+        "sellNumber": 1
+      },
+      "response": {
+        "characterList": [
+          {
+            "characterId": 263002,
+            "manaBoardAwake": {
+              "1": 1
+            }
+          }
+        ],
+        "freeMana": 2005,
+        "itemCount": 0
+      },
+      "behaviorSha256": "42ac7c33bf4dffc5959a71490f0d721c035cfc03653d737f8bce17a744a21496",
+      "dbBefore": {
+        "category9": [
+          [
+            2630021,
+            3
+          ],
+          [
+            2630023,
+            1
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          }
+        ],
+        "item1": 1,
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2000,
+          "totalManaObtained": 604795
+        },
+        "unlocks": []
+      },
+      "dbAfter": {
+        "category9": [
+          [
+            2630021,
+            3
+          ],
+          [
+            2630023,
+            1
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          }
+        ],
+        "item1": 0,
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2005,
+          "totalManaObtained": 604800
+        },
+        "unlocks": [
+          [
+            263002,
+            [
+              [
+                1,
+                1
+              ]
+            ]
+          ]
+        ]
+      },
+      "characterSeeds": [],
+      "factSeeds": [
+        "player"
+      ],
+      "directMissionSeeds": [],
+      "loaderCalls": [
+        "player",
+        "questProgress:3",
+        "categoryMissionProgress:9:2630021,2630022,2630023",
+        "characters"
+      ],
+      "missionComputes": 7,
+      "snapshotSource": "none",
+      "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
+      "freshPostWriteEvaluationRequired": true,
+      "sqlReads": 11,
+      "sqlWrites": 3,
+      "sqlByTable": {
+        "players": {
+          "reads": 2,
+          "statements": 3,
+          "writes": 1
+        },
+        "players_category_mission_stages": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_category_missions": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_character_awake_unlocks": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_characters": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_characters_bond_tokens": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_characters_mana_nodes": {
+          "reads": 2,
+          "statements": 2,
+          "writes": 0
+        },
+        "players_items": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_quest_progress": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        }
+      }
+    },
+    "reward-grant-post-commit": {
+      "request": {
+        "characterId": 341005,
+        "mana": 5,
+        "operation": "reward-grant-post-commit",
+        "playerId": 9
+      },
+      "response": {
+        "characterList": [
+          {
+            "characterId": 263002,
+            "manaBoardAwake": {
+              "1": 1
+            }
+          },
+          {
+            "characterId": 341005
+          }
+        ],
+        "duplicateItem": null
+      },
+      "behaviorSha256": "104ce49b4db723bfa9bf77f38621d9a68681ab60dc3c1fd9b45d3c1995986df0",
+      "dbBefore": {
+        "category9": [
+          [
+            2630021,
+            3
+          ],
+          [
+            2630023,
+            1
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          }
+        ],
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2000,
+          "totalManaObtained": 604795
+        },
+        "unlocks": []
+      },
+      "dbAfter": {
+        "category9": [
+          [
+            2630021,
+            3
+          ],
+          [
+            2630023,
+            1
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          },
+          {
+            "characterId": 341005,
+            "evolutionLevel": 0,
+            "exp": 0,
+            "stack": 0
+          }
+        ],
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2005,
+          "totalManaObtained": 604800
+        },
+        "unlocks": [
+          [
+            263002,
+            [
+              [
+                1,
+                1
+              ]
+            ]
+          ]
+        ]
+      },
+      "characterSeeds": [
+        341005
+      ],
+      "factSeeds": [
+        "player"
+      ],
+      "directMissionSeeds": [],
+      "loaderCalls": [
+        "player",
+        "questProgress:3",
+        "characterClearCounters",
+        "categoryMissionProgress:9:2630021,2630022,2630023,3410051,3410052,3410053",
+        "characters"
+      ],
+      "missionComputes": 7,
+      "snapshotSource": "none",
+      "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
+      "freshPostWriteEvaluationRequired": true,
+      "sqlReads": 12,
+      "sqlWrites": 5,
+      "sqlByTable": {
+        "players": {
+          "reads": 2,
+          "statements": 3,
+          "writes": 1
+        },
+        "players_category_mission_stages": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_category_missions": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_character_awake_unlocks": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_character_quest_clears": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_characters": {
+          "reads": 2,
+          "statements": 3,
+          "writes": 1
+        },
+        "players_characters_bond_tokens": {
+          "reads": 1,
+          "statements": 3,
+          "writes": 2
+        },
+        "players_characters_mana_nodes": {
+          "reads": 2,
+          "statements": 2,
+          "writes": 0
+        },
+        "players_quest_progress": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        }
+      }
+    },
+    "character-grant-owner": {
+      "request": {
+        "characterId": 341005,
+        "operation": "grant-character",
+        "playerId": 10
+      },
+      "response": {
+        "characterList": [
+          {
+            "characterId": 341005
+          }
+        ],
+        "duplicateItem": null
+      },
+      "behaviorSha256": "e96280fd1c34393d15956e115377810b5b63c04bbe9ab9cf8344f30176c8e9a6",
+      "dbBefore": {
+        "category9": [],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          }
+        ],
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2000,
+          "totalManaObtained": 0
+        },
+        "unlocks": []
+      },
+      "dbAfter": {
+        "category9": [],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 341005,
+            "evolutionLevel": 0,
+            "exp": 0,
+            "stack": 0
+          }
+        ],
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2000,
+          "totalManaObtained": 0
+        },
+        "unlocks": []
+      },
+      "characterSeeds": [
+        341005
+      ],
+      "factSeeds": [],
+      "directMissionSeeds": [],
+      "loaderCalls": [
+        "player",
+        "characterClearCounters",
+        "categoryMissionProgress:9:3410051,3410052,3410053",
+        "characters"
+      ],
+      "missionComputes": 0,
+      "snapshotSource": "none",
+      "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
+      "freshPostWriteEvaluationRequired": true,
+      "sqlReads": 10,
+      "sqlWrites": 3,
+      "sqlByTable": {
+        "players": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_category_mission_stages": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_category_missions": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_character_awake_unlocks": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_character_quest_clears": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_characters": {
+          "reads": 2,
+          "statements": 3,
+          "writes": 1
+        },
+        "players_characters_bond_tokens": {
+          "reads": 1,
+          "statements": 3,
+          "writes": 2
+        },
+        "players_characters_mana_nodes": {
+          "reads": 2,
+          "statements": 2,
+          "writes": 0
+        }
+      }
+    },
+    "single-finish": {
+      "request": {
+        "add_mana": 1,
+        "api_count": 1,
+        "category": 1,
+        "continue_count": 0,
+        "elapsed_time_ms": 1000,
+        "is_accomplished": true,
+        "is_restored": false,
+        "play_id": "awake-owner-focused-single",
+        "quest_id": 1001002,
+        "score": 123456,
+        "statistics": {
+          "clear_phase": 1,
+          "max_combo_count": 30,
+          "party": {
+            "ability_soul_ids": [
+              null,
+              null,
+              null
+            ],
+            "characters": [
+              {
+                "id": 1
+              },
+              null,
+              null
+            ],
+            "equipments": [
+              null,
+              null,
+              null
+            ],
+            "unison_characters": [
+              null,
+              null,
+              null
+            ]
+          },
+          "zones": [
+            {
+              "damage_deal_total": 1000,
+              "members": [
+                {
+                  "origin_damage": 1000
+                },
+                null,
+                null
+              ],
+              "use_dash_count": 5,
+              "use_power_flip_count": 5,
+              "use_skill_count": 5
+            }
+          ]
+        },
+        "viewer_id": 880000010
+      },
+      "response": {
+        "activeQuestRemoved": true,
+        "category9Evaluations": 2,
+        "characterList": [
+          {
+            "characterId": 1
+          },
+          {
+            "characterId": 263002,
+            "manaBoardAwake": {
+              "1": 1
+            }
+          }
+        ],
+        "statusCode": 200
+      },
+      "behaviorSha256": "98fe72f6c3f4cb0387a57ddcbc00d2ba73ba11f8c9aac560bc4ef61468a0706c",
+      "dbBefore": {
+        "activeQuestPresent": true,
+        "category9": [
+          [
+            2630021,
+            3
+          ],
+          [
+            2630023,
+            1
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          }
+        ],
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2000,
+          "totalManaObtained": 604799
+        },
+        "unlocks": []
+      },
+      "dbAfter": {
+        "activeQuestPresent": false,
+        "category9": [
+          [
+            13,
+            5
+          ],
+          [
+            2630021,
+            3
+          ],
+          [
+            2630023,
+            1
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 23,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          }
+        ],
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2021,
+          "totalManaObtained": 604820
+        },
+        "unlocks": [
+          [
+            263002,
+            [
+              [
+                1,
+                1
+              ]
+            ]
+          ]
+        ]
+      },
+      "characterSeeds": [
+        1
+      ],
+      "factSeeds": [
+        "passState:3",
+        "player"
+      ],
+      "directMissionSeeds": [],
+      "loaderCalls": [
+        "player",
+        "characters",
+        "questProgress:1,3,4,15",
+        "characterManaNodes",
+        "equipment",
+        "collectedItems:100000",
+        "degreeBattleStats",
+        "missionBattleCounters",
+        "periodicSnapshot:daily",
+        "questProgress:1,2,3,4,7,15,18,21,22",
+        "collectedItems:70048,100000",
+        "periodicSnapshot:passWeek:3",
+        "passState:3",
+        "periodicSnapshot:weekly",
+        "player",
+        "questProgress:3",
+        "categoryMissionProgress:9:11,12,13",
+        "player",
+        "questProgress:3",
+        "categoryMissionProgress:9:11,12,13,2630021,2630022,2630023",
+        "characters"
+      ],
+      "missionComputes": 405,
+      "snapshotSource": "none",
+      "rereadReason": "earlier awake settlement precedes later authoritative reward, active-mission, response-state and active-quest writes",
+      "freshPostWriteEvaluationRequired": true,
+      "sqlReads": 57,
+      "sqlWrites": 33,
+      "sqlByTable": {
+        "players": {
+          "reads": 7,
+          "statements": 12,
+          "writes": 5
+        },
+        "players_active_mission_battle_facts": {
+          "reads": 0,
+          "statements": 1,
+          "writes": 1
+        },
+        "players_active_mission_counters": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_active_missions": {
+          "reads": 1,
+          "statements": 4,
+          "writes": 3
+        },
+        "players_active_missions_stages": {
+          "reads": 1,
+          "statements": 3,
+          "writes": 2
+        },
+        "players_active_quests": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_category_mission_stages": {
+          "reads": 3,
+          "statements": 4,
+          "writes": 1
+        },
+        "players_category_missions": {
+          "reads": 4,
+          "statements": 7,
+          "writes": 3
+        },
+        "players_character_awake_unlocks": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_character_quest_clears": {
+          "reads": 0,
+          "statements": 2,
+          "writes": 2
+        },
+        "players_characters": {
+          "reads": 5,
+          "statements": 6,
+          "writes": 1
+        },
+        "players_characters_bond_tokens": {
+          "reads": 5,
+          "statements": 5,
+          "writes": 0
+        },
+        "players_characters_mana_nodes": {
+          "reads": 6,
+          "statements": 6,
+          "writes": 0
+        },
+        "players_collected_items": {
+          "reads": 2,
+          "statements": 3,
+          "writes": 1
+        },
+        "players_degree_battle_stats": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_degrees": {
+          "reads": 0,
+          "statements": 4,
+          "writes": 4
+        },
+        "players_equipment": {
+          "reads": 2,
+          "statements": 2,
+          "writes": 0
+        },
+        "players_items": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_mails": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_mission_battle_counters": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_party_race_clears": {
+          "reads": 0,
+          "statements": 1,
+          "writes": 1
+        },
+        "players_pass_cards": {
+          "reads": 1,
+          "statements": 4,
+          "writes": 3
+        },
+        "players_periodic_snapshots": {
+          "reads": 4,
+          "statements": 4,
+          "writes": 0
+        },
+        "players_quest_progress": {
+          "reads": 6,
+          "statements": 7,
+          "writes": 1
+        },
+        "server_gameplay_settings": {
+          "reads": 2,
+          "statements": 2,
+          "writes": 0
+        },
+        "sessions": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        }
+      }
+    },
+    "pass-card-receive-all": {
+      "request": {
+        "all_receive": [],
+        "pass_card_id": 3,
+        "reward1_receive": [
+          124
+        ],
+        "reward2_receive": [],
+        "viewer_id": 880000011
+      },
+      "response": {
+        "characterList": [
+          {
+            "characterId": 263002,
+            "manaBoardAwake": {
+              "1": 1
+            }
+          }
+        ],
+        "freeMana": 22000,
+        "received": [
+          {
+            "is_received_1": 1,
+            "is_received_2": 0,
+            "reward_id": 124
+          }
+        ],
+        "statusCode": 200
+      },
+      "behaviorSha256": "3e6177b64e7d013f6ec2fb9aff00c481fa015d2fddab3d1dbb93a2b6d193c34b",
+      "dbBefore": {
+        "category9": [
+          [
+            2630021,
+            3
+          ],
+          [
+            2630023,
+            1
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          }
+        ],
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2000,
+          "totalManaObtained": 584800
+        },
+        "rewardRecords": [],
+        "unlocks": []
+      },
+      "dbAfter": {
+        "category9": [
+          [
+            2630021,
+            3
+          ],
+          [
+            2630023,
+            1
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          }
+        ],
+        "player": {
+          "bondToken": 10,
+          "freeMana": 22000,
+          "totalManaObtained": 604800
+        },
+        "rewardRecords": [
+          {
+            "isReceived1": 1,
+            "isReceived2": 0,
+            "rewardId": 124
+          }
+        ],
+        "unlocks": [
+          [
+            263002,
+            [
+              [
+                1,
+                1
+              ]
+            ]
+          ]
+        ]
+      },
+      "characterSeeds": [],
+      "factSeeds": [
+        "player"
+      ],
+      "directMissionSeeds": [],
+      "loaderCalls": [
+        "player",
+        "questProgress:3",
+        "categoryMissionProgress:9:2630021,2630022,2630023",
+        "characters"
+      ],
+      "missionComputes": 7,
+      "snapshotSource": "none",
+      "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
+      "freshPostWriteEvaluationRequired": true,
+      "sqlReads": 16,
+      "sqlWrites": 3,
+      "sqlByTable": {
+        "players": {
+          "reads": 3,
+          "statements": 4,
+          "writes": 1
+        },
+        "players_category_mission_stages": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_category_missions": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_character_awake_unlocks": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_characters": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_characters_bond_tokens": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_characters_mana_nodes": {
+          "reads": 2,
+          "statements": 2,
+          "writes": 0
+        },
+        "players_mails": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_pass_card_rewards": {
+          "reads": 2,
+          "statements": 3,
+          "writes": 1
+        },
+        "players_pass_cards": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_quest_progress": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "sessions": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        }
+      }
+    },
+    "raid-event-summary": {
+      "request": {
+        "api_count": 1,
+        "event_id": 4,
+        "viewer_id": 880000012
+      },
+      "response": {
+        "characterList": [
+          {
+            "characterId": 263002,
+            "manaBoardAwake": {
+              "1": 1
+            }
+          }
+        ],
+        "freeMana": 2500,
+        "itemList": {
+          "100000": 25
+        },
+        "rewardList": [
+          {
+            "kind": 8,
+            "kind_id": 0,
+            "number": 500
+          },
+          {
+            "kind": 1,
+            "kind_id": 100000,
+            "number": 25
+          }
+        ],
+        "statusCode": 200
+      },
+      "behaviorSha256": "ca657baca0fec5be3095a788dc154cc6d2b608795188cd62edf44e0d31986723",
+      "dbBefore": {
+        "category9": [
+          [
+            2630021,
+            3
+          ],
+          [
+            2630023,
+            1
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          }
+        ],
+        "item100000": 0,
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2000,
+          "totalManaObtained": 604300
+        },
+        "receivedUpTo": 0,
+        "unlocks": []
+      },
+      "dbAfter": {
+        "category9": [
+          [
+            2630021,
+            3
+          ],
+          [
+            2630023,
+            1
+          ]
+        ],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 263002,
+            "evolutionLevel": 0,
+            "exp": 76272,
+            "stack": 0
+          }
+        ],
+        "item100000": 25,
+        "player": {
+          "bondToken": 10,
+          "freeMana": 2500,
+          "totalManaObtained": 604800
+        },
+        "receivedUpTo": 1,
+        "unlocks": [
+          [
+            263002,
+            [
+              [
+                1,
+                1
+              ]
+            ]
+          ]
+        ]
+      },
+      "characterSeeds": [],
+      "factSeeds": [
+        "player"
+      ],
+      "directMissionSeeds": [],
+      "loaderCalls": [
+        "player",
+        "questProgress:3",
+        "categoryMissionProgress:9:2630021,2630022,2630023",
+        "characters"
+      ],
+      "missionComputes": 7,
+      "snapshotSource": "none",
+      "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
+      "freshPostWriteEvaluationRequired": true,
+      "sqlReads": 23,
+      "sqlWrites": 6,
+      "sqlByTable": {
+        "players": {
+          "reads": 5,
+          "statements": 6,
+          "writes": 1
+        },
+        "players_category_mission_stages": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_category_missions": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_character_awake_unlocks": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_characters": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_characters_bond_tokens": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_characters_mana_nodes": {
+          "reads": 2,
+          "statements": 2,
+          "writes": 0
+        },
+        "players_collected_items": {
+          "reads": 0,
+          "statements": 1,
+          "writes": 1
+        },
+        "players_items": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_mails": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_quest_progress": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_raid_event_quests": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_raid_events": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_rush_events": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_rush_events_cleared_folders": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_rush_events_played_parties": {
+          "reads": 2,
+          "statements": 2,
+          "writes": 0
+        },
+        "raid_event_boss_states": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "sessions": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        }
+      }
+    }
+  }
+}

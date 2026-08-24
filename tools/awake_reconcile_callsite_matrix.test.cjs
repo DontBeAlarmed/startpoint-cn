@@ -5,6 +5,11 @@ const fs = require("node:fs")
 const path = require("node:path")
 const test = require("node:test")
 const ts = require("typescript")
+const {
+    AWAKE_OWNER_RUNTIME_EVIDENCE_REGISTRY,
+    AWAKE_OWNER_SQL_UPPER_BOUND_REGISTRY,
+    SINGLE_REREAD_REASON,
+} = require("./perf/awake_owner_focused_scenarios.cjs")
 
 const projectRoot = path.resolve(__dirname, "..")
 const sourceRoot = path.join(projectRoot, "src")
@@ -36,6 +41,8 @@ const PLANNED_CANDIDATE_SOURCES = Object.freeze({
     "story_quest/finish": "story-reward-characters",
     "tutorial/update_step:15": "tutorial-gacha-characters",
     "tutorial/update_step:16": "tutorial-present-character",
+    "pass_card/receive_all": "pass-card-reward-facts",
+    "raid_event/summary": "raid-summary-reward-facts",
 })
 const ROUTE_OWNERS = Object.freeze({
     "src/routes/api/activeMission.ts": { "/receive": "active_mission/receive" },
@@ -60,163 +67,96 @@ const ROUTE_OWNERS = Object.freeze({
     "src/routes/api/mission.ts": {
         "/update_mission_progress": "mission/update_mission_progress",
     },
+    "src/routes/api/passCard.ts": { "/receive_all": "pass_card/receive_all" },
+    "src/routes/api/raidEvent.ts": { "/summary": "raid_event/summary" },
     "src/routes/api/shop.ts": { "/buy": "shop/buy", "/bulk_buy": "shop/bulk_buy" },
     "src/routes/api/storyQuest.ts": { "/finish": "story_quest/finish" },
 })
 
+const REQUIRED_OWNER_EVIDENCE_FIELDS = Object.freeze([
+    "owner",
+    "boundary",
+    "actualCharacterSeed",
+    "actualFactSeeds",
+    "directMissionSeed",
+    "finalAuthoritativeWrite",
+    "snapshotSource",
+    "rereadReason",
+    "sqlUpperBoundKey",
+    "runtimeEvidenceKey",
+])
+const GLOBAL_FACT_OWNERS = new Set([
+    "single/finish",
+    "multi/finish",
+    "active_mission/receive",
+    "box_gacha/exec",
+    "item/sell",
+    "mail/receive",
+    "mail/receive_all",
+    "pass_card/receive_all",
+    "raid_event/summary",
+    "shop/buy",
+    "shop/bulk_buy",
+    "story_quest/finish",
+])
+
+const DEFAULT_REREAD_REASON = "no owner snapshot is injected; bounded facts are reread after the final authoritative write"
+
+function matrixRow({
+    relativeFile,
+    callee = "best-effort",
+    owner,
+    boundary,
+    actualCharacterSeed,
+    actualFactSeeds = "none",
+    directMissionSeed = "none",
+    finalAuthoritativeWrite,
+    runtimeEvidenceKey,
+    changesGlobalFacts = false,
+    rereadReason = DEFAULT_REREAD_REASON,
+}) {
+    return Object.freeze({
+        relativeFile,
+        callee,
+        owner,
+        ownerLabel: owner,
+        boundary,
+        candidateSource: "scoped-context",
+        plannedCandidateSource: PLANNED_CANDIDATE_SOURCES[owner],
+        actualCharacterSeed,
+        actualFactSeeds,
+        directMissionSeed,
+        finalAuthoritativeWrite,
+        snapshotSource: "none",
+        rereadReason,
+        sqlUpperBoundKey: runtimeEvidenceKey,
+        runtimeEvidenceKey,
+        changesGlobalFacts,
+    })
+}
+
 const EXPECTED_MATRIX = Object.freeze([
-    {
-        relativeFile: "src/lib/quest/finish/single-settlement-writes.ts",
-        callee: "best-effort",
-        ownerLabel: "single/finish",
-        boundary: "best-effort-in-tx",
-        candidateSource: "scoped-context",
-        plannedCandidateSource: "battle-party+direct-missions",
-    },
-    {
-        relativeFile: "src/multi/settlement/orchestrator.ts",
-        callee: "best-effort",
-        ownerLabel: "multi/finish",
-        boundary: "best-effort-in-tx",
-        candidateSource: "scoped-context",
-        plannedCandidateSource: "battle-party+direct-missions",
-    },
-    {
-        relativeFile: "src/routes/api/activeMission.ts",
-        callee: "best-effort",
-        ownerLabel: "active_mission/receive",
-        boundary: "best-effort-in-tx",
-        candidateSource: "scoped-context",
-        plannedCandidateSource: "claimed-reward-characters",
-    },
-    {
-        relativeFile: "src/routes/api/boxGacha.ts",
-        callee: "best-effort",
-        ownerLabel: "box_gacha/exec",
-        boundary: "best-effort-post-commit",
-        candidateSource: "scoped-context",
-        plannedCandidateSource: "drawn-reward-characters",
-    },
-    {
-        relativeFile: "src/routes/api/character.ts",
-        callee: "best-effort",
-        ownerLabel: "character/add_character_from_town",
-        boundary: "best-effort-post-commit",
-        candidateSource: "scoped-context",
-        plannedCandidateSource: "town-granted-character",
-    },
-    {
-        relativeFile: "src/routes/api/character/bond.ts",
-        callee: "best-effort",
-        ownerLabel: "character/receive_bond_token",
-        boundary: "best-effort-in-tx",
-        candidateSource: "scoped-context",
-        plannedCandidateSource: "bond-character",
-    },
-    {
-        relativeFile: "src/routes/api/character/mana.ts",
-        callee: "strict",
-        ownerLabel: "character/learn_mana_node",
-        boundary: "strict-in-tx",
-        candidateSource: "scoped-context",
-        plannedCandidateSource: "target-character",
-    },
-    {
-        relativeFile: "src/routes/api/exchange.ts",
-        callee: "best-effort",
-        ownerLabel: "exchange/star_crumb",
-        boundary: "best-effort-post-commit",
-        candidateSource: "scoped-context",
-        plannedCandidateSource: "exchange-reward-characters",
-    },
-    {
-        relativeFile: "src/routes/api/gacha.ts",
-        callee: "best-effort",
-        ownerLabel: "gacha/exchange_character",
-        boundary: "best-effort-post-commit",
-        candidateSource: "scoped-context",
-        plannedCandidateSource: "exchanged-character",
-    },
-    {
-        relativeFile: "src/routes/api/gacha.ts",
-        callee: "best-effort",
-        ownerLabel: "gacha/exec",
-        boundary: "best-effort-post-commit",
-        candidateSource: "scoped-context",
-        plannedCandidateSource: "drawn-characters",
-    },
-    {
-        relativeFile: "src/routes/api/item.ts",
-        callee: "best-effort",
-        ownerLabel: "item/sell",
-        boundary: "best-effort-post-commit",
-        candidateSource: "scoped-context",
-        plannedCandidateSource: "mana-item-fact",
-    },
-    {
-        relativeFile: "src/routes/api/mail.ts",
-        callee: "best-effort",
-        ownerLabel: "mail/receive",
-        boundary: "best-effort-in-tx",
-        candidateSource: "scoped-context",
-        plannedCandidateSource: "mail-reward-characters",
-    },
-    {
-        relativeFile: "src/routes/api/mail.ts",
-        callee: "best-effort",
-        ownerLabel: "mail/receive_all",
-        boundary: "best-effort-in-tx",
-        candidateSource: "scoped-context",
-        plannedCandidateSource: "mail-reward-characters",
-    },
-    {
-        relativeFile: "src/routes/api/mission.ts",
-        callee: "best-effort",
-        ownerLabel: "mission/update_mission_progress",
-        boundary: "best-effort-post-commit",
-        candidateSource: "scoped-context",
-        plannedCandidateSource: "category9-delta-missions",
-    },
-    {
-        relativeFile: "src/routes/api/shop.ts",
-        callee: "best-effort",
-        ownerLabel: "shop/buy",
-        boundary: "best-effort-post-commit",
-        candidateSource: "scoped-context",
-        plannedCandidateSource: "shop-reward-characters",
-    },
-    {
-        relativeFile: "src/routes/api/shop.ts",
-        callee: "best-effort",
-        ownerLabel: "shop/bulk_buy",
-        boundary: "best-effort-post-commit",
-        candidateSource: "scoped-context",
-        plannedCandidateSource: "shop-reward-characters",
-    },
-    {
-        relativeFile: "src/routes/api/storyQuest.ts",
-        callee: "best-effort",
-        ownerLabel: "story_quest/finish",
-        boundary: "best-effort-in-tx",
-        candidateSource: "scoped-context",
-        plannedCandidateSource: "story-reward-characters",
-    },
-    {
-        relativeFile: "src/routes/api/tutorial.ts",
-        callee: "best-effort",
-        ownerLabel: "tutorial/update_step:15",
-        boundary: "best-effort-in-tx",
-        candidateSource: "scoped-context",
-        plannedCandidateSource: "tutorial-gacha-characters",
-    },
-    {
-        relativeFile: "src/routes/api/tutorial.ts",
-        callee: "best-effort",
-        ownerLabel: "tutorial/update_step:16",
-        boundary: "best-effort-in-tx",
-        candidateSource: "scoped-context",
-        plannedCandidateSource: "tutorial-present-character",
-    },
+    matrixRow({ relativeFile: "src/lib/quest/finish/single-settlement-writes.ts", owner: "single/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "partyCharacterIds", actualFactSeeds: "invalidatedFactKeys", finalAuthoritativeWrite: "deletePlayerActiveQuestSync", runtimeEvidenceKey: "single-in-tx", changesGlobalFacts: true, rereadReason: SINGLE_REREAD_REASON }),
+    matrixRow({ relativeFile: "src/multi/settlement/orchestrator.ts", owner: "multi/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "invalidatedFactKeys", finalAuthoritativeWrite: "deleteActiveQuest", runtimeEvidenceKey: "candidate-multiple-in-tx", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/activeMission.ts", owner: "active_mission/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "granter.invalidatedFactKeys", finalAuthoritativeWrite: "persistPlayer", runtimeEvidenceKey: "reward-grant-in-tx", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/boxGacha.ts", owner: "box_gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "settlement.rewardResult?.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "updatePlayerItemSync", runtimeEvidenceKey: "reward-grant-post-commit", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/character.ts", owner: "character/add_character_from_town", boundary: "best-effort-post-commit", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "givePlayerCharacterSync", runtimeEvidenceKey: "character-grant-post-commit" }),
+    matrixRow({ relativeFile: "src/routes/api/character/bond.ts", owner: "character/receive_bond_token", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", finalAuthoritativeWrite: "updatePlayerCharacterBondTokenSync", runtimeEvidenceKey: "bond-in-tx" }),
+    matrixRow({ relativeFile: "src/routes/api/character/mana.ts", callee: "strict", owner: "character/learn_mana_node", boundary: "strict-in-tx", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "updatePlayerCharacterSync", runtimeEvidenceKey: "learn-mana-strict" }),
+    matrixRow({ relativeFile: "src/routes/api/exchange.ts", owner: "exchange/star_crumb", boundary: "best-effort-post-commit", actualCharacterSeed: "kind === 0 ? [targetId] : []", finalAuthoritativeWrite: "givePlayerCharacterSync", runtimeEvidenceKey: "candidate-zero-post-commit" }),
+    matrixRow({ relativeFile: "src/routes/api/gacha.ts", owner: "gacha/exchange_character", boundary: "best-effort-post-commit", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "updatePlayerGachaInfoSync", runtimeEvidenceKey: "candidate-one-post-commit" }),
+    matrixRow({ relativeFile: "src/routes/api/gacha.ts", owner: "gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", finalAuthoritativeWrite: "updatePlayerSync", runtimeEvidenceKey: "candidate-one-post-commit" }),
+    matrixRow({ relativeFile: "src/routes/api/item.ts", owner: "item/sell", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "player", finalAuthoritativeWrite: "sellItemSync", runtimeEvidenceKey: "mana-item-post-commit", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "mail", finalAuthoritativeWrite: "receiveMailSync", runtimeEvidenceKey: "reward-grant-in-tx", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive_all", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "mail", finalAuthoritativeWrite: "receiveMailSync", runtimeEvidenceKey: "reward-grant-in-tx", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/mission.ts", owner: "mission/update_mission_progress", boundary: "best-effort-post-commit", actualCharacterSeed: "awakeCandidateCharacterIds", finalAuthoritativeWrite: "incrementPlayerCategoryMissionIfSafeSync", runtimeEvidenceKey: "category9-post-commit" }),
+    matrixRow({ relativeFile: "src/routes/api/passCard.ts", owner: "pass_card/receive_all", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "result.invalidatedFactKeys", finalAuthoritativeWrite: "persistPlayer", runtimeEvidenceKey: "pass-card-post-commit", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/raidEvent.ts", owner: "raid_event/summary", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "settleRaidEventSummary", runtimeEvidenceKey: "raid-summary-post-commit", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/shop.ts", owner: "shop/buy", boundary: "best-effort-post-commit", actualCharacterSeed: "rewardResult.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "executeGenericShopPurchaseSync", runtimeEvidenceKey: "reward-grant-post-commit", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/shop.ts", owner: "shop/bulk_buy", boundary: "best-effort-post-commit", actualCharacterSeed: "rewardResult.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "executeGenericShopBatchPurchaseSync", runtimeEvidenceKey: "reward-grant-post-commit", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/storyQuest.ts", owner: "story_quest/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "story-reward+quest-progress", finalAuthoritativeWrite: "reconcileActiveMissionFacts", runtimeEvidenceKey: "story-in-tx", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/tutorial.ts", owner: "tutorial/update_step:15", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", finalAuthoritativeWrite: "updatePlayerSync", runtimeEvidenceKey: "candidate-multiple-in-tx" }),
+    matrixRow({ relativeFile: "src/routes/api/tutorial.ts", owner: "tutorial/update_step:16", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", finalAuthoritativeWrite: "updatePlayerSync", runtimeEvidenceKey: "candidate-multiple-in-tx" }),
 ])
 
 function isMissionModuleSpecifier(specifier) {
@@ -671,6 +611,148 @@ function classifyBoundary(relativeFile, callee, call) {
     return inTransaction ? "best-effort-in-tx" : "best-effort-post-commit"
 }
 
+function compactExpression(node, sourceFile) {
+    return node.getText(sourceFile).replace(/\s+/g, " ").trim()
+}
+
+function propertyName(property) {
+    if (!property.name) return null
+    if (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) return property.name.text
+    return null
+}
+
+function getObjectProperty(object, name) {
+    if (!object || !ts.isObjectLiteralExpression(object)) return null
+    for (const property of object.properties) {
+        if (propertyName(property) !== name) continue
+        if (ts.isShorthandPropertyAssignment(property)) return property.name
+        if (ts.isPropertyAssignment(property)) return property.initializer
+    }
+    return null
+}
+
+function callTerminalName(call) {
+    const expression = call.expression
+    if (ts.isIdentifier(expression)) return expression.text
+    if (ts.isPropertyAccessExpression(expression)) return expression.name.text
+    return null
+}
+
+function findContextCreation(call, sourceFile) {
+    const options = call.arguments[2]
+    const contextReference = getObjectProperty(options, "context")
+    assert.equal(
+        contextReference !== null && ts.isIdentifier(contextReference),
+        true,
+        `${sourceFile.fileName} scoped reconcile must reference a context variable`,
+    )
+    let creation = null
+    function visit(node) {
+        if (node.getStart(sourceFile) >= call.getStart(sourceFile)) return
+        if (ts.isVariableDeclaration(node)
+            && ts.isIdentifier(node.name)
+            && node.name.text === contextReference.text
+            && node.initializer
+            && ts.isCallExpression(node.initializer)
+            && callTerminalName(node.initializer)?.startsWith("createAwakeRequestContext")) {
+            creation = node.initializer
+        }
+        ts.forEachChild(node, visit)
+    }
+    visit(sourceFile)
+    assert.notEqual(creation, null, `${sourceFile.fileName} context creation is not statically traceable`)
+    return creation
+}
+
+function classifyFactSeeds(scope, sourceFile) {
+    const factSeeds = getObjectProperty(scope, "invalidatedFactKeys")
+    if (factSeeds === null) return "none"
+    const text = compactExpression(factSeeds, sourceFile)
+    if (/^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(text)) return text
+    const hasRewardFacts = text.includes("getAwakeFactKeysFromLegacyRewardResults")
+    if (hasRewardFacts && text.includes("questProgress")) return "story-reward+quest-progress"
+    if (hasRewardFacts) return "reward-result"
+    if (text.includes("getMailAwakeInvalidatedFactKeys")) return "mail"
+    if (/kind:\s*["']player["']/.test(text)) return "player"
+    assert.fail(`${sourceFile.fileName} has an unclassified Awake FactKey seed expression: ${text}`)
+}
+
+function extractScopeEvidence(importedCall) {
+    const { call, exportedName, sourceFile } = importedCall
+    let actualCharacterSeed
+    let scope
+    let contextStart
+    if (exportedName === SINGLE_AWAKE_WRAPPER) {
+        actualCharacterSeed = compactExpression(call.arguments[1], sourceFile)
+        scope = call.arguments[3]
+        contextStart = call.getStart(sourceFile)
+    } else {
+        const creation = findContextCreation(call, sourceFile)
+        contextStart = creation.getStart(sourceFile)
+        if (callTerminalName(creation) === "createAwakeRequestContext") {
+            scope = creation.arguments[0]
+            const candidate = getObjectProperty(scope, "candidateCharacterIds")
+            actualCharacterSeed = candidate === null ? "full-category9" : compactExpression(candidate, sourceFile)
+        } else {
+            actualCharacterSeed = compactExpression(creation.arguments[1], sourceFile)
+            scope = creation.arguments[2]
+        }
+    }
+    const directMissionIds = getObjectProperty(scope, "directMissionIds")
+    const snapshotProperties = scope && ts.isObjectLiteralExpression(scope)
+        ? scope.properties.map(propertyName).filter(name => name?.toLowerCase().includes("snapshot"))
+        : []
+    return {
+        actualCharacterSeed,
+        actualFactSeeds: classifyFactSeeds(scope, sourceFile),
+        directMissionSeed: directMissionIds === null
+            ? "none"
+            : compactExpression(directMissionIds, sourceFile),
+        snapshotSource: snapshotProperties.length === 0
+            ? "none"
+            : snapshotProperties.sort().join("+"),
+        contextStart,
+    }
+}
+
+function findOwnerRoot(call) {
+    for (let parent = call.parent; parent; parent = parent.parent) {
+        if (ts.isCallExpression(parent)
+            && ts.isPropertyAccessExpression(parent.expression)
+            && parent.expression.name.text === "post") {
+            const callback = parent.arguments.find(argument => (
+                ts.isArrowFunction(argument) || ts.isFunctionExpression(argument)
+            ))
+            if (callback) return callback
+        }
+    }
+    for (let parent = call.parent; parent; parent = parent.parent) {
+        if (ts.isFunctionDeclaration(parent) && parent.name) return parent
+        if ((ts.isArrowFunction(parent) || ts.isFunctionExpression(parent))
+            && ts.isVariableDeclaration(parent.parent)
+            && ts.isIdentifier(parent.parent.name)) return parent
+    }
+    assert.fail(`${call.getSourceFile().fileName} publication owner root is not traceable`)
+}
+
+function assertFinalWritePrecedesContext(call, contextStart, anchor) {
+    const sourceFile = call.getSourceFile()
+    const ownerRoot = findOwnerRoot(call)
+    const matches = []
+    function visit(node) {
+        if (ts.isCallExpression(node)
+            && callTerminalName(node) === anchor
+            && node.end <= contextStart) matches.push(node)
+        ts.forEachChild(node, visit)
+    }
+    visit(ownerRoot)
+    assert.equal(
+        matches.length > 0,
+        true,
+        `${sourceFile.fileName} context/publication precedes final authoritative write ${anchor}`,
+    )
+}
+
 function collectProductionCalls() {
     const files = ts.sys.readDirectory(sourceRoot, [".ts"], undefined, undefined)
     const calls = []
@@ -716,6 +798,14 @@ function collectProductionCalls() {
                 assert.equal(optionNames.has("context"), true, `${relativeFile} scoped publication must pass fresh context`)
             }
             const ownerLabel = classifyOwner(relativeFile, call, sourceFile)
+            const expected = EXPECTED_MATRIX.filter(entry => entry.owner === ownerLabel)
+            assert.equal(expected.length, 1, `${ownerLabel} must have exactly one matrix row`)
+            const scopeEvidence = extractScopeEvidence(importedCall)
+            assertFinalWritePrecedesContext(
+                call,
+                scopeEvidence.contextStart,
+                expected[0].finalAuthoritativeWrite,
+            )
             assert.equal(
                 typeof PLANNED_CANDIDATE_SOURCES[ownerLabel],
                 "string",
@@ -732,6 +822,15 @@ function collectProductionCalls() {
                         : call.arguments.length === 3
                 ) ? "scoped-context" : "legacy-unscoped",
                 plannedCandidateSource: PLANNED_CANDIDATE_SOURCES[ownerLabel],
+                owner: ownerLabel,
+                actualCharacterSeed: scopeEvidence.actualCharacterSeed,
+                actualFactSeeds: scopeEvidence.actualFactSeeds,
+                directMissionSeed: scopeEvidence.directMissionSeed,
+                finalAuthoritativeWrite: expected[0].finalAuthoritativeWrite,
+                snapshotSource: scopeEvidence.snapshotSource,
+                rereadReason: expected[0].rereadReason,
+                sqlUpperBoundKey: expected[0].sqlUpperBoundKey,
+                runtimeEvidenceKey: expected[0].runtimeEvidenceKey,
                 position: call.getStart(sourceFile),
             })
         }
@@ -741,32 +840,64 @@ function collectProductionCalls() {
     ))
 }
 
-test("Awake reconcile production call expressions match the fixed 19-entry audit matrix", () => {
-    const calls = collectProductionCalls()
-    assert.equal(calls.length, 19)
+function assertEvidenceContract(matrix) {
+    assert.equal(matrix.length, 21, "Awake owner matrix must contain exactly 21 rows")
+    assert.equal(new Set(matrix.map(entry => entry.owner)).size, 21, "Awake owners must be unique")
     assert.deepEqual(
-        calls.map(({ relativeFile, callee, ownerLabel, boundary, candidateSource, plannedCandidateSource }) => ({
-            relativeFile,
-            callee,
-            ownerLabel,
-            boundary,
-            candidateSource,
-            plannedCandidateSource,
-        })),
-        EXPECTED_MATRIX.map(({ relativeFile, callee, ownerLabel, boundary, candidateSource, plannedCandidateSource }) => ({
-            relativeFile,
-            callee,
-            ownerLabel,
-            boundary,
-            candidateSource,
-            plannedCandidateSource,
-        })),
+        Object.fromEntries(["strict-in-tx", "best-effort-in-tx", "best-effort-post-commit"]
+            .map(boundary => [boundary, matrix.filter(entry => entry.boundary === boundary).length])),
+        { "strict-in-tx": 1, "best-effort-in-tx": 9, "best-effort-post-commit": 11 },
     )
-    assert.equal(new Set(calls.map(call => `${call.relativeFile}:${call.position}`)).size, 19)
+    for (const entry of matrix) {
+        assert.equal(
+            entry.changesGlobalFacts,
+            GLOBAL_FACT_OWNERS.has(entry.owner),
+            `${entry.owner} global-fact ownership drifted`,
+        )
+        const runtimeEvidence = AWAKE_OWNER_RUNTIME_EVIDENCE_REGISTRY[entry.runtimeEvidenceKey]
+        assert.notEqual(runtimeEvidence, undefined, `${entry.owner} runtime evidence key must resolve`)
+        assert.equal(runtimeEvidence.boundary, entry.boundary, `${entry.owner} evidence boundary drifted`)
+        assert.equal(runtimeEvidence.owners.includes(entry.owner), true, `${entry.owner} is absent from its evidence family`)
+        assert.notEqual(
+            AWAKE_OWNER_SQL_UPPER_BOUND_REGISTRY[entry.sqlUpperBoundKey],
+            undefined,
+            `${entry.owner} SQL upper-bound key must resolve`,
+        )
+        if (entry.changesGlobalFacts) {
+            assert.notEqual(entry.actualFactSeeds, "none", `${entry.owner} omitted changed global facts`)
+        }
+        if (entry.snapshotSource !== "none") {
+            assert.match(entry.snapshotSource, /snapshot/i, `${entry.owner} claims reuse without a snapshot injection`)
+        }
+        if (entry.actualCharacterSeed === "full-category9") {
+            assert.match(entry.rereadReason, /full|recovery|unbounded/i, `${entry.owner} full Category 9 scope lacks a concrete reason`)
+            assert.notEqual(entry.sqlUpperBoundKey, "", `${entry.owner} full Category 9 scope lacks an SQL upper bound`)
+        }
+    }
+    const registeredOwners = Object.values(AWAKE_OWNER_RUNTIME_EVIDENCE_REGISTRY)
+        .flatMap(entry => entry.owners).sort()
+    assert.deepEqual(registeredOwners, matrix.map(entry => entry.owner).sort())
+}
+
+test("Awake reconcile production call expressions match the fixed 21-entry evidence matrix", () => {
+    const calls = collectProductionCalls()
+    assert.equal(calls.length, 21)
+    const comparedFields = [
+        "relativeFile", "callee", "owner", "boundary", "candidateSource",
+        "plannedCandidateSource", "actualCharacterSeed", "actualFactSeeds",
+        "directMissionSeed", "finalAuthoritativeWrite", "snapshotSource",
+        "rereadReason", "sqlUpperBoundKey", "runtimeEvidenceKey",
+    ]
+    assert.deepEqual(
+        calls.map(call => Object.fromEntries(comparedFields.map(field => [field, call[field]]))),
+        EXPECTED_MATRIX.map(entry => Object.fromEntries(comparedFields.map(field => [field, entry[field]]))),
+    )
+    assert.equal(new Set(calls.map(call => `${call.relativeFile}:${call.position}`)).size, 21)
+    assertEvidenceContract(EXPECTED_MATRIX)
 })
 
 test("Awake reconcile audit matrix freezes owner, policy, and planned candidate source", () => {
-    assert.equal(EXPECTED_MATRIX.length, 19)
+    assert.equal(EXPECTED_MATRIX.length, 21)
     assert.deepEqual(
         Object.fromEntries(["strict-in-tx", "best-effort-in-tx", "best-effort-post-commit"]
             .map(boundary => [
@@ -776,10 +907,10 @@ test("Awake reconcile audit matrix freezes owner, policy, and planned candidate 
         {
             "strict-in-tx": 1,
             "best-effort-in-tx": 9,
-            "best-effort-post-commit": 9,
+            "best-effort-post-commit": 11,
         },
     )
-    assert.equal(new Set(EXPECTED_MATRIX.map(entry => entry.ownerLabel)).size, 19)
+    assert.equal(new Set(EXPECTED_MATRIX.map(entry => entry.ownerLabel)).size, 21)
     for (const entry of EXPECTED_MATRIX) {
         assert.equal(
             entry.candidateSource,
@@ -797,6 +928,37 @@ test("Awake reconcile audit matrix freezes owner, policy, and planned candidate 
         ["gacha/exchange_character", "gacha/exec"],
     ]) {
         assert.equal(pair.every(owner => EXPECTED_MATRIX.some(entry => entry.ownerLabel === owner)), true)
+    }
+})
+
+test("35.5D audit rows carry the complete fixed 21-owner evidence contract", () => {
+    const missing = EXPECTED_MATRIX.flatMap((entry, index) => (
+        REQUIRED_OWNER_EVIDENCE_FIELDS
+            .filter(field => !Object.hasOwn(entry, field))
+            .map(field => `${index}:${entry.ownerLabel}:${field}`)
+    ))
+    assert.deepEqual(missing, [], `matrix evidence fields are missing: ${missing.join(", ")}`)
+    assert.equal(EXPECTED_MATRIX.length, 21)
+    assert.equal(EXPECTED_MATRIX.some(entry => entry.owner === "pass_card/receive_all"), true)
+    assert.equal(EXPECTED_MATRIX.some(entry => entry.owner === "raid_event/summary"), true)
+})
+
+test("35.5D matrix invariants fail closed on evidence omissions and grouping drift", () => {
+    for (const mutate of [
+        matrix => matrix.pop(),
+        matrix => { matrix[1].owner = matrix[0].owner },
+        matrix => { matrix[0].boundary = "best-effort-post-commit" },
+        matrix => { matrix[0].actualFactSeeds = "none" },
+        matrix => { matrix[0].runtimeEvidenceKey = "missing-runtime-evidence" },
+        matrix => { matrix[0].sqlUpperBoundKey = "missing-sql-bound" },
+        matrix => {
+            matrix[0].actualCharacterSeed = "full-category9"
+            matrix[0].rereadReason = "compatibility"
+        },
+    ]) {
+        const changed = structuredClone(EXPECTED_MATRIX)
+        mutate(changed)
+        assert.throws(() => assertEvidenceContract(changed))
     }
 })
 

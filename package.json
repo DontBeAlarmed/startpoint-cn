@@ -49,6 +49,7 @@
     "benchmark:mission-settlement": "node tools/perf/mission_settlement_baseline.cjs",
     "benchmark:mission-engine-focused": "node tools/perf/mission_engine_focused_baseline.cjs",
     "benchmark:awake-request-context": "node tools/perf/awake_request_context_baseline.cjs",
+    "benchmark:awake-owner-focused": "node tools/perf/awake_owner_focused_baseline.cjs",
     "benchmark:active-mission-focused": "node tools/perf/active-mission/baseline.cjs",
     "benchmark:mission-entry-load": "node tools/perf/mission_entry_layered_load.cjs",
     "benchmark:non-multi-mixed": "node tools/perf/non_multi_mixed_workload.cjs",
