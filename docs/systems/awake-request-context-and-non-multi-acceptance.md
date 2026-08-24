@@ -202,7 +202,7 @@ loader 次数记为相对门禁；“每请求最多一次”由 35.1 的显式 
 表达式为 `boxGacha`、`character/town`、`exchange`、`gacha/exchange_character`、
 `gacha/exec`、`item/sell`、`mission/update_mission_progress`、`shop/buy` 和
 `shop/bulk_buy`。`tools/post_commit_awake_owner.test.cjs` 固定两组的数量、成员和互斥性；
-`tools/awake_owner_fact_publication.test.cjs` 固定 35.2 owner 的 publication 仍在事务边界内。
+`tools/awake_reconcile_callsite_matrix.test.cjs` 固定 35.2 owner 的 publication 仍在事务边界内。
 
 35.5C1 只把 owner 实际改变的 `FactKey` 透传到 fresh Awake publication，不迁移 35.2 的事务
 边界，也不把事务内 best-effort 改成 post-commit。publication 仍发生在 owner 最后一次权威
