@@ -286,6 +286,10 @@ formal profile 使用 1000 份互相独立的存档、600 个活跃身份，并�
 `tools/active_mission_reconciliation.test.cjs`、`tools/load_awake_full_recovery.test.cjs`、
 `tools/post_commit_awake_owner.test.cjs` 和 `tools/test-workflow/select-tests.test.cjs`。
 
+以下两个证据小节中，`<WORKSPACE_ROOT>` 统一表示同时包含 `starpoint-cn/` 与外层本地
+`docs/` 的工作区根目录。所有命令本身均从 `starpoint-cn` 仓库根目录执行；
+`<WORKSPACE_ROOT>/docs/...` 报告输出路径则相对于该外层工作区根目录。
+
 ### 历史首次 35.4 实测证据（2026-08-24）
 
 本节是 `10f66f44` revision 上首次生成的 35.4 证据。后续审查发现 global-fact
@@ -295,8 +299,8 @@ formal profile 使用 1000 份互相独立的存档、600 个活跃身份，并�
 实际被测完整 commit SHA 为 `10f66f442213bbca230b577a3077c8d909963272`，即运行验收前的
 HEAD；后续用于回填证据的文档提交不属于被测 revision。验收环境为 Node.js `v22.23.1`、
 Darwin x64、CPU model `Intel(R) Core(TM) i5-8259U CPU @ 2.30GHz`、8 个逻辑 CPU；验收运行
-前后 `git status --porcelain` 均无输出。以下命令均从 `starpoint-cn` 仓库根目录执行；
-本轮没有运行 `verify:full`，没有使用 `--write` 或 `--write-reference`，也没有执行 35.5
+前后 `git status --porcelain` 均无输出。本轮没有运行 `verify:full`，没有使用 `--write` 或
+`--write-reference`，也没有执行 35.5
 的连续三轮 formal 验收。
 
 focused 使用 `npm run benchmark:awake-request-context`，退出码为 0，用时 6.33 秒。
@@ -349,8 +353,7 @@ single-battle `141/102`、shop `26/5`、gacha `74/9`、mail `18/4`；非多人�
 前后 `git status --porcelain` 均无输出。环境为 Node.js `v22.23.1`、Darwin x64、CPU model
 `Intel(R) Core(TM) i5-8259U CPU @ 2.30GHz`、8 个逻辑 CPU。runner 使用 bundled gameplay
 Content snapshot `1.4.54`，相关检入 `assets/cdn/catalog-cn-1.4.54.json` SHA-256 为
-`8b462cabc65b60603fa8aa88a69b0074c70607c8e41204e8dddddf54c6cef8d7`。以下命令均从
-`starpoint-cn` 仓库根目录执行，报告路径中的仓库外工作区统一记为 `<WORKSPACE_ROOT>`。
+`8b462cabc65b60603fa8aa88a69b0074c70607c8e41204e8dddddf54c6cef8d7`。
 
 `npm run benchmark:awake-request-context` 退出码为 0，用时 8.17 秒，五个固定场景全部
 admitted，行为、故障注入和回滚证据与检入 snapshot 一致；`SQL reads/writes/mission
