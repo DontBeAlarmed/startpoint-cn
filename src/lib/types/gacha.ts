@@ -38,6 +38,7 @@ export interface Gacha {
     tenTimesPerAccountCost?: number,
     onceTicketItemId?: number,
     tenTicketItemId?: number,
+    crazyTenTicketItemId?: number,
     wildcardTicketAvailable?: boolean,
     rarityOddsId?: string,
     guaranteeRarity?: number,

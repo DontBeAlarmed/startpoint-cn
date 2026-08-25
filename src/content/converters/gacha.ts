@@ -390,6 +390,7 @@ function buildBanner(
     const tenTimesPerAccountCost = parseOptionalInteger(row[8])
     const onceTicketItemId = parseOptionalInteger(row[27])
     const tenTicketItemId = parseOptionalInteger(row[28])
+    const crazyTenTicketItemId = parseOptionalInteger(row[45])
     const startDate = String(row[29] || "2000-01-01 00:00:00")
     const endDate = String(row[30] || "2099-01-01 00:00:00")
 
@@ -405,6 +406,7 @@ function buildBanner(
             ...(tenTimesPerAccountCost ? { tenTimesPerAccountCost } : {}),
             ...(onceTicketItemId ? { onceTicketItemId } : {}),
             ...(tenTicketItemId ? { tenTicketItemId } : {}),
+            ...(crazyTenTicketItemId ? { crazyTenTicketItemId } : {}),
             wildcardTicketAvailable: parseOptionalBoolean(row[26]),
             rarityOddsId,
             guaranteeRarity,
@@ -431,6 +433,7 @@ function buildBanner(
         ...(tenTimesPerAccountCost ? { tenTimesPerAccountCost } : {}),
         ...(onceTicketItemId ? { onceTicketItemId } : {}),
         ...(tenTicketItemId ? { tenTicketItemId } : {}),
+        ...(crazyTenTicketItemId ? { crazyTenTicketItemId } : {}),
         wildcardTicketAvailable: parseOptionalBoolean(row[20]),
         rarityOddsId,
         guaranteeRarity,

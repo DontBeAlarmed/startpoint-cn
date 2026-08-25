@@ -2,6 +2,7 @@ import { Gacha } from "./types";
 import { GACHA_EXEC_TYPES, getTicketDrawKind, ticketExecMatchesGachaType } from "./gacha-rules";
 
 export const GACHA_TICKET_ITEM_IDS = {
+    characterOnceRare4: 999008,
     characterMulti: 999001,
     characterSingle: 999003,
     equipmentMulti: 999004,
@@ -18,6 +19,8 @@ function getFallbackTicketItemId(gacha: Gacha | undefined, type: number): number
     if (gacha && !gacha.wildcardTicketAvailable) return null;
 
     switch (type) {
+        case GACHA_EXEC_TYPES.SINGLE_RARE4_TICKET:
+            return GACHA_TICKET_ITEM_IDS.characterOnceRare4;
         case GACHA_EXEC_TYPES.MULTI_TICKET:
             return GACHA_TICKET_ITEM_IDS.characterMulti;
         case GACHA_EXEC_TYPES.SINGLE_TICKET:
@@ -35,6 +38,10 @@ function getConfiguredTicketItemId(gacha: Gacha | undefined, type: number): numb
     if (!gacha) return getFallbackTicketItemId(undefined, type);
     if (!ticketExecMatchesGachaType(type, gacha)) return null;
 
+    if (type === GACHA_EXEC_TYPES.CRAZY_MULTI_TICKET) {
+        return gacha.crazyTenTicketItemId ?? null;
+    }
+
     const drawKind = getTicketDrawKind(type);
     if (drawKind === "single" && gacha.onceTicketItemId) return gacha.onceTicketItemId;
     if (drawKind === "multi" && gacha.tenTicketItemId) return gacha.tenTicketItemId;
@@ -48,15 +55,19 @@ export function getGachaTicketCost(type: number, numberOfExec: number, gacha?: G
     if (itemId === null) return null;
 
     switch (type) {
+        case GACHA_EXEC_TYPES.MULTI_CONFIGURED_TICKET:
         case GACHA_EXEC_TYPES.MULTI_TICKET:
         case GACHA_EXEC_TYPES.MULTI_WEAPON_TICKET:
+        case GACHA_EXEC_TYPES.CRAZY_MULTI_TICKET:
             return {
                 itemId,
                 useTicketCount,
                 pullCount: useTicketCount * 10,
             };
+        case GACHA_EXEC_TYPES.SINGLE_CONFIGURED_TICKET:
         case GACHA_EXEC_TYPES.SINGLE_TICKET:
         case GACHA_EXEC_TYPES.SINGLE_WEAPON_TICKET:
+        case GACHA_EXEC_TYPES.SINGLE_RARE4_TICKET:
             return {
                 itemId,
                 useTicketCount,

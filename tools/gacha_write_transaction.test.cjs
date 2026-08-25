@@ -284,6 +284,31 @@ test("gacha exec commits charge reward history points and mission fact together"
     assert.equal(captured.logs.length, 1)
 })
 
+test("newbie ten-ticket gacha consumes the configured 70030 ticket", async () => {
+    const { playerId, viewerId } = await createPlayer("gacha-newbie-ten-ticket")
+    givePlayerItemSync(playerId, 70030, 1)
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/gacha/exec",
+        payload: {
+            viewer_id: viewerId,
+            gacha_id: 1613,
+            payment_type: 3,
+            number_of_exec: 1,
+            type: 4,
+            api_count: 1,
+        },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
+    assert.equal(getPlayerItemSync(playerId, 70030), 0)
+    assert.equal(payload.data.item_list[70030], 0)
+    assert.equal(payload.data.draw.length, 10)
+    assert.equal(getPlayerGachaInfoSync(playerId, 1613).gachaExchangePoint, 10)
+})
+
 test("character duplicate gacha item_list reports the post-reward inventory", async () => {
     const { playerId } = await createPlayer("gacha-duplicate-item-list")
     const characterId = 1

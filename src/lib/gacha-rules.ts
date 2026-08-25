@@ -10,6 +10,8 @@ export const GACHA_PAYMENT_TYPES = {
 export const GACHA_EXEC_TYPES = {
     VMONEY_SINGLE: 1,
     VMONEY_MULTI: 2,
+    SINGLE_CONFIGURED_TICKET: 3,
+    MULTI_CONFIGURED_TICKET: 4,
     DAILY_SINGLE: 5,
     CAMPAIGN_SINGLE: 7,
     CAMPAIGN_MULTI: 8,
@@ -17,6 +19,8 @@ export const GACHA_EXEC_TYPES = {
     SINGLE_TICKET: 10,
     SINGLE_WEAPON_TICKET: 12,
     MULTI_WEAPON_TICKET: 13,
+    CRAZY_MULTI_TICKET: 14,
+    SINGLE_RARE4_TICKET: 20,
 } as const;
 
 export const GACHA_PAGE_KINDS = {
@@ -37,9 +41,13 @@ export function getTicketDrawKind(type: number): TicketDrawKind | null {
     switch (type) {
         case GACHA_EXEC_TYPES.SINGLE_TICKET:
         case GACHA_EXEC_TYPES.SINGLE_WEAPON_TICKET:
+        case GACHA_EXEC_TYPES.SINGLE_CONFIGURED_TICKET:
+        case GACHA_EXEC_TYPES.SINGLE_RARE4_TICKET:
             return "single";
         case GACHA_EXEC_TYPES.MULTI_TICKET:
         case GACHA_EXEC_TYPES.MULTI_WEAPON_TICKET:
+        case GACHA_EXEC_TYPES.MULTI_CONFIGURED_TICKET:
+        case GACHA_EXEC_TYPES.CRAZY_MULTI_TICKET:
             return "multi";
         default:
             return null;
@@ -47,12 +55,17 @@ export function getTicketDrawKind(type: number): TicketDrawKind | null {
 }
 
 export function ticketExecMatchesGachaType(type: number, gacha: Pick<Gacha, "type">): boolean {
+    if (type === GACHA_EXEC_TYPES.SINGLE_CONFIGURED_TICKET
+        || type === GACHA_EXEC_TYPES.MULTI_CONFIGURED_TICKET) return true;
     if (gacha.type === GachaType.WEAPON) {
         return type === GACHA_EXEC_TYPES.SINGLE_WEAPON_TICKET ||
-            type === GACHA_EXEC_TYPES.MULTI_WEAPON_TICKET;
+            type === GACHA_EXEC_TYPES.MULTI_WEAPON_TICKET ||
+            type === GACHA_EXEC_TYPES.CRAZY_MULTI_TICKET;
     }
     return type === GACHA_EXEC_TYPES.SINGLE_TICKET ||
-        type === GACHA_EXEC_TYPES.MULTI_TICKET;
+        type === GACHA_EXEC_TYPES.MULTI_TICKET ||
+        type === GACHA_EXEC_TYPES.CRAZY_MULTI_TICKET ||
+        type === GACHA_EXEC_TYPES.SINGLE_RARE4_TICKET;
 }
 
 function ticketAllowedByPageKind(pageKind: number | undefined, drawKind: TicketDrawKind): boolean {

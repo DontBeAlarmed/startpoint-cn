@@ -33,6 +33,7 @@ function gachaRow({
     rank4 = "",
     rank5 = "",
     guaranteeRarity = "4",
+    crazyTenTicketItemId = "",
 } = {}) {
     const fields = Array(47).fill("")
     fields[0] = stringId
@@ -64,6 +65,7 @@ function gachaRow({
     fields[28] = "20002"
     fields[29] = "2026-01-01 00:00:00"
     fields[30] = "2026-01-10 00:00:00"
+    fields[45] = crazyTenTicketItemId
     return fields
 }
 
@@ -226,6 +228,23 @@ test("gacha converter builds character/equipment runtime pools and raw compatibi
     const readPaths = fixture.reads.map(([, logicalPath]) => logicalPath)
     assert.equal(readPaths.some(path => path.endsWith("/.orderedmap")), false)
     assert.equal(readPaths.some(path => path.includes("(None)")), false)
+})
+
+test("gacha converter preserves the official crazy ten-ticket field", async () => {
+    const fixture = createFixture()
+    fixture.flat.set(GACHA_PATH, [
+        row("10", gachaRow({
+            stringId: "crazy_fixture",
+            name: "疯狂十连",
+            prizeKind: "0",
+            rank3: "character_3",
+            rank5: "character_5",
+            crazyTenTicketItemId: "999012",
+        })),
+    ])
+
+    const output = await convertGachas(fixture.reader)
+    assert.equal(output["gacha.json"]["10"].crazyTenTicketItemId, 999012)
 })
 
 test("gacha converter fails clearly when a referenced non-empty odds source is missing", async () => {
