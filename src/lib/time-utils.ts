@@ -11,6 +11,13 @@ export function getDayBucket(date: Date, resetHour = 5): { y: number; m: number;
     return { y: s.getUTCFullYear(), m: s.getUTCMonth(), d: s.getUTCDate() }
 }
 
+export function getBusinessDayKey(date: Date, resetHour = 5): string {
+    const bucket = getDayBucket(date, resetHour)
+    const month = String(bucket.m + 1).padStart(2, "0")
+    const day = String(bucket.d).padStart(2, "0")
+    return `${bucket.y}-${month}-${day}`
+}
+
 export function getWeekBucket(date: Date, resetHour = 5): { y: number; w: number } {
     // CN week resets at Monday 05:00 (UTC+8).
     const s = shiftByResetHour(date, resetHour)

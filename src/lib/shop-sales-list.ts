@@ -24,6 +24,8 @@ export interface BuildShopSalesListInput {
     playerId: number
     itemsByType: Readonly<Record<number, ShopItems>>
     nowMs: number
+    purchasePeriodNowMs?: number
+    resetHour?: number
     equipmentEnhancementCategoryIds?: readonly number[]
     isItemVisible: (item: Pick<ShopItem, "campaignId" | "lineupId">, shopType: number) => boolean
 }
@@ -131,7 +133,11 @@ export function buildShopSalesListSync(
                 continue
             }
 
-            const periodKeys = getShopPurchasePeriodKeys(input.nowMs, item.specifiedMonths)
+            const periodKeys = getShopPurchasePeriodKeys(
+                input.purchasePeriodNowMs ?? input.nowMs,
+                item.specifiedMonths,
+                input.resetHour,
+            )
             pendingSales.push({
                 itemId: Number(itemId),
                 item,

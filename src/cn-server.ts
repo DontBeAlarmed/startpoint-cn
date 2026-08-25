@@ -248,7 +248,6 @@ fastify.register(partyApiPlugin, { prefix: `${apiPrefix}/party` });
 fastify.register(expodApiPlugin, { prefix: `${apiPrefix}/expod` });
 fastify.register(storyQuestApiPlugin, { prefix: `${apiPrefix}/story_quest` });
 fastify.register(optionApiPlugin, { prefix: `${apiPrefix}/option` });
-fastify.register(singleBattleQuestApiPlugin, { prefix: `${apiPrefix}/single_battle_quest` });
 fastify.register(attentionApiPlugin, { prefix: `${apiPrefix}/attention` });
 fastify.register(characterApiPlugin, { prefix: `${apiPrefix}/character` });
 fastify.register(characterManaPlugin, { prefix: `${apiPrefix}/character` });
@@ -258,8 +257,6 @@ fastify.register(equipmentApiPlugin, { prefix: `${apiPrefix}/equipment` });
 fastify.register(sellApiPlugin, { prefix: `${apiPrefix}/equipment` });
 fastify.register(exBoostApiPlugin, { prefix: `${apiPrefix}/ex_boost` });
 fastify.register(boxGachaApiPlugin, { prefix: `${apiPrefix}/box_gacha` });
-fastify.register(shopApiPlugin, { prefix: `${apiPrefix}/shop` });
-fastify.register(howToGetApiPlugin, { prefix: `${apiPrefix}/how_to_get` });
 fastify.register(exchangeApiPlugin, { prefix: `${apiPrefix}/exchange` });
 fastify.register(encyclopediaApiPlugin, { prefix: `${apiPrefix}/encyclopedia` });
 fastify.register(mailApiPlugin, { prefix: `${apiPrefix}/mail` });
@@ -298,6 +295,18 @@ let runtimeHttpConfigured = false;
 function configureRuntimeHttp(config: ReturnType<typeof parseCnRuntimeConfig>): void {
     if (runtimeHttpConfigured) return;
     configureSerializedAssetVersionProvider(() => getContentSnapshot().cdn.targetVersion);
+    fastify.register(singleBattleQuestApiPlugin, {
+        prefix: `${apiPrefix}/single_battle_quest`,
+        dailyResetHour: config.dailyResetHour,
+    });
+    fastify.register(shopApiPlugin, {
+        prefix: `${apiPrefix}/shop`,
+        dailyResetHour: config.dailyResetHour,
+    });
+    fastify.register(howToGetApiPlugin, {
+        prefix: `${apiPrefix}/how_to_get`,
+        dailyResetHour: config.dailyResetHour,
+    });
     const multiContext = multiRuntimeService.getHttpContext();
     fastify.register(multiBattleRoutes, {
         prefix: `${apiPrefix}/multi_battle_quest`,

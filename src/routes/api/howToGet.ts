@@ -8,6 +8,7 @@ import {
     HowToGetTarget,
 } from "../../lib/how-to-get"
 import { generateDataHeaders, getServerTime } from "../../utils"
+import { getRealNowMs } from "../../runtime/time/game-time"
 
 interface HowToGetBody {
     readonly viewer_id?: unknown
@@ -17,6 +18,8 @@ interface HowToGetBody {
 
 export interface HowToGetRoutesOptions {
     readonly now?: () => number
+    readonly realNow?: () => number
+    readonly dailyResetHour?: number
 }
 
 function isPositiveSafeInteger(value: unknown): value is number {
@@ -45,6 +48,7 @@ export default async function howToGetRoutes(
     options: HowToGetRoutesOptions = {},
 ): Promise<void> {
     const now = options.now ?? (() => getServerTime() * 1000)
+    const realNow = options.realNow ?? getRealNowMs
 
     fastify.post("/get_list", async (
         request: FastifyRequest,
@@ -65,7 +69,13 @@ export default async function howToGetRoutes(
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             data_headers: generateDataHeaders({ viewer_id: body.viewer_id }),
-            data: getHowToGetListSync(playerId, target, now()),
+            data: getHowToGetListSync(
+                playerId,
+                target,
+                now(),
+                realNow(),
+                options.dailyResetHour ?? 5,
+            ),
         })
     })
 }

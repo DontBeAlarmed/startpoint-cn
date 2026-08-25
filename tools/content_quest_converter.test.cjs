@@ -563,9 +563,11 @@ test("challenge point derivatives come from their authoritative master rows", ()
     assert.deepEqual(buildEventChallengePointMap(
         { 1: [["expert", "name", "", "", "", "", "", "", "", "", "1"]], 2: [["expert2", "name", "", "", "", "", "", "", "", "", "251"]] },
         { 1: [["solo", "name", "", "", "", "", "", "", "", "5001"]] },
+        { 1: { 1: [row(129, { 0: 200031001, 128: 401 })] } },
     ), {
         expert_1: 1,
         expert_2: 251,
         solo_1: 5001,
+        story_200031001: 401,
     })
 })

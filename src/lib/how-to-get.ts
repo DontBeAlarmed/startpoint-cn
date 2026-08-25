@@ -189,6 +189,8 @@ export function getHowToGetListSync(
     playerId: number,
     target: HowToGetTarget,
     nowMs: number,
+    purchasePeriodNowMs = nowMs,
+    resetHour = 5,
 ): HowToGetList {
     const relevant = getRelevantShopItems(getAllAuthoritativeShopItemsSync(), target)
     const campaignLineups = getPlayerShopCampaignLineupsSync(playerId)
@@ -204,6 +206,8 @@ export function getHowToGetListSync(
         playerId,
         itemsByType: relevant.itemsByType,
         nowMs,
+        purchasePeriodNowMs,
+        resetHour,
         isItemVisible: (item, shopType) => (
             isShopItemVisibleForCampaign(item, shopType, campaignLineups)
         ),
@@ -212,6 +216,8 @@ export function getHowToGetListSync(
         playerId,
         itemsByType: relevant.itemsByType,
         nowMs,
+        purchasePeriodNowMs,
+        resetHour,
         isItemVisible: (item, shopType) => isUnselectedLineupItemAvailable(
             item,
             shopType,

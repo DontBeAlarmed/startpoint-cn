@@ -51,6 +51,7 @@ import {
     addPlayerPassCardPointSync,
 } from "../../data/domains/pass-card"
 import { getActivePassCardEventDefinitionAt } from "../../lib/pass-card"
+import { getGameTimeContext } from "../../runtime/time/game-time"
 
 interface GetSalesListBody {
     equipment_enhancement_shop_category_ids: number[],
@@ -80,7 +81,12 @@ interface BulkBuyBody {
     retry_count?: number
 }
 
-const routes = async (fastify: FastifyInstance) => {
+export interface ShopRoutesOptions {
+    readonly dailyResetHour?: number
+}
+
+const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {}) => {
+    const dailyResetHour = options.dailyResetHour ?? 5
     fastify.post("/buy", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as BuyBody
 
@@ -88,6 +94,7 @@ const routes = async (fastify: FastifyInstance) => {
         const shopType = body.shop_type
         const rawPurchaseAmount = body.number
         const shopItemId = body.shop_item_id
+        const gameTime = getGameTimeContext()
         if (isNaN(viewerId) || isNaN(shopType) || isNaN(shopItemId)) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
@@ -247,7 +254,8 @@ const routes = async (fastify: FastifyInstance) => {
                     shopType,
                     shopItemId,
                     purchaseAmount,
-                    nowMs: getServerTime() * 1000,
+                    nowMs: gameTime.realNowMs,
+                    resetHour: dailyResetHour,
                     specifiedMonths: shopItemData.specifiedMonths,
                 }, {
                     getShopPurchasePeriodKeys,
@@ -284,7 +292,9 @@ const routes = async (fastify: FastifyInstance) => {
                 shopItemId,
                 purchaseAmount,
                 shopItem: shopItemData,
-                nowMs: getServerTime() * 1000,
+                nowMs: gameTime.virtualNowMs,
+                periodNowMs: gameTime.realNowMs,
+                resetHour: dailyResetHour,
                 enforcePeriod: shopType === ShopType.EVENT_ITEM,
             }, {
                 transaction: operation => getDb().transaction(operation)(),
@@ -302,7 +312,7 @@ const routes = async (fastify: FastifyInstance) => {
                 },
                 grantRewards: grantShopRewardsInTransactionOwnerSync,
                 grantPassCardPoints: (id, amount) => {
-                    const activeEvent = getActivePassCardEventDefinitionAt(new Date(getServerTime() * 1000))
+                    const activeEvent = getActivePassCardEventDefinitionAt(gameTime.virtualNow)
                     if (!activeEvent) throw new ShopPurchaseError("No active pass card.")
                     addPlayerPassCardPointSync(id, activeEvent.eventId, amount, activeEvent.thresholdPoint)
                 },
@@ -414,7 +424,8 @@ const routes = async (fastify: FastifyInstance) => {
             toParseShopItems[ShopType.BOSS_COIN] = items === null ? existing : { ...existing, ...items }
         }
 
-        const nowMs = getServerTime() * 1000
+        const gameTime = getGameTimeContext()
+        const nowMs = gameTime.virtualNowMs
         const campaignLineups = getPlayerShopCampaignLineupsSync(playerId)
         const equipmentSnapshot = shopTypes.includes(ShopType.TREASURE_EQUIPMENT)
             ? getPlayerEquipmentListSync(playerId)
@@ -423,6 +434,8 @@ const routes = async (fastify: FastifyInstance) => {
             playerId,
             itemsByType: toParseShopItems,
             nowMs,
+            purchasePeriodNowMs: gameTime.realNowMs,
+            resetHour: dailyResetHour,
             equipmentEnhancementCategoryIds,
             isItemVisible: (item, shopType) => (
                 isShopItemVisibleForCampaign(item, shopType, campaignLineups)
@@ -543,6 +556,7 @@ const routes = async (fastify: FastifyInstance) => {
         const body = request.body as BulkBuyBody
         const viewerId = body.viewer_id
         const shopType = body.shop_type
+        const gameTime = getGameTimeContext()
         if (!Number.isSafeInteger(viewerId) || viewerId <= 0
             || (shopType !== ShopType.EVENT_ITEM && shopType !== ShopType.BOSS_COIN)
             || body.buy_item_list === null
@@ -595,7 +609,9 @@ const routes = async (fastify: FastifyInstance) => {
                 playerId,
                 shopType,
                 purchases,
-                nowMs: getServerTime() * 1000,
+                nowMs: gameTime.virtualNowMs,
+                periodNowMs: gameTime.realNowMs,
+                resetHour: dailyResetHour,
                 enforcePeriod: shopType === ShopType.EVENT_ITEM,
             }, {
                 transaction: operation => getDb().transaction(operation)(),

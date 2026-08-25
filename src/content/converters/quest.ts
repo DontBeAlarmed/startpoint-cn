@@ -904,6 +904,7 @@ export function buildDailyChallengePointLookup(
 export function buildEventChallengePointMap(
     expertTree: CsvOrderedMapTree,
     soloTree: CsvOrderedMapTree,
+    storyTree?: CsvOrderedMapTree,
 ): Readonly<Record<string, unknown>> {
     const output: Record<string, unknown> = {}
     for (const row of collectRows("expert_single_event.json", expertTree, 1)) {
@@ -921,6 +922,16 @@ export function buildEventChallengePointMap(
             row.fields[9],
             "daily_challenge_point_id",
         )
+    }
+    if (storyTree !== undefined) {
+        for (const row of collectRows("story_event_single_quest.json", storyTree, 2)) {
+            if (row.fields.length <= 128 || isMissing(row.fields[128])) continue
+            output[`story_${row.fields[0]}`] = parseInteger(
+                "story_event_single_quest.json",
+                row.fields[128],
+                "daily_challenge_point_id",
+            )
+        }
     }
     return deepFreeze(output)
 }
@@ -962,6 +973,7 @@ export async function convertQuests(
         "event_challenge_point_map.json": buildEventChallengePointMap(
             convertOrderedMapJson(expertSingleEvent, 1),
             convertOrderedMapJson(soloTimeAttackEvent, 1),
+            questTrees["story_event_single_quest.json"],
         ),
         "quest_entry_costs.json": buildQuestEntryCosts(questTrees),
         "quest_lookup.json": buildQuestLookup(

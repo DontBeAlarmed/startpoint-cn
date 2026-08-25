@@ -19,6 +19,7 @@ import type {
     ShopPurchaseCountSnapshot,
     ShopPurchaseQuery,
 } from "../data/domains/shopPurchase"
+import { getDayBucket } from "./time-utils"
 
 export const ITEM_SHOP_PERIOD_ERROR_CODE = 2053
 
@@ -38,6 +39,8 @@ export interface GenericShopPurchaseInput {
     purchaseAmount: number
     shopItem: ShopItem
     nowMs: number
+    periodNowMs?: number
+    resetHour?: number
     enforcePeriod: boolean
 }
 
@@ -112,6 +115,8 @@ export interface GenericShopBatchPurchaseInput {
     shopType: number
     purchases: readonly GenericShopBatchPurchaseEntry[]
     nowMs: number
+    periodNowMs?: number
+    resetHour?: number
     enforcePeriod: boolean
 }
 
@@ -171,6 +176,7 @@ export interface EquipmentEnhancementPurchaseCountInput {
     readonly shopItemId: number
     readonly purchaseAmount: number
     readonly nowMs: number
+    readonly resetHour?: number
     readonly specifiedMonths: readonly number[] | undefined
 }
 
@@ -178,6 +184,7 @@ export interface EquipmentEnhancementPurchaseCountDependencies {
     getShopPurchasePeriodKeys(
         nowMs: number,
         specifiedMonths: readonly number[] | undefined,
+        resetHour?: number,
     ): ShopPurchasePeriodKeys
     addPurchaseCounts(
         playerId: number,
@@ -195,6 +202,7 @@ export function recordEquipmentEnhancementPurchaseSync(
     const periodKeys = dependencies.getShopPurchasePeriodKeys(
         input.nowMs,
         input.specifiedMonths,
+        input.resetHour,
     )
     return dependencies.addPurchaseCounts(
         input.playerId,
@@ -212,12 +220,12 @@ function pad2(value: number): string {
 export function getShopPurchasePeriodKeys(
     nowMs: number,
     specifiedMonths: readonly number[] | undefined,
+    resetHour = 5,
 ): ShopPurchasePeriodKeys {
-    // CN daily/monthly shop counters reset at 05:00 in UTC+8.
-    const shifted = new Date(nowMs + 3 * 60 * 60 * 1000)
-    const year = shifted.getUTCFullYear()
-    const month = shifted.getUTCMonth() + 1
-    const daily = `${year}-${pad2(month)}-${pad2(shifted.getUTCDate())}`
+    const bucket = getDayBucket(new Date(nowMs), resetHour)
+    const year = bucket.y
+    const month = bucket.m + 1
+    const daily = `${year}-${pad2(month)}-${pad2(bucket.d)}`
     if (!specifiedMonths || specifiedMonths.length === 0) {
         return { daily, monthly: `${year}-${pad2(month)}` }
     }
@@ -372,7 +380,11 @@ export function executeGenericShopPurchaseSync(
         const player = dependencies.getPlayer(input.playerId)
         if (player === null) throw new ShopPurchaseError("Player not found.")
 
-        const periodKeys = getShopPurchasePeriodKeys(input.nowMs, input.shopItem.specifiedMonths)
+        const periodKeys = getShopPurchasePeriodKeys(
+            input.periodNowMs ?? input.nowMs,
+            input.shopItem.specifiedMonths,
+            input.resetHour,
+        )
         const counts = dependencies.getPurchaseCounts(
             input.playerId, input.shopType, input.shopItemId, periodKeys,
         )
@@ -493,8 +505,9 @@ export function executeGenericShopBatchPurchaseSync(
     }
     const purchasesWithQueries = normalized.map(entry => {
         const periodKeys = getShopPurchasePeriodKeys(
-            input.nowMs,
+            input.periodNowMs ?? input.nowMs,
             entry.shopItem.specifiedMonths,
+            input.resetHour,
         )
         const query: ShopPurchaseQuery = {
             shopType: input.shopType,

@@ -102,6 +102,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/single_continue_lifecycle.test.cjs",
             "tools/special_quest_flow.test.cjs",
             "tools/periodic_reward_settlement.test.cjs",
+            "tools/daily_challenge_and_shop_time.test.cjs",
         ],
     },
     "quick:character": {

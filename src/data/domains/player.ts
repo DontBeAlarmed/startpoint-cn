@@ -5,7 +5,7 @@ import { getDefaultPlayerData } from "../utils/default-player";
 import { deserializeBoolean, serializeBoolean } from "../utils/primitives";
 import { getAccountSync } from "./account";
 import { getPlayerQuestProgressSync } from "./quest";
-import { isNewDay, isNewWeek } from "../../lib/time-utils";
+import { getBusinessDayKey, isNewDay, isNewWeek } from "../../lib/time-utils";
 import { buildPeriodicSnapshotData, getPassWeekSnapshotType, getSnapshot, initializePeriodicMissionSnapshots, takeSnapshot } from "../../lib/mission/snapshot";
 import { getMissionMasterDefinitions, isMissionDefinitionEnabledAt } from "../../lib/mission/master-data";
 import { ensurePlayerPassCardLoginProgressSync } from "./pass-card";
@@ -30,6 +30,50 @@ function getDailyChallengePointDefaults(): DailyChallengePointListEntry[] {
         })
     }
     return entries
+}
+
+/** Refresh only recoverable challenge points against the real-time business day. */
+export function refreshPlayerDailyChallengePointsForRealDaySync(
+    playerId: number,
+    realNow: Date = getRealNow(),
+    resetHour = 5,
+): boolean {
+    const businessDay = getBusinessDayKey(realNow, resetHour)
+    const marker = getDb().prepare(`
+        SELECT last_daily_challenge_real_business_day
+        FROM players
+        WHERE id = ?
+    `).get(playerId) as { last_daily_challenge_real_business_day: string | null } | undefined
+    if (marker === undefined) return false
+
+    const entries = getPlayerDailyChallengePointListSync(playerId)
+    const defaults = getDailyChallengePointDefaults()
+    const existingIds = new Set(entries.map(entry => entry.id))
+    const missing = defaults.filter(entry => !existingIds.has(entry.id))
+    if (missing.length > 0) insertPlayerDailyChallengePointListSync(playerId, missing)
+
+    const previousBusinessDay = marker.last_daily_challenge_real_business_day
+    if (previousBusinessDay === null) {
+        updatePlayerSync({ id: playerId, lastDailyChallengeRealBusinessDay: businessDay })
+        return false
+    }
+    if (previousBusinessDay >= businessDay) return false
+
+    const lookup = getRuntimeContentTableSync(
+        "daily_challenge_point_lookup.json",
+        bundledDailyChallengePointLookup as DailyChallengePointLookup,
+    )
+    for (const entry of entries) {
+        const definition = lookup[String(entry.id)]
+        if (!definition?.isRecovery) continue
+        const point = definition.maxPoint + entry.campaignList.reduce(
+            (total, campaign) => total + campaign.additionalPoint,
+            0,
+        )
+        updatePlayerDailyChallengePointSync(playerId, entry.id, point)
+    }
+    updatePlayerSync({ id: playerId, lastDailyChallengeRealBusinessDay: businessDay })
+    return true
 }
 
 function initializeCurrentPassWeekSnapshot(
@@ -384,6 +428,7 @@ function buildPlayer(
         totalManaObtained: raw.total_mana_obtained || 0,
         maxComboAchieved: raw.max_combo_achieved || 0,
         totalLoginDays: raw.total_login_days || 0,
+        lastDailyChallengeRealBusinessDay: raw.last_daily_challenge_real_business_day,
         tutorialStep: raw.tutorial_step,
         tutorialSkipFlag: raw.tutorial_skip_flag === null ? null : deserializeBoolean(raw.tutorial_skip_flag),
         tutorialGachaCharacterId: raw.tutorial_gacha_character_id,
@@ -398,7 +443,7 @@ export function getPlayerSync(
         transition_state, role, name, last_login_time, comment,
         vmoney, free_vmoney, rank_point, star_crumb,
         bond_token, exp_pool, exp_pooled_time, leader_character_id, party_slot,
-        degree_id, birth, free_mana, paid_mana, enable_auto_3x, total_stamina_used, total_powerflips, total_dashes, total_mana_obtained, max_combo_achieved, total_login_days, tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id
+        degree_id, birth, free_mana, paid_mana, enable_auto_3x, total_stamina_used, total_powerflips, total_dashes, total_mana_obtained, max_combo_achieved, total_login_days, last_daily_challenge_real_business_day, tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id
     FROM players
     WHERE id = ?    
     `).get(playerId) as RawPlayer | undefined
@@ -417,7 +462,7 @@ export function getAllPlayersSync(
         transition_state, role, name, last_login_time, comment,
         vmoney, free_vmoney, rank_point, star_crumb,
         bond_token, exp_pool, exp_pooled_time, leader_character_id, party_slot,
-        degree_id, birth, free_mana, paid_mana, enable_auto_3x, total_stamina_used, total_powerflips, total_dashes, total_mana_obtained, max_combo_achieved, total_login_days, tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id
+        degree_id, birth, free_mana, paid_mana, enable_auto_3x, total_stamina_used, total_powerflips, total_dashes, total_mana_obtained, max_combo_achieved, total_login_days, last_daily_challenge_real_business_day, tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id
     FROM players
     LIMIT ?
     OFFSET ?
@@ -471,6 +516,7 @@ export function insertPlayerSync(
         total_mana_obtained: player.totalManaObtained ?? 0,
         max_combo_achieved: player.maxComboAchieved ?? 0,
         total_login_days: player.totalLoginDays ?? 0,
+        last_daily_challenge_real_business_day: player.lastDailyChallengeRealBusinessDay ?? null,
         account_id: accountId,
         tutorial_step: player.tutorialStep ?? null,
         tutorial_skip_flag: player.tutorialSkipFlag !== null ? serializeBoolean(player.tutorialSkipFlag) : null,
@@ -489,7 +535,7 @@ export function insertPlayerSync(
         transition_state, role, name, last_login_time, comment, vmoney, free_vmoney,
         rank_point, star_crumb, bond_token, exp_pool, exp_pooled_time, leader_character_id,
         party_slot, degree_id, birth, free_mana, paid_mana, enable_auto_3x,
-        total_stamina_used, total_powerflips, total_dashes, total_mana_obtained, max_combo_achieved, total_login_days, account_id,
+        total_stamina_used, total_powerflips, total_dashes, total_mana_obtained, max_combo_achieved, total_login_days, last_daily_challenge_real_business_day, account_id,
         tutorial_step, tutorial_skip_flag, tutorial_gacha_character_id,
         time_offset${idCol})
     VALUES (@stamina, @stamina_heal_time, @boost_point, @boss_boost_point,
@@ -497,7 +543,7 @@ export function insertPlayerSync(
         @vmoney, @free_vmoney, @rank_point, @star_crumb, @bond_token,
         @exp_pool, @exp_pooled_time, @leader_character_id, @party_slot,
         @degree_id, @birth, @free_mana, @paid_mana, @enable_auto_3x,
-        @total_stamina_used, @total_powerflips, @total_dashes, @total_mana_obtained, @max_combo_achieved, @total_login_days, @account_id,
+        @total_stamina_used, @total_powerflips, @total_dashes, @total_mana_obtained, @max_combo_achieved, @total_login_days, @last_daily_challenge_real_business_day, @account_id,
         @tutorial_step, @tutorial_skip_flag, @tutorial_gacha_character_id,
         @time_offset${idVal})
     `).run(params)
@@ -1130,6 +1176,7 @@ export function updatePlayerSync(
         'totalManaObtained': 'total_mana_obtained',
         'maxComboAchieved': 'max_combo_achieved',
         'totalLoginDays': 'total_login_days',
+        'lastDailyChallengeRealBusinessDay': 'last_daily_challenge_real_business_day',
         'tutorialStep': 'tutorial_step',
         'tutorialSkipFlag': 'tutorial_skip_flag',
         'tutorialGachaCharacterId': 'tutorial_gacha_character_id'
@@ -1255,29 +1302,6 @@ export function dailyResetPlayerDataSync(
                 (player.totalLoginDays ?? 0) + 1,
                 loginDate,
             )
-
-            // Reset daily challenge points — sync with CDN and rebuild if missing
-            const dcEntries = getPlayerDailyChallengePointListSync(playerId)
-            const defaults = getDailyChallengePointDefaults()
-            if (dcEntries.length === 0) {
-                insertPlayerDailyChallengePointListSync(playerId, defaults)
-            } else {
-                // Reset existing entries to CDN max
-                for (const entry of dcEntries) {
-                    const cdn = getRuntimeContentTableSync(
-                        "daily_challenge_point_lookup.json",
-                        bundledDailyChallengePointLookup as DailyChallengePointLookup,
-                    )[String(entry.id)]
-                    const maxPoint = cdn?.maxPoint ?? entry.point
-                    updatePlayerDailyChallengePointSync(playerId, entry.id, maxPoint + entry.campaignList.reduce((s, c) => s + c.additionalPoint, 0))
-                }
-                // Add any new CDN entries not yet in player's list
-                const existingIds = new Set(dcEntries.map(e => e.id))
-                const missing = defaults.filter(e => !existingIds.has(e.id))
-                if (missing.length > 0) {
-                    insertPlayerDailyChallengePointListSync(playerId, missing)
-                }
-            }
 
             // reset gacha "isDailyFirst" values.
             const gachaInfo = getPlayerGachaInfoListSync(playerId)

@@ -32,6 +32,7 @@ export interface StartEntryDependencies<TActiveQuest> {
     updateItemCount(playerId: number, itemId: number, amount: number): void
     updatePlayer(update: Partial<StartEntryPlayer> & Pick<StartEntryPlayer, "id">): void
     persistActiveQuest(playerId: number, activeQuest: TActiveQuest): void
+    beforePersist?(playerId: number): void
     afterPersist?(playerId: number): void
     publishActiveQuest(playerId: number, activeQuest: TActiveQuest): void
 }
@@ -95,6 +96,8 @@ export function runStartEntryTransaction<TActiveQuest>(
         }
         const player = dependencies.getPlayer(input.playerId)
         if (!player) throw new PlayerNotFoundError(input.playerId)
+
+        dependencies.beforePersist?.(input.playerId)
 
         const entryItemCost = input.entryCost
             && input.entryCost.itemId > 0

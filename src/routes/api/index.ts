@@ -1,7 +1,8 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { SessionType } from "../../data/types";
+import { getDb } from "../../data/db";
 import { getClientSerializedData, serializePlayerData } from "../../data/utils";
-import { collectPlayerDataPooledExpSync, collectPlayerPooledExpSync, dailyResetPlayerDataSync, getPlayerDailyChallengePointListSync, getPlayerSync, updatePlayerSync } from "../../data/domains/player"
+import { collectPlayerDataPooledExpSync, collectPlayerPooledExpSync, dailyResetPlayerDataSync, getPlayerDailyChallengePointListSync, getPlayerSync, refreshPlayerDailyChallengePointsForRealDaySync, updatePlayerSync } from "../../data/domains/player"
 import { getPlayerActiveMissionsSync, getPlayerClearedRegularMissionListSync } from "../../data/domains/mission"
 import { getPlayerBoxGachasSync } from "../../data/domains/boxGacha"
 import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../../data/domains/character"
@@ -65,6 +66,9 @@ const routes = async (fastify: FastifyInstance) => {
 
         // get last login time
         dailyResetPlayerDataSync(player)
+        getDb().transaction(() => {
+            refreshPlayerDailyChallengePointsForRealDaySync(playerId, new Date())
+        })()
 
         // collect the player's pooled exp
         collectPlayerDataPooledExpSync(player)

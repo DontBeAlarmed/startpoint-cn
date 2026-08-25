@@ -1,13 +1,14 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import path from "node:path";
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { collectPlayerDataPooledExpSync, dailyResetPlayerDataSync, getPlayerSync, updatePlayerSync } from "../../data/domains/player"
+import { collectPlayerDataPooledExpSync, dailyResetPlayerDataSync, getPlayerSync, refreshPlayerDailyChallengePointsForRealDaySync, updatePlayerSync } from "../../data/domains/player"
 import {
     getPlayerActiveQuestSync,
     updatePlayerActiveQuestCoordinatorOriginSync,
     updatePlayerActiveQuestEntryItemCountSync,
 } from "../../data/domains/quest_active"
 import { getSession } from "../../data/domains/session"
+import { getDb } from "../../data/db"
 import { findPendingForcedNews } from "../../lib/news-catalog"
 import { getClientSerializedData } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -216,6 +217,13 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
         const previousLastLoginMs = player.lastLoginTime.getTime();
         const isBeginner = player.totalLoginDays <= 1;
         dailyResetPlayerDataSync(player, now, options.dailyResetHour);
+        getDb().transaction(() => {
+            refreshPlayerDailyChallengePointsForRealDaySync(
+                playerId,
+                gameTime.realNow,
+                options.dailyResetHour ?? 5,
+            )
+        })()
         collectPlayerDataPooledExpSync(player);
 
         // Run save validators (permanent fixes: max_level, etc.)

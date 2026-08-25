@@ -1,6 +1,6 @@
 import { deletePlayerActiveQuestSync } from "../../../data/domains/quest_active"
 import { deletePlayerRushEventPlayedPartyListSync, getPlayerRushEventSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, updatePlayerRushEventSync } from "../../../data/domains/rushEvent"
-import { getPlayerDailyChallengePointListSync, getPlayerSync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../../data/domains/player"
+import { getPlayerDailyChallengePointListSync, getPlayerSync, refreshPlayerDailyChallengePointsForRealDaySync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../../data/domains/player"
 import { getPlayerItemSync, givePlayerItemSync } from "../../../data/domains/item"
 import { getServerGameplaySettingsSync } from "../../../data/domains/server-settings"
 import { getRaidEventBossStateSync, incrementPlayerRaidEventQuestKillCountSync, upsertRaidEventBossStateSync } from "../../../data/domains/raidEvent"
@@ -34,6 +34,7 @@ import type { ValidatedSingleFinishBody } from "../single-finish-validation"
 import { dispatchModeRushFinish } from "../../../modes/registry"
 import { createModeTransactionHost } from "../../../modes/loader"
 import { getServerTime } from "../../../utils"
+import { getRealNow } from "../../../runtime/time/game-time"
 import bundledEventChallengePointMap from "../../../../assets/event_challenge_point_map.json"
 import bundledAdditionalRewardRules from "../../../../assets/additional_reward_rules.json"
 import { handleCarnivalEventFinish } from "./carnival-handler"
@@ -55,6 +56,7 @@ export interface SingleSettlementWritesInput {
     finishCtx: FinishContext
     rushEventFolderMaxRound?: number
     scoreAttackBorderTiers: ScoreAttackBorderTier[]
+    dailyResetHour?: number
 }
 
 function finalizeSingleAwakePublicationWrites(playerId: number, isScoreAttackEvent: boolean): void {
@@ -67,7 +69,7 @@ export function executeSingleSettlementWrites(
     settlementPlayer: Player,
 ) {
     const { body, questData, rewardEligibility, finishCtx,
-        rushEventFolderMaxRound, scoreAttackBorderTiers } = input
+        rushEventFolderMaxRound, scoreAttackBorderTiers, dailyResetHour = 5 } = input
     const { playerId, questCategory, questId, clearTime, clearRank,
         questAccomplished, questProgress, questPreviouslyCompleted } = finishCtx
     const isScoreAttackEvent = questCategory === QuestCategory.SCORE_ATTACK_EVENT
@@ -150,8 +152,9 @@ export function executeSingleSettlementWrites(
         ? grantDirectRewards(playerId, "s_plus", [questData.sPlusReward]) : null
     if (didLevelUp) console.log(`[BATTLE-FINISH] player ${playerId} leveled up: ${oldRkDegree} -> ${newDegreeId}, stamina refilled`)
 
+    refreshPlayerDailyChallengePointsForRealDaySync(playerId, getRealNow(), dailyResetHour)
     const dailyChallengePointList = handleDailyChallengePoint({
-        questCategory, eventId: questData.eventId, playerId,
+        questCategory, questId, eventId: questData.eventId, playerId,
         challengePointMap: getRuntimeContentTableSync(
             "event_challenge_point_map.json",
             bundledEventChallengePointMap as Record<string, number>,

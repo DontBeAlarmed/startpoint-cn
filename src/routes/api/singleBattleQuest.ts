@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { getPlayerActiveQuestSync } from "../../data/domains/quest_active"
-import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
+import { getPlayerDailyChallengePointListSync, getPlayerSync, refreshPlayerDailyChallengePointsForRealDaySync, updatePlayerSync } from "../../data/domains/player"
 import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
 import { getPlayerMailCountSync } from "../../data/domains/mail"
 import { getQuestConfigurationErrorResponse, getQuestFromCategorySync } from "../../lib/assets"
@@ -18,6 +18,7 @@ import { settleSingleBattleQuest } from "../../lib/quest/finish/single-orchestra
 import { buildSingleFinishResponse } from "../../lib/quest/finish/single-response-projector"
 import type { SingleFinishResponseHeaders } from "../../lib/quest/finish/single-response-projector"
 import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json"
+import bundledEventChallengePointMap from "../../../assets/event_challenge_point_map.json"
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 import {
     mergeMissionSettlementResponse,
@@ -53,6 +54,16 @@ import {
     validateSingleFinishRequest,
     type ValidatedSingleFinishBody,
 } from "../../lib/quest/single-finish-validation"
+import {
+    assertDailyChallengePointAvailable,
+    DailyChallengePointExhaustedError,
+    DailyChallengePointUnavailableError,
+    getDailyChallengePointId,
+} from "../../lib/quest/daily-challenge"
+
+export interface SingleBattleQuestRoutesOptions {
+    readonly dailyResetHour?: number
+}
 
 const singleBattleModeHost = createModeHost(message => console.log(message))
 
@@ -112,7 +123,12 @@ function summarizeItemList(itemList: Record<string, number>): string {
 
 const continueVmoneyCost = 50;
 
-const routes = async (fastify: FastifyInstance) => {
+const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRoutesOptions = {}) => {
+    const dailyResetHour = options.dailyResetHour ?? 5
+    const challengePointMap = getRuntimeContentTableSync(
+        "event_challenge_point_map.json",
+        bundledEventChallengePointMap as Record<string, number>,
+    )
 
     fastify.post("/finish", async (request: FastifyRequest, reply: FastifyReply) => {
         const validationResult = validateSingleFinishRequest(request.body)
@@ -132,6 +148,7 @@ const routes = async (fastify: FastifyInstance) => {
             playerId,
             memoryActiveQuest: activeQuests[playerId],
             body,
+            dailyResetHour,
         })
         if (!finishResult.ok) {
             return reply.status(finishResult.statusCode).send(finishResult.payload)
@@ -306,6 +323,24 @@ const routes = async (fastify: FastifyInstance) => {
                 updateItemCount: updatePlayerItemSync,
                 updatePlayer: updatePlayerSync,
                 persistActiveQuest,
+                beforePersist: pointPlayerId => {
+                    const challengePointId = getDailyChallengePointId(
+                        category,
+                        questId,
+                        questData.eventId,
+                        challengePointMap,
+                    )
+                    if (challengePointId === undefined) return
+                    refreshPlayerDailyChallengePointsForRealDaySync(
+                        pointPlayerId,
+                        new Date(),
+                        dailyResetHour,
+                    )
+                    assertDailyChallengePointAvailable(
+                        challengePointId,
+                        getPlayerDailyChallengePointListSync(pointPlayerId),
+                    )
+                },
                 afterPersist: () => {
                     recordActiveMissionQuestChallengeFactSync(playerId, category)
                     missionSettlement = settleMissionCategories(
@@ -320,7 +355,9 @@ const routes = async (fastify: FastifyInstance) => {
             if (error instanceof ActiveQuestAlreadyExistsError
                 || error instanceof InsufficientEntryItemError
                 || error instanceof InsufficientStaminaError
-                || error instanceof PlayerNotFoundError) {
+                || error instanceof PlayerNotFoundError
+                || error instanceof DailyChallengePointExhaustedError
+                || error instanceof DailyChallengePointUnavailableError) {
                 console.warn(`[BATTLE-START] player ${playerId}: ${error.message}`)
                 if (error instanceof InsufficientStaminaError
                     && shouldStopAutoStartForStamina(isAutoStartMode, true)) {

@@ -54,10 +54,12 @@ export function settleSingleBattleQuest({
     playerId,
     memoryActiveQuest,
     body,
+    dailyResetHour = 5,
 }: {
     playerId: number
     memoryActiveQuest: ActiveQuest | undefined
     body: ValidatedSingleFinishBody
+    dailyResetHour?: number
 }): SingleFinishResult {
     console.log(`[FINISH] req: playerId=${playerId} questId=${body.quest_id} category=${body.category} activeExists=${memoryActiveQuest !== undefined} multi=${memoryActiveQuest?.isMulti ?? false}`)
     if (memoryActiveQuest === undefined) {
@@ -176,6 +178,7 @@ export function settleSingleBattleQuest({
                     finishCtx,
                     rushEventFolderMaxRound,
                     scoreAttackBorderTiers,
+                    dailyResetHour,
                 }, activeQuest, player)
                 return { settlement, questProgress }
             },
