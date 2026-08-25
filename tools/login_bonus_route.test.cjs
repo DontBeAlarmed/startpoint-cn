@@ -191,6 +191,19 @@ test("bonus shown acknowledges the pending batch once and later same-day loads s
     assert.equal(loaded.data.login_bonus_received_at, null)
 })
 
+test("virtual date jumps do not advance login rewards before the real 05:00 reset", async () => {
+    setServerTimeOffset(targetVirtualMs + 86_400_000 - Date.now())
+    try {
+        const response = await postLoad()
+        assert.equal(response.statusCode, 200, response.body)
+        const payload = decode(response)
+        assert.deepEqual(payload.data.bonus_index_list, [])
+        assert.equal(payload.data.login_bonus_received_at, null)
+    } finally {
+        setServerTimeOffset(targetVirtualMs - Date.now())
+    }
+})
+
 test("bonus shown rejects an unknown viewer without changing progress", async () => {
     const response = await app.inject({
         method: "POST",

@@ -26,9 +26,23 @@ const {
     confirmNormalLoginBonusShownSync,
     confirmLoginBonusesShownSync,
     getPlayerNormalLoginBonusProgressSync,
-    settleLoginBonusesSync,
-    settleNormalLoginBonusSync,
+    settleLoginBonusesSync: settleLoginBonusesSyncImpl,
+    settleNormalLoginBonusSync: settleNormalLoginBonusSyncImpl,
 } = require("../src/lib/login-bonus")
+
+function settleLoginBonusesSync(input) {
+    return settleLoginBonusesSyncImpl({
+        realNowMs: input.realNowMs ?? input.virtualNowMs,
+        ...input,
+    })
+}
+
+function settleNormalLoginBonusSync(input) {
+    return settleNormalLoginBonusSyncImpl({
+        realNowMs: input.realNowMs ?? input.virtualNowMs,
+        ...input,
+    })
+}
 
 const catalog = require("../assets/login_bonus.json")
 let database
@@ -99,9 +113,94 @@ test("Normal login reward grant is atomic and pending loads are idempotent", () 
         groupId: "normal_2022",
         lastGrantedIndex: 1,
         lastGrantedBusinessDay: "2024-08-14",
+        lastGrantedRealBusinessDay: "2024-08-14",
         receivedAt: Math.floor(virtualNowMs / 1000),
         shownAt: null,
     })
+})
+
+test("login rewards advance at the real 05:00 business-day boundary", () => {
+    const playerId = createPlayer("real-business-day")
+    const virtualNowMs = at("2024-08-14T12:00:00.000Z")
+    const realBeforeResetMs = at("2024-08-14T20:59:00.000Z")
+    const realAfterResetMs = at("2024-08-14T21:00:00.000Z")
+
+    const first = settleNormalLoginBonusSync({
+        playerId,
+        virtualNowMs,
+        realNowMs: realBeforeResetMs,
+        dailyResetHour: 5,
+        catalog,
+    })
+    assert.equal(first.status, "granted")
+    confirmNormalLoginBonusShownSync(playerId, realBeforeResetMs + 1_000)
+
+    const second = settleNormalLoginBonusSync({
+        playerId,
+        virtualNowMs,
+        realNowMs: realAfterResetMs,
+        dailyResetHour: 5,
+        catalog,
+    })
+    assert.equal(second.status, "granted")
+    assert.equal(second.bonus.index, 2)
+})
+
+test("virtual date movement alone does not advance login rewards", () => {
+    const playerId = createPlayer("virtual-only")
+    const realNowMs = at("2024-08-14T20:00:00.000Z")
+    const first = settleNormalLoginBonusSync({
+        playerId,
+        virtualNowMs: at("2024-08-14T12:00:00.000Z"),
+        realNowMs,
+        dailyResetHour: 5,
+        catalog,
+    })
+    assert.equal(first.status, "granted")
+    confirmNormalLoginBonusShownSync(playerId, realNowMs + 1_000)
+
+    const second = settleNormalLoginBonusSync({
+        playerId,
+        virtualNowMs: at("2024-08-15T12:00:00.000Z"),
+        realNowMs,
+        dailyResetHour: 5,
+        catalog,
+    })
+    assert.equal(second.status, "none")
+})
+
+test("legacy progress establishes a real-day baseline without retroactive reward", () => {
+    const playerId = createPlayer("legacy-real-day")
+    database.prepare(`
+        INSERT INTO players_login_bonus_progress (
+            player_id, group_id, last_granted_index,
+            last_granted_business_day, received_at, shown_at
+        ) VALUES (?, 'normal_2022', 1, '2024-08-14', 1723636800, 1723636801)
+    `).run(playerId)
+
+    const realNowMs = at("2024-08-14T21:30:00.000Z")
+    const baseline = settleNormalLoginBonusSync({
+        playerId,
+        virtualNowMs: at("2024-08-14T12:00:00.000Z"),
+        realNowMs,
+        dailyResetHour: 5,
+        catalog,
+    })
+    assert.equal(baseline.status, "none")
+    assert.equal(
+        getPlayerNormalLoginBonusProgressSync(playerId).lastGrantedRealBusinessDay,
+        "2024-08-15",
+    )
+
+    const next = settleNormalLoginBonusSync({
+        playerId,
+        virtualNowMs: at("2024-08-14T12:00:00.000Z"),
+        realNowMs: at("2024-08-15T21:30:00.000Z"),
+        dailyResetHour: 5,
+        catalog,
+    })
+    assert.equal(next.status, "granted")
+    assert.equal(next.bonus.index, 2)
 })
 
 test("one load grants Normal and multiple active non-premium groups in one pending batch", () => {

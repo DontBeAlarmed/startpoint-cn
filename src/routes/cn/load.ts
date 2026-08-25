@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import path from "node:path";
-import { generateDataHeaders, getServerTime, getServerDate } from "../../utils";
+import { generateDataHeaders, getServerTime } from "../../utils";
 import { collectPlayerDataPooledExpSync, dailyResetPlayerDataSync, getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import {
     getPlayerActiveQuestSync,
@@ -44,6 +44,7 @@ import {
     type LoginBonusSettlement,
 } from "../../lib/login-bonus";
 import type { LoginBonusCatalog } from "../../content/converters/login-bonus";
+import { getGameTimeContext } from "../../runtime/time/game-time";
 
 interface CnLoadBody {
     device_id: number;
@@ -210,7 +211,8 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             return reply.status(500).send({ error: "Internal Server Error", message: "No player data." });
         }
 
-        const now = getServerDate();
+        const gameTime = getGameTimeContext();
+        const now = gameTime.virtualNow;
         const previousLastLoginMs = player.lastLoginTime.getTime();
         const isBeginner = player.totalLoginDays <= 1;
         dailyResetPlayerDataSync(player, now, options.dailyResetHour);
@@ -229,6 +231,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
         const loginBonusSettlement: LoginBonusSettlement = settleLoginBonusesSync({
             playerId,
             virtualNowMs: now.getTime(),
+            realNowMs: gameTime.realNowMs,
             dailyResetHour: options.dailyResetHour ?? 5,
             catalog: getRuntimeContentTableSync(
                 "login_bonus.json",

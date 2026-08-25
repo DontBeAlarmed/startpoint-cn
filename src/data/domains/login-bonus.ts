@@ -5,6 +5,7 @@ export interface PlayerLoginBonusProgress {
     readonly groupId: string
     readonly lastGrantedIndex: number
     readonly lastGrantedBusinessDay: string
+    readonly lastGrantedRealBusinessDay: string | null
     readonly receivedAt: number
     readonly shownAt: number | null
 }
@@ -14,6 +15,7 @@ interface PlayerLoginBonusProgressRow {
     group_id: string
     last_granted_index: number
     last_granted_business_day: string
+    last_granted_real_business_day: string | null
     received_at: number
     shown_at: number | null
 }
@@ -24,6 +26,7 @@ function mapProgress(row: PlayerLoginBonusProgressRow): PlayerLoginBonusProgress
         groupId: row.group_id,
         lastGrantedIndex: row.last_granted_index,
         lastGrantedBusinessDay: row.last_granted_business_day,
+        lastGrantedRealBusinessDay: row.last_granted_real_business_day,
         receivedAt: row.received_at,
         shownAt: row.shown_at,
     }
@@ -34,7 +37,8 @@ export function listPlayerLoginBonusProgressSync(
 ): readonly PlayerLoginBonusProgress[] {
     return (getDb().prepare(`
         SELECT player_id, group_id, last_granted_index,
-               last_granted_business_day, received_at, shown_at
+               last_granted_business_day, last_granted_real_business_day,
+               received_at, shown_at
         FROM players_login_bonus_progress
         WHERE player_id = ?
         ORDER BY group_id
@@ -47,7 +51,8 @@ export function getPlayerLoginBonusProgressSync(
 ): PlayerLoginBonusProgress | null {
     const row = getDb().prepare(`
         SELECT player_id, group_id, last_granted_index,
-               last_granted_business_day, received_at, shown_at
+               last_granted_business_day, last_granted_real_business_day,
+               received_at, shown_at
         FROM players_login_bonus_progress
         WHERE player_id = ? AND group_id = ?
     `).get(playerId, groupId) as PlayerLoginBonusProgressRow | undefined
@@ -60,11 +65,13 @@ export function upsertPlayerLoginBonusProgressSync(
     getDb().prepare(`
         INSERT INTO players_login_bonus_progress (
             player_id, group_id, last_granted_index,
-            last_granted_business_day, received_at, shown_at
-        ) VALUES (?, ?, ?, ?, ?, ?)
+            last_granted_business_day, last_granted_real_business_day,
+            received_at, shown_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(player_id, group_id) DO UPDATE SET
             last_granted_index = excluded.last_granted_index,
             last_granted_business_day = excluded.last_granted_business_day,
+            last_granted_real_business_day = excluded.last_granted_real_business_day,
             received_at = excluded.received_at,
             shown_at = excluded.shown_at
     `).run(
@@ -72,6 +79,7 @@ export function upsertPlayerLoginBonusProgressSync(
         progress.groupId,
         progress.lastGrantedIndex,
         progress.lastGrantedBusinessDay,
+        progress.lastGrantedRealBusinessDay,
         progress.receivedAt,
         progress.shownAt,
     )

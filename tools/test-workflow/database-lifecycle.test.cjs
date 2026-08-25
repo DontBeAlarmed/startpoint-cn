@@ -459,9 +459,15 @@ test("default schema migrates schema 18 login bonus progress to per-group rows",
             .map(column => [column.name, column.pk]),
         [["player_id", 1], ["group_id", 2]],
     )
+    assert.equal(
+        migrated.pragma("table_info(players_login_bonus_progress)")
+            .some(column => column.name === "last_granted_real_business_day"),
+        true,
+    )
     assert.deepEqual(
         migrated.prepare(`
-            SELECT group_id, last_granted_index, last_granted_business_day, received_at, shown_at
+            SELECT group_id, last_granted_index, last_granted_business_day,
+                   last_granted_real_business_day, received_at, shown_at
             FROM players_login_bonus_progress
             WHERE player_id = ?
         `).get(playerId),
@@ -469,6 +475,7 @@ test("default schema migrates schema 18 login bonus progress to per-group rows",
             group_id: "normal_2022",
             last_granted_index: 3,
             last_granted_business_day: "2024-08-14",
+            last_granted_real_business_day: null,
             received_at: 1723636800,
             shown_at: 1723636801,
         },

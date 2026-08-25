@@ -176,6 +176,11 @@ const schemaColumns = {
         column: "login_days",
         definition: "INTEGER NOT NULL DEFAULT 0",
     },
+    "players_login_bonus_progress.last_granted_real_business_day": {
+        table: "players_login_bonus_progress",
+        column: "last_granted_real_business_day",
+        definition: "TEXT DEFAULT NULL",
+    },
     "players_mission_battle_counters.single_rank_ss_count": {
         table: "players_mission_battle_counters",
         column: "single_rank_ss_count",

@@ -292,6 +292,7 @@ test("v2 export includes all registered domains and excludes transient battle st
         group_id: "normal_2022",
         last_granted_index: 3,
         last_granted_business_day: "2026-08-24",
+        last_granted_real_business_day: null,
         received_at: 1787500000,
         shown_at: null,
     }])

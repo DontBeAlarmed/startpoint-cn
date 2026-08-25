@@ -58,6 +58,7 @@ export type LoginBonusSettlement = Readonly<
 export interface SettleLoginBonusInput {
     readonly playerId: number
     readonly virtualNowMs: number
+    readonly realNowMs: number
     readonly dailyResetHour: number
     readonly catalog: LoginBonusCatalog
     readonly previousLastLoginMs?: number
@@ -69,6 +70,7 @@ export type NormalLoginBonusSettlement = LoginBonusSettlement
 export interface SettleNormalLoginBonusInput {
     readonly playerId: number
     readonly virtualNowMs: number
+    readonly realNowMs: number
     readonly dailyResetHour: number
     readonly catalog: NormalLoginBonusCatalog
 }
@@ -197,6 +199,7 @@ function validateInput(input: SettleLoginBonusInput): void {
         throw new TypeError("playerId must be a positive safe integer")
     }
     if (!Number.isFinite(input.virtualNowMs)) throw new TypeError("virtualNowMs must be finite")
+    if (!Number.isFinite(input.realNowMs)) throw new TypeError("realNowMs must be finite")
     if (!Number.isSafeInteger(input.dailyResetHour)
         || input.dailyResetHour < 0
         || input.dailyResetHour > 23) {
@@ -229,11 +232,14 @@ export function settleLoginBonusesSync(input: SettleLoginBonusInput): LoginBonus
         }
 
         const businessDay = toBusinessDay(input.virtualNowMs, input.dailyResetHour)
-        const latestGrantedBusinessDay = progressRows
-            .map(progress => progress.lastGrantedBusinessDay)
+        const realBusinessDay = toBusinessDay(input.realNowMs, input.dailyResetHour)
+        const latestGrantedRealBusinessDay = progressRows
+            .map(progress => progress.lastGrantedRealBusinessDay)
+            .filter((day): day is string => day !== null)
             .sort()
             .at(-1)
-        if (latestGrantedBusinessDay !== undefined && businessDay <= latestGrantedBusinessDay) {
+        if (latestGrantedRealBusinessDay !== undefined
+            && realBusinessDay <= latestGrantedRealBusinessDay) {
             return { status: "none" } as const
         }
 
@@ -260,6 +266,13 @@ export function settleLoginBonusesSync(input: SettleLoginBonusInput): LoginBonus
                 progressByGroupId,
             )) continue
             if (progress === null && !isEligibleForNewGroup(group, input)) continue
+            if (progress !== null && progress.lastGrantedRealBusinessDay === null) {
+                upsertPlayerLoginBonusProgressSync({
+                    ...progress,
+                    lastGrantedRealBusinessDay: realBusinessDay,
+                })
+                continue
+            }
             const entry = nextEntry(group, progress)
             if (entry === null) continue
             selected.push({ groupId, group, entry, progress })
@@ -277,6 +290,7 @@ export function settleLoginBonusesSync(input: SettleLoginBonusInput): LoginBonus
                 groupId,
                 lastGrantedIndex: entry.index,
                 lastGrantedBusinessDay: businessDay,
+                lastGrantedRealBusinessDay: realBusinessDay,
                 receivedAt,
                 shownAt: null,
             }

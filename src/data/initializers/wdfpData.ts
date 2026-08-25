@@ -169,11 +169,13 @@ export default function init(
         group_id TEXT NOT NULL,
         last_granted_index INTEGER NOT NULL CHECK (last_granted_index > 0),
         last_granted_business_day TEXT NOT NULL,
+        last_granted_real_business_day TEXT DEFAULT NULL,
         received_at INTEGER NOT NULL CHECK (received_at >= 0),
         shown_at INTEGER DEFAULT NULL CHECK (shown_at IS NULL OR shown_at >= 0),
         PRIMARY KEY (player_id, group_id),
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
+    ensureSchemaColumn(database, "players_login_bonus_progress.last_granted_real_business_day")
 
     // Historical saves may contain a negative experience pool from an invalid
     // reward or import. The client renders it as zero, so repair it before any
