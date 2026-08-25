@@ -56,6 +56,73 @@ function asTable(
 }
 
 const positiveInteger = parsePositiveSafeIntegerMasterValue
+
+interface BossBattleQuestCandidate {
+    readonly questId: number
+    readonly hasEnemyLevel: boolean
+    readonly enemyLevel?: number
+    readonly name?: string
+}
+
+function normalizeBossName(value: unknown): string {
+    return String(value ?? "")
+        .replace(/::quest_rank::/g, "")
+        .replace(/\s+/g, "")
+}
+
+function missionBossName(definition: MissionMasterDefinition): string {
+    return normalizeBossName(String(definition.row[2] ?? "")
+        .replace(/^单人通关/, "")
+        .replace(/超级难度$/, ""))
+}
+
+export function getBossBattleQuestCandidates(
+    definition: MissionMasterDefinition,
+    rows: RawTable,
+): readonly BossBattleQuestCandidate[] {
+    const family = positiveInteger(definition.row[9])
+    const group = positiveInteger(definition.row[10])
+    if (family === undefined || group === undefined) return []
+    return Object.entries(rows).flatMap(([rawQuestId, row]) => {
+        const questId = positiveInteger(rawQuestId)
+        if (questId === undefined
+            || Math.floor(questId / 1_000_000) !== family
+            || Math.floor(questId / 1_000) % 1_000 !== group) return []
+        const raw = row as { readonly enemyLevel?: unknown; readonly name?: unknown }
+        return [{
+            questId,
+            hasEnemyLevel: Object.prototype.hasOwnProperty.call(raw, "enemyLevel"),
+            enemyLevel: positiveInteger(raw.enemyLevel),
+            name: typeof raw.name === "string" ? raw.name : undefined,
+        }]
+    })
+}
+
+export function resolveBossBattleQuestId(
+    definition: MissionMasterDefinition,
+    rows: RawTable,
+    range: readonly [number, number],
+): number | undefined {
+    const candidates = getBossBattleQuestCandidates(definition, rows)
+    const withLevels = candidates.filter((candidate): candidate is BossBattleQuestCandidate & { readonly enemyLevel: number } => (
+        candidate.enemyLevel !== undefined
+    ))
+    if (withLevels.length === 0) return undefined
+    const matches = withLevels.filter(candidate => (
+        candidate.enemyLevel >= range[0] && candidate.enemyLevel <= range[1]
+    ))
+    if (matches.length === 1) return matches[0].questId
+    if (matches.length < 2) return undefined
+    const descriptionName = missionBossName(definition)
+    if (descriptionName === "") return undefined
+    const namedMatches = matches.filter(candidate => (
+        candidate.name !== undefined
+        && normalizeBossName(candidate.name) !== ""
+        && descriptionName.includes(normalizeBossName(candidate.name))
+    ))
+    return namedMatches.length === 1 ? namedMatches[0].questId : undefined
+}
+
 function isKnownMissingTable(error: unknown, fileName: string): boolean {
     return error instanceof Error
         && error.message === `unsupported bundled mission table: ${fileName}`
@@ -215,30 +282,19 @@ function assertBossTable(definitions: readonly MissionMasterDefinition[], rows: 
         if (family === undefined || group === undefined || difficulty === undefined || !range) {
             throw invariant("bossBattleQuest", [definition], "mission selector is invalid")
         }
-        const candidates = Object.entries(rows).filter(([rawQuestId]) => {
-            const questId = positiveInteger(rawQuestId)
-            return questId !== undefined
-                && Math.floor(questId / 1_000_000) === family
-                && Math.floor(questId / 1_000) % 1_000 === group
-        })
+        const candidates = getBossBattleQuestCandidates(definition, rows)
         if (candidates.length === 0) {
             throw invariant("bossBattleQuest", [definition], "quest group is missing")
         }
-        const withLevel = candidates.filter(([, row]) => (
-            Object.prototype.hasOwnProperty.call(row, "enemyLevel")
-        ))
+        const withLevel = candidates.filter(candidate => candidate.hasEnemyLevel)
         if (withLevel.length > 0) {
             if (withLevel.length !== candidates.length) {
                 throw invariant("bossBattleQuest", [definition], "enemyLevel coverage is partial")
             }
-            const matches = withLevel.filter(([, row]) => {
-                const level = positiveInteger((row as { enemyLevel?: unknown }).enemyLevel)
-                if (level === undefined) {
-                    throw invariant("bossBattleQuest", [definition], "enemyLevel is invalid")
-                }
-                return level >= range[0] && level <= range[1]
-            })
-            if (matches.length !== 1) {
+            if (withLevel.some(row => row.enemyLevel === undefined)) {
+                throw invariant("bossBattleQuest", [definition], "enemyLevel is invalid")
+            }
+            if (resolveBossBattleQuestId(definition, rows, range) === undefined) {
                 throw invariant("bossBattleQuest", [definition], "enemyLevel selector is ambiguous")
             }
             continue

@@ -6,6 +6,7 @@ const {
     DegreeComputer,
     allFacts,
     bundledMissionContentRepository,
+    buildDegreeRuleCatalog,
     character,
     createSession,
     getMissionCatalog,
@@ -206,4 +207,18 @@ test("Degree Content table source remains the supplied Catalog", () => {
         createSession(catalog, [1111001], facts), 5, [1111001],
     )
     assert.equal(DegreeComputer.compute(1111001, context, 0), 1)
+})
+
+test("boss Degree rules use the mission description to disambiguate same-level quests", () => {
+    const catalog = getMissionCatalog(repositoryWith({
+        "boss_battle_quest.json": {
+            1001001: { enemyLevel: 10, name: "" },
+            1001002: { enemyLevel: 80, name: "技伤不死王 ::quest_rank::" },
+            1001003: { enemyLevel: 80, name: "维·索拉斯 ::quest_rank::" },
+            1001004: { enemyLevel: 80, name: "能力不死王 ::quest_rank::" },
+        },
+    }, "boss-degree-name-selector"))
+
+    const rules = buildDegreeRuleCatalog(catalog, [70009]).rules
+    assert.equal(rules.get(70009).questId, 1001003)
 })

@@ -6,6 +6,7 @@ import { getDegreeRequirement } from "./requirements/provider-degree"
 import {
     asDegreeTable,
     loadDegreeContentTables,
+    resolveBossBattleQuestId,
     type DegreeContentTables,
 } from "./degree-content-tables"
 import { readonlyMap } from "./degree-immutable"
@@ -17,6 +18,12 @@ import {
     isAuthoritativeCharacterLevelMission,
     isSecondManaBoardAggregateMission,
 } from "./degree-context-requirements"
+
+const QUEST_LEVELS = new Map<number, readonly [number, number]>([
+    [1, [1, 19]], [2, [20, 39]], [3, [40, 69]], [4, [80, 89]],
+    [5, [70, 79]], [6, [90, 99]], [7, [100, 100]],
+])
+const BUNDLED_SUPER_IDS = new Map([["1:6", 1006003], ["1:20", 1020003]])
 
 export type DegreeMetric =
     | "companionCount" | "overLimitCount" | "manaBoardCount" | "bondTokenCount"
@@ -57,14 +64,6 @@ export interface DegreeRuleCatalog {
     readonly tables: DegreeContentTables
 }
 
-type QuestRow = { readonly enemyLevel?: unknown }
-
-const QUEST_LEVELS = new Map<number, readonly [number, number]>([
-    [1, [1, 19]], [2, [20, 39]], [3, [40, 69]], [4, [80, 89]],
-    [5, [70, 79]], [6, [90, 99]], [7, [100, 100]],
-])
-const BUNDLED_SUPER_IDS = new Map([["1:6", 1006003], ["1:20", 1020003]])
-
 function descriptionTarget(definition: MissionMasterDefinition, pattern: RegExp, scale = 1): number | undefined {
     const match = pattern.exec(String(definition.row[2] ?? ""))
     const parsed = parsePositiveSafeIntegerMasterValue(match?.[1])
@@ -102,22 +101,15 @@ export function resolveBossBattleSuperQuestId(definition: MissionMasterDefinitio
     const difficulty = parsePositiveSafeIntegerMasterValue(definition.row[12])
     const range = difficulty === undefined ? undefined : QUEST_LEVELS.get(difficulty)
     if (family === undefined || group === undefined || difficulty === undefined || !range) return undefined
-    const candidates = Object.entries(quests).flatMap(([rawId, row]) => {
+    const resolved = resolveBossBattleQuestId(definition, quests, range)
+    if (resolved !== undefined) return resolved
+    const candidates = Object.entries(quests).filter(([rawId]) => {
         const questId = parsePositiveSafeIntegerMasterValue(rawId)
-        if (questId === undefined || Math.floor(questId / 1_000_000) !== family
-            || Math.floor(questId / 1_000) % 1_000 !== group) return []
-        return [{
-            questId,
-            enemyLevel: parsePositiveSafeIntegerMasterValue((row as QuestRow)?.enemyLevel),
-        }]
+        return questId !== undefined && Math.floor(questId / 1_000_000) === family
+            && Math.floor(questId / 1_000) % 1_000 === group
     })
-    const withLevels = candidates.filter((item): item is { questId: number; enemyLevel: number } => (
-        item.enemyLevel !== undefined
-    ))
-    if (withLevels.length > 0) {
-        const matches = withLevels.filter(item => item.enemyLevel >= range[0] && item.enemyLevel <= range[1])
-        return matches.length === 1 ? matches[0].questId : undefined
-    }
+    const hasLevels = candidates.some(([, row]) => Object.prototype.hasOwnProperty.call(row, "enemyLevel"))
+    if (hasLevels) return undefined
     const questId = BUNDLED_SUPER_IDS.get(`${family}:${group}`) ?? family * 1_000_000 + group * 1_000 + difficulty
     return quests[String(questId)] === undefined ? undefined : questId
 }
