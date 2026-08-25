@@ -165,6 +165,27 @@ test("repeating the same participant does not consume another seat", () => {
     assert.equal(second.value, first.value)
 })
 
+test("an admission for an already occupied room member does not reserve another seat", () => {
+    const registry = new AdmissionRegistry({
+        now: () => 1_000,
+        getOccupiedMemberCount: () => 1,
+        isOccupiedMember: (_roomNumber, viewerId) => viewerId === 101,
+    })
+    assert.equal(issue(registry).ok, true)
+    assert.equal(issue(registry, {
+        participant: { nodeSessionId: "node-b", viewerId: 202 },
+        snapshot: snapshotFixture(202, "Guest A"),
+    }).ok, true)
+    assert.equal(issue(registry, {
+        participant: { nodeSessionId: "node-c", viewerId: 303 },
+        snapshot: snapshotFixture(303, "Guest B"),
+    }).ok, true)
+    assert.deepEqual(issue(registry, {
+        participant: { nodeSessionId: "node-d", viewerId: 404 },
+        snapshot: snapshotFixture(404, "Guest C"),
+    }), { ok: false, error: "ROOM_FULL" })
+})
+
 test("concurrent admissions reserve at most the two guest seats", () => {
     const registry = new AdmissionRegistry({
         now: () => 1_000,

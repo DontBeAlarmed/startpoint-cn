@@ -1,6 +1,6 @@
 import type { CoordinatorErrorCode, ParticipantIdentity } from "../coordinator/contracts"
 import type { PlayerSnapshot } from "../snapshot/player-snapshot"
-import { getRoomOccupiedMemberCount } from "../room/manager"
+import { getRoom, getRoomOccupiedMemberCount, isRoomViewerMember } from "../room/manager"
 
 const MAX_REAL_ROOM_MEMBERS = 3
 
@@ -29,6 +29,7 @@ export type AdmissionIssueResult =
 export interface AdmissionRegistryOptions {
     readonly now?: () => number
     readonly getOccupiedMemberCount?: (roomNumber: string) => number
+    readonly isOccupiedMember?: (roomNumber: string, viewerId: number) => boolean
 }
 
 function normalizeRoomNumber(value: unknown): string | null {
@@ -49,10 +50,12 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
     private readonly admissions = new Map<string, RoomAdmission>()
     private readonly now: () => number
     private readonly getOccupiedMemberCount: (roomNumber: string) => number
+    private readonly isOccupiedMember: (roomNumber: string, viewerId: number) => boolean
 
     constructor(options: AdmissionRegistryOptions = {}) {
         this.now = options.now ?? Date.now
         this.getOccupiedMemberCount = options.getOccupiedMemberCount ?? (() => 0)
+        this.isOccupiedMember = options.isOccupiedMember ?? (() => false)
     }
 
     issue(input: AdmissionIssueInput): AdmissionIssueResult {
@@ -83,7 +86,8 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
         }
 
         const pendingMemberCount = [...this.admissions.values()]
-            .filter(admission => admission.roomNumber === roomNumber)
+            .filter(admission => admission.roomNumber === roomNumber
+                && !this.isOccupiedMember(roomNumber, admission.participant.viewerId))
             .length
         if (this.getOccupiedMemberCount(roomNumber) + pendingMemberCount >= MAX_REAL_ROOM_MEMBERS) {
             return { ok: false, error: "ROOM_FULL" }
@@ -157,4 +161,8 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
 
 export const embeddedAdmissionRegistry = new AdmissionRegistry({
     getOccupiedMemberCount: getRoomOccupiedMemberCount,
+    isOccupiedMember: (roomNumber, viewerId) => {
+        const room = getRoom(roomNumber)
+        return room !== undefined && isRoomViewerMember(room, viewerId)
+    },
 })
