@@ -10,7 +10,9 @@ import {
 } from "../../data/domains/player-history"
 import { getPlayerPartyGroupListSync } from "../../data/domains/party"
 import { getPlayerSync } from "../../data/domains/player"
+import { getAccountSync } from "../../data/domains/account"
 import { getSession } from "../../data/domains/session"
+import { clientSerializeDate } from "../../data/utils"
 import { PartyCategory } from "../../data/types"
 import { parseGlobalPartyId } from "../../lib/special-event-parties"
 import {
@@ -43,13 +45,14 @@ async function resolvePlayer(request: FastifyRequest, reply: FastifyReply) {
         reply.status(400).send({ error: "Bad Request", message: "Invalid viewer id." })
         return null
     }
+    const account = getAccountSync(session.accountId)
     const playerId = resolvePlayerIdSync(session.accountId)
     const player = playerId === null ? null : getPlayerSync(playerId)
-    if (playerId === null || !player) {
+    if (!account || playerId === null || !player) {
         reply.status(400).send({ error: "Bad Request", message: "Player not found." })
         return null
     }
-    return { viewerId: body.viewer_id, playerId, player }
+    return { viewerId: body.viewer_id, playerId, player, account }
 }
 
 function getFavoriteParty(playerId: number, partySlot: number, leaderCharacterId: number) {
@@ -97,12 +100,18 @@ function parseTopicVisibility(value: unknown): Record<string, boolean> | null {
 function serializeTopics(
     catalog: PlayerHistoryCatalog,
     topicVisibility: Record<string, boolean>,
+    startGameDate: Date,
 ) {
     return Object.fromEntries(catalog.topics.map(topic => [
         String(topic.index),
         {
             is_visible: topicVisibility[String(topic.index)] ?? topic.toggleDefault,
-            value_list: createEmptyPlayerHistoryTopicValues(topic.aggregationTarget),
+            value_list: topic.aggregationTarget === 0
+                ? {
+                    ...createEmptyPlayerHistoryTopicValues(topic.aggregationTarget),
+                    date_values: [clientSerializeDate(startGameDate)],
+                }
+                : createEmptyPlayerHistoryTopicValues(topic.aggregationTarget),
         },
     ]))
 }
@@ -131,7 +140,11 @@ const routes = async (fastify: FastifyInstance) => {
                     character_ids: settings.characterIds,
                     unison_character_ids: settings.unisonCharacterIds,
                 },
-                player_history_topic_list: serializeTopics(catalog, settings.topicVisibility),
+                player_history_topic_list: serializeTopics(
+                    catalog,
+                    settings.topicVisibility,
+                    resolved.account.regTime,
+                ),
             },
         })
     })

@@ -20,6 +20,7 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { updatePlayerPartySync } = require("../src/data/domains/party")
 const { PROFILE_FAVORITE_PARTY_CATEGORY } = require("../src/data/types")
+const { clientSerializeDate } = require("../src/data/utils")
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 const { setServerTime } = require("../src/utils")
 
@@ -126,7 +127,7 @@ test("player history index exposes the required client shape", async () => {
             value_list: {
                 int_values: null,
                 string_values: null,
-                date_values: [null],
+                date_values: [clientSerializeDate(account.regTime)],
                 character_id_values: null,
                 equipment_id_values: null,
                 quest_values: null,
