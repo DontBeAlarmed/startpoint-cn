@@ -281,7 +281,7 @@ test("default schema migration preserves v6 players and creates cascading Pass t
 
     data.initializeDatabase({ paths })
     const migrated = getDb()
-    assert.equal(migrated.pragma("user_version", { simple: true }), 18)
+    assert.equal(migrated.pragma("user_version", { simple: true }), 19)
     assert.deepEqual(
         migrated.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'players_character_election_votes'").get(),
         { name: "players_character_election_votes" },
@@ -360,7 +360,7 @@ test("default schema migrates schema 14 active quests to battle session and coor
 
     data.initializeDatabase({ paths })
 
-    assert.equal(getDb().pragma("user_version", { simple: true }), 18)
+    assert.equal(getDb().pragma("user_version", { simple: true }), 19)
     assert.equal(
         getDb().pragma("table_info(players_active_quests)")
             .some(column => column.name === "battle_session_id" && column.notnull === 0),
@@ -404,12 +404,81 @@ test("default schema migrates schema 15 databases to player history storage", t 
     fs.writeFileSync(paths.databaseVersionFile, "15")
 
     data.initializeDatabase({ paths })
-    assert.equal(getDb().pragma("user_version", { simple: true }), 18)
+    assert.equal(getDb().pragma("user_version", { simple: true }), 19)
     assert.deepEqual(
         getDb().prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'players_player_history_settings'").get(),
         { name: "players_player_history_settings" },
     )
     assert.equal(getDb().prepare("SELECT name FROM players WHERE id = ?").get(playerId).name, "schema-v15-player")
+})
+
+test("default schema migrates schema 18 login bonus progress to per-group rows", t => {
+    const paths = temporaryPaths(t)
+    data.initializeDatabase({ paths })
+    const { insertAccountSync } = require("../../src/data/domains/account")
+    const { insertDefaultPlayerSync } = require("../../src/data/domains/player")
+    const account = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId: "schema-v18-login-bonus-migration",
+        status: "normal",
+    })
+    const playerId = insertDefaultPlayerSync(account.id).id
+    data.closeDatabase()
+
+    const schema18 = new Sqlite(paths.databaseFile)
+    schema18.exec(`
+        DROP TABLE players_login_bonus_progress;
+        CREATE TABLE players_login_bonus_progress (
+            player_id INTEGER PRIMARY KEY,
+            group_id TEXT NOT NULL,
+            last_granted_index INTEGER NOT NULL CHECK (last_granted_index > 0),
+            last_granted_business_day TEXT NOT NULL,
+            received_at INTEGER NOT NULL CHECK (received_at >= 0),
+            shown_at INTEGER DEFAULT NULL CHECK (shown_at IS NULL OR shown_at >= 0),
+            FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+        );
+        INSERT INTO players_login_bonus_progress (
+            player_id, group_id, last_granted_index,
+            last_granted_business_day, received_at, shown_at
+        ) VALUES (
+            ${playerId}, 'normal_2022', 3, '2024-08-14', 1723636800, 1723636801
+        );
+    `)
+    schema18.pragma("user_version = 18")
+    schema18.close()
+    fs.writeFileSync(paths.databaseVersionFile, "18")
+
+    data.initializeDatabase({ paths })
+    const migrated = getDb()
+    assert.equal(migrated.pragma("user_version", { simple: true }), 19)
+    assert.deepEqual(
+        migrated.pragma("table_info(players_login_bonus_progress)")
+            .filter(column => column.pk > 0)
+            .map(column => [column.name, column.pk]),
+        [["player_id", 1], ["group_id", 2]],
+    )
+    assert.deepEqual(
+        migrated.prepare(`
+            SELECT group_id, last_granted_index, last_granted_business_day, received_at, shown_at
+            FROM players_login_bonus_progress
+            WHERE player_id = ?
+        `).get(playerId),
+        {
+            group_id: "normal_2022",
+            last_granted_index: 3,
+            last_granted_business_day: "2024-08-14",
+            received_at: 1723636800,
+            shown_at: 1723636801,
+        },
+    )
+    assert.doesNotThrow(() => migrated.prepare(`
+        INSERT INTO players_login_bonus_progress (
+            player_id, group_id, last_granted_index,
+            last_granted_business_day, received_at, shown_at
+        ) VALUES (?, 'limited_a', 1, '2024-08-14', 1723636800, NULL)
+    `).run(playerId))
 })
 
 test("active quest domain roundtrips nullable battle session identity", t => {

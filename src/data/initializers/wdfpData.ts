@@ -165,12 +165,13 @@ export default function init(
     ensureSchemaColumn(database, "players.max_combo_achieved")
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_login_bonus_progress (
-        player_id INTEGER PRIMARY KEY,
+        player_id INTEGER NOT NULL,
         group_id TEXT NOT NULL,
         last_granted_index INTEGER NOT NULL CHECK (last_granted_index > 0),
         last_granted_business_day TEXT NOT NULL,
         received_at INTEGER NOT NULL CHECK (received_at >= 0),
         shown_at INTEGER DEFAULT NULL CHECK (shown_at IS NULL OR shown_at >= 0),
+        PRIMARY KEY (player_id, group_id),
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
 

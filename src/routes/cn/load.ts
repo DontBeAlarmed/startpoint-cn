@@ -23,7 +23,7 @@ import {
     type AssetProviderConfig,
 } from "../../content/cdn/asset-mode";
 import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json";
-import bundledNormalLoginBonuses from "../../../assets/login_bonus_normal.json";
+import bundledLoginBonuses from "../../../assets/login_bonus.json";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 import { reconcileActiveMissionFactsWithResult } from "../../lib/mission/active-reconciliation";
 import { recordEventLoginMissionFactSync } from "../../lib/mission/event-entry-facts";
@@ -39,10 +39,10 @@ import type {
     MultiSettlementIdentity,
 } from "../../multi/settlement/verifier";
 import {
-    settleNormalLoginBonusSync,
-    type NormalLoginBonusSettlement,
+    settleLoginBonusesSync,
+    type LoginBonusSettlement,
 } from "../../lib/login-bonus";
-import type { NormalLoginBonusCatalog } from "../../content/converters/login-bonus";
+import type { LoginBonusCatalog } from "../../content/converters/login-bonus";
 
 interface CnLoadBody {
     device_id: number;
@@ -210,6 +210,8 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
         }
 
         const now = getServerDate();
+        const previousLastLoginMs = player.lastLoginTime.getTime();
+        const isBeginner = player.totalLoginDays <= 1;
         dailyResetPlayerDataSync(player, now, options.dailyResetHour);
         collectPlayerDataPooledExpSync(player);
 
@@ -223,14 +225,16 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             player = refreshedPlayer;
         }
 
-        const loginBonusSettlement: NormalLoginBonusSettlement = settleNormalLoginBonusSync({
+        const loginBonusSettlement: LoginBonusSettlement = settleLoginBonusesSync({
             playerId,
             virtualNowMs: now.getTime(),
             dailyResetHour: options.dailyResetHour ?? 5,
             catalog: getRuntimeContentTableSync(
-                "login_bonus_normal.json",
-                bundledNormalLoginBonuses as NormalLoginBonusCatalog,
+                "login_bonus.json",
+                bundledLoginBonuses as LoginBonusCatalog,
             ),
+            previousLastLoginMs,
+            isBeginner,
         });
         if (loginBonusSettlement.status === "granted") {
             const refreshedPlayer = getPlayerSync(playerId);
@@ -330,12 +334,12 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                 clientData.bonus_index_list = [];
                 clientData.login_bonus_received_at = null;
             } else {
-                clientData.bonus_index_list = [{
-                    bonus_group_id: loginBonusSettlement.bonus.groupId,
-                    bonus_group_type: "Normal",
-                    index: loginBonusSettlement.bonus.index,
-                }];
-                clientData.login_bonus_received_at = loginBonusSettlement.bonus.receivedAt;
+                clientData.bonus_index_list = loginBonusSettlement.bonuses.map(bonus => ({
+                    bonus_group_id: bonus.groupId,
+                    bonus_group_type: bonus.groupType,
+                    index: bonus.index,
+                }));
+                clientData.login_bonus_received_at = loginBonusSettlement.bonuses[0].receivedAt;
             }
 
             // Inject unfinished quest lists for battle recovery

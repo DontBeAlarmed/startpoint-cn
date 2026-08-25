@@ -179,7 +179,7 @@ const EXPECTED_REWARD_CDN_TABLES = Object.freeze({
 })
 
 const EXPECTED_LOGIN_BONUS_CDN_TABLE = Object.freeze({
-    tableName: "login_bonus_normal.json",
+    tableName: "login_bonus.json",
     source: "master/bonus/login_bonus.orderedmap",
     converterId: "login-bonus",
 })

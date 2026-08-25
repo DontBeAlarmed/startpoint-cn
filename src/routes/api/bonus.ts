@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { resolvePlayerIdSync } from "../../data/activeAccount"
 import { getSession } from "../../data/domains/session"
-import { confirmNormalLoginBonusShownSync } from "../../lib/login-bonus"
+import { confirmLoginBonusesShownSync } from "../../lib/login-bonus"
 import { getVirtualNowMs } from "../../runtime/time/game-time"
 import { generateDataHeaders } from "../../utils"
 
@@ -23,7 +23,7 @@ const routes = async (fastify: FastifyInstance) => {
         const playerId = session === null ? null : resolvePlayerIdSync(session.accountId)
         if (playerId === null) return badRequest(reply)
 
-        confirmNormalLoginBonusShownSync(playerId, getVirtualNowMs())
+        confirmLoginBonusesShownSync(playerId, getVirtualNowMs())
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             data_headers: generateDataHeaders({ viewer_id: viewerId as number }),

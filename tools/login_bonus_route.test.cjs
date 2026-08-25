@@ -18,7 +18,7 @@ process.env.DATA_DIR = databaseDirectory
 
 const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 const restoreContentSnapshot = installBundledGameplaySnapshot({
-    additionalTableNames: ["login_bonus_normal.json"],
+    additionalTableNames: ["login_bonus.json"],
 })
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
@@ -146,24 +146,25 @@ test("load grants and returns the current CDN Normal bonus with immediate invent
     assert.equal(firstResponse.statusCode, 200, firstResponse.body)
     const first = decode(firstResponse)
 
-    assert.deepEqual(first.data.bonus_index_list, [{
-        bonus_group_id: "normal_2022",
-        bonus_group_type: "Normal",
-        index: 1,
-    }])
+    assert.deepEqual(first.data.bonus_index_list, [
+        { bonus_group_id: "normal_2022", bonus_group_type: "Normal", index: 1 },
+        { bonus_group_id: "newbie_present", bonus_group_type: "ActiveUser", index: 1 },
+        { bonus_group_id: "anv3_present", bonus_group_type: "ActiveUser", index: 1 },
+        { bonus_group_id: "xmas22", bonus_group_type: "Limited", index: 1 },
+    ])
     assert.equal(typeof first.data.login_bonus_received_at, "number")
     assert.ok(Math.abs(first.data.login_bonus_received_at - targetVirtualMs / 1000) <= 2)
     assert.deepEqual(first.data.premium_bonus_index_list, [])
     assert.deepEqual(first.data.premium_bonus_mailed_item_list, [])
-    assert.equal(first.data.user_info.free_vmoney, before.freeVmoney + 50)
-    assert.equal(getPlayerSync(playerId).freeVmoney, before.freeVmoney + 50)
+    assert.equal(first.data.user_info.free_vmoney, before.freeVmoney + 6100)
+    assert.equal(getPlayerSync(playerId).freeVmoney, before.freeVmoney + 6100)
 
     const repeatedResponse = await postLoad()
     assert.equal(repeatedResponse.statusCode, 200, repeatedResponse.body)
     const repeated = decode(repeatedResponse)
     assert.deepEqual(repeated.data.bonus_index_list, first.data.bonus_index_list)
     assert.equal(repeated.data.login_bonus_received_at, first.data.login_bonus_received_at)
-    assert.equal(getPlayerSync(playerId).freeVmoney, before.freeVmoney + 50)
+    assert.equal(getPlayerSync(playerId).freeVmoney, before.freeVmoney + 6100)
 })
 
 test("bonus shown acknowledges the pending batch once and later same-day loads stay empty", async () => {
@@ -210,17 +211,18 @@ test("load encoding failure preserves one pending batch without duplicate reward
 
     const failed = await postLoadWith(failingApp, viewerId)
     assert.equal(failed.statusCode, 500)
-    assert.equal(getPlayerSync(interruptedPlayerId).freeVmoney, before.freeVmoney + 50)
+    assert.equal(getPlayerSync(interruptedPlayerId).freeVmoney, before.freeVmoney + 6100)
 
     const retryApp = await buildLoadApp()
     t.after(async () => retryApp.close())
     const retried = await postLoadWith(retryApp, viewerId)
     assert.equal(retried.statusCode, 200, retried.body)
     const payload = decode(retried)
-    assert.deepEqual(payload.data.bonus_index_list, [{
-        bonus_group_id: "normal_2022",
-        bonus_group_type: "Normal",
-        index: 1,
-    }])
-    assert.equal(getPlayerSync(interruptedPlayerId).freeVmoney, before.freeVmoney + 50)
+    assert.deepEqual(payload.data.bonus_index_list, [
+        { bonus_group_id: "normal_2022", bonus_group_type: "Normal", index: 1 },
+        { bonus_group_id: "newbie_present", bonus_group_type: "ActiveUser", index: 1 },
+        { bonus_group_id: "anv3_present", bonus_group_type: "ActiveUser", index: 1 },
+        { bonus_group_id: "xmas22", bonus_group_type: "Limited", index: 1 },
+    ])
+    assert.equal(getPlayerSync(interruptedPlayerId).freeVmoney, before.freeVmoney + 6100)
 })

@@ -15,7 +15,7 @@ process.env.DATA_DIR = databaseDirectory
 
 const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 const restoreContentSnapshot = installBundledGameplaySnapshot({
-    additionalTableNames: ["login_bonus_normal.json"],
+    additionalTableNames: ["login_bonus.json"],
 })
 const data = require("../src/data")
 const { getDb } = require("../src/data/db")
@@ -24,11 +24,13 @@ const { getPlayerItemSync } = require("../src/data/domains/item")
 const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
 const {
     confirmNormalLoginBonusShownSync,
+    confirmLoginBonusesShownSync,
     getPlayerNormalLoginBonusProgressSync,
+    settleLoginBonusesSync,
     settleNormalLoginBonusSync,
 } = require("../src/lib/login-bonus")
 
-const catalog = require("../assets/login_bonus_normal.json")
+const catalog = require("../assets/login_bonus.json")
 let database
 
 function createPlayer(label) {
@@ -44,6 +46,20 @@ function createPlayer(label) {
 
 function at(value) {
     return Date.parse(value)
+}
+
+function genericGroup(groupType, entries, options = {}) {
+    return {
+        groupType,
+        availableFromMs: options.availableFromMs ?? at("2024-08-01T00:00:00.000Z"),
+        availableUntilMs: options.availableUntilMs ?? null,
+        conditionPeriodFromMs: options.conditionPeriodFromMs ?? null,
+        conditionPeriodUntilMs: options.conditionPeriodUntilMs ?? null,
+        comebackInactivityDays: options.comebackInactivityDays ?? null,
+        linkedComebackGroupId: options.linkedComebackGroupId ?? null,
+        includeBeginner: options.includeBeginner ?? null,
+        entries,
+    }
 }
 
 test.before(() => {
@@ -69,6 +85,7 @@ test("Normal login reward grant is atomic and pending loads are idempotent", () 
     assert.equal(first.status, "granted")
     assert.deepEqual(first.bonus, {
         groupId: "normal_2022",
+        groupType: "Normal",
         index: 1,
         receivedAt: Math.floor(virtualNowMs / 1000),
     })
@@ -85,6 +102,139 @@ test("Normal login reward grant is atomic and pending loads are idempotent", () 
         receivedAt: Math.floor(virtualNowMs / 1000),
         shownAt: null,
     })
+})
+
+test("one load grants Normal and multiple active non-premium groups in one pending batch", () => {
+    const playerId = createPlayer("multiple-groups")
+    const catalog = {
+        normal: genericGroup("Normal", [
+            { index: 1, rewards: [{ kind: 0, count: 10 }] },
+            { index: 2, rewards: [{ kind: 0, count: 20 }] },
+        ]),
+        limited_a: genericGroup("Limited", [
+            { index: 1, rewards: [{ kind: 0, count: 30 }] },
+            { index: 2, rewards: [{ kind: 0, count: 40 }] },
+        ]),
+        limited_b: genericGroup("Limited", [
+            { index: 1, rewards: [{ kind: 0, count: 50 }] },
+        ]),
+    }
+    const first = settleLoginBonusesSync({
+        playerId,
+        virtualNowMs: at("2024-08-14T12:00:00.000Z"),
+        dailyResetHour: 5,
+        catalog,
+    })
+    assert.equal(first.status, "granted")
+    assert.deepEqual(first.bonuses.map(bonus => [bonus.groupId, bonus.groupType, bonus.index]), [
+        ["normal", "Normal", 1],
+        ["limited_a", "Limited", 1],
+        ["limited_b", "Limited", 1],
+    ])
+    const repeated = settleLoginBonusesSync({
+        playerId,
+        virtualNowMs: at("2024-08-15T12:00:00.000Z"),
+        dailyResetHour: 5,
+        catalog,
+    })
+    assert.equal(repeated.status, "pending")
+    assert.equal(repeated.bonuses.length, 3)
+    assert.equal(confirmLoginBonusesShownSync(playerId, at("2024-08-15T12:00:01.000Z")), true)
+
+    const second = settleLoginBonusesSync({
+        playerId,
+        virtualNowMs: at("2024-08-15T12:00:00.000Z"),
+        dailyResetHour: 5,
+        catalog,
+    })
+    assert.equal(second.status, "granted")
+    assert.deepEqual(second.bonuses.map(bonus => [bonus.groupId, bonus.index]), [
+        ["normal", 2],
+        ["limited_a", 2],
+    ])
+})
+
+test("Limited groups stop at their last entry and never wrap after a time rollback", () => {
+    const playerId = createPlayer("limited-end")
+    const catalog = {
+        limited: genericGroup("Limited", [
+            { index: 1, rewards: [{ kind: 0, count: 10 }] },
+        ]),
+    }
+    const now = at("2024-08-14T12:00:00.000Z")
+    assert.equal(settleLoginBonusesSync({ playerId, virtualNowMs: now, dailyResetHour: 5, catalog }).status, "granted")
+    assert.equal(confirmLoginBonusesShownSync(playerId, now + 1_000), true)
+    assert.equal(settleLoginBonusesSync({
+        playerId,
+        virtualNowMs: now + 86_400_000,
+        dailyResetHour: 5,
+        catalog,
+    }).status, "none")
+    assert.equal(settleLoginBonusesSync({
+        playerId,
+        virtualNowMs: now - 86_400_000,
+        dailyResetHour: 5,
+        catalog,
+    }).status, "none")
+})
+
+test("Comeback eligibility uses the previous login and ActiveUser linkage is mutually exclusive", () => {
+    const playerId = createPlayer("comeback")
+    const now = at("2024-08-15T12:00:00.000Z")
+    const catalog = {
+        comeback: genericGroup("Comeback", [
+            { index: 1, rewards: [{ kind: 0, count: 10 }] },
+            { index: 2, rewards: [{ kind: 0, count: 20 }] },
+        ], {
+            conditionPeriodFromMs: at("2024-07-01T00:00:00.000Z"),
+            conditionPeriodUntilMs: at("2024-07-31T23:59:59.000Z"),
+            comebackInactivityDays: 30,
+        }),
+        active: genericGroup("ActiveUser", [
+            { index: 1, rewards: [{ kind: 0, count: 99 }] },
+        ], { linkedComebackGroupId: "comeback" }),
+    }
+    const first = settleLoginBonusesSync({
+        playerId,
+        virtualNowMs: now,
+        previousLastLoginMs: at("2024-07-10T12:00:00.000Z"),
+        isBeginner: false,
+        dailyResetHour: 5,
+        catalog,
+    })
+    assert.equal(first.status, "granted")
+    assert.deepEqual(first.bonuses.map(bonus => bonus.groupId), ["comeback"])
+    assert.equal(confirmLoginBonusesShownSync(playerId, now + 1_000), true)
+
+    const next = settleLoginBonusesSync({
+        playerId,
+        virtualNowMs: now + 86_400_000,
+        previousLastLoginMs: now,
+        dailyResetHour: 5,
+        catalog,
+    })
+    assert.equal(next.status, "granted")
+    assert.deepEqual(next.bonuses.map(bonus => [bonus.groupId, bonus.index]), [["comeback", 2]])
+})
+
+test("Comeback groups fail closed when the prior login is outside the CDN condition period", () => {
+    const playerId = createPlayer("comeback-ineligible")
+    const catalog = {
+        comeback: genericGroup("Comeback", [
+            { index: 1, rewards: [{ kind: 0, count: 10 }] },
+        ], {
+            conditionPeriodFromMs: at("2024-07-01T00:00:00.000Z"),
+            conditionPeriodUntilMs: at("2024-07-31T23:59:59.000Z"),
+            comebackInactivityDays: 30,
+        }),
+    }
+    assert.equal(settleLoginBonusesSync({
+        playerId,
+        virtualNowMs: at("2024-08-15T12:00:00.000Z"),
+        previousLastLoginMs: at("2024-08-01T12:00:00.000Z"),
+        dailyResetHour: 5,
+        catalog,
+    }).status, "none")
 })
 
 test("shown acknowledgement is idempotent and same-day load does not grant again", () => {
@@ -130,6 +280,7 @@ test("active CDN group changes reset the cursor to index 1", () => {
     const playerId = createPlayer("group-change")
     const customCatalog = {
         old: {
+            groupType: "Normal",
             availableFromMs: at("2024-08-01T00:00:00.000Z"),
             availableUntilMs: at("2024-08-14T23:59:59.000Z"),
             entries: [
@@ -138,6 +289,7 @@ test("active CDN group changes reset the cursor to index 1", () => {
             ],
         },
         current: {
+            groupType: "Normal",
             availableFromMs: at("2024-08-15T00:00:00.000Z"),
             availableUntilMs: null,
             entries: [

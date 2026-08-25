@@ -439,7 +439,7 @@ const definitionInputs: TableSourceInput[] = [
         outputShapeVersion: 2,
     },
     {
-        tableName: "login_bonus_normal.json",
+        tableName: "login_bonus.json",
         scope: "cdn",
         sourceOrderedMaps: [LOGIN_BONUS_SOURCE],
         converterId: "login-bonus",

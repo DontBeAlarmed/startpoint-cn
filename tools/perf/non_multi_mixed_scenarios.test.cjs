@@ -240,7 +240,7 @@ test("all non-multi entries use isolated real CN HTTP journeys", async () => {
         availableAssetVersion: "1.4.54",
         characterCount: 1,
         equipmentCount: 0,
-        itemCount: 0,
+        itemCount: 4,
         unfinishedQuestCount: 0,
         unfinishedMultiQuestCount: 0,
     })
@@ -354,7 +354,7 @@ test("all non-multi entries use isolated real CN HTTP journeys", async () => {
         resultCode: 1,
         gachaId: GACHA_ID,
         loadGachaInfoCount: 0,
-        currency: { before: 1050, after: 900, spent: 150 },
+        currency: { before: 7100, after: 6950, spent: 150 },
         exchangePoint: { before: 0, after: 1, delta: 1 },
         receiveHistory: { before: 0, after: 1, delta: 1 },
         activeMissionGacha: { before: 0, after: 1, delta: 1 },

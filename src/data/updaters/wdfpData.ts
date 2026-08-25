@@ -43,6 +43,23 @@ export function updateBeforeInit(
             database.prepare(`DROP TABLE players_party_options`).run()
         }
     }
+
+    if (18 >= currentVersion) {
+        const tableExists = database.prepare(`
+            SELECT 1 FROM sqlite_master
+            WHERE type = 'table' AND name = 'players_login_bonus_progress'
+        `).get()
+        const oldExists = database.prepare(`
+            SELECT 1 FROM sqlite_master
+            WHERE type = 'table' AND name = 'players_login_bonus_progress_old'
+        `).get()
+        if (tableExists && !oldExists) {
+            database.prepare(`
+                ALTER TABLE players_login_bonus_progress
+                RENAME TO players_login_bonus_progress_old
+            `).run()
+        }
+    }
 }
 
 /**
@@ -246,5 +263,24 @@ export function updateAfterInit(
                     WHERE player_id = players_periodic_snapshots.player_id
                 ), 0)
         `).run()
+    }
+
+    if (18 >= currentVersion) {
+        const oldTableExists = database.prepare(`
+            SELECT 1 FROM sqlite_master
+            WHERE type = 'table' AND name = 'players_login_bonus_progress_old'
+        `).get()
+        if (oldTableExists) {
+            database.prepare(`
+                INSERT INTO players_login_bonus_progress (
+                    player_id, group_id, last_granted_index,
+                    last_granted_business_day, received_at, shown_at
+                )
+                SELECT player_id, group_id, last_granted_index,
+                       last_granted_business_day, received_at, shown_at
+                FROM players_login_bonus_progress_old
+            `).run()
+            database.prepare("DROP TABLE players_login_bonus_progress_old").run()
+        }
     }
 }

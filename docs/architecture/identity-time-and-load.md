@@ -99,7 +99,7 @@ sequenceDiagram
     participant L as CN /load
     participant ID as session / account / player
     participant PRE as 日切、经验池、永久校验
-    participant BONUS as Normal 登录奖励
+    participant BONUS as 非 Premium 登录奖励
     participant AQ as active quest 恢复或中止
     participant AM as Active Mission reconcile
     participant DB as SQLite 领域读取
@@ -145,7 +145,7 @@ sequenceDiagram
 | 事实 | 证据 |
 |---|---|
 | 身份解析、登录维护和永久校验 | `src/routes/cn/load.ts` |
-| CDN Normal 选择、事务发奖和展示确认 | `src/content/converters/login-bonus.ts`、`src/lib/login-bonus.ts`、`src/routes/api/bonus.ts` |
+| CDN 登录奖励组选择、事务发奖和展示确认 | `src/content/converters/login-bonus.ts`、`src/lib/login-bonus.ts`、`src/routes/api/bonus.ts` |
 | active quest 检查、恢复或中止退款 | `src/routes/cn/load.ts` |
 | Active Mission 对账与完整玩家领域聚合 | `src/routes/cn/load.ts`、`src/data/utils/player-data.ts` |
 | 登录事实使用响应 pending commit | `src/routes/cn/load.ts`、`src/routes/cn/msgpack.ts` |

@@ -279,7 +279,7 @@ test("v2 export includes all registered domains and excludes transient battle st
     assert.equal(snapshot.formatVersion, 2)
     assert.equal(snapshot.version, 2)
     assert.equal(snapshot.mode, "backup")
-    assert.equal(snapshot.producer.dbSchemaVersion, 18)
+    assert.equal(snapshot.producer.dbSchemaVersion, 19)
     assert.equal(snapshot.playerId, playerId)
     assert.equal(tables.players_mails[0].subject, "backup-mail")
     assert.equal(tables.players_box_gacha_drawn_rewards[0].number, 3)
@@ -439,7 +439,7 @@ test("v2 validation rejects future schemas and missing tables that existed in th
     const snapshot = exportPlayerSaveV2Sync(playerId)
 
     const future = cloneJson(snapshot)
-    future.producer.dbSchemaVersion = 19
+    future.producer.dbSchemaVersion = 20
     assert.throws(() => restorePlayerSaveV2Sync(future, playerId), /newer.*schema|future.*schema/i)
 
     const missingCurrent = cloneJson(snapshot)

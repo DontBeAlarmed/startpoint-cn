@@ -14,20 +14,39 @@ export interface LoginBonusEntry {
     readonly rewards: readonly LoginBonusReward[]
 }
 
-export interface NormalLoginBonusGroup {
+export const LOGIN_BONUS_GROUP_TYPES = [
+    "Normal",
+    "Limited",
+    "Comeback",
+    "ComebackAlways",
+    "ActiveUser",
+    "ComebackCn",
+    "ComebackJp",
+] as const
+
+export type LoginBonusGroupType = typeof LOGIN_BONUS_GROUP_TYPES[number]
+
+export interface LoginBonusGroup {
+    readonly groupType: LoginBonusGroupType
     readonly availableFromMs: number
     readonly availableUntilMs: number | null
+    readonly conditionPeriodFromMs: number | null
+    readonly conditionPeriodUntilMs: number | null
+    readonly comebackInactivityDays: number | null
+    readonly linkedComebackGroupId: string | null
+    readonly includeBeginner: boolean | null
     readonly entries: readonly LoginBonusEntry[]
 }
 
-export type NormalLoginBonusCatalog = Readonly<Record<string, NormalLoginBonusGroup>>
+export type LoginBonusCatalog = Readonly<Record<string, LoginBonusGroup>>
+export type NormalLoginBonusCatalog = LoginBonusCatalog
 
 export interface LoginBonusSourceReader {
     readDynamic(logicalPath: string): Promise<Buffer>
 }
 
 export interface LoginBonusConversionOutput {
-    readonly "login_bonus_normal.json": NormalLoginBonusCatalog
+    readonly "login_bonus.json": LoginBonusCatalog
 }
 
 function invalidLoginBonus(reason: string): never {
@@ -62,6 +81,29 @@ function parseJstTimestamp(value: string | undefined, subject: string): number {
     }
     // The CN 1.8.1 bootstrap assigns the legacy JST-named client constant to UTC+8.
     return Date.UTC(year, month - 1, day, hour, minute, second) - 8 * 60 * 60 * 1000
+}
+
+function parseOptionalJstTimestamp(value: string | undefined, subject: string): number | null {
+    return value === undefined || value === "" || value === "(None)"
+        ? null
+        : parseJstTimestamp(value, subject)
+}
+
+function parseOptionalPositiveInteger(value: string | undefined, subject: string): number | null {
+    return value === undefined || value === "" || value === "(None)"
+        ? null
+        : parsePositiveInteger(value, subject)
+}
+
+function parseOptionalBoolean(value: string | undefined, subject: string): boolean | null {
+    if (value === undefined || value === "" || value === "(None)") return null
+    if (value === "true") return true
+    if (value === "false") return false
+    return invalidLoginBonus(`${subject} must be true, false, or (None): ${value}`)
+}
+
+function parseOptionalText(value: string | undefined): string | null {
+    return value === undefined || value === "" || value === "(None)" ? null : value
 }
 
 function requireGroupTree(
@@ -132,7 +174,7 @@ function parseReward(
     return { kind, count }
 }
 
-function convertNormalGroup(groupId: string, tree: CsvOrderedMapTree): NormalLoginBonusGroup | null {
+function convertGroup(groupId: string, tree: CsvOrderedMapTree): LoginBonusGroup {
     const indices = Object.keys(tree)
         .map(index => parsePositiveInteger(index, `${groupId}.index`))
         .sort((left, right) => left - right)
@@ -143,24 +185,53 @@ function convertNormalGroup(groupId: string, tree: CsvOrderedMapTree): NormalLog
     const rows = indices.map(index => requireSingleRow(groupId, String(index), tree[String(index)]))
     const groupTypes = new Set(rows.map(fields => fields[0]))
     if (groupTypes.size !== 1) invalidLoginBonus(`${groupId} has inconsistent group types`)
-    if (rows[0][0] !== "0") return null
+    if (!/^[0-6]$/.test(rows[0][0])) {
+        invalidLoginBonus(`${groupId}.groupType is invalid: ${rows[0][0]}`)
+    }
+    const groupType = LOGIN_BONUS_GROUP_TYPES[Number(rows[0][0])]
 
     const periods = rows.map(fields => ({
         availableFromMs: parseJstTimestamp(fields[41], `${groupId}.availableFrom`),
-        availableUntilMs: fields[42] === "(None)"
-            ? null
-            : parseJstTimestamp(fields[42], `${groupId}.availableUntil`),
+        availableUntilMs: parseOptionalJstTimestamp(fields[42], `${groupId}.availableUntil`),
+        conditionPeriodFromMs: parseOptionalJstTimestamp(
+            fields[38],
+            `${groupId}.conditionPeriodFrom`,
+        ),
+        conditionPeriodUntilMs: parseOptionalJstTimestamp(
+            fields[39],
+            `${groupId}.conditionPeriodUntil`,
+        ),
+        comebackInactivityDays: parseOptionalPositiveInteger(
+            fields[40],
+            `${groupId}.comebackInactivityDays`,
+        ),
+        linkedComebackGroupId: parseOptionalText(fields[46]),
+        includeBeginner: parseOptionalBoolean(fields[47], `${groupId}.includeBeginner`),
     }))
     const firstPeriod = periods[0]
     if (periods.some(period => (
         period.availableFromMs !== firstPeriod.availableFromMs
         || period.availableUntilMs !== firstPeriod.availableUntilMs
+        || period.conditionPeriodFromMs !== firstPeriod.conditionPeriodFromMs
+        || period.conditionPeriodUntilMs !== firstPeriod.conditionPeriodUntilMs
+        || period.comebackInactivityDays !== firstPeriod.comebackInactivityDays
+        || period.linkedComebackGroupId !== firstPeriod.linkedComebackGroupId
+        || period.includeBeginner !== firstPeriod.includeBeginner
     ))) {
-        invalidLoginBonus(`${groupId} has inconsistent availability periods`)
+        invalidLoginBonus(`${groupId} has inconsistent group metadata`)
     }
     if (firstPeriod.availableUntilMs !== null
         && firstPeriod.availableUntilMs < firstPeriod.availableFromMs) {
         invalidLoginBonus(`${groupId} availability period is inverted`)
+    }
+    if ((firstPeriod.conditionPeriodFromMs === null)
+        !== (firstPeriod.conditionPeriodUntilMs === null)) {
+        invalidLoginBonus(`${groupId} comeback condition period must have both boundaries`)
+    }
+    if (firstPeriod.conditionPeriodFromMs !== null
+        && firstPeriod.conditionPeriodUntilMs !== null
+        && firstPeriod.conditionPeriodUntilMs < firstPeriod.conditionPeriodFromMs) {
+        invalidLoginBonus(`${groupId} comeback condition period is inverted`)
     }
 
     const entries = rows.map((fields, offset) => {
@@ -171,20 +242,25 @@ function convertNormalGroup(groupId: string, tree: CsvOrderedMapTree): NormalLog
         return { index: offset + 1, rewards }
     })
     return {
+        groupType,
         availableFromMs: firstPeriod.availableFromMs,
         availableUntilMs: firstPeriod.availableUntilMs,
+        conditionPeriodFromMs: firstPeriod.conditionPeriodFromMs,
+        conditionPeriodUntilMs: firstPeriod.conditionPeriodUntilMs,
+        comebackInactivityDays: firstPeriod.comebackInactivityDays,
+        linkedComebackGroupId: firstPeriod.linkedComebackGroupId,
+        includeBeginner: firstPeriod.includeBeginner,
         entries,
     }
 }
 
-export function convertLoginBonusTree(tree: CsvOrderedMapTree): NormalLoginBonusCatalog {
-    const output: Record<string, NormalLoginBonusGroup> = {}
+export function convertLoginBonusTree(tree: CsvOrderedMapTree): LoginBonusCatalog {
+    const output: Record<string, LoginBonusGroup> = {}
     for (const groupId of Object.keys(tree).sort()) {
         if (groupId.length === 0) invalidLoginBonus("group id must not be empty")
-        const group = convertNormalGroup(groupId, requireGroupTree(groupId, tree[groupId]))
-        if (group !== null) output[groupId] = group
+        output[groupId] = convertGroup(groupId, requireGroupTree(groupId, tree[groupId]))
     }
-    if (Object.keys(output).length === 0) invalidLoginBonus("no Normal groups were found")
+    if (Object.keys(output).length === 0) invalidLoginBonus("no login bonus groups were found")
     return deepFreeze(output)
 }
 
@@ -193,23 +269,32 @@ export async function convertLoginBonuses(
 ): Promise<LoginBonusConversionOutput> {
     const raw = await reader.readDynamic(LOGIN_BONUS_SOURCE)
     return deepFreeze({
-        "login_bonus_normal.json": convertLoginBonusTree(convertOrderedMapJson(raw, 2)),
+        "login_bonus.json": convertLoginBonusTree(convertOrderedMapJson(raw, 2)),
     })
 }
 
 export function selectActiveNormalLoginBonusGroup(
     catalog: NormalLoginBonusCatalog,
     virtualNowMs: number,
-): Readonly<{ groupId: string; group: NormalLoginBonusGroup }> | null {
+): Readonly<{ groupId: string; group: LoginBonusGroup }> | null {
+    const active = selectActiveLoginBonusGroups(catalog, "Normal", virtualNowMs)
+    return active[0] ?? null
+}
+
+export function selectActiveLoginBonusGroups(
+    catalog: LoginBonusCatalog,
+    groupType: LoginBonusGroupType,
+    virtualNowMs: number,
+): readonly Readonly<{ groupId: string; group: LoginBonusGroup }>[] {
     if (!Number.isFinite(virtualNowMs)) throw new TypeError("virtualNowMs must be finite")
-    const active = Object.entries(catalog)
+    return Object.entries(catalog)
         .filter(([, group]) => (
-            group.availableFromMs <= virtualNowMs
+            group.groupType === groupType
+            && group.availableFromMs <= virtualNowMs
             && (group.availableUntilMs === null || virtualNowMs <= group.availableUntilMs)
         ))
         .sort(([leftId, left], [rightId, right]) => (
             left.availableFromMs - right.availableFromMs || leftId.localeCompare(rightId)
         ))
-    if (active.length === 0) return null
-    return { groupId: active[0][0], group: active[0][1] }
+        .map(([groupId, group]) => ({ groupId, group }))
 }

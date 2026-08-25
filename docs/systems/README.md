@@ -7,7 +7,7 @@
 - [体力](./stamina.md)
 - [商店](./shop.md)
 - [邮件](./mail.md)
-- [常规登录奖励](./login-bonus.md)
+- [登录奖励](./login-bonus.md)
 - [首次教程状态与中断恢复](./start-tutorial.md)
 - [存档与输入校验](./save-validation.md)
 - [账号管理与继承码](./account-management-and-takeover.md)
