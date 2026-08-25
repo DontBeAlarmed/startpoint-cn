@@ -192,6 +192,16 @@ test("player save registry covers every current player-owned table", () => {
             clonePolicy: undefined,
         },
     )
+    assert.deepEqual(
+        PLAYER_SAVE_TABLES.find(table => table.name === "players_player_history_milestones"),
+        {
+            name: "players_player_history_milestones",
+            domain: "core",
+            introducedSchema: 20,
+            regenerateColumns: undefined,
+            clonePolicy: undefined,
+        },
+    )
 })
 
 test("player table discovery follows indirect foreign-key ownership", () => {
@@ -271,6 +281,11 @@ test("v2 export includes all registered domains and excludes transient battle st
             last_granted_business_day, received_at, shown_at
         ) VALUES (?, 'normal_2022', 3, '2026-08-24', 1787500000, NULL)
     `).run(playerId)
+    db.prepare(`
+        INSERT INTO players_player_history_milestones (
+            player_id, aggregation_target, slot, occurred_at, subject_id
+        ) VALUES (?, 4, 0, '2026-08-24T01:02:03.000Z', 1)
+    `).run(playerId)
 
     const snapshot = exportPlayerSaveV2Sync(playerId)
     const tables = allSnapshotTables(snapshot)
@@ -279,7 +294,7 @@ test("v2 export includes all registered domains and excludes transient battle st
     assert.equal(snapshot.formatVersion, 2)
     assert.equal(snapshot.version, 2)
     assert.equal(snapshot.mode, "backup")
-    assert.equal(snapshot.producer.dbSchemaVersion, 19)
+    assert.equal(snapshot.producer.dbSchemaVersion, 20)
     assert.equal(snapshot.playerId, playerId)
     assert.equal(tables.players_mails[0].subject, "backup-mail")
     assert.equal(tables.players_box_gacha_drawn_rewards[0].number, 3)
@@ -287,6 +302,13 @@ test("v2 export includes all registered domains and excludes transient battle st
     assert.equal(tables.players_shop_campaign_lineups[0].lineup_id, 1010)
     assert.equal(tables.players_score_attack_battle_history[0].play_id, "save-v2-play")
     assert.equal(tables.players_player_history_settings[0].background_card_id, 2)
+    assert.deepEqual(tables.players_player_history_milestones, [{
+        player_id: playerId,
+        aggregation_target: 4,
+        slot: 0,
+        occurred_at: "2026-08-24T01:02:03.000Z",
+        subject_id: 1,
+    }])
     assert.deepEqual(tables.players_login_bonus_progress, [{
         player_id: playerId,
         group_id: "normal_2022",
@@ -440,7 +462,7 @@ test("v2 validation rejects future schemas and missing tables that existed in th
     const snapshot = exportPlayerSaveV2Sync(playerId)
 
     const future = cloneJson(snapshot)
-    future.producer.dbSchemaVersion = 20
+    future.producer.dbSchemaVersion = 21
     assert.throws(() => restorePlayerSaveV2Sync(future, playerId), /newer.*schema|future.*schema/i)
 
     const missingCurrent = cloneJson(snapshot)
@@ -486,6 +508,11 @@ test("v2 validation rejects future schemas and missing tables that existed in th
     schema17.producer.dbSchemaVersion = 17
     delete schema17.domains.events.tables.players_login_bonus_progress
     assert.doesNotThrow(() => restorePlayerSaveV2Sync(schema17, playerId))
+
+    const schema19 = cloneJson(snapshot)
+    schema19.producer.dbSchemaVersion = 19
+    delete schema19.domains.core.tables.players_player_history_milestones
+    assert.doesNotThrow(() => restorePlayerSaveV2Sync(schema19, playerId))
 
     const conflictingVersion = cloneJson(snapshot)
     conflictingVersion.version = 1

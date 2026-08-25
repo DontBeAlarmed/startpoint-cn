@@ -366,6 +366,16 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_player_history_milestones (
+        player_id INTEGER NOT NULL,
+        aggregation_target INTEGER NOT NULL,
+        slot INTEGER NOT NULL,
+        occurred_at TEXT NOT NULL,
+        subject_id INTEGER,
+        PRIMARY KEY (player_id, aggregation_target, slot),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_triggered_tutorials (
         id INTEGER NOT NULL,
         player_id INTEGER NOT NULL,

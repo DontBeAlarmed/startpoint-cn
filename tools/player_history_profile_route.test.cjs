@@ -6,6 +6,7 @@ const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
 const Fastify = require("fastify")
+const Sqlite = require("better-sqlite3")
 const { unpack } = require("msgpackr")
 
 const dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "player-history-profile-"))
@@ -19,12 +20,21 @@ const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { updatePlayerPartySync } = require("../src/data/domains/party")
+const {
+    getPlayerHistoryMilestonesSync,
+    recordPlayerHistoryMilestoneSync,
+} = require("../src/data/domains/player-history-facts")
 const { PROFILE_FAVORITE_PARTY_CATEGORY } = require("../src/data/types")
 const { clientSerializeDate } = require("../src/data/utils")
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 const { setServerTime } = require("../src/utils")
 
-initializeDatabase()
+const sqlStatements = []
+initializeDatabase({
+    databaseFactory: databasePath => new Sqlite(databasePath, {
+        verbose: sql => sqlStatements.push(sql),
+    }),
+})
 setServerTime(new Date("2025-07-25T00:00:00.000Z"))
 const db = getDb()
 const account = insertAccountSync({
@@ -53,6 +63,60 @@ db.prepare(`
     INSERT INTO sessions (token, account_id, expires, type)
     VALUES (?, ?, ?, 2)
 `).run(String(otherViewerId), otherAccount.id, new Date("2099-12-31T23:59:59.000Z").toISOString())
+
+db.prepare(`
+    UPDATE players
+    SET total_login_days = 42
+    WHERE id = ?
+`).run(player.id)
+db.prepare(`
+    UPDATE players_characters
+    SET exp = 999999999, mana_board_index = 2
+    WHERE player_id = ? AND id = 1
+`).run(player.id)
+db.prepare(`
+    UPDATE players_characters_bond_tokens
+    SET status = 1
+    WHERE player_id = ? AND character_id = 1 AND mana_board_index = 1
+`).run(player.id)
+db.prepare(`
+    INSERT INTO players_mission_battle_counters (
+        player_id, multi_host_clear_count, multi_guest_clear_count
+    ) VALUES (?, 8, 13)
+`).run(player.id)
+db.prepare(`
+    INSERT INTO players_category_missions (category, id, progress, player_id)
+    VALUES (1, 29, 5, ?)
+`).run(player.id)
+db.prepare(`
+    INSERT INTO players_cleared_regular_missions (id, value, player_id)
+    VALUES (100, 1, ?), (101, 1, ?)
+`).run(player.id, player.id)
+db.prepare(`
+    INSERT INTO players_equipment (
+        id, level, enhancement_level, protection, stack, player_id
+    ) VALUES
+        (5010045, 5, 3, 0, 0, ?),
+        (5040020, 1, 0, 0, 0, ?),
+        (5100011, 2, 1, 0, 0, ?)
+`).run(player.id, player.id, player.id)
+db.prepare(`
+    INSERT INTO players_quest_progress (
+        section, quest_id, finished, unlocked, player_id
+    ) VALUES (21, 21000001, 1, 1, ?), (20, 20000001, 1, 1, ?)
+`).run(player.id, player.id)
+
+recordPlayerHistoryMilestoneSync(player.id, {
+    aggregationTarget: 2,
+    slot: 0,
+    occurredAt: new Date("2025-01-02T03:04:05.000Z"),
+})
+recordPlayerHistoryMilestoneSync(player.id, {
+    aggregationTarget: 4,
+    slot: 0,
+    subjectId: 1,
+    occurredAt: new Date("2025-02-03T04:05:06.000Z"),
+})
 
 function decode(response) {
     assert.equal(response.headers["content-type"], "application/x-msgpack")
@@ -104,6 +168,7 @@ test.after(() => {
 test("player history index exposes the required client shape", async () => {
     const app = await createApp()
     try {
+        const sqlStart = sqlStatements.length
         const response = await app.inject({
             method: "POST",
             url: "/api/index.php/player_history/index",
@@ -137,12 +202,30 @@ test("player history index exposes the required client shape", async () => {
         assert.deepEqual(data.player_history_topic_list[5].value_list, {
             int_values: null,
             string_values: null,
-            date_values: [null],
-            character_id_values: [null],
+            date_values: [clientSerializeDate(new Date("2025-02-03T04:05:06.000Z"))],
+            character_id_values: [1],
             equipment_id_values: null,
             quest_values: null,
             boss_id_values: null,
         })
+        assert.deepEqual(data.player_history_topic_list[2].value_list.int_values, [42])
+        assert.deepEqual(data.player_history_topic_list[3].value_list.date_values, [
+            clientSerializeDate(new Date("2025-01-02T03:04:05.000Z")),
+            null,
+            null,
+            null,
+            null,
+            null,
+        ])
+        assert.deepEqual(data.player_history_topic_list[6].value_list.int_values, [1])
+        assert.deepEqual(data.player_history_topic_list[7].value_list.int_values, [1])
+        assert.deepEqual(data.player_history_topic_list[10].value_list.int_values, [2])
+        assert.deepEqual(data.player_history_topic_list[12].value_list.int_values, [5])
+        assert.deepEqual(data.player_history_topic_list[13].value_list.int_values, [8, 13])
+        assert.deepEqual(data.player_history_topic_list[14].value_list.int_values, [3])
+        assert.deepEqual(data.player_history_topic_list[17].value_list.int_values.slice(0, 6), [5, 3, 1, 0, 2, 1])
+        assert.deepEqual(data.player_history_topic_list[23].value_list.int_values, [1])
+        assert.deepEqual(data.player_history_topic_list[25].value_list.int_values, [1])
         assert.deepEqual(data.player_history_topic_list[18].value_list, {
             int_values: null,
             string_values: null,
@@ -170,6 +253,60 @@ test("player history index exposes the required client shape", async () => {
             quest_values: null,
             boss_id_values: null,
         })
+        const selectStatements = sqlStatements.slice(sqlStart).filter(sql => /^SELECT\b/i.test(sql))
+        assert.ok(
+            selectStatements.length <= 12,
+            `player history index exceeded SQL read budget:\n${selectStatements.join("\n---\n")}`,
+        )
+    } finally {
+        await app.close()
+    }
+})
+
+test("player history milestones preserve the first authoritative occurrence", () => {
+    const first = new Date("2025-03-04T05:06:07.000Z")
+    const later = new Date("2025-04-05T06:07:08.000Z")
+    assert.equal(recordPlayerHistoryMilestoneSync(otherPlayer.id, {
+        aggregationTarget: 7,
+        slot: 0,
+        occurredAt: first,
+    }), true)
+    assert.equal(recordPlayerHistoryMilestoneSync(otherPlayer.id, {
+        aggregationTarget: 7,
+        slot: 0,
+        occurredAt: later,
+    }), false)
+    assert.deepEqual(getPlayerHistoryMilestonesSync(otherPlayer.id), [{
+        aggregationTarget: 7,
+        slot: 0,
+        occurredAt: first,
+    }])
+})
+
+test("player history milestones roll back with their caller transaction", () => {
+    db.prepare("DELETE FROM players_player_history_milestones WHERE player_id = ?").run(otherPlayer.id)
+    assert.throws(() => db.transaction(() => {
+        recordPlayerHistoryMilestoneSync(otherPlayer.id, {
+            aggregationTarget: 8,
+            slot: 0,
+            occurredAt: new Date("2025-05-06T07:08:09.000Z"),
+        })
+        throw new Error("injected rollback")
+    })(), /injected rollback/)
+    assert.deepEqual(getPlayerHistoryMilestonesSync(otherPlayer.id), [])
+})
+
+test("opening player history never backfills missing milestones", async () => {
+    db.prepare("DELETE FROM players_player_history_milestones WHERE player_id = ?").run(otherPlayer.id)
+    const app = await createApp()
+    try {
+        const response = await app.inject({
+            method: "POST",
+            url: "/api/index.php/player_history/index",
+            payload: { viewer_id: otherViewerId },
+        })
+        assert.equal(response.statusCode, 200, response.body)
+        assert.deepEqual(getPlayerHistoryMilestonesSync(otherPlayer.id), [])
     } finally {
         await app.close()
     }
@@ -257,6 +394,7 @@ test("profile returns the dedicated favorite party after party edit storage", as
 
     const app = await createApp()
     try {
+        const sqlStart = sqlStatements.length
         const response = await app.inject({
             method: "POST",
             url: "/api/index.php/profile/get_my_profile",
@@ -266,6 +404,16 @@ test("profile returns the dedicated favorite party after party edit storage", as
         const data = decode(response).data
         assert.deepEqual(data.user_party_group_list[0].party_list[0].character_ids, [1, null, null])
         assert.equal(data.user_party_group_list[0].party_list[0].party_name, "Favorite")
+        assert.equal(data.profile_info.max_owned_character_count, 505)
+        assert.equal(data.profile_info.owned_character_count, 1)
+        assert.equal(data.profile_info.max_opened_mana_board_second_count, 476)
+        assert.equal(data.profile_info.opened_mana_board_second_count, 1)
+        assert.equal(data.profile_info.max_owned_degree_count, 1288)
+        assert.equal(data.profile_info.owned_degree_count, 1)
+        const characterReads = sqlStatements.slice(sqlStart).filter(sql => (
+            /\bFROM\s+players_characters\b/i.test(sql)
+        ))
+        assert.equal(characterReads.length, 1, characterReads.join("\n---\n"))
     } finally {
         await app.close()
     }

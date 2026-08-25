@@ -32,7 +32,7 @@ const {
 } = require("../src/lib/quest/score-attack-history")
 
 db = initializeDatabase()
-assert.equal(db.pragma("user_version", { simple: true }), 19)
+assert.equal(db.pragma("user_version", { simple: true }), 20)
 
 const account = insertAccountSync({
     appId: "wf_cn",

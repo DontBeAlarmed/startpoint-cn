@@ -12,6 +12,7 @@
 - [首次教程状态与中断恢复](./start-tutorial.md)
 - [存档与输入校验](./save-validation.md)
 - [账号管理与继承码](./account-management-and-takeover.md)
+- [玩家资料与玩家履历](./player-history.md)
 - [多人联机与 Hub 优化架构](./multiplayer-hub-optimization.md)
 - [多人房间席位预留与加入失败语义](./multi-room-admission-and-denial.md)
 - [全服务端混合负载验收](./full-server-acceptance.md)

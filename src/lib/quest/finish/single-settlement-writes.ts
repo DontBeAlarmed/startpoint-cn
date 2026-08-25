@@ -6,6 +6,10 @@ import { getServerGameplaySettingsSync } from "../../../data/domains/server-sett
 import { getRaidEventBossStateSync, incrementPlayerRaidEventQuestKillCountSync, upsertRaidEventBossStateSync } from "../../../data/domains/raidEvent"
 import { getPlayerSingleQuestProgressSync, insertPlayerQuestProgressSync, updatePlayerQuestProgressSync } from "../../../data/domains/quest"
 import { getPlayerEquipmentListSync } from "../../../data/domains/equipment"
+import {
+    recordCompletedMainChapterMilestoneSync,
+    recordRank100MilestoneSync,
+} from "../../player-history-milestones"
 import { insertPlayerScoreAttackBattleHistorySync } from "../../../data/domains/score-attack-history"
 import { insertPlayerPracticeBattleHistorySync } from "../../../data/domains/practice-battle-history"
 import { getPlayerCarnivalEventRecordsSync, getPlayerClaimedCarnivalRewardIdsSync, insertPlayerClaimedCarnivalRewardIdsSync, runCarnivalEventTransactionSync, upsertPlayerCarnivalEventRecordSync } from "../../../data/domains/carnivalEvent"
@@ -123,11 +127,17 @@ export function executeSingleSettlementWrites(
                 clearRank: clearRank ?? 5, leaderCharacterId: leaderId ?? undefined,
             })
         }
+        if (questCategory === QuestCategory.MAIN) {
+            recordCompletedMainChapterMilestoneSync(playerId, questId)
+        }
     }
 
     const oldRkDegree = getRankDegree(beforeRankPoint)
     const newDegreeId = getRankDegree(newRankPoint)
     const didLevelUp = newDegreeId > oldRkDegree
+    if (oldRkDegree < 100 && newDegreeId >= 100) {
+        recordRank100MilestoneSync(playerId, newRankPoint)
+    }
     const afterStamina = didLevelUp ? settlementPlayer.stamina + getMaxStamina(newDegreeId) : settlementPlayer.stamina
     const afterStaminaHealTime = didLevelUp ? getRealNow() : settlementPlayer.staminaHealTime
     updatePlayerSync({

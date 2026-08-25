@@ -20,6 +20,7 @@ import { generateDataHeaders, getServerTime } from "../../utils";
 import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 import { getAwakeFactKeysFromLegacyRewardResults } from "../../lib/mission/awake-reward-facts";
 import { QuestCategory } from "../../lib/types";
+import { recordCompletedMainChapterMilestoneSync } from "../../lib/player-history-milestones";
 
 interface FinishBody {
     party_id: number,
@@ -84,6 +85,9 @@ function processStoryQuestFinish(playerId: number, questSection: number, questId
                     finished: true,
                     clearRank: 5,
                 })
+            }
+            if (questSection === QuestCategory.MAIN) {
+                recordCompletedMainChapterMilestoneSync(playerId, questId)
             }
         }
 

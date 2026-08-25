@@ -22,6 +22,7 @@ import {
 } from "../../../lib/character-mana-mutation-plan"
 import { sendManaMutationError } from "./mana-mutation-http"
 import type { ManaNodes } from "../../../lib/types"
+import { recordSecondManaBoardCompletionMilestoneSync } from "../../../lib/player-history-milestones"
 
 interface LearnManaNodeBody {
     viewer_id: number,
@@ -216,6 +217,9 @@ const routes = async (fastify: FastifyInstance) => {
                 characterId,
                 plan.nodeUpdates.map(update => update.nodeId),
             )
+            if (currentManaNodeIndex === 2 && isBoardComplete) {
+                recordSecondManaBoardCompletionMilestoneSync(playerId, characterId)
+            }
             const bond = updateBondTokenForCompletedBoard(
                 playerId, characterId, characterData, currentManaNodeIndex, isBoardComplete
             )

@@ -6,6 +6,7 @@ import { givePlayerItemSync, givePlayerItemWithinTransactionSync } from "../data
 import { getCharacterDataSync } from "./assets";
 import { getRealNow } from "../runtime/time/game-time";
 import { AddExpList, AddExpListItem, ClientReturnBondTokenStatus, ClientReturnBondTokenStatusList, ClientReturnCharacter, Element, GivePlayerCharacterResult, RewardPlayerCharacterExpResult } from "./types";
+import { recordHundredCharactersMilestoneSync } from "./player-history-milestones";
 
 export const characterExpCaps: Record<number, number[]> = {
     [1]: [ // 1* max exp amounts for each uncap level 
@@ -143,6 +144,7 @@ function givePlayerCharacterWithItemWriterSync(
             manaBoardIndex: 1,
             bondTokenList: bondTokenList
         })
+        recordHundredCharactersMilestoneSync(playerId, joinTime)
         
         const serializedDate = clientSerializeDate(joinTime)
         return {

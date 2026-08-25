@@ -47,6 +47,10 @@ import { formatHardMultiMissionDiagnostic } from "../../lib/mission/client-check
 import { sampledLog } from "../../lib/sampled-log"
 import { getServerTime } from "../../utils"
 import { getRealNow } from "../../runtime/time/game-time"
+import {
+    recordCompletedMainChapterMilestoneSync,
+    recordRank100MilestoneSync,
+} from "../../lib/player-history-milestones"
 import type { BattleSessionId } from "../coordinator/contracts"
 import type { MultiHttpContext } from "../http/context"
 import type { MultiFinishBody } from "../types"
@@ -230,6 +234,9 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
         })
         const oldRkDegree = getRankDegree(beforeRankPoint)
         const newDegreeId = getRankDegree(newRankPoint)
+        if (getRankDegree(player.rankPoint) < 100 && newDegreeId >= 100) {
+            recordRank100MilestoneSync(input.playerId, newRankPoint)
+        }
         const didLevelUp = newDegreeId > oldRkDegree
         const finishCtx: FinishContext = {
             playerId: input.playerId,
@@ -305,6 +312,9 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
                     leaderCharacterId: leaderId ?? null,
                     hostFinished,
                 })
+            }
+            if (questCategory === QuestCategory.MAIN) {
+                recordCompletedMainChapterMilestoneSync(input.playerId, questId)
             }
         }
 

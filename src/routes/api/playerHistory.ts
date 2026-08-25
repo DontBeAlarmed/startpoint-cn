@@ -20,6 +20,7 @@ import {
     loadPlayerHistoryCatalog,
     PlayerHistoryCatalog,
 } from "../../lib/player-history-catalog"
+import { loadPlayerHistoryTopicValuesSync } from "../../lib/player-history-stats"
 import { generateDataHeaders, getServerTime } from "../../utils"
 
 interface RequestBody {
@@ -101,6 +102,7 @@ function serializeTopics(
     catalog: PlayerHistoryCatalog,
     topicVisibility: Record<string, boolean>,
     startGameDate: Date,
+    valuesByTarget: ReadonlyMap<number, ReturnType<typeof createEmptyPlayerHistoryTopicValues>>,
 ) {
     return Object.fromEntries(catalog.topics.map(topic => [
         String(topic.index),
@@ -111,9 +113,25 @@ function serializeTopics(
                     ...createEmptyPlayerHistoryTopicValues(topic.aggregationTarget),
                     date_values: [clientSerializeDate(startGameDate)],
                 }
-                : createEmptyPlayerHistoryTopicValues(topic.aggregationTarget),
+                : serializeTopicDates(
+                    valuesByTarget.get(topic.aggregationTarget)
+                        ?? createEmptyPlayerHistoryTopicValues(topic.aggregationTarget),
+                ),
         },
     ]))
+}
+
+function serializeTopicDates(
+    values: ReturnType<typeof createEmptyPlayerHistoryTopicValues>,
+) {
+    return values.date_values === null
+        ? values
+        : {
+            ...values,
+            date_values: values.date_values.map(value => (
+                typeof value === "string" ? clientSerializeDate(new Date(value)) : value
+            )),
+        }
 }
 
 const routes = async (fastify: FastifyInstance) => {
@@ -125,6 +143,10 @@ const routes = async (fastify: FastifyInstance) => {
         const settings = getPlayerHistorySettingsSync(
             resolved.playerId,
             defaults,
+        )
+        const valuesByTarget = loadPlayerHistoryTopicValuesSync(
+            resolved.playerId,
+            resolved.player,
         )
         const backgroundCardId = catalog.backgroundIds.has(settings.backgroundCardId)
             ? settings.backgroundCardId
@@ -144,6 +166,7 @@ const routes = async (fastify: FastifyInstance) => {
                     catalog,
                     settings.topicVisibility,
                     resolved.account.regTime,
+                    valuesByTarget,
                 ),
             },
         })

@@ -15,6 +15,7 @@ import {
     updatePlayerProfileSettingsSync,
 } from "../../data/domains/option";
 import { getFavoritePartyGroupListSync } from "../../lib/profileFavorite";
+import { getPlayerProfileStatsSync } from "../../lib/player-profile-stats";
 
 const PROFILE_SETTING_FIELDS = [
     "show_opened_mana_board_second_count",
@@ -59,6 +60,7 @@ const routes = async (fastify: FastifyInstance) => {
         const characters = getPlayerCharactersSync(playerId)
         const charCount = Object.keys(characters).length
         const degreeCount = getOwnedPlayerDegreeIdsSync(playerId, player.degreeId).length
+        const profileStats = getPlayerProfileStatsSync(characters)
         const profileSettings = getPlayerProfileSettingsSync(playerId)
 
         // Build party group list (map from DB format to client format)
@@ -72,10 +74,10 @@ const routes = async (fastify: FastifyInstance) => {
             data_headers: generateDataHeaders({ viewer_id: viewerId }),
             data: {
                 profile_info: {
-                    max_opened_mana_board_second_count: 0,
-                    max_owned_character_count: charCount,
-                    max_owned_degree_count: degreeCount,
-                    opened_mana_board_second_count: 0,
+                    max_opened_mana_board_second_count: profileStats.maxOpenedManaBoardSecondCount,
+                    max_owned_character_count: profileStats.maxOwnedCharacterCount,
+                    max_owned_degree_count: profileStats.maxOwnedDegreeCount,
+                    opened_mana_board_second_count: profileStats.openedManaBoardSecondCount,
                     owned_character_count: charCount,
                     owned_degree_count: degreeCount,
                 },

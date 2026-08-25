@@ -50,7 +50,9 @@
 
 ### 玩家履历统计兼容
 
-`/player_history/index` 与 `/player_history/edit` 已保存收藏队伍、称号、背景和客户端实际提交的主题可见性，设置表随存档 V2 导出、恢复和克隆。Content Snapshot 已接入官方 `player_history`、`player_history_topic`、`player_history_card_background` 和 `player_history_challenge_single_boss` 四张表；当前履历索引与主题结构按服务器时间和官方主数据生成。历史统计尚未建立完整的逐项事实来源，因此主题值使用客户端 Dummy 约定的正确字段、数组长度和 `null` 占位，不伪造玩家成绩。
+`/player_history/index` 与 `/player_history/edit` 已保存收藏队伍、称号、背景和客户端实际提交的主题可见性，设置表随存档 V2 导出、恢复和克隆。Content Snapshot 已接入官方 `player_history`、`player_history_topic`、`player_history_card_background` 和 `player_history_challenge_single_boss` 四张表；当前履历索引与主题结构按服务器虚拟时间和官方主数据生成。
+
+可由当前存档证明的登录、角色、装备、任务、MVP、多人和关卡统计已经批量计算；主线章节、二板、百名角色及 Rank 100 的首次完成事实从 schema 20 起使用真实时间持久化。旧存档没有可追溯日期时继续使用客户端约定的正确字段、数组长度和 `null` 占位，打开履历页不会反向补写当前时间。完整边界见[玩家资料与玩家履历](../systems/player-history.md)。
 
 ### 百科全部解锁
 

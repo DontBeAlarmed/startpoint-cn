@@ -281,7 +281,7 @@ test("default schema migration preserves v6 players and creates cascading Pass t
 
     data.initializeDatabase({ paths })
     const migrated = getDb()
-    assert.equal(migrated.pragma("user_version", { simple: true }), 19)
+    assert.equal(migrated.pragma("user_version", { simple: true }), 20)
     assert.deepEqual(
         migrated.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'players_character_election_votes'").get(),
         { name: "players_character_election_votes" },
@@ -360,7 +360,7 @@ test("default schema migrates schema 14 active quests to battle session and coor
 
     data.initializeDatabase({ paths })
 
-    assert.equal(getDb().pragma("user_version", { simple: true }), 19)
+    assert.equal(getDb().pragma("user_version", { simple: true }), 20)
     assert.equal(
         getDb().pragma("table_info(players_active_quests)")
             .some(column => column.name === "battle_session_id" && column.notnull === 0),
@@ -404,7 +404,7 @@ test("default schema migrates schema 15 databases to player history storage", t 
     fs.writeFileSync(paths.databaseVersionFile, "15")
 
     data.initializeDatabase({ paths })
-    assert.equal(getDb().pragma("user_version", { simple: true }), 19)
+    assert.equal(getDb().pragma("user_version", { simple: true }), 20)
     assert.deepEqual(
         getDb().prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'players_player_history_settings'").get(),
         { name: "players_player_history_settings" },
@@ -452,7 +452,7 @@ test("default schema migrates schema 18 login bonus progress to per-group rows",
 
     data.initializeDatabase({ paths })
     const migrated = getDb()
-    assert.equal(migrated.pragma("user_version", { simple: true }), 19)
+    assert.equal(migrated.pragma("user_version", { simple: true }), 20)
     assert.deepEqual(
         migrated.pragma("table_info(players_login_bonus_progress)")
             .filter(column => column.pk > 0)
@@ -486,6 +486,39 @@ test("default schema migrates schema 18 login bonus progress to per-group rows",
             last_granted_business_day, received_at, shown_at
         ) VALUES (?, 'limited_a', 1, '2024-08-14', 1723636800, NULL)
     `).run(playerId))
+})
+
+test("default schema migrates schema 19 databases to player history milestones", t => {
+    const paths = temporaryPaths(t)
+    data.initializeDatabase({ paths })
+    const { insertAccountSync } = require("../../src/data/domains/account")
+    const { insertDefaultPlayerSync } = require("../../src/data/domains/player")
+    const account = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId: "schema-v19-player-history-milestones",
+        status: "normal",
+    })
+    const playerId = insertDefaultPlayerSync(account.id).id
+    data.closeDatabase()
+
+    const schema19 = new Sqlite(paths.databaseFile)
+    schema19.exec("DROP TABLE players_player_history_milestones")
+    schema19.pragma("user_version = 19")
+    schema19.close()
+    fs.writeFileSync(paths.databaseVersionFile, "19")
+
+    data.initializeDatabase({ paths })
+    assert.equal(getDb().pragma("user_version", { simple: true }), 20)
+    assert.deepEqual(
+        getDb().prepare(`
+            SELECT name FROM sqlite_master
+            WHERE type = 'table' AND name = 'players_player_history_milestones'
+        `).get(),
+        { name: "players_player_history_milestones" },
+    )
+    assert.equal(getDb().prepare("SELECT id FROM players WHERE id = ?").get(playerId).id, playerId)
 })
 
 test("active quest domain roundtrips nullable battle session identity", t => {
