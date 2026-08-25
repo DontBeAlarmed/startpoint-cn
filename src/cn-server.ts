@@ -3,6 +3,7 @@ import { ContentTypeParserDoneFunction } from "fastify/types/content-type-parser
 import { unpack } from "msgpackr";
 import path from "path";
 import { getServerTime } from "./utils";
+import { getRealNow, getRealNowMs } from "./runtime/time/game-time";
 import getDatabase, {
     checkpointDatabase,
     closeDatabase,
@@ -110,7 +111,7 @@ fastify.addHook("onRequest", async (request, reply) => {
     if (request.url === "/crash") {
         const ip = (request.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim()
             || request.ip;
-        const now = Date.now();
+        const now = getRealNowMs();
         const entry = rateLimitMap.get(ip) || { count: 0, reset: now + RATE_LIMIT_WINDOW };
         if (now > entry.reset) { entry.count = 0; entry.reset = now + RATE_LIMIT_WINDOW; }
         if (++entry.count > RATE_LIMIT_MAX) {
@@ -220,7 +221,7 @@ function parseC3032Beacon(loc: string, source: string): void {
 }
 
 fastify.post("/debug", async (request, reply) => {
-    const ts = new Date().toISOString();
+    const ts = getRealNow().toISOString();
     const loc = (request.body as any)?.loc || "unknown";
     console.log(`[BEACON ${ts}] ${loc}`);
 

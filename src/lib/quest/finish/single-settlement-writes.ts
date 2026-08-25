@@ -129,7 +129,7 @@ export function executeSingleSettlementWrites(
     const newDegreeId = getRankDegree(newRankPoint)
     const didLevelUp = newDegreeId > oldRkDegree
     const afterStamina = didLevelUp ? settlementPlayer.stamina + getMaxStamina(newDegreeId) : settlementPlayer.stamina
-    const afterStaminaHealTime = didLevelUp ? new Date() : settlementPlayer.staminaHealTime
+    const afterStaminaHealTime = didLevelUp ? getRealNow() : settlementPlayer.staminaHealTime
     updatePlayerSync({
         id: playerId,
         freeMana: newMana,

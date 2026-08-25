@@ -1,5 +1,6 @@
 import { getDb } from "../db";
 import { getServerTime } from "../../utils";
+import { getRealNow } from "../../runtime/time/game-time";
 
 /**
  * Mail attachment types matching the client's MailKind enum.
@@ -154,7 +155,7 @@ export function receiveMailSync(
 
     if (mail === null) return null
 
-    const now = new Date().toISOString().replace('T', ' ').substring(0, 19)
+    const now = getRealNow().toISOString().replace('T', ' ').substring(0, 19)
     const result = getDb().prepare(`
         UPDATE players_mails
         SET receive_time = ?
@@ -218,7 +219,7 @@ export function insertReceiveHistorySync(
     playerId: number,
     record: { type: number, type_id: number | null, number: number, reason_id?: number }
 ): void {
-    const now = new Date().toISOString().replace("T", " ").substring(0, 19)
+    const now = getRealNow().toISOString().replace("T", " ").substring(0, 19)
     getDb().prepare(`
         INSERT INTO players_receive_history (player_id, type, type_id, number, reason_id, create_time)
         VALUES (?, ?, ?, ?, ?, ?)
@@ -231,7 +232,7 @@ export function getReceiveHistorySync(
     limit: number = 500,
     offset: number = 0,
 ): RawReceiveHistory[] {
-    const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString().replace("T", " ").substring(0, 19)
+    const since = new Date(getRealNow().getTime() - sinceDays * 24 * 60 * 60 * 1000).toISOString().replace("T", " ").substring(0, 19)
     return getDb().prepare(`
         SELECT * FROM players_receive_history
         WHERE player_id = ? AND create_time >= ?
@@ -246,7 +247,7 @@ export function getReceiveHistoryPageSync(
     pageSize: number = 100,
     sinceDays: number = 7,
 ): { records: RawReceiveHistory[], totalCount: number } {
-    const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000)
+    const since = new Date(getRealNow().getTime() - sinceDays * 24 * 60 * 60 * 1000)
         .toISOString().replace("T", " ").substring(0, 19)
     return getDb().transaction(() => {
         const records = getDb().prepare(`

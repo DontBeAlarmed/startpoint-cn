@@ -18,6 +18,7 @@ import { getMailArrivedSync } from "../../../lib/mail-notification";
 import { isCharacterSecondManaBoardAvailable } from "../../../lib/mana-board-availability";
 import { getDb } from "../../../data/db";
 import { createAwakeRequestContextBestEffort } from "../../../lib/mission/awake-best-effort-context";
+import { getRealNow } from "../../../runtime/time/game-time";
 
 interface ReceiveBondTokenBody {
     character_id: number,
@@ -201,7 +202,7 @@ const routes = async (fastify: FastifyInstance) => {
             console.log(`[MANA] open_mana_board: auto-creating bond tokens, missing=${missingBondTokenIndices.join(",")} boardCount=${boardCount}`)
         }
 
-        const characterUpdate = { manaBoardIndex, updateTime: new Date() }
+        const characterUpdate = { manaBoardIndex, updateTime: getRealNow() }
         getDb().transaction(() => {
             for (const index of missingBondTokenIndices) {
                 insertPlayerCharacterBondTokenSync(playerId, characterId, {

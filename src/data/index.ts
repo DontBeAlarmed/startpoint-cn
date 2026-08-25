@@ -12,6 +12,7 @@ import {
     RuntimeDataPaths,
 } from "../runtime/data-paths";
 import { createBetterSqlite3Database } from "../runtime/native-binding";
+import { getRealNowMs } from "../runtime/time/game-time";
 
 // better-sqlite3 supports addon objects although the installed type declaration only lists paths.
 const sqlite3WithExternalAddon = sqlite3 as unknown as (
@@ -90,7 +91,7 @@ function readLegacyVersion(versionPath: string): number {
 function publishLegacyVersion(versionPath: string, version: number): void {
     const temporaryPath = path.join(
         path.dirname(versionPath),
-        `.${path.basename(versionPath)}.${process.pid}.${Date.now()}.tmp`,
+        `.${path.basename(versionPath)}.${process.pid}.${getRealNowMs()}.tmp`,
     );
     let descriptor: number | null = null;
 

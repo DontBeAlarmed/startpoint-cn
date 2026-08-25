@@ -1,3 +1,5 @@
+import { getRealNowMs } from "../../runtime/time/game-time"
+
 export type AuthenticationRejectionReason = "malformed" | "unknown" | "revoked"
 
 export type AuthenticationRejection =
@@ -25,7 +27,7 @@ export const MAX_AUTHENTICATION_REJECTIONS = 32
 export class AuthenticationRejectionBuffer {
     private readonly events: AuthenticationRejectionEvent[] = []
 
-    constructor(private readonly now: () => number = Date.now) {}
+    constructor(private readonly now: () => number = getRealNowMs) {}
 
     record(rejection: AuthenticationRejection): void {
         const timestamp = new Date(this.now()).toISOString()

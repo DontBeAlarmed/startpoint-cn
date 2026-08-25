@@ -5,6 +5,7 @@
 ## 核心系统
 
 - [体力](./stamina.md)
+- [服务端时间来源](./time-source.md)
 - [商店](./shop.md)
 - [邮件](./mail.md)
 - [登录奖励](./login-bonus.md)

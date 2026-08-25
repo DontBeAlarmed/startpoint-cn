@@ -1,6 +1,7 @@
 import { getServerTime } from "../../../utils"
 import { getRankDegree } from "../../stamina"
 import { resolveMultiPlayerContext } from "../../../multi/player-context"
+import { getRealNow } from "../../../runtime/time/game-time"
 
 interface FollowInfoPlayer {
     name: string
@@ -48,7 +49,7 @@ export async function buildFinishFollowInfo(
         followInfo.push({
             viewer_id: mateViewerId,
             name: mateCtx.player.name,
-            last_login_time: getServerTime(new Date()),
+            last_login_time: getServerTime(getRealNow()),
             rank: getRankDegree(mateCtx.player.rankPoint || 0),
             comment: "",
             role: mateCtx.player.role || 1,

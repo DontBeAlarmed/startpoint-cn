@@ -6,6 +6,7 @@ import * as fs from "fs";
 import { setServerTimeOffset } from "../utils";
 import { prepareDataVolume } from "../runtime/data-paths";
 import { getAccountPlayersSync } from "./domains/account";
+import { getRealNowMs } from "../runtime/time/game-time";
 
 interface WebState {
     activePlayerId: number | null;
@@ -64,7 +65,7 @@ export function setActivePlayerId(id: number | null): void {
 export function saveTimeOffset(offset: number | null): void {
     const state = readState();
     state.timeOffset = offset;
-    state.lastSetTime = offset !== null ? new Date(Date.now() + offset).toISOString() : null;
+    state.lastSetTime = offset !== null ? new Date(getRealNowMs() + offset).toISOString() : null;
     writeState(state);
 }
 
@@ -78,7 +79,7 @@ export function restoreTimeOffset(): void {
         setServerTimeOffset(state.timeOffset);
     } else {
         const defaultDate = new Date("2024-08-14T12:00:00Z");
-        const offset = defaultDate.getTime() - Date.now();
+        const offset = defaultDate.getTime() - getRealNowMs();
         state.timeOffset = offset;
         state.lastSetTime = defaultDate.toISOString();
         writeState(state);

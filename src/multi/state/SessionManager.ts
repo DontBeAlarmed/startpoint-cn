@@ -24,6 +24,7 @@ import {
     DEFAULT_MULTI_BATTLE_TUNING,
     type MultiBattleTuning,
 } from "../runtime/tuning"
+import { getRealNowMs } from "../../runtime/time/game-time"
 
 export interface SessionManagerOptions {
     readonly battleTuning?: MultiBattleTuning
@@ -131,7 +132,7 @@ export class SessionManager {
                 || this.battleHeartbeatTimers.get(client.connectionId) !== timer) return
             this.battleHeartbeatTimers.delete(client.connectionId)
             if (this.cidToBattleClient.get(client.connectionId) !== client || client.socket.destroyed) return
-            const inactiveMs = Date.now() - (this.battleLastActivityAt.get(client.connectionId) ?? 0)
+            const inactiveMs = getRealNowMs() - (this.battleLastActivityAt.get(client.connectionId) ?? 0)
             if (inactiveMs < leaseMs) {
                 this.scheduleActiveBattleHeartbeatLease(client, leaseMs, leaseMs - inactiveMs)
                 return
@@ -147,7 +148,7 @@ export class SessionManager {
         this.clearBattleHeartbeatLease(client.connectionId)
         const leaseMs = this.battleTuning.loadingLeaseMs
         this.battleConnectionPhase.set(client.connectionId, "loading")
-        this.battleLastActivityAt.set(client.connectionId, Date.now())
+        this.battleLastActivityAt.set(client.connectionId, getRealNowMs())
         let timer: NodeJS.Timeout | undefined
         timer = setTimeout(() => {
             if (timer === undefined
@@ -168,7 +169,7 @@ export class SessionManager {
         const previous = this.battleHeartbeatTimers.get(client.connectionId)
         if (previous) clearTimeout(previous)
         this.battleConnectionPhase.set(client.connectionId, "active")
-        this.battleLastActivityAt.set(client.connectionId, Date.now())
+        this.battleLastActivityAt.set(client.connectionId, getRealNowMs())
         this.scheduleActiveBattleHeartbeatLease(client, leaseMs, leaseMs)
     }
 
@@ -691,7 +692,7 @@ export class SessionManager {
     noteBattleActivity(connectionId: string): void {
         if (this.battleConnectionPhase.get(connectionId) !== "active") return
         if (!this.cidToBattleClient.has(connectionId)) return
-        this.battleLastActivityAt.set(connectionId, Date.now())
+        this.battleLastActivityAt.set(connectionId, getRealNowMs())
     }
 
     beginNextBattleScene(connectionId: string, roomNumber: string): boolean {

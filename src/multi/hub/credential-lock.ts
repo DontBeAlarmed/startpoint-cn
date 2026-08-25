@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto"
 import * as fs from "node:fs"
 import * as path from "node:path"
+import { getRealNowMs } from "../../runtime/time/game-time"
 const NOFOLLOW = fs.constants.O_NOFOLLOW ?? 0
 const SCHEMA_VERSION = 1
 const OWNER_TOKEN_PATTERN = /^[0-9a-f]{32}$/
@@ -133,7 +134,7 @@ export function acquireMultiHubCredentialLock(
     const ownerToken = options.ownerToken ?? randomBytes(16).toString("hex")
     if (!Number.isSafeInteger(pid) || pid <= 0) throw new TypeError("pid must be positive")
     if (!OWNER_TOKEN_PATTERN.test(ownerToken)) throw new TypeError("ownerToken must be 32 lowercase hex characters")
-    const now = options.now ?? Date.now
+    const now = options.now ?? getRealNowMs
     const sleep = options.sleep ?? (milliseconds => Atomics.wait(
         new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds))
     const isProcessAlive = options.isProcessAlive ?? defaultProcessAlive

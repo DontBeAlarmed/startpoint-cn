@@ -1,5 +1,6 @@
 import * as net from "net"
 import { DEFAULT_MULTI_TRANSPORT_TUNING } from "../runtime/tuning"
+import { getRealNowMs } from "../../runtime/time/game-time"
 
 export type ReliableSendResult = "sent" | "queued" | "closed"
 
@@ -108,7 +109,7 @@ function armTimeout(socket: net.Socket, state: SocketSendState): void {
     clearTimeoutFor(state)
     const remaining = Math.max(
         1,
-        reliableSendTuning.maxAgeMs - (Date.now() - state.blockedSince),
+        reliableSendTuning.maxAgeMs - (getRealNowMs() - state.blockedSince),
     )
     state.timeout = setTimeout(() => {
         if (socketStates.get(socket) !== state || socket.destroyed) return
@@ -118,7 +119,7 @@ function armTimeout(socket: net.Socket, state: SocketSendState): void {
 }
 
 function beginBackpressure(socket: net.Socket, state: SocketSendState): void {
-    if (state.blockedSince === 0) state.blockedSince = Date.now()
+    if (state.blockedSince === 0) state.blockedSince = getRealNowMs()
     listenForDrain(socket, state)
     armTimeout(socket, state)
 }

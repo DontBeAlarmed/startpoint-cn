@@ -4,6 +4,7 @@ import { deleteAccountSessionsOfType, deleteSession, getSession, insertSession }
 import { getAccount, getAccountFromIdpIdSync, insertAccount, updateAccount } from "../data/domains/account"
 import { getAccountFromPlayerIdSync } from "../data/domains/player"
 import { getAccountIdentityProvider } from "../lib/account-identity-provider";
+import { getRealNow, getRealNowMs } from "../runtime/time/game-time";
 
 interface CreateDeviceAccessTokenBody {
     adid: string
@@ -131,7 +132,7 @@ const routes = async (fastify: FastifyInstance) => {
         
         reply.status(200).send({
             "accessToken": "fwPla7fQ8ty9+DZT/lD//uWZD4uD6C4lD6gGIIZTLKRTQ52/SLCRmk/370jcWGs+e+1iSoZtL7lj8ov9B0/jHmijH4nsHPQT6pchaQM1M9mtwYNQq0BWhVr9hF0jjCK/a5LIVd1kBac/Gemv29WKEDKSrUS9HxxUigoPRwtOy8m+oDj9FmDJZ+rzqWCc0QjES4Ky0fTpXZ7ESoguDzNmRtW3FYr+OFexw8wBPlwiC4w=",
-            "expiryTime": new Date().getTime() + 4600000
+            "expiryTime": getRealNowMs() + 4600000
         })
     })
 
@@ -160,7 +161,7 @@ const routes = async (fastify: FastifyInstance) => {
                 await deleteAccountSessionsOfType(account.id, SessionType.ZAT)
                 // generate new zat session
                 session = await insertSession({
-                    expires: new Date(new Date().getTime() + 43200000),
+                    expires: new Date(getRealNowMs() + 43200000),
                     accountId: account.id,
                     type: SessionType.ZAT
                 })
@@ -174,7 +175,7 @@ const routes = async (fastify: FastifyInstance) => {
         // get the Account assigned to the session
         const account = await updateAccount({
             id: session.accountId,
-            lastLoginTime: new Date()
+            lastLoginTime: getRealNow()
         })
         .catch(err => {
             console.log(err)
@@ -190,7 +191,7 @@ const routes = async (fastify: FastifyInstance) => {
         await deleteSession(session.token)
 
         const newSession = await insertSession({
-            expires: new Date(new Date().getTime() + 43200000),
+            expires: new Date(getRealNowMs() + 43200000),
             accountId: account.id,
             type: SessionType.ZAT
         })
@@ -247,7 +248,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "E006": "y",
                 "N002": "n",
                 "N003": "n",
-                "timestamp": (new Date().getTime() * 1000).toString()
+                "timestamp": (getRealNowMs() * 1000).toString()
             },
             "agreementPopup": "n",
             "appId": body.appId,
@@ -327,12 +328,12 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         const zatToken = await insertSession({
-            expires: new Date(new Date().getTime() + 43200000),
+            expires: new Date(getRealNowMs() + 43200000),
             accountId: account.id,
             type: SessionType.ZAT
         })
         const zrtToken = await insertSession({
-            expires: new Date(new Date().getTime() + 2592000000),
+            expires: new Date(getRealNowMs() + 2592000000),
             accountId: account.id,
             type: SessionType.ZRT
         })

@@ -9,7 +9,7 @@ export function getDefaultPlayerData(): Omit<Player, "id"> {
     const realNow = getRealNow()
     return {
         stamina: getMaxStamina(1),
-        staminaHealTime: new Date(),
+        staminaHealTime: realNow,
         boostPoint: 10,
         bossBoostPoint: 3,
         transitionState: 0,

@@ -7,6 +7,7 @@ import {
 } from "../../lib/quest/active-quest-persistence";
 import { ensureSchemaColumn } from "../schema";
 import { pruneSpecialEventPartyGroupsSync } from "../../lib/party-group-persistence";
+import { getRealNow } from "../../runtime/time/game-time";
 
 function getInitialDropMultiplier(): number {
     const configured = process.env.DROP_MULTIPLIER
@@ -40,7 +41,7 @@ export default function init(
         database.prepare(`
             INSERT INTO server_gameplay_settings (id, drop_multiplier, updated_at)
             VALUES (1, ?, ?)
-        `).run(getInitialDropMultiplier(), new Date().toISOString())
+        `).run(getInitialDropMultiplier(), getRealNow().toISOString())
     }
 
     // create players table
@@ -80,7 +81,7 @@ export default function init(
     database.prepare(`
         INSERT OR IGNORE INTO account_cleanup_settings (id, default_policy, timeout_ms, updated_at)
         VALUES (1, 'retain', 259200000, ?)
-    `).run(new Date().toISOString())
+    `).run(getRealNow().toISOString())
     database.prepare(`CREATE TABLE IF NOT EXISTS account_cleanup_audit (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         account_id INTEGER NOT NULL,

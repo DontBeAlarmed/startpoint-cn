@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { getRealNowMs } from "../../runtime/time/game-time"
 
 import {
     MULTI_PROTOCOL_VERSION,
@@ -67,7 +68,7 @@ export class HubClient {
         this.fetchImpl = options.fetch ?? fetch
         this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
         this.maxResponseBytes = options.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES
-        this.now = options.now ?? Date.now
+        this.now = options.now ?? getRealNowMs
         this.createIdempotencyKey = options.createIdempotencyKey ?? randomUUID
         if (!Number.isSafeInteger(this.timeoutMs) || this.timeoutMs <= 0
             || !Number.isSafeInteger(this.maxResponseBytes) || this.maxResponseBytes <= 0) {

@@ -2,6 +2,7 @@ import type { IncomingHttpHeaders } from "node:http"
 
 import { getQuestFromCategorySync } from "../../lib/assets"
 import { getServerTime } from "../../utils"
+import { getRealNowMs } from "../../runtime/time/game-time"
 import type { MultiPlayerContext } from "../player-context"
 import { resolveMultiPlayerContext } from "../player-context"
 import type { MultiCoordinator } from "../coordinator/interface"
@@ -108,7 +109,7 @@ export function createEmbeddedMultiHttpContext(
     })
     const coordinatorOrigin = options.coordinatorOrigin ?? "local"
     const resolvePlayerContext = options.resolvePlayerContext ?? resolveMultiPlayerContext
-    const now = options.now ?? Date.now
+    const now = options.now ?? getRealNowMs
     const fixedCompatibility = options.compatibility
         ? Object.freeze({ ...options.compatibility }) as MultiCompatibilityProfile
         : null

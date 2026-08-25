@@ -3,7 +3,6 @@ import { FastifyRequest } from "fastify"
 
 // The server's current time offset (real time + offset = simulated time)
 let timeOffset: number | null = null;  // milliseconds, null = use system time
-console.log(`[TIME] startup offset=${timeOffset ?? 'null(system)'}`);
 
 /**
  * Returns the current server time as a unix epoch.

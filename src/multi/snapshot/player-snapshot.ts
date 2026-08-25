@@ -24,6 +24,7 @@ import {
     resolveMultiPlayerContext,
     type MultiPlayerContext,
 } from "../player-context"
+import { getRealNowMs } from "../../runtime/time/game-time"
 import {
     createLegacySnapshotReaderDependencies,
     readMultiplayerSnapshot,
@@ -353,7 +354,7 @@ export function buildYourselfFromSnapshot(
         playerRoleKind: snapshot.playerRoleKind,
         isNewbie: snapshot.isNewbie,
         isHost,
-        entryTime: Date.now(),
+        entryTime: getRealNowMs(),
         currentPartyId: snapshot.currentPartyId,
         autoplayMode: false,
         autoskillMode: 1,

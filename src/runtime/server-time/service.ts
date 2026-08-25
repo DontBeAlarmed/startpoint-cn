@@ -12,6 +12,7 @@ import {
     ServerTimeSnapshot,
     ServerTimeState,
 } from "./types"
+import { getRealNowMs } from "../time/game-time"
 
 const DEFAULT_SERVER_TIME_MS = Date.parse("2024-08-14T12:00:00.000Z")
 
@@ -47,7 +48,7 @@ export class ServerTimeService {
 
     constructor(options: ServerTimeServiceOptions = {}) {
         this.store = options.store ?? new ServerTimeStore()
-        this.now = options.now ?? Date.now
+        this.now = options.now ?? getRealNowMs
     }
 
     restore(options: ServerTimeNowOptions = {}): ServerTimeSnapshot {

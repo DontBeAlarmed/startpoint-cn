@@ -4,6 +4,7 @@ import { getPlayerCharacterSync, insertPlayerCharacterSync, updatePlayerCharacte
 import { getPlayerSync, updatePlayerSync } from "../data/domains/player"
 import { givePlayerItemSync, givePlayerItemWithinTransactionSync } from "../data/domains/item"
 import { getCharacterDataSync } from "./assets";
+import { getRealNow } from "../runtime/time/game-time";
 import { AddExpList, AddExpListItem, ClientReturnBondTokenStatus, ClientReturnBondTokenStatusList, ClientReturnCharacter, Element, GivePlayerCharacterResult, RewardPlayerCharacterExpResult } from "./types";
 
 export const characterExpCaps: Record<number, number[]> = {
@@ -129,7 +130,7 @@ function givePlayerCharacterWithItemWriterSync(
         }
 
         // give the player the character
-        const joinTime = new Date()
+        const joinTime = getRealNow()
         insertPlayerCharacterSync(playerId, characterId, {
             entryCount: 1,
             evolutionLevel: 0,

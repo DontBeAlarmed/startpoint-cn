@@ -1,4 +1,5 @@
 import { getDb } from "../db"
+import { getRealNow } from "../../runtime/time/game-time"
 
 export interface ServerGameplaySettings {
     readonly dropMultiplier: number
@@ -41,7 +42,7 @@ export function updateServerGameplaySettingsSync(
     settings: UpdateServerGameplaySettings,
 ): ServerGameplaySettings {
     validateDropMultiplier(settings.dropMultiplier)
-    const updatedAt = new Date().toISOString()
+    const updatedAt = getRealNow().toISOString()
     const result = getDb().prepare(`
         UPDATE server_gameplay_settings
         SET drop_multiplier = ?, updated_at = ?

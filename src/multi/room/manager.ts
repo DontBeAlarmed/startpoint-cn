@@ -1,6 +1,7 @@
 import { randomBytes, randomInt } from "crypto";
 import { MultiRoom, QuestCategory, RoomState } from "../types";
 import { getServerTime } from "../../utils";
+import { getRealNowMs } from "../../runtime/time/game-time";
 import { sessionManager } from "../state/SessionManager";
 import type { ParticipantIdentity } from "../coordinator/contracts";
 
@@ -41,7 +42,7 @@ interface RoomCleanupTiming {
 }
 
 function cleanExpiredRooms(timing: RoomCleanupTiming) {
-    const now = Date.now();
+    const now = getRealNowMs();
     const timeOffset = now - getServerTime() * 1000;
     let cleaned = 0;
     for (const [roomNumber, room] of rooms) {
@@ -157,7 +158,7 @@ export function createRoom(
         host_party_id: hostPartyId,
         host_main_character_id: hostMainCharacterId,
         accepted_type: acceptedType,
-        created_at: Date.now(),
+        created_at: getRealNowMs(),
         raising_state: 2,
         room_sequence: roomSequence++,
         host_entry_time: getServerTime(),

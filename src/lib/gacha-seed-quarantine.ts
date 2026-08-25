@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { dirname, join } from "path"
 
 import { resolveRuntimeDataPaths } from "../runtime/data-paths"
+import { getRealNowMs } from "../runtime/time/game-time"
 
 const SCHEMA_VERSION = 1
 const DEFAULT_RECENT_TTL_MS = 10 * 60 * 1000
@@ -81,7 +82,7 @@ export class GachaSeedQuarantine {
     constructor(options: GachaSeedQuarantineOptions = {}) {
         this.stateFile = options.stateFile
             ?? join(resolveRuntimeDataPaths().seedStateDir, "quarantine.json")
-        this.now = options.now ?? Date.now
+        this.now = options.now ?? getRealNowMs
         this.recentTtlMs = options.recentTtlMs ?? DEFAULT_RECENT_TTL_MS
         this.writeSnapshot = options.writeSnapshot ?? ((stateFile, snapshot) => {
             mkdirSync(dirname(stateFile), { recursive: true })

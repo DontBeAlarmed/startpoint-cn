@@ -6,6 +6,7 @@ import { getPlayerSync, insertDefaultPlayerSync } from "../../data/domains/playe
 import { SessionType } from "../../data/types";
 import { saveAccountDefaultPlayer } from "../../data/activeAccount";
 import { getAccountIdentityProvider } from "../../lib/account-identity-provider";
+import { getRealNow, getRealNowMs } from "../../runtime/time/game-time";
 
 interface CnSignupBody {
     device_id: number;
@@ -81,7 +82,7 @@ const routes = async (fastify: FastifyInstance) => {
             if (accountExists) {
                 accountId = binding.account_id
                 newAccount = false
-                updateAccountSync({ id: accountId, lastLoginTime: new Date() })
+                updateAccountSync({ id: accountId, lastLoginTime: getRealNow() })
                 // Clean all old sessions for this account, reuse first token
                 const sessions = getAccountSessionsOfTypeSync(accountId, SessionType.VIEWER)
                 if (sessions.length > 0) {
@@ -119,7 +120,7 @@ const routes = async (fastify: FastifyInstance) => {
             token: String(viewerId),
             accountId: accountId,
             type: SessionType.VIEWER,
-            expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+            expires: new Date(getRealNowMs() + 365 * 24 * 60 * 60 * 1000)
         });
 
         viewerIdToAccountId.set(viewerId, accountId);
@@ -137,7 +138,7 @@ const routes = async (fastify: FastifyInstance) => {
                 roleName: `Player${accountId}`,
                 accountName: `Player${accountId}`,
                 sign: "dummy_sign",
-                createDate: new Date().toISOString(),
+                createDate: getRealNow().toISOString(),
                 serverName: "StarPoint CN",
                 serverId: 1,
             }

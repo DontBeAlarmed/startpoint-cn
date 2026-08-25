@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { getRealNow } from "../../runtime/time/game-time";
 import { MultiStartBody, MultiFinishBody, MultiAbortBody, PlayContinueBody } from "../types";
 import { generateDataHeaders, realToVirtual } from "../../utils";
 import { getRoom, disbandRoom } from "../room/manager";
@@ -215,7 +216,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             playId: play_id,
             continueCount: 0,
         };
-        const startTime = new Date();
+        const startTime = getRealNow();
         let startResult;
         try {
             startResult = runStartEntryTransaction({

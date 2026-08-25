@@ -1,4 +1,5 @@
 import type { AdminMultiStatus } from "../../lib/admin-multi-status"
+import { getRealNowMs } from "../../runtime/time/game-time"
 import type {
     IssuedMultiHubCredential,
     MultiHubCredential,
@@ -48,7 +49,7 @@ export class MultiManagementService implements MultiManagementServiceContract {
 
     constructor(dependencies: MultiManagementDependencies) {
         this.dependencies = dependencies
-        this.now = dependencies.now ?? Date.now
+        this.now = dependencies.now ?? getRealNowMs
     }
 
     createCredential(label: string): IssuedMultiHubCredential {

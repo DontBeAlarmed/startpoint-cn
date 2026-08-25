@@ -14,6 +14,7 @@ import { getDb } from "../../data/db";
 import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { canClaimTownStoryCharacter } from "../../lib/story-join-character";
+import { getRealNow } from "../../runtime/time/game-time";
 
 interface OverLimitBody {
     viewer_id: number
@@ -295,7 +296,7 @@ const routes = async (fastify: FastifyInstance) => {
                         "character_id": characterId,
                         "stack": stack,
                         "create_time": clientSerializeDate(playerCharacterData.joinTime),
-                        "update_time": clientSerializeDate(new Date()),
+                        "update_time": clientSerializeDate(getRealNow()),
                         "join_time": clientSerializeDate(playerCharacterData.joinTime)
                     }
                 ],
@@ -357,7 +358,7 @@ const routes = async (fastify: FastifyInstance) => {
                 over_limit_step: newOverLimit,
                 stack: newStack,
                 create_time: clientSerializeDate(charData.joinTime),
-                update_time: clientSerializeDate(new Date()),
+                update_time: clientSerializeDate(getRealNow()),
                 join_time: clientSerializeDate(charData.joinTime),
             })
         }

@@ -17,6 +17,7 @@ import { getDb } from "../../data/db";
 import { incrementActiveMissionInjectedExpCountSync } from "../../data/domains/active_mission_counters"
 import { validateCharacterStackConversion } from "../../lib/character-stack";
 import { getMailArrivedSync } from "../../lib/mail-notification";
+import { getRealNow } from "../../runtime/time/game-time";
 
 interface InjectExpBody {
     character_id: number,
@@ -147,7 +148,7 @@ const routes = async (fastify: FastifyInstance) => {
                         "exp": character.exp,
                         "exp_total": character.exp,
                         "create_time": clientSerializeDate(character.joinTime),
-                        "update_time": clientSerializeDate(new Date()),
+                        "update_time": clientSerializeDate(getRealNow()),
                         "join_time": clientSerializeDate(character.joinTime)
                     }
                 ],

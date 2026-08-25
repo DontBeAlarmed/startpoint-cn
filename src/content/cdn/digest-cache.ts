@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
+import { getRealNowMs } from "../../runtime/time/game-time"
 
 const MAX_SNAPSHOT_ATTEMPTS = 3
 
@@ -181,7 +182,7 @@ export async function resolveDigestCache(
     }
 
     await mkdir(path.dirname(cachePath))
-    const temporaryPath = `${cachePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+    const temporaryPath = `${cachePath}.tmp-${process.pid}-${getRealNowMs()}-${Math.random().toString(16).slice(2)}`
     try {
         await writeFile(temporaryPath, `${JSON.stringify(entries, null, 2)}\n`, "utf8")
         await rename(temporaryPath, cachePath)

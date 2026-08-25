@@ -9,6 +9,7 @@ import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils"
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time"
 import { computeRealTimeStamina } from "../../lib/stamina"
 import { getStaminaCost } from "../../lib/stamina-cost"
+import { getRealNow } from "../../runtime/time/game-time"
 import { dispatchModeQuestStart } from "../../modes/registry"
 import { createModeHost } from "../../modes/loader"
 import {
@@ -302,7 +303,7 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRoutes
             playId: body.play_id,
             continueCount: 0
         }
-        const startTime = new Date()
+        const startTime = getRealNow()
         let startResult
         let missionSettlement: MissionSettlementResult | undefined
         try {
@@ -333,7 +334,7 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRoutes
                     if (challengePointId === undefined) return
                     refreshPlayerDailyChallengePointsForRealDaySync(
                         pointPlayerId,
-                        new Date(),
+                        getRealNow(),
                         dailyResetHour,
                     )
                     assertDailyChallengePointAvailable(

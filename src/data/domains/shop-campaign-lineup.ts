@@ -1,5 +1,6 @@
 import { clientSerializeDate } from "../utils/date"
 import { getDb } from "../db"
+import { getVirtualNow } from "../../runtime/time/game-time"
 
 interface RawShopCampaignLineup {
     lineup_id: number
@@ -42,7 +43,7 @@ export function selectPlayerShopCampaignLineupSync(
     shopType: number,
     campaignId: number,
     lineupId: number,
-    selectedAt: Date = new Date(),
+    selectedAt: Date = getVirtualNow(),
 ): ShopCampaignLineupSelectionResult {
     const inserted = getDb().prepare(`
         INSERT OR IGNORE INTO players_shop_campaign_lineups (

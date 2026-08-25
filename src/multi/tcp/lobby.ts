@@ -16,6 +16,7 @@ import {
     scheduleLobbyTask,
 } from "./lobby-lifecycle"
 import { updatePlayerSnapshotParty } from "../snapshot/player-snapshot"
+import { getRealNowMs } from "../../runtime/time/game-time"
 import { participantKey, type ParticipantIdentity } from "../coordinator/contracts"
 
 const DEFAULT_NPC_JOIN_DELAY_MS = 2_000
@@ -377,7 +378,7 @@ async function handleEnterComs(
             dashBehaviorMode: 1,
             allowHealFromOtherPlayers: true,
             state: [0],
-            entryTime: Date.now(),
+            entryTime: getRealNowMs(),
             isNewbie: false,
             isHost: false,
         })

@@ -5,7 +5,7 @@ import { clearPublishedActiveQuest } from "../../lib/quest/active-quest-service"
 import { loadCurrentBundleMetadata } from "../../runtime/bundle-metadata"
 import { getDb } from "../db"
 import { insertDefaultPlayerSync, replacePlayerDataSync } from "../domains/player"
-import { getRealNow } from "../../runtime/time/game-time"
+import { getRealNow, getRealNowMs } from "../../runtime/time/game-time"
 import { normalizeImportedExpPoolAnchor } from "../../lib/exp-pool-time"
 import { reviveMergedPlayerDates } from "../utils/date"
 import {
@@ -191,7 +191,7 @@ export function exportPlayerSaveV2Sync(
         version: PLAYER_SAVE_FORMAT_VERSION,
         formatVersion: PLAYER_SAVE_FORMAT_VERSION,
         mode: "backup",
-        exportedAt: new Date().toISOString(),
+        exportedAt: getRealNow().toISOString(),
         playerId,
         producer: {
             serverVersion: loadCurrentBundleMetadata().version,
@@ -549,13 +549,13 @@ export function validatePlayerSaveTemplateSync(
     const rollbackMarker = {}
     try {
         database.transaction(() => {
-            const now = new Date().toISOString()
+            const now = getRealNow().toISOString()
             const account = database.prepare(`
                 INSERT INTO accounts (
                     app_id, first_login_time, idp_alias, idp_code,
                     idp_id, reg_time, last_login_time, status
                 ) VALUES ('wf_cn', ?, '', 'save-template-validation', ?, ?, ?, 'normal')
-            `).run(now, `save-template-validation-${process.pid}-${Date.now()}`, now, now)
+            `).run(now, `save-template-validation-${process.pid}-${getRealNowMs()}`, now, now)
             const player = insertDefaultPlayerSync(Number(account.lastInsertRowid))
             applyPlayerSaveTemplateSync(parsed.snapshot, player.id, database)
             throw rollbackMarker

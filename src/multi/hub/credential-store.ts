@@ -8,6 +8,7 @@ import * as path from "node:path"
 
 import { withMultiHubCredentialLock } from "./credential-lock"
 import { generateMultiHubToken, validateMultiHubToken } from "./token"
+import { getRealNow } from "../../runtime/time/game-time"
 
 const SCHEMA_VERSION = 1 as const
 const CREDENTIAL_ID_PATTERN = /^[0-9a-f]{32}$/
@@ -162,7 +163,7 @@ export class MultiHubCredentialStore {
             throw new MultiHubCredentialStoreError("INVALID_MULTI_HUB_CREDENTIALS_PATH")
         }
         this.credentialsPath = options.credentialsPath
-        this.now = options.now ?? (() => new Date())
+        this.now = options.now ?? getRealNow
         this.generateToken = options.generateToken ?? generateMultiHubToken
         this.generateCredentialId = options.generateCredentialId
             ?? (() => randomBytes(16).toString("hex"))

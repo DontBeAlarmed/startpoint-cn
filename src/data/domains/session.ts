@@ -2,6 +2,7 @@ import { getDb } from "../db";
 import { randomBytes } from "crypto";
 import { RawSession, Session, SessionType } from "../types";
 import { generateViewerId } from "../../utils";
+import { getRealNow } from "../../runtime/time/game-time";
 
 /**
  * Converts a RawSession into a Session.
@@ -41,7 +42,7 @@ export function getSessionSync(
     const session = buildSession(raw)
 
     // viewer tokens don't expire.
-    if (session.type !== SessionType.VIEWER && new Date() >= session.expires) {
+    if (session.type !== SessionType.VIEWER && getRealNow() >= session.expires) {
         console.log(`[SESSION] expired type=${session.type} accountId=${session.accountId} expires=${session.expires.toISOString()}`)
         deleteSessionSync(session.token)
         return null
@@ -89,7 +90,7 @@ export function getDeviceBindingSync(deviceId: number): { device_id: number, acc
 
 export function insertDeviceBindingSync(deviceId: number, accountId: number, name?: string): void {
     getDb().prepare(`INSERT OR REPLACE INTO device_bindings (device_id, account_id, last_seen, name) VALUES (?, ?, ?, ?)`)
-        .run(deviceId, accountId, new Date().toISOString(), name ?? null)
+        .run(deviceId, accountId, getRealNow().toISOString(), name ?? null)
 }
 
 export function deleteDeviceBindingSync(deviceId: number): void {
@@ -333,7 +334,7 @@ export function generateViewerIdSession(
             // insert new session
             resolve(insertSessionWithTokenSync({
                 token: generateViewerId().toString(),
-                expires: new Date(new Date().getTime()),
+                expires: getRealNow(),
                 accountId: accountId,
                 type: SessionType.VIEWER
             }))

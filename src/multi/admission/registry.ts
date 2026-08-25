@@ -1,6 +1,7 @@
 import type { CoordinatorErrorCode, ParticipantIdentity } from "../coordinator/contracts"
 import type { PlayerSnapshot } from "../snapshot/player-snapshot"
 import { getRoom, getRoomOccupiedMemberCount, isRoomViewerMember } from "../room/manager"
+import { getRealNowMs } from "../../runtime/time/game-time"
 
 const MAX_REAL_ROOM_MEMBERS = 3
 
@@ -53,7 +54,7 @@ export class AdmissionRegistry implements AdmissionProvider, AdmissionIssuer {
     private readonly isOccupiedMember: (roomNumber: string, viewerId: number) => boolean
 
     constructor(options: AdmissionRegistryOptions = {}) {
-        this.now = options.now ?? Date.now
+        this.now = options.now ?? getRealNowMs
         this.getOccupiedMemberCount = options.getOccupiedMemberCount ?? (() => 0)
         this.isOccupiedMember = options.isOccupiedMember ?? (() => false)
     }

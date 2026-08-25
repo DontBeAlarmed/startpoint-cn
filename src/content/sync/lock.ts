@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
+import { getRealNowMs } from "../../runtime/time/game-time"
 
 const NOFOLLOW = fs.constants.O_NOFOLLOW ?? 0
 const DIRECTORY = fs.constants.O_DIRECTORY ?? 0
@@ -249,7 +250,7 @@ export async function acquireContentSyncLock(
     if (!Number.isSafeInteger(pid) || pid <= 0) throw new TypeError("pid must be a positive integer")
     if (!TOKEN_PATTERN.test(token)) throw new TypeError("token must be 32 lowercase hex characters")
 
-    const now = options.now ?? Date.now
+    const now = options.now ?? getRealNowMs
     const sleep = options.sleep ?? (milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)))
     const writeLock = options.writeLock ?? (async (handle, bytes) => {
         await handle.writeFile(bytes)

@@ -17,6 +17,7 @@ import { getPlayerTriggeredTutorialsSync } from "../../data/domains/tutorial"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders } from "../../utils";
+import { getRealNow } from "../../runtime/time/game-time";
 
 interface LoadBody {
     app_secret: string,
@@ -67,7 +68,7 @@ const routes = async (fastify: FastifyInstance) => {
         // get last login time
         dailyResetPlayerDataSync(player)
         getDb().transaction(() => {
-            refreshPlayerDailyChallengePointsForRealDaySync(playerId, new Date())
+            refreshPlayerDailyChallengePointsForRealDaySync(playerId, getRealNow())
         })()
 
         // collect the player's pooled exp

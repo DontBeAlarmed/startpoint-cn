@@ -1,5 +1,6 @@
 import { getDb } from "../db";
 import { Account, RawAccount } from "../types";
+import { getRealNow } from "../../runtime/time/game-time";
 
 // Account
 
@@ -169,7 +170,7 @@ export function insertAccountSync(
     account: Omit<Account, "id" | "firstLoginTime" | "regTime" | "lastLoginTime">
 ): Account {
     const db = getDb();
-    const dateNow = new Date()
+    const dateNow = getRealNow()
     const dateNowISO = dateNow.toISOString()
 
     const settings = db.prepare(`

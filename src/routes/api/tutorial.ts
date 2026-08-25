@@ -23,6 +23,7 @@ import { GachaCharacterDraw } from "../../lib/types";
 import { reconcileAwakeUnlockCharacterListBestEffort } from "../../lib/mission";
 import { collectAwakeCandidateCharacterIds } from "../../lib/mission/awake-candidate-character-ids";
 import { createAwakeRequestContextBestEffort } from "../../lib/mission/awake-best-effort-context";
+import { getRealNow } from "../../runtime/time/game-time";
 import {
     getTutorialEffectiveNextStep,
     TUTORIAL_END_EFFECTIVE_STEP,
@@ -439,7 +440,7 @@ const routes = async (fastify: FastifyInstance) => {
                     type_id: null,
                     number: 500,
                     receive_time: "0000-00-00 00:00:00",
-                    create_time: new Date().toISOString().replace("T", " ").substring(0, 19),
+                    create_time: getRealNow().toISOString().replace("T", " ").substring(0, 19),
                     reward_period_limited: 0,
                     reward_limit_time: null,
                 })

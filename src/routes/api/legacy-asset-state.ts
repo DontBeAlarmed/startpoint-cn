@@ -1,6 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import { createHash } from "node:crypto"
+import { getRealNowMs } from "../../runtime/time/game-time"
 
 export interface LegacyAssetArchive {
     readonly location: string
@@ -140,7 +141,7 @@ function publishMetadata(
     inspectOptionalRegularFile(metadataFile, "Legacy asset metadata")
     const temporaryFile = path.join(
         assetProviderDir,
-        `.${path.basename(metadataFile)}.${process.pid}.${Date.now()}.tmp`,
+        `.${path.basename(metadataFile)}.${process.pid}.${getRealNowMs()}.tmp`,
     )
     let descriptor: number | null = null
     try {

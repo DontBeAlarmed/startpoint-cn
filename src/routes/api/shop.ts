@@ -51,7 +51,7 @@ import {
     addPlayerPassCardPointSync,
 } from "../../data/domains/pass-card"
 import { getActivePassCardEventDefinitionAt } from "../../lib/pass-card"
-import { getGameTimeContext } from "../../runtime/time/game-time"
+import { getGameTimeContext, getRealNow } from "../../runtime/time/game-time"
 
 interface GetSalesListBody {
     equipment_enhancement_shop_category_ids: number[],
@@ -527,7 +527,7 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
         // Calculate recovery amount (capped at overflow)
         const afterStamina = Math.min(currentStamina + recoveryValue, maxOverflow)
         const actualRecovery = afterStamina - currentStamina
-        const recoveryTime = new Date()
+        const recoveryTime = getRealNow()
 
         updatePlayerSync({
             id: playerId,

@@ -216,7 +216,7 @@ const routes = async (fastify: FastifyInstance) => {
         // Auto-sync related time fields
         const extra: Record<string, any> = {}
         if (field === 'stamina') {
-            extra.staminaHealTime = new Date()
+            extra.staminaHealTime = getRealNow()
         }
         if (field === 'expPool') {
             extra.expPooledTime = getRealNow()

@@ -1,6 +1,7 @@
 import type { CompatibilityDifference } from "../multi/compatibility"
 import type { MultiRuntimeStatus } from "../multi/runtime/status"
 import { sanitizeDiagnosticVersion } from "./diagnostic-version"
+import { getRealNowMs } from "../runtime/time/game-time"
 
 const MAX_REJECTION_TTL_MS = 24 * 60 * 60 * 1000
 const DEFAULT_REJECTION_TTL_MS = 60 * 60 * 1000
@@ -79,7 +80,7 @@ export class CompatibilityRejectionStore {
     private latest: { summary: CompatibilityRejectionSummary; expiresAt: number } | null = null
 
     constructor(options: { readonly now?: () => number; readonly ttlMs?: number } = {}) {
-        this.now = options.now ?? Date.now
+        this.now = options.now ?? getRealNowMs
         this.ttlMs = options.ttlMs ?? DEFAULT_REJECTION_TTL_MS
         if (!Number.isSafeInteger(this.ttlMs)
             || this.ttlMs <= 0

@@ -2,6 +2,7 @@ import { getDb } from "../db";
 import { PlayerCharacter, PlayerCharacterBondToken, PlayerCharacterExBoost, RawPlayerCharacter, RawPlayerCharacterBondToken, RawPlayerCharacterManaNode } from "../types";
 import { deserializeBoolean, deserializeNumberList, serializeBoolean, serializeNumberList } from "../utils/primitives";
 import { getCharacterDataSync } from "../../lib/assets";
+import { getRealNow } from "../../runtime/time/game-time";
 
 export interface PlayerCharacterGrowthFact {
     readonly exp: number
@@ -327,7 +328,7 @@ export function insertDefaultPlayerCharacterSync(
     playerId: number,
     characterId: number | string
 ) {
-    const dateNow = new Date()
+    const dateNow = getRealNow()
 
     const bondTokenList = [
         {
@@ -404,7 +405,7 @@ export function updatePlayerCharacterSync(
     }
 
     // set the update time to now
-    character.updateTime = new Date()
+    character.updateTime = getRealNow()
 
     const sets: string[] = []
     const values: any[] = []

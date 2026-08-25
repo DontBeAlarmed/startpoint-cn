@@ -16,6 +16,7 @@ import bundledExAbility from "../../../assets/ex_ability.json"
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
+import { getRealNow } from "../../runtime/time/game-time";
 import {
     deletePendingExBoostDrawSync,
     getPendingExBoostDrawSync,
@@ -327,7 +328,7 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
                     })),
                     ex_boost: { status_id: drawResult.statusId, ability_id_list: drawResult.abilityIdList },
                     create_time: clientSerializeDate(characterData.joinTime),
-                    update_time: clientSerializeDate(new Date()),
+                    update_time: clientSerializeDate(getRealNow()),
                     join_time: clientSerializeDate(characterData.joinTime),
                 }],
                 item_list: { [String(costItemId)]: afterCostItemAmount },
@@ -403,7 +404,7 @@ const routes = async (fastify: FastifyInstance) => {
                     })),
                     ex_boost: { status_id: drawResult.statusId, ability_id_list: drawResult.abilityIdList },
                     create_time: clientSerializeDate(characterData.joinTime),
-                    update_time: clientSerializeDate(new Date()),
+                    update_time: clientSerializeDate(getRealNow()),
                     join_time: clientSerializeDate(characterData.joinTime),
                 }],
                 mail_arrived: getMailArrivedSync(playerId),

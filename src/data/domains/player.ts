@@ -681,14 +681,15 @@ export function insertDefaultPlayerSync(
     insertPlayerClearedRegularMissionListSync(playerId, {})
 
     // insert characterList
+    const characterTime = getRealNow()
     insertPlayerCharactersSync(playerId, {
         "1": {
             entryCount: 1,
             evolutionLevel: 0,
             overLimitStep: 0,
             protection: false,
-            joinTime: new Date(),
-            updateTime: new Date(),
+            joinTime: characterTime,
+            updateTime: characterTime,
             exp: 10,
             stack: 0,
             bondTokenList: [
@@ -1280,7 +1281,7 @@ export function collectPlayerPooledExpSync(
  */
 export function dailyResetPlayerDataSync(
     player: Player,
-    loginDate: Date = new Date(),
+    loginDate: Date = getRealNow(),
     resetHour = 5,
 ): boolean {
     const lastLoginTime = player.lastLoginTime
@@ -1387,5 +1388,5 @@ export function dailyResetPlayerSync(
     const playerData = getPlayerSync(playerId)
     if (!playerData) return false;
 
-    return dailyResetPlayerDataSync(playerData, new Date(), resetHour)
+    return dailyResetPlayerDataSync(playerData, getRealNow(), resetHour)
 }

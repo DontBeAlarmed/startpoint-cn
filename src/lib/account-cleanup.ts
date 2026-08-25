@@ -1,6 +1,7 @@
 import { getDb } from "../data/db"
 import { getAccountSync, getAccountPlayersSync } from "../data/domains/account"
 import { removeAccountFromAdminState } from "../data/activeAccount"
+import { getRealNow } from "../runtime/time/game-time"
 
 export type AccountCleanupPolicy = "retain" | "delete_after_timeout"
 export type AccountCleanupState = "active" | "orphaned" | "deleted"
@@ -49,7 +50,7 @@ export function getAccountCleanupSettingsSync(): AccountCleanupSettings {
 export function updateAccountCleanupSettingsSync(
     defaultPolicy: AccountCleanupPolicy,
     timeoutMs: number,
-    now: Date = new Date(),
+    now: Date = getRealNow(),
 ): AccountCleanupSettings {
     const normalizedTimeout = normalizeTimeout(timeoutMs)
     getDb().prepare(`
@@ -63,7 +64,7 @@ export function updateAccountCleanupSettingsSync(
 export function setAccountAdminNoteSync(
     accountId: number,
     note: string | null,
-    now: Date = new Date(),
+    now: Date = getRealNow(),
 ): boolean {
     const normalized = note === null ? null : note.trim()
     const value = normalized === "" ? null : normalized
@@ -82,7 +83,7 @@ export function setAccountAdminNoteSync(
 export function setAccountCleanupPolicySync(
     accountId: number,
     policy: AccountCleanupPolicy,
-    now: Date = new Date(),
+    now: Date = getRealNow(),
 ): boolean {
     const normalizedPolicy = normalizePolicy(policy)
     const settings = getAccountCleanupSettingsSync()
@@ -138,7 +139,7 @@ export function listAccountCleanupSummariesSync(): AccountCleanupSummary[] {
 export function deleteAccountForCleanupSync(
     accountId: number,
     reason: string,
-    now: Date = new Date(),
+    now: Date = getRealNow(),
 ): { accountId: number; playerIds: number[] } | null {
     const db = getDb()
     const playerIds = getAccountPlayersSync(accountId)
@@ -161,7 +162,7 @@ export function deleteAccountForCleanupSync(
 }
 
 /** Runs one deterministic due-account sweep. */
-export function runDueAccountCleanupSync(now: Date = new Date()): number {
+export function runDueAccountCleanupSync(now: Date = getRealNow()): number {
     const dueAccounts = getDb().prepare(`
         SELECT id
         FROM accounts

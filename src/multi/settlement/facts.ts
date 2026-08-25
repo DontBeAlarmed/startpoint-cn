@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { getRealNowMs } from "../../runtime/time/game-time"
 
 import {
     participantKey,
@@ -56,7 +57,7 @@ export class BattleFactStore {
     private sequence = 0
 
     constructor(options: BattleFactStoreOptions = {}) {
-        this.now = options.now ?? Date.now
+        this.now = options.now ?? getRealNowMs
         this.createBattleSessionId = options.createBattleSessionId ?? randomUUID
         this.retentionMs = options.retentionMs ?? MAX_BATTLE_FACT_RETENTION_MS
         this.maxRecords = options.maxRecords ?? DEFAULT_MAX_RECORDS

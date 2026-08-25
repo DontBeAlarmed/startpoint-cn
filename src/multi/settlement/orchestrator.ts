@@ -46,6 +46,7 @@ import { QuestCategory, type BattleQuest } from "../../lib/types"
 import { formatHardMultiMissionDiagnostic } from "../../lib/mission/client-check-diagnostics"
 import { sampledLog } from "../../lib/sampled-log"
 import { getServerTime } from "../../utils"
+import { getRealNow } from "../../runtime/time/game-time"
 import type { BattleSessionId } from "../coordinator/contracts"
 import type { MultiHttpContext } from "../http/context"
 import type { MultiFinishBody } from "../types"
@@ -320,13 +321,13 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
                 (freshValidation.statistics as any).max_combo_count ?? 0,
             ),
             ...(didLevelUp
-                ? { stamina: player.stamina + getMaxStamina(newDegreeId), staminaHealTime: new Date() }
+                ? { stamina: player.stamina + getMaxStamina(newDegreeId), staminaHealTime: getRealNow() }
                 : {}),
         })
         const playerData = { ...player }
         if (didLevelUp) {
             playerData.stamina += getMaxStamina(newDegreeId)
-            playerData.staminaHealTime = new Date()
+            playerData.staminaHealTime = getRealNow()
         }
 
         const scoreRewardsResult = givePlayerScoreRewardsSync(

@@ -3,6 +3,7 @@ import {
     getContentSnapshot,
     type ReadonlyContentRepository,
 } from "../content/runtime/content-snapshot"
+import { getVirtualNow } from "../runtime/time/game-time"
 
 const SHORT_TERM_MAX_DAYS = 60
 const CHARACTER_GACHA_TYPE = 0
@@ -199,7 +200,7 @@ function getStaticTimeline(repository: ReadonlyContentRepository): StaticClairvo
     return built
 }
 
-export function buildShortUpCharacterGachaTimeline(now: Date = new Date()): ClairvoyanceTimeline {
+export function buildShortUpCharacterGachaTimeline(now: Date = getVirtualNow()): ClairvoyanceTimeline {
     const repository = getContentSnapshot().repository
     const staticTimeline = getStaticTimeline(repository)
     const nowMs = now.getTime()

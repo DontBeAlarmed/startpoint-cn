@@ -11,6 +11,7 @@ import { markAccountOrphanedSync } from "../../lib/account-cleanup"
 import { getRankDegree } from "../../lib/stamina"
 import { getRequestUdid } from "../../lib/takeover-access"
 import { generateDataHeaders } from "../../utils"
+import { getRealNow } from "../../runtime/time/game-time"
 
 const TAKEOVER_INPUT_ID_ERROR = 3203
 const TAKEOVER_INPUT_ID_OR_PASSWORD_ERROR = 3204
@@ -120,6 +121,7 @@ function transferAccount(
 ): { sourceAccountId: number | null; sourcePlayerIds: number[]; sourceDeleted: boolean; sourceViewerId: number } {
     const db = getDb()
     const result = db.transaction(() => {
+        const auditTime = getRealNow().toISOString()
         const lockedTarget = accountByViewerId(target.viewer_id)
         if (!lockedTarget
             || lockedTarget.account_id !== target.account_id
@@ -155,7 +157,7 @@ function transferAccount(
                     )
                     SELECT id, 'takeover_unmarked_source', cleanup_policy, ?, ?
                     FROM accounts WHERE id = ?
-                `).run(sourcePlayerIds.length, new Date().toISOString(), sourceAccountId)
+                `).run(sourcePlayerIds.length, auditTime, sourceAccountId)
                 db.prepare(`DELETE FROM accounts WHERE id = ?`).run(sourceAccountId)
             }
         }
@@ -163,12 +165,12 @@ function transferAccount(
         db.prepare(`
             INSERT INTO device_bindings (device_id, account_id, last_seen, name)
             VALUES (?, ?, ?, NULL)
-        `).run(deviceId, target.account_id, new Date().toISOString())
+        `).run(deviceId, target.account_id, auditTime)
         db.prepare(`
             UPDATE accounts
             SET takeover_udid = ?, last_login_time = ?
             WHERE id = ?
-        `).run(udid, new Date().toISOString(), target.account_id)
+        `).run(udid, auditTime, target.account_id)
         db.prepare(`
             INSERT INTO account_transfer_audit (
                 source_account_id, source_viewer_id, target_account_id,
@@ -181,7 +183,7 @@ function transferAccount(
             target.viewer_id,
             sourcePlayerIds.length,
             hasSource && !sourceIsMarked ? 1 : 0,
-            new Date().toISOString(),
+            auditTime,
         )
 
         return {

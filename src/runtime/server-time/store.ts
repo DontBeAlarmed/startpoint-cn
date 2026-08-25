@@ -7,6 +7,7 @@ import {
     ServerTimeState,
 } from "./types"
 import { prepareDataVolume } from "../data-paths"
+import { getRealNowMs } from "../time/game-time"
 
 const SERVER_TIME_KEYS = ["generatedAt", "mode", "offsetMs"] as const
 const UNSUPPORTED_DIRECTORY_SYNC_CODES = new Set([
@@ -129,7 +130,7 @@ export class ServerTimeStore {
         this.legacyFilePath = options.legacyFilePath === undefined
             ? paths?.activeAccountFile ?? null
             : options.legacyFilePath
-        this.now = options.now ?? Date.now
+        this.now = options.now ?? getRealNowMs
         this.replaceFile = options.replaceFile ?? fs.renameSync
         this.syncParentDirectory = options.syncParentDirectory ?? syncParentDirectoryDefault
     }

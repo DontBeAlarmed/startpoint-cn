@@ -4,6 +4,7 @@ import { QuestCategory } from "../../lib/types"
 import { getRoom } from "../room/manager"
 import { sessionManager, SessionClient } from "../state/SessionManager"
 import { relayToBattleRoom } from "./relay"
+import { getRealNowMs } from "../../runtime/time/game-time"
 
 const BATTLE_MEASUREMENT_WARNING_THRESHOLD_MS = 2000
 
@@ -95,7 +96,7 @@ export function handleBattleMessage(socket: net.Socket, data: unknown): void {
             if (client) {
                 const bcData = data[1]
                 relayToBattleRoom(client, [2, client.connectionId, bcData])
-                sessionManager.sendJson(socket, [1, [3, 0, 0, Date.now()]])
+                sessionManager.sendJson(socket, [1, [3, 0, 0, getRealNowMs()]])
             }
             break
         }
@@ -106,7 +107,7 @@ export function handleBattleMessage(socket: net.Socket, data: unknown): void {
                 if (sendMsg) {
                     relayToBattleRoom(client, [3, client.connectionId, sendMsg])
                 }
-                sessionManager.sendJson(socket, [1, [3, 0, 0, Date.now()]])
+                sessionManager.sendJson(socket, [1, [3, 0, 0, getRealNowMs()]])
             }
             break
         }

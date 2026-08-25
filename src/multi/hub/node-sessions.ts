@@ -1,6 +1,7 @@
 import { randomBytes, timingSafeEqual } from "node:crypto"
 
 import { MULTI_PROTOCOL_VERSION, type NodeSessionId } from "../coordinator/contracts"
+import { getRealNowMs } from "../../runtime/time/game-time"
 
 const NODE_SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
 const SESSION_CREDENTIAL_PATTERN = /^[A-Za-z0-9_-]{43}$/
@@ -43,7 +44,7 @@ export class NodeSessionRegistry {
     private sweepTimer: NodeJS.Timeout | null = null
 
     constructor(options: NodeSessionRegistryOptions) {
-        this.now = options.now ?? Date.now
+        this.now = options.now ?? getRealNowMs
         this.sessionTtlMs = options.sessionTtlMs ?? 5 * 60_000
         this.sweepIntervalMs = options.sweepIntervalMs ?? 1_000
         this.generateId = options.generateId ?? (() => randomBytes(32).toString("base64url"))

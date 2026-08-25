@@ -1,3 +1,5 @@
+import { getRealNowMs } from "../../runtime/time/game-time"
+
 export interface CachedJsonResponse {
     readonly statusCode: number
     readonly body: string
@@ -35,7 +37,7 @@ export class IdempotencyCache {
     private readonly maxEntries: number
 
     constructor(options: IdempotencyCacheOptions = {}) {
-        this.now = options.now ?? Date.now
+        this.now = options.now ?? getRealNowMs
         this.ttlMs = options.ttlMs ?? 30_000
         this.maxEntries = options.maxEntries ?? 1_024
         if (!Number.isSafeInteger(this.ttlMs) || this.ttlMs <= 0

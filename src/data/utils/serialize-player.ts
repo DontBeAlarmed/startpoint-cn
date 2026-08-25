@@ -22,6 +22,7 @@ import { kIdToBusinessCode, businessCodeToKId } from "../codeMap"
 import { getCharacterVisibleManaBoardIndex } from "../../lib/mana-board-availability"
 import { computeRealTimeStamina } from "../../lib/stamina"
 import { isStartTutorialActive } from "../../lib/start-tutorial-state"
+import { getRealNow } from "../../runtime/time/game-time"
 
 export interface SerializePlayerDataOptions {
     viewerId?: number
@@ -155,7 +156,7 @@ export function serializePlayerData(
 
     const realTimeStamina = computeRealTimeStamina(playerData)
     if (realTimeStamina !== playerData.stamina) {
-        const staminaHealTime = new Date()
+        const staminaHealTime = getRealNow()
         updatePlayerSync({ id: playerData.id, stamina: realTimeStamina, staminaHealTime })
         playerData.stamina = realTimeStamina
         playerData.staminaHealTime = staminaHealTime

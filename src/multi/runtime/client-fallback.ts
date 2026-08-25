@@ -1,6 +1,7 @@
 import type { CoordinatorResult, MultiCoordinatorOrigin } from "../coordinator/contracts"
 import type { MultiHubControlStatus, MultiHubTcpEndpoint } from "../hub/control-routes"
 import type { RuntimeTcpServiceConfig } from "../../runtime/config"
+import { getRealNowMs } from "../../runtime/time/game-time"
 
 export type MultiClientFallbackState = "remote" | "probing" | "local" | "degraded"
 
@@ -36,7 +37,7 @@ export class ClientFallbackController {
     private tcpFailed = false
 
     constructor(private readonly dependencies: ClientFallbackDependencies) {
-        this.now = dependencies.now ?? Date.now
+        this.now = dependencies.now ?? getRealNowMs
         this.probeCooldownMs = dependencies.probeCooldownMs ?? DEFAULT_PROBE_COOLDOWN_MS
         this.tcpConfig = Object.freeze({
             ...(dependencies.tcpConfig ?? CLIENT_FALLBACK_TCP_CONFIG),

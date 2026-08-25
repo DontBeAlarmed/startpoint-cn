@@ -9,6 +9,7 @@ import { getDb } from "../data/db"
 import { getItemEffectSync, ItemEffectEntry } from "./assets"
 import { computeRealTimeStamina } from "./stamina"
 import { Player } from "../data/types"
+import { getRealNow } from "../runtime/time/game-time"
 
 const AS3_INT_MAX = 2_147_483_647
 
@@ -235,7 +236,7 @@ function createItemUsePlan(
             current,
             recovery: stamina.recovery,
             after,
-            recoveryTime: new Date(),
+            recoveryTime: getRealNow(),
         }
     }
 

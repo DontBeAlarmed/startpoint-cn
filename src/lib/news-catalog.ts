@@ -3,6 +3,7 @@ import path from "path"
 import { hasForcedNewsDeliverySync } from "../data/domains/news"
 import { getServerTime } from "../utils"
 import { isNewsVisibleAt } from "./news-visibility"
+import { getVirtualNow } from "../runtime/time/game-time"
 
 export interface NewsItem {
     readonly id: number
@@ -23,7 +24,7 @@ export function loadNews(): NewsItem[] {
         return items.map((news: any) => ({
             id: news.id,
             title: news.title || "",
-            date: news.date || new Date().toISOString().replace("T", " ").substring(0, 19),
+            date: news.date || getVirtualNow().toISOString().replace("T", " ").substring(0, 19),
             label: news.label || 1,
             thumbnail: news.thumbnail || 1,
             thumbnail_path: news.thumbnail_path || null,
