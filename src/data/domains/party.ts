@@ -1,5 +1,12 @@
 import { getDb } from "../db";
-import { PartyCategory, PlayerParty, PlayerPartyGroup, RawPlayerParty, RawPlayerPartyGroup } from "../types";
+import {
+    PartyCategory,
+    PlayerParty,
+    PlayerPartyGroup,
+    RawPlayerParty,
+    RawPlayerPartyGroup,
+    PROFILE_FAVORITE_PARTY_CATEGORY,
+} from "../types";
 import { deserializeBoolean, serializeBoolean } from "../utils/primitives";
 import { insertMissingPartyGroupListSync } from "../../lib/party-group-persistence";
 
@@ -20,7 +27,9 @@ export function getPlayerPartyGroupListsSync(
 ): Partial<Record<PartyCategory, Record<string, PlayerPartyGroup>>> {
     const normalizedCategories = [...new Set(categories)]
     for (const category of normalizedCategories) {
-        if (!Number.isInteger(category) || category < PartyCategory.NORMAL || category > PartyCategory.RUSH) {
+        if (!Number.isInteger(category)
+            || (category < PartyCategory.NORMAL
+                || (category > PartyCategory.RUSH && category !== PROFILE_FAVORITE_PARTY_CATEGORY))) {
             throw new TypeError("party categories must be valid non-empty categories")
         }
     }

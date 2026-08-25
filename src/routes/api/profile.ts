@@ -4,7 +4,6 @@
  */
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getPlayerCharactersSync } from "../../data/domains/character"
-import { getPlayerPartyGroupListSync } from "../../data/domains/party"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -15,6 +14,7 @@ import {
     getPlayerProfileSettingsSync,
     updatePlayerProfileSettingsSync,
 } from "../../data/domains/option";
+import { getFavoritePartyGroupListSync } from "../../lib/profileFavorite";
 
 const PROFILE_SETTING_FIELDS = [
     "show_opened_mana_board_second_count",
@@ -62,51 +62,10 @@ const routes = async (fastify: FastifyInstance) => {
         const profileSettings = getPlayerProfileSettingsSync(playerId)
 
         // Build party group list (map from DB format to client format)
-        const partyGroups = getPlayerPartyGroupListSync(playerId)
-        const partyGroupList: any[] = []
-
-        for (const [groupId, group] of Object.entries(partyGroups)) {
-            const parties = group.list || {}
-            const partyList: any[] = []
-
-            for (const [slot, party] of Object.entries(parties)) {
-                const p = party as any
-                partyList.push({
-                    ability_soul_ids: (p.abilitySoulIds || []).map((id: number | null) => id),
-                    character_ids: (p.characterIds || []).map((id: number | null) => id),
-                    equipment_ids: (p.equipmentIds || []).map((id: number | null) => id),
-                    options: { allow_other_players_to_heal_me: p.options?.allowOtherPlayersToHealMe ?? true },
-                    party_edited: p.edited ?? false,
-                    party_id: (parseInt(groupId) - 1) * 10 + parseInt(slot),
-                    party_name: p.name || "",
-                    unison_character_ids: (p.unisonCharacterIds || []).map((id: number | null) => id),
-                })
-            }
-
-            partyGroupList.push({
-                party_group_color_id: group.colorId || 15,
-                party_group_id: parseInt(groupId),
-                party_list: partyList,
-            })
-        }
-
-        // Ensure at least one party exists for favorite character display
-        if (partyGroupList.length === 0) {
-            partyGroupList.push({
-                party_group_color_id: 15,
-                party_group_id: 1,
-                party_list: [{
-                    ability_soul_ids: [null, null, null],
-                    character_ids: [player.leaderCharacterId || 1, null, null],
-                    equipment_ids: [null, null, null],
-                    options: { allow_other_players_to_heal_me: true },
-                    party_edited: false,
-                    party_id: 1,
-                    party_name: "Party A",
-                    unison_character_ids: [null, null, null],
-                }]
-            })
-        }
+        const partyGroupList = getFavoritePartyGroupListSync(
+            playerId,
+            player.leaderCharacterId,
+        )
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

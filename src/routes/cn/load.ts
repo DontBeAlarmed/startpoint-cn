@@ -28,6 +28,7 @@ import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 import { reconcileActiveMissionFactsWithResult } from "../../lib/mission/active-reconciliation";
 import { recordEventLoginMissionFactSync } from "../../lib/mission/event-entry-facts";
 import { setCnMsgpackPendingCommit } from "./msgpack";
+import { getFavoritePartyGroupListSync } from "../../lib/profileFavorite";
 import {
     isValidBattleSessionId,
     isValidMultiRoomNumber,
@@ -330,6 +331,10 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                 host: options.httpDisplayHost ?? "127.0.0.1",
                 port: options.httpPort ?? 8001,
             });
+            clientData.favorite_party_group_list = getFavoritePartyGroupListSync(
+                playerId,
+                player.leaderCharacterId,
+            );
             if (loginBonusSettlement.status === "none") {
                 clientData.bonus_index_list = [];
                 clientData.login_bonus_received_at = null;

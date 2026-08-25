@@ -92,7 +92,13 @@ stubModule("../src/data/domains/party", {
     },
 })
 stubModule("../src/lib/special-event-parties", {
-    hasValidPartyCategory: () => true,
+    hasValidPartyCategory: value => (
+        value !== null
+        && typeof value === "object"
+        && Number.isInteger(value.party_category)
+        && value.party_category >= 0
+        && value.party_category <= 4
+    ),
     parseGlobalPartyId: partyId => ({ groupId: Math.floor(partyId / 1000), slot: partyId % 1000 }),
     isGlobalPartyIdAllowedForCategory: () => true,
 })
@@ -106,12 +112,12 @@ const {
 } = require("../src/data/domains/active_mission_counters")
 const partyRoutes = require("../src/routes/api/party.ts").default
 
-function partyInfo({ equipment = [], unison = [], characters = [], abilitySouls = [null, null, null] } = {}) {
+function partyInfo({ category = 0, partyId = 1001, equipment = [], unison = [], characters = [], abilitySouls = [null, null, null] } = {}) {
     return {
         party_edited: true,
-        party_category: 0,
+        party_category: category,
         party_name: "test",
-        party_id: 1001,
+        party_id: partyId,
         unison_character_ids: unison,
         equipment_ids: equipment,
         character_ids: characters,
@@ -152,6 +158,25 @@ async function main() {
             totalGachaCampaignCount: 0,
             practiceQuestChallengeCount: 0,
         })
+
+        const beforeFavoriteEditCounters = getActiveMissionCountersSync(7)
+        const favoriteEdit = await fastify.inject({
+            method: "POST",
+            url: "/edit",
+            payload: {
+                viewer_id: 123,
+                main_party_id: 77,
+                party_info_list: [partyInfo({
+                    category: 99,
+                    partyId: 1,
+                    unison: [null, null, null],
+                    characters: [100002, null, null],
+                })],
+            },
+        })
+        assert.equal(favoriteEdit.statusCode, 200, favoriteEdit.body)
+        assert.deepEqual(getActiveMissionCountersSync(7), beforeFavoriteEditCounters)
+        assert.equal(players.get(7).partySlot, 1001)
 
         const beforeEmptyEdit = getActiveMissionCountersSync(7)
         const emptyEdit = await fastify.inject({

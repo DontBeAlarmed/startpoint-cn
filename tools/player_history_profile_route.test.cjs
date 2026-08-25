@@ -18,6 +18,8 @@ const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
+const { updatePlayerPartySync } = require("../src/data/domains/party")
+const { PROFILE_FAVORITE_PARTY_CATEGORY } = require("../src/data/types")
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 const { setServerTime } = require("../src/utils")
 
@@ -70,9 +72,13 @@ async function createApp() {
     registerCnMsgpackOnSend(app)
 
     const playerHistory = optionalModule("../src/routes/api/playerHistory")
+    const profile = optionalModule("../src/routes/api/profile")
     const social = optionalModule("../src/routes/api/socialCompatibility")
     if (playerHistory?.default) {
         await app.register(playerHistory.default, { prefix: "/api/index.php/player_history" })
+    }
+    if (profile?.default) {
+        await app.register(profile.default, { prefix: "/api/index.php/profile" })
     }
     if (social?.followCompatibilityRoutes) {
         await app.register(social.followCompatibilityRoutes, { prefix: "/api/index.php/follow" })
@@ -231,6 +237,34 @@ test("player history edit persists each supported presentation setting", async (
         assert.equal(reloaded.player_history_topic_list[1].is_visible, false)
         assert.equal(reloaded.player_history_topic_list[2].is_visible, true)
         assert.equal(Object.keys(reloaded.player_history_topic_list).length, 27)
+    } finally {
+        await app.close()
+    }
+})
+
+test("profile returns the dedicated favorite party after party edit storage", async () => {
+    updatePlayerPartySync(player.id, 1, {
+        name: "Favorite",
+        characterIds: [1, null, null],
+        unisonCharacterIds: [null, null, null],
+        equipmentIds: [null, null, null],
+        abilitySoulIds: [null, null, null],
+        edited: true,
+        options: { allowOtherPlayersToHealMe: true },
+        category: PROFILE_FAVORITE_PARTY_CATEGORY,
+    })
+
+    const app = await createApp()
+    try {
+        const response = await app.inject({
+            method: "POST",
+            url: "/api/index.php/profile/get_my_profile",
+            payload: { viewer_id: viewerId },
+        })
+        assert.equal(response.statusCode, 200, response.body)
+        const data = decode(response).data
+        assert.deepEqual(data.user_party_group_list[0].party_list[0].character_ids, [1, null, null])
+        assert.equal(data.user_party_group_list[0].party_list[0].party_name, "Favorite")
     } finally {
         await app.close()
     }

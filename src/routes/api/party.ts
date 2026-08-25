@@ -8,7 +8,7 @@ import { getPlayerPartyLoadoutSync, updatePlayerPartySync } from "../../data/dom
 import { getDb } from "../../data/db"
 import { incrementActiveMissionPartyActionCountsSync } from "../../data/domains/active_mission_counters"
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { PartyCategory } from "../../data/types";
+import { PartyCategory, PROFILE_FAVORITE_PARTY_CATEGORY } from "../../data/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { hasValidPartyCategory, isGlobalPartyIdAllowedForCategory, parseGlobalPartyId } from "../../lib/special-event-parties";
 import { getMailArrivedSync } from "../../lib/mail-notification";
@@ -39,6 +39,35 @@ interface EditBody {
     ignore_ngword: boolean,
     api_count: number,
     party_info_list: PartyInfoListItem[]
+}
+
+function hasEditablePartyCategory(
+    value: unknown,
+): value is { party_category: PartyCategory } {
+    if (value !== null
+        && typeof value === "object"
+        && "party_category" in value
+        && (value as { party_category: unknown }).party_category === PROFILE_FAVORITE_PARTY_CATEGORY) {
+        return true
+    }
+    return hasValidPartyCategory(value)
+}
+
+function isProfileFavoriteParty(info: PartyInfoListItem): boolean {
+    return info.party_category === PROFILE_FAVORITE_PARTY_CATEGORY
+}
+
+function summarizePartyEditRequest(body: Partial<EditBody>, viewerId: unknown) {
+    const partyInfoList = Array.isArray(body.party_info_list) ? body.party_info_list : []
+    return {
+        viewerValid: Number.isSafeInteger(viewerId) && (viewerId as number) > 0,
+        mainPartyId: Number.isSafeInteger(body.main_party_id) ? body.main_party_id : null,
+        partyInfoCount: partyInfoList.length,
+        partyRefs: partyInfoList.slice(0, 32).map(info => ({
+            category: Number.isSafeInteger(info?.party_category) ? info.party_category : null,
+            partyId: Number.isSafeInteger(info?.party_id) ? info.party_id : null,
+        })),
+    }
 }
 
 /*
@@ -427,12 +456,14 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "Invalid request body."
         })
         if (!Array.isArray(body.party_info_list)
-            || body.party_info_list.some(info => !hasValidPartyCategory(info)
+            || body.party_info_list.some(info => !hasEditablePartyCategory(info)
                 || parseGlobalPartyId((info as PartyInfoListItem).party_id) === null
-                || !isGlobalPartyIdAllowedForCategory(
+                || (!isProfileFavoriteParty(info as PartyInfoListItem)
+                    && !isGlobalPartyIdAllowedForCategory(
                     (info as PartyInfoListItem).party_category as PartyCategory,
                     (info as PartyInfoListItem).party_id,
-                ))) {
+                )))) {
+            console.warn(`[PARTY] edit rejected before session: ${JSON.stringify(summarizePartyEditRequest(body, viewerId))}`)
             return reply.status(400).send({
                 "error": "Bad Request",
                 "message": "Invalid party category or party ID."
@@ -472,7 +503,8 @@ const routes = async (fastify: FastifyInstance) => {
             return isOwned ? characterId : null
         }
 
-        const existingLoadouts = body.party_info_list.map(updateInfo => {
+        const battlePartyInfoList = body.party_info_list.filter(info => !isProfileFavoriteParty(info))
+        const existingLoadouts = battlePartyInfoList.map(updateInfo => {
             const parsed = parseGlobalPartyId(updateInfo.party_id)!
             const existing = getPlayerPartyLoadoutSync(
                 playerId,
@@ -485,7 +517,7 @@ const routes = async (fastify: FastifyInstance) => {
                 ability_soul_ids: existing?.abilitySoulIds ?? [],
             }
         })
-        const loadoutValidation = validatePartyLoadouts(body.party_info_list, {
+        const loadoutValidation = validatePartyLoadouts(battlePartyInfoList, {
             equipments: getPlayerEquipmentListSync(playerId),
             items: getPlayerItemsSync(playerId),
         }, existingLoadouts)
@@ -519,10 +551,14 @@ const routes = async (fastify: FastifyInstance) => {
                 },
             }
         })
+        const mappedBattleParties = mappedParties.filter(
+            ({ party }) => party.category !== PROFILE_FAVORITE_PARTY_CATEGORY,
+        )
 
         getDb().transaction(() => {
-            // store full global PartyId so /load returns the correct group+slot combo
-            if (player.partySlot !== body.main_party_id) {
+            // Profile favorites are independent from the battle party selected by the player.
+            if ((mappedParties.length === 0 || mappedBattleParties.length > 0)
+                && player.partySlot !== body.main_party_id) {
                 updatePlayerSync({
                     id: playerId,
                     partySlot: body.main_party_id,
@@ -531,28 +567,32 @@ const routes = async (fastify: FastifyInstance) => {
             for (const { parsed, party } of mappedParties) {
                 updatePlayerPartySync(playerId, parsed.slot, party, parsed.groupId)
             }
-            recordAbilitySoulEquipFactsSync(
-                playerId,
-                existingLoadouts.map(loadout => ({
-                    abilitySoulIds: loadout.ability_soul_ids,
-                })),
-                mappedParties.map(({ party }) => ({ abilitySoulIds: party.abilitySoulIds })),
-            )
-            incrementActiveMissionPartyActionCountsSync(playerId, {
-                equipmentEquipCount: mappedParties.some(({ party }) => party.equipmentIds.some(id => id !== null)) ? 1 : 0,
-                unisonSetCount: mappedParties.some(({ party }) => party.unisonCharacterIds.some(id => id !== null)) ? 1 : 0,
-                partyCharacterSetCount: mappedParties.some(({ party }) => party.characterIds.some(id => id !== null)) ? 1 : 0,
-            })
-            recordRaidSetEditMissionFactsSync(
-                playerId,
-                body.use_party_group_edit,
-                mappedParties.map(({ parsed, party }) => ({
-                    category: party.category,
-                    groupId: parsed.groupId,
-                    slot: parsed.slot,
-                })),
-                new Date(getServerTime() * 1000),
-            )
+            if (mappedBattleParties.length > 0) {
+                recordAbilitySoulEquipFactsSync(
+                    playerId,
+                    existingLoadouts.map(loadout => ({
+                        abilitySoulIds: loadout.ability_soul_ids,
+                    })),
+                    mappedBattleParties.map(({ party }) => ({
+                        abilitySoulIds: party.abilitySoulIds,
+                    })),
+                )
+                incrementActiveMissionPartyActionCountsSync(playerId, {
+                    equipmentEquipCount: mappedBattleParties.some(({ party }) => party.equipmentIds.some(id => id !== null)) ? 1 : 0,
+                    unisonSetCount: mappedBattleParties.some(({ party }) => party.unisonCharacterIds.some(id => id !== null)) ? 1 : 0,
+                    partyCharacterSetCount: mappedBattleParties.some(({ party }) => party.characterIds.some(id => id !== null)) ? 1 : 0,
+                })
+                recordRaidSetEditMissionFactsSync(
+                    playerId,
+                    body.use_party_group_edit,
+                    mappedBattleParties.map(({ parsed, party }) => ({
+                        category: party.category,
+                        groupId: parsed.groupId,
+                        slot: parsed.slot,
+                    })),
+                    new Date(getServerTime() * 1000),
+                )
+            }
         })()
 
         reply.header("content-type", "application/x-msgpack")

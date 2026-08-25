@@ -161,6 +161,10 @@ export enum PartyCategory {
     EVENT = RUSH
 }
 
+// The client uses a separate party namespace for profile favorite characters.
+// It is persisted with party rows but is never a battle party category.
+export const PROFILE_FAVORITE_PARTY_CATEGORY = 99 as PartyCategory
+
 export interface RawPlayerPartyOptions {
     allow_other_players_to_heal_me: number
 }
