@@ -1,39 +1,20 @@
 import { useState } from "react"
-import { Alert, Card, Table, Button, Space, Popconfirm, Input, message, Tag } from "antd"
-import { PlusOutlined, CopyOutlined, DeleteOutlined, SwapOutlined, EditOutlined } from "@ant-design/icons"
+import { Alert, Card, Table, Button, Space, Popconfirm, Input, message, Tag, Grid } from "antd"
+import { PlusOutlined, CopyOutlined, DeleteOutlined, SwapOutlined, EditOutlined, LeftOutlined } from "@ant-design/icons"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import { apiGet, apiPost } from "../api/client"
 import { AdminPage } from "../components/AdminPage"
+import { AccountsMobileView } from "./accounts/AccountsMobileView"
+import type { AccountRow, PlayerBrief } from "./accounts/types"
 
-interface AccountRow {
-    id: number
-    saveCount: number
-    defaultPlayerId: number | null
-    defaultPlayerName: string | null
-    activePlayerId: number | null
-    devices: DeviceBinding[]
-    players: PlayerBrief[]
-    playerIds: number[]
-}
-
-interface DeviceBinding {
-    deviceId: number
-    name: string | null
-}
-
-interface PlayerBrief {
-    id: number
-    accountId: number
-    name: string
-    degreeId: number
-    isDefault: boolean
-    isActive: boolean
-}
+const { useBreakpoint } = Grid
 
 export default function Accounts() {
     const qc = useQueryClient()
     const navigate = useNavigate()
+    const screens = useBreakpoint()
+    const isMobile = !screens.md
     const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null)
     const [renameId, setRenameId] = useState<number | null>(null)
     const [renameName, setRenameName] = useState("")
@@ -191,19 +172,29 @@ export default function Accounts() {
         {
             title: "名字", width: 150,
             render: (_: unknown, row: PlayerBrief) => renameId === row.id ? (
-                <div className="admin-edit-compact">
+                <div
+                    className="admin-edit-compact"
+                    onClick={event => event.stopPropagation()}
+                    onKeyDown={event => event.stopPropagation()}
+                >
                     <Input size="small" value={renameName} onChange={e => setRenameName(e.target.value)} onPressEnter={() => renameSave.mutate({ playerId: row.id, name: renameName })} style={{ width: 100 }} />
                     <Button size="small" type="primary" onClick={() => renameSave.mutate({ playerId: row.id, name: renameName })}>确定</Button>
                     <Button size="small" onClick={() => setRenameId(null)}>取消</Button>
                 </div>
             ) : (
-                <Space>
+                <Space onClick={event => event.stopPropagation()}>
                     <a onClick={() => navigate(`/players/${row.id}`)}>{row.name}</a>
-                    <Button type="text" size="small" icon={<EditOutlined />} onClick={() => { setRenameId(row.id); setRenameName(row.name) }} />
+                    <Button
+                        type="text"
+                        size="small"
+                        title="重命名存档"
+                        icon={<EditOutlined />}
+                        onClick={() => { setRenameId(row.id); setRenameName(row.name) }}
+                    />
                 </Space>
             ),
         },
-        { title: "等级", width: 80, responsive: ["md"] as any, render: (_: unknown, row: PlayerBrief) => `Lv.${row.degreeId || 1}` },
+        { title: "Rank", width: 80, render: (_: unknown, row: PlayerBrief) => `Rank ${row.rank}` },
         {
             title: "状态", width: 80, responsive: ["sm"] as any,
             render: (_: unknown, row: PlayerBrief) => (
@@ -214,9 +205,12 @@ export default function Accounts() {
             ),
         },
         {
-            title: "操作", width: 210,
+            title: "操作", width: 320,
             render: (_: unknown, row: PlayerBrief) => (
-                <div className="admin-action-row">
+                <div className="admin-action-row" onClick={event => event.stopPropagation()}>
+                    <Button size="small" type="primary" icon={<EditOutlined />} onClick={() => navigate(`/players/${row.id}`)}>
+                        编辑存档
+                    </Button>
                     <Button size="small" icon={<SwapOutlined />} disabled={row.isDefault && row.isActive} onClick={() => activateSave.mutate(row.id)}>
                         设为默认并切换
                     </Button>
@@ -244,20 +238,39 @@ export default function Accounts() {
                 message="选档状态说明"
                 description="新建和复制存档会设为该账号默认并切换为当前活动；删除默认存档后，服务端会在该账号剩余存档中回退到第一个可用存档。删除最后一个存档会同时删除账号。"
             />
-            <Card title="账号管理" className="admin-table-card">
-                <Table
-                    rowKey="id"
-                    columns={accountColumns}
-                    dataSource={accounts}
-                    loading={isLoading}
-                    pagination={false}
-                    size="small"
-                    scroll={{ x: "max-content" }}
-                />
-            </Card>
-
-            {selectedAccountId !== null && (
-                <Card title={`账号 ${selectedAccountId} 的存档`} className="admin-table-card" extra={<Button size="small" onClick={() => setSelectedAccountId(null)}>关闭</Button>}>
+            {isMobile ? (
+                <Card
+                    title={selectedAccount ? `账号 ${selectedAccount.id} 的存档` : "账号管理"}
+                    className="admin-mobile-list-card"
+                >
+                    <AccountsMobileView
+                        accounts={accounts}
+                        selectedAccount={selectedAccount}
+                        loading={isLoading}
+                        renamePending={renameSave.isPending || renameDevice.isPending}
+                        onSelectAccount={setSelectedAccountId}
+                        onBack={() => setSelectedAccountId(null)}
+                        onOpenPlayer={playerId => navigate(`/players/${playerId}`)}
+                        onNewSave={accountId => newSave.mutateAsync(accountId)}
+                        onDeleteAccount={accountId => deleteAccount.mutateAsync(accountId)}
+                        onActivateSave={playerId => activateSave.mutateAsync(playerId)}
+                        onCloneSave={(playerId, accountId) => cloneSave.mutateAsync({ playerId, accountId })}
+                        onDeleteSave={playerId => deleteSave.mutateAsync(playerId)}
+                        onRenameSave={(playerId, name) => renameSave.mutateAsync({ playerId, name })}
+                        onRenameDevice={(deviceId, name) => renameDevice.mutateAsync({ deviceId, name })}
+                    />
+                </Card>
+            ) : selectedAccount ? (
+                <Card
+                    title={`账号 ${selectedAccount.id} 的存档`}
+                    className="admin-table-card"
+                    extra={(
+                        <Space wrap>
+                            <Button size="small" icon={<LeftOutlined />} onClick={() => setSelectedAccountId(null)}>返回账号列表</Button>
+                            <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => newSave.mutate(selectedAccount.id)}>新建存档</Button>
+                        </Space>
+                    )}
+                >
                     <Table
                         rowKey="id"
                         columns={saveColumns}
@@ -265,7 +278,21 @@ export default function Accounts() {
                         pagination={false}
                         size="small"
                         locale={{ emptyText: "暂无存档" }}
-                        scroll={{ x: "max-content" }}
+                        onRow={row => ({
+                            className: "admin-clickable-table-row",
+                            onClick: () => navigate(`/players/${row.id}`),
+                        })}
+                    />
+                </Card>
+            ) : (
+                <Card title="账号管理" className="admin-table-card">
+                    <Table
+                        rowKey="id"
+                        columns={accountColumns}
+                        dataSource={accounts}
+                        loading={isLoading}
+                        pagination={false}
+                        size="small"
                     />
                 </Card>
             )}

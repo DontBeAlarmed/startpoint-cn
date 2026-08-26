@@ -18,6 +18,7 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const { insertPlayerCharacterSync, getPlayerCharactersSync } = require("../src/data/domains/character")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { insertDeviceBindingSync } = require("../src/data/domains/session")
+const { getRankDegree } = require("../src/lib/stamina")
 const playerRoutes = require("../src/routes/web_api/player").default
 const serverRoutes = require("../src/routes/web_api/server").default
 
@@ -170,6 +171,27 @@ test("accounts list reads all player summaries in one query", async t => {
     assert.equal(response.statusCode, 200)
     const playerReads = sqlStatements.filter(sql => /\bFROM\s+players\b/i.test(sql))
     assert.equal(playerReads.length, 1, playerReads.join("\n"))
+})
+
+test("accounts derive player Rank from rank points instead of the equipped title", async t => {
+    const account = createAccount("account-rank")
+    const player = insertDefaultPlayerSync(account.id)
+    const rankPoint = 987654321
+    const expectedRank = getRankDegree(rankPoint)
+    assert.ok(expectedRank > 1)
+    database.prepare(`
+        UPDATE players
+        SET degree_id = 1, rank_point = ?
+        WHERE id = ?
+    `).run(rankPoint, player.id)
+    const app = await createAdminServer(t)
+
+    const response = await app.inject({ method: "GET", url: "/api/server/accounts" })
+
+    assert.equal(response.statusCode, 200)
+    const accountRow = response.json().find(candidate => candidate.id === account.id)
+    assert.equal(accountRow.players[0].degreeId, 1)
+    assert.equal(accountRow.players[0].rank, expectedRank)
 })
 
 test("retired SSR-only admin actions are no longer registered", async t => {

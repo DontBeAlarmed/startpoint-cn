@@ -16,6 +16,7 @@ import { saveDefaultSaveTemplate, loadDefaultSaveTemplate, clearDefaultSaveTempl
 import { getEffectiveVersion } from "../../lib/version";
 import { buildShortUpCharacterGachaTimeline } from "../../lib/admin-clairvoyance";
 import { buildAdminContentStatus } from "../../lib/admin-content-status";
+import { getRankDegree } from "../../lib/stamina";
 import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 import type { CnRuntimeConfig } from "../../runtime/config";
 import path from "node:path";
@@ -248,6 +249,7 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
                         accountId: acc.id,
                         name: player.name,
                         degreeId: player.degreeId,
+                        rank: getRankDegree(player.rankPoint),
                         isDefault: defaultPid === player.id,
                         isActive: activePlayerId === player.id,
                     }

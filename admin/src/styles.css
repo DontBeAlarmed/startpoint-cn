@@ -475,6 +475,139 @@ html[data-admin-theme="dark"] body {
   flex: 0 0 auto;
 }
 
+.admin-clickable-table-row {
+  cursor: pointer;
+}
+
+.admin-account-mobile-list,
+.admin-mobile-list-content,
+.admin-mobile-device-list {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-mobile-view-toolbar,
+.admin-mobile-list-heading,
+.admin-mobile-actions,
+.admin-mobile-device,
+.admin-mobile-inline-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-mobile-view-toolbar {
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.admin-account-mobile-list .ant-list-items {
+  overflow: hidden;
+  border: 1px solid var(--admin-border);
+  border-radius: 6px;
+}
+
+.admin-account-mobile-list .admin-mobile-list-item {
+  display: block;
+  padding: 14px;
+  border-block-end: 1px solid var(--admin-border);
+}
+
+.admin-account-mobile-list .admin-mobile-list-item:last-child {
+  border-block-end: 0;
+}
+
+.admin-mobile-list-item-clickable {
+  cursor: pointer;
+}
+
+.admin-mobile-list-item-clickable:hover,
+.admin-mobile-list-item-clickable:focus-visible {
+  background: color-mix(in srgb, var(--admin-primary) 8%, transparent);
+  outline: 2px solid var(--admin-primary);
+  outline-offset: -2px;
+}
+
+.admin-mobile-list-heading {
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.admin-mobile-detail-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.admin-mobile-detail-list > div {
+  display: grid;
+  grid-template-columns: minmax(84px, auto) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.admin-mobile-detail-list span {
+  color: var(--admin-muted);
+}
+
+.admin-mobile-tags,
+.admin-mobile-actions {
+  margin-top: 10px;
+}
+
+.admin-mobile-device-list {
+  margin-top: 10px;
+}
+
+.admin-mobile-device {
+  justify-content: space-between;
+}
+
+.admin-mobile-inline-editor .ant-input {
+  min-width: min(100%, 180px);
+  flex: 1 1 180px;
+}
+
+.scheduled-resource-modal {
+  max-width: calc(100vw - 32px);
+  top: 24px;
+  padding-bottom: 24px;
+}
+
+.scheduled-resource-modal .ant-modal-body {
+  max-height: calc(100dvh - 210px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.scheduled-resource-number-grid,
+.scheduled-resource-date-grid {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+
+.scheduled-resource-number-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.scheduled-resource-date-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.scheduled-resource-number-grid .ant-input-number,
+.scheduled-resource-date-grid .ant-picker {
+  width: 100%;
+}
+
+.scheduled-resource-reset-note {
+  max-width: 100%;
+  height: auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
 .admin-edit-compact {
   display: grid;
   grid-template-columns: minmax(120px, 1fr) auto auto;
@@ -638,5 +771,62 @@ html[data-admin-theme="dark"] body {
 
   .admin-time-segment-label {
     flex: 0 0 auto;
+  }
+
+  .admin-mobile-list-card .ant-card-head {
+    padding-inline: 14px;
+  }
+
+  .admin-mobile-list-card .ant-card-body {
+    padding: 12px;
+  }
+
+  .admin-mobile-actions .ant-btn {
+    min-height: 36px;
+  }
+
+  .scheduled-resource-modal {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px);
+    top: 12px;
+    margin: 0 auto;
+    padding-bottom: 12px;
+  }
+
+  .scheduled-resource-modal .ant-modal-body {
+    max-height: calc(100dvh - 170px);
+    padding: 16px;
+  }
+
+  .scheduled-resource-modal .ant-radio-group {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .scheduled-resource-modal .ant-radio-button-wrapper {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 38px;
+    padding-block: 6px;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .scheduled-resource-number-grid,
+  .scheduled-resource-date-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .scheduled-resource-modal .ant-modal-footer {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .scheduled-resource-modal .ant-modal-footer .ant-btn {
+    width: 100%;
+    margin-inline-start: 0;
   }
 }

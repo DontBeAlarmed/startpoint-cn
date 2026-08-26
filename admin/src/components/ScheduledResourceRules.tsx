@@ -255,6 +255,7 @@ export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps)
             </Card>
 
             <Modal
+                className="scheduled-resource-modal"
                 open={modalOpen}
                 title={editingRule ? "编辑定时资源补充" : "新建定时资源补充"}
                 okText="保存"
@@ -304,7 +305,7 @@ export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps)
                             />
                         </Form.Item>
                     )}
-                    <Space wrap size="large" align="start">
+                    <div className="scheduled-resource-number-grid">
                         <Form.Item name="grantAmount" label="发放数量" rules={[{ required: true }]}>
                             <InputNumber min={1} precision={0} />
                         </Form.Item>
@@ -319,22 +320,24 @@ export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps)
                         >
                             <InputNumber min={1} max={officialMax} precision={0} />
                         </Form.Item>
-                    </Space>
+                    </div>
                     <Form.Item name="enabled" label="启用" valuePropName="checked">
                         <Switch />
                     </Form.Item>
-                    <Space wrap size="large" align="start">
+                    <div className="scheduled-resource-date-grid">
                         <Form.Item name="startsAtReal" label="开始时间">
                             <DatePicker showTime />
                         </Form.Item>
                         <Form.Item name="endsAtReal" label="结束时间">
                             <DatePicker showTime />
                         </Form.Item>
-                    </Space>
+                    </div>
                     <Form.Item name="description" label="备注">
                         <Input maxLength={200} showCount />
                     </Form.Item>
-                    <Tag color="blue">每日边界使用服务端 DAILY_RESET_HOUR</Tag>
+                    <Tag className="scheduled-resource-reset-note" color="blue">
+                        每日边界使用服务端 DAILY_RESET_HOUR
+                    </Tag>
                 </Form>
             </Modal>
         </>

@@ -8,6 +8,7 @@ const componentPath = path.join(__dirname, "../admin/src/components/ScheduledRes
 assert.equal(fs.existsSync(componentPath), true, "应将定时资源补充拆成独立后台组件")
 const source = fs.readFileSync(componentPath, "utf8")
 const mailSource = fs.readFileSync(path.join(__dirname, "../admin/src/pages/Mail.tsx"), "utf8")
+const styles = fs.readFileSync(path.join(__dirname, "../admin/src/styles.css"), "utf8")
 
 for (const text of [
     "定时资源补充",
@@ -29,5 +30,15 @@ assert.match(source, /apiPost<ScheduledResourceRule>\("\/api\/scheduled-resource
 assert.match(source, /apiPatch<ScheduledResourceRule>\(`\/api\/scheduled-resource\/\$\{rule\.id\}`/)
 assert.match(source, /apiDelete<\{ ok: boolean \}>\(`\/api\/scheduled-resource\/\$\{ruleId\}`\)/)
 assert.match(mailSource, /<ScheduledResourceRules players=\{players\} \/>/)
+assert.match(source, /className="scheduled-resource-modal"/)
+assert.match(source, /className="scheduled-resource-number-grid"/)
+assert.match(source, /className="scheduled-resource-date-grid"/)
+assert.match(source, /className="scheduled-resource-reset-note"/)
+assert.match(styles, /\.scheduled-resource-modal/)
+assert.match(styles, /\.scheduled-resource-number-grid/)
+assert.match(styles, /\.scheduled-resource-date-grid/)
+assert.match(styles, /\.scheduled-resource-reset-note/)
+assert.match(styles, /white-space: normal/)
+assert.match(styles, /calc\(100dvh -/)
 
 console.log("admin scheduled resource UI source tests passed")
