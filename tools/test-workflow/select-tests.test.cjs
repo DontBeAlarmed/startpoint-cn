@@ -566,9 +566,12 @@ test("maps the public reward grant layer and its regressions to one focused leaf
         "tools/score_reward_selection.test.cjs",
         "tools/single_settlement_reward_grant.test.cjs",
         "tools/task23c_reward_grants.test.cjs",
-        "tools/shop_reward_grant.test.cjs",
-        "tools/mail_reward_grant.test.cjs",
-        "tools/mail_reward_owner.test.cjs",
+            "tools/shop_reward_grant.test.cjs",
+            "tools/mail_reward_grant.test.cjs",
+            "tools/mail_reward_owner.test.cjs",
+            "tools/load_scheduled_resource_settlement.test.cjs",
+            "tools/scheduled_resource_rules.test.cjs",
+            "tools/scheduled_resource_settlement.test.cjs",
     ]
 
     assert.deepEqual(TEST_GROUPS[group], {
@@ -1320,11 +1323,13 @@ test("splits isolated integration tests into focused domains", () => {
     assert.deepEqual(TEST_GROUPS["integration:database"].tests, [
         "tools/account_cleanup_admin.test.cjs",
         "tools/account_cleanup_takeover.test.cjs",
+        "tools/admin_scheduled_resource_routes.test.cjs",
         "tools/admin_player_actions.test.cjs",
         "tools/history_receive_route.test.cjs",
         "tools/mail_receive_transaction.test.cjs",
         "tools/player_history_profile_route.test.cjs",
         "tools/player_save_v2.test.cjs",
+        "tools/scheduled_resource_storage.test.cjs",
         "tools/server_gameplay_settings.test.cjs",
         "tools/shop_purchase_period_storage.test.cjs",
         "tools/shop_purchase_snapshot_contract.test.cjs",

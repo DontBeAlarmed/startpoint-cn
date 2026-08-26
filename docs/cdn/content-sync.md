@@ -13,7 +13,7 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 
 同步器负责严格解析、引用闭包、稳定输出和文件系统安全，不负责判断 CDN 作者给出的 ID、赔率、奖励、价格或资源内容是否合理。服务端不会替 CDN 作者猜测缺失内容、复制其他活动数据、修复非法主数据或自动生成客户端补丁。
 
-阶段 B 已完成“有权威 CDN 来源的表动态迁移”这一目标。当前 Registry 的 127 张表明确分为 `117 CDN + 6 bundled + 4 server`。原阶段 A 的五个动态领域为：
+阶段 B 已完成“有权威 CDN 来源的表动态迁移”这一目标。当前 Registry 的 128 张表明确分为 `118 CDN + 6 bundled + 4 server`。原阶段 A 的五个动态领域为：
 
 | 领域 | 动态输出 |
 |---|---|
@@ -214,7 +214,7 @@ smoke 始终执行 force sync，并验证：
 
 - Release、Repository、Catalog 都是 1.4.54；当前 Registry 全部表及所有对象引用闭合；
 - 41 张通用递归 OrderedMap 表逐张与 bundled 官方 1.4.54 基线深度相等；
-- 8 张物品装备派生表闭合到同一 Release；其中 6 张逐字段等于 bundled，`item_data.json` 只允许登记的 9 个官方限时体力道具补全，`equipment_lookup.json` 必须匹配 436 条固定 canonical 摘要；
+- 9 张物品装备派生表闭合到同一 Release；其中 7 张逐字段等于 bundled，`item_data.json` 只允许登记的 9 个官方限时体力道具补全，`equipment_lookup.json` 必须匹配 436 条固定 canonical 摘要；
 - 6 张奖励派生表逐张闭合；按 `differences-1.4.54.json` 的具体键、位置与 ID 元组，只接受 5 条 Clear 字段修正、82 个空 id 清理和 47 个同名活动代币别名；
 - 20 张关卡表和 5 张关卡派生表匹配固定 canonical 摘要；名称非空、推荐属性为 `0..5`，Clear/SS 与普通掉落组全部闭合到同一 Release 的奖励表，入场和解锁索引只能引用当前关卡；每张 CN Quest OrderedMap 的权威 `TimeRange` 按国服 UTC+8 语义转换为 `availableFromMs`、`availableUntilMs`，年份只接受 `1970..2200`（含边界），空边界保留 `null`，越界年份、非法日期和倒置周期拒绝同步；98 个 bundled 兼容练习关卡必须全部进入名称索引，活动挑战点必须引用同一 Release 的每日挑战点；
 - 两张角色 cdndata 各 505 行，运行时 505 个角色；名称、稀有度、属性与 bundled 一致；

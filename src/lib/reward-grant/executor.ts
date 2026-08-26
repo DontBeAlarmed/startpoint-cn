@@ -235,10 +235,11 @@ export function executeNormalizedRewardGrantPlanAsTransactionOwnerInternalSync<T
     plan: RewardGrantPlan<TSource>,
     knownPlayerBefore: RewardGrantPlayerAfter,
     playerUpdate: RewardGrantOwnerPlayerUpdate = {},
+    knownItemsBefore: Readonly<Record<string, number | null>> = {},
 ): InternalRewardGrantResult<TSource> {
     const playerAfter = { ...knownPlayerBefore }
     const currencyDeltas = { freeMana: 0, freeVmoney: 0, expPool: 0 }
-    const itemCache = new OwnerInventoryWriteCache()
+    const itemCache = new OwnerInventoryWriteCache(knownItemsBefore)
     const entries = plan.entries.map((entry, entryIndex) => createRewardGrantEntryResult(
         entry,
         grantEntrySync(

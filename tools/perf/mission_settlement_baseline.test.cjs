@@ -69,6 +69,28 @@ test("classifies SQL totals, reads, writes, transactions, and touched tables", (
     })
 })
 
+test("classifies INSERT SELECT writes and their source-table reads", () => {
+    const counter = createSqlCounter()
+    counter.observe(`
+        INSERT OR IGNORE INTO players_player_history_milestones (
+            player_id, aggregation_target, slot, occurred_at, subject_id
+        )
+        SELECT ?, 7, 0, ?, NULL
+        WHERE (SELECT COUNT(*) FROM players_characters WHERE player_id = ?) >= 100
+    `)
+
+    assert.deepEqual(counter.snapshot(), {
+        statements: 1,
+        selectStatements: 0,
+        writeStatements: 1,
+        transactionStatements: 0,
+        byTable: {
+            players_characters: { statements: 1, reads: 1, writes: 0 },
+            players_player_history_milestones: { statements: 1, reads: 0, writes: 1 },
+        },
+    })
+})
+
 test("classifies conflict updates and delete self-reads without inventing tables", () => {
     const counter = createSqlCounter()
     counter.observe("UPDATE OR IGNORE players SET free_vmoney = 10 WHERE id = 1")

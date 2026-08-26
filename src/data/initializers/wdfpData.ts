@@ -177,6 +177,45 @@ export default function init(
         PRIMARY KEY (player_id, group_id),
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
+
+    database.prepare(`CREATE TABLE IF NOT EXISTS scheduled_resource_rules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        scope TEXT NOT NULL CHECK (scope IN ('global', 'player')),
+        player_id INTEGER,
+        reward_type TEXT NOT NULL CHECK (reward_type IN ('item', 'free_vmoney')),
+        reward_id INTEGER,
+        grant_amount INTEGER NOT NULL,
+        trigger_threshold INTEGER NOT NULL,
+        inventory_cap INTEGER NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+        starts_at_real TEXT,
+        ends_at_real TEXT,
+        description TEXT,
+        created_at_real TEXT NOT NULL,
+        updated_at_real TEXT NOT NULL,
+        CHECK (
+            (scope = 'global' AND player_id IS NULL)
+            OR (scope = 'player' AND player_id IS NOT NULL)
+        ),
+        CHECK (
+            (reward_type = 'item' AND reward_id IS NOT NULL)
+            OR (reward_type = 'free_vmoney' AND reward_id IS NULL)
+        ),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_scheduled_resource_rules_player
+        ON scheduled_resource_rules (enabled, scope, player_id, id)
+    `).run()
+
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_scheduled_resource_state (
+        player_id INTEGER NOT NULL,
+        rule_id INTEGER NOT NULL,
+        last_granted_business_day TEXT NOT NULL,
+        last_granted_at_real TEXT NOT NULL,
+        PRIMARY KEY (player_id, rule_id),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE,
+        FOREIGN KEY (rule_id) REFERENCES scheduled_resource_rules (id) ON DELETE CASCADE
+    )`).run()
     ensureSchemaColumn(database, "players_login_bonus_progress.last_granted_real_business_day")
 
     // Historical saves may contain a negative experience pool from an invalid

@@ -122,7 +122,7 @@ function assertDeepFrozen(value, seen = new Set()) {
     for (const key of Reflect.ownKeys(value)) assertDeepFrozen(value[key], seen)
 }
 
-test("item and equipment converter derives the eight authoritative runtime tables", async () => {
+test("item and equipment converter derives the nine authoritative runtime tables", async () => {
     assert.equal(typeof convertItemEquipmentTables, "function", "应导出 convertItemEquipmentTables")
     const source = fixture()
     const output = await convertItemEquipmentTables(source.reader, {
@@ -181,6 +181,12 @@ test("item and equipment converter derives the eight authoritative runtime table
             "101": "普通素材",
             "102": "比例体力药",
             "103": "测试资源箱",
+        },
+        "item_max_count.json": {
+            "100": 9999,
+            "101": 9999,
+            "102": 9999,
+            "103": 9999,
         },
         "item_sale.json": {
             "100": { category: 9, sale_price: 100, sellable: true },

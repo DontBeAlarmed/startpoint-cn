@@ -239,6 +239,8 @@ async function runScenario(scenario, runtime, publicationObserver) {
 }
 
 async function runAwakeOwnerFocusedBaseline() {
+    const originalDateNow = Date.now
+    Date.now = () => Date.parse(AWAKE_OWNER_FOCUSED_FIXED_TIME)
     const originalLog = console.log
     const originalError = console.error
     let fixture = null
@@ -291,6 +293,7 @@ async function runAwakeOwnerFocusedBaseline() {
     try { restoreRandomInt?.() } catch (error) { cleanupErrors.push(error) }
     console.log = originalLog
     console.error = originalError
+    Date.now = originalDateNow
     if (primaryError !== null || cleanupErrors.length > 0) {
         const errors = [...(primaryError === null ? [] : [primaryError]), ...cleanupErrors]
         if (errors.length === 1) throw errors[0]

@@ -46,6 +46,8 @@ import {
 } from "../../lib/login-bonus";
 import type { LoginBonusCatalog } from "../../content/converters/login-bonus";
 import { getGameTimeContext } from "../../runtime/time/game-time";
+import { settleScheduledResourcesSync } from "../../lib/scheduled-resource-settlement";
+import type { ConfigValues } from "../../lib/types/config";
 
 interface CnLoadBody {
     device_id: number;
@@ -256,6 +258,26 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             player = refreshedPlayer;
         }
 
+        const contentSnapshot = getContentSnapshot();
+        const scheduledResourceSettlement = settleScheduledResourcesSync({
+            player,
+            realNow: gameTime.realNow,
+            dailyResetHour: options.dailyResetHour ?? 5,
+            itemMaxCounts: contentSnapshot.repository.table<Readonly<Record<string, number>>>(
+                "item_max_count.json",
+            ),
+            maxFreeVmoney: contentSnapshot.repository.table<ConfigValues>(
+                "config.json",
+            ).max_virtual_money,
+        })
+        if (scheduledResourceSettlement.status === "granted") {
+            const refreshedPlayer = getPlayerSync(playerId);
+            if (refreshedPlayer === null) {
+                return reply.status(500).send({ error: "Internal Server Error", message: "No player data." });
+            }
+            player = refreshedPlayer;
+        }
+
         // 若自定义时间与 lastLogin 不同步，强制对齐（防止客户端弹"日期变了"）
         if (now.toDateString() !== player.lastLoginTime.toDateString()) {
             updatePlayerSync({ id: player.id, lastLoginTime: now });
@@ -316,7 +338,6 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             }
         }
 
-        const contentSnapshot = getContentSnapshot();
         const activeMissionReconciliation = reconcileActiveMissionFactsWithResult({
             playerId,
             repository: contentSnapshot.repository,

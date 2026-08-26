@@ -69,6 +69,9 @@ export function recordCompletedMainChapterMilestoneSync(
         Math.floor(id / 1_000_000) === chapter
     ))
     if (chapterQuestIds.length === 0) return false
+    // Main progression is linear, so only the chapter's final quest can
+    // complete the chapter. Avoid a full chapter count after every stage.
+    if (questId !== Math.max(...chapterQuestIds)) return false
     const placeholders = chapterQuestIds.map(() => "?").join(", ")
     const row = getDb().prepare(`
         SELECT COUNT(*) AS count

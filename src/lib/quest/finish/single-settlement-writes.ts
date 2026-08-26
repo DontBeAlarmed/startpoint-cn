@@ -1,15 +1,12 @@
 import { deletePlayerActiveQuestSync } from "../../../data/domains/quest_active"
 import { deletePlayerRushEventPlayedPartyListSync, getPlayerRushEventSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, updatePlayerRushEventSync } from "../../../data/domains/rushEvent"
-import { getPlayerDailyChallengePointListSync, getPlayerSync, refreshPlayerDailyChallengePointsForRealDaySync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../../data/domains/player"
+import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
 import { getPlayerItemSync, givePlayerItemSync } from "../../../data/domains/item"
 import { getServerGameplaySettingsSync } from "../../../data/domains/server-settings"
 import { getRaidEventBossStateSync, incrementPlayerRaidEventQuestKillCountSync, upsertRaidEventBossStateSync } from "../../../data/domains/raidEvent"
 import { getPlayerSingleQuestProgressSync, insertPlayerQuestProgressSync, updatePlayerQuestProgressSync } from "../../../data/domains/quest"
 import { getPlayerEquipmentListSync } from "../../../data/domains/equipment"
-import {
-    recordCompletedMainChapterMilestoneSync,
-    recordRank100MilestoneSync,
-} from "../../player-history-milestones"
+import { recordCompletedMainChapterMilestoneSync, recordRank100MilestoneSync } from "../../player-history-milestones"
 import { insertPlayerScoreAttackBattleHistorySync } from "../../../data/domains/score-attack-history"
 import { insertPlayerPracticeBattleHistorySync } from "../../../data/domains/practice-battle-history"
 import { getPlayerCarnivalEventRecordsSync, getPlayerClaimedCarnivalRewardIdsSync, insertPlayerClaimedCarnivalRewardIdsSync, runCarnivalEventTransactionSync, upsertPlayerCarnivalEventRecordSync } from "../../../data/domains/carnivalEvent"
@@ -39,19 +36,18 @@ import { dispatchModeRushFinish } from "../../../modes/registry"
 import { createModeTransactionHost } from "../../../modes/loader"
 import { getServerTime } from "../../../utils"
 import { getRealNow } from "../../../runtime/time/game-time"
-import bundledEventChallengePointMap from "../../../../assets/event_challenge_point_map.json"
 import bundledAdditionalRewardRules from "../../../../assets/additional_reward_rules.json"
 import { handleCarnivalEventFinish } from "./carnival-handler"
 import { handleRushEventFinish } from "./rush-handler"
 import { handleRaidEventFinish } from "./raid-handler"
 import { handleScoreAttackEventFinish, type ScoreAttackBorderTier } from "./score-attack-handler"
-import { handleDailyChallengePoint } from "./challenge-point"
 import type { FinishContext } from "./types"
 import { selectScoreRewardGrantPlan } from "../score-reward-selection"
 import { grantSingleSettlementScoreRewardsWithinTransactionSync } from "./single-settlement-reward-grant"
 import { createSingleSettlementStandardRewardGrant } from "./single-standard-reward-callbacks"
 import { createSingleSettlementResponseState } from "./single-settlement-response-state"
 import { prepareSingleAwakePublication, settleSingleMissionEvaluations } from "./single-mission-publication"
+import { settleSingleDailyChallengePoint } from "./single-daily-challenge"
 const settlementModeHost = createModeTransactionHost(message => console.log(message))
 export interface SingleSettlementWritesInput {
     body: ValidatedSingleFinishBody
@@ -127,17 +123,12 @@ export function executeSingleSettlementWrites(
                 clearRank: clearRank ?? 5, leaderCharacterId: leaderId ?? undefined,
             })
         }
-        if (questCategory === QuestCategory.MAIN) {
-            recordCompletedMainChapterMilestoneSync(playerId, questId)
-        }
+        if (questCategory === QuestCategory.MAIN) recordCompletedMainChapterMilestoneSync(playerId, questId)
     }
-
     const oldRkDegree = getRankDegree(beforeRankPoint)
     const newDegreeId = getRankDegree(newRankPoint)
     const didLevelUp = newDegreeId > oldRkDegree
-    if (oldRkDegree < 100 && newDegreeId >= 100) {
-        recordRank100MilestoneSync(playerId, newRankPoint)
-    }
+    if (oldRkDegree < 100 && newDegreeId >= 100) recordRank100MilestoneSync(playerId, newRankPoint)
     const afterStamina = didLevelUp ? settlementPlayer.stamina + getMaxStamina(newDegreeId) : settlementPlayer.stamina
     const afterStaminaHealTime = didLevelUp ? getRealNow() : settlementPlayer.staminaHealTime
     updatePlayerSync({
@@ -162,15 +153,12 @@ export function executeSingleSettlementWrites(
         ? grantDirectRewards(playerId, "s_plus", [questData.sPlusReward]) : null
     if (didLevelUp) console.log(`[BATTLE-FINISH] player ${playerId} leveled up: ${oldRkDegree} -> ${newDegreeId}, stamina refilled`)
 
-    refreshPlayerDailyChallengePointsForRealDaySync(playerId, getRealNow(), dailyResetHour)
-    const dailyChallengePointList = handleDailyChallengePoint({
-        questCategory, questId, eventId: questData.eventId, playerId,
-        challengePointMap: getRuntimeContentTableSync(
-            "event_challenge_point_map.json",
-            bundledEventChallengePointMap as Record<string, number>,
-        ),
-        getEntries: pid => getPlayerDailyChallengePointListSync(pid),
-        updatePoint: (pid, id, point) => updatePlayerDailyChallengePointSync(pid, id, point),
+    const dailyChallengePointList = settleSingleDailyChallengePoint({
+        questCategory,
+        questId,
+        eventId: questData.eventId,
+        playerId,
+        dailyResetHour,
     })
     console.log(`[BATTLE] scoreReward groupId=${questData.scoreRewardGroupId} groupLen=${questData.scoreRewardGroup?.length ?? "null"} questId=${questId} category=${questCategory}`)
     const scoreRewardSelection = selectScoreRewardGrantPlan(
@@ -327,7 +315,6 @@ export function executeSingleSettlementWrites(
     })
     const characterList = publishAwakeCharacterListBestEffort(playerId, partyCharacterIds,
         awakePublication.characterLists, { invalidatedFactKeys: awakePublication.invalidatedFactKeys })
-
     return {
         afterStamina, afterStaminaHealTime, dailyChallengePointList,
         scoreRewardSelection, scoreRewardsResult, additionalRewardSettlement,

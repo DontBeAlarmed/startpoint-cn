@@ -181,7 +181,11 @@ test("player save registry covers every current player-owned table", () => {
 
     assert.deepEqual([...new Set([...registered, ...excluded])].sort(), discovered)
     assert.equal(new Set([...registered, ...excluded]).size, discovered.length)
-    assert.deepEqual(excluded, ["players_active_quests"])
+    assert.deepEqual(excluded, [
+        "players_active_quests",
+        "players_scheduled_resource_state",
+        "scheduled_resource_rules",
+    ])
     assert.deepEqual(
         PLAYER_SAVE_TABLES.find(table => table.name === "players_login_bonus_progress"),
         {
@@ -388,6 +392,17 @@ test("restore preserves target identity, replaces all domains, and clears active
         INSERT INTO players_active_quests (player_id, play_id, quest_id, category)
         VALUES (?, 'must-clear', 1001, 1)
     `).run(targetId)
+    const scheduledRuleId = Number(db.prepare(`
+        INSERT INTO scheduled_resource_rules (
+            scope, player_id, reward_type, reward_id, grant_amount,
+            trigger_threshold, inventory_cap, enabled, created_at_real, updated_at_real
+        ) VALUES ('player', ?, 'item', 30005, 1, 5, 999, 1, ?, ?)
+    `).run(targetId, new Date().toISOString(), new Date().toISOString()).lastInsertRowid)
+    db.prepare(`
+        INSERT INTO players_scheduled_resource_state (
+            player_id, rule_id, last_granted_business_day, last_granted_at_real
+        ) VALUES (?, ?, '2026-08-24', ?)
+    `).run(targetId, scheduledRuleId, new Date().toISOString())
     activeQuests[targetId] = {
         playId: "must-clear",
         questId: 1001,
@@ -432,6 +447,16 @@ test("restore preserves target identity, replaces all domains, and clears active
         [{ id: 30005, amount: 9 }],
     )
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM players_active_quests WHERE player_id = ?").get(targetId).count, 0)
+    assert.equal(
+        db.prepare("SELECT COUNT(*) AS count FROM scheduled_resource_rules WHERE id = ? AND player_id = ?")
+            .get(scheduledRuleId, targetId).count,
+        1,
+    )
+    assert.equal(
+        db.prepare("SELECT COUNT(*) AS count FROM players_scheduled_resource_state WHERE player_id = ? AND rule_id = ?")
+            .get(targetId, scheduledRuleId).count,
+        1,
+    )
     assert.equal(activeQuests[targetId], undefined)
     assert.equal(db.prepare("SELECT lineup_id FROM players_shop_campaign_lineups WHERE player_id = ?").get(targetId).lineup_id, 1020)
     assert.equal(db.prepare("SELECT play_id FROM players_score_attack_battle_history WHERE player_id = ?").get(targetId).play_id, "restore-history")

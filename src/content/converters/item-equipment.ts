@@ -23,6 +23,7 @@ export interface ItemEquipmentConversionOutput {
     readonly "item_data.json": Readonly<Record<string, unknown>>
     readonly "item_ids.json": readonly number[]
     readonly "item_lookup.json": Readonly<Record<string, string>>
+    readonly "item_max_count.json": Readonly<Record<string, number>>
     readonly "item_sale.json": Readonly<Record<string, unknown>>
 }
 
@@ -243,15 +244,18 @@ function convertItems(
     readonly data: Record<string, unknown>
     readonly ids: number[]
     readonly lookup: Record<string, string>
+    readonly maxCount: Record<string, number>
     readonly sale: Record<string, unknown>
 } {
     const data: Record<string, unknown> = {}
     const ids: number[] = []
     const lookup: Record<string, string> = {}
+    const maxCount: Record<string, number> = {}
     const sale: Record<string, unknown> = {}
     for (const [id, fields] of parseRows(rows, "item", 23)) {
         ids.push(Number(id))
         lookup[id] = requireText(fields[2], `item[${id}].name`)
+        maxCount[id] = parsePositiveInteger(fields[18], `item[${id}].maxCount`)
         const effectKind = parseNonNegativeInteger(fields[6], `item[${id}].effectKind`)
         if (effectKind === 2 || effectKind === 3) {
             data[id] = {
@@ -281,7 +285,7 @@ function convertItems(
             sellable: parseBoolean(fields[21], `item[${id}].sellable`),
         }
     }
-    return { data, ids, lookup, sale }
+    return { data, ids, lookup, maxCount, sale }
 }
 
 export async function convertItemEquipmentTables(
@@ -305,6 +309,7 @@ export async function convertItemEquipmentTables(
         "item_data.json": items.data,
         "item_ids.json": items.ids,
         "item_lookup.json": items.lookup,
+        "item_max_count.json": items.maxCount,
         "item_sale.json": items.sale,
     })
 }

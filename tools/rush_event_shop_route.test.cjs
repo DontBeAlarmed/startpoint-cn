@@ -310,6 +310,21 @@ stubModule("../src/utils", {
     getServerTime: () => globalNowSeconds,
     realToVirtual: date => Math.floor(date.getTime() / 1000),
 })
+stubModule("../src/runtime/time/game-time", {
+    getGameTimeContext: () => {
+        const nowMs = globalNowSeconds * 1000
+        return {
+            realNowMs: nowMs,
+            virtualNowMs: nowMs,
+            realNow: new Date(nowMs),
+            virtualNow: new Date(nowMs),
+        }
+    },
+    getRealNow: () => new Date(globalNowSeconds * 1000),
+    getRealNowMs: () => globalNowSeconds * 1000,
+    getVirtualNowMs: () => globalNowSeconds * 1000,
+    getVirtualNow: () => new Date(globalNowSeconds * 1000),
+})
 stubModule("../src/lib/shop-reward-grant", {
     grantShopRewardsInTransactionOwnerSync(playerId, rewards, knownPlayerBefore) {
         shopRewardGrantCalls++

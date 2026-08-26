@@ -7,6 +7,7 @@ export function handleDailyChallengePoint(params: {
     eventId: number | undefined
     playerId: number
     challengePointMap: Record<string, number>
+    refreshPoints: (playerId: number) => void
     getEntries: (playerId: number) => Array<{ id: number; point: number; campaignList: Array<{ campaignId: number; additionalPoint: number }> }>
     updatePoint: (playerId: number, id: number, point: number) => void
 }): Object[] | null {
@@ -20,6 +21,7 @@ export function handleDailyChallengePoint(params: {
     )
     if (!challengePointId) return null
 
+    params.refreshPoints(playerId)
     const entries = getEntries(playerId)
     const entry = entries.find(e => e.id === challengePointId)
     if (entry === undefined || entry.point <= 0) return entries.map(e => ({

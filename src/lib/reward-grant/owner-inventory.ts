@@ -18,6 +18,21 @@ interface CachedItem {
 export class OwnerInventoryWriteCache {
     private readonly items = new Map<number, CachedItem>()
 
+    constructor(knownItemsBefore: Readonly<Record<string, number | null>> = {}) {
+        for (const [rawItemId, amount] of Object.entries(knownItemsBefore)) {
+            const itemId = Number(rawItemId)
+            if (!Number.isSafeInteger(itemId) || itemId <= 0
+                || (amount !== null && (!Number.isSafeInteger(amount) || amount < 0))) {
+                throw new TypeError("invalid known reward grant item")
+            }
+            this.items.set(itemId, {
+                hasExistingRow: amount !== null,
+                amount: amount ?? 0,
+                obtained: 0,
+            })
+        }
+    }
+
     giveItem(playerId: number, itemId: number, amount: number): number {
         let cached = this.items.get(itemId)
         if (cached === undefined) {

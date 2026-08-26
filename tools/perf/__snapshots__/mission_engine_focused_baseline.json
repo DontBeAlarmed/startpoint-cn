@@ -278,7 +278,7 @@
     },
     "get-progress-character-invalidation": {
       "sqlReads": 23,
-      "sqlWrites": 5,
+      "sqlWrites": 6,
       "missionComputes": 1209,
       "behavior": {
         "characterIds": [

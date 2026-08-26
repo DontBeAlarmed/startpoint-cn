@@ -34,10 +34,11 @@
 
 ## 覆盖范围
 
-schema 18 共有 61 张可从 `players` 外键图发现的玩家关联表：
+schema 20 共有 64 张可从 `players` 外键图发现的玩家关联表：
 
-- 60 张登记到 `core`、`missions`、`events`、`economy`、`mailbox`；
-- `players_active_quests` 是唯一排除的玩家表；
+- 61 张登记到 `core`、`missions`、`events`、`economy`、`mailbox`；
+- `players_active_quests`、`scheduled_resource_rules` 和
+  `players_scheduled_resource_state` 明确排除；
 - 邮件、领取历史、活动扭蛋箱明细、Pass、Raid、登录奖励游标、商店购买计数、campaign lineup、EX 待选结果、玩家履历设置、练习战和无限演武战斗履历均可往返。
 
 注册表位于 `src/data/player-save/registry.ts`。测试会动态遍历当前 SQLite 外键图，并要求发现结果与“已登记 + 明确排除”完全相等。以后新增玩家表但未登记时，CI 会失败，不再静默漏出快照。
@@ -57,8 +58,12 @@ schema 18 共有 61 张可从 `players` 外键图发现的玩家关联表：
 | `server_gameplay_settings` | 服务端全局配置 |
 | `raid_event_boss_states` | 全服 Raid 共享状态 |
 | `players_active_quests` | 进行中战斗、房间和预扣资源 |
+| `scheduled_resource_rules` | 服主配置的全局或指定存档补充规则 |
+| `players_scheduled_resource_state` | 与当前服务端规则 ID 绑定的发放状态 |
 
 恢复和克隆都会清理目标玩家的 `players_active_quests`。数据库事务成功后还会清除进程内 `activeQuests`；事务失败时两处状态均保留。这样旧战斗不能在已经替换的背包、体力或门票状态上继续结算。
+
+定时资源补充规则及其发放状态不导出，也不会在恢复时清理目标服现有记录，避免跨服导入携带无效规则 ID 或重置当天发放状态。
 
 ## Restore 与 Clone
 

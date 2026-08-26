@@ -8,6 +8,7 @@
 - [服务端时间来源](./time-source.md)
 - [商店](./shop.md)
 - [邮件](./mail.md)
+- [定时资源补充](./scheduled-resource-replenishment.md)
 - [登录奖励](./login-bonus.md)
 - [首次教程状态与中断恢复](./start-tutorial.md)
 - [存档与输入校验](./save-validation.md)

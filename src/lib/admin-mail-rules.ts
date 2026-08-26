@@ -33,33 +33,24 @@ const SINGLE_RULE: MailAttachmentRule = {
     reason: "角色 / 装备每封邮件只能发送 1 个",
 }
 
-const ITEM_RULES: Array<{ test: (itemId: number) => boolean; rule: MailAttachmentRule }> = [
-    {
-        test: itemId => itemId >= 100 && itemId < 1000,
-        rule: { min: 1, max: 99, label: "消耗品", reason: "体力药等消耗品采用较低持有上限" },
-    },
-    {
-        test: itemId => itemId > 0 && itemId < 100000,
-        rule: { min: 1, max: 999, label: "素材", reason: "元素、结晶和升级素材按 999 封顶" },
-    },
-    {
-        test: itemId => itemId >= 100000 && itemId < 1000000,
-        rule: { min: 1, max: 99999, label: "锻造石 / 特殊魂珠", reason: "高频资源按 99999 封顶" },
-    },
-    {
-        test: itemId => itemId >= 1000000,
-        rule: { min: 1, max: 999999, label: "活动币 / 装备魂珠", reason: "长期累计资源按 999999 封顶" },
-    },
-]
-
 export function mailTypeNeedsTypeId(mailType: number): boolean {
     return TYPE_IDS_REQUIRED.has(mailType)
 }
 
-export function getMailAttachmentRule(mailType: number, typeId: number | null = null): MailAttachmentRule {
+export function getMailAttachmentRule(
+    mailType: number,
+    typeId: number | null = null,
+    itemMaxCount?: number,
+): MailAttachmentRule {
     if (mailType === 5 || mailType === 6) return SINGLE_RULE
     if (mailType !== 1 || typeId === null) return DEFAULT_RULE
-    return ITEM_RULES.find(({ test }) => test(typeId))?.rule ?? DEFAULT_RULE
+    if (!Number.isSafeInteger(itemMaxCount) || (itemMaxCount ?? 0) < 1) return DEFAULT_RULE
+    return {
+        min: 1,
+        max: itemMaxCount as number,
+        label: "道具",
+        reason: "使用 CDN 官方持有上限",
+    }
 }
 
 export function parseAdminMailInteger(
@@ -95,6 +86,7 @@ export function validateMailAttachment(input: {
     mailType: number
     typeId: number | null
     count: number
+    itemMaxCount?: number
 }): ValidationResult<MailAttachmentRule> {
     const needsTypeId = mailTypeNeedsTypeId(input.mailType)
     if (needsTypeId && input.typeId === null) {
@@ -104,7 +96,12 @@ export function validateMailAttachment(input: {
         return { ok: false, error: "此附件类型不需要附件 ID" }
     }
 
-    const rule = getMailAttachmentRule(input.mailType, input.typeId)
+    if (input.mailType === 1
+        && (!Number.isSafeInteger(input.itemMaxCount) || (input.itemMaxCount ?? 0) < 1)) {
+        return { ok: false, error: `道具 ${input.typeId} 缺少 CDN 官方持有上限` }
+    }
+
+    const rule = getMailAttachmentRule(input.mailType, input.typeId, input.itemMaxCount)
     if (input.count < rule.min || input.count > rule.max) {
         if (rule.max === 1) {
             return { ok: false, error: `${rule.reason}` }

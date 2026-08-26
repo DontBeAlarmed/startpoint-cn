@@ -45,7 +45,7 @@
 
 `type_id` 只允许并要求用于道具、角色和装备；其他附件带 `type_id` 会被拒绝，不会静默忽略。三类 ID 分别按当前道具、角色和装备资源集合校验。
 
-角色和装备每封只能发送 1 个。道具数量按 ID 范围应用不同上限；其他资源使用 int32 安全范围。最终规则以 `src/lib/admin-mail-rules.ts` 为唯一事实来源。角色附件统一调用正常角色发放器：重复角色增加 `stack` 并发放对应重复素材，不再错误增加 `entry_count`。
+角色和装备每封只能发送 1 个。普通道具附件数量使用当前 Content Snapshot 的 `item_max_count.json`，其权威来源是 `master/item/item.orderedmap` 的 `max_count` 字段；不再按 ID 范围推测。该校验只保证单封附件数量合法，不读取收件人背包，也不预演领取后的库存；超过玩家当前可持有空间时沿用客户端领取拦截，服务端不实现部分领取或溢出转存。其他资源使用 int32 安全范围。最终规则以 `src/lib/admin-mail-rules.ts` 为唯一事实来源。角色附件统一调用正常角色发放器：重复角色增加 `stack` 并发放对应重复素材，不再错误增加 `entry_count`。
 
 领取响应继续使用旧字段：`user_info` 只包含本次涉及的余额字段，并返回提交后的绝对余额；`item_list` 对同一 ID 只保留数据库最终库存，重复角色补偿亦然；角色和装备列表沿用 RewardGrant 的稳定顺序与去重结果，再在原有时点执行 Awake unlock reconcile。响应不新增 RewardGrant source 或其他内部字段。
 

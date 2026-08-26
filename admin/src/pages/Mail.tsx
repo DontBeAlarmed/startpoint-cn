@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiGet, apiPost } from "../api/client"
 import { AdminPage } from "../components/AdminPage"
 import { getMailAttachmentRule } from "../lib/mailRules"
+import { ScheduledResourceRules } from "../components/ScheduledResourceRules"
 
 const { TextArea } = Input
 const { Text } = Typography
@@ -141,7 +142,6 @@ export default function Mail() {
     const targetMode: TargetMode = Form.useWatch("targetMode", form) ?? "all"
     const needsId = requiresTypeId(type)
     const attachmentEndpoint = lookupEndpoint(type)
-    const quantityRule = getMailAttachmentRule(type, typeId)
 
     // 预览确认：暂存待发送的表单值 + 计算好的对象描述/角色数
     const [confirm, setConfirm] = useState<null | { values: any; count: number; targetText: string; attachmentText: string }>(null)
@@ -155,6 +155,13 @@ export default function Mail() {
         enabled: needsId && !!attachmentEndpoint,
         staleTime: Infinity,
     })
+    const { data: itemMaxCounts } = useQuery({
+        queryKey: ["itemMaxCounts"],
+        queryFn: () => apiGet<Record<string, number>>("/api/lookup/item-max-counts"),
+        enabled: type === 1,
+        staleTime: Infinity,
+    })
+    const quantityRule = getMailAttachmentRule(type, typeId, itemMaxCounts?.[String(typeId)])
     const attachmentOptions = useMemo(
         () => buildAttachmentOptions(type, attachmentLookup),
         [type, attachmentLookup],
@@ -351,6 +358,8 @@ export default function Mail() {
                     </Form.Item>
                 </Form>
             </Card>
+
+            <ScheduledResourceRules players={players} />
 
             <Card title="最近群发记录" size="small" className="admin-table-card">
                 <Table<MailRecord & { key: number }>

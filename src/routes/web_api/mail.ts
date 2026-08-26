@@ -11,6 +11,8 @@ import {
     validateMailAttachment,
 } from "../../lib/admin-mail-rules"
 import { getRealNow } from "../../runtime/time/game-time"
+import bundledItemMaxCounts from "../../../assets/item_max_count.json"
+import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 
 const VALID_MAIL_TYPES: Set<number> = new Set([1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15])
 
@@ -89,7 +91,18 @@ const routes = async (fastify: FastifyInstance) => {
         const subject = body.subject && body.subject.trim() ? body.subject.trim() : null
         const desc = body.description && body.description.trim() ? body.description.trim() : null
 
-        const attachmentValidation = validateMailAttachment({ mailType, typeId, count })
+        const itemMaxCount = mailType === 1 && typeId !== null
+            ? getRuntimeContentTableSync<Readonly<Record<string, number>>>(
+                "item_max_count.json",
+                bundledItemMaxCounts,
+            )[String(typeId)]
+            : undefined
+        const attachmentValidation = validateMailAttachment({
+            mailType,
+            typeId,
+            count,
+            itemMaxCount,
+        })
         if (!attachmentValidation.ok) {
             return fail(attachmentValidation.error)
         }

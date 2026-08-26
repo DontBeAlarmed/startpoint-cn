@@ -50,7 +50,7 @@ const PLANNED_CANDIDATE_SOURCES = Object.freeze({
 const AUTHORITATIVE_WRITE_SETS = Object.freeze({
     "single/finish": Object.freeze([
         "updatePlayerQuestProgressSync", "insertPlayerQuestProgressSync", "updatePlayerSync",
-        "setPlayerState", "grantDirectRewards", "handleDailyChallengePoint",
+        "setPlayerState", "grantDirectRewards", "settleSingleDailyChallengePoint",
         "grantSingleSettlementScoreRewardsWithinTransactionSync", "settleAdditionalRewardsSync",
         "recordMissionBattleFacts", "givePlayerCharactersExpSync", "handleRushEventFinish",
         "dispatchModeRushFinish", "handleRaidEventFinish", "handleCarnivalEventFinish",

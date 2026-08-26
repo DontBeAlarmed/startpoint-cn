@@ -3,6 +3,7 @@ import bundledQuestLookup from "../../../assets/quest_lookup.json";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 import { getEquipmentLookupSync, getItemLookupSync } from "../../lib/assets";
 import { getCharacterLookup } from "../../lib/character-content";
+import bundledItemMaxCounts from "../../../assets/item_max_count.json";
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.get("/characters", async (_request: FastifyRequest, reply: FastifyReply) => {
@@ -11,6 +12,13 @@ const routes = async (fastify: FastifyInstance) => {
 
     fastify.get("/items", async (_request: FastifyRequest, reply: FastifyReply) => {
         return reply.send(getItemLookupSync())
+    })
+
+    fastify.get("/item-max-counts", async (_request: FastifyRequest, reply: FastifyReply) => {
+        return reply.send(getRuntimeContentTableSync(
+            "item_max_count.json",
+            bundledItemMaxCounts,
+        ))
     })
 
     fastify.get("/equipment", async (_request: FastifyRequest, reply: FastifyReply) => {

@@ -65,12 +65,18 @@ function classifyStatement(rawSql) {
     }
 
     if (/^INSERT\b/i.test(masked)) {
-        const { target } = matchWrite(masked, new RegExp(
+        const { match, target } = matchWrite(masked, new RegExp(
             `^INSERT(?:\\s+OR\\s+${CONFLICT_ACTION})?\\s+INTO\\s+(${IDENTIFIER})`
-            + `(?:\\s*\\([^)]*\\))?\\s+VALUES\\b`,
+            + `(?:\\s*\\([^)]*\\))?\\s+(VALUES|SELECT)\\b`,
             "is",
         ))
-        return { type: "write", readTables: new Set(), writeTables: new Set([target]) }
+        return {
+            type: "write",
+            readTables: match[2].toUpperCase() === "SELECT"
+                ? findReadTables(masked.slice(match[0].length))
+                : new Set(),
+            writeTables: new Set([target]),
+        }
     }
 
     if (/^UPDATE\b/i.test(masked)) {

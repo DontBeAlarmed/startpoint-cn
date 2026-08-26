@@ -196,6 +196,7 @@ const ITEM_EQUIPMENT_TABLES = [
     ],
     ["item_ids.json", ["master/item/item.orderedmap"]],
     ["item_lookup.json", ["master/item/item.orderedmap"]],
+    ["item_max_count.json", ["master/item/item.orderedmap"]],
     ["item_sale.json", ["master/item/item.orderedmap"]],
 ] as const
 

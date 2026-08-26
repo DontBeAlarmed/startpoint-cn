@@ -434,6 +434,7 @@ function applyV2SnapshotSync(
     database.transaction(() => {
         database.pragma("defer_foreign_keys = ON")
         for (const excluded of PLAYER_SAVE_EXCLUDED_TABLES) {
+            if (excluded.reason !== "activeQuest") continue
             database.prepare(
                 `DELETE FROM ${quotePlayerSaveIdentifier(excluded.name)} WHERE player_id = ?`,
             ).run(targetPlayerId)

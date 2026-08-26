@@ -26,6 +26,16 @@ assert.match(
     /type_id:\s*requiresTypeId\(v\.type\)\s*&&\s*v\.type_id\s*!=\s*null\s*\?\s*String\(v\.type_id\)\s*:\s*undefined/,
     "不需要附件 ID 的邮件类型不应提交 type_id",
 )
+assert.match(
+    mailSource,
+    /apiGet<Record<string, number>>\("\/api\/lookup\/item-max-counts"\)/,
+    "邮件页应读取 Content Snapshot 的官方道具持有上限",
+)
+assert.match(
+    mailSource,
+    /getMailAttachmentRule\(type, typeId, itemMaxCounts\?\.\[String\(typeId\)\]\)/,
+    "道具数量控件应使用所选道具的官方持有上限",
+)
 
 const attachmentRequiredMessages = mailSource.match(/"请选择附件"/g) ?? []
 assert.strictEqual(attachmentRequiredMessages.length, 1, "附件字段清空时只能产生一条“请选择附件”校验提示")

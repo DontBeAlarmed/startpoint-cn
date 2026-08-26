@@ -223,6 +223,8 @@ async function runMissionEngineFocusedBaseline({
     const suiteDirectory = fs.mkdtempSync(
         path.join(temporaryParent, "mission-engine-focused-baseline-"),
     )
+    const originalDateNow = Date.now
+    Date.now = () => Date.parse(FIXED_TIME)
     const originalLog = console.log
     let runtime
     let restoreContent = null
@@ -273,6 +275,7 @@ async function runMissionEngineFocusedBaseline({
             }
         },
         () => { console.log = originalLog },
+        () => { Date.now = originalDateNow },
         () => fs.rmSync(suiteDirectory, { recursive: true, force: true }),
     ])
     return report

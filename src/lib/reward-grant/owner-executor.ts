@@ -24,6 +24,7 @@ export function executeRewardGrantPlanInTransactionOwnerInternalSync<TSource>(
     plan: RewardGrantPlan<TSource>,
     knownPlayerBefore: RewardGrantPlayerAfter,
     playerUpdate: RewardGrantOwnerPlayerUpdate = {},
+    knownItemsBefore: Readonly<Record<string, number | null>> = {},
 ): InternalRewardGrantResult<TSource> {
     const db = getDb()
     if (!db.inTransaction) throw new RewardGrantTransactionRequiredError()
@@ -32,6 +33,7 @@ export function executeRewardGrantPlanInTransactionOwnerInternalSync<TSource>(
         normalizeRewardGrantPlanInternal(plan),
         snapshotKnownRewardGrantPlayer(knownPlayerBefore),
         playerUpdate,
+        knownItemsBefore,
     )
 }
 
@@ -40,6 +42,7 @@ export function executeRewardGrantPlanInTransactionOwnerSync<TSource>(
     plan: RewardGrantPlan<TSource>,
     knownPlayerBefore: RewardGrantPlayerAfter,
     playerUpdate: RewardGrantOwnerPlayerUpdate = {},
+    knownItemsBefore: Readonly<Record<string, number | null>> = {},
 ): RewardGrantResult<TSource> {
     return projectPublicRewardGrantResult(
         executeRewardGrantPlanInTransactionOwnerInternalSync(
@@ -47,6 +50,7 @@ export function executeRewardGrantPlanInTransactionOwnerSync<TSource>(
             plan,
             knownPlayerBefore,
             playerUpdate,
+            knownItemsBefore,
         ),
     )
 }

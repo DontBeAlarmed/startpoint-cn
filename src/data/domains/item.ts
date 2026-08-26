@@ -46,6 +46,22 @@ export function getPlayerItemsSync(
     return output
 }
 
+export function getPlayerItemsByIdsSync(
+    playerId: number,
+    itemIds: readonly number[],
+): Record<string, number> {
+    const ids = [...new Set(itemIds)]
+        .filter(itemId => Number.isSafeInteger(itemId) && itemId > 0)
+    if (ids.length === 0) return {}
+    const placeholders = ids.map(() => "?").join(", ")
+    const rows = getDb().prepare(`
+        SELECT id, amount
+        FROM players_items
+        WHERE player_id = ? AND id IN (${placeholders})
+    `).all(playerId, ...ids) as RawPlayerItem[]
+    return Object.fromEntries(rows.map(row => [String(row.id), row.amount]))
+}
+
 export function getPlayerCollectedItemTotalSync(
     playerId: number,
     itemId: number | string
