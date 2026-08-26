@@ -19,7 +19,8 @@ CN 1.8.1 的 `/history/practice_battle` 返回 `history` 数组。每条记录�
 schema 13 新增 `players_practice_battle_history`：
 
 - `(player_id, play_id)` 唯一，重复 finish 不会生成重复记录；
-- 按 `id DESC` 返回玩家履历；
+- 每次写入后在同一事务内按 `id DESC` 保留该玩家最新 100 条，超出的旧记录删除；
+- 客户端查询默认按 `id DESC` 返回最新 30 条；
 - 正常完成记录 `finish_kind=0` 和计算后的 `clear_rank`；
 - 失败 finish 记录 `finish_kind=1`、`clear_rank=null`；
 - 总伤害和三名主位伤害按所有 `statistics.zones` 累加；
@@ -28,6 +29,8 @@ schema 13 新增 `players_practice_battle_history`：
 履历写入位于 `/single_battle_quest/finish` 的总事务内。发奖、任务事实、关卡进度或 active quest 清理任一步失败时，履历也回滚。查询路由校验 viewer session 和当前存档，不再向任意 viewer 返回空列表。
 
 练习战和无限演武共用 29 字段的协议构造器，但使用独立表和独立查询，避免活动 ID、清理策略或后续保留数量互相耦合。
+
+客户端反编译只确认履历字段和列表读取，没有提供官服服务端的返回及存储上限。当前“返回 30 条、保留 100 条”是为控制响应体积和存档增长采用的推测性兼容行为，不应视为官方规则；以后获得权威抓包或服务端证据时可独立调整。
 
 ## 存档边界
 
@@ -45,6 +48,7 @@ schema 13 新增 `players_practice_battle_history`：
 
 - 29 字段构造、跨 zone 伤害、装备快照和非法 category；
 - 插入幂等、查询顺序和玩家隔离；
+- 默认返回 30 条、显式读取最多 100 条，以及写入后只保留最新 100 条；
 - Fastify 查询响应与非法 viewer；
 - finish 总事务成功与回滚；
 - schema 13 引入、schema 18 当前兼容、存档 V2 和 Server Bundle 数据版本契约。

@@ -382,15 +382,39 @@ export function getPlayerCategoryMissionsByIdsSync(
 export function getPlayerCategoryMissionListSync(
     playerId: number
 ): Record<string, Record<string, PlayerActiveMission>> {
-    const categories = getDb().prepare(`
-    SELECT DISTINCT category
-    FROM players_category_missions
-    WHERE player_id = ?
-    ORDER BY category
-    `).all(playerId) as { category: number }[]
+    const missions = getDb().prepare(`
+        SELECT category, id, progress
+        FROM players_category_missions
+        WHERE player_id = ?
+        ORDER BY category, id
+    `).all(playerId) as Array<{ category: number; id: number; progress: number }>
+    const stages = getDb().prepare(`
+        SELECT category, id, status, mission_id
+        FROM players_category_mission_stages
+        WHERE player_id = ?
+        ORDER BY category, mission_id, id
+    `).all(playerId) as Array<{
+        category: number
+        id: number
+        status: number
+        mission_id: number
+    }>
+    const stageBuckets = new Map<string, Record<string, boolean>>()
+    for (const stage of stages) {
+        const key = `${stage.category}:${stage.mission_id}`
+        const bucket = stageBuckets.get(key) ?? {}
+        bucket[String(stage.id)] = deserializeBoolean(stage.status)
+        stageBuckets.set(key, bucket)
+    }
     const result: Record<string, Record<string, PlayerActiveMission>> = {}
-    for (const { category } of categories) {
-        result[String(category)] = getPlayerCategoryMissionsSync(playerId, category)
+    for (const mission of missions) {
+        const category = String(mission.category)
+        const categoryMissions = result[category] ?? {}
+        categoryMissions[String(mission.id)] = {
+            progress: mission.progress,
+            stages: stageBuckets.get(`${mission.category}:${mission.id}`) ?? [],
+        }
+        result[category] = categoryMissions
     }
     return result
 }

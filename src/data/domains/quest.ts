@@ -212,19 +212,22 @@ export function insertPlayerQuestProgressSync(
 ) {
     getDb().prepare(`
     INSERT INTO players_quest_progress (section, quest_id, finished, unlocked, high_score, clear_rank, best_elapsed_time_ms, leader_character_id, host_finished, player_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-        Number(section),
-        data.questId,
-        serializeBoolean(data.finished),
-        serializeBoolean(data.unlocked ?? false),
-        data.highScore ?? null,
-        data.clearRank ?? null,
-        data.bestElapsedTimeMs ?? null,
-        data.leaderCharacterId ?? null,
-        data.hostFinished === undefined ? null : serializeBoolean(data.hostFinished),
-        playerId
+    VALUES (
+        @section, @quest_id, @finished, @unlocked, @high_score, @clear_rank,
+        @best_elapsed_time_ms, @leader_character_id, @host_finished, @player_id
     )
+    `).run({
+        section: Number(section),
+        quest_id: data.questId,
+        finished: serializeBoolean(data.finished),
+        unlocked: serializeBoolean(data.unlocked ?? false),
+        high_score: data.highScore ?? null,
+        clear_rank: data.clearRank ?? null,
+        best_elapsed_time_ms: data.bestElapsedTimeMs ?? null,
+        leader_character_id: data.leaderCharacterId ?? null,
+        host_finished: data.hostFinished === undefined ? null : serializeBoolean(data.hostFinished),
+        player_id: playerId,
+    })
 }
 
 /**

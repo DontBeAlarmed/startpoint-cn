@@ -104,6 +104,18 @@ assert.equal(history[0].quest_id, 2)
 assert.equal("playerId" in history[0], false)
 assert.equal("playId" in history[0], false)
 
+for (let index = 0; index < 101; index++) {
+    assert.equal(insertPlayerPracticeBattleHistorySync({
+        ...record,
+        playId: `practice-history-retention-${index}`,
+        quest_id: 1000 + index,
+        create_time: `2024-08-15 00:${String(index % 60).padStart(2, "0")}:00`,
+    }), true)
+}
+const retainedHistory = getPlayerPracticeBattleHistorySync(playerId, 100)
+assert.equal(retainedHistory.length, 100)
+assert.equal(retainedHistory[0].quest_id, 1100)
+
 const otherAccount = insertAccountSync({
     appId: "wf_cn",
     idpAlias: "",

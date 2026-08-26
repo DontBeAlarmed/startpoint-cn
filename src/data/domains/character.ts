@@ -294,23 +294,29 @@ export function insertPlayerCharacterSync(
     INSERT INTO players_characters (id, entry_count, evolution_level, over_limit_step, 
         protection, join_time, update_time, exp, stack, mana_board_index, player_id,
         ex_boost_status_id, ex_boost_ability_id_list, illustration_settings)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-        Number(characterId),
-        character.entryCount,
-        character.evolutionLevel,
-        character.overLimitStep,
-        serializeBoolean(character.protection),
-        character.joinTime.toISOString(),
-        character.updateTime.toISOString(),
-        character.exp,
-        character.stack,
-        character.manaBoardIndex,
-        playerId,
-        character.exBoost?.statusId === undefined ? null : character.exBoost.statusId,
-        character.exBoost?.abilityIdList === undefined ? null : serializeNumberList(character.exBoost.abilityIdList),
-        character.illustrationSettings === undefined ? null : serializeNumberList(character.illustrationSettings)
+    VALUES (
+        @id, @entry_count, @evolution_level, @over_limit_step, @protection,
+        @join_time, @update_time, @exp, @stack, @mana_board_index, @player_id,
+        @ex_boost_status_id, @ex_boost_ability_id_list, @illustration_settings
     )
+    `).run({
+        id: Number(characterId),
+        entry_count: character.entryCount,
+        evolution_level: character.evolutionLevel,
+        over_limit_step: character.overLimitStep,
+        protection: serializeBoolean(character.protection),
+        join_time: character.joinTime.toISOString(),
+        update_time: character.updateTime.toISOString(),
+        exp: character.exp,
+        stack: character.stack,
+        mana_board_index: character.manaBoardIndex,
+        player_id: playerId,
+        ex_boost_status_id: character.exBoost?.statusId ?? null,
+        ex_boost_ability_id_list: character.exBoost?.abilityIdList === undefined
+            ? null : serializeNumberList(character.exBoost.abilityIdList),
+        illustration_settings: character.illustrationSettings === undefined
+            ? null : serializeNumberList(character.illustrationSettings),
+    })
 
     // insert mana board nodes
     for (const token of character.bondTokenList) {

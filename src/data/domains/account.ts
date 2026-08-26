@@ -196,25 +196,30 @@ export function insertAccountSync(
         admin_note, cleanup_policy, cleanup_due_at, cleanup_state,
         takeover_password_hash, takeover_udid
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-        account.appId,
-        dateNowISO,
-        account.idpAlias,
-        account.idpCode,
-        account.idpId,
-        dateNowISO,
-        dateNowISO,
-        account.status,
-        account.username ?? null,
-        account.passwordHash ?? null,
-        account.adminNote ?? null,
-        cleanupPolicy,
-        cleanupDueAt?.toISOString() ?? null,
-        account.cleanupState ?? "active",
-        account.takeoverPasswordHash ?? null,
-        account.takeoverUdid ?? null,
+    VALUES (
+        @app_id, @first_login_time, @idp_alias, @idp_code, @idp_id,
+        @reg_time, @last_login_time, @status, @username, @password_hash,
+        @admin_note, @cleanup_policy, @cleanup_due_at, @cleanup_state,
+        @takeover_password_hash, @takeover_udid
     )
+    `).run({
+        app_id: account.appId,
+        first_login_time: dateNowISO,
+        idp_alias: account.idpAlias,
+        idp_code: account.idpCode,
+        idp_id: account.idpId,
+        reg_time: dateNowISO,
+        last_login_time: dateNowISO,
+        status: account.status,
+        username: account.username ?? null,
+        password_hash: account.passwordHash ?? null,
+        admin_note: account.adminNote ?? null,
+        cleanup_policy: cleanupPolicy,
+        cleanup_due_at: cleanupDueAt?.toISOString() ?? null,
+        cleanup_state: account.cleanupState ?? "active",
+        takeover_password_hash: account.takeoverPasswordHash ?? null,
+        takeover_udid: account.takeoverUdid ?? null,
+    })
 
     const id = result.lastInsertRowid
 

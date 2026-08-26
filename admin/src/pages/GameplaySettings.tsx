@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Alert, Button, Card, InputNumber, Skeleton, Space, Tag, Typography, message } from "antd"
+import { Alert, Button, Card, InputNumber, Skeleton, Space, Switch, Tag, Typography, message } from "antd"
 import { SaveOutlined } from "@ant-design/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
@@ -8,16 +8,18 @@ import { AdminPage } from "../components/AdminPage"
 
 interface GameplaySettings {
     dropMultiplier: number
+    multiRescueFragmentRewardsEnabled: boolean
     updatedAt: string
 }
 export default function GameplaySettings() {
     const queryClient = useQueryClient()
     const [draftMultiplier, setDraftMultiplier] = useState<number | null>(null)
+    const [draftRescueEnabled, setDraftRescueEnabled] = useState<boolean | null>(null)
     const settings = useQuery({
         queryKey: ["serverGameplaySettings"],
         queryFn: () => apiGet<GameplaySettings>("/api/server/settings/gameplay"),
     })
-    const save = useMutation({
+    const saveMultiplier = useMutation({
         mutationFn: (dropMultiplier: number) => apiPatch<GameplaySettings>(
             "/api/server/settings/gameplay",
             { dropMultiplier },
@@ -29,13 +31,28 @@ export default function GameplaySettings() {
         },
         onError: (error: Error) => message.error(error.message),
     })
+    const saveRescueSetting = useMutation({
+        mutationFn: (multiRescueFragmentRewardsEnabled: boolean) => apiPatch<GameplaySettings>(
+            "/api/server/settings/gameplay",
+            { multiRescueFragmentRewardsEnabled },
+        ),
+        onSuccess: value => {
+            queryClient.setQueryData(["serverGameplaySettings"], value)
+            setDraftRescueEnabled(value.multiRescueFragmentRewardsEnabled)
+            message.success("游戏设置已保存")
+        },
+        onError: (error: Error) => message.error(error.message),
+    })
 
     useEffect(() => {
         if (settings.data) setDraftMultiplier(settings.data.dropMultiplier)
+        if (settings.data) setDraftRescueEnabled(settings.data.multiRescueFragmentRewardsEnabled)
     }, [settings.data])
 
     const currentMultiplier = settings.data?.dropMultiplier
     const unchanged = draftMultiplier === null || draftMultiplier === currentMultiplier
+    const rescueUnchanged = draftRescueEnabled === null
+        || draftRescueEnabled === settings.data?.multiRescueFragmentRewardsEnabled
 
     return (
         <AdminPage
@@ -72,8 +89,9 @@ export default function GameplaySettings() {
                                 type="primary"
                                 icon={<SaveOutlined />}
                                 disabled={unchanged}
-                                loading={save.isPending}
-                                onClick={() => draftMultiplier !== null && save.mutate(draftMultiplier)}
+                                loading={saveMultiplier.isPending}
+                                onClick={() => draftMultiplier !== null
+                                    && saveMultiplier.mutate(draftMultiplier)}
                             >
                                 保存
                             </Button>
@@ -82,6 +100,29 @@ export default function GameplaySettings() {
                             type="info"
                             showIcon
                             message="影响固定道具、玛纳、经验、属性素材和以太素材；不改变稀有掉落概率。"
+                        />
+                        <Space wrap align="center">
+                            <Typography.Text>多人结算发放救援碎片</Typography.Text>
+                            <Switch
+                                checked={draftRescueEnabled ?? false}
+                                onChange={value => setDraftRescueEnabled(value)}
+                                aria-label="多人结算发放救援碎片"
+                            />
+                            <Button
+                                type="primary"
+                                icon={<SaveOutlined />}
+                                disabled={rescueUnchanged}
+                                loading={saveRescueSetting.isPending}
+                                onClick={() => draftRescueEnabled !== null
+                                    && saveRescueSetting.mutate(draftRescueEnabled)}
+                            >
+                                保存
+                            </Button>
+                        </Space>
+                        <Alert
+                            type="info"
+                            showIcon
+                            message="开启后，所有成功多人结算都会发放对应救援碎片；单人结算不受影响。"
                         />
                     </Space>
                 )}

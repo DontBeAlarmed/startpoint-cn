@@ -132,17 +132,34 @@ export function insertPlayerRushEventSync(
     rushEvent: PlayerRushEvent
 ) {
     getDb().prepare(`
-    INSERT INTO players_rush_events
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-        playerId,
-        rushEvent.eventId,
-        rushEvent.activeRushBattleFolderId,
-        rushEvent.endlessBattleMaxRound,
-        rushEvent.endlessBattleMaxRoundTime,
-        ...rushEvent.endlessBattleMaxRoundCharacterIds,
-        ...rushEvent.endlessBattleMaxRoundCharacterEvolutionImgLvls
+    INSERT INTO players_rush_events (
+        player_id, event_id, active_rush_battle_folder_id,
+        endless_battle_max_round, endless_battle_max_round_time,
+        endless_battle_max_round_character_id_1,
+        endless_battle_max_round_character_id_2,
+        endless_battle_max_round_character_id_3,
+        endless_battle_max_round_character_evolution_img_lvl_1,
+        endless_battle_max_round_character_evolution_img_lvl_2,
+        endless_battle_max_round_character_evolution_img_lvl_3
+    ) VALUES (
+        @player_id, @event_id, @active_folder_id,
+        @max_round, @max_round_time,
+        @character_id_1, @character_id_2, @character_id_3,
+        @evolution_level_1, @evolution_level_2, @evolution_level_3
     )
+    `).run({
+        player_id: playerId,
+        event_id: rushEvent.eventId,
+        active_folder_id: rushEvent.activeRushBattleFolderId,
+        max_round: rushEvent.endlessBattleMaxRound,
+        max_round_time: rushEvent.endlessBattleMaxRoundTime,
+        character_id_1: rushEvent.endlessBattleMaxRoundCharacterIds[0],
+        character_id_2: rushEvent.endlessBattleMaxRoundCharacterIds[1],
+        character_id_3: rushEvent.endlessBattleMaxRoundCharacterIds[2],
+        evolution_level_1: rushEvent.endlessBattleMaxRoundCharacterEvolutionImgLvls[0],
+        evolution_level_2: rushEvent.endlessBattleMaxRoundCharacterEvolutionImgLvls[1],
+        evolution_level_3: rushEvent.endlessBattleMaxRoundCharacterEvolutionImgLvls[2],
+    })
 }
 
 /**
@@ -472,32 +489,47 @@ export function insertPlayerRushEventPlayedPartySync(
     party: PlayerRushEventPlayedParty
 ) {
     getDb().prepare(`
-    INSERT OR REPLACE INTO players_rush_events_played_parties
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-        party.characterIds[0],
-        party.characterIds[1],
-        party.characterIds[2],
-        party.unisonCharacterIds[0],
-        party.unisonCharacterIds[1],
-        party.unisonCharacterIds[2],
-        party.equipmentIds[0],
-        party.equipmentIds[1],
-        party.equipmentIds[2],
-        party.abilitySoulIds[0],
-        party.abilitySoulIds[1],
-        party.abilitySoulIds[2],
-        party.evolutionImgLevels[0],
-        party.evolutionImgLevels[1],
-        party.evolutionImgLevels[2],
-        party.unisonEvolutionImgLevels[0],
-        party.unisonEvolutionImgLevels[1],
-        party.unisonEvolutionImgLevels[2],
-        playerId,
-        eventId,
-        party.round,
-        party.battleType
+    INSERT OR REPLACE INTO players_rush_events_played_parties (
+        character_id_1, character_id_2, character_id_3,
+        unison_character_id_1, unison_character_id_2, unison_character_id_3,
+        equipment_id_1, equipment_id_2, equipment_id_3,
+        ability_soul_id_1, ability_soul_id_2, ability_soul_id_3,
+        evolution_img_level_1, evolution_img_level_2, evolution_img_level_3,
+        unison_evolution_img_level_1, unison_evolution_img_level_2,
+        unison_evolution_img_level_3, player_id, event_id, round, battle_type
+    ) VALUES (
+        @character_id_1, @character_id_2, @character_id_3,
+        @unison_id_1, @unison_id_2, @unison_id_3,
+        @equipment_id_1, @equipment_id_2, @equipment_id_3,
+        @ability_soul_id_1, @ability_soul_id_2, @ability_soul_id_3,
+        @evolution_level_1, @evolution_level_2, @evolution_level_3,
+        @unison_evolution_level_1, @unison_evolution_level_2,
+        @unison_evolution_level_3, @player_id, @event_id, @round, @battle_type
     )
+    `).run({
+        character_id_1: party.characterIds[0] ?? null,
+        character_id_2: party.characterIds[1] ?? null,
+        character_id_3: party.characterIds[2] ?? null,
+        unison_id_1: party.unisonCharacterIds[0] ?? null,
+        unison_id_2: party.unisonCharacterIds[1] ?? null,
+        unison_id_3: party.unisonCharacterIds[2] ?? null,
+        equipment_id_1: party.equipmentIds[0] ?? null,
+        equipment_id_2: party.equipmentIds[1] ?? null,
+        equipment_id_3: party.equipmentIds[2] ?? null,
+        ability_soul_id_1: party.abilitySoulIds[0] ?? null,
+        ability_soul_id_2: party.abilitySoulIds[1] ?? null,
+        ability_soul_id_3: party.abilitySoulIds[2] ?? null,
+        evolution_level_1: party.evolutionImgLevels[0] ?? null,
+        evolution_level_2: party.evolutionImgLevels[1] ?? null,
+        evolution_level_3: party.evolutionImgLevels[2] ?? null,
+        unison_evolution_level_1: party.unisonEvolutionImgLevels[0] ?? null,
+        unison_evolution_level_2: party.unisonEvolutionImgLevels[1] ?? null,
+        unison_evolution_level_3: party.unisonEvolutionImgLevels[2] ?? null,
+        player_id: playerId,
+        event_id: eventId,
+        round: party.round,
+        battle_type: party.battleType,
+    })
 }
 
 /**
@@ -642,7 +674,7 @@ export function updatePlayerRushEventPlayedPartySync(
         evolution_img_level_3 = ?,
         unison_evolution_img_level_1 = ?,
         unison_evolution_img_level_2 = ?,
-        unison_evolution_img_level_3 = ?,
+        unison_evolution_img_level_3 = ?
     WHERE player_id = ? AND event_id = ? AND round = ? AND battle_type = ?
     `).run(
         party.characterIds[0] ?? null,

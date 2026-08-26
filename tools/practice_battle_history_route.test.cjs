@@ -48,7 +48,7 @@ async function main() {
         expires: new Date("2099-01-01T00:00:00.000Z"),
         type: SessionType.VIEWER,
     })
-    insertPlayerPracticeBattleHistorySync({
+    const historyRecord = {
         playerId,
         playId: "route-practice-1",
         ability_soul_id_1: null,
@@ -80,7 +80,14 @@ async function main() {
         unison_character_id_1: null,
         unison_character_id_2: null,
         unison_character_id_3: null,
-    })
+    }
+    for (let index = 0; index < 31; index++) {
+        insertPlayerPracticeBattleHistorySync({
+            ...historyRecord,
+            playId: `route-practice-${index}`,
+            quest_id: index + 1,
+        })
+    }
 
     const routes = require("../src/routes/api/history").default
     const fastify = Fastify()
@@ -100,7 +107,8 @@ async function main() {
     })
     assert.equal(response.statusCode, 200, response.body)
     const decoded = unpack(Buffer.from(response.body, "base64"))
-    assert.equal(decoded.data.history.length, 1)
+    assert.equal(decoded.data.history.length, 30)
+    assert.equal(decoded.data.history[0].quest_id, 31)
     assert.equal(decoded.data.history[0].score, 12_345)
     assert.equal(Object.keys(decoded.data.history[0]).length, 29)
 

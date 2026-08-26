@@ -24,6 +24,8 @@ export async function projectMultiplayerFinishResponse(input: MultiplayerFinishR
         rewardCharacterExpResult,
         scoreRewardsResult,
         additionalRewardSettlement,
+        rescueFragmentSettlement,
+        rescueFragmentAdditionalReward,
         periodicRewardSettlement,
         sPlusClearReward,
         missionSettlement,
@@ -89,7 +91,10 @@ export async function projectMultiplayerFinishResponse(input: MultiplayerFinishR
         "clear_rank": clearRank ?? 5,
         "drop_score_reward_ids": scoreRewardsResult.drop_score_reward_ids,
         "drop_rare_reward_ids": scoreRewardsResult.drop_rare_reward_ids,
-        "drop_additional_reward_ids": additionalRewardSettlement.dropAdditionalRewardIds,
+        "drop_additional_reward_ids": [
+            ...additionalRewardSettlement.dropAdditionalRewardIds,
+            ...(rescueFragmentAdditionalReward === null ? [] : [rescueFragmentAdditionalReward]),
+        ],
         "drop_periodic_reward_ids": periodicRewardSettlement.dropPeriodicRewardIds,
         "equipment_list": [
             ...scoreRewardsResult.equipment_list,
@@ -103,6 +108,7 @@ export async function projectMultiplayerFinishResponse(input: MultiplayerFinishR
         "item_list": {
             ...scoreRewardsResult.items,
             ...(additionalRewardSettlement.rewardResult?.items ?? {}),
+            ...(rescueFragmentSettlement?.items ?? {}),
             ...periodicRewardSettlement.items,
         },
         "user_periodic_reward_point_list": periodicRewardSettlement.periodicRewardPointList,

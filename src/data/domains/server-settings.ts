@@ -3,16 +3,19 @@ import { getRealNow } from "../../runtime/time/game-time"
 
 export interface ServerGameplaySettings {
     readonly dropMultiplier: number
+    readonly multiRescueFragmentRewardsEnabled: boolean
     readonly updatedAt: string
 }
 
 interface RawServerGameplaySettings {
     readonly drop_multiplier: number
+    readonly multi_rescue_fragment_rewards_enabled: number
     readonly updated_at: string
 }
 
 export interface UpdateServerGameplaySettings {
     readonly dropMultiplier: number
+    readonly multiRescueFragmentRewardsEnabled?: boolean
 }
 
 function validateDropMultiplier(value: unknown): asserts value is number {
@@ -25,13 +28,14 @@ function mapSettings(row: RawServerGameplaySettings | undefined): ServerGameplay
     if (row === undefined) throw new Error("server gameplay settings are not initialized")
     return {
         dropMultiplier: row.drop_multiplier,
+        multiRescueFragmentRewardsEnabled: row.multi_rescue_fragment_rewards_enabled === 1,
         updatedAt: row.updated_at,
     }
 }
 
 export function getServerGameplaySettingsSync(): ServerGameplaySettings {
     const row = getDb().prepare(`
-        SELECT drop_multiplier, updated_at
+        SELECT drop_multiplier, multi_rescue_fragment_rewards_enabled, updated_at
         FROM server_gameplay_settings
         WHERE id = 1
     `).get() as RawServerGameplaySettings | undefined
@@ -42,12 +46,26 @@ export function updateServerGameplaySettingsSync(
     settings: UpdateServerGameplaySettings,
 ): ServerGameplaySettings {
     validateDropMultiplier(settings.dropMultiplier)
+    if (settings.multiRescueFragmentRewardsEnabled !== undefined
+        && typeof settings.multiRescueFragmentRewardsEnabled !== "boolean") {
+        throw new Error("invalid multi rescue fragment reward setting")
+    }
     const updatedAt = getRealNow().toISOString()
     const result = getDb().prepare(`
         UPDATE server_gameplay_settings
-        SET drop_multiplier = ?, updated_at = ?
+        SET drop_multiplier = ?,
+            multi_rescue_fragment_rewards_enabled = COALESCE(?, multi_rescue_fragment_rewards_enabled),
+            updated_at = ?
         WHERE id = 1
-    `).run(settings.dropMultiplier, updatedAt)
+    `).run(
+        settings.dropMultiplier,
+        settings.multiRescueFragmentRewardsEnabled === undefined
+            ? null : settings.multiRescueFragmentRewardsEnabled ? 1 : 0,
+        updatedAt,
+    )
     if (result.changes !== 1) throw new Error("server gameplay settings are not initialized")
-    return { dropMultiplier: settings.dropMultiplier, updatedAt }
+    return {
+        ...getServerGameplaySettingsSync(),
+        updatedAt,
+    }
 }

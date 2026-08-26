@@ -32,15 +32,18 @@ export default function init(
     database.prepare(`CREATE TABLE IF NOT EXISTS server_gameplay_settings (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         drop_multiplier INTEGER NOT NULL CHECK (drop_multiplier BETWEEN 1 AND 10),
+        multi_rescue_fragment_rewards_enabled INTEGER NOT NULL DEFAULT 1,
         updated_at TEXT NOT NULL
     )`).run()
+    ensureSchemaColumn(database, "server_gameplay_settings.multi_rescue_fragment_rewards_enabled")
     const gameplaySettingsExist = database.prepare(
         "SELECT 1 FROM server_gameplay_settings WHERE id = 1",
     ).get() !== undefined
     if (!gameplaySettingsExist) {
         database.prepare(`
-            INSERT INTO server_gameplay_settings (id, drop_multiplier, updated_at)
-            VALUES (1, ?, ?)
+            INSERT INTO server_gameplay_settings (
+                id, drop_multiplier, multi_rescue_fragment_rewards_enabled, updated_at
+            ) VALUES (1, ?, 1, ?)
         `).run(getInitialDropMultiplier(), getRealNow().toISOString())
     }
 

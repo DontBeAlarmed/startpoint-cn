@@ -129,7 +129,15 @@ export function recordMissionBattleResultSync(
             rank_ss_count, rank_s_count, rank_a_count, rank_b_count,
             challenge_dungeon_clear_count, single_score_max, single_clear_time_min,
             boss_battle_clear_count, skill_use_count
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (
+            @player_id, @single_play_count, @single_clear_count,
+            @multi_play_count, @multi_clear_count,
+            @multi_host_clear_count, @multi_guest_clear_count,
+            @single_rank_ss_count, @rank_ss_count, @rank_s_count,
+            @rank_a_count, @rank_b_count, @challenge_dungeon_clear_count,
+            @single_score_max, @single_clear_time_min,
+            @boss_battle_clear_count, @skill_use_count
+        )
         ON CONFLICT(player_id) DO UPDATE SET
             single_play_count = single_play_count + excluded.single_play_count,
             single_clear_count = single_clear_count + excluded.single_clear_count,
@@ -152,23 +160,23 @@ export function recordMissionBattleResultSync(
             END,
             boss_battle_clear_count = boss_battle_clear_count + excluded.boss_battle_clear_count,
             skill_use_count = skill_use_count + excluded.skill_use_count
-    `).run(
-        playerId,
-        singlePlay,
-        singleClear,
-        multiPlay,
-        multiClear,
-        multiHostClear,
-        multiGuestClear,
-        singleRankSs,
-        rankSs,
-        rankS,
-        rankA,
-        rankB,
-        challengeDungeonClear,
-        singleScore,
-        singleClearTime,
-        bossBattleClear,
-        skillUseCount,
-    )
+    `).run({
+        player_id: playerId,
+        single_play_count: singlePlay,
+        single_clear_count: singleClear,
+        multi_play_count: multiPlay,
+        multi_clear_count: multiClear,
+        multi_host_clear_count: multiHostClear,
+        multi_guest_clear_count: multiGuestClear,
+        single_rank_ss_count: singleRankSs,
+        rank_ss_count: rankSs,
+        rank_s_count: rankS,
+        rank_a_count: rankA,
+        rank_b_count: rankB,
+        challenge_dungeon_clear_count: challengeDungeonClear,
+        single_score_max: singleScore,
+        single_clear_time_min: singleClearTime,
+        boss_battle_clear_count: bossBattleClear,
+        skill_use_count: skillUseCount,
+    })
 }

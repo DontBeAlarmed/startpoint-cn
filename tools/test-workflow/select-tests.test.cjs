@@ -302,6 +302,18 @@ test("maps representative source files to focused groups", () => {
         ["integration:multi-hub", "quick:protocol"],
     )
     assert.deepEqual(
+        selectTestGroups(["src/multi/rescue-fragment-reward.ts"]),
+        ["integration:multi-hub", "integration:party", "quick:protocol"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/multi/settlement/orchestrator.ts"]),
+        ["integration:multi-hub", "integration:party", "quick:protocol"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/data/domains/mission.ts"]),
+        ["full", "integration:database", "integration:mission"],
+    )
+    assert.deepEqual(
         selectTestGroups(["tools/multi_coordinator_contract.test.cjs"]),
         ["quick:protocol"],
     )
@@ -1230,6 +1242,7 @@ test("routes active mission focused metrics, baseline, and production boundaries
     assert.deepEqual(selectTestGroups(["src/data/domains/mission.ts"]), [
         "full",
         "integration:database",
+        "integration:mission",
     ])
     for (const file of [
         "tools/active_mission_evaluator_equivalence.test.cjs",
@@ -1327,6 +1340,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/admin_player_actions.test.cjs",
         "tools/history_receive_route.test.cjs",
         "tools/mail_receive_transaction.test.cjs",
+        "tools/mission_category_batch_read.test.cjs",
         "tools/player_history_profile_route.test.cjs",
         "tools/player_save_v2.test.cjs",
         "tools/scheduled_resource_storage.test.cjs",
@@ -1337,6 +1351,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/test-workflow/database-lifecycle.test.cjs",
         "tools/test-workflow/runtime-data-paths.test.cjs",
         "tools/stamina_serialization.test.cjs",
+        "tools/sql_write_shape.test.cjs",
     ])
     assert.deepEqual(TEST_GROUPS["integration:event"].tests, [
         "tools/box_gacha_exec_transaction.test.cjs",
@@ -1526,6 +1541,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/multi_battle_lifecycle.test.cjs",
         "tools/perf/multi_settlement_baseline.test.cjs",
         "tools/perf/multi_snapshot_baseline.test.cjs",
+        "tools/rescue_fragment_reward.test.cjs",
         "tools/special_quest_party.test.cjs",
     ])
 })

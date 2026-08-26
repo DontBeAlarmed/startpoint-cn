@@ -813,6 +813,8 @@ test("production /finish settles activity hard multi periodic rewards for host a
             ])
             assert.equal(response.item_list[40405], 9)
             assert.equal(getPlayerItemSync(home.playerId, 40405), 9)
+            assert.equal(response.item_list[49002], 10)
+            assert.equal(getPlayerItemSync(home.playerId, 49002), 10)
             assert.equal(
                 getPlayerPeriodicRewardPointsSync(home.playerId)
                     .find(entry => entry.id === 10000002)?.point,

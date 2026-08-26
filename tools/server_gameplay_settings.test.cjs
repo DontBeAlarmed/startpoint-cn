@@ -42,9 +42,9 @@ test("initializes the singleton gameplay settings row from the legacy environmen
     assert.deepEqual(table, { name: "server_gameplay_settings" })
     assert.deepEqual(
         getDb().prepare(
-            "SELECT id, drop_multiplier FROM server_gameplay_settings WHERE id = 1",
+            "SELECT id, drop_multiplier, multi_rescue_fragment_rewards_enabled FROM server_gameplay_settings WHERE id = 1",
         ).get(),
-        { id: 1, drop_multiplier: 10 },
+        { id: 1, drop_multiplier: 10, multi_rescue_fragment_rewards_enabled: 1 },
     )
 
     getDb().prepare(
@@ -78,8 +78,13 @@ test("gameplay settings domain and API persist only validated integer multiplier
     const settingsRoutes = require(routePath).default
 
     assert.equal(getServerGameplaySettingsSync().dropMultiplier, 1)
-    const updated = updateServerGameplaySettingsSync({ dropMultiplier: 7 })
+    assert.equal(getServerGameplaySettingsSync().multiRescueFragmentRewardsEnabled, true)
+    const updated = updateServerGameplaySettingsSync({
+        dropMultiplier: 7,
+        multiRescueFragmentRewardsEnabled: false,
+    })
     assert.equal(updated.dropMultiplier, 7)
+    assert.equal(updated.multiRescueFragmentRewardsEnabled, false)
     assert.match(updated.updatedAt, /^\d{4}-\d{2}-\d{2}T/)
     for (const value of [0, 11, 1.5, NaN, "10", null, undefined]) {
         assert.throws(
@@ -89,6 +94,7 @@ test("gameplay settings domain and API persist only validated integer multiplier
         )
     }
     assert.equal(getServerGameplaySettingsSync().dropMultiplier, 7)
+    assert.equal(getServerGameplaySettingsSync().multiRescueFragmentRewardsEnabled, false)
 
     const fastify = Fastify()
     t.after(() => fastify.close())
@@ -108,6 +114,16 @@ test("gameplay settings domain and API persist only validated integer multiplier
     })
     assert.equal(saved.statusCode, 200)
     assert.equal(saved.json().dropMultiplier, 8)
+    assert.equal(saved.json().multiRescueFragmentRewardsEnabled, false)
+
+    const rescueEnabled = await fastify.inject({
+        method: "PATCH",
+        url: "/api/server/settings/gameplay",
+        payload: { multiRescueFragmentRewardsEnabled: true },
+    })
+    assert.equal(rescueEnabled.statusCode, 200)
+    assert.equal(rescueEnabled.json().dropMultiplier, 8)
+    assert.equal(rescueEnabled.json().multiRescueFragmentRewardsEnabled, true)
 
     for (const payload of [
         null,
@@ -115,6 +131,7 @@ test("gameplay settings domain and API persist only validated integer multiplier
         { dropMultiplier: "10" },
         { dropMultiplier: 0 },
         { dropMultiplier: 11 },
+        { multiRescueFragmentRewardsEnabled: "true" },
         { dropMultiplier: 2, unexpected: true },
     ]) {
         const rejected = await fastify.inject({
@@ -126,6 +143,7 @@ test("gameplay settings domain and API persist only validated integer multiplier
         assert.equal(rejected.statusCode, 400, JSON.stringify(payload))
     }
     assert.equal(getServerGameplaySettingsSync().dropMultiplier, 8)
+    assert.equal(getServerGameplaySettingsSync().multiRescueFragmentRewardsEnabled, true)
 })
 
 test("quest score rewards use the persisted multiplier instead of DROP_MULTIPLIER", t => {

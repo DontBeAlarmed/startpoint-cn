@@ -1,5 +1,6 @@
 import { Database as BetterSqlite3Database } from "better-sqlite3"
 import { PartyCategory, PlayerParty, PlayerPartyGroup } from "../data/types"
+import { buildPartyWriteParameters, PARTY_WRITE_VALUES } from "./party-write-parameters"
 
 const PRUNED_SPECIAL_EVENT_CATEGORIES = [PartyCategory.CARNIVAL, PartyCategory.RUSH]
 const MAX_SPECIAL_EVENT_PARTY_GROUP_ID = 6
@@ -28,16 +29,8 @@ function insertMissingPartySync(
         unison_character_1, unison_character_2, unison_character_3, equipment_1, equipment_2,
         equipment_3, ability_soul_1, ability_soul_2, ability_soul_3, edited, player_id, group_id, category,
         current_battle_power, before_battle_power)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-        Number(slot), party.name,
-        party.characterIds[0] || null, party.characterIds[1] || null, party.characterIds[2] || null,
-        party.unisonCharacterIds[0] || null, party.unisonCharacterIds[1] || null, party.unisonCharacterIds[2] || null,
-        party.equipmentIds[0] || null, party.equipmentIds[1] || null, party.equipmentIds[2] || null,
-        party.abilitySoulIds[0] || null, party.abilitySoulIds[1] || null, party.abilitySoulIds[2] || null,
-        party.edited ? 1 : 0, playerId, Number(groupId), party.category,
-        party.currentBattlePower ?? 0, party.beforeBattlePower ?? 0,
-    )
+    VALUES (${PARTY_WRITE_VALUES})
+    `).run(buildPartyWriteParameters(playerId, groupId, slot, party))
 }
 
 export function insertMissingPartyGroupListSync(

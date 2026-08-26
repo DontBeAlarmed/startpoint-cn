@@ -39,15 +39,29 @@ export function insertPlayerActiveQuestSync(playerId: number, quest: PlayerActiv
              use_boost_point, is_auto_start_mode, is_multi, room_number,
              battle_session_id, coordinator_origin, entry_item_id, entry_item_count,
              event_id, continue_count)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-        playerId, quest.playId, quest.questId, quest.category,
-        quest.useBossBoostPoint ? 1 : 0, quest.useBoostPoint ? 1 : 0,
-        quest.isAutoStartMode ? 1 : 0, quest.isMulti ? 1 : 0,
-        quest.roomNumber ?? null, quest.battleSessionId ?? null, coordinatorOrigin,
-        quest.entryItemId ?? null,
-        quest.entryItemCount ?? null, quest.eventId ?? null, quest.continueCount
-    )
+        VALUES (
+            @player_id, @play_id, @quest_id, @category, @use_boss_boost_point,
+            @use_boost_point, @is_auto_start_mode, @is_multi, @room_number,
+            @battle_session_id, @coordinator_origin, @entry_item_id,
+            @entry_item_count, @event_id, @continue_count
+        )
+    `).run({
+        player_id: playerId,
+        play_id: quest.playId,
+        quest_id: quest.questId,
+        category: quest.category,
+        use_boss_boost_point: quest.useBossBoostPoint ? 1 : 0,
+        use_boost_point: quest.useBoostPoint ? 1 : 0,
+        is_auto_start_mode: quest.isAutoStartMode ? 1 : 0,
+        is_multi: quest.isMulti ? 1 : 0,
+        room_number: quest.roomNumber ?? null,
+        battle_session_id: quest.battleSessionId ?? null,
+        coordinator_origin: coordinatorOrigin,
+        entry_item_id: quest.entryItemId ?? null,
+        entry_item_count: quest.entryItemCount ?? null,
+        event_id: quest.eventId ?? null,
+        continue_count: quest.continueCount,
+    })
 }
 
 export function updatePlayerActiveQuestCoordinatorOriginSync(

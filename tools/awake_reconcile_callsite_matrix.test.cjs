@@ -62,7 +62,7 @@ const AUTHORITATIVE_WRITE_SETS = Object.freeze({
     "multi/finish": Object.freeze([
         "givePlayerRewardSync", "updatePlayerQuestProgressSync", "insertPlayerQuestProgressSync",
         "updatePlayerSync", "givePlayerScoreRewardsSync", "settleAdditionalRewardsSync",
-        "settleActivityPeriodicRewardsSync", "recordMissionBattleFacts",
+        "settleRescueFragmentReward", "settleActivityPeriodicRewardsSync", "recordMissionBattleFacts",
         "givePlayerCharactersExpSync", "settleMissionCategoriesWithEvaluation",
         "settleAwakeMissionCandidatesWithEvaluation", "finalizeMultiAwakePublicationWrites",
     ]),

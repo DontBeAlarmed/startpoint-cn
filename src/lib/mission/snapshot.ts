@@ -73,16 +73,32 @@ export function takeSnapshot(playerId: number, periodType: string, data: Snapsho
          single_play_count, single_clear_count, multi_play_count, multi_clear_count,
          multi_host_clear_count, multi_guest_clear_count, dash_count, power_flip_count,
          login_days, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-    `).run(
-        playerId, periodType,
-        data.questClears, data.staminaUsed,
-        data.rankSs, data.rankS, data.rankA, data.rankB,
-        data.singlePlayCount, data.singleClearCount,
-        data.multiPlayCount, data.multiClearCount,
-        data.multiHostClearCount, data.multiGuestClearCount,
-        data.dashCount, data.powerFlipCount, data.loginDays,
+    VALUES (
+        @player_id, @period_type, @quest_clears, @stamina_used,
+        @rank_ss, @rank_s, @rank_a, @rank_b,
+        @single_play_count, @single_clear_count, @multi_play_count,
+        @multi_clear_count, @multi_host_clear_count, @multi_guest_clear_count,
+        @dash_count, @power_flip_count, @login_days, datetime('now')
     )
+    `).run({
+        player_id: playerId,
+        period_type: periodType,
+        quest_clears: data.questClears,
+        stamina_used: data.staminaUsed,
+        rank_ss: data.rankSs,
+        rank_s: data.rankS,
+        rank_a: data.rankA,
+        rank_b: data.rankB,
+        single_play_count: data.singlePlayCount,
+        single_clear_count: data.singleClearCount,
+        multi_play_count: data.multiPlayCount,
+        multi_clear_count: data.multiClearCount,
+        multi_host_clear_count: data.multiHostClearCount,
+        multi_guest_clear_count: data.multiGuestClearCount,
+        dash_count: data.dashCount,
+        power_flip_count: data.powerFlipCount,
+        login_days: data.loginDays,
+    })
 }
 
 export function getSnapshot(playerId: number, periodType: string): SnapshotData | null {

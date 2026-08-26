@@ -55,20 +55,24 @@ export function insertMailSync(
 ): number {
     const result = getDb().prepare(`
         INSERT INTO players_mails (player_id, reason_id, subject, description, type, type_id, number, receive_time, create_time, reward_period_limited, reward_limit_time)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-        playerId,
-        mail.reason_id,
-        mail.subject,
-        mail.description,
-        mail.type,
-        mail.type_id,
-        mail.number,
-        mail.receive_time,
-        mail.create_time,
-        mail.reward_period_limited,
-        mail.reward_limit_time
-    )
+        VALUES (
+            @player_id, @reason_id, @subject, @description, @type, @type_id,
+            @number, @receive_time, @create_time, @reward_period_limited,
+            @reward_limit_time
+        )
+    `).run({
+        player_id: playerId,
+        reason_id: mail.reason_id,
+        subject: mail.subject,
+        description: mail.description,
+        type: mail.type,
+        type_id: mail.type_id,
+        number: mail.number,
+        receive_time: mail.receive_time,
+        create_time: mail.create_time,
+        reward_period_limited: mail.reward_period_limited,
+        reward_limit_time: mail.reward_limit_time,
+    })
     return Number(result.lastInsertRowid)
 }
 

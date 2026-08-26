@@ -54,6 +54,9 @@ import {
 import type { BattleSessionId } from "../coordinator/contracts"
 import type { MultiHttpContext } from "../http/context"
 import type { MultiFinishBody } from "../types"
+import {
+    settleRescueFragmentReward,
+} from "../rescue-fragment-reward"
 
 export interface MultiplayerSettlementPreparationInput {
     readonly body: MultiFinishBody
@@ -356,6 +359,7 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
                 rewardDate: settlementTime,
             },
         )
+        const gameplaySettings = getServerGameplaySettingsSync()
         const additionalRewardSettlement = questAccomplished
             ? settleAdditionalRewardsSync(
                 getRuntimeContentTableSync(
@@ -377,11 +381,17 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
                     ),
                     rewardCampaignRates,
                     boostPointUsed: useBoostPoint,
-                    serverDropMultiplier: getServerGameplaySettingsSync().dropMultiplier,
+                    serverDropMultiplier: gameplaySettings.dropMultiplier,
                 },
                 { grantRewards: rewards => givePlayerRewardsSync(input.playerId, rewards) },
             )
             : { dropAdditionalRewardIds: [], rewardResult: null }
+        const rescueFragment = settleRescueFragmentReward({
+            enabled: gameplaySettings.multiRescueFragmentRewardsEnabled,
+            questAccomplished,
+            questCategory,
+            questId,
+        }, rewards => givePlayerRewardsSync(input.playerId, [...rewards]))
         const periodicRewardSettlement = settleActivityPeriodicRewardsSync({
             playerId: input.playerId,
             questCategory,
@@ -467,6 +477,8 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             rewardCharacterExpResult,
             scoreRewardsResult,
             additionalRewardSettlement,
+            rescueFragmentSettlement: rescueFragment.rewardResult,
+            rescueFragmentAdditionalReward: rescueFragment.additionalReward,
             periodicRewardSettlement,
             sPlusClearReward,
             missionSettlement,

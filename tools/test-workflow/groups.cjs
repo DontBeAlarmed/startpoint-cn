@@ -335,6 +335,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/admin_player_actions.test.cjs",
             "tools/history_receive_route.test.cjs",
             "tools/mail_receive_transaction.test.cjs",
+            "tools/mission_category_batch_read.test.cjs",
             "tools/player_history_profile_route.test.cjs",
             "tools/player_save_v2.test.cjs",
             "tools/scheduled_resource_storage.test.cjs",
@@ -345,6 +346,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/test-workflow/database-lifecycle.test.cjs",
             "tools/test-workflow/runtime-data-paths.test.cjs",
             "tools/stamina_serialization.test.cjs",
+            "tools/sql_write_shape.test.cjs",
         ],
     },
     "integration:event": {
@@ -549,6 +551,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/multi_battle_lifecycle.test.cjs",
             "tools/perf/multi_settlement_baseline.test.cjs",
             "tools/perf/multi_snapshot_baseline.test.cjs",
+            "tools/rescue_fragment_reward.test.cjs",
             "tools/special_quest_party.test.cjs",
         ],
     },
