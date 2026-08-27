@@ -115,7 +115,20 @@ const INDEX_CASES = [
             ORDER BY create_time DESC, id DESC
             LIMIT ? OFFSET ?
         `,
-        parameters: fixture => [fixture.playerId, "2024-08-01 00:00:00", 10, 5],
+            parameters: fixture => [fixture.playerId, "2024-08-01 00:00:00", 10, 5],
+    },
+    {
+        name: "idx_receive_history_created",
+        table: "players_receive_history",
+        columns: [["create_time", 0], ["id", 0]],
+        query: `
+            SELECT id
+            FROM players_receive_history
+            WHERE create_time < ?
+            ORDER BY create_time, id
+            LIMIT ?
+        `,
+        parameters: () => ["2024-08-01 00:00:00", 100],
     },
 ]
 

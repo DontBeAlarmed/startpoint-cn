@@ -13,7 +13,7 @@
 
 邮件是否未领取以 `receive_time = '0000-00-00 00:00:00'` 判断。领取记录会写入 `players_receive_history`。
 
-邮件有效期沿用客户端协议的 `reward_period_limited` 与 `reward_limit_time` 字段。`reward_period_limited=0` 或没有到期时间表示永久有效；后台发送的邮件默认有效 31 天，也允许配置 1～3650 天。到期时间使用发送时的虚拟服务器时间计算，服务端在邮箱列表、单封领取和批量领取入口以同一规则批量删除过期邮件；已领取历史不会被删除。
+邮件有效期沿用客户端协议的 `reward_period_limited` 与 `reward_limit_time` 字段。`reward_period_limited=0` 或没有到期时间表示永久有效；后台发送的邮件默认有效 31 天，也允许配置 1～3650 天。到期时间使用发送时的虚拟服务器时间计算，服务端在邮箱列表、单封领取和批量领取入口以同一规则批量删除过期邮件；已领取历史不会随邮件过期删除，只由独立的保留任务做有界清理（见下文）。
 
 单领和全领都以 SQLite 外层事务覆盖附件发放、`players_receive_history`、邮件领取时间和角色觉醒解锁响应。事务内读取一次权威 Player 前态，标准附件交给 RewardGrant owner 执行，专用附件复用同一前态；owner 不查询 Player，也不建立 plan savepoint。任一步骤异常会回滚整个请求；批量请求中的重复 `mail_id` 只处理一次，不会重复发奖。已经领取或不存在的 ID 仍计入 `already_mail_count`，不会使其他合法邮件失败。
 
@@ -76,6 +76,10 @@
 单封领取使用 `getPlayerMailSync(playerId, mailId, true)` 定点读取目标邮件，不再为了查找一个 ID 扫描最多 1000 封未领取邮件。`receive_all` 使用一次 `id IN (...)` 查询请求中的唯一 ID 集合，再复用已读到的邮件对象完成奖励和条件更新；因此不会对每封邮件再次执行状态查询。邮件领取仍由 `receive_time` 条件更新确认并发，状态变化会使最外层事务回滚。
 
 本次优化保持列表分页接口不变，也保持重复、已领取和不存在 ID 的原有计数语义。默认混合基线中邮件入口仍为 0 错误、行为签名稳定、回滚验证通过；该小基线不是正式并发准入测试。
+
+## 领取历史保留
+
+服务启动时会开启一个每日运行的 `players_receive_history` 保留任务：先分批删除超过保留期的旧行，再按存档保留最新的行，单批写入量有上界。默认保留 31 天、每存档最多 500 条；可用 `RECEIVE_HISTORY_RETENTION_ENABLED`（设为 `0`/`false`/`off`/`no` 关闭）、`RECEIVE_HISTORY_RETENTION_MAX_AGE_DAYS`、`RECEIVE_HISTORY_RETENTION_MAX_ROWS` 覆盖，非法值回退默认。历史读取按最近 7 天窗口和分页上限进行，正常玩法不受清理影响；清理使用真实时间，与 `create_time` 的写入时钟一致。
 
 ## 存档与恢复边界
 

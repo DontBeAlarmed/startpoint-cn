@@ -260,6 +260,10 @@ const SOURCE_RULES = [
         groups: ["integration:reward-grant", "integration:rules"],
     },
     {
+        pattern: /^src\/lib\/receive-history-retention\.ts$/,
+        groups: ["integration:database"],
+    },
+    {
         pattern: /^src\/routes\/api\/gacha\.ts$/,
         groups: ["integration:reward-grant", "integration:rules", "quick:gacha"],
     },

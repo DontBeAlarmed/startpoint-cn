@@ -472,6 +472,10 @@ export default function init(
         ON players_receive_history (player_id, create_time DESC, id DESC)
     `).run()
 
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_receive_history_created
+        ON players_receive_history (create_time, id)
+    `).run()
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_cleared_regular_missions (
         id INTEGER NOT NULL,
         value INTEGER NOT NULL,

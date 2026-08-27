@@ -87,6 +87,10 @@ import characterElectionApiPlugin from "./routes/api/characterElection";
 import bonusApiPlugin from "./routes/api/bonus";
 import { installTakeoverUdidGuard } from "./lib/takeover-access";
 import { AccountCleanupService } from "./lib/account-cleanup";
+import {
+    ReceiveHistoryRetentionService,
+    resolveReceiveHistoryRetentionConfig,
+} from "./lib/receive-history-retention";
 const fastify = Fastify({
     logger: {
         level: "info"
@@ -101,6 +105,11 @@ let multiManagementService: MultiManagementService | null = null;
 const serverTimeService = new ServerTimeService();
 const gachaSeedQuarantine = getDefaultGachaSeedQuarantine();
 const accountCleanupService = new AccountCleanupService();
+const receiveHistoryRetentionService = new ReceiveHistoryRetentionService(
+    () => getDatabase(Database.WDFP_DATA),
+    resolveReceiveHistoryRetentionConfig(),
+    { getNow: () => getRealNow() },
+);
 
 // Simple in-memory rate limiter for /crash endpoint only.
 // /debug is excluded — game client sends heavy beacon traffic during normal startup.
@@ -412,9 +421,11 @@ runtimeCoordinator = createRuntimeCoordinator({
     readyHttp: async () => {
         await fastify.ready();
         accountCleanupService.start();
+        receiveHistoryRetentionService.start();
     },
     listenHttp: config => fastify.listen({ ...config.http }),
     closeHttp: async () => {
+        await receiveHistoryRetentionService.stop();
         accountCleanupService.stop();
         await fastify.close();
     },
