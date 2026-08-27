@@ -65,6 +65,8 @@ function createHarness(itemBalance = 20) {
     db.exec(`
         CREATE TABLE player_state (
             id INTEGER PRIMARY KEY,
+            vmoney INTEGER NOT NULL,
+            paid_mana INTEGER NOT NULL,
             free_mana INTEGER NOT NULL,
             free_vmoney INTEGER NOT NULL,
             bond_token INTEGER NOT NULL,
@@ -85,7 +87,7 @@ function createHarness(itemBalance = 20) {
             count INTEGER NOT NULL,
             PRIMARY KEY (player_id, shop_type, shop_item_id, period_type, period_key)
         );
-        INSERT INTO player_state VALUES (7, 500, 20, 3, 0);
+        INSERT INTO player_state VALUES (7, 0, 0, 500, 20, 3, 0);
         INSERT INTO item_state VALUES (7, 10, ${itemBalance});
     `)
 
@@ -98,6 +100,8 @@ function createHarness(itemBalance = 20) {
         const row = db.prepare("SELECT * FROM player_state WHERE id = ?").get(playerId)
         return row === undefined ? null : {
             id: row.id,
+            vmoney: row.vmoney,
+            paidMana: row.paid_mana,
             freeMana: row.free_mana,
             freeVmoney: row.free_vmoney,
             bondToken: row.bond_token,
@@ -147,9 +151,18 @@ function createHarness(itemBalance = 20) {
             updatePlayer(player) {
                 db.prepare(`
                     UPDATE player_state
-                    SET free_mana = ?, free_vmoney = ?, bond_token = ?, exp_pool = ?
+                    SET vmoney = ?, paid_mana = ?, free_mana = ?, free_vmoney = ?,
+                        bond_token = ?, exp_pool = ?
                     WHERE id = ?
-                `).run(player.freeMana, player.freeVmoney, player.bondToken, player.expPool, player.id)
+                `).run(
+                    player.vmoney,
+                    player.paidMana,
+                    player.freeMana,
+                    player.freeVmoney,
+                    player.bondToken,
+                    player.expPool,
+                    player.id,
+                )
             },
             getItem,
             setItem(playerId, itemId, amount) {

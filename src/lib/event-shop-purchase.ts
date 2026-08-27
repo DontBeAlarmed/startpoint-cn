@@ -20,12 +20,14 @@ import type {
     ShopPurchaseQuery,
 } from "../data/domains/shopPurchase"
 import { getDayBucket } from "./time-utils"
+import { planFreeFirstDeduction } from "./economy/free-first-deduction"
 
 export const ITEM_SHOP_PERIOD_ERROR_CODE = 2053
 
 export interface GenericShopPlayerState {
     id: number
     vmoney: number
+    paidMana: number
     freeMana: number
     freeVmoney: number
     bondToken: number
@@ -395,14 +397,28 @@ export function executeGenericShopPurchaseSync(
         if (userCost !== undefined) {
             const cost = userCost.amount * purchaseAmount
             switch (userCost.type) {
-                case ShopItemUserCostType.MANA:
-                    nextPlayer.freeMana -= cost
-                    if (nextPlayer.freeMana < 0) throw new ShopBalanceError("Not enough mana.")
+                case ShopItemUserCostType.MANA: {
+                    const deduction = planFreeFirstDeduction(
+                        nextPlayer.freeMana,
+                        nextPlayer.paidMana,
+                        cost,
+                    )
+                    if (deduction === null) throw new ShopBalanceError("Not enough mana.")
+                    nextPlayer.freeMana = deduction.freeBalance
+                    nextPlayer.paidMana = deduction.paidBalance
                     break
-                case ShopItemUserCostType.BEADS:
-                    nextPlayer.freeVmoney -= cost
-                    if (nextPlayer.freeVmoney < 0) throw new ShopBalanceError("Not enough beads.")
+                }
+                case ShopItemUserCostType.BEADS: {
+                    const deduction = planFreeFirstDeduction(
+                        nextPlayer.freeVmoney,
+                        nextPlayer.vmoney,
+                        cost,
+                    )
+                    if (deduction === null) throw new ShopBalanceError("Not enough beads.")
+                    nextPlayer.freeVmoney = deduction.freeBalance
+                    nextPlayer.vmoney = deduction.paidBalance
                     break
+                }
                 case ShopItemUserCostType.AMITY_SCROLL:
                     nextPlayer.bondToken -= cost
                     if (nextPlayer.bondToken < 0) throw new ShopBalanceError("Not enough amity scrolls.")
@@ -546,15 +562,34 @@ export function executeGenericShopBatchPurchaseSync(
             if (userCost !== undefined) {
                 const cost = userCost.amount * entry.purchaseAmount
                 switch (userCost.type) {
-                    case ShopItemUserCostType.MANA:
-                        nextPlayer.freeMana -= cost
+                    case ShopItemUserCostType.MANA: {
+                        const deduction = planFreeFirstDeduction(
+                            nextPlayer.freeMana,
+                            nextPlayer.paidMana,
+                            cost,
+                        )
+                        if (deduction === null) throw new ShopBalanceError("Not enough mana.")
+                        nextPlayer.freeMana = deduction.freeBalance
+                        nextPlayer.paidMana = deduction.paidBalance
                         manaSpent += cost
                         break
-                    case ShopItemUserCostType.BEADS:
-                        nextPlayer.freeVmoney -= cost
+                    }
+                    case ShopItemUserCostType.BEADS: {
+                        const deduction = planFreeFirstDeduction(
+                            nextPlayer.freeVmoney,
+                            nextPlayer.vmoney,
+                            cost,
+                        )
+                        if (deduction === null) throw new ShopBalanceError("Not enough beads.")
+                        nextPlayer.freeVmoney = deduction.freeBalance
+                        nextPlayer.vmoney = deduction.paidBalance
                         break
+                    }
                     case ShopItemUserCostType.AMITY_SCROLL:
                         nextPlayer.bondToken -= cost
+                        break
+                    case ShopItemUserCostType.PAID_BEADS:
+                        nextPlayer.vmoney -= cost
                         break
                 }
             }
@@ -567,8 +602,7 @@ export function executeGenericShopBatchPurchaseSync(
             rewards.push(...buildRewards(entry.shopItem, entry.purchaseAmount))
         }
 
-        if (nextPlayer.freeMana < 0) throw new ShopBalanceError("Not enough mana.")
-        if (nextPlayer.freeVmoney < 0) throw new ShopBalanceError("Not enough beads.")
+        if (nextPlayer.vmoney < 0) throw new ShopBalanceError("Not enough paid beads.")
         if (nextPlayer.bondToken < 0) throw new ShopBalanceError("Not enough amity scrolls.")
 
         const itemList: Record<string, number> = {}

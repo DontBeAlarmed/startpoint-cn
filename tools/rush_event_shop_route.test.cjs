@@ -56,6 +56,8 @@ const db = new Database(":memory:")
 db.exec(`
     CREATE TABLE player_state (
         id INTEGER PRIMARY KEY,
+        vmoney INTEGER NOT NULL,
+        paid_mana INTEGER NOT NULL,
         free_mana INTEGER NOT NULL,
         free_vmoney INTEGER NOT NULL,
         bond_token INTEGER NOT NULL,
@@ -95,7 +97,7 @@ db.exec(`
         lineup_id INTEGER NOT NULL,
         PRIMARY KEY (player_id, shop_type, campaign_id)
     );
-    INSERT INTO player_state VALUES (17, 1000, 100, 20, 50);
+    INSERT INTO player_state VALUES (17, 0, 0, 1000, 100, 20, 50);
     INSERT INTO item_state VALUES (17, 2370001, 1000);
     INSERT INTO item_state VALUES (17, 49100, 3);
     INSERT INTO item_state VALUES (17, 40401, 5);
@@ -108,6 +110,8 @@ function getPlayer(playerId) {
     const row = db.prepare("SELECT * FROM player_state WHERE id = ?").get(playerId)
     return row === undefined ? null : {
         id: row.id,
+        vmoney: row.vmoney,
+        paidMana: row.paid_mana,
         freeMana: row.free_mana,
         freeVmoney: row.free_vmoney,
         bondToken: row.bond_token,
@@ -250,9 +254,12 @@ stubModule("../src/data/domains/player", {
         const current = getPlayer(player.id)
         db.prepare(`
             UPDATE player_state
-            SET free_mana = ?, free_vmoney = ?, bond_token = ?, exp_pool = ?
+            SET vmoney = ?, paid_mana = ?, free_mana = ?, free_vmoney = ?,
+                bond_token = ?, exp_pool = ?
             WHERE id = ?
         `).run(
+            player.vmoney ?? current.vmoney,
+            player.paidMana ?? current.paidMana,
             player.freeMana ?? current.freeMana,
             player.freeVmoney ?? current.freeVmoney,
             player.bondToken ?? current.bondToken,
@@ -541,13 +548,19 @@ async function main() {
             delete eventItemShopAsset["11"]["700011"]
         }
 
+        db.prepare("UPDATE player_state SET free_vmoney = 20, vmoney = 40 WHERE id = 17").run()
         const staminaRecovery = await fastify.inject({
             method: "POST",
             url: "/recover_stamina",
             payload: { viewer_id: 123 },
         })
         assert.equal(staminaRecovery.statusCode, 200, staminaRecovery.body)
-        assert.equal(decode(staminaRecovery).data.mail_arrived, true)
+        const staminaRecoveryBody = decode(staminaRecovery)
+        assert.equal(staminaRecoveryBody.data.mail_arrived, true)
+        assert.equal(staminaRecoveryBody.data.user_info.free_vmoney, 0)
+        assert.equal(staminaRecoveryBody.data.user_info.vmoney, 10)
+        assert.equal(getPlayer(17).freeVmoney, 0)
+        assert.equal(getPlayer(17).vmoney, 10)
 
         globalNowSeconds = Date.parse("2025-06-26T11:59:59+08:00") / 1000
         assert.equal((await getRushSales(fastify, 11, 700011)).length, 0)
@@ -724,6 +737,7 @@ async function main() {
         const enhancementItem = equipmentEnhancementShopAsset["2001"]
         enhancementItem.userCost = { type: 1, amount: 30 }
         const grantsBeforeEnhancement = shopRewardGrantCalls
+        db.prepare("UPDATE player_state SET free_mana = 10, paid_mana = 100 WHERE id = 17").run()
         try {
             const enhancementPurchase = await fastify.inject({
                 method: "POST",
@@ -731,6 +745,11 @@ async function main() {
                 payload: { viewer_id: 123, shop_type: 10, shop_item_id: 2001, number: 1 },
             })
             assert.equal(enhancementPurchase.statusCode, 200, enhancementPurchase.body)
+            const enhancementBody = decode(enhancementPurchase)
+            assert.equal(enhancementBody.data.user_info.free_mana, 0)
+            assert.equal(enhancementBody.data.user_info.paid_mana, 80)
+            assert.equal(getPlayer(17).freeMana, 0)
+            assert.equal(getPlayer(17).paidMana, 80)
             assert.equal(
                 getUsedManaCount(17),
                 31,

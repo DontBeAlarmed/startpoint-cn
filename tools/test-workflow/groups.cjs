@@ -285,6 +285,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/equipment_enhancement.test.cjs",
             "tools/economy_write_transaction.test.cjs",
             "tools/event_currency.test.cjs",
+            "tools/free_first_deduction.test.cjs",
             "tools/gacha_write_transaction.test.cjs",
             "tools/item_sell_awake_publication.test.cjs",
             "tools/item_use_cultivate_pack.test.cjs",

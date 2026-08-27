@@ -8,6 +8,7 @@ const test = require("node:test")
 const {
     executeGenericShopBatchPurchaseSync,
     executeGenericShopPurchaseSync,
+    ShopBalanceError,
 } = require("../src/lib/event-shop-purchase")
 const {
     RewardType,
@@ -20,15 +21,17 @@ const CHARACTER_ID = 1
 const DUPLICATE_ITEM_ID = 14002
 const EQUIPMENT_ID = 3010006
 
-function createHarness(failAt) {
+function createHarness(failAt, playerOverrides = {}) {
     let state = {
         player: {
             id: 7,
             vmoney: 50,
+            paidMana: 0,
             freeMana: 500,
             freeVmoney: 20,
             bondToken: 3,
             expPool: 10,
+            ...playerOverrides,
         },
         items: { 10: 40 },
         purchaseCounts: {},
@@ -150,6 +153,8 @@ function createHarness(failAt) {
                 }
             }
             const playerAfter = {
+                vmoney: state.player.vmoney,
+                paidMana: state.player.paidMana,
                 freeMana: state.player.freeMana,
                 freeVmoney: state.player.freeVmoney,
                 expPool: state.player.expPool,
@@ -206,6 +211,7 @@ test("single purchase representative fixture preserves mixed reward order and fi
     assert.deepEqual(result.player, {
         id: 7,
         vmoney: 50,
+        paidMana: 0,
         freeMana: 430,
         freeVmoney: 20,
         bondToken: 3,
@@ -231,12 +237,116 @@ test("single purchase passes its post-cost player snapshot to the reward owner",
     assert.deepEqual(harness.grantCalls[0].knownPlayerBefore, {
         id: 7,
         vmoney: 50,
+        paidMana: 0,
         freeMana: 400,
         freeVmoney: 20,
         bondToken: 3,
         expPool: 10,
     })
     assert.equal(harness.getPlayerCalls(), 1, "owner path must not re-read player after grant")
+})
+
+test("ordinary mana and bead costs spend free balances before paid balances", () => {
+    const manaHarness = createHarness(undefined, {
+        freeMana: 20,
+        paidMana: 100,
+    })
+    const manaResult = executeGenericShopPurchaseSync({
+        playerId: 7,
+        shopType: ShopType.EVENT_ITEM,
+        shopItemId: 201,
+        purchaseAmount: 1,
+        shopItem: mixedShopItem({
+            costs: [],
+            rewards: [],
+            userCost: { type: ShopItemUserCostType.MANA, amount: 80 },
+        }),
+        nowMs: Date.parse("2024-02-01T00:00:00Z"),
+        enforcePeriod: true,
+    }, manaHarness.dependencies)
+    assert.equal(manaResult.player.freeMana, 0)
+    assert.equal(manaResult.player.paidMana, 40)
+
+    const beadHarness = createHarness(undefined, {
+        freeVmoney: 20,
+        vmoney: 100,
+    })
+    const beadResult = executeGenericShopPurchaseSync({
+        playerId: 7,
+        shopType: ShopType.EVENT_ITEM,
+        shopItemId: 202,
+        purchaseAmount: 1,
+        shopItem: mixedShopItem({
+            costs: [],
+            rewards: [],
+            userCost: { type: ShopItemUserCostType.BEADS, amount: 80 },
+        }),
+        nowMs: Date.parse("2024-02-01T00:00:00Z"),
+        enforcePeriod: true,
+    }, beadHarness.dependencies)
+    assert.equal(beadResult.player.freeVmoney, 0)
+    assert.equal(beadResult.player.vmoney, 40)
+})
+
+test("bulk purchases share free and paid balances across all selected products", () => {
+    const harness = createHarness(undefined, {
+        freeMana: 50,
+        paidMana: 100,
+        freeVmoney: 20,
+        vmoney: 100,
+    })
+    const result = executeGenericShopBatchPurchaseSync({
+        playerId: 7,
+        shopType: ShopType.EVENT_ITEM,
+        purchases: [
+            {
+                shopItemId: 211,
+                purchaseAmount: 1,
+                shopItem: mixedShopItem({
+                    costs: [],
+                    rewards: [],
+                    userCost: { type: ShopItemUserCostType.MANA, amount: 120 },
+                }),
+            },
+            {
+                shopItemId: 212,
+                purchaseAmount: 1,
+                shopItem: mixedShopItem({
+                    costs: [],
+                    rewards: [],
+                    userCost: { type: ShopItemUserCostType.BEADS, amount: 80 },
+                }),
+            },
+        ],
+        nowMs: Date.parse("2024-02-01T00:00:00Z"),
+        enforcePeriod: true,
+    }, harness.dependencies)
+    assert.equal(result.player.freeMana, 0)
+    assert.equal(result.player.paidMana, 30)
+    assert.equal(result.player.freeVmoney, 0)
+    assert.equal(result.player.vmoney, 40)
+})
+
+test("paid-only bead prices never consume free beads", () => {
+    const harness = createHarness(undefined, {
+        freeVmoney: 100,
+        vmoney: 20,
+    })
+    const before = harness.getState()
+    assert.throws(() => executeGenericShopPurchaseSync({
+        playerId: 7,
+        shopType: ShopType.EVENT_ITEM,
+        shopItemId: 213,
+        purchaseAmount: 1,
+        shopItem: mixedShopItem({
+            costs: [],
+            rewards: [],
+            userCost: { type: ShopItemUserCostType.PAID_BEADS, amount: 50 },
+        }),
+        nowMs: Date.parse("2024-02-01T00:00:00Z"),
+        enforcePeriod: true,
+    }, harness.dependencies), ShopBalanceError)
+    assert.deepEqual(harness.getState(), before)
 })
 
 test("bulk representative fixture validates aggregate costs before granting rewards", () => {

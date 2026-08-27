@@ -54,6 +54,7 @@ import {
 } from "../../data/domains/pass-card"
 import { getActivePassCardEventDefinitionAt } from "../../lib/pass-card"
 import { getGameTimeContext, getRealNow } from "../../runtime/time/game-time"
+import { planFreeFirstDeduction } from "../../lib/economy/free-first-deduction"
 
 interface GetSalesListBody {
     equipment_enhancement_shop_category_ids: number[],
@@ -203,25 +204,46 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
         // Equipment enhancement shop: update equipment enhancement level
         if (shopType === ShopType.TREASURE_EQUIPMENT) {
             const itemList: Record<string, number> = {}
+            let vmoney = player.vmoney
+            let paidMana = player.paidMana
             let freeVmoney = player.freeVmoney
             let freeMana = player.freeMana
             let bondTokens = player.bondToken
+            let manaSpent = 0
             const userCost = shopItemData.userCost
             if (userCost !== undefined) {
                 const amount = userCost.amount * purchaseAmount
                 switch (userCost.type) {
-                    case ShopItemUserCostType.MANA:
-                        freeMana -= amount
+                    case ShopItemUserCostType.MANA: {
+                        const deduction = planFreeFirstDeduction(freeMana, paidMana, amount)
+                        if (deduction === null) return reply.status(400).send({
+                            "error": "Bad Request",
+                            "message": "Not enough currency to purchase shop item.",
+                        })
+                        freeMana = deduction.freeBalance
+                        paidMana = deduction.paidBalance
+                        manaSpent = amount
                         break
-                    case ShopItemUserCostType.BEADS:
-                        freeVmoney -= amount
+                    }
+                    case ShopItemUserCostType.BEADS: {
+                        const deduction = planFreeFirstDeduction(freeVmoney, vmoney, amount)
+                        if (deduction === null) return reply.status(400).send({
+                            "error": "Bad Request",
+                            "message": "Not enough currency to purchase shop item.",
+                        })
+                        freeVmoney = deduction.freeBalance
+                        vmoney = deduction.paidBalance
                         break
+                    }
                     case ShopItemUserCostType.AMITY_SCROLL:
                         bondTokens -= amount
                         break
+                    case ShopItemUserCostType.PAID_BEADS:
+                        vmoney -= amount
+                        break
                 }
             }
-            if (freeVmoney < 0 || freeMana < 0 || bondTokens < 0) {
+            if (vmoney < 0 || bondTokens < 0) {
                 return reply.status(400).send({
                     "error": "Bad Request",
                     "message": "Not enough currency to purchase shop item."
@@ -238,13 +260,14 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
 
             const equipmentId = enhancementEquipmentId!
             const newLevel = enhancementNewLevel!
-            const manaSpent = player.freeMana - freeMana
             getDb().transaction(() => {
                 for (const [itemId, nextAmount] of Object.entries(itemList)) {
                     updatePlayerItemSync(playerId, itemId, nextAmount)
                 }
                 updatePlayerSync({
                     id: playerId,
+                    vmoney,
+                    paidMana,
                     freeMana,
                     freeVmoney,
                     bondToken: bondTokens,
@@ -274,7 +297,9 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
                 }),
                 "data": {
                     "user_info": {
+                        "vmoney": vmoney,
                         "free_vmoney": freeVmoney,
+                        "paid_mana": paidMana,
                         "free_mana": freeMana,
                         "bond_token": bondTokens
                     },
@@ -361,6 +386,7 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
             "user_info": {
                 "vmoney": afterPlayer.vmoney,
                 "free_vmoney": afterPlayer.freeVmoney,
+                "paid_mana": afterPlayer.paidMana,
                 "free_mana": afterPlayer.freeMana,
                 "bond_token": afterPlayer.bondToken,
                 "exp_pool": afterPlayer.expPool,
@@ -527,10 +553,13 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
             })
         }
 
-        // Insufficient vmoney
-        const freeVmoney = player.freeVmoney
-        if (freeVmoney < recoveryCost) {
-            console.warn(`[RECOVER-STAMINA] player ${playerId} insufficient vmoney: ${freeVmoney} < ${recoveryCost}`)
+        const deduction = planFreeFirstDeduction(
+            player.freeVmoney,
+            player.vmoney,
+            recoveryCost,
+        )
+        if (deduction === null) {
+            console.warn(`[RECOVER-STAMINA] player ${playerId} insufficient vmoney: free=${player.freeVmoney} paid=${player.vmoney} cost=${recoveryCost}`)
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId, result_code: 0 }),
@@ -547,10 +576,11 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
             id: playerId,
             stamina: afterStamina,
             staminaHealTime: recoveryTime,
-            freeVmoney: freeVmoney - recoveryCost
+            freeVmoney: deduction.freeBalance,
+            vmoney: deduction.paidBalance,
         })
 
-        console.log(`[RECOVER-STAMINA] player ${playerId}: stamina ${currentStamina}->${afterStamina} (+${actualRecovery}), freeVmoney ${freeVmoney}->${freeVmoney - recoveryCost}`)
+        console.log(`[RECOVER-STAMINA] player ${playerId}: stamina ${currentStamina}->${afterStamina} (+${actualRecovery}), freeVmoney ${player.freeVmoney}->${deduction.freeBalance}, vmoney ${player.vmoney}->${deduction.paidBalance}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -559,7 +589,8 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
                 "user_info": {
                     "stamina": afterStamina,
                     "stamina_heal_time": realToVirtual(recoveryTime),
-                    "free_vmoney": freeVmoney - recoveryCost
+                    "vmoney": deduction.paidBalance,
+                    "free_vmoney": deduction.freeBalance,
                 },
                 "mail_arrived": getMailArrivedSync(playerId)
             }
@@ -668,7 +699,9 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
                 "user_info": {
+                    "vmoney": afterPlayer.vmoney,
                     "free_vmoney": afterPlayer.freeVmoney,
+                    "paid_mana": afterPlayer.paidMana,
                     "free_mana": afterPlayer.freeMana,
                     "bond_token": afterPlayer.bondToken,
                     "exp_pool": afterPlayer.expPool,
