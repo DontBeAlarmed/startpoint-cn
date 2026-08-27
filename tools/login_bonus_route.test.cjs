@@ -22,7 +22,14 @@ const restoreContentSnapshot = installBundledGameplaySnapshot({
 })
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
+const { getPlayerDegreeIdsSync } = require("../src/data/domains/degree")
+const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
+const { getPlayerPassCardStateSync } = require("../src/data/domains/pass-card")
+const {
+    getPlayerSync,
+    insertDefaultPlayerSync,
+    updatePlayerSync,
+} = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
@@ -204,6 +211,105 @@ test("virtual date jumps do not advance login rewards before the real 05:00 rese
     }
 })
 
+test("load settles cumulative login missions immediately without duplicate rewards", async t => {
+    const viewerId = VIEWER_ID + 10
+    const loginMissionPlayerId = await createViewer(viewerId, "cumulative-login-mission")
+    updatePlayerSync({
+        id: loginMissionPlayerId,
+        totalLoginDays: 1,
+        lastLoginTime: new Date(targetVirtualMs - 86_400_000),
+    })
+
+    const targetApp = await buildLoadApp()
+    t.after(async () => targetApp.close())
+
+    const firstResponse = await postLoadWith(targetApp, viewerId)
+    assert.equal(firstResponse.statusCode, 200, firstResponse.body)
+    const first = decode(firstResponse)
+    assert.deepEqual(
+        first.data.mission_info.filter(entry => (
+            entry.mission_category_id === 1 && entry.mission_id === 24
+        )),
+        [{
+            mission_category_id: 1,
+            mission_id: 24,
+            mission_reward_id: 24001,
+        }],
+    )
+    assert.deepEqual(getPlayerCategoryMissionsSync(loginMissionPlayerId, 1)[24], {
+        progress: 2,
+        stages: { 1: true },
+    })
+    assert.equal(
+        first.data.user_info.free_vmoney,
+        getPlayerSync(loginMissionPlayerId).freeVmoney,
+        "登录任务发奖后的首个 /load 响应必须返回最终余额",
+    )
+
+    const freeVmoneyAfterFirst = getPlayerSync(loginMissionPlayerId).freeVmoney
+    const repeatedResponse = await postLoadWith(targetApp, viewerId)
+    assert.equal(repeatedResponse.statusCode, 200, repeatedResponse.body)
+    const repeated = decode(repeatedResponse)
+    assert.deepEqual(repeated.data.mission_info, [])
+    assert.equal(getPlayerSync(loginMissionPlayerId).freeVmoney, freeVmoneyAfterFirst)
+})
+
+test("load settles cumulative login degree missions at the login fact boundary", async t => {
+    const viewerId = VIEWER_ID + 11
+    const loginDegreePlayerId = await createViewer(viewerId, "cumulative-login-degree")
+    updatePlayerSync({
+        id: loginDegreePlayerId,
+        totalLoginDays: 6,
+        lastLoginTime: new Date(targetVirtualMs - 86_400_000),
+    })
+
+    const targetApp = await buildLoadApp()
+    t.after(async () => targetApp.close())
+
+    const response = await postLoadWith(targetApp, viewerId)
+    assert.equal(response.statusCode, 200, response.body)
+    const loaded = decode(response)
+    assert.deepEqual(
+        loaded.data.mission_info.filter(entry => (
+            entry.mission_category_id === 5 && entry.mission_id === 53000
+        )),
+        [{
+            mission_category_id: 5,
+            mission_id: 53000,
+            mission_reward_id: 53000001,
+        }],
+    )
+    assert.equal(getPlayerDegreeIdsSync(loginDegreePlayerId).includes(53000), true)
+})
+
+test("load settles the active pass login mission but leaves level rewards claimable", async t => {
+    const viewerId = VIEWER_ID + 12
+    const passLoginPlayerId = await createViewer(viewerId, "pass-login-mission")
+    updatePlayerSync({
+        id: passLoginPlayerId,
+        totalLoginDays: 1,
+        lastLoginTime: new Date(targetVirtualMs - 86_400_000),
+    })
+
+    const targetApp = await buildLoadApp()
+    t.after(async () => targetApp.close())
+
+    const response = await postLoadWith(targetApp, viewerId)
+    assert.equal(response.statusCode, 200, response.body)
+    const loaded = decode(response)
+    assert.deepEqual(
+        loaded.data.mission_info.filter(entry => (
+            entry.mission_category_id === 8 && entry.mission_id === 13
+        )),
+        [{
+            mission_category_id: 8,
+            mission_id: 13,
+            mission_reward_id: 13001,
+        }],
+    )
+    assert.equal(getPlayerPassCardStateSync(passLoginPlayerId, 3).point, 100)
+})
+
 test("bonus shown rejects an unknown viewer without changing progress", async () => {
     const response = await app.inject({
         method: "POST",
@@ -238,4 +344,39 @@ test("load encoding failure preserves one pending batch without duplicate reward
         { bonus_group_id: "xmas22", bonus_group_type: "Limited", index: 1 },
     ])
     assert.equal(getPlayerSync(interruptedPlayerId).freeVmoney, before.freeVmoney + 6100)
+})
+
+test("load encoding failure rolls back ordinary login mission settlement for retry", async t => {
+    const viewerId = VIEWER_ID + 20
+    const missionPlayerId = await createViewer(viewerId, "login-mission-encoding-failure")
+    updatePlayerSync({
+        id: missionPlayerId,
+        totalLoginDays: 1,
+        lastLoginTime: new Date(targetVirtualMs - 86_400_000),
+    })
+
+    const failingApp = await buildLoadApp(() => {
+        throw new Error("forced ordinary login mission encoding failure")
+    })
+    t.after(async () => failingApp.close())
+
+    const failed = await postLoadWith(failingApp, viewerId)
+    assert.equal(failed.statusCode, 500)
+    assert.equal(getPlayerCategoryMissionsSync(missionPlayerId, 1)[24], undefined)
+
+    const retryApp = await buildLoadApp()
+    t.after(async () => retryApp.close())
+    const retried = await postLoadWith(retryApp, viewerId)
+    assert.equal(retried.statusCode, 200, retried.body)
+    const payload = decode(retried)
+    assert.deepEqual(
+        payload.data.mission_info.filter(entry => (
+            entry.mission_category_id === 1 && entry.mission_id === 24
+        )),
+        [{
+            mission_category_id: 1,
+            mission_id: 24,
+            mission_reward_id: 24001,
+        }],
+    )
 })

@@ -18,6 +18,8 @@ function stubModule(relativePath, exports) {
     }
 }
 
+const observedAutomaticScopes = []
+
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "mission-progress-route-db-"))
 const previousDataDirectory = process.env.DATA_DIR
 const previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR
@@ -53,6 +55,21 @@ stubModule("../src/lib/mission/index", {
     settleAwakeMissionRewards: () => ({
         missionInfo: [], itemList: {}, characterList: [], equipmentList: [], degreeIds: [],
     }),
+    settleMissionCategories: (_playerId, scopes) => {
+        observedAutomaticScopes.push(structuredClone(scopes))
+        return {
+            missionInfo: scopes.flatMap(scope => scope.missionIds.map(missionId => ({
+                mission_category_id: scope.category,
+                mission_id: missionId,
+                mission_reward_id: missionId * 1000 + 1,
+            }))),
+            itemList: {},
+            characterList: [],
+            equipmentList: [],
+            degreeIds: [],
+            passCardPoints: {},
+        }
+    },
     settleMissionCategoriesWithEvaluation: playerId => {
         const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
         const missions = Object.entries(getPlayerCategoryMissionsSync(playerId, 5)).map(([missionId, mission]) => ({
@@ -80,7 +97,9 @@ stubModule("../src/lib/mission/index", {
         }
     },
     evaluateMissionProgressStageB: () => null,
-    mergeMissionSettlementResponse: () => {},
+    mergeMissionSettlementResponse: (data, settlement) => {
+        data.mission_info.push(...settlement.missionInfo)
+    },
 })
 
 const missionRoutes = require("../src/routes/api/mission").default
@@ -175,6 +194,15 @@ async function main() {
         for (const [missionPattern, missionId] of degreeCases) {
             const response = await postProgress(fastify, missionPattern, 1)
             assert.equal(response.statusCode, 200, response.body)
+            assert.deepEqual(unpack(response.rawPayload).data.mission_info, [{
+                mission_category_id: 5,
+                mission_id: missionId,
+                mission_reward_id: missionId * 1000 + 1,
+            }])
+            assert.deepEqual(observedAutomaticScopes.at(-1), [{
+                category: 5,
+                missionIds: [missionId],
+            }])
             const progress = getPlayerCategoryMissionsSync(playerId, 5)
             assert.equal(progress[missionId]?.progress, 1, `${missionPattern} 必须只累计对应 Degree`)
         }

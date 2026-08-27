@@ -27,8 +27,14 @@ import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json";
 import bundledLoginBonuses from "../../../assets/login_bonus.json";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 import { reconcileActiveMissionFactsWithResult } from "../../lib/mission/active-reconciliation";
-import { recordEventLoginMissionFactSync } from "../../lib/mission/event-entry-facts";
-import { setCnMsgpackPendingCommit } from "./msgpack";
+import {
+    getEventLoginMissionId,
+    recordEventLoginMissionFactSync,
+} from "../../lib/mission/event-entry-facts";
+import { settleLoginFactMissions } from "../../lib/mission/login-fact-settlement";
+import { setCnMsgpackPendingEncoder } from "./msgpack";
+import { settleMissionCategories } from "../../lib/mission/settlement";
+import { mergeMissionSettlementResponse } from "../../lib/mission/response";
 import { getFavoritePartyGroupListSync } from "../../lib/profileFavorite";
 import {
     isValidBattleSessionId,
@@ -378,6 +384,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                 }));
                 clientData.login_bonus_received_at = loginBonusSettlement.bonuses[0].receivedAt;
             }
+            clientData.mission_info = [];
 
             // Inject unfinished quest lists for battle recovery
             if (activeQuest) {
@@ -409,9 +416,30 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
         })();
 
         reply.header("content-type", "application/x-msgpack");
-        setCnMsgpackPendingCommit(reply, () => {
-            recordEventLoginMissionFactSync(playerId, now);
-        });
+        setCnMsgpackPendingEncoder(reply, (payload, encoder) => (
+            getDb().transaction(() => {
+                const loginMissionSettlement = settleLoginFactMissions(playerId, now)
+                mergeMissionSettlementResponse(
+                    (payload as { data: Record<string, unknown> }).data,
+                    loginMissionSettlement,
+                    accountId,
+                )
+                const eventLoginMissionId = getEventLoginMissionId(now)
+                if (eventLoginMissionId !== null) {
+                    recordEventLoginMissionFactSync(playerId, now)
+                    const eventLoginSettlement = settleMissionCategories(playerId, [{
+                        category: 3,
+                        missionIds: [eventLoginMissionId],
+                    }], now)
+                    mergeMissionSettlementResponse(
+                        (payload as { data: Record<string, unknown> }).data,
+                        eventLoginSettlement,
+                        accountId,
+                    )
+                }
+                return encoder(payload)
+            })()
+        ));
         reply.status(200).send(responsePayload);
         } catch(e: any) {
             console.error(`[CN-LOAD] ERROR:`, e.message, e.stack);

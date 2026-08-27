@@ -91,6 +91,7 @@ export interface ProductionMissionFactDomains {
 export interface ProductionMissionFactSeeds {
     readonly player?: Player
     readonly characters?: Record<string, PlayerCharacter>
+    readonly equipment?: Record<string, PlayerEquipment>
     readonly characterClears?: Record<string, PlayerCharacterClear>
     readonly partyCoClearCounters?: readonly PlayerPartyCoClearCounter[]
     readonly categoryMissions?: ReadonlyMap<
@@ -136,7 +137,9 @@ export function createProductionMissionFactLoaderRegistry(
         .register("characterManaNodes", ({ playerId }) => (
             domains.getPlayerCharactersManaNodesSync(playerId)
         ))
-        .register("equipment", ({ playerId }) => domains.getPlayerEquipmentListSync(playerId))
+        .register("equipment", ({ playerId }) => (
+            seeds.equipment ?? domains.getPlayerEquipmentListSync(playerId)
+        ))
         .register("items", ({ playerId }) => domains.getPlayerItemsSync(playerId))
         .register("partyGroups", ({ playerId, key }) => (
             domains.getPlayerPartyGroupListSync(playerId, key.category)

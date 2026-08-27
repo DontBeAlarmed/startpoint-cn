@@ -7,7 +7,7 @@ import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
 import { getPlayerMailCountSync } from "../../data/domains/mail"
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { createCharacterAwakeEligibilityResolver, evaluateMissionProgressStageB, getCharacterIdFromMission, getCurrentStage, getMissionCatalog, mergeMissionSettlementResponse, settleAwakeMissionCandidatesWithEvaluation, settleMissionCategoriesWithEvaluation } from "../../lib/mission/index";
+import { createCharacterAwakeEligibilityResolver, evaluateMissionProgressStageB, getCharacterIdFromMission, getCurrentStage, getMissionCatalog, mergeMissionSettlementResponse, settleAwakeMissionCandidatesWithEvaluation, settleMissionCategories, settleMissionCategoriesWithEvaluation } from "../../lib/mission/index";
 import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context";
 import { resolveClientProgressTargets } from "../../lib/mission/client-progress";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -225,8 +225,9 @@ const routes = async (fastify: FastifyInstance) => {
         let updatedCount = 0
         const evaluationTime = new Date(getServerTime() * 1000)
         const awakeCandidateCharacterIds: number[] = []
+        const automaticMissionIdsByCategory = new Map<number, Set<number>>()
 
-        getDb().transaction(() => {
+        const automaticSettlement = getDb().transaction(() => {
             for (const param of missionParams) {
                 if (param === null || typeof param !== "object" || Array.isArray(param)) continue
                 const delta = addMissionProgressDelta(0, param.progress_value)
@@ -248,10 +249,22 @@ const routes = async (fastify: FastifyInstance) => {
                             if (Number.isSafeInteger(characterId) && characterId > 0) {
                                 awakeCandidateCharacterIds.push(characterId)
                             }
+                        } else {
+                            const missionIds = automaticMissionIdsByCategory.get(match.category)
+                                ?? new Set<number>()
+                            missionIds.add(match.missionId)
+                            automaticMissionIdsByCategory.set(match.category, missionIds)
                         }
                     }
                 }
             }
+            const scopes = [...automaticMissionIdsByCategory].map(([category, missionIds]) => ({
+                category,
+                missionIds: [...missionIds],
+            }))
+            return scopes.length > 0
+                ? settleMissionCategories(playerId, scopes, evaluationTime)
+                : null
         })()
 
         const characterList = publishAwakeCharacterListBestEffort(
@@ -262,15 +275,22 @@ const routes = async (fastify: FastifyInstance) => {
         )
         console.log(`[MISSION] update_progress viewer=${viewerId} params=${missionParams.length} db_updates=${updatedCount}`)
 
+        const responseData: Record<string, unknown> = {
+            mission_info: [],
+            degree_list: [],
+            character_list: characterList,
+            item_list: {},
+            equipment_list: [],
+            mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
+        }
+        if (automaticSettlement) {
+            mergeMissionSettlementResponse(responseData, automaticSettlement, viewerId)
+        }
+
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {
-                "mission_info": [],
-                "degree_list": [],
-                character_list: characterList,
-                "mail_arrived": getPlayerMailCountSync(playerId, true) > 0
-            }
+            "data": responseData,
         })
     })
 }

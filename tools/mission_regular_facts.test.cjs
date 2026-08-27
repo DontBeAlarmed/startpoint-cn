@@ -46,9 +46,11 @@ const { getSnapshot, takeSnapshot } = require("../src/lib/mission/snapshot")
 const { getRankDegree } = require("../src/lib/stamina")
 const {
     countAbilitySoulEquipments,
-    recordAbilitySoulEquipFactsSync,
     recordMissionOperationFactsSync,
 } = require("../src/lib/mission/degree-operation-facts")
+const {
+    settleAbilitySoulEquipFactsSync,
+} = require("../src/lib/mission/operation-fact-settlement")
 const { recordRegularMissionBattleFactsSync } = require("../src/lib/mission/regular-battle-facts")
 const { recordDegreeMissionBattleFacts } = require("../src/lib/mission/degree-battle-facts")
 const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
@@ -596,11 +598,18 @@ assert.equal(countAbilitySoulEquipments(
     [{ abilitySoulIds: [null, 1001, 1002] }],
     [{ abilitySoulIds: [1001, 1001, null] }],
 ), 1, "新增装配计一次，未变化与卸下不计数")
-assert.equal(recordAbilitySoulEquipFactsSync(
+const abilitySoulSettlement = settleAbilitySoulEquipFactsSync(
     playerId,
     [{ abilitySoulIds: [null, 1001, 1002] }],
     [{ abilitySoulIds: [1001, 2001, null] }],
-), 2, "新增和替换魂珠各计一次")
+    evaluationTime,
+)
+assert.equal(abilitySoulSettlement.amount, 2, "新增和替换魂珠各计一次")
+assert.deepEqual(
+    abilitySoulSettlement.settlement?.missionInfo.map(entry => [entry.mission_category_id, entry.mission_id]),
+    [[1, 65]],
+    "魂珠装配达到条件时必须在本次操作中结算普通任务奖励",
+)
 const battleOperationProgress = getPlayerCategoryMissionsSync(playerId, 1)
 assert.equal(battleOperationProgress[4].progress, 100, "战斗获得玛纳按真实到账值累计")
 assert.equal(battleOperationProgress[29].progress, 1, "成功多人结算只接受官方 is_mvp=true")

@@ -3,17 +3,21 @@ import { pack } from "msgpackr"
 import { fixUint32Tags } from "../../lib/msgpack-compat"
 
 type CnMsgpackEncoder = (payload: unknown) => string
-const pendingCommits = new WeakMap<object, () => void>()
+type CnMsgpackPendingEncoder = (
+    payload: unknown,
+    encoder: CnMsgpackEncoder,
+) => string
+const pendingEncoders = new WeakMap<object, CnMsgpackPendingEncoder>()
 
 export function encodeCnMsgpackPayload(payload: unknown): string {
     return fixUint32Tags(pack(payload)).toString("base64")
 }
 
-export function setCnMsgpackPendingCommit(
+export function setCnMsgpackPendingEncoder(
     reply: FastifyReply,
-    commit: () => void,
+    pendingEncoder: CnMsgpackPendingEncoder,
 ): void {
-    pendingCommits.set(reply, commit)
+    pendingEncoders.set(reply, pendingEncoder)
 }
 
 export function registerCnMsgpackOnSend(
@@ -22,18 +26,19 @@ export function registerCnMsgpackOnSend(
 ): void {
     fastify.addHook("onSend", (_request, reply, payload, done) => {
         if (reply.getHeader("content-type") !== "application/x-msgpack") {
-            pendingCommits.delete(reply)
+            pendingEncoders.delete(reply)
             done(null, payload)
             return
         }
         try {
-            const encodedPayload = encoder(payload)
-            const commit = pendingCommits.get(reply)
-            pendingCommits.delete(reply)
-            commit?.()
+            const pendingEncoder = pendingEncoders.get(reply)
+            pendingEncoders.delete(reply)
+            const encodedPayload = pendingEncoder
+                ? pendingEncoder(payload, encoder)
+                : encoder(payload)
             done(null, encodedPayload)
         } catch (error) {
-            pendingCommits.delete(reply)
+            pendingEncoders.delete(reply)
             done(error as Error)
         }
     })

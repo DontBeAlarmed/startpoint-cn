@@ -10,9 +10,11 @@ import { givePlayerCharacterSync } from "../../lib/character";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { givePlayerRewardSync } from "../../lib/quest";
 import {
+    mergeMissionSettlementResponse,
     reconcileActiveMissionFacts,
     reconcileAwakeUnlockCharacterListBestEffort,
 } from "../../lib/mission";
+import { settleCharacterStoryFactMissions } from "../../lib/mission/story-fact-settlement";
 import { collectAwakeCandidateCharacterIds } from "../../lib/mission/awake-candidate-character-ids";
 import { createAwakeRequestContextBestEffort } from "../../lib/mission/awake-best-effort-context";
 import { getQuestJoinCharacterIds } from "../../lib/story-join-character";
@@ -38,7 +40,12 @@ interface FinishWithSkipBody {
     api_count: number
 }
 
-function processStoryQuestFinish(playerId: number, questSection: number, questId: number) {
+function processStoryQuestFinish(
+    playerId: number,
+    viewerId: number,
+    questSection: number,
+    questId: number,
+) {
     const questData = getQuestFromCategorySync(questSection, questId)
     if (questData === null) {
         console.log(`[STORY] quest not found: category=${questSection} questId=${questId}`)
@@ -91,6 +98,10 @@ function processStoryQuestFinish(playerId: number, questSection: number, questId
             }
         }
 
+        const evaluationTime = new Date(getServerTime() * 1000)
+        const missionSettlement = firstClear && questSection === QuestCategory.CHARACTER
+            ? settleCharacterStoryFactMissions(playerId, evaluationTime)
+            : null
         const playerAfter = getPlayerSync(playerId)
         if (playerAfter === null) throw new Error(`Player ${playerId} disappeared during story settlement.`)
         const existingCharacterList = [
@@ -100,7 +111,7 @@ function processStoryQuestFinish(playerId: number, questSection: number, questId
         const activeMissionList = reconcileActiveMissionFacts({
             playerId,
             repository: getContentSnapshot().repository,
-            now: getServerTime() * 1000,
+            now: evaluationTime.getTime(),
         })
         const candidateCharacterIds = collectAwakeCandidateCharacterIds(
             storyCandidateCharacterIds,
@@ -125,7 +136,7 @@ function processStoryQuestFinish(playerId: number, questSection: number, questId
                 existingCharacterList,
                 { context: awakeContext },
             )
-        return {
+        const responseData: Record<string, unknown> = {
             user_info: {
                 free_vmoney: playerAfter.freeVmoney,
                 free_mana: playerAfter.freeMana,
@@ -141,6 +152,10 @@ function processStoryQuestFinish(playerId: number, questSection: number, questId
             active_mission_list: activeMissionList,
             mail_arrived: getMailArrivedSync(playerId),
         }
+        if (missionSettlement) {
+            mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)
+        }
+        return responseData
     })()
 }
 
@@ -166,7 +181,7 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "No player bound to account."
         })
 
-        const result = processStoryQuestFinish(playerId, body.category, body.quest_id)
+        const result = processStoryQuestFinish(playerId, viewerId, body.category, body.quest_id)
         if (result === null) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid quest ID provided."
@@ -201,7 +216,7 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "No player bound to account."
         })
 
-        const result = processStoryQuestFinish(playerId, body.category, body.quest_id)
+        const result = processStoryQuestFinish(playerId, viewerId, body.category, body.quest_id)
         if (result === null) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid quest ID provided."

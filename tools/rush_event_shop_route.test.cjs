@@ -291,6 +291,7 @@ stubModule("../src/data/domains/shop-campaign-lineup", {
 })
 stubModule("../src/data/activeAccount", { resolvePlayerIdSync: () => 17 })
 const degreeOperationCalls = []
+let failDegreeSettlement = false
 stubModule("../src/data/domains/active_mission_counters", {
     incrementActiveMissionUsedManaCountSync(playerId, amount) {
         db.prepare(`
@@ -299,8 +300,19 @@ stubModule("../src/data/domains/active_mission_counters", {
         `).run(playerId, amount)
     },
 })
-stubModule("../src/lib/mission/degree-operation-facts", {
-    recordMissionOperationFactsSync: (...args) => degreeOperationCalls.push(args),
+stubModule("../src/lib/mission/operation-fact-settlement", {
+    settleMissionOperationFactsSync: (...args) => {
+        degreeOperationCalls.push(args)
+        if (failDegreeSettlement) throw new Error("injected mission settlement failure")
+        return {
+            missionInfo: [{ mission_category_id: 1, mission_id: 41, mission_reward_id: 41001 }],
+            itemList: {},
+            characterList: [],
+            equipmentList: [],
+            degreeIds: [45000],
+            passCardPoints: {},
+        }
+    },
 })
 stubModule("../src/utils", {
     generateDataHeaders(values = {}) {
@@ -681,7 +693,33 @@ async function main() {
         })
         assert.equal(manaPurchase.statusCode, 200)
         assert.equal(getUsedManaCount(17), 1, "通用商店路由必须累计实际消费的玛纳")
-        assert.deepEqual(degreeOperationCalls.at(-1), [17, "treasure_mana", 1])
+        assert.deepEqual(
+            degreeOperationCalls.at(-1).slice(0, 3),
+            [17, "treasure_mana", 1],
+            "珍奇品商店消费必须立即结算对应普通任务与称号",
+        )
+        const manaPurchaseBody = decode(manaPurchase)
+        assert.deepEqual(manaPurchaseBody.data.mission_info, [
+            { mission_category_id: 1, mission_id: 41, mission_reward_id: 41001 },
+        ])
+        assert.deepEqual(manaPurchaseBody.data.degree_list, [
+            { viewer_id: 123, degree_id: 45000 },
+        ])
+
+        const beforeMissionFailure = snapshot()
+        failDegreeSettlement = true
+        const failedMissionSettlement = await fastify.inject({
+            method: "POST",
+            url: "/buy",
+            payload: { viewer_id: 123, shop_type: 2, shop_item_id: 200001, number: 1 },
+        })
+        failDegreeSettlement = false
+        assert.equal(failedMissionSettlement.statusCode, 500)
+        assert.deepEqual(
+            snapshot(),
+            beforeMissionFailure,
+            "任务结算异常必须回滚珍奇品兑换的扣款、发奖与购买记录",
+        )
 
         const enhancementItem = equipmentEnhancementShopAsset["2001"]
         enhancementItem.userCost = { type: 1, amount: 30 }

@@ -3,7 +3,7 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
-    getPlayerEquipmentSync, getPlayerEquipmentsByIdsSync, playerOwnsEquipmentSync,
+    getPlayerEquipmentListSync, getPlayerEquipmentSync, getPlayerEquipmentsByIdsSync, playerOwnsEquipmentSync,
     normalizeEquipmentBatchIds, updatePlayerEquipmentSync,
 } from "../../data/domains/equipment";
 import {
@@ -11,15 +11,16 @@ import {
 } from "../../data/domains/item";
 import { getPlayerSync } from "../../data/domains/player";
 import { getSession } from "../../data/domains/session";
-import { generateDataHeaders } from "../../utils";
-import { clientSerializeEquipment, buildFullEquipmentList } from "../../lib/equipment";
+import { generateDataHeaders, getServerDate } from "../../utils";
+import { clientSerializeEquipment, buildFullEquipmentList, serializeFullEquipmentList } from "../../lib/equipment";
 import { getEquipmentDissolveSync, getConfigSync, getEquipmentCraftSync } from "../../lib/assets";
 import { AccountId, PlayerId } from "../../lib/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDb } from "../../data/db";
 import { canUseEquipmentAwakeningCrystal } from "../../lib/equipment-upgrade";
 import { getMailArrivedSync } from "../../lib/mail-notification";
-import { recordMissionOperationFactsSync } from "../../lib/mission/degree-operation-facts";
+import { settleMissionOperationFactsSync } from "../../lib/mission/operation-fact-settlement";
+import { mergeMissionSettlementResponse } from "../../lib/mission";
 
 interface SetProtectionBody {
     protection: boolean
@@ -98,7 +99,7 @@ const routes = async (fastify: FastifyInstance) => {
         const returnItemList: Record<string, number> = {}
 
         const dissolveInfo = getEquipmentDissolveSync(equipmentId)
-        getDb().transaction(() => {
+        const operationResult = getDb().transaction(() => {
             if (!useStack && itemId !== undefined) {
                 returnItemList[itemId] = newItemCount
                 updatePlayerItemSync(playerId, itemId, newItemCount)
@@ -107,28 +108,42 @@ const routes = async (fastify: FastifyInstance) => {
             returnItemList[wrightpieceItemId()] = newWrightPieces
             updatePlayerItemSync(playerId, wrightpieceItemId(), newWrightPieces)
             updatePlayerEquipmentSync(playerId, equipmentId, { stack: newStack, level: newLevel })
-            recordMissionOperationFactsSync(playerId, "equipment_upgrade", upgradeCount)
+            const equipmentSnapshot = getPlayerEquipmentListSync(playerId)
+            const missionSettlement = settleMissionOperationFactsSync(
+                playerId,
+                "equipment_upgrade",
+                upgradeCount,
+                getServerDate(),
+                equipmentSnapshot,
+            )
 
             if (dissolveInfo && dissolveInfo.generate_ability_soul) {
                 returnItemList[dissolveInfo.ability_soul_id] = givePlayerItemSync(playerId, dissolveInfo.ability_soul_id, upgradeCount)
             }
+            return { equipmentSnapshot, missionSettlement }
         })()
 
         equipment.level = newLevel
         equipment.stack = newStack
 
-        const returnEquipmentList = buildFullEquipmentList(playerId)
+        const returnEquipmentList = serializeFullEquipmentList(operationResult.equipmentSnapshot)
 
         console.log(`[UPGRADE] account=${accountId} player=${playerId}: eid=${equipmentId} rarity=${equipmentRarity} level ${equipment.level-upgradeCount}->${equipment.level} stack ${equipment.stack+upgradeCount}->${equipment.stack} craft -${upgradeCost*upgradeCount}`)
 
         reply.header("content-type", "application/x-msgpack")
+        const responseData: Record<string, unknown> = {
+            equipment_list: returnEquipmentList,
+            item_list: returnItemList,
+            mission_info: [],
+            degree_list: [],
+            mail_arrived: getMailArrivedSync(playerId),
+        }
+        if (operationResult.missionSettlement) {
+            mergeMissionSettlementResponse(responseData, operationResult.missionSettlement, viewerId)
+        }
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {
-                "equipment_list": returnEquipmentList,
-                "item_list": returnItemList,
-                "mail_arrived": getMailArrivedSync(playerId)
-            }
+            "data": responseData,
         })
     })
 
@@ -204,7 +219,7 @@ const routes = async (fastify: FastifyInstance) => {
         const returnItemList: Record<number, number> = {}
 
         const newCraftPoints = currentCraftPoints - totalCraftPointCost
-        getDb().transaction(() => {
+        const operationResult = getDb().transaction(() => {
             for (const upgrade of upgrades) {
                 updatePlayerEquipmentSync(playerId, upgrade.equipmentId, {
                     level: upgrade.newLevel,
@@ -219,22 +234,36 @@ const routes = async (fastify: FastifyInstance) => {
                 }
             }
             updatePlayerItemSync(playerId, wrightpieceItemId(), newCraftPoints)
-            recordMissionOperationFactsSync(
+            const equipmentSnapshot = getPlayerEquipmentListSync(playerId)
+            const missionSettlement = settleMissionOperationFactsSync(
                 playerId,
                 "equipment_upgrade",
                 upgrades.reduce((total, entry) => total + entry.upgradeCount, 0),
+                getServerDate(),
+                equipmentSnapshot,
             )
+            return { equipmentSnapshot, missionSettlement }
         })()
         returnItemList[wrightpieceItemId()] = newCraftPoints
 
         console.log(`[BULK_UPGRADE] account=${accountId} player=${playerId}: ${upgrades.length} equipment upgraded, craft points ${currentCraftPoints} -> ${newCraftPoints}`)
 
-        const returnEquipmentList = buildFullEquipmentList(playerId)
+        const returnEquipmentList = serializeFullEquipmentList(operationResult.equipmentSnapshot)
 
         reply.header("content-type", "application/x-msgpack")
+        const responseData: Record<string, unknown> = {
+            equipment_list: returnEquipmentList,
+            item_list: returnItemList,
+            mission_info: [],
+            degree_list: [],
+            mail_arrived: getMailArrivedSync(playerId),
+        }
+        if (operationResult.missionSettlement) {
+            mergeMissionSettlementResponse(responseData, operationResult.missionSettlement, viewerId)
+        }
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": { "equipment_list": returnEquipmentList, "item_list": returnItemList, "mail_arrived": getMailArrivedSync(playerId) }
+            "data": responseData,
         })
     })
 

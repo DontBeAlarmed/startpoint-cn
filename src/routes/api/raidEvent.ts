@@ -29,9 +29,14 @@ import { settleRaidEventSummary } from "../../lib/raid-event-summary";
 import { getRaidEventRequiredKillCount } from "../../lib/raid-event-master";
 import { getRaidBossHpPercentage } from "../../lib/quest/finish/raid-handler";
 import { getMailArrivedSync } from "../../lib/mail-notification";
-import { recordRaidSummaryMissionFactFailSoftSync } from "../../lib/mission/event-entry-facts";
+import {
+    getRaidSummaryMissionId,
+    recordRaidSummaryMissionFactSync,
+} from "../../lib/mission/event-entry-facts";
 import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context";
 import { getAwakeFactKeysFromLegacyRewardResults } from "../../lib/mission/awake-reward-facts";
+import { settleMissionCategories, type MissionSettlementResult } from "../../lib/mission/settlement";
+import { mergeMissionSettlementResponse } from "../../lib/mission/response";
 
 interface EventIdBody {
     event_id: number,
@@ -93,7 +98,7 @@ const routes = async (fastify: FastifyInstance) => {
         console.log(`[RAID] summary: folderParties=${Object.keys(serializedPlayedParties.folderParties ?? {}).length} endlessParties=${Object.keys(serializedPlayedParties.endlessParties ?? {}).length}`)
 
         const summary = getDb().transaction(() => {
-            recordRaidSummaryMissionFactFailSoftSync(playerId, eventId, evaluationTime)
+            let missionSettlement: MissionSettlementResult | null = null
             const raidBossState = getRaidEventBossStateSync(eventId)
                 ?? { weightedKillCount: 0, totalKillCount: 0 }
             const playerState = getPlayerRaidEventSync(playerId, eventId)
@@ -112,9 +117,28 @@ const routes = async (fastify: FastifyInstance) => {
                     )
                 },
             })
+            const missionId = getRaidSummaryMissionId(eventId, evaluationTime)
+            if (missionId !== null) {
+                try {
+                    missionSettlement = getDb().transaction(() => {
+                        recordRaidSummaryMissionFactSync(playerId, eventId, evaluationTime)
+                        return settleMissionCategories(playerId, [{
+                            category: 3,
+                            eventId,
+                            missionIds: [missionId],
+                        }], evaluationTime)
+                    })()
+                } catch (error) {
+                    console.warn(
+                        `[MISSION] raid summary fact failed player=${playerId} event=${eventId}`
+                        + ` mission=${missionId}: ${error instanceof Error ? error.message : String(error)}`,
+                    )
+                }
+            }
             return {
                 raidBossState,
                 settlement,
+                missionSettlement,
                 questCounts: getPlayerRaidEventQuestCountsSync(playerId, eventId),
                 player: getPlayerSync(playerId),
             }
@@ -140,9 +164,7 @@ const routes = async (fastify: FastifyInstance) => {
         ]))
 
         reply.header("content-type", "application/x-msgpack");
-        return reply.status(200).send({
-            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {
+        const responseData: Record<string, unknown> = {
                 "aggregated_time": clientSerializeDate(getServerDate()),
                 "auto_start_point": 0,
                 "kill_count_reward_data": {
@@ -173,7 +195,13 @@ const routes = async (fastify: FastifyInstance) => {
                 "endless_battle_played_party_list": serializedPlayedParties.endlessParties,
                 "rush_battle_played_party_list": serializedPlayedParties.folderParties,
                 "endless_battle_my_ranking": getPlayerRushEventEndlessBattleRankingSync(playerId, eventId, { rushEventData }),
-            }
+        }
+        if (summary.missionSettlement) {
+            mergeMissionSettlementResponse(responseData, summary.missionSettlement, viewerId)
+        }
+        return reply.status(200).send({
+            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+            "data": responseData,
         });
     });
 

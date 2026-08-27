@@ -400,18 +400,16 @@ function getOpenRaidSetRuleFamily(
     return openFamilies.length === 1 ? openFamilies[0] : undefined
 }
 
-export function recordRaidSetEditMissionFactsSync(
-    playerId: number,
+export function getRaidSetEditMissionIds(
     usePartyGroupEdit: boolean,
     parties: readonly RaidSetEditPartyFactInput[],
     evaluationTime: Date,
-): boolean {
-    if (!Number.isSafeInteger(playerId) || playerId <= 0
-        || usePartyGroupEdit !== true
+): readonly number[] {
+    if (usePartyGroupEdit !== true
         || !Array.isArray(parties)
         || parties.some(party => !isValidRaidSetEditPartyFactInput(party))
         || !(evaluationTime instanceof Date)
-        || !Number.isFinite(evaluationTime.getTime())) return false
+        || !Number.isFinite(evaluationTime.getTime())) return []
 
     const slots = new Set(parties
         .filter(party => party.category === PartyCategory.RAID
@@ -419,14 +417,26 @@ export function recordRaidSetEditMissionFactsSync(
             && party.slot >= 1
             && party.slot <= 3)
         .map(party => party.slot))
-    if (slots.size === 0) return false
+    if (slots.size === 0) return []
 
     const family = getOpenRaidSetRuleFamily(evaluationTime)
-    if (!family) return false
+    if (!family) return []
     const missionIds = [...slots].map(slot => (
         family.find(spec => spec.raidSetSlot === slot)?.missionId
     ))
-    if (missionIds.some(missionId => missionId === undefined)) return false
+    if (missionIds.some(missionId => missionId === undefined)) return []
+    return missionIds as number[]
+}
+
+export function recordRaidSetEditMissionFactsSync(
+    playerId: number,
+    usePartyGroupEdit: boolean,
+    parties: readonly RaidSetEditPartyFactInput[],
+    evaluationTime: Date,
+): boolean {
+    if (!Number.isSafeInteger(playerId) || playerId <= 0) return false
+    const missionIds = getRaidSetEditMissionIds(usePartyGroupEdit, parties, evaluationTime)
+    if (missionIds.length === 0) return false
 
     return getDb().transaction(() => {
         let changed = false
@@ -469,14 +479,21 @@ function getCnNaturalDay(date: Date): number | undefined {
     return Number.isFinite(time) ? Math.floor((time + 8 * 3600_000) / 86400_000) : undefined
 }
 
-export function recordEventLoginMissionFactSync(playerId: number, evaluationTime: Date): boolean {
+export function getEventLoginMissionId(evaluationTime: Date): number | null {
     const spec = EVENT_ENTRY_RULES.find(rule => rule.producer === "login")
-    if (!spec) return false
+    if (!spec) return null
     const definition = getValidatedRule(spec)
+    return definition && isMissionDefinitionEnabledAt(definition, evaluationTime)
+        ? spec.missionId
+        : null
+}
+
+export function recordEventLoginMissionFactSync(playerId: number, evaluationTime: Date): boolean {
+    const missionId = getEventLoginMissionId(evaluationTime)
     const naturalDay = getCnNaturalDay(evaluationTime)
-    if (!definition || naturalDay === undefined
-        || !isMissionDefinitionEnabledAt(definition, evaluationTime)) return false
-    return recordPlayerEventMissionLoginDaySync(playerId, spec.missionId, naturalDay)
+    return missionId === null || naturalDay === undefined
+        ? false
+        : recordPlayerEventMissionLoginDaySync(playerId, missionId, naturalDay)
 }
 
 export function getOpenCharacterElectionVoteMissionId(
@@ -508,32 +525,28 @@ function getRaidSummaryRule(eventId: number): EventEntryRuleSpec | undefined {
     ))
 }
 
+export function getRaidSummaryMissionId(
+    eventId: number,
+    evaluationTime: Date,
+): number | null {
+    if (!Number.isSafeInteger(eventId) || eventId <= 0
+        || !(evaluationTime instanceof Date)
+        || !Number.isFinite(evaluationTime.getTime())) return null
+    const spec = getRaidSummaryRule(eventId)
+    if (!spec) return null
+    const definition = getValidatedRule(spec)
+    return definition && isMissionDefinitionEnabledAt(definition, evaluationTime)
+        ? spec.missionId
+        : null
+}
+
 export function recordRaidSummaryMissionFactSync(
     playerId: number,
     eventId: number,
     evaluationTime: Date,
 ): boolean {
-    if (!Number.isSafeInteger(eventId) || eventId <= 0
-        || !Number.isFinite(evaluationTime.getTime())) return false
-    const spec = getRaidSummaryRule(eventId)
-    if (!spec) return false
-    const definition = getValidatedRule(spec)
-    if (!definition || !isMissionDefinitionEnabledAt(definition, evaluationTime)) return false
-    return completePlayerEventMissionFactSync(playerId, spec.missionId)
-}
-
-export function recordRaidSummaryMissionFactFailSoftSync(
-    playerId: number,
-    eventId: number,
-    evaluationTime: Date,
-): boolean {
-    try {
-        return recordRaidSummaryMissionFactSync(playerId, eventId, evaluationTime)
-    } catch (error) {
-        const missionId = getRaidSummaryRule(eventId)?.missionId
-        console.warn(
-            `[MISSION] raid summary fact failed player=${playerId} event=${eventId} mission=${missionId ?? "unknown"}: ${error instanceof Error ? error.message : String(error)}`,
-        )
-        return false
-    }
+    const missionId = getRaidSummaryMissionId(eventId, evaluationTime)
+    return missionId === null
+        ? false
+        : completePlayerEventMissionFactSync(playerId, missionId)
 }

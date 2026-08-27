@@ -229,6 +229,16 @@ test("bulk_upgrade reads unique requested equipment once and returns the full in
     assert.equal(equipmentById(responseData, EQUIPMENT_B).level, 2)
     assert.ok(equipmentById(responseData, UNRELATED_EQUIPMENT))
     assert.equal(equipmentById(responseData, MISSING_EQUIPMENT), undefined)
+    assert.deepEqual(
+        responseData.data.mission_info.filter(entry => (
+            entry.mission_category_id === 1 && entry.mission_id === 67
+        )),
+        [{
+            mission_category_id: 1,
+            mission_id: 67,
+            mission_reward_id: 67001,
+        }],
+    )
 })
 
 test("sell_stack aggregates duplicate entries from one requested-equipment snapshot", async () => {

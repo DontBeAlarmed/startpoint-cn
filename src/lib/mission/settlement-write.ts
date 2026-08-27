@@ -13,6 +13,7 @@ import type {
     MissionSettlementObserver,
     MissionSettlementResult,
 } from "./settlement"
+import type { ProductionMissionFactSeeds } from "./production-fact-loaders"
 
 export function settleMissionEvaluation(
     evaluation: MissionEvaluationResult,
@@ -28,6 +29,7 @@ export interface MissionEvaluationSettlement {
 
 export interface MissionSettlementRewardDependencies {
     readonly standardRewardGrant?: MissionRewardGrantContext["standardRewardGrant"]
+    readonly factSeeds?: ProductionMissionFactSeeds
 }
 
 export function settleMissionEvaluationWithInvalidations(

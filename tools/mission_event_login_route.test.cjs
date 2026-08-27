@@ -136,6 +136,14 @@ async function main() {
 
         const first = await load(fastify, viewerIds[0], 101)
         assert.equal(first.statusCode, 200, first.body)
+        const firstData = unpack(Buffer.from(first.body, "base64")).data
+        assert.deepEqual(
+            firstData.mission_info
+                .filter(entry => entry.mission_category_id === 3)
+                .map(entry => entry.mission_id),
+            [1225],
+            "活动登录任务必须在本次 load 响应中完成并发奖",
+        )
         const repeatedOtherDevice = await load(fastify, viewerIds[1], 202)
         assert.equal(repeatedOtherDevice.statusCode, 200, repeatedOtherDevice.body)
         assert.equal(getPlayerCategoryMissionsSync(playerId, 3)[1225].progress, 1)

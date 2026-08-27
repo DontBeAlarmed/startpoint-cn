@@ -61,6 +61,11 @@ export function recordAbilitySoulEquipFactsSync(
     const amount = countAbilitySoulEquipments(previous, current)
     if (amount <= 0) return 0
 
+    recordAbilitySoulEquipAmountSync(playerId, amount)
+    return amount
+}
+
+function recordAbilitySoulEquipAmountSync(playerId: number, amount: number): void {
     if (getMissionMasterDefinition(1, 65)?.pattern === "total_ability_soul_use_count") {
         incrementPlayerCategoryMissionSync(playerId, 1, 65, amount)
     }
@@ -69,7 +74,21 @@ export function recordAbilitySoulEquipFactsSync(
             incrementPlayerCategoryMissionSync(playerId, 5, missionId, amount)
         }
     }
-    return amount
+}
+
+export function getAbilitySoulEquipMissionIds(): {
+    readonly regular: readonly number[]
+    readonly degree: readonly number[]
+} {
+    const regularMissionIds = getMissionMasterDefinition(1, 65)?.pattern
+        === "total_ability_soul_use_count" ? [65] : []
+    const degreeMissionIds = ABILITY_SOUL_DEGREE_MISSION_IDS.filter(
+        isAbilitySoulDefinitionSupported,
+    )
+    return {
+        regular: regularMissionIds,
+        degree: degreeMissionIds,
+    }
 }
 
 function validMissionIds(kind: DegreeOperationKind): readonly number[] {
@@ -105,6 +124,17 @@ export function recordMissionOperationFactsSync(
     if (getMissionMasterDefinition(1, regularRule.missionId)?.pattern === regularRule.pattern) {
         incrementPlayerCategoryMissionSync(playerId, 1, regularRule.missionId, amount)
     }
+}
+
+export function getMissionOperationMissionIds(
+    kind: DegreeOperationKind,
+): { readonly regular: readonly number[], readonly degree: readonly number[] } {
+    const regularRule = REGULAR_RULES[kind]
+    const regularMissionIds = getMissionMasterDefinition(1, regularRule.missionId)?.pattern
+        === regularRule.pattern
+        ? [regularRule.missionId]
+        : []
+    return { regular: regularMissionIds, degree: validMissionIds(kind) }
 }
 
 export const recordDegreeOperationFactsSync = recordMissionOperationFactsSync

@@ -50,7 +50,7 @@ Pass 周常使用 `pass-week:<event_id>` 专属快照。新存档和玩家跨日
 
 `get_pass_card` 返回真实 `point`、`is_buy` 和 `all_received_record`。两个 Pass 路由都只接受服务器时间下正在开放的活动；`receive_all` 在发奖前统一校验活动归属、当前等级、购买状态和请求数组，重复领取为空操作，任一奖励失败时整批回滚。
 
-Pass 任务的完成状态在客户端请求 `mission/get_mission_progress` 时计算：服务端按统一服务器时间选取当前开放期，并在同一事务内结算 category 6/7/8。成功战斗产生事实后，客户端再次请求任务进度即可看到变化；打开 Pass 页面本身不是结算时点。
+Pass 任务按统一服务器时间选取当前开放期，并在事实所属请求中结算 category 6/7/8：登录任务随 `/load`，战斗任务随成功 finish 自动完成、发放任务奖励并增加 Pass 点数。`mission/get_mission_progress` 继续提供幂等补结算和任务页聚合，不作为正常事实的首个发奖时点；打开 Pass 页面本身也不是结算时点。Pass 等级奖励仍由 `receive_all` 手动领取。
 
 游戏内不再通过支付 SDK 购买高阶资格：`/payment/item_list` 永远返回空商品列表，因此 Pass 页面不会打开高阶修行礼包的支付弹窗，也不会调用雷霆 SDK 支付。当前开放活动对所有存档默认授予高阶资格：新存档初始化时写入 `is_buy=1`，旧存档请求 `get_pass_card` 时幂等修正为 `true`；点数、登录基线和领取记录不变。现有 `/payment/start` 与 `/payment/finish` 仅保留协议兼容代码；若被外部直接调用也不代表真实支付成功。高阶奖励仍通过 `receive_all` 按原有记录领取，不在授予资格时直接发放。
 官方 CDN 的特殊礼包 `220040`（一步登天礼包）已按已确认字段接入 `/shop/buy`：消耗 50 点付费星导石，增加当前开放 Pass 100 点，单品库存上限为 99。该语义只覆盖此已确认礼包；其他特殊礼包没有转换为通用奖励，继续 fail closed。

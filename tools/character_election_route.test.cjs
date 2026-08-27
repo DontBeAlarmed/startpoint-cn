@@ -95,7 +95,11 @@ async function main() {
             keyword_id: 1000001,
         }))
         assert.equal(voted.data_headers.result_code, 1)
-        assert.deepEqual(voted.data, {})
+        assert.deepEqual(
+            voted.data.mission_info.map(entry => entry.mission_id),
+            [2389],
+            "首次投票必须在同一次响应中完成并发放活动任务",
+        )
         assert.deepEqual(
             db.prepare("SELECT election_id, keyword_id FROM players_character_election_votes WHERE player_id = ?").all(first.playerId),
             [{ election_id: 1, keyword_id: 1000001 }],

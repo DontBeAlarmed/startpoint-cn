@@ -39,7 +39,9 @@ import {
     validateShopPurchaseAmount,
 } from "../../lib/event-shop-purchase";
 import { getMailArrivedSync } from "../../lib/mail-notification";
-import { recordMissionOperationFactsSync } from "../../lib/mission/degree-operation-facts";
+import { settleMissionOperationFactsSync } from "../../lib/mission/operation-fact-settlement";
+import { mergeMissionSettlementResponse } from "../../lib/mission/response";
+import type { MissionSettlementResult } from "../../lib/mission/settlement";
 import {
     isShopItemVisibleForCampaign,
     requireAvailableShopCampaign,
@@ -285,6 +287,7 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
         }
 
         let purchaseResult
+        let missionSettlement: MissionSettlementResult | null = null
         try {
             purchaseResult = executeGenericShopPurchaseSync({
                 playerId,
@@ -307,7 +310,12 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
                 recordManaSpent: (id, amount) => {
                     incrementActiveMissionUsedManaCountSync(id, amount)
                     if (shopType === ShopType.TREASURE) {
-                        recordMissionOperationFactsSync(id, "treasure_mana", amount)
+                        missionSettlement = settleMissionOperationFactsSync(
+                            id,
+                            "treasure_mana",
+                            amount,
+                            gameTime.virtualNow,
+                        )
                     }
                 },
                 grantRewards: grantShopRewardsInTransactionOwnerSync,
@@ -349,23 +357,29 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
         console.log(`[shop:buy] after DB freeMana=${afterPlayer.freeMana} freeVmoney=${afterPlayer.freeVmoney} rewardItems=${JSON.stringify(rewardResult?.items ?? {})}`)
 
         reply.header("content-type", "application/x-msgpack")
+        const responseData: Record<string, unknown> = {
+            "user_info": {
+                "vmoney": afterPlayer.vmoney,
+                "free_vmoney": afterPlayer.freeVmoney,
+                "free_mana": afterPlayer.freeMana,
+                "bond_token": afterPlayer.bondToken,
+                "exp_pool": afterPlayer.expPool,
+            },
+            "character_list": characterList,
+            "equipment_list": rewardResult.equipment_list,
+            "item_list": purchaseResult.itemList,
+            "mission_info": [],
+            "degree_list": [],
+            "mail_arrived": getMailArrivedSync(playerId)
+        }
+        if (missionSettlement) {
+            mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)
+        }
         return reply.status(200).send({
             "data_headers": generateDataHeaders({
                 viewer_id: viewerId
             }),
-            "data": {
-                "user_info": {
-                    "vmoney": afterPlayer.vmoney,
-                    "free_vmoney": afterPlayer.freeVmoney,
-                    "free_mana": afterPlayer.freeMana,
-                    "bond_token": afterPlayer.bondToken,
-                    "exp_pool": afterPlayer.expPool,
-                },
-                "character_list": characterList,
-                "equipment_list": rewardResult.equipment_list,
-                "item_list": purchaseResult.itemList,
-                "mail_arrived": getMailArrivedSync(playerId)
-            }
+            "data": responseData
         })
     })
 

@@ -148,7 +148,7 @@ export function settleMissionCategoriesWithEvaluation(
             undefined,
             selection,
         )
-        const evaluation = evaluateMissionCandidates(prepared, observer)
+        const evaluation = evaluateMissionCandidates(prepared, observer, dependencies?.factSeeds)
         const settled = settleMissionEvaluationWithInvalidations(evaluation, observer, dependencies)
         return {
             prepared,

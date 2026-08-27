@@ -27,7 +27,12 @@ export function clientSerializeEquipment(
  * complete snapshot of the player's equipment after any modifications.
  */
 export function buildFullEquipmentList(playerId: number): Object[] {
-    const allEquipment = getPlayerEquipmentListSync(playerId)
+    return serializeFullEquipmentList(getPlayerEquipmentListSync(playerId))
+}
+
+export function serializeFullEquipmentList(
+    allEquipment: Readonly<Record<string, PlayerEquipment>>,
+): Object[] {
     const list: Object[] = []
     for (const [equipId, equip] of Object.entries(allEquipment)) {
         list.push(clientSerializeEquipment(parseInt(equipId), equip))

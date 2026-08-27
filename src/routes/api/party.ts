@@ -12,9 +12,14 @@ import { PartyCategory, PROFILE_FAVORITE_PARTY_CATEGORY } from "../../data/types
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { hasValidPartyCategory, isGlobalPartyIdAllowedForCategory, parseGlobalPartyId } from "../../lib/special-event-parties";
 import { getMailArrivedSync } from "../../lib/mail-notification";
-import { recordRaidSetEditMissionFactsSync } from "../../lib/mission/event-entry-facts";
+import {
+    getRaidSetEditMissionIds,
+    recordRaidSetEditMissionFactsSync,
+} from "../../lib/mission/event-entry-facts";
 import { validatePartyLoadouts } from "../../lib/party-loadout-validation";
-import { recordAbilitySoulEquipFactsSync } from "../../lib/mission/degree-operation-facts";
+import { settleAbilitySoulEquipFactsSync } from "../../lib/mission/operation-fact-settlement";
+import { settleMissionCategories, type MissionSettlementResult } from "../../lib/mission/settlement";
+import { mergeMissionSettlementResponse } from "../../lib/mission/response";
 
 interface PartyInfoListItem {
     party_edited: boolean
@@ -555,7 +560,9 @@ const routes = async (fastify: FastifyInstance) => {
             ({ party }) => party.category !== PROFILE_FAVORITE_PARTY_CATEGORY,
         )
 
-        getDb().transaction(() => {
+        const evaluationTime = new Date(getServerTime() * 1000)
+        const missionSettlements = getDb().transaction(() => {
+            const settlements: MissionSettlementResult[] = []
             // Profile favorites are independent from the battle party selected by the player.
             if ((mappedParties.length === 0 || mappedBattleParties.length > 0)
                 && player.partySlot !== body.main_party_id) {
@@ -568,7 +575,7 @@ const routes = async (fastify: FastifyInstance) => {
                 updatePlayerPartySync(playerId, parsed.slot, party, parsed.groupId)
             }
             if (mappedBattleParties.length > 0) {
-                recordAbilitySoulEquipFactsSync(
+                const abilitySoulSettlement = settleAbilitySoulEquipFactsSync(
                     playerId,
                     existingLoadouts.map(loadout => ({
                         abilitySoulIds: loadout.ability_soul_ids,
@@ -576,33 +583,54 @@ const routes = async (fastify: FastifyInstance) => {
                     mappedBattleParties.map(({ party }) => ({
                         abilitySoulIds: party.abilitySoulIds,
                     })),
+                    evaluationTime,
                 )
+                if (abilitySoulSettlement.settlement) {
+                    settlements.push(abilitySoulSettlement.settlement)
+                }
                 incrementActiveMissionPartyActionCountsSync(playerId, {
                     equipmentEquipCount: mappedBattleParties.some(({ party }) => party.equipmentIds.some(id => id !== null)) ? 1 : 0,
                     unisonSetCount: mappedBattleParties.some(({ party }) => party.unisonCharacterIds.some(id => id !== null)) ? 1 : 0,
                     partyCharacterSetCount: mappedBattleParties.some(({ party }) => party.characterIds.some(id => id !== null)) ? 1 : 0,
                 })
+                const raidSetParties = mappedBattleParties.map(({ parsed, party }) => ({
+                    category: party.category,
+                    groupId: parsed.groupId,
+                    slot: parsed.slot,
+                }))
+                const raidSetMissionIds = getRaidSetEditMissionIds(
+                    body.use_party_group_edit,
+                    raidSetParties,
+                    evaluationTime,
+                )
                 recordRaidSetEditMissionFactsSync(
                     playerId,
                     body.use_party_group_edit,
-                    mappedBattleParties.map(({ parsed, party }) => ({
-                        category: party.category,
-                        groupId: parsed.groupId,
-                        slot: parsed.slot,
-                    })),
-                    new Date(getServerTime() * 1000),
+                    raidSetParties,
+                    evaluationTime,
                 )
+                if (raidSetMissionIds.length > 0) {
+                    settlements.push(settleMissionCategories(playerId, [{
+                        category: 3,
+                        missionIds: raidSetMissionIds,
+                    }], evaluationTime))
+                }
             }
+            return settlements
         })()
 
         reply.header("content-type", "application/x-msgpack")
+        const responseData: Record<string, unknown> = {
+            "mail_arrived": getMailArrivedSync(playerId)
+        }
+        for (const settlement of missionSettlements) {
+            mergeMissionSettlementResponse(responseData, settlement, viewerId)
+        }
         return reply.status(200).send({
             "data_headers": generateDataHeaders({
                 viewer_id: viewerId
             }),
-            "data": {
-                "mail_arrived": getMailArrivedSync(playerId)
-            }
+            "data": responseData
         })
     })
 

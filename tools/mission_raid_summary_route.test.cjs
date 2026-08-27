@@ -44,7 +44,7 @@ const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
-const { insertDefaultPlayerSync } = require("../src/data/domains/player")
+const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { activeQuests, insertActiveQuest } = require("../src/lib/quest/active-quest-service")
 const raidEventRoutes = require("../src/routes/api/raidEvent").default
 const singleBattleRoutes = require("../src/routes/api/singleBattleQuest").default
@@ -150,8 +150,17 @@ async function main() {
         const first = await summary(fastify, 800000421, 4, 2)
         assert.equal(first.statusCode, 200, first.body)
         const firstData = unpack(first.rawPayload).data
-        assert.equal("mission_info" in firstData, false, "Raid summary 响应协议不得增加 mission 字段")
+        assert.deepEqual(
+            firstData.mission_info.map(entry => entry.mission_id),
+            [400053],
+            "Raid summary 首次进入必须在本次响应中完成并发放活动任务",
+        )
         assert.equal(getPlayerCategoryMissionsSync(playerId, 3)[400053].progress, 1)
+        assert.equal(
+            firstData.user_info.free_mana,
+            getPlayerSync(playerId).freeMana,
+            "Raid summary 首响应必须返回活动奖励与任务奖励合并后的最终余额",
+        )
 
         const repeated = await summary(fastify, 800000421, 4, 3)
         assert.equal(repeated.statusCode, 200, repeated.body)

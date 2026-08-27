@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import type { ReadonlyCharacterElectionTable } from "../../content/converters/character-election"
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { resolvePlayerIdSync } from "../../data/activeAccount"
+import { getDb } from "../../data/db"
 import {
     getPlayerCharacterElectionVoteSync,
     recordPlayerCharacterElectionVoteSync,
@@ -14,6 +15,8 @@ import {
     isCharacterElectionOpenAt,
 } from "../../lib/character-election"
 import { getOpenCharacterElectionVoteMissionId } from "../../lib/mission/event-entry-facts"
+import { settleMissionCategories } from "../../lib/mission/settlement"
+import { mergeMissionSettlementResponse } from "../../lib/mission/response"
 import { generateDataHeaders, getServerTime } from "../../utils"
 
 interface ElectionBody {
@@ -133,13 +136,21 @@ export default async function characterElectionRoutes(
         if (missionId === null) {
             return sendBadRequest(reply, "Character election mission is unavailable.")
         }
-        recordPlayerCharacterElectionVoteSync(
-            context.playerId,
-            body.election_id,
-            body.keyword_id,
-            Math.floor(evaluationTime.getTime() / 1000),
-            missionId,
-        )
-        return sendMsgpack(reply, context.viewerId, 1, {})
+        const missionSettlement = getDb().transaction(() => {
+            recordPlayerCharacterElectionVoteSync(
+                context.playerId,
+                body.election_id as number,
+                body.keyword_id as number,
+                Math.floor(evaluationTime.getTime() / 1000),
+                missionId,
+            )
+            return settleMissionCategories(context.playerId, [{
+                category: 3,
+                missionIds: [missionId],
+            }], evaluationTime)
+        })()
+        const responseData: Record<string, unknown> = {}
+        mergeMissionSettlementResponse(responseData, missionSettlement, context.viewerId)
+        return sendMsgpack(reply, context.viewerId, 1, responseData)
     })
 }

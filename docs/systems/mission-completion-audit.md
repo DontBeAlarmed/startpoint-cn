@@ -9,6 +9,7 @@
   无法确定分类的历史行不会猜测迁移。
 - 进度写入使用 SQLite UPSERT，不再通过 `INSERT OR REPLACE` 删除已有的阶段领奖子记录。
 - `update_mission_progress` 把客户端值作为增量处理，符合 `MissionCounterLogic` 每次静默上报后清空本地批次的行为。
+- 非 category 9 的白名单客户端增量会在同一事务中定向完成判定并自动发奖；category 9 继续使用觉醒专用结算。打开任务页不是该事实的正常发奖时点。
 - 每日和每周重置分别删除 category 2/6 与 category 7/10 的任务状态，并记录累计战斗、评级、冲刺、强化弹射、
   体力和登录天数的当前基线。旧存档升级时以升级时状态创建基线，避免把历史累计量误算成本周期进度。
 - `get_mission_progress` 会检查任务开放时间、收集任务 `event_id`，并独立处理每个角色觉醒
@@ -32,7 +33,7 @@
   ID 白名单。强化弹射、单场连击、三角色同队和指定队长+关卡/限时均在一次成功 finish 中原子记录，不读取
   可跨场污染的全局或关卡历史摘要。`2310012` 使用主位与 Sub 种族合集的包含判断；`1610022/2610072`
   使用全部 zone 的 `encoffinment_count` 总和为 0。核心解锁与领奖流程已通过客户端，144 条条件尚未逐条验收。
-- category 1、2、6、7、8、10 的 `get_mission_progress` 会补结算已完成且未领取的阶段；携带角色 ID 的 category 9 请求仍是
+- category 1、2、6、7、8、10 的 `get_mission_progress` 会兼容补结算已完成但历史入口未发奖的阶段；携带角色 ID 的 category 9 请求仍是
   觉醒第一页的正式领奖入口。
 - ActiveMission 领奖会在原子发奖前校验任务存在、阶段定义、完成阈值、既有领奖状态与重复请求。
 - ActiveMission 奖励保留 kind 0（星导石），并把物品、装备、角色、玛纳、经验和称号写入正确的响应集合。
@@ -112,9 +113,9 @@
   type 20 Attention 因 `FinishContext` 没有权威救援来源而保持 0 条，普通 Guest 不冒充 Attention。
 - “接取救援请求”保持低优先级，暂不实现；在获得可区分 Attention 的权威来源前，不以普通 Guest 代替。
 - 当前 category 3 共启用 2485 条事实：805 条原生严格 QuestRange 协力规则、948 条空 selector 兼容规则、257 条 type 23 精确通关规则、445 条关卡、物品、竞速、阶段、当前状态及单人累计规则、18 条 Event 入口/SET/投票事实、2 条歼灭者 type 86 及 10 条 type 87。
-- 1225 只在任务开放期内的真实 `/load` 按统一服务器时间和 CN 自然日增加 1；`players_event_mission_login_days` 仅保存玩家与任务的最后计数日。Active Mission reconcile 与响应构建完成后，load 在 reply 上登记 request-local pending commit；生产 CN MsgPack `onSend` hook 完成实际编码后才执行该 commit，并使用 `BEGIN IMMEDIATE` 处理多连接竞争。同一自然日只有一个连接增长。同一玩家的多设备、同日重复 load 和服务器时间回拨都不重复累计，一次登录也不补造跳过的历史天数。reconcile、响应构建或实际 CN onSend 编码失败均不计数；编码成功后交给网络栈的传输失败不纳入该保证。
-- 400053/400071/400089/400093 分别只在活动 4/5/6/7 的 `/event/raid/summary` 请求中幂等完成到 1；事实写入使用嵌套保存点，异常时仅回滚该事实并记录 player/event/mission 告警，既有 summary 奖励、状态和响应继续完成且不增加响应字段。
-- 400054～400056、400072～400074、400090～400092、400094～400096 只在 `use_party_group_edit=true` 的 `/party/edit` 事务成功保存 RAID 第 1 组槽位 1/2/3 后，分别幂等完成主队伍、副 1、副 2 的 progress 1。同请求重复槽位去重；普通编辑、非 RAID、其他组、槽位 4～10、无开放活动族或多个活动族重叠开放均 fail closed。任务 SQL 异常向外传播并回滚队伍更新与 Active Mission 计数，成功响应不增加 `mission_info`。这只能证明 SET 编辑器成功保存目标槽位，不能证明用户点击了复制按钮。
+- 1225 只在任务开放期内的真实 `/load` 按统一服务器时间和 CN 自然日增加 1；`players_event_mission_login_days` 仅保存玩家与任务的最后计数日。load 在 CN MsgPack `onSend` 中用短事务完成事实、定向结算、响应合并和实际编码；编码失败会整体回滚。同一自然日只有一个连接增长，多设备、同日重复 load 和服务器时间回拨都不重复累计，一次登录也不补造跳过的历史天数。成功响应会直接携带本次 `mission_info` 与奖励绝对值。
+- 400053/400071/400089/400093 分别只在活动 4/5/6/7 的 `/event/raid/summary` 请求中幂等完成到 1，并在同次响应返回任务结算。事实与发奖使用嵌套保存点；异常时两者一起回滚并记录 player/event/mission 告警，既有 summary 奖励、状态和响应继续完成。
+- 400054～400056、400072～400074、400090～400092、400094～400096 只在 `use_party_group_edit=true` 的 `/party/edit` 事务成功保存 RAID 第 1 组槽位 1/2/3 后，分别幂等完成主队伍、副 1、副 2 的 progress 1，并在同次响应返回任务结算。同请求重复槽位去重；普通编辑、非 RAID、其他组、槽位 4～10、无开放活动族或多个活动族重叠开放均 fail closed。任务 SQL 异常向外传播并回滚队伍更新与 Active Mission 计数。这只能证明 SET 编辑器成功保存目标槽位，不能证明用户点击了复制按钮。
 - 18 条规则逐 ID 校验官方 pattern、严格十进制 pattern type/奖励 target、可选 QuestRange selector、保留空字段和精确 `YYYY-MM-DD HH:mm:ss` UTC+8 日历开放期；空串、首尾空白、溢出整数、不存在日期和任一主数据漂移均 fail closed。
   其中新增的 7 条战斗结算事实来自官方主数据 pattern 26/27/28：1208/1209/1210 只在 battle_kind=3 的成功 SS 结算中逐场增加；1216 读取成功结算的 `statistics.max_power`，仅接受非负安全整数并以最大值写入；1200/1211/1223 校验官方 row[3]=2 后读取 `zones[].use_dash_count`，三条适用规则以同一批次逐场累加非负安全整数总和，任一 zone 非法、统计求和溢出，或历史持久化 progress 加本次 delta 超过 `Number.MAX_SAFE_INTEGER`，则三条整批不增长。非负统计输入仍是合法格式，但合计为 0 时是 no-op，不写入 progress，也不视为 matched。7 条规则均由精确 mission ID 白名单逐条取主数据，动态校验 pattern、battle kind、statistics code，并受任务开放期限制；battle_kind=3 同时接受单人和多人。另有 29 条 Ranking Phase 任务只接受 category 11 的成功单人结算，按官方关卡表精确匹配 quest ID，并以合法整数 `clear_phase` 完成不高于本次阶段的任务；另有 8 条 type 14 任务按摇曳迷宫、EX 和崩坏域的权威 QuestRange 逐次累计成功单人结算。
   其中包括 40 条 `get_item_count`、54 条土俑单关卡、18 条土俑聚合任务、37 条崩坏域庆贺单关卡

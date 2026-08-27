@@ -190,6 +190,17 @@ async function main() {
     assert.equal(characterEpisodeFinish.statusCode, 200, characterEpisodeFinish.body)
     const characterEpisodeData = decode(characterEpisodeFinish).data
     assert.deepEqual(
+        characterEpisodeData.mission_info.filter(entry => (
+            entry.mission_category_id === 1 && entry.mission_id === 23
+        )),
+        [{
+            mission_category_id: 1,
+            mission_id: 23,
+            mission_reward_id: 23001,
+        }],
+        "普通角色故事任务必须在首次通关响应中完成并发奖",
+    )
+    assert.deepEqual(
         characterEpisodeData.active_mission_list.find(entry => entry.mission_id === 11010),
         {
             mission_id: 11010,

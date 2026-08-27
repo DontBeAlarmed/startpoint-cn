@@ -92,6 +92,24 @@ stubModule("../src/utils", {
     generateDataHeaders: values => ({ viewer_id: values.viewer_id, result_code: values.result_code ?? 1 }),
     getServerTime: () => evaluationTime.getTime() / 1000,
 })
+const missionSettlementCalls = []
+stubModule("../src/lib/mission/settlement", {
+    settleMissionCategories: (...args) => {
+        missionSettlementCalls.push(args)
+        return {
+            missionInfo: [400054, 400055, 400056].map(missionId => ({
+                mission_category_id: 3,
+                mission_id: missionId,
+                mission_reward_id: missionId * 10 + 1,
+            })),
+            itemList: {},
+            characterList: [],
+            equipmentList: [],
+            degreeIds: [],
+            passCardPoints: {},
+        }
+    },
+})
 
 const { PartyCategory } = require("../src/data/types")
 const { getActiveMissionCountersSync } = require("../src/data/domains/active_mission_counters")
@@ -159,7 +177,12 @@ async function main() {
             "SET 编辑器成功保存主/副1/副2槽后应各完成一条事实",
         )
         const responseData = unpack(threeSlots.rawPayload)
-        assert.equal(responseData.data.mission_info, undefined)
+        assert.deepEqual(
+            responseData.data.mission_info.map(entry => entry.mission_id),
+            [400054, 400055, 400056],
+            "Raid SET 保存必须在同一次响应中返回活动任务结算",
+        )
+        assert.equal(missionSettlementCalls.length, 1)
 
         evaluationTime = new Date("2024-12-05T04:00:00.000Z")
         const ordinaryEdit = await edit([partyInfo({ partyId: 1 })], false)

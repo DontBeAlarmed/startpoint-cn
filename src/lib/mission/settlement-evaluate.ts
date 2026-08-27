@@ -8,6 +8,7 @@ import type { Player, PlayerActiveMission } from "../../data/types"
 import { MissionEvaluationSession } from "./evaluation-session"
 import { getMissionCatalog } from "./mission-catalog"
 import { createProductionMissionFactLoaderRegistry } from "./production-fact-loaders"
+import type { ProductionMissionFactSeeds } from "./production-fact-loaders"
 import { getMissionFactRequirementRegistry } from "./requirements/registry"
 import { getComputer } from "./registry"
 import { getMissionPattern } from "./patterns"
@@ -98,6 +99,7 @@ function groupPassMissionIds(
 export function evaluateMissionCandidates(
     prepared: PreparedMissionSettlement,
     observer?: MissionSettlementObserver,
+    factSeeds: ProductionMissionFactSeeds = {},
 ): MissionEvaluationResult {
     if (prepared.candidates.length === 0) {
         throw new Error("Mission evaluation requires at least one prepared candidate")
@@ -156,6 +158,7 @@ export function evaluateMissionCandidates(
         candidates: prepared.candidates,
         orchestratorFacts: [{ kind: "player" }],
         loaders: createProductionMissionFactLoaderRegistry(undefined, {
+            ...factSeeds,
             player,
             categoryMissions: persistedByCategory,
         }),

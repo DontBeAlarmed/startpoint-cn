@@ -63,9 +63,7 @@ fail closed，阻止显示任务、结算奖励或创建新解锁。
 普通奖励领取。若最后一个入口条件是学习一板最后节点，`learn_mana_node` 会先写入节点，再在同一响应内校准
 解锁；合并逻辑保留该角色条目已有的进化、信赖证等字段，同时加入 `mana_board_awake`。
 
-`mission/update_mission_progress` 只累计客户端上报的任务增量，不执行奖励结算，也不调用
-`computeAwakeSummary`。写入进度后它会调用 `reconcileAwakeUnlockCharacterList`，因此若该权威增量刚好完成最终条件，
-可以在同一响应中发布新的持久解锁。
+`mission/update_mission_progress` 只接受客户端五种白名单增量。非 category 9 的实际匹配任务会在同一事务中定向结算并自动发奖；category 9 继续走觉醒专用计算与领奖时序。写入进度后接口仍会调用 `reconcileAwakeUnlockCharacterList`，因此若该权威增量刚好完成最终条件，可以在同一响应中发布新的持久解锁。
 
 当前所有调用 `reconcileAwakeUnlockCharacterList` 的业务入口都会在状态落库后执行校准，覆盖：单人和多人战斗结算、剧情结算、普通与兑换抽卡、BoxGacha、星粒 exchange、商店购买、城镇或角色获得、教程步骤 15/16、邮件领取、物品出售、信赖证领取、任务进度更新和 Active Mission 领奖。新增角色来源或新增觉醒条件时必须重新反向审计调用点，不能假定未来端点会自动覆盖。
 `/load` 会对持有角色执行同样的持久化校准，并把持久解锁与已经觉醒的节点等级按每块板的最大值合并序列化。
