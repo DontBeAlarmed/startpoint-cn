@@ -333,6 +333,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/account_cleanup_takeover.test.cjs",
             "tools/admin_scheduled_resource_routes.test.cjs",
             "tools/admin_player_actions.test.cjs",
+            "tools/admin_mail_expiry.test.cjs",
             "tools/history_receive_route.test.cjs",
             "tools/mail_receive_transaction.test.cjs",
             "tools/mission_category_batch_read.test.cjs",

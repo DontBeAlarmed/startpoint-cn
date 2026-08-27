@@ -26,7 +26,8 @@ function getRegularLoginMissionIds(): number[] {
     return [...selectCached(
         getMissionMasterDefinitions(1),
         regularCandidateCache,
-        definition => definition.pattern === "total_login",
+        definition => definition.pattern === "total_login"
+            || definition.pattern === "special_total_login_2anv",
     )]
 }
 

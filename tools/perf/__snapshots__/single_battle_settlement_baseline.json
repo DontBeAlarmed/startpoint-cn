@@ -104,9 +104,7 @@
         "startResponse": {
           "data": {
             "category_id": 7,
-            "character_list": [],
             "degree_list": [],
-            "equipment_list": [],
             "is_multi": "single",
             "item_list": {
               "10000072": 1
@@ -132,7 +130,7 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "261e0b5baca8233743ced169fb138290e66542e525e524ace70f7c3f1150257a",
+      "behaviorSha256": "d917487d4b4fddb977228b9708c35aefe6ea6298a840636c4502073f51346a3d",
       "sql": {
         "statements": 41,
         "selectStatements": 27,
@@ -385,6 +383,11 @@
               "category": 1,
               "id": 40,
               "progress": 31
+            },
+            {
+              "category": 1,
+              "id": 108,
+              "progress": 1
             },
             {
               "category": 2,
@@ -1113,7 +1116,7 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "f986576cd30d0ab1a447d185530e1ea7b1d2c3363df3d313e0b75ec34a2194a3",
+      "behaviorSha256": "b343e04faad64d5c7fb0bd2f5fd81f127fd05d156b55d77f810a7d99eca335cd",
       "sql": {
         "statements": 120,
         "selectStatements": 61,
@@ -1606,6 +1609,11 @@
               "progress": 31
             },
             {
+              "category": 1,
+              "id": 108,
+              "progress": 1
+            },
+            {
               "category": 2,
               "id": 11,
               "progress": 1
@@ -2096,7 +2104,7 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "462252424112a5e57dcd4d1e50d3d7f905dac2209b8a00fdecfe357369a894f2",
+      "behaviorSha256": "7119d703719536544a456203d74027cf0c1ab32e82b4007ee55993d47c430a2e",
       "sql": {
         "statements": 97,
         "selectStatements": 57,
@@ -2366,6 +2374,11 @@
               "category": 1,
               "id": 40,
               "progress": 31
+            },
+            {
+              "category": 1,
+              "id": 108,
+              "progress": 1
             },
             {
               "category": 2,
@@ -2801,6 +2814,11 @@
                 "category": 1,
                 "id": 40,
                 "progress": 31
+              },
+              {
+                "category": 1,
+                "id": 108,
+                "progress": 1
               },
               {
                 "category": 2,
@@ -3380,6 +3398,11 @@
                 "progress": 62
               },
               {
+                "category": 1,
+                "id": 108,
+                "progress": 1
+              },
+              {
                 "category": 2,
                 "id": 11,
                 "progress": 2
@@ -3946,7 +3969,7 @@
           }
         }
       },
-      "behaviorSha256": "fd4065b26542248c03268f017e59d4e95d2c0be6b7bd74d8efd679d0e10c5082",
+      "behaviorSha256": "535ddc1631ffc3868098ea657f4fc7710aa0fcae49e21072944567e04a7f7db6",
       "sql": {
         "statements": 92,
         "selectStatements": 57,
@@ -4203,6 +4226,11 @@
               "progress": 1
             },
             {
+              "category": 1,
+              "id": 108,
+              "progress": 1
+            },
+            {
               "category": 2,
               "id": 16,
               "progress": 1
@@ -4258,9 +4286,7 @@
         "response": {
           "data": {
             "category_id": 1,
-            "character_list": [],
             "degree_list": [],
-            "equipment_list": [],
             "is_multi": "single",
             "item_list": {},
             "mail_arrived": false,
@@ -4284,7 +4310,7 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "0f8d44986b78239b50775bb7882487748b349b563c3b035549879e74565c7b5a",
+      "behaviorSha256": "6d0c004cdc4fc4eb245510985d9058884817f7a7efd3ca69ceacc5b9ab937475",
       "sql": {
         "statements": 25,
         "selectStatements": 18,

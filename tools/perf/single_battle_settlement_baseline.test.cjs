@@ -110,8 +110,16 @@ test("checked snapshot matches a fresh baseline run", async () => {
 })
 
 test("baseline CLI is read-only unless --write is explicit", () => {
-    assert.deepEqual(parseArgs([]), { write: false })
-    assert.deepEqual(parseArgs(["--write"]), { write: true })
+    assert.deepEqual(parseArgs([]), { write: false, acceptBehaviorChange: false })
+    assert.deepEqual(parseArgs(["--write"]), { write: true, acceptBehaviorChange: false })
+    assert.deepEqual(
+        parseArgs(["--write", "--accept-behavior-change"]),
+        { write: true, acceptBehaviorChange: true },
+    )
+    assert.throws(
+        () => parseArgs(["--accept-behavior-change"]),
+        /requires --write/,
+    )
     assert.throws(() => parseArgs(["--output", "elsewhere.json"]), /unknown argument/)
     assert.throws(() => parseArgs(["--write", "--write"]), /duplicate --write/)
 })

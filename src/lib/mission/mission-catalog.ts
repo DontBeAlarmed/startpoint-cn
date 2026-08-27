@@ -109,9 +109,10 @@ export function isMissionMasterDefinitionEnabledAt(
     }
 
     const now = at.getTime()
+    if (!Number.isFinite(now)) return false
+
     const start = parseMasterCnTime(definition.enableStart)
     const end = parseMasterCnTime(definition.enableEnd)
-    if (!Number.isFinite(now)) return false
     if (start !== undefined && (!Number.isFinite(start) || start > now)) return false
     if (end !== undefined && (!Number.isFinite(end) || now > end)) return false
     return true

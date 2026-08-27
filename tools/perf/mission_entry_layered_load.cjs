@@ -32,8 +32,9 @@ const FORMAL_CONCURRENCY_STEPS = Object.freeze([1, 10, 25, 50, 100])
 const FORMAL_PREPARED_STATES = 600
 const FORMAL_REQUESTS_PER_ENTRY = 150
 const APPROVED_BEHAVIOR_SIGNATURES = Object.freeze({
-    "single-finish": "e011f6a47915dd705138ff72cfedb9fe76573beaedf72f0a36cd74621ae105be",
-    "multi-finish": "253f4b86d8ae23cdd7d8f04f09c06ddea910ab97163b0b0d44f55b546391865c",
+    "get-progress": "e30a9d15a262f2a17ff9a5c9d61ccab0ac8b5f09640d8167088999e91548b7fa",
+    "single-finish": "d2d70f29389735e3136cbcb857748e01628a40df9cae57cdeac2c6ba07fb979d",
+    "multi-finish": "66acac4bc1fa05caee238fcfd461aa67e5462e36ca5e0434c821e47fea5728db",
 })
 const REFERENCE_PATH = path.join(
     __dirname,

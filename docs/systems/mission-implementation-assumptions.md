@@ -68,6 +68,15 @@
 - CN 1.8.1 将 type 79 解析为 `raid_event_top_check`。`RaidEventLoadingTask` 在进入 Raid top、quest select 等 Raid 场景前先请求 `event/raid/summary(event_id)`，成功后才请求 party 并进入页面；因此 400053/400071/400089/400093 只由对应 eventId 4/5/6/7 的真实 summary 请求完成。普通 load、战斗 finish、错误 event 和其他 Raid API 不产生该事实。
 - 17 条规则同时校验官方 mission ID、string pattern、严格十进制 pattern type/奖励 target、QuestRange selector/eventId token、保留空字段，以及精确 `YYYY-MM-DD HH:mm:ss` UTC+8 日历开放期。空串不能表示 type 0，整数 token 不接受空白、符号、小数或溢出，日期会逐字段校验闰年与每月天数；结构不一致时保持既有 progress，不猜测替代映射。type 79 与 type 80/81/82 均只幂等确保 progress 至少为 1，并由对应业务请求定向结算、自动发奖和返回 `mission_info`。
 - 1225 在 Active Mission reconcile 与基础响应构建成功后，于 CN MsgPack `onSend` 的短事务内记录自然日事实、定向结算并编码已合并响应。reconcile、响应构建、任务发奖或实际编码失败均不计数、不发奖，多连接竞争同日 marker 只有一个连接成功；编码成功后交给网络栈的传输错误不属于该事务边界。
+
+## 普通任务 108：特别累计登录
+
+- `mission_regular` 的 `108` 使用 pattern `special_total_login_2anv`，客户端文案为“【特别】累计登陆天数 ::x_count::”。
+  18 个奖励阶段的累计登录阈值直接来自 `mission_regular_reward`，不是由任务 ID 或日期推测。
+- CDN 权威开放字段为开始时间 `2023-08-31 12:00:00`、结束时间为空；行内后续重复日期不属于开放窗口。
+  因此运行时使用普通目录规则：只有到达官方启用时点后才参与结算，之后不设关闭日期，不需要任务专用时间特判。
+- 进度读取账号已有的 `totalLoginDays`，和普通 `total_login` 共用 `/load` 登录事实、普通 Category 1 自动结算及幂等发奖链路。
+  这不会改变真实每日登录奖励的 05:00 刷新规则，也不会使用虚拟日期跳跃伪造登录天数。
 - type 79 使用嵌套 SQLite 保存点参与 Raid summary：成功时事实、任务发奖和 summary 外层事务一起提交；任务事实或发奖异常时保存点完整回滚，再记录包含 player/event/mission 的告警并继续原有 summary。该可选任务不得把既有 summary 变成错误响应，也不得留下部分任务写入；其他 summary 奖励或状态异常仍按原外层事务整体回滚。
 
 ## category 3：角色总选举投票

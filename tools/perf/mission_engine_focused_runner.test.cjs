@@ -12,6 +12,7 @@ const {
     SCENARIO_KEYS,
     admitFocusedMissionReport,
     createBehaviorSummary,
+    parseArgs,
     runMissionEngineFocusedBaseline,
     writeFocusedMissionSnapshotAtomic,
 } = require("./mission_engine_focused_baseline.cjs")
@@ -51,6 +52,19 @@ function createAdmissionReport() {
         },
     }
 }
+
+test("focused baseline requires write mode for explicit behavior approval", () => {
+    assert.deepEqual(parseArgs([]), { write: false, acceptBehaviorChange: false })
+    assert.deepEqual(parseArgs(["--write"]), { write: true, acceptBehaviorChange: false })
+    assert.deepEqual(
+        parseArgs(["--write", "--accept-behavior-change"]),
+        { write: true, acceptBehaviorChange: true },
+    )
+    assert.throws(
+        () => parseArgs(["--accept-behavior-change"]),
+        /requires --write/,
+    )
+})
 
 test("focused snapshot writer replaces atomically and cleans failed temporary files", () => {
     const temporaryParent = fs.mkdtempSync(path.join(os.tmpdir(), "mission-focused-write-"))
@@ -130,12 +144,36 @@ test("focused admission keeps ordinary runs read-only and blocks behavior-changi
 
         fs.writeFileSync(temporarySnapshot, checkedJson)
         const changed = createAdmissionReport()
-        changed.scenarios.focused.behavior.result = "changed"
+        Object.assign(
+            changed.scenarios.focused,
+            createBehaviorSummary({ result: "changed" }),
+        )
         const rejected = admitFocusedMissionReport(changed, {
             snapshotPath: temporarySnapshot,
             write: true,
         })
         assert.equal(rejected.admitted, false)
+        assert.equal(fs.readFileSync(temporarySnapshot, "utf8"), checkedJson)
+
+        const accepted = admitFocusedMissionReport(changed, {
+            snapshotPath: temporarySnapshot,
+            write: true,
+            acceptBehaviorChange: true,
+        })
+        assert.equal(accepted.admitted, true)
+        assert.deepEqual(
+            JSON.parse(fs.readFileSync(temporarySnapshot, "utf8")),
+            changed,
+        )
+
+        fs.writeFileSync(temporarySnapshot, checkedJson)
+        changed.scenarios.focused.sqlReads++
+        const structuralRegression = admitFocusedMissionReport(changed, {
+            snapshotPath: temporarySnapshot,
+            write: true,
+            acceptBehaviorChange: true,
+        })
+        assert.equal(structuralRegression.admitted, false)
         assert.equal(fs.readFileSync(temporarySnapshot, "utf8"), checkedJson)
     } finally {
         fs.rmSync(temporaryParent, { recursive: true, force: true })

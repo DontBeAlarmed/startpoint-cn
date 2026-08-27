@@ -16,7 +16,7 @@
           "1": {
             "candidates": 120,
             "computed": 107,
-            "progressChanged": 4,
+            "progressChanged": 5,
             "rewardStagesGranted": 0
           },
           "2": {
@@ -58,7 +58,7 @@
         },
         "candidates": 3557,
         "computed": 177,
-        "progressChanged": 6
+        "progressChanged": 7
       },
       "name": "new-account",
       "rewardStagesGranted": 1,
@@ -142,8 +142,8 @@
           "1": {
             "candidates": 120,
             "computed": 107,
-            "progressChanged": 17,
-            "rewardStagesGranted": 31
+            "progressChanged": 18,
+            "rewardStagesGranted": 41
           },
           "2": {
             "candidates": 656,
@@ -184,10 +184,10 @@
         },
         "candidates": 3557,
         "computed": 177,
-        "progressChanged": 27
+        "progressChanged": 28
       },
       "name": "normal-progress",
-      "rewardStagesGranted": 39,
+      "rewardStagesGranted": 49,
       "sql": {
         "byTable": {
           "players": {
@@ -273,8 +273,8 @@
           "1": {
             "candidates": 120,
             "computed": 107,
-            "progressChanged": 39,
-            "rewardStagesGranted": 119
+            "progressChanged": 40,
+            "rewardStagesGranted": 133
           },
           "2": {
             "candidates": 656,
@@ -315,10 +315,10 @@
         },
         "candidates": 3557,
         "computed": 177,
-        "progressChanged": 54
+        "progressChanged": 55
       },
       "name": "high-completion-volume",
-      "rewardStagesGranted": 133,
+      "rewardStagesGranted": 147,
       "sql": {
         "byTable": {
           "players": {
@@ -400,5 +400,5 @@
     }
   ],
   "version": 2,
-  "sha256": "6004cc8a57bd6341f7c0ddf960bdf4a735523a7c3913fa4ccf06aefb3eed9843"
+  "sha256": "76b36e0b20002644562a553913ba2e17ab0a5006292e3dc7fba144e169716337"
 }

@@ -71,6 +71,25 @@ test("focused admission classifies two valid different behaviors as equivalence 
     ]) assert.equal(admission[flag], true, flag)
 })
 
+test("focused admission allows an explicitly approved behavior change without relaxing metrics", () => {
+    const snapshot = createReport()
+    const current = createReport()
+    Object.assign(current.scenarios.focused, createBehaviorSummary({ result: "changed" }))
+
+    const approved = evaluateFocusedMissionAdmission(current, snapshot, {
+        allowBehaviorChange: true,
+    })
+    assert.equal(approved.admitted, true)
+    assert.deepEqual(approved.failures, [])
+
+    current.scenarios.focused.sqlReads++
+    const regression = evaluateFocusedMissionAdmission(current, snapshot, {
+        allowBehaviorChange: true,
+    })
+    assert.equal(regression.admitted, false)
+    assert.deepEqual(failureMetrics(regression), ["focused:sqlReads"])
+})
+
 test("focused admission rejects non-JSON behavior trees without throwing", () => {
     const circular = { value: 1 }
     circular.self = circular

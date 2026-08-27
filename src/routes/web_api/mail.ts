@@ -10,7 +10,8 @@ import {
     parseAdminMailInteger,
     validateMailAttachment,
 } from "../../lib/admin-mail-rules"
-import { getRealNow } from "../../runtime/time/game-time"
+import { getGameTimeContext } from "../../runtime/time/game-time"
+import { clientSerializeDate } from "../../data/utils/date"
 import bundledItemMaxCounts from "../../../assets/item_max_count.json"
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 
@@ -25,6 +26,7 @@ interface SendMailBody {
     // 可选定向发送：playerId（指定存档）优先于 accountId（指定账号）；均不传则群发全体
     accountId?: string
     playerId?: string
+    expirationDays?: string | number
 }
 
 // 群发历史（内存，最近 MAX_HISTORY 条；服务重启后清空）
@@ -36,8 +38,11 @@ interface MailSendRecord {
     subject: string | null
     target: string
     sent: number
+    expirationDays: number
 }
 const MAX_HISTORY = 20
+const DEFAULT_EXPIRATION_DAYS = 31
+const MAX_EXPIRATION_DAYS = 3650
 const sendHistory: MailSendRecord[] = []
 
 const routes = async (fastify: FastifyInstance) => {
@@ -88,6 +93,15 @@ const routes = async (fastify: FastifyInstance) => {
             return fail(parsedCount.ok ? "数量无效" : parsedCount.error)
         }
         const count = parsedCount.value
+        const parsedExpirationDays = parseAdminMailInteger(
+            body.expirationDays === undefined ? String(DEFAULT_EXPIRATION_DAYS) : String(body.expirationDays),
+            "有效天数",
+            { min: 1, max: MAX_EXPIRATION_DAYS },
+        )
+        if (!parsedExpirationDays.ok || parsedExpirationDays.value === null) {
+            return fail(parsedExpirationDays.ok ? "有效天数无效" : parsedExpirationDays.error)
+        }
+        const expirationDays = parsedExpirationDays.value
         const subject = body.subject && body.subject.trim() ? body.subject.trim() : null
         const desc = body.description && body.description.trim() ? body.description.trim() : null
 
@@ -145,7 +159,11 @@ const routes = async (fastify: FastifyInstance) => {
             targetLabel = "全体"
         }
 
-        const now = getRealNow().toISOString().replace("T", " ").substring(0, 19)
+        const time = getGameTimeContext()
+        const now = clientSerializeDate(time.virtualNow)
+        const rewardLimitTime = clientSerializeDate(new Date(
+            time.virtualNowMs + expirationDays * 24 * 60 * 60 * 1000,
+        ))
         let sentCount = 0
 
         for (const playerId of targetPlayerIds) {
@@ -159,8 +177,8 @@ const routes = async (fastify: FastifyInstance) => {
                     number: count,
                     receive_time: "0000-00-00 00:00:00",
                     create_time: now,
-                    reward_period_limited: 0,
-                    reward_limit_time: null,
+                    reward_period_limited: 1,
+                    reward_limit_time: rewardLimitTime,
                 })
                 sentCount++
             } catch {
@@ -177,6 +195,7 @@ const routes = async (fastify: FastifyInstance) => {
             subject,
             target: targetLabel,
             sent: sentCount,
+            expirationDays,
         })
         if (sendHistory.length > MAX_HISTORY) sendHistory.length = MAX_HISTORY
 

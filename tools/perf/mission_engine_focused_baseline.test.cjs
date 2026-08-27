@@ -24,8 +24,8 @@ const EXPECTED_SCENARIO_KEYS = [
     "single-battle-finish",
     "multi-battle-finish",
 ]
-const HISTORICAL_SETTLEMENT_SHA256 =
-    "6004cc8a57bd6341f7c0ddf960bdf4a735523a7c3913fa4ccf06aefb3eed9843"
+const APPROVED_SETTLEMENT_SHA256 =
+    "76b36e0b20002644562a553913ba2e17ab0a5006292e3dc7fba144e169716337"
 const snapshotPath = path.join(
     __dirname,
     "__snapshots__",
@@ -447,15 +447,15 @@ test("cleanup attempts every scenario and suite restoration after failures", asy
     }
 })
 
-test("historical mission settlement behavior summary remains unchanged", () => {
+test("mission settlement behavior summary matches the approved baseline", () => {
     const { createStableSummary } = require("./mission_settlement_baseline.cjs")
     const historicalPath = path.join(
         __dirname,
         "__snapshots__",
         "mission_settlement_baseline.json",
     )
-    const historical = JSON.parse(fs.readFileSync(historicalPath, "utf8"))
-    const recomputed = createStableSummary(historical)
-    assert.equal(recomputed.sha256, historical.sha256)
-    assert.equal(recomputed.sha256, HISTORICAL_SETTLEMENT_SHA256)
+    const baseline = JSON.parse(fs.readFileSync(historicalPath, "utf8"))
+    const recomputed = createStableSummary(baseline)
+    assert.equal(recomputed.sha256, baseline.sha256)
+    assert.equal(recomputed.sha256, APPROVED_SETTLEMENT_SHA256)
 })

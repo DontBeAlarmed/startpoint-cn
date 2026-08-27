@@ -97,6 +97,22 @@ test("snapshot writer requires admission and replaces the target atomically", ()
     }
 })
 
+test("snapshot writer requires explicit approval for an intentional behavior change", () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "single-battle-behavior-admission-"))
+    const snapshotPath = path.join(directory, "baseline.json")
+    try {
+        const snapshot = report({ result: "stable" })
+        const changed = report({ result: "intentional-change" })
+        fs.writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`)
+
+        assert.throws(() => writeAdmittedSnapshot(changed, snapshotPath), /behavior differs/i)
+        writeAdmittedSnapshot(changed, snapshotPath, { allowBehaviorChange: true })
+        assert.deepEqual(JSON.parse(fs.readFileSync(snapshotPath, "utf8")), changed)
+    } finally {
+        fs.rmSync(directory, { recursive: true, force: true })
+    }
+})
+
 test("snapshot writer admits behavior-equivalent SQL reductions but rejects regressions", () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "single-battle-sql-admission-"))
     const snapshotPath = path.join(directory, "baseline.json")

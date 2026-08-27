@@ -236,7 +236,22 @@ test("load settles cumulative login missions immediately without duplicate rewar
             mission_reward_id: 24001,
         }],
     )
+    assert.deepEqual(
+        first.data.mission_info.filter(entry => (
+            entry.mission_category_id === 1 && entry.mission_id === 108
+        )),
+        [{
+            mission_category_id: 1,
+            mission_id: 108,
+            mission_reward_id: 108001,
+        }],
+        "special cumulative login mission must settle from the account login fact",
+    )
     assert.deepEqual(getPlayerCategoryMissionsSync(loginMissionPlayerId, 1)[24], {
+        progress: 2,
+        stages: { 1: true },
+    })
+    assert.deepEqual(getPlayerCategoryMissionsSync(loginMissionPlayerId, 1)[108], {
         progress: 2,
         stages: { 1: true },
     })
@@ -252,6 +267,34 @@ test("load settles cumulative login missions immediately without duplicate rewar
     const repeated = decode(repeatedResponse)
     assert.deepEqual(repeated.data.mission_info, [])
     assert.equal(getPlayerSync(loginMissionPlayerId).freeVmoney, freeVmoneyAfterFirst)
+})
+
+test("load settles every reached special cumulative login stage in one request", async t => {
+    const viewerId = VIEWER_ID + 14
+    const historicalPlayerId = await createViewer(viewerId, "historical-cumulative-login")
+    updatePlayerSync({
+        id: historicalPlayerId,
+        totalLoginDays: 299,
+        lastLoginTime: new Date(targetVirtualMs - 86_400_000),
+    })
+
+    const targetApp = await buildLoadApp()
+    t.after(async () => targetApp.close())
+
+    const response = await postLoadWith(targetApp, viewerId)
+    assert.equal(response.statusCode, 200, response.body)
+    const payload = decode(response)
+    const specialRewards = payload.data.mission_info.filter(entry => (
+        entry.mission_category_id === 1 && entry.mission_id === 108
+    ))
+    assert.deepEqual(
+        specialRewards.map(entry => entry.mission_reward_id),
+        Array.from({ length: 18 }, (_, index) => 108001 + index),
+    )
+    assert.deepEqual(getPlayerCategoryMissionsSync(historicalPlayerId, 1)[108], {
+        progress: 300,
+        stages: Object.fromEntries(Array.from({ length: 18 }, (_, index) => [index + 1, true])),
+    })
 })
 
 test("load settles cumulative login degree missions at the login fact boundary", async t => {

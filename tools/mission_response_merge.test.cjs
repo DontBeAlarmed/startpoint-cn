@@ -54,6 +54,30 @@ assert.deepEqual(data.degree_list, [
     { viewer_id: 99, degree_id: 31 },
 ])
 
+const loadDataWithoutIncrementalLists = {
+    mission_info: [],
+    user_character_list: { 10: { character_id: 10, level: 2 } },
+    user_equipment_list: {},
+}
+mergeMissionSettlementResponse(loadDataWithoutIncrementalLists, {
+    missionInfo: [],
+    userInfo: undefined,
+    itemList: {},
+    characterList: [],
+    equipmentList: [],
+    degreeIds: [],
+}, 99)
+assert.equal(
+    Object.hasOwn(loadDataWithoutIncrementalLists, "character_list"),
+    false,
+    "empty mission rewards must not shadow the serialized load character list",
+)
+assert.equal(
+    Object.hasOwn(loadDataWithoutIncrementalLists, "equipment_list"),
+    false,
+    "empty mission rewards must not shadow the serialized load equipment list",
+)
+
 const activeMissionSource = fs.readFileSync(
     path.join(__dirname, "../src/routes/api/activeMission.ts"),
     "utf8",

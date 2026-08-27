@@ -282,9 +282,25 @@ async function runMissionEngineFocusedBaseline({
 }
 
 function parseArgs(argv) {
-    if (argv.length === 0) return { write: false }
-    if (argv.length === 1 && argv[0] === "--write") return { write: true }
-    throw new Error(`unknown argument: ${argv[0]}`)
+    let write = false
+    let acceptBehaviorChange = false
+    for (const argument of argv) {
+        if (argument === "--write") {
+            if (write) throw new Error("duplicate --write")
+            write = true
+            continue
+        }
+        if (argument === "--accept-behavior-change") {
+            if (acceptBehaviorChange) throw new Error("duplicate --accept-behavior-change")
+            acceptBehaviorChange = true
+            continue
+        }
+        throw new Error(`unknown argument: ${argument}`)
+    }
+    if (acceptBehaviorChange && !write) {
+        throw new Error("--accept-behavior-change requires --write")
+    }
+    return { write, acceptBehaviorChange }
 }
 
 function serializeFocusedMissionReport(report) {
@@ -334,9 +350,12 @@ function writeFocusedMissionSnapshotAtomic(report, snapshotPath, {
 function admitFocusedMissionReport(report, {
     snapshotPath = SNAPSHOT_PATH,
     write = false,
+    acceptBehaviorChange = false,
 } = {}) {
     const snapshot = JSON.parse(fs.readFileSync(snapshotPath, "utf8"))
-    const admission = evaluateFocusedMissionAdmission(report, snapshot)
+    const admission = evaluateFocusedMissionAdmission(report, snapshot, {
+        allowBehaviorChange: acceptBehaviorChange,
+    })
     if (write && admission.admitted) {
         writeFocusedMissionSnapshotAtomic(admission.canonicalReport, snapshotPath)
     }
@@ -344,10 +363,10 @@ function admitFocusedMissionReport(report, {
 }
 
 async function main() {
-    const { write } = parseArgs(process.argv.slice(2))
+    const options = parseArgs(process.argv.slice(2))
     const report = await runMissionEngineFocusedBaseline()
     const serialized = `${JSON.stringify(report, null, 2)}\n`
-    const admission = admitFocusedMissionReport(report, { write })
+    const admission = admitFocusedMissionReport(report, options)
     process.stdout.write(serialized)
     if (!admission.admitted) {
         for (const failure of formatFocusedMissionAdmissionFailures(admission)) {

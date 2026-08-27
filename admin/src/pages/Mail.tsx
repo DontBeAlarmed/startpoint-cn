@@ -33,7 +33,7 @@ type TargetMode = "all" | "account" | "player"
 interface SendResult { ok: boolean; sent: number }
 interface AccountRow { id: number; saveCount: number; defaultPlayerId: number | null; defaultPlayerName: string | null; playerIds: number[] }
 interface PlayerBrief { id: number; name: string; lastLoginTime: string; degreeId: number }
-interface MailRecord { time: string; type: number; typeId: number | null; number: number; subject: string | null; target: string; sent: number }
+interface MailRecord { time: string; type: number; typeId: number | null; number: number; subject: string | null; target: string; sent: number; expirationDays: number }
 interface CharacterLookupRow { name: string; title: string; rarity: string; element: string }
 interface EquipmentLookupRow { name: string; rarity: string; category: string }
 type ItemLookup = Record<string, string>
@@ -178,6 +178,7 @@ export default function Mail() {
             description: v.description ?? "",
             accountId: v.targetMode === "account" && v.accountId != null ? String(v.accountId) : "",
             playerId: v.targetMode === "player" && v.playerId != null ? String(v.playerId) : "",
+            expirationDays: String(v.expirationDays ?? 31),
         }),
         onSuccess: (r) => {
             message.success(`已向 ${r.sent} 个角色发送邮件`)
@@ -226,7 +227,7 @@ export default function Mail() {
                             : targetMode === "account" ? "将向所选账号下的所有存档发送邮件"
                                 : "将向所选的单个存档发送邮件"
                     } />
-                <Form form={form} layout="vertical" onFinish={openConfirm} initialValues={{ number: 1, targetMode: "all" }}>
+                <Form form={form} layout="vertical" onFinish={openConfirm} initialValues={{ number: 1, expirationDays: 31, targetMode: "all" }}>
                     <Form.Item name="targetMode" label="发送对象">
                         <Radio.Group optionType="button" buttonStyle="solid">
                             <Radio.Button value="all">全体存档</Radio.Button>
@@ -350,6 +351,18 @@ export default function Mail() {
                         <TextArea rows={3} maxLength={512} showCount placeholder="留空使用游戏默认" />
                     </Form.Item>
 
+                    <Form.Item
+                        name="expirationDays"
+                        label="有效天数"
+                        rules={[
+                            { required: true, message: "请输入有效天数" },
+                            { type: "number", min: 1, max: 3650, message: "有效天数需在 1-3650 之间" },
+                        ]}
+                        extra="到期后邮件会在打开邮箱或领取时自动删除。"
+                    >
+                        <InputNumber style={{ width: "100%" }} min={1} max={3650} precision={0} />
+                    </Form.Item>
+
                     <Form.Item>
                         <Space wrap>
                             <Button type="primary" htmlType="submit">发送</Button>
@@ -377,6 +390,7 @@ export default function Mail() {
                             render: (_: unknown, r) => `${TYPE_LABEL[r.type] ?? r.type}${r.typeId ? ` #${r.typeId}` : ""} × ${r.number}`,
                         },
                         { title: "发送数", dataIndex: "sent", width: 80, render: (n: number) => <Tag color="blue">{n}</Tag> },
+                        { title: "有效期", dataIndex: "expirationDays", width: 90, render: (n: number) => String(n ?? 31) + " 天" },
                     ]}
                 />
             </Card>
@@ -402,6 +416,7 @@ export default function Mail() {
                                 <Descriptions.Item label="附件 ID">{confirm.values.type_id}</Descriptions.Item>
                             )}
                             <Descriptions.Item label="数量">× {confirm.values.number}</Descriptions.Item>
+                            <Descriptions.Item label="有效期">{confirm.values.expirationDays} 天</Descriptions.Item>
                             {confirm.values.subject && (
                                 <Descriptions.Item label="标题">{confirm.values.subject}</Descriptions.Item>
                             )}

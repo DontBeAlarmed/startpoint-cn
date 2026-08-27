@@ -86,12 +86,27 @@ function addMail(playerId, type, typeId, number) {
     })
 }
 
+function addExpiredMail(playerId, type, typeId, number) {
+    return insertMailSync(playerId, {
+        reason_id: 0,
+        subject: "expired transaction test",
+        description: null,
+        type,
+        type_id: typeId,
+        number,
+        receive_time: "0000-00-00 00:00:00",
+        create_time: "2020-01-01 00:00:00",
+        reward_period_limited: 1,
+        reward_limit_time: "2020-02-01 00:00:00",
+    })
+}
+
 function decode(response) {
     return unpack(Buffer.from(response.body, "base64"))
 }
 
 function mailState(mailId) {
-    return database.prepare("SELECT receive_time FROM players_mails WHERE id = ?").get(mailId).receive_time
+    return database.prepare("SELECT receive_time FROM players_mails WHERE id = ?").get(mailId)?.receive_time ?? null
 }
 
 function receiveHistoryCount(playerId) {
@@ -160,6 +175,84 @@ test("receive_all grants each requested mail id at most once", async () => {
     assert.equal(receiveHistoryCount(playerId), 1)
 })
 
+test("single receive rejects an expired limited mail without granting its attachment", async () => {
+    const { playerId, viewerId } = await createPlayer("expired-single")
+    const itemId = 30005
+    const before = getPlayerItemSync(playerId, itemId) ?? 0
+    const mailId = addExpiredMail(playerId, MailType.ITEM, itemId, 3)
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/receive",
+        payload: { viewer_id: viewerId, mail_id: mailId },
+    })
+
+    assert.equal(response.statusCode, 400, response.body)
+    assert.equal(getPlayerItemSync(playerId, itemId) ?? 0, before)
+    assert.equal(mailState(mailId), null)
+    assert.equal(receiveHistoryCount(playerId), 0)
+})
+
+test("mail index deletes expired limited mails before pagination", async () => {
+    const { playerId, viewerId } = await createPlayer("expired-index")
+    const expiredMailId = addExpiredMail(playerId, MailType.ITEM, 30005, 2)
+    const validMailId = addMail(playerId, MailType.ITEM, 30005, 4)
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/index",
+        payload: { viewer_id: viewerId, current_page: 1 },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    const result = decode(response).data
+    assert.deepEqual(result.mail.map(mail => mail.id), [validMailId])
+    assert.equal(result.total_count, 1)
+    assert.equal(mailState(expiredMailId), null)
+})
+
+test("receive_all skips expired limited mails and grants remaining valid mails", async () => {
+    const { playerId, viewerId } = await createPlayer("expired-batch")
+    const itemId = 30005
+    const before = getPlayerItemSync(playerId, itemId) ?? 0
+    const expiredMailId = addExpiredMail(playerId, MailType.ITEM, itemId, 2)
+    const validMailId = addMail(playerId, MailType.ITEM, itemId, 4)
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/receive_all",
+        payload: { viewer_id: viewerId, mail_ids: [expiredMailId, validMailId] },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    const result = decode(response).data
+    assert.deepEqual(result.mail_ids, [validMailId])
+    assert.equal(result.outdated_mail_count, 1)
+    assert.equal(getPlayerItemSync(playerId, itemId), before + 4)
+    assert.equal(mailState(expiredMailId), null)
+    assert.equal(receiveHistoryCount(playerId), 1)
+})
+
+test("expired cleanup leaves already-received mail out of batch counts", async () => {
+    const { playerId, viewerId } = await createPlayer("expired-already-received")
+    const expiredMailId = addExpiredMail(playerId, MailType.ITEM, 30005, 2)
+    database.prepare("UPDATE players_mails SET receive_time = ? WHERE id = ?")
+        .run("2026-08-18 00:00:01", expiredMailId)
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/receive_all",
+        payload: { viewer_id: viewerId, mail_ids: [expiredMailId] },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    const result = decode(response).data
+    assert.deepEqual(result.mail_ids, [])
+    assert.equal(result.already_mail_count, 1)
+    assert.equal(result.outdated_mail_count, 0)
+    assert.notEqual(mailState(expiredMailId), null)
+})
+
 test("single receive owns one player snapshot without nested reward transaction SQL", async () => {
     const { playerId, viewerId } = await createPlayer("single-owner-sql")
     const mailId = addMail(playerId, MailType.ITEM, 30005, 2)
@@ -175,6 +268,11 @@ test("single receive owns one player snapshot without nested reward transaction 
     assert.equal(nestedTransactionStatements(measured.statements).length, 2, measured.statements.join("\n---\n"))
     assert.equal(
         measured.statements.filter(statement => /SELECT \* FROM players_mails WHERE player_id = \?/i.test(statement)).length,
+        0,
+        measured.statements.join("\n---\n"),
+    )
+    assert.equal(
+        measured.statements.filter(statement => /^\s*DELETE\s+FROM\s+players_mails\b/i.test(statement)).length,
         0,
         measured.statements.join("\n---\n"),
     )
@@ -212,6 +310,11 @@ test("receive_all reads one owner reward snapshot plus one bounded Awake player 
     assert.equal(nestedTransactionStatements(measured.statements).length, 2, measured.statements.join("\n---\n"))
     assert.equal(
         measured.statements.filter(statement => /LIMIT \? OFFSET \?/i.test(statement)).length,
+        0,
+        measured.statements.join("\n---\n"),
+    )
+    assert.equal(
+        measured.statements.filter(statement => /^\s*DELETE\s+FROM\s+players_mails\b/i.test(statement)).length,
         0,
         measured.statements.join("\n---\n"),
     )
@@ -268,6 +371,23 @@ test("receive_all rolls every reward back when one mail cannot be marked", async
     assert.equal(getPlayerItemSync(playerId, itemId) ?? 0, before)
     assert.equal(mailState(firstMailId), "0000-00-00 00:00:00")
     assert.equal(mailState(secondMailId), "0000-00-00 00:00:00")
+    assert.equal(receiveHistoryCount(playerId), 0)
+})
+
+test("receive_all keeps expired cleanup committed when reward settlement fails", async () => {
+    const { playerId, viewerId } = await createPlayer("expired-batch-failure")
+    const expiredMailId = addExpiredMail(playerId, MailType.ITEM, 30005, 2)
+    const unsupportedMailId = addMail(playerId, MailType.DEGREE, 1001, 1)
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/receive_all",
+        payload: { viewer_id: viewerId, mail_ids: [expiredMailId, unsupportedMailId] },
+    })
+
+    assert.equal(response.statusCode, 400, response.body)
+    assert.equal(mailState(expiredMailId), null)
+    assert.equal(mailState(unsupportedMailId), "0000-00-00 00:00:00")
     assert.equal(receiveHistoryCount(playerId), 0)
 })
 

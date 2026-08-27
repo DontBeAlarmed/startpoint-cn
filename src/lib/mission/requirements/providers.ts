@@ -36,6 +36,7 @@ const REGULAR_FACTS: Readonly<Record<string, readonly FactKey[]>> = Object.freez
     user_rank: [{ kind: "player" }],
     clear_episode: [{ kind: "questProgress", sections: [3] }],
     total_login: [{ kind: "player" }],
+    special_total_login_2anv: [{ kind: "player" }],
     multi_battle_play: [{ kind: "missionBattleCounters" }],
     multi_play_host: [{ kind: "missionBattleCounters" }],
     multi_play_guest: [{ kind: "missionBattleCounters" }],

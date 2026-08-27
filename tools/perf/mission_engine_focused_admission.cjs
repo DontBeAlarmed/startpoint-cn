@@ -16,7 +16,9 @@ const {
     validMetric,
 } = require("./mission_engine_focused_report.cjs")
 
-function evaluateFocusedMissionAdmission(current, snapshot) {
+function evaluateFocusedMissionAdmission(current, snapshot, {
+    allowBehaviorChange = false,
+} = {}) {
     const failures = []
     const currentBehaviorSummaries = new Map()
     const flags = {
@@ -168,7 +170,8 @@ function evaluateFocusedMissionAdmission(current, snapshot) {
             && !isDeepStrictEqual(
                 validity.current.behaviorSummary.behavior,
                 validity.snapshot.behaviorSummary.behavior,
-            )) {
+            )
+            && !allowBehaviorChange) {
             fail("behavior-equivalence", {
                 scenario,
                 metric: "behavior",

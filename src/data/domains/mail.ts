@@ -1,6 +1,7 @@
 import { getDb } from "../db";
 import { getServerTime } from "../../utils";
 import { getRealNow } from "../../runtime/time/game-time";
+import { clientSerializeDate } from "../utils/date";
 
 /**
  * Mail attachment types matching the client's MailKind enum.
@@ -123,6 +124,43 @@ export function getPlayerMailsByIdsSync(
     let query = `SELECT * FROM players_mails WHERE player_id = ? AND id IN (${placeholders})`
     if (unreceivedOnly) query += ` AND receive_time = '0000-00-00 00:00:00'`
     return getDb().prepare(query).all(playerId, ...ids) as RawPlayerMail[]
+}
+
+/** Deletes expired period-limited mail in one bounded statement. */
+export function deleteExpiredPlayerMailsSync(
+    playerId: number,
+    now: Date,
+): number[] {
+    const rows = getDb().prepare(
+        `
+        DELETE FROM players_mails
+        WHERE player_id = ?
+          AND receive_time = '0000-00-00 00:00:00'
+          AND reward_period_limited = 1
+          AND reward_limit_time IS NOT NULL
+          AND reward_limit_time <= ?
+        RETURNING id
+    `,
+    ).all(playerId, clientSerializeDate(now)) as { id: number }[]
+    return rows.map(row => row.id)
+}
+
+export function isPlayerMailExpiredAt(mail: RawPlayerMail, now: Date): boolean {
+    return mail.reward_period_limited === 1
+        && mail.reward_limit_time !== null
+        && mail.reward_limit_time <= clientSerializeDate(now)
+}
+
+export function deletePlayerMailsByIdsSync(
+    playerId: number,
+    mailIds: readonly number[],
+): number {
+    const ids = [...new Set(mailIds)]
+    if (ids.length === 0) return 0
+    const placeholders = ids.map(() => "?").join(", " )
+    return getDb().prepare(
+        `DELETE FROM players_mails WHERE player_id = ? AND id IN (${placeholders})`,
+    ).run(playerId, ...ids).changes
 }
 
 /**

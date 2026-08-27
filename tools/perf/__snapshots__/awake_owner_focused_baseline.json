@@ -4582,7 +4582,7 @@
           "bondToken": 10,
           "expPool": 0,
           "freeMana": 2000,
-          "freeVmoney": 115,
+          "freeVmoney": 155,
           "starCrumb": 2,
           "totalManaObtained": 0,
           "tutorialStep": 0,
@@ -4618,23 +4618,25 @@
       },
       "loaderCalls": [
         "player",
+        "questProgress:3",
+        "player",
         "questProgress:2,3",
         "characters",
         "characterClearCounters",
         "partyCoClearCounters",
         "categoryMissionProgress:9:11,12,13,1110011,1110012,1110013,1210011,1210012,1210013,1310051,1310052,1310053,1410031,1410032,1410033,1510061,1510062,1510063,1610021,1610022,1610023,2110011,2110012,2110013,2210041,2210042,2210043,2310011,2310012,2310013,2410631,2410632,2410633,2510031,2510032,2510033,2510041,2510042,2510043,2610071,2610072,2610073,2630021,2630022,2630023,3210131,3210132,3210133,3310031,3310032,3310033,3410011,3410012,3410013"
       ],
-      "missionComputes": 7,
+      "missionComputes": 10,
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 27,
-      "sqlWrites": 10,
+      "sqlReads": 31,
+      "sqlWrites": 13,
       "sqlByTable": {
         "players": {
-          "reads": 6,
-          "statements": 7,
-          "writes": 1
+          "reads": 7,
+          "statements": 9,
+          "writes": 2
         },
         "players_active_mission_counters": {
           "reads": 1,
@@ -4652,14 +4654,14 @@
           "writes": 3
         },
         "players_category_mission_stages": {
-          "reads": 1,
-          "statements": 1,
-          "writes": 0
+          "reads": 2,
+          "statements": 3,
+          "writes": 1
         },
         "players_category_missions": {
-          "reads": 1,
-          "statements": 1,
-          "writes": 0
+          "reads": 2,
+          "statements": 3,
+          "writes": 1
         },
         "players_character_awake_unlocks": {
           "reads": 1,
@@ -4702,8 +4704,8 @@
           "writes": 0
         },
         "players_quest_progress": {
-          "reads": 3,
-          "statements": 4,
+          "reads": 4,
+          "statements": 5,
           "writes": 1
         },
         "sessions": {

@@ -176,6 +176,7 @@ function migrateSnapshotStaminaTimeSemantics(value) {
 function evaluateSingleBattleAdmission(current, snapshot, {
     allowSqlReduction = false,
     allowTimeSemanticsMigration = false,
+    allowBehaviorChange = false,
 } = {}) {
     const currentReport = inspectReport(current, "current")
     const snapshotReport = inspectReport(snapshot, "snapshot")
@@ -203,7 +204,7 @@ function evaluateSingleBattleAdmission(current, snapshot, {
             )
             snapshotBehavior = createBehaviorSummary(migratedBehavior)
         }
-        if (!isDeepStrictEqual(
+        if (!allowBehaviorChange && !isDeepStrictEqual(
             {
                 behavior: currentScenario.canonical.behavior,
                 behaviorSha256: currentScenario.canonical.behaviorSha256,
@@ -242,13 +243,18 @@ function evaluateSingleBattleAdmission(current, snapshot, {
 }
 
 function writeAdmittedSnapshot(report, snapshotPath, {
+    allowBehaviorChange = false,
     renameSync = fs.renameSync,
 } = {}) {
     const snapshot = JSON.parse(fs.readFileSync(snapshotPath, "utf8"))
     const admission = evaluateSingleBattleAdmission(
         report,
         snapshot,
-        { allowSqlReduction: true, allowTimeSemanticsMigration: true },
+        {
+            allowSqlReduction: true,
+            allowTimeSemanticsMigration: true,
+            allowBehaviorChange,
+        },
     )
     if (!admission.admitted) {
         throw new Error(`Single battle snapshot admission failed:\n${admission.failures.join("\n")}`)

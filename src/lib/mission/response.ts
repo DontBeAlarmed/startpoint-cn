@@ -62,8 +62,12 @@ export function mergeMissionSettlementResponse(
 ): void {
     data.mission_info = [...(data.mission_info ?? []), ...settlement.missionInfo]
     data.item_list = { ...(data.item_list ?? {}), ...settlement.itemList }
-    data.character_list = mergeCharacterList(data.character_list ?? [], settlement.characterList)
-    data.equipment_list = mergeEquipmentList(data.equipment_list ?? [], settlement.equipmentList)
+    if (data.character_list !== undefined || settlement.characterList.length > 0) {
+        data.character_list = mergeCharacterList(data.character_list ?? [], settlement.characterList)
+    }
+    if (data.equipment_list !== undefined || settlement.equipmentList.length > 0) {
+        data.equipment_list = mergeEquipmentList(data.equipment_list ?? [], settlement.equipmentList)
+    }
     if (settlement.userInfo) {
         data.user_info = { ...(data.user_info ?? {}), ...settlement.userInfo }
     }

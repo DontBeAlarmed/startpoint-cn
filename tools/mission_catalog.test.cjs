@@ -206,6 +206,24 @@ test("uses CN master time boundaries and event scope with invalid dates closed",
     assert.equal(catalog.isEnabledAt(4, 999, new Date("2026-01-01T04:00:00.000Z"), 7), false)
 })
 
+test("keeps the historical cumulative login mission open after its official start", () => {
+    const tables = emptyTables()
+    addMission(tables, 1, "108", { 1: [rewardRow(1, 108001, 2)] }, {
+        pattern: "special_total_login_2anv",
+        start: "2023-08-31 12:00:00",
+    })
+    addMission(tables, 1, "109", { 1: [rewardRow(1, 109001, 2)] }, {
+        pattern: "special_total_login_2anv",
+        start: "2023-08-31 12:00:00",
+        end: "2023-08-31 12:00:00",
+    })
+    const catalog = getMissionCatalog(repository(tables))
+    assert.equal(catalog.isEnabledAt(1, 108, new Date("2026-08-27T00:00:00.000Z")), true)
+    assert.equal(catalog.isEnabledAt(1, 108, new Date("2022-01-01T00:00:00.000Z")), false)
+    assert.equal(catalog.isEnabledAt(1, 108, new Date("invalid")), false)
+    assert.equal(catalog.isEnabledAt(1, 109, new Date("2026-08-27T00:00:00.000Z")), false)
+})
+
 test("parses CN master dates strictly with leap-day validation", () => {
     const tables = emptyTables()
     const invalidDates = [

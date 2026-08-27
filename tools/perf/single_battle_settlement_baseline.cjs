@@ -18,12 +18,24 @@ const SNAPSHOT_PATH = path.join(
 
 function parseArgs(argv) {
     let write = false
+    let acceptBehaviorChange = false
     for (const argument of argv) {
-        if (argument !== "--write") throw new Error(`unknown argument: ${argument}`)
-        if (write) throw new Error("duplicate --write")
-        write = true
+        if (argument === "--write") {
+            if (write) throw new Error("duplicate --write")
+            write = true
+            continue
+        }
+        if (argument === "--accept-behavior-change") {
+            if (acceptBehaviorChange) throw new Error("duplicate --accept-behavior-change")
+            acceptBehaviorChange = true
+            continue
+        }
+        throw new Error(`unknown argument: ${argument}`)
     }
-    return { write }
+    if (acceptBehaviorChange && !write) {
+        throw new Error("--accept-behavior-change requires --write")
+    }
+    return { write, acceptBehaviorChange }
 }
 
 async function runSingleBattleSettlementBaseline({
@@ -46,9 +58,12 @@ function readSnapshot(snapshotPath = SNAPSHOT_PATH) {
 function admitSingleBattleReport(report, {
     snapshotPath = SNAPSHOT_PATH,
     write = false,
+    acceptBehaviorChange = false,
 } = {}) {
     if (write) {
-        writeAdmittedSnapshot(report, snapshotPath)
+        writeAdmittedSnapshot(report, snapshotPath, {
+            allowBehaviorChange: acceptBehaviorChange,
+        })
     }
     return evaluateSingleBattleAdmission(report, readSnapshot(snapshotPath))
 }

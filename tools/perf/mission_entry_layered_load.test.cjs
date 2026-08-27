@@ -13,6 +13,10 @@ const {
 
 test("keeps fixed BASE structure separate from approved Lv60 behavior", () => {
     assert.notEqual(
+        APPROVED_BEHAVIOR_SIGNATURES["get-progress"],
+        reference.entries["get-progress"].behaviorSignature,
+    )
+    assert.notEqual(
         APPROVED_BEHAVIOR_SIGNATURES["single-finish"],
         reference.entries["single-finish"].behaviorSignature,
     )

@@ -83,7 +83,7 @@ function periodValue(current: number, baseline: number | undefined): number {
 
 const LIFETIME_PATTERNS = new Set([
     "max_combo", "rank_ss", "use_dash", "single_battle_play", "use_power_flip",
-    "user_rank", "total_login", "multi_battle_play", "multi_play_host", "multi_play_guest",
+    "user_rank", "total_login", "special_total_login_2anv", "multi_battle_play", "multi_play_host", "multi_play_guest",
     "use_skill", "character_level", "clear_episode", "weak_point_attack", "max_skill_chain",
     "max_power_achievement", "fever", "max_score", "enemy_kill", "ex_rank_ss",
     "characters_count", "got_equip_kind_count", "character_80_level",
@@ -115,7 +115,9 @@ function computeLifetime(pattern: string, ctx: CategoryContext, dbProgress: numb
     if (pattern === "single_battle_play") return Math.max(dbProgress, counters.singleClearCount)
     if (pattern === "use_power_flip") return Math.max(dbProgress, ctx.player.totalPowerflips ?? 0)
     if (pattern === "user_rank") return Math.max(dbProgress, getRankDegree(ctx.player.rankPoint))
-    if (pattern === "total_login") return Math.max(dbProgress, ctx.player.totalLoginDays ?? 0)
+    if (pattern === "total_login" || pattern === "special_total_login_2anv") {
+        return Math.max(dbProgress, ctx.player.totalLoginDays ?? 0)
+    }
     if (pattern === "multi_battle_play") return Math.max(dbProgress, counters.multiClearCount)
     if (pattern === "multi_play_host") return Math.max(dbProgress, counters.multiHostClearCount)
     if (pattern === "multi_play_guest") return Math.max(dbProgress, counters.multiGuestClearCount)
