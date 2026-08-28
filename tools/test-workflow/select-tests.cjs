@@ -477,7 +477,11 @@ const SOURCE_RULES = [
     },
     { pattern: /^tools\/perf\/hub_baseline(?:_helpers)?\.cjs$/, groups: ["integration:multi-hub"] },
     {
-        pattern: /^src\/multi\/(?:rescue-fragment-reward|settlement\/(?:orchestrator|response))\.ts$/,
+        pattern: /^src\/multi\/settlement\/(?:orchestrator|response)\.ts$/,
+        groups: ["integration:mission", "integration:party"],
+    },
+    {
+        pattern: /^src\/multi\/rescue-fragment-reward\.ts$/,
         groups: ["integration:party"],
     },
     { pattern: /^src\/multi\//, groups: ["quick:protocol", "integration:multi-hub"] },

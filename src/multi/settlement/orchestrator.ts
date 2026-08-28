@@ -408,7 +408,10 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
         )
         const missionEvaluation = settleMissionCategoriesWithEvaluation(
             input.playerId,
-            buildBattleMissionSettlementScopes(partyCharacterIdsArray),
+            buildBattleMissionSettlementScopes(
+                partyCharacterIdsArray,
+                missionBattleFacts.degreeMissionIds,
+            ),
             settlementTime,
         )
         const missionSettlement = missionEvaluation?.settlement ?? {

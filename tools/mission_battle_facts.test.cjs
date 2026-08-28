@@ -50,7 +50,10 @@ stubModule("../src/lib/mission/event-battle-facts", {
     recordEventMissionBattleFacts: ctx => calls.push(["event", ctx.questId]),
 })
 stubModule("../src/lib/mission/degree-battle-facts", {
-    recordDegreeMissionBattleFacts: ctx => calls.push(["degree", ctx.questId]),
+    recordDegreeMissionBattleFacts: ctx => {
+        calls.push(["degree", ctx.questId])
+        return [26000, 26010]
+    },
 })
 stubModule("../src/lib/mission/pass-battle-facts", {
     recordPassMissionBattleFacts: ctx => calls.push(["pass", ctx.questId]),
@@ -117,7 +120,7 @@ const baseContext = {
 }
 
 const failedResult = recordMissionBattleFacts({ ...baseContext, questAccomplished: false })
-assert.deepEqual(failedResult, { awakeMissionIds: [] })
+assert.deepEqual(failedResult, { awakeMissionIds: [], degreeMissionIds: [] })
 assert.deepEqual(calls, [["result", 1, {
     isMulti: false,
     questCategory: 1,
@@ -136,7 +139,10 @@ const completedResult = recordMissionBattleFacts({
     isMulti: true,
     isMultiHost: true,
 })
-assert.deepEqual(completedResult, { awakeMissionIds: [3310032, 3310033] })
+assert.deepEqual(completedResult, {
+    awakeMissionIds: [3310032, 3310033],
+    degreeMissionIds: [26000, 26010],
+})
 assert.deepEqual(calls, [
     ["result", 1, {
         isMulti: false,
@@ -285,7 +291,7 @@ const multiCharacterExp = multiBattleSource.indexOf(
     multiFactCall,
 )
 const multiSettlementTime = multiBattleSource.indexOf(
-    "buildBattleMissionSettlementScopes(partyCharacterIdsArray),\n            settlementTime,",
+    "buildBattleMissionSettlementScopes(\n                partyCharacterIdsArray,\n                missionBattleFacts.degreeMissionIds,\n            ),\n            settlementTime,",
     multiFactCall,
 )
 const multiAwakeSettlement = multiBattleSource.indexOf(

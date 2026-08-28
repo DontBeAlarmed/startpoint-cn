@@ -240,6 +240,19 @@ Awake 保留独立 eligibility、角色候选和奖励解锁语义，但接入�
 - Awake 奖励造成的角色、物品或装备变化纳入失效键；
 - Active Mission 不因 Awake 接入而改变所有权。
 
+## 战斗 Degree contextual scope
+
+战斗结算的 Category 5 候选保留旧宽集合作为兼容回退：调用方没有传入 contextual
+Degree IDs 时，`buildBattleMissionSettlementScopes` 的行为不变。单人、多人 finish
+在现有 `recordMissionBattleFacts` 调用点取得同一个 `degreeMissionIds` 结果后传入该
+边界；不重复查询，也不在单人/多人路径复制规则。
+
+`recordDegreeMissionBattleFacts` 仍是本场 Degree 事实的唯一实际来源，继续只负责
+官方多人 MVP（type 19）和精确 Boss/Advent 关卡清除（type 23 精确 selector），失败战斗
+返回空数组。contextual scope 从通用宽候选中移除全部 type 19 和精确 type 23，再只加回
+本场 facts 返回的 ID；累计领主战、土偶、机兵等非精确 type 23 继续留在通用候选。type 44
+角色候选仍按 `affectedCharacterIds` 原有过滤语义处理。
+
 ## 事务与错误语义
 
 1. 战斗事实、角色经验和其他业务写入必须先完成，再创建读取这些事实的求值 Session。

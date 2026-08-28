@@ -14,7 +14,10 @@ import { recordActiveMissionSpecificBattleFactsSync } from "./active-mission-spe
 import { createActiveBattleFactContext } from "./active-battle-fact-context"
 import { getActiveMissionPlan } from "./active-plan"
 import { recordDailyMissionBattleFacts } from "./daily-battle-facts"
-import { recordDegreeMissionBattleFacts } from "./degree-battle-facts"
+import {
+    getExactDegreeQuestClearMissionIds,
+    recordDegreeMissionBattleFacts,
+} from "./degree-battle-facts"
 import { recordDegreeBattleStatisticsSync } from "./degree-battle-stat-facts"
 import { getDegreeMissionIdsForConditionTypes } from "./degree-candidates"
 import { recordRegularMissionBattleFactsSync } from "./regular-battle-facts"
@@ -29,21 +32,54 @@ export const BATTLE_DEGREE_CONDITION_TYPES = Object.freeze([
 
 export interface MissionBattleFactsResult {
     awakeMissionIds: number[]
+    degreeMissionIds: number[]
 }
 
 export function buildBattleMissionSettlementScopes(
     affectedCharacterIds: readonly number[],
+    contextualDegreeMissionIds?: readonly number[],
 ): readonly (number | MissionSettlementScope)[] {
+    if (contextualDegreeMissionIds === undefined) {
+        return [
+            1,
+            2,
+            3,
+            {
+                category: 5,
+                missionIds: getDegreeMissionIdsForConditionTypes(
+                    BATTLE_DEGREE_CONDITION_TYPES,
+                    affectedCharacterIds,
+                ),
+            },
+            6,
+            7,
+            8,
+            10,
+        ]
+    }
+
+    const generalMissionIds = getDegreeMissionIdsForConditionTypes(
+        BATTLE_DEGREE_CONDITION_TYPES.filter(conditionType => conditionType !== 19 && conditionType !== 23),
+        affectedCharacterIds,
+    )
+    const exactMissionIds = getExactDegreeQuestClearMissionIds()
+    const nonExactType23MissionIds = getDegreeMissionIdsForConditionTypes(
+        [23],
+        affectedCharacterIds,
+    ).filter(missionId => !exactMissionIds.includes(missionId))
+    const missionIds = [...new Set([
+        ...generalMissionIds,
+        ...nonExactType23MissionIds,
+        ...contextualDegreeMissionIds,
+    ])].sort((left, right) => left - right)
+
     return [
         1,
         2,
         3,
         {
             category: 5,
-            missionIds: getDegreeMissionIdsForConditionTypes(
-                BATTLE_DEGREE_CONDITION_TYPES,
-                affectedCharacterIds,
-            ),
+            missionIds,
         },
         6,
         7,
@@ -81,11 +117,11 @@ export function recordMissionBattleFacts(
     })
     recordPassMissionBattleFacts(ctx, evaluationTime)
     recordRegularMissionBattleFactsSync(ctx)
-    if (!ctx.questAccomplished) return { awakeMissionIds: [] }
+    if (!ctx.questAccomplished) return { awakeMissionIds: [], degreeMissionIds: [] }
     recordDegreeBattleStatisticsSync(ctx)
     recordDailyMissionBattleFacts(ctx, evaluationTime)
     recordEventMissionBattleFacts(ctx, evaluationTime)
-    recordDegreeMissionBattleFacts({
+    const degreeMissionIds = recordDegreeMissionBattleFacts({
         playerId: ctx.playerId,
         questCategory: ctx.questCategory,
         questId: ctx.questId,
@@ -113,5 +149,5 @@ export function recordMissionBattleFacts(
     trackLeaderPowerflip(ctx)
     const awakeMissionIds = trackPartyCoClears(ctx)
     trackPowerflip(ctx)
-    return { awakeMissionIds }
+    return { awakeMissionIds, degreeMissionIds }
 }

@@ -308,7 +308,7 @@ test("maps representative source files to focused groups", () => {
     )
     assert.deepEqual(
         selectTestGroups(["src/multi/settlement/orchestrator.ts"]),
-        ["integration:multi-hub", "integration:party", "quick:protocol"],
+        ["integration:mission", "integration:multi-hub", "integration:party", "quick:protocol"],
     )
     assert.deepEqual(
         selectTestGroups(["src/data/domains/mission.ts"]),
@@ -824,6 +824,25 @@ test("registers mission fact requirements in the mission integration suite", () 
         selectTestGroups(["tools/mission_fact_requirements.test.cjs"]),
         ["integration:mission"],
     )
+})
+
+test("registers degree battle contextual scope in the mission integration suite", () => {
+    assert.deepEqual(
+        selectTestGroups(["tools/mission_degree_battle_context.test.cjs"]),
+        ["integration:mission"],
+    )
+    assert.equal(TEST_GROUPS["integration:mission"].tests.includes(
+        "tools/mission_degree_battle_context.test.cjs",
+    ), true)
+    assert.deepEqual(
+        selectTestGroups(["src/lib/mission/battle-facts.ts"]),
+        ["integration:mission"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/mission/degree-battle-facts.ts"]),
+        ["integration:mission"],
+    )
+    assert.deepEqual(selectTestGroups(["src/lib/character.ts"]), ["full"])
 })
 
 test("registers focused runtime state and socket smoke groups", () => {
@@ -1426,6 +1445,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_coverage_audit.test.cjs",
         "tools/mission_daily_battle_facts.test.cjs",
         "tools/mission_degree_candidates.test.cjs",
+        "tools/mission_degree_battle_context.test.cjs",
         "tools/mission_degree_characterization.test.cjs",
         "tools/mission_degree_content_cache.test.cjs",
         "tools/mission_degree_content_tables.test.cjs",

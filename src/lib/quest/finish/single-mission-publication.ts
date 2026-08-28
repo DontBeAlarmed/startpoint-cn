@@ -26,11 +26,15 @@ export function settleSingleMissionEvaluations(input: {
     readonly evaluationTime: Date
     readonly questAccomplished: boolean
     readonly directAwakeMissionIds: readonly number[]
+    readonly directDegreeMissionIds: readonly number[]
     readonly rewardDependencies: MissionSettlementRewardDependencies
 }) {
     const missionEvaluation = settleMissionCategoriesWithEvaluation(
         input.playerId,
-        buildBattleMissionSettlementScopes(input.partyCharacterIds),
+        buildBattleMissionSettlementScopes(
+            input.partyCharacterIds,
+            input.directDegreeMissionIds,
+        ),
         input.evaluationTime,
         undefined,
         input.rewardDependencies,

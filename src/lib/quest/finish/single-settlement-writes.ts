@@ -281,6 +281,7 @@ export function executeSingleSettlementWrites(
         settleSingleMissionEvaluations({
         playerId, partyCharacterIds, evaluationTime: settlementTime, questAccomplished,
         directAwakeMissionIds: missionBattleFacts.awakeMissionIds,
+        directDegreeMissionIds: missionBattleFacts.degreeMissionIds,
         rewardDependencies: { standardRewardGrant: standardRewardGrant.forMission },
     })
     responseState.observeResult(missionSettlement)
