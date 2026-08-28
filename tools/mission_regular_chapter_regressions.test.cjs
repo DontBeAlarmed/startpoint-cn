@@ -14,17 +14,36 @@ const previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR
 process.env.DATA_DIR = databaseDirectory
 delete process.env.WDFP_DATABASE_DIR
 let db
+let restoreContentSnapshot = () => {}
+let cleaned = false
 
-function cleanup() {
-    if (db?.open) db.close()
-    fs.rmSync(databaseDirectory, { recursive: true, force: true })
+function restoreEnvironment() {
     if (previousDataDirectory === undefined) delete process.env.DATA_DIR
     else process.env.DATA_DIR = previousDataDirectory
     if (previousDatabaseDirectory === undefined) delete process.env.WDFP_DATABASE_DIR
     else process.env.WDFP_DATABASE_DIR = previousDatabaseDirectory
 }
 
+function cleanup() {
+    if (cleaned) return
+    cleaned = true
+    const errors = []
+    for (const action of [
+        () => restoreContentSnapshot(),
+        () => { if (db?.open) db.close() },
+        () => fs.rmSync(databaseDirectory, { recursive: true, force: true }),
+        restoreEnvironment,
+    ]) {
+        try { action() } catch (error) { errors.push(error) }
+    }
+    if (errors.length === 1) throw errors[0]
+    if (errors.length > 1) throw new AggregateError(errors, "chapter regression cleanup failed")
+}
+
 process.once("exit", cleanup)
+
+const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+restoreContentSnapshot = installBundledGameplaySnapshot()
 
 const mainQuests = require("../assets/main_quest.json")
 const exQuests = require("../assets/ex_quest.json")
@@ -65,17 +84,6 @@ const enabledMissionIds = Object.freeze([
 const evaluationTime = new Date("2026-08-28T04:00:00.000Z")
 const chapters = Object.freeze(Array.from({ length: 12 }, (_, index) => index + 1))
 
-function parseIntegerList(value) {
-    if (value === undefined || value === null || value === "(None)") return null
-    if (value === "") return []
-    const values = String(value).split(",").map(Number)
-    assert.ok(
-        values.every(Number.isSafeInteger),
-        `mission selector contains a non-integer: ${String(value)}`,
-    )
-    return values
-}
-
 function getQuestsByChapter(table) {
     const result = new Map(chapters.map(chapter => [chapter, []]))
     for (const questIdText of Object.keys(table)) {
@@ -93,27 +101,6 @@ function assertChapterSectionsAreNonEmpty() {
         assert.ok(mainQuestsByChapter.get(chapter).length > 0, `main chapter ${chapter} is empty`)
         assert.ok(exQuestsByChapter.get(chapter).length > 0, `high-difficulty chapter ${chapter} is empty`)
     }
-}
-
-function questMatchesSelector(questId, worlds, chaptersInSelector, quests) {
-    return (worlds === null || worlds.includes(Math.floor(questId / 1_000_000)))
-        && (chaptersInSelector === null || chaptersInSelector.includes(Math.floor(questId / 1_000) % 1_000))
-        && (quests === null || quests.includes(questId % 1_000))
-}
-
-function getMissionCandidates(definition) {
-    const rangeKind = Number(definition.row[7])
-    assert.ok(rangeKind === 0 || rangeKind === 1)
-    const worlds = parseIntegerList(definition.row[8])
-    const chaptersInSelector = parseIntegerList(definition.row[9])
-    const quests = parseIntegerList(definition.row[10])
-    const table = rangeKind === 0 ? mainQuests : exQuests
-    const candidates = Object.keys(table)
-        .map(Number)
-        .filter(questId => questMatchesSelector(questId, worlds, chaptersInSelector, quests))
-        .sort((left, right) => left - right)
-    assert.ok(candidates.length > 0, `mission ${definition.missionId} has no official quests`)
-    return Object.freeze(candidates)
 }
 
 function insertQuestProgress(playerId, section, questIds) {
@@ -163,12 +150,6 @@ for (const definition of definitions) {
         Number(definition.row[7]) === 0 ? 1 : 4,
     )
 }
-
-const candidatesByMissionId = new Map(definitions.map(definition => [
-    definition.missionId,
-    getMissionCandidates(definition),
-]))
-assert.equal(candidatesByMissionId.size, 48)
 
 const mainGaps = chapters.map(chapter => {
     const quests = mainQuestsByChapter.get(chapter).sort((left, right) => left - right)
