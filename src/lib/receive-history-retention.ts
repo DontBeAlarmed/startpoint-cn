@@ -171,37 +171,47 @@ export async function runReceiveHistoryRetentionPass(
         "batchSize",
     )
 
+    const yieldAndCheckStop = async (): Promise<boolean> => {
+        await yieldBetweenBatches()
+        return shouldStop()
+    }
+    const currentResult = () => Object.freeze({
+        batches,
+        deletedExpired,
+        deletedOverflow,
+        deletedRows,
+    })
+
     while (!shouldStop()) {
         const deletedInBatch = runExpiredAgeBatch(database, now, maxAgeDays, batchSize)
         batches++
         deletedExpired += deletedInBatch
         deletedRows += deletedInBatch
+        if (await yieldAndCheckStop()) return currentResult()
         if (deletedInBatch < batchSize) break
-        await yieldBetweenBatches()
     }
 
-    if (!shouldStop()) {
-        const overflowCandidates = findOverflowCandidates(database, maxRowsPerPlayer)
-        for (const candidate of overflowCandidates) {
-            const batchesForPlayer = Math.ceil(candidate.overflowRows / batchSize)
-            for (let index = 0; index < batchesForPlayer; index++) {
-                if (shouldStop()) break
-                const deletedInBatch = runOverflowBatch(
-                    database,
-                    candidate.playerId,
-                    maxRowsPerPlayer,
-                    batchSize,
-                )
-                batches++
-                deletedOverflow += deletedInBatch
-                deletedRows += deletedInBatch
-                await yieldBetweenBatches()
-            }
-            if (shouldStop()) break
+    const overflowCandidates = findOverflowCandidates(database, maxRowsPerPlayer)
+
+    if (await yieldAndCheckStop()) return currentResult()
+
+    for (const candidate of overflowCandidates) {
+        const batchesForPlayer = Math.ceil(candidate.overflowRows / batchSize)
+        for (let index = 0; index < batchesForPlayer; index++) {
+            const deletedInBatch = runOverflowBatch(
+                database,
+                candidate.playerId,
+                maxRowsPerPlayer,
+                batchSize,
+            )
+            batches++
+            deletedOverflow += deletedInBatch
+            deletedRows += deletedInBatch
+            if (await yieldAndCheckStop()) return currentResult()
         }
     }
 
-    return Object.freeze({ batches, deletedExpired, deletedOverflow, deletedRows })
+    return currentResult()
 }
 
 export class ReceiveHistoryRetentionService {

@@ -198,7 +198,7 @@ test("a retention pass drains multiple bounded batches and yields between them",
         deletedOverflow: 2,
         deletedRows: 7,
     })
-    assert.equal(yieldCount, 3)
+    assert.equal(yieldCount, 5)
     assert.equal(database.prepare("SELECT COUNT(*) count FROM players_receive_history").get().count, 5)
     database.close()
 })
@@ -222,6 +222,74 @@ test("a stop set at a yield prevents the next bounded batch", async () => {
         deletedRows: 2,
     })
     assert.equal(database.prepare("SELECT COUNT(*) count FROM players_receive_history").get().count, 3)
+    database.close()
+})
+
+test("a stop after the final age batch prevents the overflow candidate query", async () => {
+    const database = createDatabase()
+    insert(database, 1, "2026-06-01 00:00:00", 5)
+    const counted = countingDatabase(database)
+    let shouldStop = false
+    let yieldCount = 0
+
+    const result = await runReceiveHistoryRetentionPass(
+        counted,
+        new Date("2026-08-28T00:00:00Z"),
+        { maxAgeDays: 31, maxRowsPerPlayer: 500, batchSize: 2 },
+        async () => {
+            yieldCount++
+            if (yieldCount === 3) shouldStop = true
+        },
+        () => shouldStop,
+    )
+    assert.deepEqual(result, {
+        batches: 3,
+        deletedExpired: 5,
+        deletedOverflow: 0,
+        deletedRows: 5,
+    })
+    assert.equal(yieldCount, 3)
+    assert.equal(counted.statements.some(entry =>
+        entry.sql.includes("HAVING COUNT(*) > ?")
+    ), false)
+    assert.equal(database.prepare("SELECT COUNT(*) count FROM players_receive_history").get().count, 0)
+    database.close()
+})
+
+test("a stop after the candidate query prevents the first overflow delete", async () => {
+    const database = createDatabase()
+    insert(database, 1, "2026-08-27 00:00:00", 7)
+    const counted = countingDatabase(database)
+    let shouldStop = false
+    let yieldCount = 0
+
+    const result = await runReceiveHistoryRetentionPass(
+        counted,
+        new Date("2026-08-28T00:00:00Z"),
+        { maxAgeDays: 31, maxRowsPerPlayer: 5, batchSize: 3 },
+        async () => {
+            yieldCount++
+            if (yieldCount === 2) shouldStop = true
+        },
+        () => shouldStop,
+    )
+    assert.deepEqual(result, {
+        batches: 1,
+        deletedExpired: 0,
+        deletedOverflow: 0,
+        deletedRows: 0,
+    })
+    assert.equal(yieldCount, 2)
+    const candidateQueries = counted.statements.filter(entry =>
+        entry.sql.includes("HAVING COUNT(*) > ?")
+    )
+    assert.equal(candidateQueries.length, 1)
+    const overflowDeletes = counted.statements.filter(entry =>
+        entry.sql.trimStart().toUpperCase().startsWith("DELETE")
+        && entry.sql.includes("ORDER BY create_time DESC, id DESC")
+    )
+    assert.equal(overflowDeletes.length, 0)
+    assert.equal(database.prepare("SELECT COUNT(*) count FROM players_receive_history").get().count, 7)
     database.close()
 })
 
