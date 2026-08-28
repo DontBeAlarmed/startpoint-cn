@@ -259,6 +259,19 @@ test("a loading disconnect defers its Leave until surviving clients activate the
     assert.equal(sessionManager.battleConnectionPhase.get(third.client.connectionId), "active")
 })
 
+test("scene activation fails closed before the SceneReady barrier releases", () => {
+    const battle = createBattle(1001002, 2)
+    const [first, second] = battle.clients
+
+    notify(first, [0])
+    assert.equal(sessionManager.activateBattleScene(battle.room.room_number), false)
+
+    assert.deepEqual(first.socket.writes, [])
+    assert.deepEqual(second.socket.writes, [])
+    assert.equal(sessionManager.battleConnectionPhase.get(first.client.connectionId), "ready")
+    assert.equal(sessionManager.battleConnectionPhase.get(second.client.connectionId), "loading")
+})
+
 test("a disconnect after scene activation broadcasts its Leave immediately", () => {
     const battle = createBattle(1001002, 3)
     const [first, second, leaving] = battle.clients
@@ -273,6 +286,47 @@ test("a disconnect after scene activation broadcasts its Leave immediately", () 
     assert.deepEqual(first.socket.writes.slice(before), [
         [1, [0, leaving.client.connectionId]],
     ])
+})
+
+test("participant cleanup after an active client disconnect does not repeat Leave", () => {
+    const battle = createBattle(1001002, 2)
+    const [survivor, leaving] = battle.clients
+
+    notify(survivor, [0])
+    notify(leaving, [0])
+    sessionManager.removeClient(leaving.client)
+    assert.equal(sessionManager.removeBattleParticipant(
+        battle.room.room_number,
+        leaving.client.participant,
+    ), true)
+
+    assert.deepEqual(survivor.socket.writes, [
+        [1, [1]],
+        [1, [0, leaving.client.connectionId]],
+    ])
+    assert.equal(countMessage(survivor, [1, [0, leaving.client.connectionId]]), 1)
+})
+
+test("participant cleanup after pending Leave flush does not repeat Leave", () => {
+    const battle = createBattle(1001002, 3)
+    const [first, second, leaving] = battle.clients
+
+    sessionManager.removeClient(leaving.client)
+    notify(first, [0])
+    notify(second, [0])
+    assert.equal(sessionManager.removeBattleParticipant(
+        battle.room.room_number,
+        leaving.client.participant,
+    ), true)
+
+    const expectedFrames = [
+        [1, [1]],
+        [1, [0, leaving.client.connectionId]],
+    ]
+    assert.deepEqual(first.socket.writes, expectedFrames)
+    assert.deepEqual(second.socket.writes, expectedFrames)
+    assert.equal(countMessage(first, [1, [0, leaving.client.connectionId]]), 1)
+    assert.equal(countMessage(second, [1, [0, leaving.client.connectionId]]), 1)
 })
 
 test("reconnecting before activation cancels the pending Leave and the old socket stays inert", async () => {
@@ -420,6 +474,44 @@ test("a participant reconnecting after barrier release receives only its missed 
     assert.equal(countMessage(reconnected, [1, [1]]), 2)
     assert.equal(countMessage(host, [1, [1]]), 2)
     sessionManager.removeClient(client)
+})
+
+test("a reconnect after barrier release rejoins active membership for one later Leave", async () => {
+    const battle = createBattle(1001002, 2)
+    const [survivor, leaving] = battle.clients
+    battle.room.raising_state = 4
+
+    notify(survivor, [0])
+    sessionManager.removeClient(leaving.client)
+    assert.deepEqual(survivor.socket.writes, [
+        [1, [1]],
+        [1, [0, leaving.client.connectionId]],
+    ])
+
+    const socket = new FakeSocket()
+    await handleHandshake(socket, {
+        socklet: "cooperation_battle",
+        room_number: battle.room.room_number,
+        connection_id: leaving.client.connectionId,
+    })
+    const client = sessionManager.getBattleClient(leaving.client.connectionId)
+    assert.ok(client)
+    notify({ client, socket }, [0])
+    assert.deepEqual(socket.writes.slice(1), [[1, [1]]])
+    assert.equal(sessionManager.battleConnectionPhase.get(client.connectionId), "active")
+
+    sessionManager.removeClient(client)
+    assert.equal(sessionManager.removeBattleParticipant(
+        battle.room.room_number,
+        leaving.client.participant,
+    ), true)
+
+    assert.deepEqual(survivor.socket.writes, [
+        [1, [1]],
+        [1, [0, leaving.client.connectionId]],
+        [1, [0, leaving.client.connectionId]],
+    ])
+    assert.equal(countMessage(survivor, [1, [0, leaving.client.connectionId]]), 2)
 })
 
 test("an unwritable BattleStart target remains eligible for reconnect replay", async () => {

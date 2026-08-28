@@ -335,6 +335,14 @@ export class SessionManager {
         return this.activatedBattleScenes.get(roomNumber)?.has(generation) === true
     }
 
+    private addCurrentBattleSceneMember(roomNumber: string, connectionId: string): boolean {
+        const generation = this.battleSceneGeneration.get(roomNumber) ?? -1
+        const members = this.activatedBattleScenes.get(roomNumber)?.get(generation)
+        if (!members) return false
+        members.add(connectionId)
+        return true
+    }
+
     private cancelPendingBattleLeave(roomNumber: string, connectionId: string): void {
         const generation = this.battleSceneGeneration.get(roomNumber) ?? -1
         this.pendingBattleLeaves.get(roomNumber)?.get(generation)?.delete(connectionId)
@@ -375,14 +383,20 @@ export class SessionManager {
 
     private removeBattleConnectionRecord(roomNumber: string, connectionId: string): void {
         const generation = this.battleSceneGeneration.get(roomNumber) ?? -1
-        if (generation >= 0 && this.isBattleSceneActivated(roomNumber, generation)) {
-            this.broadcastBattleLeave(roomNumber, connectionId)
-        } else {
-            this.queuePendingBattleLeave(roomNumber, connectionId)
-        }
-
-        this.battleClients.get(roomNumber)?.delete(connectionId)
+        const battleConnections = this.battleClients.get(roomNumber)
+        const wasConnected = battleConnections?.delete(connectionId) === true
         this.sceneReadyClients.get(roomNumber)?.delete(connectionId)
+
+        const activeMembers = this.activatedBattleScenes.get(roomNumber)?.get(generation)
+        if (activeMembers) {
+            if (activeMembers.delete(connectionId)) {
+                this.broadcastBattleLeave(roomNumber, connectionId)
+            }
+            return
+        }
+        if (generation < 0 || !wasConnected) return
+
+        this.queuePendingBattleLeave(roomNumber, connectionId)
         const expected = this.battleExpectedCount.get(roomNumber)
         if (expected !== undefined && expected > 1) {
             this.battleExpectedCount.set(roomNumber, expected - 1)
@@ -681,6 +695,11 @@ export class SessionManager {
         if (currentGeneration < 0) return false
         const client = this.cidToBattleClient.get(connectionId)
         if (!client) return false
+        if (client.roomNumber === roomNumber
+            && this.isBattleSceneBarrierReleased(roomNumber)
+            && this.addCurrentBattleSceneMember(roomNumber, connectionId)) {
+            this.armActiveBattleHeartbeatLease(client)
+        }
 
         let deliveredByGeneration = this.battleStartDeliveredClients.get(roomNumber)
         for (let generation = 0; generation <= currentGeneration; generation++) {
@@ -712,18 +731,21 @@ export class SessionManager {
 
     activateBattleScene(roomNumber: string): boolean {
         const generation = this.battleSceneGeneration.get(roomNumber) ?? -1
-        if (generation < 0 || this.isBattleSceneActivated(roomNumber, generation)) return false
+        if (generation < 0
+            || (this.battleExpectedCount.get(roomNumber) ?? -1) !== 0
+            || this.isBattleSceneActivated(roomNumber, generation)) return false
 
         let activationsByGeneration = this.activatedBattleScenes.get(roomNumber)
         if (!activationsByGeneration) {
             activationsByGeneration = new Map()
             this.activatedBattleScenes.set(roomNumber, activationsByGeneration)
         }
+        const clients = this.getBattleClientsInRoom(roomNumber)
         activationsByGeneration.set(generation, new Set(
-            this.getBattleClientsInRoom(roomNumber).map(client => client.connectionId),
+            clients.map(client => client.connectionId),
         ))
 
-        for (const client of this.getBattleClientsInRoom(roomNumber)) {
+        for (const client of clients) {
             this.armActiveBattleHeartbeatLease(client)
         }
         this.broadcastBattleStart(roomNumber)
@@ -746,7 +768,9 @@ export class SessionManager {
         if (expected === undefined) return false
         const client = this.cidToBattleClient.get(connectionId)
         if (expected <= 0) {
-            if (expected === 0 && client?.roomNumber === roomNumber) {
+            if (expected === 0
+                && client?.roomNumber === roomNumber
+                && this.addCurrentBattleSceneMember(roomNumber, connectionId)) {
                 this.armActiveBattleHeartbeatLease(client)
             }
             return false
