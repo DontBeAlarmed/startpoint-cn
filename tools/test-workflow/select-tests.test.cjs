@@ -375,8 +375,8 @@ test("accumulates every directly related source group", () => {
     assert.ok(TEST_GROUPS["integration:mission"].tests.includes(
         "tools/mission_degree_reference_regressions.test.cjs",
     ))
+    assert.deepEqual(selectTestGroups(["src/lib/character.ts"]), ["full"])
     for (const file of [
-        "src/lib/character.ts",
         "src/lib/mission/computer-degree.ts",
         "src/lib/mission/degree-operation-facts.ts",
         "src/lib/mission/degree-rule-catalog.ts",
@@ -695,7 +695,7 @@ test("maps the single battle settlement baseline family to integration quest", (
 test("upgrades package and unknown source changes to full", () => {
     assert.deepEqual(selectTestGroups(["package.json"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/unmapped/new-feature.ts"]), ["full"])
-    assert.deepEqual(selectTestGroups(["src/lib/character.ts"]), ["integration:mission"])
+    assert.deepEqual(selectTestGroups(["src/lib/character.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["tools/test-workflow/groups.cjs"]), ["full"])
 })
 
