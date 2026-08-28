@@ -71,6 +71,7 @@ test("maps representative source files to focused groups", () => {
         ["integration:mission"],
     )
     for (const file of [
+        "tools/mission_regular_chapter_regressions.test.cjs",
         "src/lib/mission/pass.ts",
         "src/lib/mission/periodic-session-context.ts",
         "tools/oracle/git-object-runtime.test.cjs",
@@ -1496,6 +1497,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/pass_card_point_change.test.cjs",
         "tools/mission_periodic_session_migration.test.cjs",
         "tools/mission_progress_route.test.cjs",
+        "tools/mission_regular_chapter_regressions.test.cjs",
         "tools/mission_regular_facts.test.cjs",
         "tools/mission_regular_session_equivalence.test.cjs",
         "tools/mission_regular_session_scope.test.cjs",
