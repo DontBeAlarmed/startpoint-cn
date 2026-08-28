@@ -17,13 +17,6 @@ export interface ReceiveHistoryRetentionBatchOptions {
     readonly batchSize?: number
 }
 
-export interface ReceiveHistoryRetentionBatchResult {
-    readonly deletedExpired: number
-    readonly deletedOverflow: number
-    readonly deletedRows: number
-    readonly hasMore: boolean
-}
-
 export interface ReceiveHistoryRetentionPassResult {
     readonly batches: number
     readonly deletedExpired: number
@@ -88,29 +81,21 @@ function requirePositiveInteger(value: number, label: string): number {
     return value
 }
 
-export function runReceiveHistoryRetentionBatch(
+function runExpiredAgeBatch(
     database: Database,
     now: Date,
-    options: ReceiveHistoryRetentionBatchOptions,
-): ReceiveHistoryRetentionBatchResult {
+    maxAgeDays: number,
+    batchSize: number,
+): number {
     if (!(now instanceof Date) || !Number.isFinite(now.getTime())) {
         throw new TypeError("now must be a valid Date")
     }
-    const maxAgeDays = requirePositiveInteger(options.maxAgeDays, "maxAgeDays")
-    const maxRowsPerPlayer = requirePositiveInteger(
-        options.maxRowsPerPlayer,
-        "maxRowsPerPlayer",
-    )
-    const batchSize = requirePositiveInteger(
-        options.batchSize ?? DEFAULT_RECEIVE_HISTORY_BATCH_SIZE,
-        "batchSize",
-    )
     const cutoff = clientSerializeDate(new Date(
         now.getTime() - maxAgeDays * 24 * 60 * 60 * 1000,
     ))
 
     return database.transaction(() => {
-        const deletedExpired = database.prepare(`
+        return database.prepare(`
             DELETE FROM players_receive_history
             WHERE id IN (
                 SELECT id
@@ -120,33 +105,49 @@ export function runReceiveHistoryRetentionBatch(
                 LIMIT ?
             )
         `).run(cutoff, batchSize).changes
-
-        const remaining = batchSize - deletedExpired
-        const deletedOverflow = remaining <= 0 ? 0 : database.prepare(`
-            DELETE FROM players_receive_history
-            WHERE id IN (
-                SELECT id
-                FROM (
-                    SELECT id, ROW_NUMBER() OVER (
-                        PARTITION BY player_id
-                        ORDER BY create_time DESC, id DESC
-                    ) AS row_number
-                    FROM players_receive_history
-                )
-                WHERE row_number > ?
-                ORDER BY id
-                LIMIT ?
-            )
-        `).run(maxRowsPerPlayer, remaining).changes
-
-        const deletedRows = deletedExpired + deletedOverflow
-        return Object.freeze({
-            deletedExpired,
-            deletedOverflow,
-            deletedRows,
-            hasMore: deletedRows === batchSize,
-        })
     })()
+}
+
+interface ReceiveHistoryOverflowCandidate {
+    readonly playerId: number
+    readonly overflowRows: number
+}
+
+function findOverflowCandidates(
+    database: Database,
+    maxRowsPerPlayer: number,
+): ReceiveHistoryOverflowCandidate[] {
+    return database.prepare<[number, number], {
+        player_id: number
+        overflow_rows: number
+    }>(`
+        SELECT player_id, COUNT(*) - ? AS overflow_rows
+        FROM players_receive_history
+        GROUP BY player_id
+        HAVING COUNT(*) > ?
+        ORDER BY player_id
+    `).all(maxRowsPerPlayer, maxRowsPerPlayer).map(row => ({
+        playerId: row.player_id,
+        overflowRows: row.overflow_rows,
+    }))
+}
+
+function runOverflowBatch(
+    database: Database,
+    playerId: number,
+    maxRowsPerPlayer: number,
+    batchSize: number,
+): number {
+    return database.transaction(() => database.prepare(`
+        DELETE FROM players_receive_history
+        WHERE id IN (
+            SELECT id
+            FROM players_receive_history
+            WHERE player_id = ?
+            ORDER BY create_time DESC, id DESC
+            LIMIT ? OFFSET ?
+        )
+    `).run(playerId, batchSize, maxRowsPerPlayer).changes)()
 }
 
 export async function runReceiveHistoryRetentionPass(
@@ -154,20 +155,50 @@ export async function runReceiveHistoryRetentionPass(
     now: Date,
     options: ReceiveHistoryRetentionBatchOptions,
     yieldBetweenBatches: () => Promise<void> = () => new Promise(resolve => setImmediate(resolve)),
+    shouldStop: () => boolean = () => false,
 ): Promise<ReceiveHistoryRetentionPassResult> {
     let batches = 0
     let deletedExpired = 0
     let deletedOverflow = 0
     let deletedRows = 0
+    const maxAgeDays = requirePositiveInteger(options.maxAgeDays, "maxAgeDays")
+    const maxRowsPerPlayer = requirePositiveInteger(
+        options.maxRowsPerPlayer,
+        "maxRowsPerPlayer",
+    )
+    const batchSize = requirePositiveInteger(
+        options.batchSize ?? DEFAULT_RECEIVE_HISTORY_BATCH_SIZE,
+        "batchSize",
+    )
 
-    while (true) {
-        const batch = runReceiveHistoryRetentionBatch(database, now, options)
+    while (!shouldStop()) {
+        const deletedInBatch = runExpiredAgeBatch(database, now, maxAgeDays, batchSize)
         batches++
-        deletedExpired += batch.deletedExpired
-        deletedOverflow += batch.deletedOverflow
-        deletedRows += batch.deletedRows
-        if (!batch.hasMore) break
+        deletedExpired += deletedInBatch
+        deletedRows += deletedInBatch
+        if (deletedInBatch < batchSize) break
         await yieldBetweenBatches()
+    }
+
+    if (!shouldStop()) {
+        const overflowCandidates = findOverflowCandidates(database, maxRowsPerPlayer)
+        for (const candidate of overflowCandidates) {
+            const batchesForPlayer = Math.ceil(candidate.overflowRows / batchSize)
+            for (let index = 0; index < batchesForPlayer; index++) {
+                if (shouldStop()) break
+                const deletedInBatch = runOverflowBatch(
+                    database,
+                    candidate.playerId,
+                    maxRowsPerPlayer,
+                    batchSize,
+                )
+                batches++
+                deletedOverflow += deletedInBatch
+                deletedRows += deletedInBatch
+                await yieldBetweenBatches()
+            }
+            if (shouldStop()) break
+        }
     }
 
     return Object.freeze({ batches, deletedExpired, deletedOverflow, deletedRows })
@@ -254,6 +285,7 @@ export class ReceiveHistoryRetentionService {
                     batchSize: this.options.batchSize,
                 },
                 this.yieldBetweenBatches,
+                () => !this.running,
             )
             this.logger.log(
                 `[DB-MAINTENANCE] receive history retention completed: batches=${result.batches} deletedExpired=${result.deletedExpired} deletedOverflow=${result.deletedOverflow} deletedRows=${result.deletedRows}`,
