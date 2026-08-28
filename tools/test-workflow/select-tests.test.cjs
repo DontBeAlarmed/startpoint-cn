@@ -369,6 +369,24 @@ test("accumulates every directly related source group", () => {
         ["integration:mission"],
     )
     assert.deepEqual(
+        selectTestGroups(["tools/mission_degree_reference_regressions.test.cjs"]),
+        ["integration:mission"],
+    )
+    assert.ok(TEST_GROUPS["integration:mission"].tests.includes(
+        "tools/mission_degree_reference_regressions.test.cjs",
+    ))
+    for (const file of [
+        "src/lib/character.ts",
+        "src/lib/mission/computer-degree.ts",
+        "src/lib/mission/degree-operation-facts.ts",
+        "src/lib/mission/degree-rule-catalog.ts",
+        "src/lib/mission/degree-session-context.ts",
+        "src/lib/mission/degree-state-derivation.ts",
+        "tools/helpers/mission-degree-session-fixture.cjs",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["integration:mission"], file)
+    }
+    assert.deepEqual(
         selectTestGroups(["tools/helpers/mission-degree-session-fixture.cjs"]),
         ["integration:mission"],
     )
@@ -677,7 +695,7 @@ test("maps the single battle settlement baseline family to integration quest", (
 test("upgrades package and unknown source changes to full", () => {
     assert.deepEqual(selectTestGroups(["package.json"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/unmapped/new-feature.ts"]), ["full"])
-    assert.deepEqual(selectTestGroups(["src/lib/character.ts"]), ["full"])
+    assert.deepEqual(selectTestGroups(["src/lib/character.ts"]), ["integration:mission"])
     assert.deepEqual(selectTestGroups(["tools/test-workflow/groups.cjs"]), ["full"])
 })
 
@@ -1415,6 +1433,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_degree_immutable.test.cjs",
         "tools/mission_degree_oracle_independence.test.cjs",
         "tools/mission_degree_progress.test.cjs",
+        "tools/mission_degree_reference_regressions.test.cjs",
         "tools/mission_degree_session_context.test.cjs",
         "tools/mission_degree_session_selection.test.cjs",
         "tools/mission_degree_settlement_session.test.cjs",

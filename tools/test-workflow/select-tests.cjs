@@ -23,6 +23,10 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
+        pattern: /^(?:src\/lib\/character\.ts|tools\/mission_degree_reference_regressions\.test\.cjs)$/,
+        groups: ["integration:mission"],
+    },
+    {
         pattern: /^src\/lib\/mission\/(?:computer-degree|degree-(?:content-tables|coverage|immutable|rule-catalog|state-derivation|session-context))\.ts$/,
         groups: ["integration:mission"],
     },

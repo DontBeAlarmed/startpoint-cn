@@ -419,6 +419,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/mission_degree_immutable.test.cjs",
             "tools/mission_degree_oracle_independence.test.cjs",
             "tools/mission_degree_progress.test.cjs",
+            "tools/mission_degree_reference_regressions.test.cjs",
             "tools/mission_degree_session_context.test.cjs",
             "tools/mission_degree_session_selection.test.cjs",
             "tools/mission_degree_settlement_session.test.cjs",
