@@ -233,6 +233,158 @@ test("disconnect releases the remaining client from the next-scene barrier", () 
     assert.equal(countMessage(first, [1, [1]]), 2)
 })
 
+test("a loading disconnect defers its Leave until surviving clients activate the scene", () => {
+    const battle = createBattle(1001002, 3)
+    const [leaving, second, third] = battle.clients
+
+    notify(leaving, [0])
+    sessionManager.removeClient(leaving.client)
+    assert.equal(countMessage(second, [1, [0, leaving.client.connectionId]]), 0)
+    assert.equal(countMessage(third, [1, [0, leaving.client.connectionId]]), 0)
+
+    notify(second, [0])
+    assert.deepEqual(second.socket.writes, [])
+    assert.deepEqual(third.socket.writes, [])
+    notify(third, [0])
+
+    assert.deepEqual(second.socket.writes, [
+        [1, [1]],
+        [1, [0, leaving.client.connectionId]],
+    ])
+    assert.deepEqual(third.socket.writes, [
+        [1, [1]],
+        [1, [0, leaving.client.connectionId]],
+    ])
+    assert.equal(sessionManager.battleConnectionPhase.get(second.client.connectionId), "active")
+    assert.equal(sessionManager.battleConnectionPhase.get(third.client.connectionId), "active")
+})
+
+test("a disconnect after scene activation broadcasts its Leave immediately", () => {
+    const battle = createBattle(1001002, 3)
+    const [first, second, leaving] = battle.clients
+
+    notify(first, [0])
+    notify(second, [0])
+    notify(leaving, [0])
+    assert.deepEqual(first.socket.writes, [[1, [1]]])
+
+    const before = first.socket.writes.length
+    sessionManager.removeClient(leaving.client)
+    assert.deepEqual(first.socket.writes.slice(before), [
+        [1, [0, leaving.client.connectionId]],
+    ])
+})
+
+test("reconnecting before activation cancels the pending Leave and the old socket stays inert", async () => {
+    const battle = createBattle(1001002, 3)
+    const [leaving, second, third] = battle.clients
+    battle.room.raising_state = 4
+
+    notify(leaving, [0])
+    sessionManager.removeClient(leaving.client)
+
+    const socket = new FakeSocket()
+    await handleHandshake(socket, {
+        socklet: "cooperation_battle",
+        room_number: battle.room.room_number,
+        connection_id: leaving.client.connectionId,
+    })
+    const client = sessionManager.getBattleClient(leaving.client.connectionId)
+    assert.ok(client)
+    const reconnected = { client, socket }
+    assert.deepEqual(socket.writes, [[0, battle.room.room_number, ""]])
+    notify(reconnected, [0])
+
+    sessionManager.removeClient(leaving.client)
+    notify(second, [0])
+    notify(third, [0])
+
+    assert.deepEqual(reconnected.socket.writes.slice(1), [[1, [1]]])
+    assert.deepEqual(second.socket.writes, [[1, [1]]])
+    assert.deepEqual(third.socket.writes, [[1, [1]]])
+})
+
+test("next-scene activation isolates pending leaves by generation", () => {
+    const battle = createBattle(1001002, 3)
+    const [first, second, leaving] = battle.clients
+
+    notify(first, [0])
+    notify(second, [0])
+    notify(leaving, [0])
+    sessionManager.removeClient(leaving.client)
+
+    notify(first, [1])
+    sessionManager.removeClient(second.client)
+    notify(first, [0])
+
+    assert.deepEqual(first.socket.writes, [
+        [1, [1]],
+        [1, [0, leaving.client.connectionId]],
+        [1, [1]],
+        [1, [0, second.client.connectionId]],
+    ])
+    assert.equal(sessionManager.battleSceneGeneration.get(battle.room.room_number), 1)
+    assert.equal(sessionManager.battleConnectionPhase.get(first.client.connectionId), "active")
+})
+
+test("generation-zero pending leaves do not leak into generation one", () => {
+    const battle = createBattle(1001002, 3)
+    const [first, second, third] = battle.clients
+
+    notify(first, [0])
+    notify(second, [0])
+    notify(third, [0])
+    sessionManager.removeClient(third.client)
+    notify(first, [1])
+    notify(second, [1])
+    notify(first, [0])
+    notify(second, [0])
+    const firstFrames = [...first.socket.writes]
+    const secondFrames = [...second.socket.writes]
+
+    assert.deepEqual(firstFrames, [
+        [1, [1]],
+        [1, [0, third.client.connectionId]],
+        [1, [1]],
+    ])
+    assert.deepEqual(secondFrames, [
+        [1, [1]],
+        [1, [0, third.client.connectionId]],
+        [1, [1]],
+    ])
+    assert.equal(sessionManager.battleSceneGeneration.get(battle.room.room_number), 1)
+})
+
+test("failed BattleStart delivery preserves replay eligibility after pending leaves flush", async () => {
+    const battle = createBattle(1001002, 3)
+    const [leaving, unwritable, delivered] = battle.clients
+    battle.room.raising_state = 4
+
+    notify(leaving, [0])
+    sessionManager.removeClient(leaving.client)
+    unwritable.socket.writable = false
+    notify(unwritable, [0])
+    notify(delivered, [0])
+
+    assert.deepEqual(delivered.socket.writes, [
+        [1, [1]],
+        [1, [0, leaving.client.connectionId]],
+    ])
+    notify(delivered, [0])
+    assert.equal(countMessage(delivered, [1, [1]]), 1)
+
+    const socket = new FakeSocket()
+    await handleHandshake(socket, {
+        socklet: "cooperation_battle",
+        room_number: battle.room.room_number,
+        connection_id: leaving.client.connectionId,
+    })
+    const client = sessionManager.getBattleClient(leaving.client.connectionId)
+    assert.ok(client)
+    notify({ client, socket }, [0])
+    assert.deepEqual(socket.writes.slice(1), [[1, [1]]])
+})
+
 test("a participant reconnecting after barrier release receives only its missed BattleStart", async () => {
     const battle = createBattle(1001002, 2)
     const [host, guest] = battle.clients

@@ -33,9 +33,11 @@ function handleBattleNotify(socket: net.Socket, data: unknown): void {
             if (!client) break
             const allReady = sessionManager.markSceneReady(client.connectionId, client.roomNumber)
             if (allReady) {
-                sessionManager.broadcastBattleStart(client.roomNumber)
+                sessionManager.activateBattleScene(client.roomNumber)
             } else {
-                sessionManager.replayBattleStartIfNeeded(client.connectionId, client.roomNumber)
+                if (sessionManager.isBattleSceneBarrierReleased(client.roomNumber)) {
+                    sessionManager.replayBattleStartIfNeeded(client.connectionId, client.roomNumber)
+                }
             }
             break
         }

@@ -118,19 +118,75 @@ test("a battle connection that never reaches SceneReady expires its loading leas
     assert.equal(manager.getBattleClient(client.connectionId), undefined)
 })
 
-test("battle activity extends the active lease without recreating the connection", async () => {
+test("battle activity extends the activated scene lease without recreating the connection", async () => {
     const manager = createManager()
     const roomNumber = "heartbeat-active-room"
     manager.setBattleExpectedCount(roomNumber, 1)
     const { client, socket } = createBattleClient(manager, roomNumber)
 
     assert.equal(manager.markSceneReady(client.connectionId, roomNumber), true)
+    manager.activateBattleScene(roomNumber)
     await new Promise(resolve => setTimeout(resolve, 45))
     manager.noteBattleActivity(client.connectionId)
     await new Promise(resolve => setTimeout(resolve, 45))
     assert.equal(socket.destroyed, false)
 
     await waitFor(() => socket.destroyed, "active battle socket did not expire after inactivity")
+})
+
+test("battle activity renews the ready lease until the scene barrier activates", async () => {
+    const manager = new SessionManager({
+        battleTuning: { loadingLeaseMs: 200, heartbeatLeaseMs: 80 },
+    })
+    const roomNumber = "heartbeat-ready-room"
+    manager.setBattleExpectedCount(roomNumber, 2)
+    const first = createBattleClient(manager, roomNumber)
+    const second = createBattleClient(manager, roomNumber)
+
+    assert.equal(manager.battleConnectionPhase.get(first.client.connectionId), "loading")
+    assert.equal(manager.markSceneReady(first.client.connectionId, roomNumber), false)
+    assert.equal(manager.battleConnectionPhase.get(first.client.connectionId), "ready")
+
+    await new Promise(resolve => setTimeout(resolve, 45))
+    manager.noteBattleActivity(first.client.connectionId)
+    await new Promise(resolve => setTimeout(resolve, 45))
+    assert.equal(first.socket.destroyed, false)
+    assert.equal(second.socket.destroyed, false)
+
+    assert.equal(manager.markSceneReady(second.client.connectionId, roomNumber), true)
+    manager.activateBattleScene(roomNumber)
+    assert.equal(manager.battleConnectionPhase.get(first.client.connectionId), "active")
+    assert.equal(manager.battleConnectionPhase.get(second.client.connectionId), "active")
+
+    await waitFor(() => first.socket.destroyed && second.socket.destroyed,
+        "active battle sockets did not expire after inactivity")
+})
+
+test("clearing battle state makes old heartbeat timers and sockets inert", () => {
+    const captured = captureTimeouts()
+    const manager = createManager()
+    const roomNumber = "heartbeat-cleanup-room"
+    const battle = []
+    try {
+        manager.setBattleExpectedCount(roomNumber, 2)
+        battle.push(createBattleClient(manager, roomNumber))
+        battle.push(createBattleClient(manager, roomNumber))
+        manager.markSceneReady(battle[0].client.connectionId, roomNumber)
+        const readyTimer = captured.timers.at(-1)
+
+        manager.clearBattleSceneState(roomNumber)
+        assert.equal(readyTimer.cleared, true)
+        readyTimer.callback()
+        for (const { client, socket } of battle) {
+            assert.equal(socket.destroyed, false)
+            assert.equal(manager.battleConnectionPhase.has(client.connectionId), false)
+        }
+    } finally {
+        for (const { client } of battle) {
+            if (manager.getBattleClient(client.connectionId) === client) manager.removeClient(client)
+        }
+        captured.restore()
+    }
 })
 
 test("replacing a same-room battle socket cancels the old lease", async () => {
@@ -151,6 +207,7 @@ test("a reconnect after the scene barrier is released enters the active lease", 
     const first = createBattleClient(manager, roomNumber, "reconnect-cid")
 
     assert.equal(manager.markSceneReady(first.client.connectionId, roomNumber), true)
+    manager.activateBattleScene(roomNumber)
     const second = createBattleClient(manager, roomNumber, "reconnect-cid")
     assert.equal(manager.markSceneReady(second.client.connectionId, roomNumber), false)
 
@@ -242,6 +299,7 @@ test("an old active timer cannot take ownership from a replacement connection", 
         first = createBattleClient(manager, roomNumber, connectionId)
         const firstLoadingTimer = captured.timers.at(-1)
         assert.equal(manager.markSceneReady(connectionId, roomNumber), true)
+        manager.activateBattleScene(roomNumber)
         const firstActiveTimer = captured.timers.at(-1)
         assert.equal(firstLoadingTimer.cleared, true)
         assert.equal(firstActiveTimer.delayMs, 40)
