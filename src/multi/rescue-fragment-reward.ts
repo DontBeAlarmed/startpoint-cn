@@ -23,7 +23,10 @@ type RawQuestTable = Record<string, RawBattleQuest>
 const rewardByQuest = new Map<string, number>()
 
 function key(category: number, questId: number): string {
-    return `${category}:${Math.abs(Math.trunc(questId))}`
+    const normalizedCategory = category === QuestCategory.ADVENT_EVENT_SINGLE
+        ? QuestCategory.ADVENT_EVENT_MULTI
+        : category
+    return `${normalizedCategory}:${Math.abs(Math.trunc(questId))}`
 }
 
 function register(category: number, questId: number, itemId: number): void {
