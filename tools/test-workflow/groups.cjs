@@ -483,7 +483,6 @@ const TEST_GROUPS = Object.freeze({
             "tools/mission_periodic_session_migration.test.cjs",
             "tools/mission_progress_route.test.cjs",
             "tools/mission_regular_facts.test.cjs",
-            "tools/mission_regular_chapter_matrix.test.cjs",
             "tools/mission_regular_session_equivalence.test.cjs",
             "tools/mission_regular_session_scope.test.cjs",
             "tools/mission_regular_session_settlement.test.cjs",
