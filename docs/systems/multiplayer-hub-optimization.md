@@ -101,6 +101,16 @@ HTTP prepare / TCP admission
 - NPC roster 正式提交后，同步所有已经完成 Enter 的房间客户端；尚未 Enter 的连接仍走原有 Welcome 初始化顺序。
 - 真实随机招募启用前不新增救援席位预留或通知行为。
 
+Battle socket 的连接阶段按 `loading → ready → active` 推进。单个客户端发送 `SceneReady` 只进入可续期的 ready lease；只有当前 `battleSceneGeneration` 的房间屏障释放后，场景激活 owner 才会把存活连接统一转为 active。屏障前发生的离场按房间和场景代次暂存，激活时严格按以下顺序投影到客户端：
+
+```text
+全体存活连接进入 active
+  → 发送本代 BattleStart
+  → 发送本代暂存 Leave
+```
+
+屏障释放后的离场仍立即发送 Leave。同 connection ID 在激活前重连会撤销本代暂存 Leave；在激活后重连并补收 BattleStart 时重新加入本代 active membership，因此后续真实离场只发送一次 Leave。BattleStart 的送达记录、active membership、暂存 Leave 和场景激活状态都按 `battleSceneGeneration` 隔离；第二场景、房间清理和连接替换不得继承旧代状态。
+
 ## 明确不纳入本轮
 
 - 真实随机招募、公开房间列表、救援通知和 `RealMateProvider`；
@@ -121,6 +131,7 @@ HTTP prepare / TCP admission
 - Hub 验证发生在本地写事务之前；
 - 故障注入证明奖励、任务和 active quest 不产生半状态；
 - 慢连接、连接替换、旧 timer、旧来源缓存和 NPC 延迟回调不能影响新代次；
+- 多人加载期掉线不得让幸存客户端先收到 Leave；同代消息顺序固定为 BattleStart 后 Leave，重复 Hub/连接清理不得重复发送 Leave；
 - 重赛回房后按当前权威席位补齐 NPC，已离开的真人、上一场 NPC 和旧招募请求均不能重复占位；
 - 双服运行器结束后活动连接、房间、临时数据库和子进程全部归零。
 
