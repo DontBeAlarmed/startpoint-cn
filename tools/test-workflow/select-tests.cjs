@@ -315,6 +315,10 @@ const SOURCE_RULES = [
         groups: ["quick:character", "quick:content"],
     },
     {
+        pattern: /^src\/lib\/mission\/awake-evolution-repair\.ts$/,
+        groups: ["integration:mission", "quick:character", "quick:content"],
+    },
+    {
         pattern: /^(?:src\/data\/domains\/character\.ts|src\/routes\/api\/character\/(?:mana|mana-awake)\.ts|tools\/character_mana_batch_writes\.test\.cjs)$/,
         groups: ["integration:rules"],
     },

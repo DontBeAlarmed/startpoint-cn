@@ -1742,6 +1742,10 @@ test("quick character includes growth transaction rollback coverage", () => {
         ["quick:character", "quick:content"],
     )
     assert.deepEqual(
+        selectTestGroups(["src/lib/mission/awake-evolution-repair.ts"]),
+        ["integration:mission", "quick:character", "quick:content"],
+    )
+    assert.deepEqual(
         selectTestGroups(["src/routes/api/character/mana-awake.ts"]),
         ["full", "integration:rules", "quick:character", "quick:content"],
     )

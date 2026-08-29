@@ -16,6 +16,7 @@ import { getPlayerOptionsSync } from "../domains/option"
 import { getPlayerPartyGroupListSync } from "../domains/party"
 import { getPlayerTriggeredTutorialsSync } from "../domains/tutorial"
 import { computeAwakeSummary, createAwakeRequestContext, filterToActiveMissions, reconcileAwakeUnlocksFromProgress } from "../../lib/mission/index"
+import { reconcileAwakeEvolutionLevelsSync } from "../../lib/mission/awake-evolution-repair"
 import { computeManaBoardAwakeFromNodes, mergeManaBoardAwakeMaps } from "../../lib/character-helpers"
 import { getDb } from "../db"
 import { getCarnivalSaveStateSync } from "../../lib/carnival-save-state"
@@ -78,13 +79,18 @@ export function getClientSerializedData(
         awakeSummary.manaBoardAwakeMap,
         computeManaBoardAwakeFromNodes(nodeAwakeLevels)
     )
+    const evolutionRepair = reconcileAwakeEvolutionLevelsSync(playerId, {
+        characters: awakeEligibility.characters,
+        manaNodes: awakeEligibility.manaNodes,
+        manaNodeAwakeLevels: nodeAwakeLevels,
+    })
 
     return serializePlayerData({
         player: playerData,
         dailyChallengePointList: getPlayerDailyChallengePointListSync(playerId),
         triggeredTutorial: getPlayerTriggeredTutorialsSync(playerId),
         clearedRegularMissionList: getPlayerClearedRegularMissionListSync(playerId),
-        characterList: awakeEligibility.characters,
+        characterList: evolutionRepair.characters,
         characterManaNodeList: awakeEligibility.manaNodes,
         characterManaNodeAwakeLevels: nodeAwakeLevels,
         manaBoardAwakeMap,
