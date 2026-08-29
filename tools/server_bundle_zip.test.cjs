@@ -93,7 +93,7 @@ function createPackFixture(t, serverVersion = "1.2.3") {
             minDataSchema: 0,
             node: ">=20.12.0",
             runtimeApi: 1,
-            targetDataSchema: 21,
+            targetDataSchema: 22,
         },
         schemaVersion: 3,
         serverVersion,

@@ -5,10 +5,11 @@ const test = require("node:test")
 require("ts-node/register/transpile-only")
 
 const adventEventQuests = require("../assets/advent_event_quest.json")
+const additionalRewardRules = require("../assets/additional_reward_rules.json")
 const { QuestCategory, RewardType } = require("../src/lib/types")
 const {
-    getRescueFragmentAdditionalReward,
     getRescueFragmentReward,
+    resolveLocalRescueFragmentEligibility,
     RESCUE_PURPLE_FRAGMENT_ITEM_ID,
     RESCUE_GOLD_FRAGMENT_ITEM_ID,
     RESCUE_SILVER_FRAGMENT_ITEM_ID,
@@ -73,12 +74,20 @@ test("normalizes single-player advent category to the multiplayer advent table",
     )
 })
 
-test("projects rescue fragments into the additional reward protocol", () => {
-    const reward = getRescueFragmentReward(QuestCategory.BOSS_BATTLE, 1001001)
-    assert.deepEqual(getRescueFragmentAdditionalReward(reward), {
-        group_id: 490000,
-        index: 1,
-        number: 10,
+test("keeps rescue fragments out of unofficial additional reward groups", () => {
+    const officialGroupIds = new Set(Object.keys(additionalRewardRules.groups).map(Number))
+    assert.equal(
+        [490000, 490001, 490002].some(groupId => officialGroupIds.has(groupId)),
+        false,
+    )
+
+    assert.deepEqual(settleRescueFragmentReward({
+        eligible: true,
+        questAccomplished: true,
+        questCategory: QuestCategory.BOSS_BATTLE,
+        questId: 1001001,
+    }, rewards => ({ items: { [rewards[0].id]: rewards[0].count } })), {
+        items: { [RESCUE_SILVER_FRAGMENT_ITEM_ID]: 10 },
     })
 })
 
@@ -89,24 +98,23 @@ test("settles only successful enabled multiplayer compatibility rewards", () => 
         return { items: { [rewards[0].id]: 25 } }
     }
     const enabled = settleRescueFragmentReward({
-        enabled: true,
+        eligible: true,
         questAccomplished: true,
         questCategory: QuestCategory.BOSS_BATTLE,
         questId: 1001001,
     }, grant)
     assert.equal(granted.length, 1)
-    assert.equal(enabled.rewardResult.items[RESCUE_SILVER_FRAGMENT_ITEM_ID], 25)
-    assert.equal(enabled.additionalReward.number, 10)
+    assert.equal(enabled.items[RESCUE_SILVER_FRAGMENT_ITEM_ID], 25)
 
     for (const input of [
-        { enabled: false, questAccomplished: true },
-        { enabled: true, questAccomplished: false },
+        { eligible: false, questAccomplished: true },
+        { eligible: true, questAccomplished: false },
     ]) {
         assert.deepEqual(settleRescueFragmentReward({
             ...input,
             questCategory: QuestCategory.BOSS_BATTLE,
             questId: 1001001,
-        }, grant), { rewardResult: null, additionalReward: null })
+        }, grant), null)
     }
     assert.equal(granted.length, 1)
 })
@@ -118,24 +126,63 @@ test("settles normalized advent rewards with the same success gate", () => {
         return { items: { [rewards[0].id]: 10 } }
     }
     const enabled = settleRescueFragmentReward({
-        enabled: true,
+        eligible: true,
         questAccomplished: true,
         questCategory: QuestCategory.ADVENT_EVENT_SINGLE,
         questId: 1002,
     }, grant)
     assert.equal(granted.length, 1)
-    assert.equal(enabled.rewardResult.items[RESCUE_SILVER_FRAGMENT_ITEM_ID], 10)
-    assert.equal(enabled.additionalReward.number, 10)
+    assert.equal(enabled.items[RESCUE_SILVER_FRAGMENT_ITEM_ID], 10)
 
     for (const input of [
-        { enabled: false, questAccomplished: true },
-        { enabled: true, questAccomplished: false },
+        { eligible: false, questAccomplished: true },
+        { eligible: true, questAccomplished: false },
     ]) {
         assert.deepEqual(settleRescueFragmentReward({
             ...input,
             questCategory: QuestCategory.ADVENT_EVENT_SINGLE,
             questId: 1002,
-        }, grant), { rewardResult: null, additionalReward: null })
+    }, grant), null)
     }
     assert.equal(granted.length, 1)
+})
+
+test("freezes the local rescue eligibility from host identity and switches", () => {
+    const hostCases = [
+        {
+            allMultiRoomsEligible: false,
+            hostSelfRescueEnabled: false,
+            expected: false,
+        },
+        {
+            allMultiRoomsEligible: false,
+            hostSelfRescueEnabled: true,
+            expected: false,
+        },
+        {
+            allMultiRoomsEligible: true,
+            hostSelfRescueEnabled: false,
+            expected: false,
+        },
+        {
+            allMultiRoomsEligible: true,
+            hostSelfRescueEnabled: true,
+            expected: true,
+        },
+    ]
+    for (const input of hostCases) {
+        assert.equal(resolveLocalRescueFragmentEligibility({
+            allMultiRoomsEligible: input.allMultiRoomsEligible,
+            isRoomHost: true,
+            hostSelfRescueEnabled: input.hostSelfRescueEnabled,
+        }), input.expected, JSON.stringify(input))
+    }
+
+    for (const allMultiRoomsEligible of [false, true]) {
+        assert.equal(resolveLocalRescueFragmentEligibility({
+            allMultiRoomsEligible,
+            isRoomHost: false,
+            hostSelfRescueEnabled: true,
+        }), allMultiRoomsEligible)
+    }
 })

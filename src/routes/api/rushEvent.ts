@@ -385,6 +385,7 @@ const routes = async (fastify: FastifyInstance) => {
             isAutoStartMode: isAutoStartMode,
             isMulti: false,
             coordinatorOrigin: null,
+            rescueFragmentEligible: false,
             playId: body.play_id,
             continueCount: 0
         })

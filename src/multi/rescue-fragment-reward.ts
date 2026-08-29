@@ -8,15 +8,6 @@ import { QuestCategory, Reward, RewardType } from "../lib/types"
 export const RESCUE_SILVER_FRAGMENT_ITEM_ID = 49000
 export const RESCUE_GOLD_FRAGMENT_ITEM_ID = 49001
 export const RESCUE_PURPLE_FRAGMENT_ITEM_ID = 49002
-export const RESCUE_SILVER_FRAGMENT_ADDITIONAL_REWARD_GROUP_ID = 490000
-export const RESCUE_GOLD_FRAGMENT_ADDITIONAL_REWARD_GROUP_ID = 490001
-export const RESCUE_PURPLE_FRAGMENT_ADDITIONAL_REWARD_GROUP_ID = 490002
-
-export interface RescueFragmentAdditionalReward {
-    group_id: number
-    index: number
-    number: number
-}
 
 type RawBattleQuest = { rankPointReward?: number; [key: string]: unknown }
 type RawQuestTable = Record<string, RawBattleQuest>
@@ -108,39 +99,27 @@ export function getRescueFragmentReward(category: number, questId: number): Rewa
     return itemId === undefined ? null : { type: RewardType.ITEM, id: itemId, count: 10 } as Reward
 }
 
-export function getRescueFragmentAdditionalReward(
-    reward: Reward | null,
-): RescueFragmentAdditionalReward | null {
-    if (reward === null || reward.type !== RewardType.ITEM || reward.id === undefined) return null
-    const groupId = reward.id === RESCUE_SILVER_FRAGMENT_ITEM_ID
-        ? RESCUE_SILVER_FRAGMENT_ADDITIONAL_REWARD_GROUP_ID
-        : reward.id === RESCUE_GOLD_FRAGMENT_ITEM_ID
-            ? RESCUE_GOLD_FRAGMENT_ADDITIONAL_REWARD_GROUP_ID
-            : reward.id === RESCUE_PURPLE_FRAGMENT_ITEM_ID
-                ? RESCUE_PURPLE_FRAGMENT_ADDITIONAL_REWARD_GROUP_ID : null
-    return groupId === null ? null : { group_id: groupId, index: 1, number: 10 }
-}
-
-export interface RescueFragmentSettlement<TRewardResult> {
-    readonly rewardResult: TRewardResult | null
-    readonly additionalReward: RescueFragmentAdditionalReward | null
+export function resolveLocalRescueFragmentEligibility(input: {
+    readonly allMultiRoomsEligible: boolean
+    readonly isRoomHost: boolean
+    readonly hostSelfRescueEnabled: boolean
+}): boolean {
+    return input.allMultiRoomsEligible
+        && (!input.isRoomHost || input.hostSelfRescueEnabled)
 }
 
 export function settleRescueFragmentReward<TRewardResult>(
     input: {
-        readonly enabled: boolean
+        readonly eligible: boolean
         readonly questAccomplished: boolean
         readonly questCategory: number
         readonly questId: number
     },
     grant: (rewards: readonly Reward[]) => TRewardResult,
-): RescueFragmentSettlement<TRewardResult> {
-    const reward = input.enabled && input.questAccomplished
+): TRewardResult | null {
+    const eligible = input.eligible && input.questAccomplished
+    const reward = eligible
         ? getRescueFragmentReward(input.questCategory, input.questId)
         : null
-    if (reward === null) return { rewardResult: null, additionalReward: null }
-    return {
-        rewardResult: grant([reward]),
-        additionalReward: getRescueFragmentAdditionalReward(reward),
-    }
+    return reward === null ? null : grant([reward])
 }

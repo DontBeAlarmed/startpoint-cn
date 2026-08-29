@@ -45,3 +45,13 @@ export function ensureActiveQuestCoordinatorOriginStorageSync(database: Database
         CHECK (coordinator_origin IS NULL OR coordinator_origin IN ('remote', 'local'))
     `).run()
 }
+
+export function ensureActiveQuestRescueFragmentEligibilityStorageSync(database: Database): void {
+    const columns = database.prepare(`PRAGMA table_info(players_active_quests)`).all() as { name: string }[]
+    if (columns.some(column => column.name === "rescue_fragment_eligible")) return
+    database.prepare(`
+        ALTER TABLE players_active_quests
+        ADD COLUMN rescue_fragment_eligible INTEGER NOT NULL DEFAULT 0
+        CHECK (rescue_fragment_eligible IN (0, 1))
+    `).run()
+}

@@ -6,6 +6,11 @@ const schemaColumns = {
         column: "multi_rescue_fragment_rewards_enabled",
         definition: "INTEGER NOT NULL DEFAULT 1",
     },
+    "server_gameplay_settings.multi_rescue_host_rewards_enabled": {
+        table: "server_gameplay_settings",
+        column: "multi_rescue_host_rewards_enabled",
+        definition: "INTEGER NOT NULL DEFAULT 1",
+    },
     "players.tutorial_gacha_character_id": {
         table: "players",
         column: "tutorial_gacha_character_id",

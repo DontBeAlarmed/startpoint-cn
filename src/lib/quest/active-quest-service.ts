@@ -34,6 +34,7 @@ export interface ActiveQuest {
     staminaCost?: number | null
     dailyChallengePointId?: number | null
     eventId?: number | null
+    rescueFragmentEligible: boolean
     playId: string
     continueCount: number
 }
@@ -81,6 +82,7 @@ export function persistActiveQuest(playerId: number, quest: ActiveQuest): void {
         staminaCost: quest.staminaCost ?? null,
         dailyChallengePointId: quest.dailyChallengePointId ?? null,
         eventId: quest.eventId ?? null,
+        rescueFragmentEligible: quest.isMulti && quest.rescueFragmentEligible === true,
         continueCount: quest.continueCount,
     })
 }

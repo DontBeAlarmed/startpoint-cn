@@ -34,12 +34,14 @@
 
 ## 覆盖范围
 
-schema 21 共有 64 张可从 `players` 外键图发现的玩家关联表：
+schema 22 共有 64 张可从 `players` 外键图发现的玩家关联表：
 
 - 61 张登记到 `core`、`missions`、`events`、`economy`、`mailbox`；
 - `players_active_quests`、`scheduled_resource_rules` 和
   `players_scheduled_resource_state` 明确排除；
 - 邮件、领取历史、活动扭蛋箱明细、Pass、Raid、登录奖励游标、商店购买计数、campaign lineup、EX 待选结果、玩家履历设置、练习战和无限演武战斗履历均可往返。
+
+schema 22 只为已明确排除的 `players_active_quests` 增加一列，因此存档格式和玩家表注册表均保持不变。
 
 注册表位于 `src/data/player-save/registry.ts`。测试会动态遍历当前 SQLite 外键图，并要求发现结果与“已登记 + 明确排除”完全相等。以后新增玩家表但未登记时，CI 会失败，不再静默漏出快照。
 

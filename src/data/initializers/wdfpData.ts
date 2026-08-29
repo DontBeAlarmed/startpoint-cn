@@ -5,6 +5,7 @@ import {
     ensureActiveQuestCoordinatorOriginStorageSync,
     ensureActiveQuestEntryItemCountStorageSync,
     ensureActiveQuestResourceCostStorageSync,
+    ensureActiveQuestRescueFragmentEligibilityStorageSync,
 } from "../../lib/quest/active-quest-persistence";
 import { ensureSchemaColumn } from "../schema";
 import { pruneSpecialEventPartyGroupsSync } from "../../lib/party-group-persistence";
@@ -34,17 +35,20 @@ export default function init(
         id INTEGER PRIMARY KEY CHECK (id = 1),
         drop_multiplier INTEGER NOT NULL CHECK (drop_multiplier BETWEEN 1 AND 10),
         multi_rescue_fragment_rewards_enabled INTEGER NOT NULL DEFAULT 1,
+        multi_rescue_host_rewards_enabled INTEGER NOT NULL DEFAULT 1,
         updated_at TEXT NOT NULL
     )`).run()
     ensureSchemaColumn(database, "server_gameplay_settings.multi_rescue_fragment_rewards_enabled")
+    ensureSchemaColumn(database, "server_gameplay_settings.multi_rescue_host_rewards_enabled")
     const gameplaySettingsExist = database.prepare(
         "SELECT 1 FROM server_gameplay_settings WHERE id = 1",
     ).get() !== undefined
     if (!gameplaySettingsExist) {
         database.prepare(`
             INSERT INTO server_gameplay_settings (
-                id, drop_multiplier, multi_rescue_fragment_rewards_enabled, updated_at
-            ) VALUES (1, ?, 1, ?)
+                id, drop_multiplier, multi_rescue_fragment_rewards_enabled,
+                multi_rescue_host_rewards_enabled, updated_at
+            ) VALUES (1, ?, 1, 1, ?)
         `).run(getInitialDropMultiplier(), getRealNow().toISOString())
     }
 
@@ -1137,6 +1141,8 @@ export default function init(
         stamina_cost INTEGER,
         daily_challenge_point_id INTEGER,
         event_id INTEGER,
+        rescue_fragment_eligible INTEGER NOT NULL DEFAULT 0
+            CHECK (rescue_fragment_eligible IN (0, 1)),
         continue_count INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
@@ -1144,4 +1150,5 @@ export default function init(
     ensureActiveQuestBattleSessionIdStorageSync(database)
     ensureActiveQuestCoordinatorOriginStorageSync(database)
     ensureActiveQuestResourceCostStorageSync(database)
+    ensureActiveQuestRescueFragmentEligibilityStorageSync(database)
 }

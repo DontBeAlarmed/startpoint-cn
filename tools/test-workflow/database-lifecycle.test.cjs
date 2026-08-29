@@ -281,7 +281,7 @@ test("default schema migration preserves v6 players and creates cascading Pass t
 
     data.initializeDatabase({ paths })
     const migrated = getDb()
-    assert.equal(migrated.pragma("user_version", { simple: true }), 21)
+    assert.equal(migrated.pragma("user_version", { simple: true }), 22)
     assert.deepEqual(
         migrated.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'players_character_election_votes'").get(),
         { name: "players_character_election_votes" },
@@ -360,7 +360,12 @@ test("default schema migrates schema 14 active quests to battle session and coor
 
     data.initializeDatabase({ paths })
 
-    assert.equal(getDb().pragma("user_version", { simple: true }), 21)
+    assert.equal(getDb().pragma("user_version", { simple: true }), 22)
+    assert.equal(
+        getDb().pragma("table_info(players_active_quests)")
+            .some(column => column.name === "rescue_fragment_eligible"),
+        true,
+    )
     assert.equal(
         getDb().pragma("table_info(players_active_quests)")
             .some(column => column.name === "battle_session_id" && column.notnull === 0),
@@ -373,12 +378,126 @@ test("default schema migrates schema 14 active quests to battle session and coor
     )
     assert.deepEqual(
         getDb().prepare(`
-            SELECT play_id, battle_session_id, coordinator_origin
+            SELECT play_id, battle_session_id, coordinator_origin, rescue_fragment_eligible
             FROM players_active_quests
             WHERE player_id = 77
         `).get(),
-        { play_id: "legacy-play", battle_session_id: null, coordinator_origin: null },
+        {
+            play_id: "legacy-play",
+            battle_session_id: null,
+            coordinator_origin: null,
+            rescue_fragment_eligible: 0,
+        },
     )
+})
+
+test("migrates schema 21 active quests to frozen rescue eligibility storage", t => {
+    const paths = temporaryPaths(t)
+    fs.mkdirSync(paths.dataDir, { recursive: true })
+    data.initializeDatabase({ paths })
+    const account = require("../../src/data/domains/account").insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId: "schema21-rescue-active-quest",
+        status: "normal",
+    })
+    const playerId = require("../../src/data/domains/player").insertDefaultPlayerSync(account.id).id
+    data.closeDatabase()
+    const schema21 = new Sqlite(paths.databaseFile)
+    schema21.exec(`
+        DROP TABLE players_active_quests;
+        CREATE TABLE players_active_quests (
+            player_id INTEGER PRIMARY KEY,
+            play_id TEXT NOT NULL,
+            quest_id INTEGER NOT NULL,
+            category INTEGER NOT NULL,
+            use_boss_boost_point INTEGER NOT NULL DEFAULT 0,
+            use_boost_point INTEGER NOT NULL DEFAULT 0,
+            is_auto_start_mode INTEGER NOT NULL DEFAULT 0,
+            is_multi INTEGER NOT NULL DEFAULT 0,
+            coordinator_origin TEXT CHECK (
+                coordinator_origin IS NULL OR coordinator_origin IN ('remote', 'local')
+            ),
+            room_number TEXT,
+            battle_session_id TEXT,
+            entry_item_id INTEGER,
+            entry_item_count INTEGER,
+            stamina_cost INTEGER,
+            daily_challenge_point_id INTEGER,
+            event_id INTEGER,
+            continue_count INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+        );
+        INSERT INTO players_active_quests (
+            player_id, play_id, quest_id, category, is_multi
+        ) VALUES (${playerId}, 'legacy-play', 1001, 2, 1);
+    `)
+    schema21.pragma("user_version = 21")
+    schema21.close()
+    fs.writeFileSync(paths.databaseVersionFile, "21")
+
+    data.initializeDatabase({ paths })
+
+    const questDomain = require("../../src/data/domains/quest_active")
+    assert.equal(getDb().pragma("user_version", { simple: true }), 22)
+    assert.equal(questDomain.getPlayerActiveQuestSync(playerId)?.rescueFragmentEligible, false)
+    assert.equal(getDb().prepare(
+        "SELECT rescue_fragment_eligible FROM players_active_quests WHERE player_id = ?",
+    ).get(playerId).rescue_fragment_eligible, 0)
+
+    questDomain.deletePlayerActiveQuestSync(playerId)
+    questDomain.insertPlayerActiveQuestSync(playerId, {
+        playId: "true-play",
+        questId: 1001,
+        category: 2,
+        useBossBoostPoint: false,
+        useBoostPoint: false,
+        isAutoStartMode: false,
+        isMulti: true,
+        coordinatorOrigin: "local",
+        rescueFragmentEligible: true,
+        continueCount: 0,
+    })
+    assert.equal(questDomain.getPlayerActiveQuestSync(playerId)?.rescueFragmentEligible, true)
+    assert.equal(getDb().prepare(
+        "SELECT rescue_fragment_eligible FROM players_active_quests WHERE player_id = ?",
+    ).get(playerId).rescue_fragment_eligible, 1)
+
+    questDomain.deletePlayerActiveQuestSync(playerId)
+    questDomain.insertPlayerActiveQuestSync(playerId, {
+        playId: "false-play",
+        questId: 1001,
+        category: 2,
+        useBossBoostPoint: false,
+        useBoostPoint: false,
+        isAutoStartMode: false,
+        isMulti: true,
+        coordinatorOrigin: "local",
+        rescueFragmentEligible: false,
+        continueCount: 0,
+    })
+    assert.equal(getDb().prepare(
+        "SELECT rescue_fragment_eligible FROM players_active_quests WHERE player_id = ?",
+    ).get(playerId).rescue_fragment_eligible, 0)
+    questDomain.deletePlayerActiveQuestSync(playerId)
+    const { persistActiveQuest } = require("../../src/lib/quest/active-quest-service")
+    persistActiveQuest(playerId, {
+        playId: "single-play",
+        questId: 1001,
+        category: 1,
+        useBossBoostPoint: false,
+        useBoostPoint: false,
+        isAutoStartMode: false,
+        isMulti: false,
+        coordinatorOrigin: "local",
+        rescueFragmentEligible: true,
+        continueCount: 0,
+    })
+    assert.equal(questDomain.getPlayerActiveQuestSync(playerId)?.rescueFragmentEligible, false)
+    assert.throws(() => getDb().prepare(
+        "UPDATE players_active_quests SET rescue_fragment_eligible = 2 WHERE player_id = ?",
+    ).run(playerId))
 })
 
 test("default schema migrates schema 15 databases to player history storage", t => {
@@ -404,7 +523,7 @@ test("default schema migrates schema 15 databases to player history storage", t 
     fs.writeFileSync(paths.databaseVersionFile, "15")
 
     data.initializeDatabase({ paths })
-    assert.equal(getDb().pragma("user_version", { simple: true }), 21)
+    assert.equal(getDb().pragma("user_version", { simple: true }), 22)
     assert.deepEqual(
         getDb().prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'players_player_history_settings'").get(),
         { name: "players_player_history_settings" },
@@ -452,7 +571,7 @@ test("default schema migrates schema 18 login bonus progress to per-group rows",
 
     data.initializeDatabase({ paths })
     const migrated = getDb()
-    assert.equal(migrated.pragma("user_version", { simple: true }), 21)
+    assert.equal(migrated.pragma("user_version", { simple: true }), 22)
     assert.deepEqual(
         migrated.pragma("table_info(players_login_bonus_progress)")
             .filter(column => column.pk > 0)
@@ -510,7 +629,7 @@ test("default schema migrates schema 19 databases to player history milestones",
     fs.writeFileSync(paths.databaseVersionFile, "19")
 
     data.initializeDatabase({ paths })
-    assert.equal(getDb().pragma("user_version", { simple: true }), 21)
+    assert.equal(getDb().pragma("user_version", { simple: true }), 22)
     assert.deepEqual(
         getDb().prepare(`
             SELECT name FROM sqlite_master

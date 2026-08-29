@@ -65,6 +65,6 @@ test("multi finish enables multi-only rules and publishes additional rewards ato
     )
     assert.match(
         response,
-        /"drop_additional_reward_ids": \[[\s\S]*?\.\.\.additionalRewardSettlement\.dropAdditionalRewardIds[\s\S]*?rescueFragmentAdditionalReward/,
+        /"drop_additional_reward_ids": additionalRewardSettlement\.dropAdditionalRewardIds,/,
     )
 })

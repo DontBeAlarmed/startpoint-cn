@@ -19,6 +19,7 @@ import {
 } from "../../data/domains/player";
 import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item";
 import { getQuestConfigurationErrorResponse, getQuestFromCategorySync } from "../../lib/assets";
+import { getServerGameplaySettingsSync } from "../../data/domains/server-settings";
 import { computeRealTimeStamina } from "../../lib/stamina";
 import { getStaminaCost } from "../../lib/stamina-cost";
 import { BattleQuest } from "../../lib/types";
@@ -47,6 +48,7 @@ import {
     runMultiplayerSettlementOrchestration,
 } from "../settlement/orchestrator";
 import { projectMultiplayerFinishResponse } from "../settlement/response";
+import { resolveLocalRescueFragmentEligibility } from "../rescue-fragment-reward";
 
 export function canAbortMultiBattle(
     roomNumber: string,
@@ -199,6 +201,12 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             participant,
             roomNumber: battle.value.roomNumber,
         });
+        const gameplaySettings = getServerGameplaySettingsSync();
+        const rescueFragmentEligible = resolveLocalRescueFragmentEligibility({
+            allMultiRoomsEligible: gameplaySettings.multiRescueFragmentRewardsEnabled,
+            isRoomHost,
+            hostSelfRescueEnabled: gameplaySettings.multiRescueHostRewardsEnabled,
+        });
         const activeQuest = {
             questId: quest_id,
             category,
@@ -211,6 +219,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             battleSessionId: battle.value.battleSessionId,
             matePlayerIds: Array.isArray(mate_player_ids) ? mate_player_ids : [],
             mateComIds: [],
+            rescueFragmentEligible,
             entryItemId: entryCost && entryCost.itemId > 0 ? entryCost.itemId : undefined,
             entryItemCount: entryCost && entryCost.itemCount > 0 ? entryCost.itemCount : undefined,
             playId: play_id,

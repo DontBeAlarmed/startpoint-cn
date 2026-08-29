@@ -50,7 +50,7 @@ fs.writeFileSync(paths.databaseVersionFile, "20")
 
 data.initializeDatabase({ paths })
 const migrated = getDb()
-assert.equal(migrated.pragma("user_version", { simple: true }), 21)
+assert.equal(migrated.pragma("user_version", { simple: true }), 22)
 assert.deepEqual(migrated.prepare(`
     SELECT stamina, stamina_heal_time, total_stamina_used FROM players WHERE id = ?
 `).get(playerId), { stamina: 12, stamina_heal_time: 1000, total_stamina_used: 345 })

@@ -276,7 +276,7 @@ test("refuses to run while the shared database is open and leaves it untouched",
             accounts: getDb().prepare("SELECT COUNT(*) AS count FROM accounts").get().count,
             players: getDb().prepare("SELECT COUNT(*) AS count FROM players").get().count,
         }, before)
-        assert.deepEqual(data.getDatabaseStatus(), { open: true, ready: true, schema: 21 })
+        assert.deepEqual(data.getDatabaseStatus(), { open: true, ready: true, schema: 22 })
         assert.deepEqual(fs.readdirSync(temporaryParent), [])
     } finally {
         data.closeDatabase()

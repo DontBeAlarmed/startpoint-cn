@@ -826,6 +826,7 @@ export interface RawPlayerActiveQuest {
     stamina_cost: number | null
     daily_challenge_point_id: number | null
     event_id: number | null
+    rescue_fragment_eligible: number
     continue_count: number
 }
 
@@ -846,5 +847,6 @@ export interface PlayerActiveQuest {
     staminaCost: number | null
     dailyChallengePointId: number | null
     eventId: number | null
+    rescueFragmentEligible: boolean
     continueCount: number
 }

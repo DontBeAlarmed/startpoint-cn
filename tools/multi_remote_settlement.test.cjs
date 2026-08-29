@@ -509,6 +509,7 @@ const {
 const { getPlayerCharacterAwakeUnlocksSync } = require("../src/data/domains/character_awake")
 const { updatePlayerCategoryMissionSync } = require("../src/data/domains/mission")
 const { getPlayerActiveQuestSync } = require("../src/data/domains/quest_active")
+const { updateServerGameplaySettingsSync } = require("../src/data/domains/server-settings")
 const { activeQuests } = require("../src/lib/quest/active-quest-service")
 const { getCharacterDataSync, getCharacterManaNodesSync } = require("../src/lib/assets")
 const { characterExpCaps } = require("../src/lib/character")
@@ -754,7 +755,9 @@ async function openProductionHome(label, participant, isHost, settlementVerifier
         },
         questAvailability: { check: () => ({ available: true }) },
         coordinator,
-        resolveCoordinatorOrigin: async () => options.coordinatorOrigin ?? "remote",
+        resolveCoordinatorOrigin: async input => options.resolveCoordinatorOrigin
+            ? options.resolveCoordinatorOrigin(input)
+            : options.coordinatorOrigin ?? "remote",
         settlementVerifier,
     }
     const app = Fastify({ logger: false })
@@ -815,10 +818,146 @@ test("production /finish settles activity hard multi periodic rewards for host a
             assert.equal(getPlayerItemSync(home.playerId, 40405), 9)
             assert.equal(response.item_list[49002], 10)
             assert.equal(getPlayerItemSync(home.playerId, 49002), 10)
+            assert.deepEqual(
+                response.drop_additional_reward_ids.filter(entry => [
+                    490000,
+                    490001,
+                    490002,
+                ].includes(entry.group_id)),
+                [],
+            )
             assert.equal(
                 getPlayerPeriodicRewardPointsSync(home.playerId)
                     .find(entry => entry.id === 10000002)?.point,
                 1,
+            )
+        } finally {
+            await closeProductionHome(home)
+        }
+    }
+})
+
+test("production /start reads local rescue eligibility after coordinator origin resolves", async () => {
+    let releaseOrigin
+    let markOriginReached
+    const originReached = new Promise(resolve => { markOriginReached = resolve })
+    const originReleased = new Promise(resolve => { releaseOrigin = resolve })
+    let home
+    try {
+        home = await openProductionHome(
+            "rescue-origin-order",
+            host,
+            true,
+            { verify: async () => ({ ok: true, isHost: true }) },
+            {
+                quest: activityHardMultiQuest,
+                resolveCoordinatorOrigin: async () => {
+                    markOriginReached()
+                    await originReleased
+                    return "remote"
+                },
+            },
+        )
+        updateServerGameplaySettingsSync({
+            dropMultiplier: 1,
+            multiRescueFragmentRewardsEnabled: true,
+            multiRescueHostRewardsEnabled: true,
+        })
+        const questFields = {
+            category: activityHardMultiQuest.category,
+            quest_id: activityHardMultiQuest.questId,
+        }
+        const startPending = home.app.inject({
+            method: "POST",
+            url: "/start",
+            payload: startPayload(host.viewerId, "rescue-origin-order", questFields),
+        })
+        await originReached
+        updateServerGameplaySettingsSync({
+            dropMultiplier: 1,
+            multiRescueFragmentRewardsEnabled: false,
+            multiRescueHostRewardsEnabled: false,
+        })
+        releaseOrigin()
+
+        const started = await startPending
+        assert.equal(started.statusCode, 200, started.body)
+        assert.equal(
+            getPlayerActiveQuestSync(home.playerId)?.rescueFragmentEligible,
+            false,
+        )
+        assert.equal(getDb().prepare(
+            "SELECT rescue_fragment_eligible FROM players_active_quests WHERE player_id = ?",
+        ).get(home.playerId).rescue_fragment_eligible, 0)
+    } finally {
+        releaseOrigin?.()
+        await closeProductionHome(home)
+    }
+})
+
+test("production /finish uses stored SQLite rescue eligibility despite memory and settings drift", async () => {
+    for (const [label, participant, isHost, startEligible, finishEligible] of [
+        ["host-freeze-on", host, true, true, false],
+        ["guest-freeze-off", guest, false, false, true],
+    ]) {
+        let home
+        try {
+            home = await openProductionHome(
+                label,
+                participant,
+                isHost,
+                { verify: async () => ({ ok: true, isHost }) },
+                { quest: activityHardMultiQuest },
+            )
+            updateServerGameplaySettingsSync({
+                dropMultiplier: 1,
+                multiRescueFragmentRewardsEnabled: startEligible,
+                multiRescueHostRewardsEnabled: startEligible,
+            })
+            const playId = label
+            const questFields = {
+                category: activityHardMultiQuest.category,
+                quest_id: activityHardMultiQuest.questId,
+            }
+            const started = await home.app.inject({
+                method: "POST",
+                url: "/start",
+                payload: startPayload(participant.viewerId, playId, questFields),
+            })
+            assert.equal(started.statusCode, 200, started.body)
+            assert.equal(
+                getPlayerActiveQuestSync(home.playerId)?.rescueFragmentEligible,
+                startEligible,
+            )
+            assert.equal(getDb().prepare(
+                "SELECT rescue_fragment_eligible FROM players_active_quests WHERE player_id = ?",
+            ).get(home.playerId).rescue_fragment_eligible, startEligible ? 1 : 0)
+            activeQuests[home.playerId].rescueFragmentEligible = !startEligible
+
+            updateServerGameplaySettingsSync({
+                dropMultiplier: 1,
+                multiRescueFragmentRewardsEnabled: finishEligible,
+                multiRescueHostRewardsEnabled: finishEligible,
+            })
+            const finished = await home.app.inject({
+                method: "POST",
+                url: "/finish",
+                payload: finishPayload(participant.viewerId, playId, questFields),
+            })
+            assert.equal(finished.statusCode, 200, finished.body)
+            const response = JSON.parse(finished.body).data
+            assert.equal(response.item_list[49002], startEligible ? 10 : undefined)
+            assert.equal(
+                getPlayerItemSync(home.playerId, 49002),
+                startEligible ? 10 : null,
+            )
+            assert.deepEqual(
+                response.drop_additional_reward_ids.filter(entry => [
+                    490000,
+                    490001,
+                    490002,
+                ].includes(entry.group_id)),
+                [],
             )
         } finally {
             await closeProductionHome(home)

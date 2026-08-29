@@ -425,7 +425,7 @@ function createResourceFixture({
 
 {
     const dataIndexSource = fs.readFileSync(path.join(projectRoot, "src/data/index.ts"), "utf8")
-assert.match(dataIndexSource, /latestVersion:\s*21/)
+assert.match(dataIndexSource, /latestVersion:\s*22/)
 
 {
     let notification = null

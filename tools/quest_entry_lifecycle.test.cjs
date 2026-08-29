@@ -5,6 +5,15 @@ const path = require("node:path")
 require("ts-node/register/transpile-only")
 
 const projectRoot = path.resolve(__dirname, "..")
+const activeQuestServiceSource = fs.readFileSync(
+    path.join(projectRoot, "src/lib/quest/active-quest-service.ts"),
+    "utf8",
+)
+assert.match(
+    activeQuestServiceSource,
+    /export interface ActiveQuest \{[\s\S]*?rescueFragmentEligible: boolean/,
+)
+assert.doesNotMatch(activeQuestServiceSource, /rescueFragmentEligible\?: boolean/)
 const questEntryCosts = require(path.join(projectRoot, "assets/quest_entry_costs.json"))
 
 let lifecycle = {}
@@ -478,6 +487,15 @@ assert.ok(
 activeQuestStorage.ensureActiveQuestBattleSessionIdStorageSync(legacyDb)
 activeQuestStorage.ensureActiveQuestCoordinatorOriginStorageSync(legacyDb)
 activeQuestStorage.ensureActiveQuestResourceCostStorageSync(legacyDb)
+assert.equal(
+    typeof activeQuestStorage.ensureActiveQuestRescueFragmentEligibilityStorageSync,
+    "function",
+)
+activeQuestStorage.ensureActiveQuestRescueFragmentEligibilityStorageSync(legacyDb)
+assert.ok(
+    legacyDb.prepare("PRAGMA table_info(players_active_quests)").all()
+        .some(column => column.name === "rescue_fragment_eligible"),
+)
 
 const dbModulePath = require.resolve("../src/data/db")
 require.cache[dbModulePath] = {

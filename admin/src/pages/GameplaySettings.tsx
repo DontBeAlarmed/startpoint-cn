@@ -9,12 +9,14 @@ import { AdminPage } from "../components/AdminPage"
 interface GameplaySettings {
     dropMultiplier: number
     multiRescueFragmentRewardsEnabled: boolean
+    multiRescueHostRewardsEnabled: boolean
     updatedAt: string
 }
 export default function GameplaySettings() {
     const queryClient = useQueryClient()
     const [draftMultiplier, setDraftMultiplier] = useState<number | null>(null)
     const [draftRescueEnabled, setDraftRescueEnabled] = useState<boolean | null>(null)
+    const [draftHostRescueEnabled, setDraftHostRescueEnabled] = useState<boolean | null>(null)
     const settings = useQuery({
         queryKey: ["serverGameplaySettings"],
         queryFn: () => apiGet<GameplaySettings>("/api/server/settings/gameplay"),
@@ -43,16 +45,31 @@ export default function GameplaySettings() {
         },
         onError: (error: Error) => message.error(error.message),
     })
+    const saveHostRescueSetting = useMutation({
+        mutationFn: (multiRescueHostRewardsEnabled: boolean) => apiPatch<GameplaySettings>(
+            "/api/server/settings/gameplay",
+            { multiRescueHostRewardsEnabled },
+        ),
+        onSuccess: value => {
+            queryClient.setQueryData(["serverGameplaySettings"], value)
+            setDraftHostRescueEnabled(value.multiRescueHostRewardsEnabled)
+            message.success("游戏设置已保存")
+        },
+        onError: (error: Error) => message.error(error.message),
+    })
 
     useEffect(() => {
         if (settings.data) setDraftMultiplier(settings.data.dropMultiplier)
         if (settings.data) setDraftRescueEnabled(settings.data.multiRescueFragmentRewardsEnabled)
+        if (settings.data) setDraftHostRescueEnabled(settings.data.multiRescueHostRewardsEnabled)
     }, [settings.data])
 
     const currentMultiplier = settings.data?.dropMultiplier
     const unchanged = draftMultiplier === null || draftMultiplier === currentMultiplier
     const rescueUnchanged = draftRescueEnabled === null
         || draftRescueEnabled === settings.data?.multiRescueFragmentRewardsEnabled
+    const hostRescueUnchanged = draftHostRescueEnabled === null
+        || draftHostRescueEnabled === settings.data?.multiRescueHostRewardsEnabled
 
     return (
         <AdminPage
@@ -102,11 +119,11 @@ export default function GameplaySettings() {
                             message="影响固定道具、玛纳、经验、属性素材和以太素材；不改变稀有掉落概率。"
                         />
                         <Space wrap align="center">
-                            <Typography.Text>多人结算发放救援碎片</Typography.Text>
+                            <Typography.Text>本服玩家：所有多人房间救援资格</Typography.Text>
                             <Switch
                                 checked={draftRescueEnabled ?? false}
                                 onChange={value => setDraftRescueEnabled(value)}
-                                aria-label="多人结算发放救援碎片"
+                                aria-label="本服玩家：所有多人房间救援资格"
                             />
                             <Button
                                 type="primary"
@@ -122,7 +139,30 @@ export default function GameplaySettings() {
                         <Alert
                             type="info"
                             showIcon
-                            message="开启后，所有成功多人结算都会发放对应救援碎片；单人结算不受影响。"
+                            message="开启后只影响本服所属真人玩家，不改变其他服务器、不发布铃铛。"
+                        />
+                        <Space wrap align="center">
+                            <Typography.Text>本服玩家：房主允许自救</Typography.Text>
+                            <Switch
+                                checked={draftHostRescueEnabled ?? false}
+                                onChange={value => setDraftHostRescueEnabled(value)}
+                                aria-label="本服玩家：房主允许自救"
+                            />
+                            <Button
+                                type="primary"
+                                icon={<SaveOutlined />}
+                                disabled={hostRescueUnchanged}
+                                loading={saveHostRescueSetting.isPending}
+                                onClick={() => draftHostRescueEnabled !== null
+                                    && saveHostRescueSetting.mutate(draftHostRescueEnabled)}
+                            >
+                                保存
+                            </Button>
+                        </Space>
+                        <Alert
+                            type="info"
+                            showIcon
+                            message="开启后允许本服房主自救；当前还要求第一开关开启。"
                         />
                     </Space>
                 )}

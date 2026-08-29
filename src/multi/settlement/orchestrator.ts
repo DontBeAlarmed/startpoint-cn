@@ -403,7 +403,7 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
                 rewardDate: settlementTime,
             },
         )
-        const gameplaySettings = getServerGameplaySettingsSync()
+        const serverDropMultiplier = getServerGameplaySettingsSync().dropMultiplier
         const additionalRewardSettlement = questAccomplished
             ? settleAdditionalRewardsSync(
                 getRuntimeContentTableSync(
@@ -425,13 +425,13 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
                     ),
                     rewardCampaignRates,
                     boostPointUsed: useBoostPoint,
-                    serverDropMultiplier: gameplaySettings.dropMultiplier,
+                    serverDropMultiplier,
                 },
                 { grantRewards: rewards => givePlayerRewardsSync(input.playerId, rewards) },
             )
             : { dropAdditionalRewardIds: [], rewardResult: null }
-        const rescueFragment = settleRescueFragmentReward({
-            enabled: gameplaySettings.multiRescueFragmentRewardsEnabled,
+        const rescueFragmentSettlement = settleRescueFragmentReward({
+            eligible: storedQuest.rescueFragmentEligible === true,
             questAccomplished,
             questCategory,
             questId,
@@ -524,8 +524,7 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             rewardCharacterExpResult,
             scoreRewardsResult,
             additionalRewardSettlement,
-            rescueFragmentSettlement: rescueFragment.rewardResult,
-            rescueFragmentAdditionalReward: rescueFragment.additionalReward,
+            rescueFragmentSettlement,
             periodicRewardSettlement,
             sPlusClearReward,
             missionSettlement,
