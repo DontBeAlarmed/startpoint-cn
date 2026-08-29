@@ -823,6 +823,8 @@ export interface RawPlayerActiveQuest {
     battle_session_id: string | null
     entry_item_id: number | null
     entry_item_count: number | null
+    stamina_cost: number | null
+    daily_challenge_point_id: number | null
     event_id: number | null
     continue_count: number
 }
@@ -841,6 +843,8 @@ export interface PlayerActiveQuest {
     battleSessionId: string | null
     entryItemId: number | null
     entryItemCount: number | null
+    staminaCost: number | null
+    dailyChallengePointId: number | null
     eventId: number | null
     continueCount: number
 }

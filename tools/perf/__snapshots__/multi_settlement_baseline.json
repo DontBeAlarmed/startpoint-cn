@@ -9,12 +9,12 @@
       },
       "outputSignature": "sha256:6251057102cadbbc480793acf2f3a111f18d9844c9210191b3b71a013d0cce0e",
       "sql": {
-        "selectStatements": 55,
-        "statements": 91,
+        "selectStatements": 56,
+        "statements": 93,
         "transactionStatements": 12,
-        "writeStatements": 24,
+        "writeStatements": 25,
         "byTable": {
-          "players": { "reads": 9, "statements": 14, "writes": 5 },
+          "players": { "reads": 10, "statements": 16, "writes": 6 },
           "players_active_mission_battle_facts": { "reads": 0, "statements": 1, "writes": 1 },
           "players_active_quests": { "reads": 1, "statements": 2, "writes": 1 },
           "players_category_mission_stages": { "reads": 4, "statements": 5, "writes": 1 },

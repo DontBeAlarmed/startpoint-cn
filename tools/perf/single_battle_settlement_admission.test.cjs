@@ -137,6 +137,12 @@ test("snapshot writer admits behavior-equivalent SQL reductions but rejects regr
             () => writeAdmittedSnapshot(regression, snapshotPath),
             /structural SQL regression/i,
         )
+
+        assert.throws(
+            () => writeAdmittedSnapshot(regression, snapshotPath, { allowBehaviorChange: true }),
+            /structural SQL regression/i,
+        )
+        assert.deepEqual(JSON.parse(fs.readFileSync(snapshotPath, "utf8")), optimized)
     } finally {
         fs.rmSync(directory, { recursive: true, force: true })
     }

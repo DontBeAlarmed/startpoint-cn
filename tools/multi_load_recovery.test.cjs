@@ -37,6 +37,7 @@ const {
     isValidBattleSessionId,
     isValidMultiRoomNumber,
 } = require("../src/multi/coordinator/contracts")
+const { getRealNow } = require("../src/runtime/time/game-time")
 const { RemoteMultiCoordinator } = require("../src/multi/coordinator/remote")
 const { HubClient } = require("../src/multi/hub/client")
 const cnLoadRoutes = require("../src/routes/cn/load").default
@@ -237,6 +238,31 @@ for (const [role, entry] of [
         ).get(home.playerId).count, 0)
     })
 }
+
+test("load recovery exposes refunded stamina in the same response", async t => {
+    const quest = activeQuest("load-stamina-refund", {
+        entryItemId: QUEST.ticketId,
+        entryItemCount: 2,
+        staminaCost: 8,
+    })
+    const home = await openHome("load-stamina-refund", quest)
+    getDb().prepare(`
+        UPDATE players
+        SET stamina = 10, stamina_heal_time = ?
+        WHERE id = ?
+    `).run(getRealNow().getTime(), home.playerId)
+    const app = await buildLoadApp({ inspect: async () => ({ state: "missing" }) })
+    t.after(async () => {
+        delete activeQuests[home.playerId]
+        await app.close()
+    })
+
+    const result = await load(app)
+
+    assert.equal(result.response.statusCode, 200, result.response.body)
+    assert.equal(result.payload.data.user_info.stamina, 18)
+    assert.equal(getPlayerItemSync(home.playerId, QUEST.ticketId), 5)
+})
 
 test("concurrent missing load and abort refund a stored cost once", async t => {
     const quest = activeQuest("concurrent-missing")

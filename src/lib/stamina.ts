@@ -2,7 +2,11 @@ import playerRankTable from "../../assets/cdndata/player_rank_full.json";
 import { getConfigSync } from "./assets";
 import { getRealNowMs } from "../runtime/time/game-time";
 
-const STAMINA_OVERFLOW_MAX = 999;
+export const STAMINA_OVERFLOW_MAX = 999;
+
+export function addStaminaWithOverflowCap(currentStamina: number, staminaIncrease: number): number {
+    return Math.min(currentStamina + staminaIncrease, STAMINA_OVERFLOW_MAX);
+}
 
 interface RankEntry { stamina: number; threshold: number; healRate: number }
 const rankMap = new Map<number, RankEntry>();
@@ -38,7 +42,8 @@ export function computeRealTimeStamina(player: { stamina: number; staminaHealTim
     const nowSec = Math.floor(getRealNowMs() / 1000);
     const elapsed = (nowSec - healSec) / recoverySeconds;
     const maxStamina = Math.max(getMaxStamina(degree), player.stamina);
-    return Math.min(Math.max(0, player.stamina + Math.floor(elapsed)), maxStamina, STAMINA_OVERFLOW_MAX);
+    const recoveryGain = Math.max(0, Math.floor(elapsed));
+    return Math.min(Math.max(0, player.stamina + recoveryGain), maxStamina, STAMINA_OVERFLOW_MAX);
 }
 
 export function getRankDegree(rankPoint: number): number {

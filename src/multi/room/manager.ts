@@ -35,10 +35,17 @@ export interface RoomCleanupStatus {
 
 let cleanupTimer: RoomCleanupTimer | null = null;
 let clearCleanupInterval: ((timer: RoomCleanupTimer) => void) | null = null;
+let roomDisbandListener:
+    | ((roomNumber: string, hostPlayerId: number) => void)
+    | null = null;
 
 interface RoomCleanupTiming {
     readonly incompleteExpiryMs: number;
     readonly fullExpiryMs: number;
+}
+
+function notifyRoomDisbanded(roomNumber: string, hostPlayerId: number): void {
+    roomDisbandListener?.(roomNumber, hostPlayerId);
 }
 
 function cleanExpiredRooms(timing: RoomCleanupTiming) {
@@ -63,10 +70,7 @@ function cleanExpiredRooms(timing: RoomCleanupTiming) {
         }
 
         if (idleAge > timeout) {
-            rooms.delete(roomNumber);
-            sessionManager.removeRoomState(roomNumber);
-            notifiedRooms.delete(roomNumber);
-            cleaned++;
+            if (disbandRoom(roomNumber)) cleaned++;
         }
     }
     if (cleaned > 0) console.log(`[MULTI] expired rooms cleaned: ${cleaned}`);
@@ -102,6 +106,12 @@ export function stopRoomCleanup(): void {
     cleanupTimer = null;
     clearCleanupInterval = null;
     clearIntervalHandle(timer);
+}
+
+export function setRoomDisbandListener(
+    listener: ((roomNumber: string, hostPlayerId: number) => void) | null,
+): void {
+    roomDisbandListener = listener;
 }
 
 export function getRoomCleanupStatus(): RoomCleanupStatus {
@@ -263,10 +273,13 @@ export function setRoomBattle(roomNumber: string): boolean {
 }
 
 export function disbandRoom(roomNumber: string): boolean {
+    const room = rooms.get(roomNumber);
     const deleted = rooms.delete(roomNumber);
     if (deleted) {
         console.log(`[MULTI] room deleted: ${roomNumber}`);
         sessionManager.removeRoomState(roomNumber);
+        notifiedRooms.delete(roomNumber);
+        notifyRoomDisbanded(roomNumber, room?.host_player_id ?? 0);
     }
     return deleted;
 }

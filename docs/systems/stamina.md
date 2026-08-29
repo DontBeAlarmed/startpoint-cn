@@ -56,6 +56,10 @@ cost = max(1, floor(baseCost * activeRate))
 
 任一步失败都不保留部分写入。成功响应立即返回扣除后的 `stamina` 和 `stamina_heal_time`。
 
+start 的扣除是预扣语义：active quest 会保存本次实际 `stamina_cost`，但 `total_stamina_used` 和“消耗体力”任务事实延迟到成功 finish 事务中写入。abort、失败 finish、单人残留清理和多人房间失效都会按保存成本返还体力；schema 20 及更早的旧 active quest 的 `stamina_cost` 为 `NULL`，未完成释放时不猜测、不返体力。
+
+释放时先按战斗期间经过的真实时间计算自然恢复，再加回 start 保存的预扣成本。退款属于归还原有资源，因此结果可以超过当前 Rank 的自然上限；例如 `100 → start 预扣 10 → 战斗中自然恢复到 92 → 失败释放` 的最终体力为 `102`。退款后的最终值只受绝对溢出上限 `999` 约束。当前秒内的毫秒锚点或系统时钟小幅回拨不会产生负恢复量，也不会在退款前倒扣体力。
+
 ## 自动连战耗尽
 
 自动连战的下一轮仍然必须通过同一套体力事务校验，服务端不会因为
@@ -63,13 +67,15 @@ cost = max(1, floor(baseCost * activeRate))
 
 国服客户端没有独立的“自动连战体力不足” start 响应类型。服务端只在自动连战且确定为体力不足时以 HTTP 200 返回 `data_headers.result_code=4050`，避免进入 HTTP/API 全局致命错误路径；普通手动挑战仍返回入场错误。`4050` 的官方含义是 `QuestOutOfPeriod`，客户端会使用“关卡超出开放期”提示和对应返回路由，它不是正常自动连战完成状态，也不保证回到配队页。正常次数耗尽仍应由客户端自身计数器收尾；该兜底只处理客户端额外发起下一轮 start 的异常边界，待真机验收。
 
-单人结算增加 rank point 后重新计算 degree。跨级时，当前实现是在结算前体力上**增加** `getMaxStamina(newDegreeId)`，并重置恢复时间；它不是把体力直接设为 999，也不是简单设为新等级自然上限。
+单人结算增加 rank point 后重新计算 degree。跨级时，当前实现是在结算前体力上**增加** `getMaxStamina(newDegreeId)`，并重置恢复时间；它不是把体力直接设为新等级自然上限。失败结算会先完成自然恢复与预扣退款，再叠加跨级补充；成功和失败路径的最终体力都统一限制为 `999`。
 
 ## 多人关卡
 
 多人开战由房主按同一套入场事务校验并扣除体力与入场道具；成员不承担房主的关卡入场体力成本。开战响应使用与数据库写入相同的恢复时间锚点，避免客户端对同一段自然恢复再次累计。
 
-多人结算已经实现 rank point 与 degree 更新。跨级时同样在当前体力上增加 `getMaxStamina(newDegreeId)` 并重置恢复时间，然后通过 `user_info` 返回新体力。
+多人结算已经实现 rank point 与 degree 更新。跨级时同样在当前体力上增加 `getMaxStamina(newDegreeId)` 并重置恢复时间，然后通过 `user_info` 返回新体力；数据库写入和响应投影复用同一绝对上限计算，最终都不会超过 `999`。
+
+多人入场成本仍只由房主承担。房主成功 finish 确认消耗 `total_stamina_used`；房主 abort、失败 finish 或房间失效释放保存成本。成员 start 保存零成本，成功不增加客机体力消耗，未完成也不退款。
 
 ## 活动折扣
 
@@ -95,7 +101,7 @@ cost = max(1, floor(baseCost * activeRate))
 
 - 多人入场成本由房主承担，成员不扣房主的体力或入场道具；
 - 自动连战在体力不足时仍按普通入场返回 H400，客户端缺少官方的非致命停止语义；
-- 体力、门票与 active quest 已在单人 start 事务化；单人和协力 finish 的数据库写入也已有总事务，详见[战斗关卡结算事务](./quest-finish-transactions.md)；
+- 体力与门票在 start 预扣并保存实际成本，未完成路径复用同一释放 owner 返还；单人和协力 finish 的数据库写入也已有总事务，详见[战斗关卡结算事务](./quest-finish-transactions.md)；
 - 客户端显示和长时间离线恢复仍需结合服务器 `timeOffset` 做人工验收。
 
 当前项目不按存档单独应用 `time_offset`。活动折扣使用带全局 `timeOffset` 的 `getServerDate()`；自然恢复使用真实 `getRealNowMs()` 计算经过秒数。两者是有意分离的时间来源，非零全局偏移不会加速或倒退玩家的自然恢复。

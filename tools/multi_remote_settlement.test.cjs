@@ -957,7 +957,7 @@ test("production /start charges only the host in isolated SQLite home saves", as
             coordinatorOrigin: getPlayerActiveQuestSync(home.playerId).coordinatorOrigin,
         }, {
             stamina: home.entryStamina - 10,
-            totalStaminaUsed: 10,
+            totalStaminaUsed: 0,
             ticketCount: 0,
             battleSessionId,
             coordinatorOrigin: "remote",
@@ -1059,6 +1059,41 @@ test("production /finish settles through a real HubClient session rotation", asy
     }
 })
 
+test("production /finish consumes stored stamina cost despite a drifted memory quest", async () => {
+    let home
+    try {
+        home = await openProductionHome(
+            "stored-stamina-finish",
+            host,
+            true,
+            { verify: async () => ({ ok: true, isHost: true }) },
+        )
+        const playId = "stored-stamina-finish"
+        const started = await home.app.inject({
+            method: "POST",
+            url: "/start",
+            payload: startPayload(host.viewerId, playId),
+        })
+        assert.equal(started.statusCode, 200, started.body)
+        const storedQuest = getPlayerActiveQuestSync(home.playerId)
+        assert.equal(typeof storedQuest.staminaCost, "number")
+        activeQuests[home.playerId].staminaCost = storedQuest.staminaCost + 17
+
+        const finished = await home.app.inject({
+            method: "POST",
+            url: "/finish",
+            payload: finishPayload(host.viewerId, playId),
+        })
+        assert.equal(finished.statusCode, 200, finished.body)
+        assert.equal(
+            getPlayerSync(home.playerId).totalStaminaUsed,
+            storedQuest.staminaCost,
+        )
+    } finally {
+        await closeProductionHome(home)
+    }
+})
+
 for (const [label, participant, isHost] of [
     ["host", host, true],
     ["guest", guest, false],
@@ -1143,7 +1178,7 @@ test("production /start atomically occupies an empty SQLite active quest", async
         for (const pending of waiting) pending.resolve({ ok: true, value: pending.battle })
         const responses = await Promise.all([firstPending, secondPending])
         assert.deepEqual(responses.map(response => response.statusCode).sort(), [200, 400])
-        assert.equal(getPlayerSync(home.playerId).totalStaminaUsed, 10)
+        assert.equal(getPlayerSync(home.playerId).totalStaminaUsed, 0)
         assert.equal(getPlayerItemSync(home.playerId, productionQuest.ticketId), 1)
         assert.ok([
             "concurrent-start-a",

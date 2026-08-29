@@ -179,6 +179,7 @@ function createFixture({
         observedActiveQuest: null,
         resolvedIdentity: { playId: "", questId: 0, category: 0 },
         itemList: {},
+        refundedStamina: 0,
     })
     assert.equal(fixture.getActiveReads(), 1)
     assert.equal(fixture.getState().memoryActiveQuest, null)
@@ -476,6 +477,7 @@ assert.ok(
 )
 activeQuestStorage.ensureActiveQuestBattleSessionIdStorageSync(legacyDb)
 activeQuestStorage.ensureActiveQuestCoordinatorOriginStorageSync(legacyDb)
+activeQuestStorage.ensureActiveQuestResourceCostStorageSync(legacyDb)
 
 const dbModulePath = require.resolve("../src/data/db")
 require.cache[dbModulePath] = {

@@ -13,6 +13,7 @@ const {
     insertPlayerRushEventSync,
 } = require("../src/data/domains/rushEvent")
 const { QuestCategory, RewardType } = require("../src/lib/types")
+const { getMaxStamina, getRankDegree } = require("../src/lib/stamina")
 const { getServerTime, realToVirtual } = require("../src/utils")
 const {
     MAIN_QUEST_ID,
@@ -142,6 +143,44 @@ test("single finish keeps the final inventory when clear and S+ touch the same i
     })
 })
 
+test("single finish rolls back when the stored challenge point is exhausted", async () => {
+    await withSingleBattleHarness("final-exhausted-challenge-point", async harness => {
+        const activeQuest = harness.createActiveQuest({
+            playId: "task-26d2-exhausted-point",
+        })
+        activeQuest.dailyChallengePointId = 9001
+        harness.insertActiveQuest(activeQuest)
+        harness.db.prepare(`
+            INSERT INTO daily_challenge_point_list_entries (id, point, player_id)
+            VALUES (9001, 0, ?)
+        `).run(harness.playerId)
+        const before = harness.snapshotState()
+
+        const response = await harness.post(
+            "finish",
+            harness.finishPayload({ playId: "task-26d2-exhausted-point" }),
+            { normalize: false },
+        )
+
+        assert.equal(response.statusCode, 400, JSON.stringify(response))
+        assert.deepEqual(harness.snapshotState(), before)
+        assert.equal(harness.db.prepare(`
+            SELECT point FROM daily_challenge_point_list_entries
+            WHERE id = 9001 AND player_id = ?
+        `).get(harness.playerId)?.point, 0)
+        assert.deepEqual(harness.db.prepare(`
+            SELECT play_id, daily_challenge_point_id
+            FROM players_active_quests
+            WHERE player_id = ?
+        `).get(harness.playerId), {
+            play_id: "task-26d2-exhausted-point",
+            daily_challenge_point_id: 9001,
+        })
+    }, {
+        tableOverrides: noIncidentalRewardOverrides(),
+    })
+})
+
 test("single finish user_info is the final persisted player projection", async () => {
     await withSingleBattleHarness("final-player", async harness => {
         const before = harness.getPlayer()
@@ -166,6 +205,66 @@ test("single finish user_info is the final persisted player projection", async (
             { name: "clear exp", type: RewardType.EXP, count: 19 },
             { name: "S+ mana", type: RewardType.MANA, count: 37 },
         ),
+    })
+})
+
+test("single failed finish applies rank refill after releasing entry stamina", async () => {
+    await withSingleBattleHarness("final-failed-rank-up-refill", async harness => {
+        const playId = "task-26d2-failed-rank-up-refill"
+        const rankPointBefore = 93
+        const currentStamina = 90
+        harness.updatePlayer({
+            rankPoint: rankPointBefore,
+            stamina: currentStamina,
+            staminaHealTime: new Date(Date.now() + 250),
+        })
+        const activeQuest = harness.createActiveQuest({ playId })
+        activeQuest.staminaCost = 10
+        harness.insertActiveQuest(activeQuest)
+
+        const payload = harness.finishPayload({ playId })
+        payload.is_accomplished = false
+        const response = await harness.post("finish", payload, { normalize: false })
+        assert.equal(response.statusCode, 200, JSON.stringify(response))
+
+        const persisted = harness.getPlayer()
+        assert.ok(persisted)
+        const newDegreeId = getRankDegree(rankPointBefore + 3)
+        const releasedAfterStamina = currentStamina + 10
+        const expectedStamina = Math.min(
+            releasedAfterStamina + getMaxStamina(newDegreeId),
+            999,
+        )
+        assert.equal(persisted.stamina, expectedStamina)
+        assert.equal(response.data.user_info.stamina, expectedStamina)
+    }, {
+        tableOverrides: noIncidentalRewardOverrides(),
+    })
+})
+
+test("single rank-up final stamina is capped at the absolute overflow maximum", async () => {
+    await withSingleBattleHarness("final-rank-up-overflow-cap", async harness => {
+        const playId = "task-26d2-rank-up-overflow-cap"
+        harness.updatePlayer({
+            rankPoint: 93,
+            stamina: 995,
+            staminaHealTime: new Date(Date.now() + 250),
+        })
+        harness.insertActiveQuest(harness.createActiveQuest({ playId }))
+
+        const response = await harness.post(
+            "finish",
+            harness.finishPayload({ playId }),
+            { normalize: false },
+        )
+        assert.equal(response.statusCode, 200, JSON.stringify(response))
+
+        const persisted = harness.getPlayer()
+        assert.ok(persisted)
+        assert.equal(persisted.stamina, 999)
+        assert.equal(response.data.user_info.stamina, 999)
+    }, {
+        tableOverrides: noIncidentalRewardOverrides(),
     })
 })
 

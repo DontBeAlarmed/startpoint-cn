@@ -4,6 +4,7 @@ import {
     ensureActiveQuestBattleSessionIdStorageSync,
     ensureActiveQuestCoordinatorOriginStorageSync,
     ensureActiveQuestEntryItemCountStorageSync,
+    ensureActiveQuestResourceCostStorageSync,
 } from "../../lib/quest/active-quest-persistence";
 import { ensureSchemaColumn } from "../schema";
 import { pruneSpecialEventPartyGroupsSync } from "../../lib/party-group-persistence";
@@ -1133,6 +1134,8 @@ export default function init(
         battle_session_id TEXT,
         entry_item_id INTEGER,
         entry_item_count INTEGER,
+        stamina_cost INTEGER,
+        daily_challenge_point_id INTEGER,
         event_id INTEGER,
         continue_count INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
@@ -1140,4 +1143,5 @@ export default function init(
     ensureActiveQuestEntryItemCountStorageSync(database)
     ensureActiveQuestBattleSessionIdStorageSync(database)
     ensureActiveQuestCoordinatorOriginStorageSync(database)
+    ensureActiveQuestResourceCostStorageSync(database)
 }

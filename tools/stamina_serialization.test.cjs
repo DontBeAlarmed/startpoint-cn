@@ -39,7 +39,7 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { getMergedPlayerDataSync } = require("../src/data/utils/player-data")
 const { serializePlayerData } = require("../src/data/utils/serialize-player")
-const { getMaxStamina, getRankDegree } = require("../src/lib/stamina")
+const { computeRealTimeStamina, getMaxStamina, getRankDegree } = require("../src/lib/stamina")
 const { realToVirtual } = require("../src/utils")
 const singleBattleSource = fs.readFileSync(
     path.join(__dirname, "../src/routes/api/singleBattleQuest.ts"),
@@ -90,6 +90,25 @@ assert.doesNotMatch(singleBattleSource, /"stamina_heal_time": realToVirtual\(new
 assert.match(multiBattleSource, /"stamina_heal_time": realToVirtual\(startTime\)/)
 assert.match(itemSource, /"stamina_heal_time": realToVirtual\(recoveryTime\)/)
 assert.match(shopSource, /"stamina_heal_time": realToVirtual\(recoveryTime\)/)
+
+{
+    const fixedNowMs = 1_700_000_000_000
+    const sameSecondAnchor = new Date(fixedNowMs + 250)
+    const currentStamina = 10
+    const previousDateNow = Date.now
+    Date.now = () => fixedNowMs
+    try {
+        updatePlayerSync({ id: playerId, stamina: currentStamina, staminaHealTime: sameSecondAnchor })
+        const recovered = computeRealTimeStamina(getPlayerSync(playerId))
+        assert.ok(
+            recovered >= currentStamina,
+            `same-second fractional heal anchor must not reduce stamina (${recovered} < ${currentStamina})`,
+        )
+        assert.equal(recovered, currentStamina)
+    } finally {
+        Date.now = previousDateNow
+    }
+}
 
 console.log("stamina serialization snapshot tests passed")
 cleanup()

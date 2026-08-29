@@ -132,15 +132,15 @@
       },
       "behaviorSha256": "d917487d4b4fddb977228b9708c35aefe6ea6298a840636c4502073f51346a3d",
       "sql": {
-        "statements": 41,
-        "selectStatements": 27,
-        "writeStatements": 6,
+        "statements": 43,
+        "selectStatements": 28,
+        "writeStatements": 7,
         "transactionStatements": 8,
         "byTable": {
           "players": {
-            "statements": 6,
-            "reads": 5,
-            "writes": 1
+            "statements": 8,
+            "reads": 6,
+            "writes": 2
           },
           "players_active_quests": {
             "statements": 5,
@@ -4231,11 +4231,6 @@
               "progress": 1
             },
             {
-              "category": 2,
-              "id": 16,
-              "progress": 1
-            },
-            {
               "category": 10,
               "id": 1,
               "progress": 1
@@ -4253,7 +4248,7 @@
             "stamina": 99,
             "staminaHealTime": "within-request-window",
             "totalManaObtained": 0,
-            "totalStaminaUsed": 1,
+            "totalStaminaUsed": 0,
             "vmoney": 100
           },
           "questProgress": null
@@ -4310,7 +4305,7 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "6d0c004cdc4fc4eb245510985d9058884817f7a7efd3ca69ceacc5b9ab937475",
+      "behaviorSha256": "751564e37beef18c55a2c4fb7f456dbd752e6fb0897f5879f4c63b5d6316931d",
       "sql": {
         "statements": 25,
         "selectStatements": 18,

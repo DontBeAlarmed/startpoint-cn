@@ -8,6 +8,10 @@ import {
 } from "../../assets"
 import { QuestCategory, type BattleQuest } from "../../types"
 import { activeQuests, type ActiveQuest } from "../active-quest-service"
+import {
+    DailyChallengePointExhaustedError,
+    DailyChallengePointUnavailableError,
+} from "../daily-challenge"
 import { resolveQuestRewardEligibility } from "../first-clear-reward"
 import {
     runSingleFinishSettlementTransaction,
@@ -185,6 +189,10 @@ export function settleSingleBattleQuest({
         })
     } catch (error) {
         if (error instanceof SingleFinishSettlementValidationError) {
+            return failure(400, "Bad Request", error.message)
+        }
+        if (error instanceof DailyChallengePointExhaustedError
+            || error instanceof DailyChallengePointUnavailableError) {
             return failure(400, "Bad Request", error.message)
         }
         throw error

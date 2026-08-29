@@ -16,6 +16,8 @@ function buildActiveQuest(raw: RawPlayerActiveQuest): PlayerActiveQuest {
         battleSessionId: raw.battle_session_id,
         entryItemId: raw.entry_item_id,
         entryItemCount: raw.entry_item_count,
+        staminaCost: raw.stamina_cost,
+        dailyChallengePointId: raw.daily_challenge_point_id,
         eventId: raw.event_id,
         continueCount: raw.continue_count
     }
@@ -38,12 +40,13 @@ export function insertPlayerActiveQuestSync(playerId: number, quest: PlayerActiv
             (player_id, play_id, quest_id, category, use_boss_boost_point,
              use_boost_point, is_auto_start_mode, is_multi, room_number,
              battle_session_id, coordinator_origin, entry_item_id, entry_item_count,
-             event_id, continue_count)
+             stamina_cost, daily_challenge_point_id, event_id, continue_count)
         VALUES (
             @player_id, @play_id, @quest_id, @category, @use_boss_boost_point,
             @use_boost_point, @is_auto_start_mode, @is_multi, @room_number,
             @battle_session_id, @coordinator_origin, @entry_item_id,
-            @entry_item_count, @event_id, @continue_count
+            @entry_item_count, @stamina_cost, @daily_challenge_point_id,
+            @event_id, @continue_count
         )
     `).run({
         player_id: playerId,
@@ -59,6 +62,8 @@ export function insertPlayerActiveQuestSync(playerId: number, quest: PlayerActiv
         coordinator_origin: coordinatorOrigin,
         entry_item_id: quest.entryItemId ?? null,
         entry_item_count: quest.entryItemCount ?? null,
+        stamina_cost: quest.staminaCost ?? null,
+        daily_challenge_point_id: quest.dailyChallengePointId ?? null,
         event_id: quest.eventId ?? null,
         continue_count: quest.continueCount,
     })

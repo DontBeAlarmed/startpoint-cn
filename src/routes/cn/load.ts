@@ -328,7 +328,16 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                     questId: activeQuest.questId,
                     category: activeQuest.category,
                 });
-                activeQuest = aborted.cancelled ? null : getPlayerActiveQuestSync(playerId);
+                if (aborted.cancelled) {
+                    activeQuest = null;
+                    const refreshedPlayer = getPlayerSync(playerId);
+                    if (refreshedPlayer === null) {
+                        return reply.status(500).send({ error: "Internal Server Error", message: "No player data." });
+                    }
+                    player = refreshedPlayer;
+                } else {
+                    activeQuest = getPlayerActiveQuestSync(playerId);
+                }
             }
             if (activeQuest) {
                 activeQuest = restoreActiveQuestFromStorage(playerId, activeQuest, {

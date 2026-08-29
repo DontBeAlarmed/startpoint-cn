@@ -143,7 +143,7 @@ const SOURCE_RULES = [
         groups: ["integration:quest", "quick:quest"],
     },
     {
-        pattern: /^(?:src\/lib\/quest\/(?:abort-request-validation|entry-lifecycle|start-entry)\.ts|src\/routes\/api\/singleBattleQuest\.ts|tools\/(?:quest_abort_route|quest_entry_lifecycle|single_battle_(?:abort_(?:numeric_)?validation|identity_reads)|single_continue_(?:idempotency|lifecycle|route|route_errors))\.test\.cjs)$/,
+        pattern: /^(?:src\/lib\/quest\/(?:abort-request-validation|active-quest-persistence|entry-lifecycle|start-entry)\.ts|src\/routes\/api\/singleBattleQuest\.ts|tools\/(?:quest_abort_route|quest_(?:entry_lifecycle|resource_lifecycle)|single_battle_(?:abort_(?:numeric_)?validation|identity_reads)|single_continue_(?:idempotency|lifecycle|route|route_errors))\.test\.cjs)$/,
         groups: ["integration:quest", "integration:rules", "quick:quest"],
     },
     {

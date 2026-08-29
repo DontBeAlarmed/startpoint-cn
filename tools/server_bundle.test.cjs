@@ -218,7 +218,7 @@ test("builds a canonical reproducible thin server bundle without web/public", as
             minDataSchema: 0,
             node: ">=20.12.0",
             runtimeApi: 1,
-            targetDataSchema: 20,
+            targetDataSchema: 21,
         },
         schemaVersion: 3,
         serverVersion: "1.0.1",
@@ -643,8 +643,9 @@ test("verifier enforces runtime, Node, data schema, entry, and admin compatibili
         assert.doesNotThrow(() => verifyServerBundle({ bundleRoot: fixture.outputRoot, dataSchema: 17 }))
         assert.doesNotThrow(() => verifyServerBundle({ bundleRoot: fixture.outputRoot, dataSchema: 19 }))
         assert.doesNotThrow(() => verifyServerBundle({ bundleRoot: fixture.outputRoot, dataSchema: 20 }))
+        assert.doesNotThrow(() => verifyServerBundle({ bundleRoot: fixture.outputRoot, dataSchema: 21 }))
         assert.throws(
-            () => verifyServerBundle({ bundleRoot: fixture.outputRoot, dataSchema: 21 }),
+            () => verifyServerBundle({ bundleRoot: fixture.outputRoot, dataSchema: 22 }),
             /data schema/i,
         )
         rewriteManifest(fixture.outputRoot, manifest => { manifest.requires.minDataSchema = 2 })
@@ -652,7 +653,7 @@ test("verifier enforces runtime, Node, data schema, entry, and admin compatibili
 
         const targetFixture = buildFixture(t)
         rewriteManifest(targetFixture.outputRoot, manifest => {
-            manifest.requires.targetDataSchema = 21
+            manifest.requires.targetDataSchema = 22
         })
         assert.throws(() => verifyServerBundle({ bundleRoot: targetFixture.outputRoot }), /data schema/i)
     })

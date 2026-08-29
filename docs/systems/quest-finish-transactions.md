@@ -28,6 +28,13 @@ Boost 标记或余额非法时，均在奖励与进度写入前 fail closed。�
 `rewardEligibility`、`questPreviouslyCompleted` 和 `FinishContext`，并调用写入层。奖励写入、最终 Player 投影与最终
 `item_list` 也在该外层事务内按实际写入顺序权威形成；这里不增加全局请求上下文或额外最终查询。
 
+资源生命周期由 `commitEntryResources()` 与 `releaseEntryResources()` 统一拥有。成功 finish 在既有结算事务内增加
+`total_stamina_used`，并按 active quest 保存的 `daily_challenge_point_id` 扣一次挑战点；刷新仍使用真实时钟和
+`dailyResetHour=5`，因此跨北京时间 05:00 的成功结算扣成功结算日对应的点，虚拟时间跳转不会改变保存的退款成本。
+成功提交时固定 ID 缺失或点数耗尽会 fail closed，事务回滚并保留 active quest。
+失败 finish 在同一事务内释放保存的体力和门票，再走原有失败响应投影，不写消耗事实、不扣挑战点。schema 21 前的旧
+active quest 没有 `stamina_cost` 时禁止猜测体力退款；已有 `entry_item_count=NULL` 的一次性门票兼容规则保持不变。
+
 ## 单人分类覆盖
 
 `src/routes/api/singleBattleQuest.ts` 只完成请求校验、session 适配、协调器调用和 HTTP 发送。它把已校验请求、player ID 与
@@ -63,7 +70,7 @@ Carnival、mission 等来源继续按实际执行顺序推进。Carnival `new_de
 - 首通与 S+ 奖励、普通掉落、Rare Score Reward、Additional Reward；
 - 关卡完成进度、最高分、评级、耗时和队长记录；
 - 玛纳、经验池、Rank Point、Boost、角色战斗经验与升级体力；
-- 每日挑战点、任务战斗事实、任务领奖结算与角色觉醒解锁校准；
+- 成功路径的每日挑战点扣减、`total_stamina_used` 与任务战斗事实；
 - 数据库中的 active quest 删除。
 
 任务进度与阶段状态的写入仍由任务引擎负责，但单人结算不再为每条变化的任务各执行一次 SQL。`settlement-write.ts`
@@ -103,7 +110,8 @@ Carnival、mission 等来源继续按实际执行顺序推进。Carnival `new_de
 ## 协力结算
 
 协力 finish 的首通/S+ 奖励、关卡进度、玩家数值、普通与追加掉落、任务事实、角色经验、觉醒校准和数据库
-active quest 删除同样由一个外层事务覆盖。服务端先在事务外向 Hub 只读验证参与者、房间、
+active quest 删除同样由一个外层事务覆盖。成功 finish 由同一资源 owner 确认房主 `total_stamina_used`；失败 finish
+释放房主保存的体力和门票。成员零成本状态不变。服务端先在事务外向 Hub 只读验证参与者、房间、
 `battleSessionId` 和最终完成事实，再由 coordinator 权威结束已满足条件的房间生命周期；网络等待不会占用本地
 SQLite 事务。Hub 在房间释放后继续限时保留完成事实，本地结算失败不会消费该事实。
 

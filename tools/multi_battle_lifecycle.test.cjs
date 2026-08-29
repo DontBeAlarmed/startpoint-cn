@@ -174,7 +174,10 @@ test("multi battle routes use the shared lifecycle boundaries", () => {
         "deletePlayerActiveQuestSync(playerId)",
         deleteFunction,
     )
-    const settlementWrites = activeQuestService.indexOf("settle(deleteOnce)", activeQuestDelete)
+    const settlementWrites = activeQuestService.indexOf(
+        "settle(deleteOnce, storedQuest)",
+        activeQuestDelete,
+    )
     const deleteAfterSettlement = activeQuestService.indexOf("deleteOnce()", settlementWrites)
     assert.ok(settlementTransaction >= 0)
     assert.ok(activeQuestRead > settlementTransaction)

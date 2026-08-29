@@ -34,7 +34,7 @@
 
 ## 覆盖范围
 
-schema 20 共有 64 张可从 `players` 外键图发现的玩家关联表：
+schema 21 共有 64 张可从 `players` 外键图发现的玩家关联表：
 
 - 61 张登记到 `core`、`missions`、`events`、`economy`、`mailbox`；
 - `players_active_quests`、`scheduled_resource_rules` 和

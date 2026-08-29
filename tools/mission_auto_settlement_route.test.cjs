@@ -202,7 +202,7 @@ async function main() {
             startData.mission_info
                 .filter(entry => entry.mission_category_id === 2)
                 .map(entry => entry.mission_id),
-            [13, 14, 16],
+            [13, 14],
         )
         assert.equal(startData.mail_arrived, true)
 
@@ -306,7 +306,7 @@ async function main() {
             finishData.mission_info
                 .filter(entry => entry.mission_category_id === 2)
                 .map(entry => entry.mission_id),
-            [11, 17],
+            [11, 16, 17],
         )
         assert.deepEqual(
             finishData.mission_info.find(entry => (

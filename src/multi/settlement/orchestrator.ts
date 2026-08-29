@@ -27,6 +27,12 @@ import {
     runMultiActiveQuestSettlementTransaction,
     type ActiveQuest,
 } from "../../lib/quest/active-quest-service"
+import {
+    commitEntryResources,
+    computeEntryLifecycleStamina,
+    releaseEntryResources,
+    type ReleaseEntryResourcesResult,
+} from "../../lib/quest/entry-lifecycle"
 import { resolveQuestRewardEligibility } from "../../lib/quest/first-clear-reward"
 import { settleActivityPeriodicRewardsSync } from "../../lib/quest/finish/periodic-reward-handler"
 import type { FinishContext } from "../../lib/quest/finish/types"
@@ -40,7 +46,8 @@ import {
     getRewardCampaignRates,
 } from "../../lib/reward-campaign"
 import { getCommonScoreRewardCount } from "../../lib/score-reward-lottery"
-import { getMaxStamina, getRankDegree } from "../../lib/stamina"
+import { addStaminaWithOverflowCap, getMaxStamina, getRankDegree } from "../../lib/stamina"
+import { getPlayerItemSync, setPlayerItemSync } from "../../data/domains/item"
 import { PlayerNotFoundError } from "../../lib/quest/start-entry"
 import { QuestCategory, type BattleQuest } from "../../lib/types"
 import { formatHardMultiMissionDiagnostic } from "../../lib/mission/client-check-diagnostics"
@@ -209,7 +216,10 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             && characterId > 0) partyCharacterIdsArray.push(characterId)
     }
 
-    const executeFinishWrites = (deleteActiveQuest?: () => void) => {
+    const executeFinishWrites = (
+        deleteActiveQuest: () => void,
+        storedQuest: ActiveQuest,
+    ) => {
         const player = getPlayerSync(input.playerId)
         if (!player) throw new PlayerNotFoundError(input.playerId)
         const freshValidation = validateMultiFinishRequest(
@@ -241,6 +251,37 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             recordRank100MilestoneSync(input.playerId, newRankPoint)
         }
         const didLevelUp = newDegreeId > oldRkDegree
+        const entryResourceResult = questAccomplished
+            ? commitEntryResources({
+                playerId: input.playerId,
+                activeQuest: storedQuest,
+            }, {
+                getPlayer: getPlayerSync,
+                updatePlayer: updatePlayerSync,
+                refreshDailyChallengePoints: () => {},
+                getDailyChallengePointEntries: () => [],
+                updateDailyChallengePoint: () => {},
+            })
+            : releaseEntryResources({
+                playerId: input.playerId,
+                activeQuest: storedQuest,
+                now: getRealNow(),
+            }, {
+                getPlayer: getPlayerSync,
+                computeStamina: computeEntryLifecycleStamina,
+                updatePlayer: updatePlayerSync,
+                getItemCount: getPlayerItemSync,
+                setItemCount: setPlayerItemSync,
+                deleteActiveQuest,
+            })
+        player.totalStaminaUsed = (player.totalStaminaUsed ?? 0) + entryResourceResult.staminaUsed
+        const releasedEntryResources = questAccomplished
+            ? null
+            : entryResourceResult as ReleaseEntryResourcesResult
+        if (releasedEntryResources) {
+            player.stamina = releasedEntryResources.afterStamina
+            player.staminaHealTime = releasedEntryResources.afterStaminaHealTime
+        }
         const finishCtx: FinishContext = {
             playerId: input.playerId,
             questCategory,
@@ -334,12 +375,15 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
                 (freshValidation.statistics as any).max_combo_count ?? 0,
             ),
             ...(didLevelUp
-                ? { stamina: player.stamina + getMaxStamina(newDegreeId), staminaHealTime: getRealNow() }
+                ? {
+                    stamina: addStaminaWithOverflowCap(player.stamina, getMaxStamina(newDegreeId)),
+                    staminaHealTime: getRealNow(),
+                }
                 : {}),
         })
         const playerData = { ...player }
         if (didLevelUp) {
-            playerData.stamina += getMaxStamina(newDegreeId)
+            playerData.stamina = addStaminaWithOverflowCap(playerData.stamina, getMaxStamina(newDegreeId))
             playerData.staminaHealTime = getRealNow()
         }
 

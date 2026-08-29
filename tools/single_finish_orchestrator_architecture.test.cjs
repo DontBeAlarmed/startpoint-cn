@@ -143,6 +143,7 @@ test("single finish production files stay focused", () => {
         "src/lib/quest/finish/single-response-projector.ts",
         "src/lib/quest/finish/single-settlement-response-state.ts",
         "src/lib/quest/finish/single-mission-publication.ts",
+        "src/lib/quest/finish/single-entry-resource-settlement.ts",
         "src/lib/quest/finish/single-settlement-writes.ts",
     ]) {
         const lineCount = readSource(relativePath).split("\n").length
@@ -153,6 +154,8 @@ test("single finish production files stay focused", () => {
 test("single settlement writes derives duplicated values from authoritative inputs", () => {
     const orchestrator = readSource("src/lib/quest/finish/single-orchestrator.ts")
     const writes = readSource("src/lib/quest/finish/single-settlement-writes.ts")
+    const finishTypes = readSource("src/lib/quest/finish/types.ts")
+    assert.ok(finishTypes.includes("export interface SingleSettlementWritesInput {"))
     const callInput = sourceBetween(
         orchestrator,
         "executeSingleSettlementWrites({",
@@ -160,9 +163,9 @@ test("single settlement writes derives duplicated values from authoritative inpu
         "single settlement writes call input",
     )
     const inputInterface = sourceBetween(
-        writes,
+        finishTypes,
         "export interface SingleSettlementWritesInput {",
-        "}\n\nexport function executeSingleSettlementWrites",
+        "    dailyResetHour?: number\n}",
         "single settlement writes input interface",
     )
     const progressUpdate = sourceBetween(

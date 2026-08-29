@@ -5,10 +5,15 @@ import {
     insertPlayerActiveQuestSync,
     updatePlayerActiveQuestContinueCountSync,
 } from "../../data/domains/quest_active"
+import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getPlayerItemSync, setPlayerItemSync } from "../../data/domains/item"
 import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json"
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
-import { runAbortEntryTransaction } from "./entry-lifecycle"
+import { getRealNow } from "../../runtime/time/game-time"
+import {
+    computeEntryLifecycleStamina,
+    runAbortEntryTransaction,
+} from "./entry-lifecycle"
 import type { StartEntryCost } from "./start-entry"
 import type { MultiCoordinatorOrigin } from "../../multi/coordinator/contracts"
 
@@ -26,6 +31,8 @@ export interface ActiveQuest {
     mateComIds?: number[]
     entryItemId?: number | null
     entryItemCount?: number | null
+    staminaCost?: number | null
+    dailyChallengePointId?: number | null
     eventId?: number | null
     playId: string
     continueCount: number
@@ -71,6 +78,8 @@ export function persistActiveQuest(playerId: number, quest: ActiveQuest): void {
         battleSessionId: quest.battleSessionId ?? null,
         entryItemId: quest.entryItemId ?? null,
         entryItemCount: quest.entryItemCount ?? null,
+        staminaCost: quest.staminaCost ?? null,
+        dailyChallengePointId: quest.dailyChallengePointId ?? null,
         eventId: quest.eventId ?? null,
         continueCount: quest.continueCount,
     })
@@ -127,7 +136,7 @@ function matchesMultiSettlementIdentity(
 export function runMultiActiveQuestSettlementTransaction<T>(
     playerId: number,
     identity: MultiSettlementActiveQuestIdentity,
-    settle: (deleteActiveQuest?: () => void) => T,
+    settle: (deleteActiveQuest: () => void, storedQuest: ActiveQuest) => T,
 ): T {
     return getDb().transaction(() => {
         const storedQuest = getPlayerActiveQuestSync(playerId)
@@ -140,7 +149,7 @@ export function runMultiActiveQuestSettlementTransaction<T>(
             deletePlayerActiveQuestSync(playerId)
             deleted = true
         }
-        const result = settle(deleteOnce)
+        const result = settle(deleteOnce, storedQuest)
         deleteOnce()
         return result
     })()
@@ -174,9 +183,12 @@ export function runAbortActiveQuestTransaction(
         category: number | null
     },
 ) {
-    return runAbortEntryTransaction({ playerId, ...identity }, {
+    return runAbortEntryTransaction({ playerId, now: getRealNow(), ...identity }, {
         transaction: operation => getDb().transaction(operation)(),
         getActiveQuest: getPlayerActiveQuestSync,
+        getPlayer: getPlayerSync,
+        computeStamina: computeEntryLifecycleStamina,
+        updatePlayer: updatePlayerSync,
         getItemCount: getPlayerItemSync,
         setItemCount: setPlayerItemSync,
         deleteActiveQuest: deletePlayerActiveQuestSync,
@@ -188,4 +200,17 @@ export function runAbortActiveQuestTransaction(
             )
         )[`${category}_${questId}`],
     })
+}
+
+export function releaseAbandonedMultiActiveQuest(
+    playerId: number,
+    roomNumber: string,
+): boolean {
+    const storedQuest = getPlayerActiveQuestSync(playerId)
+    if (!storedQuest?.isMulti || storedQuest.roomNumber !== roomNumber) return false
+    return runAbortActiveQuestTransaction(playerId, {
+        playId: null,
+        questId: null,
+        category: null,
+    }).cancelled
 }

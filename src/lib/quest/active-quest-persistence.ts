@@ -18,6 +18,24 @@ export function ensureActiveQuestBattleSessionIdStorageSync(database: Database):
     `).run()
 }
 
+export function ensureActiveQuestResourceCostStorageSync(database: Database): void {
+    const readColumns = () => database
+        .prepare(`PRAGMA table_info(players_active_quests)`)
+        .all() as { name: string }[]
+    if (!readColumns().some(column => column.name === "stamina_cost")) {
+        database.prepare(`
+            ALTER TABLE players_active_quests
+            ADD COLUMN stamina_cost INTEGER
+        `).run()
+    }
+    if (!readColumns().some(column => column.name === "daily_challenge_point_id")) {
+        database.prepare(`
+            ALTER TABLE players_active_quests
+            ADD COLUMN daily_challenge_point_id INTEGER
+        `).run()
+    }
+}
+
 export function ensureActiveQuestCoordinatorOriginStorageSync(database: Database): void {
     const columns = database.prepare(`PRAGMA table_info(players_active_quests)`).all() as { name: string }[]
     if (columns.some(column => column.name === "coordinator_origin")) return

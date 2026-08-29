@@ -11,6 +11,7 @@ import {
 import { handleBattleMessage } from "./battle"
 import { sessionManager } from "../state/SessionManager"
 import {
+    setRoomDisbandListener,
     startRoomCleanup,
     stopRoomCleanup,
     type RoomCleanupOptions,
@@ -37,6 +38,7 @@ import {
     type MultiBattleTuning,
     type MultiTransportTuning,
 } from "../runtime/tuning"
+import { releaseAbandonedMultiActiveQuest } from "../../lib/quest/active-quest-service"
 
 export const SESSION_PORT = 8003
 export const SESSION_HOST = "127.0.0.1"
@@ -714,6 +716,13 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
         createdServer.listen(options.port ?? SESSION_PORT, options.host ?? SESSION_HOST, () => {
             if (activeContext !== context || phase !== "starting") return
             try {
+                setRoomDisbandListener((roomNumber, hostPlayerId) => {
+                    try {
+                        releaseAbandonedMultiActiveQuest(hostPlayerId, roomNumber)
+                    } catch (error) {
+                        console.error(`[MULTI] abandoned host release failed: code=${failureCode(error) ?? "UNKNOWN"}`)
+                    }
+                })
                 startRoomCleanup(options.roomCleanup)
                 configureReconnectGraceMs(options.roomCleanup?.reconnectGraceMs)
                 configureNpcRecruitmentTiming(options.npcRecruitment)

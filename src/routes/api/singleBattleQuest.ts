@@ -290,6 +290,12 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRoutes
         const staminaInfo = getStaminaCost(questKey)
         console.log(`[BATTLE] start entry: questId=${questId} questKey=${questKey} entryCost=${JSON.stringify(entryCost)} discountRate=${staminaInfo.rate} baseStamina=${staminaInfo.baseCost}→${staminaInfo.cost}`)
         const staminaCost = staminaInfo.cost
+        const challengePointId = getDailyChallengePointId(
+            category,
+            questId,
+            questData.eventId,
+            challengePointMap,
+        )
         const activeQuest: ActiveQuest = {
             questId: questId,
             category: category,
@@ -300,6 +306,7 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRoutes
             coordinatorOrigin: null,
             entryItemId: entryCost && entryCost.itemId > 0 ? entryCost.itemId : undefined,
             entryItemCount: entryCost && entryCost.itemCount > 0 ? entryCost.itemCount : undefined,
+            dailyChallengePointId: challengePointId,
             playId: body.play_id,
             continueCount: 0
         }
@@ -325,12 +332,6 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRoutes
                 updatePlayer: updatePlayerSync,
                 persistActiveQuest,
                 beforePersist: pointPlayerId => {
-                    const challengePointId = getDailyChallengePointId(
-                        category,
-                        questId,
-                        questData.eventId,
-                        challengePointMap,
-                    )
                     if (challengePointId === undefined) return
                     refreshPlayerDailyChallengePointsForRealDaySync(
                         pointPlayerId,

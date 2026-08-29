@@ -17,8 +17,8 @@ import { getRushEventFolderClearRewards } from "../../assets"
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../character"
 import { getCommonScoreRewardCount } from "../../score-reward-lottery"
 import { calculateCharacterBattleExp, calculateFixedQuestMana, calculateFixedQuestPoolExp, getRewardCampaignRates } from "../../reward-campaign"
-import { QuestCategory, type BattleQuest } from "../../types"
-import { getRankDegree, getMaxStamina } from "../../stamina"
+import { QuestCategory } from "../../types"
+import { addStaminaWithOverflowCap, getRankDegree, getMaxStamina } from "../../stamina"
 import { getRuntimeContentTableSync } from "../../../content/runtime/table-access"
 import { settleAdditionalRewardsSync, type AdditionalRewardTable } from "../../additional-reward"
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../rush"
@@ -29,9 +29,7 @@ import { givePlayerEquipmentSync } from "../../equipment"
 import { getRaidEventRequiredKillCount } from "../../raid-event-master"
 import { buildScoreAttackBattleHistoryRecord } from "../score-attack-history"
 import { buildPracticeBattleHistoryRecord } from "../practice-battle-history"
-import type { QuestRewardEligibility } from "../first-clear-reward"
 import type { ActiveQuest } from "../active-quest-service"
-import type { ValidatedSingleFinishBody } from "../single-finish-validation"
 import { dispatchModeRushFinish } from "../../../modes/registry"
 import { createModeTransactionHost } from "../../../modes/loader"
 import { getServerTime } from "../../../utils"
@@ -40,29 +38,20 @@ import bundledAdditionalRewardRules from "../../../../assets/additional_reward_r
 import { handleCarnivalEventFinish } from "./carnival-handler"
 import { handleRushEventFinish } from "./rush-handler"
 import { handleRaidEventFinish } from "./raid-handler"
-import { handleScoreAttackEventFinish, type ScoreAttackBorderTier } from "./score-attack-handler"
-import type { FinishContext } from "./types"
+import { handleScoreAttackEventFinish } from "./score-attack-handler"
+import type { FinishContext, SingleSettlementWritesInput } from "./types"
 import { selectScoreRewardGrantPlan } from "../score-reward-selection"
 import { grantSingleSettlementScoreRewardsWithinTransactionSync } from "./single-settlement-reward-grant"
 import { createSingleSettlementStandardRewardGrant } from "./single-standard-reward-callbacks"
 import { createSingleSettlementResponseState } from "./single-settlement-response-state"
 import { prepareSingleAwakePublication, settleSingleMissionEvaluations } from "./single-mission-publication"
-import { settleSingleDailyChallengePoint } from "./single-daily-challenge"
-const settlementModeHost = createModeTransactionHost(message => console.log(message))
-export interface SingleSettlementWritesInput {
-    body: ValidatedSingleFinishBody
-    questData: BattleQuest & { rankPointReward: number }
-    rewardEligibility: QuestRewardEligibility
-    finishCtx: FinishContext
-    rushEventFolderMaxRound?: number
-    scoreAttackBorderTiers: ScoreAttackBorderTier[]
-    dailyResetHour?: number
-}
+import { settleSingleEntryResources } from "./single-entry-resource-settlement"
 
 function finalizeSingleAwakePublicationWrites(playerId: number, isScoreAttackEvent: boolean): void {
     if (!isScoreAttackEvent) deletePlayerActiveQuestSync(playerId)
 }
 
+const settlementModeHost = createModeTransactionHost(message => console.log(message))
 export function executeSingleSettlementWrites(
     input: SingleSettlementWritesInput,
     settlementActiveQuest: ActiveQuest,
@@ -95,6 +84,13 @@ export function executeSingleSettlementWrites(
     const newMana = settlementPlayer.freeMana + fixedManaReward + body.add_mana
     const manaObtained = fixedManaReward + body.add_mana
     finishCtx.manaObtained = manaObtained
+    const entryResourceResult = settleSingleEntryResources({
+        playerId,
+        activeQuest: settlementActiveQuest,
+        questAccomplished,
+        dailyResetHour,
+    })
+    settlementPlayer.totalStaminaUsed += entryResourceResult.staminaUsed
     const responseState = createSingleSettlementResponseState(playerId, settlementPlayer)
     const grantDirectRewards = responseState.grant
     const standardRewardGrant = createSingleSettlementStandardRewardGrant(
@@ -129,8 +125,15 @@ export function executeSingleSettlementWrites(
     const newDegreeId = getRankDegree(newRankPoint)
     const didLevelUp = newDegreeId > oldRkDegree
     if (oldRkDegree < 100 && newDegreeId >= 100) recordRank100MilestoneSync(playerId, newRankPoint)
-    const afterStamina = didLevelUp ? settlementPlayer.stamina + getMaxStamina(newDegreeId) : settlementPlayer.stamina
-    const afterStaminaHealTime = didLevelUp ? getRealNow() : settlementPlayer.staminaHealTime
+    const releasedEntryResources = entryResourceResult.kind === "released"
+        ? entryResourceResult : null
+    const staminaBeforeRankRefill = releasedEntryResources?.afterStamina ?? settlementPlayer.stamina
+    const afterStamina = didLevelUp
+        ? addStaminaWithOverflowCap(staminaBeforeRankRefill, getMaxStamina(newDegreeId))
+        : staminaBeforeRankRefill
+    const afterStaminaHealTime = releasedEntryResources
+        ? releasedEntryResources.afterStaminaHealTime
+        : didLevelUp ? getRealNow() : settlementPlayer.staminaHealTime
     updatePlayerSync({
         id: playerId,
         freeMana: newMana,
@@ -153,13 +156,8 @@ export function executeSingleSettlementWrites(
         ? grantDirectRewards(playerId, "s_plus", [questData.sPlusReward]) : null
     if (didLevelUp) console.log(`[BATTLE-FINISH] player ${playerId} leveled up: ${oldRkDegree} -> ${newDegreeId}, stamina refilled`)
 
-    const dailyChallengePointList = settleSingleDailyChallengePoint({
-        questCategory,
-        questId,
-        eventId: questData.eventId,
-        playerId,
-        dailyResetHour,
-    })
+    const dailyChallengePointList = entryResourceResult.kind === "committed"
+        ? entryResourceResult.dailyChallengePointList : null
     console.log(`[BATTLE] scoreReward groupId=${questData.scoreRewardGroupId} groupLen=${questData.scoreRewardGroup?.length ?? "null"} questId=${questId} category=${questCategory}`)
     const scoreRewardSelection = selectScoreRewardGrantPlan(
         questData.scoreRewardGroupId, questData.scoreRewardGroup, useBoostPoint, questData.element, {

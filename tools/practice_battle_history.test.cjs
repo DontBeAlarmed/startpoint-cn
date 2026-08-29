@@ -37,7 +37,7 @@ const {
 } = require("../src/lib/quest/practice-battle-history")
 
 db = initializeDatabase()
-assert.equal(db.pragma("user_version", { simple: true }), 20)
+assert.equal(db.pragma("user_version", { simple: true }), 21)
 
 const account = insertAccountSync({
     appId: "wf_cn",

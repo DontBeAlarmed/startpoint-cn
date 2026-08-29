@@ -252,7 +252,7 @@ function createInput() {
     assert.equal(fixture.getPublishedWithinTransaction(), false)
     assert.equal(fixture.getState().itemCount, 0)
     assert.equal(fixture.getState().player.stamina, 0)
-    assert.equal(fixture.getState().player.totalStaminaUsed, 52)
+    assert.equal(fixture.getState().player.totalStaminaUsed, 12)
     assert.equal(fixture.getState().player.partySlot, 3)
     assert.equal(fixture.getState().activeQuest.playId, "treasure-play-1")
     assert.equal(fixture.getState().publishedActiveQuest.playId, "treasure-play-1")

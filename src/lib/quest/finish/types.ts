@@ -1,6 +1,10 @@
 // Finish context — pass-through data shared by all finish trackers
 
 import type { Player } from "../../../data/types"
+import type { QuestRewardEligibility } from "../first-clear-reward"
+import type { BattleQuest } from "../../types"
+import type { ScoreAttackBorderTier } from "./score-attack-handler"
+import type { ValidatedSingleFinishBody } from "../single-finish-validation"
 
 export interface PartyCharacter {
     id?: number | null
@@ -54,4 +58,14 @@ export interface FinishContext {
     questProgress: { bestElapsedTimeMs?: number | null; highScore?: number; clearRank?: number } | null
     isMulti?: boolean
     isMultiHost?: boolean
+}
+
+export interface SingleSettlementWritesInput {
+    body: ValidatedSingleFinishBody
+    questData: BattleQuest & { rankPointReward: number }
+    rewardEligibility: QuestRewardEligibility
+    finishCtx: FinishContext
+    rushEventFolderMaxRound?: number
+    scoreAttackBorderTiers: ScoreAttackBorderTier[]
+    dailyResetHour?: number
 }

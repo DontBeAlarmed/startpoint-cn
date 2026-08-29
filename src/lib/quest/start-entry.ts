@@ -132,10 +132,11 @@ export function runStartEntryTransaction<TActiveQuest>(
         const playerUpdate: Partial<StartEntryPlayer> & Pick<StartEntryPlayer, "id"> = {
             id: input.playerId,
         }
+        const resourceCostQuest = input.activeQuest as { staminaCost?: number | null }
+        resourceCostQuest.staminaCost = input.staminaCost
         if (input.staminaCost > 0) {
             playerUpdate.stamina = afterStamina
             playerUpdate.staminaHealTime = input.now
-            playerUpdate.totalStaminaUsed = (player.totalStaminaUsed ?? 0) + input.staminaCost
         }
         if (input.updatePartySlot) playerUpdate.partySlot = input.partyId
         if (Object.keys(playerUpdate).length > 1) dependencies.updatePlayer(playerUpdate)
