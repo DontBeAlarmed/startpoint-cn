@@ -87,6 +87,12 @@ function requireSafePositiveInteger(value: unknown, label: string): number {
     return value as number
 }
 
+function assertCanonicalSaveDatabase(database: Database): void {
+    if (database !== getDb()) {
+        throw new Error("Player save mutations require the canonical database connection")
+    }
+}
+
 function getCurrentSchemaVersion(database: Database): number {
     const version = database.pragma("user_version", { simple: true })
     if (!Number.isSafeInteger(version) || (version as number) < 0) {
@@ -467,6 +473,7 @@ export function restorePlayerSaveV2Sync(
     targetPlayerId: number,
     database: Database = getDb(),
 ): PlayerSaveRestoreResult {
+    assertCanonicalSaveDatabase(database)
     const parsed = parsePlayerSaveSnapshot(input)
     if (parsed.kind !== "v2") throw new Error("Legacy v1 saves require the legacy partial restore path")
     applyV2SnapshotSync(parsed.snapshot, targetPlayerId, "restore", database)
@@ -490,6 +497,7 @@ function restoreLegacyV1SaveSync(
     targetPlayerId: number,
     database: Database,
 ): PlayerSaveRestoreResult {
+    assertCanonicalSaveDatabase(database)
     const parsed = parsePlayerSaveSnapshot(input)
     if (parsed.kind !== "legacy-v1") throw new Error("Expected a legacy v1 player save")
     requireSafePositiveInteger(targetPlayerId, "targetPlayerId")
@@ -535,6 +543,7 @@ export function restorePlayerSaveSnapshotSync(
     targetPlayerId: number,
     database: Database = getDb(),
 ): PlayerSaveRestoreResult {
+    assertCanonicalSaveDatabase(database)
     const parsed = parsePlayerSaveSnapshot(input)
     if (parsed.kind === "v2") return restorePlayerSaveV2Sync(parsed.snapshot, targetPlayerId, database)
     return restoreLegacyV1SaveSync(parsed.snapshot, targetPlayerId, database)
@@ -545,6 +554,7 @@ export function applyPlayerSaveTemplateSync(
     targetPlayerId: number,
     database: Database = getDb(),
 ): PlayerSaveRestoreResult {
+    assertCanonicalSaveDatabase(database)
     const parsed = parsePlayerSaveSnapshot(input)
     if (parsed.kind === "v2") {
         applyV2SnapshotSync(parsed.snapshot, targetPlayerId, "clone", database)
@@ -557,6 +567,7 @@ export function validatePlayerSaveTemplateSync(
     input: unknown,
     database: Database = getDb(),
 ): ParsedPlayerSaveSnapshot {
+    assertCanonicalSaveDatabase(database)
     const parsed = validatePlayerSaveSnapshotSync(input, database)
     const rollbackMarker = {}
     try {
@@ -583,6 +594,7 @@ export function clonePlayerSaveV2Sync(
     destinationAccountId: number,
     database: Database = getDb(),
 ): PlayerSaveRestoreResult {
+    assertCanonicalSaveDatabase(database)
     const parsed = parsePlayerSaveSnapshot(input)
     if (parsed.kind !== "v2") throw new Error("Legacy v1 saves cannot use the full clone path")
     requireSafePositiveInteger(destinationAccountId, "destinationAccountId")

@@ -25,6 +25,7 @@ const {
     exportPlayerSaveV2Sync,
     restorePlayerSaveSnapshotSync,
     restorePlayerSaveV2Sync,
+    validatePlayerSaveTemplateSync,
 } = require("../src/data/player-save")
 
 let db
@@ -87,6 +88,11 @@ function duplicateOptionInSnapshot(snapshot) {
     const rows = snapshot.domains.core.tables.players_options
     snapshot.domains.core.tables.players_options = [...rows, { ...rows[0] }]
     return snapshot
+}
+
+function getMergedPlayerData(playerId) {
+    const { getMergedPlayerDataSync } = require("../src/data/utils/player-data")
+    return getMergedPlayerDataSync(playerId)
 }
 
 test.before(() => {
@@ -210,43 +216,54 @@ test("failed legacy import after clearing rolls back the original redemption", (
     const original = redemptionRows(targetId)
     const legacy = getMergedPlayerDataSync(sourceId)
 
-    const failingDatabase = Object.create(db)
-    failingDatabase.prepare = sql => {
-        if (sql.includes("players_login_bonus_progress") && /^\s*INSERT\b/i.test(sql)) {
-            throw new Error("injected preserved insert failure")
-        }
-        return db.prepare(sql)
-    }
+    db.prepare(`
+        CREATE TRIGGER fail_preserved_login_bonus_insert
+        BEFORE INSERT ON players_login_bonus_progress
+        WHEN NEW.group_id = 'gift-rollback'
+        BEGIN
+            SELECT RAISE(ABORT, 'injected preserved insert failure');
+        END
+    `).run()
     assert.throws(
-        () => db.transaction(() => restorePlayerSaveSnapshotSync({
+        () => restorePlayerSaveSnapshotSync({
             schema: "starpoint-cn-save",
             version: 1,
             playerId: sourceId,
             data: legacy,
-        }, targetId, failingDatabase))(),
+        }, targetId, db),
         /injected preserved insert failure/,
     )
+    db.prepare("DROP TRIGGER fail_preserved_login_bonus_insert").run()
     assert.deepEqual(redemptionRows(targetId), original)
 })
 
-test("clone helper copies snapshots while failed clone rolls the whole target back", () => {
-    const sourceId = insertDefaultPlayerSync(createAccount("helper-source").id).id
-    const destinationAccount = createAccount("helper-target")
+test("failed real clone through the public API rolls the whole target back", () => {
+    const sourceId = insertDefaultPlayerSync(createAccount("clone-fail-source").id).id
+    const destinationAccount = createAccount("clone-fail-target")
     addRedemption(sourceId, null, 3)
     const snapshot = exportPlayerSaveV2Sync(sourceId)
-    const targetId = insertDefaultPlayerSync(destinationAccount.id).id
-    copyGiftRedemptionsForCloneSync(sourceId, targetId)
-    assert.equal(redemptionRows(targetId).length, 1)
 
-    db.prepare("DELETE FROM players_gift_redemptions WHERE player_id = ?").run(targetId)
+    const targetId = insertDefaultPlayerSync(destinationAccount.id).id
+    addRedemption(targetId, null, 4)
+    const targetBefore = redemptionRows(targetId)
     const playersBefore = db.prepare("SELECT COUNT(*) AS count FROM players").get().count
     const redemptionsBefore = db.prepare("SELECT COUNT(*) AS count FROM players_gift_redemptions").get().count
-    assert.throws(() => db.transaction(() => {
-        const player = insertDefaultPlayerSync(destinationAccount.id)
-        restorePlayerSaveV2Sync(snapshot, player.id, db)
-        copyGiftRedemptionsForCloneSync(sourceId, player.id)
-        throw new Error("injected clone failure")
-    })(), /injected clone failure/)
+
+    db.prepare(`
+        CREATE TRIGGER fail_inherited_gift_clone
+        BEFORE INSERT ON players_gift_redemptions
+        WHEN NEW.inherited_from_player_id IS NOT NULL
+             AND NEW.player_id <> NEW.inherited_from_player_id
+        BEGIN
+            SELECT RAISE(ABORT, 'inherited gift clone failure');
+        END
+    `).run()
+    assert.throws(
+        () => clonePlayerSaveV2Sync(snapshot, destinationAccount.id, db),
+        /inherited gift clone failure/,
+    )
+    db.prepare("DROP TRIGGER fail_inherited_gift_clone").run()
+
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM players").get().count, playersBefore)
     assert.equal(
         db.prepare("SELECT COUNT(*) AS count FROM players_gift_redemptions").get().count,
@@ -256,7 +273,48 @@ test("clone helper copies snapshots while failed clone rolls the whole target ba
         db.prepare("SELECT COUNT(*) AS count FROM players WHERE account_id = ?").get(destinationAccount.id).count,
         1,
     )
+    assert.deepEqual(redemptionRows(targetId), targetBefore)
     assert.equal(redemptionRows(sourceId).length, 1)
+})
+
+test("public save mutations reject a non-canonical database before changing rows", () => {
+    const sourceId = insertDefaultPlayerSync(createAccount("canonical-source").id).id
+    const targetId = insertDefaultPlayerSync(createAccount("canonical-target").id).id
+    const templateAccountId = createAccount("canonical-template").id
+    const snapshot = exportPlayerSaveV2Sync(sourceId)
+    const legacy = getMergedPlayerData(sourceId)
+    const nonCanonical = Object.create(db)
+    const playersBefore = db.prepare("SELECT COUNT(*) AS count FROM players").get().count
+    const accountsBefore = db.prepare("SELECT COUNT(*) AS count FROM accounts").get().count
+
+    assert.throws(
+        () => clonePlayerSaveV2Sync(snapshot, templateAccountId, nonCanonical),
+        /canonical database connection/,
+    )
+    assert.throws(
+        () => restorePlayerSaveV2Sync(snapshot, targetId, nonCanonical),
+        /canonical database connection/,
+    )
+    assert.throws(
+        () => restorePlayerSaveSnapshotSync({
+            schema: "starpoint-cn-save",
+            version: 1,
+            playerId: sourceId,
+            data: legacy,
+        }, targetId, nonCanonical),
+        /canonical database connection/,
+    )
+    assert.throws(
+        () => applyPlayerSaveTemplateSync(snapshot, targetId, nonCanonical),
+        /canonical database connection/,
+    )
+    assert.throws(
+        () => validatePlayerSaveTemplateSync(snapshot, nonCanonical),
+        /canonical database connection/,
+    )
+
+    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM players").get().count, playersBefore)
+    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM accounts").get().count, accountsBefore)
 })
 
 test("external restore helper clears only the requested player's redemptions", () => {
