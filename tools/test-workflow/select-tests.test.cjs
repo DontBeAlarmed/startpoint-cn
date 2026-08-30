@@ -1551,9 +1551,14 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/score_attack_history_route.test.cjs",
         "tools/score_attack_route_transaction.test.cjs",
     ])
+    assert.deepEqual(
+        selectTestGroups(["tools/character_awake_lavu_route.test.cjs"]),
+        ["integration:mission"],
+    )
     assert.deepEqual(TEST_GROUPS["integration:mission"].tests, [
         "tools/character_awake_battle_tracker.test.cjs",
         "tools/character_awake_facts.test.cjs",
+        "tools/character_awake_lavu_route.test.cjs",
         "tools/character_awake_route.test.cjs",
         "tools/character_awake_settlement.test.cjs",
         "tools/character_awake_unlock.test.cjs",

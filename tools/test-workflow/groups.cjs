@@ -395,6 +395,7 @@ const TEST_GROUPS = Object.freeze({
         tests: [
             "tools/character_awake_battle_tracker.test.cjs",
             "tools/character_awake_facts.test.cjs",
+            "tools/character_awake_lavu_route.test.cjs",
             "tools/character_awake_route.test.cjs",
             "tools/character_awake_settlement.test.cjs",
             "tools/character_awake_unlock.test.cjs",

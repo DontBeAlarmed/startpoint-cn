@@ -298,6 +298,7 @@ function battleFactContext({
     category = 1,
     questId = 1,
     ids = [],
+    unisonIds = [],
     isMulti = false,
     accomplished = true,
     clearTime = 1000,
@@ -311,7 +312,7 @@ function battleFactContext({
         clearTime,
         party: {
             characters: ids.map(id => ({ id })),
-            unison_characters: [],
+            unison_characters: unisonIds.map(id => ({ id })),
         },
         statistics,
     }
@@ -369,7 +370,7 @@ for (const [missionIds, category, questId, leaderId, clearTime, isMulti] of [
     [[2310013], 2, 1010004, 231001, 90000, false],
     [[2510032, 2510033], 13, 1020, 251003, 1000, false],
     [[2510032, 2510033], 13, 1020, 251003, 180000, false],
-    [[2630023], 19, 100100004, 151006, 1000, false],
+    [[2630023], 18, 400001104, 151006, 1000, false],
 ]) {
     assert.deepEqual(getAwakeBattleProgressFacts(battleFactContext({
         category,
@@ -383,6 +384,13 @@ for (const [missionIds, category, questId, leaderId, clearTime, isMulti] of [
     })
 }
 for (const context of [
+    battleFactContext({ category: 19, questId: 400001104, ids: [151006] }),
+    battleFactContext({ category: 18, questId: 100100004, ids: [151006] }),
+    battleFactContext({ category: 18, questId: 100401004, ids: [151006] }),
+    battleFactContext({ category: 18, questId: 400001104, ids: [999, 151006] }),
+    battleFactContext({ category: 18, questId: 400001104, ids: [151006], isMulti: true }),
+    battleFactContext({ category: 18, questId: 400001104, ids: [151006], accomplished: false }),
+    battleFactContext({ category: 18, questId: 400001104, unisonIds: [151006] }),
     battleFactContext({ category: 2, questId: 1028004, ids: [999, 111001] }),
     battleFactContext({ category: 2, questId: 1028005, ids: [111001] }),
     battleFactContext({ category: 2, questId: 1028004, ids: [111001], isMulti: true }),
