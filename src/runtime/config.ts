@@ -336,7 +336,6 @@ function parseMultiRuntimeConfig(
     }
     if (mode === "host") {
         if (env.MULTI_HUB_HOST === undefined
-            || env.MULTI_HUB_PORT === undefined
             || env.SESSION_PUBLIC_HOST === undefined) {
             throw new RuntimeConfigError()
         }

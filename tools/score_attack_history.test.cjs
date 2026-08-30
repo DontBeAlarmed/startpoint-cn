@@ -1,5 +1,6 @@
 require("ts-node/register/transpile-only")
 
+const path = require("node:path")
 const { loadServerReleaseContract } = require("../tools/server-bundle/release-contract.cjs")
 const currentDataSchema = loadServerReleaseContract(path.resolve(__dirname, "..")).currentDataSchema
 
@@ -7,7 +8,6 @@ const assert = require("node:assert/strict")
 const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")
 const os = require("node:os")
-const path = require("node:path")
 
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "score-attack-history-db-"))
 const previousDataDirectory = process.env.DATA_DIR

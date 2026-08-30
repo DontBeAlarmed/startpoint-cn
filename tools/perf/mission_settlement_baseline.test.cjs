@@ -2,6 +2,7 @@
 
 require("ts-node/register/transpile-only")
 
+const path = require("node:path")
 const { loadServerReleaseContract } = require("../server-bundle/release-contract.cjs")
 const currentDataSchema = loadServerReleaseContract(path.resolve(__dirname, "../..")).currentDataSchema
 
@@ -9,7 +10,6 @@ const assert = require("node:assert/strict")
 const crypto = require("node:crypto")
 const fs = require("node:fs")
 const os = require("node:os")
-const path = require("node:path")
 const test = require("node:test")
 
 const {

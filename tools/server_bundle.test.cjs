@@ -443,6 +443,38 @@ test("verifier detects tampered, extra, and missing files", async t => {
     }
 })
 
+test("verifier rejects a self-consistent altered bundle release contract", t => {
+    const { verifyServerBundle } = loadImplementations()
+    const fixture = buildFixture(t)
+    assert.doesNotThrow(() => verifyServerBundle({ bundleRoot: fixture.outputRoot }))
+
+    const contractPath = path.join(
+        fixture.outputRoot,
+        "assets/server_release_contract.json",
+    )
+    const bundleContract = JSON.parse(fs.readFileSync(contractPath, "utf8"))
+    bundleContract.currentDataSchema = releaseContract.currentDataSchema + 1
+    const contractBytes = Buffer.from(`${JSON.stringify(bundleContract)}\n`, "utf8")
+    fs.writeFileSync(contractPath, contractBytes)
+    rewriteManifest(fixture.outputRoot, manifest => {
+        const file = manifest.files.find(
+            candidate => candidate.path === "assets/server_release_contract.json",
+        )
+        file.bytes = contractBytes.length
+        file.sha256 = crypto.createHash("sha256").update(contractBytes).digest("hex")
+    })
+
+    let thrown
+    try {
+        verifyServerBundle({ bundleRoot: fixture.outputRoot })
+    } catch (error) {
+        thrown = error
+    }
+    assert.ok(thrown)
+    assert.match(thrown.message, /bundle release contract/i)
+    assert.equal(thrown.message.includes(fixture.outputRoot), false)
+})
+
 test("verifier rejects self-consistent files outside the owned bundle roots", async t => {
     const { verifyServerBundle } = loadImplementations()
     for (const relativePath of [

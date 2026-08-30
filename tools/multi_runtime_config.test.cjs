@@ -7,10 +7,12 @@ const net = require("node:net")
 const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
+const { loadServerReleaseContract } = require("./server-bundle/release-contract.cjs")
 
 require("ts-node/register/transpile-only")
 
 const projectRoot = path.resolve(__dirname, "..")
+const releaseContract = loadServerReleaseContract(projectRoot)
 const { parseCnRuntimeConfig } = require("../src/runtime/config")
 const { resolveDisplayHost } = require("../src/runtime/network-host")
 const { createMultiRuntimeService } = require("../src/multi/runtime/service")
@@ -329,6 +331,37 @@ test("host mode requires public TCP reachability and keeps credentials private",
             MULTI_HUB_PORT: "8004",
         },
     }))
+})
+
+test("host mode uses the release Hub port default and accepts an explicit override", () => {
+    const baseEnv = {
+        ASSET_MODE: "client-owned",
+        MULTI_MODE: "host",
+        MULTI_HUB_HOST: "127.0.0.1",
+        SESSION_PUBLIC_HOST: "hub.internal",
+    }
+
+    const defaulted = parseCnRuntimeConfig({ projectRoot, env: baseEnv })
+    assert.equal(defaulted.multi.hub.port, releaseContract.defaultPorts.hub)
+
+    const overridden = parseCnRuntimeConfig({
+        projectRoot,
+        env: {
+            ...baseEnv,
+            MULTI_HUB_PORT: "8104",
+        },
+    })
+    assert.equal(overridden.multi.hub.port, 8104)
+
+    for (const missingEnv of [
+        { ...baseEnv, MULTI_HUB_HOST: undefined },
+        { ...baseEnv, SESSION_PUBLIC_HOST: undefined },
+    ]) {
+        assert.throws(
+            () => parseCnRuntimeConfig({ projectRoot, env: missingEnv }),
+            error => error?.code === "INVALID_RUNTIME_CONFIG",
+        )
+    }
 })
 
 test("host accepts an explicit absolute credentials path outside tracked content", t => {

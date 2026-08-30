@@ -293,6 +293,17 @@ function verifyServerBundle(options = {}) {
             fail(`bundle file "${file.path}" has the wrong hash`)
         }
     }
+
+    let bundleContract
+    try {
+        bundleContract = loadServerReleaseContract(bundleRoot)
+    } catch {
+        fail("bundle release contract is missing or invalid")
+    }
+    if (!canonicalJsonBuffer(bundleContract).equals(canonicalJsonBuffer(CONTRACT))) {
+        fail("bundle release contract does not match repository contract")
+    }
+
     return manifest
 }
 
