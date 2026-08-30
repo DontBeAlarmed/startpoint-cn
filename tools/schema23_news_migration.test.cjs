@@ -63,7 +63,8 @@ test("creates a new database with an empty server-owned news table", () => {
     const fresh = data.initializeDatabase()
     assert.equal(fresh.pragma("user_version", { simple: true }), 23)
     assert.deepEqual(fresh.prepare("SELECT * FROM server_news").all(), [])
-    assert.equal(fs.existsSync(path.join(freshDirectory, "assets/news.json")), false)
+    assert.equal(fs.readdirSync(path.join(freshDirectory, "assets"), { withFileTypes: true })
+        .some(entry => entry.isFile() && /^news\./i.test(entry.name)), false)
 })
 
 test("migration cleanup runs only for schema 22 or earlier", () => {

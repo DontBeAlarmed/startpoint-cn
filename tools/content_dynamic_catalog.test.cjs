@@ -123,7 +123,7 @@ test("modern current is authoritative and emits a stable warning when legacy cur
 
     assert.equal(snapshot.cdn.targetVersion, "1.4.55")
     assert.equal(snapshot.repository.info().assetVersion, "1.4.55")
-    assert.deepEqual(snapshot.repository.table("news.json"), { fixture: "modern" })
+    assert.deepEqual(snapshot.repository.table("config.json"), { fixture: "modern" })
     assert.equal(warnings, "警告 [CONTENT_LEGACY_CURRENT_IGNORED]：已忽略旧版内容快照\n")
 })
 
@@ -160,7 +160,7 @@ test("missing modern current selects one complete legacy snapshot for catalog an
 
     assert.equal(snapshot.cdn.targetVersion, "1.4.54")
     assert.equal(snapshot.repository.info().releaseDigest, legacy.manifest.releaseDigest)
-    assert.deepEqual(snapshot.repository.table("news.json"), { fixture: "legacy-only" })
+    assert.deepEqual(snapshot.repository.table("config.json"), { fixture: "legacy-only" })
 })
 
 test("explicit legacy layout reads only its configured store", async t => {
@@ -194,7 +194,7 @@ test("explicit legacy layout reads only its configured store", async t => {
     const snapshot = await provider.initialize()
 
     assert.equal(storeCreations, 1)
-    assert.deepEqual(snapshot.repository.table("news.json"), { fixture: "configured-legacy" })
+    assert.deepEqual(snapshot.repository.table("config.json"), { fixture: "configured-legacy" })
 })
 
 test("missing modern and legacy currents share one configured runtime fallback without writes", async t => {

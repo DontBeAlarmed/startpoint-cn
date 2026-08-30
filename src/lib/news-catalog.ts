@@ -1,64 +1,51 @@
-import { readFileSync } from "fs"
-import path from "path"
-import { hasForcedNewsDeliverySync } from "../data/domains/news"
-import { getServerTime } from "../utils"
-import { isNewsVisibleAt } from "./news-visibility"
-import { getVirtualNow } from "../runtime/time/game-time"
+import {
+    getVisibleNewsSync,
+    listVisibleNewsSync,
+    type ServerNewsRow,
+} from "../data/domains/news"
+import { getRealNow } from "../runtime/time/game-time"
 
-export interface NewsItem {
+export interface ClientNewsItem {
     readonly id: number
     readonly title: string
     readonly date: string
+    readonly html: string
     readonly label: number
     readonly thumbnail: number
-    readonly thumbnail_path: string | null
-    readonly added_time: string | null
-    readonly html: string
-    readonly forced: boolean
+    readonly thumbnail_path: null
+    readonly added_time: null
 }
 
-export function loadNews(): NewsItem[] {
-    try {
-        const raw = readFileSync(path.join(__dirname, "..", "..", "assets", "news.json"), "utf-8")
-        const items = JSON.parse(raw) as any[]
-        return items.map((news: any) => ({
-            id: news.id,
-            title: news.title || "",
-            date: news.date || getVirtualNow().toISOString().replace("T", " ").substring(0, 19),
-            label: news.label || 1,
-            thumbnail: news.thumbnail || 1,
-            thumbnail_path: news.thumbnail_path || null,
-            added_time: news.added_time || null,
-            html: news.html || "",
-            forced: news.forced === true,
-        }))
-    } catch {
-        return []
-    }
+export function toCnClientNewsDate(iso: string): string {
+    const shifted = new Date(Date.parse(iso) + 8 * 60 * 60 * 1000)
+    return shifted.toISOString().slice(0, 19).replace("T", " ")
 }
 
-export function loadVisibleNews(nowMs = getServerTime() * 1000): NewsItem[] {
-    return loadNews().filter(news => isNewsVisibleAt(news, nowMs))
-}
-
-export function findPendingForcedNews(
-    playerId: number,
-    nowMs = getServerTime() * 1000,
-): NewsItem | null {
-    return loadVisibleNews(nowMs).find(news => (
-        news.forced && !hasForcedNewsDeliverySync(playerId, news.id)
-    )) ?? null
-}
-
-export function toClientNews(news: NewsItem) {
+export function toClientNews(row: ServerNewsRow): ClientNewsItem {
     return {
-        id: news.id,
-        title: news.title,
-        date: news.date,
-        html: news.html,
-        label: news.label,
-        thumbnail: news.thumbnail,
-        thumbnail_path: news.thumbnail_path,
-        added_time: news.added_time,
+        id: row.id,
+        title: row.title,
+        date: toCnClientNewsDate(row.publishedAtReal),
+        html: row.bodyRichText,
+        label: row.label,
+        thumbnail: row.thumbnail,
+        thumbnail_path: null,
+        added_time: null,
     }
+}
+
+export function listVisibleNewsForClient(input: {
+    category: 1 | 2 | 3
+    page: number
+}): { rows: readonly ServerNewsRow[]; totalCount: number } {
+    return listVisibleNewsSync({
+        category: input.category,
+        nowIso: getRealNow().toISOString(),
+        page: input.page,
+        pageSize: 20,
+    })
+}
+
+export function getVisibleNewsForClient(id: number): ServerNewsRow | null {
+    return getVisibleNewsSync(id, getRealNow().toISOString())
 }

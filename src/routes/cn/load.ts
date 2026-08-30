@@ -10,7 +10,6 @@ import {
 } from "../../data/domains/quest_active"
 import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
-import { findPendingForcedNews } from "../../lib/news-catalog"
 import { getClientSerializedData } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getRoom } from "../../multi/room/manager";
@@ -419,9 +418,6 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                 }),
                 data: clientData
             };
-            if (findPendingForcedNews(playerId) !== null) {
-                payload.data_headers.force_news = 1;
-            }
             return payload;
         })();
 

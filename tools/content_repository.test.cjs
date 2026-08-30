@@ -128,7 +128,7 @@ test("bundled fallback reads only the configured runtime root without writing it
     fs.mkdirSync(runtimeRoot)
     copyRegisteredRuntimeTables(runtimeRoot)
     t.after(() => fs.rmSync(root, { force: true, recursive: true }))
-    const before = fs.statSync(path.join(runtimeRoot, "news.json"))
+    const before = fs.statSync(path.join(runtimeRoot, "config.json"))
 
     const repository = await ContentRepository.load({
         projectRoot: temporaryProject,
@@ -140,10 +140,10 @@ test("bundled fallback reads only the configured runtime root without writing it
     })
 
     assert.equal(fs.existsSync(path.join(temporaryProject, "assets")), false)
-    assert.deepEqual(repository.table("news.json"), JSON.parse(
-        fs.readFileSync(path.join(runtimeRoot, "news.json"), "utf8"),
+    assert.deepEqual(repository.table("config.json"), JSON.parse(
+        fs.readFileSync(path.join(runtimeRoot, "config.json"), "utf8"),
     ))
-    assert.equal(fs.statSync(path.join(runtimeRoot, "news.json")).mtimeMs, before.mtimeMs)
+    assert.equal(fs.statSync(path.join(runtimeRoot, "config.json")).mtimeMs, before.mtimeMs)
     assert.deepEqual(fs.readdirSync(root).sort(), ["project", "runtime"])
 })
 

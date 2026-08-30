@@ -1,85 +1,91 @@
-require("ts-node/register/transpile-only")
+"use strict"
 
 const assert = require("node:assert/strict")
+const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
+const test = require("node:test")
+
 const Fastify = require("fastify")
 const { unpack } = require("msgpackr")
 
-const dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "forced-news-route-"))
-const previousDataDirectory = process.env.DATA_DIR
-process.env.DATA_DIR = dataDirectory
+require("ts-node/register/transpile-only")
 
-const { initializeDatabase } = require("../src/data")
+const previousDataDirectory = process.env.DATA_DIR
+const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "forced-news-route-"))
+process.env.DATA_DIR = databaseDirectory
+
+const data = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
-const { findPendingForcedNews } = require("../src/lib/news-catalog")
+const { insertSessionWithToken } = require("../src/data/domains/session")
+const { SessionType } = require("../src/data/types")
+const { createNewsSync } = require("../src/data/domains/news")
 const newsRoutes = require("../src/routes/api/news").default
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
-const { getTimeOffset, setServerTime, setServerTimeOffset } = require("../src/utils")
 
-function decode(response) {
-    return unpack(Buffer.from(response.body, "base64"))
-}
+data.initializeDatabase()
+const publishedAt = new Date(Date.now() - 60_000).toISOString()
 
-async function main() {
-    initializeDatabase()
-    const database = getDb()
-    const originalTimeOffset = getTimeOffset()
+test("forced news stays empty without reading SQLite announcements or claiming delivery", async t => {
     const account = insertAccountSync({
         appId: "wf_cn",
-        idpAlias: "forced-news-route",
+        idpAlias: "",
         idpCode: "test",
-        idpId: "forced-news-route-player",
+        idpId: `forced-news-route-${randomUUID()}`,
         status: "normal",
     })
     const player = insertDefaultPlayerSync(account.id)
     const viewerId = 730000000 + player.id
-    database.prepare(`
-        INSERT INTO sessions (token, account_id, expires, type)
-        VALUES (?, ?, ?, 2)
-    `).run(viewerId.toString(), account.id, new Date(Date.now() + 3600_000).toISOString())
+    await insertSessionWithToken({
+        token: String(viewerId),
+        accountId: account.id,
+        expires: new Date("2099-12-31T23:59:59.000Z"),
+        type: SessionType.VIEWER,
+    })
+    createNewsSync({
+        category: 1,
+        title: "ordinary announcement",
+        publishedAtReal: publishedAt,
+        bodyRichText: "<p>ordinary announcement</p>",
+        label: 4,
+        thumbnail: 7,
+        enabled: true,
+    })
 
-    setServerTime(new Date("2026-08-14T10:00:00.000Z"))
-    assert.equal(findPendingForcedNews(player.id)?.id, 1)
-
-    const app = Fastify()
+    const app = Fastify({ logger: false })
     registerCnMsgpackOnSend(app)
     await app.register(newsRoutes)
     await app.ready()
+    t.after(() => app.close())
 
-    try {
-        const first = decode(await app.inject({
+    async function latestForced() {
+        const response = await app.inject({
             method: "POST",
             url: "/latest_forced",
             payload: { viewer_id: viewerId },
-        }))
-        assert.equal(first.data.id, 1)
-        assert.equal(first.data.label, 4)
-        assert.equal(Object.hasOwn(first.data, "forced"), false)
-        assert.equal(findPendingForcedNews(player.id), null)
-
-        const repeated = decode(await app.inject({
-            method: "POST",
-            url: "/latest_forced",
-            payload: { viewer_id: viewerId },
-        }))
-        assert.deepEqual(repeated.data, {})
-    } finally {
-        await app.close()
-        setServerTimeOffset(originalTimeOffset)
-        if (database.open) database.close()
-        fs.rmSync(dataDirectory, { recursive: true, force: true })
-        if (previousDataDirectory === undefined) delete process.env.DATA_DIR
-        else process.env.DATA_DIR = previousDataDirectory
+        })
+        assert.equal(response.statusCode, 200)
+        return unpack(Buffer.from(response.body, "base64"))
     }
-}
 
-main()
-    .then(() => console.log("forced news route tests passed"))
-    .catch(error => {
-        console.error(error)
-        process.exitCode = 1
-    })
+    assert.deepEqual((await latestForced()).data, {})
+    assert.deepEqual((await latestForced()).data, {})
+    assert.equal(
+        getDb().prepare(`
+            SELECT COUNT(*) AS count
+            FROM players_options
+            WHERE key GLOB 'server.forced_news.*'
+        `).get().count,
+        0,
+    )
+})
+
+test.after(() => {
+    data.closeDatabase()
+    fs.rmSync(databaseDirectory, { recursive: true, force: true })
+    if (previousDataDirectory === undefined) delete process.env.DATA_DIR
+    else process.env.DATA_DIR = previousDataDirectory
+})

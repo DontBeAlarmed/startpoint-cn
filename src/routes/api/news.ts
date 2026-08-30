@@ -1,87 +1,118 @@
-/**
- * News / Announcement API.
- * Exact format from CN client decompiled code:
- *   NewsIndexRealRemote.as — expects { current_page, news, news_count }
- *   NewsGetInfoRealRemote.as — expects { id, title, date, html, label, thumbnail, added_time, thumbnail_path }
- */
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getSession } from "../../data/domains/session"
-import { claimForcedNewsDeliverySync } from "../../data/domains/news"
-import { resolvePlayerIdSync } from "../../data/activeAccount"
-import { findPendingForcedNews, loadVisibleNews, toClientNews } from "../../lib/news-catalog"
+import {
+    getVisibleNewsForClient,
+    listVisibleNewsForClient,
+    toClientNews,
+} from "../../lib/news-catalog"
 import { generateDataHeaders } from "../../utils";
 
-const routes = async (fastify: FastifyInstance) => {
-    // News list (paginated by page_index, category)
-    fastify.post("/index", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as any
-        const viewerId = body.viewer_id
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
+type NewsCategory = 1 | 2 | 3
+
+function requireCategory(value: unknown): NewsCategory {
+    if (value !== 1 && value !== 2 && value !== 3) {
+        throw new TypeError("category must be 1, 2, or 3")
+    }
+    return value
+}
+
+function requirePositiveInteger(value: unknown, label: string): number {
+    if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) {
+        throw new TypeError(`${label} must be a positive integer`)
+    }
+    return value
+}
+
+async function requireViewer(
+    request: FastifyRequest,
+    reply: FastifyReply,
+): Promise<number | null> {
+    const body = request.body as { viewer_id?: unknown } | null | undefined
+    const viewerId = body?.viewer_id
+    if (typeof viewerId !== "number" || !Number.isSafeInteger(viewerId)) {
+        await reply.status(400).send({
             error: "Bad Request",
             message: "Invalid request body."
         })
+        return null
+    }
 
-        const session = await getSession(viewerId.toString())
-        if (!session) return reply.status(400).send({
+    const session = await getSession(viewerId.toString())
+    if (!session) {
+        await reply.status(400).send({
             error: "Bad Request",
             message: "Invalid viewer id."
         })
+        return null
+    }
+    return viewerId
+}
 
-        const allNews = loadVisibleNews()
-        const page = body.page_index || body.current_page || 1
-        const perPage = 20
-        const start = (page - 1) * perPage
-        const items = allNews.slice(start, start + perPage)
+const routes = async (fastify: FastifyInstance) => {
+    fastify.post("/index", async (request: FastifyRequest, reply: FastifyReply) => {
+        const viewerId = await requireViewer(request, reply)
+        if (viewerId === null) return reply
+
+        const body = request.body as Record<string, unknown>
+        let category: NewsCategory
+        let page: number
+        try {
+            category = requireCategory(body.category)
+            page = requirePositiveInteger(body.page_index, "page_index")
+        } catch (error) {
+            if (!(error instanceof TypeError)) throw error
+            return reply.status(400).send({
+                error: "Bad Request",
+                message: error.message,
+            })
+        }
+
+        const { rows, totalCount } = listVisibleNewsForClient({ category, page })
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             data_headers: generateDataHeaders({ viewer_id: viewerId }),
             data: {
                 current_page: page,
-                news: items.map(toClientNews),
-                news_count: allNews.length,
-            }
+                news: rows.map(toClientNews),
+                news_count: totalCount,
+            },
         })
     })
 
-    // Single news detail
     fastify.post("/get_info", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as any
-        const viewerId = body.viewer_id
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
-            error: "Bad Request",
-            message: "Invalid request body."
-        })
+        const viewerId = await requireViewer(request, reply)
+        if (viewerId === null) return reply
 
-        const session = await getSession(viewerId.toString())
-        if (!session) return reply.status(400).send({
-            error: "Bad Request",
-            message: "Invalid viewer id."
-        })
-
-        const allNews = loadVisibleNews()
-        const news = allNews.find(n => n.id === body.news_id)
-        if (!news) return reply.status(400).send({
-            error: "Bad Request",
-            message: `News with id '${body.news_id}' not found.`
-        })
+        const body = request.body as { news_id?: unknown }
+        let newsId: number
+        try {
+            newsId = requirePositiveInteger(body.news_id, "news_id")
+        } catch (error) {
+            if (!(error instanceof TypeError)) throw error
+            return reply.status(400).send({
+                error: "Bad Request",
+                message: error.message,
+            })
+        }
+        const news = getVisibleNewsForClient(newsId)
+        if (news === null) {
+            return reply.status(400).send({
+                error: "Bad Request",
+                message: `News with id '${body.news_id}' not found.`
+            })
+        }
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             data_headers: generateDataHeaders({ viewer_id: viewerId }),
-            data: {
-                ...toClientNews(news),
-            }
+            data: toClientNews(news),
         })
     })
 
-    // System news index (same format, different endpoint)
     fastify.post("/system_index", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as any
-        const viewerId = body.viewer_id
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({ error: "Bad Request", message: "Invalid request body." })
-        const session = await getSession(viewerId.toString())
-        if (!session) return reply.status(400).send({ error: "Bad Request", message: "Invalid viewer id." })
+        const viewerId = await requireViewer(request, reply)
+        if (viewerId === null) return reply
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -90,13 +121,9 @@ const routes = async (fastify: FastifyInstance) => {
         })
     })
 
-    // System news detail (same format, different endpoint)
     fastify.post("/get_system_info", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as any
-        const viewerId = body.viewer_id
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({ error: "Bad Request", message: "Invalid request body." })
-        const session = await getSession(viewerId.toString())
-        if (!session) return reply.status(400).send({ error: "Bad Request", message: "Invalid viewer id." })
+        const viewerId = await requireViewer(request, reply)
+        if (viewerId === null) return reply
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -105,29 +132,9 @@ const routes = async (fastify: FastifyInstance) => {
         })
     })
 
-    // Latest forced news popup — claim once per player and announcement.
     fastify.post("/latest_forced", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as any
-        const viewerId = body.viewer_id
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({ error: "Bad Request", message: "Invalid request body." })
-        const session = await getSession(viewerId.toString())
-        if (!session) return reply.status(400).send({ error: "Bad Request", message: "Invalid viewer id." })
-
-        const playerId = resolvePlayerIdSync(session.accountId)
-        const news = playerId === null ? null : findPendingForcedNews(playerId)
-        if (playerId !== null && news !== null) {
-            const claimed = claimForcedNewsDeliverySync(
-                playerId,
-                news.id,
-            )
-            if (claimed) {
-                reply.header("content-type", "application/x-msgpack")
-                return reply.status(200).send({
-                    data_headers: generateDataHeaders({ viewer_id: viewerId }),
-                    data: toClientNews(news),
-                })
-            }
-        }
+        const viewerId = await requireViewer(request, reply)
+        if (viewerId === null) return reply
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -136,13 +143,9 @@ const routes = async (fastify: FastifyInstance) => {
         })
     })
 
-    // System forced news — return empty
     fastify.post("/latest_forced_system", async (request: FastifyRequest, reply: FastifyReply) => {
-        const body = request.body as any
-        const viewerId = body.viewer_id
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({ error: "Bad Request", message: "Invalid request body." })
-        const session = await getSession(viewerId.toString())
-        if (!session) return reply.status(400).send({ error: "Bad Request", message: "Invalid viewer id." })
+        const viewerId = await requireViewer(request, reply)
+        if (viewerId === null) return reply
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

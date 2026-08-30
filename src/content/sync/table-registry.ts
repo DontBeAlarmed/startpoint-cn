@@ -212,7 +212,6 @@ const BUNDLED_TABLE_NAMES = [
 const SERVER_TABLE_NAMES = [
     "cdn_general_shop_whitelist.json",
     "config.json",
-    "news.json",
     "payment_products.json",
 ] as const
 
