@@ -13,7 +13,7 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 
 同步器负责严格解析、引用闭包、稳定输出和文件系统安全，不负责判断 CDN 作者给出的 ID、赔率、奖励、价格或资源内容是否合理。服务端不会替 CDN 作者猜测缺失内容、复制其他活动数据、修复非法主数据或自动生成客户端补丁。
 
-阶段 B 已完成“有权威 CDN 来源的表动态迁移”这一目标。当前 Registry 的 128 张表明确分为 `118 CDN + 6 bundled + 4 server`。原阶段 A 的五个动态领域为：
+阶段 B 已完成“有权威 CDN 来源的表动态迁移”这一目标。当前 Registry 的 127 张表明确分为 `118 CDN + 6 bundled + 3 server`。原阶段 A 的五个动态领域为：
 
 | 领域 | 动态输出 |
 |---|---|
@@ -64,18 +64,19 @@ Challenge、Tower、Hard Multi 等历史列偏移；其中 Hard Multi 体力列�
 Content Sync 时，20015/20016 会保持 fail closed。使用官方 CDN 执行同步后，当前 Release 才会包含实际
 角色效果索引。
 
-Registry 仍要求每个 Release 闭合当前全部注册表，但“闭合”不等于所有表都必须从 CDN 生成。当前 5 张 bundled 表为 `cdndata/player_rank_full.json`、`encyclopedia.json`、两张任务审计派生表和 `practice_quest.json`：
+Registry 仍要求每个 Release 闭合当前全部注册表，但“闭合”不等于所有表都必须从 CDN 生成。当前 6 张 bundled 表为 `cdndata/player_rank_full.json`、`content-seeds/character_level_apk_3_5.json`、`encyclopedia.json`、两张任务审计派生表和 `practice_quest.json`：
 
 - `cdndata/player_rank_full.json` 的玩家 `0..100` 等级数据来自历史实测，没有已确认的 CDN 权威来源；
+- `content-seeds/character_level_apk_3_5.json` 是角色等级转换的 bundled 兼容种子；
 - `encyclopedia.json` 的官方源与 bundled 显示集合不一致，客户端显示和解锁语义尚未证明可以直接替换；
 - 两张任务审计派生表由服务端任务规则审计生成，不是可直接复制的 CDN 表；
 - `practice_quest.json` 还保留 7 个官方 1.4.54 OrderedMap 不包含的兼容 ID。
 
-这些表不会因为 CDN OrderedMap 改动而自动变化，也不作为当前 CDN 迁移缺口。除非后续获得权威来源并完成独立转换器、引用闭包和 smoke，否则不猜测规则、不伪造 CDN 输出。4 张 `server` 表为服务端配置或后台内容，不属于 CDN 转换范围。
+这些表不会因为 CDN OrderedMap 改动而自动变化，也不作为当前 CDN 迁移缺口。除非后续获得权威来源并完成独立转换器、引用闭包和 smoke，否则不猜测规则、不伪造 CDN 输出。3 张 `server` 表为服务端配置或后台内容，不属于 CDN 转换范围。
 
 ### 阶段 B 的完成判定
 
-阶段 B 的“完成”指：所有有权威 CDN 来源、且属于服务端运行时内容的表，都已经登记为 `scope=cdn` 并由当前 Content Release 生成；没有权威来源的 bundled 表和服务端配置表保留其原职责。注册表测试固定三类范围为 `cdn=113`、`bundled=5`、`server=4`，以后新增表必须先明确来源和职责，再更新对应转换器与测试。此处不要求把所有活动逻辑改造成可插拔插件，特殊关卡继续使用独立 handler 加共享结算基础设施。
+阶段 B 的“完成”指：所有有权威 CDN 来源、且属于服务端运行时内容的表，都已经登记为 `scope=cdn` 并由当前 Content Release 生成；没有权威来源的 bundled 表和服务端配置表保留其原职责。注册表测试固定三类范围为 `cdn=114`、`bundled=5`、`server=3`，以后新增表必须先明确来源和职责，再更新对应转换器与测试。此处不要求把所有活动逻辑改造成可插拔插件，特殊关卡继续使用独立 handler 加共享结算基础设施。
 
 ## 受支持输入
 

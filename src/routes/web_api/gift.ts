@@ -48,6 +48,13 @@ class GiftRequestValidationError extends Error {
     }
 }
 
+class GiftRedemptionSnapshotError extends Error {
+    constructor() {
+        super("Invalid gift redemption snapshot")
+        this.name = "GiftRedemptionSnapshotError"
+    }
+}
+
 function isDatabaseReady(): boolean {
     return getDatabaseStatus().ready
 }
@@ -88,19 +95,19 @@ function parseRewardSnapshot(rawSnapshot: string): readonly GiftReward[] {
     try {
         parsed = JSON.parse(rawSnapshot)
     } catch {
-        throw new GiftRequestValidationError()
+        throw new GiftRedemptionSnapshotError()
     }
-    if (!Array.isArray(parsed)) throw new GiftRequestValidationError()
+    if (!Array.isArray(parsed)) throw new GiftRedemptionSnapshotError()
 
     return Object.freeze(parsed.map((item, position): GiftReward => {
         if (item === null || typeof item !== "object" || Array.isArray(item)) {
-            throw new GiftRequestValidationError()
+            throw new GiftRedemptionSnapshotError()
         }
         const record = item as Record<string, unknown>
         const rawType = record.type
         if (rawType !== 1 && rawType !== 4 && rawType !== 5
             && rawType !== 6 && rawType !== 8 && rawType !== 9) {
-            throw new GiftRequestValidationError()
+            throw new GiftRedemptionSnapshotError()
         }
         const rawTypeId = record.type_id
         const hasTypeId = rawType === 1 || rawType === 5 || rawType === 6
@@ -110,11 +117,11 @@ function parseRewardSnapshot(rawSnapshot: string): readonly GiftReward[] {
                 || typeof rawTypeId !== "number"
                 || !Number.isSafeInteger(rawTypeId)
                 || rawTypeId < 1) {
-                throw new GiftRequestValidationError()
+                throw new GiftRedemptionSnapshotError()
             }
             typeId = rawTypeId
         } else if (rawTypeId !== null && rawTypeId !== undefined) {
-            throw new GiftRequestValidationError()
+            throw new GiftRedemptionSnapshotError()
         } else {
             typeId = null
         }
@@ -123,13 +130,13 @@ function parseRewardSnapshot(rawSnapshot: string): readonly GiftReward[] {
             || !Number.isSafeInteger(rawNumber)
             || rawNumber < 1
             || rawNumber > 2147483647) {
-            throw new GiftRequestValidationError()
+            throw new GiftRedemptionSnapshotError()
         }
         const rawPosition = record.position
         if (rawPosition !== position
             || typeof rawPosition !== "number"
             || !Number.isSafeInteger(rawPosition)) {
-            throw new GiftRequestValidationError()
+            throw new GiftRedemptionSnapshotError()
         }
         return Object.freeze({
             position: rawPosition,
@@ -212,6 +219,13 @@ function sendRouteError(
     reply: FastifyReply,
     error: unknown,
 ): FastifyReply {
+    if (error instanceof GiftRedemptionSnapshotError) {
+        request.log.error(
+            { code: "ADMIN_GIFT_REDEMPTION_SNAPSHOT_INVALID" },
+            "Admin gift redemption snapshot is invalid",
+        )
+        return reply.status(500).send({ error: "礼包操作失败" })
+    }
     if (error instanceof GiftNotFoundError) {
         return reply.status(404).send({ error: "礼包不存在" })
     }

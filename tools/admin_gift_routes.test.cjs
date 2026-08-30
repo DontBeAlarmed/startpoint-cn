@@ -5,6 +5,7 @@ const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
+const { Writable } = require("node:stream")
 const Fastify = require("fastify")
 
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "admin-gift-"))
@@ -33,6 +34,13 @@ let playerOne
 let accountTwo
 let playerTwo
 let playerThree
+const logLines = []
+const logStream = new Writable({
+    write(chunk, _encoding, callback) {
+        logLines.push(chunk.toString())
+        callback()
+    },
+})
 
 const itemReward = { position: 0, type: 1, typeId: 1, number: 2 }
 const beadsReward = { position: 1, type: 4, typeId: null, number: 10 }
@@ -106,7 +114,7 @@ test.before(async () => {
     getDb().prepare("UPDATE players SET name = ? WHERE id = ?").run("Bob%_Match", playerTwo.id)
     getDb().prepare("UPDATE players SET name = ? WHERE id = ?").run("Carol", playerThree.id)
 
-    app = Fastify({ logger: false })
+    app = Fastify({ logger: { level: "error", stream: logStream } })
     app.register(giftRoutes, { prefix: "/api/gifts" })
     await app.ready()
 })
@@ -492,4 +500,47 @@ test("isolates redemption pages and searches to the requested gift", async () =>
         secondBySecondPlayerName.rows.map(row => row.playerId),
         [playerTwo.id],
     )
+})
+
+test("limits corrupted redemption snapshots to a redacted internal error", async () => {
+    const giftId = getDb().prepare(
+        "SELECT id FROM server_gift_codes WHERE code = ?",
+    ).get(paddedGift.code).id
+    const rawSnapshot = "CORRUPTED_GIFT_SNAPSHOT_PAYLOAD"
+    const updated = getDb().prepare(`
+        UPDATE players_gift_redemptions
+        SET reward_snapshot = ?
+        WHERE gift_id = ? AND player_id = ?
+    `).run(rawSnapshot, giftId, playerOne.id)
+    assert.equal(updated.changes, 1)
+    const logCountBefore = logLines.length
+
+    const response = await inject(
+        "GET",
+        `/api/gifts/${giftId}/redemptions?page=1&pageSize=50`,
+    )
+
+    assert.equal(response.statusCode, 500)
+    assert.deepEqual(json(response), { error: "礼包操作失败" })
+    assert.equal(response.payload.includes(rawSnapshot), false)
+    assert.equal(response.payload.includes("Alice"), false)
+    assert.equal(response.payload.includes(String(playerOne.id)), false)
+    assert.equal(response.payload.includes(String(accountOne.id)), false)
+
+    const snapshotLogs = logLines.slice(logCountBefore).filter(line => (
+        line.includes("ADMIN_GIFT_REDEMPTION_SNAPSHOT_INVALID")
+    ))
+    assert.equal(snapshotLogs.length, 1)
+    const snapshotLog = JSON.parse(snapshotLogs[0])
+    assert.deepEqual(Object.keys(snapshotLog).sort(), [
+        "code",
+        "hostname",
+        "level",
+        "msg",
+        "pid",
+        "reqId",
+        "time",
+    ])
+    assert.equal(snapshotLog.code, "ADMIN_GIFT_REDEMPTION_SNAPSHOT_INVALID")
+    assert.equal(snapshotLog.msg, "Admin gift redemption snapshot is invalid")
 })

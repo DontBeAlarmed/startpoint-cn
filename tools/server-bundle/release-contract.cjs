@@ -89,11 +89,23 @@ function parseServerReleaseContract(value) {
     requireNonNegativeInteger(contract.minimumDataSchema, "minimumDataSchema")
     requireNonNegativeInteger(contract.currentDataSchema, "currentDataSchema")
     requireValidSchemaRange(contract.minimumDataSchema, contract.currentDataSchema)
-    requireRelativePath(contract.serverEntry, "serverEntry")
-    requireRelativePath(contract.localPrepareEntry, "localPrepareEntry")
-    requireRelativePath(contract.adminPath, "adminPath")
+    requireFixed(
+        requireRelativePath(contract.serverEntry, "serverEntry"),
+        "out/cn-server.js",
+        "serverEntry",
+    )
+    requireFixed(
+        requireRelativePath(contract.localPrepareEntry, "localPrepareEntry"),
+        "out/content/sync/entry.js",
+        "localPrepareEntry",
+    )
+    requireFixed(requireRelativePath(contract.adminPath, "adminPath"), "web/dist", "adminPath")
     requireFixed(contract.adminRequired, true, "adminRequired")
-    requireVersion(contract.bundledCdnCatalogVersion, "bundledCdnCatalogVersion")
+    requireFixed(
+        requireVersion(contract.bundledCdnCatalogVersion, "bundledCdnCatalogVersion"),
+        "1.4.54",
+        "bundledCdnCatalogVersion",
+    )
     if (!Array.isArray(contract.supportedAssetModes)
         || contract.supportedAssetModes.length !== 3
         || contract.supportedAssetModes[0] !== "client-owned"

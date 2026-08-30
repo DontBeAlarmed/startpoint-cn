@@ -80,3 +80,39 @@ test("release contract adapters reject inverted schema ranges and freeze results
     assert.equal(Object.isFrozen(contract.supportedAssetModes), true)
     assert.equal(Object.isFrozen(contract.defaultPorts), true)
 })
+
+test("release contract adapters require the same fixed path and version values", t => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "release-contract-fixed-"))
+    t.after(() => fs.rmSync(tempRoot, { recursive: true, force: true }))
+    fs.mkdirSync(path.join(tempRoot, "assets"))
+    fs.copyFileSync(
+        path.join(root, "assets/server_release_contract.json"),
+        path.join(tempRoot, "assets/server_release_contract.json"),
+    )
+
+    require("ts-node/register/transpile-only")
+    const { parseServerReleaseContract } = require("../src/runtime/release-contract")
+    const validContract = loadServerReleaseContract(tempRoot)
+    const mutations = [
+        ["serverEntry", "out/wrong-server.js"],
+        ["localPrepareEntry", "out/content/wrong-entry.js"],
+        ["adminPath", "web/wrong-dist"],
+        ["bundledCdnCatalogVersion", "9.9.9"],
+    ]
+
+    for (const [field, invalidValue] of mutations) {
+        const mutated = { ...validContract, [field]: invalidValue }
+        fs.writeFileSync(
+            path.join(tempRoot, "assets/server_release_contract.json"),
+            JSON.stringify(mutated),
+        )
+        assert.throws(
+            () => loadServerReleaseContract(tempRoot),
+            `CommonJS loader must reject a changed ${field}`,
+        )
+        assert.throws(
+            () => parseServerReleaseContract(mutated),
+            `TypeScript parser must reject a changed ${field}`,
+        )
+    }
+})
