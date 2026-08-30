@@ -99,6 +99,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/reward_campaign_routes.test.cjs",
             "tools/quest_sampled_logging.test.cjs",
             "tools/quest_session_identity.test.cjs",
+            "tools/single_continue_request.test.cjs",
             "tools/single_continue_idempotency.test.cjs",
             "tools/single_continue_lifecycle.test.cjs",
             "tools/special_quest_flow.test.cjs",

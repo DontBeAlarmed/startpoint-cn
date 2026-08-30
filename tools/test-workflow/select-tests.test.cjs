@@ -598,6 +598,21 @@ test("maps single continue lifecycle implementation and regression precisely", (
     )
 })
 
+test("maps single continue statistics parser to the quest leaf", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest/single-continue-request.ts"]),
+        ["quick:quest"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/single_continue_request.test.cjs"]),
+        ["quick:quest"],
+    )
+    assert.ok(
+        TEST_GROUPS["quick:quest"].tests
+            .includes("tools/single_continue_request.test.cjs"),
+    )
+})
+
 test("maps the public reward grant layer and its regressions to one focused leaf", () => {
     const group = "integration:reward-grant"
     const tests = [
