@@ -43,6 +43,13 @@ export class NewsRevisionConflictError extends Error {
     }
 }
 
+export class NewsValidationError extends TypeError {
+    constructor() {
+        super("News validation failed")
+        this.name = "NewsValidationError"
+    }
+}
+
 const NEWS_DRAFT_KEYS = [
     "bodyRichText",
     "category",
@@ -135,7 +142,12 @@ function validateDraftRecord(input: unknown): ValidatedNewsDraft {
 }
 
 export function validateNewsDraft(input: unknown): ValidatedNewsDraft {
-    return validateDraftRecord(input)
+    try {
+        return validateDraftRecord(input)
+    } catch (error) {
+        if (error instanceof TypeError) throw new NewsValidationError()
+        throw error
+    }
 }
 
 function rowToNews(row: Record<string, unknown>): ServerNewsRow {

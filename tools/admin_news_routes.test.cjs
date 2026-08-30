@@ -14,6 +14,7 @@ require("ts-node/register/transpile-only")
 
 const data = require("../src/data")
 const newsDomain = require("../src/data/domains/news")
+const { NewsValidationError } = require("../src/data/domains/news")
 
 let newsRoutes
 try {
@@ -130,6 +131,22 @@ test("admin news routes reject invalid requests and unknown announcements", asyn
         revision: 1,
     })
     assert.equal(missingRevision.statusCode, 404)
+
+    for (const revision of [0, 1.5, "1"]) {
+        const invalidUpdateRevision = await inject("PATCH", "/api/news/999999", {
+            ...draft,
+            revision,
+        })
+        assert.equal(invalidUpdateRevision.statusCode, 400, String(revision))
+        assert.deepEqual(json(invalidUpdateRevision), { error: "公告内容无效" })
+
+        const invalidToggleRevision = await inject("PATCH", "/api/news/999999/enabled", {
+            enabled: true,
+            revision,
+        })
+        assert.equal(invalidToggleRevision.statusCode, 400, String(revision))
+        assert.deepEqual(json(invalidToggleRevision), { error: "公告内容无效" })
+    }
 })
 
 test("admin news updates reject stale exact revisions", async () => {
@@ -186,7 +203,7 @@ test("admin news routes return a limited 503 when the database is not ready", as
 test("admin news route hides unexpected storage failures", async t => {
     const created = json(await inject("POST", "/api/news", draft))
     t.mock.method(newsDomain, "getAdminNewsSync", () => {
-        throw new Error("secret SQL failure")
+        throw new TypeError("secret internal type failure")
     })
 
     const response = await inject("GET", `/api/news/${created.id}`)

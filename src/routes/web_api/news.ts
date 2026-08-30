@@ -7,6 +7,7 @@ import {
     getAdminNewsSync,
     listAdminNewsSync,
     NewsNotFoundError,
+    NewsValidationError,
     NewsRevisionConflictError,
     setNewsEnabledSync,
     updateNewsSync,
@@ -15,6 +16,13 @@ import {
 
 interface NewsParams {
     readonly id: string
+}
+
+class NewsRequestValidationError extends Error {
+    constructor() {
+        super("Invalid news request")
+        this.name = "NewsRequestValidationError"
+    }
 }
 
 function isDatabaseReady(): boolean {
@@ -36,6 +44,13 @@ function requireNewsId(request: FastifyRequest, reply: FastifyReply): number | n
     return id
 }
 
+function requireRequestRevision(value: unknown): number {
+    if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) {
+        throw new NewsRequestValidationError()
+    }
+    return value
+}
+
 function sendRouteError(
     request: FastifyRequest,
     reply: FastifyReply,
@@ -47,7 +62,7 @@ function sendRouteError(
     if (error instanceof NewsRevisionConflictError) {
         return reply.status(409).send({ error: "公告已被其他操作修改，请刷新" })
     }
-    if (error instanceof TypeError) {
+    if (error instanceof NewsValidationError || error instanceof NewsRequestValidationError) {
         return reply.status(400).send({ error: "公告内容无效" })
     }
     request.log.error({ code: "ADMIN_NEWS_OPERATION_FAILED" }, "Admin news operation failed")
@@ -105,11 +120,11 @@ const routes = async (fastify: FastifyInstance) => {
 
         try {
             const body = request.body as { revision?: unknown }
-            const revision = typeof body?.revision === "number" ? body.revision : null
-            if (revision === null) throw new TypeError("News revision is required")
+            const revision = requireRequestRevision(body?.revision)
             const { revision: _ignoredRevision, ...draft } = body as Record<string, unknown>
+            const validatedDraft = validateNewsDraft(draft)
             return reply.status(200).send(
-                updateNewsSync(id, revision, validateNewsDraft(draft)),
+                updateNewsSync(id, revision, validatedDraft),
             )
         } catch (error) {
             return sendRouteError(request, reply, error)
@@ -124,9 +139,10 @@ const routes = async (fastify: FastifyInstance) => {
         try {
             const body = request.body as { enabled?: unknown; revision?: unknown }
             if (typeof body?.enabled !== "boolean" || typeof body.revision !== "number") {
-                throw new TypeError("News enabled and revision are required")
+                throw new NewsRequestValidationError()
             }
-            return reply.status(200).send(setNewsEnabledSync(id, body.revision, body.enabled))
+            const revision = requireRequestRevision(body.revision)
+            return reply.status(200).send(setNewsEnabledSync(id, revision, body.enabled))
         } catch (error) {
             return sendRouteError(request, reply, error)
         }
@@ -140,7 +156,7 @@ const routes = async (fastify: FastifyInstance) => {
         try {
             const query = request.query as { revision?: string }
             const revision = parseInteger(query.revision)
-            if (revision === null) throw new TypeError("News revision is required")
+            if (revision === null) throw new NewsRequestValidationError()
             deleteNewsSync(id, revision)
             return reply.status(200).send({ ok: true })
         } catch (error) {

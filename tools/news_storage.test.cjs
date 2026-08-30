@@ -24,6 +24,9 @@ const {
     updateNewsSync,
     validateNewsDraft,
 } = require("../src/data/domains/news")
+const {
+    NewsValidationError,
+} = require("../src/data/domains/news")
 const { validateNewsRichText } = require("../src/lib/news-rich-text")
 
 const draft = {
@@ -192,6 +195,13 @@ test("audit writes use the real clock abstraction and ignore virtual offset", ()
 })
 
 test("validates required fields, enum ranges, and UTF-16 lengths", () => {
+    assert.equal(typeof NewsValidationError, "function")
+    assert.throws(() => validateNewsDraft(null), error => {
+        assert.ok(error instanceof NewsValidationError)
+        assert.ok(error instanceof TypeError)
+        assert.equal(error.message, "News validation failed")
+        return true
+    })
     assert.throws(() => validateNewsDraft(null), TypeError)
     assert.throws(() => validateNewsDraft({ ...draft, category: 4 }), TypeError)
     assert.throws(() => validateNewsDraft({ ...draft, label: 0 }), TypeError)
