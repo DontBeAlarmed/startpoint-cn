@@ -1,5 +1,8 @@
 require("ts-node/register/transpile-only")
 
+const { loadServerReleaseContract } = require("../tools/server-bundle/release-contract.cjs")
+const currentDataSchema = loadServerReleaseContract(path.resolve(__dirname, "..")).currentDataSchema
+
 const assert = require("node:assert/strict")
 const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")
@@ -32,7 +35,7 @@ const {
 } = require("../src/lib/quest/score-attack-history")
 
 db = initializeDatabase()
-assert.equal(db.pragma("user_version", { simple: true }), 22)
+assert.equal(db.pragma("user_version", { simple: true }), currentDataSchema)
 
 const account = insertAccountSync({
     appId: "wf_cn",

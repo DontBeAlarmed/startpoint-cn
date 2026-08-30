@@ -7,6 +7,9 @@ const Sqlite = require("better-sqlite3")
 
 require("ts-node/register/transpile-only")
 
+const { loadServerReleaseContract } = require("../server-bundle/release-contract.cjs")
+const currentDataSchema = loadServerReleaseContract(path.resolve(__dirname, "../..")).currentDataSchema
+
 const data = require("../../src/data")
 const { getDb } = require("../../src/data/db")
 const { resolveRuntimeDataPaths } = require("../../src/runtime/data-paths")
@@ -50,7 +53,7 @@ fs.writeFileSync(paths.databaseVersionFile, "20")
 
 data.initializeDatabase({ paths })
 const migrated = getDb()
-assert.equal(migrated.pragma("user_version", { simple: true }), 22)
+assert.equal(migrated.pragma("user_version", { simple: true }), currentDataSchema)
 assert.deepEqual(migrated.prepare(`
     SELECT stamina, stamina_heal_time, total_stamina_used FROM players WHERE id = ?
 `).get(playerId), { stamina: 12, stamina_heal_time: 1000, total_stamina_used: 345 })

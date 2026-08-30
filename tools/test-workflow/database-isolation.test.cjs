@@ -5,6 +5,8 @@ const os = require("node:os")
 const path = require("node:path")
 
 const projectRoot = path.resolve(__dirname, "../..")
+const { loadServerReleaseContract } = require("../server-bundle/release-contract.cjs")
+const currentDataSchema = loadServerReleaseContract(projectRoot).currentDataSchema
 const defaultDatabaseDirectory = path.join(projectRoot, ".database")
 
 function snapshotDirectory(directory) {
@@ -53,9 +55,12 @@ try {
     data.initializeDatabase()
     const db = getDb()
     assert.equal(db.prepare("SELECT 1 AS value").get().value, 1)
-    assert.deepEqual(data.getDatabaseStatus(), { open: true, ready: true, schema: 22 })
+    assert.deepEqual(data.getDatabaseStatus(), { open: true, ready: true, schema: currentDataSchema })
     assert.equal(fs.existsSync(path.join(dataDirectory, "wdfp_data.db")), true)
-    assert.equal(fs.readFileSync(path.join(dataDirectory, "wdfp_data.db.version"), "utf8"), "22")
+    assert.equal(
+        fs.readFileSync(path.join(dataDirectory, "wdfp_data.db.version"), "utf8"),
+        String(currentDataSchema),
+    )
 
     assert.equal(data.closeDatabase(), true)
     assert.equal(data.closeDatabase(), false)

@@ -2,6 +2,7 @@ import fastifyStatic from "@fastify/static"
 import type { FastifyInstance } from "fastify"
 import { lstatSync, readFileSync } from "fs"
 import path from "path"
+import { SERVER_RELEASE_CONTRACT } from "./release-contract"
 
 export interface RequiredAdminBuild {
     readonly distDir: string
@@ -10,6 +11,7 @@ export interface RequiredAdminBuild {
 }
 
 const ADMIN_ENTRY_REFERENCE_PATTERN = /\b(?:src|href)\s*=\s*(["'])(\/admin\/[^"'?#]+)(?:[?#][^"']*)?\1/gi
+const ADMIN_INDEX_LABEL = path.posix.join(SERVER_RELEASE_CONTRACT.adminPath, "index.html")
 
 function requireRegularAdminFile(filePath: string, label: string): void {
     let status
@@ -46,7 +48,10 @@ function requireAdminEntryAssets(distDir: string, indexHtml: Buffer): void {
         throw new Error("Required admin build is unavailable: index.html has no local admin entry assets")
     }
     for (const relativePath of references) {
-        requireRegularAdminFile(path.join(distDir, ...relativePath.split("/")), `web/dist/${relativePath}`)
+        requireRegularAdminFile(
+            path.join(distDir, ...relativePath.split("/")),
+            `${SERVER_RELEASE_CONTRACT.adminPath}/${relativePath}`,
+        )
     }
 }
 
@@ -72,20 +77,20 @@ function acceptsHtml(accept: string | undefined): boolean {
 }
 
 export function requireAdminBuild(projectRoot: string): RequiredAdminBuild {
-    const distDir = path.join(projectRoot, "web", "dist")
+    const distDir = path.join(projectRoot, SERVER_RELEASE_CONTRACT.adminPath)
     const indexPath = path.join(distDir, "index.html")
     let distStatus
     try {
         distStatus = lstatSync(distDir)
     } catch {
         throw new Error(
-            "Required admin build is unavailable: web/dist must be a directory; run npm run build:server",
+            `Required admin build is unavailable: ${SERVER_RELEASE_CONTRACT.adminPath} must be a directory; run npm run build:server`,
         )
     }
     if (distStatus.isSymbolicLink() || !distStatus.isDirectory()) {
-        throw new Error("Required admin build is unavailable: web/dist must be a directory; run npm run build:server")
+        throw new Error(`Required admin build is unavailable: ${SERVER_RELEASE_CONTRACT.adminPath} must be a directory; run npm run build:server`)
     }
-    requireRegularAdminFile(indexPath, "web/dist/index.html")
+    requireRegularAdminFile(indexPath, ADMIN_INDEX_LABEL)
     const indexHtml = readFileSync(indexPath)
     requireAdminEntryAssets(distDir, indexHtml)
     return { distDir, indexPath, indexHtml }

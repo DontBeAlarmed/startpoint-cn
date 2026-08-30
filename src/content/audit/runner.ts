@@ -7,6 +7,7 @@ import {
     type MissionContractAuditResult,
 } from "./mission-contracts"
 import { ASSET_AUDIT_SOURCE_PAIRS } from "./source-registry"
+import { BUNDLED_CDN_CATALOG_VERSION } from "../constants"
 import {
     ContentAssetAuditError,
     type ContentAssetAuditSourcePair,
@@ -27,7 +28,7 @@ export interface ContentAssetAuditReport {
     readonly missionContracts: MissionContractAuditResult
 }
 
-export const SUPPORTED_CONTENT_ASSET_AUDIT_VERSION = "1.4.54"
+export const SUPPORTED_CONTENT_ASSET_AUDIT_VERSION = BUNDLED_CDN_CATALOG_VERSION
 
 interface ContentAssetAuditDependencies {
     readonly tableNames?: readonly string[]

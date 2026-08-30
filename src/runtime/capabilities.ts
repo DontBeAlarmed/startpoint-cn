@@ -7,14 +7,15 @@ import {
     type LoadedModeIdentity,
 } from "../modes/registry"
 import { buildModeDigest } from "../multi/compatibility/mode-digest"
+import { RUNTIME_API_VERSION } from "./release-contract"
 import type { BundleMetadata } from "./bundle-metadata"
+
+export { RUNTIME_API_VERSION }
 
 const SHA256_IDENTITY = /^sha256:[0-9a-f]{64}$/
 const SHA256_HEX = /^[0-9a-f]{64}$/
 const DECIMAL = /^(0|[1-9][0-9]*)$/
 const VERSION = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/
-
-export const RUNTIME_API_VERSION = 1 as const
 
 const MODE_SERVER_CAPABILITIES = Object.freeze([
     "mode.hook.quest-start@1",

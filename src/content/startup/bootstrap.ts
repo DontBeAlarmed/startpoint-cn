@@ -1,6 +1,7 @@
 import { spawn as spawnChildProcess } from "node:child_process"
 import path from "node:path"
 
+import { SERVER_RELEASE_CONTRACT } from "../../runtime/release-contract"
 import { parseAssetProviderConfig } from "../cdn/asset-mode"
 
 export interface StartupOutcome {
@@ -123,7 +124,7 @@ export async function runContentStartup(
         if (assetProvider.mode === "local") {
             const syncOutcome = await runStage(
                 "sync",
-                path.join(projectRoot, "out/content/sync/entry.js"),
+                path.join(projectRoot, SERVER_RELEASE_CONTRACT.localPrepareEntry),
             )
             if (
                 shutdownSignal !== null
@@ -135,7 +136,7 @@ export async function runContentStartup(
         }
         const serverOutcome = await runStage(
             "server",
-            path.join(projectRoot, "out/cn-server.js"),
+            path.join(projectRoot, SERVER_RELEASE_CONTRACT.serverEntry),
         )
         if (shutdownSignal !== null && serverOutcome.code === 0 && serverOutcome.signal === null) {
             stderr.write("[startup] CN server exited cleanly\n")

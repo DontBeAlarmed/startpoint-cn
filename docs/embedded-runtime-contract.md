@@ -127,7 +127,7 @@ Bundle 不包含：
 
 默认开发路径是项目根的 `.database`。嵌入模式必须显式传入由 Supervisor 管理的绝对 `DATA_DIR`。服务端在打开数据库前解析现有祖先的物理路径，拒绝 Data Volume 与 Server Bundle 或 local CDN 相等、互为祖先/后代；通过祖先符号链接指回这些只读输入也会被拒绝。替换 Server Bundle 不得覆盖 Data Volume。
 
-数据库 schema 由服务端代码拥有。当前 Bundle 接受 schema `0..22`，启动时由服务端事务化迁移到 `22`，并拒绝高于 `22` 的数据库。Supervisor 只在停服后复制备份，不直接执行 SQL。
+数据库 schema 由服务端代码拥有。当前 Bundle 接受 schema `0..22`，启动时由服务端事务化迁移到 `22`，并拒绝高于 `22` 的数据库。集中发布契约锚点以本文档末尾的 `release-contract` 块为准。Supervisor 只在停服后复制备份，不直接执行 SQL。
 
 ### Asset Provider
 
@@ -172,7 +172,8 @@ manifest 核心字段如下：
   },
   "ports": {
     "http": 8001,
-    "tcp": 8003
+    "tcp": 8003,
+    "hub": 8004
   },
   "files": []
 }
@@ -199,6 +200,7 @@ Supervisor 以 Server Bundle 根为工作目录。local 模式先执行 manifest
 | `CN_LISTEN_PORT` | `8001` | HTTP 端口 |
 | `SESSION_HOST` | `127.0.0.1` | TCP 监听地址 |
 | `SESSION_PORT` | `8003` | TCP 端口 |
+| `MULTI_HUB_PORT` | `8004` | 联机 Hub 端口 |
 | `SESSION_PUBLIC_HOST` | 自动推导 | 客户端可达的 TCP 地址 |
 | `ASSET_MODE` | `local` | `client-owned` / `local` / `remote` |
 | `CDN_DIR` | `.cdn` | local 模式 CDN 父目录 |
@@ -357,6 +359,20 @@ Builder 和服务进程都不能自行操作这些指针。
 - keystore、密码和私钥不能进入 Bundle、Data Volume、日志或仓库。
 
 契约的稳定面是 manifest schema、环境变量、进程/退出码和健康响应。新增可选字段可以向后兼容；删除字段、改变语义或增加必需字段必须提升对应契约主版本。
+
+```release-contract
+{
+  "serverManifestSchemaVersion": 3,
+  "runtimeApiVersion": 1,
+  "currentDataSchema": 22,
+  "serverEntry": "out/cn-server.js",
+  "localPrepareEntry": "out/content/sync/entry.js",
+  "adminPath": "web/dist",
+  "bundledCdnCatalogVersion": "1.4.54",
+  "supportedAssetModes": ["client-owned", "local", "remote"],
+  "defaultPorts": { "http": 8001, "tcp": 8003, "hub": 8004 }
+}
+```
 
 ## 当前实现状态
 

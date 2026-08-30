@@ -8,6 +8,9 @@ const test = require("node:test")
 
 require("ts-node/register/transpile-only")
 
+const { loadServerReleaseContract } = require("../tools/server-bundle/release-contract.cjs")
+const releaseContract = loadServerReleaseContract(path.resolve(__dirname, ".."))
+
 const { createRuntimeHealthSnapshot } = require("../src/runtime/health")
 const {
     FALLBACK_BUNDLE_VERSION,
@@ -32,14 +35,18 @@ function validManifest(schemaVersion) {
             node: ">=20.12.0",
             dependencyLock: `sha256:${"b".repeat(64)}`,
             minDataSchema: 0,
-            targetDataSchema: 22,
+            targetDataSchema: releaseContract.currentDataSchema,
         },
         admin: { path: "web/dist", required: false },
         assets: {
             supportedModes: ["client-owned", "local", "remote"],
             minClientAssetVersion: "1.4.54",
         },
-        ports: { http: 8001, tcp: 8003 },
+        ports: {
+            http: releaseContract.defaultPorts.http,
+            tcp: releaseContract.defaultPorts.tcp,
+            hub: releaseContract.defaultPorts.hub,
+        },
         files: [],
     }
     if (schemaVersion === 3) {

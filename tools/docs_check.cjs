@@ -3,6 +3,7 @@
 const fs = require("node:fs")
 const path = require("node:path")
 const { spawnSync } = require("node:child_process")
+const { loadServerReleaseContract } = require("./server-bundle/release-contract.cjs")
 
 const REQUIRED_READMES = [
     "README.md",
@@ -16,6 +17,11 @@ const REQUIRED_READMES = [
     "docs/runtime/README.md",
     "docs/status/README.md",
     "docs/systems/README.md",
+]
+
+const RELEASE_CONTRACT_DOCUMENTS = [
+    "docs/embedded-runtime-contract.md",
+    "docs/runtime/server-bundle.md",
 ]
 
 function toPosix(filePath) {
@@ -173,6 +179,62 @@ function resolveIndexedTargets(rootDir, readmeFile, markdown) {
     return targets
 }
 
+function extractReleaseContractBlock(markdown, document) {
+    const match = markdown.match(/^```release-contract\r?\n([\s\S]*?)\r?\n```$/gmu)
+    if (match === null || match.length !== 1) {
+        throw new Error("缺少唯一 release-contract 代码块")
+    }
+    const [fence] = match
+    const body = fence.replace(/^```release-contract\r?\n/, "").replace(/\r?\n```$/, "")
+    try {
+        return JSON.parse(body)
+    } catch {
+        throw new Error("release-contract 代码块不是有效 JSON")
+    }
+}
+
+function checkReleaseContractDocumentation({ rootDir, contract }) {
+    const errors = []
+    for (const document of RELEASE_CONTRACT_DOCUMENTS) {
+        const file = path.join(rootDir, document)
+        let anchors
+        try {
+            anchors = extractReleaseContractBlock(fs.readFileSync(file, "utf8"), document)
+        } catch (error) {
+            errors.push(`${document}: ${error instanceof Error ? error.message : String(error)}`)
+            continue
+        }
+
+        const expected = {
+            serverManifestSchemaVersion: contract.serverManifestSchemaVersion,
+            runtimeApiVersion: contract.runtimeApiVersion,
+            currentDataSchema: contract.currentDataSchema,
+            serverEntry: contract.serverEntry,
+            localPrepareEntry: contract.localPrepareEntry,
+            adminPath: contract.adminPath,
+            bundledCdnCatalogVersion: contract.bundledCdnCatalogVersion,
+            supportedAssetModes: contract.supportedAssetModes,
+            defaultPorts: contract.defaultPorts,
+        }
+        for (const [field, expectedValue] of Object.entries(expected)) {
+            const actualValue = anchors[field]
+            const matches = Array.isArray(expectedValue)
+                ? Array.isArray(actualValue)
+                    && actualValue.length === expectedValue.length
+                    && actualValue.every((value, index) => value === expectedValue[index])
+                : typeof expectedValue === "object" && expectedValue !== null
+                    ? typeof actualValue === "object"
+                        && actualValue !== null
+                        && !Array.isArray(actualValue)
+                        && Object.keys(expectedValue).length === Object.keys(actualValue).length
+                        && Object.entries(expectedValue).every(([key, value]) => actualValue[key] === value)
+                    : actualValue === expectedValue
+            if (!matches) errors.push(`${document}: ${field} 与发布契约不一致`)
+        }
+    }
+    return errors
+}
+
 function checkDocumentation({ rootDir, trackedFiles = listTrackedFiles(rootDir) }) {
     const normalizedRoot = path.resolve(rootDir)
     const candidateDocs = [...new Set(trackedFiles.map(toPosix).filter(isDocumentationFile))].sort()
@@ -237,6 +299,10 @@ function main() {
     const rootDir = path.resolve(__dirname, "..")
     const trackedFiles = listTrackedFiles(rootDir)
     const errors = checkDocumentation({ rootDir, trackedFiles })
+        .concat(checkReleaseContractDocumentation({
+            rootDir,
+            contract: loadServerReleaseContract(rootDir),
+        }))
     if (errors.length > 0) {
         process.stderr.write(`${errors.map(error => `- ${error}`).join("\n")}\n`)
         return 1
@@ -257,4 +323,5 @@ module.exports = {
     isForbiddenRouteCapture,
     listTrackedFiles,
     main,
+    checkReleaseContractDocumentation,
 }

@@ -12,6 +12,8 @@ process.on("exit", () => fs.rmSync(importSandbox, { recursive: true, force: true
 require("ts-node/register/transpile-only")
 
 const projectRoot = path.resolve(__dirname, "../..")
+const { loadServerReleaseContract } = require("../server-bundle/release-contract.cjs")
+const currentDataSchema = loadServerReleaseContract(projectRoot).currentDataSchema
 const data = require("../../src/data")
 const { getDb } = require("../../src/data/db")
 const { resolveRuntimeDataPaths } = require("../../src/runtime/data-paths")
@@ -281,7 +283,7 @@ test("default schema migration preserves v6 players and creates cascading Pass t
 
     data.initializeDatabase({ paths })
     const migrated = getDb()
-    assert.equal(migrated.pragma("user_version", { simple: true }), 22)
+    assert.equal(migrated.pragma("user_version", { simple: true }), currentDataSchema)
     assert.deepEqual(
         migrated.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'players_character_election_votes'").get(),
         { name: "players_character_election_votes" },
@@ -360,7 +362,7 @@ test("default schema migrates schema 14 active quests to battle session and coor
 
     data.initializeDatabase({ paths })
 
-    assert.equal(getDb().pragma("user_version", { simple: true }), 22)
+    assert.equal(getDb().pragma("user_version", { simple: true }), currentDataSchema)
     assert.equal(
         getDb().pragma("table_info(players_active_quests)")
             .some(column => column.name === "rescue_fragment_eligible"),
@@ -440,7 +442,7 @@ test("migrates schema 21 active quests to frozen rescue eligibility storage", t 
     data.initializeDatabase({ paths })
 
     const questDomain = require("../../src/data/domains/quest_active")
-    assert.equal(getDb().pragma("user_version", { simple: true }), 22)
+    assert.equal(getDb().pragma("user_version", { simple: true }), currentDataSchema)
     assert.equal(questDomain.getPlayerActiveQuestSync(playerId)?.rescueFragmentEligible, false)
     assert.equal(getDb().prepare(
         "SELECT rescue_fragment_eligible FROM players_active_quests WHERE player_id = ?",
@@ -523,7 +525,7 @@ test("default schema migrates schema 15 databases to player history storage", t 
     fs.writeFileSync(paths.databaseVersionFile, "15")
 
     data.initializeDatabase({ paths })
-    assert.equal(getDb().pragma("user_version", { simple: true }), 22)
+    assert.equal(getDb().pragma("user_version", { simple: true }), currentDataSchema)
     assert.deepEqual(
         getDb().prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'players_player_history_settings'").get(),
         { name: "players_player_history_settings" },
@@ -571,7 +573,7 @@ test("default schema migrates schema 18 login bonus progress to per-group rows",
 
     data.initializeDatabase({ paths })
     const migrated = getDb()
-    assert.equal(migrated.pragma("user_version", { simple: true }), 22)
+    assert.equal(migrated.pragma("user_version", { simple: true }), currentDataSchema)
     assert.deepEqual(
         migrated.pragma("table_info(players_login_bonus_progress)")
             .filter(column => column.pk > 0)
@@ -629,7 +631,7 @@ test("default schema migrates schema 19 databases to player history milestones",
     fs.writeFileSync(paths.databaseVersionFile, "19")
 
     data.initializeDatabase({ paths })
-    assert.equal(getDb().pragma("user_version", { simple: true }), 22)
+    assert.equal(getDb().pragma("user_version", { simple: true }), currentDataSchema)
     assert.deepEqual(
         getDb().prepare(`
             SELECT name FROM sqlite_master

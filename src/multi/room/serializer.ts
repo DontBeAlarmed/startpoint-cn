@@ -1,6 +1,7 @@
 import { MultiRoom } from "../types"
 import type { RoomStatus } from "../coordinator/interface"
 import { resolveDisplayHost } from "../../runtime/network-host"
+import { DEFAULT_SERVER_PORTS } from "../../runtime/release-contract"
 
 export const getDisplayHost = resolveDisplayHost
 
@@ -105,7 +106,7 @@ function serializeRoomConnectionFields(room: {
 }, endpoint?: RoomConnectionEndpoint | null): SerializedRoomConnection {
     const endpointUnavailable = endpoint === null;
     const displayHost = endpointUnavailable ? "" : endpoint?.host ?? getDisplayHost();
-    const sessionPort = endpointUnavailable ? 0 : endpoint?.port ?? 8003;
+    const sessionPort = endpointUnavailable ? 0 : endpoint?.port ?? DEFAULT_SERVER_PORTS.tcp;
     return {
         application_update_url: "",
         category_id: room.category,

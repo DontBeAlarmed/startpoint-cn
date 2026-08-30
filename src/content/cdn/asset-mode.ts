@@ -2,10 +2,14 @@ import { isIP } from "node:net"
 import os from "node:os"
 
 import { resolveCnCdnRoot } from "../paths"
+import {
+    DEFAULT_SERVER_PORTS,
+    SUPPORTED_ASSET_MODES,
+} from "../../runtime/release-contract"
 import { resolveRuntimeDataPaths } from "../../runtime/data-paths"
 import { normalizeCdnBaseUrl } from "./protocol"
 
-export type AssetMode = "client-owned" | "local" | "remote"
+export type AssetMode = (typeof SUPPORTED_ASSET_MODES)[number]
 
 export type AssetProviderConfig =
     | Readonly<{ readonly mode: "client-owned" }>
@@ -57,8 +61,8 @@ export class AssetModeConfigError extends Error {
 }
 
 function parseMode(value: string | undefined): AssetMode {
-    if (value === undefined) return "local"
-    if (value === "client-owned" || value === "local" || value === "remote") return value
+    if (value === undefined) return SUPPORTED_ASSET_MODES[1]
+    if ((SUPPORTED_ASSET_MODES as readonly string[]).includes(value)) return value as AssetMode
     throw new AssetModeConfigError("INVALID_ASSET_MODE", "invalid ASSET_MODE configuration")
 }
 
@@ -153,7 +157,7 @@ function resolveLocalBaseUrl(
             ? resolveListenHost(listenHost)
             : listenHost
     const host = formatTrustedHost(selectedHost)
-    const port = requireTrustedPort(env.CN_LISTEN_PORT ?? "8001")
+    const port = requireTrustedPort(env.CN_LISTEN_PORT ?? String(DEFAULT_SERVER_PORTS.http))
     return normalizeCdnBaseUrl(`http://${host}:${port}/patch/cn`)
 }
 

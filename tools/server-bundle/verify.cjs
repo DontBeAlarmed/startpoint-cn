@@ -6,8 +6,10 @@ const fs = require("node:fs")
 const path = require("node:path")
 
 const { canonicalJsonBuffer, sha256Hex } = require("./canonical-json.cjs")
+const { loadServerReleaseContract } = require("./release-contract.cjs")
 
 const MANIFEST_NAME = "server-manifest.json"
+const CONTRACT = loadServerReleaseContract(path.resolve(__dirname, "../.."))
 const ROOT_KEYS = ["admin", "assets", "bundleId", "entry", "files", "name", "ports", "requires", "schemaVersion", "serverVersion", "startup"]
 
 function fail(message) {
@@ -56,8 +58,8 @@ function requireOwnedBundlePath(relativePath, directory) {
     if (isWithin(relativePath, "out") && !isWithin(relativePath, "out/.tsbuildinfo-cn")) return
     if (isWithin(relativePath, "assets")
         && !isWithin(relativePath, "assets/asset-patch")) return
-    if (isWithin(relativePath, "web/dist")) return
-    if (directory && relativePath === "web") return
+    if (isWithin(relativePath, CONTRACT.adminPath)) return
+    if (directory && relativePath === path.posix.dirname(CONTRACT.adminPath)) return
     fail(`bundle path "${relativePath}" is not an allowed owned path`)
 }
 
@@ -101,7 +103,7 @@ function compareVersions(left, right) {
 function validateManifest(manifest, manifestBytes, dataSchema, dependencyLock) {
     exactKeys(manifest, ROOT_KEYS, "manifest")
     if (!manifestBytes.equals(canonicalJsonBuffer(manifest))) fail("server manifest must be canonical JSON")
-    if (manifest.schemaVersion !== 3) fail("schemaVersion must be 3")
+    if (manifest.schemaVersion !== CONTRACT.serverManifestSchemaVersion) fail("schemaVersion must be 3")
     if (manifest.name !== "starpoint-cn") fail("name must be starpoint-cn")
     if (typeof manifest.serverVersion !== "string"
         || !/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(manifest.serverVersion)) {
@@ -110,13 +112,13 @@ function validateManifest(manifest, manifestBytes, dataSchema, dependencyLock) {
     if (typeof manifest.bundleId !== "string" || !/^sha256:[0-9a-f]{64}$/.test(manifest.bundleId)) {
         fail("bundleId must be a lowercase SHA-256 digest")
     }
-    if (safeRelativePath(manifest.entry, "entry") !== "out/cn-server.js") {
-        fail("entry must be out/cn-server.js")
+    if (safeRelativePath(manifest.entry, "entry") !== CONTRACT.serverEntry) {
+        fail(`entry must be ${CONTRACT.serverEntry}`)
     }
     exactKeys(manifest.startup, ["localPrepareEntry"], "startup")
     if (safeRelativePath(manifest.startup.localPrepareEntry, "startup.localPrepareEntry")
-        !== "out/content/sync/entry.js") {
-        fail("startup.localPrepareEntry must be out/content/sync/entry.js")
+        !== CONTRACT.localPrepareEntry) {
+        fail(`startup.localPrepareEntry must be ${CONTRACT.localPrepareEntry}`)
     }
 
     exactKeys(
@@ -124,7 +126,7 @@ function validateManifest(manifest, manifestBytes, dataSchema, dependencyLock) {
         ["dependencyLock", "minDataSchema", "node", "runtimeApi", "targetDataSchema"],
         "requires",
     )
-    if (manifest.requires.runtimeApi !== 1) fail("requires.runtimeApi must be 1")
+    if (manifest.requires.runtimeApi !== CONTRACT.runtimeApiVersion) fail("requires.runtimeApi must be 1")
     if (typeof manifest.requires.dependencyLock !== "string"
         || !/^sha256:[0-9a-f]{64}$/.test(manifest.requires.dependencyLock)) {
         fail("requires.dependencyLock must be a lowercase SHA-256 digest")
@@ -144,8 +146,9 @@ function validateManifest(manifest, manifestBytes, dataSchema, dependencyLock) {
     const currentNode = currentMatch.slice(1).map(Number)
     if (compareVersions(currentNode, requiredNode) < 0) fail("current Node version is incompatible")
     const { minDataSchema, targetDataSchema } = manifest.requires
-    if (minDataSchema !== 0 || targetDataSchema !== 22) {
-        fail("data schema range must be exactly 0 through 22")
+    if (minDataSchema !== CONTRACT.minimumDataSchema
+        || targetDataSchema !== CONTRACT.currentDataSchema) {
+        fail(`data schema range must be exactly ${CONTRACT.minimumDataSchema} through ${CONTRACT.currentDataSchema}`)
     }
     if (dataSchema !== undefined) {
         if (!Number.isSafeInteger(dataSchema)
@@ -156,23 +159,25 @@ function validateManifest(manifest, manifestBytes, dataSchema, dependencyLock) {
     }
 
     exactKeys(manifest.admin, ["path", "required"], "admin")
-    if (safeRelativePath(manifest.admin.path, "admin.path") !== "web/dist") {
-        fail("admin.path must be web/dist")
+    if (safeRelativePath(manifest.admin.path, "admin.path") !== CONTRACT.adminPath) {
+        fail(`admin.path must be ${CONTRACT.adminPath}`)
     }
-    if (manifest.admin.required !== true) fail("admin.required must be true")
+    if (manifest.admin.required !== CONTRACT.adminRequired) fail("admin.required must be true")
 
     exactKeys(manifest.assets, ["minClientAssetVersion", "supportedModes"], "assets")
-    if (manifest.assets.minClientAssetVersion !== "1.4.54") {
-        fail("assets.minClientAssetVersion must be 1.4.54")
+    if (manifest.assets.minClientAssetVersion !== CONTRACT.bundledCdnCatalogVersion) {
+        fail(`assets.minClientAssetVersion must be ${CONTRACT.bundledCdnCatalogVersion}`)
     }
     if (!Array.isArray(manifest.assets.supportedModes)
-        || manifest.assets.supportedModes.length !== 3
-        || manifest.assets.supportedModes.some((mode, index) => mode !== ["client-owned", "local", "remote"][index])) {
+        || manifest.assets.supportedModes.length !== CONTRACT.supportedAssetModes.length
+        || manifest.assets.supportedModes.some((mode, index) => mode !== CONTRACT.supportedAssetModes[index])) {
         fail("assets.supportedModes is invalid")
     }
 
-    exactKeys(manifest.ports, ["http", "tcp"], "ports")
-    if (manifest.ports.http !== 8001 || manifest.ports.tcp !== 8003) fail("ports are invalid")
+    exactKeys(manifest.ports, ["http", "tcp", "hub"], "ports")
+    if (manifest.ports.http !== CONTRACT.defaultPorts.http
+        || manifest.ports.tcp !== CONTRACT.defaultPorts.tcp
+        || manifest.ports.hub !== CONTRACT.defaultPorts.hub) fail("ports are invalid")
 
     if (!Array.isArray(manifest.files)) fail("files must be an array")
     const seen = new Set()
@@ -201,7 +206,7 @@ function validateManifest(manifest, manifestBytes, dataSchema, dependencyLock) {
     for (const requiredFile of ["LICENSE", "NOTICE"]) {
         if (!seen.has(requiredFile)) fail(`${requiredFile} is required in files`)
     }
-    const adminIndex = `${manifest.admin.path}/index.html`
+    const adminIndex = `${CONTRACT.adminPath}/index.html`
     if (!seen.has(adminIndex)) {
         fail("required admin index is missing")
     }

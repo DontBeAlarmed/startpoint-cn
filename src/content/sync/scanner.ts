@@ -23,12 +23,13 @@ import {
     type PatchOverlayDependencies,
 } from "../cdn/patch-overlay"
 import { deepFreeze } from "../deep-freeze"
+import { BUNDLED_CDN_CATALOG_VERSION } from "../constants"
 import type { ContentPaths } from "../paths"
 
 const PLACEHOLDER_DIGEST = "0".repeat(64)
 const TRACKED_BASELINE_PATH = path.resolve(
     __dirname,
-    "../../../assets/cdn/catalog-cn-1.4.54.json",
+    `../../../assets/cdn/catalog-cn-${BUNDLED_CDN_CATALOG_VERSION}.json`,
 )
 
 interface ArchiveDirectory {

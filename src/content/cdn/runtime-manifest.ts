@@ -2,8 +2,10 @@ import fs from "node:fs"
 import path from "node:path"
 
 import { buildCdnCatalog } from "./catalog-builder"
+import { BUNDLED_CDN_CATALOG_VERSION } from "../constants"
 import type { CdnCatalogArchiveInput, CdnCatalogInput } from "./types"
 
+const CDN_RUNTIME_BASELINE: `cn-${typeof BUNDLED_CDN_CATALOG_VERSION}` = `cn-${BUNDLED_CDN_CATALOG_VERSION}`
 const SHA256_PATTERN = /^[a-f0-9]{64}$/
 const ROOT_KEYS = ["schemaVersion", "baseline", "catalogInput", "entityLists"] as const
 const CATALOG_INPUT_KEYS = ["archives", "installedBytes", "entityListsRelativePath"] as const
@@ -22,7 +24,7 @@ const ENTITY_LISTS_KEYS = ["relativePath", "compressedBytes", "sha256"] as const
 
 export interface CdnRuntimeManifest {
     readonly schemaVersion: 1
-    readonly baseline: "cn-1.4.54"
+    readonly baseline: typeof CDN_RUNTIME_BASELINE
     readonly catalogInput: CdnCatalogInput
     readonly entityLists: {
         readonly relativePath: string
@@ -155,8 +157,8 @@ function deepFreeze<T>(value: T): T {
 
 function orderCatalogInput(input: CdnCatalogInput): CdnCatalogInput {
     const catalog = buildCdnCatalog(input)
-    if (catalog.targetVersion !== "1.4.54") {
-        throw new Error(`manifest Catalog target must be 1.4.54, received ${catalog.targetVersion}`)
+    if (catalog.targetVersion !== BUNDLED_CDN_CATALOG_VERSION) {
+        throw new Error(`manifest Catalog target must be ${BUNDLED_CDN_CATALOG_VERSION}, received ${catalog.targetVersion}`)
     }
     const byPath = new Map(input.archives.map(archive => [archive.relativePath, archive]))
     const seen = new Set<string>()
@@ -181,7 +183,9 @@ function orderCatalogInput(input: CdnCatalogInput): CdnCatalogInput {
 export function parseCdnRuntimeManifest(value: unknown): CdnRuntimeManifest {
     const manifest = requireExactObject(value, ROOT_KEYS, "manifest")
     if (manifest.schemaVersion !== 1) throw new Error("manifest.schemaVersion must be 1")
-    if (manifest.baseline !== "cn-1.4.54") throw new Error("manifest.baseline must be cn-1.4.54")
+    if (manifest.baseline !== CDN_RUNTIME_BASELINE) {
+        throw new Error(`manifest.baseline must be ${CDN_RUNTIME_BASELINE}`)
+    }
 
     const catalogInput = orderCatalogInput(parseCatalogInput(manifest.catalogInput))
     const entityLists = parseEntityLists(manifest.entityLists)
@@ -191,7 +195,7 @@ export function parseCdnRuntimeManifest(value: unknown): CdnRuntimeManifest {
 
     return deepFreeze({
         schemaVersion: 1,
-        baseline: "cn-1.4.54",
+        baseline: CDN_RUNTIME_BASELINE,
         catalogInput,
         entityLists,
     })
@@ -203,7 +207,7 @@ export function createCdnRuntimeManifest(
 ): CdnRuntimeManifest {
     return parseCdnRuntimeManifest({
         schemaVersion: 1,
-        baseline: "cn-1.4.54",
+        baseline: CDN_RUNTIME_BASELINE,
         catalogInput: input,
         entityLists,
     })

@@ -3,6 +3,7 @@ import { readFileSync } from "fs"
 import { join } from "path"
 
 import { getDefaultGachaSeedQuarantine } from "./gacha-seed-quarantine"
+import { BUNDLED_CDN_CATALOG_VERSION } from "../content/constants"
 
 type SeedPool = Record<string, Record<string, number[]>>
 
@@ -41,7 +42,7 @@ export interface GachaSeedCatalogOptions {
 
 const DEFAULT_CATALOG_DIR = join(__dirname, "..", "..", "assets", "gacha-seed-catalog")
 const EXPECTED_CLIENT_VERSION = "1.8.1"
-const EXPECTED_CDN_VERSION = "1.4.54"
+const EXPECTED_CDN_VERSION = BUNDLED_CDN_CATALOG_VERSION
 const OFFICIAL_MOVIE_IDS = ["fes", "fes_guarantee", "normal", "normal_guarantee"] as const
 const MOVIE_ID_PATTERN = /^[a-z][a-z0-9_]*$/
 const MAX_SEED = 2_147_483_647

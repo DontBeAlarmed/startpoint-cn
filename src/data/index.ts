@@ -12,6 +12,7 @@ import {
     RuntimeDataPaths,
 } from "../runtime/data-paths";
 import { createBetterSqlite3Database } from "../runtime/native-binding";
+import { CURRENT_DATA_SCHEMA } from "../runtime/release-contract";
 import { getRealNowMs } from "../runtime/time/game-time";
 
 // better-sqlite3 supports addon objects although the installed type declaration only lists paths.
@@ -61,7 +62,7 @@ export class DatabaseLifecycleError extends Error {
 }
 
 const defaultMigrations: DatabaseMigrations = {
-    latestVersion: 22,
+    latestVersion: CURRENT_DATA_SCHEMA,
     init: initWdfpData,
     updateBefore: updateWdfpDataBefore,
     updateAfter: updateWdfpDataAfter,

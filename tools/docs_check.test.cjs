@@ -4,6 +4,7 @@ const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
+const { loadServerReleaseContract } = require("./server-bundle/release-contract.cjs")
 
 const REQUIRED_DOC_DIRECTORIES = [
     "admin",
@@ -49,6 +50,77 @@ function createValidFixture(t) {
 
     return root
 }
+
+function writeReleaseContractDocs(t, mutateField) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-contract-docs-"))
+    t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+    const contract = loadServerReleaseContract(path.resolve(__dirname, ".."))
+    const anchors = {
+        serverManifestSchemaVersion: contract.serverManifestSchemaVersion,
+        runtimeApiVersion: contract.runtimeApiVersion,
+        currentDataSchema: contract.currentDataSchema,
+        serverEntry: contract.serverEntry,
+        localPrepareEntry: contract.localPrepareEntry,
+        adminPath: contract.adminPath,
+        bundledCdnCatalogVersion: contract.bundledCdnCatalogVersion,
+        supportedAssetModes: contract.supportedAssetModes,
+        defaultPorts: contract.defaultPorts,
+    }
+    if (mutateField) {
+        const [field, value] = mutateField
+        anchors[field] = value
+    }
+    const block = `\`\`\`release-contract\n${JSON.stringify(anchors, null, 2)}\n\`\`\``
+    fs.mkdirSync(path.join(root, "docs/runtime"), { recursive: true })
+    fs.writeFileSync(path.join(root, "docs/embedded-runtime-contract.md"), `${block}\n`)
+    fs.writeFileSync(path.join(root, "docs/runtime/server-bundle.md"), `${block}\n`)
+    return root
+}
+
+test("两份运行时契约文档的发布锚点通过", t => {
+    const { checkReleaseContractDocumentation } = require("./docs_check.cjs")
+    const root = writeReleaseContractDocs(t)
+
+    assert.deepEqual(checkReleaseContractDocumentation({
+        rootDir: root,
+        contract: loadServerReleaseContract(path.resolve(__dirname, "..")),
+    }), [])
+})
+
+test("任一运行时契约文档锚点改错时指出文档和字段", t => {
+    const { checkReleaseContractDocumentation } = require("./docs_check.cjs")
+    const documents = [
+        "docs/embedded-runtime-contract.md",
+        "docs/runtime/server-bundle.md",
+    ]
+    const cases = [
+        ["serverManifestSchemaVersion", 4],
+        ["runtimeApiVersion", 2],
+        ["currentDataSchema", 23],
+        ["serverEntry", "out/server.js"],
+        ["localPrepareEntry", "out/sync.js"],
+        ["adminPath", "admin/dist"],
+        ["bundledCdnCatalogVersion", "1.4.55"],
+        ["supportedAssetModes", ["client-owned", "remote"]],
+        ["defaultPorts", { http: 9001, tcp: 9003, hub: 9004 }],
+    ]
+
+    for (const [field, value] of cases) {
+        const root = writeReleaseContractDocs(t, [field, value])
+        const errors = checkReleaseContractDocumentation({
+            rootDir: root,
+            contract: loadServerReleaseContract(path.resolve(__dirname, "..")),
+        })
+
+        assert.equal(errors.length, documents.length)
+        for (const document of documents) {
+            assert.ok(
+                errors.some(error => error.includes(document) && error.includes(field)),
+                `${document}: ${field}`,
+            )
+        }
+    }
+})
 
 function trackedMarkdown(root) {
     const files = []

@@ -2,8 +2,12 @@
 
 const assert = require("node:assert/strict")
 const test = require("node:test")
+const path = require("node:path")
 
 require("ts-node/register/transpile-only")
+
+const { loadServerReleaseContract } = require("../tools/server-bundle/release-contract.cjs")
+const releaseContract = loadServerReleaseContract(path.resolve(__dirname, ".."))
 
 const Fastify = require("fastify")
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
@@ -50,7 +54,7 @@ test("ready health preserves v1 fields and adds embedded multiplayer details", (
         assets: {
             mode: "local",
             status: "ready",
-            minClientVersion: "1.4.54",
+            minClientVersion: releaseContract.bundledCdnCatalogVersion,
             observedClientVersion: null,
         },
         multiplayer: {
@@ -112,7 +116,7 @@ test("client-owned unknown assets do not block readiness", () => {
     assert.deepEqual(result.body.assets, {
         mode: "client-owned",
         status: "unknown",
-        minClientVersion: "1.4.54",
+        minClientVersion: releaseContract.bundledCdnCatalogVersion,
         observedClientVersion: null,
     })
 })

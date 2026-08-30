@@ -1,13 +1,14 @@
 import type { CoordinatorResult, MultiCoordinatorOrigin } from "../coordinator/contracts"
 import type { MultiHubControlStatus, MultiHubTcpEndpoint } from "../hub/control-routes"
 import type { RuntimeTcpServiceConfig } from "../../runtime/config"
+import { DEFAULT_SERVER_PORTS } from "../../runtime/release-contract"
 import { getRealNowMs } from "../../runtime/time/game-time"
 
 export type MultiClientFallbackState = "remote" | "probing" | "local" | "degraded"
 
 export const CLIENT_FALLBACK_TCP_CONFIG = Object.freeze({
     host: "127.0.0.1",
-    port: 8003,
+    port: DEFAULT_SERVER_PORTS.tcp,
 })
 
 const DEFAULT_PROBE_COOLDOWN_MS = 1_000

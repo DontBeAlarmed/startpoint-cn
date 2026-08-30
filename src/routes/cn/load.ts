@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import path from "node:path";
+import { DEFAULT_SERVER_PORTS } from "../../runtime/release-contract";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { collectPlayerDataPooledExpSync, dailyResetPlayerDataSync, getPlayerSync, refreshPlayerDailyChallengePointsForRealDaySync, updatePlayerSync } from "../../data/domains/player"
 import {
@@ -376,7 +377,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             const assetState = resolveAssetLoadState(assetProvider, resVer, snapshotTargetVersion);
             wrapOptionFields(clientData, assetState.availableAssetVersion, {
                 host: options.httpDisplayHost ?? "127.0.0.1",
-                port: options.httpPort ?? 8001,
+                port: options.httpPort ?? DEFAULT_SERVER_PORTS.http,
             });
             clientData.favorite_party_group_list = getFavoritePartyGroupListSync(
                 playerId,

@@ -1,10 +1,11 @@
+import fs from "node:fs"
+import path from "node:path"
+import { DEFAULT_SERVER_PORTS } from "./release-contract"
 import {
     AssetModeEnvironment,
     AssetProviderConfig,
     parseAssetProviderConfig,
 } from "../content/cdn/asset-mode"
-import fs from "node:fs"
-import path from "node:path"
 import { validateMultiHubToken } from "../multi/hub/token"
 import { resolveRuntimeDataPaths } from "./data-paths"
 import {
@@ -328,7 +329,7 @@ function parseMultiRuntimeConfig(
             mode,
             tcp: Object.freeze({
                 host,
-                port: parsePort(env.SESSION_PORT, 8003),
+                port: parsePort(env.SESSION_PORT, DEFAULT_SERVER_PORTS.tcp),
                 ...(publicHost === undefined ? {} : { publicHost }),
             }),
         })
@@ -345,12 +346,12 @@ function parseMultiRuntimeConfig(
             mode,
             tcp: Object.freeze({
                 host: parseHost(env.SESSION_HOST, "127.0.0.1"),
-                port: parsePort(env.SESSION_PORT, 8003),
+                port: parsePort(env.SESSION_PORT, DEFAULT_SERVER_PORTS.tcp),
                 publicHost,
             }),
             hub: Object.freeze({
                 host: parseHost(env.MULTI_HUB_HOST, ""),
-                port: parsePort(env.MULTI_HUB_PORT, 8004),
+                port: parsePort(env.MULTI_HUB_PORT, DEFAULT_SERVER_PORTS.hub),
             }),
             credentialsPath: resolveMultiHubCredentialsPath(env, projectRoot),
         })
@@ -368,7 +369,7 @@ function parseMultiRuntimeConfig(
             token: env.MULTI_HUB_TOKEN,
             tcp: Object.freeze({
                 host,
-                port: parsePort(env.SESSION_PORT, 8003),
+                port: parsePort(env.SESSION_PORT, DEFAULT_SERVER_PORTS.tcp),
                 ...(publicHost === undefined ? {} : { publicHost }),
             }),
         })
@@ -489,7 +490,7 @@ export function parseCnRuntimeConfig({
 }: ParseCnRuntimeConfigOptions): CnRuntimeConfig {
     const http = Object.freeze({
         host: parseHost(env.CN_LISTEN_HOST, "127.0.0.1"),
-        port: parsePort(env.CN_LISTEN_PORT, 8001),
+        port: parsePort(env.CN_LISTEN_PORT, DEFAULT_SERVER_PORTS.http),
     })
     const httpDisplayHost = resolveDisplayHost({
         listenHost: http.host,

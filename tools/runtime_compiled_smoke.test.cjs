@@ -16,6 +16,8 @@ const {
 } = require("./test-workflow/benchmark.cjs")
 
 const projectRoot = path.resolve(__dirname, "..")
+const { loadServerReleaseContract } = require("./server-bundle/release-contract.cjs")
+const currentDataSchema = loadServerReleaseContract(projectRoot).currentDataSchema
 const seedBundleFiles = [
     "gacha-seed-catalog/manifest.json",
     "gacha-seed-catalog/normal.json",
@@ -236,7 +238,7 @@ test("[socket] official CN wrapper reports ready and releases resources on SIGTE
     assert.equal(health.status, "ready")
     assert.deepEqual(health.serverBundle, { version: "1.0.1", bundleId: null })
     assert.deepEqual(health.services, { http: true, tcp: true })
-        assert.deepEqual(health.database, { ready: true, schema: 22 })
+        assert.deepEqual(health.database, { ready: true, schema: currentDataSchema })
     assert.deepEqual(health.assets, {
         mode: "client-owned",
         status: "unknown",
@@ -258,7 +260,7 @@ test("[socket] official CN wrapper reports ready and releases resources on SIGTE
     const database = new Sqlite(path.join(dataDir, "wdfp_data.db"))
     try {
         assert.deepEqual(database.prepare("SELECT 1 AS value").get(), { value: 1 })
-        assert.equal(database.pragma("user_version", { simple: true }), 22)
+        assert.equal(database.pragma("user_version", { simple: true }), currentDataSchema)
     } finally {
         database.close()
     }
@@ -308,6 +310,16 @@ test("compiled lifecycle order and metadata fallback survive an isolated bundle"
     fs.copyFileSync(
         path.join(projectRoot, "out/runtime/bundle-metadata.js"),
         path.join(runtimeDir, "bundle-metadata.js"),
+    )
+    fs.copyFileSync(
+        path.join(projectRoot, "out/runtime/release-contract.js"),
+        path.join(runtimeDir, "release-contract.js"),
+    )
+    const assetsDir = path.join(bundleRoot, "assets")
+    fs.mkdirSync(assetsDir, { recursive: true })
+    fs.copyFileSync(
+        path.join(projectRoot, "assets/server_release_contract.json"),
+        path.join(assetsDir, "server_release_contract.json"),
     )
 
     const { loadBundleMetadata } = require(path.join(runtimeDir, "bundle-metadata.js"))

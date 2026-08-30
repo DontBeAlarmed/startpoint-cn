@@ -11,6 +11,9 @@ const Sqlite = require("better-sqlite3")
 
 require("ts-node/register/transpile-only")
 
+const { loadServerReleaseContract } = require("../tools/server-bundle/release-contract.cjs")
+const currentDataSchema = loadServerReleaseContract(path.resolve(__dirname, "..")).currentDataSchema
+
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "player-save-v2-"))
 const previousDataDirectory = process.env.DATA_DIR
 process.env.DATA_DIR = databaseDirectory
@@ -298,7 +301,7 @@ test("v2 export includes all registered domains and excludes transient battle st
     assert.equal(snapshot.formatVersion, 2)
     assert.equal(snapshot.version, 2)
     assert.equal(snapshot.mode, "backup")
-    assert.equal(snapshot.producer.dbSchemaVersion, 22)
+    assert.equal(snapshot.producer.dbSchemaVersion, currentDataSchema)
     assert.equal(snapshot.playerId, playerId)
     assert.equal(tables.players_mails[0].subject, "backup-mail")
     assert.equal(tables.players_box_gacha_drawn_rewards[0].number, 3)

@@ -31,6 +31,7 @@ function createHarness(statuses, {
         dependencies: {
             cleanOrphanCompiledFiles: () => cleaned.push("cleaned"),
             executable: "/runtime/node",
+            loadServerReleaseContract: () => ({ adminPath: "web/dist" }),
             npmExecutable,
             platform,
             projectRoot: "/project",

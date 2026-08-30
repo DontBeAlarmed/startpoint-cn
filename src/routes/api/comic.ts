@@ -7,6 +7,7 @@ import { getSession } from "../../data/domains/session"
 import { generateDataHeaders } from "../../utils";
 import { readdirSync, readFileSync, existsSync } from "fs";
 import path from "path";
+import { DEFAULT_SERVER_PORTS } from "../../runtime/release-contract";
 
 interface ComicRouteOptions {
     readonly comicDir?: string | null
@@ -17,7 +18,7 @@ interface ComicRouteOptions {
 export function buildComicBaseUrl(
     requestHost: string | undefined,
     httpDisplayHost = "127.0.0.1",
-    httpPort = 8001,
+    httpPort = DEFAULT_SERVER_PORTS.http,
 ): string {
     if (requestHost) return `http://${requestHost}`
     const host = httpDisplayHost.includes(":") && !httpDisplayHost.startsWith("[")

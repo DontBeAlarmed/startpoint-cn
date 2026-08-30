@@ -2,6 +2,11 @@ import type { FastifyInstance } from "fastify"
 
 import type { AssetMode } from "../content/cdn/asset-mode"
 import type { MultiRuntimeStatus } from "../multi/runtime/status"
+import {
+    BUNDLED_CDN_CATALOG_VERSION,
+    RUNTIME_API_VERSION,
+    SERVER_RELEASE_CONTRACT,
+} from "./release-contract"
 
 export type RuntimePhase = "starting" | "ready" | "stopping" | "failed" | "stopped"
 
@@ -38,13 +43,13 @@ export interface RuntimeHealthBody {
         readonly tcp: boolean
     }
     readonly admin: {
-        readonly required: true
+        readonly required: typeof SERVER_RELEASE_CONTRACT.adminRequired
         readonly available: boolean
     }
     readonly assets: {
         readonly mode: AssetMode
         readonly status: "ready" | "not-ready" | "unknown"
-        readonly minClientVersion: "1.4.54"
+        readonly minClientVersion: typeof BUNDLED_CDN_CATALOG_VERSION
         readonly observedClientVersion: null
     }
     readonly multiplayer?: MultiRuntimeStatus
@@ -76,17 +81,20 @@ export function createRuntimeHealthSnapshot(state: RuntimeHealthState): RuntimeH
                 version: state.bundleVersion,
                 bundleId: state.bundleId,
             }),
-            runtime: Object.freeze({ api: 1, node: state.nodeVersion }),
+            runtime: Object.freeze({ api: RUNTIME_API_VERSION, node: state.nodeVersion }),
             database: Object.freeze({ ...state.database }),
             services: Object.freeze({
                 http: state.httpListening,
                 tcp: state.multi.tcp.available,
             }),
-            admin: Object.freeze({ required: true as const, available: state.adminAvailable }),
+            admin: Object.freeze({
+                required: SERVER_RELEASE_CONTRACT.adminRequired,
+                available: state.adminAvailable,
+            }),
             assets: Object.freeze({
                 mode: state.assetMode,
                 status: assetStatus,
-                minClientVersion: "1.4.54",
+                minClientVersion: BUNDLED_CDN_CATALOG_VERSION,
                 observedClientVersion: null,
             }),
             multiplayer: state.multi,

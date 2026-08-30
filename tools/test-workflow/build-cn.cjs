@@ -4,6 +4,7 @@
 const { spawnSync } = require("node:child_process")
 const fs = require("node:fs")
 const path = require("node:path")
+const { loadServerReleaseContract } = require("../server-bundle/release-contract.cjs")
 
 const COMPILED_SUFFIXES = [".d.ts.map", ".js.map", ".d.ts", ".js"]
 const SOURCE_SUFFIXES = [".ts", ".tsx", ".cts", ".mts"]
@@ -28,13 +29,20 @@ function processStatus(result, stage, stderr) {
     return result.status
 }
 
-function hasRequiredAdminBuild(projectRoot) {
+function hasRequiredAdminBuildAtPath(projectRoot, adminPath) {
     try {
-        const status = fs.lstatSync(path.join(projectRoot, "web/dist/index.html"))
+        const status = fs.lstatSync(path.join(projectRoot, adminPath, "index.html"))
         return status.isFile() && !status.isSymbolicLink()
     } catch {
         return false
     }
+}
+
+function hasRequiredAdminBuild(projectRoot) {
+    return hasRequiredAdminBuildAtPath(
+        projectRoot,
+        loadServerReleaseContract(projectRoot).adminPath,
+    )
 }
 
 function removeOrphanCompiledFiles(sourceDirectory, outputDirectory) {
@@ -67,6 +75,8 @@ function removeOrphanCompiledFiles(sourceDirectory, outputDirectory) {
 
 function runCnBuild(dependencies = {}) {
     const projectRoot = path.resolve(dependencies.projectRoot ?? path.resolve(__dirname, "../.."))
+    const loadContract = dependencies.loadServerReleaseContract ?? loadServerReleaseContract
+    const adminPath = loadContract(projectRoot).adminPath
     const platform = dependencies.platform ?? process.platform
     const executable = dependencies.executable ?? process.execPath
     const npmExecutable = dependencies.npmExecutable ?? (platform === "win32" ? "npm.cmd" : "npm")
@@ -87,7 +97,7 @@ function runCnBuild(dependencies = {}) {
             path.join(projectRoot, "out"),
         ))
     const verifyAdminBuild = dependencies.verifyAdminBuild
-        ?? (() => hasRequiredAdminBuild(projectRoot))
+        ?? (() => hasRequiredAdminBuildAtPath(projectRoot, adminPath))
     const spawnOptions = {
         cwd: projectRoot,
         shell: false,
@@ -136,7 +146,7 @@ function runCnBuild(dependencies = {}) {
         adminReady = false
     }
     if (!adminReady) {
-        stderr.write("CN build admin output invalid: web/dist/index.html is required\n")
+        stderr.write(`CN build admin output invalid: ${adminPath}/index.html is required\n`)
         return 1
     }
 

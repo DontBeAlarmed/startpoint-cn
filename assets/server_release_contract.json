@@ -1,0 +1,13 @@
+{
+  "serverManifestSchemaVersion": 3,
+  "runtimeApiVersion": 1,
+  "minimumDataSchema": 0,
+  "currentDataSchema": 22,
+  "serverEntry": "out/cn-server.js",
+  "localPrepareEntry": "out/content/sync/entry.js",
+  "adminPath": "web/dist",
+  "adminRequired": true,
+  "bundledCdnCatalogVersion": "1.4.54",
+  "supportedAssetModes": ["client-owned", "local", "remote"],
+  "defaultPorts": { "http": 8001, "tcp": 8003, "hub": 8004 }
+}

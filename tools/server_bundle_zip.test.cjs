@@ -12,6 +12,9 @@ const packPath = path.join(__dirname, "server-bundle/pack.cjs")
 const zipPath = path.join(__dirname, "server-bundle/zip.cjs")
 const { collectBundleEntries, crc32, writeStoredZip } = require(zipPath)
 const { canonicalJsonBuffer } = require("./server-bundle/canonical-json.cjs")
+const { loadServerReleaseContract } = require("./server-bundle/release-contract.cjs")
+
+const releaseContract = loadServerReleaseContract(path.resolve(__dirname, ".."))
 
 const LOCAL_SIGNATURE = 0x04034b50
 const CENTRAL_SIGNATURE = 0x02014b50
@@ -87,13 +90,17 @@ function createPackFixture(t, serverVersion = "1.2.3") {
         entry: "out/cn-server.js",
         files,
         name: "starpoint-cn",
-        ports: { http: 8001, tcp: 8003 },
+        ports: {
+            http: releaseContract.defaultPorts.http,
+            tcp: releaseContract.defaultPorts.tcp,
+            hub: releaseContract.defaultPorts.hub,
+        },
         requires: {
             dependencyLock: `sha256:${"0".repeat(64)}`,
             minDataSchema: 0,
             node: ">=20.12.0",
             runtimeApi: 1,
-            targetDataSchema: 22,
+            targetDataSchema: releaseContract.currentDataSchema,
         },
         schemaVersion: 3,
         serverVersion,

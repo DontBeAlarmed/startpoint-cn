@@ -6,8 +6,10 @@ const { buildSeedCatalogFromPools, writeSeedCatalog } = require("./catalog.cjs")
 const { DEFAULT_SEED_END, DEFAULT_SEED_START } = require("./catalog_defaults.cjs")
 const { currentCatalogMetadata } = require("./catalog_metadata.cjs")
 const { integerArgument, parseArguments } = require("./cli.cjs")
+const { loadServerReleaseContract } = require("../server-bundle/release-contract.cjs")
 
 const ROOT = path.join(__dirname, "..", "..")
+const BUNDLED_CDN_CATALOG_VERSION = loadServerReleaseContract(ROOT).bundledCdnCatalogVersion
 const DEFAULT_MOVIES = ["normal", "normal_guarantee", "fes", "fes_guarantee"]
 const SUPPORTED_MOVIES = new Set(DEFAULT_MOVIES)
 
@@ -91,7 +93,7 @@ async function main(argv) {
     const metadata = currentCatalogMetadata()
     const catalog = buildSeedCatalogFromPools({
         clientVersion: args["client-version"] ?? "1.8.1",
-        cdnVersion: args["cdn-version"] ?? "1.4.54",
+        cdnVersion: args["cdn-version"] ?? BUNDLED_CDN_CATALOG_VERSION,
         configDigest: metadata.configDigest,
         predictorDigest: metadata.predictorDigest,
         seedStart,

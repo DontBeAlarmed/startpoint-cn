@@ -1,6 +1,7 @@
 import path from "node:path"
 
 import { deepFreeze } from "../deep-freeze"
+import { BUNDLED_CDN_CATALOG_VERSION } from "../constants"
 import type { ContentPaths } from "../paths"
 import type { CdnCatalog } from "./types"
 
@@ -145,10 +146,10 @@ export function parseArchiveSourceSummary(
     if (isRecord(summary) && Object.prototype.hasOwnProperty.call(summary, "archiveSources")) {
         return parseArchiveSourceManifest(summary.archiveSources, catalog)
     }
-    if (!allowLegacyBaselineFallback || catalog.targetVersion !== "1.4.54") {
+    if (!allowLegacyBaselineFallback || catalog.targetVersion !== BUNDLED_CDN_CATALOG_VERSION) {
         return fail(
             "ARCHIVE_SOURCE_SCHEMA",
-            "release summary without archiveSources is only valid for the 1.4.54 baseline",
+            `release summary without archiveSources is only valid for the ${BUNDLED_CDN_CATALOG_VERSION} baseline`,
         )
     }
     return createBaselineArchiveSourceManifest(catalog)

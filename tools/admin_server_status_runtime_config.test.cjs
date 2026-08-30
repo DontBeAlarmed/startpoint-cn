@@ -64,3 +64,13 @@ test("server status uses startup runtime config instead of request-time environm
     assert.equal(body.cdn.baseUrl, "http://configured.example:9101/patch/cn")
     assert.equal(body.cdn.configuredDir, "/runtime/cdn")
 })
+
+test("server status falls back to the release HTTP default without runtime config", async t => {
+    const app = Fastify()
+    t.after(() => app.close())
+    await app.register(serverRoutes)
+
+    const response = await app.inject({ method: "GET", url: "/status" })
+    assert.equal(response.statusCode, 200, response.body)
+    assert.equal(response.json().server.listenPort, "8001")
+})

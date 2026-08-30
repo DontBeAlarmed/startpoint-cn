@@ -424,10 +424,6 @@ function createResourceFixture({
 }
 
 {
-    const dataIndexSource = fs.readFileSync(path.join(projectRoot, "src/data/index.ts"), "utf8")
-assert.match(dataIndexSource, /latestVersion:\s*22/)
-
-{
     let notification = null
     setRoomDisbandListener((roomNumber, hostPlayerId) => {
         notification = { roomNumber, hostPlayerId }
@@ -442,7 +438,6 @@ assert.match(dataIndexSource, /latestVersion:\s*22/)
     disbandRoom(room.room_number)
     assert.equal(notification, null)
     setRoomDisbandListener(null)
-}
 }
 
 console.log("quest resource lifecycle tests passed")

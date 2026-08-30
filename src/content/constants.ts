@@ -1,1 +1,1 @@
-export const BUNDLED_CDN_CATALOG_VERSION = "1.4.54"
+export { BUNDLED_CDN_CATALOG_VERSION } from "../runtime/release-contract"

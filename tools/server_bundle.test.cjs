@@ -7,8 +7,10 @@ const os = require("node:os")
 const path = require("node:path")
 const { spawnSync } = require("node:child_process")
 const test = require("node:test")
+const { loadServerReleaseContract } = require("./server-bundle/release-contract.cjs")
 
 const projectRoot = path.resolve(__dirname, "..")
+const releaseContract = loadServerReleaseContract(projectRoot)
 const builderPath = path.join(projectRoot, "tools/server-bundle/build.cjs")
 const verifierPath = path.join(projectRoot, "tools/server-bundle/verify.cjs")
 
@@ -42,6 +44,9 @@ function temporaryProject(t, { admin = true } = {}) {
         lockfileVersion: 3,
         packages: {},
     }))
+    write(root, "assets/server_release_contract.json", fs.readFileSync(
+        path.join(projectRoot, "assets/server_release_contract.json"),
+    ))
     write(root, "out/cn-server.js", "console.log('server')\n")
     write(
         root,
@@ -210,7 +215,11 @@ test("builds a canonical reproducible thin server bundle without web/public", as
         startup: { localPrepareEntry: "out/content/sync/entry.js" },
         files: first.files,
         name: "starpoint-cn",
-        ports: { http: 8001, tcp: 8003 },
+        ports: {
+            http: releaseContract.defaultPorts.http,
+            tcp: releaseContract.defaultPorts.tcp,
+            hub: releaseContract.defaultPorts.hub,
+        },
         requires: {
             dependencyLock: `sha256:${crypto.createHash("sha256")
                 .update(fs.readFileSync(path.join(root, "package-lock.json")))
@@ -231,6 +240,7 @@ test("builds a canonical reproducible thin server bundle without web/public", as
             "NOTICE",
             "assets/base.json",
             "assets/nested/table.json",
+            "assets/server_release_contract.json",
             "out/cn-server.js",
             "out/content/sync/entry.js",
             "out/lib/runtime.js",
@@ -695,5 +705,8 @@ test("verifier keeps traversal and validation independent from the builder", () 
     const dependencies = [...source.matchAll(/require\(["']([^"']+)["']\)/g)]
         .map(match => match[1])
         .filter(specifier => !specifier.startsWith("node:"))
-    assert.deepEqual(dependencies, ["./canonical-json.cjs"])
+    assert.deepEqual(dependencies, [
+        "./canonical-json.cjs",
+        "./release-contract.cjs",
+    ])
 })

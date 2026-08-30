@@ -19,6 +19,7 @@ import { buildAdminContentStatus } from "../../lib/admin-content-status";
 import { getRankDegree } from "../../lib/stamina";
 import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 import type { CnRuntimeConfig } from "../../runtime/config";
+import { DEFAULT_SERVER_PORTS } from "../../runtime/release-contract";
 import path from "node:path";
 import { wantsJson } from "./http";
 import {
@@ -77,7 +78,7 @@ function legacyTimeResponse(
 const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) => {
     const serverTimeService = options.serverTimeService ?? new ServerTimeService()
     const fallbackRuntimeConfig: Pick<CnRuntimeConfig, "http" | "httpDisplayHost" | "assetProvider"> = {
-        http: { host: "127.0.0.1", port: 8001 },
+        http: { host: "127.0.0.1", port: DEFAULT_SERVER_PORTS.http },
         httpDisplayHost: "127.0.0.1",
         assetProvider: { mode: "client-owned" },
     }

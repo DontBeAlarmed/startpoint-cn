@@ -39,8 +39,9 @@ import {
     type MultiTransportTuning,
 } from "../runtime/tuning"
 import { releaseAbandonedMultiActiveQuest } from "../../lib/quest/active-quest-service"
+import { DEFAULT_SERVER_PORTS } from "../../runtime/release-contract"
 
-export const SESSION_PORT = 8003
+export const SESSION_PORT = DEFAULT_SERVER_PORTS.tcp
 export const SESSION_HOST = "127.0.0.1"
 export const DEFAULT_SESSION_SHUTDOWN_TIMEOUT_MS = 5000
 export const DEFAULT_SESSION_HANDSHAKE_TIMEOUT_MS = DEFAULT_MULTI_TRANSPORT_TUNING.handshakeTimeoutMs

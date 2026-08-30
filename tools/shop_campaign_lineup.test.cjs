@@ -8,6 +8,9 @@ const path = require("node:path")
 
 require("ts-node/register/transpile-only")
 
+const { loadServerReleaseContract } = require("../tools/server-bundle/release-contract.cjs")
+const currentDataSchema = loadServerReleaseContract(path.resolve(__dirname, "..")).currentDataSchema
+
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "shop-campaign-lineup-"))
 const previousDataDirectory = process.env.DATA_DIR
 process.env.DATA_DIR = databaseDirectory
@@ -38,7 +41,7 @@ const {
 } = require("../src/lib/shop-select-campaign")
 
 db = initializeDatabase()
-assert.equal(db.pragma("user_version", { simple: true }), 22)
+assert.equal(db.pragma("user_version", { simple: true }), currentDataSchema)
 
 const account = insertAccountSync({
     appId: "wf_cn",

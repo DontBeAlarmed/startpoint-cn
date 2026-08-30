@@ -19,8 +19,10 @@ const {
     createCdnRuntimeManifest,
     serializeCdnRuntimeManifest,
 } = require("../src/content/cdn/runtime-manifest")
+const { loadServerReleaseContract } = require("./server-bundle/release-contract.cjs")
 
 const PROJECT_ROOT = path.resolve(__dirname, "..")
+const { bundledCdnCatalogVersion } = loadServerReleaseContract(PROJECT_ROOT)
 const MAX_ARGUMENT_VALUE_LENGTH = 4096
 const VALUE_OPTIONS = new Map([
     ["--output", "outputPath"],
@@ -158,10 +160,10 @@ async function run(argv, dependencies = {}) {
     if (outputPath !== null) await assertOutputPathAllowed(outputPath, paths, dependencies)
     const input = await (dependencies.scanCatalogInput ?? scanCdnCatalogInput)(paths)
     const catalog = (dependencies.buildCatalog ?? buildCdnCatalog)(input)
-    if (catalog.targetVersion !== "1.4.54") {
+    if (catalog.targetVersion !== bundledCdnCatalogVersion) {
         throw new ManifestCliError(
             "MANIFEST_UNSUPPORTED_TARGET",
-            `Catalog target 必须是 1.4.54，实际为 ${catalog.targetVersion}`,
+            `Catalog target 必须是 ${bundledCdnCatalogVersion}，实际为 ${catalog.targetVersion}`,
         )
     }
 

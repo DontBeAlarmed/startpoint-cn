@@ -6,6 +6,7 @@ const fs = require("node:fs")
 const path = require("node:path")
 
 const { canonicalJsonBuffer, sha256Hex } = require("./canonical-json.cjs")
+const { loadServerReleaseContract } = require("./release-contract.cjs")
 const { verifyServerBundle } = require("./verify.cjs")
 
 const MANIFEST_NAME = "server-manifest.json"
@@ -121,8 +122,8 @@ function copySingleFile({ sourcePath, destinationRoot, bundleRelative, files }) 
     files.push({ path: bundleRelative, bytes: bytes.length, sha256: sha256Hex(bytes) })
 }
 
-function inspectRequiredAdmin(projectRoot) {
-    const adminRoot = path.join(projectRoot, "web/dist")
+function inspectRequiredAdmin(projectRoot, adminPath) {
+    const adminRoot = path.join(projectRoot, adminPath)
     const rootStatus = lstat(adminRoot, "Required admin input")
     if (rootStatus.isSymbolicLink()) throw new Error("Required admin input must not be a symbolic link")
     if (!rootStatus.isDirectory()) throw new Error("Required admin input must be a directory")
@@ -168,6 +169,7 @@ function publishBundle(temporaryRoot, outputRoot, hadExistingOutput) {
 
 function buildServerBundle(options = {}) {
     const projectRoot = path.resolve(options.projectRoot ?? path.resolve(__dirname, "../.."))
+    const contract = loadServerReleaseContract(projectRoot)
     const outputRoot = path.resolve(projectRoot, options.outputRoot ?? DEFAULT_OUTPUT)
     const legacyAdminRoot = path.join(projectRoot, "web/pages")
     if (lstat(legacyAdminRoot, "Legacy admin source web/pages", { optional: true }) !== null) {
@@ -203,7 +205,7 @@ function buildServerBundle(options = {}) {
         throw new Error("Input dependency lock is incompatible with package metadata")
     }
 
-    const adminRoot = inspectRequiredAdmin(projectRoot)
+    const adminRoot = inspectRequiredAdmin(projectRoot, contract.adminPath)
     const inputs = [
         path.join(projectRoot, "out"),
         path.join(projectRoot, "assets"),
@@ -243,39 +245,43 @@ function buildServerBundle(options = {}) {
         copyTree({
             sourceRoot: adminRoot,
             destinationRoot: temporaryRoot,
-            destinationPrefix: "web/dist",
+            destinationPrefix: contract.adminPath,
             exclude: isVersionControlMetadata,
             files,
         })
         copySingleFile({ sourcePath: path.join(projectRoot, "LICENSE"), destinationRoot: temporaryRoot, bundleRelative: "LICENSE", files })
         copySingleFile({ sourcePath: path.join(projectRoot, "NOTICE"), destinationRoot: temporaryRoot, bundleRelative: "NOTICE", files })
         files.sort((left, right) => compareRelativePaths(left.path, right.path))
-        if (!files.some(file => file.path === "out/cn-server.js")) {
-            throw new Error("Bundle entry out/cn-server.js is missing")
+        if (!files.some(file => file.path === contract.serverEntry)) {
+            throw new Error(`Bundle entry ${contract.serverEntry} is missing`)
         }
-        if (!files.some(file => file.path === "out/content/sync/entry.js")) {
-            throw new Error("Local prepare entry out/content/sync/entry.js is missing")
+        if (!files.some(file => file.path === contract.localPrepareEntry)) {
+            throw new Error(`Local prepare entry ${contract.localPrepareEntry} is missing`)
         }
 
         const digestInput = {
-            schemaVersion: 3,
+            schemaVersion: contract.serverManifestSchemaVersion,
             name: "starpoint-cn",
             serverVersion: packageJson.version,
-            entry: "out/cn-server.js",
-            startup: { localPrepareEntry: "out/content/sync/entry.js" },
+            entry: contract.serverEntry,
+            startup: { localPrepareEntry: contract.localPrepareEntry },
             requires: {
-                runtimeApi: 1,
+                runtimeApi: contract.runtimeApiVersion,
                 node: packageJson.engines.node,
                 dependencyLock: `sha256:${sha256Hex(dependencyLockBytes)}`,
-                minDataSchema: 0,
-                targetDataSchema: 22,
+                minDataSchema: contract.minimumDataSchema,
+                targetDataSchema: contract.currentDataSchema,
             },
-            admin: { path: "web/dist", required: true },
+            admin: { path: contract.adminPath, required: contract.adminRequired },
             assets: {
-                supportedModes: ["client-owned", "local", "remote"],
-                minClientAssetVersion: "1.4.54",
+                supportedModes: [...contract.supportedAssetModes],
+                minClientAssetVersion: contract.bundledCdnCatalogVersion,
             },
-            ports: { http: 8001, tcp: 8003 },
+            ports: {
+                http: contract.defaultPorts.http,
+                tcp: contract.defaultPorts.tcp,
+                hub: contract.defaultPorts.hub,
+            },
             files,
         }
         const manifest = {

@@ -1,6 +1,8 @@
 import fs from "node:fs"
 import path from "node:path"
 
+import { SERVER_RELEASE_CONTRACT } from "./release-contract"
+
 // Health metadata source only; this module does not validate or activate server bundles.
 export const FALLBACK_BUNDLE_VERSION = "unknown"
 const SEMANTIC_VERSION = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/
@@ -56,7 +58,7 @@ function hasSupportedManifestSchema(value: unknown): boolean {
     const startupKeys = Object.keys(startup)
     return startupKeys.length === 1
         && startupKeys[0] === "localPrepareEntry"
-        && (startup as Record<string, unknown>).localPrepareEntry === "out/content/sync/entry.js"
+        && (startup as Record<string, unknown>).localPrepareEntry === SERVER_RELEASE_CONTRACT.localPrepareEntry
 }
 
 function readDefaultServerManifest(
@@ -70,14 +72,14 @@ function readDefaultServerManifest(
         || !SEMANTIC_VERSION.test(value.serverVersion)
         || typeof value.bundleId !== "string"
         || !BUNDLE_ID.test(value.bundleId)
-        || value.entry !== "out/cn-server.js"
-        || value.requires?.runtimeApi !== 1
+        || value.entry !== SERVER_RELEASE_CONTRACT.serverEntry
+        || value.requires?.runtimeApi !== SERVER_RELEASE_CONTRACT.runtimeApiVersion
         || typeof value.requires?.node !== "string"
         || !/^>=(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(value.requires.node)
         || typeof value.requires?.dependencyLock !== "string"
         || !BUNDLE_ID.test(value.requires.dependencyLock)
-        || value.requires?.minDataSchema !== 0
-        || value.requires?.targetDataSchema !== 22) return null
+        || value.requires?.minDataSchema !== SERVER_RELEASE_CONTRACT.minimumDataSchema
+        || value.requires?.targetDataSchema !== SERVER_RELEASE_CONTRACT.currentDataSchema) return null
     return {
         version: value.serverVersion,
         bundleId: value.bundleId,

@@ -27,7 +27,7 @@ node tools/server-bundle/pack.cjs --bundle /path/to/server-bundle --output /path
 
 `server-manifest.json` 使用递归键排序的 UTF-8 canonical JSON，并以换行结尾。`files` 按 POSIX 相对路径稳定排序，记录普通文件的字节数和小写 SHA256。manifest 自身不进入 `files`，避免摘要递归；`bundleId` 是移除 `bundleId` 后 canonical manifest 的 SHA256。`requires.dependencyLock` 是构建输入 `package-lock.json` 原始字节的 SHA256；Runtime Pack 必须用同一 lock 执行 `npm ci --omit=dev`，Supervisor 再通过 verifier 的 `--dependency-lock` 做依赖锁兼容校验。Node ABI、平台、CPU 架构和原生模块仍由 Supervisor 按 Runtime Pack manifest 独立校验。
 
-verifier 仅依赖 Node 内置模块和独立 canonical JSON 小模块。它会重新遍历 Bundle，并把 `out`、`assets`、`web/dist`、`LICENSE`、`NOTICE` 作为唯一允许的文件集合；即使伪造的 manifest 与额外文件彼此自洽，`web/public`、`web/pages`、`node_modules`、数据库、内容状态、CDN、APK、`asset-patch`、漫画和增量编译状态仍会被拒绝。它同时拒绝未知字段、不安全或重复路径、错序清单、符号链接、特殊文件、文件集合差异、摘要错误、`admin.required` 不为 `true`、缺少 admin 入口，以及不兼容的 runtime API、Node、Runtime Pack dependency lock 或可选数据 schema。
+verifier 仅依赖 Node 内置模块和独立 canonical JSON 小模块。它会重新遍历 Bundle，并把 `out`、`assets`、`web/dist`、`LICENSE`、`NOTICE` 作为唯一允许的文件集合；即使伪造的 manifest 与额外文件彼此自洽，`web/public`、`web/pages`、`node_modules`、数据库、内容状态、CDN、APK、`asset-patch`、漫画和增量编译状态仍会被拒绝。它同时拒绝未知字段、不安全或重复路径、错序清单、符号链接、特殊文件、文件集合差异、摘要错误、`admin.required` 不为 `true`、缺少 admin 入口，以及不兼容的 runtime API、Node、Runtime Pack dependency lock 或可选数据 schema。发布契约锚点由下方 `release-contract` 块集中校验。
 
 v3 固定 `entry=out/cn-server.js`，并固定 `startup.localPrepareEntry=out/content/sync/entry.js`；两个入口都必须出现在 `files` 中。准备入口是编译后的生产 CLI，只执行一次 Content Sync 并以退出码报告结果，不启动 HTTP/TCP 服务。Supervisor 仅在 `ASSET_MODE=local` 时运行它，并在确认退出码为 `0` 后直接启动 `entry`。v2 Bundle 仍可用于 `client-owned` 和 `remote`，但不能声明 local 已具备受支持的嵌入启动流程。
 
@@ -36,3 +36,17 @@ v3 固定 `entry=out/cn-server.js`，并固定 `startup.localPrepareEntry=out/co
 Server Bundle 的可验证形态和格式权威始终是目录。ZIP 只是跨设备导入容器，不替代 `server-manifest.json` 或解包后的 verifier。Launcher 只接受专用的 `starpoint-cn-server-bundle-<serverVersion>.zip`；GitHub 自动生成的 `Source code.zip` 不是 Server Bundle，不能导入 Launcher。专用归档中必须恰好只有一个顶层 `server-bundle/`，其下内容与权威目录一致。解包安全规则、staging 和回滚顺序以[嵌入式运行契约](../embedded-runtime-contract.md)为准。
 
 归档器只使用 Node 内置模块，不增加 npm 依赖，也不改变 Runtime Pack 的 `requires.dependencyLock` 身份。输出采用确定性的 ZIP32 STORE：文件按 UTF-8 路径排序，时间戳和权限元数据固定，内容不压缩。因此相同 Bundle 产生相同字节，但归档体积接近未压缩目录总大小。ZIP32 要求每个文件、中央目录偏移和归档总偏移均不超过 4 GiB 边界，并最多包含 65,534 个条目；超限时打包会在发布前失败。
+
+```release-contract
+{
+  "serverManifestSchemaVersion": 3,
+  "runtimeApiVersion": 1,
+  "currentDataSchema": 22,
+  "serverEntry": "out/cn-server.js",
+  "localPrepareEntry": "out/content/sync/entry.js",
+  "adminPath": "web/dist",
+  "bundledCdnCatalogVersion": "1.4.54",
+  "supportedAssetModes": ["client-owned", "local", "remote"],
+  "defaultPorts": { "http": 8001, "tcp": 8003, "hub": 8004 }
+}
+```
