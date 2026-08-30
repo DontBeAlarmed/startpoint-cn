@@ -33,8 +33,12 @@ interface RedemptionRecord {
     readonly playerName: string
     readonly redeemedAt: string
     readonly rewardRevision: number
-    readonly rewardSnapshot: string
+    readonly rewardSnapshot: readonly GiftReward[]
     readonly sourcePlayerId: number | null
+}
+
+interface RawRedemptionRecord extends Omit<RedemptionRecord, "rewardSnapshot"> {
+    readonly rewardSnapshot: string
 }
 
 class GiftRequestValidationError extends Error {
@@ -100,14 +104,19 @@ function parseRewardSnapshot(rawSnapshot: string): readonly GiftReward[] {
         }
         const rawTypeId = record.type_id
         const hasTypeId = rawType === 1 || rawType === 5 || rawType === 6
-        if (rawTypeId === null || rawTypeId === undefined ? hasTypeId : !hasTypeId) {
-            throw new GiftRequestValidationError()
-        }
-        if (hasTypeId
-            && (typeof rawTypeId !== "number"
+        let typeId: number | null
+        if (hasTypeId) {
+            if (rawTypeId === null || rawTypeId === undefined
+                || typeof rawTypeId !== "number"
                 || !Number.isSafeInteger(rawTypeId)
-                || rawTypeId < 1)) {
+                || rawTypeId < 1) {
+                throw new GiftRequestValidationError()
+            }
+            typeId = rawTypeId
+        } else if (rawTypeId !== null && rawTypeId !== undefined) {
             throw new GiftRequestValidationError()
+        } else {
+            typeId = null
         }
         const rawNumber = record.number
         if (typeof rawNumber !== "number"
@@ -125,7 +134,7 @@ function parseRewardSnapshot(rawSnapshot: string): readonly GiftReward[] {
         return Object.freeze({
             position: rawPosition,
             type: rawType,
-            typeId: hasTypeId ? rawTypeId : null,
+            typeId,
             number: rawNumber,
         })
     }))
@@ -186,7 +195,7 @@ function listRedemptions(
         ...parameters,
         pageSize,
         (page - 1) * pageSize,
-    ) as readonly RedemptionRecord[]
+    ) as readonly RawRedemptionRecord[]
 
     return {
         totalCount: countRow.totalCount,
