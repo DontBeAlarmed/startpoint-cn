@@ -16,10 +16,9 @@ const MAIL_TYPES = [
     { value: 5, label: "角色", needsId: true, singleOnly: true },
     { value: 6, label: "装备", needsId: true, singleOnly: true },
     { value: 7, label: "星之碎片" },
+    { value: 8, label: "玛纳" },
+    { value: 9, label: "经验值" },
     { value: 10, label: "羁绊之证" },
-    { value: 11, label: "Boss Boost 点" },
-    { value: 12, label: "Boost 点" },
-    { value: 15, label: "Rank 点" },
 ]
 
 const TYPE_LABEL: Record<number, string> = Object.fromEntries(MAIL_TYPES.map(t => [t.value, t.label]))

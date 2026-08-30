@@ -12,6 +12,9 @@ const removedTypeLabels = [
     "Mana",
     "经验池",
     "Exp Pool",
+    "Boss Boost 点",
+    "Boost 点",
+    "Rank 点",
 ]
 
 for (const label of removedTypeLabels) {
@@ -21,6 +24,22 @@ for (const label of removedTypeLabels) {
 const starCrumbTypeMatch = mailSource.match(/\{\s*value:\s*7,\s*label:\s*"星之碎片"([^}]*)\}/)
 assert(starCrumbTypeMatch, "邮件附件类型应展示 value 7：星之碎片")
 assert(!starCrumbTypeMatch[1].includes("needsId"), "星之碎片不应要求 type_id")
+const mailTypesBlock = mailSource.match(/const MAIL_TYPES = \[([\s\S]*?)\n\]/)
+assert(mailTypesBlock, "应存在邮件附件类型矩阵")
+assert.deepEqual(
+    mailTypesBlock[1].split("\n").map(line => line.trim()).filter(Boolean),
+    [
+        `{ value: 1, label: "道具", needsId: true },`,
+        `{ value: 4, label: "免费星导石" },`,
+        `{ value: 5, label: "角色", needsId: true, singleOnly: true },`,
+        `{ value: 6, label: "装备", needsId: true, singleOnly: true },`,
+        `{ value: 7, label: "星之碎片" },`,
+        `{ value: 8, label: "玛纳" },`,
+        `{ value: 9, label: "经验值" },`,
+        `{ value: 10, label: "羁绊之证" },`,
+    ],
+    "邮件附件类型矩阵应精确匹配受支持的新建类型",
+)
 assert.match(
     mailSource,
     /type_id:\s*requiresTypeId\(v\.type\)\s*&&\s*v\.type_id\s*!=\s*null\s*\?\s*String\(v\.type_id\)\s*:\s*undefined/,
