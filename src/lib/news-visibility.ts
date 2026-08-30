@@ -8,6 +8,11 @@ interface NewsWithDate {
 function parseLegacyDateMs(value: unknown): number | null {
     if (typeof value !== "string") return null
 
+    const isoTimestamp = Date.parse(value)
+    if (/(?:Z|[+-]\d{2}:\d{2})$/i.test(value) && Number.isFinite(isoTimestamp)) {
+        return isoTimestamp
+    }
+
     const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value)
     if (!match) return null
 

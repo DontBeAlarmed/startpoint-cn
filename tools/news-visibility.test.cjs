@@ -52,6 +52,15 @@ test("数据库公告拒绝历法无效的 UTC 发布时间", () => {
     )
 })
 
+test("legacy ISO 时区公告按边界时间显示", () => {
+    const boundary = Date.parse("2026-08-14T10:00:00.000Z")
+    assert.equal(
+        isNewsVisibleAt({ date: "2026-08-14T10:00:00Z" }, boundary - 1),
+        false,
+    )
+    assert.equal(isNewsVisibleAt({ date: "2026-08-14T10:00:00Z" }, boundary), true)
+})
+
 test("缺少或无效日期的旧公告保持可见", () => {
     assert.equal(isNewsVisibleAt({}, Date.parse("2026-08-06T00:00:00.000Z")), true)
     assert.equal(
