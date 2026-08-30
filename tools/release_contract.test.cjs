@@ -12,7 +12,7 @@ test("release contract keeps the public literal anchors", () => {
     assert.equal(contract.serverManifestSchemaVersion, 3)
     assert.equal(contract.runtimeApiVersion, 1)
     assert.equal(contract.minimumDataSchema, 0)
-    assert.equal(contract.currentDataSchema, 23)
+    assert.equal(contract.currentDataSchema, 24)
     assert.equal(contract.serverEntry, "out/cn-server.js")
     assert.equal(contract.localPrepareEntry, "out/content/sync/entry.js")
     assert.equal(contract.adminPath, "web/dist")
@@ -34,7 +34,7 @@ test("release contract loader validates and isolates each project root", t => {
         serverManifestSchemaVersion: 3,
         runtimeApiVersion: 1,
         minimumDataSchema: 0,
-        currentDataSchema: 23,
+        currentDataSchema: 24,
         serverEntry: "out/cn-server.js",
         localPrepareEntry: "out/content/sync/entry.js",
         adminPath: "web/dist",
@@ -44,7 +44,7 @@ test("release contract loader validates and isolates each project root", t => {
         defaultPorts: { http: 9001, tcp: 9003, hub: 9004 },
     }))
     assert.throws(() => loadServerReleaseContract(secondRoot), /server_release_contract\.json/)
-    assert.equal(loadServerReleaseContract(firstRoot).currentDataSchema, 23)
+    assert.equal(loadServerReleaseContract(firstRoot).currentDataSchema, 24)
     assert.equal(loadServerReleaseContract(firstRoot).defaultPorts.tcp, 9003)
 })
 

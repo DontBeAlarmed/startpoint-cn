@@ -8,7 +8,7 @@ v3 在 v2 的必需依赖锁身份上增加 `startup.localPrepareEntry`，使宿
 npm run build:bundle
 npm run verify:bundle
 npm run pack:bundle
-npm run verify:bundle -- /path/to/server-bundle --data-schema 22
+npm run verify:bundle -- /path/to/server-bundle --data-schema 24
 npm run verify:bundle -- /path/to/server-bundle --dependency-lock sha256:<runtime-pack-lock>
 ```
 
@@ -41,7 +41,7 @@ Server Bundle 的可验证形态和格式权威始终是目录。ZIP 只是跨�
 {
   "serverManifestSchemaVersion": 3,
   "runtimeApiVersion": 1,
-  "currentDataSchema": 23,
+  "currentDataSchema": 24,
   "serverEntry": "out/cn-server.js",
   "localPrepareEntry": "out/content/sync/entry.js",
   "adminPath": "web/dist",
