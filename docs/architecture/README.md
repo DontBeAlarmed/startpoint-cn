@@ -25,7 +25,7 @@
 | 编号 | 主题 | 文档 | 关注点 |
 |---|---|---|---|
 | D12 | 后台运营能力目标架构 | [后台运营能力 Gate](./admin-operations-gate.md) | 发布契约集中化、SQLite 公告、公共礼包码与邮件资源边界 |
-| D13 | 角色觉醒、玛纳板与复活目标架构 | [角色觉醒与复活 Gate](./character-awake-and-continue-gate.md) | 拉芙任务、一版/二版/Awake 独立性与单人星导石复活协议 |
+| D13 | 拉芙觉醒任务与单人复活目标架构 | [觉醒任务与复活 Gate](./character-awake-and-continue-gate.md) | 拉芙任务 exact quest 与单人星导石复活协议；玛纳板独立性延期 |
 
 ## 阅读顺序
 
