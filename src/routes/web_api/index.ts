@@ -6,6 +6,7 @@ import lookupApiPlugin from "./lookup"
 import settingsApiPlugin from "./settings"
 import multiManagementApiPlugin from "./multi-management"
 import scheduledResourceApiPlugin from "./scheduled-resource"
+import newsApiPlugin from "./news"
 import { ADMIN_UPLOAD_FILE_SIZE_LIMIT } from "./upload-limits"
 import type { ServerRoutesOptions } from "./server"
 import type { MultiManagementRoutesOptions } from "./multi-management"
@@ -38,6 +39,7 @@ const routes = async (fastify: FastifyInstance, options: WebApiRoutesOptions) =>
         serverTimeService: options.serverTimeService,
     })
     fastify.register(mailApiPlugin, { prefix: "/mail" })
+    fastify.register(newsApiPlugin, { prefix: "/news" })
     fastify.register(scheduledResourceApiPlugin, { prefix: "/scheduled-resource" })
     fastify.register(lookupApiPlugin, { prefix: "/lookup" })
     fastify.register(settingsApiPlugin, { prefix: "/server/settings" })

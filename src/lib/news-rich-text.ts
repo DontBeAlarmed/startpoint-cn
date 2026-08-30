@@ -23,7 +23,7 @@ function parseTag(source: string, opening: number): { end: number; raw: string }
 
 function tagName(raw: string, selfClosing: boolean): string {
     const name = selfClosing ? raw.slice(0, -1) : raw
-    if (!/^[a-z]+$/.test(name)) {
+    if (!/^[a-z][a-z0-9]*$/.test(name)) {
         throw new TypeError("News RichText contains an invalid tag or attribute")
     }
     return name
@@ -46,7 +46,7 @@ export function validateNewsRichText(source: string): string {
         const tag = parseTag(source, opening)
         const raw = tag.raw
         if (raw.startsWith("/")) {
-            if (!/^[a-z]+$/.test(raw.slice(1))) {
+            if (!/^[a-z][a-z0-9]*$/.test(raw.slice(1))) {
                 throw new TypeError("News RichText contains an invalid closing tag")
             }
             const name = raw.slice(1)

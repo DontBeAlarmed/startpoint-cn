@@ -7,6 +7,7 @@ import {
     Mail as MailIcon,
     Menu as MenuIcon,
     Moon,
+    Megaphone,
     Settings2,
     Sparkles,
     Sun,
@@ -17,6 +18,7 @@ import Dashboard from "./pages/Dashboard"
 import Accounts from "./pages/Accounts"
 import PlayerDetail from "./pages/PlayerDetail"
 import Mail from "./pages/Mail"
+import News from "./pages/News"
 import Seeds from "./pages/Seeds"
 import TimeControl from "./pages/TimeControl"
 import GameplaySettings from "./pages/GameplaySettings"
@@ -30,6 +32,7 @@ const menuItems = [
     { key: "/time", icon: <Clock3 size={18} />, label: "时间 / 千里眼" },
     { key: "/accounts", icon: <Users size={18} />, label: "账号 / 存档" },
     { key: "/mail", icon: <MailIcon size={18} />, label: "邮件" },
+    { key: "/news", icon: <Megaphone size={18} />, label: "公告" },
     { key: "/seeds", icon: <Database size={18} />, label: "动画种子" },
     { key: "/settings", icon: <Settings2 size={18} />, label: "游戏设置" },
 ]
@@ -39,6 +42,7 @@ const pageTitles: Record<string, string> = {
     "/time": "时间 / 千里眼",
     "/accounts": "账号 / 存档",
     "/mail": "邮件",
+    "/news": "公告",
     "/seeds": "动画种子",
     "/settings": "游戏设置",
 }
@@ -118,6 +122,7 @@ export default function App({ dark, onToggleDark }: AppProps) {
                         <Route path="/accounts" element={<Accounts />} />
                         <Route path="/players/:playerId" element={<PlayerDetail />} />
                         <Route path="/mail" element={<Mail />} />
+                        <Route path="/news" element={<News />} />
                         <Route path="/seeds" element={<Seeds />} />
                         <Route path="/settings" element={<GameplaySettings />} />
                         <Route path="*" element={<Navigate to="/" replace />} />

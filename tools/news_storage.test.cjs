@@ -203,11 +203,20 @@ test("validates required fields, enum ranges, and UTF-16 lengths", () => {
 
 test("allows only whitelisted, balanced RichText without attributes or links", () => {
     assert.equal(validateNewsRichText("<p>Line<br>Second</p>"), "<p>Line<br>Second</p>")
+    assert.equal(
+        validateNewsRichText("<h1>one</h1><h2>two</h2><h3>three</h3>"),
+        "<h1>one</h1><h2>two</h2><h3>three</h3>",
+    )
     assert.equal(validateNewsRichText("<ul><li>One</li><li>Two</li></ul>"), "<ul><li>One</li><li>Two</li></ul>")
     assert.equal(validateNewsRichText("<table><tr><th>A</th><td>B</td></tr></table>"), "<table><tr><th>A</th><td>B</td></tr></table>")
 
     const rejected = [
         "<P>uppercase</P>",
+        "<h1 class=\"x\">attribute</h1>",
+        "<h2/>self-closed heading</h2>",
+        "<h3!>punctuation</h3>",
+        "<h4>unknown</h4>",
+        "</h1>uppercase</h1>",
         "<p class=\"x\">attribute</p>",
         "<p><script>alert(1)</script></p>",
         "<!-- comment --><p>text</p>",
