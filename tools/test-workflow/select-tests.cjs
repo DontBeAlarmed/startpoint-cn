@@ -41,8 +41,16 @@ const SOURCE_RULES = [
     { pattern: /^admin\//, groups: ["admin"] },
     { pattern: /^tests\/admin-/, groups: ["admin"] },
     {
-        pattern: /^(?:assets\/server_release_contract\.json|src\/runtime\/release-contract\.ts|tools\/release_contract\.test\.cjs|docs\/(?:embedded-runtime-contract|runtime\/server-bundle)\.md)$/,
+        pattern: /^(?:assets\/server_release_contract\.json|src\/runtime\/release-contract\.ts|tools\/(?:release_contract\.test|server-bundle\/release-contract)\.cjs|docs\/(?:embedded-runtime-contract|runtime\/server-bundle)\.md)$/,
         groups: ["integration:database", "quick:runtime"],
+    },
+    {
+        pattern: /^src\/runtime\/admin\.ts$/,
+        groups: ["full", "quick:runtime"],
+    },
+    {
+        pattern: /^src\/lib\/admin-mail-rules\.ts$/,
+        groups: ["admin", "full"],
     },
     {
         pattern: /^(?:assets\/news\.json|src\/data\/(?:domains\/news|schema\/server-news)\.ts|src\/lib\/news-(?:catalog|rich-text|time|visibility)\.ts|src\/routes\/api\/news\.ts|docs\/systems\/news\.md)$/,

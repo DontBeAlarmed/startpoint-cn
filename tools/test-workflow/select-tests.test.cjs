@@ -758,6 +758,27 @@ test("routes admin operations gate feature files to focused groups", () => {
     }
 })
 
+test("maps the server bundle release contract to database and runtime checks", () => {
+    assert.deepEqual(
+        selectTestGroups(["tools/server-bundle/release-contract.cjs"]),
+        ["integration:database", "quick:runtime"],
+    )
+})
+
+test("keeps runtime admin wiring in full and adds the runtime checks", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/runtime/admin.ts"]),
+        ["full", "quick:runtime"],
+    )
+})
+
+test("keeps admin mail rules in full and adds the admin checks", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/lib/admin-mail-rules.ts"]),
+        ["admin", "full"],
+    )
+})
+
 test("maps score reward selection and projection to every affected leaf", () => {
     const sourceGroups = ["integration:reward-grant", "integration:rules", "quick:quest"]
 
