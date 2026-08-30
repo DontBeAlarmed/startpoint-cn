@@ -20,7 +20,7 @@
 | `/tool/contact_active` | 返回 `enable_customer_service: false` | 官方客服关闭，属于外围平台能力 |
 | `/tool/custom_notify` | 返回空对象 | 当前没有自定义运营通知，空响应合法 |
 | OpenAPI push token、heartbeat 等 | 接受请求但不维护推送平台状态 | 仅承担雷霆 SDK 登录兼容；不应描述为真实推送服务 |
-| `/news/system_index`、`/news/latest_forced*` | 返回空系统公告或无强制弹窗 | 当前没有对应配置源时为空是合法结果；普通 `/news/index` 仍读取 `assets/news.json` |
+| `/news/index`、`/news/system_index`、`/news/latest_forced*` | 普通公告来自 SQLite `server_news`；系统公告和强制弹窗保持空 | 普通 `/news/index` 和 `/news/get_info` 已由持久公告数据驱动，不属于固定空响应；系统与强制路由按兼容契约保持空，`/load` 不再发出 `force_news` |
 | `/episode_trial_reading/finish` | 返回空对象 | CN 客户端请求只携带 `character_id`、`quest_id`，完成回调不合并持久字段；它是卡池角色剧情试读，不是普通角色剧情阅读记录 |
 | `/patch/cn/recovery/empty.csv` | 返回恢复流程所需空文件 | CDN 恢复协议兼容资源，不代表缺少业务实现 |
 | `/reproduce/post` | 接受后丢弃设备诊断日志 | 项目不收集玩家设备日志；属于隐私边界内的兼容接收，不是存档恢复能力 |

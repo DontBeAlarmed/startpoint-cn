@@ -119,6 +119,7 @@ test.after(() => {
 
 test("news index filters by category and projects SQLite rows for the client", async t => {
     const previousOffset = getTimeOffset()
+    t.after(() => setServerTimeOffset(previousOffset))
     let realNow = initialNowMs
     t.mock.method(gameTime, "getRealNow", () => new Date(realNow))
     const app = Fastify({ logger: false })
@@ -185,7 +186,6 @@ test("news index filters by category and projects SQLite rows for the client", a
     assert.equal(arrived.data.news_count, 3)
     assert.equal(arrived.data.news[0].title, "future")
 
-    setServerTimeOffset(previousOffset)
 })
 
 test("news detail returns only enabled announcements visible at real now", async t => {
@@ -236,14 +236,14 @@ test("news index rejects invalid category and page values", async t => {
     }
 })
 
-test("news detail rejects invalid news ids as bad requests", async t => {
+test("news detail rejects invalid or missing news ids as bad requests", async t => {
     const app = Fastify({ logger: false })
     registerCnMsgpackOnSend(app)
     await app.register(newsRoutes)
     await app.ready()
     t.after(() => app.close())
 
-    for (const newsId of [0, 1.5, "1"]) {
+    for (const newsId of [0, 1.5, "1", 999999999]) {
         const response = await postNews(app, "/get_info", {
             viewer_id: viewerId,
             news_id: newsId,
