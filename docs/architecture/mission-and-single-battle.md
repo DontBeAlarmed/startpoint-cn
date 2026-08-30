@@ -2,6 +2,15 @@
 
 本页展示当前 Category Mission 结算主链，以及普通单人战斗从入场到结算的事务生命周期。
 
+## 单人复活当前边界
+
+`/single_battle_quest/play_continue` 的 CN 1.8.1 请求复活次数来自
+`sum(statistics.zones[].continue_count)`；`statistics.continue_count` 不是 CN 1.8.1 顶层字段，服务端不接受它作为
+兼容来源。费用权威是共享配置 `getConfigSync().continue_virtual_money`，扣款先消耗 `free_vmoney`，不足部分从
+`vmoney` 扣除。成功响应是 HTTP 200、Base64(MsgPack)、`data_headers.result_code=1`，并返回扣款后的
+`user_info` 余额。官方负路径非成功 `result_code` 仍未知/延期；`battle_max_continue_count` 的服务端权威校验
+同样延期。玛纳板与角色觉醒独立性不因本边界而改变，属于后续独立 Gate。
+
 ## D2 当前任务结算流水线
 
 ```mermaid

@@ -1,6 +1,6 @@
 # 拉芙觉醒任务与单人复活 Gate 目标架构
 
-设计状态：范围修订，等待书面确认。
+状态：D13 目标架构。以下请求、判定和费用边界是当前实现口径；Gate 收尾验证和 CN 客户端实机验收尚未完成，本文不声明 D13 已实现。
 
 ## 1. 目标
 
@@ -144,7 +144,7 @@ POST /api/index.php/single_battle_quest/play_continue
 
 客户端不会发送 `statistics.continue_count`。只有最终 finish 请求存在与 `statistics` 平级的根级 `continue_count`。
 
-### 当前根因
+### 修复前根因
 
 当前服务端强制读取 `statistics.continue_count`。对 CN 1.8.1 标准请求，该字段为 `undefined`，因此在 session、active quest、余额和扣款检查之前稳定返回 HTTP 400 `Invalid request body`。
 
