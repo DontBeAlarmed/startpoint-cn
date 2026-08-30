@@ -55,7 +55,7 @@ assets/server_release_contract.json
   "serverManifestSchemaVersion": 3,
   "runtimeApiVersion": 1,
   "minimumDataSchema": 0,
-  "currentDataSchema": 22,
+  "currentDataSchema": 24,
   "serverEntry": "out/cn-server.js",
   "localPrepareEntry": "out/content/sync/entry.js",
   "adminPath": "web/dist",

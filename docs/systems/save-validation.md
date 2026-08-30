@@ -16,7 +16,7 @@
   "playerId": 1,
   "producer": {
     "serverVersion": "1.0.1",
-    "dbSchemaVersion": 18,
+    "dbSchemaVersion": 24,
     "contentVersion": "1.4.54"
   },
   "domains": {
@@ -34,14 +34,14 @@
 
 ## 覆盖范围
 
-schema 22 共有 64 张可从 `players` 外键图发现的玩家关联表：
+当前数据库 schema 是 24。快照范围不是按固定表数硬编码，而是继续以 `players` 外键图发现结果和显式注册表对账：
 
-- 61 张登记到 `core`、`missions`、`events`、`economy`、`mailbox`；
-- `players_active_quests`、`scheduled_resource_rules` 和
+- 已登记表进入 `core`、`missions`、`events`、`economy`、`mailbox`；
+- `players_active_quests`、`players_gift_redemptions`、`scheduled_resource_rules` 和
   `players_scheduled_resource_state` 明确排除；
 - 邮件、领取历史、活动扭蛋箱明细、Pass、Raid、登录奖励游标、商店购买计数、campaign lineup、EX 待选结果、玩家履历设置、练习战和无限演武战斗履历均可往返。
 
-schema 22 只为已明确排除的 `players_active_quests` 增加一列，因此存档格式和玩家表注册表均保持不变。
+schema 23 新增服务器级 `server_news`，schema 24 新增礼包定义和 `players_gift_redemptions`。两者都不进入 V2 快照；礼包领取记录由下文的专用恢复和克隆边界处理。
 
 注册表位于 `src/data/player-save/registry.ts`。测试会动态遍历当前 SQLite 外键图，并要求发现结果与“已登记 + 明确排除”完全相等。以后新增玩家表但未登记时，CI 会失败，不再静默漏出快照。
 
@@ -60,12 +60,15 @@ schema 22 只为已明确排除的 `players_active_quests` 增加一列，因此
 | `server_gameplay_settings` | 服务端全局配置 |
 | `raid_event_boss_states` | 全服 Raid 共享状态 |
 | `players_active_quests` | 进行中战斗、房间和预扣资源 |
+| `players_gift_redemptions` | 服务器本地礼包领取运营事实 |
 | `scheduled_resource_rules` | 服主配置的全局或指定存档补充规则 |
 | `players_scheduled_resource_state` | 与当前服务端规则 ID 绑定的发放状态 |
 
 恢复和克隆都会清理目标玩家的 `players_active_quests`。数据库事务成功后还会清除进程内 `activeQuests`；事务失败时两处状态均保留。这样旧战斗不能在已经替换的背包、体力或门票状态上继续结算。
 
 定时资源补充规则及其发放状态不导出，也不会在恢复时清理目标服现有记录，避免跨服导入携带无效规则 ID 或重置当天发放状态。
+
+礼包领取记录的专用继承和清除语义见[公共礼包码](./gift-codes.md)。
 
 ## Restore 与 Clone
 
@@ -75,6 +78,7 @@ schema 22 只为已明确排除的 `players_active_quests` 增加一列，因此
 - 替换所有已登记玩家领域；
 - 不复制账号、设备、会话和服务器配置；
 - `players.time_offset` 统一写为 `NULL`，运行时只使用全局服务器时间；
+- 同一恢复事务清除目标存档的 `players_gift_redemptions`，外部导入后礼包按未领取处理；
 - 整个操作在单一 SQLite 事务中执行，任一表失败即回滚。
 
 克隆先在目标账号创建新玩家，再使用独立策略写入：
@@ -82,6 +86,7 @@ schema 22 只为已明确排除的 `players_active_quests` 增加一列，因此
 - 新玩家 ID 和目标账号关系由服务器分配；
 - `players_mails`、`players_receive_history`、`players_practice_battle_history`、`players_score_attack_battle_history` 的自增 ID 重新生成；
 - `players_tutorial_step_receipts` 不复制，避免向新玩家重放源存档缓存的旧教程响应；
+- 同服显式克隆在同一事务复制 `players_gift_redemptions`，并把来源玩家写入 `inherited_from_player_id`；
 - 业务主键和玩家进度按原值复制。
 
 ## 跨版本规则

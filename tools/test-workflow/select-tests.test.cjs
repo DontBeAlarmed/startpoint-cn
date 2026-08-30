@@ -128,7 +128,6 @@ test("maps representative source files to focused groups", () => {
     )
     for (const file of [
         "src/lib/mail-reward-grant.ts",
-        "docs/systems/mail.md",
     ]) {
         assert.deepEqual(
             selectTestGroups([file]),
@@ -136,6 +135,10 @@ test("maps representative source files to focused groups", () => {
             file,
         )
     }
+    assert.deepEqual(
+        selectTestGroups(["docs/systems/mail.md"]),
+        ["admin", "integration:reward-grant", "integration:rules"],
+    )
     for (const file of [
         "tools/mail_reward_grant.test.cjs",
         "tools/mail_reward_owner.test.cjs",
@@ -200,7 +203,12 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/lib/version.ts"]), ["full"])
     assert.deepEqual(
         selectTestGroups(["src/routes/cn/load.ts"]),
-        ["full", "integration:mission", "quick:protocol"],
+        [
+            "full",
+            "integration:database",
+            "integration:mission",
+            "quick:protocol",
+        ],
     )
     assert.deepEqual(
         selectTestGroups(["src/routes/api/raidEvent.ts"]),
@@ -273,7 +281,10 @@ test("maps representative source files to focused groups", () => {
     )
     assert.deepEqual(selectTestGroups(["tools/server-bundle/build.cjs"]), ["quick:runtime"])
     assert.deepEqual(selectTestGroups(["tools/server-bundle/verify.cjs"]), ["quick:runtime"])
-    assert.deepEqual(selectTestGroups(["docs/runtime/server-bundle.md"]), ["quick:runtime"])
+    assert.deepEqual(
+        selectTestGroups(["docs/runtime/server-bundle.md"]),
+        ["integration:database", "quick:runtime"],
+    )
     assert.deepEqual(
         selectTestGroups(["src/content/startup/bootstrap.ts"]),
         ["integration:runtime", "quick:content"],
@@ -604,6 +615,7 @@ test("maps the public reward grant layer and its regressions to one focused leaf
             "tools/load_scheduled_resource_settlement.test.cjs",
             "tools/scheduled_resource_rules.test.cjs",
             "tools/scheduled_resource_settlement.test.cjs",
+            "tools/gift_receive_transaction.test.cjs",
     ]
 
     assert.deepEqual(TEST_GROUPS[group], {
@@ -649,6 +661,101 @@ test("maps Task23c reward domains and its real regression to precise groups", ()
     assert.ok(TEST_GROUPS["integration:reward-grant"].tests.includes(
         "tools/task23c_reward_grants.test.cjs",
     ))
+})
+
+test("routes admin operations gate feature files to focused groups", () => {
+    for (const file of [
+        "assets/server_release_contract.json",
+        "src/runtime/release-contract.ts",
+        "docs/embedded-runtime-contract.md",
+        "docs/runtime/server-bundle.md",
+    ]) {
+        assert.deepEqual(
+            selectTestGroups([file]),
+            ["integration:database", "quick:runtime"],
+            file,
+        )
+    }
+
+    assert.deepEqual(
+        selectTestGroups(["tools/release_contract.test.cjs"]),
+        ["quick:runtime"],
+    )
+    assert.ok(TEST_GROUPS["quick:runtime"].tests.includes(
+        "tools/release_contract.test.cjs",
+    ))
+
+    assert.deepEqual(
+        selectTestGroups(["src/routes/cn/tool.ts"]),
+        ["full", "integration:database", "quick:protocol", "quick:runtime"],
+    )
+
+    const newsGroups = ["integration:database", "quick:content"]
+    for (const file of [
+        "assets/news.json",
+        "src/data/domains/news.ts",
+        "src/data/schema/server-news.ts",
+        "src/lib/news-catalog.ts",
+        "src/lib/news-rich-text.ts",
+        "src/lib/news-time.ts",
+        "src/lib/news-visibility.ts",
+        "src/routes/api/news.ts",
+        "docs/systems/news.md",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), newsGroups, file)
+    }
+
+    const giftGroups = [
+        "integration:database",
+        "integration:reward-grant",
+        "quick:protocol",
+    ]
+    for (const file of [
+        "src/data/domains/gift.ts",
+        "src/data/schema/server-gifts.ts",
+        "src/lib/gift-code/capability.ts",
+        "src/lib/gift-code/redemption.ts",
+        "src/lib/gift-code/types.ts",
+        "src/lib/gift-code/validation.ts",
+        "src/routes/api/gift.ts",
+        "docs/systems/gift-codes.md",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), giftGroups, file)
+    }
+
+    for (const file of [
+        "src/data/player-save/registry.ts",
+        "src/data/player-save/types.ts",
+        "src/data/player-save/v2.ts",
+        "tools/gift_redemption_save_lifecycle.test.cjs",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["integration:database"], file)
+    }
+
+    for (const file of [
+        "admin/src/features/gifts/GiftEditor.tsx",
+        "admin/src/features/news/NewsEditor.tsx",
+        "tests/admin-gift-ui-source.test.js",
+        "tests/admin-news-ui-source.test.js",
+        "tools/admin_gift_routes.test.cjs",
+        "tools/admin_news_routes.test.cjs",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["admin"], file)
+    }
+
+    for (const [file, group] of [
+        ["tools/schema23_news_migration.test.cjs", "integration:database"],
+        ["tools/schema24_gift_migration.test.cjs", "integration:database"],
+        ["tools/news_storage.test.cjs", "integration:database"],
+        ["tools/gift_capability.test.cjs", "quick:protocol"],
+        ["tools/gift_code_lifecycle.test.cjs", "quick:protocol"],
+        ["tools/gift_receive_route.test.cjs", "quick:protocol"],
+        ["tools/gift_receive_transaction.test.cjs", "integration:reward-grant"],
+        ["tools/admin_mail_type_policy.test.cjs", "admin"],
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), [group], file)
+        assert.ok(TEST_GROUPS[group].tests.includes(file), file)
+    }
 })
 
 test("maps score reward selection and projection to every affected leaf", () => {
@@ -884,6 +991,7 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/server_time_routes.test.cjs",
             "tools/runtime_capabilities.test.cjs",
             "tools/runtime_capabilities_wiring.test.cjs",
+            "tools/release_contract.test.cjs",
         ],
     })
     assert.deepEqual(
@@ -1378,6 +1486,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/admin_scheduled_resource_routes.test.cjs",
         "tools/admin_player_actions.test.cjs",
         "tools/admin_mail_expiry.test.cjs",
+        "tools/gift_redemption_save_lifecycle.test.cjs",
         "tools/history_receive_route.test.cjs",
         "tools/mail_receive_transaction.test.cjs",
         "tools/mission_category_batch_read.test.cjs",
@@ -1388,6 +1497,9 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/server_gameplay_settings.test.cjs",
         "tools/shop_purchase_period_storage.test.cjs",
         "tools/shop_purchase_snapshot_contract.test.cjs",
+        "tools/news_storage.test.cjs",
+        "tools/schema23_news_migration.test.cjs",
+        "tools/schema24_gift_migration.test.cjs",
         "tools/test-workflow/database-isolation.test.cjs",
         "tools/test-workflow/database-lifecycle.test.cjs",
         "tools/test-workflow/runtime-data-paths.test.cjs",
@@ -1714,7 +1826,10 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
         "tools/room_cleanup_lifecycle.test.cjs",
         "tools/session_frame_order.test.cjs",
         "tools/session_server_lifecycle.test.cjs",
-        "tools/multi_tcp_guardrails.test.cjs",
+            "tools/multi_tcp_guardrails.test.cjs",
+            "tools/gift_capability.test.cjs",
+            "tools/gift_code_lifecycle.test.cjs",
+            "tools/gift_receive_route.test.cjs",
     ])
 })
 

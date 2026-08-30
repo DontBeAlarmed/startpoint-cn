@@ -41,6 +41,35 @@ const SOURCE_RULES = [
     { pattern: /^admin\//, groups: ["admin"] },
     { pattern: /^tests\/admin-/, groups: ["admin"] },
     {
+        pattern: /^(?:assets\/server_release_contract\.json|src\/runtime\/release-contract\.ts|tools\/release_contract\.test\.cjs|docs\/(?:embedded-runtime-contract|runtime\/server-bundle)\.md)$/,
+        groups: ["integration:database", "quick:runtime"],
+    },
+    {
+        pattern: /^(?:assets\/news\.json|src\/data\/(?:domains\/news|schema\/server-news)\.ts|src\/lib\/news-(?:catalog|rich-text|time|visibility)\.ts|src\/routes\/api\/news\.ts|docs\/systems\/news\.md)$/,
+        groups: ["integration:database", "quick:content"],
+    },
+    {
+        pattern: /^(?:src\/data\/(?:domains\/gift|schema\/server-gifts)\.ts|src\/lib\/gift-code\/.*\.ts|src\/routes\/api\/gift\.ts|docs\/systems\/gift-codes\.md)$/,
+        groups: ["integration:database", "integration:reward-grant", "quick:protocol"],
+    },
+    {
+        pattern: /^tools\/(?:schema2[34]_(?:news|gift)_migration|news_storage|gift_redemption_save_lifecycle)\.test\.cjs$/,
+        groups: ["integration:database"],
+    },
+    {
+        pattern: /^tools\/gift_receive_transaction\.test\.cjs$/,
+        groups: ["integration:reward-grant"],
+    },
+    {
+        pattern: /^tools\/gift_(?:capability|code_lifecycle|receive_route)\.test\.cjs$/,
+        groups: ["quick:protocol"],
+    },
+    {
+        pattern: /^tools\/admin_(?:gift_routes|news_routes|mail_type_policy)\.test\.cjs$/,
+        groups: ["admin"],
+    },
+    { pattern: /^docs\/(?:admin\/README|systems\/mail)\.md$/, groups: ["admin"] },
+    {
         pattern: /^src\/(?:data\/domains\/session|validate_cdn)\.ts$/,
         groups: ["quick:workflow"],
     },
@@ -105,7 +134,14 @@ const SOURCE_RULES = [
     },
     { pattern: /^src\/content\/deep-freeze\.ts$/, groups: ["integration:cdn"] },
     { pattern: /^src\/lib\/version\.ts$/, groups: ["full"] },
-    { pattern: /^src\/routes\/cn\/load\.ts$/, groups: ["full", "integration:mission", "quick:protocol"] },
+    {
+        pattern: /^src\/routes\/cn\/load\.ts$/,
+        groups: ["full", "integration:database", "integration:mission", "quick:protocol"],
+    },
+    {
+        pattern: /^src\/routes\/cn\/tool\.ts$/,
+        groups: ["full", "integration:database", "quick:protocol", "quick:runtime"],
+    },
     {
         pattern: /^src\/cn-server\.ts$/,
         groups: [
@@ -491,10 +527,13 @@ const SOURCE_RULES = [
     { pattern: /^src\/multi\//, groups: ["quick:protocol", "integration:multi-hub"] },
     { pattern: /^src\/multi\/tcp\/server\.ts$/, groups: ["integration:runtime"] },
     {
-        pattern: /^src\/data\/(?!player-save\/|defaultSave\.ts$)/,
+        pattern: /^src\/data\/(?!player-save\/|defaultSave\.ts$|domains\/(?:gift|news)\.ts$|schema\/server-(?:gifts|news)\.ts$)/,
         groups: ["integration:database", "full"],
     },
-    { pattern: /^src\/routes\/(?!api\/singleBattleQuest\.ts$|web_api\/)/, groups: ["full"] },
+    {
+        pattern: /^src\/routes\/(?!api\/(?:gift|news|singleBattleQuest)\.ts$|web_api\/)/,
+        groups: ["full"],
+    },
 ]
 
 function normalizePath(filePath) {

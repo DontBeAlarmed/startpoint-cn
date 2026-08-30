@@ -8,6 +8,8 @@
 - [服务端时间来源](./time-source.md)
 - [商店](./shop.md)
 - [邮件](./mail.md)
+- [普通公告](./news.md)
+- [公共礼包码](./gift-codes.md)
 - [定时资源补充](./scheduled-resource-replenishment.md)
 - [登录奖励](./login-bonus.md)
 - [首次教程状态与中断恢复](./start-tutorial.md)

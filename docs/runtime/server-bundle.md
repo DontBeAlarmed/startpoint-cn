@@ -29,6 +29,8 @@ node tools/server-bundle/pack.cjs --bundle /path/to/server-bundle --output /path
 
 verifier 仅依赖 Node 内置模块和独立 canonical JSON 小模块。它会重新遍历 Bundle，并把 `out`、`assets`、`web/dist`、`LICENSE`、`NOTICE` 作为唯一允许的文件集合；即使伪造的 manifest 与额外文件彼此自洽，`web/public`、`web/pages`、`node_modules`、数据库、内容状态、CDN、APK、`asset-patch`、漫画和增量编译状态仍会被拒绝。它同时拒绝未知字段、不安全或重复路径、错序清单、符号链接、特殊文件、文件集合差异、摘要错误、`admin.required` 不为 `true`、缺少 admin 入口，以及不兼容的 runtime API、Node、Runtime Pack dependency lock 或可选数据 schema。发布契约锚点由下方 `release-contract` 块集中校验。
 
+manifest `ports` 是随发布契约下发的默认值，不是运行时授权或实际监听结果。部署环境可通过服务端支持的环境变量覆盖监听地址和端口；Supervisor 和客户端应以服务启动后的 `RuntimeConfig`、健康输出或部署配置为准，不得直接把 manifest 端口当作运行中的 HTTP、TCP 或 Hub endpoint。
+
 v3 固定 `entry=out/cn-server.js`，并固定 `startup.localPrepareEntry=out/content/sync/entry.js`；两个入口都必须出现在 `files` 中。准备入口是编译后的生产 CLI，只执行一次 Content Sync 并以退出码报告结果，不启动 HTTP/TCP 服务。Supervisor 仅在 `ASSET_MODE=local` 时运行它，并在确认退出码为 `0` 后直接启动 `entry`。v2 Bundle 仍可用于 `client-owned` 和 `remote`，但不能声明 local 已具备受支持的嵌入启动流程。
 
 漫画是宿主或部署者另行准备的外置本地内容。普通开发默认读取项目根 `web/public/comic/`；嵌入模式必须通过绝对 `COMIC_DIR` 显式挂载，未配置时漫画接口返回空列表或 404。该目录不作为通用 `/public` 静态根，也不进入 Server Bundle。

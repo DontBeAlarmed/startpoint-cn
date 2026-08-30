@@ -187,6 +187,8 @@ manifest 核心字段如下：
 
 Manifest v2 继续作为兼容输入，只允许 `client-owned` 和 `remote`。要求 local 模式的 Supervisor 必须拒绝缺少 `startup.localPrepareEntry` 的 v2 Bundle；旧 Supervisor 则会因未知 schema 拒绝 v3，不能把 v3 当作 v2 降级执行。
 
+`assets/server_release_contract.json` 是仓库内只读发布契约的生产权威。数据库 latest schema、Bundle builder/verifier、runtime metadata、capabilities、固定入口、admin path、资产模式和文档锚点都从这里取得同一契约值。manifest 中的 `ports` 只表示发布契约的默认端口；运行进程实际监听地址和端口由启动环境解析成的 `RuntimeConfig` 决定，Supervisor 不应把 manifest 端口当作健康探测或客户端连接地址。
+
 ## 启动配置
 
 Supervisor 以 Server Bundle 根为工作目录。local 模式先执行 manifest `startup.localPrepareEntry`，成功后再执行 manifest `entry`；其他模式直接执行 `entry`。
