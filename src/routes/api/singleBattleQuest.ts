@@ -3,7 +3,11 @@ import { getPlayerActiveQuestSync } from "../../data/domains/quest_active"
 import { getPlayerDailyChallengePointListSync, getPlayerSync, refreshPlayerDailyChallengePointsForRealDaySync, updatePlayerSync } from "../../data/domains/player"
 import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
 import { getPlayerMailCountSync } from "../../data/domains/mail"
-import { getQuestConfigurationErrorResponse, getQuestFromCategorySync } from "../../lib/assets"
+import {
+    getConfigSync,
+    getQuestConfigurationErrorResponse,
+    getQuestFromCategorySync,
+} from "../../lib/assets"
 import type { BattleQuest } from "../../lib/types"
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils"
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time"
@@ -50,6 +54,7 @@ import {
 import { getMailArrivedSync } from "../../lib/mail-notification"
 import { recordActiveMissionQuestChallengeFactSync } from "../../lib/mission/active-entry-facts"
 import { runSingleContinueLifecycleTransaction } from "../../lib/quest/single-continue-lifecycle"
+import { parseSingleContinueExpectedCount } from "../../lib/quest/single-continue-request"
 import { validateAbortRequest } from "../../lib/quest/abort-request-validation"
 import {
     validateSingleFinishRequest,
@@ -62,8 +67,9 @@ import {
     getDailyChallengePointId,
 } from "../../lib/quest/daily-challenge"
 
-export interface SingleBattleQuestRoutesOptions {
+export interface SingleBattleQuestRouteOptions {
     readonly dailyResetHour?: number
+    readonly getContinueVmoneyCost?: () => number
 }
 
 const singleBattleModeHost = createModeHost(message => console.log(message))
@@ -81,16 +87,10 @@ interface StartBody {
 }
 
 interface QuestStatistics {
-    clear_phase: number,
-    continue_count: number,
-    party: {
-        unison_characters: ({ id: (number | null) } | null)[],
-        characters: ({ id: (number | null) } | null)[],
-        equipments: ({ id: (number | null) } | null)[],
-        ability_soul_ids: (number | null)[],
-        leader?: ({ id: (number | null) } | null)
-    }
-    zones?: {
+    zones: {
+        floor: number
+        zone: number
+        continue_count: number
         use_power_flip_count?: number
         use_dash_count?: number
         use_skill_count?: number
@@ -122,9 +122,7 @@ function summarizeItemList(itemList: Record<string, number>): string {
     return entries.map(([itemId, amount]) => `${itemId}:${amount}`).join(",")
 }
 
-const continueVmoneyCost = 50;
-
-const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRoutesOptions = {}) => {
+const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteOptions = {}) => {
     const dailyResetHour = options.dailyResetHour ?? 5
     const challengePointMap = getRuntimeContentTableSync(
         "event_challenge_point_map.json",
@@ -428,11 +426,25 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRoutes
             || typeof body.play_id !== "string"
             || body.play_id.length === 0
             || body.payment_type !== 1
-            || typeof body.statistics !== "object"
-            || body.statistics === null
-            || !Number.isSafeInteger(body.statistics.continue_count)
-            || body.statistics.continue_count < 0
         ) return sendBadRequest("Invalid request body.")
+        const expectedContinueCount = parseSingleContinueExpectedCount(body.statistics)
+        if (expectedContinueCount === null) return sendBadRequest("Invalid request body.")
+
+        const continueVmoneyCost = (
+            options.getContinueVmoneyCost
+                ?? (() => getConfigSync().continue_virtual_money)
+        )()
+        if (!Number.isSafeInteger(continueVmoneyCost) || continueVmoneyCost <= 0) {
+            request.log.error(
+                { code: "SINGLE_CONTINUE_CONFIG_INVALID" },
+                "Single continue configuration is invalid",
+            )
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(500).send({
+                error: "Internal Server Error",
+                message: "Continue configuration is invalid.",
+            })
+        }
 
         const sessionResult = await validateSessionIdentity(viewerId)
         if (!sessionResult) return sendBadRequest("Invalid viewer id.")
@@ -444,7 +456,7 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRoutes
             playId: body.play_id,
             questId: body.quest_id,
             category: body.category,
-            expectedContinueCount: body.statistics.continue_count,
+            expectedContinueCount,
             cost: continueVmoneyCost,
         })
         if (!continueResult.ok) return sendBadRequest(continueResult.message)

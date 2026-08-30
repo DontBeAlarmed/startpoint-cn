@@ -139,7 +139,9 @@ async function playContinueFreeThenPaid() {
             quest_id: MAIN_QUEST_ID,
             category: MAIN_CATEGORY,
             play_id: "gate-task-18-continue",
-            statistics: { continue_count: 0 },
+            statistics: {
+                zones: [{ floor: 0, zone: 0, continue_count: 0 }],
+            },
         }
         const measured = await harness.measure(() => harness.post("play_continue", payload))
         if (measured.error) throw measured.error

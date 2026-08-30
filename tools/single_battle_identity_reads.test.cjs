@@ -55,7 +55,9 @@ test("continue first request and replay each avoid an outer Player read", async 
             quest_id: MAIN_QUEST_ID,
             category: MAIN_CATEGORY,
             play_id: "task-26c-continue",
-            statistics: { continue_count: 0 },
+            statistics: {
+                zones: [{ floor: 0, zone: 0, continue_count: 0 }],
+            },
         }
 
         const first = await harness.measure(() => harness.post("play_continue", payload))

@@ -35,6 +35,7 @@ const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 let app
 let database
 let nextViewerId = 845000000
+let continueVmoneyCost = 50
 
 async function createPlayer(label) {
     const account = insertAccountSync({
@@ -76,7 +77,9 @@ function createPayload(viewerId, activeQuest, continueCount = 0) {
         play_id: activeQuest.playId,
         payment_type: 1,
         api_count: 1,
-        statistics: { continue_count: continueCount },
+        statistics: {
+            zones: [{ floor: 0, zone: 0, continue_count: continueCount }],
+        },
     }
 }
 
@@ -103,7 +106,10 @@ test.before(async () => {
         (_request, body, done) => done(null, unpack(Buffer.from(body, "base64"))),
     )
     registerCnMsgpackOnSend(app)
-    await app.register(singleBattleRoutes, { prefix: "/single_battle_quest" })
+    await app.register(singleBattleRoutes, {
+        prefix: "/single_battle_quest",
+        getContinueVmoneyCost: () => continueVmoneyCost,
+    })
     await app.register(cnLoadRoutes, { assetProvider: { mode: "client-owned" } })
     await app.ready()
 })
@@ -125,6 +131,7 @@ test("formal load restores persisted continue state before replay without a seco
     publishActiveQuest(playerId, activeQuest)
     t.after(() => delete activeQuests[playerId])
     const payload = createPayload(viewerId, activeQuest)
+    assert.equal(Object.hasOwn(payload.statistics, "continue_count"), false)
 
     const first = await app.inject({
         method: "POST",
@@ -217,5 +224,70 @@ test("play_continue rejects persisted state when memory active quest is missing"
         vmoney: 100,
         storedContinueCount: 0,
         memoryContinueCount: null,
+    })
+})
+
+test("play_continue sums every zone continue count", async t => {
+    const { playerId, viewerId } = await createPlayer("continue-multi-zone")
+    updatePlayerSync({ id: playerId, freeVmoney: 30, vmoney: 40 })
+    const activeQuest = createActiveQuest("continue-multi-zone-play")
+    activeQuest.continueCount = 2
+    persistActiveQuest(playerId, activeQuest)
+    publishActiveQuest(playerId, activeQuest)
+    t.after(() => delete activeQuests[playerId])
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/single_battle_quest/play_continue",
+        payload: {
+            viewer_id: viewerId,
+            quest_id: activeQuest.questId,
+            category: activeQuest.category,
+            play_id: activeQuest.playId,
+            payment_type: 1,
+            api_count: 1,
+            statistics: {
+                zones: [
+                    { floor: 0, zone: 0, continue_count: 1 },
+                    { floor: 0, zone: 1, continue_count: 0 },
+                    { floor: 1, zone: 0, continue_count: 1 },
+                ],
+            },
+        },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    assert.deepEqual(decode(response).data.user_info, { free_vmoney: 0, vmoney: 20 })
+    assert.deepEqual(snapshotState(playerId), {
+        freeVmoney: 0,
+        vmoney: 20,
+        storedContinueCount: 3,
+        memoryContinueCount: 3,
+    })
+})
+
+test("play_continue uses the injected continue vmoney cost", async t => {
+    continueVmoneyCost = 37
+    t.after(() => { continueVmoneyCost = 50 })
+    const { playerId, viewerId } = await createPlayer("continue-custom-cost")
+    updatePlayerSync({ id: playerId, freeVmoney: 20, vmoney: 30 })
+    const activeQuest = createActiveQuest("continue-custom-cost-play")
+    persistActiveQuest(playerId, activeQuest)
+    publishActiveQuest(playerId, activeQuest)
+    t.after(() => delete activeQuests[playerId])
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/single_battle_quest/play_continue",
+        payload: createPayload(viewerId, activeQuest),
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    assert.deepEqual(decode(response).data.user_info, { free_vmoney: 0, vmoney: 13 })
+    assert.deepEqual(snapshotState(playerId), {
+        freeVmoney: 0,
+        vmoney: 13,
+        storedContinueCount: 1,
+        memoryContinueCount: 1,
     })
 })

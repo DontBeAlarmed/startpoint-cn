@@ -33,6 +33,7 @@ const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 
 let app
 let nextViewerId = 846000000
+let continueVmoneyCost = 50
 
 async function createPlayer(label) {
     const account = insertAccountSync({
@@ -74,7 +75,9 @@ function createPayload(viewerId, activeQuest, continueCount = 0) {
         play_id: activeQuest.playId,
         payment_type: 1,
         api_count: 1,
-        statistics: { continue_count: continueCount },
+        statistics: {
+            zones: [{ floor: 0, zone: 0, continue_count: continueCount }],
+        },
     }
 }
 
@@ -97,11 +100,20 @@ function assertMsgpackError(response, message) {
     })
 }
 
+function assertMsgpackStatus(response, statusCode, payload) {
+    assert.equal(response.statusCode, statusCode, response.body)
+    assert.match(response.headers["content-type"], /^application\/x-msgpack/)
+    assert.deepEqual(unpack(Buffer.from(response.body, "base64")), payload)
+}
+
 test.before(async () => {
     data.initializeDatabase()
     app = Fastify({ logger: false })
     registerCnMsgpackOnSend(app)
-    await app.register(singleBattleRoutes, { prefix: "/single_battle_quest" })
+    await app.register(singleBattleRoutes, {
+        prefix: "/single_battle_quest",
+        getContinueVmoneyCost: () => continueVmoneyCost,
+    })
     await app.ready()
 })
 
@@ -143,13 +155,37 @@ test("play_continue rejects missing and invalid statistics counts as MsgPack bef
     const scenarios = [
         { name: "missing statistics", payload: { ...validPayload, statistics: undefined } },
         { name: "null statistics", payload: { ...validPayload, statistics: null } },
-        { name: "missing continue_count", payload: { ...validPayload, statistics: {} } },
+        { name: "missing zones", payload: { ...validPayload, statistics: {} } },
+        { name: "empty zones", payload: { ...validPayload, statistics: { zones: [] } } },
+        {
+            name: "null zone",
+            payload: { ...validPayload, statistics: { zones: [null] } },
+        },
+        {
+            name: "missing count",
+            payload: {
+                ...validPayload,
+                statistics: { zones: [{ floor: 0, zone: 0 }] },
+            },
+        },
         { name: "negative", payload: createPayload(viewerId, activeQuest, -1) },
         { name: "fraction", payload: createPayload(viewerId, activeQuest, 0.5) },
         { name: "string", payload: createPayload(viewerId, activeQuest, "0") },
         {
             name: "unsafe",
             payload: createPayload(viewerId, activeQuest, Number.MAX_SAFE_INTEGER + 1),
+        },
+        {
+            name: "overflow sum",
+            payload: {
+                ...validPayload,
+                statistics: {
+                    zones: [
+                        { floor: 0, zone: 0, continue_count: Number.MAX_SAFE_INTEGER },
+                        { floor: 0, zone: 1, continue_count: 1 },
+                    ],
+                },
+            },
         },
     ]
 
@@ -164,6 +200,35 @@ test("play_continue rejects missing and invalid statistics counts as MsgPack bef
             assert.deepEqual(snapshotState(playerId), before)
         })
     }
+})
+
+test("play_continue returns a bounded MsgPack failure for invalid continue config", async t => {
+    const { playerId, viewerId } = await createPlayer("continue-invalid-config")
+    updatePlayerSync({ id: playerId, freeVmoney: 100, vmoney: 100 })
+    const activeQuest = createActiveQuest("continue-invalid-config-play")
+    persistActiveQuest(playerId, activeQuest)
+    publishActiveQuest(playerId, activeQuest)
+    t.after(() => delete activeQuests[playerId])
+    const before = snapshotState(playerId)
+
+    continueVmoneyCost = 0
+    t.after(() => { continueVmoneyCost = 50 })
+    let response
+    try {
+        response = await app.inject({
+            method: "POST",
+            url: "/single_battle_quest/play_continue",
+            payload: createPayload(viewerId, activeQuest),
+        })
+    } finally {
+        continueVmoneyCost = 50
+    }
+
+    assertMsgpackStatus(response, 500, {
+        error: "Internal Server Error",
+        message: "Continue configuration is invalid.",
+    })
+    assert.deepEqual(snapshotState(playerId), before)
 })
 
 test("play_continue encodes invalid viewer failures as MsgPack", async () => {
