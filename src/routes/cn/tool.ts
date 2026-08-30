@@ -6,6 +6,7 @@ import { getPlayerSync, insertDefaultPlayerSync } from "../../data/domains/playe
 import { SessionType } from "../../data/types";
 import { saveAccountDefaultPlayer } from "../../data/activeAccount";
 import { getAccountIdentityProvider } from "../../lib/account-identity-provider";
+import { isGiftCodeEnabledSync } from "../../lib/gift-code/capability";
 import { getRealNow, getRealNowMs } from "../../runtime/time/game-time";
 
 interface CnSignupBody {
@@ -47,6 +48,14 @@ const routes = async (fastify: FastifyInstance) => {
                 viewer_id: body.viewer_id
             }),
             "data": []
+        });
+    });
+
+    fastify.post("/check_enable_gift", async (_request, reply) => {
+        reply.header("content-type", "application/x-msgpack");
+        reply.status(200).send({
+            data_headers: generateDataHeaders(),
+            data: { enable_gift: isGiftCodeEnabledSync() },
         });
     });
 

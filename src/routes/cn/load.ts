@@ -53,6 +53,7 @@ import {
 import type { LoginBonusCatalog } from "../../content/converters/login-bonus";
 import { getGameTimeContext } from "../../runtime/time/game-time";
 import { settleScheduledResourcesSync } from "../../lib/scheduled-resource-settlement";
+import { isGiftCodeEnabledSync } from "../../lib/gift-code/capability";
 import type { ConfigValues } from "../../lib/types/config";
 
 interface CnLoadBody {
@@ -105,7 +106,7 @@ function wrapOptionFields(
     d.survey_url = "";
     d.qq_group_url = "";
     d.bug_report_url = "";
-    d.enable_gift = false;
+    d.enable_gift = isGiftCodeEnabledSync();
     d.enable_customer_service = false;
     d.enable_rename = true;
     d.enable_delete_file = false;

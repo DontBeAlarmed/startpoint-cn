@@ -84,6 +84,7 @@ import comicApiPlugin from "./routes/api/comic";
 import questUnlockApiPlugin from "./routes/api/questUnlock";
 import itemApiPlugin from "./routes/api/item";
 import characterElectionApiPlugin from "./routes/api/characterElection";
+import giftApiPlugin from "./routes/api/gift";
 import bonusApiPlugin from "./routes/api/bonus";
 import { installTakeoverUdidGuard } from "./lib/takeover-access";
 import { AccountCleanupService } from "./lib/account-cleanup";
@@ -173,11 +174,6 @@ function stubMsgpackReply(reply: any, data: any) {
 
 fastify.post(`${apiPrefix}/tool/check_social_link_enable`, async (_request, reply) => {
     stubMsgpackReply(reply, { enable: false });
-});
-
-// Gift code exchange is not implemented, so do not advertise the client entry.
-fastify.post(`${apiPrefix}/tool/check_enable_gift`, async (_request, reply) => {
-    stubMsgpackReply(reply, { enable_gift: false });
 });
 
 fastify.post(`${apiPrefix}/tool/contact_active`, async (_request, reply) => {
@@ -287,6 +283,7 @@ fastify.register(snsCompatibilityRoutes, { prefix: `${apiPrefix}/sns` });
 fastify.register(historyApiPlugin, { prefix: `${apiPrefix}/history` });
 fastify.register(questUnlockApiPlugin, { prefix: `${apiPrefix}/quest` });
 fastify.register(itemApiPlugin, { prefix: `${apiPrefix}/item` });
+fastify.register(giftApiPlugin, { prefix: `${apiPrefix}/gift` });
 fastify.register(characterElectionApiPlugin, { prefix: `${apiPrefix}/character_election` });
 fastify.register(bonusApiPlugin, { prefix: `${apiPrefix}/bonus` });
 
