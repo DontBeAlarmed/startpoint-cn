@@ -12,7 +12,7 @@ test("release contract keeps the public literal anchors", () => {
     assert.equal(contract.serverManifestSchemaVersion, 3)
     assert.equal(contract.runtimeApiVersion, 1)
     assert.equal(contract.minimumDataSchema, 0)
-    assert.equal(contract.currentDataSchema, 22)
+    assert.equal(contract.currentDataSchema, 23)
     assert.equal(contract.serverEntry, "out/cn-server.js")
     assert.equal(contract.localPrepareEntry, "out/content/sync/entry.js")
     assert.equal(contract.adminPath, "web/dist")

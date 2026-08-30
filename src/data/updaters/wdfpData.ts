@@ -1,6 +1,7 @@
 // Updates an outdated wdfp_data database
 
 import { Database } from "better-sqlite3";
+import { migrateServerNewsSchema23Sync } from "../schema/server-news";
 import awakeRewards from "../../../assets/mission_char_awake_reward.json";
 
 function parseDecimalSafeInteger(value: unknown): number | null {
@@ -282,5 +283,9 @@ export function updateAfterInit(
             `).run()
             database.prepare("DROP TABLE players_login_bonus_progress_old").run()
         }
+    }
+
+    if (22 >= currentVersion) {
+        migrateServerNewsSchema23Sync(database, currentVersion)
     }
 }

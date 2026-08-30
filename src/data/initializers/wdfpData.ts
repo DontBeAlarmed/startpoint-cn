@@ -8,6 +8,7 @@ import {
     ensureActiveQuestRescueFragmentEligibilityStorageSync,
 } from "../../lib/quest/active-quest-persistence";
 import { ensureSchemaColumn } from "../schema";
+import { initializeServerNewsSchemaSync } from "../schema/server-news";
 import { pruneSpecialEventPartyGroupsSync } from "../../lib/party-group-persistence";
 import { getRealNow } from "../../runtime/time/game-time";
 
@@ -51,6 +52,8 @@ export default function init(
             ) VALUES (1, ?, 1, 1, ?)
         `).run(getInitialDropMultiplier(), getRealNow().toISOString())
     }
+
+    initializeServerNewsSchemaSync(database)
 
     // create players table
     database.prepare(`CREATE TABLE IF NOT EXISTS accounts (

@@ -364,7 +364,7 @@ Builder 和服务进程都不能自行操作这些指针。
 {
   "serverManifestSchemaVersion": 3,
   "runtimeApiVersion": 1,
-  "currentDataSchema": 22,
+  "currentDataSchema": 23,
   "serverEntry": "out/cn-server.js",
   "localPrepareEntry": "out/content/sync/entry.js",
   "adminPath": "web/dist",
