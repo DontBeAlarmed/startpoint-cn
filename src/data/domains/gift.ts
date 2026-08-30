@@ -1,3 +1,4 @@
+import { Database } from "better-sqlite3"
 import { getDb } from "../db"
 import {
     GiftCodeValidationError,
@@ -295,4 +296,33 @@ export function getGiftByExactCodeSync(code: string): GiftDefinition | null {
         WHERE codes.code = ?
     `).get(code) as Record<string, unknown> | undefined
     return row === undefined ? null : rowToGift(row)
+}
+
+export function copyGiftRedemptionsForCloneSync(
+    sourcePlayerId: number,
+    targetPlayerId: number,
+    database: Database = getDb(),
+): number {
+    requirePositiveInteger(sourcePlayerId, "Source player ID")
+    requirePositiveInteger(targetPlayerId, "Target player ID")
+    return database.prepare(`
+        INSERT INTO players_gift_redemptions (
+            gift_id, player_id, reward_revision, reward_snapshot,
+            redeemed_at, inherited_from_player_id
+        )
+        SELECT gift_id, ?, reward_revision, reward_snapshot,
+               redeemed_at, ?
+        FROM players_gift_redemptions
+        WHERE player_id = ?
+    `).run(targetPlayerId, sourcePlayerId, sourcePlayerId).changes
+}
+
+export function clearGiftRedemptionsForExternalRestoreSync(
+    playerId: number,
+    database: Database = getDb(),
+): number {
+    requirePositiveInteger(playerId, "Player ID")
+    return database.prepare(
+        "DELETE FROM players_gift_redemptions WHERE player_id = ?",
+    ).run(playerId).changes
 }

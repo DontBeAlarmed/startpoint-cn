@@ -13,7 +13,7 @@ export interface PlayerSaveTableDefinition {
 
 export interface PlayerSaveExcludedTableDefinition {
     readonly name: string
-    readonly reason: "activeQuest" | "serverConfig"
+    readonly reason: "activeQuest" | "serverConfig" | "serverOperation"
 }
 
 export type PlayerSaveRow = Record<string, unknown>

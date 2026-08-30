@@ -85,6 +85,7 @@ export const PLAYER_SAVE_TABLES: readonly PlayerSaveTableDefinition[] = [
 
 export const PLAYER_SAVE_EXCLUDED_TABLES: readonly PlayerSaveExcludedTableDefinition[] = [
     { name: "players_active_quests", reason: "activeQuest" },
+    { name: "players_gift_redemptions", reason: "serverOperation" },
     { name: "players_scheduled_resource_state", reason: "serverConfig" },
     { name: "scheduled_resource_rules", reason: "serverConfig" },
 ]

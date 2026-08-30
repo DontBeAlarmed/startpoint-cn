@@ -5,6 +5,10 @@ import { clearPublishedActiveQuest } from "../../lib/quest/active-quest-service"
 import { loadCurrentBundleMetadata } from "../../runtime/bundle-metadata"
 import { getDb } from "../db"
 import { insertDefaultPlayerSync, replacePlayerDataSync } from "../domains/player"
+import {
+    clearGiftRedemptionsForExternalRestoreSync,
+    copyGiftRedemptionsForCloneSync,
+} from "../domains/gift"
 import { getRealNow, getRealNowMs } from "../../runtime/time/game-time"
 import { normalizeImportedExpPoolAnchor } from "../../lib/exp-pool-time"
 import { reviveMergedPlayerDates } from "../utils/date"
@@ -58,6 +62,11 @@ const LEGACY_V1_UNMANAGED_TABLES = new Set([
     "players_receive_history",
     "players_mails",
 ])
+
+export {
+    clearGiftRedemptionsForExternalRestoreSync,
+    copyGiftRedemptionsForCloneSync,
+}
 
 interface SqliteColumn {
     name: string
@@ -439,6 +448,7 @@ function applyV2SnapshotSync(
                 `DELETE FROM ${quotePlayerSaveIdentifier(excluded.name)} WHERE player_id = ?`,
             ).run(targetPlayerId)
         }
+        clearGiftRedemptionsForExternalRestoreSync(targetPlayerId, database)
         for (const definition of [...insertionOrder].reverse()) {
             database.prepare(
                 `DELETE FROM ${quotePlayerSaveIdentifier(definition.name)} WHERE player_id = ?`,
@@ -506,6 +516,7 @@ function restoreLegacyV1SaveSync(
     database.transaction(() => {
         database.pragma("defer_foreign_keys = ON")
         replacePlayerDataSync(legacyData)
+        clearGiftRedemptionsForExternalRestoreSync(targetPlayerId, database)
         for (const definition of [...definitions].reverse()) {
             database.prepare(
                 `DELETE FROM ${quotePlayerSaveIdentifier(definition.name)} WHERE player_id = ?`,
@@ -579,8 +590,13 @@ export function clonePlayerSaveV2Sync(
     if (account === undefined) throw new Error(`Destination account ${destinationAccountId} was not found`)
 
     return database.transaction(() => {
+        const sourcePlayerId = requireSafePositiveInteger(parsed.snapshot.playerId, "snapshot.playerId")
+        if (database.prepare("SELECT id FROM players WHERE id = ?").get(sourcePlayerId) === undefined) {
+            throw new Error(`Clone source player ${sourcePlayerId} was not found`)
+        }
         const player = insertDefaultPlayerSync(destinationAccountId)
         applyV2SnapshotSync(parsed.snapshot, player.id, "clone", database)
+        copyGiftRedemptionsForCloneSync(sourcePlayerId, player.id, database)
         return { playerId: player.id, legacyPartial: false }
     })()
 }

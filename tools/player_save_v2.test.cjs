@@ -186,6 +186,7 @@ test("player save registry covers every current player-owned table", () => {
     assert.equal(new Set([...registered, ...excluded]).size, discovered.length)
     assert.deepEqual(excluded, [
         "players_active_quests",
+        "players_gift_redemptions",
         "players_scheduled_resource_state",
         "scheduled_resource_rules",
     ])
@@ -326,6 +327,7 @@ test("v2 export includes all registered domains and excludes transient battle st
         shown_at: null,
     }])
     assert.equal(Object.hasOwn(tables, "players_active_quests"), false)
+    assert.equal(Object.hasOwn(tables, "players_gift_redemptions"), false)
     assert.deepEqual(snapshot.excludedDomains, ["account", "session", "serverConfig", "activeQuest"])
 })
 
@@ -490,7 +492,7 @@ test("v2 validation rejects future schemas and missing tables that existed in th
     const snapshot = exportPlayerSaveV2Sync(playerId)
 
     const future = cloneJson(snapshot)
-    future.producer.dbSchemaVersion = 23
+    future.producer.dbSchemaVersion = 25
     assert.throws(() => restorePlayerSaveV2Sync(future, playerId), /newer.*schema|future.*schema/i)
 
     const missingCurrent = cloneJson(snapshot)

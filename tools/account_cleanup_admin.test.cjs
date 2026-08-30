@@ -16,6 +16,10 @@ const data = require("../src/data")
 const { insertAccountSync, getAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getDb } = require("../src/data/db")
+const {
+    clearGiftRedemptionsForExternalRestoreSync,
+    copyGiftRedemptionsForCloneSync,
+} = require("../src/data/player-save")
 const serverRoutes = require("../src/routes/web_api/server").default
 
 function createAccount(label) {
@@ -86,4 +90,31 @@ test("account cleanup admin API exposes settings and executes explicit lifecycle
         payload: { accountId: account.id },
     })
     assert.equal(missing.statusCode, 404)
+})
+
+test("account cleanup imports keep gift records server-owned", () => {
+    const account = createAccount("cleanup-gift")
+    const sourceId = insertDefaultPlayerSync(account.id).id
+    const targetId = insertDefaultPlayerSync(account.id).id
+    getDb().transaction(() => {
+        getDb().prepare(`
+            INSERT INTO server_gift_codes (id, code, status, reward_revision, created_at, updated_at)
+            VALUES (9001, 'cleanup-gift', 'active', 1, '2026-08-30T00:00:00.000Z', '2026-08-30T00:00:00.000Z')
+        `).run()
+        getDb().prepare(`
+            INSERT INTO players_gift_redemptions (
+                gift_id, player_id, reward_revision, reward_snapshot, redeemed_at
+            ) VALUES (9001, ?, 1, '[]', '2026-08-30T00:00:00.000Z')
+        `).run(sourceId)
+    })()
+
+    assert.equal(copyGiftRedemptionsForCloneSync(sourceId, targetId), 1)
+    assert.equal(
+        getDb().prepare("SELECT inherited_from_player_id FROM players_gift_redemptions WHERE player_id = ?")
+            .get(targetId).inherited_from_player_id,
+        sourceId,
+    )
+    assert.equal(clearGiftRedemptionsForExternalRestoreSync(targetId), 1)
+    assert.equal(getDb().prepare("SELECT COUNT(*) AS count FROM players_gift_redemptions WHERE player_id = ?")
+        .get(targetId).count, 0)
 })
