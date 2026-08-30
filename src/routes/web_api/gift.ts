@@ -148,20 +148,20 @@ function listRedemptions(
 ): { rows: readonly RedemptionRecord[]; totalCount: number } {
     const db = getDb()
     const hasSearch = search !== undefined
-    const isExactId = hasSearch && /^[1-9]\d*$/.test(search)
-    const exactId = isExactId ? Number(search) : null
+    const exactId = hasSearch ? parseInteger(search) : null
+    const isExactId = exactId !== null
     const namePattern = hasSearch ? `%${escapeLikePattern(search)}%` : null
     const escapeCharacter = BACKSLASH
-    const where = hasSearch
+    const where = `WHERE r.gift_id = ?${hasSearch
         ? (isExactId
-            ? "WHERE (r.player_id = ? OR p.account_id = ? OR p.name LIKE ? ESCAPE ?)"
-            : "WHERE p.name LIKE ? ESCAPE ?")
-        : ""
+            ? " AND (r.player_id = ? OR p.account_id = ? OR p.name LIKE ? ESCAPE ?)"
+            : " AND p.name LIKE ? ESCAPE ?")
+        : ""}`
     const parameters = hasSearch
         ? (isExactId
-            ? [exactId, exactId, namePattern, escapeCharacter]
-            : [namePattern, escapeCharacter])
-        : []
+            ? [giftId, exactId, exactId, namePattern, escapeCharacter]
+            : [giftId, namePattern, escapeCharacter])
+        : [giftId]
     const countRow = db.prepare(`
         SELECT COUNT(*) AS totalCount
         FROM players_gift_redemptions AS r

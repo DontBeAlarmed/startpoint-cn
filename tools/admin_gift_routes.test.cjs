@@ -367,3 +367,129 @@ test("accepts an omitted redemption search as an unfiltered page", async () => {
     assert.equal(page.totalCount, 3)
     assert.equal(page.rows.length, 1)
 })
+
+test("does not round an oversized numeric search to a safe redemption id", async () => {
+    const giftId = getDb().prepare(
+        "SELECT id FROM server_gift_codes WHERE code = ?",
+    ).get(paddedGift.code).id
+    getDb().prepare(
+        "UPDATE sqlite_sequence SET seq = ? WHERE name = 'players'",
+    ).run("9007199254740991")
+    const roundedAccount = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId: "admin-gift-rounded-player",
+        status: "normal",
+    })
+    const roundedPlayer = insertDefaultPlayerSync(roundedAccount.id)
+    assert.equal(roundedPlayer.id, 9007199254740992)
+    getDb().prepare(`
+        INSERT INTO players_gift_redemptions (
+            gift_id,
+            player_id,
+            reward_revision,
+            reward_snapshot,
+            redeemed_at
+        ) VALUES (?, ?, ?, ?, ?)
+    `).run(
+        giftId,
+        roundedPlayer.id,
+        1,
+        JSON.stringify([{ position: 0, type: 1, type_id: 1, number: 2 }]),
+        "2026-08-30T03:00:00.000Z",
+    )
+
+    const response = await inject(
+        "GET",
+        `/api/gifts/${giftId}/redemptions?page=1&pageSize=50&q=9007199254740993`,
+    )
+
+    assert.equal(response.statusCode, 200, response.payload)
+    assert.deepEqual(json(response), {
+        rows: [],
+        totalCount: 0,
+        page: 1,
+        pageSize: 50,
+    })
+})
+
+test("isolates redemption pages and searches to the requested gift", async () => {
+    const firstGiftId = getDb().prepare(
+        "SELECT id FROM server_gift_codes WHERE code = ?",
+    ).get(paddedGift.code).id
+    const secondCreatedResponse = await inject("POST", "/api/gifts", draft(
+        "second-gift-code",
+        [{ ...itemReward }],
+    ))
+    assert.equal(secondCreatedResponse.statusCode, 201, secondCreatedResponse.payload)
+    const secondCreated = json(secondCreatedResponse)
+    assert.equal(secondCreated.status, "stopped")
+    const secondActivated = json(await inject(
+        "POST",
+        `/api/gifts/${secondCreated.id}/start`,
+        { revision: secondCreated.revision },
+    ))
+    assert.equal(secondActivated.status, "active")
+    assert.equal(receiveGiftCodeSync(playerTwo.id, secondActivated.code).resultCode, 1)
+
+    const firstPage = json(await inject(
+        "GET",
+        `/api/gifts/${firstGiftId}/redemptions?page=1&pageSize=50`,
+    ))
+    assert.equal(firstPage.totalCount, 4)
+    assert.deepEqual(firstPage.rows.map(row => row.playerId).sort((left, right) => left - right), [
+        playerOne.id,
+        playerTwo.id,
+        playerThree.id,
+        9007199254740992,
+    ])
+
+    const secondPage = json(await inject(
+        "GET",
+        `/api/gifts/${secondCreated.id}/redemptions?page=1&pageSize=50`,
+    ))
+    assert.equal(secondPage.totalCount, 1)
+    assert.deepEqual(secondPage.rows.map(row => row.playerId), [playerTwo.id])
+
+    const firstByFirstOnlyPlayer = json(await inject(
+        "GET",
+        `/api/gifts/${firstGiftId}/redemptions?page=1&pageSize=50&q=${encodeURIComponent(String(playerOne.id))}`,
+    ))
+    assert.equal(firstByFirstOnlyPlayer.totalCount, 1)
+    assert.deepEqual(
+        firstByFirstOnlyPlayer.rows.map(row => row.playerId),
+        [playerOne.id],
+    )
+
+    const secondByFirstOnlyPlayer = json(await inject(
+        "GET",
+        `/api/gifts/${secondCreated.id}/redemptions?page=1&pageSize=50&q=${encodeURIComponent(String(playerOne.id))}`,
+    ))
+    assert.deepEqual(secondByFirstOnlyPlayer, {
+        rows: [],
+        totalCount: 0,
+        page: 1,
+        pageSize: 50,
+    })
+
+    const firstBySecondPlayerName = json(await inject(
+        "GET",
+        `/api/gifts/${firstGiftId}/redemptions?page=1&pageSize=50&q=${encodeURIComponent("Bob%_Match")}`,
+    ))
+    assert.equal(firstBySecondPlayerName.totalCount, 1)
+    assert.deepEqual(
+        firstBySecondPlayerName.rows.map(row => row.playerId),
+        [playerTwo.id],
+    )
+
+    const secondBySecondPlayerName = json(await inject(
+        "GET",
+        `/api/gifts/${secondCreated.id}/redemptions?page=1&pageSize=50&q=${encodeURIComponent("Bob%_Match")}`,
+    ))
+    assert.equal(secondBySecondPlayerName.totalCount, 1)
+    assert.deepEqual(
+        secondBySecondPlayerName.rows.map(row => row.playerId),
+        [playerTwo.id],
+    )
+})
