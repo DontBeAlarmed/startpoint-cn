@@ -26,6 +26,12 @@ function forcedNewsCount(database) {
     ).get().count
 }
 
+function hasNewsAsset(directory) {
+    if (!fs.existsSync(directory)) return false
+    return fs.readdirSync(directory, { withFileTypes: true })
+        .some(entry => entry.isFile() && /^news\./i.test(entry.name))
+}
+
 test("migrates schema 22, creates an empty news table, and removes forced delivery keys", () => {
     data.initializeDatabase()
     data.closeDatabase()
@@ -44,7 +50,7 @@ test("migrates schema 22, creates an empty news table, and removes forced delive
     fs.writeFileSync(path.join(process.env.DATA_DIR, "wdfp_data.version"), "22")
 
     const migrated = data.initializeDatabase()
-    assert.equal(migrated.pragma("user_version", { simple: true }), 23)
+    assert.equal(migrated.pragma("user_version", { simple: true }), 24)
     assert.deepEqual(migrated.prepare("SELECT * FROM server_news").all(), [])
     assert.equal(forcedNewsCount(migrated), 0)
     assert.equal(migrated.prepare(
@@ -61,10 +67,9 @@ test("creates a new database with an empty server-owned news table", () => {
     process.env.DATA_DIR = path.join(freshDirectory, "data")
 
     const fresh = data.initializeDatabase()
-    assert.equal(fresh.pragma("user_version", { simple: true }), 23)
+    assert.equal(fresh.pragma("user_version", { simple: true }), 24)
     assert.deepEqual(fresh.prepare("SELECT * FROM server_news").all(), [])
-    assert.equal(fs.readdirSync(path.join(freshDirectory, "assets"), { withFileTypes: true })
-        .some(entry => entry.isFile() && /^news\./i.test(entry.name)), false)
+    assert.equal(hasNewsAsset(path.join(freshDirectory, "assets")), false)
 })
 
 test("migration cleanup runs only for schema 22 or earlier", () => {

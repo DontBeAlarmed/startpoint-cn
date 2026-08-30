@@ -61,6 +61,9 @@ function addManifest(fixture, listedPaths) {
 
 function createPackFixture(t, serverVersion = "1.2.3") {
     const fixture = createFixture(t, {
+        "assets/server_release_contract.json": fs.readFileSync(
+            path.resolve(__dirname, "../assets/server_release_contract.json"),
+        ),
         "LICENSE": "GPL-3.0-or-later\n",
         "NOTICE": "notice\n",
         "out/cn-server.js": "console.log('server')\n",
@@ -70,6 +73,7 @@ function createPackFixture(t, serverVersion = "1.2.3") {
     const outputDirectory = path.join(fixture.sandbox, "dist")
     fs.mkdirSync(outputDirectory)
     const listedPaths = [
+        "assets/server_release_contract.json",
         "LICENSE",
         "NOTICE",
         "out/cn-server.js",
@@ -271,6 +275,7 @@ test("packs verified bundles by server version and repeats idempotently", t => {
         [
             "server-bundle/LICENSE",
             "server-bundle/NOTICE",
+            "server-bundle/assets/server_release_contract.json",
             "server-bundle/out/cn-server.js",
             "server-bundle/out/content/sync/entry.js",
             "server-bundle/server-manifest.json",

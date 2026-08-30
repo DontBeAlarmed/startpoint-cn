@@ -676,6 +676,24 @@ test("default release builder rejects an incomplete converter output", async () 
     )
 })
 
+function pendingBundledImportCount() {
+    const { deriveCharacterManaAdmissionSeedTableName } = require(
+        "../src/content/sync/release-builder"
+    )
+    const importedDefinitions = TABLE_SOURCES.filter(definition => (
+        definition.converterId === "bundled-json"
+        || definition.converterId === "server-json"
+    ))
+    const converterImportedTables = new Set([
+        deriveCharacterManaAdmissionSeedTableName(TABLE_SOURCES),
+        "equipment_lookup.json",
+        "practice_quest.json",
+    ])
+    return importedDefinitions.filter(definition => (
+        !converterImportedTables.has(definition.tableName)
+    )).length
+}
+
 test("default release builder bounds parallel reads and imports while preserving order", async () => {
     const { createDefaultContentTableBuilder } = require(
         "../src/content/sync/release-builder"
@@ -739,7 +757,7 @@ test("default release builder bounds parallel reads and imports while preserving
     const built = await builder.build(defaultBuilderContext(archiveIndex))
 
     assert.equal(maxOddsReads, 8)
-    assert.equal(maxImports, 8)
+    assert.equal(maxImports, Math.min(8, pendingBundledImportCount()))
     assert.deepEqual(
         reads.filter(logicalPath => logicalPath.startsWith("master/gacha_odds/")),
         expectedOddsPaths,

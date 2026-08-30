@@ -427,7 +427,7 @@ test("non-local snapshot initialization ignores CDN_DIR and uses bundled 1.4.54 
         assetVersion: "1.4.54",
         generatorVersion: 3,
         releaseDigest: null,
-        contentDigest: "sha256:8da49175341567eb1e749946048b945424b6a8027e68dbfb48db1820876176c6",
+        contentDigest: "sha256:8875d825e0724121f177fc04c2eaca6992e38b1b724030fe38a6edca541f1b70",
         multiBattleContentDigest: "sha256:918d4a8d30fa7651c2c9361a872a05dd9bbb5670172b20f870cd269cb4d7513f",
     })
     assert.equal(localValidationCalls, 0)
