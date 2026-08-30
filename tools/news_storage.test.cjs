@@ -140,6 +140,25 @@ test("normalizes timezone-aware publication times to real UTC ISO", () => {
     )
 })
 
+test("normalizes early years without the JavaScript 1900 remap", () => {
+    const normalized = validateNewsDraft({
+        ...draft,
+        publishedAtReal: "0099-01-01T00:00:00.000Z",
+    })
+    assert.equal(normalized.publishedAtReal, "0099-01-01T00:00:00.000Z")
+    assert.equal(validateNewsDraft({
+        ...draft,
+        publishedAtReal: "0099-01-01T01:02:03.004+08:00",
+    }).publishedAtReal, "0098-12-31T17:02:03.004Z")
+    assert.throws(
+        () => validateNewsDraft({
+            ...draft,
+            publishedAtReal: "0099-02-30T00:00:00Z",
+        }),
+        TypeError,
+    )
+})
+
 test("audit writes use the real clock abstraction and ignore virtual offset", () => {
     clearNews()
     const originalGetRealNow = gameTime.getRealNow

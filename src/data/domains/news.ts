@@ -1,4 +1,5 @@
 import { getDb } from "../db"
+import { parseTimezoneAwareCalendarTimestamp } from "../../lib/news-time"
 import { validateNewsRichText } from "../../lib/news-rich-text"
 import { getRealNow } from "../../runtime/time/game-time"
 
@@ -82,59 +83,17 @@ function requireTimestampWithTimezone(value: unknown, label: string): string {
     if (typeof value !== "string") {
         throw new TypeError(`${label} must include a timezone offset`)
     }
-    const timestamp = parseCalendarTimestamp(value)
+    const timestamp = parseTimezoneAwareCalendarTimestamp(value)
     if (!Number.isFinite(timestamp)) {
         throw new TypeError(`${label} must be a valid date and time`)
     }
     return new Date(timestamp).toISOString()
 }
 
-function parseCalendarTimestamp(value: string): number {
-    const match = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})$/.exec(value)
-    if (match === null) return Number.NaN
-
-    const [, rawYear, rawMonth, rawDay, rawHour, rawMinute, rawSecond, rawFraction, rawOffset]
-        = match
-    const year = Number(rawYear)
-    const month = Number(rawMonth)
-    const day = Number(rawDay)
-    const hour = Number(rawHour)
-    const minute = Number(rawMinute)
-    const second = Number(rawSecond)
-    if (month < 1 || month > 12 || hour > 23 || minute > 59 || second > 59) {
-        return Number.NaN
-    }
-
-    const daysInMonth = [
-        31,
-        year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 29 : 28,
-        31, 30, 31, 30, 31, 31, 30, 31, 30, 31,
-    ]
-    if (day < 1 || day > daysInMonth[month - 1]) return Number.NaN
-
-    const offsetMatch = rawOffset === "Z"
-        ? null
-        : /^([+-])(\d{2}):(\d{2})$/.exec(rawOffset)
-    if (offsetMatch !== null
-        && (Number(offsetMatch[2]) > 23 || Number(offsetMatch[3]) > 59)) {
-        return Number.NaN
-    }
-
-    const offsetDirection = offsetMatch === null || offsetMatch[1] === "+" ? 1 : -1
-    const offsetMinutes = offsetMatch === null
-        ? 0
-        : Number(offsetMatch[2]) * 60 + Number(offsetMatch[3])
-    const fractionMs = rawFraction === undefined
-        ? 0
-        : Number(rawFraction.slice(0, 3).padEnd(3, "0"))
-    return Date.UTC(year, month - 1, day, hour, minute, second, fractionMs)
-        - offsetDirection * offsetMinutes * 60_000
-}
-
 function requireUtcTimestamp(value: unknown, label: string): string {
     if (typeof value !== "string"
         || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value)
-        || !Number.isFinite(parseCalendarTimestamp(value))) {
+        || !Number.isFinite(parseTimezoneAwareCalendarTimestamp(value))) {
         throw new TypeError(`${label} must be a UTC ISO timestamp`)
     }
     return value

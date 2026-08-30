@@ -42,6 +42,16 @@ test("数据库公告使用 UTC 发布时间且未来不可见", () => {
     )
 })
 
+test("数据库公告拒绝历法无效的 UTC 发布时间", () => {
+    assert.equal(
+        isNewsVisibleAt(
+            { publishedAtReal: "2026-02-30T12:00:00Z" },
+            Date.parse("2026-03-02T12:00:01.000Z"),
+        ),
+        false,
+    )
+})
+
 test("缺少或无效日期的旧公告保持可见", () => {
     assert.equal(isNewsVisibleAt({}, Date.parse("2026-08-06T00:00:00.000Z")), true)
     assert.equal(
