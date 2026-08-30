@@ -146,9 +146,9 @@ POST /api/index.php/single_battle_quest/play_continue
 
 ### 修复前根因
 
-当前服务端强制读取 `statistics.continue_count`。对 CN 1.8.1 标准请求，该字段为 `undefined`，因此在 session、active quest、余额和扣款检查之前稳定返回 HTTP 400 `Invalid request body`。
+修复前服务端强制读取 `statistics.continue_count`。对 CN 1.8.1 标准请求，该字段为 `undefined`，因此在 session、active quest、余额和扣款检查之前稳定返回 HTTP 400 `Invalid request body`。
 
-现有路由测试也自造了同一个错误顶层字段，并有源码结构断言锁定该读取路径，形成“自造请求满足自造校验”的错误闭环。
+修复前路由测试也自造了同一个错误顶层字段，并有源码结构断言锁定该读取路径，形成“自造请求满足自造校验”的错误闭环。
 
 ### 请求解析
 
