@@ -65,11 +65,14 @@ function validateCommand(command: OpenManaBoardCommand): void {
 }
 
 function assertTargetBoard(command: OpenManaBoardCommand, character: CharacterGrowthCoreFact, boardCount: number): void {
-    if (command.targetBoardIndex < 2 || command.targetBoardIndex > boardCount) {
+    if (command.targetBoardIndex > boardCount) {
         throw growthError("BOARD_NOT_AVAILABLE", `board ${command.targetBoardIndex} is not available.`)
     }
     if (command.targetBoardIndex < character.manaBoardIndex) {
         throw growthError("INVALID_GROWTH_STATE", "mana board cannot be downgraded.")
+    }
+    if (command.targetBoardIndex < 2) {
+        throw growthError("BOARD_NOT_AVAILABLE", `board ${command.targetBoardIndex} is not available.`)
     }
     if (command.targetBoardIndex > character.manaBoardIndex + 1) {
         throw growthError("PREVIOUS_BOARD_INCOMPLETE", "previous mana board is not open.")

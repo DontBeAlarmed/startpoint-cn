@@ -181,7 +181,7 @@ test("openManaBoard rejects incomplete, downgrade, and jump requests at the comm
             targetBoardIndex: 1,
             evaluationTime: new Date("2024-08-14T12:00:00.000Z"),
         }),
-        error => error.code === "BOARD_NOT_AVAILABLE",
+        error => error.code === "INVALID_GROWTH_STATE",
     )
     assert.throws(
         () => openManaBoard({
@@ -277,25 +277,48 @@ test("a real mana-node route can complete board one before the Growth command op
     await app.close()
 })
 
-test("HTTP adapter maps representative incomplete, downgrade, and jump requests to 400", async () => {
+test("HTTP adapter maps incomplete, true downgrade, and unsupported board three representatives to 400", async () => {
     const app = await createAdapterApp()
     const incomplete = createEligibleIncompletePlayer()
-    const viewerId = 860000000 + incomplete.playerId
-    const account = db.prepare("SELECT account_id FROM players WHERE id = ?").get(incomplete.playerId)
+    const incompleteViewerId = 860000000 + incomplete.playerId
+    const incompleteAccount = db.prepare("SELECT account_id FROM players WHERE id = ?").get(incomplete.playerId)
     await insertSessionWithToken({
-        token: String(viewerId),
-        accountId: account.account_id,
+        token: String(incompleteViewerId),
+        accountId: incompleteAccount.account_id,
         expires: new Date("2099-01-01T00:00:00.000Z"),
         type: SessionType.VIEWER,
     })
-    const request = targetBoardIndex => app.inject({
+    const request = (viewerId, targetBoardIndex) => app.inject({
         method: "POST",
         url: "/bond/open_mana_board",
         payload: { viewer_id: viewerId, character_id: 1, mana_board_index: targetBoardIndex, api_count: 1 },
     })
-    assert.equal((await request(2)).statusCode, 400)
-    assert.equal((await request(1)).statusCode, 400)
-    assert.equal((await request(3)).statusCode, 400)
+    const incompleteResponse = await request(incompleteViewerId, 2)
+    assert.equal(incompleteResponse.statusCode, 400)
+    assert.match(incompleteResponse.body, /PREVIOUS_BOARD_INCOMPLETE/)
+
+    const opened = createReadyPlayer()
+    openManaBoard({
+        playerId: opened,
+        characterId: 1,
+        targetBoardIndex: 2,
+        evaluationTime: new Date("2024-08-14T12:00:00.000Z"),
+    })
+    const openedViewerId = 861000000 + opened
+    const openedAccount = db.prepare("SELECT account_id FROM players WHERE id = ?").get(opened)
+    await insertSessionWithToken({
+        token: String(openedViewerId),
+        accountId: openedAccount.account_id,
+        expires: new Date("2099-01-01T00:00:00.000Z"),
+        type: SessionType.VIEWER,
+    })
+    const downgradeResponse = await request(openedViewerId, 1)
+    assert.equal(downgradeResponse.statusCode, 400)
+    assert.match(downgradeResponse.body, /INVALID_GROWTH_STATE/)
+
+    const unsupportedBoardResponse = await request(openedViewerId, 3)
+    assert.equal(unsupportedBoardResponse.statusCode, 400)
+    assert.match(unsupportedBoardResponse.body, /BOARD_NOT_AVAILABLE/)
     await app.close()
 })
 
