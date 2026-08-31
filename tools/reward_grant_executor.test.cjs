@@ -250,6 +250,29 @@ test("character grants report ownership transition and RewardGrant reuses it wit
     ))
     assert.equal(characterReads.length, 1)
     assert.deepEqual(measured.result.entries[0].result.joined_character_id_list, [CHARACTER_ID])
+
+    const duplicatePlayerId = createPlayer("owner-character-duplicate-no-pre-read")
+    const duplicateBefore = playerState(duplicatePlayerId)
+    let duplicateMeasured
+    database.transaction(() => {
+        duplicateMeasured = captureSql(() => executeRewardGrantPlanInTransactionOwnerSync(
+            duplicatePlayerId,
+            createRewardGrantPlan([{
+                source: "duplicate-character",
+                reward: { type: RewardType.CHARACTER, id: DUPLICATE_CHARACTER_ID },
+            }]),
+            duplicateBefore,
+        ))
+    })()
+    const duplicateCharacterReads = duplicateMeasured.statements.filter(sql => (
+        /^\s*SELECT/i.test(sql) && /\bFROM\s+players_characters\b/i.test(sql)
+    ))
+    assert.equal(duplicateCharacterReads.length, 1)
+    assert.equal(
+        duplicateMeasured.result.entries[0].result.character_list[0].stack,
+        1,
+    )
+    assert.equal(getPlayerItemSync(duplicatePlayerId, DUPLICATE_CHARACTER_ITEM_ID), 1)
 })
 
 test("transaction-owner execution snapshots known player fields once without leaking extras", () => {

@@ -44,6 +44,7 @@ interface RawCoreRow {
     id: number
     exp: number
     stack: number
+    protection: number
     over_limit_step: number
     evolution_level: number
     mana_board_index: number
@@ -54,6 +55,7 @@ function buildCore(row: RawCoreRow): CharacterGrowthStoredCore {
         characterId: positiveInteger(row.id, "character.id"),
         exp: nonNegativeInteger(row.exp, "character.exp"),
         stack: nonNegativeInteger(row.stack, "character.stack"),
+        protection: row.protection === 1,
         overLimitStep: nonNegativeInteger(row.over_limit_step, "character.over_limit_step"),
         evolutionLevel: nonNegativeInteger(row.evolution_level, "character.evolution_level"),
         manaBoardIndex: validateBoardIndex(row.mana_board_index),
@@ -63,7 +65,7 @@ function buildCore(row: RawCoreRow): CharacterGrowthStoredCore {
 export class CharacterGrowthRepository {
     getCharacterSync(playerId: number, characterId: number): CharacterGrowthStoredCore | null {
         const row = getDb().prepare(`
-            SELECT id, exp, stack, over_limit_step, evolution_level, mana_board_index
+            SELECT id, exp, stack, protection, over_limit_step, evolution_level, mana_board_index
             FROM players_characters
             WHERE player_id = ? AND id = ?
         `).get(playerId, characterId) as RawCoreRow | undefined
@@ -78,7 +80,7 @@ export class CharacterGrowthRepository {
         if (characterIds.length === 0) return {}
         const placeholders = characterIds.map(() => "?").join(", ")
         const rows = getDb().prepare(`
-            SELECT id, exp, stack, over_limit_step, evolution_level, mana_board_index
+            SELECT id, exp, stack, protection, over_limit_step, evolution_level, mana_board_index
             FROM players_characters
             WHERE player_id = ? AND id IN (${placeholders})
             ORDER BY id
@@ -188,4 +190,3 @@ export class CharacterGrowthRepository {
         ]))
     }
 }
-

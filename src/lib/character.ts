@@ -1,97 +1,17 @@
 import { clientSerializeDate } from "../data/utils/date";
 import { getDb } from "../data/db";
 import { getPlayerCharacterSync, insertPlayerCharacterSync, updatePlayerCharacterSync } from "../data/domains/character"
-import { getPlayerSync, updatePlayerSync } from "../data/domains/player"
 import { givePlayerItemSync, givePlayerItemWithinTransactionSync } from "../data/domains/item"
 import { getCharacterDataSync } from "./assets";
 import { getRealNow } from "../runtime/time/game-time";
-import { AddExpList, AddExpListItem, ClientReturnBondTokenStatus, ClientReturnBondTokenStatusList, ClientReturnCharacter, Element, GivePlayerCharacterResult, RewardPlayerCharacterExpResult } from "./types";
+import { GivePlayerCharacterResult } from "./types";
 import { recordHundredCharactersMilestoneSync } from "./player-history-milestones";
-
-export const characterExpCaps: Record<number, number[]> = {
-    [1]: [ // 1* max exp amounts for each uncap level 
-        11416,  // level 40
-        15820,  // level 45
-        21477,  // level 50
-        28538,  // level 55
-        37241,  // level 60
-        49481,  // level 65
-        66600,  // level 70
-        91180,  // level 75
-        125223, // level 80
-        170928, // level 85
-        216633, // level 90
-        262338, // level 95
-        308043, // level 100
-    ],
-    [2]: [ // 2* max exp amounts for each uncap level 
-        21477,  // level 50
-        28538,  // level 55
-        37241,  // level 60
-        49481,  // level 65
-        66600,  // level 70
-        91180,  // level 75
-        125223, // level 80
-        170928, // level 85
-        216633, // level 90
-        262338, // level 95
-        308043, // level 100
-    ],
-    [3]: [ // 3* max exp amounts for each uncap level 
-        37241,  // level 60
-        49481,  // level 65
-        66600,  // level 70
-        91180,  // level 75
-        125223, // level 80
-        170928, // level 85
-        216633, // level 90
-        262338, // level 95
-        308043  // level 100
-    ], 
-    [4]: [ // 4* max exp amounts for each uncap level 
-        76272,  // level 70
-        102829, // level 75
-        139190, // level 80
-        189995, // level 85
-        240800, // level 90
-        291605, // level 95
-        342410  // level 100
-    ],
-    [5]: [ // 5* max exp amounts for each uncap level 
-        153988, // level 80
-        210488, // level 85
-        266988, // level 90
-        323488, // level 95
-        379988, // level 100
-    ], 
-}
-
-const dupeItemRewards: Record<number, Record<Element, number>> = {
-    [3]: { // 3* dupe item rewards for each element
-        [Element.FIRE]: 14001,
-        [Element.WATER]: 14004,
-        [Element.LIGHTNING]: 14007,
-        [Element.WIND]: 14010,
-        [Element.LIGHT]: 14016,
-        [Element.DARK]: 14013
-    },
-    [4]: { // 4* dupe item rewards for each element
-        [Element.FIRE]: 14002,
-        [Element.WATER]: 14005,
-        [Element.LIGHTNING]: 14008,
-        [Element.WIND]: 14011,
-        [Element.LIGHT]: 14017,
-        [Element.DARK]: 14014
-    },
-    [5]: { // 5* dupe item rewards for each element
-        [Element.FIRE]: 14003,
-        [Element.WATER]: 14006,
-        [Element.LIGHTNING]: 14009,
-        [Element.WIND]: 14012,
-        [Element.LIGHT]: 14018,
-        [Element.DARK]: 14015
-    }
-};
+import {
+    grantCharacterExp,
+    grantCharacterExpWithinTransactionSync,
+} from "./character-growth/commands/grant-character-exp"
+import { grantCharacterStackWithinTransactionSync } from "./character-growth/commands/grant-character-stack"
+export { characterExpCaps } from "./character-growth/exp-caps";
 
 /**
  * Rewards a player a character.
@@ -168,35 +88,14 @@ function givePlayerCharacterWithItemWriterSync(
             }
         }
     } else {
-        // otherwise, it was a dupe
-        const dupeRewards = dupeItemRewards[assetData.rarity]
-        let returnItem = undefined
-        if (dupeRewards) {
-            const itemId = dupeRewards[assetData.element]
-            giveItem(playerId, itemId, 1)
-            returnItem = {
-                id: itemId,
-                count: 1
-            }
-        }
-
-        // update stack
-        const newStack = playerCharacter.stack + 1
-        updatePlayerCharacterSync(playerId, characterId, {
-            stack: newStack
-        })
-
-        return {
-            isNew: false,
-            character: {
-                "character_id": characterId,
-                "stack": newStack,
-                "create_time": clientSerializeDate(playerCharacter.joinTime),
-                "update_time": clientSerializeDate(playerCharacter.updateTime),
-                "join_time": clientSerializeDate(playerCharacter.joinTime),
-            },
-            item: returnItem
-        }
+        // Duplicate ownership is a Growth mutation. The character domain keeps
+        // responsibility for creating first-time ownership only.
+        const grant = () => grantCharacterStackWithinTransactionSync(
+            { playerId, characterId },
+            giveItem as typeof givePlayerItemWithinTransactionSync,
+            playerCharacter,
+        )
+        return getDb().inTransaction ? grant() : getDb().transaction(grant)()
     }
 }
 
@@ -230,106 +129,29 @@ export function givePlayerCharacterWithinTransactionSync(
  * @param expAmount The amount of exp to add.
  * @returns A RewardPlayerCharacterExpResult, detailing how much exp was added.
  */
+/**
+ * Compatibility adapter for callers outside a settlement owner. All EXP
+ * calculations and writes belong to the Growth command implementation.
+ */
 export function givePlayerCharactersExpSync(
     playerId: number,
     characterIds: number[],
     expAmount: number,
     ignoreUpdate: boolean,
     knownExpPool?: number,
-): RewardPlayerCharacterExpResult {
-
-    const addExpList: AddExpList = []
-    const characterList: ClientReturnCharacter[] = []
-    const bondTokenStatusList: ClientReturnBondTokenStatusList = {}
-
-    let addToExpPool = 0
-
-    for (const characterId of characterIds) {
-        const characterData = getPlayerCharacterSync(playerId, characterId)
-        const assetData = getCharacterDataSync(characterId)
-        
-        if ((characterData !== null) && (assetData !== null) && !ignoreUpdate) {
-            const expCap = characterExpCaps[assetData.rarity][characterData.overLimitStep] || Number.MAX_SAFE_INTEGER
-            const currentExp = characterData.exp
-
-            let afterExp = currentExp + expAmount
-            const overflowExp = afterExp > expCap ? afterExp - expCap : 0
-            addToExpPool += overflowExp
-
-            afterExp = Math.min(expCap, afterExp)
-
-            updatePlayerCharacterSync(playerId, characterId, {
-                exp: afterExp
-            })
-
-            addExpList.push({
-                character_id: characterId,
-                add_exp: overflowExp > 0 ? overflowExp - expAmount : expAmount,
-                after_exp: afterExp,
-                add_exp_pool: overflowExp
-            })
-
-            characterList.push({
-                "character_id": characterId,
-                "exp": afterExp,
-                "create_time": clientSerializeDate(characterData.joinTime),
-                "update_time": clientSerializeDate(characterData.updateTime),
-                "join_time": clientSerializeDate(characterData.joinTime),
-                "exp_total": afterExp
-            })
-
-            // insert bondTokenStatusList entry
-            const bondTokenStatus: ClientReturnBondTokenStatus[] = characterData.bondTokenList.map(entry => {
-                return {
-                    mana_board_index: entry.manaBoardIndex,
-                    status: entry.status
-                }
-            })
-
-            bondTokenStatusList[characterId] = {
-                before: bondTokenStatus,
-                after: bondTokenStatus
-            }
-        } else {
-            addExpList.push({
-                character_id: characterId,
-                add_exp: 0,
-                after_exp : 379988,
-                add_exp_pool: 0
-            } as AddExpListItem)
-        }
-
-        // Always create bondTokenStatusList entry for every party character
-        // (F1010: client accesses bondTokenStatusVariations.h[id] in experience card)
-        if (!(characterId in bondTokenStatusList)) {
-            const fallbackBond: ClientReturnBondTokenStatus[] = []
-            bondTokenStatusList[characterId] = {
-                before: fallbackBond,
-                after: fallbackBond
-            }
-        }
+    evaluationTime?: Date,
+): ReturnType<typeof grantCharacterExp> {
+    const command = {
+        playerId,
+        characterIds,
+        amount: expAmount,
+        ignoreUpdate,
+        knownExpPool,
+        evaluationTime,
     }
-
-    // Reuse a caller-owned settlement snapshot when available. Standalone
-    // callers retain the legacy database read.
-    const currentExpPool = knownExpPool === undefined
-        ? getPlayerSync(playerId)?.expPool ?? null
-        : knownExpPool
-    const afterExpPool = currentExpPool === null ? null : currentExpPool + addToExpPool
-    
-    if (afterExpPool !== null && addToExpPool > 0) {
-        updatePlayerSync({
-            id: playerId,
-            expPool: afterExpPool
-        })
-    }
-
-    return {
-        add_exp_list: addExpList,
-        character_list: characterList,
-        bond_token_status_list: bondTokenStatusList,
-        exp_pool: afterExpPool === null ? 0 : afterExpPool
-    }
+    return getDb().inTransaction
+        ? grantCharacterExpWithinTransactionSync(command)
+        : grantCharacterExp(command)
 }
 
 /**

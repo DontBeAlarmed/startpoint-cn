@@ -15,6 +15,7 @@ export type CharacterGrowthErrorCode =
     | "AWAKE_COST_MISSING"
     | "INSUFFICIENT_ITEM"
     | "INSUFFICIENT_MANA"
+    | "INSUFFICIENT_EXP"
     | "INVALID_GROWTH_STATE"
     | "CONTENT_INVALID"
 

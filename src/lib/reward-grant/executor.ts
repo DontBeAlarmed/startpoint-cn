@@ -249,13 +249,13 @@ export function executeNormalizedRewardGrantPlanAsTransactionOwnerInternalSync<T
             (pid, reward) => grantOwnerCurrency(reward, playerAfter, currencyDeltas),
             (pid, itemId, amount) => itemCache.giveItem(pid, Number(itemId), amount),
             (pid, characterId) => givePlayerCharacterWithinTransactionSync(
-                pid,
-                characterId,
-                (itemOwnerId, itemId, amount) => itemCache.giveItem(
-                    itemOwnerId,
-                    Number(itemId),
-                    amount,
-                ),
+                    pid,
+                    characterId,
+                    (itemOwnerId, itemId, amount) => itemCache.giveItem(
+                        itemOwnerId,
+                        Number(itemId),
+                        amount,
+                    ),
             ),
             (pid, itemId) => itemCache.getItemCount(Number(itemId)) ?? getPlayerItemSync(pid, itemId),
         ),

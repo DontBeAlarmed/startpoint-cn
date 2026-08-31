@@ -6,6 +6,7 @@ export interface CharacterGrowthCoreFact {
     readonly rarity: number
     readonly exp: number
     readonly stack: number
+    readonly protection: boolean
     readonly overLimitStep: number
     readonly evolutionLevel: number
     readonly manaBoardIndex: number
@@ -23,6 +24,7 @@ export interface CharacterGrowthStoredCore {
     readonly characterId: number
     readonly exp: number
     readonly stack: number
+    readonly protection: boolean
     readonly overLimitStep: number
     readonly evolutionLevel: number
     readonly manaBoardIndex: number
@@ -45,4 +47,3 @@ export interface CharacterGrowthNormalManaNodeRow {
     readonly value: number
     readonly awake_level: number
 }
-

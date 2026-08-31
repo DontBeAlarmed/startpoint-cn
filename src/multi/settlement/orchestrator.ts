@@ -449,6 +449,8 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             partyCharacterIdsArray,
             characterBattleExp,
             questData.fixedParty !== undefined,
+            undefined,
+            settlementTime,
         )
         const missionEvaluation = settleMissionCategoriesWithEvaluation(
             input.playerId,

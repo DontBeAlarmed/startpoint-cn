@@ -53,6 +53,7 @@ function buildCore(
         rarity,
         exp: stored.exp,
         stack: stored.stack,
+        protection: stored.protection,
         overLimitStep: stored.overLimitStep,
         evolutionLevel: stored.evolutionLevel,
         manaBoardIndex: stored.manaBoardIndex,

@@ -195,6 +195,7 @@ export function executeSingleSettlementWrites(
         addExpAmount,
         questData.fixedParty !== undefined,
         responseState.playerState.expPool,
+        settlementTime,
     )
     responseState.setExpPool(rewardCharacterExpResult.exp_pool)
 

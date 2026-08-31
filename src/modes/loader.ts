@@ -18,7 +18,7 @@ import { pathToFileURL } from "node:url"
 
 import { getContentSnapshot } from "../content/runtime/content-snapshot"
 import { getCharacterDataSync } from "../lib/assets"
-import { givePlayerCharactersExpSync } from "../lib/character"
+import { grantCharacterExpWithinTransactionSync } from "../lib/character-growth/commands/grant-character-exp"
 import { updatePlayerEquipmentSync } from "../data/domains/equipment"
 import {
     isModeManifest,
@@ -74,7 +74,12 @@ export function createModeTransactionHost(
             ) => { updatePlayerEquipmentSync(playerId, equipmentId, patch) },
             givePlayerCharactersExp: (
                 playerId: number, characterIds: number[], amount: number,
-            ) => givePlayerCharactersExpSync(playerId, characterIds, amount, false),
+            ) => grantCharacterExpWithinTransactionSync({
+                playerId,
+                characterIds,
+                amount,
+                evaluationTime: new Date(),
+            }),
         }),
     })
 }

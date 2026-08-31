@@ -2,15 +2,16 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getPlayerCharacterSync, getPlayerCharactersSync, updatePlayerCharacterSync } from "../../data/domains/character"
-import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
-import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
+import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { generateDataHeaders } from "../../utils";
-import { getCharacterDataSync } from "../../lib/assets";
-import { characterExpCaps, givePlayerCharacterSync } from "../../lib/character";
+import { givePlayerCharacterSync } from "../../lib/character";
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDb } from "../../data/db";
+import { CharacterGrowthError } from "../../lib/character-growth/errors"
+import { executeOverLimit } from "../../lib/character-growth/commands/over-limit"
+import { executeBulkOverLimit } from "../../lib/character-growth/commands/bulk-over-limit"
 import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { canClaimTownStoryCharacter } from "../../lib/story-join-character";
@@ -37,6 +38,16 @@ interface SetProtectionBody {
     protection: boolean
     viewer_id: number
     api_count: number
+}
+
+function growthFailure(reply: FastifyReply, error: unknown) {
+    if (error instanceof CharacterGrowthError) {
+        return reply.status(400).send({
+            error: "Bad Request",
+            message: error.message.replace(/^[A-Z_]+: /, ""),
+        })
+    }
+    throw error
 }
 
 export const characterMaxOverLimits: Record<number, number> = {
@@ -180,130 +191,47 @@ const routes = async (fastify: FastifyInstance) => {
 
     fastify.post("/over_limit", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as OverLimitBody
-
         const viewerId = body.viewer_id
-        if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Invalid request body."
+        if (!Number.isSafeInteger(viewerId) || viewerId <= 0) return reply.status(400).send({
+            error: "Bad Request", message: "Invalid request body.",
         })
-
         const viewerIdSession = await getSession(viewerId.toString())
         if (!viewerIdSession) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Invalid viewer id."
+            error: "Bad Request", message: "Invalid viewer id.",
         })
-
-        // get player
-        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
-        const player = playerId !== null ? getPlayerSync(playerId) : null
-
-        if (player === null) return reply.status(500).send({
-            "error": "Internal Server Error",
-            "message": "No players bound to account."
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)
+        if (playerId === null || getPlayerSync(playerId) === null) return reply.status(500).send({
+            error: "Internal Server Error", message: "No players bound to account.",
         })
-
-        // get character data
-        const characterId = body.character_id
-        const playerCharacterData = getPlayerCharacterSync(playerId, characterId)
-        if (playerCharacterData === null) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Character not owned."
-        })
-
-        // get character asset data
-        const characterAssetData = getCharacterDataSync(characterId)
-        if (characterAssetData === null) return reply.status(500).send({
-            "error": "Internal Server Error",
-            "message": "No character asset data found."
-        })
-
-        // calculate new over limit
-        const overLimitCount = body.over_limit_count
-        if (!Number.isInteger(overLimitCount) || overLimitCount <= 0) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Over limit count must be a positive integer."
-        })
-        const newOverLimit = playerCharacterData.overLimitStep + overLimitCount
-        const characterRarity = characterAssetData.rarity
-        if (newOverLimit > characterMaxOverLimits[characterRarity]) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Character cannot be uncapped further."
-        })
-
-        let stack = playerCharacterData.stack
-        const item_list: Record<number, number> = {}
-
-        if (body.use_stack) {
-            // stack uncapping
-            
-            // ensure that the character has enough stack
-            stack = stack - overLimitCount
-            if (0 > stack) return reply.status(400).send({
-                "error": "Bad Request",
-                "message": "Character does not have enough duplicates to uncap."
+        try {
+            const result = executeOverLimit({
+                playerId,
+                characterId: body.character_id,
+                overLimitCount: body.over_limit_count,
+                useStack: body.use_stack,
+                itemId: body.item_id,
+                evaluationTime: getRealNow(),
             })
-
-            // update the character
-            updatePlayerCharacterSync(playerId, characterId, {
-                overLimitStep: newOverLimit,
-                stack: stack
+            const character = getPlayerCharacterSync(playerId, body.character_id)!
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(200).send({
+                data_headers: generateDataHeaders({ viewer_id: viewerId }),
+                data: {
+                    character_list: [{
+                        over_limit_step: result.after.overLimitStep,
+                        character_id: body.character_id,
+                        stack: result.after.stack,
+                        create_time: clientSerializeDate(character.joinTime),
+                        update_time: clientSerializeDate(character.updateTime),
+                        join_time: clientSerializeDate(character.joinTime),
+                    }],
+                    item_list: result.itemId === undefined ? {} : { [result.itemId]: result.itemCount },
+                    mail_arrived: getMailArrivedSync(playerId),
+                },
             })
-        } else {
-            // item uncapping
-            const itemId = body.item_id
-
-            // ensure that the item trying to be used is valid
-            // 5* characters can only be uncapped by item 10003 (awaking_crystal_5)
-            // 4* characters and below can only be uncapped by items 10002 (awaking_crystal_4) and 10001 (awaking_crystal_3)
-            if ( (characterRarity === 5 && itemId !== 10003) 
-                || ( 4 >= characterRarity && (itemId !== 10002 && itemId !== 10001)) 
-            ) return reply.status(400).send({
-                "error": "Bad Request",
-                "message": "Attempted to use invalid item."
-            })
-
-            const itemData = getPlayerItemSync(playerId, itemId)
-            if (itemData === null) return reply.status(400).send({
-                "error": "Bad Request",
-                "message": "Attempted to use unowned item."
-            })
-
-            // make sure that the player has enough of the item
-            const newAmount = itemData - overLimitCount
-            if (0 > newAmount) return reply.status(400).send({
-                "error": "Bad Request",
-                "message": "Not enough of item to uncap."
-            })
-
-            getDb().transaction(() => {
-                updatePlayerItemSync(playerId, itemId, newAmount)
-                updatePlayerCharacterSync(playerId, characterId, {
-                    overLimitStep: newOverLimit
-                })
-            })()
-            item_list[itemId] = newAmount
+        } catch (error) {
+            return growthFailure(reply, error)
         }
-
-        reply.header("content-type", "application/x-msgpack")
-        return reply.status(200).send({
-            "data_headers": generateDataHeaders({
-                viewer_id: viewerId
-            }),
-            "data": {
-                "character_list": [
-                    {
-                        "over_limit_step": newOverLimit,
-                        "character_id": characterId,
-                        "stack": stack,
-                        "create_time": clientSerializeDate(playerCharacterData.joinTime),
-                        "update_time": clientSerializeDate(getRealNow()),
-                        "join_time": clientSerializeDate(playerCharacterData.joinTime)
-                    }
-                ],
-                "item_list": item_list,
-                "mail_arrived": getMailArrivedSync(playerId)
-            }
-        })
     })
 
     fastify.post("/bulk_over_limit", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -325,63 +253,32 @@ const routes = async (fastify: FastifyInstance) => {
             error: "Internal Server Error", message: "No players bound to account.",
         })
 
-        const characters = getPlayerCharactersSync(playerId)
-        console.log(`[bulk_over_limit] player=${playerId} totalChars=${Object.keys(characters).length}`)
-
-        const characterList: any[] = []
-        const updates: Array<{ characterId: number, overLimitStep: number, stack: number }> = []
-
-        for (const [charId, charData] of Object.entries(characters)) {
-            if (charData.stack <= 0) continue
-
-            const assetData = getCharacterDataSync(Number(charId))
-            if (!assetData) continue
-
-            const maxOver = characterMaxOverLimits[assetData.rarity]
-            if (maxOver === undefined) continue
-
-            const rest = maxOver - charData.overLimitStep
-            if (rest <= 0) continue
-
-            const count = Math.min(charData.stack, rest)
-            const newOverLimit = charData.overLimitStep + count
-            const newStack = charData.stack - count
-
-            updates.push({
-                characterId: Number(charId),
-                overLimitStep: newOverLimit,
-                stack: newStack,
+        try {
+            const result = executeBulkOverLimit({ playerId, evaluationTime: getRealNow() })
+            const characters = getPlayerCharactersSync(playerId)
+            const characterList = result.characters.map(character => {
+                const written = characters[String(character.characterId)]!
+                return {
+                    character_id: character.characterId,
+                    over_limit_step: character.overLimitStep,
+                    stack: character.stack,
+                    create_time: clientSerializeDate(written.joinTime),
+                    update_time: clientSerializeDate(written.updateTime),
+                    join_time: clientSerializeDate(written.joinTime),
+                }
             })
 
-            characterList.push({
-                character_id: Number(charId),
-                over_limit_step: newOverLimit,
-                stack: newStack,
-                create_time: clientSerializeDate(charData.joinTime),
-                update_time: clientSerializeDate(getRealNow()),
-                join_time: clientSerializeDate(charData.joinTime),
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(200).send({
+                data_headers: generateDataHeaders({ viewer_id: viewerId }),
+                data: {
+                    character_list: characterList,
+                    mail_arrived: getMailArrivedSync(playerId),
+                },
             })
+        } catch (error) {
+            return growthFailure(reply, error)
         }
-
-        getDb().transaction(() => {
-            for (const update of updates) {
-                updatePlayerCharacterSync(playerId, update.characterId, {
-                    overLimitStep: update.overLimitStep,
-                    stack: update.stack,
-                })
-            }
-        })()
-
-        console.log(`[bulk_over_limit] done: ${characterList.length} characters modified`)
-
-        reply.header("content-type", "application/x-msgpack")
-        return reply.status(200).send({
-            data_headers: generateDataHeaders({ viewer_id: viewerId }),
-            data: {
-                character_list: characterList,
-                mail_arrived: getMailArrivedSync(playerId),
-            },
-        })
     })
 
     fastify.post("/add_character_from_town", async (request: FastifyRequest, reply: FastifyReply) => {

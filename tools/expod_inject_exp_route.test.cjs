@@ -106,6 +106,37 @@ stubModule("../src/lib/character", {
         }
     },
 })
+// This route now delegates to the Growth command. Keep this legacy transport
+// fixture small by replacing the command boundary rather than recreating the
+// production players_characters schema here.
+stubModule("../src/lib/character-growth/commands/inject-exp", {
+    executeInjectCharacterExp({ playerId, characterId, addExp }) {
+        const { CharacterGrowthError } = require("../src/lib/character-growth/errors")
+        if (!Number.isSafeInteger(addExp) || addExp <= 0) {
+            throw new CharacterGrowthError("INVALID_REQUEST", "Invalid exp amount.")
+        }
+        const currentPool = db.prepare("SELECT exp_pool FROM player_state WHERE id = ?").get(playerId).exp_pool
+        if (addExp > currentPool) {
+            throw new CharacterGrowthError("INSUFFICIENT_EXP", "Not enough exp.")
+        }
+        db.prepare("UPDATE player_state SET exp_pool = exp_pool - ? WHERE id = ?")
+            .run(addExp, playerId)
+        db.prepare("UPDATE character_state SET exp = exp + ? WHERE player_id = ? AND character_id = ?")
+            .run(addExp, playerId, characterId)
+        if (failExpWrite) throw new Error("injected character exp failure")
+        db.prepare(`
+            INSERT INTO players_active_mission_counters (player_id, total_injected_exp_count)
+            VALUES (?, 1)
+            ON CONFLICT(player_id) DO UPDATE SET
+                total_injected_exp_count = total_injected_exp_count + 1
+        `).run(playerId)
+        const expPool = db.prepare("SELECT exp_pool FROM player_state WHERE id = ?").get(playerId).exp_pool
+        return {
+            addExpList: [{ character_id: characterId, add_exp: addExp }],
+            expPool,
+        }
+    },
+})
 
 const counterDomain = require("../src/data/domains/active_mission_counters")
 const expodRoutes = require("../src/routes/api/expod.ts").default

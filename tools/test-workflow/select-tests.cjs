@@ -15,7 +15,7 @@ const HUB_AUTHENTICATION_GROUPS = [
 
 const SOURCE_RULES = [
     {
-        pattern: /^(?:src\/lib\/character-growth\/(?:model|errors|invariants|content-facts|request-context|batch-context|repository|result|resource-plan|node-state|node-command-support|commands\/(?:receive-bond-token|open-mana-board|learn-mana-nodes|awake-mana-nodes))\.ts|tools\/character_growth_(?:core|context|bond_command|open_board_command|node_commands|awake_node_commands|node_transaction)\.test\.cjs|tools\/perf\/character_growth_context_admission\.test\.cjs)$/,
+        pattern: /^(?:src\/lib\/character-growth\/(?:model|errors|invariants|content-facts|request-context|batch-context|repository|result|resource-plan|node-state|node-command-support|mutation-support|exp-calculation|exp-caps|limits|commands\/(?:receive-bond-token|open-mana-board|learn-mana-nodes|awake-mana-nodes|inject-exp|stack-to-exp|bulk-stack-to-exp|over-limit|bulk-over-limit|grant-character-exp|grant-character-stack))\.ts|tools\/(?:character_growth_(?:core|context|bond_command|open_board_command|node_commands|awake_node_commands|node_transaction|exp_commands|stack_commands|over_limit_commands|exp_transaction)\.test\.cjs|helpers\/character-growth-c4-fixture\.cjs)|tools\/perf\/character_growth_context_admission\.test\.cjs)$/,
         groups: ["quick:character-growth"],
     },
     {
