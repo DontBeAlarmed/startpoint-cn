@@ -124,12 +124,44 @@ export function getPlayerCharacterSync(
     SELECT mana_board_index, status, character_id
     FROM players_characters_bond_tokens
     WHERE player_id = ? AND character_id = ?
+    ORDER BY character_id, mana_board_index
     `).all(playerId, characterId) as RawPlayerCharacterBondToken[]
 
     return buildPlayerCharacter(
         rawCharacter,
         rawBondTokens.map(raw => buildCharacterBondToken(raw))
     )
+}
+
+/** Reads bond tokens by character, with a stable SQL order for projections and diagnostics. */
+export function getPlayerCharacterBondTokensByIdsSync(
+    playerId: number,
+    ids: readonly number[],
+): Record<string, PlayerCharacterBondToken[]> {
+    const characterIds = normalizeCharacterFactIds(ids)
+    if (characterIds.length === 0) return {}
+    const placeholders = characterIds.map(() => "?").join(", ")
+    const rows = getDb().prepare(`
+        SELECT character_id, mana_board_index, status
+        FROM players_characters_bond_tokens
+        WHERE player_id = ? AND character_id IN (${placeholders})
+        ORDER BY character_id, mana_board_index
+    `).all(playerId, ...characterIds) as RawPlayerCharacterBondToken[]
+    const buckets: Record<string, PlayerCharacterBondToken[]> = {}
+    for (const row of rows) {
+        ;(buckets[String(row.character_id)] ??= []).push({
+            manaBoardIndex: row.mana_board_index,
+            status: row.status,
+        })
+    }
+    return buckets
+}
+
+export function getPlayerCharacterBondTokensSync(
+    playerId: number,
+    characterId: number,
+): PlayerCharacterBondToken[] {
+    return getPlayerCharacterBondTokensByIdsSync(playerId, [characterId])[String(characterId)] ?? []
 }
 
 export function getPlayerCharacterGrowthFactsByIdsSync(
@@ -172,6 +204,7 @@ export function getPlayerCharactersSync(
     SELECT mana_board_index, status, character_id
     FROM players_characters_bond_tokens
     WHERE player_id = ?
+    ORDER BY character_id, mana_board_index
     `).all(playerId) as RawPlayerCharacterBondToken[]
 
     const bondBuckets: Record<string, PlayerCharacterBondToken[]> = {}
@@ -218,6 +251,7 @@ export function getPlayerCharactersByIdsSync(
     SELECT mana_board_index, status, character_id
     FROM players_characters_bond_tokens
     WHERE player_id = ? AND character_id IN (${placeholders})
+    ORDER BY character_id, mana_board_index
     `).all(playerId, ...characterIds) as RawPlayerCharacterBondToken[]
     const bondBuckets: Record<string, PlayerCharacterBondToken[]> = {}
     for (const raw of rawBondTokens) {

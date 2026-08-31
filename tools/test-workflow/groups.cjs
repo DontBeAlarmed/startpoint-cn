@@ -107,6 +107,15 @@ const TEST_GROUPS = Object.freeze({
             "tools/daily_challenge_and_shop_time.test.cjs",
         ],
     },
+    "quick:character-growth": {
+        execution: "parallel",
+        timeoutMs: 60_000,
+        tests: [
+            "tools/character_growth_core.test.cjs",
+            "tools/character_growth_context.test.cjs",
+            "tools/perf/character_growth_context_admission.test.cjs",
+        ],
+    },
     "quick:character": {
         execution: "parallel",
         timeoutMs: 60_000,

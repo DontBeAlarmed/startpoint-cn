@@ -30,6 +30,7 @@ export function getPlayerCharacterAwakeUnlocksSync(
         SELECT character_id, board_index, awake_level
         FROM players_character_awake_unlocks
         WHERE player_id = ?
+        ORDER BY character_id, board_index
     `).all(playerId) as RawCharacterAwakeUnlock[]
 
     const result: CharacterAwakeUnlockMap = new Map()
@@ -38,6 +39,31 @@ export function getPlayerCharacterAwakeUnlocksSync(
         const awakeLevels = result.get(characterId) ?? {}
         awakeLevels[row.board_index] = row.awake_level
         result.set(characterId, awakeLevels)
+    }
+    return result
+}
+
+export function getPlayerCharacterAwakeUnlocksByIdsSync(
+    playerId: number,
+    ids: readonly number[],
+): Record<string, Record<number, number>> {
+    const characterIds = [...new Set(ids)]
+    for (const characterId of characterIds) {
+        if (!Number.isSafeInteger(characterId) || characterId <= 0) {
+            throw new TypeError("character IDs must be positive safe integers.")
+        }
+    }
+    if (characterIds.length === 0) return {}
+    const placeholders = characterIds.map(() => "?").join(", ")
+    const rows = getDb().prepare(`
+        SELECT character_id, board_index, awake_level
+        FROM players_character_awake_unlocks
+        WHERE player_id = ? AND character_id IN (${placeholders})
+        ORDER BY character_id, board_index
+    `).all(playerId, ...characterIds) as RawCharacterAwakeUnlock[]
+    const result: Record<string, Record<number, number>> = {}
+    for (const row of rows) {
+        ;(result[String(row.character_id)] ??= {})[row.board_index] = row.awake_level
     }
     return result
 }

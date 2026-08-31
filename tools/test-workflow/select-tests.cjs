@@ -15,6 +15,10 @@ const HUB_AUTHENTICATION_GROUPS = [
 
 const SOURCE_RULES = [
     {
+        pattern: /^(?:src\/lib\/character-growth\/(?:model|errors|invariants|content-facts|request-context|batch-context|repository|result)\.ts|tools\/character_growth_(?:core|context)\.test\.cjs|tools\/perf\/character_growth_context_admission\.test\.cjs)$/,
+        groups: ["quick:character-growth"],
+    },
+    {
         pattern: /^tools\/(?:active_mission_evaluator_equivalence\.test|helpers\/active-mission-legacy-evaluator)\.cjs$/,
         groups: ["integration:mission"],
     },
