@@ -374,6 +374,14 @@ test("reachable order board two then Awake does not change the ordinary board in
         assert.equal(awakeResponse.statusCode, 200, awakeResponse.body)
         assert.equal(getPlayerCharacterSync(player.playerId, 1).manaBoardIndex, 2)
         assert.equal(getPlayerCharacterManaNodeAwakeLevelsSync(player.playerId, 1)[2219], 1)
+        assert.deepEqual(
+            db.prepare(`
+                SELECT value, awake_level
+                FROM players_characters_mana_nodes
+                WHERE player_id = ? AND character_id = 1 AND value = 2401
+            `).get(player.playerId),
+            { value: 2401, awake_level: 0 },
+        )
     })
 })
 
