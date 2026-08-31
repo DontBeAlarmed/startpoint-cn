@@ -57,10 +57,9 @@ function testAwakeAuthorizationUsesIndependentUnlockState() {
         "utf8"
     )
 
-    assert.match(
-        awakeRouteSource,
-        /const unlockedAwakeLevel = getPlayerCharacterAwakeUnlocksSync\(playerId\)/,
-    )
+    assert.match(awakeRouteSource, /executeAwakeManaNodes/)
+    assert.doesNotMatch(awakeRouteSource, /getPlayerCharacterAwakeUnlocksSync/)
+    assert.doesNotMatch(awakeRouteSource, /updatePlayerCharacterManaNodeAwakeLevelsBatchSync/)
     assert.doesNotMatch(awakeRouteSource, /computeManaBoardAwakeFromNodes/)
     assert.doesNotMatch(awakeRouteSource, /computeAwakeSummary/)
 }

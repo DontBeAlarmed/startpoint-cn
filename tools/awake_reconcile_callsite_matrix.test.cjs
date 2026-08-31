@@ -75,7 +75,7 @@ const AUTHORITATIVE_WRITE_SETS = Object.freeze({
     "character/learn_mana_node": Object.freeze([
         "updatePlayerSync", "incrementActiveMissionUsedManaCountSync",
         "setPlayerItemWithinTransactionSync", "insertPlayerCharacterManaNodesSync",
-        "updateBondTokenForCompletedBoard", "finalizeLearnManaAwakePublicationWrites",
+        "updateBondTokenForCompletedBoardFromGrowthState", "finalizeLearnManaAwakePublicationWrites",
     ]),
     "exchange/star_crumb": Object.freeze(["transaction"]),
     "gacha/exchange_character": Object.freeze(["transaction"]),
@@ -290,13 +290,13 @@ function matrixRow({
 }
 
 const EXPECTED_MATRIX = Object.freeze([
+    matrixRow({ relativeFile: "src/lib/character-growth/commands/learn-mana-nodes.ts", callee: "strict", owner: "character/learn_mana_node", boundary: "strict-in-tx", actualCharacterSeed: "[command.characterId]", finalAuthoritativeWrite: "finalizeLearnManaAwakePublicationWrites", runtimeEvidenceKey: "learn-mana-final-node" }),
     matrixRow({ relativeFile: "src/lib/quest/finish/single-settlement-writes.ts", owner: "single/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "partyCharacterIds", actualFactSeeds: "awakePublication.invalidatedFactKeys", finalAuthoritativeWrite: "finalizeSingleAwakePublicationWrites", runtimeEvidenceKey: "single-finish", changesGlobalFacts: true, rereadReason: SINGLE_REREAD_REASON }),
     matrixRow({ relativeFile: "src/multi/settlement/orchestrator.ts", owner: "multi/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "invalidatedFactKeys", finalAuthoritativeWrite: "finalizeMultiAwakePublicationWrites", runtimeEvidenceKey: "multi-finish", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/activeMission.ts", owner: "active_mission/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "granter.invalidatedFactKeys", finalAuthoritativeWrite: "persistPlayer", runtimeEvidenceKey: "active-mission-receive", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/boxGacha.ts", owner: "box_gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "settlement.rewardResult?.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "box-gacha-exec", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/character.ts", owner: "character/add_character_from_town", boundary: "best-effort-post-commit", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "character-town-grant" }),
     matrixRow({ relativeFile: "src/routes/api/character/bond.ts", owner: "character/receive_bond_token", boundary: "best-effort-in-tx", actualCharacterSeed: "[body.character_id]", finalAuthoritativeWrite: "receiveBondToken", runtimeEvidenceKey: "bond-success" }),
-    matrixRow({ relativeFile: "src/routes/api/character/mana.ts", callee: "strict", owner: "character/learn_mana_node", boundary: "strict-in-tx", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "finalizeLearnManaAwakePublicationWrites", runtimeEvidenceKey: "learn-mana-final-node" }),
     matrixRow({ relativeFile: "src/routes/api/exchange.ts", owner: "exchange/star_crumb", boundary: "best-effort-post-commit", actualCharacterSeed: "kind === 0 ? [targetId] : []", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "exchange-star-crumb" }),
     matrixRow({ relativeFile: "src/routes/api/gacha.ts", owner: "gacha/exchange_character", boundary: "best-effort-post-commit", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "gacha-exchange-character" }),
     matrixRow({ relativeFile: "src/routes/api/gacha.ts", owner: "gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "gacha-exec" }),
@@ -428,6 +428,9 @@ function findEnclosingFunctionName(call) {
 }
 
 function classifyOwner(relativeFile, call, sourceFile, checker) {
+    if (relativeFile === "src/lib/character-growth/commands/learn-mana-nodes.ts") {
+        return "character/learn_mana_node"
+    }
     if (relativeFile === "src/lib/quest/finish/single-settlement-writes.ts") {
         assert.equal(findEnclosingFunctionName(call), "executeSingleSettlementWrites")
         return "single/finish"
@@ -1901,7 +1904,7 @@ test("35.5D matrix invariants fail closed on evidence omissions and grouping dri
         matrix => matrix.pop(),
         matrix => { matrix[1].owner = matrix[0].owner },
         matrix => { matrix[0].boundary = "best-effort-post-commit" },
-        matrix => { matrix[0].actualFactSeeds = "none" },
+        matrix => { matrix.find(entry => entry.owner === "single/finish").actualFactSeeds = "none" },
         matrix => { matrix[0].runtimeEvidenceKey = "missing-runtime-evidence" },
         matrix => { matrix[0].sqlUpperBoundKey = "missing-sql-bound" },
         matrix => { matrix[0].authoritativeWriteSet = [] },

@@ -1,4 +1,4 @@
-import { deletePlayerCharacterAwakeUnlocksSync, getPlayerCharacterAwakeUnlocksSync, upsertPlayerCharacterAwakeUnlockSync } from "../../data/domains/character_awake"
+import { getPlayerCharacterAwakeUnlocksSync, upsertPlayerCharacterAwakeUnlockSync } from "../../data/domains/character_awake"
 import type { CharacterAwakeUnlockMap } from "../../data/domains/character_awake"
 import { getPlayerCategoryMissionsSync } from "../../data/domains/mission"
 import { getDb } from "../../data/db"
@@ -52,16 +52,6 @@ export function reconcileAwakeUnlocksFromProgressCore(
     const nextUnlocks: CharacterAwakeUnlockMap = new Map(
         [...unlocks].map(([characterId, levels]) => [characterId, { ...levels }]),
     )
-    for (const [characterId, levels] of unlocks) {
-        const numericCharacterId = Number(characterId)
-        if (effectiveResolver.getBaseReadiness(numericCharacterId) !== "not-ready") continue
-        if (effectiveResolver.hasPositiveManaNodeAwakeLevel(numericCharacterId)) continue
-        if (deletePlayerCharacterAwakeUnlocksSync(playerId, numericCharacterId)) {
-            removed.set(characterId, { ...levels })
-            nextUnlocks.delete(characterId)
-        }
-    }
-
     for (const entry of progressList) {
         const characterId = getCharacterIdFromMission(entry.missionId)
         if (!effectiveResolver.isNewUnlockEligible(Number(characterId), entry.missionId)) continue

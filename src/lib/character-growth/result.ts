@@ -9,6 +9,8 @@ export interface CharacterGrowthObservedState extends CharacterGrowthCoreFact {
 export interface CharacterGrowthResourceState {
     readonly items?: ReadonlyMap<number, number>
     readonly mana?: number
+    readonly freeMana?: number
+    readonly paidMana?: number
 }
 
 export interface CharacterGrowthCommandResult {
@@ -20,4 +22,3 @@ export interface CharacterGrowthCommandResult {
     readonly missionSettlement?: unknown
     readonly replayed: boolean
 }
-

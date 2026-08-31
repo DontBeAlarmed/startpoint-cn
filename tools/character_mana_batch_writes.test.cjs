@@ -497,3 +497,16 @@ test("awake affected-row mismatch rolls back mana, items, nodes, evolution, and 
     assert.equal(manaNodeAwakeUpdates(statements).length, 1, statements.join("\n---\n"))
     assert.deepEqual(manaMutationState(playerId), before)
 })
+
+test("Growth node routes delegate persistent node writes to their commands", () => {
+    const learnRoute = fs.readFileSync(path.join(__dirname, "../src/routes/api/character/mana.ts"), "utf8")
+    const awakeRoute = fs.readFileSync(path.join(__dirname, "../src/routes/api/character/mana-awake.ts"), "utf8")
+    assert.match(learnRoute, /executeLearnManaNodes/)
+    assert.match(awakeRoute, /executeAwakeManaNodes/)
+    for (const source of [learnRoute, awakeRoute]) {
+        assert.doesNotMatch(source, /insertPlayerCharacterManaNodesSync/)
+        assert.doesNotMatch(source, /updatePlayerCharacterManaNodeAwakeLevelsBatchSync/)
+        assert.doesNotMatch(source, /updatePlayerCharacterSync/)
+        assert.doesNotMatch(source, /setPlayerItemWithinTransactionSync/)
+    }
+})

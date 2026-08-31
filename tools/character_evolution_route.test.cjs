@@ -556,11 +556,11 @@ test("awake_mana_node reads one item snapshot for planning and settlement", asyn
     seedBoardNodes(singleSnapshot.playerId)
     upsertPlayerCharacterAwakeUnlockSync(singleSnapshot.playerId, CHARACTER_ID, 1, 1)
     grantAwakeCost(singleSnapshot.playerId, SKILL_EVOLUTION_NODE_ID)
-    const originalGetPlayerItemsSync = itemDomain.getPlayerItemsSync
+    const originalGetPlayerItemsByIdsSync = itemDomain.getPlayerItemsByIdsSync
     let readCount = 0
-    itemDomain.getPlayerItemsSync = (...args) => {
+    itemDomain.getPlayerItemsByIdsSync = (...args) => {
         if (args[0] === singleSnapshot.playerId) readCount += 1
-        return originalGetPlayerItemsSync(...args)
+        return originalGetPlayerItemsByIdsSync(...args)
     }
     try {
         const response = await app.inject({
@@ -577,7 +577,7 @@ test("awake_mana_node reads one item snapshot for planning and settlement", asyn
         assert.equal(response.statusCode, 200, response.body)
         assert.equal(readCount, 1)
     } finally {
-        itemDomain.getPlayerItemsSync = originalGetPlayerItemsSync
+        itemDomain.getPlayerItemsByIdsSync = originalGetPlayerItemsByIdsSync
     }
 })
 

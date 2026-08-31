@@ -12,6 +12,7 @@ import { generateDataHeaders } from "../utils"
 import { clientSerializeDate } from "../data/utils/date"
 import { getBondTokenStatus, projectSortedBondTokens } from "./character-growth/invariants"
 import type { BondTokenStatus } from "./character-growth/model"
+import type { CharacterGrowthObservedState } from "./character-growth/result"
 import { growthError } from "./character-growth/errors"
 
 // ─── Response types ───
@@ -76,7 +77,7 @@ export function validateCharacterOwnership(
 
 // ─── Mana deduction ───
 
-export function computeManaDeduction(player: Player, manaCost: number): {
+export function computeManaDeduction(player: Pick<Player, "freeMana" | "paidMana">, manaCost: number): {
     newFreeMana: number
     newPaidMana: number
 } | null {
@@ -138,6 +139,23 @@ export function buildCharacterListEntry(
             })),
         ...extras,
     }
+}
+
+/** Builds a protocol character entry from the command's authoritative after-state. */
+export function buildCharacterListEntryFromGrowth(
+    characterId: number,
+    characterData: PlayerCharacter,
+    after: CharacterGrowthObservedState,
+    extras: Record<string, unknown> = {},
+): Record<string, unknown> {
+    return buildCharacterListEntry(characterId, characterData, {
+        evolution_level: after.evolutionLevel,
+        evolution_img_level: after.evolutionLevel,
+        ...(after.bondTokens ? {
+            bond_token_list: projectSortedBondTokens(after.bondTokens),
+        } : {}),
+        ...extras,
+    })
 }
 
 /** Merges mission-unlocked and persisted mana-board awake levels. */
@@ -232,6 +250,22 @@ export function updateBondTokenForCompletedBoard(
         entry.manaBoardIndex,
         entry.status as BondTokenStatus,
     ]))
+    return updateBondTokenForCompletedBoardFromGrowthState(
+        playerId,
+        characterId,
+        tokenMap,
+        boardIndex,
+        isBoardComplete,
+    )
+}
+
+export function updateBondTokenForCompletedBoardFromGrowthState(
+    playerId: number,
+    characterId: number,
+    tokenMap: ReadonlyMap<number, BondTokenStatus>,
+    boardIndex: number,
+    isBoardComplete: boolean,
+): BondTokenResult {
     const currentStatus = getBondTokenStatus(tokenMap, boardIndex)
     if (currentStatus === null) {
         throw growthError(

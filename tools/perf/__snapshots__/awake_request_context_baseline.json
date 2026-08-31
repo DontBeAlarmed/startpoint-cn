@@ -217,14 +217,14 @@
       "behaviorSha256": "3ee3ee50e4a7d1372448eefa2e0d6b3d40b5d1d56b78f2ca9035b1f09cc2c8b1"
     },
     "empty-candidate-cleanup": {
-      "sqlReads": 6,
-      "sqlWrites": 1,
+      "sqlReads": 5,
+      "sqlWrites": 0,
       "missionComputes": 0,
       "sqlByTable": {
         "players_character_awake_unlocks": {
-          "reads": 2,
-          "writes": 1,
-          "statements": 3
+          "reads": 1,
+          "writes": 0,
+          "statements": 1
         },
         "players_characters": {
           "reads": 1,
@@ -243,10 +243,7 @@
         }
       },
       "behavior": {
-        "all": [],
-        "changed": [],
-        "finalUnlocks": [],
-        "removed": [
+        "all": [
           [
             341005,
             [
@@ -256,13 +253,26 @@
               ]
             ]
           ]
-        ]
+        ],
+        "changed": [],
+        "finalUnlocks": [
+          [
+            341005,
+            [
+              [
+                1,
+                1
+              ]
+            ]
+          ]
+        ],
+        "removed": []
       },
-      "behaviorSha256": "bbbcbc055cad69b216b3b1d2ff14bb7bdabd7abcb9be4ef622c9eb22fbc92b3b"
+      "behaviorSha256": "2f79e9b7dee5fab9f9cff559bea6d80019e04520f4e2a85bacef3cf2ee173a71"
     },
     "strict-failure-rollback": {
-      "sqlReads": 13,
-      "sqlWrites": 2,
+      "sqlReads": 11,
+      "sqlWrites": 1,
       "missionComputes": 7,
       "sqlByTable": {
         "players": {
@@ -271,19 +281,19 @@
           "statements": 1
         },
         "players_category_mission_stages": {
-          "reads": 2,
+          "reads": 1,
           "writes": 0,
-          "statements": 2
+          "statements": 1
         },
         "players_category_missions": {
-          "reads": 2,
+          "reads": 1,
           "writes": 0,
-          "statements": 2
+          "statements": 1
         },
         "players_character_awake_unlocks": {
           "reads": 1,
-          "writes": 2,
-          "statements": 3
+          "writes": 1,
+          "statements": 2
         },
         "players_character_quest_clears": {
           "reads": 1,
@@ -328,8 +338,8 @@
       "behaviorSha256": "85c0693a4e815a0ddebe51ce6f91d7334fc69c25a6561222cc4d790431ec6c84"
     },
     "best-effort-failure": {
-      "sqlReads": 13,
-      "sqlWrites": 2,
+      "sqlReads": 11,
+      "sqlWrites": 1,
       "missionComputes": 7,
       "sqlByTable": {
         "players": {
@@ -338,19 +348,19 @@
           "statements": 1
         },
         "players_category_mission_stages": {
-          "reads": 2,
+          "reads": 1,
           "writes": 0,
-          "statements": 2
+          "statements": 1
         },
         "players_category_missions": {
-          "reads": 2,
+          "reads": 1,
           "writes": 0,
-          "statements": 2
+          "statements": 1
         },
         "players_character_awake_unlocks": {
           "reads": 1,
-          "writes": 2,
-          "statements": 3
+          "writes": 1,
+          "statements": 2
         },
         "players_character_quest_clears": {
           "reads": 1,

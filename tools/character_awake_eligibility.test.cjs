@@ -231,9 +231,9 @@ async function testEligibilityAndCleanup() {
         invalidPersistedContract.playerId,
         [],
     )
-    assert.deepEqual(removedUnlocks.all, new Map())
+    assert.deepEqual(removedUnlocks.all.get(String(characterId)), { 1: 1 })
     assert.deepEqual(removedUnlocks.changed, new Map())
-    assert.deepEqual(removedUnlocks.removed, new Map([[String(characterId), { 1: 1 }]]))
+    assert.deepEqual(removedUnlocks.removed, new Map())
 
     const invalidPersisted = createPlayer("awake-invalid-persisted")
     learnBoardOne(invalidPersisted.playerId, boardOneNodeIds.slice(0, 1))
@@ -248,12 +248,16 @@ async function testEligibilityAndCleanup() {
             mana_board_awake: { 1: 1 },
         }],
     )
-    assert.equal(invalidPersistedResponse.length, 1)
-    assert.equal(invalidPersistedResponse[0].character_id, characterId)
-    assert.equal(invalidPersistedResponse[0].evolution_level, 2)
-    assert.strictEqual(invalidPersistedResponse[0].bond_token_list, existingBondTokenList)
-    assert.deepEqual(invalidPersistedResponse[0].mana_board_awake, {})
-    assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(invalidPersisted.playerId), new Map())
+    assert.deepEqual(invalidPersistedResponse, [{
+        character_id: characterId,
+        evolution_level: 2,
+        bond_token_list: existingBondTokenList,
+        mana_board_awake: { 1: 1 },
+    }])
+    assert.deepEqual(
+        getPlayerCharacterAwakeUnlocksSync(invalidPersisted.playerId),
+        new Map([[String(characterId), { 1: 1 }]]),
+    )
 
     setBaseCap(invalidPersisted.playerId)
     learnBoardOne(invalidPersisted.playerId, boardOneNodeIds.slice(1))
@@ -284,7 +288,7 @@ async function testEligibilityAndCleanup() {
     )
     assert.deepEqual(
         reconcileAwakeUnlockCharacterList(invalidPersistedWithoutExisting.playerId, []),
-        [{ character_id: characterId, mana_board_awake: {} }],
+        [],
     )
 
     const awakenedPersisted = createPlayer("awake-awakened-persisted")

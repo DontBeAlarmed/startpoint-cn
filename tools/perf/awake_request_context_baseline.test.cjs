@@ -440,9 +440,9 @@ test("current publication and reconcile baseline matches the checked snapshot", 
     assert.deepEqual(report.scenarios["candidate-one"].behavior.second.changed, [])
     assert.deepEqual(
         report.scenarios["empty-candidate-cleanup"].behavior.removed,
-        [[341005, [[1, 1]]]],
+        [],
     )
-    assert.deepEqual(report.scenarios["empty-candidate-cleanup"].behavior.finalUnlocks, [])
+    assert.deepEqual(report.scenarios["empty-candidate-cleanup"].behavior.finalUnlocks, [[341005, [[1, 1]]]])
     assert.deepEqual(report.scenarios["strict-failure-rollback"].behavior, {
         candidateUnlockPresent: false,
         errorCategory: "database-write-failure",
@@ -462,7 +462,7 @@ test("current publication and reconcile baseline matches the checked snapshot", 
         unlockCount: 1,
     })
     for (const name of ["strict-failure-rollback", "best-effort-failure"]) {
-        assert.equal(report.scenarios[name].sqlWrites, 2, name)
+        assert.equal(report.scenarios[name].sqlWrites, 1, name)
         assert.equal(report.scenarios[name].sqlByTable.players.writes, 0, name)
         assert.equal(
             report.scenarios[name].sqlByTable.players.statements,

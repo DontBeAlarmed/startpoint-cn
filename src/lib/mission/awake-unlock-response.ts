@@ -42,7 +42,7 @@ function reconcileAwakeUnlockCharacterListCore(
     })
     assertAwakeRequestContext(context, playerId)
     return getDb().transaction(() => {
-        const { changed, removed } = reconcileAwakeUnlocksFromProgressCore(
+        const { changed } = reconcileAwakeUnlocksFromProgressCore(
             playerId,
             context.evaluate(options.candidateCharacterIds),
             context.resolver,
@@ -100,23 +100,6 @@ function reconcileAwakeUnlockCharacterListCore(
                     merged[index].mana_board_awake,
                     update.mana_board_awake,
                 ),
-            }
-        }
-
-        for (const characterId of removed.keys()) {
-            const index = indexByCharacterId.get(characterId)
-            if (index === undefined) {
-                indexByCharacterId.set(characterId, merged.length)
-                merged.push({
-                    character_id: Number(characterId),
-                    mana_board_awake: {},
-                })
-                continue
-            }
-
-            merged[index] = {
-                ...merged[index],
-                mana_board_awake: {},
             }
         }
 
