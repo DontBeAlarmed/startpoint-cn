@@ -88,6 +88,7 @@ export class CharacterGrowthRequestContextImpl implements CharacterGrowthRequest
     private cachedContentFacts: CharacterGrowthContentFacts | null = null
     private readonly cachedItems = new Map<number, number>()
     private requiredItemsLoaded = false
+    private requiredItemIds: ReadonlySet<number> | null = null
 
     constructor(options: CharacterGrowthRequestContextOptions) {
         this.playerId = positiveId(options.playerId, "playerId")
@@ -139,7 +140,7 @@ export class CharacterGrowthRequestContextImpl implements CharacterGrowthRequest
         const requestedIds = [...new Set(ids)]
         for (const id of requestedIds) positiveId(id, "itemId")
         if (this.requiredItemsLoaded) {
-            const hasNewId = requestedIds.some(id => !this.cachedItems.has(id))
+            const hasNewId = requestedIds.some(id => !this.requiredItemIds?.has(id))
             if (hasNewId) {
                 throw growthError(
                     "INVALID_GROWTH_STATE",
@@ -148,7 +149,8 @@ export class CharacterGrowthRequestContextImpl implements CharacterGrowthRequest
             }
         } else {
             const loaded = this.repository.getRequiredItemsSync(this.playerId, requestedIds)
-            for (const [id, amount] of loaded) this.cachedItems.set(id, amount)
+            this.requiredItemIds = new Set(requestedIds)
+            for (const id of requestedIds) this.cachedItems.set(id, loaded.get(id) ?? 0)
             this.requiredItemsLoaded = true
         }
         return new Map(requestedIds.map(id => [id, this.cachedItems.get(id) ?? 0]))

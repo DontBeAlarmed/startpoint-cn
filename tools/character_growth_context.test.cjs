@@ -62,7 +62,10 @@ function createRepository(calls, overrides = {}) {
         getRequiredItemsSync(playerId, ids) {
             calls.items++
             calls.itemIds.push([...ids])
-            return new Map(ids.map(id => [id, id * 10]))
+            const missingItemIds = new Set(overrides.missingItemIds ?? [])
+            return new Map(ids
+                .filter(id => !missingItemIds.has(id))
+                .map(id => [id, id * 10]))
         },
     }
 }
@@ -190,6 +193,47 @@ test("batch required item section also rejects a later disjoint ID set", () => {
     )
     assert.equal(calls.items, 1)
     assert.deepEqual(calls.itemIds, [[4]])
+})
+
+test("request context caches missing items as zero for the same set and its subsets", () => {
+    const calls = { core: 0, bond: 0, nodes: 0, awake: 0, items: 0, itemIds: [] }
+    const context = createCharacterGrowthRequestContext({
+        playerId: 7,
+        characterId: 101,
+        repository: createRepository(calls, { missingItemIds: [999] }),
+        rarityLoader: () => 5,
+    })
+    assert.deepEqual(context.requiredItems([999]), new Map([[999, 0]]))
+    assert.deepEqual(context.requiredItems([999]), new Map([[999, 0]]))
+    assert.deepEqual(context.requiredItems([]), new Map())
+    assert.throws(
+        () => context.requiredItems([999, 1000]),
+        error => error.code === "INVALID_GROWTH_STATE",
+    )
+    assert.equal(calls.items, 1)
+    assert.deepEqual(calls.itemIds, [[999]])
+})
+
+test("batch context caches missing items as zero for the same set and its subsets", () => {
+    const calls = {
+        core: 0, coreBatch: 0, bondBatch: 0, nodesBatch: 0, awakeBatch: 0,
+        items: 0, itemIds: [],
+    }
+    const context = createCharacterGrowthBatchContext({
+        playerId: 7,
+        characterIds: [101, 202],
+        repository: createRepository(calls, { missingItemIds: [999] }),
+        rarityLoader: () => 5,
+    })
+    assert.deepEqual(context.requiredItems([999]), new Map([[999, 0]]))
+    assert.deepEqual(context.requiredItems([999]), new Map([[999, 0]]))
+    assert.deepEqual(context.requiredItems([]), new Map())
+    assert.throws(
+        () => context.requiredItems([999, 1000]),
+        error => error.code === "INVALID_GROWTH_STATE",
+    )
+    assert.equal(calls.items, 1)
+    assert.deepEqual(calls.itemIds, [[999]])
 })
 
 test("legacy character reads keep their existing token query order while the Growth entry is sorted", () => {
