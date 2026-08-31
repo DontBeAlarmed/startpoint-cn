@@ -236,7 +236,7 @@ test("batch context caches missing items as zero for the same set and its subset
     assert.deepEqual(calls.itemIds, [[999]])
 })
 
-test("legacy character reads keep their existing token query order while the Growth entry is sorted", () => {
+test("character response reads and Growth entries keep bond tokens ordered by board identity", () => {
     const source = fs.readFileSync(
         path.join(__dirname, "../src/data/domains/character.ts"),
         "utf8",
@@ -247,14 +247,15 @@ test("legacy character reads keep their existing token query order while the Gro
     )
     assert.match(growthEntry, /ORDER BY character_id, mana_board_index/)
 
-    for (const functionName of [
-        "getPlayerCharacterSync",
-        "getPlayerCharactersSync",
-        "getPlayerCharactersByIdsSync",
-    ]) {
-        const start = source.indexOf(`export function ${functionName}`)
-        const end = source.indexOf("\nexport function ", start + 1)
-        const block = source.slice(start, end === -1 ? source.length : end)
-        assert.doesNotMatch(block, /ORDER BY character_id, mana_board_index/)
-    }
+    assert.match(source.slice(
+        source.indexOf("export function getPlayerCharacterSync"),
+        source.indexOf("export function getPlayerCharactersSync"),
+    ), /ORDER BY mana_board_index/)
+    assert.match(source.slice(
+        source.indexOf("export function getPlayerCharactersSync"),
+        source.indexOf("export function getPlayerCharactersByIdsSync"),
+    ), /ORDER BY character_id, mana_board_index/)
+    const byIdsStart = source.indexOf("export function getPlayerCharactersByIdsSync")
+    const byIdsEnd = source.indexOf("\nexport function ", byIdsStart + 1)
+    assert.match(source.slice(byIdsStart, byIdsEnd === -1 ? source.length : byIdsEnd), /ORDER BY character_id, mana_board_index/)
 })

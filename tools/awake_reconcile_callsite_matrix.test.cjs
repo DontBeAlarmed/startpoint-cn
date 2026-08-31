@@ -71,9 +71,7 @@ const AUTHORITATIVE_WRITE_SETS = Object.freeze({
     ]),
     "box_gacha/exec": Object.freeze(["transaction"]),
     "character/add_character_from_town": Object.freeze(["transaction"]),
-    "character/receive_bond_token": Object.freeze([
-        "updatePlayerSync", "updatePlayerCharacterBondTokenSync",
-    ]),
+    "character/receive_bond_token": Object.freeze(["receiveBondToken"]),
     "character/learn_mana_node": Object.freeze([
         "updatePlayerSync", "incrementActiveMissionUsedManaCountSync",
         "setPlayerItemWithinTransactionSync", "insertPlayerCharacterManaNodesSync",
@@ -297,7 +295,7 @@ const EXPECTED_MATRIX = Object.freeze([
     matrixRow({ relativeFile: "src/routes/api/activeMission.ts", owner: "active_mission/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "granter.invalidatedFactKeys", finalAuthoritativeWrite: "persistPlayer", runtimeEvidenceKey: "active-mission-receive", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/boxGacha.ts", owner: "box_gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "settlement.rewardResult?.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "box-gacha-exec", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/character.ts", owner: "character/add_character_from_town", boundary: "best-effort-post-commit", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "character-town-grant" }),
-    matrixRow({ relativeFile: "src/routes/api/character/bond.ts", owner: "character/receive_bond_token", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", finalAuthoritativeWrite: "updatePlayerCharacterBondTokenSync", runtimeEvidenceKey: "bond-success" }),
+    matrixRow({ relativeFile: "src/routes/api/character/bond.ts", owner: "character/receive_bond_token", boundary: "best-effort-in-tx", actualCharacterSeed: "[body.character_id]", finalAuthoritativeWrite: "receiveBondToken", runtimeEvidenceKey: "bond-success" }),
     matrixRow({ relativeFile: "src/routes/api/character/mana.ts", callee: "strict", owner: "character/learn_mana_node", boundary: "strict-in-tx", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "finalizeLearnManaAwakePublicationWrites", runtimeEvidenceKey: "learn-mana-final-node" }),
     matrixRow({ relativeFile: "src/routes/api/exchange.ts", owner: "exchange/star_crumb", boundary: "best-effort-post-commit", actualCharacterSeed: "kind === 0 ? [targetId] : []", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "exchange-star-crumb" }),
     matrixRow({ relativeFile: "src/routes/api/gacha.ts", owner: "gacha/exchange_character", boundary: "best-effort-post-commit", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "gacha-exchange-character" }),

@@ -10,6 +10,8 @@ import { getPlayerItemSync } from "../data/domains/item"
 import { updatePlayerCharacterBondTokenSync } from "../data/domains/character"
 import { generateDataHeaders } from "../utils"
 import { clientSerializeDate } from "../data/utils/date"
+import { getBondTokenStatus, projectSortedBondTokens } from "./character-growth/invariants"
+import type { BondTokenStatus } from "./character-growth/model"
 
 // ─── Response types ───
 
@@ -127,10 +129,12 @@ export function buildCharacterListEntry(
         create_time: clientSerializeDate(characterData.joinTime),
         update_time: clientSerializeDate(characterData.updateTime),
         join_time: clientSerializeDate(characterData.joinTime),
-        bond_token_list: characterData.bondTokenList.map(entry => ({
+        bond_token_list: [...characterData.bondTokenList]
+            .sort((left, right) => left.manaBoardIndex - right.manaBoardIndex)
+            .map(entry => ({
             mana_board_index: entry.manaBoardIndex,
             status: entry.status,
-        })),
+            })),
         ...extras,
     }
 }
@@ -223,7 +227,11 @@ export function updateBondTokenForCompletedBoard(
     boardIndex: number,
     isBoardComplete: boolean
 ): BondTokenResult {
-    const bondTokenGranted = characterData.bondTokenList[boardIndex - 1]?.status === 0
+    const tokenMap = new Map<number, BondTokenStatus>(characterData.bondTokenList.map(entry => [
+        entry.manaBoardIndex,
+        entry.status as BondTokenStatus,
+    ]))
+    const bondTokenGranted = getBondTokenStatus(tokenMap, boardIndex) === 0
         && isBoardComplete
 
     if (bondTokenGranted) {
@@ -232,10 +240,10 @@ export function updateBondTokenForCompletedBoard(
 
     return {
         bondTokenGranted,
-        bondTokenList: characterData.bondTokenList.map(entry => ({
-            "mana_board_index": entry.manaBoardIndex,
-            "status": bondTokenGranted && entry.manaBoardIndex === boardIndex ? 1 : entry.status,
-        })),
+        bondTokenList: projectSortedBondTokens(new Map(tokenMap).set(
+            boardIndex,
+            bondTokenGranted ? 1 : (tokenMap.get(boardIndex) ?? 0),
+        )),
     }
 }
 

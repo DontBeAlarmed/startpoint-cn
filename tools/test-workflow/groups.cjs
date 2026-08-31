@@ -113,6 +113,8 @@ const TEST_GROUPS = Object.freeze({
         tests: [
             "tools/character_growth_core.test.cjs",
             "tools/character_growth_context.test.cjs",
+            "tools/character_growth_bond_command.test.cjs",
+            "tools/character_growth_open_board_command.test.cjs",
             "tools/perf/character_growth_context_admission.test.cjs",
         ],
     },
@@ -124,6 +126,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/character_evolution.test.cjs",
             "tools/character_evolution_route.test.cjs",
             "tools/character_growth_transaction.test.cjs",
+            "tools/character_growth_open_board_transaction.test.cjs",
             "tools/character_mana_mutation_content.test.cjs",
             "tools/character_mana_mutation_http.test.cjs",
             "tools/character_mana_mutation_plan.test.cjs",

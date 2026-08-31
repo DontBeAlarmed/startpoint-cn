@@ -166,6 +166,32 @@ async function main() {
     assert.equal(bondResponse.statusCode, 500)
     assert.deepEqual(characterState(bond.playerId), beforeBond)
 
+    const reversedBond = await createPlayer(10)
+    db.prepare(`
+        DELETE FROM players_characters_bond_tokens
+        WHERE player_id = ? AND character_id = 1
+    `).run(reversedBond.playerId)
+    db.prepare(`
+        INSERT INTO players_characters_bond_tokens
+            (mana_board_index, status, player_id, character_id)
+        VALUES (2, 0, ?, 1), (1, 1, ?, 1)
+    `).run(reversedBond.playerId, reversedBond.playerId)
+    const reversedBondResponse = await app.inject({
+        method: "POST",
+        url: "/bond/receive_bond_token",
+        payload: {
+            viewer_id: reversedBond.viewerId,
+            character_id: 1,
+            mana_board_index: 1,
+            api_count: 1,
+        },
+    })
+    assert.equal(reversedBondResponse.statusCode, 200)
+    assert.deepEqual(characterState(reversedBond.playerId).bonds, [
+        { mana_board_index: 1, status: 2 },
+        { mana_board_index: 2, status: 0 },
+    ])
+
     const open = await createPlayer(3)
     updatePlayerCharacterSync(open.playerId, 1, {
         exp: characterExpCaps[4][0],
@@ -239,6 +265,61 @@ async function main() {
         { mana_board_index: 1, status: 2 },
         { mana_board_index: 2, status: 0 },
     ])
+
+    const missingHistory = await createPlayer(11)
+    updatePlayerCharacterSync(missingHistory.playerId, 1, {
+        manaBoardIndex: 2,
+    })
+    db.prepare(`
+        DELETE FROM players_characters_bond_tokens
+        WHERE player_id = ? AND character_id = 1 AND mana_board_index = 1
+    `).run(missingHistory.playerId)
+    const beforeMissingHistory = characterState(missingHistory.playerId)
+    const missingHistoryResponse = await app.inject({
+        method: "POST",
+        url: "/bond/open_mana_board",
+        payload: {
+            viewer_id: missingHistory.viewerId,
+            character_id: 1,
+            mana_board_index: 2,
+            api_count: 1,
+        },
+    })
+    assert.equal(missingHistoryResponse.statusCode, 400)
+    assert.deepEqual(characterState(missingHistory.playerId), beforeMissingHistory)
+
+    const missionFailure = await createPlayer(12)
+    updatePlayerCharacterSync(missionFailure.playerId, 1, {
+        exp: characterExpCaps[4][0],
+        evolutionLevel: 3,
+        overLimitStep: 4,
+    })
+    for (const nodeId of firstBoardNodeIds) insertOpenNode.run(nodeId, missionFailure.playerId)
+    updatePlayerCharacterBondTokenSync(missionFailure.playerId, 1, { manaBoardIndex: 1, status: 2 })
+    db.prepare(`
+        DELETE FROM players_characters_bond_tokens
+        WHERE player_id = ? AND character_id = 1 AND mana_board_index = 2
+    `).run(missionFailure.playerId)
+    const beforeMissionFailure = characterState(missionFailure.playerId)
+    db.exec(`
+        CREATE TRIGGER reject_open_mission_progress
+        BEFORE INSERT ON players_category_missions
+        WHEN NEW.player_id = ${missionFailure.playerId} AND NEW.category = 1
+        BEGIN SELECT RAISE(ABORT, 'forced open mission failure'); END;
+    `)
+    const missionFailureResponse = await app.inject({
+        method: "POST",
+        url: "/bond/open_mana_board",
+        payload: {
+            viewer_id: missionFailure.viewerId,
+            character_id: 1,
+            mana_board_index: 2,
+            api_count: 1,
+        },
+    })
+    assert.equal(missionFailureResponse.statusCode, 500)
+    assert.deepEqual(characterState(missionFailure.playerId), beforeMissionFailure)
+    db.exec("DROP TRIGGER reject_open_mission_progress")
 
     const overLimit = await createPlayer(4)
     givePlayerItemSync(overLimit.playerId, 10002, 1)

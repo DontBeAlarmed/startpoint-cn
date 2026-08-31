@@ -1881,6 +1881,7 @@ test("quick character includes growth transaction rollback coverage", () => {
         "tools/character_evolution.test.cjs",
         "tools/character_evolution_route.test.cjs",
         "tools/character_growth_transaction.test.cjs",
+        "tools/character_growth_open_board_transaction.test.cjs",
         "tools/character_mana_mutation_content.test.cjs",
         "tools/character_mana_mutation_http.test.cjs",
         "tools/character_mana_mutation_plan.test.cjs",

@@ -15,8 +15,12 @@ const HUB_AUTHENTICATION_GROUPS = [
 
 const SOURCE_RULES = [
     {
-        pattern: /^(?:src\/lib\/character-growth\/(?:model|errors|invariants|content-facts|request-context|batch-context|repository|result)\.ts|tools\/character_growth_(?:core|context)\.test\.cjs|tools\/perf\/character_growth_context_admission\.test\.cjs)$/,
+        pattern: /^(?:src\/lib\/character-growth\/(?:model|errors|invariants|content-facts|request-context|batch-context|repository|result|commands\/(?:receive-bond-token|open-mana-board))\.ts|tools\/character_growth_(?:core|context|bond_command|open_board_command)\.test\.cjs|tools\/perf\/character_growth_context_admission\.test\.cjs)$/,
         groups: ["quick:character-growth"],
+    },
+    {
+        pattern: /^(?:src\/routes\/api\/character\/bond\.ts|src\/lib\/character-helpers\.ts|tools\/character_growth_(?:transaction|open_board_transaction)\.test\.cjs)$/,
+        groups: ["quick:character"],
     },
     {
         pattern: /^tools\/(?:active_mission_evaluator_equivalence\.test|helpers\/active-mission-legacy-evaluator)\.cjs$/,

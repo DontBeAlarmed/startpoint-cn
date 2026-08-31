@@ -273,7 +273,7 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     assert.equal(bondReconcileCall.enclosingTransactionCallbacks.length, 1)
     assert.equal(
         bondReconcileCall.position
-            > getLastCallPosition(bondReceiveBlock, "updatePlayerCharacterBondTokenSync"),
+            > getLastCallPosition(bondReceiveBlock, "receiveBondToken"),
         true
     )
 
