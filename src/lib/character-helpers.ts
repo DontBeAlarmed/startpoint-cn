@@ -12,6 +12,7 @@ import { generateDataHeaders } from "../utils"
 import { clientSerializeDate } from "../data/utils/date"
 import { getBondTokenStatus, projectSortedBondTokens } from "./character-growth/invariants"
 import type { BondTokenStatus } from "./character-growth/model"
+import { growthError } from "./character-growth/errors"
 
 // ─── Response types ───
 
@@ -231,19 +232,25 @@ export function updateBondTokenForCompletedBoard(
         entry.manaBoardIndex,
         entry.status as BondTokenStatus,
     ]))
-    const bondTokenGranted = getBondTokenStatus(tokenMap, boardIndex) === 0
+    const currentStatus = getBondTokenStatus(tokenMap, boardIndex)
+    if (currentStatus === null) {
+        throw growthError(
+            "INVALID_GROWTH_STATE",
+            `completed mana board ${boardIndex} is missing its bond token row.`,
+        )
+    }
+    const bondTokenGranted = currentStatus === 0
         && isBoardComplete
 
     if (bondTokenGranted) {
         updatePlayerCharacterBondTokenSync(playerId, characterId, { manaBoardIndex: boardIndex, status: 1 })
     }
 
+    const nextTokenMap = new Map(tokenMap)
+    if (bondTokenGranted) nextTokenMap.set(boardIndex, 1)
     return {
         bondTokenGranted,
-        bondTokenList: projectSortedBondTokens(new Map(tokenMap).set(
-            boardIndex,
-            bondTokenGranted ? 1 : (tokenMap.get(boardIndex) ?? 0),
-        )),
+        bondTokenList: projectSortedBondTokens(nextTokenMap),
     }
 }
 

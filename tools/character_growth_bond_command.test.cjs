@@ -25,6 +25,8 @@ const {
 const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getDb } = require("../src/data/db")
 const { receiveBondToken } = require("../src/lib/character-growth/commands/receive-bond-token")
+const { updateBondTokenForCompletedBoard } = require("../src/lib/character-helpers")
+const { createCharacterGrowthRequestContext } = require("../src/lib/character-growth/request-context")
 
 initializeDatabase()
 const db = getDb()
@@ -108,7 +110,7 @@ test("receiveBondToken replay is idempotent and status zero is rejected without 
     assert.deepEqual(state(playerId), statusZero)
 })
 
-test("receiveBondToken uses board identity when persisted token rows are reversed", () => {
+test("receiveBondToken persists a reversed-row fixture and still claims by board identity", () => {
     const playerId = createPlayer()
     db.prepare("DELETE FROM players_characters_bond_tokens WHERE player_id = ? AND character_id = 1")
         .run(playerId)
@@ -135,6 +137,54 @@ test("receiveBondToken uses board identity when persisted token rows are reverse
             { mana_board_index: 1, status: 2 },
             { mana_board_index: 2, status: 0 },
         ],
+    )
+})
+
+test("Growth context accepts reversed keyed token input without array-order assumptions", () => {
+    const context = createCharacterGrowthRequestContext({
+        playerId: 1,
+        characterId: 1,
+        repository: {
+            getCharacterSync: () => ({
+                characterId: 1,
+                exp: 0,
+                stack: 0,
+                overLimitStep: 0,
+                evolutionLevel: 0,
+                manaBoardIndex: 1,
+            }),
+            getBondTokensSync: () => new Map([[2, 0], [1, 1]]),
+            getNormalManaNodesSync: () => new Map(),
+            getAwakeUnlocksSync: () => new Map(),
+            getRequiredItemsSync: () => new Map(),
+        },
+        contentFactsLoader: () => ({
+            boardCount: 2,
+            boardNodeIds: new Map(),
+            secondBoardAvailable: true,
+        }),
+        rarityLoader: () => 4,
+    })
+    assert.equal(context.bondTokens().get(1), 1)
+    assert.equal(context.bondTokens().get(2), 0)
+})
+
+test("completed-board helper rejects a missing token row instead of manufacturing status zero", () => {
+    const playerId = createPlayer()
+    db.prepare(`
+        DELETE FROM players_characters_bond_tokens
+        WHERE player_id = ? AND character_id = 1 AND mana_board_index = 1
+    `).run(playerId)
+    const character = getPlayerCharacterSync(playerId, 1)
+    const beforeBond = getPlayerSync(playerId).bondToken
+    assert.throws(
+        () => updateBondTokenForCompletedBoard(playerId, 1, character, 1, true),
+        error => error.code === "INVALID_GROWTH_STATE",
+    )
+    assert.equal(getPlayerSync(playerId).bondToken, beforeBond)
+    assert.deepEqual(
+        getPlayerCharacterSync(playerId, 1).bondTokenList,
+        [{ manaBoardIndex: 2, status: 0 }],
     )
 })
 

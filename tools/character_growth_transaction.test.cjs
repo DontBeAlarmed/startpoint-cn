@@ -70,7 +70,8 @@ async function createPlayer(sequence) {
 function characterState(playerId) {
     return {
         player: db.prepare(`
-            SELECT free_mana, paid_mana, bond_token FROM players WHERE id = ?
+            SELECT free_mana, paid_mana, bond_token, free_vmoney, exp_pool, total_mana_obtained
+            FROM players WHERE id = ?
         `).get(playerId),
         character: db.prepare(`
             SELECT evolution_level, mana_board_index FROM players_characters
@@ -85,6 +86,20 @@ function characterState(playerId) {
             WHERE player_id = ? AND character_id = 1 ORDER BY value
         `).all(playerId),
         item: getPlayerItemSync(playerId, 1),
+        missionProgress: db.prepare(`
+            SELECT category, id, progress
+            FROM players_category_missions
+            WHERE player_id = ? AND category = 1 ORDER BY id
+        `).all(playerId),
+        missionStages: db.prepare(`
+            SELECT category, id, status, mission_id
+            FROM players_category_mission_stages
+            WHERE player_id = ? AND category = 1 ORDER BY mission_id, id
+        `).all(playerId),
+        rewardBalances: db.prepare(`
+            SELECT id, amount FROM players_items
+            WHERE player_id = ? ORDER BY id
+        `).all(playerId),
     }
 }
 
@@ -320,6 +335,72 @@ async function main() {
     assert.equal(missionFailureResponse.statusCode, 500)
     assert.deepEqual(characterState(missionFailure.playerId), beforeMissionFailure)
     db.exec("DROP TRIGGER reject_open_mission_progress")
+
+    const stageFailure = await createPlayer(13)
+    updatePlayerCharacterSync(stageFailure.playerId, 1, {
+        exp: characterExpCaps[4][0],
+        evolutionLevel: 3,
+        overLimitStep: 4,
+    })
+    for (const nodeId of firstBoardNodeIds) insertOpenNode.run(nodeId, stageFailure.playerId)
+    updatePlayerCharacterBondTokenSync(stageFailure.playerId, 1, { manaBoardIndex: 1, status: 2 })
+    db.prepare(`
+        DELETE FROM players_characters_bond_tokens
+        WHERE player_id = ? AND character_id = 1 AND mana_board_index = 2
+    `).run(stageFailure.playerId)
+    const beforeStageFailure = characterState(stageFailure.playerId)
+    db.exec(`
+        CREATE TRIGGER reject_open_stage_failure
+        BEFORE INSERT ON players_category_mission_stages
+        WHEN NEW.player_id = ${stageFailure.playerId} AND NEW.category = 1
+        BEGIN SELECT RAISE(ABORT, 'forced stage failure'); END;
+    `)
+    const stageFailureResponse = await app.inject({
+        method: "POST",
+        url: "/bond/open_mana_board",
+        payload: {
+            viewer_id: stageFailure.viewerId,
+            character_id: 1,
+            mana_board_index: 2,
+            api_count: 1,
+        },
+    })
+    assert.equal(stageFailureResponse.statusCode, 500)
+    assert.deepEqual(characterState(stageFailure.playerId), beforeStageFailure)
+    db.exec("DROP TRIGGER reject_open_stage_failure")
+
+    const rewardFailure = await createPlayer(14)
+    updatePlayerCharacterSync(rewardFailure.playerId, 1, {
+        exp: characterExpCaps[4][0],
+        evolutionLevel: 3,
+        overLimitStep: 4,
+    })
+    for (const nodeId of firstBoardNodeIds) insertOpenNode.run(nodeId, rewardFailure.playerId)
+    updatePlayerCharacterBondTokenSync(rewardFailure.playerId, 1, { manaBoardIndex: 1, status: 2 })
+    db.prepare(`
+        DELETE FROM players_characters_bond_tokens
+        WHERE player_id = ? AND character_id = 1 AND mana_board_index = 2
+    `).run(rewardFailure.playerId)
+    const beforeRewardFailure = characterState(rewardFailure.playerId)
+    db.exec(`
+        CREATE TRIGGER reject_open_reward_failure
+        BEFORE UPDATE OF free_vmoney ON players
+        WHEN NEW.id = ${rewardFailure.playerId} AND NEW.free_vmoney > OLD.free_vmoney
+        BEGIN SELECT RAISE(ABORT, 'forced reward failure'); END;
+    `)
+    const rewardFailureResponse = await app.inject({
+        method: "POST",
+        url: "/bond/open_mana_board",
+        payload: {
+            viewer_id: rewardFailure.viewerId,
+            character_id: 1,
+            mana_board_index: 2,
+            api_count: 1,
+        },
+    })
+    assert.equal(rewardFailureResponse.statusCode, 500)
+    assert.deepEqual(characterState(rewardFailure.playerId), beforeRewardFailure)
+    db.exec("DROP TRIGGER reject_open_reward_failure")
 
     const overLimit = await createPlayer(4)
     givePlayerItemSync(overLimit.playerId, 10002, 1)

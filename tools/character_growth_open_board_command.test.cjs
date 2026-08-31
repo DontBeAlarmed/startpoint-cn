@@ -8,6 +8,7 @@ const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
+const Fastify = require("fastify")
 
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "character-growth-open-command-"))
 const previousDataDirectory = process.env.DATA_DIR
@@ -22,11 +23,18 @@ const {
     updatePlayerCharacterBondTokenSync,
     updatePlayerCharacterSync,
 } = require("../src/data/domains/character")
-const { insertDefaultPlayerSync } = require("../src/data/domains/player")
+const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { getDb } = require("../src/data/db")
 const { characterExpCaps } = require("../src/lib/character")
 const { getCharacterManaNodesSync } = require("../src/lib/assets")
 const { openManaBoard } = require("../src/lib/character-growth/commands/open-mana-board")
+const { getCharacterGrowthContentFactsSync } = require("../src/lib/character-growth/content-facts")
+const manaRoutes = require("../src/routes/api/character/mana").default
+const bondRoutes = require("../src/routes/api/character/bond").default
+const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
+const { insertSessionWithToken } = require("../src/data/domains/session")
+const { SessionType } = require("../src/data/types")
+const { givePlayerItemSync } = require("../src/data/domains/item")
 
 initializeDatabase()
 const db = getDb()
@@ -57,6 +65,34 @@ function createReadyPlayer() {
         WHERE player_id = ? AND character_id = 1 AND mana_board_index = 2
     `).run(playerId)
     return playerId
+}
+
+function createEligibleIncompletePlayer() {
+    const account = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId: `open-incomplete-${randomUUID()}`,
+        status: "normal",
+    })
+    const playerId = insertDefaultPlayerSync(account.id).id
+    updatePlayerCharacterSync(playerId, 1, {
+        exp: characterExpCaps[4][0],
+        overLimitStep: 4,
+    })
+    return { playerId, accountId: account.id }
+}
+
+async function createAdapterApp() {
+    const app = Fastify({ logger: false })
+    app.addContentTypeParser("application/x-www-form-urlencoded", { parseAs: "string" }, (_request, body, done) => {
+        done(null, require("msgpackr").unpack(Buffer.from(body, "base64")))
+    })
+    registerCnMsgpackOnSend(app)
+    await app.register(manaRoutes, { prefix: "/mana" })
+    await app.register(bondRoutes, { prefix: "/bond" })
+    await app.ready()
+    return app
 }
 
 test("openManaBoard opens board two, builds missing token rows, and settles category one", () => {
@@ -117,6 +153,150 @@ test("openManaBoard exact replay has no writes and invalid board three fails clo
         error => error.code === "BOARD_NOT_AVAILABLE",
     )
     assert.deepEqual(getPlayerCharacterSync(playerId, 1), beforeReplay)
+})
+
+test("openManaBoard rejects incomplete, downgrade, and jump requests at the command boundary", () => {
+    const incomplete = createEligibleIncompletePlayer()
+    assert.throws(
+        () => openManaBoard({
+            playerId: incomplete.playerId,
+            characterId: 1,
+            targetBoardIndex: 2,
+            evaluationTime: new Date("2024-08-14T12:00:00.000Z"),
+        }),
+        error => error.code === "PREVIOUS_BOARD_INCOMPLETE",
+    )
+
+    const ready = createReadyPlayer()
+    openManaBoard({
+        playerId: ready,
+        characterId: 1,
+        targetBoardIndex: 2,
+        evaluationTime: new Date("2024-08-14T12:00:00.000Z"),
+    })
+    assert.throws(
+        () => openManaBoard({
+            playerId: ready,
+            characterId: 1,
+            targetBoardIndex: 1,
+            evaluationTime: new Date("2024-08-14T12:00:00.000Z"),
+        }),
+        error => error.code === "BOARD_NOT_AVAILABLE",
+    )
+    assert.throws(
+        () => openManaBoard({
+            playerId: incomplete.playerId,
+            characterId: 1,
+            targetBoardIndex: 3,
+            evaluationTime: new Date("2024-08-14T12:00:00.000Z"),
+        }),
+        error => error.code === "BOARD_NOT_AVAILABLE",
+    )
+})
+
+test("content loader rejects a missing board node table instead of exposing an empty board", () => {
+    const assets = require("../src/lib/assets")
+    const originalGetNodes = assets.getCharacterManaNodesSync
+    assets.getCharacterManaNodesSync = (characterId, boardIndex) => (
+        boardIndex === 1 ? null : originalGetNodes(characterId, boardIndex)
+    )
+    try {
+        assert.throws(
+            () => getCharacterGrowthContentFactsSync(1),
+            error => error.code === "CONTENT_INVALID",
+        )
+        const playerId = createReadyPlayer()
+        assert.throws(
+            () => openManaBoard({
+                playerId,
+                characterId: 1,
+                targetBoardIndex: 2,
+                evaluationTime: new Date("2024-08-14T12:00:00.000Z"),
+            }),
+            error => error.code === "CONTENT_INVALID",
+        )
+        assert.equal(getPlayerCharacterSync(playerId, 1).manaBoardIndex, 1)
+    } finally {
+        assets.getCharacterManaNodesSync = originalGetNodes
+    }
+})
+
+test("a real mana-node route can complete board one before the Growth command opens board two", async () => {
+    const app = await createAdapterApp()
+    const account = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId: `open-reachable-${randomUUID()}`,
+        status: "normal",
+    })
+    const playerId = insertDefaultPlayerSync(account.id).id
+    const viewerId = 850000000 + playerId
+    await insertSessionWithToken({
+        token: String(viewerId),
+        accountId: account.id,
+        expires: new Date("2099-01-01T00:00:00.000Z"),
+        type: SessionType.VIEWER,
+    })
+    updatePlayerCharacterSync(playerId, 1, {
+        exp: characterExpCaps[4][0],
+        overLimitStep: 4,
+    })
+    updatePlayerSync({ id: playerId, freeMana: 1_000_000, paidMana: 0 })
+    const boardNodes = getCharacterManaNodesSync(1, 1)
+    const itemIds = new Set(Object.values(boardNodes).flatMap(node => Object.keys(node.items).map(Number)))
+    for (const itemId of itemIds) givePlayerItemSync(playerId, itemId, 100_000)
+    const response = await app.inject({
+        method: "POST",
+        url: "/mana/learn_mana_node",
+        payload: {
+            viewer_id: viewerId,
+            character_id: 1,
+            mana_node_multiplied_id_list: Object.keys(boardNodes).map(Number),
+            api_count: 1,
+        },
+    })
+    assert.equal(response.statusCode, 200)
+    const completed = getPlayerCharacterSync(playerId, 1)
+    assert.equal(completed.bondTokenList.find(token => token.manaBoardIndex === 1).status, 1)
+    const claimed = require("../src/lib/character-growth/commands/receive-bond-token").receiveBondToken({
+        playerId,
+        characterId: 1,
+        manaBoardIndex: 1,
+        evaluationTime: new Date("2024-08-14T12:00:00.000Z"),
+    })
+    assert.equal(claimed.replayed, false)
+    const opened = openManaBoard({
+        playerId,
+        characterId: 1,
+        targetBoardIndex: 2,
+        evaluationTime: new Date("2024-08-14T12:00:00.000Z"),
+    })
+    assert.equal(opened.replayed, false)
+    assert.equal(opened.after.manaBoardIndex, 2)
+    await app.close()
+})
+
+test("HTTP adapter maps representative incomplete, downgrade, and jump requests to 400", async () => {
+    const app = await createAdapterApp()
+    const incomplete = createEligibleIncompletePlayer()
+    const viewerId = 860000000 + incomplete.playerId
+    const account = db.prepare("SELECT account_id FROM players WHERE id = ?").get(incomplete.playerId)
+    await insertSessionWithToken({
+        token: String(viewerId),
+        accountId: account.account_id,
+        expires: new Date("2099-01-01T00:00:00.000Z"),
+        type: SessionType.VIEWER,
+    })
+    const request = targetBoardIndex => app.inject({
+        method: "POST",
+        url: "/bond/open_mana_board",
+        payload: { viewer_id: viewerId, character_id: 1, mana_board_index: targetBoardIndex, api_count: 1 },
+    })
+    assert.equal((await request(2)).statusCode, 400)
+    assert.equal((await request(1)).statusCode, 400)
+    assert.equal((await request(3)).statusCode, 400)
+    await app.close()
 })
 
 test.after(() => {

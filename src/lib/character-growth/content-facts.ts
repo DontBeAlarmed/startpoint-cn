@@ -17,7 +17,13 @@ export function getCharacterGrowthContentFactsSync(
     const boardCount = getCharacterManaBoardCountSync(characterId)
     const boardNodeIds = new Map<number, ReadonlySet<number>>()
     for (let boardIndex = 1; boardIndex <= boardCount; boardIndex++) {
-        const nodes = getCharacterManaNodesSync(characterId, boardIndex) ?? {}
+        const nodes = getCharacterManaNodesSync(characterId, boardIndex)
+        if (nodes === null) {
+            throw growthError(
+                "CONTENT_INVALID",
+                `character ${characterId} board ${boardIndex} content is unavailable.`,
+            )
+        }
         boardNodeIds.set(boardIndex, new Set(Object.keys(nodes).map(Number)))
     }
 
@@ -27,4 +33,3 @@ export function getCharacterGrowthContentFactsSync(
         secondBoardAvailable: boardCount >= 2,
     }
 }
-
