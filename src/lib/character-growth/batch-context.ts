@@ -87,7 +87,7 @@ export class CharacterGrowthBatchContextImpl implements CharacterGrowthBatchCont
     private cachedNormalManaNodes: ReadonlyMap<number, ReadonlyMap<number, number>> | null = null
     private cachedAwakeUnlocks: ReadonlyMap<number, ReadonlyMap<number, number>> | null = null
     private readonly cachedItems = new Map<number, number>()
-    private readonly loadedItemIds = new Set<number>()
+    private requiredItemsLoaded = false
     private readonly contentCache = new Map<number, CharacterGrowthContentFacts>()
 
     constructor(options: CharacterGrowthBatchContextOptions) {
@@ -147,11 +147,18 @@ export class CharacterGrowthBatchContextImpl implements CharacterGrowthBatchCont
     requiredItems(ids: readonly number[]): ReadonlyMap<number, number> {
         const requestedIds = [...new Set(ids)]
         for (const id of requestedIds) positiveId(id, "itemId")
-        const missingIds = requestedIds.filter(id => !this.loadedItemIds.has(id))
-        if (missingIds.length > 0) {
-            const loaded = this.repository.getRequiredItemsSync(this.playerId, missingIds)
+        if (this.requiredItemsLoaded) {
+            const hasNewId = requestedIds.some(id => !this.cachedItems.has(id))
+            if (hasNewId) {
+                throw growthError(
+                    "INVALID_GROWTH_STATE",
+                    "requiredItems section was already loaded with a different ID set.",
+                )
+            }
+        } else {
+            const loaded = this.repository.getRequiredItemsSync(this.playerId, requestedIds)
             for (const [id, amount] of loaded) this.cachedItems.set(id, amount)
-            for (const id of missingIds) this.loadedItemIds.add(id)
+            this.requiredItemsLoaded = true
         }
         return new Map(requestedIds.map(id => [id, this.cachedItems.get(id) ?? 0]))
     }
@@ -171,4 +178,3 @@ export function createCharacterGrowthBatchContext(
 ): CharacterGrowthBatchContext {
     return new CharacterGrowthBatchContextImpl(options)
 }
-

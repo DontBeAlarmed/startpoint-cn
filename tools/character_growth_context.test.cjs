@@ -3,6 +3,8 @@
 require("ts-node/register/transpile-only")
 
 const assert = require("node:assert/strict")
+const fs = require("node:fs")
+const path = require("node:path")
 const test = require("node:test")
 
 const {
@@ -123,6 +125,23 @@ test("request context rejects invalid raw section values before exposing them", 
     assert.throws(() => context.awakeUnlocks(), error => error.code === "INVALID_GROWTH_STATE")
 })
 
+test("required item section rejects a later disjoint ID set instead of issuing a second read", () => {
+    const calls = { core: 0, bond: 0, nodes: 0, awake: 0, items: 0, itemIds: [] }
+    const context = createCharacterGrowthRequestContext({
+        playerId: 7,
+        characterId: 101,
+        repository: createRepository(calls),
+        rarityLoader: () => 5,
+    })
+    assert.deepEqual(context.requiredItems([4]), new Map([[4, 40]]))
+    assert.throws(
+        () => context.requiredItems([5]),
+        error => error.code === "INVALID_GROWTH_STATE",
+    )
+    assert.equal(calls.items, 1)
+    assert.deepEqual(calls.itemIds, [[4]])
+})
+
 test("batch context reads each requested table once and returns character buckets", () => {
     const calls = {
         core: 0, coreBatch: 0, bondBatch: 0, nodesBatch: 0, awakeBatch: 0,
@@ -153,3 +172,45 @@ test("batch context reads each requested table once and returns character bucket
     assert.equal(calls.core, 0)
 })
 
+test("batch required item section also rejects a later disjoint ID set", () => {
+    const calls = {
+        core: 0, coreBatch: 0, bondBatch: 0, nodesBatch: 0, awakeBatch: 0,
+        items: 0, itemIds: [],
+    }
+    const context = createCharacterGrowthBatchContext({
+        playerId: 7,
+        characterIds: [101, 202],
+        repository: createRepository(calls),
+        rarityLoader: () => 5,
+    })
+    assert.deepEqual(context.requiredItems([4]), new Map([[4, 40]]))
+    assert.throws(
+        () => context.requiredItems([5]),
+        error => error.code === "INVALID_GROWTH_STATE",
+    )
+    assert.equal(calls.items, 1)
+    assert.deepEqual(calls.itemIds, [[4]])
+})
+
+test("legacy character reads keep their existing token query order while the Growth entry is sorted", () => {
+    const source = fs.readFileSync(
+        path.join(__dirname, "../src/data/domains/character.ts"),
+        "utf8",
+    )
+    const growthEntry = source.slice(
+        source.indexOf("export function getPlayerCharacterBondTokensByIdsSync"),
+        source.indexOf("export function getPlayerCharacterBondTokensSync"),
+    )
+    assert.match(growthEntry, /ORDER BY character_id, mana_board_index/)
+
+    for (const functionName of [
+        "getPlayerCharacterSync",
+        "getPlayerCharactersSync",
+        "getPlayerCharactersByIdsSync",
+    ]) {
+        const start = source.indexOf(`export function ${functionName}`)
+        const end = source.indexOf("\nexport function ", start + 1)
+        const block = source.slice(start, end === -1 ? source.length : end)
+        assert.doesNotMatch(block, /ORDER BY character_id, mana_board_index/)
+    }
+})

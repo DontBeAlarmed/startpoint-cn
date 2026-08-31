@@ -87,7 +87,7 @@ export class CharacterGrowthRequestContextImpl implements CharacterGrowthRequest
     private cachedAwakeUnlocks: ReadonlyMap<number, number> | null = null
     private cachedContentFacts: CharacterGrowthContentFacts | null = null
     private readonly cachedItems = new Map<number, number>()
-    private readonly loadedItemIds = new Set<number>()
+    private requiredItemsLoaded = false
 
     constructor(options: CharacterGrowthRequestContextOptions) {
         this.playerId = positiveId(options.playerId, "playerId")
@@ -138,11 +138,18 @@ export class CharacterGrowthRequestContextImpl implements CharacterGrowthRequest
     requiredItems(ids: readonly number[]): ReadonlyMap<number, number> {
         const requestedIds = [...new Set(ids)]
         for (const id of requestedIds) positiveId(id, "itemId")
-        const missingIds = requestedIds.filter(id => !this.loadedItemIds.has(id))
-        if (missingIds.length > 0) {
-            const loaded = this.repository.getRequiredItemsSync(this.playerId, missingIds)
+        if (this.requiredItemsLoaded) {
+            const hasNewId = requestedIds.some(id => !this.cachedItems.has(id))
+            if (hasNewId) {
+                throw growthError(
+                    "INVALID_GROWTH_STATE",
+                    "requiredItems section was already loaded with a different ID set.",
+                )
+            }
+        } else {
+            const loaded = this.repository.getRequiredItemsSync(this.playerId, requestedIds)
             for (const [id, amount] of loaded) this.cachedItems.set(id, amount)
-            for (const id of missingIds) this.loadedItemIds.add(id)
+            this.requiredItemsLoaded = true
         }
         return new Map(requestedIds.map(id => [id, this.cachedItems.get(id) ?? 0]))
     }
@@ -160,4 +167,3 @@ export function createCharacterGrowthRequestContext(
 ): CharacterGrowthRequestContext {
     return new CharacterGrowthRequestContextImpl(options)
 }
-
