@@ -101,6 +101,31 @@ test("repository rejects invalid persisted EXP/stack values at the save boundary
     }
 })
 
+test("inject_exp maps persisted Growth corruption to HTTP 500", async () => {
+    const fixture = createCharacterGrowthC4Fixture()
+    const app = Fastify({ logger: false })
+    try {
+        const playerId = fixture.createPlayer()
+        const viewerId = await fixture.createViewer(playerId, 890000009)
+        fixture.db.prepare("UPDATE players_characters SET exp = -1 WHERE player_id = ? AND id = 1")
+            .run(playerId)
+        await app.register(expodRoutes)
+        await app.ready()
+
+        const response = await app.inject({
+            method: "POST",
+            url: "/inject_exp",
+            payload: { viewer_id: viewerId, character_id: 1, exp: 1 },
+        })
+        assert.equal(response.statusCode, 500, response.body)
+        assert.equal(JSON.parse(response.body).error, "Internal Server Error")
+        assert.match(JSON.parse(response.body).message, /INVALID_GROWTH_STATE/)
+    } finally {
+        await app.close()
+        fixture.cleanup()
+    }
+})
+
 test("all five CN growth routes keep their transport response shape", async () => {
     const fixture = createCharacterGrowthC4Fixture()
     const app = Fastify({ logger: false })

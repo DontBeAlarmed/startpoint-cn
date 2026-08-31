@@ -9,9 +9,9 @@ import { givePlayerCharacterSync } from "../../lib/character";
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDb } from "../../data/db";
-import { CharacterGrowthError } from "../../lib/character-growth/errors"
 import { executeOverLimit } from "../../lib/character-growth/commands/over-limit"
 import { executeBulkOverLimit } from "../../lib/character-growth/commands/bulk-over-limit"
+import { sendGrowthMutationError } from "./character/mana-mutation-http"
 import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { canClaimTownStoryCharacter } from "../../lib/story-join-character";
@@ -41,12 +41,7 @@ interface SetProtectionBody {
 }
 
 function growthFailure(reply: FastifyReply, error: unknown) {
-    if (error instanceof CharacterGrowthError) {
-        return reply.status(400).send({
-            error: "Bad Request",
-            message: error.message.replace(/^[A-Z_]+: /, ""),
-        })
-    }
+    if (sendGrowthMutationError(reply, error)) return
     throw error
 }
 

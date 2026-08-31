@@ -12,10 +12,10 @@ import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time"
 import { getMailArrivedSync } from "../../lib/mail-notification"
 import { getRealNow } from "../../runtime/time/game-time"
 import { generateDataHeaders } from "../../utils"
-import { CharacterGrowthError } from "../../lib/character-growth/errors"
 import { executeInjectCharacterExp } from "../../lib/character-growth/commands/inject-exp"
 import { executeStackToExp } from "../../lib/character-growth/commands/stack-to-exp"
 import { executeBulkStackToExp } from "../../lib/character-growth/commands/bulk-stack-to-exp"
+import { sendGrowthMutationError } from "./character/mana-mutation-http"
 
 interface InjectExpBody {
     character_id: number
@@ -41,12 +41,7 @@ function invalidRequest(reply: FastifyReply, message = "Invalid request body.") 
 }
 
 function growthFailure(reply: FastifyReply, error: unknown) {
-    if (error instanceof CharacterGrowthError) {
-        return reply.status(400).send({
-            error: "Bad Request",
-            message: error.message.replace(/^[A-Z_]+: /, ""),
-        })
-    }
+    if (sendGrowthMutationError(reply, error)) return
     throw error
 }
 
