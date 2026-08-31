@@ -8,6 +8,7 @@ const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
+const Fastify = require("fastify")
 
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "character-growth-node-command-"))
 const previousDataDirectory = process.env.DATA_DIR
@@ -27,9 +28,18 @@ const { characterExpCaps } = require("../src/lib/character")
 const { givePlayerItemSync, getPlayerItemsSync } = require("../src/data/domains/item")
 const { getDb } = require("../src/data/db")
 const { getCharacterManaNodesSync } = require("../src/lib/assets")
+const { getManaNodeAwakeCost } = require("../src/lib/assets")
+const { upsertPlayerCharacterAwakeUnlockSync } = require("../src/data/domains/character_awake")
+const { insertSessionWithToken } = require("../src/data/domains/session")
+const { SessionType } = require("../src/data/types")
+const manaRoutes = require("../src/routes/api/character/mana").default
+const bondRoutes = require("../src/routes/api/character/bond").default
+const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
+const { getTimeOffset, setServerTime, setServerTimeOffset } = require("../src/utils")
 
 initializeDatabase()
 const db = getDb()
+let routeApp
 
 function loadLearnCommand() {
     try {
@@ -50,7 +60,7 @@ function createPlayer() {
     const playerId = insertDefaultPlayerSync(account.id).id
     updatePlayerSync({ id: playerId, freeMana: 0, paidMana: 0 })
     require("../src/data/domains/character").updatePlayerCharacterSync(playerId, 1, {
-        exp: characterExpCaps[4][0],
+        exp: characterExpCaps[4].at(-1),
         overLimitStep: 4,
     })
     return playerId
@@ -70,6 +80,82 @@ function grantNodeCost(playerId, nodeIds) {
     }
     updatePlayerSync({ id: playerId, freeMana: mana, paidMana: 0 })
     for (const [itemId, amount] of items) givePlayerItemSync(playerId, itemId, amount)
+}
+
+function grantBoardNodeCosts(playerId, boardId, nodeIds) {
+    const nodes = getCharacterManaNodesSync(1, boardId)
+    let mana = 0
+    const items = new Map()
+    for (const nodeId of nodeIds) {
+        const node = nodes[String(nodeId)]
+        assert.ok(node, `missing board ${boardId} node ${nodeId}`)
+        mana += node.manaCost
+        for (const [itemId, amount] of Object.entries(node.items)) {
+            items.set(itemId, (items.get(itemId) ?? 0) + amount)
+        }
+    }
+    updatePlayerSync({ id: playerId, freeMana: mana, paidMana: 0 })
+    for (const [itemId, amount] of items) givePlayerItemSync(playerId, itemId, amount)
+}
+
+function grantAwakeNodeCost(playerId, nodeId) {
+    const cost = getManaNodeAwakeCost(1, nodeId, 4)
+    assert.ok(cost, `missing Awake cost for ${nodeId}`)
+    updatePlayerSync({ id: playerId, freeMana: cost.manaAmount, paidMana: 0 })
+    for (const [itemId, amount] of Object.entries(cost.items)) givePlayerItemSync(playerId, itemId, amount)
+}
+
+function seedBoardOne(playerId) {
+    const nodeIds = Object.keys(getCharacterManaNodesSync(1, 1)).map(Number)
+    insertPlayerCharacterManaNodesSync(playerId, 1, nodeIds)
+    return nodeIds
+}
+
+async function createReachablePlayer() {
+    const account = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId: `node-route-${randomUUID()}`,
+        status: "normal",
+    })
+    const playerId = insertDefaultPlayerSync(account.id).id
+    const viewerId = 920000000 + playerId
+    await insertSessionWithToken({
+        token: String(viewerId),
+        accountId: account.id,
+        expires: new Date("2099-01-01T00:00:00.000Z"),
+        type: SessionType.VIEWER,
+    })
+    require("../src/data/domains/character").updatePlayerCharacterSync(playerId, 1, {
+        exp: characterExpCaps[4].at(-1),
+        overLimitStep: 4,
+    })
+    return { playerId, viewerId }
+}
+
+async function openBoardTwo(player) {
+    const response = await routeApp.inject({
+        method: "POST",
+        url: "/bond/open_mana_board",
+        payload: {
+            viewer_id: player.viewerId,
+            character_id: 1,
+            mana_board_index: 2,
+            api_count: 1,
+        },
+    })
+    assert.equal(response.statusCode, 200, response.body)
+}
+
+async function withBoardTwoAvailable(callback) {
+    const previousTimeOffset = getTimeOffset()
+    setServerTime(new Date("2024-08-14T12:00:00.000Z"))
+    try {
+        return await callback()
+    } finally {
+        setServerTimeOffset(previousTimeOffset)
+    }
 }
 
 test("learnManaNodes uses DB/content costs and persists a normal node", () => {
@@ -194,7 +280,142 @@ test("learnManaNodes rejects duplicate, unknown, already learned, and unparented
     )
 })
 
-test.after(() => {
+test("reachable learn route opens board two and learns its real root node", async () => {
+    await withBoardTwoAvailable(async () => {
+        const player = await createReachablePlayer()
+        seedBoardOne(player.playerId)
+        upsertPlayerCharacterAwakeUnlockSync(player.playerId, 1, 1, 1)
+        await openBoardTwo(player)
+        grantBoardNodeCosts(player.playerId, 2, [2401])
+
+        const response = await routeApp.inject({
+            method: "POST",
+            url: "/mana/learn_mana_node",
+            payload: {
+                viewer_id: player.viewerId,
+                character_id: 1,
+                mana_node_multiplied_id_list: [2401],
+                api_count: 1,
+            },
+        })
+        assert.equal(response.statusCode, 200, response.body)
+        assert.equal(getPlayerCharacterSync(player.playerId, 1).manaBoardIndex, 2)
+        assert.equal(getPlayerCharacterManaNodeAwakeLevelsSync(player.playerId, 1)[2401], 0)
+    })
+})
+
+test("reachable order Awake then board two keeps both states authoritative", async () => {
+    await withBoardTwoAvailable(async () => {
+        const player = await createReachablePlayer()
+        seedBoardOne(player.playerId)
+        upsertPlayerCharacterAwakeUnlockSync(player.playerId, 1, 1, 1)
+        grantAwakeNodeCost(player.playerId, 2219)
+        const awakeResponse = await routeApp.inject({
+            method: "POST",
+            url: "/mana/awake_mana_node",
+            payload: {
+                viewer_id: player.viewerId,
+                character_id: 1,
+                mana_node_multiplied_id_list: [2219],
+                awake_level: 1,
+                api_count: 1,
+            },
+        })
+        assert.equal(awakeResponse.statusCode, 200, awakeResponse.body)
+        await openBoardTwo(player)
+        grantBoardNodeCosts(player.playerId, 2, [2401])
+        const learnResponse = await routeApp.inject({
+            method: "POST",
+            url: "/mana/learn_mana_node",
+            payload: {
+                viewer_id: player.viewerId,
+                character_id: 1,
+                mana_node_multiplied_id_list: [2401],
+                api_count: 1,
+            },
+        })
+        assert.equal(learnResponse.statusCode, 200, learnResponse.body)
+        assert.equal(getPlayerCharacterSync(player.playerId, 1).manaBoardIndex, 2)
+        assert.equal(getPlayerCharacterManaNodeAwakeLevelsSync(player.playerId, 1)[2219], 1)
+        assert.equal(getPlayerCharacterManaNodeAwakeLevelsSync(player.playerId, 1)[2401], 0)
+    })
+})
+
+test("reachable order board two then Awake does not change the ordinary board index", async () => {
+    await withBoardTwoAvailable(async () => {
+        const player = await createReachablePlayer()
+        seedBoardOne(player.playerId)
+        upsertPlayerCharacterAwakeUnlockSync(player.playerId, 1, 1, 1)
+        await openBoardTwo(player)
+        grantBoardNodeCosts(player.playerId, 2, [2401])
+        const learnResponse = await routeApp.inject({
+            method: "POST",
+            url: "/mana/learn_mana_node",
+            payload: {
+                viewer_id: player.viewerId,
+                character_id: 1,
+                mana_node_multiplied_id_list: [2401],
+                api_count: 1,
+            },
+        })
+        assert.equal(learnResponse.statusCode, 200, learnResponse.body)
+        grantAwakeNodeCost(player.playerId, 2219)
+        const awakeResponse = await routeApp.inject({
+            method: "POST",
+            url: "/mana/awake_mana_node",
+            payload: {
+                viewer_id: player.viewerId,
+                character_id: 1,
+                mana_node_multiplied_id_list: [2219],
+                awake_level: 1,
+                api_count: 1,
+            },
+        })
+        assert.equal(awakeResponse.statusCode, 200, awakeResponse.body)
+        assert.equal(getPlayerCharacterSync(player.playerId, 1).manaBoardIndex, 2)
+        assert.equal(getPlayerCharacterManaNodeAwakeLevelsSync(player.playerId, 1)[2219], 1)
+    })
+})
+
+test("reachable board two route completion records the second-board milestone", async () => {
+    await withBoardTwoAvailable(async () => {
+        const player = await createReachablePlayer()
+        seedBoardOne(player.playerId)
+        await openBoardTwo(player)
+        const boardTwoNodeIds = Object.keys(getCharacterManaNodesSync(1, 2)).map(Number)
+        grantBoardNodeCosts(player.playerId, 2, boardTwoNodeIds)
+        const response = await routeApp.inject({
+            method: "POST",
+            url: "/mana/learn_mana_node",
+            payload: {
+                viewer_id: player.viewerId,
+                character_id: 1,
+                mana_node_multiplied_id_list: boardTwoNodeIds,
+                api_count: 1,
+            },
+        })
+        assert.equal(response.statusCode, 200, response.body)
+        assert.deepEqual(
+            db.prepare(`
+                SELECT aggregation_target, slot, subject_id
+                FROM players_player_history_milestones
+                WHERE player_id = ?
+            `).all(player.playerId),
+            [{ aggregation_target: 4, slot: 0, subject_id: 1 }],
+        )
+    })
+})
+
+test.before(async () => {
+    routeApp = Fastify({ logger: false })
+    registerCnMsgpackOnSend(routeApp)
+    await routeApp.register(manaRoutes, { prefix: "/mana" })
+    await routeApp.register(bondRoutes, { prefix: "/bond" })
+    await routeApp.ready()
+})
+
+test.after(async () => {
+    if (routeApp) await routeApp.close()
     if (db.open) db.close()
     restoreContentSnapshot()
     fs.rmSync(databaseDirectory, { recursive: true, force: true })

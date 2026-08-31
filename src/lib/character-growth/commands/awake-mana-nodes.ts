@@ -83,6 +83,12 @@ export function executeAwakeManaNodes(command: AwakeManaNodesCommand): AwakeMana
         })
         const character = context.character()
         const content = mutationContent(command.characterId, 1)
+        const boardOneNodeIds = new Set(Object.keys(content.nodes).map(Number))
+        for (const nodeId of requestedNodeIds) {
+            if (!boardOneNodeIds.has(nodeId)) {
+                throw growthError("UNKNOWN_NODE", `node ${nodeId} is not on Awake board one.`)
+            }
+        }
         const allNodeLevels = context.normalManaNodes()
         assertBoardComplete(allNodeLevels, content)
         const unlockedAwakeLevel = context.awakeUnlocks().get(1) ?? 0

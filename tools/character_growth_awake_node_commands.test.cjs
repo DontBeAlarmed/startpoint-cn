@@ -8,6 +8,7 @@ const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
+const Fastify = require("fastify")
 
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "character-growth-awake-node-command-"))
 const previousDataDirectory = process.env.DATA_DIR
@@ -28,9 +29,15 @@ const { givePlayerItemSync } = require("../src/data/domains/item")
 const { getCharacterDataSync, getCharacterManaNodesSync, getManaNodeAwakeCost } = require("../src/lib/assets")
 const { characterExpCaps } = require("../src/lib/character")
 const { getDb } = require("../src/data/db")
+const { insertSessionWithToken } = require("../src/data/domains/session")
+const { SessionType } = require("../src/data/types")
+const manaRoutes = require("../src/routes/api/character/mana").default
+const bondRoutes = require("../src/routes/api/character/bond").default
+const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 
 initializeDatabase()
 const db = getDb()
+let routeApp
 
 function loadAwakeCommand() {
     try {
@@ -61,6 +68,29 @@ function seedBoardOne(playerId) {
     insertPlayerCharacterManaNodesSync(playerId, 1, nodeIds)
     upsertPlayerCharacterAwakeUnlockSync(playerId, 1, 1, 1)
     return nodeIds
+}
+
+async function createRoutePlayer() {
+    const account = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId: `awake-node-route-${randomUUID()}`,
+        status: "normal",
+    })
+    const playerId = insertDefaultPlayerSync(account.id).id
+    const viewerId = 910000000 + playerId
+    await insertSessionWithToken({
+        token: String(viewerId),
+        accountId: account.id,
+        expires: new Date("2099-01-01T00:00:00.000Z"),
+        type: SessionType.VIEWER,
+    })
+    require("../src/data/domains/character").updatePlayerCharacterSync(playerId, 1, {
+        exp: characterExpCaps[4][0],
+        overLimitStep: 4,
+    })
+    return { playerId, viewerId }
 }
 
 function grantAwakeCost(playerId, nodeId, targetAwakeLevel = 1) {
@@ -183,7 +213,56 @@ test("awakeManaNodes rejects an invalid level, incomplete board, unlearned node,
     )
 })
 
-test.after(() => {
+test("awakeManaNodes rejects unknown and off-board nodes before reading Awake costs", () => {
+    const playerId = createPlayer()
+    seedBoardOne(playerId)
+    const offBoardNodeId = Number(Object.keys(getCharacterManaNodesSync(1, 2))[0])
+    for (const nodeId of [99999999, offBoardNodeId]) {
+        assert.throws(
+            () => loadAwakeCommand().executeAwakeManaNodes({
+                playerId,
+                characterId: 1,
+                requestedNodeIds: [nodeId],
+                targetAwakeLevel: 1,
+                evaluationTime: new Date("2024-08-14T12:00:00.000Z"),
+            }),
+            error => error.code === "UNKNOWN_NODE",
+            `node ${nodeId} should be rejected as UNKNOWN_NODE`,
+        )
+    }
+})
+
+test.before(async () => {
+    routeApp = Fastify({ logger: false })
+    registerCnMsgpackOnSend(routeApp)
+    await routeApp.register(manaRoutes, { prefix: "/mana" })
+    await routeApp.register(bondRoutes, { prefix: "/bond" })
+    await routeApp.ready()
+})
+
+test("awake_mana_node route maps an off-board node to HTTP 400 UNKNOWN_NODE", async () => {
+    const player = await createRoutePlayer()
+    seedBoardOne(player.playerId)
+    const offBoardNodeId = Number(Object.keys(getCharacterManaNodesSync(1, 2))[0])
+    for (const nodeId of [99999999, offBoardNodeId]) {
+        const response = await routeApp.inject({
+            method: "POST",
+            url: "/mana/awake_mana_node",
+            payload: {
+                viewer_id: player.viewerId,
+                character_id: 1,
+                mana_node_multiplied_id_list: [nodeId],
+                awake_level: 1,
+                api_count: 1,
+            },
+        })
+        assert.equal(response.statusCode, 400, response.body)
+        assert.match(response.body, /UNKNOWN_NODE/)
+    }
+})
+
+test.after(async () => {
+    if (routeApp) await routeApp.close()
     if (db.open) db.close()
     restoreContentSnapshot()
     fs.rmSync(databaseDirectory, { recursive: true, force: true })
