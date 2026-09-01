@@ -5,6 +5,7 @@ const equipmentTable = require("../../assets/equipment_dissolve.json")
 const itemTable = require("../../assets/item_sale.json")
 const mainQuestTable = require("../../assets/main_quest.json")
 const rushEventQuestTable = require("../../assets/rush_event_quest.json")
+const characterLevelTable = require("../../assets/character_level.json")
 
 const FIXTURE_TIME = "2024-07-18T12:00:00.000Z"
 const CHARACTER_IDS = Object.keys(characterTable).map(Number).filter(id => id !== 1)
@@ -18,6 +19,15 @@ const EVENT_QUEST_IDS = Object.entries(rushEventQuestTable)
     .filter(([, quest]) => quest.rushEventId === 700004)
     .map(([questId]) => Number(questId))
     .sort((left, right) => left - right)
+
+function getCharacterExpCaps(rarity) {
+    const levels = characterLevelTable[String(rarity)]
+    const baseLevel = 40 + (rarity - 1) * 10
+    return Array.from(
+        { length: ((100 - baseLevel) / 5) + 1 },
+        (_, index) => levels[String(baseLevel + index * 5)],
+    )
+}
 
 function getDb() {
     return require("../../src/data/db").getDb()
@@ -85,13 +95,17 @@ function seedInventory(playerId, itemCount, equipmentCount, characterCount) {
         ) VALUES (?, 1, ?, ?, 0, ?, ?, ?, 0, 1, ?, NULL, NULL, NULL)
     `)
     for (let index = 0; index < characterCount; index++) {
+        const characterId = CHARACTER_IDS[index]
+        const rarity = characterTable[String(characterId)].rarity
+        const expCaps = getCharacterExpCaps(rarity)
+        const overLimitStep = index % expCaps.length
         insertCharacter.run(
-            CHARACTER_IDS[index],
-            index % 2,
-            index % 6,
+            characterId,
+            0,
+            overLimitStep,
             FIXTURE_TIME,
             FIXTURE_TIME,
-            index * 10_000,
+            Math.min(index * 10_000, expCaps[overLimitStep]),
             playerId,
         )
     }

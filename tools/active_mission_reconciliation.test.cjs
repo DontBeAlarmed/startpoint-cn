@@ -132,7 +132,7 @@ const tables = {
     "config.json": require("../assets/config.json"),
     "item_max_count.json": require("../assets/item_max_count.json"),
     "login_bonus.json": require("../assets/login_bonus.json"),
-    "mana_node.json": {},
+    "mana_node.json": require("../assets/mana_node.json"),
     "mana_board2_open_condition.json": {},
     "mission_active.json": {
         90001: [missionRow({ eventId: 901, pattern: 57, questKind: 0, questA: 1, questB: 8, questC: 4 })],

@@ -143,7 +143,7 @@
             "candidates": 120,
             "computed": 107,
             "progressChanged": 18,
-            "rewardStagesGranted": 41
+            "rewardStagesGranted": 40
           },
           "2": {
             "candidates": 656,
@@ -187,7 +187,7 @@
         "progressChanged": 28
       },
       "name": "normal-progress",
-      "rewardStagesGranted": 49,
+      "rewardStagesGranted": 48,
       "sql": {
         "byTable": {
           "players": {
@@ -400,5 +400,5 @@
     }
   ],
   "version": 2,
-  "sha256": "76b36e0b20002644562a553913ba2e17ab0a5006292e3dc7fba144e169716337"
+  "sha256": "defbe19c1f93564967f98526447f87b8397cf796a1456d5d515ba5b6f0250b06"
 }

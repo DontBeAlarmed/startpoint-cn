@@ -438,15 +438,13 @@ test("publication projection failures roll back strict and best-effort unlock wr
         WHERE player_id = ? AND id = ?
     `).run(playerId, CHARACTER_A)
     const existing = [{ character_id: CHARACTER_A, stack: 4 }]
-    const projectionError = new Error("invalid joinTime during Awake response projection")
-    const originalGetUTCFullYear = Date.prototype.getUTCFullYear
+    const expectedProjectionError = {
+        code: "INVALID_GROWTH_STATE",
+        message: "INVALID_GROWTH_STATE: character date must be a valid Date.",
+    }
     const originalConsoleError = console.error
     let loggedError
 
-    Date.prototype.getUTCFullYear = function getUTCFullYearWithValidation() {
-        if (Number.isNaN(this.getTime())) throw projectionError
-        return originalGetUTCFullYear.call(this)
-    }
     console.error = (...args) => {
         loggedError = args
     }
@@ -459,7 +457,8 @@ test("publication projection failures roll back strict and best-effort unlock wr
             ),
             existing,
         )
-        assert.strictEqual(loggedError?.[1], projectionError)
+        assert.equal(loggedError?.[1]?.code, expectedProjectionError.code)
+        assert.equal(loggedError?.[1]?.message, expectedProjectionError.message)
         assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has(String(CHARACTER_A)), false)
 
         assert.throws(
@@ -468,11 +467,11 @@ test("publication projection failures roll back strict and best-effort unlock wr
                 existing,
                 { candidateCharacterIds: [CHARACTER_A] },
             ),
-            error => error === projectionError,
+            error => error?.code === expectedProjectionError.code
+                && error?.message === expectedProjectionError.message,
         )
         assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has(String(CHARACTER_A)), false)
     } finally {
-        Date.prototype.getUTCFullYear = originalGetUTCFullYear
         console.error = originalConsoleError
     }
 })

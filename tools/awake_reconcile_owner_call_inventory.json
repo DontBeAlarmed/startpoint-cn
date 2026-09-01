@@ -44,6 +44,7 @@
     "before-anchor:member:context#character=1",
     "before-anchor:member:context#normalManaNodes=1",
     "before-anchor:member:context#requiredItems=1",
+    "before-anchor:member:Math#max=1",
     "before-anchor:member:nextNodes#has=1",
     "before-anchor:member:Object.keys(content.nodes)#map=1",
     "before-anchor:member:Object#fromEntries=1",
@@ -51,7 +52,7 @@
     "before-anchor:member:plan.nodeUpdates#map=1",
     "before-anchor:member:resources.itemsBefore#has=1",
     "final-anchor:local-function:finalizeLearnManaAwakePublicationWrites=1",
-    "inside-publication:import:../../character-helpers#buildCharacterListEntryFromGrowth=1",
+    "inside-publication:import:../response-projector#projectCharacterGrowthIncrement=1",
     "publication:import:../facts/awake-unlock-facts#publishAwakeUnlockCharacterListWithStateWithinTransaction=1"
   ],
   "single/finish": [
@@ -295,7 +296,7 @@
     "after-publication:local-function:sendGrowthError=1",
     "anchor-to-publication:call-result:member:getDb()#transaction=1",
     "anchor-to-publication:import:../../../data/domains/character#getPlayerCharacterSync=1",
-    "anchor-to-publication:import:../../../lib/character-helpers#buildCharacterListEntry=1",
+    "anchor-to-publication:import:../../../lib/character-growth/response-projector#projectCharacterGrowthIncrement=1",
     "anchor-to-publication:member:getDb()#transaction=1",
     "before-anchor:import:../../../data/db#getDb=1",
     "before-anchor:import:../../../lib/character-helpers#validateSessionAndPlayer=1",

@@ -40,6 +40,8 @@ productionContentSnapshotProvider.snapshot = {
             if (failReconciliation) throw new Error("forced load reconciliation failure")
             if (tableName === "mission_event.json") return require("../assets/mission_event.json")
             if (tableName === "mission_event_reward.json") return require("../assets/mission_event_reward.json")
+            if (tableName === "character.json") return require("../assets/character.json")
+            if (tableName === "mana_node.json") return require("../assets/mana_node.json")
             return {}
         },
     },

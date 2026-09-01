@@ -539,6 +539,7 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
         "kind === 0 ? [targetId] : []",
         "[settlement.characterList]",
         "{}",
+        '"exchange/star_crumb"',
     ])
     assert.deepEqual(starCrumbCall.conditionalConditions, [])
     assert.equal(starCrumbCall.position > getLastCallPosition(starCrumbBlock, "givePlayerCharacterSync"), true)
@@ -552,7 +553,13 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
     const townGrantBlock = getRouteBlock(characterSource, "/add_character_from_town")
     const townCall = getOnlyCall(townGrantBlock, "reconcileAwakeUnlockCharacterList")
     assert.equal(findCalls(characterSource, "reconcileAwakeUnlockCharacterList").length, 1)
-    assert.deepEqual(townCall.arguments, ["playerId", "[characterId]", "[existingCharacterList]", "{}"])
+    assert.deepEqual(townCall.arguments, [
+        "playerId",
+        "[characterId]",
+        "[existingCharacterList]",
+        "{}",
+        '"character/add_character_from_town"',
+    ])
     assert.deepEqual(townCall.conditionalConditions, [])
     assert.equal(townCall.position > getLastCallPosition(townGrantBlock, "givePlayerCharacterSync"), true)
     assert.equal(findCalls(townGrantBlock, "getPlayerCharacterSync").length, 0)
