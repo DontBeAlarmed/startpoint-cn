@@ -130,18 +130,22 @@ export interface PlayerCharacterExBoost {
     abilityIdList: number[]
 }
 
-export interface PlayerCharacter {
+/** Metadata needed to project a character mutation without loading Growth child rows. */
+export interface PlayerCharacterProjectionData {
     entryCount: number
+    joinTime: Date
+    updateTime: Date
+    exBoost?: PlayerCharacterExBoost
+    illustrationSettings?: number[]
+}
+
+export interface PlayerCharacter extends PlayerCharacterProjectionData {
     evolutionLevel: number
     overLimitStep: number
     protection: boolean
-    joinTime: Date
-    updateTime: Date
     exp: number
     stack: number
     manaBoardIndex: number
-    exBoost?: PlayerCharacterExBoost
-    illustrationSettings?: number[]
     bondTokenList: PlayerCharacterBondToken[]
 }
 

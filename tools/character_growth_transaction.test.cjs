@@ -300,7 +300,9 @@ async function main() {
             api_count: 1,
         },
     })
-    assert.equal(missingHistoryResponse.statusCode, 400)
+    assert.equal(missingHistoryResponse.statusCode, 500)
+    assert.equal(JSON.parse(missingHistoryResponse.body).error, "Internal Server Error")
+    assert.match(JSON.parse(missingHistoryResponse.body).message, /INVALID_GROWTH_STATE/)
     assert.deepEqual(characterState(missingHistory.playerId), beforeMissingHistory)
 
     const missionFailure = await createPlayer(12)

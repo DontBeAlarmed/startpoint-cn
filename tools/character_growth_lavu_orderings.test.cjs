@@ -651,6 +651,39 @@ test("CN-reachable Lavu Awake-first and board-two-first orderings converge", asy
     }
 })
 
+test("CN load returns a finite 500 for malformed persisted character protection", async () => {
+    const app = await createApp()
+    try {
+        const player = await createReachablePlayer()
+        fixture.db.prepare(`
+            UPDATE players_characters
+            SET protection = 2
+            WHERE player_id = ? AND id = ?
+        `).run(player.playerId, LAVU_ID)
+        const response = await app.inject({
+            method: "POST",
+            url: "/api/index.php/load",
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            payload: pack({
+                viewer_id: player.viewerId,
+                keychain: player.viewerId,
+                device_id: player.viewerId,
+                device_token: "character-growth-invalid-protection",
+                graphics_device_name: "test",
+                platform_os_version: "test",
+                storage_directory_path: "test",
+            }).toString("base64"),
+        })
+        assert.equal(response.statusCode, 500, response.body)
+        assert.equal(response.body.length < 512, true)
+        const error = JSON.parse(response.body)
+        assert.equal(error.error, "Internal Server Error")
+        assert.match(error.message, /INVALID_GROWTH_STATE/)
+    } finally {
+        await app.close()
+    }
+})
+
 test.after(() => {
     for (const restore of patchedCommands.reverse()) restore()
     setServerTimeOffset(previousTimeOffset)

@@ -14,6 +14,7 @@ const stackToExp = require("../src/lib/character-growth/commands/stack-to-exp")
 const { createCharacterGrowthC4Fixture } = require("./helpers/character-growth-c4-fixture.cjs")
 const expodRoutes = require("../src/routes/api/expod").default
 const characterRoutes = require("../src/routes/api/character").default
+const { givePlayerCharacterSync } = require("../src/lib/character")
 
 test("C4 reward collaborators expose Growth-owned character boundaries", () => {
     assert.equal(typeof rewardExp.grantCharacterExp, "function")
@@ -123,6 +124,39 @@ test("duplicate character reward returns final absolute stack and rolls back wit
         assert.throws(() => rewardStack.grantCharacterStack({ playerId, characterId: 341003 }))
         assert.equal(fixture.addCharacter(playerId, 341003).stack, 5)
         assert.equal(fixture.item(playerId, 14010), 1)
+    } finally {
+        fixture.cleanup()
+    }
+})
+
+test("duplicate-character ingress rejects malformed protection before stack or compensation writes", () => {
+    const fixture = createCharacterGrowthC4Fixture()
+    try {
+        const playerId = fixture.createPlayer()
+        fixture.addCharacter(playerId, 341003, { stack: 4 })
+        fixture.db.prepare(`
+            UPDATE players_characters
+            SET protection = 2
+            WHERE player_id = ? AND id = 341003
+        `).run(playerId)
+        const readState = () => ({
+            character: fixture.db.prepare(`
+                SELECT stack, protection
+                FROM players_characters
+                WHERE player_id = ? AND id = 341003
+            `).get(playerId),
+            compensation: fixture.db.prepare(`
+                SELECT amount
+                FROM players_items
+                WHERE player_id = ? AND id = 14010
+            `).get(playerId) ?? null,
+        })
+        const before = readState()
+        assert.throws(
+            () => givePlayerCharacterSync(playerId, 341003),
+            error => error.code === "INVALID_GROWTH_STATE",
+        )
+        assert.deepEqual(readState(), before)
     } finally {
         fixture.cleanup()
     }

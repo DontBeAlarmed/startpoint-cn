@@ -18,6 +18,20 @@ const { createSqlCounter } = require("./mission_settlement_sql.cjs")
 const { CharacterGrowthRepository } = require("../../src/lib/character-growth/repository")
 const { createCharacterGrowthRequestContext } = require("../../src/lib/character-growth/request-context")
 const { createCharacterGrowthBatchContext } = require("../../src/lib/character-growth/batch-context")
+const { executeBulkOverLimit } = require("../../src/lib/character-growth/commands/bulk-over-limit")
+const { executeBulkStackToExp } = require("../../src/lib/character-growth/commands/bulk-stack-to-exp")
+const { characterMaxOverLimits } = require("../../src/lib/character-growth/limits")
+const { getCharacterDataSync } = require("../../src/lib/assets")
+const restoreContentSnapshot = require("../helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+
+const CHARACTER_IDS = Object.freeze([
+    1,
+    ...Object.keys(require("../../assets/character.json"))
+        .map(Number)
+        .filter(id => Number.isSafeInteger(id) && id > 0 && id !== 1),
+].slice(0, 20))
+assert.equal(CHARACTER_IDS.length, 20)
 
 const TABLES = Object.freeze([
     "players_characters",
@@ -79,7 +93,7 @@ function facts() {
     }
 }
 
-function setupDatabase() {
+function setupDatabase(characterCount = 20) {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), "character-growth-real-admission-"))
     const state = { active: null }
     let database
@@ -119,7 +133,7 @@ function setupDatabase() {
             VALUES (?, ?, 1, 1)
         `)
         const now = "2026-08-31T00:00:00.000Z"
-        for (let characterId = 2; characterId <= 20; characterId++) {
+        for (const characterId of CHARACTER_IDS.slice(1, characterCount)) {
             insertCharacter.run(characterId, now, now, playerId)
             insertToken.run(1, 0, playerId, characterId)
             insertNode.run(2201, characterId, playerId)
@@ -256,7 +270,7 @@ test("admission measures constant real SQLite SQL for one and twenty character b
         context.requiredItems([1, 2])
     }
     const one = measure(fixture.state, () => runBatch([1]))
-    const twentyIds = Array.from({ length: 20 }, (_unused, index) => index + 1)
+    const twentyIds = [...CHARACTER_IDS]
     const twenty = measure(fixture.state, () => runBatch(twentyIds))
 
     for (const measured of [one, twenty]) {
@@ -276,6 +290,81 @@ test("admission measures constant real SQLite SQL for one and twenty character b
             batchTwenty: reportScenario(twenty, { characterCount: 20, sections: ["all"] }),
         },
     }))
+})
+
+function measureBulkGrowthCommand(commandName, characterCount) {
+    const fixture = setupDatabase(characterCount)
+    try {
+        const ids = CHARACTER_IDS.slice(0, characterCount)
+        for (const characterId of ids) {
+            const rarity = getCharacterDataSync(characterId)?.rarity
+            const maxOverLimit = characterMaxOverLimits[rarity]
+            assert.equal(Number.isSafeInteger(maxOverLimit), true)
+            fixture.database.prepare(`
+                UPDATE players_characters
+                SET stack = 1, protection = 0, over_limit_step = ?
+                WHERE player_id = ? AND id = ?
+            `).run(commandName === "bulk_stack_to_exp" ? maxOverLimit : 0, fixture.playerId, characterId)
+        }
+        let result
+        const measured = measure(fixture.state, () => {
+            result = commandName === "bulk_over_limit"
+                ? executeBulkOverLimit({
+                    playerId: fixture.playerId,
+                    evaluationTime: new Date("2026-08-31T00:00:00.000Z"),
+                })
+                : executeBulkStackToExp({
+                    playerId: fixture.playerId,
+                    evaluationTime: new Date("2026-08-31T00:00:00.000Z"),
+                })
+        })
+        return { ids, measured, result }
+    } finally {
+        closeDatabase()
+        fs.rmSync(fixture.directory, { recursive: true, force: true })
+    }
+}
+
+test("bulk Growth commands read characters once, skip bonds, and keep constant one/twenty SQL", () => {
+    for (const commandName of ["bulk_over_limit", "bulk_stack_to_exp"]) {
+        const one = measureBulkGrowthCommand(commandName, 1)
+        const twenty = measureBulkGrowthCommand(commandName, 20)
+        for (const scenario of [one, twenty]) {
+            assert.equal(scenario.measured.sqlByTable.players_characters.reads, 1)
+            assert.equal(scenario.measured.sqlByTable.players_characters.writes, 1)
+            assert.equal(scenario.measured.sqlByTable.players_characters_bond_tokens, undefined)
+            assert.equal(scenario.result.characters.length, scenario.ids.length)
+            assert.deepEqual(
+                scenario.result.characters.map(character => character.characterId),
+                scenario.ids,
+            )
+            assert.equal(
+                Object.keys(scenario.result.projectionCharacters).length,
+                scenario.ids.length,
+            )
+            assert.equal(scenario.result.characters.every(character => character.stack === 0), true)
+            if (commandName === "bulk_over_limit") {
+                assert.equal(scenario.result.characters.every(character => character.overLimitStep === 1), true)
+            }
+        }
+        assert.deepEqual({
+            prepareCalls: twenty.measured.prepareCalls,
+            allCalls: twenty.measured.allCalls,
+            getCalls: twenty.measured.getCalls,
+            runCalls: twenty.measured.runCalls,
+            sqlReads: twenty.measured.sqlReads,
+            sqlWrites: twenty.measured.sqlWrites,
+            sqlByTable: twenty.measured.sqlByTable,
+        }, {
+            prepareCalls: one.measured.prepareCalls,
+            allCalls: one.measured.allCalls,
+            getCalls: one.measured.getCalls,
+            runCalls: one.measured.runCalls,
+            sqlReads: one.measured.sqlReads,
+            sqlWrites: one.measured.sqlWrites,
+            sqlByTable: one.measured.sqlByTable,
+        })
+    }
 })
 
 test("admission report schema includes real operation counters and stable behavior hashes", () => {
@@ -298,3 +387,6 @@ test("admission report schema includes real operation counters and stable behavi
     assert.match(report.behaviorSha256, /^[a-f0-9]{64}$/)
 })
 
+test.after(() => {
+    restoreContentSnapshot()
+})

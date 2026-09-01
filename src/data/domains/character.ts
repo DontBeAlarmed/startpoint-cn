@@ -1,8 +1,9 @@
 import { getDb } from "../db";
-import { PlayerCharacter, PlayerCharacterBondToken, PlayerCharacterExBoost, RawPlayerCharacter, RawPlayerCharacterBondToken, RawPlayerCharacterManaNode } from "../types";
-import { deserializeBoolean, deserializeNumberList, serializeBoolean, serializeNumberList } from "../utils/primitives";
+import { PlayerCharacter, PlayerCharacterBondToken, PlayerCharacterExBoost, PlayerCharacterProjectionData, RawPlayerCharacter, RawPlayerCharacterBondToken, RawPlayerCharacterManaNode } from "../types";
+import { deserializeNumberList, serializeBoolean, serializeNumberList } from "../utils/primitives";
 import { getCharacterDataSync } from "../../lib/assets";
 import { getRealNow } from "../../runtime/time/game-time";
+import { growthError } from "../../lib/character-growth/errors";
 
 export interface PlayerCharacterGrowthFact {
     readonly exp: number
@@ -15,6 +16,11 @@ export interface PlayerCharacterWithStoredGrowth {
         "id" | "exp" | "stack" | "protection" | "over_limit_step"
             | "evolution_level" | "mana_board_index"
     >>
+}
+
+export interface PlayerCharacterGrowthSeed {
+    readonly projection: PlayerCharacterProjectionData
+    readonly storedGrowth: PlayerCharacterWithStoredGrowth["storedGrowth"]
 }
 
 function normalizeCharacterFactIds(ids: readonly number[]): number[] {
@@ -61,6 +67,41 @@ function buildPlayerCharacterExBoost(
     }
 }
 
+function deserializePlayerCharacterProtection(value: number): boolean {
+    if (value !== 0 && value !== 1) {
+        throw growthError("INVALID_GROWTH_STATE", "character.protection must be 0 or 1.")
+    }
+    return value === 1
+}
+
+function buildPlayerCharacterProjectionData(
+    rawCharacter: RawPlayerCharacter,
+): PlayerCharacterProjectionData {
+    return {
+        entryCount: rawCharacter.entry_count,
+        joinTime: new Date(rawCharacter.join_time),
+        updateTime: new Date(rawCharacter.update_time),
+        exBoost: buildPlayerCharacterExBoost(rawCharacter.ex_boost_status_id, rawCharacter.ex_boost_ability_id_list),
+        illustrationSettings: rawCharacter.illustration_settings === null
+            ? undefined
+            : deserializeNumberList(rawCharacter.illustration_settings),
+    }
+}
+
+function storedGrowthFromRawCharacter(
+    rawCharacter: RawPlayerCharacter,
+): PlayerCharacterWithStoredGrowth["storedGrowth"] {
+    return {
+        id: rawCharacter.id,
+        exp: rawCharacter.exp,
+        stack: rawCharacter.stack,
+        protection: rawCharacter.protection,
+        over_limit_step: rawCharacter.over_limit_step,
+        evolution_level: rawCharacter.evolution_level,
+        mana_board_index: rawCharacter.mana_board_index,
+    }
+}
+
 /**
  * Converts a RawPlayerCharacter into a PlayerCharacter
  * 
@@ -73,17 +114,13 @@ function buildPlayerCharacter(
     bondTokens: PlayerCharacterBondToken[]
 ): PlayerCharacter {
     return {
-        entryCount: rawCharacter.entry_count,
+        ...buildPlayerCharacterProjectionData(rawCharacter),
         evolutionLevel: rawCharacter.evolution_level,
         overLimitStep: rawCharacter.over_limit_step,
-        protection: deserializeBoolean(rawCharacter.protection),
-        joinTime: new Date(rawCharacter.join_time),
-        updateTime: new Date(rawCharacter.update_time),
+        protection: deserializePlayerCharacterProtection(rawCharacter.protection),
         exp: rawCharacter.exp,
         stack: rawCharacter.stack,
         manaBoardIndex: rawCharacter.mana_board_index,
-        exBoost: buildPlayerCharacterExBoost(rawCharacter.ex_boost_status_id, rawCharacter.ex_boost_ability_id_list),
-        illustrationSettings: rawCharacter.illustration_settings === null ? undefined : deserializeNumberList(rawCharacter.illustration_settings),
         bondTokenList: bondTokens
     }
 }
@@ -94,15 +131,7 @@ function buildPlayerCharacterWithStoredGrowth(
 ): PlayerCharacterWithStoredGrowth {
     return {
         character: buildPlayerCharacter(rawCharacter, bondTokens),
-        storedGrowth: {
-            id: rawCharacter.id,
-            exp: rawCharacter.exp,
-            stack: rawCharacter.stack,
-            protection: rawCharacter.protection,
-            over_limit_step: rawCharacter.over_limit_step,
-            evolution_level: rawCharacter.evolution_level,
-            mana_board_index: rawCharacter.mana_board_index,
-        },
+        storedGrowth: storedGrowthFromRawCharacter(rawCharacter),
     }
 }
 
@@ -274,6 +303,32 @@ export function getPlayerCharactersSync(
     }
 
     return out
+}
+
+/**
+ * Reads every owned character once for batch Growth commands. This deliberately
+ * excludes bond-token rows because stack/over-limit commands do not observe them.
+ */
+export function getPlayerCharacterGrowthSeedsSync(
+    playerId: number,
+): Record<string, PlayerCharacterGrowthSeed> {
+    const rows = getDb().prepare(`
+        SELECT id, entry_count, evolution_level, over_limit_step, protection,
+            join_time, update_time, exp, stack, mana_board_index, ex_boost_status_id,
+            ex_boost_ability_id_list, illustration_settings
+        FROM players_characters
+        WHERE player_id = ?
+        ORDER BY id
+    `).all(playerId) as RawPlayerCharacter[]
+    return Object.fromEntries(rows.map(row => {
+        // Projection metadata does not expose protection, but every Growth read
+        // boundary must still reject malformed persisted values before mutation.
+        deserializePlayerCharacterProtection(row.protection)
+        return [String(row.id), {
+            projection: buildPlayerCharacterProjectionData(row),
+            storedGrowth: storedGrowthFromRawCharacter(row),
+        }]
+    }))
 }
 
 export function getPlayerCharactersByIdsSync(

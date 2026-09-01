@@ -1,7 +1,8 @@
 // Handles the insertion and conversion of character EXP.
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
-import { getPlayerCharacterSync, getPlayerCharactersSync } from "../../data/domains/character"
+import { getPlayerCharacterSync } from "../../data/domains/character"
+import type { PlayerCharacterProjectionData } from "../../data/types"
 import { getPlayerItemsSync } from "../../data/domains/item"
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
@@ -62,7 +63,7 @@ async function resolveViewerPlayer(viewerId: number): Promise<
 function characterListEntry(
     viewerId: number,
     after: CharacterGrowthProjectionState,
-    character: NonNullable<ReturnType<typeof getPlayerCharacterSync>>,
+    character: PlayerCharacterProjectionData,
     options: { readonly includeViewer?: boolean, readonly includeStack?: boolean, readonly includeOverLimit?: boolean } = {},
 ): Record<string, unknown> {
     return projectCharacterGrowthIncrement(
@@ -141,10 +142,8 @@ const routes = async (fastify: FastifyInstance) => {
                 playerId: resolved.playerId,
                 evaluationTime: getRealNow(),
             })
-            const player = getPlayerSync(resolved.playerId)!
-            const characters = getPlayerCharactersSync(resolved.playerId)
             const characterList = result.characters.map(character => (
-                characterListEntry(viewerId, character, characters[String(character.characterId)]!, {
+                characterListEntry(viewerId, character, result.projectionCharacters[String(character.characterId)]!, {
                     includeOverLimit: true, includeStack: true,
                 })
             ))
@@ -157,7 +156,7 @@ const routes = async (fastify: FastifyInstance) => {
                     item_list: getPlayerItemsSync(resolved.playerId),
                     user_info: {
                         exp_pool: result.expPool,
-                        exp_pooled_time: expPoolRealDateToClientTimestamp(player.expPooledTime),
+                        exp_pooled_time: expPoolRealDateToClientTimestamp(result.expPooledTime),
                     },
                     mail_arrived: getMailArrivedSync(resolved.playerId),
                 },

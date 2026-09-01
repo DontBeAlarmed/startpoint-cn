@@ -201,16 +201,20 @@ test("openManaBoard rejects an invalid raw protection value before Growth or mis
         }),
         error => error.code === "INVALID_GROWTH_STATE",
     )
-    const persisted = getPlayerCharacterSync(playerId, 1)
-    assert.equal(persisted.manaBoardIndex, 1)
-    assert.equal(db.prepare(`
-        SELECT protection
+    const persisted = db.prepare(`
+        SELECT mana_board_index, protection
         FROM players_characters
         WHERE player_id = ? AND id = 1
-    `).get(playerId).protection, 2)
+    `).get(playerId)
+    assert.equal(persisted.mana_board_index, 1)
+    assert.equal(persisted.protection, 2)
     assert.equal(
-        persisted.bondTokenList.some(token => token.manaBoardIndex === 2),
-        false,
+        db.prepare(`
+            SELECT COUNT(*) AS count
+            FROM players_characters_bond_tokens
+            WHERE player_id = ? AND character_id = 1 AND mana_board_index = 2
+        `).get(playerId).count,
+        0,
     )
     assert.deepEqual(db.prepare(`
         SELECT category, id, progress
@@ -291,7 +295,7 @@ test("openManaBoard rejects incomplete, downgrade, and jump requests at the comm
             targetBoardIndex: 1,
             evaluationTime: new Date("2024-08-14T12:00:00.000Z"),
         }),
-        error => error.code === "INVALID_GROWTH_STATE",
+        error => error.code === "BOARD_NOT_AVAILABLE",
     )
     assert.throws(
         () => openManaBoard({
@@ -424,11 +428,51 @@ test("HTTP adapter maps incomplete, true downgrade, and unsupported board three 
     })
     const downgradeResponse = await request(openedViewerId, 1)
     assert.equal(downgradeResponse.statusCode, 400)
-    assert.match(downgradeResponse.body, /INVALID_GROWTH_STATE/)
+    assert.match(downgradeResponse.body, /BOARD_NOT_AVAILABLE/)
 
     const unsupportedBoardResponse = await request(openedViewerId, 3)
     assert.equal(unsupportedBoardResponse.statusCode, 400)
     assert.match(unsupportedBoardResponse.body, /BOARD_NOT_AVAILABLE/)
+
+    const corrupted = createReadyPlayer()
+    const corruptedViewerId = 862000000 + corrupted
+    const corruptedAccount = db.prepare("SELECT account_id FROM players WHERE id = ?").get(corrupted)
+    await insertSessionWithToken({
+        token: String(corruptedViewerId),
+        accountId: corruptedAccount.account_id,
+        expires: new Date("2099-01-01T00:00:00.000Z"),
+        type: SessionType.VIEWER,
+    })
+    db.prepare(`
+        UPDATE players_characters
+        SET protection = 2
+        WHERE player_id = ? AND id = 1
+    `).run(corrupted)
+    const readCorruptedState = () => ({
+        character: db.prepare(`
+            SELECT mana_board_index, protection
+            FROM players_characters
+            WHERE player_id = ? AND id = 1
+        `).get(corrupted),
+        tokens: db.prepare(`
+            SELECT mana_board_index, status
+            FROM players_characters_bond_tokens
+            WHERE player_id = ? AND character_id = 1
+            ORDER BY mana_board_index
+        `).all(corrupted),
+        items: db.prepare(`
+            SELECT id, amount
+            FROM players_items
+            WHERE player_id = ?
+            ORDER BY id
+        `).all(corrupted),
+    })
+    const corruptedBefore = readCorruptedState()
+    const corruptedResponse = await request(corruptedViewerId, 2)
+    assert.equal(corruptedResponse.statusCode, 500)
+    assert.equal(JSON.parse(corruptedResponse.body).error, "Internal Server Error")
+    assert.match(JSON.parse(corruptedResponse.body).message, /INVALID_GROWTH_STATE/)
+    assert.deepEqual(readCorruptedState(), corruptedBefore)
     await app.close()
 })
 

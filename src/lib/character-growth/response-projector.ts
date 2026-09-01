@@ -1,4 +1,4 @@
-import type { PlayerCharacter, PlayerCharacterExBoost } from "../../data/types"
+import type { PlayerCharacter, PlayerCharacterExBoost, PlayerCharacterProjectionData } from "../../data/types"
 import { clientSerializeDate } from "../../data/utils/date"
 import { getServerTime } from "../../utils"
 import { growthError } from "./errors"
@@ -43,7 +43,7 @@ export interface CharacterGrowthIncrementResultLike {
 
 export interface ProjectCharacterGrowthEntryOptions {
     readonly characterId: number
-    readonly character: PlayerCharacter
+    readonly character: PlayerCharacterProjectionData
     readonly state: CharacterGrowthProjectionState
     readonly fields: readonly CharacterGrowthProjectionField[]
     readonly viewerId?: number

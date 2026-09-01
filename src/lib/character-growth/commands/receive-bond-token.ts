@@ -32,13 +32,13 @@ function observed(
 
 function validateCommand(command: ReceiveBondTokenCommand): void {
     if (!Number.isSafeInteger(command.playerId) || command.playerId <= 0) {
-        throw growthError("INVALID_GROWTH_STATE", "playerId must be a positive safe integer.")
+        throw growthError("INVALID_REQUEST", "playerId must be a positive safe integer.")
     }
     if (!Number.isSafeInteger(command.characterId) || command.characterId <= 0) {
-        throw growthError("INVALID_GROWTH_STATE", "characterId must be a positive safe integer.")
+        throw growthError("INVALID_REQUEST", "characterId must be a positive safe integer.")
     }
     if (!Number.isSafeInteger(command.manaBoardIndex) || command.manaBoardIndex <= 0) {
-        throw growthError("INVALID_GROWTH_STATE", "manaBoardIndex must be a positive safe integer.")
+        throw growthError("INVALID_REQUEST", "manaBoardIndex must be a positive safe integer.")
     }
     if (!(command.evaluationTime instanceof Date) || !Number.isFinite(command.evaluationTime.getTime())) {
         throw growthError("INVALID_GROWTH_STATE", "evaluationTime must be a valid Date.")

@@ -1,24 +1,46 @@
 import { getDb } from "../../data/db"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
+import type { RawPlayerCharacter } from "../../data/types"
 import { getRealNow } from "../../runtime/time/game-time"
 import { growthError } from "./errors"
-import type { CharacterGrowthCoreFact } from "./model"
+import type { CharacterGrowthCoreFact, CharacterGrowthStoredCore } from "./model"
 
 export function validateGrowthCommandIds(
     playerId: unknown,
     characterId: unknown,
 ): asserts playerId is number {
     if (typeof playerId !== "number" || !Number.isSafeInteger(playerId) || playerId <= 0) {
-        throw growthError("INVALID_GROWTH_STATE", "playerId must be a positive safe integer.")
+        throw growthError("INVALID_REQUEST", "playerId must be a positive safe integer.")
     }
     if (typeof characterId !== "number" || !Number.isSafeInteger(characterId) || characterId <= 0) {
-        throw growthError("INVALID_GROWTH_STATE", "characterId must be a positive safe integer.")
+        throw growthError("INVALID_REQUEST", "characterId must be a positive safe integer.")
     }
 }
 
 export function validateGrowthPlayerId(value: unknown): asserts value is number {
     if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
-        throw growthError("INVALID_GROWTH_STATE", "playerId must be a positive safe integer.")
+        throw growthError("INVALID_REQUEST", "playerId must be a positive safe integer.")
+    }
+}
+
+export function characterGrowthStoredCoreFromRaw(
+    raw: Readonly<Pick<
+        RawPlayerCharacter,
+        "id" | "exp" | "stack" | "protection" | "over_limit_step"
+            | "evolution_level" | "mana_board_index"
+    >>,
+): CharacterGrowthStoredCore {
+    if (raw.protection !== 0 && raw.protection !== 1) {
+        throw growthError("INVALID_GROWTH_STATE", "character.protection must be 0 or 1.")
+    }
+    return {
+        characterId: raw.id,
+        exp: raw.exp,
+        stack: raw.stack,
+        protection: raw.protection === 1,
+        overLimitStep: raw.over_limit_step,
+        evolutionLevel: raw.evolution_level,
+        manaBoardIndex: raw.mana_board_index,
     }
 }
 

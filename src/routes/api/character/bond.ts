@@ -9,12 +9,12 @@ import {
     validateSessionAndPlayer,
 } from "../../../lib/character-helpers"
 import { mergeMissionSettlementResponse } from "../../../lib/mission"
-import { CharacterGrowthError } from "../../../lib/character-growth/errors"
 import { receiveBondToken } from "../../../lib/character-growth/commands/receive-bond-token"
 import { openManaBoard } from "../../../lib/character-growth/commands/open-mana-board"
 import { getServerDate } from "../../../utils"
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../../lib/character-growth/owner-publication"
 import { MANA_CHARACTER_GROWTH_FIELDS, projectCharacterGrowthIncrement } from "../../../lib/character-growth/response-projector"
+import { sendGrowthMutationError } from "./mana-mutation-http"
 
 interface CharacterGrowthRequestBody {
     character_id: number
@@ -27,16 +27,6 @@ function isValidRequestBody(body: CharacterGrowthRequestBody): boolean {
     return Number.isSafeInteger(body?.viewer_id)
         && Number.isSafeInteger(body?.character_id)
         && Number.isSafeInteger(body?.mana_board_index)
-}
-
-function sendGrowthError(reply: FastifyReply, error: unknown): boolean {
-    if (!(error instanceof CharacterGrowthError)) return false
-    const statusCode = error.code === "CONTENT_INVALID" ? 500 : 400
-    reply.status(statusCode).send({
-        error: statusCode === 400 ? "Bad Request" : "Internal Server Error",
-        message: error.message,
-    })
-    return true
 }
 
 const routes = async (fastify: FastifyInstance) => {
@@ -88,7 +78,7 @@ const routes = async (fastify: FastifyInstance) => {
                 mail_arrived: getMailArrivedSync(sess.playerId),
             })
         } catch (error) {
-            if (sendGrowthError(reply, error)) return
+            if (sendGrowthMutationError(reply, error)) return
             throw error
         }
     })
@@ -130,7 +120,7 @@ const routes = async (fastify: FastifyInstance) => {
             }
             return sendCharacterResponse(reply, body.viewer_id, responseData)
         } catch (error) {
-            if (sendGrowthError(reply, error)) return
+            if (sendGrowthMutationError(reply, error)) return
             throw error
         }
     })

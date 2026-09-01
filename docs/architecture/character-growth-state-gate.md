@@ -1,6 +1,6 @@
 # D14 统一角色成长状态服务目标架构
 
-状态：设计已通过，尚未实施。本文件定义 D14 在同一 Gate 内直接落地完整 Character Growth Application Service 的目标架构、迁移阶段、性能合同和测试可达性。C1-C6 是同一架构目标的内部迁移阶段，不是可单独交付的过渡版本；在全部阶段实现并完成验证前，不得把本文描述成当前运行行为。
+状态：服务端实现与自动化 Gate 已完成，等待 CN 客户端实机验收。本文件既保留 D14 的目标架构与迁移依据，也描述当前已经落地的 Character Growth Application Service、性能合同和测试可达性。C1-C6 是同一架构目标的历史内部迁移阶段，不是可单独交付的过渡版本。
 
 ## 1. 背景
 
@@ -14,7 +14,7 @@ CN 1.8.1 客户端把普通一版、普通二版和 CharacterAwake 视为共享�
 
 二版不检查 Awake 状态；Awake 不检查 `mana_board_index=2` 或二版节点。用户重新尝试“先完成 Awake、再操作二版”也没有复现历史报错，因此 D14 不把状态耦合作为已证实根因。
 
-当前服务端仍存在结构性分散：角色基础成长、普通板、节点、Awake、bond token、任务事实、响应投影、`/load` 和存档分别在路由、数据层、任务 helper 和序列化代码中推导。静态审计已经确认：
+D14 实施前，服务端存在结构性分散：角色基础成长、普通板、节点、Awake、bond token、任务事实、响应投影、`/load` 和存档分别在路由、数据层、任务 helper 和序列化代码中推导。静态审计当时确认：
 
 1. bond token 查询未稳定排序，部分业务按数组下标识别板；
 2. `open_mana_board` 先提交板索引与 token，之后才结算任务，可能半提交；
@@ -22,7 +22,7 @@ CN 1.8.1 客户端把普通一版、普通二版和 CharacterAwake 视为共享�
 4. v2 存档没有按角色 Content 校验普通板、Awake 和 token 的业务范围；
 5. 相同成长不变量在路由、任务、存档和响应层存在重复实现，后续继续补丁会扩大状态漂移风险。
 
-D14 不再先交付小型方案 A。它直接建立统一角色成长应用服务，并在 C1-C6 阶段中迁移全部目标调用点、删除旧实现；只有全部阶段完成后才形成本文定义的可交付架构。
+D14 没有先交付小型方案 A，而是直接建立统一角色成长应用服务，并在 C1-C6 阶段中迁移全部目标调用点、删除旧实现。当前服务端已经形成本文定义的架构；实机验收仍不能由自动测试替代。
 
 ## 2. 客户端权威事实
 
@@ -538,9 +538,7 @@ projector 不访问数据库。`result.after`、事务提交后的 DB、端点�
 
 C1-C6 必须顺序迁移并保持每个阶段可验证；具体执行与验证编排只记录在版本库外实施计划与执行账本中，不进入本架构契约。
 
-## 19. 规模与完成标准
-
-客户端不可达场景不再扩写为过量集成测试后，预计生产代码变更约 2,500-4,500 行，测试与基础设施约 2,500-4,500 行，文档约 500-1,000 行，总 diff 约 6,000-10,000 行；如果真实调用面扩大，必须报告并重新确认范围，不能用测试删减掩盖生产复杂度。
+## 19. 完成标准
 
 D14 只有同时满足以下条件才完成：
 
@@ -559,19 +557,23 @@ D14 只有同时满足以下条件才完成：
 - 与变更范围相称的自动验证证明类型、文档、事务、协议、性能和客户端可达流程满足本文合同；
 - 明确标注服务端自动 Gate 不替代 CN 客户端实机验收。
 
-## 20. 主要现状证据路径
+## 20. 当前实现与验证证据
+
+D14 已完成 C1-C6 迁移，没有保留方案 A facade 或 Growth 双写。唯一一次变更范围 broad 运行得到 `490 passed / 11 failed / 0 skipped`；11 个失败均为并发 timeout 或迁移后旧 fixture、职责门禁与性能快照漂移，随后逐个 direct leaf 关闭，并顺序通过 6 个对应 focused group（合计 `145/145`）。该 Gate 没有为了获得表面全绿而重跑 broad。
+
+最终修复波另通过角色成长 command/transaction/context、单人与联机投影和性能基线、类型、文档、仓库卫生与差异检查。自动证据确认状态所有权、事务、增量投影、load/save 和 SQL 结构合同；它不替代 CN 客户端对两种成长顺序、bond token 显示、失败恢复和历史 C2265 场景的实机验收。
 
 | 事实 | 路径 |
 |---|---|
-| 当前角色基础与路由入口 | `src/routes/api/character.ts`、`src/routes/api/character/` |
-| 当前 bond 与开板 | `src/routes/api/character/bond.ts` |
-| 当前普通/Awake 节点 | `src/routes/api/character/mana.ts`、`src/routes/api/character/mana-awake.ts` |
-| 当前 Mana planner | `src/lib/character-mana-mutation-plan.ts`、`src/lib/character-mana-mutation-validation.ts` |
-| 当前 Growth 数据读取 | `src/data/domains/character.ts`、`src/data/domains/character_awake.ts` |
-| 当前 Awake reconciliation | `src/lib/mission/awake-unlock.ts`、`src/lib/mission/awake-unlock-response.ts` |
-| 当前 request context | `src/lib/mission/awake-request-context.ts` |
-| 当前 mission transaction | `src/lib/mission/settlement.ts` |
-| 当前 load 投影 | `src/data/utils/serialize-player.ts`、`src/data/utils/player-data.ts` |
-| 当前 v2 save | `src/data/player-save/v2.ts`、`src/data/utils/deserialize-player.ts` |
-| 当前外部 owner 证据 | `tools/awake_reconcile_callsite_matrix.test.cjs`、`tools/perf/awake_owner_focused_baseline.test.cjs` |
-| 当前性能与事务证据 | `tools/character_growth_transaction.test.cjs`、`tools/character_mana_batch_writes.test.cjs`、`tools/perf/awake_request_context_admission.test.cjs`、`tools/mission_regular_session_scope.test.cjs` |
+| 领域模型、不变量与错误 | `src/lib/character-growth/model.ts`、`invariants.ts`、`errors.ts` |
+| 单角色与批量读取边界 | `src/lib/character-growth/request-context.ts`、`batch-context.ts`、`repository.ts` |
+| bond、开板与节点 commands | `src/lib/character-growth/commands/receive-bond-token.ts`、`open-mana-board.ts`、`learn-mana-nodes.ts`、`awake-mana-nodes.ts` |
+| EXP、stack 与突破 commands | `src/lib/character-growth/commands/inject-exp.ts`、`grant-character-exp.ts`、`grant-character-stack.ts`、`stack-to-exp.ts`、`bulk-stack-to-exp.ts`、`over-limit.ts`、`bulk-over-limit.ts` |
+| HTTP adapter | `src/routes/api/character.ts`、`src/routes/api/character/`、`src/routes/api/expod.ts` |
+| 外部 owner 与 Awake 单调发布 | `src/lib/character-growth/owner-publication.ts`、`facts/awake-unlock-facts.ts`、`facts/mission-growth-facts.ts` |
+| 增量响应与客户端合并 | `src/lib/character-growth/response-projector.ts`、`tools/character_growth_response_projector.test.cjs`、`tools/character_growth_client_merge.test.cjs` |
+| `/load` 完整投影 | `src/lib/character-growth/load-projector.ts`、`src/data/utils/serialize-player.ts` |
+| v2 save 投影与终态校验 | `src/lib/character-growth/save/project-growth-state.ts`、`validate-growth-state.ts`、`src/data/player-save/v2.ts` |
+| 两种可达成长顺序 | `tools/character_growth_lavu_orderings.test.cjs`、`tools/character_growth_gate_acceptance.test.cjs` |
+| owner 与事务边界 | `tools/awake_reconcile_callsite_matrix.test.cjs`、`tools/character_growth_owner_transactions.test.cjs`、`tools/character_growth_transaction.test.cjs` |
+| SQL 与性能 admission | `tools/perf/character_growth_context_admission.test.cjs`、`tools/perf/awake_owner_focused_baseline.test.cjs`、`tools/perf/single_battle_settlement_baseline.test.cjs`、`tools/perf/multi_settlement_baseline.test.cjs` |

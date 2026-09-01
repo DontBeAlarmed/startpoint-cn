@@ -1,7 +1,7 @@
 // Handles the insertion of mana into characters.
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getPlayerCharacterSync, getPlayerCharactersSync, updatePlayerCharacterSync } from "../../data/domains/character"
+import { getPlayerCharacterSync, updatePlayerCharacterSync } from "../../data/domains/character"
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { generateDataHeaders } from "../../utils";
@@ -234,9 +234,8 @@ const routes = async (fastify: FastifyInstance) => {
 
         try {
             const result = executeBulkOverLimit({ playerId, evaluationTime: getRealNow() })
-            const characters = getPlayerCharactersSync(playerId)
             const characterList = result.characters.map(character => {
-                const written = characters[String(character.characterId)]!
+                const written = result.projectionCharacters[String(character.characterId)]!
                 return projectCharacterGrowthIncrement(
                     { after: character, changedNodeIds: [] },
                     { character: written, fields: OVER_LIMIT_CHARACTER_GROWTH_FIELDS },

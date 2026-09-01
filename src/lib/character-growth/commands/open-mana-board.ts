@@ -55,13 +55,13 @@ function observed(
 
 function validateCommand(command: OpenManaBoardCommand): void {
     if (!Number.isSafeInteger(command.playerId) || command.playerId <= 0) {
-        throw growthError("INVALID_GROWTH_STATE", "playerId must be a positive safe integer.")
+        throw growthError("INVALID_REQUEST", "playerId must be a positive safe integer.")
     }
     if (!Number.isSafeInteger(command.characterId) || command.characterId <= 0) {
-        throw growthError("INVALID_GROWTH_STATE", "characterId must be a positive safe integer.")
+        throw growthError("INVALID_REQUEST", "characterId must be a positive safe integer.")
     }
     if (!Number.isSafeInteger(command.targetBoardIndex) || command.targetBoardIndex <= 0) {
-        throw growthError("INVALID_GROWTH_STATE", "targetBoardIndex must be a positive safe integer.")
+        throw growthError("INVALID_REQUEST", "targetBoardIndex must be a positive safe integer.")
     }
     if (!(command.evaluationTime instanceof Date) || !Number.isFinite(command.evaluationTime.getTime())) {
         throw growthError("INVALID_GROWTH_STATE", "evaluationTime must be a valid Date.")
@@ -73,7 +73,7 @@ function assertTargetBoard(command: OpenManaBoardCommand, character: CharacterGr
         throw growthError("BOARD_NOT_AVAILABLE", `board ${command.targetBoardIndex} is not available.`)
     }
     if (command.targetBoardIndex < character.manaBoardIndex) {
-        throw growthError("INVALID_GROWTH_STATE", "mana board cannot be downgraded.")
+        throw growthError("BOARD_NOT_AVAILABLE", "mana board cannot be downgraded.")
     }
     if (command.targetBoardIndex < 2) {
         throw growthError("BOARD_NOT_AVAILABLE", `board ${command.targetBoardIndex} is not available.`)
@@ -153,9 +153,6 @@ export function openManaBoard(command: OpenManaBoardCommand): OpenManaBoardResul
             )
         }
         const { character: characterData, storedGrowth } = storedCharacter
-        if (storedGrowth.protection !== 0 && storedGrowth.protection !== 1) {
-            throw growthError("INVALID_GROWTH_STATE", "character.protection must be 0 or 1.")
-        }
         const context = createCharacterGrowthRequestContext({
             playerId: command.playerId,
             characterId: command.characterId,

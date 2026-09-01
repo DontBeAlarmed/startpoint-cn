@@ -1,21 +1,23 @@
 import { getDb } from "../../../data/db"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
-import { getPlayerCharactersSync } from "../../../data/domains/character"
+import { getPlayerCharacterGrowthSeedsSync } from "../../../data/domains/character"
+import type { PlayerCharacterProjectionData } from "../../../data/types"
 import {
     getPlayerItemSync,
     recordPlayerCollectedItemWithinTransactionSync,
     setPlayerItemWithinTransactionSync,
 } from "../../../data/domains/item"
-import { getCharacterDataSync } from "../../assets"
 import { createCharacterGrowthBatchContext } from "../batch-context"
 import { growthError } from "../errors"
 import {
     CHARACTER_STACK_CONVERSION_EXP,
     CHARACTER_STACK_CONVERSION_ITEM,
     STACK_CONVERSION_REWARD_ITEM_ID,
+    characterMaxOverLimits,
 } from "../limits"
 import {
     addSafeInteger,
+    characterGrowthStoredCoreFromRaw,
     observedCore,
     updateCharacterGrowthRowsSync,
     validateEvaluationTime,
@@ -33,7 +35,9 @@ export interface BulkStackToExpResult {
     readonly addExp: number
     readonly addStarGrain: number
     readonly expPool: number
+    readonly expPooledTime: Date
     readonly itemCount: number
+    readonly projectionCharacters: Readonly<Record<string, PlayerCharacterProjectionData>>
     readonly replayed: false
 }
 
@@ -43,21 +47,22 @@ export function executeBulkStackToExp(command: BulkStackToExpCommand): BulkStack
     return getDb().transaction(() => {
         const player = getPlayerSync(command.playerId)
         if (player === null) throw growthError("INVALID_GROWTH_STATE", "player is unavailable.")
-        const storedCharacters = getPlayerCharactersSync(command.playerId)
-        const characterIds = Object.keys(storedCharacters).map(Number)
+        const seeds = getPlayerCharacterGrowthSeedsSync(command.playerId)
+        const characterIds = Object.keys(seeds).map(Number)
         const context = createCharacterGrowthBatchContext({
             playerId: command.playerId,
             characterIds,
+            storedCharactersSnapshot: Object.fromEntries(Object.entries(seeds).map(([id, seed]) => [
+                id,
+                characterGrowthStoredCoreFromRaw(seed.storedGrowth),
+            ])),
         })
         const selected: ReturnType<typeof observedCore>[] = []
         let addExp = 0
         let addStarGrain = 0
         for (const character of context.characters().values()) {
-            const asset = getCharacterDataSync(character.characterId)
-            const maxOverLimit = asset === null ? undefined : ({
-                1: 12, 2: 10, 3: 8, 4: 6, 5: 4,
-            } as Record<number, number>)[asset.rarity]
-            if (asset === null || maxOverLimit === undefined
+            const maxOverLimit = characterMaxOverLimits[character.rarity]
+            if (maxOverLimit === undefined
                 || character.protection || character.stack <= 0
                 || character.overLimitStep < maxOverLimit) continue
             const expPerStack = CHARACTER_STACK_CONVERSION_EXP[character.rarity]
@@ -73,7 +78,7 @@ export function executeBulkStackToExp(command: BulkStackToExpCommand): BulkStack
         const existingItem = getPlayerItemSync(command.playerId, STACK_CONVERSION_REWARD_ITEM_ID)
         const currentItem = existingItem ?? 0
         const afterItem = addSafeInteger(currentItem, addStarGrain, "item.amount")
-        updateCharacterGrowthRowsSync(command.playerId, selected.map(character => ({
+        const updateTime = updateCharacterGrowthRowsSync(command.playerId, selected.map(character => ({
             characterId: character.characterId,
             stack: 0,
         })))
@@ -97,7 +102,15 @@ export function executeBulkStackToExp(command: BulkStackToExpCommand): BulkStack
             addExp,
             addStarGrain,
             expPool: afterPool,
+            expPooledTime: player.expPooledTime,
             itemCount: afterItem,
+            projectionCharacters: Object.fromEntries(selected.map(character => {
+                const projection = seeds[String(character.characterId)]?.projection
+                if (projection === undefined || updateTime === null) {
+                    throw growthError("INVALID_GROWTH_STATE", "bulk Growth projection metadata is unavailable.")
+                }
+                return [String(character.characterId), { ...projection, updateTime }]
+            })),
             replayed: false,
         } as BulkStackToExpResult
     })()
