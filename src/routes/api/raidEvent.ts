@@ -33,7 +33,7 @@ import {
     getRaidSummaryMissionId,
     recordRaidSummaryMissionFactSync,
 } from "../../lib/mission/event-entry-facts";
-import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context";
+import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { getAwakeFactKeysFromLegacyRewardResults } from "../../lib/mission/awake-reward-facts";
 import { settleMissionCategories, type MissionSettlementResult } from "../../lib/mission/settlement";
 import { mergeMissionSettlementResponse } from "../../lib/mission/response";
@@ -148,7 +148,7 @@ const routes = async (fastify: FastifyInstance) => {
         const rewardCharacterList = (rewardResult?.character_list ?? []) as Record<string, unknown>[]
         const characterList = rewardResult === undefined
             ? undefined
-            : publishAwakeCharacterListBestEffort(
+            : publishCharacterGrowthOwnerStateBestEffort(
                 playerId,
                 [],
                 [rewardCharacterList],
@@ -157,7 +157,8 @@ const routes = async (fastify: FastifyInstance) => {
                         rewardResult,
                     ),
                 },
-            )
+                "raid-event/summary",
+            ).characterList
         const questList = Object.fromEntries(Object.entries(summary.questCounts).map(([questId, killCount]) => [
             questId,
             { kill_count: killCount },

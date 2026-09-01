@@ -32,19 +32,19 @@ const OWNER_CONTRACTS = Object.freeze({
     "single-finish": Object.freeze({
         owner: "single/finish",
         boundary: "best-effort-in-tx",
-        observation: wrapperObservation([1], [1], ["passState:3", "player"]),
+        observation: wrapperObservation([1], [1], ["passState:3", "player"], [11, 12, 13, 14]),
     }),
     "multi-finish": Object.freeze({
         owner: "multi/finish",
         boundary: "best-effort-in-tx",
-        observation: contextObservation("best-effort-context", [1], [
+        observation: wrapperObservation([1], [1], [
             "collectedItems:100000", "items", "passState:3", "player",
-        ]),
+        ], [11, 12, 13, 14]),
     }),
     "active-mission-receive": Object.freeze({
         owner: "active_mission/receive",
         boundary: "best-effort-in-tx",
-        observation: contextObservation("best-effort-context", [], ["player"]),
+        observation: wrapperObservation([], [], ["player"]),
     }),
     "box-gacha-exec": Object.freeze({
         owner: "box_gacha/exec",
@@ -59,7 +59,7 @@ const OWNER_CONTRACTS = Object.freeze({
     "bond-success": Object.freeze({
         owner: "character/receive_bond_token",
         boundary: "best-effort-in-tx",
-        observation: contextObservation("best-effort-context", [263002]),
+        observation: wrapperObservation([263002], [263002]),
     }),
     "learn-mana-final-node": Object.freeze({
         owner: "character/learn_mana_node",
@@ -89,12 +89,12 @@ const OWNER_CONTRACTS = Object.freeze({
     "mail-receive": Object.freeze({
         owner: "mail/receive",
         boundary: "best-effort-in-tx",
-        observation: contextObservation("best-effort-context", [], ["player"]),
+        observation: wrapperObservation([], [], ["player"]),
     }),
     "mail-receive-all": Object.freeze({
         owner: "mail/receive_all",
         boundary: "best-effort-in-tx",
-        observation: contextObservation("best-effort-context", [], ["player"]),
+        observation: wrapperObservation([], [], ["player"]),
     }),
     "category9-update-progress": Object.freeze({
         owner: "mission/update_mission_progress",
@@ -124,17 +124,17 @@ const OWNER_CONTRACTS = Object.freeze({
     "story-finish": Object.freeze({
         owner: "story_quest/finish",
         boundary: "best-effort-in-tx",
-        observation: contextObservation("best-effort-context", [], ["questProgress:3"]),
+        observation: wrapperObservation([], [], ["questProgress:3"]),
     }),
     "tutorial-step-15": Object.freeze({
         owner: "tutorial/update_step:15",
         boundary: "best-effort-in-tx",
-        observation: contextObservation("best-effort-context", [251001]),
+        observation: wrapperObservation([251001], [251001]),
     }),
     "tutorial-step-16": Object.freeze({
         owner: "tutorial/update_step:16",
         boundary: "best-effort-in-tx",
-        observation: contextObservation("best-effort-context", [243001]),
+        observation: wrapperObservation([243001], [243001]),
     }),
 })
 

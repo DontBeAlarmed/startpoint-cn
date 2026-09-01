@@ -20,6 +20,9 @@ const {
 const {
     getAwakeFactKeysFromLegacyRewardResults,
 } = require("../src/lib/mission/awake-reward-facts")
+const {
+    publishCharacterGrowthOwnerStateBestEffort,
+} = require("../src/lib/character-growth/owner-publication")
 
 const PASS_CARD_EVENT_ID = 3
 const PASS_CARD_REWARD_ID = 124
@@ -270,6 +273,27 @@ test("multi orchestration publishes player invalidation in a runnable settlement
     assertAwakePublished(playerId, result.characterList)
 })
 
+test("owner publication normalizes string character ids from client-shaped reward lists", async () => {
+    const { playerId } = await fixture.createPlayer("string-character-id")
+    fixture.prepareForManaUnlock(playerId, AWAKE_MANA_THRESHOLD)
+
+    const result = publishCharacterGrowthOwnerStateBestEffort(
+        playerId,
+        [],
+        [[{ character_id: String(AWAKE_CHARACTER_ID) }]],
+        { invalidatedFactKeys: [{ kind: "player" }] },
+        "client-shaped-reward",
+    )
+
+    assert.deepEqual(result.growthFacts[0].candidateCharacterIds, [AWAKE_CHARACTER_ID])
+    assert.deepEqual(fixture.awakeUnlock(playerId), { 1: 1 })
+    assert.deepEqual(
+        result.characterList.find(entry => String(entry.character_id) === String(AWAKE_CHARACTER_ID))
+            ?.mana_board_awake,
+        { 1: 1 },
+    )
+})
+
 test("pass-card receive_all publishes a Mana Awake unlock after committing its reward record", async () => {
     const { playerId, viewerId } = await fixture.createPlayer("pass-card")
     fixture.prepareForManaUnlock(playerId, AWAKE_MANA_THRESHOLD - PASS_CARD_MANA_REWARD)
@@ -329,7 +353,7 @@ test("pass-card publication failure preserves the committed reward and original 
     assert.equal(result.body.data.user_info.free_mana, fixture.playerDomain.getPlayerSync(playerId).freeMana)
     assert.equal(fixture.awakeUnlock(playerId), undefined)
     assert.equal(errors.length, 1)
-    assert.match(String(errors[0][0]), /Failed to publish character unlocks/)
+    assert.match(String(errors[0][0]), /Failed to publish owner state/)
     const publicationError = errors[0][1]
     assert.ok(publicationError instanceof Error)
     assert.match(publicationError.message, new RegExp(triggerName))
@@ -391,7 +415,7 @@ test("raid summary publication failure preserves the committed cursor and origin
     assert.deepEqual(result.body.data.character_list, [])
     assert.equal(fixture.awakeUnlock(playerId), undefined)
     assert.equal(errors.length, 1)
-    assert.match(String(errors[0][0]), /Failed to publish character unlocks/)
+    assert.match(String(errors[0][0]), /Failed to publish owner state/)
     const publicationError = errors[0][1]
     assert.ok(publicationError instanceof Error)
     assert.match(publicationError.message, new RegExp(triggerName))

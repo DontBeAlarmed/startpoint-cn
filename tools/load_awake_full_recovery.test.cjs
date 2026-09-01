@@ -183,7 +183,7 @@ test.after(() => {
     else process.env.WDFP_DATABASE_DIR = previousDatabaseDirectory
 })
 
-test("load uses an independent full recovery context for missions, stages, and stale unlock cleanup", () => {
+test("load uses an independent full recovery context without deleting permanent unlocks", () => {
     const playerId = createPlayer()
     makeReadyCharacter(playerId, 341005)
     insertDefaultPlayerCharacterSync(playerId, 311002)
@@ -200,7 +200,7 @@ test("load uses an independent full recovery context for missions, stages, and s
         stage: 1,
         received: true,
     })
-    assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has("311002"), false)
+    assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has("311002"), true)
     assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has("341005"), false)
     assert.equal(Object.keys(getPlayerCharactersSync(playerId)).length, 3)
 

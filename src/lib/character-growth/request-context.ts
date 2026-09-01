@@ -2,7 +2,10 @@ import { getCharacterDataSync } from "../assets"
 import { getCharacterGrowthContentFactsSync } from "./content-facts"
 import { CharacterGrowthError, growthError } from "./errors"
 import { validateAwakeLevel, validateBondTokenStatus, validateBoardIndex } from "./invariants"
-import { CharacterGrowthRepository } from "./repository"
+import {
+    CharacterGrowthRepository,
+    validateCharacterGrowthStoredCore,
+} from "./repository"
 import type {
     BondTokenStatus,
     CharacterGrowthContentFacts,
@@ -25,6 +28,8 @@ export interface CharacterGrowthRequestContextOptions {
     readonly repository?: CharacterGrowthRepository
     readonly contentFactsLoader?: (characterId: number) => CharacterGrowthContentFacts
     readonly rarityLoader?: (characterId: number) => number | null
+    readonly storedCharacterSnapshot?: CharacterGrowthStoredCore
+    readonly bondTokenSnapshot?: ReadonlyMap<number, BondTokenStatus>
 }
 
 function positiveId(value: number, field: string): number {
@@ -97,6 +102,19 @@ export class CharacterGrowthRequestContextImpl implements CharacterGrowthRequest
         this.repository = options.repository ?? new CharacterGrowthRepository()
         this.contentFactsLoader = options.contentFactsLoader ?? getCharacterGrowthContentFactsSync
         this.rarityLoader = options.rarityLoader ?? defaultRarityLoader
+        if (options.storedCharacterSnapshot !== undefined) {
+            if (options.storedCharacterSnapshot.characterId !== this.characterId) {
+                throw growthError("INVALID_GROWTH_STATE", "character snapshot identity mismatch.")
+            }
+            this.cachedCharacter = buildCore(
+                validateCharacterGrowthStoredCore(options.storedCharacterSnapshot),
+                this.playerId,
+                this.rarityLoader,
+            )
+        }
+        if (options.bondTokenSnapshot !== undefined) {
+            this.cachedBondTokens = validateTokenMap(new Map(options.bondTokenSnapshot))
+        }
     }
 
     character(): CharacterGrowthCoreFact {

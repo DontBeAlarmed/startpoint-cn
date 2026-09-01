@@ -12,11 +12,9 @@ import { givePlayerRewardSync } from "../../lib/quest";
 import {
     mergeMissionSettlementResponse,
     reconcileActiveMissionFacts,
-    reconcileAwakeUnlockCharacterListBestEffort,
 } from "../../lib/mission";
 import { settleCharacterStoryFactMissions } from "../../lib/mission/story-fact-settlement";
-import { collectAwakeCandidateCharacterIds } from "../../lib/mission/awake-candidate-character-ids";
-import { createAwakeRequestContextBestEffort } from "../../lib/mission/awake-best-effort-context";
+import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { getQuestJoinCharacterIds } from "../../lib/story-join-character";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { getContentSnapshot } from "../../content/runtime/content-snapshot";
@@ -113,13 +111,10 @@ function processStoryQuestFinish(
             repository: getContentSnapshot().repository,
             now: evaluationTime.getTime(),
         })
-        const candidateCharacterIds = collectAwakeCandidateCharacterIds(
+        const characterList = publishCharacterGrowthOwnerStateBestEffort(
+            playerId,
             storyCandidateCharacterIds,
             [existingCharacterList],
-        )
-        const awakeContext = createAwakeRequestContextBestEffort(
-            playerId,
-            candidateCharacterIds,
             {
                 invalidatedFactKeys: [
                     ...getAwakeFactKeysFromLegacyRewardResults(rewardResult),
@@ -128,14 +123,9 @@ function processStoryQuestFinish(
                         : []),
                 ],
             },
-        )
-        const characterList = awakeContext === null
-            ? existingCharacterList
-            : reconcileAwakeUnlockCharacterListBestEffort(
-                playerId,
-                existingCharacterList,
-                { context: awakeContext },
-            )
+            "story/finish",
+            evaluationTime,
+        ).characterList
         const responseData: Record<string, unknown> = {
             user_info: {
                 free_vmoney: playerAfter.freeVmoney,

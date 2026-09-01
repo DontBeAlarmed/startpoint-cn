@@ -421,6 +421,8 @@ const TEST_GROUPS = Object.freeze({
             "tools/character_awake_unlock.test.cjs",
             "tools/awake_fact_scope.test.cjs",
             "tools/awake_owner_fact_publication.test.cjs",
+            "tools/character_growth_owner_publication.test.cjs",
+            "tools/character_growth_owner_transactions.test.cjs",
             "tools/awake_request_context.test.cjs",
             "tools/awake_reconcile_callsite_matrix.test.cjs",
             "tools/load_awake_full_recovery.test.cjs",

@@ -402,7 +402,7 @@ test("current owner-focused evidence exactly matches the checked snapshot", asyn
     assert.equal(report.scenarios["single-finish"].freshPostWriteEvaluationRequired, true)
     assert.equal(report.scenarios["single-finish"].response.category9Evaluations, 2)
     assert.deepEqual(report.scenarios["single-finish"].factSeeds, ["passState:3", "player"])
-    assert.deepEqual(report.scenarios["single-finish"].directMissionSeeds, [])
+    assert.deepEqual(report.scenarios["single-finish"].directMissionSeeds, [11, 12, 13, 14])
     assert.equal(
         Object.hasOwn(
             AWAKE_OWNER_RUNTIME_EVIDENCE_REGISTRY["single-finish"].seedContract,

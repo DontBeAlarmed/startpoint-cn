@@ -285,7 +285,7 @@ test("identity mismatch and incomplete forged context fail closed", () => {
     )
 })
 
-test("candidate zero keeps cleanup semantics while one and many stay scoped", () => {
+test("candidate zero preserves permanent unlocks while one and many stay scoped", () => {
     const playerId = createPlayer("candidate-cardinality", [CHARACTER_A, CHARACTER_B])
     const characterAAsset = characterAssets.getCharacterDataSync(CHARACTER_A)
     characterDomain.updatePlayerCharacterSync(
@@ -309,7 +309,7 @@ test("candidate zero keeps cleanup semantics while one and many stay scoped", ()
         )
     ))
     assert.equal(counts.total > 0, true)
-    assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has(String(CHARACTER_A)), false)
+    assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has(String(CHARACTER_A)), true)
 
     const one = requestContextModule().createAwakeRequestContext({
         playerId,

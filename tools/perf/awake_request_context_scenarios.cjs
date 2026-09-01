@@ -27,7 +27,6 @@ function summarizeReconciliation(result) {
     return {
         all: summarizeUnlocks(result.all),
         changed: summarizeUnlocks(result.changed),
-        removed: summarizeUnlocks(result.removed),
     }
 }
 
@@ -169,7 +168,7 @@ function createAwakeRequestContextScenarios(runtime) {
             },
         },
         {
-            name: "empty-candidate-cleanup",
+            name: "empty-candidate-permanent-unlock",
             prepare() {
                 const playerId = prepareReadyFixture(runtime)
                 runtime.upsertPlayerCharacterAwakeUnlockSync(playerId, CHARACTER_ID, 1, 1)

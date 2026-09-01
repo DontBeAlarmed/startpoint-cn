@@ -1,20 +1,18 @@
 {
   "character/learn_mana_node": [
+    "after-publication:identifier:Number=1",
+    "after-publication:identifier:String=1",
     "after-publication:import:../../character-evolution#buildCharacterEvolutionResponse=1",
-    "after-publication:import:../request-context#createCharacterGrowthRequestContext=1",
     "after-publication:local-function:observed=2",
     "after-publication:member:[...plan.nodeUpdates]#map=1",
-    "after-publication:member:context#awakeUnlocks=1",
-    "after-publication:member:context#bondTokens=1",
-    "after-publication:member:context#normalManaNodes=1",
-    "after-publication:member:createCharacterGrowthRequestContext({ playerId: command.playerId, characterId: command.characterId, })#awakeUnlocks=1",
+    "after-publication:member:Object.entries(publication.all.get(String(command.characterId)) ?? {})#map=1",
+    "after-publication:member:Object#entries=1",
+    "after-publication:member:publication.all#get=1",
     "anchor-to-publication:call-result:member:getDb()#transaction=1",
     "anchor-to-publication:import:../../../data/domains/character#getPlayerCharacterSync=1",
     "anchor-to-publication:import:../../mission/awake-request-context#createAwakeRequestContext=1",
     "anchor-to-publication:import:../errors#growthError=1",
     "anchor-to-publication:local-function:observed=1",
-    "anchor-to-publication:member:context#awakeUnlocks=1",
-    "anchor-to-publication:member:context#bondTokens=1",
     "anchor-to-publication:member:getDb()#transaction=1",
     "anchor-to-publication:member:nextBondTokens#set=1",
     "before-anchor:import:../../../data/db#getDb=1",
@@ -41,9 +39,10 @@
     "before-anchor:import:../resource-plan#planCharacterGrowthResources=1",
     "before-anchor:local-function:validateCommand=1",
     "before-anchor:member:[...Object.keys(content.nodes).map(Number)]#every=1",
+    "before-anchor:member:context#awakeUnlocks=1",
     "before-anchor:member:context#bondTokens=1",
     "before-anchor:member:context#character=1",
-    "before-anchor:member:context#normalManaNodes=2",
+    "before-anchor:member:context#normalManaNodes=1",
     "before-anchor:member:context#requiredItems=1",
     "before-anchor:member:nextNodes#has=1",
     "before-anchor:member:Object.keys(content.nodes)#map=1",
@@ -53,7 +52,7 @@
     "before-anchor:member:resources.itemsBefore#has=1",
     "final-anchor:local-function:finalizeLearnManaAwakePublicationWrites=1",
     "inside-publication:import:../../character-helpers#buildCharacterListEntryFromGrowth=1",
-    "publication:import:../../mission/awake-unlock-response#reconcileAwakeUnlockCharacterListStrict=1"
+    "publication:import:../facts/awake-unlock-facts#publishAwakeUnlockCharacterListWithStateWithinTransaction=1"
   ],
   "single/finish": [
     "anchor-to-publication:import:./single-mission-publication#prepareSingleAwakePublication=1",
@@ -133,10 +132,9 @@
     "before-anchor:member:settlementTime#getTime=1",
     "before-anchor:parameter:operation=1",
     "final-anchor:local-function:finalizeSingleAwakePublicationWrites=1",
-    "publication:import:../../mission/awake-best-effort-context#publishAwakeCharacterListBestEffort=1"
+    "publication:import:../../character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "multi/finish": [
-    "anchor-to-publication:import:../../lib/mission/awake-best-effort-context#createAwakeRequestContextBestEffort=1",
     "anchor-to-publication:import:../../lib/mission/awake-candidate-character-ids#collectAwakeCandidateCharacterIds=1",
     "anchor-to-publication:import:../../lib/mission/awake-reward-facts#getAwakeFactKeysFromLegacyRewardResults=1",
     "before-anchor:import:../../content/runtime/table-access#getRuntimeContentTableSync=1",
@@ -180,7 +178,9 @@
     "before-anchor:member:Math#min=1",
     "before-anchor:member:settlementTime#getTime=1",
     "final-anchor:local-function:finalizeMultiAwakePublicationWrites=1",
-    "publication:import:../../lib/mission#reconcileAwakeUnlockCharacterListBestEffort=1"
+    "inside-publication:member:awakeMissionEvaluation?.evaluation.missions#map=1",
+    "inside-publication:member:awakeMissionEvaluation.evaluation.missions#map=1",
+    "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "active_mission/receive": [
     "after-publication:import:../../data/domains/mail#getPlayerMailCountSync=1",
@@ -195,9 +195,7 @@
     "after-publication:member:reply#status=1",
     "after-publication:member:resultByMission#values=1",
     "anchor-to-publication:call-result:member:getDb()#transaction=1",
-    "anchor-to-publication:expression:ParenthesizedExpression:(() => { const candidateCharacterIds = collectAwakeCandidateCharacterIds([], [existingCharacterList]) const awakeContext = createAwakeRequestContextBestEffort( playerId, candidateCharacterIds, { invalidatedFactKeys: granter.invalidatedFactKeys }, ) if (awakeContext === null) return existingCharacterList return reconcileAwakeUnlockCharacterListBestEffort( playerId, existingCharacterList, { context: awakeContext }, ) })=1",
-    "anchor-to-publication:import:../../lib/mission/awake-best-effort-context#createAwakeRequestContextBestEffort=1",
-    "anchor-to-publication:import:../../lib/mission/awake-candidate-character-ids#collectAwakeCandidateCharacterIds=1",
+    "anchor-to-publication:expression:ParenthesizedExpression:(() => { return publishCharacterGrowthOwnerStateBestEffort( playerId, [], [existingCharacterList], { invalidatedFactKeys: granter.invalidatedFactKeys }, \"active-mission/receive\", new Date(getServerTime() * 1000), ).characterList })=1",
     "anchor-to-publication:member:getDb()#transaction=1",
     "before-anchor:identifier:isNaN=1",
     "before-anchor:import:../../content/runtime/content-snapshot#getContentSnapshot=1",
@@ -219,7 +217,8 @@
     "before-anchor:member:resultByMission#set=1",
     "before-anchor:member:viewerId#toString=1",
     "final-anchor:member:granter#persistPlayer=1",
-    "publication:import:../../lib/mission/index#reconcileAwakeUnlockCharacterListBestEffort=1"
+    "inside-publication:import:../../utils#getServerTime=1",
+    "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "box_gacha/exec": [
     "after-publication:import:../../lib/exp-pool-time#expPoolRealDateToClientTimestamp=1",
@@ -266,7 +265,7 @@
     "inside-final-anchor:member:playerDrawnRewards#map=1",
     "inside-final-anchor:member:playerDrawnRewards#reduce=1",
     "inside-publication:import:../../lib/mission/awake-reward-facts#getAwakeFactKeysFromLegacyRewardResults=1",
-    "publication:import:../../lib/mission/awake-best-effort-context#publishAwakeCharacterListBestEffort=1"
+    "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "character/add_character_from_town": [
     "after-publication:import:../../lib/mail-notification#getMailArrivedSync=1",
@@ -288,27 +287,25 @@
     "final-anchor:member:getDb()#transaction=1",
     "inside-final-anchor:import:../../lib/character#givePlayerCharacterSync=1",
     "inside-final-anchor:import:../../lib/story-join-character#canClaimTownStoryCharacter=1",
-    "publication:import:../../lib/mission/awake-best-effort-context#publishAwakeCharacterListBestEffort=1"
+    "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "character/receive_bond_token": [
-    "after-publication:import:../../../data/domains/player#getPlayerSync=1",
     "after-publication:import:../../../lib/character-helpers#sendCharacterResponse=1",
     "after-publication:import:../../../lib/mail-notification#getMailArrivedSync=1",
     "after-publication:local-function:sendGrowthError=1",
     "anchor-to-publication:call-result:member:getDb()#transaction=1",
     "anchor-to-publication:import:../../../data/domains/character#getPlayerCharacterSync=1",
     "anchor-to-publication:import:../../../lib/character-helpers#buildCharacterListEntry=1",
-    "anchor-to-publication:import:../../../lib/mission/awake-best-effort-context#createAwakeRequestContextBestEffort=1",
     "anchor-to-publication:member:getDb()#transaction=1",
     "before-anchor:import:../../../data/db#getDb=1",
-    "before-anchor:import:../../../lib/character-helpers#validateCharacterOwnership=1",
     "before-anchor:import:../../../lib/character-helpers#validateSessionAndPlayer=1",
     "before-anchor:local-function:isValidRequestBody=1",
     "before-anchor:member:reply.status(400)#send=1",
     "before-anchor:member:reply#status=1",
     "final-anchor-evaluation:import:../../../utils#getServerDate=1",
     "final-anchor:import:../../../lib/character-growth/commands/receive-bond-token#receiveBondToken=1",
-    "publication:import:../../../lib/mission/awake-unlock-response#reconcileAwakeUnlockCharacterListBestEffort=1"
+    "inside-publication:import:../../../utils#getServerDate=1",
+    "publication:import:../../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "exchange/star_crumb": [
     "after-publication:import:../../lib/mail-notification#getMailArrivedSync=1",
@@ -343,7 +340,7 @@
     "inside-final-anchor:import:../../lib/equipment#givePlayerEquipmentSync=1",
     "inside-final-anchor:member:characterList#push=1",
     "inside-final-anchor:member:equipmentList#push=1",
-    "publication:import:../../lib/mission/awake-best-effort-context#publishAwakeCharacterListBestEffort=1"
+    "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "gacha/exchange_character": [
     "after-publication:import:../../lib/mail-notification#getMailArrivedSync=1",
@@ -369,7 +366,7 @@
     "inside-final-anchor:import:../../data/domains/gacha#updatePlayerGachaInfoSync=1",
     "inside-final-anchor:import:../../data/domains/mail#insertReceiveHistorySync=1",
     "inside-final-anchor:import:../../lib/character#givePlayerCharacterSync=1",
-    "publication:import:../../lib/mission/awake-best-effort-context#publishAwakeCharacterListBestEffort=1"
+    "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "gacha/exec": [
     "after-publication:import:../../lib/mail-notification#getMailArrivedSync=2",
@@ -417,7 +414,7 @@
     "inside-final-anchor:import:../../lib/gacha#rewardPlayerGachaDrawResultSync=1",
     "inside-final-anchor:member:drawMetadata#map=1",
     "inside-final-anchor:member:gachaCampaigns#push=1",
-    "publication:import:../../lib/mission/awake-best-effort-context#publishAwakeCharacterListBestEffort=1"
+    "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "item/sell": [
     "after-publication:import:../../lib/mail-notification#getMailArrivedSync=1",
@@ -436,7 +433,7 @@
     "before-anchor:member:reply#status=3",
     "before-anchor:member:viewerId#toString=1",
     "final-anchor:import:../../lib/item-sell#sellItemSync=1",
-    "publication:import:../../lib/mission/awake-best-effort-context#publishAwakeCharacterListBestEffort=1"
+    "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "mail/receive": [
     "after-publication:import:../../data/domains/mail#getPlayerMailCountSync=2",
@@ -448,9 +445,6 @@
     "after-publication:member:reply#header=1",
     "after-publication:member:reply#status=2",
     "anchor-to-publication:call-result:member:getDb()#transaction=1",
-    "anchor-to-publication:import:../../lib/mission/awake-best-effort-context#createAwakeRequestContextBestEffort=1",
-    "anchor-to-publication:import:../../lib/mission/awake-candidate-character-ids#collectAwakeCandidateCharacterIds=1",
-    "anchor-to-publication:local-function:getMailAwakeInvalidatedFactKeys=1",
     "anchor-to-publication:member:getDb()#transaction=1",
     "before-anchor:identifier:isNaN=2",
     "before-anchor:import:../../data/activeAccount#resolvePlayerIdSync=1",
@@ -466,7 +460,9 @@
     "before-anchor:member:reply#status=3",
     "before-anchor:member:viewerId#toString=1",
     "final-anchor:local-function:finalizeMailReceiveAwakePublicationWrites=1",
-    "publication:import:../../lib/mission#reconcileAwakeUnlockCharacterListBestEffort=1"
+    "inside-publication:import:../../runtime/time/game-time#getVirtualNow=1",
+    "inside-publication:local-function:getMailAwakeInvalidatedFactKeys=1",
+    "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "mail/receive_all": [
     "after-publication:import:../../data/domains/mail#getPlayerMailCountSync=2",
@@ -477,9 +473,6 @@
     "after-publication:member:reply#header=1",
     "after-publication:member:reply#status=1",
     "anchor-to-publication:call-result:member:getDb()#transaction=1",
-    "anchor-to-publication:import:../../lib/mission/awake-best-effort-context#createAwakeRequestContextBestEffort=1",
-    "anchor-to-publication:import:../../lib/mission/awake-candidate-character-ids#collectAwakeCandidateCharacterIds=1",
-    "anchor-to-publication:local-function:getMailAwakeInvalidatedFactKeys=1",
     "anchor-to-publication:member:getDb()#transaction=1",
     "before-anchor:identifier:isNaN=1",
     "before-anchor:import:../../data/activeAccount#resolvePlayerIdSync=1",
@@ -504,7 +497,9 @@
     "before-anchor:member:validMails#map=1",
     "before-anchor:member:viewerId#toString=1",
     "final-anchor:local-function:finalizeMailReceiveAllAwakePublicationWrites=1",
-    "publication:import:../../lib/mission#reconcileAwakeUnlockCharacterListBestEffort=1"
+    "inside-publication:import:../../runtime/time/game-time#getVirtualNow=1",
+    "inside-publication:local-function:getMailAwakeInvalidatedFactKeys=1",
+    "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "mission/update_mission_progress": [
     "after-publication:import:../../data/domains/mail#getPlayerMailCountSync=1",
@@ -539,7 +534,7 @@
     "inside-final-anchor:member:awakeCandidateCharacterIds#push=1",
     "inside-final-anchor:member:missionIds#add=1",
     "inside-final-anchor:member:Number#isSafeInteger=1",
-    "publication:import:../../lib/mission/awake-best-effort-context#publishAwakeCharacterListBestEffort=1"
+    "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "pass_card/receive_all": [
     "after-publication:import:../../data/domains/mail#getPlayerMailCountSync=1",
@@ -573,7 +568,7 @@
     "inside-final-anchor:member:granter#grant=2",
     "inside-final-anchor:member:granter#persistPlayer=1",
     "inside-final-anchor:member:received#get=1",
-    "publication:import:../../lib/mission/awake-best-effort-context#publishAwakeCharacterListBestEffort=1"
+    "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "raid_event/summary": [
     "after-publication:import:../../data/utils#clientSerializeDate=1",
@@ -626,7 +621,7 @@
     "inside-final-anchor:member:console#warn=1",
     "inside-final-anchor:member:getDb()#transaction=1",
     "inside-publication:import:../../lib/mission/awake-reward-facts#getAwakeFactKeysFromLegacyRewardResults=1",
-    "publication:import:../../lib/mission/awake-best-effort-context#publishAwakeCharacterListBestEffort=1"
+    "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "shop/buy": [
     "after-publication:import:../../lib/mail-notification#getMailArrivedSync=1",
@@ -691,7 +686,8 @@
     "final-anchor-evaluation:member:getDb()#transaction=1",
     "final-anchor:import:../../lib/event-shop-purchase#executeGenericShopPurchaseSync=1",
     "inside-publication:import:../../lib/mission/awake-reward-facts#getAwakeFactKeysFromLegacyRewardResults=1",
-    "publication:import:../../lib/mission/awake-best-effort-context#publishAwakeCharacterListBestEffort=1"
+    "inside-publication:import:../../runtime/time/game-time#getVirtualNow=1",
+    "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "shop/bulk_buy": [
     "after-publication:import:../../lib/mail-notification#getMailArrivedSync=1",
@@ -728,15 +724,13 @@
     "final-anchor-evaluation:member:getDb()#transaction=1",
     "final-anchor:import:../../lib/event-shop-purchase#executeGenericShopBatchPurchaseSync=1",
     "inside-publication:import:../../lib/mission/awake-reward-facts#getAwakeFactKeysFromLegacyRewardResults=1",
-    "publication:import:../../lib/mission/awake-best-effort-context#publishAwakeCharacterListBestEffort=1"
+    "inside-publication:import:../../runtime/time/game-time#getVirtualNow=1",
+    "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "story_quest/finish": [
     "after-publication:import:../../lib/mail-notification#getMailArrivedSync=1",
     "after-publication:import:../../lib/mission#mergeMissionSettlementResponse=1",
     "anchor-to-publication:call-result:member:getDb()#transaction=1",
-    "anchor-to-publication:import:../../lib/mission/awake-best-effort-context#createAwakeRequestContextBestEffort=1",
-    "anchor-to-publication:import:../../lib/mission/awake-candidate-character-ids#collectAwakeCandidateCharacterIds=1",
-    "anchor-to-publication:import:../../lib/mission/awake-reward-facts#getAwakeFactKeysFromLegacyRewardResults=1",
     "anchor-to-publication:member:getDb()#transaction=1",
     "before-anchor:import:../../data/db#getDb=1",
     "before-anchor:import:../../data/domains/character#getPlayerCharacterSync=1",
@@ -757,15 +751,14 @@
     "final-anchor-evaluation:import:../../content/runtime/content-snapshot#getContentSnapshot=1",
     "final-anchor-evaluation:member:evaluationTime#getTime=1",
     "final-anchor:import:../../lib/mission#reconcileActiveMissionFacts=1",
-    "publication:import:../../lib/mission#reconcileAwakeUnlockCharacterListBestEffort=1"
+    "inside-publication:import:../../lib/mission/awake-reward-facts#getAwakeFactKeysFromLegacyRewardResults=1",
+    "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "tutorial/update_step:15": [
     "after-publication:import:../../data/domains/tutorial#upsertTutorialStepReceiptSync=1",
     "after-publication:import:../../lib/mail-notification#getMailArrivedSync=1",
     "after-publication:import:../../utils#getServerTime=1",
-    "anchor-to-publication:expression:ParenthesizedExpression:(() => { const candidateCharacterIds = collectAwakeCandidateCharacterIds( [randomCharacterId], [existingCharacterList], ) const awakeContext = createAwakeRequestContextBestEffort(playerId, candidateCharacterIds) if (awakeContext === null) return existingCharacterList return reconcileAwakeUnlockCharacterListBestEffort( playerId, existingCharacterList, { context: awakeContext, candidateCharacterIds }, ) })=1",
-    "anchor-to-publication:import:../../lib/mission/awake-best-effort-context#createAwakeRequestContextBestEffort=1",
-    "anchor-to-publication:import:../../lib/mission/awake-candidate-character-ids#collectAwakeCandidateCharacterIds=1",
+    "anchor-to-publication:expression:ParenthesizedExpression:(() => { return publishCharacterGrowthOwnerStateBestEffort( playerId, [randomCharacterId], [existingCharacterList], {}, \"tutorial/gacha\", getVirtualNow(), ).characterList })=1",
     "anchor-to-publication:member:Array#isArray=1",
     "anchor-to-publication:member:rewardResult.characters#filter=1",
     "before-anchor:import:../../data/domains/mail#insertReceiveHistorySync=1",
@@ -773,14 +766,13 @@
     "before-anchor:import:../../lib/reward-grant/owner-executor#executeRewardGrantPlanInTransactionOwnerInternalSync=1",
     "before-anchor:import:crypto#randomInt=1",
     "final-anchor:import:../../data/domains/player#updatePlayerSync=1",
-    "publication:import:../../lib/mission#reconcileAwakeUnlockCharacterListBestEffort=1"
+    "inside-publication:import:../../runtime/time/game-time#getVirtualNow=1",
+    "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "tutorial/update_step:16": [
     "after-publication:import:../../data/domains/tutorial#upsertTutorialStepReceiptSync=1",
     "after-publication:import:../../utils#getServerTime=1",
-    "anchor-to-publication:expression:ParenthesizedExpression:(() => { const candidateCharacterIds = collectAwakeCandidateCharacterIds( [freeTutorialCharacterId], [existingCharacterList], ) const awakeContext = createAwakeRequestContextBestEffort(playerId, candidateCharacterIds) if (awakeContext === null) return existingCharacterList return reconcileAwakeUnlockCharacterListBestEffort( playerId, existingCharacterList, { context: awakeContext, candidateCharacterIds }, ) })=1",
-    "anchor-to-publication:import:../../lib/mission/awake-best-effort-context#createAwakeRequestContextBestEffort=1",
-    "anchor-to-publication:import:../../lib/mission/awake-candidate-character-ids#collectAwakeCandidateCharacterIds=1",
+    "anchor-to-publication:expression:ParenthesizedExpression:(() => { return publishCharacterGrowthOwnerStateBestEffort( playerId, [freeTutorialCharacterId], [existingCharacterList], {}, \"tutorial/free-character\", getVirtualNow(), ).characterList })=1",
     "before-anchor:import:../../data/domains/mail#insertMailSync=1",
     "before-anchor:import:../../data/domains/mail#insertReceiveHistorySync=2",
     "before-anchor:import:../../lib/character#givePlayerCharacterSync=1",
@@ -789,6 +781,7 @@
     "before-anchor:member:getRealNow().toISOString()#replace=1",
     "before-anchor:member:getRealNow()#toISOString=1",
     "final-anchor:import:../../data/domains/player#updatePlayerSync=1",
-    "publication:import:../../lib/mission#reconcileAwakeUnlockCharacterListBestEffort=1"
+    "inside-publication:import:../../runtime/time/game-time#getVirtualNow=1",
+    "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ]
 }

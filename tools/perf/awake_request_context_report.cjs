@@ -8,7 +8,7 @@ const AWAKE_REQUEST_CONTEXT_FIXED_TIME = "2025-01-01T12:00:00.000Z"
 const AWAKE_REQUEST_CONTEXT_SCENARIO_KEYS = Object.freeze([
     "full-publication",
     "candidate-one",
-    "empty-candidate-cleanup",
+    "empty-candidate-permanent-unlock",
     "strict-failure-rollback",
     "best-effort-failure",
 ])

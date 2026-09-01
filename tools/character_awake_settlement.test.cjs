@@ -203,11 +203,8 @@ function testUnreceivedFinalStageRestoresMissingUnlock(playerId, progressList) {
         { mission_category_id: 9, mission_id: 3410054, mission_reward_id: 34100541 },
     ])
     assert.deepEqual(settlement.itemList, { 16: itemAmountBefore + 1 })
-    assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId).get("341005"), { 1: 1 })
-    assert.deepEqual(
-        settlement.characterList.find(entry => entry.character_id === 341005)?.mana_board_awake,
-        { 1: 1 }
-    )
+    assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has("341005"), false)
+    assert.equal(settlement.characterList.some(entry => entry.character_id === 341005), false)
 
     const repeatedSettlement = settleAwakeMissionRewards(playerId, progressList)
     assert.deepEqual(repeatedSettlement.missionInfo, [])
@@ -216,45 +213,14 @@ function testUnreceivedFinalStageRestoresMissingUnlock(playerId, progressList) {
     assert.equal(getPlayerItemSync(playerId, 16) ?? 0, itemAmountBefore + 1)
 }
 
-function testSpecialUnlockFailureRollsBackSettlement(playerId) {
+function testSpecialUnlockIsPublishedByGrowthOwner(playerId) {
     const missionId = 3410054
     const itemAmountBefore = getPlayerItemSync(playerId, 16) ?? 0
-    const originalUpsert = characterAwakeDomain.upsertPlayerCharacterAwakeUnlockSync
-    let reachedUnlockUpsert = false
+    const settlement = settleAwakeMissionRewards(playerId, [{ missionId, progress: 3 }])
 
-    characterAwakeDomain.upsertPlayerCharacterAwakeUnlockSync = (...args) => {
-        reachedUnlockUpsert = true
-        const inTransactionMission = getPlayerCategoryMissionsSync(playerId, 9)[missionId]
-        assert.equal(inTransactionMission.progress, 3)
-        assert.equal(inTransactionMission.stages[1], true)
-        assert.equal(getPlayerItemSync(playerId, 16), itemAmountBefore + 1)
-        assert.equal(originalUpsert(...args), true)
-        assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId).get("341005"), { 1: 1 })
-        throw new Error("injected awake unlock upsert failure")
-    }
-
-    try {
-        assert.throws(
-            () => settleAwakeMissionRewards(playerId, [{ missionId, progress: 3 }]),
-            /injected awake unlock upsert failure/
-        )
-    } finally {
-        characterAwakeDomain.upsertPlayerCharacterAwakeUnlockSync = originalUpsert
-    }
-
-    assert.equal(reachedUnlockUpsert, true)
-    assert.equal(getPlayerItemSync(playerId, 16) ?? 0, itemAmountBefore)
-    assert.equal(db.prepare(`
-        SELECT COUNT(*) AS count
-        FROM players_category_missions
-        WHERE player_id = ? AND category = 9 AND id = ?
-    `).get(playerId, missionId).count, 0)
-    assert.equal(db.prepare(`
-        SELECT COUNT(*) AS count
-        FROM players_category_mission_stages
-        WHERE player_id = ? AND category = 9 AND mission_id = ?
-    `).get(playerId, missionId).count, 0)
+    assert.equal(getPlayerItemSync(playerId, 16) ?? 0, itemAmountBefore + 1)
     assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has("341005"), false)
+    assert.equal(settlement.characterList.some(entry => entry.character_id === 341005), false)
 }
 
 db.exec("BEGIN")
@@ -419,14 +385,14 @@ try {
     db.prepare("DELETE FROM players_category_mission_stages WHERE player_id = ? AND category = 9").run(faultPlayerId)
     db.prepare("DELETE FROM players_category_missions WHERE player_id = ? AND category = 9").run(faultPlayerId)
     db.prepare("DELETE FROM players_character_awake_unlocks WHERE player_id = ?").run(faultPlayerId)
-    testSpecialUnlockFailureRollsBackSettlement(faultPlayerId)
+    testSpecialUnlockIsPublishedByGrowthOwner(faultPlayerId)
 
     const missionRouteSource = fs.readFileSync(
         path.join(__dirname, "../src/routes/api/mission.ts"),
         "utf8"
     )
     const silentUpdateBlock = missionRouteSource.split('fastify.post("/update_mission_progress"')[1]
-    assert.equal(silentUpdateBlock.includes("publishAwakeCharacterListBestEffort"), true)
+    assert.equal(silentUpdateBlock.includes("publishCharacterGrowthOwnerStateBestEffort"), true)
     assert.equal(silentUpdateBlock.includes("settleAwakeMissionRewards"), false)
     assert.equal(silentUpdateBlock.includes("computeAwakeSummary"), false)
 

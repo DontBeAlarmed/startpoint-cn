@@ -195,8 +195,7 @@
                 ]
               ]
             ]
-          ],
-          "removed": []
+          ]
         },
         "second": {
           "all": [
@@ -210,13 +209,12 @@
               ]
             ]
           ],
-          "changed": [],
-          "removed": []
+          "changed": []
         }
       },
-      "behaviorSha256": "3ee3ee50e4a7d1372448eefa2e0d6b3d40b5d1d56b78f2ca9035b1f09cc2c8b1"
+      "behaviorSha256": "ef65f5aad39566a57621dc575dbc356e02b2766831cc16f935c43df2fd676d75"
     },
-    "empty-candidate-cleanup": {
+    "empty-candidate-permanent-unlock": {
       "sqlReads": 5,
       "sqlWrites": 0,
       "missionComputes": 0,
@@ -265,10 +263,9 @@
               ]
             ]
           ]
-        ],
-        "removed": []
+        ]
       },
-      "behaviorSha256": "2f79e9b7dee5fab9f9cff559bea6d80019e04520f4e2a85bacef3cf2ee173a71"
+      "behaviorSha256": "aa259ff6a58341c79e6acdba42b4959808c3300b1602d02f5c52de887c81ebec"
     },
     "strict-failure-rollback": {
       "sqlReads": 11,

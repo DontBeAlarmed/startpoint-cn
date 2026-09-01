@@ -439,10 +439,13 @@ test("current publication and reconcile baseline matches the checked snapshot", 
     )
     assert.deepEqual(report.scenarios["candidate-one"].behavior.second.changed, [])
     assert.deepEqual(
-        report.scenarios["empty-candidate-cleanup"].behavior.removed,
+        report.scenarios["empty-candidate-permanent-unlock"].behavior.changed,
         [],
     )
-    assert.deepEqual(report.scenarios["empty-candidate-cleanup"].behavior.finalUnlocks, [[341005, [[1, 1]]]])
+    assert.deepEqual(
+        report.scenarios["empty-candidate-permanent-unlock"].behavior.finalUnlocks,
+        [[341005, [[1, 1]]]],
+    )
     assert.deepEqual(report.scenarios["strict-failure-rollback"].behavior, {
         candidateUnlockPresent: false,
         errorCategory: "database-write-failure",

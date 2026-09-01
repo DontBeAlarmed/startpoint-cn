@@ -1,13 +1,9 @@
-import { getPlayerCharacterAwakeUnlocksSync, upsertPlayerCharacterAwakeUnlockSync } from "../../data/domains/character_awake"
-import type { CharacterAwakeUnlockMap } from "../../data/domains/character_awake"
 import { getPlayerCategoryMissionsSync } from "../../data/domains/mission"
 import { getDb } from "../../data/db"
 import { getCharacterIdFromMission } from "./character-queries"
 import { buildAwakeContext } from "./computer-awake"
 import { getComputer } from "./registry"
-import { getAwakeMissionRewardStageDefinition } from "./rewards"
-import { getCompletedStageNumbers, getMissionIdsByCategory } from "./stages"
-import { createCharacterAwakeEligibilityResolver } from "./awake-eligibility"
+import { getMissionIdsByCategory } from "./stages"
 import type { CharacterAwakeEligibilityResolver } from "./awake-eligibility"
 import {
     assertAwakeRequestContext,
@@ -15,18 +11,13 @@ import {
     isAwakeRequestContext,
     type AwakeRequestContext,
 } from "./awake-request-context"
-import { consumeAwakeRequestContextWrite } from "./awake-request-context-state"
+import {
+    reconcileAwakeUnlocksFromProgressCore as reconcileAwakeUnlocksFromProgressCoreInGrowth,
+    type AwakeUnlockProgress,
+    type AwakeUnlockReconciliationResult,
+} from "../character-growth/facts/awake-unlock-facts"
 
-export interface AwakeUnlockReconciliationResult {
-    all: CharacterAwakeUnlockMap
-    changed: CharacterAwakeUnlockMap
-    removed: CharacterAwakeUnlockMap
-}
-
-export interface AwakeUnlockProgress {
-    missionId: number
-    progress: number
-}
+export type { AwakeUnlockProgress, AwakeUnlockReconciliationResult }
 
 export function reconcileAwakeUnlocksFromProgressCore(
     playerId: number,
@@ -34,59 +25,12 @@ export function reconcileAwakeUnlocksFromProgressCore(
     resolver?: CharacterAwakeEligibilityResolver,
     context?: AwakeRequestContext,
 ): AwakeUnlockReconciliationResult {
-    if (context) {
-        assertAwakeRequestContext(context, playerId)
-        if (resolver && resolver !== context.resolver) {
-            throw new Error("Awake context resolver mismatch")
-        }
-        consumeAwakeRequestContextWrite(context, playerId, progressList)
-    }
-    const effectiveResolver = context?.resolver
-        ?? resolver
-        ?? createCharacterAwakeEligibilityResolver(playerId)
-    const contextUnlocks = context?.readUnlocks()
-    const changed: CharacterAwakeUnlockMap = new Map()
-    const removed: CharacterAwakeUnlockMap = new Map()
-
-    const unlocks = contextUnlocks ?? getPlayerCharacterAwakeUnlocksSync(playerId)
-    const nextUnlocks: CharacterAwakeUnlockMap = new Map(
-        [...unlocks].map(([characterId, levels]) => [characterId, { ...levels }]),
+    return reconcileAwakeUnlocksFromProgressCoreInGrowth(
+        playerId,
+        progressList,
+        resolver,
+        context,
     )
-    for (const entry of progressList) {
-        const characterId = getCharacterIdFromMission(entry.missionId)
-        if (!effectiveResolver.isNewUnlockEligible(Number(characterId), entry.missionId)) continue
-
-        for (const stage of getCompletedStageNumbers(9, entry.missionId, entry.progress)) {
-            const specialReward = getAwakeMissionRewardStageDefinition(entry.missionId, stage)?.specialReward
-            if (!specialReward || String(specialReward.characterId) !== characterId) continue
-            if (!upsertPlayerCharacterAwakeUnlockSync(
-                playerId,
-                specialReward.characterId,
-                specialReward.boardIndex,
-                specialReward.awakeLevel
-            )) continue
-
-            const levels = changed.get(characterId) ?? {}
-            levels[specialReward.boardIndex] = Math.max(
-                levels[specialReward.boardIndex] ?? 0,
-                specialReward.awakeLevel
-            )
-            changed.set(characterId, levels)
-
-            const allLevels = nextUnlocks.get(characterId) ?? {}
-            allLevels[specialReward.boardIndex] = Math.max(
-                allLevels[specialReward.boardIndex] ?? 0,
-                specialReward.awakeLevel,
-            )
-            nextUnlocks.set(characterId, allLevels)
-        }
-    }
-
-    return {
-        all: nextUnlocks,
-        changed,
-        removed,
-    }
 }
 
 export function reconcileAwakeUnlocksFromProgress(

@@ -11,7 +11,7 @@ import {
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { MissionRewardGranter } from "../../lib/mission/grants"
-import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context"
+import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication"
 import { getPassCardEventDefinition, getPassCardRewardDefinition, isPassCardEventActiveAt } from "../../lib/pass-card"
 import { generateDataHeaders, getServerTime } from "../../utils"
 
@@ -159,12 +159,13 @@ export default async function passCardRoutes(fastify: FastifyInstance): Promise<
             return granter
         })()
         const rewardCharacterList = result.characterList as Record<string, unknown>[]
-        const characterList = publishAwakeCharacterListBestEffort(
+        const characterList = publishCharacterGrowthOwnerStateBestEffort(
             playerId,
             [],
             [rewardCharacterList],
             { invalidatedFactKeys: result.invalidatedFactKeys },
-        )
+            "pass-card/receive_all",
+        ).characterList
 
         reply.header("content-type", "application/x-msgpack")
         return reply.send({

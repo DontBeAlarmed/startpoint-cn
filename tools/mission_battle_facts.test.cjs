@@ -224,7 +224,7 @@ const singleAwakeFinalization = singleBattleSource.indexOf(
     singleMissionEvaluationCall,
 )
 const singleAwakePublication = singleBattleSource.indexOf(
-    "publishAwakeCharacterListBestEffort(",
+    "publishCharacterGrowthOwnerStateBestEffort(",
     singleAwakeFinalization,
 )
 const singleGeneralMerge = singleProjectorSource.indexOf(
@@ -257,7 +257,7 @@ assert.equal(singleAwakePublication > singleAwakeFinalization, true, "单人 cha
 assert.equal(singleGeneralMerge >= 0 && singleAwakeMerge > singleGeneralMerge, true, "单人响应必须先合并通用结算再合并觉醒结算")
 assert.match(
     singleBattleSource,
-    /publishAwakeCharacterListBestEffort\(\s*playerId,\s*partyCharacterIds,[\s\S]*?awakePublication\.characterLists/,
+    /publishCharacterGrowthOwnerStateBestEffort\(\s*playerId,\s*partyCharacterIds,[\s\S]*?awakePublication\.characterLists/,
     "单人 character_list 必须在 reconcile 前包含觉醒奖励与解锁更新",
 )
 assert.match(
@@ -318,7 +318,7 @@ assert.equal(multiAwakeSettlement > multiSettlementTime, true, "多人觉醒 sea
 assert.equal(multiGeneralMerge >= 0 && multiAwakeMerge > multiGeneralMerge, true, "多人响应必须先合并通用结算再合并觉醒结算")
 assert.match(
     multiBattleSource,
-    /const existingCharacterList = \[[\s\S]*?awakeMissionSettlement\.characterList[\s\S]*?reconcileAwakeUnlockCharacterListBestEffort\(\s*input\.playerId,\s*existingCharacterList,/,
+    /const existingCharacterList = \[[\s\S]*?awakeMissionSettlement\.characterList[\s\S]*?publishCharacterGrowthOwnerStateBestEffort\(\s*input\.playerId,\s*candidateCharacterIds,\s*\[existingCharacterList\],/,
     "多人 character_list 必须在 reconcile 前包含觉醒奖励与解锁更新",
 )
 assert.equal(multiTransactionCall > multiFactCall, true, "任务事实必须在事务体执行后统一提交")

@@ -37,6 +37,9 @@ const {
     settleAwakeBattleMissions,
     settleAwakeMissionCandidatesWithEvaluation,
 } = require("../src/lib/mission/awake-settlement")
+const {
+    publishCharacterGrowthOwnerStateBestEffort,
+} = require("../src/lib/character-growth/owner-publication")
 const { getFactKeyId } = require("../src/lib/mission/facts/fact-key")
 
 initializeDatabase()
@@ -85,7 +88,7 @@ function expectedRewardBalances(before) {
     ]))
 }
 
-test("battle seam evaluates immutable Session results and returns rewards and unlock immediately", () => {
+test("battle seam evaluates immutable Session results and leaves Growth publication to the owner", () => {
     const playerId = createEligiblePlayer("awake-seam")
     const before = itemAmounts(playerId)
     const originalLegacyBuilder = AwakeComputer.buildContext
@@ -109,8 +112,21 @@ test("battle seam evaluates immutable Session results and returns rewards and un
         mission_reward_id: missionId * 10 + 1,
     })))
     assert.deepEqual(settlement.itemList, expectedRewardBalances(before))
+    assert.equal(
+        settlement.characterList.some(entry => entry.character_id === 341005),
+        false,
+    )
+    assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has("341005"), false)
+    const published = publishCharacterGrowthOwnerStateBestEffort(
+        playerId,
+        [341005],
+        [settlement.characterList],
+        { invalidatedFactKeys: [{ kind: "awakeEligibility" }] },
+        "mission-awake-test",
+        evaluationTime,
+    )
     assert.deepEqual(
-        settlement.characterList.find(entry => entry.character_id === 341005)?.mana_board_awake,
+        published.characterList.find(entry => entry.character_id === 341005)?.mana_board_awake,
         { 1: 1 },
     )
     assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId).get("341005"), { 1: 1 })
@@ -135,7 +151,7 @@ test("battle seam evaluates immutable Session results and returns rewards and un
     assert.deepEqual(itemAmounts(playerId), expectedRewardBalances(before))
 })
 
-test("special Awake unlock invalidates only awake eligibility when the upsert changes state", () => {
+test("special Awake reward invalidates Growth publication when a new stage is received", () => {
     const playerId = createEligiblePlayer("awake-unlock-invalidation")
     const result = settleAwakeMissionCandidatesWithEvaluation(
         playerId,
@@ -152,6 +168,21 @@ test("special Awake unlock invalidates only awake eligibility when the upsert ch
     assert.equal(new Set(invalidationIds).size, invalidationIds.length)
     assert.equal(Object.isFrozen(result.invalidatedFactKeys), true)
     assert.equal(result.invalidatedFactKeys.every(Object.isFrozen), true)
+    assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has("341005"), false)
+
+    const published = publishCharacterGrowthOwnerStateBestEffort(
+        playerId,
+        [341005],
+        [[]],
+        { invalidatedFactKeys: result.invalidatedFactKeys },
+        "mission-awake-test",
+        evaluationTime,
+    )
+    assert.deepEqual(
+        published.characterList.find(entry => entry.character_id === 341005)?.mana_board_awake,
+        { 1: 1 },
+    )
+    assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId).get("341005"), { 1: 1 })
 
     const repeated = settleAwakeMissionCandidatesWithEvaluation(
         playerId,
@@ -162,6 +193,48 @@ test("special Awake unlock invalidates only awake eligibility when the upsert ch
         repeated.invalidatedFactKeys.map(getFactKeyId).includes("awakeEligibility"),
         false,
     )
+})
+
+test("owner publication reuses a complete CN-reachable Awake evaluation", () => {
+    const playerId = createEligiblePlayer("awake-precomputed-publication")
+    const result = settleAwakeMissionCandidatesWithEvaluation(
+        playerId,
+        awakeMissionIds,
+        evaluationTime,
+    )
+    assert.ok(result)
+
+    const originalGetFact = MissionEvaluationSession.prototype.getFact
+    MissionEvaluationSession.prototype.getFact = () => {
+        throw new Error("complete owner evaluation must not recompute Mission facts")
+    }
+    try {
+        const published = publishCharacterGrowthOwnerStateBestEffort(
+            playerId,
+            [341005],
+            [result.settlement.characterList],
+            {
+                directMissionIds: awakeMissionIds,
+                evaluatedAwakeUnlocks: {
+                    progressList: result.evaluation.missions.map(mission => ({
+                        missionId: mission.missionId,
+                        progress: mission.finalProgress,
+                    })),
+                    resolver: result.resolver,
+                },
+            },
+            "mission-awake-precomputed-test",
+            evaluationTime,
+        )
+        assert.equal(published.missionSettlement, null)
+        assert.deepEqual(
+            published.characterList.find(entry => entry.character_id === 341005)?.mana_board_awake,
+            { 1: 1 },
+        )
+    } finally {
+        MissionEvaluationSession.prototype.getFact = originalGetFact
+    }
+    assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId).get("341005"), { 1: 1 })
 })
 
 for (const routeKind of ["single", "multi"]) {
@@ -178,7 +251,7 @@ for (const routeKind of ["single", "multi"]) {
                     evaluationTime,
                 })
                 assert.equal(settlement.missionInfo.length, 4)
-                assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId).get("341005"), { 1: 1 })
+                assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has("341005"), false)
                 throw new Error(`injected ${routeKind} finish failure`)
             })(),
             new RegExp(`injected ${routeKind} finish failure`),

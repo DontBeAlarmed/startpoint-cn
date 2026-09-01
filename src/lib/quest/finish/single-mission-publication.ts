@@ -51,6 +51,14 @@ export function settleSingleMissionEvaluations(input: {
     return {
         missionSettlement: missionEvaluation?.settlement ?? emptySettlement(),
         awakeMissionSettlement: awakeMissionEvaluation?.settlement ?? emptySettlement(),
+        awakeMissionIds: awakeMissionEvaluation?.evaluation.missions.map(mission => mission.missionId) ?? [],
+        evaluatedAwakeUnlocks: awakeMissionEvaluation === null ? undefined : {
+            progressList: awakeMissionEvaluation.evaluation.missions.map(mission => ({
+                missionId: mission.missionId,
+                progress: mission.finalProgress,
+            })),
+            resolver: awakeMissionEvaluation.resolver,
+        },
         activeMissionList: reconcileActiveMissionFacts({
             playerId: input.playerId,
             repository: getContentSnapshot().repository,
@@ -71,6 +79,11 @@ export function prepareSingleAwakePublication(input: {
     readonly questCategory: number
     readonly questAccomplished: boolean
     readonly questPreviouslyCompleted: boolean
+    readonly directAwakeMissionIds: readonly number[]
+    readonly evaluatedAwakeUnlocks?: {
+        readonly progressList: readonly { readonly missionId: number; readonly progress: number }[]
+        readonly resolver: import("../../mission/awake-eligibility").CharacterAwakeEligibilityResolver
+    }
 }) {
     const invalidatedFactKeys: FactKey[] = [
         ...input.invalidatedFactKeys,
@@ -82,5 +95,10 @@ export function prepareSingleAwakePublication(input: {
             ? [{ kind: "questProgress" as const, sections: [QuestCategory.CHARACTER] }]
             : []),
     ]
-    return { characterLists: input.characterLists, invalidatedFactKeys }
+    return {
+        characterLists: input.characterLists,
+        invalidatedFactKeys,
+        directMissionIds: input.directAwakeMissionIds,
+        evaluatedAwakeUnlocks: input.evaluatedAwakeUnlocks,
+    }
 }

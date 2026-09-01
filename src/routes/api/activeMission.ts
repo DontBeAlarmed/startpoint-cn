@@ -9,11 +9,9 @@ import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import {
-    reconcileAwakeUnlockCharacterListBestEffort,
     validateMissionRewardClaims,
 } from "../../lib/mission/index";
-import { collectAwakeCandidateCharacterIds } from "../../lib/mission/awake-candidate-character-ids";
-import { createAwakeRequestContextBestEffort } from "../../lib/mission/awake-best-effort-context";
+import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { MissionRewardGranter } from "../../lib/mission/grants";
 import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time";
@@ -84,18 +82,14 @@ const routes = async (fastify: FastifyInstance) => {
             const existingCharacterList = granter.characterList as unknown as Record<string, unknown>[]
             return validation.claims.length > 0
                 ? (() => {
-                    const candidateCharacterIds = collectAwakeCandidateCharacterIds([], [existingCharacterList])
-                    const awakeContext = createAwakeRequestContextBestEffort(
+                    return publishCharacterGrowthOwnerStateBestEffort(
                         playerId,
-                        candidateCharacterIds,
+                        [],
+                        [existingCharacterList],
                         { invalidatedFactKeys: granter.invalidatedFactKeys },
-                    )
-                    if (awakeContext === null) return existingCharacterList
-                    return reconcileAwakeUnlockCharacterListBestEffort(
-                        playerId,
-                        existingCharacterList,
-                        { context: awakeContext },
-                    )
+                        "active-mission/receive",
+                        new Date(getServerTime() * 1000),
+                    ).characterList
                 })()
                 : existingCharacterList
         })()

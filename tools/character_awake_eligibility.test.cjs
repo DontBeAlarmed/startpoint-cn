@@ -219,7 +219,7 @@ async function testEligibilityAndCleanup() {
     const published = reconcileCompletedProgress(eligible.playerId)
     assert.deepEqual(published.changed.get(String(characterId)), { 1: 1 })
     assert.deepEqual(published.all.get(String(characterId)), { 1: 1 })
-    assert.deepEqual(published.removed, new Map())
+    assert.equal("removed" in published, false)
 
     const invalidPersistedContract = createPlayer("awake-invalid-persisted-contract")
     learnBoardOne(invalidPersistedContract.playerId, boardOneNodeIds.slice(0, 1))
@@ -227,13 +227,13 @@ async function testEligibilityAndCleanup() {
         upsertPlayerCharacterAwakeUnlockSync(invalidPersistedContract.playerId, characterId, 1, 1),
         true,
     )
-    const removedUnlocks = reconcileAwakeUnlocksFromProgress(
+    const preservedUnlocks = reconcileAwakeUnlocksFromProgress(
         invalidPersistedContract.playerId,
         [],
     )
-    assert.deepEqual(removedUnlocks.all.get(String(characterId)), { 1: 1 })
-    assert.deepEqual(removedUnlocks.changed, new Map())
-    assert.deepEqual(removedUnlocks.removed, new Map())
+    assert.deepEqual(preservedUnlocks.all.get(String(characterId)), { 1: 1 })
+    assert.deepEqual(preservedUnlocks.changed, new Map())
+    assert.equal("removed" in preservedUnlocks, false)
 
     const invalidPersisted = createPlayer("awake-invalid-persisted")
     learnBoardOne(invalidPersisted.playerId, boardOneNodeIds.slice(0, 1))

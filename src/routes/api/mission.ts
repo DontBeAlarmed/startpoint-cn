@@ -8,7 +8,7 @@ import { getDb } from "../../data/db"
 import { getPlayerMailCountSync } from "../../data/domains/mail"
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { createCharacterAwakeEligibilityResolver, evaluateMissionProgressStageB, getCharacterIdFromMission, getCurrentStage, getMissionCatalog, mergeMissionSettlementResponse, settleAwakeMissionCandidatesWithEvaluation, settleMissionCategories, settleMissionCategoriesWithEvaluation } from "../../lib/mission/index";
-import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context";
+import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { resolveClientProgressTargets } from "../../lib/mission/client-progress";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { addMissionProgressDelta } from "../../lib/mission/progress";
@@ -267,12 +267,13 @@ const routes = async (fastify: FastifyInstance) => {
                 : null
         })()
 
-        const characterList = publishAwakeCharacterListBestEffort(
+        const characterList = publishCharacterGrowthOwnerStateBestEffort(
             playerId,
             awakeCandidateCharacterIds,
             [[]],
             {},
-        )
+            "mission/update_mission_progress",
+        ).characterList
         console.log(`[MISSION] update_progress viewer=${viewerId} params=${missionParams.length} db_updates=${updatedCount}`)
 
         const responseData: Record<string, unknown> = {

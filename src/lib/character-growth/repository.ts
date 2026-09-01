@@ -34,6 +34,23 @@ function nonNegativeInteger(value: unknown, field: string): number {
     return value
 }
 
+export function validateCharacterGrowthStoredCore(
+    core: CharacterGrowthStoredCore,
+): CharacterGrowthStoredCore {
+    if (typeof core.protection !== "boolean") {
+        throw growthError("INVALID_GROWTH_STATE", "character.protection must be boolean.")
+    }
+    return {
+        characterId: positiveInteger(core.characterId, "character.id"),
+        exp: nonNegativeInteger(core.exp, "character.exp"),
+        stack: nonNegativeInteger(core.stack, "character.stack"),
+        protection: core.protection,
+        overLimitStep: nonNegativeInteger(core.overLimitStep, "character.over_limit_step"),
+        evolutionLevel: nonNegativeInteger(core.evolutionLevel, "character.evolution_level"),
+        manaBoardIndex: validateBoardIndex(core.manaBoardIndex),
+    }
+}
+
 function normalizeIds(ids: readonly number[]): number[] {
     const normalized = [...new Set(ids)]
     for (const id of normalized) positiveInteger(id, "characterId")
@@ -51,15 +68,18 @@ interface RawCoreRow {
 }
 
 function buildCore(row: RawCoreRow): CharacterGrowthStoredCore {
-    return {
-        characterId: positiveInteger(row.id, "character.id"),
-        exp: nonNegativeInteger(row.exp, "character.exp"),
-        stack: nonNegativeInteger(row.stack, "character.stack"),
-        protection: row.protection === 1,
-        overLimitStep: nonNegativeInteger(row.over_limit_step, "character.over_limit_step"),
-        evolutionLevel: nonNegativeInteger(row.evolution_level, "character.evolution_level"),
-        manaBoardIndex: validateBoardIndex(row.mana_board_index),
+    if (row.protection !== 0 && row.protection !== 1) {
+        throw growthError("INVALID_GROWTH_STATE", "character.protection must be 0 or 1.")
     }
+    return validateCharacterGrowthStoredCore({
+        characterId: row.id,
+        exp: row.exp,
+        stack: row.stack,
+        protection: row.protection === 1,
+        overLimitStep: row.over_limit_step,
+        evolutionLevel: row.evolution_level,
+        manaBoardIndex: row.mana_board_index,
+    })
 }
 
 export class CharacterGrowthRepository {

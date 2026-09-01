@@ -2,13 +2,11 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { getPlayerCharacterSync } from "../../../data/domains/character"
-import { getPlayerSync } from "../../../data/domains/player"
 import { getDb } from "../../../data/db"
 import { getMailArrivedSync } from "../../../lib/mail-notification"
 import {
     buildCharacterListEntry,
     sendCharacterResponse,
-    validateCharacterOwnership,
     validateSessionAndPlayer,
 } from "../../../lib/character-helpers"
 import { mergeMissionSettlementResponse } from "../../../lib/mission"
@@ -16,8 +14,7 @@ import { CharacterGrowthError } from "../../../lib/character-growth/errors"
 import { receiveBondToken } from "../../../lib/character-growth/commands/receive-bond-token"
 import { openManaBoard } from "../../../lib/character-growth/commands/open-mana-board"
 import { getServerDate } from "../../../utils"
-import { createAwakeRequestContextBestEffort } from "../../../lib/mission/awake-best-effort-context"
-import { reconcileAwakeUnlockCharacterListBestEffort } from "../../../lib/mission/awake-unlock-response"
+import { publishCharacterGrowthOwnerStateBestEffort } from "../../../lib/character-growth/owner-publication"
 
 interface CharacterGrowthRequestBody {
     character_id: number
@@ -51,10 +48,9 @@ const routes = async (fastify: FastifyInstance) => {
 
         const sess = await validateSessionAndPlayer(body.viewer_id, reply)
         if (!sess) return
-        if (!validateCharacterOwnership(sess.playerId, body.character_id, reply)) return
 
         try {
-            const characterList = getDb().transaction(() => {
+            const settlement = getDb().transaction(() => {
                 const result = receiveBondToken({
                     playerId: sess.playerId,
                     characterId: body.character_id,
@@ -66,24 +62,23 @@ const routes = async (fastify: FastifyInstance) => {
                     throw new Error("bond token command completed without authoritative state")
                 }
                 const existingCharacterList = [buildCharacterListEntry(body.character_id, character)]
-                if (result.replayed) return existingCharacterList
-                const awakeContext = createAwakeRequestContextBestEffort(
-                    sess.playerId,
-                    [body.character_id],
-                )
-                return awakeContext === null
-                    ? existingCharacterList
-                    : reconcileAwakeUnlockCharacterListBestEffort(
-                        sess.playerId,
-                        existingCharacterList,
-                        { context: awakeContext, candidateCharacterIds: [body.character_id] },
-                    )
+                return {
+                    bondTokenAfter: result.playerBondTokenAfter,
+                    characterList: result.replayed
+                        ? existingCharacterList
+                        : publishCharacterGrowthOwnerStateBestEffort(
+                            sess.playerId,
+                            [body.character_id],
+                            [existingCharacterList],
+                            {},
+                            "character/receive_bond_token",
+                            getServerDate(),
+                        ).characterList,
+                }
             })()
-            const player = getPlayerSync(sess.playerId)
-            if (player === null) throw new Error("bond token command completed without player state")
             return sendCharacterResponse(reply, body.viewer_id, {
-                user_info: { bond_token: player.bondToken },
-                character_list: characterList,
+                user_info: { bond_token: settlement.bondTokenAfter },
+                character_list: settlement.characterList,
                 user_character_mana_node_list: {},
                 item_list: {},
                 evolution: [],
@@ -103,7 +98,6 @@ const routes = async (fastify: FastifyInstance) => {
 
         const sess = await validateSessionAndPlayer(body.viewer_id, reply)
         if (!sess) return
-        if (!validateCharacterOwnership(sess.playerId, body.character_id, reply)) return
 
         try {
             const result = openManaBoard({
@@ -112,17 +106,12 @@ const routes = async (fastify: FastifyInstance) => {
                 targetBoardIndex: body.mana_board_index,
                 evaluationTime: getServerDate(),
             })
-            const player = getPlayerSync(sess.playerId)
-            const character = getPlayerCharacterSync(sess.playerId, body.character_id)
-            if (player === null || character === null) {
-                throw new Error("mana board command completed without authoritative state")
-            }
             const responseData = {
                 user_info: {},
-                character_list: [buildCharacterListEntry(body.character_id, character, {
+                character_list: result.characterList.map(character => ({
+                    ...character,
                     viewer_id: body.viewer_id,
-                    mana_board_index: result.after.manaBoardIndex,
-                })],
+                })),
                 user_character_mana_node_list: {},
                 item_list: {},
                 evolution: [],
@@ -134,7 +123,6 @@ const routes = async (fastify: FastifyInstance) => {
             if (result.missionSettlement !== null) {
                 mergeMissionSettlementResponse(responseData, result.missionSettlement, body.viewer_id)
             }
-            responseData.mail_arrived = getMailArrivedSync(sess.playerId)
             return sendCharacterResponse(reply, body.viewer_id, responseData)
         } catch (error) {
             if (sendGrowthError(reply, error)) return

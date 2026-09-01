@@ -204,7 +204,12 @@
         "characterSeeds": [
           1
         ],
-        "directMissionSeeds": [],
+        "directMissionSeeds": [
+          11,
+          12,
+          13,
+          14
+        ],
         "factSeeds": [
           "collectedItems:100000",
           "items",
@@ -290,7 +295,12 @@
         "characterSeeds": [
           1
         ],
-        "directMissionSeeds": [],
+        "directMissionSeeds": [
+          11,
+          12,
+          13,
+          14
+        ],
         "factSeeds": [
           "passState:3",
           "player"
@@ -497,7 +507,12 @@
         "characterSeeds": [
           1
         ],
-        "directMissionSeeds": [],
+        "directMissionSeeds": [
+          11,
+          12,
+          13,
+          14
+        ],
         "factSeeds": [
           "collectedItems:100000",
           "items",
@@ -563,7 +578,12 @@
         "characterSeeds": [
           1
         ],
-        "directMissionSeeds": [],
+        "directMissionSeeds": [
+          11,
+          12,
+          13,
+          14
+        ],
         "factSeeds": [
           "passState:3",
           "player"
@@ -789,7 +809,12 @@
         "passState:3",
         "player"
       ],
-      "directMissionSeeds": [],
+      "directMissionSeeds": [
+        11,
+        12,
+        13,
+        14
+      ],
       "publicationObservation": {
         "kind": "publish-wrapper",
         "explicitCharacterSeeds": [
@@ -806,7 +831,12 @@
           "passState:3",
           "player"
         ],
-        "directMissionSeeds": []
+        "directMissionSeeds": [
+          11,
+          12,
+          13,
+          14
+        ]
       },
       "loaderCalls": [
         "player",
@@ -831,16 +861,16 @@
         "categoryMissionProgress:9:11,12,13,2630021,2630022,2630023",
         "characters"
       ],
-      "missionComputes": 405,
+      "missionComputes": 342,
       "snapshotSource": "none",
       "rereadReason": "earlier awake settlement precedes later authoritative reward, active-mission, response-state and active-quest writes",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 57,
+      "sqlReads": 60,
       "sqlWrites": 33,
       "sqlByTable": {
         "players": {
-          "reads": 7,
-          "statements": 12,
+          "reads": 8,
+          "statements": 13,
           "writes": 5
         },
         "players_active_mission_battle_facts": {
@@ -889,13 +919,13 @@
           "writes": 2
         },
         "players_characters": {
-          "reads": 5,
-          "statements": 6,
+          "reads": 6,
+          "statements": 7,
           "writes": 1
         },
         "players_characters_bond_tokens": {
-          "reads": 5,
-          "statements": 5,
+          "reads": 6,
+          "statements": 6,
           "writes": 0
         },
         "players_characters_mana_nodes": {
@@ -1100,14 +1130,21 @@
         "passState:3",
         "player"
       ],
-      "directMissionSeeds": [],
+      "directMissionSeeds": [
+        11,
+        12,
+        13,
+        14
+      ],
       "publicationObservation": {
-        "kind": "best-effort-context",
-        "explicitCharacterSeeds": [],
-        "characterListSeeds": [],
-        "contextCandidateCharacterSeeds": [
+        "kind": "publish-wrapper",
+        "explicitCharacterSeeds": [
           1
         ],
+        "characterListSeeds": [
+          1
+        ],
+        "contextCandidateCharacterSeeds": [],
         "characterSeeds": [
           1
         ],
@@ -1117,7 +1154,12 @@
           "passState:3",
           "player"
         ],
-        "directMissionSeeds": []
+        "directMissionSeeds": [
+          11,
+          12,
+          13,
+          14
+        ]
       },
       "loaderCalls": [
         "player",
@@ -1142,11 +1184,11 @@
         "categoryMissionProgress:9:11,12,13,2630021,2630022,2630023",
         "characters"
       ],
-      "missionComputes": 405,
+      "missionComputes": 342,
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 48,
+      "sqlReads": 50,
       "sqlWrites": 27,
       "sqlByTable": {
         "players": {
@@ -1185,13 +1227,13 @@
           "writes": 2
         },
         "players_characters": {
-          "reads": 4,
-          "statements": 5,
+          "reads": 5,
+          "statements": 6,
           "writes": 1
         },
         "players_characters_bond_tokens": {
-          "reads": 4,
-          "statements": 4,
+          "reads": 5,
+          "statements": 5,
           "writes": 0
         },
         "players_characters_mana_nodes": {
@@ -1388,7 +1430,7 @@
       ],
       "directMissionSeeds": [],
       "publicationObservation": {
-        "kind": "best-effort-context",
+        "kind": "publish-wrapper",
         "explicitCharacterSeeds": [],
         "characterListSeeds": [],
         "contextCandidateCharacterSeeds": [],
@@ -1993,12 +2035,14 @@
       "factSeeds": [],
       "directMissionSeeds": [],
       "publicationObservation": {
-        "kind": "best-effort-context",
-        "explicitCharacterSeeds": [],
-        "characterListSeeds": [],
-        "contextCandidateCharacterSeeds": [
+        "kind": "publish-wrapper",
+        "explicitCharacterSeeds": [
           263002
         ],
+        "characterListSeeds": [
+          263002
+        ],
+        "contextCandidateCharacterSeeds": [],
         "characterSeeds": [
           263002
         ],
@@ -2015,12 +2059,12 @@
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 15,
+      "sqlReads": 18,
       "sqlWrites": 3,
       "sqlByTable": {
         "players": {
-          "reads": 3,
-          "statements": 4,
+          "reads": 4,
+          "statements": 5,
           "writes": 1
         },
         "players_category_mission_stages": {
@@ -2039,13 +2083,13 @@
           "writes": 1
         },
         "players_characters": {
-          "reads": 2,
-          "statements": 2,
+          "reads": 3,
+          "statements": 3,
           "writes": 0
         },
         "players_characters_bond_tokens": {
-          "reads": 2,
-          "statements": 3,
+          "reads": 3,
+          "statements": 4,
           "writes": 1
         },
         "players_characters_mana_nodes": {
@@ -2286,12 +2330,12 @@
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 17,
+      "sqlReads": 23,
       "sqlWrites": 9,
       "sqlByTable": {
         "players": {
-          "reads": 3,
-          "statements": 4,
+          "reads": 4,
+          "statements": 5,
           "writes": 1
         },
         "players_active_mission_counters": {
@@ -2310,8 +2354,8 @@
           "writes": 0
         },
         "players_character_awake_unlocks": {
-          "reads": 1,
-          "statements": 1,
+          "reads": 2,
+          "statements": 2,
           "writes": 0
         },
         "players_character_quest_clears": {
@@ -2320,13 +2364,13 @@
           "writes": 0
         },
         "players_characters": {
-          "reads": 2,
-          "statements": 3,
+          "reads": 4,
+          "statements": 5,
           "writes": 1
         },
         "players_characters_bond_tokens": {
-          "reads": 2,
-          "statements": 3,
+          "reads": 4,
+          "statements": 5,
           "writes": 1
         },
         "players_characters_mana_nodes": {
@@ -3152,7 +3196,7 @@
       ],
       "directMissionSeeds": [],
       "publicationObservation": {
-        "kind": "best-effort-context",
+        "kind": "publish-wrapper",
         "explicitCharacterSeeds": [],
         "characterListSeeds": [],
         "contextCandidateCharacterSeeds": [],
@@ -3358,7 +3402,7 @@
       ],
       "directMissionSeeds": [],
       "publicationObservation": {
-        "kind": "best-effort-context",
+        "kind": "publish-wrapper",
         "explicitCharacterSeeds": [],
         "characterListSeeds": [],
         "contextCandidateCharacterSeeds": [],
@@ -4606,7 +4650,7 @@
       ],
       "directMissionSeeds": [],
       "publicationObservation": {
-        "kind": "best-effort-context",
+        "kind": "publish-wrapper",
         "explicitCharacterSeeds": [],
         "characterListSeeds": [],
         "contextCandidateCharacterSeeds": [],
@@ -4800,12 +4844,14 @@
       "factSeeds": [],
       "directMissionSeeds": [],
       "publicationObservation": {
-        "kind": "best-effort-context",
-        "explicitCharacterSeeds": [],
-        "characterListSeeds": [],
-        "contextCandidateCharacterSeeds": [
+        "kind": "publish-wrapper",
+        "explicitCharacterSeeds": [
           251001
         ],
+        "characterListSeeds": [
+          251001
+        ],
+        "contextCandidateCharacterSeeds": [],
         "characterSeeds": [
           251001
         ],
@@ -4958,12 +5004,14 @@
       "factSeeds": [],
       "directMissionSeeds": [],
       "publicationObservation": {
-        "kind": "best-effort-context",
-        "explicitCharacterSeeds": [],
-        "characterListSeeds": [],
-        "contextCandidateCharacterSeeds": [
+        "kind": "publish-wrapper",
+        "explicitCharacterSeeds": [
           243001
         ],
+        "characterListSeeds": [
+          243001
+        ],
+        "contextCandidateCharacterSeeds": [],
         "characterSeeds": [
           243001
         ],

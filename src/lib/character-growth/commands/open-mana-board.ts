@@ -1,6 +1,9 @@
 import { getDb } from "../../../data/db"
-import { getPlayerSync } from "../../../data/domains/player"
-import { insertPlayerCharacterBondTokenSync, updatePlayerCharacterSync } from "../../../data/domains/character"
+import {
+    getPlayerCharacterWithStoredGrowthSync,
+    insertPlayerCharacterBondTokenSync,
+    updatePlayerCharacterSync,
+} from "../../../data/domains/character"
 import { getCharacterGrowthContentFactsSync } from "../content-facts"
 import { growthError } from "../errors"
 import { findMissingBondTokenBoards, getBondTokenStatus, isNormalBoardComplete } from "../invariants"
@@ -11,7 +14,7 @@ import { settleMissionCategories } from "../../mission/settlement"
 import type { MissionSettlementResult } from "../../mission/settlement"
 import { characterExpCaps } from "../../character"
 import { isCharacterSecondManaBoardAvailable } from "../../mana-board-availability"
-import { getRealNow } from "../../../runtime/time/game-time"
+import { buildCharacterListEntryFromGrowth } from "../../character-helpers"
 
 export interface OpenManaBoardCommand {
     readonly playerId: number
@@ -23,6 +26,7 @@ export interface OpenManaBoardCommand {
 export interface OpenManaBoardResult extends CharacterGrowthCommandResult {
     readonly replayed: boolean
     readonly missionSettlement: MissionSettlementResult | null
+    readonly characterList: readonly Record<string, unknown>[]
 }
 
 const REQUIRED_UNCAPS: Readonly<Record<number, number>> = {
@@ -138,19 +142,41 @@ export function openManaBoard(command: OpenManaBoardCommand): OpenManaBoardResul
     validateCommand(command)
     const db = getDb()
     return db.transaction(() => {
+        const storedCharacter = getPlayerCharacterWithStoredGrowthSync(
+            command.playerId,
+            command.characterId,
+        )
+        if (storedCharacter === null) {
+            throw growthError(
+                "CHARACTER_NOT_OWNED",
+                `character ${command.characterId} is not owned by player ${command.playerId}.`,
+            )
+        }
+        const { character: characterData, storedGrowth } = storedCharacter
+        if (storedGrowth.protection !== 0 && storedGrowth.protection !== 1) {
+            throw growthError("INVALID_GROWTH_STATE", "character.protection must be 0 or 1.")
+        }
         const context = createCharacterGrowthRequestContext({
             playerId: command.playerId,
             characterId: command.characterId,
             contentFactsLoader: getCharacterGrowthContentFactsSync,
+            storedCharacterSnapshot: {
+                characterId: storedGrowth.id,
+                exp: storedGrowth.exp,
+                stack: storedGrowth.stack,
+                protection: storedGrowth.protection === 1,
+                overLimitStep: storedGrowth.over_limit_step,
+                evolutionLevel: storedGrowth.evolution_level,
+                manaBoardIndex: storedGrowth.mana_board_index,
+            },
+            bondTokenSnapshot: new Map(characterData.bondTokenList.map(token => [
+                token.manaBoardIndex,
+                token.status as 0 | 1 | 2,
+            ])),
         })
         const character = context.character()
         const content = context.contentFacts()
         const tokens = context.bondTokens()
-        const player = getPlayerSync(command.playerId)
-        if (player === null) {
-            throw growthError("INVALID_GROWTH_STATE", `player ${command.playerId} is unavailable.`)
-        }
-
         assertTargetBoard(command, character, content.boardCount)
         const isReplay = command.targetBoardIndex === character.manaBoardIndex
         if (isReplay) {
@@ -162,13 +188,20 @@ export function openManaBoard(command: OpenManaBoardCommand): OpenManaBoardResul
                     )
                 }
             }
+            const after = observed(character, tokens)
             return {
                 command: "open_mana_board",
-                before: observed(character, tokens),
-                after: observed(character, tokens),
+                before: after,
+                after,
                 changedNodeIds: [],
                 replayed: true,
                 missionSettlement: null,
+                characterList: [buildCharacterListEntryFromGrowth(
+                    command.characterId,
+                    characterData,
+                    after,
+                    { mana_board_index: after.manaBoardIndex },
+                )],
             }
         }
 
@@ -193,10 +226,14 @@ export function openManaBoard(command: OpenManaBoardCommand): OpenManaBoardResul
                 status: 0,
             })
         }
-        updatePlayerCharacterSync(command.playerId, command.characterId, {
+        const characterUpdate: { manaBoardIndex: number; updateTime?: Date } = {
             manaBoardIndex: command.targetBoardIndex,
-            updateTime: getRealNow(),
-        })
+        }
+        updatePlayerCharacterSync(command.playerId, command.characterId, characterUpdate)
+        const updateTime = characterUpdate.updateTime
+        if (updateTime === undefined) {
+            throw growthError("INVALID_GROWTH_STATE", "character update time was not recorded.")
+        }
 
         const missionSettlement = settleMissionCategories(
             command.playerId,
@@ -205,16 +242,23 @@ export function openManaBoard(command: OpenManaBoardCommand): OpenManaBoardResul
         )
         const afterTokens = new Map(tokens)
         for (const boardIndex of missingBoards) afterTokens.set(boardIndex, 0)
+        const after = observed({
+            ...character,
+            manaBoardIndex: command.targetBoardIndex,
+        }, afterTokens)
         return {
             command: "open_mana_board",
             before: observed(character, tokens),
-            after: observed({
-                ...character,
-                manaBoardIndex: command.targetBoardIndex,
-            }, afterTokens),
+            after,
             changedNodeIds: [],
             replayed: false,
             missionSettlement,
+            characterList: [buildCharacterListEntryFromGrowth(
+                command.characterId,
+                { ...characterData, updateTime },
+                after,
+                { mana_board_index: after.manaBoardIndex },
+            )],
         }
     })()
 }

@@ -1,9 +1,7 @@
-import { upsertPlayerCharacterAwakeUnlockSync } from "../../data/domains/character_awake"
 import {
     updatePlayerCategoryMissionStageSync,
     updatePlayerCategoryMissionSync,
 } from "../../data/domains/mission"
-import { buildManaBoardAwakeCharacterList } from "../character-helpers"
 import type { CharacterAwakeEligibilityResolver } from "./awake-eligibility"
 import type { AwakeMissionInfo, AwakeMissionSettlementResult } from "./awake-settlement"
 import { MissionRewardGranter } from "./grants"
@@ -42,7 +40,6 @@ export function settleAwakeMissionEvaluationWithInvalidations(
     ))
     const granter = new MissionRewardGranter(evaluation.playerId, evaluation.player)
     const missionInfo: AwakeMissionInfo[] = []
-    const unlockMap = new Map<string, Record<number, number>>()
     let awakeEligibilityChanged = false
 
     for (const mission of missions) {
@@ -78,28 +75,14 @@ export function settleAwakeMissionEvaluationWithInvalidations(
                 mission_reward_id: definition.missionRewardId,
             })
             if (!definition.specialReward) continue
-            const special = definition.specialReward
-            if (!upsertPlayerCharacterAwakeUnlockSync(
-                evaluation.playerId,
-                special.characterId,
-                special.boardIndex,
-                special.awakeLevel,
-            )) continue
+            // The mission engine records the reward receipt only. Permanent
+            // CharacterAwake state is published by Character Growth after the
+            // outer owner has finished producing all mission facts.
             awakeEligibilityChanged = true
-            const levels = unlockMap.get(String(special.characterId)) ?? {}
-            levels[special.boardIndex] = Math.max(
-                levels[special.boardIndex] ?? 0,
-                special.awakeLevel,
-            )
-            unlockMap.set(String(special.characterId), levels)
         }
     }
 
     granter.persistPlayer()
-    const characterList = [
-        ...(granter.characterList as Record<string, unknown>[]),
-        ...buildManaBoardAwakeCharacterList(resolver.characters, unlockMap),
-    ]
     const invalidatedFacts = new Map(granter.invalidatedFactKeys.map(key => [
         getFactKeyId(key),
         key,
@@ -112,7 +95,7 @@ export function settleAwakeMissionEvaluationWithInvalidations(
         settlement: {
             missionInfo,
             itemList: granter.itemList,
-            characterList,
+            characterList: granter.characterList as Record<string, unknown>[],
             equipmentList: granter.equipmentList,
             degreeIds: granter.degreeList,
             passCardPoints: {},

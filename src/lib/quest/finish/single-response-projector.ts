@@ -138,7 +138,7 @@ export function buildSingleFinishResponse({
             "boss_boost_point": player.bossBoostPoint,
         },
         "add_exp_list": rewardCharacterExpResult.add_exp_list,
-        "character_list": characterList,
+        "character_list": [...characterList],
         "bond_token_status_list": rewardCharacterExpResult.bond_token_status_list,
         "rewards": {
             "overflow_pool_exp": 0,

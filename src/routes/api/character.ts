@@ -12,7 +12,7 @@ import { getDb } from "../../data/db";
 import { executeOverLimit } from "../../lib/character-growth/commands/over-limit"
 import { executeBulkOverLimit } from "../../lib/character-growth/commands/bulk-over-limit"
 import { sendGrowthMutationError } from "./character/mana-mutation-http"
-import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context";
+import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { canClaimTownStoryCharacter } from "../../lib/story-join-character";
 import { getRealNow } from "../../runtime/time/game-time";
@@ -307,12 +307,13 @@ const routes = async (fastify: FastifyInstance) => {
         const itemList = giveResult?.item
             ? { [giveResult.item.id]: giveResult.item.count }
             : {}
-        const characterList = publishAwakeCharacterListBestEffort(
+        const characterList = publishCharacterGrowthOwnerStateBestEffort(
             playerId,
             [characterId],
             [existingCharacterList],
             {},
-        )
+            "character/add_character_from_town",
+        ).characterList
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

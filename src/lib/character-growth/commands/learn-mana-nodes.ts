@@ -14,8 +14,8 @@ import {
     updateBondTokenForCompletedBoardFromGrowthState,
 } from "../../character-helpers"
 import { buildCharacterEvolutionResponse } from "../../character-evolution"
-import { reconcileAwakeUnlockCharacterListStrict } from "../../mission/awake-unlock-response"
 import { createAwakeRequestContext } from "../../mission/awake-request-context"
+import { publishAwakeUnlockCharacterListWithStateWithinTransaction } from "../facts/awake-unlock-facts"
 import { planLearnManaNodeMutation } from "../../character-mana-mutation-plan"
 import type { CharacterGrowthCoreFact, BondTokenStatus } from "../model"
 import type { CharacterGrowthCommandResult, CharacterGrowthObservedState } from "../result"
@@ -55,6 +55,12 @@ export interface LearnManaNodesResult extends CharacterGrowthCommandResult {
     readonly responseNodeEntries: readonly { readonly multiplied_id: number; readonly awake_level: number }[]
     readonly evolution: Object
     readonly missionFacts: Readonly<{ readonly usedMana: number }>
+    readonly resourceState: Readonly<{
+        mana: number
+        freeMana: number
+        paidMana: number
+        items: ReadonlyMap<number, number>
+    }>
 }
 
 function validateCommand(command: LearnManaNodesCommand): readonly number[] {
@@ -98,13 +104,16 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
             characterId: command.characterId,
         })
         const character = context.character()
+        const beforeBondTokens = context.bondTokens()
+        const beforeNormalManaNodes = context.normalManaNodes()
+        const beforeAwakeUnlocks = context.awakeUnlocks()
         const boardId = character.manaBoardIndex
         if (boardId === 2 && !isCharacterSecondManaBoardAvailable(command.characterId, command.evaluationTime)) {
             throw growthError("BOARD_NOT_AVAILABLE", "second mana board is not available.")
         }
         assertNormalBoardOwnership(character, boardId)
         const content = mutationContent(command.characterId, boardId)
-        const boardLevels = boardNodeLevels(context.normalManaNodes(), content)
+        const boardLevels = boardNodeLevels(beforeNormalManaNodes, content)
         const level = characterLevelFromContent(command.characterId, character.rarity, character.exp)
         const itemIds = requiredItemIds(content, requestedNodeIds)
         const player = getPlayerSync(command.playerId)
@@ -135,12 +144,12 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
             paidMana: player.paidMana,
             itemBalances,
         })
-        const nextNodes = applyManaNodePlan(context.normalManaNodes(), plan)
+        const nextNodes = applyManaNodePlan(beforeNormalManaNodes, plan)
         const isBoardComplete = [...Object.keys(content.nodes).map(Number)].every(nodeId => nextNodes.has(nodeId))
         const bond = updateBondTokenForCompletedBoardFromGrowthState(
             command.playerId,
             command.characterId,
-            context.bondTokens(),
+            beforeBondTokens,
             boardId,
             isBoardComplete,
         )
@@ -187,27 +196,28 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
         })
         const characterData = getPlayerCharacterSync(command.playerId, command.characterId)
         if (characterData === null) throw growthError("INVALID_GROWTH_STATE", "character disappeared during growth.")
-        const nextBondTokens = new Map(context.bondTokens())
+        const nextBondTokens = new Map(beforeBondTokens)
         if (bond.bondTokenGranted) nextBondTokens.set(boardId, 1)
         const afterBeforeAwakeReconciliation = observed(
             afterCore,
             nextBondTokens,
             nextNodes,
-            context.awakeUnlocks(),
+            beforeAwakeUnlocks,
         )
-        const characterList = reconcileAwakeUnlockCharacterListStrict(
+        const publication = publishAwakeUnlockCharacterListWithStateWithinTransaction(
             command.playerId,
             [buildCharacterListEntryFromGrowth(command.characterId, characterData, afterBeforeAwakeReconciliation)],
-            { context: awakeContext, candidateCharacterIds: [command.characterId] },
+            awakeContext,
+            [command.characterId],
         )
-        const afterAwakeUnlocks = createCharacterGrowthRequestContext({
-            playerId: command.playerId,
-            characterId: command.characterId,
-        }).awakeUnlocks()
+        const afterAwakeUnlocks = new Map(
+            Object.entries(publication.all.get(String(command.characterId)) ?? {})
+                .map(([boardIndex, awakeLevel]) => [Number(boardIndex), awakeLevel]),
+        )
         const after = observed(afterCore, nextBondTokens, nextNodes, afterAwakeUnlocks) as LearnManaNodesResult["after"]
         return {
             command: "learn_mana_nodes",
-            before: observed(character, context.bondTokens(), context.normalManaNodes(), context.awakeUnlocks()),
+            before: observed(character, beforeBondTokens, beforeNormalManaNodes, beforeAwakeUnlocks),
             after,
             changedNodeIds: [...plan.nodeUpdates].map(update => update.nodeId),
             resourceState: {
@@ -220,7 +230,7 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
             missionFacts: { usedMana: resources.totalManaCost },
             replayed: false,
             bondTokenGranted: bond.bondTokenGranted,
-            characterList,
+            characterList: publication.characterList,
             responseNodeEntries: plan.responseNodeEntries,
             evolution: buildCharacterEvolutionResponse(
                 command.characterId,

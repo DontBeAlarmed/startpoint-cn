@@ -7,7 +7,7 @@ import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
 import { getRealNow } from "../../runtime/time/game-time";
 import { sellItemSync } from "../../lib/item-sell";
 import { AccountId, PlayerId } from "../../lib/types";
-import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context";
+import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
 import {
@@ -104,9 +104,9 @@ const routes = async (fastify: FastifyInstance) => {
             const code = 'errorCode' in result ? result.errorCode : undefined
             return reply.status(400).send({ "error": "Bad Request", "code": code, "message": result.error })
         }
-        const characterList = publishAwakeCharacterListBestEffort(playerId, [], [[]], {
+        const characterList = publishCharacterGrowthOwnerStateBestEffort(playerId, [], [[]], {
             invalidatedFactKeys: [{ kind: "player" }],
-        })
+        }, "item/sell").characterList
 
         console.log(`[ITEM_SELL] account=${accountId} player=${playerId}: item ${itemId} ×${sellNumber} sold, mana +${result.manaGained} (${result.freeMana - result.manaGained} -> ${result.freeMana})`)
 

@@ -8,6 +8,15 @@ export interface PlayerCharacterGrowthFact {
     readonly exp: number
 }
 
+export interface PlayerCharacterWithStoredGrowth {
+    readonly character: PlayerCharacter
+    readonly storedGrowth: Readonly<Pick<
+        RawPlayerCharacter,
+        "id" | "exp" | "stack" | "protection" | "over_limit_step"
+            | "evolution_level" | "mana_board_index"
+    >>
+}
+
 function normalizeCharacterFactIds(ids: readonly number[]): number[] {
     const normalized = new Set<number>()
     for (const id of ids) {
@@ -108,6 +117,14 @@ export function getPlayerCharacterSync(
     playerId: number,
     characterId: number
 ): PlayerCharacter | null {
+    return getPlayerCharacterWithStoredGrowthSync(playerId, characterId)?.character ?? null
+}
+
+/** Reads the protocol character and unnormalized stored Growth fields in one pass. */
+export function getPlayerCharacterWithStoredGrowthSync(
+    playerId: number,
+    characterId: number,
+): PlayerCharacterWithStoredGrowth | null {
 
     const rawCharacter = getDb().prepare(`
     SELECT id, entry_count, evolution_level, over_limit_step, protection,
@@ -115,7 +132,7 @@ export function getPlayerCharacterSync(
         ex_boost_ability_id_list, illustration_settings
     FROM players_characters
     WHERE player_id = ? AND id = ?
-    `).get(playerId, characterId) as RawPlayerCharacter
+    `).get(playerId, characterId) as RawPlayerCharacter | undefined
 
     if (rawCharacter === undefined) return null
 
@@ -127,10 +144,21 @@ export function getPlayerCharacterSync(
     ORDER BY mana_board_index
     `).all(playerId, characterId) as RawPlayerCharacterBondToken[]
 
-    return buildPlayerCharacter(
-        rawCharacter,
-        rawBondTokens.map(raw => buildCharacterBondToken(raw))
-    )
+    return {
+        character: buildPlayerCharacter(
+            rawCharacter,
+            rawBondTokens.map(raw => buildCharacterBondToken(raw)),
+        ),
+        storedGrowth: {
+            id: rawCharacter.id,
+            exp: rawCharacter.exp,
+            stack: rawCharacter.stack,
+            protection: rawCharacter.protection,
+            over_limit_step: rawCharacter.over_limit_step,
+            evolution_level: rawCharacter.evolution_level,
+            mana_board_index: rawCharacter.mana_board_index,
+        },
+    }
 }
 
 /** Reads bond tokens by character, with a stable SQL order for projections and diagnostics. */

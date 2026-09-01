@@ -4,9 +4,7 @@ import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders } from "../../utils";
-import { reconcileAwakeUnlockCharacterListBestEffort } from "../../lib/mission";
-import { collectAwakeCandidateCharacterIds } from "../../lib/mission/awake-candidate-character-ids";
-import { createAwakeRequestContextBestEffort } from "../../lib/mission/awake-best-effort-context";
+import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { getDb } from "../../data/db";
 import { getVirtualNow } from "../../runtime/time/game-time";
 import {
@@ -160,21 +158,16 @@ const routes = async (fastify: FastifyInstance) => {
                 if (!player) throw new Error(`Mail player ${playerId} no longer exists.`)
                 const reward = settleMailRewardsInTransactionOwnerSync(playerId, [mail], player)
                 finalizeMailReceiveAwakePublicationWrites(playerId, mailId, mail)
-                const candidateCharacterIds = collectAwakeCandidateCharacterIds([], [reward.characterList])
-                const awakeContext = createAwakeRequestContextBestEffort(
-                    playerId,
-                    candidateCharacterIds,
-                    { invalidatedFactKeys: getMailAwakeInvalidatedFactKeys([mail]) },
-                )
                 return {
                     ...reward,
-                    reconciledCharacterList: awakeContext === null
-                        ? reward.characterList
-                        : reconcileAwakeUnlockCharacterListBestEffort(
-                            playerId,
-                            reward.characterList,
-                            { context: awakeContext },
-                        ),
+                    reconciledCharacterList: publishCharacterGrowthOwnerStateBestEffort(
+                        playerId,
+                        [],
+                        [reward.characterList],
+                        { invalidatedFactKeys: getMailAwakeInvalidatedFactKeys([mail]) },
+                        "mail/receive",
+                        new Date(getVirtualNow()),
+                    ).characterList,
                 }
             })()
         } catch (error) {
@@ -264,24 +257,19 @@ const routes = async (fastify: FastifyInstance) => {
                     validMailIds,
                     mailMap,
                 )
-                const candidateCharacterIds = collectAwakeCandidateCharacterIds([], [reward.characterList])
-                const awakeContext = createAwakeRequestContextBestEffort(
-                    playerId,
-                    candidateCharacterIds,
-                    { invalidatedFactKeys: getMailAwakeInvalidatedFactKeys(orderedValidMails) },
-                )
                 return {
                     alreadyCount: uniqueMailIds.length - validMailIds.length - outdatedCount,
                     deletedCount: expiredMailIds.length,
                     outdatedCount,
                     claimed,
-                    reconciledCharacterList: awakeContext === null
-                        ? reward.characterList
-                        : reconcileAwakeUnlockCharacterListBestEffort(
-                            playerId,
-                            reward.characterList,
-                            { context: awakeContext },
-                        ),
+                    reconciledCharacterList: publishCharacterGrowthOwnerStateBestEffort(
+                        playerId,
+                        [],
+                        [reward.characterList],
+                        { invalidatedFactKeys: getMailAwakeInvalidatedFactKeys(orderedValidMails) },
+                        "mail/receive-all",
+                        new Date(getVirtualNow()),
+                    ).characterList,
                     equipmentList: reward.equipmentList,
                     itemList: reward.itemList,
                     userInfo: reward.userInfo,

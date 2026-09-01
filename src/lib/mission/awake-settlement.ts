@@ -1,4 +1,3 @@
-import { upsertPlayerCharacterAwakeUnlockSync } from "../../data/domains/character_awake"
 import {
     getPlayerCategoryMissionsSync,
     updatePlayerCategoryMissionStageSync,
@@ -6,7 +5,6 @@ import {
 } from "../../data/domains/mission"
 import { getPlayerSync } from "../../data/domains/player"
 import { getDb } from "../../data/db"
-import { buildManaBoardAwakeCharacterList } from "../character-helpers"
 import { MissionRewardGranter } from "./grants"
 import { getAwakeMissionRewardStageDefinition } from "./rewards"
 import { getCompletedStageNumbers } from "./stages"
@@ -53,6 +51,7 @@ export interface AwakeMissionSettlementResult {
 export interface AwakeMissionSettlementEvaluation {
     readonly prepared: PreparedMissionSettlement
     readonly evaluation: MissionEvaluationResult
+    readonly resolver: CharacterAwakeEligibilityResolver
     readonly settlement: AwakeMissionSettlementResult
     readonly invalidatedFactKeys: readonly FactKey[]
 }
@@ -134,15 +133,18 @@ export function settleAwakeMissionCandidatesWithEvaluation(
             selection,
         )
         const evaluation = evaluateMissionCandidates(prepared)
+        const effectiveResolver = resolver
+            ?? createCharacterAwakeEligibilityResolver(playerId, evaluationTime)
         const settled = settleAwakeMissionEvaluationWithInvalidations(
             evaluation,
-            resolver ?? createCharacterAwakeEligibilityResolver(playerId, evaluationTime),
+            effectiveResolver,
             undefined,
             dependencies,
         )
         return {
             prepared,
             evaluation,
+            resolver: effectiveResolver,
             settlement: settled.settlement,
             invalidatedFactKeys: settled.invalidatedFactKeys,
         }
@@ -192,8 +194,6 @@ export function settleAwakeMissionRewards(
     const persistedMissions = getPlayerCategoryMissionsSync(playerId, 9)
     const granter = new MissionRewardGranter(playerId, player)
     const missionInfo: AwakeMissionInfo[] = []
-    const unlockMap = new Map<string, Record<number, number>>()
-
     getDb().transaction(() => {
         for (const entry of aggregatedProgressList) {
             updatePlayerCategoryMissionSync(playerId, 9, entry.missionId, entry.progress)
@@ -215,38 +215,16 @@ export function settleAwakeMissionRewards(
                     mission_reward_id: definition.missionRewardId,
                 })
 
-                if (definition.specialReward) {
-                    const special = definition.specialReward
-                    if (upsertPlayerCharacterAwakeUnlockSync(
-                        playerId,
-                        special.characterId,
-                        special.boardIndex,
-                        special.awakeLevel
-                    )) {
-                        const levels = unlockMap.get(String(special.characterId)) ?? {}
-                        levels[special.boardIndex] = Math.max(levels[special.boardIndex] ?? 0, special.awakeLevel)
-                        unlockMap.set(String(special.characterId), levels)
-                    }
-                }
             }
         }
 
         granter.persistPlayer()
     })()
 
-    const unlockCharacterList = buildManaBoardAwakeCharacterList(
-        resolver.characters,
-        unlockMap
-    )
-    const characterList = [
-        ...(granter.characterList as Record<string, unknown>[]),
-        ...unlockCharacterList,
-    ]
-
     return {
         missionInfo,
         itemList: granter.itemList,
-        characterList,
+        characterList: granter.characterList as Record<string, unknown>[],
         equipmentList: granter.equipmentList,
         degreeIds: granter.degreeList,
         passCardPoints: {},

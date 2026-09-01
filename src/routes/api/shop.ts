@@ -27,7 +27,7 @@ import { grantShopRewardsInTransactionOwnerSync } from "../../lib/shop-reward-gr
 import { computeRealTimeStamina } from "../../lib/stamina";
 import { clientSerializeEquipment } from "../../lib/equipment";
 import { planEquipmentEnhancementPurchase } from "../../lib/equipment-enhancement";
-import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context";
+import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { getAwakeFactKeysFromLegacyRewardResults } from "../../lib/mission/awake-reward-facts";
 import {
     executeGenericShopBatchPurchaseSync,
@@ -53,7 +53,7 @@ import {
     addPlayerPassCardPointSync,
 } from "../../data/domains/pass-card"
 import { getActivePassCardEventDefinitionAt } from "../../lib/pass-card"
-import { getGameTimeContext, getRealNow } from "../../runtime/time/game-time"
+import { getGameTimeContext, getRealNow, getVirtualNow } from "../../runtime/time/game-time"
 import { planFreeFirstDeduction } from "../../lib/economy/free-first-deduction"
 
 interface GetSalesListBody {
@@ -371,12 +371,14 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
         }
 
         const rewardResult = purchaseResult.rewardResult
-        const characterList = publishAwakeCharacterListBestEffort(
+        const characterList = publishCharacterGrowthOwnerStateBestEffort(
             playerId,
             rewardResult.joined_character_id_list ?? [],
             [rewardResult.character_list as Record<string, unknown>[]],
             { invalidatedFactKeys: getAwakeFactKeysFromLegacyRewardResults(rewardResult) },
-        )
+            "shop/buy",
+            getVirtualNow(),
+        ).characterList
 
         const afterPlayer = purchaseResult.player
         console.log(`[shop:buy] after DB freeMana=${afterPlayer.freeMana} freeVmoney=${afterPlayer.freeVmoney} rewardItems=${JSON.stringify(rewardResult?.items ?? {})}`)
@@ -688,12 +690,14 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
 
         const afterPlayer = purchaseResult.player
         const rewardResult = purchaseResult.rewardResult
-        const characterList = publishAwakeCharacterListBestEffort(
+        const characterList = publishCharacterGrowthOwnerStateBestEffort(
             playerId,
             rewardResult.joined_character_id_list ?? [],
             [rewardResult.character_list as Record<string, unknown>[]],
             { invalidatedFactKeys: getAwakeFactKeysFromLegacyRewardResults(rewardResult) },
-        )
+            "shop/bulk-buy",
+            getVirtualNow(),
+        ).characterList
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),

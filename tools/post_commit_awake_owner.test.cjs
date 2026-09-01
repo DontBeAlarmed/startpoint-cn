@@ -21,15 +21,21 @@ const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snaps
 const data = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { getPlayerCharacterSync, getPlayerCharactersSync } = require("../src/data/domains/character")
+const {
+    getPlayerCharacterSync,
+    getPlayerCharactersSync,
+    insertPlayerCharacterManaNodesSync,
+    updatePlayerCharacterSync,
+} = require("../src/data/domains/character")
 const { getPlayerCategoryMissionsSync, updatePlayerCategoryMissionSync } = require("../src/data/domains/mission")
 const { getPlayerItemSync, givePlayerItemSync } = require("../src/data/domains/item")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const {
     getPlayerCharacterAwakeUnlocksSync,
-    upsertPlayerCharacterAwakeUnlockSync,
 } = require("../src/data/domains/character_awake")
 const { givePlayerCharacterSync } = require("../src/lib/character")
+const { getCharacterDataSync, getCharacterManaNodesSync } = require("../src/lib/assets")
+const { characterExpCaps } = require("../src/lib/character")
 const { publishAwakeCharacterListBestEffort } = require("../src/lib/mission/awake-best-effort-context")
 
 const POST_COMMIT_35_3_OWNER_INVENTORY = Object.freeze({
@@ -39,6 +45,8 @@ const POST_COMMIT_35_3_OWNER_INVENTORY = Object.freeze({
     "src/routes/api/gacha.ts": ["exchanged-character", "drawn-characters"],
     "src/routes/api/item.ts": ["mana-item-fact"],
     "src/routes/api/mission.ts": ["category9-delta-missions"],
+    "src/routes/api/passCard.ts": ["pass-card-reward-facts"],
+    "src/routes/api/raidEvent.ts": ["raid-summary-reward-facts"],
     "src/routes/api/shop.ts": ["shop-reward-characters", "shop-reward-characters"],
 })
 
@@ -70,23 +78,33 @@ function createPlayer(label) {
 
 function withPublicationFailure(playerId, operation) {
     database.exec(`
-        CREATE TRIGGER reject_post_commit_awake_cleanup
-        BEFORE DELETE ON players_character_awake_unlocks
-        WHEN OLD.player_id = ${playerId}
+        CREATE TRIGGER reject_post_commit_awake_publication
+        BEFORE INSERT ON players_character_awake_unlocks
+        WHEN NEW.player_id = ${playerId}
         BEGIN SELECT RAISE(ABORT, 'injected post-commit publication failure'); END;
     `)
     try {
         sqlStatements = []
         return operation()
     } finally {
-        database.exec("DROP TRIGGER IF EXISTS reject_post_commit_awake_cleanup")
+        database.exec("DROP TRIGGER IF EXISTS reject_post_commit_awake_publication")
     }
 }
 
-function prepareStaleUnlock(playerId) {
-    givePlayerCharacterSync(playerId, 1)
-    upsertPlayerCharacterAwakeUnlockSync(playerId, 1, 1, 1)
-    assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId).get("1"), { 1: 1 })
+function preparePendingUnlock(playerId) {
+    const characterId = 341005
+    givePlayerCharacterSync(playerId, characterId)
+    const rarity = getCharacterDataSync(characterId).rarity
+    updatePlayerCharacterSync(playerId, characterId, {
+        exp: characterExpCaps[rarity][0],
+    })
+    insertPlayerCharacterManaNodesSync(
+        playerId,
+        characterId,
+        Object.keys(getCharacterManaNodesSync(characterId, 1)).map(Number),
+    )
+    updatePlayerCategoryMissionSync(playerId, 9, 3410054, 3)
+    assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has(String(characterId)), false)
 }
 
 test.before(() => {
@@ -111,23 +129,26 @@ test.after(() => {
 
 test("post-commit publication failure preserves a committed owner and original empty response", () => {
     const playerId = createPlayer("empty-reward")
-    prepareStaleUnlock(playerId)
+    preparePendingUnlock(playerId)
     const beforeMana = getPlayerSync(playerId).freeMana
 
     const response = withPublicationFailure(playerId, () => {
         database.transaction(() => updatePlayerSync({ id: playerId, freeMana: beforeMana + 7 }))()
-        return publishAwakeCharacterListBestEffort(playerId, [], [[]])
+        return publishAwakeCharacterListBestEffort(playerId, [], [[]], {
+            directMissionIds: [3410054],
+        })
     })
 
     assert.deepEqual(response, [])
     assert.equal(getPlayerSync(playerId).freeMana, beforeMana + 7)
-    assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId).get("1"), { 1: 1 })
-    assert.equal(sqlStatements.some(statement => /DELETE FROM players_character_awake_unlocks/i.test(statement)), true)
+    assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has("341005"), false)
+    assert.equal(sqlStatements.some(statement => /INSERT INTO players_character_awake_unlocks/i.test(statement)), true)
 })
 
 test("post-commit publication failure keeps duplicate-character compensation and response", () => {
     const playerId = createPlayer("duplicate-character")
-    prepareStaleUnlock(playerId)
+    preparePendingUnlock(playerId)
+    givePlayerCharacterSync(playerId, 1)
     const duplicate = givePlayerCharacterSync(playerId, 1)
     assert.ok(duplicate?.character)
     const beforeItemCount = getPlayerItemSync(playerId, duplicate.item.id) ?? 0
@@ -138,20 +159,21 @@ test("post-commit publication failure keeps duplicate-character compensation and
             playerId,
             [1],
             [[duplicate.character]],
+            { directMissionIds: [3410054] },
         )
     })
 
     assert.deepEqual(response, [duplicate.character])
     assert.equal(getPlayerItemSync(playerId, duplicate.item.id), beforeItemCount + 3)
     assert.equal(getPlayerCharacterSync(playerId, 1).stack, 2)
-    assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId).get("1"), { 1: 1 })
+    assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has("341005"), false)
 })
 
 test("post-commit publication failure keeps a newly granted character candidate", () => {
     const playerId = createPlayer("new-character")
-    prepareStaleUnlock(playerId)
+    preparePendingUnlock(playerId)
     const granted = {
-        character_id: 341005,
+        character_id: 231003,
         entry_count: 1,
     }
     const beforeCharacters = getPlayerCharactersSync(playerId)
@@ -159,15 +181,17 @@ test("post-commit publication failure keeps a newly granted character candidate"
     const response = withPublicationFailure(playerId, () => {
         database.transaction(() => {
             updatePlayerCategoryMissionSync(playerId, 9, 3410051, 1)
-            givePlayerCharacterSync(playerId, 341005)
+            givePlayerCharacterSync(playerId, 231003)
         })()
-        return publishAwakeCharacterListBestEffort(playerId, [341005], [[granted]])
+        return publishAwakeCharacterListBestEffort(playerId, [231003], [[granted]], {
+            directMissionIds: [3410054],
+        })
     })
 
     assert.deepEqual(response, [granted])
     assert.equal(Object.keys(getPlayerCharactersSync(playerId)).length, Object.keys(beforeCharacters).length + 1)
     assert.equal(getPlayerCategoryMissionsSync(playerId, 9)[3410051].progress, 1)
-    assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId).get("1"), { 1: 1 })
+    assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has("341005"), false)
 })
 
 test("Mana item sell publishes the invalidated player fact without a character hardcode", () => {
@@ -175,22 +199,22 @@ test("Mana item sell publishes the invalidated player fact without a character h
     const sellBlock = itemSource.slice(itemSource.indexOf('fastify.post("/sell"'))
     assert.match(
         sellBlock,
-        /publishAwakeCharacterListBestEffort\(playerId, \[\], \[\[\]\], \{\s*invalidatedFactKeys: \[\{ kind: ["']player["'] \}\],\s*\}\)/,
+        /publishCharacterGrowthOwnerStateBestEffort\(playerId, \[\], \[\[\]\], \{\s*invalidatedFactKeys: \[\{ kind: ["']player["'] \}\],\s*\},\s*["']item\/sell["']\)\.characterList/,
     )
     const publicationCall = sellBlock.slice(
-        sellBlock.indexOf("publishAwakeCharacterListBestEffort("),
+        sellBlock.indexOf("publishCharacterGrowthOwnerStateBestEffort("),
         sellBlock.indexOf("console.log("),
     )
     assert.doesNotMatch(publicationCall, /263002|characterId|character_id/)
 })
 
-test("35.3 has exactly nine post-commit owner expressions", () => {
+test("post-commit inventory covers the eleven Character Growth owner expressions", () => {
     const postCommitFiles = new Set(Object.keys(POST_COMMIT_35_3_OWNER_INVENTORY))
     const transactionFiles = new Set(Object.values(TRANSACTION_INTERNAL_35_2_OWNER_INVENTORY).flat())
     assert.equal(
         Object.values(POST_COMMIT_35_3_OWNER_INVENTORY).flat().length,
-        9,
-        "35.3 post-commit owner expressions",
+        11,
+        "post-commit Character Growth owner expressions",
     )
     assert.equal(
         Object.keys(TRANSACTION_INTERNAL_35_2_OWNER_INVENTORY).length,
@@ -205,7 +229,7 @@ test("35.3 has exactly nine post-commit owner expressions", () => {
 
     for (const [relativeFile, sources] of Object.entries(POST_COMMIT_35_3_OWNER_INVENTORY)) {
         const source = fs.readFileSync(path.join(__dirname, "..", relativeFile), "utf8")
-        assert.equal((source.match(/publishAwakeCharacterListBestEffort\(/g) ?? []).length, sources.length, relativeFile)
+        assert.equal((source.match(/publishCharacterGrowthOwnerStateBestEffort\(/g) ?? []).length, sources.length, relativeFile)
         assert.doesNotMatch(source, /reconcileAwakeUnlockCharacterList\(/, relativeFile)
     }
 })

@@ -23,7 +23,7 @@ import { getRuntimeContentTableSync } from "../../../content/runtime/table-acces
 import { settleAdditionalRewardsSync, type AdditionalRewardTable } from "../../additional-reward"
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../rush"
 import { recordMissionBattleFacts } from "../../mission/battle-facts"
-import { publishAwakeCharacterListBestEffort } from "../../mission/awake-best-effort-context"
+import { publishCharacterGrowthOwnerStateBestEffort } from "../../character-growth/owner-publication"
 import { getCarnivalRewardDefinitions, grantCarnivalRewards } from "../../carnival-rewards"
 import { givePlayerEquipmentSync } from "../../equipment"
 import { getRaidEventRequiredKillCount } from "../../raid-event-master"
@@ -276,7 +276,14 @@ export function executeSingleSettlementWrites(
         deleteActiveQuest: pid => deletePlayerActiveQuestSync(pid),
     }) : null
     const scoreAttackRewardResult = scoreAttackFinishResult?.rewardResult
-    const { missionSettlement, awakeMissionSettlement, activeMissionList, invalidatedFactKeys } =
+    const {
+        missionSettlement,
+        awakeMissionSettlement,
+        awakeMissionIds,
+        evaluatedAwakeUnlocks,
+        activeMissionList,
+        invalidatedFactKeys,
+    } =
         settleSingleMissionEvaluations({
         playerId, partyCharacterIds, evaluationTime: settlementTime, questAccomplished,
         directAwakeMissionIds: missionBattleFacts.awakeMissionIds,
@@ -312,9 +319,24 @@ export function executeSingleSettlementWrites(
             rushEventRewardsResult, carnivalRewardResult, scoreAttackRewardResult,
         ],
         manaObtained, questCategory, questAccomplished, questPreviouslyCompleted,
+        directAwakeMissionIds: [
+            ...missionBattleFacts.awakeMissionIds,
+            ...awakeMissionIds,
+        ],
+        evaluatedAwakeUnlocks,
     })
-    const characterList = publishAwakeCharacterListBestEffort(playerId, partyCharacterIds,
-        awakePublication.characterLists, { invalidatedFactKeys: awakePublication.invalidatedFactKeys })
+    const characterList = publishCharacterGrowthOwnerStateBestEffort(
+        playerId,
+        partyCharacterIds,
+        awakePublication.characterLists,
+        {
+            invalidatedFactKeys: awakePublication.invalidatedFactKeys,
+            directMissionIds: awakePublication.directMissionIds,
+            evaluatedAwakeUnlocks: awakePublication.evaluatedAwakeUnlocks,
+        },
+        "single-finish",
+        settlementTime,
+    ).characterList
     return {
         afterStamina, afterStaminaHealTime, dailyChallengePointList,
         scoreRewardSelection, scoreRewardsResult, additionalRewardSettlement,

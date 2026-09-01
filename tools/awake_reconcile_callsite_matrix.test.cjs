@@ -21,9 +21,17 @@ const CALLEES = new Map([
     ["reconcileAwakeUnlockCharacterListStrict", "strict"],
     ["reconcileAwakeUnlockCharacterListBestEffort", "best-effort"],
     ["publishAwakeCharacterListBestEffort", "best-effort"],
+    ["publishCharacterGrowthOwnerStateBestEffort", "best-effort"],
+    ["publishAwakeUnlockCharacterListWithinTransaction", "growth-facts-in-tx"],
+    ["publishAwakeUnlockCharacterListWithStateWithinTransaction", "growth-facts-in-tx"],
 ])
 const AWAKE_CALLEE_PREFIX = "reconcileAwakeUnlockCharacterList"
 const SINGLE_AWAKE_WRAPPER = "publishAwakeCharacterListBestEffort"
+const GROWTH_AWAKE_WRAPPER = "publishCharacterGrowthOwnerStateBestEffort"
+const GROWTH_AWAKE_FACT_WRITERS = new Set([
+    "publishAwakeUnlockCharacterListWithinTransaction",
+    "publishAwakeUnlockCharacterListWithStateWithinTransaction",
+])
 const PLANNED_CANDIDATE_SOURCES = Object.freeze({
     "single/finish": "battle-party+invalidated-facts",
     "multi/finish": "battle-party+direct-missions",
@@ -290,10 +298,10 @@ function matrixRow({
 }
 
 const EXPECTED_MATRIX = Object.freeze([
-    matrixRow({ relativeFile: "src/lib/character-growth/commands/learn-mana-nodes.ts", callee: "strict", owner: "character/learn_mana_node", boundary: "strict-in-tx", actualCharacterSeed: "[command.characterId]", finalAuthoritativeWrite: "finalizeLearnManaAwakePublicationWrites", runtimeEvidenceKey: "learn-mana-final-node" }),
-    matrixRow({ relativeFile: "src/lib/quest/finish/single-settlement-writes.ts", owner: "single/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "partyCharacterIds", actualFactSeeds: "awakePublication.invalidatedFactKeys", finalAuthoritativeWrite: "finalizeSingleAwakePublicationWrites", runtimeEvidenceKey: "single-finish", changesGlobalFacts: true, rereadReason: SINGLE_REREAD_REASON }),
-    matrixRow({ relativeFile: "src/multi/settlement/orchestrator.ts", owner: "multi/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "invalidatedFactKeys", finalAuthoritativeWrite: "finalizeMultiAwakePublicationWrites", runtimeEvidenceKey: "multi-finish", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/activeMission.ts", owner: "active_mission/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "granter.invalidatedFactKeys", finalAuthoritativeWrite: "persistPlayer", runtimeEvidenceKey: "active-mission-receive", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/lib/character-growth/commands/learn-mana-nodes.ts", callee: "growth-facts-in-tx", owner: "character/learn_mana_node", boundary: "strict-in-tx", actualCharacterSeed: "[command.characterId]", finalAuthoritativeWrite: "finalizeLearnManaAwakePublicationWrites", runtimeEvidenceKey: "learn-mana-final-node" }),
+    matrixRow({ relativeFile: "src/lib/quest/finish/single-settlement-writes.ts", owner: "single/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "partyCharacterIds", actualFactSeeds: "awakePublication.invalidatedFactKeys", directMissionSeed: "awakePublication.directMissionIds", finalAuthoritativeWrite: "finalizeSingleAwakePublicationWrites", runtimeEvidenceKey: "single-finish", changesGlobalFacts: true, rereadReason: SINGLE_REREAD_REASON }),
+    matrixRow({ relativeFile: "src/multi/settlement/orchestrator.ts", owner: "multi/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "invalidatedFactKeys", directMissionSeed: "[ ...missionBattleFacts.awakeMissionIds, ...(awakeMissionEvaluation?.evaluation.missions.map(mission => mission.missionId) ?? []), ]", finalAuthoritativeWrite: "finalizeMultiAwakePublicationWrites", runtimeEvidenceKey: "multi-finish", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/activeMission.ts", owner: "active_mission/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "[]", actualFactSeeds: "granter.invalidatedFactKeys", finalAuthoritativeWrite: "persistPlayer", runtimeEvidenceKey: "active-mission-receive", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/boxGacha.ts", owner: "box_gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "settlement.rewardResult?.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "box-gacha-exec", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/character.ts", owner: "character/add_character_from_town", boundary: "best-effort-post-commit", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "character-town-grant" }),
     matrixRow({ relativeFile: "src/routes/api/character/bond.ts", owner: "character/receive_bond_token", boundary: "best-effort-in-tx", actualCharacterSeed: "[body.character_id]", finalAuthoritativeWrite: "receiveBondToken", runtimeEvidenceKey: "bond-success" }),
@@ -301,16 +309,16 @@ const EXPECTED_MATRIX = Object.freeze([
     matrixRow({ relativeFile: "src/routes/api/gacha.ts", owner: "gacha/exchange_character", boundary: "best-effort-post-commit", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "gacha-exchange-character" }),
     matrixRow({ relativeFile: "src/routes/api/gacha.ts", owner: "gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "gacha-exec" }),
     matrixRow({ relativeFile: "src/routes/api/item.ts", owner: "item/sell", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "player", finalAuthoritativeWrite: "sellItemSync", runtimeEvidenceKey: "mana-item-sell", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "mail", finalAuthoritativeWrite: "finalizeMailReceiveAwakePublicationWrites", runtimeEvidenceKey: "mail-receive", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive_all", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "mail", finalAuthoritativeWrite: "finalizeMailReceiveAllAwakePublicationWrites", runtimeEvidenceKey: "mail-receive-all", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "[]", actualFactSeeds: "mail", finalAuthoritativeWrite: "finalizeMailReceiveAwakePublicationWrites", runtimeEvidenceKey: "mail-receive", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive_all", boundary: "best-effort-in-tx", actualCharacterSeed: "[]", actualFactSeeds: "mail", finalAuthoritativeWrite: "finalizeMailReceiveAllAwakePublicationWrites", runtimeEvidenceKey: "mail-receive-all", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/mission.ts", owner: "mission/update_mission_progress", boundary: "best-effort-post-commit", actualCharacterSeed: "awakeCandidateCharacterIds", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "category9-update-progress" }),
     matrixRow({ relativeFile: "src/routes/api/passCard.ts", owner: "pass_card/receive_all", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "result.invalidatedFactKeys", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "pass-card-receive-all", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/raidEvent.ts", owner: "raid_event/summary", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "raid-event-summary", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/shop.ts", owner: "shop/buy", boundary: "best-effort-post-commit", actualCharacterSeed: "rewardResult.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "executeGenericShopPurchaseSync", runtimeEvidenceKey: "shop-buy", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/shop.ts", owner: "shop/bulk_buy", boundary: "best-effort-post-commit", actualCharacterSeed: "rewardResult.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "executeGenericShopBatchPurchaseSync", runtimeEvidenceKey: "shop-bulk-buy", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/storyQuest.ts", owner: "story_quest/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "story-reward+quest-progress", finalAuthoritativeWrite: "reconcileActiveMissionFacts", runtimeEvidenceKey: "story-finish", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/tutorial.ts", owner: "tutorial/update_step:15", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", finalAuthoritativeWrite: "updatePlayerSync", runtimeEvidenceKey: "tutorial-step-15" }),
-    matrixRow({ relativeFile: "src/routes/api/tutorial.ts", owner: "tutorial/update_step:16", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", finalAuthoritativeWrite: "updatePlayerSync", runtimeEvidenceKey: "tutorial-step-16" }),
+    matrixRow({ relativeFile: "src/routes/api/storyQuest.ts", owner: "story_quest/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "storyCandidateCharacterIds", actualFactSeeds: "story-reward+quest-progress", finalAuthoritativeWrite: "reconcileActiveMissionFacts", runtimeEvidenceKey: "story-finish", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/tutorial.ts", owner: "tutorial/update_step:15", boundary: "best-effort-in-tx", actualCharacterSeed: "[randomCharacterId]", finalAuthoritativeWrite: "updatePlayerSync", runtimeEvidenceKey: "tutorial-step-15" }),
+    matrixRow({ relativeFile: "src/routes/api/tutorial.ts", owner: "tutorial/update_step:16", boundary: "best-effort-in-tx", actualCharacterSeed: "[freeTutorialCharacterId]", finalAuthoritativeWrite: "updatePlayerSync", runtimeEvidenceKey: "tutorial-step-16" }),
 ])
 
 function isMissionModuleSpecifier(specifier) {
@@ -331,7 +339,9 @@ function collectImportedAwakeCalls(source, fileName) {
             for (const element of bindings.elements) {
                 const exportedName = element.propertyName?.text ?? element.name.text
                 if (!exportedName.startsWith(AWAKE_CALLEE_PREFIX)
-                    && exportedName !== SINGLE_AWAKE_WRAPPER) continue
+                    && exportedName !== SINGLE_AWAKE_WRAPPER
+                    && exportedName !== GROWTH_AWAKE_WRAPPER
+                    && !GROWTH_AWAKE_FACT_WRITERS.has(exportedName)) continue
                 const symbol = checker.getSymbolAtLocation(element.name)
                 if (symbol === undefined) continue
                 namedImports.push({ symbol, exportedName, moduleSpecifier })
@@ -363,7 +373,10 @@ function collectImportedAwakeCalls(source, fileName) {
                 }
                 const namespaceSpecifier = imported.moduleSpecifier
                 const name = node.expression.name.text
-                if (name.startsWith(AWAKE_CALLEE_PREFIX) || name === SINGLE_AWAKE_WRAPPER) {
+                if (name.startsWith(AWAKE_CALLEE_PREFIX)
+                    || name === SINGLE_AWAKE_WRAPPER
+                    || name === GROWTH_AWAKE_WRAPPER
+                    || GROWTH_AWAKE_FACT_WRITERS.has(name)) {
                     exportedName = name
                     moduleSpecifier = namespaceSpecifier
                 }
@@ -373,7 +386,18 @@ function collectImportedAwakeCalls(source, fileName) {
                     && !moduleSpecifier.endsWith("/awake-best-effort-context")) {
                     throw new Error(`${fileName} single Awake wrapper import must use awake-best-effort-context`)
                 }
+                if (exportedName === GROWTH_AWAKE_WRAPPER
+                    && !moduleSpecifier.endsWith("/character-growth/owner-publication")) {
+                    throw new Error(`${fileName} Growth owner wrapper import must use character-growth/owner-publication`)
+                }
+                if (GROWTH_AWAKE_FACT_WRITERS.has(exportedName)
+                    && !moduleSpecifier.endsWith("/character-growth/facts/awake-unlock-facts")
+                    && !moduleSpecifier.endsWith("/facts/awake-unlock-facts")) {
+                    throw new Error(`${fileName} Growth fact writer import must use character-growth/facts/awake-unlock-facts`)
+                }
                 if (exportedName !== SINGLE_AWAKE_WRAPPER
+                    && exportedName !== GROWTH_AWAKE_WRAPPER
+                    && !GROWTH_AWAKE_FACT_WRITERS.has(exportedName)
                     && !isMissionModuleSpecifier(moduleSpecifier)) {
                     ts.forEachChild(node, visit)
                     return
@@ -932,13 +956,18 @@ function assertMultiSettlementTransactionOwnership(source, fileName) {
         checker,
         "runMultiplayerSettlementOrchestration",
     )
+    const growthPublication = source.includes("publishCharacterGrowthOwnerStateBestEffort")
     const awakeImportSymbol = findNamedImportSymbol(
         sourceFile,
         checker,
-        source.includes("reconcileAwakeUnlockCharacterListBestEffort")
-            ? "reconcileAwakeUnlockCharacterListBestEffort"
-            : "reconcileAwakeUnlockCharacterList",
-        isMissionModuleSpecifier,
+        growthPublication
+            ? "publishCharacterGrowthOwnerStateBestEffort"
+            : source.includes("reconcileAwakeUnlockCharacterListBestEffort")
+                ? "reconcileAwakeUnlockCharacterListBestEffort"
+                : "reconcileAwakeUnlockCharacterList",
+        growthPublication
+            ? specifier => specifier.endsWith("/character-growth/owner-publication")
+            : isMissionModuleSpecifier,
     )
     const awakeCalls = collectCallsForSymbol(sourceFile, checker, awakeImportSymbol)
     assert.equal(
@@ -1016,7 +1045,7 @@ function classifyBoundary(relativeFile, callee, call) {
         return "best-effort-in-tx"
     }
     const inTransaction = isInsideDirectTransaction(call)
-    if (callee === "strict") {
+    if (callee === "strict" || callee === "growth-facts-in-tx") {
         assert.equal(inTransaction, true, `${relativeFile} strict publication left its transaction`)
         return "strict-in-tx"
     }
@@ -1050,9 +1079,11 @@ function callTerminalName(call) {
     return null
 }
 
-function findContextCreation(call, sourceFile, checker, ownerRoot) {
+function findContextCreation(call, sourceFile, checker, ownerRoot, directContextArgument = false) {
     const options = call.arguments[2]
-    const contextReference = getObjectProperty(options, "context")
+    const contextReference = directContextArgument
+        ? options
+        : getObjectProperty(options, "context")
     assert.equal(
         contextReference !== null && ts.isIdentifier(contextReference),
         true,
@@ -1125,12 +1156,18 @@ function extractScopeEvidence(importedCall, ownerRoot = findOwnerRoot(importedCa
     let actualCharacterSeed
     let scope
     let contextStart
-    if (exportedName === SINGLE_AWAKE_WRAPPER) {
+    if (exportedName === SINGLE_AWAKE_WRAPPER || exportedName === GROWTH_AWAKE_WRAPPER) {
         actualCharacterSeed = compactExpression(call.arguments[1], sourceFile)
         scope = call.arguments[3]
         contextStart = call.getStart(sourceFile)
     } else {
-        const creation = findContextCreation(call, sourceFile, checker, ownerRoot)
+        const creation = findContextCreation(
+            call,
+            sourceFile,
+            checker,
+            ownerRoot,
+            GROWTH_AWAKE_FACT_WRITERS.has(exportedName),
+        )
         contextStart = creation.getStart(sourceFile)
         if (callTerminalName(creation) === "createAwakeRequestContext") {
             scope = creation.arguments[0]
@@ -1621,7 +1658,10 @@ function collectProductionCalls() {
     const calls = []
     for (const file of files) {
         const relativeFile = path.relative(projectRoot, file).split(path.sep).join("/")
-        if (relativeFile === "src/lib/mission/awake-unlock-response.ts") continue
+        if (relativeFile === "src/lib/mission/awake-unlock-response.ts"
+            || relativeFile === "src/lib/mission/awake-best-effort-context.ts"
+            || relativeFile === "src/lib/character-growth/owner-publication.ts"
+            || relativeFile === "src/lib/character-growth/facts/awake-unlock-facts.ts") continue
         const source = fs.readFileSync(file, "utf8")
         for (const importedCall of collectImportedAwakeCalls(source, relativeFile)) {
             const { call, callee, checker, exportedName, moduleSpecifier, sourceFile } = importedCall
@@ -1640,13 +1680,26 @@ function collectProductionCalls() {
                 if (relativeFile === "src/lib/quest/finish/single-settlement-writes.ts") {
                     assertSingleAwakePublicationWrapper()
                 }
+            } else if (exportedName === GROWTH_AWAKE_WRAPPER) {
+                assert.ok(
+                    call.arguments.length === 4 || call.arguments.length === 5 || call.arguments.length === 6,
+                    `${relativeFile} Growth owner publication must use the supported signature`,
+                )
+            } else if (GROWTH_AWAKE_FACT_WRITERS.has(exportedName)) {
+                assert.equal(
+                    call.arguments.length,
+                    4,
+                    `${relativeFile} Growth fact writer must use the supported signature`,
+                )
             } else {
                 assert.ok(
                     call.arguments.length === 2 || call.arguments.length === 3,
                     `${relativeFile} publication must use the supported signature`,
                 )
             }
-            if (call.arguments.length === 3 && exportedName !== SINGLE_AWAKE_WRAPPER) {
+            if (call.arguments.length === 3 && exportedName !== SINGLE_AWAKE_WRAPPER
+                && exportedName !== GROWTH_AWAKE_WRAPPER
+                && !GROWTH_AWAKE_FACT_WRITERS.has(exportedName)) {
                 const options = call.arguments[2]
                 assert.equal(
                     ts.isObjectLiteralExpression(options),
@@ -1706,9 +1759,13 @@ function collectProductionCalls() {
                 ownerLabel,
                 boundary: classifyBoundary(relativeFile, callee, call),
                 candidateSource: (
-                    exportedName === SINGLE_AWAKE_WRAPPER
+                        exportedName === SINGLE_AWAKE_WRAPPER
                         ? call.arguments.length === 4
-                        : call.arguments.length === 3
+                        : exportedName === GROWTH_AWAKE_WRAPPER
+                            ? call.arguments.length >= 4
+                            : GROWTH_AWAKE_FACT_WRITERS.has(exportedName)
+                                ? call.arguments.length === 4
+                            : call.arguments.length === 3
                 ) ? "scoped-context" : "legacy-unscoped",
                 plannedCandidateSource: PLANNED_CANDIDATE_SOURCES[ownerLabel],
                 owner: ownerLabel,
@@ -1866,7 +1923,7 @@ test("Awake reconcile audit matrix freezes owner, policy, and planned candidate 
     assert.equal(new Set(EXPECTED_MATRIX.map(entry => entry.ownerLabel)).size, 21)
     const single = EXPECTED_MATRIX.find(entry => entry.owner === "single/finish")
     assert.equal(single.plannedCandidateSource, "battle-party+invalidated-facts")
-    assert.equal(single.directMissionSeed, "none")
+    assert.equal(single.directMissionSeed, "awakePublication.directMissionIds")
     for (const entry of EXPECTED_MATRIX) {
         assert.equal(
             entry.candidateSource,

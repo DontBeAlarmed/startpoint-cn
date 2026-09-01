@@ -15,7 +15,7 @@ import { getBoxGachaSync } from "../../lib/assets";
 import { parseBoxGachaResetRequest, sendBoxGachaResultCode } from "../../lib/box-gacha-protocol";
 import { BoxGachaInvalidPeriodError, BoxGachaResetError, resetBoxGachaSync, validateBoxGachaPeriod } from "../../lib/box-gacha-reset";
 import { drawBoxGachaSync, rewardPlayerBoxGachaResultSync } from "../../lib/gacha";
-import { publishAwakeCharacterListBestEffort } from "../../lib/mission/awake-best-effort-context";
+import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { BoxGachaBoxes } from "../../lib/types";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time";
@@ -437,7 +437,7 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         const existingCharacterList = (settlement.rewardResult?.character_list ?? []) as Record<string, unknown>[]
-        const characterList = publishAwakeCharacterListBestEffort(
+        const characterList = publishCharacterGrowthOwnerStateBestEffort(
             playerId,
             settlement.rewardResult?.joined_character_id_list ?? [],
             [existingCharacterList],
@@ -446,7 +446,8 @@ const routes = async (fastify: FastifyInstance) => {
                     settlement.rewardResult,
                 ),
             },
-        )
+            "box-gacha/exec",
+        ).characterList
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

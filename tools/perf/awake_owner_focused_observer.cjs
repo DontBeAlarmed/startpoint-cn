@@ -48,10 +48,36 @@ function observation(kind, {
 function installAwakeOwnerFocusedObserver() {
     const bestEffort = require("../../src/lib/mission/awake-best-effort-context")
     const strictContext = require("../../src/lib/mission/awake-request-context")
+    const growthPublication = require("../../src/lib/character-growth/owner-publication")
     const originals = {
         publish: bestEffort.publishAwakeCharacterListBestEffort,
+        growthPublication: growthPublication.publishCharacterGrowthOwnerStateBestEffort,
         bestEffortContext: bestEffort.createAwakeRequestContextBestEffort,
         strictContext: strictContext.createAwakeRequestContext,
+    }
+    growthPublication.publishCharacterGrowthOwnerStateBestEffort = function observedGrowthPublication(
+        playerId,
+        explicitCharacterIds,
+        characterLists,
+        scope = {},
+    ) {
+        if (nestedHelperDepth === 0) active?.push(observation("publish-wrapper", {
+            explicitCharacterIds, characterLists, scope,
+        }))
+        nestedHelperDepth++
+        try {
+            return originals.growthPublication.call(
+                this,
+                playerId,
+                explicitCharacterIds,
+                characterLists,
+                scope,
+                arguments[4],
+                arguments[5],
+            )
+        } finally {
+            nestedHelperDepth--
+        }
     }
     let active = null
     let nestedHelperDepth = 0
@@ -113,6 +139,7 @@ function installAwakeOwnerFocusedObserver() {
         restore() {
             active = null
             bestEffort.publishAwakeCharacterListBestEffort = originals.publish
+            growthPublication.publishCharacterGrowthOwnerStateBestEffort = originals.growthPublication
             bestEffort.createAwakeRequestContextBestEffort = originals.bestEffortContext
             strictContext.createAwakeRequestContext = originals.strictContext
         },

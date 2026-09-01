@@ -13,12 +13,11 @@ import { givePlayerCharactersExpSync } from "../../lib/character"
 import { buildBattleMissionSettlementScopes, recordMissionBattleFacts } from "../../lib/mission/battle-facts"
 import {
     getAwakeBattleMissionIds,
-    reconcileAwakeUnlockCharacterListBestEffort,
     settleAwakeMissionCandidatesWithEvaluation,
     settleMissionCategoriesWithEvaluation,
 } from "../../lib/mission"
 import { collectAwakeCandidateCharacterIds } from "../../lib/mission/awake-candidate-character-ids"
-import { createAwakeRequestContextBestEffort } from "../../lib/mission/awake-best-effort-context"
+import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication"
 import { getAwakeFactKeysFromLegacyRewardResults } from "../../lib/mission/awake-reward-facts"
 import type { FactKey } from "../../lib/mission/facts/fact-key"
 import {
@@ -507,18 +506,29 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
                 ? [{ kind: "questProgress" as const, sections: [QuestCategory.CHARACTER] }]
                 : []),
         ]
-        const awakeContext = createAwakeRequestContextBestEffort(
+        const characterList = publishCharacterGrowthOwnerStateBestEffort(
             input.playerId,
             candidateCharacterIds,
-            { invalidatedFactKeys },
-        )
-        const characterList = awakeContext === null
-            ? existingCharacterList
-            : reconcileAwakeUnlockCharacterListBestEffort(
-                input.playerId,
-                existingCharacterList,
-                { context: awakeContext },
-            )
+            [existingCharacterList],
+            {
+                invalidatedFactKeys,
+                directMissionIds: [
+                    ...missionBattleFacts.awakeMissionIds,
+                    ...(awakeMissionEvaluation?.evaluation.missions.map(mission => mission.missionId) ?? []),
+                ],
+                ...(awakeMissionEvaluation === null ? {} : {
+                    evaluatedAwakeUnlocks: {
+                        progressList: awakeMissionEvaluation.evaluation.missions.map(mission => ({
+                            missionId: mission.missionId,
+                            progress: mission.finalProgress,
+                        })),
+                        resolver: awakeMissionEvaluation.resolver,
+                    },
+                }),
+            },
+            "multi-finish",
+            settlementTime,
+        ).characterList
         return {
             characterList,
             clearReward,

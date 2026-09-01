@@ -333,7 +333,7 @@
     },
     "single-battle-finish": {
       "sqlReads": 31,
-      "sqlWrites": 32,
+      "sqlWrites": 31,
       "missionComputes": 425,
       "behavior": {
         "adapter": "mission-finish-boundary",
@@ -344,9 +344,7 @@
             3410053,
             3410054
           ],
-          "characterIds": [
-            341005
-          ],
+          "characterIds": [],
           "degreeIds": [],
           "equipmentIds": [],
           "itemIds": [
@@ -430,11 +428,11 @@
           "missionProgressSha256": "11dd27442f2ff1b0c2614337fefa7218f6970cd73884aa8c382978ae3e88b8eb"
         }
       },
-      "behaviorSha256": "5ef3038d8f9e610ef77dd448268e3d5e6376afa51ab65ba432ea01b72cc18079"
+      "behaviorSha256": "d52ffaa18213ed908d72dd41a4b391ca55bb82705649b86f1bcf9f452cc17147"
     },
     "multi-battle-finish": {
       "sqlReads": 32,
-      "sqlWrites": 38,
+      "sqlWrites": 37,
       "missionComputes": 425,
       "behavior": {
         "adapter": "mission-finish-boundary",
@@ -445,9 +443,7 @@
             3410053,
             3410054
           ],
-          "characterIds": [
-            341005
-          ],
+          "characterIds": [],
           "degreeIds": [],
           "equipmentIds": [],
           "itemIds": [
@@ -547,7 +543,7 @@
           "missionProgressSha256": "cee72ac82a628e00620d2a847b6920093ce5b9b0132fc9155a135c5109faebc3"
         }
       },
-      "behaviorSha256": "0bbb33321d91198995aa1d342438e617bb5cf8ea1c9768c0a0c2c5522ec335c0"
+      "behaviorSha256": "aa58efd69b986ff5afc4d46b6ce4fe866996d4d84d4b8284ba20d75042221edc"
     }
   }
 }

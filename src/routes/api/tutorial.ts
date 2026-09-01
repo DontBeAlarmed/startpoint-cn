@@ -20,10 +20,8 @@ import { rewardPlayerGachaDrawResultSync } from "../../lib/gacha";
 import { givePlayerCharacterSync } from "../../lib/character";
 import { randomInt } from "crypto";
 import { GachaCharacterDraw } from "../../lib/types";
-import { reconcileAwakeUnlockCharacterListBestEffort } from "../../lib/mission";
-import { collectAwakeCandidateCharacterIds } from "../../lib/mission/awake-candidate-character-ids";
-import { createAwakeRequestContextBestEffort } from "../../lib/mission/awake-best-effort-context";
-import { getRealNow } from "../../runtime/time/game-time";
+import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
+import { getRealNow, getVirtualNow } from "../../runtime/time/game-time";
 import {
     getTutorialEffectiveNextStep,
     TUTORIAL_END_EFFECTIVE_STEP,
@@ -368,17 +366,14 @@ const routes = async (fastify: FastifyInstance) => {
                 )
                 const characterList = existingCharacterList.length > 0
                     ? (() => {
-                        const candidateCharacterIds = collectAwakeCandidateCharacterIds(
+                        return publishCharacterGrowthOwnerStateBestEffort(
+                            playerId,
                             [randomCharacterId],
                             [existingCharacterList],
-                        )
-                        const awakeContext = createAwakeRequestContextBestEffort(playerId, candidateCharacterIds)
-                        if (awakeContext === null) return existingCharacterList
-                        return reconcileAwakeUnlockCharacterListBestEffort(
-                            playerId,
-                            existingCharacterList,
-                            { context: awakeContext, candidateCharacterIds },
-                        )
+                            {},
+                            "tutorial/gacha",
+                            getVirtualNow(),
+                        ).characterList
                     })()
                     : existingCharacterList
 
@@ -454,17 +449,14 @@ const routes = async (fastify: FastifyInstance) => {
 
                 const characterList = existingCharacterList.length > 0
                     ? (() => {
-                        const candidateCharacterIds = collectAwakeCandidateCharacterIds(
+                        return publishCharacterGrowthOwnerStateBestEffort(
+                            playerId,
                             [freeTutorialCharacterId],
                             [existingCharacterList],
-                        )
-                        const awakeContext = createAwakeRequestContextBestEffort(playerId, candidateCharacterIds)
-                        if (awakeContext === null) return existingCharacterList
-                        return reconcileAwakeUnlockCharacterListBestEffort(
-                            playerId,
-                            existingCharacterList,
-                            { context: awakeContext, candidateCharacterIds },
-                        )
+                            {},
+                            "tutorial/free-character",
+                            getVirtualNow(),
+                        ).characterList
                     })()
                     : existingCharacterList
 

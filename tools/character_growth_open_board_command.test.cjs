@@ -35,6 +35,7 @@ const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
 const { givePlayerItemSync } = require("../src/data/domains/item")
+const { buildCharacterListEntry } = require("../src/lib/character-helpers")
 
 initializeDatabase()
 const db = getDb()
@@ -120,6 +121,77 @@ test("openManaBoard opens board two, builds missing token rows, and settles cate
             { manaBoardIndex: 2, status: 0 },
         ],
     )
+    const persistedCharacter = getPlayerCharacterSync(playerId, 1)
+    assert.equal(
+        result.characterList[0].update_time,
+        buildCharacterListEntry(1, persistedCharacter).update_time,
+    )
+})
+
+test("openManaBoard rejects an invalid raw protection value before Growth or mission writes", () => {
+    const playerId = createReadyPlayer()
+    db.prepare(`
+        UPDATE players_characters
+        SET protection = 2
+        WHERE player_id = ? AND id = 1
+    `).run(playerId)
+    const missionProgressBefore = db.prepare(`
+        SELECT category, id, progress
+        FROM players_category_missions
+        WHERE player_id = ? AND category = 1
+        ORDER BY id
+    `).all(playerId)
+    const missionStagesBefore = db.prepare(`
+        SELECT category, id, status, mission_id
+        FROM players_category_mission_stages
+        WHERE player_id = ? AND category = 1
+        ORDER BY mission_id, id
+    `).all(playerId)
+    const itemsBefore = db.prepare(`
+        SELECT id, amount
+        FROM players_items
+        WHERE player_id = ?
+        ORDER BY id
+    `).all(playerId)
+
+    assert.throws(
+        () => openManaBoard({
+            playerId,
+            characterId: 1,
+            targetBoardIndex: 2,
+            evaluationTime: new Date("2024-08-14T12:00:00.000Z"),
+        }),
+        error => error.code === "INVALID_GROWTH_STATE",
+    )
+    const persisted = getPlayerCharacterSync(playerId, 1)
+    assert.equal(persisted.manaBoardIndex, 1)
+    assert.equal(db.prepare(`
+        SELECT protection
+        FROM players_characters
+        WHERE player_id = ? AND id = 1
+    `).get(playerId).protection, 2)
+    assert.equal(
+        persisted.bondTokenList.some(token => token.manaBoardIndex === 2),
+        false,
+    )
+    assert.deepEqual(db.prepare(`
+        SELECT category, id, progress
+        FROM players_category_missions
+        WHERE player_id = ? AND category = 1
+        ORDER BY id
+    `).all(playerId), missionProgressBefore)
+    assert.deepEqual(db.prepare(`
+        SELECT category, id, status, mission_id
+        FROM players_category_mission_stages
+        WHERE player_id = ? AND category = 1
+        ORDER BY mission_id, id
+    `).all(playerId), missionStagesBefore)
+    assert.deepEqual(db.prepare(`
+        SELECT id, amount
+        FROM players_items
+        WHERE player_id = ?
+        ORDER BY id
+    `).all(playerId), itemsBefore)
 })
 
 test("openManaBoard exact replay has no writes and invalid board three fails closed", () => {

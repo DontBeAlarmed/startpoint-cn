@@ -367,6 +367,10 @@ const SOURCE_RULES = [
         groups: ["integration:mission", "integration:mission-compiled"],
     },
     {
+        pattern: /^(?:src\/lib\/character-growth\/(?:facts\/(?:mission-growth-facts|awake-unlock-facts)|owner-publication)\.ts|tools\/character_growth_owner_(?:publication|transactions)\.test\.cjs)$/,
+        groups: ["integration:mission", "quick:character-growth"],
+    },
+    {
         pattern: /^(?:assets\/(?:mana_node|mana_board2_open_condition)\.json|src\/content\/mana-node-semantics\.ts|src\/lib\/(?:character-evolution|mana-board-availability)\.ts|src\/routes\/api\/character\/(?:mana|mana-awake|bond)\.ts|src\/data\/utils\/serialize-player\.ts|tools\/character_evolution(?:_route)?\.test\.cjs)$/,
         groups: ["quick:character", "quick:content"],
     },
