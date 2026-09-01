@@ -35,7 +35,11 @@ const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
 const { givePlayerItemSync } = require("../src/data/domains/item")
-const { buildCharacterListEntry } = require("../src/lib/character-helpers")
+const { getClientSerializedData } = require("../src/data/utils/player-data")
+const {
+    MANA_CHARACTER_GROWTH_FIELDS,
+    projectCharacterGrowthIncrement,
+} = require("../src/lib/character-growth/response-projector")
 
 initializeDatabase()
 const db = getDb()
@@ -123,9 +127,43 @@ test("openManaBoard opens board two, builds missing token rows, and settles cate
     )
     const persistedCharacter = getPlayerCharacterSync(playerId, 1)
     assert.equal(
-        result.characterList[0].update_time,
-        buildCharacterListEntry(1, persistedCharacter).update_time,
+        result.character.updateTime.toISOString(),
+        persistedCharacter.updateTime.toISOString(),
     )
+    assert.equal(result.character.manaBoardIndex, 2)
+    assert.deepEqual(result.character.bondTokenList, persistedCharacter.bondTokenList)
+
+    const responseCharacter = projectCharacterGrowthIncrement(result, {
+        character: result.character,
+        fields: [...MANA_CHARACTER_GROWTH_FIELDS, "mana_board_index"],
+    }).character_list[0]
+    const mergedClient = {
+        mana_board_index: 1,
+        bond_token_list: [{ mana_board_index: 1, status: 2 }],
+        ...responseCharacter,
+    }
+    const nextLoad = getClientSerializedData(playerId, { viewerId: 1 })
+    const loadedCharacter = nextLoad.user_character_list["1"]
+    const expectedGrowth = {
+        mana_board_index: 2,
+        bond_token_list: [
+            { mana_board_index: 1, status: 2 },
+            { mana_board_index: 2, status: 0 },
+        ],
+    }
+    assert.deepEqual({
+        mana_board_index: result.after.manaBoardIndex,
+        bond_token_list: [...result.after.bondTokens]
+            .map(([mana_board_index, status]) => ({ mana_board_index, status })),
+    }, expectedGrowth)
+    assert.deepEqual({
+        mana_board_index: mergedClient.mana_board_index,
+        bond_token_list: mergedClient.bond_token_list,
+    }, expectedGrowth)
+    assert.deepEqual({
+        mana_board_index: loadedCharacter.mana_board_index,
+        bond_token_list: loadedCharacter.bond_token_list,
+    }, expectedGrowth)
 })
 
 test("openManaBoard rejects an invalid raw protection value before Growth or mission writes", () => {

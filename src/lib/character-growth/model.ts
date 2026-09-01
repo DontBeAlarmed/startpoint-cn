@@ -13,6 +13,7 @@ export interface CharacterGrowthCoreFact {
 }
 
 export interface CharacterGrowthContentFacts {
+    readonly rarity: number
     readonly boardCount: number
     readonly boardNodeIds: ReadonlyMap<number, ReadonlySet<number>>
     readonly secondBoardAvailable: boolean

@@ -69,8 +69,8 @@ export interface GrowthRowUpdate {
 export function updateCharacterGrowthRowsSync(
     playerId: number,
     updates: readonly GrowthRowUpdate[],
-): void {
-    if (updates.length === 0) return
+): Date | null {
+    if (updates.length === 0) return null
     const unique = new Map<number, GrowthRowUpdate>()
     for (const update of updates) unique.set(update.characterId, update)
     const rows = [...unique.values()].sort((left, right) => left.characterId - right.characterId)
@@ -87,9 +87,10 @@ export function updateCharacterGrowthRowsSync(
         sets.push(`${column} = CASE id ${changed.map(() => "WHEN ? THEN ?").join(" ")} ELSE ${column} END`)
         for (const row of changed) values.push(row.characterId, row[property])
     }
-    if (sets.length === 0) return
+    if (sets.length === 0) return null
+    const updateTime = getRealNow()
     sets.push("update_time = ?")
-    values.push(getRealNow().toISOString())
+    values.push(updateTime.toISOString())
     const placeholders = rows.map(() => "?").join(", ")
     values.push(playerId, ...rows.map(row => row.characterId))
     getDb().prepare(`
@@ -97,6 +98,7 @@ export function updateCharacterGrowthRowsSync(
         SET ${sets.join(", ")}
         WHERE player_id = ? AND id IN (${placeholders})
     `).run(...values)
+    return updateTime
 }
 
 export function updatePlayerExpPoolSync(playerId: number, expPool: number): void {

@@ -1,8 +1,10 @@
 import { getDb } from "../../../data/db"
 import {
+    getPlayerCharacterSync,
     updatePlayerCharacterManaNodeAwakeLevelsBatchSync,
     updatePlayerCharacterSync,
 } from "../../../data/domains/character"
+import type { PlayerCharacter } from "../../../data/types"
 import { incrementActiveMissionUsedManaCountSync } from "../../../data/domains/active_mission_counters"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
 import { setPlayerItemWithinTransactionSync } from "../../../data/domains/item"
@@ -18,7 +20,6 @@ import {
     assertBoardComplete,
     boardNodeLevels,
     deriveEvolutionLevel,
-    deriveManaBoardAwake,
 } from "../node-state"
 import {
     characterLevelFromContent,
@@ -44,9 +45,8 @@ export interface AwakeManaNodesResult extends CharacterGrowthCommandResult {
         readonly bondTokens: ReadonlyMap<number, BondTokenStatus>
         readonly normalManaNodes: ReadonlyMap<number, number>
     }
-    readonly characterList: readonly Record<string, unknown>[]
+    readonly character: PlayerCharacter
     readonly evolution: Object
-    readonly manaBoardAwake: Record<number, number> | undefined
     readonly responseNodeEntries: readonly { readonly multiplied_id: number; readonly awake_level: number }[]
     readonly missionFacts: Readonly<{ readonly usedMana: number }>
 }
@@ -135,7 +135,6 @@ export function executeAwakeManaNodes(command: AwakeManaNodesCommand): AwakeMana
         }
         const nextNodes = applyManaNodePlan(allNodeLevels, plan)
         const plannedEvolutionLevel = deriveEvolutionLevel(content, nextNodes)
-        const manaBoardAwake = deriveManaBoardAwake(nextNodes, content, command.targetAwakeLevel)
         const before = observed(character, context.bondTokens(), allNodeLevels, context.awakeUnlocks())
 
         let resources
@@ -177,6 +176,10 @@ export function executeAwakeManaNodes(command: AwakeManaNodesCommand): AwakeMana
             nextNodes,
             context.awakeUnlocks(),
         ) as AwakeManaNodesResult["after"]
+        const characterData = getPlayerCharacterSync(command.playerId, command.characterId)
+        if (characterData === null) {
+            throw growthError("INVALID_GROWTH_STATE", "character disappeared during Growth mutation.")
+        }
         return {
             command: "awake_mana_nodes",
             before,
@@ -193,14 +196,13 @@ export function executeAwakeManaNodes(command: AwakeManaNodesCommand): AwakeMana
             missionSettlement: null,
             missionFacts: { usedMana: resources?.totalManaCost ?? 0 },
             replayed: false,
-            characterList: [],
+            character: characterData,
             responseNodeEntries: plan.responseNodeEntries,
             evolution: buildCharacterEvolutionResponse(
                 command.characterId,
                 character.evolutionLevel,
                 plannedEvolutionLevel,
             ),
-            manaBoardAwake,
         }
     })()
 }

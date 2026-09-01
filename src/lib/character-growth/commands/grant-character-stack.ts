@@ -4,11 +4,15 @@ import {
     givePlayerItemSync,
     givePlayerItemWithinTransactionSync,
 } from "../../../data/domains/item"
-import { clientSerializeDate } from "../../../data/utils/date"
 import type { PlayerCharacter } from "../../../data/types"
 import { getCharacterDataSync } from "../../assets"
 import type { Element, GivePlayerCharacterResult } from "../../types"
 import { addSafeInteger, assertInsideTransaction, updateCharacterGrowthRowsSync, validateGrowthCommandIds } from "../mutation-support"
+import {
+    STACK_CHARACTER_GROWTH_FIELDS,
+    characterGrowthProjectionStateFromPlayerCharacter,
+    projectCharacterGrowthEntry,
+} from "../response-projector"
 
 const duplicateItemByRarityAndElement: Readonly<Record<number, Readonly<Record<number, number>>>> = Object.freeze({
     3: { 0: 14001, 1: 14004, 2: 14007, 3: 14010, 4: 14016, 5: 14013 },
@@ -36,19 +40,20 @@ export function grantCharacterStackWithinTransactionSync(
     const itemId = duplicateItemByRarityAndElement[asset.rarity]?.[asset.element as Element]
     if (itemId !== undefined) giveItem(command.playerId, itemId, 1)
     const stack = addSafeInteger(character.stack, 1, "character.stack")
-    updateCharacterGrowthRowsSync(command.playerId, [{
+    const updateTime = updateCharacterGrowthRowsSync(command.playerId, [{
         characterId: command.characterId,
         stack,
     }])
+    if (updateTime === null) throw new Error("character stack update did not write")
+    const afterCharacter: PlayerCharacter = { ...character, stack, updateTime }
     return {
         isNew: false,
-        character: {
-            character_id: command.characterId,
-            stack,
-            create_time: clientSerializeDate(character.joinTime),
-            update_time: clientSerializeDate(character.updateTime),
-            join_time: clientSerializeDate(character.joinTime),
-        },
+        character: projectCharacterGrowthEntry({
+            characterId: command.characterId,
+            character: afterCharacter,
+            state: characterGrowthProjectionStateFromPlayerCharacter(command.characterId, afterCharacter),
+            fields: STACK_CHARACTER_GROWTH_FIELDS,
+        }),
         ...(itemId === undefined ? {} : { item: { id: itemId, count: 1 } }),
     }
 }

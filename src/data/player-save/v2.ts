@@ -30,6 +30,12 @@ import {
     PlayerSaveTableDefinition,
     PlayerSaveV2Snapshot,
 } from "./types"
+import {
+    CHARACTER_GROWTH_SAVE_TABLE_NAMES,
+    projectCharacterGrowthSaveTables,
+    replaceProjectedCharacterGrowthSaveTables,
+} from "../../lib/character-growth/save/project-growth-state"
+import { assertValidCharacterGrowthSaveState } from "../../lib/character-growth/save/validate-growth-state"
 
 const DOMAIN_NAMES: readonly PlayerSaveDomainName[] = ["core", "missions", "events", "economy", "mailbox"]
 const EXCLUDED_DOMAINS = ["account", "session", "serverConfig", "activeQuest"] as const
@@ -200,6 +206,11 @@ export function exportPlayerSaveV2Sync(
         )
     }
     if (domains.core.tables.players.length !== 1) throw new Error(`Player ${playerId} was not found`)
+    const growthProjection = projectCharacterGrowthSaveTables(domains.core.tables)
+    assertValidCharacterGrowthSaveState(growthProjection)
+    for (const table of CHARACTER_GROWTH_SAVE_TABLE_NAMES) {
+        domains.core.tables[table] = growthProjection[table].map(row => ({ ...row }))
+    }
 
     return {
         schema: PLAYER_SAVE_SCHEMA,
@@ -355,6 +366,12 @@ function flattenAndValidateV2Snapshot(
     return tables
 }
 
+function projectAndValidateGrowthTables(tables: Map<string, PlayerSaveRow[]>): void {
+    const projection = projectCharacterGrowthSaveTables(tables)
+    assertValidCharacterGrowthSaveState(projection)
+    replaceProjectedCharacterGrowthSaveTables(tables, projection)
+}
+
 function getInsertionOrder(
     metadata: ReadonlyMap<string, PlayerSaveTableMetadata>,
 ): PlayerSaveTableDefinition[] {
@@ -442,6 +459,7 @@ function applyV2SnapshotSync(
     requireSafePositiveInteger(targetPlayerId, "targetPlayerId")
     const schemaMetadata = assertRegistryMatchesDatabase(database)
     const tables = flattenAndValidateV2Snapshot(snapshot, database, schemaMetadata)
+    projectAndValidateGrowthTables(tables)
     const target = database.prepare("SELECT account_id FROM players WHERE id = ?").get(targetPlayerId)
     if (target === undefined) throw new Error(`Target player ${targetPlayerId} was not found`)
     const insertionOrder = getInsertionOrder(schemaMetadata)
@@ -487,7 +505,8 @@ export function validatePlayerSaveSnapshotSync(
     const parsed = parsePlayerSaveSnapshot(input)
     if (parsed.kind === "v2") {
         const schemaMetadata = assertRegistryMatchesDatabase(database)
-        flattenAndValidateV2Snapshot(parsed.snapshot, database, schemaMetadata)
+        const tables = flattenAndValidateV2Snapshot(parsed.snapshot, database, schemaMetadata)
+        projectAndValidateGrowthTables(tables)
     }
     return parsed
 }

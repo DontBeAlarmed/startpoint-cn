@@ -74,7 +74,18 @@ stubModule("../src/data/domains/character", {
         const row = db.prepare(
             "SELECT * FROM character_state WHERE player_id = ? AND character_id = ?",
         ).get(playerId, characterId)
-        return row === undefined ? null : { id: row.character_id, exp: row.exp }
+        return row === undefined ? null : {
+            entryCount: 1,
+            evolutionLevel: 0,
+            overLimitStep: 0,
+            protection: false,
+            joinTime: new Date("2026-01-01T00:00:00.000Z"),
+            updateTime: new Date("2026-01-01T00:00:00.000Z"),
+            exp: row.exp,
+            stack: 0,
+            manaBoardIndex: 1,
+            bondTokenList: [{ manaBoardIndex: 1, status: 0 }],
+        }
     },
     getPlayerCharactersSync: () => ({}),
     updatePlayerCharacterSync() {},
@@ -131,9 +142,23 @@ stubModule("../src/lib/character-growth/commands/inject-exp", {
                 total_injected_exp_count = total_injected_exp_count + 1
         `).run(playerId)
         const expPool = db.prepare("SELECT exp_pool FROM player_state WHERE id = ?").get(playerId).exp_pool
+        const afterExp = db.prepare(
+            "SELECT exp FROM character_state WHERE player_id = ? AND character_id = ?",
+        ).get(playerId, characterId).exp
         return {
             addExpList: [{ character_id: characterId, add_exp: addExp }],
             expPool,
+            after: {
+                playerId,
+                characterId,
+                rarity: 4,
+                exp: afterExp,
+                stack: 0,
+                protection: false,
+                overLimitStep: 0,
+                evolutionLevel: 0,
+                manaBoardIndex: 1,
+            },
         }
     },
 })

@@ -1,4 +1,5 @@
 import { getDb } from "../../../data/db"
+import type { PlayerCharacter } from "../../../data/types"
 import {
     getPlayerCharacterSync,
     insertPlayerCharacterManaNodesSync,
@@ -10,7 +11,6 @@ import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
 import { setPlayerItemWithinTransactionSync } from "../../../data/domains/item"
 import { isCharacterSecondManaBoardAvailable } from "../../mana-board-availability"
 import {
-    buildCharacterListEntryFromGrowth,
     updateBondTokenForCompletedBoardFromGrowthState,
 } from "../../character-helpers"
 import { buildCharacterEvolutionResponse } from "../../character-evolution"
@@ -37,6 +37,7 @@ import {
     validateNodeCommandIds,
 } from "../node-command-support"
 import { growthError } from "../errors"
+import { MANA_CHARACTER_GROWTH_FIELDS, projectCharacterGrowthIncrement } from "../response-projector"
 
 export interface LearnManaNodesCommand {
     readonly playerId: number
@@ -51,7 +52,7 @@ export interface LearnManaNodesResult extends CharacterGrowthCommandResult {
         readonly normalManaNodes: ReadonlyMap<number, number>
     }
     readonly bondTokenGranted: boolean
-    readonly characterList: readonly Record<string, unknown>[]
+    readonly character: PlayerCharacter
     readonly responseNodeEntries: readonly { readonly multiplied_id: number; readonly awake_level: number }[]
     readonly evolution: Object
     readonly missionFacts: Readonly<{ readonly usedMana: number }>
@@ -206,7 +207,10 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
         )
         const publication = publishAwakeUnlockCharacterListWithStateWithinTransaction(
             command.playerId,
-            [buildCharacterListEntryFromGrowth(command.characterId, characterData, afterBeforeAwakeReconciliation)],
+            projectCharacterGrowthIncrement(
+                { after: afterBeforeAwakeReconciliation, changedNodeIds: [] },
+                { character: characterData, fields: MANA_CHARACTER_GROWTH_FIELDS },
+            ).character_list,
             awakeContext,
             [command.characterId],
         )
@@ -214,7 +218,12 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
             Object.entries(publication.all.get(String(command.characterId)) ?? {})
                 .map(([boardIndex, awakeLevel]) => [Number(boardIndex), awakeLevel]),
         )
-        const after = observed(afterCore, nextBondTokens, nextNodes, afterAwakeUnlocks) as LearnManaNodesResult["after"]
+        const after = observed(
+            afterCore,
+            nextBondTokens,
+            nextNodes,
+            afterAwakeUnlocks,
+        ) as LearnManaNodesResult["after"]
         return {
             command: "learn_mana_nodes",
             before: observed(character, beforeBondTokens, beforeNormalManaNodes, beforeAwakeUnlocks),
@@ -230,7 +239,7 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
             missionFacts: { usedMana: resources.totalManaCost },
             replayed: false,
             bondTokenGranted: bond.bondTokenGranted,
-            characterList: publication.characterList,
+            character: characterData,
             responseNodeEntries: plan.responseNodeEntries,
             evolution: buildCharacterEvolutionResponse(
                 command.characterId,

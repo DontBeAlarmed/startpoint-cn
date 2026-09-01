@@ -122,7 +122,7 @@ test("awakeManaNodes writes Awake levels on fixed board one and keeps normal boa
     assert.equal(getPlayerCharacterSync(playerId, 1).manaBoardIndex, beforeBoard)
     assert.equal(getPlayerCharacterManaNodeAwakeLevelsSync(playerId, 1)[2219], 1)
     assert.equal(result.after.normalManaNodes.get(2219), 1)
-    assert.equal(result.manaBoardAwake, undefined)
+    assert.equal("manaBoardAwake" in result.after, false)
 })
 
 test("awakeManaNodes only moves Awake state forward and does not spend resources on a no-op", () => {
@@ -146,7 +146,7 @@ test("awakeManaNodes only moves Awake state forward and does not spend resources
     assert.deepEqual(result.changedNodeIds, [])
     assert.equal(result.resourceState, undefined)
     assert.deepEqual(getPlayerSync(playerId), playerBefore)
-    assert.equal(result.manaBoardAwake, undefined)
+    assert.equal("manaBoardAwake" in result.after, false)
 })
 
 test("awakeManaNodes rejects an invalid level, incomplete board, unlearned node, and non-owned board", () => {

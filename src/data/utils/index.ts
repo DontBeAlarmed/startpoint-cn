@@ -2,5 +2,5 @@ export { clientSerializeDate, deserializeClientDate, reviveMergedPlayerDates } f
 export { deserializePlayerData } from "./deserialize-player"
 export { getDefaultPlayerData, getClientSerializedData, getMergedPlayerDataSync } from "./player-data"
 export { serializeBoolean, deserializeBoolean, serializeNumberList, deserializeNumberList } from "./primitives"
-export { serializeBondTokenStatuses, serializeGachaCampaign, serializePartyGroupList, serializeRushEvent } from "./serialize-entities"
+export { serializeGachaCampaign, serializePartyGroupList, serializeRushEvent } from "./serialize-entities"
 export { SerializePlayerDataOptions, serializePlayerData } from "./serialize-player"

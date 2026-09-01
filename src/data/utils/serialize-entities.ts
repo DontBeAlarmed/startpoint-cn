@@ -1,23 +1,5 @@
-import { ClientPlayerData, DailyChallengePointListEntry, MergedPlayerData, PartyCategory, Player, PlayerBoxGacha, PlayerCharacter, PlayerCharacterBondToken, PlayerDrawnQuest, PlayerEquipment, PlayerGachaCampaign, PlayerGachaInfo, PlayerMultiSpecialExchangeCampaign, PlayerParty, PlayerPartyGroup, PlayerQuestProgress, PlayerRushEvent, PlayerRushEventPlayedParty, PlayerStartDashExchangeCampaign, RushEventBattleType, UserBoxGacha, UserCharacter, UserCharacterBondTokenStatus, UserEquipment, UserGachaCampaign, UserPartyGroup, UserPartyGroupTeam, UserQuestProgress, UserRushEvent, UserRushEventPlayedParty, UserRushEventPlayedPartyList, UserTutorial } from "../types"
+import { ClientPlayerData, DailyChallengePointListEntry, MergedPlayerData, PartyCategory, Player, PlayerBoxGacha, PlayerDrawnQuest, PlayerEquipment, PlayerGachaCampaign, PlayerGachaInfo, PlayerMultiSpecialExchangeCampaign, PlayerParty, PlayerPartyGroup, PlayerQuestProgress, PlayerRushEvent, PlayerRushEventPlayedParty, PlayerStartDashExchangeCampaign, RushEventBattleType, UserBoxGacha, UserCharacter, UserEquipment, UserGachaCampaign, UserPartyGroup, UserPartyGroupTeam, UserQuestProgress, UserRushEvent, UserRushEventPlayedParty, UserRushEventPlayedPartyList, UserTutorial } from "../types"
 import { kIdToBusinessCode, businessCodeToKId } from "../codeMap"
-
-/**
- * Serializes a list of PlayerCharacterBondTokens into UserCharacterBondTokenStatuses
- * 
- * @param toSerialize 
- * @returns 
- */
-export function serializeBondTokenStatuses(
-    toSerialize: PlayerCharacterBondToken[]
-): UserCharacterBondTokenStatus[] {
-    return toSerialize.map(bondToken => {
-        return {
-            mana_board_index: bondToken.manaBoardIndex,
-            status: bondToken.status
-        }
-    })
-}
-
 
 /**
  * Serializes a PlayerGachaCampaign into a UserGachaCampaign.
@@ -96,4 +78,3 @@ export function serializeRushEvent(
         endless_battle_max_round_character_evolution_img_lvl_3: characterEvolutionImgLevels?.[2],
     }
 }
-

@@ -9,11 +9,13 @@ import { resolvePlayerIdSync } from "../data/activeAccount"
 import { getPlayerItemSync } from "../data/domains/item"
 import { updatePlayerCharacterBondTokenSync } from "../data/domains/character"
 import { generateDataHeaders } from "../utils"
-import { clientSerializeDate } from "../data/utils/date"
 import { getBondTokenStatus, projectSortedBondTokens } from "./character-growth/invariants"
 import type { BondTokenStatus } from "./character-growth/model"
-import type { CharacterGrowthObservedState } from "./character-growth/result"
 import { growthError } from "./character-growth/errors"
+import {
+    characterGrowthProjectionStateFromPlayerCharacter,
+    projectCharacterGrowthEntry,
+} from "./character-growth/response-projector"
 
 // ─── Response types ───
 
@@ -116,48 +118,6 @@ export function computeItemDeductions(
     return result
 }
 
-// ─── Response builders ───
-
-/** Builds the standard character_list entry for mana-related responses. */
-export function buildCharacterListEntry(
-    characterId: number,
-    characterData: PlayerCharacter,
-    extras: Record<string, unknown> = {}
-): Record<string, unknown> {
-    return {
-        character_id: characterId,
-        evolution_level: characterData.evolutionLevel,
-        evolution_img_level: characterData.evolutionLevel,
-        create_time: clientSerializeDate(characterData.joinTime),
-        update_time: clientSerializeDate(characterData.updateTime),
-        join_time: clientSerializeDate(characterData.joinTime),
-        bond_token_list: [...characterData.bondTokenList]
-            .sort((left, right) => left.manaBoardIndex - right.manaBoardIndex)
-            .map(entry => ({
-            mana_board_index: entry.manaBoardIndex,
-            status: entry.status,
-            })),
-        ...extras,
-    }
-}
-
-/** Builds a protocol character entry from the command's authoritative after-state. */
-export function buildCharacterListEntryFromGrowth(
-    characterId: number,
-    characterData: PlayerCharacter,
-    after: CharacterGrowthObservedState,
-    extras: Record<string, unknown> = {},
-): Record<string, unknown> {
-    return buildCharacterListEntry(characterId, characterData, {
-        evolution_level: after.evolutionLevel,
-        evolution_img_level: after.evolutionLevel,
-        ...(after.bondTokens ? {
-            bond_token_list: projectSortedBondTokens(after.bondTokens),
-        } : {}),
-        ...extras,
-    })
-}
-
 /** Merges mission-unlocked and persisted mana-board awake levels. */
 export function mergeManaBoardAwakeMaps(
     ...maps: Map<string, Record<number, number>>[]
@@ -189,13 +149,19 @@ export function buildManaBoardAwakeCharacterList(
         const character = characters[characterId]
         if (!character) continue
 
-        result.push({
-            character_id: Number(characterId),
-            exp: character.exp,
-            join_time: clientSerializeDate(character.joinTime),
-            update_time: clientSerializeDate(character.updateTime),
-            mana_board_awake: { ...manaBoardAwake },
-        })
+        const id = Number(characterId)
+        result.push(projectCharacterGrowthEntry({
+            characterId: id,
+            character,
+            state: {
+                ...characterGrowthProjectionStateFromPlayerCharacter(id, character),
+                awakeUnlocks: new Map(Object.entries(manaBoardAwake).map(([boardIndex, level]) => [
+                    Number(boardIndex),
+                    level,
+                ])),
+            },
+            fields: ["exp", "join_time", "update_time", "mana_board_awake"],
+        }))
     }
 
     return result

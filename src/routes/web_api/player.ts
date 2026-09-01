@@ -4,7 +4,7 @@ import { wantsJson } from "./http";
 import { getAllPlayersSync, getDefaultPlayerPartyGroupsSync, getPlayerDailyChallengePointListSync, getPlayerSync, insertPlayerDailyChallengePointListSync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../data/domains/player"
 import { deleteAllPlayerMailSync } from "../../data/domains/mail"
 import { getDb } from "../../data/db"
-import { getPlayerCharactersSync, insertDefaultPlayerCharacterSync, insertPlayerCharacterSync } from "../../data/domains/character"
+import { deletePlayerCharacterSync, getPlayerCharactersSync, insertDefaultPlayerCharacterSync } from "../../data/domains/character"
 import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
 import { getPlayerItemsSync, setPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
 import { getPlayerQuestProgressSync, getPlayerDrawnQuestsSync } from "../../data/domains/quest"
@@ -294,17 +294,18 @@ const routes = async (fastify: FastifyInstance) => {
         if (isNaN(playerId) || isNaN(charCode)) return reply.status(400).send({ error: "Invalid params" })
 
         try {
-        const db = getDb();
-        // 1. Delete character data
-        db.prepare(`DELETE FROM players_characters WHERE player_id = ? AND id = ?`).run(playerId, charCode)
-        db.prepare(`DELETE FROM players_characters_bond_tokens WHERE player_id = ? AND character_id = ?`).run(playerId, charCode)
-        db.prepare(`DELETE FROM players_characters_mana_nodes WHERE player_id = ? AND character_id = ?`).run(playerId, charCode)
-        // 2. Clear all party references to this character
-        for (const col of ['character_id_1', 'character_id_2', 'character_id_3',
-                            'unison_character_1', 'unison_character_2', 'unison_character_3']) {
-            db.prepare(`UPDATE players_parties SET ${col} = NULL WHERE player_id = ? AND ${col} = ?`).run(playerId, charCode)
-        }
-        return reply.status(200).send({ ok: true })
+            const db = getDb()
+            db.transaction(() => {
+                deletePlayerCharacterSync(playerId, charCode)
+                for (const column of [
+                    "character_id_1", "character_id_2", "character_id_3",
+                    "unison_character_1", "unison_character_2", "unison_character_3",
+                ]) {
+                    db.prepare(`UPDATE players_parties SET ${column} = NULL WHERE player_id = ? AND ${column} = ?`)
+                        .run(playerId, charCode)
+                }
+            })()
+            return reply.status(200).send({ ok: true })
         } catch (e: any) {
             return reply.status(500).send({ error: e.message })
         }

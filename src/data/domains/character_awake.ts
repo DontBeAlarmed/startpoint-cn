@@ -92,16 +92,6 @@ export function upsertPlayerCharacterAwakeUnlockSync(
     return result.changes > 0
 }
 
-export function deletePlayerCharacterAwakeUnlocksSync(
-    playerId: number,
-    characterId: number
-): boolean {
-    return getDb().prepare(`
-        DELETE FROM players_character_awake_unlocks
-        WHERE player_id = ? AND character_id = ?
-    `).run(playerId, characterId).changes > 0
-}
-
 export function insertPlayerCharacterAwakeUnlocksSync(
     playerId: number,
     unlocks: CharacterAwakeUnlockRecord

@@ -17,6 +17,8 @@ const currentDataSchema = loadServerReleaseContract(path.resolve(__dirname, ".."
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "player-save-v2-"))
 const previousDataDirectory = process.env.DATA_DIR
 process.env.DATA_DIR = databaseDirectory
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
 
 const data = require("../src/data")
 const { getDb } = require("../src/data/db")
@@ -46,6 +48,7 @@ const playerRoutes = require("../src/routes/web_api/player").default
 const serverRoutes = require("../src/routes/web_api/server").default
 const { activeQuests } = require("../src/lib/quest/active-quest-service")
 const { ADMIN_UPLOAD_FILE_SIZE_LIMIT } = require("../src/routes/web_api")
+const { getCharacterManaNodesSync } = require("../src/lib/assets")
 const {
     PlayerSaveDownloadTooLargeError,
     serializePlayerSaveDownload,
@@ -139,6 +142,16 @@ function seedEveryRegisteredPlayerTable(database, playerId) {
             for (const foreignKey of group) row[foreignKey.from] = parent[foreignKey.to]
         }
 
+        // The generic matrix fixture must remain a valid Growth save. These
+        // values are real board-one facts for the default owned character.
+        if (definition.name === "players_characters_mana_nodes") {
+            row.value = 2201
+            row.awake_level = 0
+        } else if (definition.name === "players_character_awake_unlocks") {
+            row.board_index = 1
+            row.awake_level = 1
+        }
+
         const rowColumns = Object.keys(row)
         database.prepare(`
             INSERT INTO ${table} (${rowColumns.map(quoteIdentifier).join(", ")})
@@ -172,6 +185,7 @@ test.before(() => {
 
 test.after(() => {
     data.closeDatabase()
+    restoreContentSnapshot()
     fs.rmSync(databaseDirectory, { recursive: true, force: true })
     if (previousDataDirectory === undefined) delete process.env.DATA_DIR
     else process.env.DATA_DIR = previousDataDirectory
@@ -660,6 +674,13 @@ test("clone round-trips every registered player table with non-empty source data
     const destinationAccount = createAccount("matrix-target")
     const sourceId = insertDefaultPlayerSync(sourceAccount.id).id
     seedEveryRegisteredPlayerTable(db, sourceId)
+    const boardOneNodeIds = Object.keys(getCharacterManaNodesSync(1, 1)).map(Number)
+    const insertManaNode = db.prepare(`
+        INSERT OR IGNORE INTO players_characters_mana_nodes
+            (player_id, character_id, value, awake_level)
+        VALUES (?, 1, ?, 0)
+    `)
+    for (const nodeId of boardOneNodeIds) insertManaNode.run(sourceId, nodeId)
     const source = exportPlayerSaveV2Sync(sourceId)
     const sourceTables = allSnapshotTables(source)
     for (const definition of PLAYER_SAVE_TABLES) {

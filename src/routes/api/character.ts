@@ -6,7 +6,6 @@ import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { generateDataHeaders } from "../../utils";
 import { givePlayerCharacterSync } from "../../lib/character";
-import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDb } from "../../data/db";
 import { executeOverLimit } from "../../lib/character-growth/commands/over-limit"
@@ -16,6 +15,13 @@ import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { canClaimTownStoryCharacter } from "../../lib/story-join-character";
 import { getRealNow } from "../../runtime/time/game-time";
+import {
+    FULL_CHARACTER_GROWTH_FIELDS,
+    OVER_LIMIT_CHARACTER_GROWTH_FIELDS,
+    characterGrowthProjectionStateFromPlayerCharacter,
+    projectCharacterGrowthEntry,
+    projectCharacterGrowthIncrement,
+} from "../../lib/character-growth/response-projector"
 
 interface OverLimitBody {
     viewer_id: number
@@ -95,34 +101,13 @@ const routes = async (fastify: FastifyInstance) => {
         const characterList = uniqueCharacterIds.flatMap(characterId => {
             const character = getPlayerCharacterSync(playerId, characterId)
             if (!character) return []
-            return [{
-                "viewer_id": viewerId,
-                "character_id": characterId,
-                "entry_count": character.entryCount,
-                "evolution_level": character.evolutionLevel,
-                "evolution_img_level": character.evolutionLevel,
-                "over_limit_step": character.overLimitStep,
-                "protection": character.protection,
-                "exp": character.exp,
-                "stack": character.stack,
-                "mana_board_index": character.manaBoardIndex,
-                "bond_token_list": character.bondTokenList.map(entry => ({
-                    "mana_board_index": entry.manaBoardIndex,
-                    "status": entry.status,
-                })),
-                ...(character.exBoost ? {
-                    "ex_boost": {
-                        "status_id": character.exBoost.statusId,
-                        "ability_id_list": character.exBoost.abilityIdList,
-                    },
-                } : {}),
-                ...(character.illustrationSettings ? {
-                    "illustration_settings": character.illustrationSettings,
-                } : {}),
-                "create_time": clientSerializeDate(character.joinTime),
-                "update_time": clientSerializeDate(character.updateTime),
-                "join_time": clientSerializeDate(character.joinTime),
-            }]
+            return [projectCharacterGrowthEntry({
+                characterId,
+                character,
+                state: characterGrowthProjectionStateFromPlayerCharacter(characterId, character),
+                fields: [...FULL_CHARACTER_GROWTH_FIELDS, "evolution_img_level"],
+                viewerId,
+            })]
         })
 
         reply.header("content-type", "application/x-msgpack")
@@ -212,14 +197,13 @@ const routes = async (fastify: FastifyInstance) => {
             return reply.status(200).send({
                 data_headers: generateDataHeaders({ viewer_id: viewerId }),
                 data: {
-                    character_list: [{
-                        over_limit_step: result.after.overLimitStep,
-                        character_id: body.character_id,
-                        stack: result.after.stack,
-                        create_time: clientSerializeDate(character.joinTime),
-                        update_time: clientSerializeDate(character.updateTime),
-                        join_time: clientSerializeDate(character.joinTime),
-                    }],
+                    character_list: [...projectCharacterGrowthIncrement({
+                        after: result.after,
+                        changedNodeIds: [],
+                    }, {
+                        character,
+                        fields: OVER_LIMIT_CHARACTER_GROWTH_FIELDS,
+                    }).character_list],
                     item_list: result.itemId === undefined ? {} : { [result.itemId]: result.itemCount },
                     mail_arrived: getMailArrivedSync(playerId),
                 },
@@ -253,14 +237,10 @@ const routes = async (fastify: FastifyInstance) => {
             const characters = getPlayerCharactersSync(playerId)
             const characterList = result.characters.map(character => {
                 const written = characters[String(character.characterId)]!
-                return {
-                    character_id: character.characterId,
-                    over_limit_step: character.overLimitStep,
-                    stack: character.stack,
-                    create_time: clientSerializeDate(written.joinTime),
-                    update_time: clientSerializeDate(written.updateTime),
-                    join_time: clientSerializeDate(written.joinTime),
-                }
+                return projectCharacterGrowthIncrement(
+                    { after: character, changedNodeIds: [] },
+                    { character: written, fields: OVER_LIMIT_CHARACTER_GROWTH_FIELDS },
+                ).character_list[0]
             })
 
             reply.header("content-type", "application/x-msgpack")

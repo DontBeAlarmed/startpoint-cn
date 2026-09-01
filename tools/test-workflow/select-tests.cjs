@@ -15,6 +15,18 @@ const HUB_AUTHENTICATION_GROUPS = [
 
 const SOURCE_RULES = [
     {
+        pattern: /^(?:src\/lib\/character-growth\/(?:response-projector|load-projector)\.ts|tools\/character_growth_(?:response_projector|load_projector|client_merge)\.test\.cjs)$/,
+        groups: ["quick:character-growth"],
+    },
+    {
+        pattern: /^(?:src\/lib\/character-growth\/save\/.*\.ts|tools\/character_growth_save_validation\.test\.cjs)$/,
+        groups: ["integration:database"],
+    },
+    {
+        pattern: /^src\/data\/utils\/(?:player-data|serialize-player)\.ts$/,
+        groups: ["quick:character-growth", "quick:character", "integration:database", "integration:mission"],
+    },
+    {
         pattern: /^(?:src\/lib\/character-growth\/(?:model|errors|invariants|content-facts|request-context|batch-context|repository|result|resource-plan|node-state|node-command-support|mutation-support|exp-calculation|exp-caps|limits|commands\/(?:receive-bond-token|open-mana-board|learn-mana-nodes|awake-mana-nodes|inject-exp|stack-to-exp|bulk-stack-to-exp|over-limit|bulk-over-limit|grant-character-exp|grant-character-stack))\.ts|tools\/(?:character_growth_(?:core|context|bond_command|open_board_command|node_commands|awake_node_commands|node_transaction|exp_commands|stack_commands|over_limit_commands|exp_transaction)\.test\.cjs|helpers\/character-growth-c4-fixture\.cjs)|tools\/perf\/character_growth_context_admission\.test\.cjs)$/,
         groups: ["quick:character-growth"],
     },

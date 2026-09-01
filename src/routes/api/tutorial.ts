@@ -9,7 +9,6 @@ import {
     upsertTutorialStepReceiptSync,
 } from "../../data/domains/tutorial"
 import { getPlayerCharacterSync } from "../../data/domains/character"
-import { clientSerializeDate, serializeBondTokenStatuses } from "../../data/utils"
 import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
 import { executeRewardGrantPlanInTransactionOwnerInternalSync } from "../../lib/reward-grant/owner-executor"
@@ -29,6 +28,10 @@ import {
     TUTORIAL_GACHA_EFFECTIVE_STEP,
     TUTORIAL_PRESENT_EFFECTIVE_STEP,
 } from "../../lib/start-tutorial-state";
+import {
+    characterGrowthProjectionStateFromPlayerCharacter,
+    projectCharacterGrowthEntry,
+} from "../../lib/character-growth/response-projector"
 
 interface UpdateStepBody {
     viewer_id: number
@@ -53,26 +56,25 @@ function serializeTutorialReplayCharacter(
     characterId: number,
     character: NonNullable<ReturnType<typeof getPlayerCharacterSync>>,
 ) {
-    return {
-        "viewer_id": viewerId,
-        "character_id": characterId,
-        "entry_count": character.entryCount,
-        "evolution_level": character.evolutionLevel,
-        "over_limit_step": character.overLimitStep,
-        "protection": character.protection,
-        "join_time": clientSerializeDate(character.joinTime),
-        "update_time": clientSerializeDate(character.updateTime),
-        "exp": character.exp,
-        "stack": character.stack,
-        "mana_board_index": character.manaBoardIndex,
-        "bond_token_list": serializeBondTokenStatuses(character.bondTokenList),
-        ...(character.exBoost === undefined ? {} : {
-            "ex_boost": {
-                "status_id": character.exBoost.statusId,
-                "ability_id_list": character.exBoost.abilityIdList,
-            },
-        }),
-    }
+    return projectCharacterGrowthEntry({
+        characterId,
+        character,
+        state: characterGrowthProjectionStateFromPlayerCharacter(characterId, character),
+        viewerId,
+        fields: [
+            "entry_count",
+            "evolution_level",
+            "over_limit_step",
+            "protection",
+            "join_time",
+            "update_time",
+            "exp",
+            "stack",
+            "mana_board_index",
+            "bond_token_list",
+            "ex_boost",
+        ],
+    })
 }
 
 function buildTutorialGachaReplayData(

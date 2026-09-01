@@ -28,6 +28,7 @@ export function getCharacterGrowthContentFactsSync(
     }
 
     return {
+        rarity: character.rarity,
         boardCount,
         boardNodeIds,
         secondBoardAvailable: boardCount >= 2,

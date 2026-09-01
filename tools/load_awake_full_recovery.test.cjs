@@ -186,7 +186,7 @@ test.after(() => {
 test("load uses an independent full recovery context without deleting permanent unlocks", () => {
     const playerId = createPlayer()
     makeReadyCharacter(playerId, 341005)
-    insertDefaultPlayerCharacterSync(playerId, 311002)
+    makeReadyCharacter(playerId, 311002)
     upsertPlayerCharacterAwakeUnlockSync(playerId, 311002, 1, 1)
     updatePlayerCategoryMissionSync(playerId, 9, 3410051, 3)
     updatePlayerCategoryMissionStageSync(playerId, 9, 1, 3410051, true)

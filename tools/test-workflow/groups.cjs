@@ -113,6 +113,9 @@ const TEST_GROUPS = Object.freeze({
         tests: [
             "tools/character_growth_core.test.cjs",
             "tools/character_growth_context.test.cjs",
+            "tools/character_growth_response_projector.test.cjs",
+            "tools/character_growth_load_projector.test.cjs",
+            "tools/character_growth_client_merge.test.cjs",
             "tools/character_growth_bond_command.test.cjs",
             "tools/character_growth_open_board_command.test.cjs",
             "tools/character_growth_node_commands.test.cjs",
@@ -366,6 +369,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/mission_category_batch_read.test.cjs",
             "tools/player_history_profile_route.test.cjs",
             "tools/player_save_v2.test.cjs",
+            "tools/character_growth_save_validation.test.cjs",
             "tools/receive_history_retention.test.cjs",
             "tools/scheduled_resource_storage.test.cjs",
             "tools/server_gameplay_settings.test.cjs",

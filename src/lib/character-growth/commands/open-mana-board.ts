@@ -4,6 +4,7 @@ import {
     insertPlayerCharacterBondTokenSync,
     updatePlayerCharacterSync,
 } from "../../../data/domains/character"
+import type { PlayerCharacter } from "../../../data/types"
 import { getCharacterGrowthContentFactsSync } from "../content-facts"
 import { growthError } from "../errors"
 import { findMissingBondTokenBoards, getBondTokenStatus, isNormalBoardComplete } from "../invariants"
@@ -14,7 +15,6 @@ import { settleMissionCategories } from "../../mission/settlement"
 import type { MissionSettlementResult } from "../../mission/settlement"
 import { characterExpCaps } from "../../character"
 import { isCharacterSecondManaBoardAvailable } from "../../mana-board-availability"
-import { buildCharacterListEntryFromGrowth } from "../../character-helpers"
 
 export interface OpenManaBoardCommand {
     readonly playerId: number
@@ -26,7 +26,7 @@ export interface OpenManaBoardCommand {
 export interface OpenManaBoardResult extends CharacterGrowthCommandResult {
     readonly replayed: boolean
     readonly missionSettlement: MissionSettlementResult | null
-    readonly characterList: readonly Record<string, unknown>[]
+    readonly character: PlayerCharacter
 }
 
 const REQUIRED_UNCAPS: Readonly<Record<number, number>> = {
@@ -196,12 +196,7 @@ export function openManaBoard(command: OpenManaBoardCommand): OpenManaBoardResul
                 changedNodeIds: [],
                 replayed: true,
                 missionSettlement: null,
-                characterList: [buildCharacterListEntryFromGrowth(
-                    command.characterId,
-                    characterData,
-                    after,
-                    { mana_board_index: after.manaBoardIndex },
-                )],
+                character: characterData,
             }
         }
 
@@ -246,6 +241,14 @@ export function openManaBoard(command: OpenManaBoardCommand): OpenManaBoardResul
             ...character,
             manaBoardIndex: command.targetBoardIndex,
         }, afterTokens)
+        const afterCharacter: PlayerCharacter = {
+            ...characterData,
+            updateTime,
+            manaBoardIndex: command.targetBoardIndex,
+            bondTokenList: [...afterTokens.entries()]
+                .sort(([left], [right]) => left - right)
+                .map(([manaBoardIndex, status]) => ({ manaBoardIndex, status })),
+        }
         return {
             command: "open_mana_board",
             before: observed(character, tokens),
@@ -253,12 +256,7 @@ export function openManaBoard(command: OpenManaBoardCommand): OpenManaBoardResul
             changedNodeIds: [],
             replayed: false,
             missionSettlement,
-            characterList: [buildCharacterListEntryFromGrowth(
-                command.characterId,
-                { ...characterData, updateTime },
-                after,
-                { mana_board_index: after.manaBoardIndex },
-            )],
+            character: afterCharacter,
         }
     })()
 }

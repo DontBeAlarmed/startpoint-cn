@@ -5,7 +5,6 @@ import { getPlayerCharacterSync } from "../../../data/domains/character"
 import { getDb } from "../../../data/db"
 import { getMailArrivedSync } from "../../../lib/mail-notification"
 import {
-    buildCharacterListEntry,
     sendCharacterResponse,
     validateSessionAndPlayer,
 } from "../../../lib/character-helpers"
@@ -15,6 +14,7 @@ import { receiveBondToken } from "../../../lib/character-growth/commands/receive
 import { openManaBoard } from "../../../lib/character-growth/commands/open-mana-board"
 import { getServerDate } from "../../../utils"
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../../lib/character-growth/owner-publication"
+import { MANA_CHARACTER_GROWTH_FIELDS, projectCharacterGrowthIncrement } from "../../../lib/character-growth/response-projector"
 
 interface CharacterGrowthRequestBody {
     character_id: number
@@ -61,7 +61,10 @@ const routes = async (fastify: FastifyInstance) => {
                 if (character === null) {
                     throw new Error("bond token command completed without authoritative state")
                 }
-                const existingCharacterList = [buildCharacterListEntry(body.character_id, character)]
+                const existingCharacterList = [...projectCharacterGrowthIncrement(result, {
+                    character,
+                    fields: MANA_CHARACTER_GROWTH_FIELDS,
+                }).character_list]
                 return {
                     bondTokenAfter: result.playerBondTokenAfter,
                     characterList: result.replayed
@@ -106,12 +109,14 @@ const routes = async (fastify: FastifyInstance) => {
                 targetBoardIndex: body.mana_board_index,
                 evaluationTime: getServerDate(),
             })
+            const growthProjection = projectCharacterGrowthIncrement(result, {
+                character: result.character,
+                fields: [...MANA_CHARACTER_GROWTH_FIELDS, "mana_board_index"],
+                viewerId: body.viewer_id,
+            })
             const responseData = {
                 user_info: {},
-                character_list: result.characterList.map(character => ({
-                    ...character,
-                    viewer_id: body.viewer_id,
-                })),
+                character_list: [...growthProjection.character_list],
                 user_character_mana_node_list: {},
                 item_list: {},
                 evolution: [],

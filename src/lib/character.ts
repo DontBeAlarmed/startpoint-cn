@@ -1,6 +1,6 @@
-import { clientSerializeDate } from "../data/utils/date";
 import { getDb } from "../data/db";
-import { getPlayerCharacterSync, insertPlayerCharacterSync, updatePlayerCharacterSync } from "../data/domains/character"
+import { getPlayerCharacterSync, insertPlayerCharacterSync } from "../data/domains/character"
+import type { PlayerCharacter } from "../data/types"
 import { givePlayerItemSync, givePlayerItemWithinTransactionSync } from "../data/domains/item"
 import { getCharacterDataSync } from "./assets";
 import { getRealNow } from "../runtime/time/game-time";
@@ -11,6 +11,10 @@ import {
     grantCharacterExpWithinTransactionSync,
 } from "./character-growth/commands/grant-character-exp"
 import { grantCharacterStackWithinTransactionSync } from "./character-growth/commands/grant-character-stack"
+import {
+    characterGrowthProjectionStateFromPlayerCharacter,
+    projectCharacterGrowthEntry,
+} from "./character-growth/response-projector"
 export { characterExpCaps } from "./character-growth/exp-caps";
 
 /**
@@ -52,7 +56,7 @@ function givePlayerCharacterWithItemWriterSync(
 
         // give the player the character
         const joinTime = getRealNow()
-        insertPlayerCharacterSync(playerId, characterId, {
+        const character: PlayerCharacter = {
             entryCount: 1,
             evolutionLevel: 0,
             overLimitStep: 0,
@@ -63,29 +67,28 @@ function givePlayerCharacterWithItemWriterSync(
             stack: 0,
             manaBoardIndex: 1,
             bondTokenList: bondTokenList
-        })
+        }
+        insertPlayerCharacterSync(playerId, characterId, character)
         recordHundredCharactersMilestoneSync(playerId, joinTime)
-        
-        const serializedDate = clientSerializeDate(joinTime)
+
         return {
             isNew: true,
-            character: {
-                "viewer_id": 0,
-                "character_id": characterId,
-                "entry_count": 1,
-                "exp": 0,
-                "exp_total": 0,
-                "bond_token_list": bondTokenList.map(bondToken => {
-                    return {
-                        "mana_board_index": bondToken.manaBoardIndex,
-                        "status": bondToken.status
-                    }
-                }),
-                "mana_board_index": 1,
-                "create_time": serializedDate,
-                "update_time": serializedDate,
-                "join_time": serializedDate,
-            }
+            character: projectCharacterGrowthEntry({
+                characterId,
+                character,
+                state: characterGrowthProjectionStateFromPlayerCharacter(characterId, character),
+                viewerId: 0,
+                fields: [
+                    "entry_count",
+                    "exp",
+                    "exp_total",
+                    "bond_token_list",
+                    "mana_board_index",
+                    "create_time",
+                    "update_time",
+                    "join_time",
+                ],
+            }),
         }
     } else {
         // Duplicate ownership is a Growth mutation. The character domain keeps

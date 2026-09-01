@@ -9,19 +9,21 @@ import { getSession } from "../../data/domains/session"
 import { getCharacterDataSync, getExBoostItemSync, getExStatusPoolSync } from "../../lib/assets"
 import { generateDataHeaders } from "../../utils"
 import { randomInt } from "crypto"
-import { clientSerializeDate } from "../../data/utils"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { characterMaxOverLimits } from "./character"
 import bundledExAbility from "../../../assets/ex_ability.json"
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
-import { getRealNow } from "../../runtime/time/game-time";
 import {
     deletePendingExBoostDrawSync,
     getPendingExBoostDrawSync,
     upsertPendingExBoostDrawSync,
 } from "../../data/domains/ex_boost";
+import {
+    characterGrowthProjectionStateFromPlayerCharacter,
+    projectCharacterGrowthEntry,
+} from "../../lib/character-growth/response-projector"
 
 interface ExBoostDrawBody {
     character_id: number,
@@ -40,6 +42,37 @@ interface ExBoostDrawResult {
     characterId: number,
     statusId: number,
     abilityIdList: number[]
+}
+
+function projectExBoostCharacter(
+    viewerId: number,
+    characterId: number,
+    character: NonNullable<ReturnType<typeof getPlayerCharacterSync>>,
+    exBoost: { readonly statusId: number; readonly abilityIdList: readonly number[] },
+    updateTime: Date = character.updateTime,
+): Record<string, unknown> {
+    return projectCharacterGrowthEntry({
+        characterId,
+        character,
+        state: characterGrowthProjectionStateFromPlayerCharacter(characterId, character),
+        viewerId,
+        exBoost: { statusId: exBoost.statusId, abilityIdList: [...exBoost.abilityIdList] },
+        updateTime,
+        fields: [
+            "entry_count",
+            "evolution_level",
+            "over_limit_step",
+            "protection",
+            "exp",
+            "stack",
+            "mana_board_index",
+            "bond_token_list",
+            "ex_boost",
+            "create_time",
+            "update_time",
+            "join_time",
+        ],
+    })
 }
 
 // ---- A/B group classification from orderedmap ability names ----
@@ -246,28 +279,12 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
         return reply.status(200).send({
             data_headers: generateDataHeaders({ viewer_id: viewerId }),
             data: {
-                character_list: [{
-                    character_id: characterId,
-                    viewer_id: viewerId,
-                    entry_count: characterData.entryCount,
-                    evolution_level: characterData.evolutionLevel,
-                    over_limit_step: characterData.overLimitStep,
-                    protection: characterData.protection,
-                    exp: characterData.exp,
-                    stack: characterData.stack,
-                    mana_board_index: characterData.manaBoardIndex,
-                    bond_token_list: characterData.bondTokenList.map(bt => ({
-                        mana_board_index: bt.manaBoardIndex,
-                        status: bt.status,
-                    })),
-                    ex_boost: {
-                        status_id: characterData.exBoost.statusId,
-                        ability_id_list: characterData.exBoost.abilityIdList,
-                    },
-                    create_time: clientSerializeDate(characterData.joinTime),
-                    update_time: clientSerializeDate(characterData.joinTime),
-                    join_time: clientSerializeDate(characterData.joinTime),
-                }],
+                character_list: [projectExBoostCharacter(
+                    viewerId,
+                    characterId,
+                    characterData,
+                    characterData.exBoost,
+                )],
                 item_list: { [String(costItemId)]: currentCostItemAmount },
                 mail_arrived: getMailArrivedSync(playerId),
             },
@@ -305,32 +322,25 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
 
     reply.header("content-type", "application/x-msgpack")
     if (autoAccept) {
+        const characterUpdate: Parameters<typeof updatePlayerCharacterSync>[2] = {
+            exBoost: { statusId: drawResult.statusId, abilityIdList: drawResult.abilityIdList },
+        }
         getDb().transaction(() => {
             updatePlayerItemSync(playerId, costItemId, afterCostItemAmount)
-            updatePlayerCharacterSync(playerId, characterId, {
-                exBoost: { statusId: drawResult.statusId, abilityIdList: drawResult.abilityIdList }
-            })
+            updatePlayerCharacterSync(playerId, characterId, characterUpdate)
         })()
+        const updateTime = characterUpdate.updateTime
+        if (updateTime === undefined) throw new Error("EX Boost update did not record update time")
         return reply.status(200).send({
             data_headers: headers,
             data: {
-                character_list: [{
-                    character_id: characterId, viewer_id: viewerId,
-                    entry_count: characterData.entryCount,
-                    evolution_level: characterData.evolutionLevel,
-                    over_limit_step: characterData.overLimitStep,
-                    protection: characterData.protection,
-                    exp: characterData.exp,
-                    stack: characterData.stack,
-                    mana_board_index: characterData.manaBoardIndex,
-                    bond_token_list: characterData.bondTokenList.map(bt => ({
-                        mana_board_index: bt.manaBoardIndex, status: bt.status
-                    })),
-                    ex_boost: { status_id: drawResult.statusId, ability_id_list: drawResult.abilityIdList },
-                    create_time: clientSerializeDate(characterData.joinTime),
-                    update_time: clientSerializeDate(getRealNow()),
-                    join_time: clientSerializeDate(characterData.joinTime),
-                }],
+                character_list: [projectExBoostCharacter(
+                    viewerId,
+                    characterId,
+                    characterData,
+                    drawResult,
+                    updateTime,
+                )],
                 item_list: { [String(costItemId)]: afterCostItemAmount },
                 mail_arrived: getMailArrivedSync(playerId),
             },
@@ -382,31 +392,25 @@ const routes = async (fastify: FastifyInstance) => {
         if (characterData === null) return reply.status(400).send({
             "error": "Bad Request", "message": "Player does not own character."
         })
+        const characterUpdate: Parameters<typeof updatePlayerCharacterSync>[2] = {
+            exBoost: { statusId: drawResult.statusId, abilityIdList: drawResult.abilityIdList },
+        }
         getDb().transaction(() => {
-            updatePlayerCharacterSync(playerId, characterId, {
-                exBoost: { statusId: drawResult.statusId, abilityIdList: drawResult.abilityIdList }
-            })
+            updatePlayerCharacterSync(playerId, characterId, characterUpdate)
             deletePendingExBoostDrawSync(playerId)
         })()
+        const updateTime = characterUpdate.updateTime
+        if (updateTime === undefined) throw new Error("EX Boost update did not record update time")
         return reply.status(200).send({
             data_headers: headers,
             data: {
-                character_list: [{
-                    character_id: characterId, viewer_id: viewerId,
-                    entry_count: characterData.entryCount,
-                    evolution_level: characterData.evolutionLevel,
-                    over_limit_step: characterData.overLimitStep,
-                    protection: characterData.protection,
-                    exp: characterData.exp, stack: characterData.stack,
-                    mana_board_index: characterData.manaBoardIndex,
-                    bond_token_list: characterData.bondTokenList.map(bt => ({
-                        mana_board_index: bt.manaBoardIndex, status: bt.status
-                    })),
-                    ex_boost: { status_id: drawResult.statusId, ability_id_list: drawResult.abilityIdList },
-                    create_time: clientSerializeDate(characterData.joinTime),
-                    update_time: clientSerializeDate(getRealNow()),
-                    join_time: clientSerializeDate(characterData.joinTime),
-                }],
+                character_list: [projectExBoostCharacter(
+                    viewerId,
+                    characterId,
+                    characterData,
+                    drawResult,
+                    updateTime,
+                )],
                 mail_arrived: getMailArrivedSync(playerId),
             },
         })

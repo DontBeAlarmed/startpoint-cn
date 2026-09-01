@@ -5,7 +5,6 @@ import { getPlayerCharacterSync, getPlayerCharactersSync } from "../../data/doma
 import { getPlayerItemsSync } from "../../data/domains/item"
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
-import { clientSerializeDate } from "../../data/utils"
 import { resolvePlayerIdSync } from "../../data/activeAccount"
 import { getDb } from "../../data/db"
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time"
@@ -16,6 +15,11 @@ import { executeInjectCharacterExp } from "../../lib/character-growth/commands/i
 import { executeStackToExp } from "../../lib/character-growth/commands/stack-to-exp"
 import { executeBulkStackToExp } from "../../lib/character-growth/commands/bulk-stack-to-exp"
 import { sendGrowthMutationError } from "./character/mana-mutation-http"
+import {
+    EXP_CHARACTER_GROWTH_FIELDS,
+    projectCharacterGrowthIncrement,
+    type CharacterGrowthProjectionState,
+} from "../../lib/character-growth/response-projector"
 
 interface InjectExpBody {
     character_id: number
@@ -57,23 +61,22 @@ async function resolveViewerPlayer(viewerId: number): Promise<
 
 function characterListEntry(
     viewerId: number,
-    characterId: number,
+    after: CharacterGrowthProjectionState,
     character: NonNullable<ReturnType<typeof getPlayerCharacterSync>>,
     options: { readonly includeViewer?: boolean, readonly includeStack?: boolean, readonly includeOverLimit?: boolean } = {},
 ): Record<string, unknown> {
-    const joinTime = character.joinTime instanceof Date ? character.joinTime : getRealNow()
-    const updateTime = character.updateTime instanceof Date ? character.updateTime : getRealNow()
-    return {
-        ...(options.includeViewer === true ? { viewer_id: viewerId } : {}),
-        character_id: characterId,
-        ...(options.includeOverLimit === true ? { over_limit_step: character.overLimitStep } : {}),
-        ...(options.includeStack === true ? { stack: character.stack } : {}),
-        exp: character.exp,
-        exp_total: character.exp,
-        create_time: clientSerializeDate(joinTime),
-        update_time: clientSerializeDate(updateTime),
-        join_time: clientSerializeDate(joinTime),
-    }
+    return projectCharacterGrowthIncrement(
+        { after, changedNodeIds: [] },
+        {
+            character,
+            fields: [
+                ...EXP_CHARACTER_GROWTH_FIELDS,
+                ...(options.includeOverLimit === true ? ["over_limit_step" as const] : []),
+                ...(options.includeStack === true ? ["stack" as const] : []),
+            ],
+            ...(options.includeViewer === true ? { viewerId } : {}),
+        },
+    ).character_list[0]
 }
 
 const routes = async (fastify: FastifyInstance) => {
@@ -110,7 +113,7 @@ const routes = async (fastify: FastifyInstance) => {
                         exp_pool: result.expPool,
                         exp_pooled_time: expPoolRealDateToClientTimestamp(player.expPooledTime),
                     },
-                    character_list: [characterListEntry(viewerId, characterId, character, {
+                    character_list: [characterListEntry(viewerId, result.after, character, {
                         includeViewer: true, includeStack: true,
                     })],
                     converted_exp_info: { add_exp: result.addExp },
@@ -141,7 +144,7 @@ const routes = async (fastify: FastifyInstance) => {
             const player = getPlayerSync(resolved.playerId)!
             const characters = getPlayerCharactersSync(resolved.playerId)
             const characterList = result.characters.map(character => (
-                characterListEntry(viewerId, character.characterId, characters[String(character.characterId)]!, {
+                characterListEntry(viewerId, character, characters[String(character.characterId)]!, {
                     includeOverLimit: true, includeStack: true,
                 })
             ))
@@ -193,7 +196,7 @@ const routes = async (fastify: FastifyInstance) => {
                 data_headers: generateDataHeaders({ viewer_id: viewerId }),
                 data: {
                     add_exp_list: result.addExpList,
-                    character_list: [characterListEntry(viewerId, body.character_id, character)],
+                    character_list: [characterListEntry(viewerId, result.after, character)],
                     user_info: {
                         exp_pool: result.expPool,
                         exp_pooled_time: expPoolRealDateToClientTimestamp(player.expPooledTime),

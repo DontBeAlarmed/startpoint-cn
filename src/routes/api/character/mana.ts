@@ -6,6 +6,7 @@ import { mapToRecord } from "../../../lib/character-growth/resource-plan"
 import { sendGrowthMutationError } from "./mana-mutation-http"
 import { registerAwakeManaNodeRoute } from "./mana-awake"
 import { getServerDate } from "../../../utils"
+import { MANA_CHARACTER_GROWTH_FIELDS, projectCharacterGrowthIncrement } from "../../../lib/character-growth/response-projector"
 
 interface LearnManaNodeBody {
     viewer_id: number
@@ -48,14 +49,22 @@ const routes = async (fastify: FastifyInstance) => {
             throw error
         }
         const resourceState = result.resourceState
+        const growthProjection = projectCharacterGrowthIncrement(result, {
+            character: result.character,
+            fields: MANA_CHARACTER_GROWTH_FIELDS,
+            includeChangedNodes: true,
+            nodeIds: result.responseNodeEntries.map(entry => entry.multiplied_id),
+        })
         return sendCharacterResponse(reply, viewerId, {
             user_info: {
                 free_mana: resourceState.freeMana,
                 paid_mana: resourceState.paidMana,
             },
-            character_list: [...result.characterList],
+            character_list: [...growthProjection.character_list],
             user_character_mana_node_list: {
-                [String(characterId)]: [...result.responseNodeEntries],
+                [String(characterId)]: [
+                    ...(growthProjection.user_character_mana_node_list?.[String(characterId)] ?? []),
+                ],
             },
             item_list: mapToRecord(resourceState.items),
             evolution: result.evolution,

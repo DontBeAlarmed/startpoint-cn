@@ -1,28 +1,22 @@
 import { clientSerializeDate } from "./date"
 import { resolveSerializedAssetVersion } from "./serialized-asset-version"
-import { serializeBondTokenStatuses, serializePartyGroupList, serializeGachaCampaign, serializeRushEvent } from "./serialize-entities"
-import { getDateFromServerTime, getServerTime, getServerDate, realToVirtual } from "../../utils"
+import { serializePartyGroupList, serializeGachaCampaign, serializeRushEvent } from "./serialize-entities"
+import { getServerTime, realToVirtual } from "../../utils"
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time"
-import { ClientPlayerData, DailyChallengePointListEntry, MergedPlayerData, PartyCategory, Player, PlayerBoxGacha, PlayerCharacter, PlayerCharacterBondToken, PlayerDrawnQuest, PlayerEquipment, PlayerGachaCampaign, PlayerGachaInfo, PlayerMultiSpecialExchangeCampaign, PlayerParty, PlayerPartyGroup, PlayerQuestProgress, PlayerRushEvent, PlayerRushEventPlayedParty, PlayerStartDashExchangeCampaign, RushEventBattleType, UserBoxGacha, UserCharacter, UserCharacterBondTokenStatus, UserEquipment, UserGachaCampaign, UserPartyGroup, UserPartyGroupTeam, UserQuestProgress, UserRushEvent, UserRushEventPlayedParty, UserRushEventPlayedPartyList, UserTutorial } from "../types"
-import { deserializePlayerRushEventPlayedParty, deserializeRushEvent, getPlayerRushEventListClearedFoldersSync, getPlayerRushEventListPlayedPartiesSync, getPlayerRushEventListSync, serializePlayerRushEventPlayedParty } from "../domains/rushEvent"
-import { getPlayerActiveMissionsSync, getPlayerClearedCollectItemEventMissionListSync, getPlayerClearedRegularMissionListSync } from "../domains/mission"
-import { getPlayerBoxGachasSync } from "../domains/boxGacha"
-import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../domains/character"
-import { getPlayerDailyChallengePointListSync, getPlayerSync, updatePlayerSync } from "../domains/player"
-import { getPlayerDrawnQuestsSync, getPlayerQuestProgressSync } from "../domains/quest"
-import { getPlayerEquipmentListSync } from "../domains/equipment"
-import { getPlayerGachaCampaignListSync, getPlayerGachaInfoListSync } from "../domains/gacha"
-import { getPlayerItemsSync } from "../domains/item"
+import { ClientPlayerData, MergedPlayerData, PlayerQuestProgress, RushEventBattleType, UserBoxGacha, UserEquipment, UserPartyGroup, UserQuestProgress, UserRushEvent, UserRushEventPlayedParty, UserRushEventPlayedPartyList, UserTutorial } from "../types"
+import { serializePlayerRushEventPlayedParty } from "../domains/rushEvent"
+import { getPlayerClearedCollectItemEventMissionListSync } from "../domains/mission"
+import { updatePlayerSync } from "../domains/player"
 import { getPlayerMailCountSync } from "../domains/mail"
-import { getPlayerMultiSpecialExchangeCampaignsSync, getPlayerPeriodicRewardPointsSync, getPlayerStartDashExchangeCampaignsSync } from "../domains/campaign"
-import { getPlayerOptionsSync } from "../domains/option"
-import { getPlayerPartyGroupListSync } from "../domains/party"
-import { getPlayerTriggeredTutorialsSync } from "../domains/tutorial"
-import { kIdToBusinessCode, businessCodeToKId } from "../codeMap"
+import { kIdToBusinessCode } from "../codeMap"
 import { getCharacterVisibleManaBoardIndex } from "../../lib/mana-board-availability"
 import { computeRealTimeStamina } from "../../lib/stamina"
 import { isStartTutorialActive } from "../../lib/start-tutorial-state"
 import { getRealNow } from "../../runtime/time/game-time"
+import { createCharacterGrowthBatchContext } from "../../lib/character-growth/batch-context"
+import { projectCharacterGrowthLoad } from "../../lib/character-growth/load-projector"
+import type { BondTokenStatus, CharacterGrowthStoredCore } from "../../lib/character-growth/model"
+import { getCharacterDataSync } from "../../lib/assets"
 
 export interface SerializePlayerDataOptions {
     viewerId?: number
@@ -46,6 +40,115 @@ export function serializePlayerQuestProgress(progress: PlayerQuestProgress): Use
     }
 }
 
+function assertCharacterRecordKeys(
+    record: Readonly<Record<string, unknown>> | undefined,
+    characterIds: ReadonlySet<number>,
+    field: string,
+): void {
+    if (record === undefined) return
+    for (const rawCharacterId of Object.keys(record)) {
+        const characterId = Number(rawCharacterId)
+        if (!Number.isSafeInteger(characterId)
+            || characterId <= 0
+            || String(characterId) !== rawCharacterId
+            || !characterIds.has(characterId)) {
+            throw new Error(`${field} contains unknown character ${rawCharacterId}`)
+        }
+    }
+}
+
+function projectSerializedCharacterGrowth(toSerialize: MergedPlayerData) {
+    const characterIds = Object.keys(toSerialize.characterList).map(rawCharacterId => {
+        const characterId = Number(rawCharacterId)
+        if (!Number.isSafeInteger(characterId) || characterId <= 0 || String(characterId) !== rawCharacterId) {
+            throw new Error(`characterList contains invalid character ${rawCharacterId}`)
+        }
+        return characterId
+    })
+    const characterIdSet = new Set(characterIds)
+    assertCharacterRecordKeys(toSerialize.characterManaNodeList, characterIdSet, "characterManaNodeList")
+    assertCharacterRecordKeys(
+        toSerialize.characterManaNodeAwakeLevels,
+        characterIdSet,
+        "characterManaNodeAwakeLevels",
+    )
+    assertCharacterRecordKeys(toSerialize.characterAwakeUnlocks, characterIdSet, "characterAwakeUnlocks")
+    if (toSerialize.manaBoardAwakeMap !== undefined) {
+        assertCharacterRecordKeys(
+            Object.fromEntries(toSerialize.manaBoardAwakeMap),
+            characterIdSet,
+            "manaBoardAwakeMap",
+        )
+    }
+
+    const storedCharactersSnapshot: Record<string, CharacterGrowthStoredCore> = {}
+    const bondTokenSnapshots: Record<string, ReadonlyMap<number, BondTokenStatus>> = {}
+    const normalManaNodeSnapshots: Record<string, ReadonlyMap<number, number>> = {}
+    const awakeUnlockSnapshots: Record<string, ReadonlyMap<number, number>> = {}
+    const visibleManaBoardIndexes = new Map<number, number>()
+    const rarityByCharacter = new Map<number, number | null>()
+
+    for (const characterId of characterIds) {
+        const key = String(characterId)
+        const character = toSerialize.characterList[key]
+        storedCharactersSnapshot[key] = {
+            characterId,
+            exp: character.exp,
+            stack: character.stack,
+            protection: character.protection,
+            overLimitStep: character.overLimitStep,
+            evolutionLevel: character.evolutionLevel,
+            manaBoardIndex: character.manaBoardIndex,
+        }
+        bondTokenSnapshots[key] = new Map(character.bondTokenList.map(token => [
+            token.manaBoardIndex,
+            token.status as BondTokenStatus,
+        ]))
+
+        const nodeIds = toSerialize.characterManaNodeList[key] ?? []
+        if (new Set(nodeIds).size !== nodeIds.length) {
+            throw new Error(`characterManaNodeList contains duplicate nodes for character ${characterId}`)
+        }
+        const awakeLevels = toSerialize.characterManaNodeAwakeLevels?.[key] ?? {}
+        const nodeIdSet = new Set(nodeIds)
+        for (const rawNodeId of Object.keys(awakeLevels)) {
+            if (!nodeIdSet.has(Number(rawNodeId))) {
+                throw new Error(`characterManaNodeAwakeLevels contains unknown node ${characterId}/${rawNodeId}`)
+            }
+        }
+        normalManaNodeSnapshots[key] = new Map(nodeIds.map(nodeId => [nodeId, awakeLevels[nodeId] ?? 0]))
+
+        const explicitAwake = toSerialize.manaBoardAwakeMap?.get(key)
+            ?? toSerialize.characterAwakeUnlocks?.[key]
+            ?? {}
+        const awakeUnlocks = new Map(Object.entries(explicitAwake).map(([boardIndex, awakeLevel]) => [
+            Number(boardIndex),
+            awakeLevel,
+        ]))
+        awakeUnlockSnapshots[key] = awakeUnlocks
+        visibleManaBoardIndexes.set(
+            characterId,
+            getCharacterVisibleManaBoardIndex(character.manaBoardIndex, characterId),
+        )
+        rarityByCharacter.set(characterId, getCharacterDataSync(characterId)?.rarity ?? null)
+    }
+
+    const batch = createCharacterGrowthBatchContext({
+        playerId: toSerialize.player.id,
+        characterIds,
+        storedCharactersSnapshot,
+        bondTokenSnapshots,
+        normalManaNodeSnapshots,
+        awakeUnlockSnapshots,
+        rarityLoader: characterId => rarityByCharacter.get(characterId) ?? null,
+    })
+    return projectCharacterGrowthLoad({
+        batch,
+        characters: toSerialize.characterList,
+        visibleManaBoardIndexes,
+    })
+}
+
 
 /**
  * Serializes a player data object in the way that the world flipper client expects it.
@@ -57,48 +160,7 @@ export function serializePlayerData(
     toSerialize: MergedPlayerData,
     options?: SerializePlayerDataOptions
 ): ClientPlayerData {
-
-    // convert userCharacterList (k_id → business code)
-    const userCharacterList: Record<string, UserCharacter> = {}
-    for (const [characterId, character] of Object.entries(toSerialize.characterList)) {
-        const kId = parseInt(characterId);
-        const code = kIdToBusinessCode(kId);
-        const codeKey = String(code);
-        // convert bond tokens
-        const bondTokenList = serializeBondTokenStatuses(character.bondTokenList);
-        const converted_character: UserCharacter = {
-            "entry_count": character.entryCount,
-            "evolution_level": character.evolutionLevel,
-            "over_limit_step": character.overLimitStep,
-            "protection": character.protection,
-            "join_time": getServerTime(character.joinTime),
-            "update_time": getServerTime(character.updateTime),
-            "exp": character.exp,
-            "stack": character.stack,
-            "bond_token_list": bondTokenList,
-            "mana_board_index": getCharacterVisibleManaBoardIndex(character.manaBoardIndex, kId)
-        }
-
-        const exBoost = character.exBoost
-        if (exBoost !== undefined) {
-            converted_character['ex_boost'] = {
-                "status_id": exBoost.statusId,
-                "ability_id_list": exBoost.abilityIdList
-            }
-        }
-
-        if (character.illustrationSettings !== undefined) {
-            converted_character['illustration_settings'] = character.illustrationSettings
-        }
-
-        // Set mana_board_awake from actual node awake levels (post-awakening data, not mission-based)
-        const manaBoard = toSerialize.manaBoardAwakeMap?.get(characterId)
-        if (manaBoard) {
-            converted_character.mana_board_awake = manaBoard
-        }
-
-        userCharacterList[codeKey] = converted_character
-    }
+    const growthLoadProjection = projectSerializedCharacterGrowth(toSerialize)
 
     // convert parties
     const userPartyGroupList: Record<string, UserPartyGroup> = serializePartyGroupList(toSerialize.partyGroupList)
@@ -211,21 +273,8 @@ export function serializePlayerData(
             ? { character_id: toSerialize.player.tutorialGachaCharacterId }
             : null,
         "cleared_regular_mission_list": toSerialize.clearedRegularMissionList,
-        "user_character_list": userCharacterList,
-        "user_character_mana_node_list": (() => {
-                const awakeLevels = toSerialize.characterManaNodeAwakeLevels ?? {}
-                const list: Record<string, { multiplied_id: number, awake_level: number }[]> = {}
-                for (const [charId, nodeIds] of Object.entries(toSerialize.characterManaNodeList)) {
-                    if (nodeIds.length > 0) {
-                        const charLevels = awakeLevels[charId] ?? {}
-                        list[charId] = nodeIds.map(id => ({
-                            multiplied_id: id,
-                            awake_level: charLevels[id] ?? 0
-                        }))
-                    }
-                }
-                return list
-            })(),
+        "user_character_list": growthLoadProjection.userCharacterList as unknown as ClientPlayerData["user_character_list"],
+        "user_character_mana_node_list": growthLoadProjection.userCharacterManaNodeList as ClientPlayerData["user_character_mana_node_list"],
         "user_party_group_list": userPartyGroupList,
         "item_list": toSerialize.itemList,
         "user_equipment_list": userEquipmentList,

@@ -1,7 +1,6 @@
 import { getDb } from "../../../data/db"
 import { getPlayerCharactersByIdsSync } from "../../../data/domains/character"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
-import { clientSerializeDate } from "../../../data/utils/date"
 import type {
     AddExpList,
     ClientReturnBondTokenStatus,
@@ -12,6 +11,7 @@ import type {
 import { createCharacterGrowthBatchContext } from "../batch-context"
 import { calculateCharacterExpAfter } from "../exp-calculation"
 import { growthError } from "../errors"
+import { projectSortedBondTokens } from "../invariants"
 import {
     addSafeInteger,
     assertInsideTransaction,
@@ -20,6 +20,11 @@ import {
     validateGrowthPlayerId,
     validateNonNegativeAmount,
 } from "../mutation-support"
+import {
+    EXP_CHARACTER_GROWTH_FIELDS,
+    characterGrowthProjectionStateFromPlayerCharacter,
+    projectCharacterGrowthEntry,
+} from "../response-projector"
 
 export interface GrantCharacterExpCommand {
     readonly playerId: number
@@ -94,10 +99,9 @@ export function grantCharacterExpWithinTransactionSync(
             after_exp: calculation.afterExp,
             add_exp_pool: calculation.overflowExp,
         })
-        const tokens: ClientReturnBondTokenStatus[] = [...context.bondTokens(characterId)].map(([boardIndex, status]) => ({
-            mana_board_index: boardIndex,
-            status,
-        }))
+        const tokens: ClientReturnBondTokenStatus[] = projectSortedBondTokens(
+            context.bondTokens(characterId),
+        )
         bondTokenStatusList[characterId] = { before: tokens, after: tokens }
     }
 
@@ -117,14 +121,12 @@ export function grantCharacterExpWithinTransactionSync(
     for (const characterId of ids) {
         const character = written[String(characterId)]
         if (!character || command.ignoreUpdate) continue
-        characterList.push({
-            character_id: characterId,
-            exp: character.exp,
-            create_time: clientSerializeDate(character.joinTime),
-            update_time: clientSerializeDate(character.updateTime),
-            join_time: clientSerializeDate(character.joinTime),
-            exp_total: character.exp,
-        })
+        characterList.push(projectCharacterGrowthEntry({
+            characterId,
+            character,
+            state: characterGrowthProjectionStateFromPlayerCharacter(characterId, character),
+            fields: EXP_CHARACTER_GROWTH_FIELDS,
+        }) as unknown as ClientReturnCharacter)
     }
     return {
         add_exp_list: addExpList,

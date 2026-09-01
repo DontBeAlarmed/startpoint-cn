@@ -23,6 +23,7 @@ import { getCarnivalSaveStateSync } from "../../lib/carnival-save-state"
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { getPlayerCharacterAwakeUnlockRecordSync } from "../domains/character_awake"
 import { reconcileInterruptedStartTutorialSync } from "../../lib/start-tutorial-state"
+import { projectMergedCharacterGrowthState } from "../../lib/character-growth/save/project-growth-state"
 export { getDefaultPlayerData } from "./default-player"
 
 export interface GetClientSerializedDataOptions extends SerializePlayerDataOptions {
@@ -132,16 +133,19 @@ export function getMergedPlayerDataSync(
 ): MergedPlayerData | null {
     const playerData = getPlayerSync(playerId)
     if (playerData === null) return null
+    const growth = projectMergedCharacterGrowthState({
+        characterList: getPlayerCharactersSync(playerId),
+        characterManaNodeList: getPlayerCharactersManaNodesSync(playerId),
+        characterManaNodeAwakeLevels: getPlayerCharactersManaNodeAwakeLevelsSync(playerId),
+        characterAwakeUnlocks: getPlayerCharacterAwakeUnlockRecordSync(playerId),
+    })
 
     return {
         player: playerData,
         dailyChallengePointList: getPlayerDailyChallengePointListSync(playerId),
         triggeredTutorial: getPlayerTriggeredTutorialsSync(playerId),
         clearedRegularMissionList: getPlayerClearedRegularMissionListSync(playerId),
-        characterList: getPlayerCharactersSync(playerId),
-        characterManaNodeList: getPlayerCharactersManaNodesSync(playerId),
-        characterManaNodeAwakeLevels: getPlayerCharactersManaNodeAwakeLevelsSync(playerId),
-        characterAwakeUnlocks: getPlayerCharacterAwakeUnlockRecordSync(playerId),
+        ...growth,
         partyGroupList: getPlayerPartyGroupListSync(playerId),
         itemList: getPlayerItemsSync(playerId),
         equipmentList: getPlayerEquipmentListSync(playerId),

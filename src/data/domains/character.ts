@@ -106,6 +106,14 @@ export function playerOwnsCharacterSync(
     `).get(playerId, characterId) !== undefined
 }
 
+/** Explicit ownership removal used by the admin editor; child Growth rows cascade. */
+export function deletePlayerCharacterSync(playerId: number, characterId: number): boolean {
+    return getDb().prepare(`
+        DELETE FROM players_characters
+        WHERE player_id = ? AND id = ?
+    `).run(playerId, characterId).changes > 0
+}
+
 /**
  * Gets a singular character from a player's data.
  * 

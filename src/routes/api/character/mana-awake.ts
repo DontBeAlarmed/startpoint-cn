@@ -3,7 +3,6 @@ import { getPlayerCharacterSync } from "../../../data/domains/character"
 import { getPlayerSync } from "../../../data/domains/player"
 import { executeAwakeManaNodes } from "../../../lib/character-growth/commands/awake-mana-nodes"
 import {
-    buildCharacterListEntryFromGrowth,
     validateCharacterOwnership,
     validateSessionAndPlayer,
     sendCharacterResponse,
@@ -12,6 +11,7 @@ import { getMailArrivedSync } from "../../../lib/mail-notification"
 import { mapToRecord } from "../../../lib/character-growth/resource-plan"
 import { sendGrowthMutationError } from "./mana-mutation-http"
 import { getServerDate } from "../../../utils"
+import { MANA_CHARACTER_GROWTH_FIELDS, projectCharacterGrowthIncrement } from "../../../lib/character-growth/response-projector"
 
 interface AwakeManaNodeBody {
     viewer_id: number
@@ -59,23 +59,24 @@ export function registerAwakeManaNodeRoute(fastify: FastifyInstance): void {
             throw error
         }
         const player = getPlayerSync(session.playerId)
-        const character = getPlayerCharacterSync(session.playerId, characterId)
-        if (!player || !character) return reply.status(500).send({ error: "Internal Server Error", message: "Growth state unavailable." })
+        if (!player) return reply.status(500).send({ error: "Internal Server Error", message: "Growth state unavailable." })
         const resourceState = result.resourceState
-        const characterList = [buildCharacterListEntryFromGrowth(
-            characterId,
-            character,
-            result.after,
-            result.manaBoardAwake === undefined ? {} : { mana_board_awake: result.manaBoardAwake },
-        )]
+        const growthProjection = projectCharacterGrowthIncrement(result, {
+            character: result.character,
+            fields: MANA_CHARACTER_GROWTH_FIELDS,
+            includeChangedNodes: true,
+            nodeIds: result.responseNodeEntries.map(entry => entry.multiplied_id),
+        })
         return sendCharacterResponse(reply, viewerId, {
             user_info: {
                 free_mana: resourceState?.freeMana ?? player.freeMana,
                 paid_mana: resourceState?.paidMana ?? player.paidMana,
             },
-            character_list: characterList,
+            character_list: [...growthProjection.character_list],
             user_character_mana_node_list: {
-                [String(characterId)]: [...result.responseNodeEntries],
+                [String(characterId)]: [
+                    ...(growthProjection.user_character_mana_node_list?.[String(characterId)] ?? []),
+                ],
             },
             item_list: mapToRecord(resourceState?.items ?? new Map()),
             evolution: result.evolution,

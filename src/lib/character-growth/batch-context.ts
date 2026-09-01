@@ -2,7 +2,7 @@ import { getCharacterDataSync } from "../assets"
 import { getCharacterGrowthContentFactsSync } from "./content-facts"
 import { growthError } from "./errors"
 import { validateAwakeLevel, validateBondTokenStatus, validateBoardIndex } from "./invariants"
-import { CharacterGrowthRepository } from "./repository"
+import { CharacterGrowthRepository, validateCharacterGrowthStoredCore } from "./repository"
 import type {
     BondTokenStatus,
     CharacterGrowthContentFacts,
@@ -26,6 +26,10 @@ export interface CharacterGrowthBatchContextOptions {
     readonly repository?: CharacterGrowthRepository
     readonly contentFactsLoader?: (characterId: number) => CharacterGrowthContentFacts
     readonly rarityLoader?: (characterId: number) => number | null
+    readonly storedCharactersSnapshot?: Readonly<Record<string, CharacterGrowthStoredCore>>
+    readonly bondTokenSnapshots?: Readonly<Record<string, ReadonlyMap<number, BondTokenStatus>>>
+    readonly normalManaNodeSnapshots?: Readonly<Record<string, ReadonlyMap<number, number>>>
+    readonly awakeUnlockSnapshots?: Readonly<Record<string, ReadonlyMap<number, number>>>
 }
 
 function positiveId(value: number, field: string): number {
@@ -77,6 +81,32 @@ function validateAwakeMap(unlocks: ReadonlyMap<number, number>): ReadonlyMap<num
     return unlocks
 }
 
+function validateNormalManaNodeMap(nodes: ReadonlyMap<number, number>): ReadonlyMap<number, number> {
+    const result = new Map<number, number>()
+    for (const [nodeId, awakeLevel] of nodes) {
+        const validNodeId = positiveId(nodeId, "manaNodeId")
+        if (!Number.isSafeInteger(awakeLevel) || awakeLevel < 0) {
+            throw growthError("INVALID_GROWTH_STATE", "mana node awake level must be a non-negative safe integer.")
+        }
+        result.set(validNodeId, awakeLevel)
+    }
+    return result
+}
+
+function snapshotEntries<T>(
+    snapshot: Readonly<Record<string, T>>,
+    selectedCharacterIds: ReadonlySet<number>,
+    field: string,
+): readonly (readonly [number, T])[] {
+    return Object.entries(snapshot).map(([rawCharacterId, value]) => {
+        const characterId = positiveId(Number(rawCharacterId), `${field}.characterId`)
+        if (String(characterId) !== rawCharacterId || !selectedCharacterIds.has(characterId)) {
+            throw growthError("INVALID_GROWTH_STATE", `${field} contains an unexpected character ${rawCharacterId}.`)
+        }
+        return [characterId, value] as const
+    })
+}
+
 export class CharacterGrowthBatchContextImpl implements CharacterGrowthBatchContext {
     private readonly playerId: number
     private readonly characterIds: readonly number[]
@@ -98,6 +128,41 @@ export class CharacterGrowthBatchContextImpl implements CharacterGrowthBatchCont
         this.repository = options.repository ?? new CharacterGrowthRepository()
         this.contentFactsLoader = options.contentFactsLoader ?? getCharacterGrowthContentFactsSync
         this.rarityLoader = options.rarityLoader ?? defaultRarityLoader
+        const selectedCharacterIds = new Set(this.characterIds)
+        if (options.storedCharactersSnapshot !== undefined) {
+            this.cachedCharacters = new Map(snapshotEntries(
+                options.storedCharactersSnapshot,
+                selectedCharacterIds,
+                "storedCharactersSnapshot",
+            ).map(([characterId, stored]) => {
+                const core = validateCharacterGrowthStoredCore(stored)
+                if (core.characterId !== characterId) {
+                    throw growthError("INVALID_GROWTH_STATE", "character snapshot identity mismatch.")
+                }
+                return [characterId, buildCore(core, this.playerId, this.rarityLoader)]
+            }))
+        }
+        if (options.bondTokenSnapshots !== undefined) {
+            this.cachedBondTokens = new Map(snapshotEntries(
+                options.bondTokenSnapshots,
+                selectedCharacterIds,
+                "bondTokenSnapshots",
+            ).map(([characterId, tokens]) => [characterId, validateTokenMap(new Map(tokens))]))
+        }
+        if (options.normalManaNodeSnapshots !== undefined) {
+            this.cachedNormalManaNodes = new Map(snapshotEntries(
+                options.normalManaNodeSnapshots,
+                selectedCharacterIds,
+                "normalManaNodeSnapshots",
+            ).map(([characterId, nodes]) => [characterId, validateNormalManaNodeMap(nodes)]))
+        }
+        if (options.awakeUnlockSnapshots !== undefined) {
+            this.cachedAwakeUnlocks = new Map(snapshotEntries(
+                options.awakeUnlockSnapshots,
+                selectedCharacterIds,
+                "awakeUnlockSnapshots",
+            ).map(([characterId, unlocks]) => [characterId, validateAwakeMap(new Map(unlocks))]))
+        }
     }
 
     characters(): ReadonlyMap<number, CharacterGrowthCoreFact> {
