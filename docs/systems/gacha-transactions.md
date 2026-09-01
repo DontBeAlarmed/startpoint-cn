@@ -27,6 +27,10 @@
 
 角色 projection 按抽次保留 `movie_id`、`seed`、`entry_count`、`rarity_5_guarantee` 特殊路径、quarantine `markSent` 次数、重复角色的 `ex_boost_item` 本次增量和 `item_list` 最终库存；同角色对象按抽取顺序合并。装备 projection 保留每抽 `draw_equipment` 顺序、`treasure_up_type`、`is_erupt`，装备列表按 ID 只保留最后状态。未提供 owner callback 的直接内部调用仍使用 `gacha-reward-legacy.ts`，其结果由迁移前 fixture 锁定。
 
+装备动画字段由服务端显式决定，客户端不会根据最终装备自动纠正：`treasure_up_type=1` 表示 `3→5`，`2` 表示 `4→5`，`3` 表示 `3→4`。因此类型的目标星级必须等于实际抽中装备的星级：3 星只能返回 `0`，4 星只能返回 `0/3`，5 星只能返回 `0/1/2`。`is_erupt` 只在整批至少包含一个 5 星装备时计算；爆发成立时全批 `treasure_up_type` 均为 `0`。概率来自当前 Content Snapshot 的 `equipment_gacha_movie_probability.json`；概率 `0` 按禁用处理。
+
+CN 客户端 Dummy 的反编译代码含一处与上述结果工厂、宝箱起始/目标星级和字段命名互相矛盾的取反分支，不能作为生产后端合同机械复制。服务端以 RealRemote 的真实响应字段合同、结果动画工厂和最终客户端可见不变量共同约束动画类型；不在此处推断已停服官服的随机数等号边界。
+
 任一后段写入失败时，费用、奖励、历史、积分和任务事实全部回滚。角色 sampled log 只在最外层事务成功返回后记录一次；事务回滚时不会留下成功日志。响应只在事务提交后组装；角色列表再执行 fail-soft 的觉醒解锁协调。
 
 ## 待审阅边界

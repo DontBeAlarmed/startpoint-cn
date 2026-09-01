@@ -23,6 +23,20 @@ const normalProbability = {
 assert.deepStrictEqual(getEquipmentGachaMovieProbabilitySync("1"), normalProbability);
 assert.strictEqual(getEquipmentGachaMovieProbabilitySync("missing"), null);
 
+function rolls(values) {
+  let index = 0;
+  return () => {
+    if (index >= values.length) {
+      throw new Error(`missing roll at index ${index}`);
+    }
+    return values[index++];
+  };
+}
+
+function neverRoll() {
+  throw new Error("this client-reachable result must not consume an animation roll");
+}
+
 assert.deepStrictEqual(
   computeEquipmentGachaMovieEffectsForGacha(
     { equipmentMovieProbabilityId: "1" },
@@ -37,63 +51,11 @@ assert.deepStrictEqual(
   },
 );
 
-function rolls(values) {
-  let index = 0;
-  return () => {
-    if (index >= values.length) {
-      throw new Error(`missing roll at index ${index}`);
-    }
-    return values[index++];
-  };
-}
-
 assert.deepStrictEqual(
-  computeEquipmentGachaMovieEffects(
-    [
-      { id: 4030003, rank: 4, isGuarantee: false },
-      { id: 3050002, rank: 3, isGuarantee: false },
-    ],
-    normalProbability,
-    rolls([0.19, 0.21, 0.26]),
-  ),
-  {
-    isErupt: false,
-    draws: [
-      { equipmentId: 4030003, treasureUpType: 2 },
-      { equipmentId: 3050002, treasureUpType: 0 },
-    ],
-  },
-);
-
-assert.deepStrictEqual(
-  computeEquipmentGachaMovieEffects(
-    [{ id: 3050002, rank: 3, isGuarantee: false }],
-    normalProbability,
-    rolls([0.19]),
-  ),
-  {
-    isErupt: false,
-    draws: [{ equipmentId: 3050002, treasureUpType: 1 }],
-  },
-);
-
-assert.deepStrictEqual(
-  computeEquipmentGachaMovieEffects(
-    [{ id: 3050002, rank: 3, isGuarantee: false }],
-    normalProbability,
-    rolls([0.21, 0.24]),
-  ),
-  {
-    isErupt: false,
-    draws: [{ equipmentId: 3050002, treasureUpType: 3 }],
-  },
-);
-
-assert.deepStrictEqual(
-  computeEquipmentGachaMovieEffects(
+  computeEquipmentGachaMovieEffectsForGacha(
+    { equipmentMovieProbabilityId: "missing" },
     [{ id: 5020008, rank: 5, isGuarantee: false }],
-    { ...normalProbability, probabilityEruption: 0 },
-    rolls([0]),
+    neverRoll,
   ),
   {
     isErupt: false,
@@ -101,18 +63,66 @@ assert.deepStrictEqual(
   },
 );
 
+assert.deepStrictEqual(
+  computeEquipmentGachaMovieEffects(
+    [{ id: 3050002, rank: 3, isGuarantee: false }],
+    normalProbability,
+    neverRoll,
+  ),
+  {
+    isErupt: false,
+    draws: [{ equipmentId: 3050002, treasureUpType: 0 }],
+  },
+);
+
+assert.deepStrictEqual(
+  computeEquipmentGachaMovieEffects(
+    [{ id: 4030003, rank: 4, isGuarantee: false }],
+    normalProbability,
+    rolls([0.24]),
+  ),
+  {
+    isErupt: false,
+    draws: [{ equipmentId: 4030003, treasureUpType: 3 }],
+  },
+);
+
+assert.deepStrictEqual(
+  computeEquipmentGachaMovieEffects(
+    [{ id: 5020008, rank: 5, isGuarantee: false }],
+    { ...normalProbability, probabilityEruption: 0 },
+    rolls([0, 0.19]),
+  ),
+  {
+    isErupt: false,
+    draws: [{ equipmentId: 5020008, treasureUpType: 1 }],
+  },
+);
+
 assert.equal(
   drawEquipmentTreasureUpType(
-    3,
+    5,
     {
       ...normalProbability,
       probabilityTreasureUp3To5: 0,
-      probabilityTreasureUp3To4: 0,
+      probabilityTreasureUp4To5: 0,
     },
     false,
     rolls([0, 0]),
   ),
   0,
+);
+
+assert.deepStrictEqual(
+  computeEquipmentGachaMovieEffects(
+    [{ id: 5020008, rank: 5, isGuarantee: false }],
+    { ...normalProbability, probabilityEruption: 0 },
+    rolls([0, 0.2, 0.34]),
+  ),
+  {
+    isErupt: false,
+    draws: [{ equipmentId: 5020008, treasureUpType: 2 }],
+  },
 );
 
 assert.deepStrictEqual(
@@ -139,12 +149,28 @@ assert.deepStrictEqual(
       { id: 4030003, rank: 4, isGuarantee: true },
     ],
     normalProbability,
-    rolls([0.3]),
+    rolls([0]),
   ),
   {
     isErupt: false,
     draws: [
-      { equipmentId: 4030003, treasureUpType: 2 },
+      { equipmentId: 4030003, treasureUpType: 0 },
+    ],
+  },
+);
+
+assert.deepStrictEqual(
+  computeEquipmentGachaMovieEffects(
+    [
+      { id: 5020008, rank: 5, isGuarantee: true },
+    ],
+    { ...normalProbability, probabilityEruption: 0 },
+    rolls([0, 0, 0.34]),
+  ),
+  {
+    isErupt: false,
+    draws: [
+      { equipmentId: 5020008, treasureUpType: 2 },
     ],
   },
 );

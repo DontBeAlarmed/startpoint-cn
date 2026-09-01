@@ -480,22 +480,22 @@ test("equipment owner plan preserves draw order metadata effects and last equipm
     const { playerId } = await createPlayer("gacha-owner-equipment-plan")
     const movieModule = require("../src/lib/gacha-equipment-movie")
     const originalCompute = movieModule.computeEquipmentGachaMovieEffectsForGacha
-    const drawResult = [5040016, 5040016, 5020008]
+    const drawResult = [4030003, 4030003, 5020008]
     const metadata = [
         { id: drawResult[0], rank: 4, isGuarantee: false },
-        { id: drawResult[1], rank: 5, isGuarantee: true },
-        { id: drawResult[2], rank: 3, isGuarantee: false },
+        { id: drawResult[1], rank: 4, isGuarantee: false },
+        { id: drawResult[2], rank: 5, isGuarantee: false },
     ]
     let movieInputs
     let capturedPlan
     movieModule.computeEquipmentGachaMovieEffectsForGacha = (_gacha, inputs) => {
         movieInputs = inputs
         return {
-            isErupt: true,
+            isErupt: false,
             draws: [
-                { equipmentId: drawResult[0], treasureUpType: 2 },
-                { equipmentId: drawResult[1], treasureUpType: 1 },
-                { equipmentId: drawResult[2], treasureUpType: 0 },
+                { equipmentId: drawResult[0], treasureUpType: 3 },
+                { equipmentId: drawResult[1], treasureUpType: 0 },
+                { equipmentId: drawResult[2], treasureUpType: 1 },
             ],
         }
     }
@@ -532,11 +532,11 @@ test("equipment owner plan preserves draw order metadata effects and last equipm
         rewardId,
     })))
     assert.deepEqual(result.draw, [
-        { equipment_id: drawResult[0], treasure_up_type: 2 },
-        { equipment_id: drawResult[1], treasure_up_type: 1 },
-        { equipment_id: drawResult[2], treasure_up_type: 0 },
+        { equipment_id: drawResult[0], treasure_up_type: 3 },
+        { equipment_id: drawResult[1], treasure_up_type: 0 },
+        { equipment_id: drawResult[2], treasure_up_type: 1 },
     ])
-    assert.equal(result.isErupt, true)
+    assert.equal(result.isErupt, false)
     assert.deepEqual(result.equipment.map(item => [item.equipment_id, item.stack]), [
         [drawResult[0], 1],
         [drawResult[2], 0],
