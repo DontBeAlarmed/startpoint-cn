@@ -125,6 +125,8 @@ const TEST_GROUPS = Object.freeze({
             "tools/character_growth_stack_commands.test.cjs",
             "tools/character_growth_over_limit_commands.test.cjs",
             "tools/character_growth_exp_transaction.test.cjs",
+            "tools/character_growth_lavu_orderings.test.cjs",
+            "tools/character_growth_gate_acceptance.test.cjs",
             "tools/perf/character_growth_context_admission.test.cjs",
         ],
     },

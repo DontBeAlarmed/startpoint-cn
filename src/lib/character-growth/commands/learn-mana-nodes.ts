@@ -155,7 +155,10 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
             isBoardComplete,
         )
         const boardOneContent = mutationContent(command.characterId, 1)
-        const plannedEvolutionLevel = deriveEvolutionLevel(boardOneContent, nextNodes)
+        const plannedEvolutionLevel = Math.max(
+            character.evolutionLevel,
+            deriveEvolutionLevel(boardOneContent, nextNodes),
+        )
         if (plan.hasResourceWrites) {
             updatePlayerSync({
                 id: command.playerId,

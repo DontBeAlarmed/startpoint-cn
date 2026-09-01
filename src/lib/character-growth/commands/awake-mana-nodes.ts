@@ -134,7 +134,10 @@ export function executeAwakeManaNodes(command: AwakeManaNodesCommand): AwakeMana
             growthMutationError(error)
         }
         const nextNodes = applyManaNodePlan(allNodeLevels, plan)
-        const plannedEvolutionLevel = deriveEvolutionLevel(content, nextNodes)
+        const plannedEvolutionLevel = Math.max(
+            character.evolutionLevel,
+            deriveEvolutionLevel(content, nextNodes),
+        )
         const before = observed(character, context.bondTokens(), allNodeLevels, context.awakeUnlocks())
 
         let resources

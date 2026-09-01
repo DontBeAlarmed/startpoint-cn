@@ -199,16 +199,16 @@ test("learn_mana_node persists and returns CN evolution before board completion"
     assert.ok(routeState(learned.playerId).nodes.length < Object.keys(getCharacterManaNodesSync(CHARACTER_ID, 1)).length)
 })
 
-test("learn_mana_node corrects an overstated persisted evolution without a growth response", async () => {
-    const corrected = await createPlayer(6)
-    updatePlayerCharacterSync(corrected.playerId, CHARACTER_ID, { evolutionLevel: 3 })
-    insertPlayerCharacterManaNodesSync(corrected.playerId, CHARACTER_ID, [2219])
-    grantLearnCost(corrected.playerId, 2220)
+test("learn_mana_node preserves a historical higher evolution without a growth response", async () => {
+    const preserved = await createPlayer(6)
+    updatePlayerCharacterSync(preserved.playerId, CHARACTER_ID, { evolutionLevel: 3 })
+    insertPlayerCharacterManaNodesSync(preserved.playerId, CHARACTER_ID, [2219])
+    grantLearnCost(preserved.playerId, 2220)
     const response = await app.inject({
         method: "POST",
         url: "/mana/learn_mana_node",
         payload: {
-            viewer_id: corrected.viewerId,
+            viewer_id: preserved.viewerId,
             character_id: CHARACTER_ID,
             mana_node_multiplied_id_list: [2220],
             api_count: 1,
@@ -217,11 +217,11 @@ test("learn_mana_node corrects an overstated persisted evolution without a growt
 
     assert.equal(response.statusCode, 200, response.body)
     const data = decode(response)
-    assert.equal(getPlayerCharacterSync(corrected.playerId, CHARACTER_ID).evolutionLevel, 0)
-    assert.equal(characterEntry(data).evolution_level, 0)
-    assert.equal(characterEntry(data).evolution_img_level, 0)
+    assert.equal(getPlayerCharacterSync(preserved.playerId, CHARACTER_ID).evolutionLevel, 3)
+    assert.equal(characterEntry(data).evolution_level, 3)
+    assert.equal(characterEntry(data).evolution_img_level, 3)
     assert.deepEqual(data.evolution, [])
-    assert.deepEqual(characterEntry(data).bond_token_list, bondTokenList(corrected.playerId))
+    assert.deepEqual(characterEntry(data).bond_token_list, bondTokenList(preserved.playerId))
 })
 
 test("learn_mana_node rolls back node, costs, bond, and evolution on a late failure", async () => {

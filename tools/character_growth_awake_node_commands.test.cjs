@@ -22,6 +22,7 @@ const {
     getPlayerCharacterSync,
     getPlayerCharacterManaNodeAwakeLevelsSync,
     insertPlayerCharacterManaNodesSync,
+    updatePlayerCharacterSync,
 } = require("../src/data/domains/character")
 const { upsertPlayerCharacterAwakeUnlockSync } = require("../src/data/domains/character_awake")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
@@ -123,6 +124,24 @@ test("awakeManaNodes writes Awake levels on fixed board one and keeps normal boa
     assert.equal(getPlayerCharacterManaNodeAwakeLevelsSync(playerId, 1)[2219], 1)
     assert.equal(result.after.normalManaNodes.get(2219), 1)
     assert.equal("manaBoardAwake" in result.after, false)
+})
+
+test("awakeManaNodes never lowers a historical evolution level", () => {
+    const playerId = createPlayer()
+    seedBoardOne(playerId)
+    updatePlayerCharacterSync(playerId, 1, { evolutionLevel: 99 })
+    grantAwakeCost(playerId, 2219)
+
+    const result = loadAwakeCommand().executeAwakeManaNodes({
+        playerId,
+        characterId: 1,
+        requestedNodeIds: [2219],
+        targetAwakeLevel: 1,
+        evaluationTime: new Date("2024-08-14T12:00:00.000Z"),
+    })
+
+    assert.equal(result.after.evolutionLevel, 99)
+    assert.equal(getPlayerCharacterSync(playerId, 1).evolutionLevel, 99)
 })
 
 test("awakeManaNodes only moves Awake state forward and does not spend resources on a no-op", () => {

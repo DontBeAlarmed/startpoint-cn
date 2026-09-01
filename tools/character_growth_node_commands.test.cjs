@@ -22,6 +22,7 @@ const {
     getPlayerCharacterSync,
     getPlayerCharacterManaNodeAwakeLevelsSync,
     insertPlayerCharacterManaNodesSync,
+    updatePlayerCharacterSync,
 } = require("../src/data/domains/character")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { characterExpCaps } = require("../src/lib/character")
@@ -176,6 +177,22 @@ test("learnManaNodes uses DB/content costs and persists a normal node", () => {
     assert.equal(getPlayerCharacterManaNodeAwakeLevelsSync(playerId, 1)[2201], 0)
     assert.equal(result.after.normalManaNodes.get(2201), 0)
     assert.ok(result.missionFacts)
+})
+
+test("learnManaNodes never lowers a historical evolution level", () => {
+    const playerId = createPlayer()
+    updatePlayerCharacterSync(playerId, 1, { evolutionLevel: 99 })
+    grantNodeCost(playerId, [2201])
+
+    const result = loadLearnCommand().executeLearnManaNodes({
+        playerId,
+        characterId: 1,
+        requestedNodeIds: [2201],
+        evaluationTime: new Date("2024-08-14T12:00:00.000Z"),
+    })
+
+    assert.equal(result.after.evolutionLevel, 99)
+    assert.equal(getPlayerCharacterSync(playerId, 1).evolutionLevel, 99)
 })
 
 test("learnManaNodes aggregates shared item costs before producing absolute after-state", () => {

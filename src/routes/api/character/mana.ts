@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
+import { getPlayerCharacterSync } from "../../../data/domains/character"
 import { executeLearnManaNodes } from "../../../lib/character-growth/commands/learn-mana-nodes"
 import { validateSessionAndPlayer, validateCharacterOwnership, sendCharacterResponse } from "../../../lib/character-helpers"
 import { getMailArrivedSync } from "../../../lib/mail-notification"
@@ -42,6 +43,7 @@ const routes = async (fastify: FastifyInstance) => {
         } catch (error) {
             console.warn(
                 `[MANA] learn_mana_node rejected: player=${session.playerId} char=${characterId}`
+                + ` board=${getPlayerCharacterSync(session.playerId, characterId)?.manaBoardIndex ?? "unknown"}`
                 + ` code=${(error && typeof error === "object" && "code" in error) ? String(error.code) : "unknown"}`
                 + ` nodes=${nodeIds.length}`,
             )

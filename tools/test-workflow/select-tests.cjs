@@ -15,6 +15,10 @@ const HUB_AUTHENTICATION_GROUPS = [
 
 const SOURCE_RULES = [
     {
+        pattern: /^tools\/character_growth_(?:lavu_orderings|gate_acceptance)\.test\.cjs$/,
+        groups: ["quick:character-growth"],
+    },
+    {
         pattern: /^(?:src\/lib\/character-growth\/(?:response-projector|load-projector)\.ts|tools\/character_growth_(?:response_projector|load_projector|client_merge)\.test\.cjs)$/,
         groups: ["quick:character-growth"],
     },

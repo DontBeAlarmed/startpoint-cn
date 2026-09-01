@@ -98,12 +98,15 @@ test("bundled ContentRepository keeps tracked gacha fallback behavior", async t 
     assert.deepEqual(repository.table("gacha_campaign.json"), trackedCampaigns)
 })
 
-test("character and gacha API routes share the Repository-backed assets facade", () => {
+test("character grant owner and gacha API route share the Repository-backed assets facade", () => {
     const characterRoute = fs.readFileSync(path.join(projectRoot, "src/routes/api/character.ts"), "utf8")
+    const characterOwner = fs.readFileSync(path.join(projectRoot, "src/lib/character.ts"), "utf8")
     const gachaRoute = fs.readFileSync(path.join(projectRoot, "src/routes/api/gacha.ts"), "utf8")
 
-    assert.match(characterRoute, /getCharacterDataSync.*from "\.\.\/\.\.\/lib\/assets"/)
+    assert.match(characterRoute, /givePlayerCharacterSync.*from "\.\.\/\.\.\/lib\/character"/)
+    assert.match(characterOwner, /getCharacterDataSync.*from "\.\/assets"/)
     assert.match(gachaRoute, /getGachaCampaignIdSync, getGachaSync.*from "\.\.\/\.\.\/lib\/assets"/)
     assert.doesNotMatch(characterRoute, /assets\/character\.json/)
+    assert.doesNotMatch(characterOwner, /assets\/character\.json/)
     assert.doesNotMatch(gachaRoute, /assets\/gacha(?:_campaign)?\.json/)
 })
