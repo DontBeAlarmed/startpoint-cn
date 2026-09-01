@@ -10,9 +10,13 @@ const path = require("node:path")
 
 const LAVU_ID = 263002
 const BARETTA_ID = 151006
-const MISSION_ID = 2630023
-const CATEGORY = 18
-const QUEST_ID = 400001104
+const LAVU_MISSION_ID = 2630023
+const LAVU_CATEGORY = 18
+const LAVU_QUEST_ID = 400001104
+const RAMS_ID = 231001
+const RAMS_MISSION_ID = 2310013
+const RAMS_CATEGORY = 21
+const RAMS_QUEST_ID = 1006
 
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "lavu-awake-route-db-"))
 const previousDataDirectory = process.env.DATA_DIR
@@ -40,7 +44,9 @@ process.once("exit", cleanup)
 const {
     installBundledGameplaySnapshot,
 } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
-restoreContentSnapshot = installBundledGameplaySnapshot()
+restoreContentSnapshot = installBundledGameplaySnapshot({
+    additionalTableNames: ["event_item_shop.json"],
+})
 
 const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
@@ -78,20 +84,22 @@ const viewerId = 800000201
 db.prepare("INSERT INTO sessions (token, account_id, expires, type) VALUES (?, ?, ?, ?)")
     .run(String(viewerId), account.id, new Date("2099-12-31T23:59:59.000Z").toISOString(), 2)
 
-for (const characterId of [LAVU_ID, BARETTA_ID]) {
+for (const characterId of [LAVU_ID, BARETTA_ID, RAMS_ID]) {
     insertDefaultPlayerCharacterSync(playerId, characterId)
 }
-const lavuRarity = characterAssets.getCharacterDataSync(LAVU_ID).rarity
-updatePlayerCharacterSync(playerId, LAVU_ID, { exp: characterExpCaps[lavuRarity][0] })
-insertPlayerCharacterManaNodesSync(
-    playerId,
-    LAVU_ID,
-    Object.keys(characterAssets.getCharacterManaNodesSync(LAVU_ID, 1)).map(Number),
-)
+for (const characterId of [LAVU_ID, RAMS_ID]) {
+    const rarity = characterAssets.getCharacterDataSync(characterId).rarity
+    updatePlayerCharacterSync(playerId, characterId, { exp: characterExpCaps[rarity][0] })
+    insertPlayerCharacterManaNodesSync(
+        playerId,
+        characterId,
+        Object.keys(characterAssets.getCharacterManaNodesSync(characterId, 1)).map(Number),
+    )
+}
 
 insertActiveQuest(playerId, {
-    questId: QUEST_ID,
-    category: CATEGORY,
+    questId: LAVU_QUEST_ID,
+    category: LAVU_CATEGORY,
     useBossBoostPoint: false,
     useBoostPoint: false,
     isAutoStartMode: false,
@@ -106,6 +114,54 @@ function encodeRequest(body) {
 
 function decodeResponse(response) {
     return unpack(Buffer.from(response.body, "base64"))
+}
+
+function finishBattle(fastify, { playId, questId, category, leaderId, elapsedTimeMs }) {
+    return fastify.inject({
+        method: "POST",
+        url: "/api/index.php/single_battle_quest/finish",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        payload: encodeRequest({
+            viewer_id: viewerId,
+            api_count: 1,
+            play_id: playId,
+            quest_id: questId,
+            category,
+            score: 0,
+            elapsed_time_ms: elapsedTimeMs,
+            add_mana: 0,
+            is_accomplished: true,
+            is_restored: false,
+            continue_count: 0,
+            statistics: {
+                clear_phase: 1,
+                max_combo_count: 0,
+                zones: [{
+                    damage_deal_total: 0,
+                    members: [{ origin_damage: 0 }, null, null],
+                }],
+                party: {
+                    characters: [{ id: leaderId }, null, null],
+                    unison_characters: [null, null, null],
+                    equipments: [null, null, null],
+                    ability_soul_ids: [null, null, null],
+                },
+            },
+        }),
+    })
+}
+
+function requestAwakeProgress(fastify, characterId) {
+    return fastify.inject({
+        method: "POST",
+        url: "/api/index.php/mission/get_mission_progress",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        payload: encodeRequest({
+            viewer_id: viewerId,
+            api_count: 1,
+            category_list: [{ category: 9, character_id: characterId }],
+        }),
+    })
 }
 
 async function main() {
@@ -129,58 +185,53 @@ async function main() {
     await fastify.ready()
 
     try {
-        const finish = await fastify.inject({
-            method: "POST",
-            url: "/api/index.php/single_battle_quest/finish",
-            headers: { "content-type": "application/x-www-form-urlencoded" },
-            payload: encodeRequest({
-                viewer_id: viewerId,
-                api_count: 1,
-                play_id: "lavu-awake-super-plus",
-                quest_id: QUEST_ID,
-                category: CATEGORY,
-                score: 0,
-                elapsed_time_ms: 1000,
-                add_mana: 0,
-                is_accomplished: true,
-                is_restored: false,
-                continue_count: 0,
-                statistics: {
-                    clear_phase: 1,
-                    max_combo_count: 0,
-                    zones: [{
-                        damage_deal_total: 0,
-                        members: [{ origin_damage: 0 }, null, null],
-                    }],
-                    party: {
-                        characters: [{ id: BARETTA_ID }, null, null],
-                        unison_characters: [null, null, null],
-                        equipments: [null, null, null],
-                        ability_soul_ids: [null, null, null],
-                    },
-                },
-            }),
+        const finish = await finishBattle(fastify, {
+            playId: "lavu-awake-super-plus",
+            questId: LAVU_QUEST_ID,
+            category: LAVU_CATEGORY,
+            leaderId: BARETTA_ID,
+            elapsedTimeMs: 1000,
         })
         assert.equal(finish.statusCode, 200, finish.body)
-        assert.equal(getPlayerCategoryMissionsSync(playerId, 9)[MISSION_ID].progress, 1)
+        assert.equal(getPlayerCategoryMissionsSync(playerId, 9)[LAVU_MISSION_ID].progress, 1)
 
-        const progress = await fastify.inject({
-            method: "POST",
-            url: "/api/index.php/mission/get_mission_progress",
-            headers: { "content-type": "application/x-www-form-urlencoded" },
-            payload: encodeRequest({
-                viewer_id: viewerId,
-                api_count: 1,
-                category_list: [{ category: 9, character_id: LAVU_ID }],
-            }),
-        })
+        const progress = await requestAwakeProgress(fastify, LAVU_ID)
         assert.equal(progress.statusCode, 200, progress.body)
         const progressData = decodeResponse(progress).data
         const missionProgress = progressData.mission_progress_list.find(
-            entry => entry.mission_id === MISSION_ID,
+            entry => entry.mission_id === LAVU_MISSION_ID,
         )
-        assert.equal(missionProgress.mission_id, MISSION_ID)
+        assert.equal(missionProgress.mission_id, LAVU_MISSION_ID)
         assert.equal(missionProgress.progress_value >= 1, true)
+
+        insertActiveQuest(playerId, {
+            questId: RAMS_QUEST_ID,
+            category: RAMS_CATEGORY,
+            useBossBoostPoint: false,
+            useBoostPoint: false,
+            isAutoStartMode: false,
+            isMulti: false,
+            playId: "rams-awake-hermit-crab-hell",
+            continueCount: 0,
+        })
+        const ramsFinish = await finishBattle(fastify, {
+            playId: "rams-awake-hermit-crab-hell",
+            questId: RAMS_QUEST_ID,
+            category: RAMS_CATEGORY,
+            leaderId: RAMS_ID,
+            elapsedTimeMs: 90000,
+        })
+        assert.equal(ramsFinish.statusCode, 200, ramsFinish.body)
+        assert.equal(getPlayerCategoryMissionsSync(playerId, 9)[RAMS_MISSION_ID].progress, 1)
+
+        const ramsProgress = await requestAwakeProgress(fastify, RAMS_ID)
+        assert.equal(ramsProgress.statusCode, 200, ramsProgress.body)
+        const ramsProgressData = decodeResponse(ramsProgress).data
+        const ramsMissionProgress = ramsProgressData.mission_progress_list.find(
+            entry => entry.mission_id === RAMS_MISSION_ID,
+        )
+        assert.equal(ramsMissionProgress.mission_id, RAMS_MISSION_ID)
+        assert.equal(ramsMissionProgress.progress_value >= 1, true)
     } finally {
         await fastify.close()
         cleanup()
@@ -189,7 +240,7 @@ async function main() {
 }
 
 main().then(
-    () => console.log("lavu awake route tests passed"),
+    () => console.log("exact awake mission route tests passed"),
     error => {
         console.error(error)
         process.exitCode = 1

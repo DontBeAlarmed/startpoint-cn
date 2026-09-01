@@ -367,7 +367,7 @@ for (const [missionIds, category, questId, leaderId, clearTime, isMulti] of [
     [[1110013], 2, 1028004, 111001, 1000, false],
     [[1310052], 15, 25, 131005, 1000, false],
     [[2110013], 2, 1028004, 211001, 1000, true],
-    [[2310013], 2, 1010004, 231001, 90000, false],
+    [[2310013], 21, 1006, 231001, 90000, false],
     [[2510032, 2510033], 13, 1020, 251003, 1000, false],
     [[2510032, 2510033], 13, 1020, 251003, 180000, false],
     [[2630023], 18, 400001104, 151006, 1000, false],
@@ -394,7 +394,11 @@ for (const context of [
     battleFactContext({ category: 2, questId: 1028004, ids: [999, 111001] }),
     battleFactContext({ category: 2, questId: 1028005, ids: [111001] }),
     battleFactContext({ category: 2, questId: 1028004, ids: [111001], isMulti: true }),
-    battleFactContext({ category: 2, questId: 1010004, ids: [231001], clearTime: 90001 }),
+    battleFactContext({ category: 21, questId: 1006, ids: [231001], clearTime: 90001 }),
+    battleFactContext({ category: 21, questId: 1006, ids: [999, 231001], clearTime: 90000 }),
+    battleFactContext({ category: 21, questId: 1006, ids: [231001], clearTime: 90000, isMulti: true }),
+    battleFactContext({ category: 21, questId: 1006, ids: [231001], clearTime: 90000, accomplished: false }),
+    battleFactContext({ category: 2, questId: 1010004, ids: [231001], clearTime: 90000 }),
     battleFactContext({ category: 15, questId: 92, ids: [131005] }),
     battleFactContext({ category: 15, questId: 96, ids: [131005] }),
 ]) {
@@ -476,9 +480,9 @@ assert.equal(awakeComputer.compute(2410633, {
 assert.equal(awakeComputer.compute(2310013, {
     categoryMissionProgress: new Map(),
     questProgress: {
-        2: [
-            { questId: 1010004, finished: true, bestElapsedTimeMs: 80000, leaderCharacterId: 999 },
-            { questId: 1010005, finished: true, bestElapsedTimeMs: 70000, leaderCharacterId: 231001 },
+        21: [
+            { questId: 1006, finished: true, bestElapsedTimeMs: 80000, leaderCharacterId: 999 },
+            { questId: 1007, finished: true, bestElapsedTimeMs: 70000, leaderCharacterId: 231001 },
         ],
     },
 }, 0), 0)

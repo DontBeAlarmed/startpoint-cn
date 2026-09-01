@@ -133,7 +133,7 @@ const EXACT_QUEST_RULES: readonly ExactQuestRule[] = Object.freeze([
     { missionId: 1110013, category: 2, questIds: [1028004], leaderCharacterId: 111001, singleOnly: true },
     { missionId: 1310052, category: 15, questIds: [BARAK_AWAKE_PRACTICE_QUEST_ID], leaderCharacterId: 131005, singleOnly: true },
     { missionId: 2110013, category: 2, questIds: [1028004], leaderCharacterId: 211001, singleOnly: false },
-    { missionId: 2310013, category: 2, questIds: [1010004], leaderCharacterId: 231001, singleOnly: true, timeLimitMs: 90000 },
+    { missionId: 2310013, category: 21, questIds: [1006], leaderCharacterId: 231001, singleOnly: true, timeLimitMs: 90000 },
     { missionId: 2510032, category: 13, questIds: [1020, 1023, 1026, 1029, 1032, 1035, 1038], leaderCharacterId: 251003, singleOnly: true },
     { missionId: 2510033, category: 13, questIds: [1020, 1023, 1026, 1029, 1032, 1035, 1038], leaderCharacterId: 251003, singleOnly: true, timeLimitMs: 180000 },
     { missionId: 2630023, category: 18, questIds: [400001104], leaderCharacterId: 151006, singleOnly: true },
