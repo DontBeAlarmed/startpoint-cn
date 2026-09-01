@@ -12,6 +12,8 @@ const previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR
 process.env.DATA_DIR = databaseDirectory
 delete process.env.WDFP_DATABASE_DIR
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
 const { closeDatabase, initializeDatabase } = require("../src/data")
 let cleaned = false
 function cleanupDatabase() {
@@ -19,6 +21,7 @@ function cleanupDatabase() {
     try {
         closeDatabase()
     } finally {
+        restoreContentSnapshot()
         fs.rmSync(databaseDirectory, { recursive: true, force: true })
         if (previousDataDirectory === undefined) delete process.env.DATA_DIR
         else process.env.DATA_DIR = previousDataDirectory
@@ -113,63 +116,25 @@ assert.throws(
 assert.deepEqual(degreeTools.mergeOwnedDegreeIds(61000, [61000, 61020]), [1, 61000, 61020])
 
 const { serializePlayerData } = require("../src/data/utils/serialize-player")
-const now = new Date()
-const serializedPlayer = serializePlayerData({
-    player: {
-        id: 0,
-        stamina: 999,
-        staminaHealTime: now,
-        boostPoint: 0,
-        bossBoostPoint: 0,
-        transitionState: 0,
-        role: 1,
-        name: "test",
-        lastLoginTime: now,
-        comment: "",
-        vmoney: 0,
-        freeVmoney: 0,
-        rankPoint: 0,
-        starCrumb: 0,
-        bondToken: 0,
-        expPool: 0,
-        expPooledTime: now,
-        leaderCharacterId: 1,
-        partySlot: 1,
-        degreeId: 61000,
-        birth: 19900101,
-        freeMana: 0,
-        paidMana: 0,
-        enableAuto3x: false,
-        totalStaminaUsed: 0,
-        totalPowerflips: 0,
-        totalDashes: 0,
-        totalManaObtained: 0,
-        maxComboAchieved: 0,
-        totalLoginDays: 0,
-        tutorialStep: null,
-        tutorialSkipFlag: null,
-        tutorialGachaCharacterId: null,
-    },
-    dailyChallengePointList: [],
-    triggeredTutorial: [12],
-    clearedRegularMissionList: {},
-    characterList: {},
-    characterManaNodeList: {},
-    partyGroupList: {},
-    itemList: {},
-    equipmentList: {},
-    questProgress: {},
-    gachaInfoList: [],
-    gachaCampaignList: [],
-    drawnQuestList: [],
-    periodicRewardPointList: [],
-    allActiveMissionList: {},
-    boxGachaList: {},
-    purchasedTimesList: {},
-    startDashExchangeCampaignList: [],
-    multiSpecialExchangeCampaignList: [],
-    userOption: {},
-}, {
+const { insertAccountSync } = require("../src/data/domains/account")
+const {
+    insertDefaultPlayerSync,
+    updatePlayerSync,
+} = require("../src/data/domains/player")
+const { getMergedPlayerDataSync } = require("../src/data/utils/player-data")
+const serializationAccount = insertAccountSync({
+    appId: "wf_cn",
+    idpAlias: "",
+    idpCode: "test",
+    idpId: "carnival-rewards-serialization",
+    status: "normal",
+})
+const serializationPlayerId = insertDefaultPlayerSync(serializationAccount.id).id
+assert.equal(serializationPlayerId > 0, true)
+updatePlayerSync({ id: serializationPlayerId, degreeId: 61000 })
+const mergedPlayer = getMergedPlayerDataSync(serializationPlayerId)
+assert.notEqual(mergedPlayer, null)
+const serializedPlayer = serializePlayerData(mergedPlayer, {
     summonComSeconds: 9,
 })
 assert.equal(serializedPlayer.user_info.degree_id, 61000)

@@ -265,7 +265,7 @@ test("single receive owns one player snapshot without nested reward transaction 
 
     assert.equal(measured.result.statusCode, 200, measured.result.body)
     assert.equal(playerSnapshots(measured.statements).length, 1, measured.statements.join("\n---\n"))
-    assert.equal(nestedTransactionStatements(measured.statements).length, 2, measured.statements.join("\n---\n"))
+    assert.equal(nestedTransactionStatements(measured.statements).length, 0, measured.statements.join("\n---\n"))
     assert.equal(
         measured.statements.filter(statement => /SELECT \* FROM players_mails WHERE player_id = \?/i.test(statement)).length,
         0,
@@ -307,7 +307,7 @@ test("receive_all reads one owner reward snapshot plus one bounded Awake player 
     assert.ok(mailWriteIndexes.length > 0, measured.statements.join("\n---\n"))
     assert.ok(playerSnapshotIndexes[0] < authoritativeWriteIndexes[0], measured.statements.join("\n---\n"))
     assert.ok(playerSnapshotIndexes[1] > authoritativeWriteIndexes.at(-1), measured.statements.join("\n---\n"))
-    assert.equal(nestedTransactionStatements(measured.statements).length, 2, measured.statements.join("\n---\n"))
+    assert.equal(nestedTransactionStatements(measured.statements).length, 0, measured.statements.join("\n---\n"))
     assert.equal(
         measured.statements.filter(statement => /LIMIT \? OFFSET \?/i.test(statement)).length,
         0,

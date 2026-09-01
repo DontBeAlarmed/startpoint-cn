@@ -1,6 +1,10 @@
 import { getDb } from "../../../data/db"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
-import { getPlayerItemSync, setPlayerItemWithinTransactionSync } from "../../../data/domains/item"
+import {
+    getPlayerItemSync,
+    recordPlayerCollectedItemWithinTransactionSync,
+    setPlayerItemWithinTransactionSync,
+} from "../../../data/domains/item"
 import { createCharacterGrowthRequestContext } from "../request-context"
 import { growthError } from "../errors"
 import { validateCharacterStackConversion } from "../../character-stack"
@@ -74,6 +78,11 @@ export function executeStackToExp(command: StackToExpCommand): StackToExpResult 
             STACK_CONVERSION_REWARD_ITEM_ID,
             afterItem,
             existingItem !== null,
+        )
+        recordPlayerCollectedItemWithinTransactionSync(
+            command.playerId,
+            STACK_CONVERSION_REWARD_ITEM_ID,
+            addStarGrain,
         )
         return {
             command: "stack_to_exp",

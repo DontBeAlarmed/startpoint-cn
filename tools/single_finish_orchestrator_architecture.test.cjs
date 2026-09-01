@@ -30,6 +30,7 @@ test("single finish route delegates preparation and settlement to the orchestrat
     const orchestrator = readSource("src/lib/quest/finish/single-orchestrator.ts")
     const writes = readSource("src/lib/quest/finish/single-settlement-writes.ts")
     const missionPublication = readSource("src/lib/quest/finish/single-mission-publication.ts")
+    const growthPublication = readSource("src/lib/quest/finish/single-growth-publication.ts")
 
     assert.match(route, /settleSingleBattleQuest\s*\(\s*\{/)
     assert.match(route, /validateSessionIdentity\s*\(\s*viewerId\s*\)/)
@@ -64,7 +65,11 @@ test("single finish route delegates preparation and settlement to the orchestrat
         /getPlayerSingleQuestProgressSync\s*\(/,
     )
     assert.match(writes, /settleAdditionalRewardsSync\s*\(/)
-    assert.match(writes, /settleSingleMissionEvaluations\s*\(/)
+    assert.match(writes, /prepareSingleGrowthPublication\s*\(/)
+    assert.match(writes, /publishPreparedSingleGrowthPublication\s*\(/)
+    assert.match(growthPublication, /settleSingleMissionEvaluations\s*\(/)
+    assert.match(growthPublication, /prepareSingleAwakePublication\s*\(/)
+    assert.match(growthPublication, /publishCharacterGrowthOwnerStateBestEffort\s*\(/)
     assert.match(missionPublication, /settleMissionCategoriesWithEvaluation\s*\(/)
     assert.match(missionPublication, /settleAwakeMissionCandidatesWithEvaluation\s*\(/)
     assert.match(writes, /handleRushEventFinish\s*\(/)
@@ -143,12 +148,39 @@ test("single finish production files stay focused", () => {
         "src/lib/quest/finish/single-response-projector.ts",
         "src/lib/quest/finish/single-settlement-response-state.ts",
         "src/lib/quest/finish/single-mission-publication.ts",
+        "src/lib/quest/finish/single-growth-publication.ts",
         "src/lib/quest/finish/single-entry-resource-settlement.ts",
         "src/lib/quest/finish/single-settlement-writes.ts",
     ]) {
         const lineCount = readSource(relativePath).split("\n").length
         assert.ok(lineCount <= 330, `${relativePath} exceeds 330 lines: ${lineCount}`)
     }
+})
+
+test("single settlement keeps Growth preparation, response finalization, deletion, and publication ordered", () => {
+    const writes = readSource("src/lib/quest/finish/single-settlement-writes.ts")
+    const growthPublication = readSource("src/lib/quest/finish/single-growth-publication.ts")
+    const orderedTail = sourceBetween(
+        writes,
+        "const preparedGrowthPublication = prepareSingleGrowthPublication({",
+        "    return {",
+        "single Growth publication tail",
+    )
+    const markers = [
+        "prepareSingleGrowthPublication({",
+        "responseState.observeResult(missionSettlement)",
+        "responseState.finalize({",
+        "if (!isScoreAttackEvent) deletePlayerActiveQuestSync(playerId)",
+        "publishPreparedSingleGrowthPublication({",
+    ]
+    let previous = -1
+    for (const marker of markers) {
+        const current = orderedTail.indexOf(marker)
+        assert.ok(current > previous, `${marker} must keep its settlement order`)
+        previous = current
+    }
+    assert.doesNotMatch(growthPublication, /getDb\s*\(|\.transaction\s*\(/)
+    assert.doesNotMatch(growthPublication, /deletePlayerActiveQuestSync|\breply\b|\.send\s*\(/)
 })
 
 test("single settlement writes derives duplicated values from authoritative inputs", () => {

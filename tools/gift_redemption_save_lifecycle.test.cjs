@@ -11,6 +11,8 @@ process.env.DATA_DIR = databaseDirectory
 
 require("ts-node/register/transpile-only")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
 const data = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
@@ -101,6 +103,7 @@ test.before(() => {
 
 test.after(() => {
     data.closeDatabase()
+    restoreContentSnapshot()
     fs.rmSync(databaseDirectory, { recursive: true, force: true })
 })
 

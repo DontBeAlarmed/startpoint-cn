@@ -10,6 +10,7 @@ const { pack, unpack } = require("msgpackr")
 const rewardExp = require("../src/lib/character-growth/commands/grant-character-exp")
 const rewardStack = require("../src/lib/character-growth/commands/grant-character-stack")
 const injectExp = require("../src/lib/character-growth/commands/inject-exp")
+const stackToExp = require("../src/lib/character-growth/commands/stack-to-exp")
 const { createCharacterGrowthC4Fixture } = require("./helpers/character-growth-c4-fixture.cjs")
 const expodRoutes = require("../src/routes/api/expod").default
 const characterRoutes = require("../src/routes/api/character").default
@@ -48,6 +49,57 @@ test("Growth EXP transaction rolls back pool, character, and mission fact togeth
             character: fixture.db.prepare("SELECT exp FROM players_characters WHERE player_id = ? AND id = 1").get(playerId),
             counter: fixture.db.prepare("SELECT total_injected_exp_count FROM players_active_mission_counters WHERE player_id = ?").get(playerId),
         }, before)
+    } finally {
+        fixture.cleanup()
+    }
+})
+
+test("stack conversion rolls stack, EXP pool, current item, and collection fact back together", () => {
+    const fixture = createCharacterGrowthC4Fixture()
+    try {
+        const playerId = fixture.createPlayer()
+        fixture.setPlayer(playerId, { expPool: 100 })
+        fixture.addCharacter(playerId, 341003, {
+            stack: 3,
+            overLimitStep: 8,
+            protection: false,
+        })
+        const readState = () => ({
+            player: fixture.db.prepare("SELECT exp_pool FROM players WHERE id = ?").get(playerId),
+            character: fixture.db.prepare(`
+                SELECT stack
+                FROM players_characters
+                WHERE player_id = ? AND id = 341003
+            `).get(playerId),
+            item: fixture.db.prepare(`
+                SELECT amount
+                FROM players_items
+                WHERE player_id = ? AND id = 990008
+            `).get(playerId),
+            collectedItem: fixture.db.prepare(`
+                SELECT total_obtained
+                FROM players_collected_items
+                WHERE player_id = ? AND item_id = 990008
+            `).get(playerId),
+        })
+        const before = readState()
+        fixture.db.exec(`
+            CREATE TRIGGER reject_stack_conversion_reward_fact
+            BEFORE INSERT ON players_collected_items
+            WHEN NEW.player_id = ${playerId} AND NEW.item_id = 990008
+            BEGIN SELECT RAISE(ABORT, 'forced stack conversion reward fact failure'); END;
+        `)
+
+        assert.throws(
+            () => stackToExp.executeStackToExp({
+                playerId,
+                characterId: 341003,
+                useStackCount: 2,
+                evaluationTime: new Date("2026-08-31T00:00:00.000Z"),
+            }),
+            /forced stack conversion reward fact failure/,
+        )
+        assert.deepEqual(readState(), before)
     } finally {
         fixture.cleanup()
     }

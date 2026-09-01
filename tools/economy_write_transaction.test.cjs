@@ -224,8 +224,8 @@ test("bulk stack conversion skips protected characters", async () => {
     const { playerId, viewerId } = await createPlayer("bulk-stack-exp-protection")
     insertDefaultPlayerCharacterSync(playerId, 111001)
     insertDefaultPlayerCharacterSync(playerId, 211001)
-    updatePlayerCharacterSync(playerId, 111001, { overLimitStep: 99, stack: 2, protection: true })
-    updatePlayerCharacterSync(playerId, 211001, { overLimitStep: 99, stack: 3 })
+    updatePlayerCharacterSync(playerId, 111001, { overLimitStep: 4, stack: 2, protection: true })
+    updatePlayerCharacterSync(playerId, 211001, { overLimitStep: 6, stack: 3 })
 
     const response = await app.inject({
         method: "POST",

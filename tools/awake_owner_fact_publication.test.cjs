@@ -427,7 +427,7 @@ test("all existing global-fact owners pass bounded invalidations into fresh publ
         path.join(__dirname, "..", relativePath),
         "utf8",
     )
-    const single = source("src/lib/quest/finish/single-settlement-writes.ts")
+    const single = source("src/lib/quest/finish/single-growth-publication.ts")
     const singlePublication = source("src/lib/quest/finish/single-mission-publication.ts")
     const multi = source("src/multi/settlement/orchestrator.ts")
 

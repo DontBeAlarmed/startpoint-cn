@@ -88,6 +88,24 @@ function buildPlayerCharacter(
     }
 }
 
+function buildPlayerCharacterWithStoredGrowth(
+    rawCharacter: RawPlayerCharacter,
+    bondTokens: PlayerCharacterBondToken[],
+): PlayerCharacterWithStoredGrowth {
+    return {
+        character: buildPlayerCharacter(rawCharacter, bondTokens),
+        storedGrowth: {
+            id: rawCharacter.id,
+            exp: rawCharacter.exp,
+            stack: rawCharacter.stack,
+            protection: rawCharacter.protection,
+            over_limit_step: rawCharacter.over_limit_step,
+            evolution_level: rawCharacter.evolution_level,
+            mana_board_index: rawCharacter.mana_board_index,
+        },
+    }
+}
+
 /**
  * Checks whether a player owns a given character or not.
  * 
@@ -152,21 +170,10 @@ export function getPlayerCharacterWithStoredGrowthSync(
     ORDER BY mana_board_index
     `).all(playerId, characterId) as RawPlayerCharacterBondToken[]
 
-    return {
-        character: buildPlayerCharacter(
-            rawCharacter,
-            rawBondTokens.map(raw => buildCharacterBondToken(raw)),
-        ),
-        storedGrowth: {
-            id: rawCharacter.id,
-            exp: rawCharacter.exp,
-            stack: rawCharacter.stack,
-            protection: rawCharacter.protection,
-            over_limit_step: rawCharacter.over_limit_step,
-            evolution_level: rawCharacter.evolution_level,
-            mana_board_index: rawCharacter.mana_board_index,
-        },
-    }
+    return buildPlayerCharacterWithStoredGrowth(
+        rawCharacter,
+        rawBondTokens.map(raw => buildCharacterBondToken(raw)),
+    )
 }
 
 /** Reads bond tokens by character, with a stable SQL order for projections and diagnostics. */
@@ -273,6 +280,18 @@ export function getPlayerCharactersByIdsSync(
     playerId: number,
     ids: readonly number[],
 ): Record<string, PlayerCharacter> {
+    const storedCharacters = getPlayerCharactersWithStoredGrowthByIdsSync(playerId, ids)
+    return Object.fromEntries(Object.entries(storedCharacters).map(([id, stored]) => [
+        id,
+        stored.character,
+    ]))
+}
+
+/** Batch equivalent of getPlayerCharacterWithStoredGrowthSync; preserves raw Growth fields. */
+export function getPlayerCharactersWithStoredGrowthByIdsSync(
+    playerId: number,
+    ids: readonly number[],
+): Record<string, PlayerCharacterWithStoredGrowth> {
     const characterIds = normalizeCharacterFactIds(ids)
     if (characterIds.length === 0) return {}
     const placeholders = characterIds.map(() => "?").join(", ")
@@ -294,10 +313,10 @@ export function getPlayerCharactersByIdsSync(
         const id = String(raw.character_id)
         ;(bondBuckets[id] ??= []).push(buildCharacterBondToken(raw))
     }
-    return Object.fromEntries(rawCharacters.map(raw => [String(raw.id), buildPlayerCharacter(
-        raw,
-        bondBuckets[String(raw.id)] ?? [],
-    )]))
+    return Object.fromEntries(rawCharacters.map(raw => [
+        String(raw.id),
+        buildPlayerCharacterWithStoredGrowth(raw, bondBuckets[String(raw.id)] ?? []),
+    ]))
 }
 
 /**

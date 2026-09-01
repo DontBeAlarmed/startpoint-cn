@@ -308,14 +308,21 @@ test("single and multi production finish routes call the shared Awake evaluation
         path.join(__dirname, "../src/lib/quest/finish/single-mission-publication.ts"),
         "utf8",
     )
+    const singleGrowthPublication = fs.readFileSync(
+        path.join(__dirname, "../src/lib/quest/finish/single-growth-publication.ts"),
+        "utf8",
+    )
     const singleOrchestrator = fs.readFileSync(
         path.join(__dirname, "../src/lib/quest/finish/single-orchestrator.ts"),
         "utf8",
     )
     const singleTransactionBody = singleWrites.indexOf("export function executeSingleSettlementWrites(")
-    const singleEvaluationCall = singleWrites.indexOf(
-        "settleSingleMissionEvaluations({",
+    const singlePreparationCall = singleWrites.indexOf(
+        "prepareSingleGrowthPublication({",
         singleTransactionBody,
+    )
+    const singleEvaluationCall = singleGrowthPublication.indexOf(
+        "settleSingleMissionEvaluations({",
     )
     const singleSeamCall = singleMissionPublication.indexOf(
         "settleAwakeMissionCandidatesWithEvaluation(",
@@ -330,7 +337,8 @@ test("single and multi production finish routes call the shared Awake evaluation
         singleSettleBinding,
     )
     assert.equal(singleTransactionBody >= 0, true, "single settlement writes function")
-    assert.equal(singleEvaluationCall > singleTransactionBody, true, "single mission evaluation inside writes")
+    assert.equal(singlePreparationCall > singleTransactionBody, true, "single Growth preparation inside writes")
+    assert.equal(singleEvaluationCall >= 0, true, "single mission evaluation inside Growth preparation")
     assert.equal(singleSeamCall >= 0, true, "single shared Awake evaluation seam call")
     assert.equal(singleTransactionCall >= 0, true, "single transaction call")
     assert.equal(singleSettleBinding > singleTransactionCall, true, "single transaction callback")

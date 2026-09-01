@@ -1,7 +1,11 @@
 import { getDb } from "../../../data/db"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
 import { getPlayerCharactersSync } from "../../../data/domains/character"
-import { getPlayerItemSync, setPlayerItemWithinTransactionSync } from "../../../data/domains/item"
+import {
+    getPlayerItemSync,
+    recordPlayerCollectedItemWithinTransactionSync,
+    setPlayerItemWithinTransactionSync,
+} from "../../../data/domains/item"
 import { getCharacterDataSync } from "../../assets"
 import { createCharacterGrowthBatchContext } from "../batch-context"
 import { growthError } from "../errors"
@@ -74,12 +78,19 @@ export function executeBulkStackToExp(command: BulkStackToExpCommand): BulkStack
             stack: 0,
         })))
         updatePlayerSync({ id: command.playerId, expPool: afterPool })
-        if (addStarGrain > 0) setPlayerItemWithinTransactionSync(
-            command.playerId,
-            STACK_CONVERSION_REWARD_ITEM_ID,
-            afterItem,
-            existingItem !== null,
-        )
+        if (addStarGrain > 0) {
+            setPlayerItemWithinTransactionSync(
+                command.playerId,
+                STACK_CONVERSION_REWARD_ITEM_ID,
+                afterItem,
+                existingItem !== null,
+            )
+            recordPlayerCollectedItemWithinTransactionSync(
+                command.playerId,
+                STACK_CONVERSION_REWARD_ITEM_ID,
+                addStarGrain,
+            )
+        }
         return {
             command: "bulk_stack_to_exp",
             characters: selected,

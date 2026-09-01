@@ -152,15 +152,25 @@ async function main() {
         )
         assert.equal(response.statusCode, 200, response.body)
     }
-    const awakeContextModule = require("../src/lib/mission/awake-best-effort-context")
-    const originalCreateAwakeRequestContextBestEffort = awakeContextModule.createAwakeRequestContextBestEffort
+    const ownerPublicationModule = require("../src/lib/character-growth/owner-publication")
+    const originalPublishCharacterGrowthOwnerStateBestEffort =
+        ownerPublicationModule.publishCharacterGrowthOwnerStateBestEffort
     let observedCandidateCharacterIds
-    awakeContextModule.createAwakeRequestContextBestEffort = (playerId, candidateCharacterIds) => {
-        observedCandidateCharacterIds = [...candidateCharacterIds]
-        return originalCreateAwakeRequestContextBestEffort(playerId, candidateCharacterIds)
+    ownerPublicationModule.publishCharacterGrowthOwnerStateBestEffort = (
+        playerId,
+        explicitCharacterIds,
+        ...rest
+    ) => {
+        observedCandidateCharacterIds = [...explicitCharacterIds]
+        return originalPublishCharacterGrowthOwnerStateBestEffort(playerId, explicitCharacterIds, ...rest)
     }
-    const ownedStoryFinish = await finish(app, ownedStoryCharacter.viewerId, 2009007)
-    awakeContextModule.createAwakeRequestContextBestEffort = originalCreateAwakeRequestContextBestEffort
+    let ownedStoryFinish
+    try {
+        ownedStoryFinish = await finish(app, ownedStoryCharacter.viewerId, 2009007)
+    } finally {
+        ownerPublicationModule.publishCharacterGrowthOwnerStateBestEffort =
+            originalPublishCharacterGrowthOwnerStateBestEffort
+    }
     assert.equal(ownedStoryFinish.statusCode, 200, ownedStoryFinish.body)
     const ownedStoryData = decode(ownedStoryFinish).data
     const { createAwakeRequestContext } = require("../src/lib/mission/awake-request-context")
@@ -177,6 +187,11 @@ async function main() {
         ownedStoryData.story_join_character_id_list,
         [],
         "already-owned story character must remain absent from the response grant list",
+    )
+    assert.deepEqual(
+        ownedStoryData.character_list,
+        [],
+        "evaluated candidates without state changes must not project empty character entries",
     )
 
     const characterEpisode = await createPlayer(5)

@@ -398,17 +398,7 @@ stubModule("../src/lib/mission", {
     getAwakeBattleMissionIds: () => [],
     reconcileActiveMissionFacts: () => [],
     reconcileAwakeUnlockCharacterList: (_playerId, list) => list,
-    settleAwakeMissionCandidatesWithEvaluation: () => ({
-        settlement: {
-            missionInfo: [],
-            itemList: {},
-            characterList: [],
-            equipmentList: [],
-            degreeIds: [],
-            passCardPoints: {},
-        },
-        invalidatedFactKeys: [],
-    }),
+    settleAwakeMissionCandidatesWithEvaluation: () => null,
     settleAwakeBattleMissions: () => ({
         missionInfo: [],
         itemList: {},
@@ -436,6 +426,13 @@ stubModule("../src/lib/mission", {
         invalidatedFactKeys: [],
     }),
     mergeMissionSettlementResponse() {},
+})
+stubModule("../src/lib/character-growth/owner-publication", {
+    publishCharacterGrowthOwnerStateBestEffort: (_playerId, _explicitCharacterIds, characterLists) => ({
+        characterList: characterLists.flat(),
+        missionSettlement: null,
+        growthFacts: [],
+    }),
 })
 stubModule("../src/lib/carnival-rewards", { getCarnivalRewardDefinitions: () => [], grantCarnivalRewards: () => null })
 stubModule("../src/lib/equipment", { givePlayerEquipmentSync: () => ({}) })

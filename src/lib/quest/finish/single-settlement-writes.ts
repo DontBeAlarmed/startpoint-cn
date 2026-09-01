@@ -23,7 +23,6 @@ import { getRuntimeContentTableSync } from "../../../content/runtime/table-acces
 import { settleAdditionalRewardsSync, type AdditionalRewardTable } from "../../additional-reward"
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../rush"
 import { recordMissionBattleFacts } from "../../mission/battle-facts"
-import { publishCharacterGrowthOwnerStateBestEffort } from "../../character-growth/owner-publication"
 import { getCarnivalRewardDefinitions, grantCarnivalRewards } from "../../carnival-rewards"
 import { givePlayerEquipmentSync } from "../../equipment"
 import { getRaidEventRequiredKillCount } from "../../raid-event-master"
@@ -44,12 +43,11 @@ import { selectScoreRewardGrantPlan } from "../score-reward-selection"
 import { grantSingleSettlementScoreRewardsWithinTransactionSync } from "./single-settlement-reward-grant"
 import { createSingleSettlementStandardRewardGrant } from "./single-standard-reward-callbacks"
 import { createSingleSettlementResponseState } from "./single-settlement-response-state"
-import { prepareSingleAwakePublication, settleSingleMissionEvaluations } from "./single-mission-publication"
+import {
+    prepareSingleGrowthPublication,
+    publishPreparedSingleGrowthPublication,
+} from "./single-growth-publication"
 import { settleSingleEntryResources } from "./single-entry-resource-settlement"
-
-function finalizeSingleAwakePublicationWrites(playerId: number, isScoreAttackEvent: boolean): void {
-    if (!isScoreAttackEvent) deletePlayerActiveQuestSync(playerId)
-}
 
 const settlementModeHost = createModeTransactionHost(message => console.log(message))
 export function executeSingleSettlementWrites(
@@ -276,20 +274,30 @@ export function executeSingleSettlementWrites(
         deleteActiveQuest: pid => deletePlayerActiveQuestSync(pid),
     }) : null
     const scoreAttackRewardResult = scoreAttackFinishResult?.rewardResult
-    const {
-        missionSettlement,
-        awakeMissionSettlement,
-        awakeMissionIds,
-        evaluatedAwakeUnlocks,
-        activeMissionList,
-        invalidatedFactKeys,
-    } =
-        settleSingleMissionEvaluations({
+    const preparedGrowthPublication = prepareSingleGrowthPublication({
         playerId, partyCharacterIds, evaluationTime: settlementTime, questAccomplished,
         directAwakeMissionIds: missionBattleFacts.awakeMissionIds,
         directDegreeMissionIds: missionBattleFacts.degreeMissionIds,
         rewardDependencies: { standardRewardGrant: standardRewardGrant.forMission },
+        characterLists: [
+            rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
+            (clearReward?.character_list || []) as Record<string, unknown>[],
+            (sPlusClearReward?.character_list || []) as Record<string, unknown>[],
+            scoreRewardsResult.character_list as Record<string, unknown>[],
+            (scoreAttackRewardResult?.character_list ?? []) as Record<string, unknown>[],
+        ],
+        legacyRewardResults: [
+            clearReward, sPlusClearReward, scoreRewardsResult,
+            additionalRewardSettlement.rewardResult,
+            rushEventRewardsResult, carnivalRewardResult, scoreAttackRewardResult,
+        ],
+        manaObtained, questCategory, questPreviouslyCompleted,
     })
+    const {
+        missionSettlement,
+        awakeMissionSettlement,
+        activeMissionList,
+    } = preparedGrowthPublication
     responseState.observeResult(missionSettlement)
     responseState.observeResult(awakeMissionSettlement)
     if (settlementActiveQuest.entryItemId) {
@@ -302,41 +310,11 @@ export function executeSingleSettlementWrites(
         rankPoint: newRankPoint, stamina: afterStamina, staminaHealTime: afterStaminaHealTime,
         boostPoint: newBoostPoint, bossBoostPoint: newBossBoostPoint,
     })
-    finalizeSingleAwakePublicationWrites(playerId, isScoreAttackEvent)
-    const awakePublication = prepareSingleAwakePublication({
-        characterLists: [
-            rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
-            (clearReward?.character_list || []) as Record<string, unknown>[],
-            (sPlusClearReward?.character_list || []) as Record<string, unknown>[], scoreRewardsResult.character_list as Record<string, unknown>[],
-            (scoreAttackRewardResult?.character_list ?? []) as Record<string, unknown>[],
-            missionSettlement.characterList as Record<string, unknown>[],
-            awakeMissionSettlement.characterList as Record<string, unknown>[],
-        ],
-        invalidatedFactKeys,
-        legacyRewardResults: [
-            clearReward, sPlusClearReward, scoreRewardsResult,
-            additionalRewardSettlement.rewardResult,
-            rushEventRewardsResult, carnivalRewardResult, scoreAttackRewardResult,
-        ],
-        manaObtained, questCategory, questAccomplished, questPreviouslyCompleted,
-        directAwakeMissionIds: [
-            ...missionBattleFacts.awakeMissionIds,
-            ...awakeMissionIds,
-        ],
-        evaluatedAwakeUnlocks,
+    if (!isScoreAttackEvent) deletePlayerActiveQuestSync(playerId)
+    const characterList = publishPreparedSingleGrowthPublication({
+        playerId, partyCharacterIds, evaluationTime: settlementTime,
+        publication: preparedGrowthPublication.publication,
     })
-    const characterList = publishCharacterGrowthOwnerStateBestEffort(
-        playerId,
-        partyCharacterIds,
-        awakePublication.characterLists,
-        {
-            invalidatedFactKeys: awakePublication.invalidatedFactKeys,
-            directMissionIds: awakePublication.directMissionIds,
-            evaluatedAwakeUnlocks: awakePublication.evaluatedAwakeUnlocks,
-        },
-        "single-finish",
-        settlementTime,
-    ).characterList
     return {
         afterStamina, afterStaminaHealTime, dailyChallengePointList,
         scoreRewardSelection, scoreRewardsResult, additionalRewardSettlement,

@@ -51,7 +51,7 @@ const POST_COMMIT_35_3_OWNER_INVENTORY = Object.freeze({
 })
 
 const TRANSACTION_INTERNAL_35_2_OWNER_INVENTORY = Object.freeze({
-    "single/finish": ["src/lib/quest/finish/single-settlement-writes.ts"],
+    "single/finish": ["src/lib/quest/finish/single-growth-publication.ts"],
     "multi/finish": ["src/multi/settlement/orchestrator.ts"],
     story: ["src/routes/api/storyQuest.ts"],
     bond: ["src/routes/api/character/bond.ts"],

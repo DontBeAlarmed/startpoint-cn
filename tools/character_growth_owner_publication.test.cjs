@@ -15,7 +15,7 @@ const ownerFiles = [
     "src/routes/api/gacha.ts",
     "src/routes/api/storyQuest.ts",
     "src/routes/api/tutorial.ts",
-    "src/lib/quest/finish/single-settlement-writes.ts",
+    "src/lib/quest/finish/single-growth-publication.ts",
     "src/multi/settlement/orchestrator.ts",
 ]
 

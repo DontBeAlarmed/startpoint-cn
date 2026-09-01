@@ -1118,10 +1118,10 @@
       },
       "behaviorSha256": "b343e04faad64d5c7fb0bd2f5fd81f127fd05d156b55d77f810a7d99eca335cd",
       "sql": {
-        "statements": 120,
+        "statements": 117,
         "selectStatements": 61,
-        "writeStatements": 49,
-        "transactionStatements": 10,
+        "writeStatements": 48,
+        "transactionStatements": 8,
         "byTable": {
           "players": {
             "statements": 13,
@@ -1159,9 +1159,9 @@
             "writes": 6
           },
           "players_character_awake_unlocks": {
-            "statements": 3,
+            "statements": 2,
             "reads": 1,
-            "writes": 2
+            "writes": 1
           },
           "players_character_quest_clears": {
             "statements": 4,
@@ -1394,9 +1394,9 @@
       },
       "behaviorSha256": "ece93a5759d57939832dd018021034f586638e6c14584eb71c241c6f4ff00a9e",
       "sql": {
-        "statements": 106,
+        "statements": 105,
         "selectStatements": 50,
-        "writeStatements": 48,
+        "writeStatements": 47,
         "transactionStatements": 8,
         "byTable": {
           "players": {
@@ -1433,11 +1433,6 @@
             "statements": 8,
             "reads": 2,
             "writes": 6
-          },
-          "players_character_awake_unlocks": {
-            "statements": 1,
-            "reads": 0,
-            "writes": 1
           },
           "players_character_quest_clears": {
             "statements": 3,
@@ -2106,10 +2101,10 @@
       },
       "behaviorSha256": "7119d703719536544a456203d74027cf0c1ab32e82b4007ee55993d47c430a2e",
       "sql": {
-        "statements": 97,
+        "statements": 95,
         "selectStatements": 57,
         "writeStatements": 28,
-        "transactionStatements": 12,
+        "transactionStatements": 10,
         "byTable": {
           "players": {
             "statements": 12,
@@ -3971,10 +3966,10 @@
       },
       "behaviorSha256": "535ddc1631ffc3868098ea657f4fc7710aa0fcae49e21072944567e04a7f7db6",
       "sql": {
-        "statements": 92,
+        "statements": 90,
         "selectStatements": 57,
         "writeStatements": 25,
-        "transactionStatements": 10,
+        "transactionStatements": 8,
         "byTable": {
           "players": {
             "statements": 11,

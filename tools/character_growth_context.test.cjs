@@ -257,5 +257,14 @@ test("character response reads and Growth entries keep bond tokens ordered by bo
     ), /ORDER BY character_id, mana_board_index/)
     const byIdsStart = source.indexOf("export function getPlayerCharactersByIdsSync")
     const byIdsEnd = source.indexOf("\nexport function ", byIdsStart + 1)
-    assert.match(source.slice(byIdsStart, byIdsEnd === -1 ? source.length : byIdsEnd), /ORDER BY character_id, mana_board_index/)
+    assert.match(
+        source.slice(byIdsStart, byIdsEnd === -1 ? source.length : byIdsEnd),
+        /getPlayerCharactersWithStoredGrowthByIdsSync/,
+    )
+    const storedByIdsStart = source.indexOf("export function getPlayerCharactersWithStoredGrowthByIdsSync")
+    const storedByIdsEnd = source.indexOf("\nexport function ", storedByIdsStart + 1)
+    assert.match(
+        source.slice(storedByIdsStart, storedByIdsEnd === -1 ? source.length : storedByIdsEnd),
+        /ORDER BY character_id, mana_board_index/,
+    )
 })

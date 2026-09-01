@@ -285,7 +285,10 @@ test("Awake publication failure preserves the committed item sale", async t => {
     assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has(String(AWAKE_CHARACTER_ID)), false)
     assert.equal(responseData.character_list, undefined)
     assert.equal(publicationErrors.length, 1)
-    assert.match(String(publicationErrors[0][0]), /Failed to publish character unlocks/)
+    assert.match(
+        String(publicationErrors[0][0]),
+        /^\[character-growth\] Failed to publish owner state\.$/,
+    )
     const publicationError = publicationErrors[0][1]
     assert.ok(publicationError instanceof Error)
     assert.equal(publicationError.message, "injected item sale Awake publication failure")
