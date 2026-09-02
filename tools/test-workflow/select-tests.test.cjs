@@ -677,6 +677,8 @@ test("maps the public reward grant layer and its regressions to one focused leaf
     const group = "integration:reward-grant"
     const tests = [
         "tools/reward_grant_plan.test.cjs",
+        "tools/reward_grant_typed_contract.test.cjs",
+        "tools/reward_grant_typed_contract_adversarial.test.cjs",
         "tools/reward_grant_executor.test.cjs",
         "tools/login_bonus_settlement.test.cjs",
         "tools/reward_grant_architecture.test.cjs",
