@@ -715,6 +715,11 @@ test("v1 snapshots remain parseable but are explicitly legacy partial", () => {
 test("legacy v1 restore updates legacy fields without deleting newer domains", () => {
     const account = createAccount("legacy")
     const playerId = insertDefaultPlayerSync(account.id).id
+    db.prepare("INSERT INTO players_items (id, amount, player_id) VALUES (30005, 99, ?)").run(playerId)
+    db.prepare(`
+        INSERT INTO players_collected_items (player_id, item_id, total_obtained)
+        VALUES (?, 30005, 41)
+    `).run(playerId)
     db.prepare(`
         INSERT INTO players_mails (
             player_id, reason_id, subject, description, type, type_id,
@@ -744,6 +749,7 @@ test("legacy v1 restore updates legacy fields without deleting newer domains", (
     const dataV1 = cloneJson(getMergedPlayerDataSync(playerId))
     dataV1.player.name = "legacy-name-restored"
     dataV1.boxGachaList = {}
+    dataV1.itemList = { 30005: 0, 70014: 12 }
     const result = restorePlayerSaveSnapshotSync({
         schema: "starpoint-cn-save",
         version: 1,
@@ -753,6 +759,17 @@ test("legacy v1 restore updates legacy fields without deleting newer domains", (
 
     assert.deepEqual(result, { playerId, legacyPartial: true })
     assert.equal(db.prepare("SELECT name FROM players WHERE id = ?").get(playerId).name, "legacy-name-restored")
+    assert.deepEqual(
+        db.prepare("SELECT id, amount FROM players_items WHERE player_id = ? ORDER BY id").all(playerId),
+        [
+            { id: 30005, amount: 0 },
+            { id: 70014, amount: 12 },
+        ],
+    )
+    assert.equal(
+        db.prepare("SELECT total_obtained FROM players_collected_items WHERE player_id = ? AND item_id = 30005").get(playerId).total_obtained,
+        41,
+    )
     assert.equal(db.prepare("SELECT subject FROM players_mails WHERE player_id = ?").get(playerId).subject, "preserve-v1-mail")
     assert.equal(db.prepare("SELECT lineup_id FROM players_shop_campaign_lineups WHERE player_id = ?").get(playerId).lineup_id, 1010)
     assert.equal(

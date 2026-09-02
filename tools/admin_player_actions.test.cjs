@@ -16,6 +16,7 @@ const Fastify = require("fastify")
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { insertPlayerCharacterSync, getPlayerCharactersSync } = require("../src/data/domains/character")
+const { getPlayerCollectedItemTotalSync, getPlayerItemSync } = require("../src/data/domains/item")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { insertDeviceBindingSync } = require("../src/data/domains/session")
 const { getRankDegree } = require("../src/lib/stamina")
@@ -192,6 +193,40 @@ test("accounts derive player Rank from rank points instead of the equipped title
     const accountRow = response.json().find(candidate => candidate.id === account.id)
     assert.equal(accountRow.players[0].degreeId, 1)
     assert.equal(accountRow.players[0].rank, expectedRank)
+})
+
+test("admin Item maintenance preserves an exact zero row and deletes only the inventory row", async t => {
+    const account = createAccount("item-maintenance")
+    const playerId = insertDefaultPlayerSync(account.id).id
+    const itemId = 1
+    database.prepare(`
+        INSERT INTO players_collected_items (player_id, item_id, total_obtained)
+        VALUES (?, ?, 23)
+    `).run(playerId, itemId)
+    const app = await createAdminServer(t)
+
+    const setZero = await app.inject({
+        method: "POST",
+        url: `/api/player/${playerId}/item`,
+        headers: { accept: "application/json", "content-type": "application/json" },
+        payload: { id: itemId, count: 0 },
+    })
+
+    assert.equal(setZero.statusCode, 200)
+    assert.deepEqual(setZero.json(), { ok: true, itemId, count: 0 })
+    assert.equal(getPlayerItemSync(playerId, itemId), 0)
+    assert.equal(getPlayerCollectedItemTotalSync(playerId, itemId), 23)
+
+    const deleted = await app.inject({
+        method: "DELETE",
+        url: `/api/player/${playerId}/item/${itemId}`,
+        headers: { accept: "application/json" },
+    })
+
+    assert.equal(deleted.statusCode, 200)
+    assert.deepEqual(deleted.json(), { ok: true })
+    assert.equal(getPlayerItemSync(playerId, itemId), null)
+    assert.equal(getPlayerCollectedItemTotalSync(playerId, itemId), 23)
 })
 
 test("retired SSR-only admin actions are no longer registered", async t => {

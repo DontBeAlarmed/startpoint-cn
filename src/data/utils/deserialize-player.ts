@@ -10,7 +10,6 @@ import { getPlayerDailyChallengePointListSync, getPlayerSync, updatePlayerSync }
 import { getPlayerDrawnQuestsSync, getPlayerQuestProgressSync } from "../domains/quest"
 import { getPlayerEquipmentListSync } from "../domains/equipment"
 import { getPlayerGachaCampaignListSync, getPlayerGachaInfoListSync } from "../domains/gacha"
-import { getPlayerItemsSync } from "../domains/item"
 import { getPlayerMailCountSync } from "../domains/mail"
 import { getPlayerMultiSpecialExchangeCampaignsSync, getPlayerPeriodicRewardPointsSync, getPlayerStartDashExchangeCampaignsSync } from "../domains/campaign"
 import { getPlayerOptionsSync } from "../domains/option"

@@ -464,6 +464,10 @@ test("accumulates every directly related source group", () => {
         ["admin", "integration:database"],
     )
     assert.deepEqual(
+        selectTestGroups(["src/data/domains/item-maintenance.ts"]),
+        ["admin", "integration:database"],
+    )
+    assert.deepEqual(
         selectTestGroups(["src/routes/api/singleBattleQuest.ts"]),
         [
             "integration:compiled",

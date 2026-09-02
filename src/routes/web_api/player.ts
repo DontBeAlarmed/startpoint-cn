@@ -6,7 +6,11 @@ import { deleteAllPlayerMailSync } from "../../data/domains/mail"
 import { getDb } from "../../data/db"
 import { deletePlayerCharacterSync, getPlayerCharactersSync, insertDefaultPlayerCharacterSync } from "../../data/domains/character"
 import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
-import { getPlayerItemsSync, setPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
+import { getPlayerItemsSync } from "../../data/domains/item"
+import {
+    deletePlayerItemForMaintenanceSync,
+    setPlayerItemForMaintenanceSync,
+} from "../../data/domains/item-maintenance"
 import { getPlayerQuestProgressSync, getPlayerDrawnQuestsSync } from "../../data/domains/quest"
 import { insertPlayerPartyGroupListSync } from "../../data/domains/party"
 import { PartyCategory } from "../../data/types";
@@ -319,13 +323,13 @@ const routes = async (fastify: FastifyInstance) => {
 
         const body = request.body as Record<string, any> || {}
         const itemId = Number(body.id || body.itemId)
-        const count = Number(body.count || 1)
+        const count = Number(body.count === 0 ? 0 : (body.count || 1))
         if (isNaN(itemId) || isNaN(count)) return reply.status(400).send({ error: "Missing id or count" })
         if (!isValidItemId(itemId)) return reply.status(400).send({ error: `道具 ID ${itemId} 不存在于资源表中` })
         if (count < 0 || count > MAX_INT) return reply.status(400).send({ error: `count 超出范围（需 0 ~ ${MAX_INT}）` })
 
         try {
-            setPlayerItemSync(playerId, itemId, count)
+            setPlayerItemForMaintenanceSync(playerId, itemId, count)
             return reply.status(200).send({ ok: true, itemId, count })
         } catch (e: any) {
             return reply.status(500).send({ error: e.message })
@@ -340,8 +344,7 @@ const routes = async (fastify: FastifyInstance) => {
         if (isNaN(playerId) || isNaN(iid)) return reply.status(400).send({ error: "Invalid params" })
 
         try {
-            const db = getDb();
-        db.prepare(`DELETE FROM players_items WHERE player_id = ? AND id = ?`).run(playerId, iid)
+            deletePlayerItemForMaintenanceSync(playerId, iid)
             return reply.status(200).send({ ok: true })
         } catch (e: any) {
             return reply.status(500).send({ error: e.message })

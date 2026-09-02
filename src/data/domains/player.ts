@@ -117,7 +117,7 @@ function recordCurrentPassLogin(
 
 import { insertPlayerTriggeredTutorialsSync } from "./tutorial";
 import { insertPlayerOptionsSync } from "./option";
-import { insertPlayerItemsSync } from "./item";
+import { insertPlayerItemsForRestoreImportSync } from "./item-maintenance";
 import { insertPlayerEquipmentListSync } from "./equipment";
 import { insertPlayerPartyGroupListSync } from "./party";
 import { getPartyGroupLimit } from "../../lib/special-event-parties";
@@ -255,27 +255,6 @@ export function updatePlayerDailyChallengePointSync(
     `).run(point, entryId, playerId)
 }
 
-/**
- * Inserts a singular item into the player's inventory.
- * 
- * @param playerId The ID of the player.
- * @param itemId The ID of the item to insert.
- * @param amount The amount of the item to insert.
- */
-function insertPlayerItemSync(
-    playerId: number,
-    itemId: number | string,
-    amount: number
-) {
-    getDb().prepare(`
-    INSERT INTO players_items (id, amount, player_id)
-    VALUES (?, ?, ?)
-    `).run(
-        Number(itemId),
-        amount,
-        playerId
-    )
-}
 /**
  * Converts a PlayerRushEventPlayedParty object from database format.
  * 
@@ -578,7 +557,7 @@ export function insertMergedPlayerDataSync(
         insertPlayerCharacterAwakeUnlocksSync(playerId, toInsert.characterAwakeUnlocks)
     }
     insertPlayerPartyGroupListSync(playerId, toInsert.partyGroupList)
-    insertPlayerItemsSync(playerId, toInsert.itemList)
+    insertPlayerItemsForRestoreImportSync(playerId, toInsert.itemList)
     insertPlayerEquipmentListSync(playerId, toInsert.equipmentList)
     insertPlayerQuestProgressListSync(playerId, toInsert.questProgress)
     insertPlayerGachaInfoListSync(playerId, toInsert.gachaInfoList)
@@ -711,9 +690,6 @@ export function insertDefaultPlayerSync(
 
     // insert default parties
     insertPlayerPartyGroupListSync(playerId, getDefaultPlayerPartyGroupsSync())
-
-    // insert items
-    insertPlayerItemsSync(playerId, {})
 
     // insert equipment
     insertPlayerEquipmentListSync(playerId, {})

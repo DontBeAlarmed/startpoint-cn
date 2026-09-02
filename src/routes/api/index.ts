@@ -9,7 +9,6 @@ import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../..
 import { getPlayerDrawnQuestsSync, getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
 import { getPlayerGachaInfoListSync } from "../../data/domains/gacha"
-import { getPlayerItemsSync } from "../../data/domains/item"
 import { getPlayerMultiSpecialExchangeCampaignsSync, getPlayerPeriodicRewardPointsSync, getPlayerStartDashExchangeCampaignsSync } from "../../data/domains/campaign"
 import { getPlayerOptionsSync } from "../../data/domains/option"
 import { getPlayerPartyGroupListSync } from "../../data/domains/party"

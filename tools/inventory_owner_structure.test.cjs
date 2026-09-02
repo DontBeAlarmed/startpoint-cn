@@ -46,6 +46,31 @@ test("public Inventory business API excludes maintenance absolute set and delete
     assert.doesNotMatch(barrel, /createInventoryBatchContextWithinTransactionSync/)
 })
 
+test("W6a keeps exact Item maintenance separate from business Inventory and V2 restore", () => {
+    const maintenance = fs.readFileSync(
+        path.join(projectRoot, "src/data/domains/item-maintenance.ts"),
+        "utf8",
+    )
+    assert.deepEqual(
+        [...maintenance.matchAll(/export function (\w+)/g)].map(match => match[1]),
+        [
+            "setPlayerItemForMaintenanceSync",
+            "deletePlayerItemForMaintenanceSync",
+            "insertPlayerItemsForRestoreImportSync",
+        ],
+    )
+    assert.doesNotMatch(
+        maintenance,
+        /lib\/inventory|players_collected_items|item-cap-plan|event-trade|mana-capacity|domains\/mail|reward-grant/i,
+    )
+
+    const v2 = fs.readFileSync(path.join(projectRoot, "src/data/player-save/v2.ts"), "utf8")
+    const registry = fs.readFileSync(path.join(projectRoot, "src/data/player-save/registry.ts"), "utf8")
+    assert.doesNotMatch(v2, /item-maintenance|lib\/inventory/)
+    assert.match(registry, /table\("players_items", "core"\)/)
+    assert.match(registry, /table\("players_collected_items", "core", 6\)/)
+})
+
 test("SQLite row-existence facts remain inside repository and batch context", () => {
     const publicFiles = ["index.ts", "model.ts", "owner.ts", "errors.ts"]
         .map(source)
@@ -299,10 +324,7 @@ test("remaining legacy Item mutation references match the staged migration manif
     visit(sourceRoot)
 
     assert.deepEqual(remaining.sort(), [
-        // W6 primitive definition / maintenance.
+        // W6b removes the old primitive definitions.
         "src/data/domains/item.ts",
-        "src/data/domains/player.ts",
-        // W6 maintenance adapter.
-        "src/routes/web_api/player.ts",
     ])
 })

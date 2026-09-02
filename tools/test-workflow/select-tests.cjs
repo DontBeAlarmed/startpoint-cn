@@ -195,6 +195,10 @@ const SOURCE_RULES = [
     { pattern: /^src\/routes\/cn\/versionCheck\.ts$/, groups: ["integration:cdn", "full"] },
     { pattern: /^src\/routes\/web_api\//, groups: ["admin", "integration:database"] },
     {
+        pattern: /^src\/data\/domains\/item-maintenance\.ts$/,
+        groups: ["admin", "integration:database"],
+    },
+    {
         pattern: /^src\/data\/(?:player-save\/|defaultSave\.ts$)/,
         groups: ["integration:database"],
     },
@@ -605,7 +609,7 @@ const SOURCE_RULES = [
     { pattern: /^src\/multi\//, groups: ["quick:protocol", "integration:multi-hub"] },
     { pattern: /^src\/multi\/tcp\/server\.ts$/, groups: ["integration:runtime"] },
     {
-        pattern: /^src\/data\/(?!player-save\/|defaultSave\.ts$|domains\/(?:gift|news)\.ts$|schema\/server-(?:gifts|news)\.ts$)/,
+        pattern: /^src\/data\/(?!player-save\/|defaultSave\.ts$|domains\/(?:gift|item-maintenance|news)\.ts$|schema\/server-(?:gifts|news)\.ts$)/,
         groups: ["integration:database", "full"],
     },
     {

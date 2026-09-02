@@ -65,38 +65,7 @@ export function insertPlayerClearedRegularMissionListSync(
         }
     })()
 }
-/**
-/**
-/**
- * Inserts a singular item into the player's inventory.
- * 
- * @param playerId The ID of the player.
- * @param itemId The ID of the item to insert.
- * @param amount The amount of the item to insert.
- */
-function insertPlayerItemSync(
-    playerId: number,
-    itemId: number | string,
-    amount: number
-) {
-    getDb().prepare(`
-    INSERT INTO players_items (id, amount, player_id)
-    VALUES (?, ?, ?)
-    `).run(
-        Number(itemId),
-        amount,
-        playerId
-    )
-}
-/**
-/**
-/**
-/**
- * Retrieves the missions that a player is currently completing.
- * 
- * @param playerId The ID of the player.
- * @returns A record of each mission and its current progress.
- */
+
 /**
  * Retrieves the missions that a player is currently completing.
  * 
