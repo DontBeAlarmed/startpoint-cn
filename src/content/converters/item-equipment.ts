@@ -22,9 +22,30 @@ export interface ItemEquipmentConversionOutput {
     readonly "equipment_lookup.json": Readonly<Record<string, unknown>>
     readonly "item_data.json": Readonly<Record<string, unknown>>
     readonly "item_ids.json": readonly number[]
+    readonly "item_inventory_policy.json": ItemInventoryPolicyConversionCatalog
     readonly "item_lookup.json": Readonly<Record<string, string>>
     readonly "item_max_count.json": Readonly<Record<string, number>>
     readonly "item_sale.json": Readonly<Record<string, unknown>>
+}
+
+export type ItemEffectKindConversionCode =
+    | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+    | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17
+    | 18 | 19 | 20 | 21 | 22
+
+export interface ItemInventoryPolicyConversionEntry {
+    readonly effectKind: ItemEffectKindConversionCode
+    readonly category: number
+    readonly salePrice: number
+    readonly maxCount: number
+    readonly sellable: boolean
+    readonly startTimeMs: number
+    readonly endTimeMs: number | null
+}
+
+export interface ItemInventoryPolicyConversionCatalog {
+    readonly byItemId: Readonly<Record<string, ItemInventoryPolicyConversionEntry>>
+    readonly eventTradeItemIds: readonly number[]
 }
 
 export interface ItemEquipmentConversionCompatibility {
@@ -34,6 +55,11 @@ export interface ItemEquipmentConversionCompatibility {
 }
 
 type ParsedRow = readonly [string, readonly string[]]
+
+const ITEM_EFFECT_KIND_MIN = 0
+const ITEM_EFFECT_KIND_MAX = 22
+const CN_CONTENT_TIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/
+const CN_CONTENT_UTC_OFFSET_MS = 8 * 60 * 60 * 1000
 
 function invalidItemEquipment(reason: string): never {
     throw new Error(`invalid item/equipment content: ${reason}`)
@@ -102,6 +128,49 @@ function parseBoolean(value: string, subject: string): boolean {
     if (/^true$/i.test(value)) return true
     if (/^false$/i.test(value)) return false
     invalidItemEquipment(`${subject} must be a boolean: ${value}`)
+}
+
+function parseItemEffectKind(value: string, subject: string): ItemEffectKindConversionCode {
+    const parsed = parseNonNegativeInteger(value, subject)
+    if (parsed < ITEM_EFFECT_KIND_MIN || parsed > ITEM_EFFECT_KIND_MAX) {
+        invalidItemEquipment(`${subject} must be an integer from 0 through 22: ${value}`)
+    }
+    return parsed as ItemEffectKindConversionCode
+}
+
+function parseCnContentTime(value: string, subject: string): number {
+    const match = CN_CONTENT_TIME_PATTERN.exec(value)
+    if (!match) {
+        invalidItemEquipment(`${subject} must be a UTC+8 second-precision time: ${value}`)
+    }
+    const [, yearText, monthText, dayText, hourText, minuteText, secondText] = match
+    const year = Number(yearText)
+    const month = Number(monthText)
+    const day = Number(dayText)
+    const hour = Number(hourText)
+    const minute = Number(minuteText)
+    const second = Number(secondText)
+    const utcWallClock = Date.UTC(year, month - 1, day, hour, minute, second)
+    const check = new Date(utcWallClock)
+    if (check.getUTCFullYear() !== year
+        || check.getUTCMonth() !== month - 1
+        || check.getUTCDate() !== day
+        || check.getUTCHours() !== hour
+        || check.getUTCMinutes() !== minute
+        || check.getUTCSeconds() !== second) {
+        invalidItemEquipment(`${subject} must be a valid UTC+8 time: ${value}`)
+    }
+    const epochMs = utcWallClock - CN_CONTENT_UTC_OFFSET_MS
+    if (!Number.isSafeInteger(epochMs) || epochMs < 0) {
+        invalidItemEquipment(
+            `${subject} must convert to a non-negative safe epoch millisecond: ${value}`,
+        )
+    }
+    return epochMs
+}
+
+function parseOptionalCnContentEndTime(value: string, subject: string): number | null {
+    return value === "(None)" ? null : parseCnContentTime(value, subject)
 }
 
 function requireText(value: string, subject: string): string {
@@ -243,20 +312,45 @@ function convertItems(
 ): {
     readonly data: Record<string, unknown>
     readonly ids: number[]
+    readonly inventoryPolicy: ItemInventoryPolicyConversionCatalog
     readonly lookup: Record<string, string>
     readonly maxCount: Record<string, number>
     readonly sale: Record<string, unknown>
 } {
     const data: Record<string, unknown> = {}
     const ids: number[] = []
+    const inventoryPolicyByItemId: Record<string, ItemInventoryPolicyConversionEntry> = {}
+    const eventTradeItemIds: number[] = []
     const lookup: Record<string, string> = {}
     const maxCount: Record<string, number> = {}
     const sale: Record<string, unknown> = {}
     for (const [id, fields] of parseRows(rows, "item", 23)) {
         ids.push(Number(id))
         lookup[id] = requireText(fields[2], `item[${id}].name`)
-        maxCount[id] = parsePositiveInteger(fields[18], `item[${id}].maxCount`)
-        const effectKind = parseNonNegativeInteger(fields[6], `item[${id}].effectKind`)
+        const effectKind = parseItemEffectKind(fields[6], `item[${id}].effectKind`)
+        const category = parseNonNegativeInteger(fields[14], `item[${id}].category`)
+        const salePrice = parseNonNegativeInteger(fields[16], `item[${id}].salePrice`)
+        const parsedMaxCount = parsePositiveInteger(fields[18], `item[${id}].maxCount`)
+        const startTimeMs = parseCnContentTime(fields[19], `item[${id}].startTime`)
+        const endTimeMs = parseOptionalCnContentEndTime(fields[20], `item[${id}].endTime`)
+        const sellable = parseBoolean(fields[21], `item[${id}].sellable`)
+        if (endTimeMs !== null && endTimeMs < startTimeMs) {
+            invalidItemEquipment(`item[${id}] endTime must not precede startTime`)
+        }
+        if (effectKind === 9 && salePrice <= 0) {
+            invalidItemEquipment(`item[${id}].salePrice must be positive for EventTrade`)
+        }
+        maxCount[id] = parsedMaxCount
+        inventoryPolicyByItemId[id] = {
+            effectKind,
+            category,
+            salePrice,
+            maxCount: parsedMaxCount,
+            sellable,
+            startTimeMs,
+            endTimeMs,
+        }
+        if (effectKind === 9) eventTradeItemIds.push(Number(id))
         if (effectKind === 2 || effectKind === 3) {
             data[id] = {
                 effectKind,
@@ -280,12 +374,22 @@ function convertItems(
             }
         }
         sale[id] = {
-            category: parseNonNegativeInteger(fields[14], `item[${id}].category`),
-            sale_price: parseNonNegativeInteger(fields[16], `item[${id}].salePrice`),
-            sellable: parseBoolean(fields[21], `item[${id}].sellable`),
+            category,
+            sale_price: salePrice,
+            sellable,
         }
     }
-    return { data, ids, lookup, maxCount, sale }
+    return {
+        data,
+        ids,
+        inventoryPolicy: {
+            byItemId: inventoryPolicyByItemId,
+            eventTradeItemIds,
+        },
+        lookup,
+        maxCount,
+        sale,
+    }
 }
 
 export async function convertItemEquipmentTables(
@@ -308,6 +412,7 @@ export async function convertItemEquipmentTables(
         "equipment_lookup.json": equipment.lookup,
         "item_data.json": items.data,
         "item_ids.json": items.ids,
+        "item_inventory_policy.json": items.inventoryPolicy,
         "item_lookup.json": items.lookup,
         "item_max_count.json": items.maxCount,
         "item_sale.json": items.sale,

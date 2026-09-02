@@ -89,6 +89,7 @@ const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
     "equipment_lookup.json",
     "item_data.json",
     "item_ids.json",
+    "item_inventory_policy.json",
     "item_lookup.json",
     "item_max_count.json",
     "item_sale.json",

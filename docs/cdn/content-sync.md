@@ -13,7 +13,7 @@ Content Sync 在服务启动前把一份完整 CDN 输入转换为不可变 Cont
 
 同步器负责严格解析、引用闭包、稳定输出和文件系统安全，不负责判断 CDN 作者给出的 ID、赔率、奖励、价格或资源内容是否合理。服务端不会替 CDN 作者猜测缺失内容、复制其他活动数据、修复非法主数据或自动生成客户端补丁。
 
-阶段 B 已完成“有权威 CDN 来源的表动态迁移”这一目标。当前 Registry 的 127 张表明确分为 `118 CDN + 6 bundled + 3 server`。原阶段 A 的五个动态领域为：
+阶段 B 已完成“有权威 CDN 来源的表动态迁移”这一目标。当前 Registry 的 128 张表明确分为 `119 CDN + 6 bundled + 3 server`。原阶段 A 的五个动态领域为：
 
 | 领域 | 动态输出 |
 |---|---|
@@ -186,12 +186,12 @@ npm run content:audit -- --source-root <WF_ASSETS_CN_ROOT> --format json
 
 当前审计分两层：
 
-1. Content Registry 的 127 张运行表必须存在、是普通文件且可解析为 JSON；
+1. Content Registry 的 128 张运行表必须存在、是普通文件且可解析为 JSON；
 2. 普通、每日、每周、称号、活动、角色觉醒、收集、Active Mission 和 Pass 共 25 张关键表与官方提取源按解析后的完整 JSON 深度比较，并校验 11 组任务/奖励 ID、144 条觉醒任务四元组和 Pass 活动奖励引用闭包。
 
-官方 1.4.54 基线为 127 张 Registry 表、25 张任务深度对比表、13327 个任务深度对比顶层键、36 个觉醒角色组、19 个 Pass 活动及 1140 条 Pass 等级奖励；玩家履历的四张官方表另由直接 OrderedMap smoke 与 bundled 基线逐值比较。`story_join_character.json`、`mana_board2_open_condition.json` 与常规登录奖励表也继续由各自的权威 OrderedMap 转换结果和 bundled 基线逐值比较。格式和对象键顺序不构成差异，数组顺序、ID 集合和嵌套值差异会失败。
+官方 1.4.54 基线为 128 张 Registry 表、25 张任务深度对比表、13327 个任务深度对比顶层键、36 个觉醒角色组、19 个 Pass 活动及 1140 条 Pass 等级奖励；玩家履历的四张官方表另由直接 OrderedMap smoke 与 bundled 基线逐值比较。`story_join_character.json`、`mana_board2_open_condition.json` 与常规登录奖励表也继续由各自的权威 OrderedMap 转换结果和 bundled 基线逐值比较。格式和对象键顺序不构成差异，数组顺序、ID 集合和嵌套值差异会失败。
 
-该命令不写 CDN、`assets/`、`.content/` 或玩家数据库，不生成修复数据，也不由 `start:cn`、`dev:cn` 或 `content:sync` 自动调用。单个 JSON 通过文件描述符读取并在前后核对身份；127 张运行表各读取一次后作为本次内存快照复用于后续检查。该工具不提供跨 127 个文件的原子文件系统快照，发布者必须在停止内容写入后运行；同 UID 对抗性进程在检查间隙替换并恢复路径不属于保护边界。完整 CDN 归档合法性仍由 `content:smoke` 负责，两项工具不能互相替代。
+该命令不写 CDN、`assets/`、`.content/` 或玩家数据库，不生成修复数据，也不由 `start:cn`、`dev:cn` 或 `content:sync` 自动调用。单个 JSON 通过文件描述符读取并在前后核对身份；128 张运行表各读取一次后作为本次内存快照复用于后续检查。该工具不提供跨 128 个文件的原子文件系统快照，发布者必须在停止内容写入后运行；同 UID 对抗性进程在检查间隙替换并恢复路径不属于保护边界。完整 CDN 归档合法性仍由 `content:smoke` 负责，两项工具不能互相替代。
 
 ## 真实 CDN smoke
 
@@ -215,7 +215,7 @@ smoke 始终执行 force sync，并验证：
 
 - Release、Repository、Catalog 都是 1.4.54；当前 Registry 全部表及所有对象引用闭合；
 - 41 张通用递归 OrderedMap 表逐张与 bundled 官方 1.4.54 基线深度相等；
-- 9 张物品装备派生表闭合到同一 Release；其中 7 张逐字段等于 bundled，`item_data.json` 只允许登记的 9 个官方限时体力道具补全，`equipment_lookup.json` 必须匹配 436 条固定 canonical 摘要；
+- 10 张物品装备派生表闭合到同一 Release；其中 8 张逐字段等于 bundled（包含 `item_inventory_policy.json`），`item_data.json` 只允许登记的 9 个官方限时体力道具补全，`equipment_lookup.json` 必须匹配 436 条固定 canonical 摘要；
 - 6 张奖励派生表逐张闭合；按 `differences-1.4.54.json` 的具体键、位置与 ID 元组，只接受 5 条 Clear 字段修正、82 个空 id 清理和 47 个同名活动代币别名；
 - 20 张关卡表和 5 张关卡派生表匹配固定 canonical 摘要；名称非空、推荐属性为 `0..5`，Clear/SS 与普通掉落组全部闭合到同一 Release 的奖励表，入场和解锁索引只能引用当前关卡；每张 CN Quest OrderedMap 的权威 `TimeRange` 按国服 UTC+8 语义转换为 `availableFromMs`、`availableUntilMs`，年份只接受 `1970..2200`（含边界），空边界保留 `null`，越界年份、非法日期和倒置周期拒绝同步；98 个 bundled 兼容练习关卡必须全部进入名称索引，活动挑战点必须引用同一 Release 的每日挑战点；
 - 两张角色 cdndata 各 505 行，运行时 505 个角色；名称、稀有度、属性与 bundled 一致；

@@ -312,6 +312,10 @@ const SOURCE_RULES = [
         groups: ["quick:content"],
     },
     {
+        pattern: /^(?:assets\/item_inventory_policy\.json|src\/lib\/inventory\/(?:item-inventory-policy|item-cap-plan|event-trade-expiry-plan|mana-capacity-plan)\.ts)$/,
+        groups: ["quick:content"],
+    },
+    {
         pattern: /^(?:assets\/additional_reward_rules\.json|src\/lib\/additional-reward\.ts)$/,
         groups: ["integration:rules", "quick:content", "quick:quest"],
     },

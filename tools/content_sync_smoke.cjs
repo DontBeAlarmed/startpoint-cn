@@ -9,7 +9,7 @@ const { isDeepStrictEqual } = require("node:util")
 const { loadServerReleaseContract } = require("./server-bundle/release-contract.cjs")
 
 const EXPECTED_VERSION = loadServerReleaseContract(path.resolve(__dirname, "..")).bundledCdnCatalogVersion
-const EXPECTED_TABLE_COUNT = 127
+const EXPECTED_TABLE_COUNT = 128
 const EXPECTED_FEATURE_DIGEST = "sha256:21898330b538f6c60a0c8114a15f8e247934bea46a104ca4711cc72cde761bf4"
 const EXPECTED_FEATURE_COUNTS = Object.freeze({
     outer: 543,

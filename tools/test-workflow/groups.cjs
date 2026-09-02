@@ -219,6 +219,8 @@ const TEST_GROUPS = Object.freeze({
             "tools/content_gameplay_converter.test.cjs",
             "tools/content_gameplay_runtime.test.cjs",
             "tools/content_item_equipment_converter.test.cjs",
+            "tools/inventory_c1_plans.test.cjs",
+            "tools/inventory_c1_structure.test.cjs",
             "tools/content_login_bonus_converter.test.cjs",
             "tools/content_mana_node_converter.test.cjs",
             "tools/mana_board_parent_index.test.cjs",

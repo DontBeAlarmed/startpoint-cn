@@ -86,7 +86,15 @@ function fixture(overrides = {}) {
         ]],
         [SOURCES.item, [
             row("100", itemFields()),
-            row("101", itemFields({ 2: "普通素材", 6: "0", 7: "", 16: "5" })),
+            row("101", itemFields({
+                2: "活动素材",
+                6: "9",
+                7: "",
+                14: "3",
+                16: "5",
+                20: "2020-07-01 04:59:59",
+                21: "false",
+            })),
             row("102", itemFields({ 2: "比例体力药", 6: "3", 7: "50" })),
             row("103", itemFields({
                 2: "测试资源箱",
@@ -122,7 +130,7 @@ function assertDeepFrozen(value, seen = new Set()) {
     for (const key of Reflect.ownKeys(value)) assertDeepFrozen(value[key], seen)
 }
 
-test("item and equipment converter derives the nine authoritative runtime tables", async () => {
+test("item and equipment converter derives the ten authoritative runtime tables", async () => {
     assert.equal(typeof convertItemEquipmentTables, "function", "应导出 convertItemEquipmentTables")
     const source = fixture()
     const output = await convertItemEquipmentTables(source.reader, {
@@ -176,9 +184,50 @@ test("item and equipment converter derives the nine authoritative runtime tables
             },
         },
         "item_ids.json": [100, 101, 102, 103],
+        "item_inventory_policy.json": {
+            byItemId: {
+                "100": {
+                    effectKind: 2,
+                    category: 9,
+                    salePrice: 100,
+                    maxCount: 9999,
+                    sellable: true,
+                    startTimeMs: Date.UTC(2015, 11, 31, 15, 59, 59),
+                    endTimeMs: null,
+                },
+                "101": {
+                    effectKind: 9,
+                    category: 3,
+                    salePrice: 5,
+                    maxCount: 9999,
+                    sellable: false,
+                    startTimeMs: Date.UTC(2015, 11, 31, 15, 59, 59),
+                    endTimeMs: Date.UTC(2020, 5, 30, 20, 59, 59),
+                },
+                "102": {
+                    effectKind: 3,
+                    category: 9,
+                    salePrice: 100,
+                    maxCount: 9999,
+                    sellable: true,
+                    startTimeMs: Date.UTC(2015, 11, 31, 15, 59, 59),
+                    endTimeMs: null,
+                },
+                "103": {
+                    effectKind: 22,
+                    category: 9,
+                    salePrice: 100,
+                    maxCount: 9999,
+                    sellable: false,
+                    startTimeMs: Date.UTC(2015, 11, 31, 15, 59, 59),
+                    endTimeMs: null,
+                },
+            },
+            eventTradeItemIds: [101],
+        },
         "item_lookup.json": {
             "100": "测试道具",
-            "101": "普通素材",
+            "101": "活动素材",
             "102": "比例体力药",
             "103": "测试资源箱",
         },
@@ -190,12 +239,85 @@ test("item and equipment converter derives the nine authoritative runtime tables
         },
         "item_sale.json": {
             "100": { category: 9, sale_price: 100, sellable: true },
-            "101": { category: 9, sale_price: 5, sellable: true },
+            "101": { category: 3, sale_price: 5, sellable: false },
             "102": { category: 9, sale_price: 100, sellable: true },
             "103": { category: 9, sale_price: 100, sellable: false },
         },
     })
     assertDeepFrozen(output)
+})
+
+test("item inventory policy accepts the closed effect kinds 14 and 17", async () => {
+    const source = fixture({
+        [SOURCES.item]: [
+            row("100", itemFields({ 6: "14", 7: "" })),
+            row("101", itemFields({ 6: "17", 7: "" })),
+        ],
+    })
+    const output = await convertItemEquipmentTables(source.reader)
+    assert.equal(output["item_inventory_policy.json"].byItemId[100].effectKind, 14)
+    assert.equal(output["item_inventory_policy.json"].byItemId[101].effectKind, 17)
+    assert.deepEqual(output["item_inventory_policy.json"].eventTradeItemIds, [])
+})
+
+for (const { name, overrides, expected } of [
+    {
+        name: "negative effect kind",
+        overrides: { 6: "-1" },
+        expected: /effectKind must be a non-negative integer/i,
+    },
+    {
+        name: "effect kind above the closed range",
+        overrides: { 6: "23" },
+        expected: /effectKind must be an integer from 0 through 22/i,
+    },
+    {
+        name: "non-integer effect kind",
+        overrides: { 6: "9.5" },
+        expected: /effectKind must be a non-negative integer/i,
+    },
+    {
+        name: "invalid UTC+8 date",
+        overrides: { 19: "2020-02-30 00:00:00" },
+        expected: /startTime must be a valid UTC\+8 time/i,
+    },
+    {
+        name: "1969 time with a negative epoch",
+        overrides: { 19: "1969-12-31 23:59:59" },
+        expected: /startTime must convert to a non-negative safe epoch millisecond/i,
+    },
+    {
+        name: "time without second precision",
+        overrides: { 19: "2020-01-01 00:00" },
+        expected: /startTime must be a UTC\+8 second-precision time/i,
+    },
+    {
+        name: "inverted availability window",
+        overrides: { 19: "2020-01-02 00:00:00", 20: "2020-01-01 23:59:59" },
+        expected: /endTime must not precede startTime/i,
+    },
+    {
+        name: "EventTrade without a positive sale price",
+        overrides: { 6: "9", 16: "0" },
+        expected: /salePrice must be positive for EventTrade/i,
+    },
+]) {
+    test(`item inventory policy rejects ${name}`, async () => {
+        const source = fixture({
+            [SOURCES.item]: [row("100", itemFields(overrides))],
+        })
+        await assert.rejects(convertItemEquipmentTables(source.reader), expected)
+    })
+}
+
+test("item inventory policy requires all 23 Item columns", async () => {
+    const source = fixture({
+        [SOURCES.item]: [row("100", itemFields().slice(0, -1))],
+    })
+    await assert.rejects(
+        convertItemEquipmentTables(source.reader),
+        /item\[100\] must have 23 columns, got 22/i,
+    )
 })
 
 test("item and equipment converter rejects malformed authoritative rows", async () => {

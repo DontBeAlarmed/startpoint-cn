@@ -291,6 +291,14 @@ test("maps representative source files to focused groups", () => {
     )
     assert.deepEqual(selectTestGroups(["src/content/sync/entry.ts"]), ["quick:content"])
     assert.deepEqual(
+        selectTestGroups(["src/lib/inventory/event-trade-expiry-plan.ts"]),
+        ["quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["assets/item_inventory_policy.json"]),
+        ["quick:content"],
+    )
+    assert.deepEqual(
         selectTestGroups(["src/multi/tcp/server.ts"]),
         ["integration:multi-hub", "integration:runtime", "quick:protocol"],
     )
