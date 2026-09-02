@@ -22,12 +22,14 @@ const CALLEES = new Map([
     ["reconcileAwakeUnlockCharacterListBestEffort", "best-effort"],
     ["publishAwakeCharacterListBestEffort", "best-effort"],
     ["publishCharacterGrowthOwnerStateBestEffort", "best-effort"],
+    ["publishPreparedSingleGrowthPublication", "best-effort"],
     ["publishAwakeUnlockCharacterListWithinTransaction", "growth-facts-in-tx"],
     ["publishAwakeUnlockCharacterListWithStateWithinTransaction", "growth-facts-in-tx"],
 ])
 const AWAKE_CALLEE_PREFIX = "reconcileAwakeUnlockCharacterList"
 const SINGLE_AWAKE_WRAPPER = "publishAwakeCharacterListBestEffort"
 const GROWTH_AWAKE_WRAPPER = "publishCharacterGrowthOwnerStateBestEffort"
+const SINGLE_GROWTH_PUBLICATION_WRAPPER = "publishPreparedSingleGrowthPublication"
 const GROWTH_AWAKE_FACT_WRITERS = new Set([
     "publishAwakeUnlockCharacterListWithinTransaction",
     "publishAwakeUnlockCharacterListWithStateWithinTransaction",
@@ -63,9 +65,9 @@ const AUTHORITATIVE_WRITE_SETS = Object.freeze({
         "recordMissionBattleFacts", "givePlayerCharactersExpSync", "handleRushEventFinish",
         "dispatchModeRushFinish", "handleRaidEventFinish", "handleCarnivalEventFinish",
         "insertPlayerScoreAttackBattleHistorySync", "insertPlayerPracticeBattleHistorySync",
-        "handleScoreAttackEventFinish", "settleSingleMissionEvaluations", "setExpPool",
+        "handleScoreAttackEventFinish", "prepareSingleGrowthPublication", "setExpPool",
         "observeGrant", "observeItems", "observeResult", "finalize",
-        "finalizeSingleAwakePublicationWrites",
+        "deletePlayerActiveQuestSync",
     ]),
     "multi/finish": Object.freeze([
         "givePlayerRewardSync", "updatePlayerQuestProgressSync", "insertPlayerQuestProgressSync",
@@ -82,7 +84,7 @@ const AUTHORITATIVE_WRITE_SETS = Object.freeze({
     "character/receive_bond_token": Object.freeze(["receiveBondToken"]),
     "character/learn_mana_node": Object.freeze([
         "updatePlayerSync", "incrementActiveMissionUsedManaCountSync",
-        "setPlayerItemWithinTransactionSync", "insertPlayerCharacterManaNodesSync",
+        "withInventoryBatchContextWithinTransactionSync", "insertPlayerCharacterManaNodesSync",
         "updateBondTokenForCompletedBoardFromGrowthState", "finalizeLearnManaAwakePublicationWrites",
     ]),
     "exchange/star_crumb": Object.freeze(["transaction"]),
@@ -130,6 +132,7 @@ const TUTORIAL_OWNER_SCOPE_CONTRACTS = Object.freeze({
     }),
 })
 const SINGLE_SYNC_AUTHORITATIVE_CALLBACKS = Object.freeze({
+    deleteActiveQuest: Object.freeze(["deletePlayerActiveQuestSync"]),
     grantRewards: Object.freeze(["grantDirectRewards"]),
     giveRewards: Object.freeze(["grantDirectRewards"]),
     updateProgress: Object.freeze(["updatePlayerQuestProgressSync"]),
@@ -138,19 +141,14 @@ const SINGLE_SYNC_AUTHORITATIVE_CALLBACKS = Object.freeze({
 const TUTORIAL_STEP_15_SYNC_AUTHORITATIVE_CALLBACKS = Object.freeze({
     ownerGrant: Object.freeze(["executeRewardGrantPlanInTransactionOwnerInternalSync"]),
 })
+const LEARN_MANA_SYNC_AUTHORITATIVE_CALLBACKS = Object.freeze({
+    withInventoryBatchContextWithinTransactionSync: Object.freeze([
+        "updatePlayerSync",
+        "incrementActiveMissionUsedManaCountSync",
+        "updateBondTokenForCompletedBoardFromGrowthState",
+    ]),
+})
 const FINAL_WRITE_HELPERS = Object.freeze({
-    "single/finish": Object.freeze({
-        helperName: "finalizeSingleAwakePublicationWrites",
-        callInventory: Object.freeze([
-            "import:../../../data/domains/quest_active#deletePlayerActiveQuestSync=1",
-        ]),
-        executionInventory: Object.freeze([
-            "sync:import:../../../data/domains/quest_active#deletePlayerActiveQuestSync=1",
-        ]),
-        internalWrites: Object.freeze([
-            Object.freeze({ kind: "import", name: "deletePlayerActiveQuestSync" }),
-        ]),
-    }),
     "multi/finish": Object.freeze({
         helperName: "finalizeMultiAwakePublicationWrites",
         callInventory: Object.freeze(["parameter:deleteActiveQuest=1"]),
@@ -269,6 +267,7 @@ function matrixRow({
     actualFactSeeds = "none",
     directMissionSeed = "none",
     finalAuthoritativeWrite,
+    finalWriteRule,
     runtimeEvidenceKey,
     changesGlobalFacts = false,
     rereadReason = DEFAULT_REREAD_REASON,
@@ -286,9 +285,9 @@ function matrixRow({
         directMissionSeed,
         finalAuthoritativeWrite,
         authoritativeWriteSet: AUTHORITATIVE_WRITE_SETS[owner],
-        finalWriteRule: OWNER_TRANSACTION_ANCHORS[owner] === undefined
+        finalWriteRule: finalWriteRule ?? (OWNER_TRANSACTION_ANCHORS[owner] === undefined
             ? "same-block-direct"
-            : "owner-transaction-statement",
+            : "owner-transaction-statement"),
         snapshotSource: "none",
         rereadReason,
         sqlUpperBoundKey: runtimeEvidenceKey,
@@ -299,7 +298,7 @@ function matrixRow({
 
 const EXPECTED_MATRIX = Object.freeze([
     matrixRow({ relativeFile: "src/lib/character-growth/commands/learn-mana-nodes.ts", callee: "growth-facts-in-tx", owner: "character/learn_mana_node", boundary: "strict-in-tx", actualCharacterSeed: "[command.characterId]", finalAuthoritativeWrite: "finalizeLearnManaAwakePublicationWrites", runtimeEvidenceKey: "learn-mana-final-node" }),
-    matrixRow({ relativeFile: "src/lib/quest/finish/single-settlement-writes.ts", owner: "single/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "partyCharacterIds", actualFactSeeds: "awakePublication.invalidatedFactKeys", directMissionSeed: "awakePublication.directMissionIds", finalAuthoritativeWrite: "finalizeSingleAwakePublicationWrites", runtimeEvidenceKey: "single-finish", changesGlobalFacts: true, rereadReason: SINGLE_REREAD_REASON }),
+    matrixRow({ relativeFile: "src/lib/quest/finish/single-settlement-writes.ts", owner: "single/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "partyCharacterIds", actualFactSeeds: "preparedGrowthPublication.publication.invalidatedFactKeys", directMissionSeed: "preparedGrowthPublication.publication.directMissionIds", finalAuthoritativeWrite: "deletePlayerActiveQuestSync", finalWriteRule: "single-active-quest-finalization", runtimeEvidenceKey: "single-finish", changesGlobalFacts: true, rereadReason: SINGLE_REREAD_REASON }),
     matrixRow({ relativeFile: "src/multi/settlement/orchestrator.ts", owner: "multi/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "invalidatedFactKeys", directMissionSeed: "[ ...missionBattleFacts.awakeMissionIds, ...(awakeMissionEvaluation?.evaluation.missions.map(mission => mission.missionId) ?? []), ]", finalAuthoritativeWrite: "finalizeMultiAwakePublicationWrites", runtimeEvidenceKey: "multi-finish", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/activeMission.ts", owner: "active_mission/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "[]", actualFactSeeds: "granter.invalidatedFactKeys", finalAuthoritativeWrite: "persistPlayer", runtimeEvidenceKey: "active-mission-receive", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/boxGacha.ts", owner: "box_gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "settlement.rewardResult?.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "box-gacha-exec", changesGlobalFacts: true }),
@@ -341,6 +340,7 @@ function collectImportedAwakeCalls(source, fileName) {
                 if (!exportedName.startsWith(AWAKE_CALLEE_PREFIX)
                     && exportedName !== SINGLE_AWAKE_WRAPPER
                     && exportedName !== GROWTH_AWAKE_WRAPPER
+                    && exportedName !== SINGLE_GROWTH_PUBLICATION_WRAPPER
                     && !GROWTH_AWAKE_FACT_WRITERS.has(exportedName)) continue
                 const symbol = checker.getSymbolAtLocation(element.name)
                 if (symbol === undefined) continue
@@ -376,6 +376,7 @@ function collectImportedAwakeCalls(source, fileName) {
                 if (name.startsWith(AWAKE_CALLEE_PREFIX)
                     || name === SINGLE_AWAKE_WRAPPER
                     || name === GROWTH_AWAKE_WRAPPER
+                    || name === SINGLE_GROWTH_PUBLICATION_WRAPPER
                     || GROWTH_AWAKE_FACT_WRITERS.has(name)) {
                     exportedName = name
                     moduleSpecifier = namespaceSpecifier
@@ -390,6 +391,10 @@ function collectImportedAwakeCalls(source, fileName) {
                     && !moduleSpecifier.endsWith("/character-growth/owner-publication")) {
                     throw new Error(`${fileName} Growth owner wrapper import must use character-growth/owner-publication`)
                 }
+                if (exportedName === SINGLE_GROWTH_PUBLICATION_WRAPPER
+                    && !moduleSpecifier.endsWith("/single-growth-publication")) {
+                    throw new Error(`${fileName} single Growth publication wrapper import must use single-growth-publication`)
+                }
                 if (GROWTH_AWAKE_FACT_WRITERS.has(exportedName)
                     && !moduleSpecifier.endsWith("/character-growth/facts/awake-unlock-facts")
                     && !moduleSpecifier.endsWith("/facts/awake-unlock-facts")) {
@@ -397,6 +402,7 @@ function collectImportedAwakeCalls(source, fileName) {
                 }
                 if (exportedName !== SINGLE_AWAKE_WRAPPER
                     && exportedName !== GROWTH_AWAKE_WRAPPER
+                    && exportedName !== SINGLE_GROWTH_PUBLICATION_WRAPPER
                     && !GROWTH_AWAKE_FACT_WRITERS.has(exportedName)
                     && !isMissionModuleSpecifier(moduleSpecifier)) {
                     ts.forEachChild(node, visit)
@@ -885,6 +891,52 @@ function assertSingleAwakePublicationWrapper() {
     )
 }
 
+function assertSingleGrowthPublicationWrapper() {
+    const relativeFile = "src/lib/quest/finish/single-growth-publication.ts"
+    const source = fs.readFileSync(path.join(projectRoot, relativeFile), "utf8")
+    const { checker, sourceFile } = createTypeCheckedSource(source, relativeFile)
+    const wrapper = findExportedFunctionDeclaration(
+        sourceFile,
+        checker,
+        SINGLE_GROWTH_PUBLICATION_WRAPPER,
+    )
+    const publicationSymbol = findNamedImportSymbol(
+        sourceFile,
+        checker,
+        GROWTH_AWAKE_WRAPPER,
+        specifier => specifier.endsWith("/character-growth/owner-publication"),
+    )
+    const publicationCalls = collectCallsForSymbol(wrapper, checker, publicationSymbol)
+    assert.equal(publicationCalls.length, 1, "single Growth wrapper must publish exactly once")
+    const publicationCall = publicationCalls[0]
+    assert.equal(publicationCall.arguments.length, 6, "single Growth wrapper must preserve the owner scope")
+    assert.deepEqual(
+        [0, 1, 2, 4, 5].map(index => compactExpression(publicationCall.arguments[index], sourceFile)),
+        [
+            "input.playerId",
+            "input.partyCharacterIds",
+            "input.publication.characterLists",
+            '"single-finish"',
+            "input.evaluationTime",
+        ],
+    )
+    const scope = publicationCall.arguments[3]
+    assert.equal(ts.isObjectLiteralExpression(scope), true, "single Growth wrapper scope must be explicit")
+    const expectedScope = {
+        invalidatedFactKeys: "input.publication.invalidatedFactKeys",
+        directMissionIds: "input.publication.directMissionIds",
+        evaluatedAwakeUnlocks: "input.publication.evaluatedAwakeUnlocks",
+    }
+    assert.deepEqual(
+        Object.fromEntries(Object.keys(expectedScope).map(name => {
+            const value = getObjectProperty(scope, name)
+            assert.notEqual(value, null, `single Growth wrapper scope omitted ${name}`)
+            return [name, compactExpression(value, sourceFile)]
+        })),
+        expectedScope,
+    )
+}
+
 function assertSingleSettlementTransactionOwnership(source, fileName) {
     const { checker, sourceFile } = createTypeCheckedSource(source, fileName)
     const owner = findExportedFunctionDeclaration(
@@ -1156,6 +1208,22 @@ function extractScopeEvidence(importedCall, ownerRoot = findOwnerRoot(importedCa
     let actualCharacterSeed
     let scope
     let contextStart
+    if (exportedName === SINGLE_GROWTH_PUBLICATION_WRAPPER) {
+        const input = call.arguments[0]
+        assert.equal(ts.isObjectLiteralExpression(input), true, "single Growth publication input must be explicit")
+        const partyCharacterIds = getObjectProperty(input, "partyCharacterIds")
+        const publication = getObjectProperty(input, "publication")
+        assert.notEqual(partyCharacterIds, null, "single Growth publication omitted party characters")
+        assert.notEqual(publication, null, "single Growth publication omitted prepared state")
+        const publicationText = compactExpression(publication, sourceFile)
+        return {
+            actualCharacterSeed: compactExpression(partyCharacterIds, sourceFile),
+            actualFactSeeds: `${publicationText}.invalidatedFactKeys`,
+            directMissionSeed: `${publicationText}.directMissionIds`,
+            snapshotSource: "none",
+            contextStart: call.getStart(sourceFile),
+        }
+    }
     if (exportedName === SINGLE_AWAKE_WRAPPER || exportedName === GROWTH_AWAKE_WRAPPER) {
         actualCharacterSeed = compactExpression(call.arguments[1], sourceFile)
         scope = call.arguments[3]
@@ -1430,6 +1498,25 @@ function isExactOwnerTransactionCallbackWrite(call, ownerRoot, publicationCall) 
 }
 
 function isReviewedSyncCallbackWrite(call, ownerRoot, ownerLabel) {
+    if (ownerLabel === "character/learn_mana_node") {
+        const nestedFunctions = nonImmediateFunctionAncestors(call, ownerRoot)
+        if (nestedFunctions.length !== 2) return false
+        const [callback, transactionCallback] = nestedFunctions
+        const ownerCall = callback.parent
+        const transactionCall = transactionCallback.parent
+        if (!ts.isCallExpression(ownerCall)
+            || ownerCall.arguments[1] !== callback
+            || hasOptionalCalleeChain(ownerCall)
+            || !ts.isCallExpression(transactionCall)
+            || callTerminalName(transactionCall) !== "transaction"
+            || transactionCall.arguments[0] !== transactionCallback
+            || hasOptionalCalleeChain(transactionCall)) return false
+        const ownerCallName = callTerminalName(ownerCall)
+        const writeName = callTerminalName(call)
+        return ownerCallName !== null
+            && writeName !== null
+            && LEARN_MANA_SYNC_AUTHORITATIVE_CALLBACKS[ownerCallName]?.includes(writeName) === true
+    }
     const callbackContract = ownerLabel === "single/finish"
         ? SINGLE_SYNC_AUTHORITATIVE_CALLBACKS
         : ownerLabel === "tutorial/update_step:15"
@@ -1477,6 +1564,166 @@ function collectExecutableCallsInRange(statement, start, end, authoritativeWrite
     return calls
 }
 
+function assertScoreAttackHandlerDeleteContractInSource(source, fileName) {
+    const { checker, sourceFile } = createTypeCheckedSource(source, fileName)
+    const handler = findExportedFunctionDeclaration(
+        sourceFile,
+        checker,
+        "handleScoreAttackEventFinish",
+    )
+    const dependencies = handler.parameters[1]
+    assert.equal(
+        dependencies !== undefined && ts.isIdentifier(dependencies.name),
+        true,
+        "score-attack handler dependencies parameter must be exact",
+    )
+    const dependencySymbol = checker.getSymbolAtLocation(dependencies.name)
+    assert.notEqual(dependencySymbol, undefined, "score-attack dependencies symbol is missing")
+    const dependencyCalls = []
+    function visit(node) {
+        if (ts.isCallExpression(node)
+            && ts.isPropertyAccessExpression(node.expression)
+            && ts.isIdentifier(node.expression.expression)
+            && checker.getSymbolAtLocation(node.expression.expression) === dependencySymbol) {
+            dependencyCalls.push(node)
+        }
+        ts.forEachChild(node, visit)
+    }
+    visit(handler)
+    const transactionCalls = dependencyCalls.filter(call => call.expression.name.text === "transaction")
+    assert.equal(transactionCalls.length, 1, "score-attack handler must own one transaction callback")
+    const transactionCall = transactionCalls[0]
+    assert.equal(
+        handler.body?.statements.length === 1
+            && ts.isReturnStatement(handler.body.statements[0])
+            && handler.body.statements[0].expression === transactionCall,
+        true,
+        "score-attack handler transaction must be its only top-level unconditional return",
+    )
+    const transactionCallback = transactionCall.arguments[0]
+    assert.equal(
+        transactionCallback !== undefined
+            && (ts.isArrowFunction(transactionCallback) || ts.isFunctionExpression(transactionCallback))
+            && ts.isBlock(transactionCallback.body),
+        true,
+        "score-attack transaction callback must be a direct block",
+    )
+    const deleteCalls = dependencyCalls.filter(call => call.expression.name.text === "deleteActiveQuest")
+    assert.equal(deleteCalls.length, 1, "score-attack handler must delete the active quest exactly once")
+    const deleteCall = deleteCalls[0]
+    assert.notEqual(
+        findAncestor(deleteCall, node => node === transactionCallback),
+        null,
+        "score-attack active-quest delete must stay in the transaction callback",
+    )
+    assert.equal(
+        nonImmediateFunctionAncestors(deleteCall, transactionCallback).length,
+        0,
+        "score-attack active-quest delete must not be deferred",
+    )
+    const deleteStatement = transactionCallback.body.statements.find(statement => (
+        deleteCall.getStart(sourceFile) >= statement.getStart(sourceFile)
+            && deleteCall.end <= statement.end
+    ))
+    assert.equal(
+        deleteStatement !== undefined
+            && isDirectUnconditionalCallInStatement(deleteCall, deleteStatement),
+        true,
+        "score-attack active-quest delete must be an unconditional transaction statement",
+    )
+}
+
+function assertScoreAttackHandlerDeleteContract() {
+    const relativeFile = "src/lib/quest/finish/score-attack-handler.ts"
+    assertScoreAttackHandlerDeleteContractInSource(
+        fs.readFileSync(path.join(projectRoot, relativeFile), "utf8"),
+        relativeFile,
+    )
+}
+
+function assertSingleScoreAttackFinalizationComplement(
+    ownerRoot,
+    checker,
+    sourceFile,
+    publicationCall,
+) {
+    assert.notEqual(checker, null, "single active-quest finalization requires TypeChecker evidence")
+    const declarations = []
+    function visit(node) {
+        if (ts.isVariableDeclaration(node)
+            && ts.isIdentifier(node.name)
+            && node.name.text === "scoreAttackFinishResult") declarations.push(node)
+        ts.forEachChild(node, visit)
+    }
+    visit(ownerRoot)
+    assert.equal(declarations.length, 1, "single finish must bind scoreAttackFinishResult exactly once")
+    const initializer = declarations[0].initializer
+    assert.equal(
+        initializer !== undefined && ts.isConditionalExpression(initializer),
+        true,
+        "scoreAttackFinishResult must use the exact score-attack conditional",
+    )
+    assert.equal(
+        compactExpression(initializer.condition, sourceFile),
+        "isScoreAttackEvent",
+        "score-attack handler condition must be isScoreAttackEvent",
+    )
+    assert.equal(initializer.whenFalse.kind, ts.SyntaxKind.NullKeyword, "score-attack false branch must be null")
+    const handlerCall = initializer.whenTrue
+    assert.equal(
+        ts.isCallExpression(handlerCall)
+            && !hasOptionalCalleeChain(handlerCall)
+            && callExpressionIdentity(handlerCall, checker, sourceFile)
+                === "import:./score-attack-handler#handleScoreAttackEventFinish",
+        true,
+        "score-attack true branch must directly call the production handler",
+    )
+    assert.equal(
+        handlerCall.end < publicationCall.getStart(sourceFile),
+        true,
+        "score-attack handler must execute before Growth publication",
+    )
+    const dependencies = handlerCall.arguments[1]
+    assert.equal(
+        dependencies !== undefined && ts.isObjectLiteralExpression(dependencies),
+        true,
+        "score-attack handler dependencies must be explicit",
+    )
+    const transaction = getObjectProperty(dependencies, "transaction")
+    assert.equal(
+        transaction !== null
+            && ts.isArrowFunction(transaction)
+            && transaction.parameters.length === 1
+            && ts.isIdentifier(transaction.parameters[0].name)
+            && ts.isCallExpression(transaction.body)
+            && ts.isIdentifier(transaction.body.expression)
+            && checker.getSymbolAtLocation(transaction.body.expression)
+                === checker.getSymbolAtLocation(transaction.parameters[0].name)
+            && transaction.body.arguments.length === 0
+            && !hasOptionalCalleeChain(transaction.body),
+        true,
+        "score-attack transaction dependency must invoke its operation synchronously",
+    )
+    const deleteActiveQuest = getObjectProperty(dependencies, "deleteActiveQuest")
+    assert.equal(
+        deleteActiveQuest !== null
+            && ts.isArrowFunction(deleteActiveQuest)
+            && deleteActiveQuest.parameters.length === 1
+            && ts.isIdentifier(deleteActiveQuest.parameters[0].name)
+            && ts.isCallExpression(deleteActiveQuest.body)
+            && callExpressionIdentity(deleteActiveQuest.body, checker, sourceFile)
+                === "import:../../../data/domains/quest_active#deletePlayerActiveQuestSync"
+            && deleteActiveQuest.body.arguments.length === 1
+            && ts.isIdentifier(deleteActiveQuest.body.arguments[0])
+            && checker.getSymbolAtLocation(deleteActiveQuest.body.arguments[0])
+                === checker.getSymbolAtLocation(deleteActiveQuest.parameters[0].name)
+            && !hasOptionalCalleeChain(deleteActiveQuest.body),
+        true,
+        "score-attack delete dependency must synchronously forward to the production active-quest owner",
+    )
+    assertScoreAttackHandlerDeleteContract()
+}
+
 function assertFinalWritePrecedesContext(
     call,
     contextStart,
@@ -1488,6 +1735,9 @@ function assertFinalWritePrecedesContext(
 ) {
     const sourceFile = call.getSourceFile()
     const ownerRoot = findOwnerRoot(call, ownerLabel, checker)
+    if (finalWriteRule === "single-active-quest-finalization") {
+        assertSingleScoreAttackFinalizationComplement(ownerRoot, checker, sourceFile, call)
+    }
     const authoritativeWrites = new Set(authoritativeWriteNames)
     assert.equal(authoritativeWrites.has(anchor), true, `${anchor} must belong to the authoritative write set`)
     const anchorMatches = []
@@ -1544,6 +1794,35 @@ function assertFinalWritePrecedesContext(
                 publicationStatement,
             }
             break
+        }
+        if (finalWriteRule === "single-active-quest-finalization"
+            && ownerLabel === "single/finish"
+            && anchor === "deletePlayerActiveQuestSync") {
+            let conditionalAnchor = null
+            for (const [index, statement] of block.statements.entries()) {
+                if (index >= publicationIndex) break
+                if (!ts.isIfStatement(statement)
+                    || statement.elseStatement !== undefined
+                    || compactExpression(statement.expression, sourceFile) !== "!isScoreAttackEvent") continue
+                const match = anchorMatches.find(candidate => (
+                    candidate.end <= contextStart
+                        && isDirectUnconditionalCallInStatement(candidate, statement.thenStatement)
+                ))
+                if (match !== undefined) {
+                    conditionalAnchor = { match, statementIndex: index }
+                    break
+                }
+            }
+            if (conditionalAnchor !== null) {
+                dominanceEvidence = {
+                    anchorMatch: conditionalAnchor.match,
+                    anchorStatementIndex: conditionalAnchor.statementIndex,
+                    block,
+                    publicationIndex,
+                    publicationStatement,
+                }
+                break
+            }
         }
         if (finalWriteRule !== "owner-transaction-statement" || ownerLabel === null) continue
         assert.equal(
@@ -1661,7 +1940,8 @@ function collectProductionCalls() {
         if (relativeFile === "src/lib/mission/awake-unlock-response.ts"
             || relativeFile === "src/lib/mission/awake-best-effort-context.ts"
             || relativeFile === "src/lib/character-growth/owner-publication.ts"
-            || relativeFile === "src/lib/character-growth/facts/awake-unlock-facts.ts") continue
+            || relativeFile === "src/lib/character-growth/facts/awake-unlock-facts.ts"
+            || relativeFile === "src/lib/quest/finish/single-growth-publication.ts") continue
         const source = fs.readFileSync(file, "utf8")
         for (const importedCall of collectImportedAwakeCalls(source, relativeFile)) {
             const { call, callee, checker, exportedName, moduleSpecifier, sourceFile } = importedCall
@@ -1685,6 +1965,14 @@ function collectProductionCalls() {
                     call.arguments.length === 4 || call.arguments.length === 5 || call.arguments.length === 6,
                     `${relativeFile} Growth owner publication must use the supported signature`,
                 )
+            } else if (exportedName === SINGLE_GROWTH_PUBLICATION_WRAPPER) {
+                assert.equal(call.arguments.length, 1, `${relativeFile} single Growth publication must use one input`)
+                assert.equal(
+                    ts.isObjectLiteralExpression(call.arguments[0]),
+                    true,
+                    `${relativeFile} single Growth publication input must be an object expression`,
+                )
+                assertSingleGrowthPublicationWrapper()
             } else if (GROWTH_AWAKE_FACT_WRITERS.has(exportedName)) {
                 assert.equal(
                     call.arguments.length,
@@ -1699,6 +1987,7 @@ function collectProductionCalls() {
             }
             if (call.arguments.length === 3 && exportedName !== SINGLE_AWAKE_WRAPPER
                 && exportedName !== GROWTH_AWAKE_WRAPPER
+                && exportedName !== SINGLE_GROWTH_PUBLICATION_WRAPPER
                 && !GROWTH_AWAKE_FACT_WRITERS.has(exportedName)) {
                 const options = call.arguments[2]
                 assert.equal(
@@ -1763,6 +2052,8 @@ function collectProductionCalls() {
                         ? call.arguments.length === 4
                         : exportedName === GROWTH_AWAKE_WRAPPER
                             ? call.arguments.length >= 4
+                            : exportedName === SINGLE_GROWTH_PUBLICATION_WRAPPER
+                                ? call.arguments.length === 1
                             : GROWTH_AWAKE_FACT_WRITERS.has(exportedName)
                                 ? call.arguments.length === 4
                             : call.arguments.length === 3
@@ -1821,6 +2112,10 @@ function assertEvidenceContract(matrix) {
                 entry.finalAuthoritativeWrite,
                 `${entry.owner} lacks its exact outer transaction anchor rule`,
             )
+        } else if (entry.finalWriteRule === "single-active-quest-finalization") {
+            assert.equal(entry.owner, "single/finish")
+            assert.equal(entry.finalAuthoritativeWrite, "deletePlayerActiveQuestSync")
+            assert.equal(OWNER_TRANSACTION_ANCHORS[entry.owner], undefined)
         } else {
             assert.equal(entry.finalWriteRule, "same-block-direct")
             assert.equal(OWNER_TRANSACTION_ANCHORS[entry.owner], undefined)
@@ -1923,7 +2218,7 @@ test("Awake reconcile audit matrix freezes owner, policy, and planned candidate 
     assert.equal(new Set(EXPECTED_MATRIX.map(entry => entry.ownerLabel)).size, 21)
     const single = EXPECTED_MATRIX.find(entry => entry.owner === "single/finish")
     assert.equal(single.plannedCandidateSource, "battle-party+invalidated-facts")
-    assert.equal(single.directMissionSeed, "awakePublication.directMissionIds")
+    assert.equal(single.directMissionSeed, "preparedGrowthPublication.publication.directMissionIds")
     for (const entry of EXPECTED_MATRIX) {
         assert.equal(
             entry.candidateSource,
@@ -2180,6 +2475,75 @@ test("final-write evidence rejects an optional property anchor", () => {
     assert.throws(
         () => assertFinalWritePrecedesContext(importedCall.call, scope.contextStart, "persistPlayer"),
         /same control-flow path|optional|dominat/i,
+    )
+})
+
+test("single active-quest finalization requires complementary normal and score-attack paths", () => {
+    const source = `
+        import { deletePlayerActiveQuestSync } from "../../../data/domains/quest_active"
+        import { handleScoreAttackEventFinish } from "./score-attack-handler"
+        import { publishPreparedSingleGrowthPublication } from "./single-growth-publication"
+        export function executeSingleSettlementWrites(isScoreAttackEvent, otherCondition) {
+            const scoreAttackFinishResult = isScoreAttackEvent
+                ? handleScoreAttackEventFinish({}, {
+                    transaction: operation => operation(),
+                    deleteActiveQuest: pid => deletePlayerActiveQuestSync(pid),
+                })
+                : null
+            if (!isScoreAttackEvent) deletePlayerActiveQuestSync(1)
+            return publishPreparedSingleGrowthPublication({
+                playerId: 1,
+                partyCharacterIds: [],
+                evaluationTime: new Date(0),
+                publication: preparedGrowthPublication.publication,
+            })
+        }
+    `
+    function assertEvidence(candidate) {
+        const importedCall = collectImportedAwakeCalls(
+            candidate,
+            "src/lib/quest/finish/single-settlement-writes.ts",
+        )[0]
+        const scope = extractScopeEvidence(importedCall)
+        return assertFinalWritePrecedesContext(
+            importedCall.call,
+            scope.contextStart,
+            "deletePlayerActiveQuestSync",
+            "single/finish",
+            ["handleScoreAttackEventFinish", "deletePlayerActiveQuestSync"],
+            "single-active-quest-finalization",
+            importedCall.checker,
+        )
+    }
+
+    assert.doesNotThrow(() => assertEvidence(source))
+    assert.throws(
+        () => assertEvidence(source.replace(
+            "scoreAttackFinishResult = isScoreAttackEvent",
+            "scoreAttackFinishResult = otherCondition",
+        )),
+        /condition must be isScoreAttackEvent/i,
+    )
+    assert.throws(
+        () => assertEvidence(source.replace(
+            "deletePlayerActiveQuestSync(pid)",
+            "deletePlayerActiveQuestSync?.(pid)",
+        )),
+        /delete dependency must synchronously forward/i,
+    )
+    assert.throws(
+        () => assertScoreAttackHandlerDeleteContractInSource(`
+            export function handleScoreAttackEventFinish(input, dependencies) {
+                if (otherCondition) {
+                    return dependencies.transaction(() => {
+                        dependencies.deleteActiveQuest(input.playerId)
+                        return {}
+                    })
+                }
+                return {}
+            }
+        `, "synthetic-score-attack-handler.ts"),
+        /only top-level unconditional return/i,
     )
 })
 

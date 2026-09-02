@@ -1,7 +1,6 @@
 import { getDb } from "../data/db";
 import { getPlayerCharacterSync, insertPlayerCharacterSync } from "../data/domains/character"
 import type { PlayerCharacter } from "../data/types"
-import { givePlayerItemSync, givePlayerItemWithinTransactionSync } from "../data/domains/item"
 import { getCharacterDataSync } from "./assets";
 import { getRealNow } from "../runtime/time/game-time";
 import { GivePlayerCharacterResult } from "./types";
@@ -10,7 +9,10 @@ import {
     grantCharacterExp,
     grantCharacterExpWithinTransactionSync,
 } from "./character-growth/commands/grant-character-exp"
-import { grantCharacterStackWithinTransactionSync } from "./character-growth/commands/grant-character-stack"
+import {
+    grantCharacterStackWithinTransactionSync,
+    type CharacterStackCompensationGrant,
+} from "./character-growth/commands/grant-character-stack"
 import {
     characterGrowthProjectionStateFromPlayerCharacter,
     projectCharacterGrowthEntry,
@@ -24,10 +26,10 @@ export { characterExpCaps } from "./character-growth/exp-caps";
  * @param characterId The ID of the character to give.
  * @returns An items list, indicating what, if any, items were given to the player.
  */
-function givePlayerCharacterWithItemWriterSync(
+function givePlayerCharacterInCurrentScopeSync(
     playerId: number,
     characterId: number,
-    giveItem: typeof givePlayerItemSync,
+    grantCompensation?: CharacterStackCompensationGrant,
 ): GivePlayerCharacterResult | null {
 
     // get the character's asset data
@@ -95,7 +97,7 @@ function givePlayerCharacterWithItemWriterSync(
         // responsibility for creating first-time ownership only.
         const grant = () => grantCharacterStackWithinTransactionSync(
             { playerId, characterId },
-            giveItem as typeof givePlayerItemWithinTransactionSync,
+            grantCompensation,
             playerCharacter,
         )
         return getDb().inTransaction ? grant() : getDb().transaction(grant)()
@@ -106,21 +108,21 @@ export function givePlayerCharacterSync(
     playerId: number,
     characterId: number,
 ): GivePlayerCharacterResult | null {
-    return givePlayerCharacterWithItemWriterSync(playerId, characterId, givePlayerItemSync)
+    return givePlayerCharacterInCurrentScopeSync(playerId, characterId)
 }
 
 export function givePlayerCharacterWithinTransactionSync(
     playerId: number,
     characterId: number,
-    giveItem: typeof givePlayerItemWithinTransactionSync = givePlayerItemWithinTransactionSync,
+    grantCompensation?: CharacterStackCompensationGrant,
 ): GivePlayerCharacterResult | null {
     if (!getDb().inTransaction) {
         throw new Error("givePlayerCharacterWithinTransactionSync requires an active caller transaction")
     }
-    return givePlayerCharacterWithItemWriterSync(
+    return givePlayerCharacterInCurrentScopeSync(
         playerId,
         characterId,
-        giveItem,
+        grantCompensation,
     )
 }
 

@@ -202,6 +202,9 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
         "src/lib/quest/finish/single-response-projector.ts",
     )
     const singleBattleSource = readProjectSource("src/lib/quest/finish/single-settlement-writes.ts")
+    const singleGrowthPublicationSource = readProjectSource(
+        "src/lib/quest/finish/single-growth-publication.ts",
+    )
     const singleAwakeWrapperSource = readProjectSource("src/lib/mission/awake-best-effort-context.ts")
     const storySource = readRouteSource("storyQuest.ts")
     const bondSource = readRouteSource("character/bond.ts")
@@ -223,9 +226,18 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
 
     assert.match(
         singleBattleSource,
-        /import \{ reconcileAwakeUnlockCharacterList \} from ["']\.\.\/\.\.\/character-growth\/owner-publication["']/,
+        /from ["']\.\/single-growth-publication["']/,
     )
-    assert.equal(countOccurrences(singleBattleSource, "reconcileAwakeUnlockCharacterList("), 1)
+    assert.equal(countOccurrences(singleBattleSource, "prepareSingleGrowthPublication("), 1)
+    assert.equal(countOccurrences(singleBattleSource, "publishPreparedSingleGrowthPublication("), 1)
+    assert.match(
+        singleGrowthPublicationSource,
+        /from ["']\.\.\/\.\.\/character-growth\/owner-publication["']/,
+    )
+    assert.equal(
+        countOccurrences(singleGrowthPublicationSource, "reconcileAwakeUnlockCharacterList("),
+        1,
+    )
     assert.equal(countOccurrences(singleAwakeWrapperSource, "reconcileAwakeUnlockCharacterList("), 1)
     assert.match(
         singleAwakeWrapperSource,
@@ -237,18 +249,18 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
         assert.equal(source.includes("reconcileAwakeUnlockCharacterList"), true)
     }
 
-    const singleBattleCall = singleBattleSource.lastIndexOf("reconcileAwakeUnlockCharacterList(")
+    const singleBattleCall = singleBattleSource.lastIndexOf("publishPreparedSingleGrowthPublication(")
     assert.equal(singleBattleCall > singleBattleSource.indexOf("recordMissionBattleFacts(finishCtx, settlementTime)"), true)
     assert.equal(singleBattleCall > singleBattleSource.indexOf("givePlayerCharactersExpSync("), true)
     assert.equal(singleBattleCall > singleBattleSource.indexOf("handleRushEventFinish("), true)
     assert.equal(singleBattleCall > singleBattleSource.indexOf("handleCarnivalEventFinish({"), true)
     const singleBattlePublicationPreparation = singleBattleSource.lastIndexOf(
-        "prepareSingleAwakePublication({",
+        "prepareSingleGrowthPublication({",
         singleBattleCall,
     )
     const singleBattleMergeBlock = singleBattleSource.slice(
         singleBattlePublicationPreparation,
-        singleBattleSource.indexOf("\n\n    return", singleBattleCall),
+        singleBattleCall,
     )
     for (const existingSegment of [
         "rewardCharacterExpResult.character_list",

@@ -680,6 +680,51 @@ test("duplicate character compensation reports final item inventory post-state",
     assert.equal(getPlayerItemSync(playerId, DUPLICATE_CHARACTER_ITEM_ID), 2)
 })
 
+test("transaction owner coalesces a direct Item reward with duplicate compensation", () => {
+    const playerId = createPlayer("mixed-duplicate-compensation")
+    const before = playerState(playerId)
+    const plan = createRewardGrantPlan([
+        {
+            source: "direct-item",
+            reward: { type: RewardType.ITEM, id: DUPLICATE_CHARACTER_ITEM_ID, count: 3 },
+        },
+        {
+            source: "duplicate-character",
+            reward: { type: RewardType.CHARACTER, id: DUPLICATE_CHARACTER_ID },
+        },
+    ])
+    let measured
+    database.transaction(() => {
+        measured = captureSql(() => executeRewardGrantPlanInTransactionOwnerSync(
+            playerId,
+            plan,
+            before,
+        ))
+    })()
+
+    assert.equal(measured.result.entries[0].result.items[DUPLICATE_CHARACTER_ITEM_ID], 3)
+    assert.equal(measured.result.entries[1].result.items[DUPLICATE_CHARACTER_ITEM_ID], 4)
+    assert.equal(measured.result.aggregate.items[DUPLICATE_CHARACTER_ITEM_ID], 4)
+    assert.equal(getPlayerItemSync(playerId, DUPLICATE_CHARACTER_ITEM_ID), 4)
+    assert.equal(database.prepare(`
+        SELECT total_obtained
+        FROM players_collected_items
+        WHERE player_id = ? AND item_id = ?
+    `).get(playerId, DUPLICATE_CHARACTER_ITEM_ID).total_obtained, 4)
+    assert.equal(
+        measured.statements.filter(sql => /SELECT[\s\S]*FROM\s+players_items/i.test(sql)).length,
+        1,
+    )
+    assert.equal(
+        measured.statements.filter(sql => /INSERT INTO players_items/i.test(sql)).length,
+        1,
+    )
+    assert.equal(
+        measured.statements.filter(sql => /INSERT INTO players_collected_items/i.test(sql)).length,
+        1,
+    )
+})
+
 test("internal owner result retains compensation delta outside the public barrel", () => {
     const playerId = createPlayer("internal-character-detail")
     const before = playerState(playerId)

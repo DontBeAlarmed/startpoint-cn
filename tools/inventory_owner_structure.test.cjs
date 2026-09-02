@@ -76,6 +76,7 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
     const reviewedMigrations = [
         "src/lib/character-growth/commands/awake-mana-nodes.ts",
         "src/lib/character-growth/commands/bulk-stack-to-exp.ts",
+        "src/lib/character-growth/commands/grant-character-stack.ts",
         "src/lib/character-growth/commands/learn-mana-nodes.ts",
         "src/lib/character-growth/commands/over-limit.ts",
         "src/lib/character-growth/commands/stack-to-exp.ts",
@@ -87,6 +88,11 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         const contents = fs.readFileSync(path.join(projectRoot, relativePath), "utf8")
         assert.doesNotMatch(contents, /data\/domains\/item/, relativePath)
     }
+    assert.doesNotMatch(
+        fs.readFileSync(path.join(projectRoot, "src/lib/character.ts"), "utf8"),
+        /data\/domains\/item/,
+        "src/lib/character.ts",
+    )
 
     const legacy = fs.readFileSync(path.join(projectRoot, "src/data/domains/item.ts"), "utf8")
     assert.match(legacy, /export function givePlayerItemSync/)

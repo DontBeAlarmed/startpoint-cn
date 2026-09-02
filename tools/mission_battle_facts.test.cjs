@@ -195,6 +195,10 @@ const singleMissionPublicationSource = fs.readFileSync(
     path.join(__dirname, "../src/lib/quest/finish/single-mission-publication.ts"),
     "utf8",
 )
+const singleGrowthPublicationSource = fs.readFileSync(
+    path.join(__dirname, "../src/lib/quest/finish/single-growth-publication.ts"),
+    "utf8",
+)
 const singleTransactionStart = singleBattleSource.indexOf("export function executeSingleSettlementWrites(")
 const singleEvaluationTime = singleBattleSource.indexOf(
     "const settlementTime = new Date(getServerTime() * 1000)",
@@ -208,9 +212,12 @@ const singleCharacterExp = singleBattleSource.indexOf(
     "givePlayerCharactersExpSync(",
     singleFactCall,
 )
-const singleMissionEvaluationCall = singleBattleSource.indexOf(
-    "settleSingleMissionEvaluations({",
+const singleGrowthPreparation = singleBattleSource.indexOf(
+    "prepareSingleGrowthPublication({",
     singleCharacterExp,
+)
+const singleMissionEvaluationCall = singleGrowthPublicationSource.indexOf(
+    "settleSingleMissionEvaluations({",
 )
 const singleSettlementTime = singleMissionPublicationSource.indexOf(
     "settleMissionCategoriesWithEvaluation(",
@@ -220,11 +227,11 @@ const singleAwakeSettlement = singleMissionPublicationSource.indexOf(
     singleSettlementTime,
 )
 const singleAwakeFinalization = singleBattleSource.indexOf(
-    "finalizeSingleAwakePublicationWrites(playerId, isScoreAttackEvent)",
-    singleMissionEvaluationCall,
+    "deletePlayerActiveQuestSync(playerId)",
+    singleGrowthPreparation,
 )
 const singleAwakePublication = singleBattleSource.indexOf(
-    "publishCharacterGrowthOwnerStateBestEffort(",
+    "publishPreparedSingleGrowthPublication({",
     singleAwakeFinalization,
 )
 const singleGeneralMerge = singleProjectorSource.indexOf(
@@ -248,17 +255,23 @@ const singleWritesBinding = singleOrchestratorSource.indexOf(
 assert.equal(singleEvaluationTime > singleTransactionStart, true, "单人 finish 必须在事务体内固定任务时间")
 assert.equal(singleFactCall > singleEvaluationTime, true, "单人任务事实必须使用事务时间")
 assert.equal(singleCharacterExp > singleFactCall, true, "单人角色经验必须在任务事实后写入")
-assert.equal(singleMissionEvaluationCall > singleCharacterExp, true, "单人称号结算必须看到本场角色经验")
+assert.equal(singleGrowthPreparation > singleCharacterExp, true, "单人称号结算必须看到本场角色经验")
+assert.equal(singleMissionEvaluationCall >= 0, true, "单人成长发布适配器必须调用任务结算")
 assert.equal(singleSettlementTime >= 0, true, "单人 finish 必须调用通用任务结算")
 assert.equal(singleAwakeSettlement >= 0, true, "单人 finish 必须把本场 facts 传入觉醒 seam")
 assert.equal(singleAwakeSettlement > singleSettlementTime, true, "单人觉醒 seam 必须位于通用结算之后")
-assert.equal(singleAwakeFinalization > singleMissionEvaluationCall, true, "单人 finish 必须在任务结算后清理 active quest")
+assert.equal(singleAwakeFinalization > singleGrowthPreparation, true, "单人 finish 必须在任务结算后清理 active quest")
 assert.equal(singleAwakePublication > singleAwakeFinalization, true, "单人 character_list 必须在 active quest 清理后发布")
 assert.equal(singleGeneralMerge >= 0 && singleAwakeMerge > singleGeneralMerge, true, "单人响应必须先合并通用结算再合并觉醒结算")
 assert.match(
     singleBattleSource,
-    /publishCharacterGrowthOwnerStateBestEffort\(\s*playerId,\s*partyCharacterIds,[\s\S]*?awakePublication\.characterLists/,
-    "单人 character_list 必须在 reconcile 前包含觉醒奖励与解锁更新",
+    /prepareSingleGrowthPublication\(\{[\s\S]*?directAwakeMissionIds: missionBattleFacts\.awakeMissionIds[\s\S]*?\}\)/,
+    "单人成长发布准备必须包含本场觉醒任务事实",
+)
+assert.match(
+    singleBattleSource,
+    /publishPreparedSingleGrowthPublication\(\{[\s\S]*?publication: preparedGrowthPublication\.publication[\s\S]*?\}\)/,
+    "单人 character_list 必须发布已准备的成长状态",
 )
 assert.match(
     singleBattleSource,

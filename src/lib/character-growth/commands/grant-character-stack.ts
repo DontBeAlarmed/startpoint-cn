@@ -1,11 +1,8 @@
 import { getDb } from "../../../data/db"
 import { getPlayerCharacterSync } from "../../../data/domains/character"
-import {
-    givePlayerItemSync,
-    givePlayerItemWithinTransactionSync,
-} from "../../../data/domains/item"
 import type { PlayerCharacter } from "../../../data/types"
 import { getCharacterDataSync } from "../../assets"
+import { withInventoryBatchContextWithinTransactionSync } from "../../inventory"
 import type { Element, GivePlayerCharacterResult } from "../../types"
 import { addSafeInteger, assertInsideTransaction, updateCharacterGrowthRowsSync, validateGrowthCommandIds } from "../mutation-support"
 import {
@@ -25,10 +22,16 @@ export interface GrantCharacterStackCommand {
     readonly characterId: number
 }
 
+export type CharacterStackCompensationGrant = (
+    playerId: number,
+    itemId: number,
+    amount: number,
+) => void
+
 /** Adds one duplicate-character stack; new ownership remains the character domain's job. */
 export function grantCharacterStackWithinTransactionSync(
     command: GrantCharacterStackCommand,
-    giveItem: typeof givePlayerItemWithinTransactionSync = givePlayerItemWithinTransactionSync,
+    grantCompensation?: CharacterStackCompensationGrant,
     knownCharacter?: PlayerCharacter,
 ): GivePlayerCharacterResult | null {
     assertInsideTransaction()
@@ -38,31 +41,44 @@ export function grantCharacterStackWithinTransactionSync(
     const asset = getCharacterDataSync(command.characterId)
     if (asset === null) return null
     const itemId = duplicateItemByRarityAndElement[asset.rarity]?.[asset.element as Element]
-    if (itemId !== undefined) giveItem(command.playerId, itemId, 1)
     const stack = addSafeInteger(character.stack, 1, "character.stack")
-    const updateTime = updateCharacterGrowthRowsSync(command.playerId, [{
-        characterId: command.characterId,
-        stack,
-    }])
-    if (updateTime === null) throw new Error("character stack update did not write")
-    const afterCharacter: PlayerCharacter = { ...character, stack, updateTime }
-    return {
-        isNew: false,
-        character: projectCharacterGrowthEntry({
+
+    const updateStack = (): GivePlayerCharacterResult => {
+        const updateTime = updateCharacterGrowthRowsSync(command.playerId, [{
             characterId: command.characterId,
-            character: afterCharacter,
-            state: characterGrowthProjectionStateFromPlayerCharacter(command.characterId, afterCharacter),
-            fields: STACK_CHARACTER_GROWTH_FIELDS,
-        }),
-        ...(itemId === undefined ? {} : { item: { id: itemId, count: 1 } }),
+            stack,
+        }])
+        if (updateTime === null) throw new Error("character stack update did not write")
+        const afterCharacter: PlayerCharacter = { ...character, stack, updateTime }
+        return {
+            isNew: false,
+            character: projectCharacterGrowthEntry({
+                characterId: command.characterId,
+                character: afterCharacter,
+                state: characterGrowthProjectionStateFromPlayerCharacter(command.characterId, afterCharacter),
+                fields: STACK_CHARACTER_GROWTH_FIELDS,
+            }),
+            ...(itemId === undefined ? {} : { item: { id: itemId, count: 1 } }),
+        }
     }
+
+    if (itemId === undefined) return updateStack()
+    if (grantCompensation !== undefined) {
+        grantCompensation(command.playerId, itemId, 1)
+        return updateStack()
+    }
+    return withInventoryBatchContextWithinTransactionSync({
+        playerId: command.playerId,
+        preloadItemIds: [itemId],
+    }, inventory => {
+        inventory.grant(itemId, 1)
+        inventory.flush()
+        return updateStack()
+    })
 }
 
 export function grantCharacterStack(command: GrantCharacterStackCommand): GivePlayerCharacterResult | null {
-    return getDb().transaction(() => grantCharacterStackWithinTransactionSync(
-        command,
-        (playerId, itemId, amount) => givePlayerItemSync(playerId, itemId, amount),
-    ))()
+    return getDb().transaction(() => grantCharacterStackWithinTransactionSync(command))()
 }
 
 export const executeGrantCharacterStack = grantCharacterStack

@@ -453,6 +453,7 @@ test("a later owner reward failure rolls the real settlement state chain back", 
 test("single settlement migrates score while preserving multiplayer, Carnival and Mission boundaries", () => {
     const adapter = readSource("src/lib/quest/finish/single-settlement-reward-grant.ts")
     const writes = readSource("src/lib/quest/finish/single-settlement-writes.ts")
+    const growthPublication = readSource("src/lib/quest/finish/single-growth-publication.ts")
     const missionPublication = readSource("src/lib/quest/finish/single-mission-publication.ts")
     const responseState = readSource("src/lib/quest/finish/single-settlement-response-state.ts")
 
@@ -479,7 +480,8 @@ test("single settlement migrates score while preserving multiplayer, Carnival an
 
     assert.doesNotMatch(writes, /\bgivePlayerScoreRewardsSync\s*\(/)
     assert.match(writes, /\bgrantCarnivalRewards\s*\(/)
-    assert.match(writes, /\bsettleSingleMissionEvaluations\s*\(/)
+    assert.match(writes, /\bprepareSingleGrowthPublication\s*\(/)
+    assert.match(growthPublication, /\bsettleSingleMissionEvaluations\s*\(/)
     assert.match(missionPublication, /\bsettleMissionCategoriesWithEvaluation\s*\(/)
     assert.match(missionPublication, /\bsettleAwakeMissionCandidatesWithEvaluation\s*\(/)
     assert.match(missionPublication, /input\.rewardDependencies/)

@@ -114,6 +114,11 @@ test("duplicate character reward returns final absolute stack and rolls back wit
         const first = rewardStack.grantCharacterStack({ playerId, characterId: 341003 })
         assert.equal(first.character.stack, 5)
         assert.equal(fixture.item(playerId, 14010), 1)
+        assert.equal(fixture.db.prepare(`
+            SELECT total_obtained
+            FROM players_collected_items
+            WHERE player_id = ? AND item_id = 14010
+        `).get(playerId).total_obtained, 1)
 
         fixture.db.exec(`
             CREATE TRIGGER reject_stack_growth
@@ -124,6 +129,11 @@ test("duplicate character reward returns final absolute stack and rolls back wit
         assert.throws(() => rewardStack.grantCharacterStack({ playerId, characterId: 341003 }))
         assert.equal(fixture.addCharacter(playerId, 341003).stack, 5)
         assert.equal(fixture.item(playerId, 14010), 1)
+        assert.equal(fixture.db.prepare(`
+            SELECT total_obtained
+            FROM players_collected_items
+            WHERE player_id = ? AND item_id = 14010
+        `).get(playerId).total_obtained, 1)
     } finally {
         fixture.cleanup()
     }
