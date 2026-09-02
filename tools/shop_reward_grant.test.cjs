@@ -208,7 +208,7 @@ test("cost-only shop purchase flushes the shared Inventory context", () => {
     assert.deepEqual(result.rewardResult.items, {})
 })
 
-test("owner adapter preserves source order and has no nested transaction SQL", () => {
+test("owner adapter preserves reward order and has no nested transaction SQL", () => {
     const plan = createShopRewardPlan([
         { type: RewardType.ITEM, id: REWARD_ITEM_ID, count: 2 },
         { type: RewardType.MANA, count: 4 },
@@ -217,13 +217,13 @@ test("owner adapter preserves source order and has no nested transaction SQL", (
         { type: RewardType.AETHER, id: AETHER_ITEM_ID, count: 7 },
         { type: RewardType.BEADS, count: 8 },
     ])
-    assert.deepEqual(plan.entries.map(entry => entry.source), [
-        { rewardIndex: 0 },
-        { rewardIndex: 1 },
-        { rewardIndex: 2 },
-        { rewardIndex: 3 },
-        { rewardIndex: 4 },
-        { rewardIndex: 5 },
+    assert.deepEqual(plan.entries, [
+        { type: RewardType.ITEM, id: REWARD_ITEM_ID, count: 2 },
+        { type: RewardType.MANA, count: 4 },
+        { type: RewardType.EXP, count: 5 },
+        { type: RewardType.ELEMENT, id: ELEMENT_ITEM_ID, count: 6 },
+        { type: RewardType.AETHER, id: AETHER_ITEM_ID, count: 7 },
+        { type: RewardType.BEADS, count: 8 },
     ])
 
     const playerId = createPlayer("adapter")
@@ -274,6 +274,37 @@ test("owner adapter preserves source order and has no nested transaction SQL", (
         "RewardGrant reuses the owner-bound player snapshot",
     )
     assert.equal(measured.statements.some(statement => /^\s*(?:BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)\b/i.test(statement)), false)
+})
+
+test("owner adapter rejects another player's snapshot and rolls shared Inventory back", () => {
+    const playerId = createPlayer("identity-target")
+    const otherPlayerId = createPlayer("identity-other")
+    grantInventoryFixtureItemSync(playerId, COST_ITEM_ID, 10)
+    updatePlayerSync({ id: otherPlayerId, freeMana: 900 })
+    const playerBefore = getPlayerSync(playerId)
+    const otherPlayer = getPlayerSync(otherPlayerId)
+
+    assert.throws(
+        database.transaction(() => withDeferredInventoryBatchContextWithinTransactionSync({
+            playerId,
+            preloadItemIds: [COST_ITEM_ID, REWARD_ITEM_ID],
+            playerExistence: "caller-verified",
+        }, inventory => {
+            inventory.deduct(COST_ITEM_ID, 1)
+            return grantShopRewardsInTransactionOwnerWithInventorySync(
+                playerId,
+                [{ type: RewardType.ITEM, id: REWARD_ITEM_ID, count: 2 }],
+                otherPlayer,
+                inventory,
+            )
+        })),
+        /Invalid RewardGrant contract at entry -1: playerId/,
+    )
+
+    assert.equal(getPlayerItemSync(playerId, COST_ITEM_ID), 10)
+    assert.equal(getPlayerItemSync(playerId, REWARD_ITEM_ID), null)
+    assert.deepEqual(getPlayerSync(playerId), playerBefore)
+    assert.equal(getPlayerSync(otherPlayerId).freeMana, otherPlayer.freeMana)
 })
 
 test("bulk shop rewards cannot pay its costs and final duplicate item equals database", () => {
@@ -404,7 +435,7 @@ test("invalid reward rolls the shop cost back before purchase counts", () => {
         shopItem: shopItem([{ type: ShopItemRewardType.ITEM, id: REWARD_ITEM_ID, count: 0 }]),
         nowMs: NOW_MS,
         enforcePeriod: true,
-    }, dependencies()), /Invalid reward grant entry/)
+    }, dependencies()), /Invalid RewardGrant contract at entry 0: count/)
 
     assert.equal(getPlayerItemSync(playerId, COST_ITEM_ID), 10)
     assert.equal(getPlayerItemSync(playerId, REWARD_ITEM_ID), null)
@@ -427,7 +458,7 @@ test("unknown character rolls the shop cost and reward back", () => {
         shopItem: shopItem([{ type: ShopItemRewardType.CHARACTER, id: 999999999 }]),
         nowMs: NOW_MS,
         enforcePeriod: true,
-    }, dependencies()), /unknown character/)
+    }, dependencies()), /RewardGrant entry 0 failed: unknown Character 999999999/)
 
     assert.equal(getPlayerItemSync(playerId, COST_ITEM_ID), 10)
     assert.equal(getPlayerSync(playerId).freeMana, before.freeMana)

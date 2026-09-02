@@ -5,15 +5,13 @@ import {
 } from "../data/domains/mail"
 import { updatePlayerSync } from "../data/domains/player"
 import type { Player } from "../data/types"
-import { createRewardGrantPlan } from "./reward-grant"
-import type { RewardGrantPlan, RewardGrantReward } from "./reward-grant"
-import { executeRewardGrantPlanInTransactionOwnerSync } from "./reward-grant/owner-executor"
+import {
+    createRewardGrantExecutionPlan,
+    executeRewardGrantExecutionPlanAsTransactionOwnerSync,
+    type RewardGrantCommand,
+    type RewardGrantExecutionPlan,
+} from "./reward-grant"
 import { RewardType } from "./types/rewards"
-
-export interface MailRewardSource {
-    readonly mailId: number
-    readonly attachmentIndex: number
-}
 
 export interface MailRewardSettlement {
     readonly characterList: Record<string, unknown>[]
@@ -86,7 +84,7 @@ function validateMailReward(mail: RawPlayerMail): void {
     }
 }
 
-function standardReward(mail: RawPlayerMail): RewardGrantReward | null {
+function standardReward(mail: RawPlayerMail): RewardGrantCommand | null {
     switch (mail.type) {
         case MailType.ITEM:
             return { type: RewardType.ITEM, id: requireMailTypeId(mail), count: mail.number }
@@ -107,21 +105,18 @@ function standardReward(mail: RawPlayerMail): RewardGrantReward | null {
 
 export function createMailRewardPlan(
     mails: readonly RawPlayerMail[],
-): RewardGrantPlan<MailRewardSource> {
-    const entries: Array<{ source: MailRewardSource, reward: RewardGrantReward }> = []
+): RewardGrantExecutionPlan {
+    const entries: RewardGrantCommand[] = []
     for (const mail of mails) {
         validateMailReward(mail)
         const reward = standardReward(mail)
         if (reward === null) continue
         const attachmentCount = mail.type === MailType.CHARACTER ? mail.number : 1
         for (let attachmentIndex = 0; attachmentIndex < attachmentCount; attachmentIndex++) {
-            entries.push({
-                source: { mailId: mail.id, attachmentIndex },
-                reward,
-            })
+            entries.push(reward)
         }
     }
-    return createRewardGrantPlan(entries)
+    return createRewardGrantExecutionPlan(entries)
 }
 
 function addDedicatedReward(
@@ -225,10 +220,15 @@ export function settleMailRewardsInTransactionOwnerSync(
 ): MailRewardSettlement {
     const plan = createMailRewardPlan(mails)
     const dedicated = settleDedicatedMailBalance(mails, knownPlayerBefore)
-    const grant = executeRewardGrantPlanInTransactionOwnerSync(
+    const grant = executeRewardGrantExecutionPlanAsTransactionOwnerSync(
         playerId,
         plan,
-        knownPlayerBefore,
+        {
+            playerId: knownPlayerBefore.id,
+            freeMana: knownPlayerBefore.freeMana,
+            freeVmoney: knownPlayerBefore.freeVmoney,
+            expPool: knownPlayerBefore.expPool,
+        },
     )
     if (Object.keys(dedicated.update).length > 0) {
         updatePlayerSync({ id: playerId, ...dedicated.update })
@@ -241,9 +241,16 @@ export function settleMailRewardsInTransactionOwnerSync(
         })
     }
     return {
-        characterList: grant.aggregate.character_list as Record<string, unknown>[],
-        equipmentList: grant.aggregate.equipment_list as Record<string, unknown>[],
-        itemList: grant.aggregate.items,
+        characterList: grant.assets.characters.map(entry => (
+            entry.after as Record<string, unknown>
+        )),
+        equipmentList: grant.assets.equipment.map(entry => (
+            entry.after as Record<string, unknown>
+        )),
+        itemList: Object.fromEntries(grant.assets.items.map(item => [
+            String(item.itemId),
+            item.afterAmount,
+        ])),
         userInfo: projectMailUserInfo(mails, grant.playerAfter, dedicated.balance),
     }
 }

@@ -25,7 +25,7 @@ function mail(id, type, typeId, number) {
     }
 }
 
-test("mail adapter maps only standard rewards and preserves source order", () => {
+test("mail adapter maps only standard rewards and preserves attachment order", () => {
     let createMailRewardPlan
     assert.doesNotThrow(() => {
         ({ createMailRewardPlan } = require("../src/lib/mail-reward-grant"))
@@ -42,17 +42,7 @@ test("mail adapter maps only standard rewards and preserves source order", () =>
         mail(17, MailType.STAR_CRUMB, null, 7),
     ])
 
-    assert.deepEqual(plan.entries.map(entry => entry.source), [
-        { mailId: 10, attachmentIndex: 0 },
-        { mailId: 12, attachmentIndex: 0 },
-        { mailId: 12, attachmentIndex: 1 },
-        { mailId: 12, attachmentIndex: 2 },
-        { mailId: 13, attachmentIndex: 0 },
-        { mailId: 14, attachmentIndex: 0 },
-        { mailId: 15, attachmentIndex: 0 },
-        { mailId: 16, attachmentIndex: 0 },
-    ])
-    assert.deepEqual(plan.entries.map(entry => entry.reward), [
+    assert.deepEqual(plan.entries, [
         { type: RewardType.ITEM, id: 30005, count: 2 },
         { type: RewardType.CHARACTER, id: 1 },
         { type: RewardType.CHARACTER, id: 1 },

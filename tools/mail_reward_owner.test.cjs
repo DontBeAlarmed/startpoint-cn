@@ -19,7 +19,7 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerCharactersSync } = require("../src/data/domains/character")
 const { getPlayerItemSync } = require("../src/data/domains/item")
 const { MailType } = require("../src/data/domains/mail")
-const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
+const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 
 const CHARACTER_ID = 1
@@ -199,4 +199,31 @@ test("batch mail owner callback uses one snapshot and projects final mixed state
     for (const field of ["source", "mailId", "attachmentIndex", "isNew", "itemDeltas", "joined_character_id_list"]) {
         assert.equal(serialized.includes(`\"${field}\"`), false, serialized)
     }
+})
+
+test("mail owner rejects a snapshot from another player before rewards or history", () => {
+    const { settleMailRewardsInTransactionOwnerSync } = require("../src/lib/mail-reward-grant")
+    const playerId = createPlayer("identity-target")
+    const otherPlayerId = createPlayer("identity-other")
+    updatePlayerSync({ id: otherPlayerId, vmoney: 900 })
+    const playerBefore = getPlayerSync(playerId)
+    const otherPlayer = getPlayerSync(otherPlayerId)
+    const itemBefore = getPlayerItemSync(playerId, ITEM_ID)
+
+    assert.throws(
+        database.transaction(() => settleMailRewardsInTransactionOwnerSync(
+            playerId,
+            [
+                mail(30, MailType.PAID_VMONEY, null, 7),
+                mail(31, MailType.ITEM, ITEM_ID, 2),
+            ],
+            otherPlayer,
+        )),
+        /Invalid RewardGrant contract at entry -1: playerId/,
+    )
+
+    assert.deepEqual(getPlayerSync(playerId), playerBefore)
+    assert.equal(getPlayerItemSync(playerId, ITEM_ID), itemBefore)
+    assert.equal(historyCount(playerId), 0)
+    assert.equal(getPlayerSync(otherPlayerId).vmoney, otherPlayer.vmoney)
 })

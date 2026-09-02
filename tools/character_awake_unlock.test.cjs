@@ -362,17 +362,35 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
             > genericShopPurchaseBlock.indexOf("dependencies.grantRewards("),
         true
     )
+    assert.equal(
+        genericShopPurchaseBlock.indexOf("dependencies.grantPassCardPoints(")
+            > genericShopPurchaseBlock.indexOf("dependencies.grantRewards("),
+        true
+    )
+    assert.equal(
+        genericShopPurchaseBlock.indexOf("dependencies.recordManaSpent(")
+            > genericShopPurchaseBlock.indexOf("dependencies.grantRewards("),
+        true
+    )
     assert.deepEqual(
         findPropertyAssignmentValues(shopBuyBlock, "grantRewards"),
         ["grantShopRewardsInTransactionOwnerWithInventorySync"]
     )
-    assert.deepEqual(
-        getOnlyCall(
-            shopRewardGrantSource,
-            "executeRewardGrantPlanInTransactionOwnerWithInventorySync"
-        ).arguments.slice(0, 4),
-        ["playerId", "createShopRewardPlan(rewards)", "knownPlayerBefore", "inventory"]
+    const createShopPlanCall = getOnlyCall(shopRewardGrantSource, "createShopRewardPlan")
+    const typedShopGrantCall = getOnlyCall(
+        shopRewardGrantSource,
+        "withRewardGrantExecutionPlanAsTransactionOwnerWithInventorySync"
     )
+    assert.equal(createShopPlanCall.position < typedShopGrantCall.position, true)
+    assert.deepEqual(typedShopGrantCall.arguments.slice(0, 2), ["playerId", "plan"])
+    assert.match(typedShopGrantCall.arguments[2], /playerId:\s*knownPlayerBefore\.id/)
+    assert.equal(typedShopGrantCall.arguments[3], "inventory")
+    const validateShopGrantCall = getOnlyCall(
+        shopRewardGrantSource,
+        "snapshotRewardGrantExecutionResultForPlan"
+    )
+    const finalizeShopGrantCall = getOnlyCall(shopRewardGrantSource, "finalize")
+    assert.equal(validateShopGrantCall.position < finalizeShopGrantCall.position, true)
     assert.equal(shopReadOnlyBlock.includes("reconcileAwakeUnlockCharacterList("), false)
     assert.equal(
         shopBulkBuyBlock.indexOf("reconcileAwakeUnlockCharacterList(")
