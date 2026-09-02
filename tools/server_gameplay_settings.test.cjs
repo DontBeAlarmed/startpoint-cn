@@ -236,13 +236,13 @@ test("quest score rewards use the persisted multiplier instead of DROP_MULTIPLIE
     updateServerGameplaySettingsSync({ dropMultiplier: 4 })
     process.env.DROP_MULTIPLIER = "99"
 
-    const result = givePlayerScoreRewardsSync(playerId, 7001, [{
+    const result = getDb().transaction(() => givePlayerScoreRewardsSync(playerId, 7001, [{
         name: "test mana",
         type: ScoreRewardType.ITEM,
         reward_type: RewardType.MANA,
         count: 3,
         field5: 0,
-    }])
+    }]))()
 
     assert.equal(result.drop_score_reward_ids[0].number, 12)
     assert.equal(result.user_info.free_mana, 12)

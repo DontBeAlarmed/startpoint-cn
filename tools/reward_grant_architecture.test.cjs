@@ -96,6 +96,11 @@ test("standalone execution normalizes before one transaction without calling wit
 
 test("transaction-owner execution is strongly named and adds no savepoint or player reads", () => {
     const executor = readSource("src/lib/reward-grant/owner-executor.ts")
+    const transactionAssertion = exportedFunctionSource(
+        executor,
+        "assertRewardGrantTransactionOwnerSync",
+        "export function executeRewardGrantPlanInTransactionOwnerInternalSync",
+    )
     const internalOwner = exportedFunctionSource(
         executor,
         "executeRewardGrantPlanInTransactionOwnerInternalSync",
@@ -107,13 +112,15 @@ test("transaction-owner execution is strongly named and adds no savepoint or pla
         null,
     )
 
-    assert.match(internalOwner, /(?:getDb\(\)|db)\.inTransaction/)
+    assert.match(transactionAssertion, /(?:getDb\(\)|db)\.inTransaction/)
+    assert.match(internalOwner, /assertRewardGrantTransactionOwnerSync\s*\(\)/)
     assert.match(internalOwner, /normalizeRewardGrantPlanInternal\s*\(/)
     assert.match(internalOwner, /knownPlayerBefore/)
     assert.doesNotMatch(internalOwner, /\.transaction\s*\(/)
     assert.doesNotMatch(internalOwner, /getPlayerSync\s*\(/)
     assert.ok(
-        internalOwner.indexOf("inTransaction") < internalOwner.indexOf("normalizeRewardGrantPlan"),
+        internalOwner.indexOf("assertRewardGrantTransactionOwnerSync")
+            < internalOwner.indexOf("normalizeRewardGrantPlan"),
         "transaction state must be checked before normalization",
     )
     assert.match(publicOwner, /projectPublicRewardGrantResult\s*\(/)
@@ -171,11 +178,13 @@ test("only approved standard reward domains and single settlement paths consume 
         "src/lib/quest/finish/single-settlement-reward-grant.ts",
         "src/lib/quest/finish/single-settlement-writes.ts",
         "src/lib/quest/finish/single-standard-reward-callbacks.ts",
+        "src/lib/quest/legacy-quest-reward-grant.ts",
         "src/lib/quest/score-reward-normalization.ts",
         "src/lib/quest/score-reward-projection.ts",
         "src/lib/quest/score-reward-selection-core.ts",
         "src/lib/quest/score-reward-selection.ts",
         "src/lib/quest/score-reward-settlement.ts",
+        "src/lib/quest.ts",
         "src/lib/scheduled-resource-settlement.ts",
         "src/lib/shop-reward-grant.ts",
         "src/routes/api/boxGacha.ts",

@@ -124,10 +124,19 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["src/lib/hot-path-log-formatters.ts"]),
         ["quick:gacha", "quick:quest"],
     )
-    assert.deepEqual(
-        selectTestGroups(["src/lib/quest.ts"]),
-        ["integration:rules", "quick:quest"],
-    )
+    for (const file of [
+        "src/lib/quest.ts",
+        "src/lib/quest/legacy-quest-reward-grant.ts",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), [
+            "integration:event",
+            "integration:party",
+            "integration:quest",
+            "integration:reward-grant",
+            "integration:rules",
+            "quick:quest",
+        ], file)
+    }
     for (const file of [
         "src/lib/event-shop-purchase.ts",
         "src/lib/shop-reward-grant.ts",
@@ -662,6 +671,7 @@ test("maps the public reward grant layer and its regressions to one focused leaf
         "tools/score_reward_selection_core.test.cjs",
         "tools/score_reward_selection.test.cjs",
         "tools/single_settlement_reward_grant.test.cjs",
+        "tools/legacy_quest_reward_grant.test.cjs",
         "tools/task23c_reward_grants.test.cjs",
             "tools/shop_reward_grant.test.cjs",
             "tools/mail_reward_grant.test.cjs",

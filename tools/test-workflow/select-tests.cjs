@@ -268,6 +268,10 @@ const SOURCE_RULES = [
         groups: ["integration:reward-grant"],
     },
     {
+        pattern: /^tools\/legacy_quest_reward_grant\.test\.cjs$/,
+        groups: ["integration:reward-grant"],
+    },
+    {
         pattern: /^(?:src\/lib\/quest\/finish\/(?:single-settlement-reward-grant|single-standard-reward-callbacks)\.ts|tools\/(?:single_settlement_reward_grant|task23c_reward_grants)\.test\.cjs)$/,
         groups: ["integration:reward-grant"],
     },
@@ -351,8 +355,15 @@ const SOURCE_RULES = [
         groups: ["quick:gacha"],
     },
     {
-        pattern: /^src\/lib\/quest\.ts$/,
-        groups: ["integration:rules", "quick:quest"],
+        pattern: /^(?:src\/lib\/quest\.ts|src\/lib\/quest\/legacy-quest-reward-grant\.ts)$/,
+        groups: [
+            "integration:event",
+            "integration:party",
+            "integration:quest",
+            "integration:reward-grant",
+            "integration:rules",
+            "quick:quest",
+        ],
     },
     {
         pattern: /^(?:src\/lib\/(?:event-shop-purchase|shop-reward-grant)\.ts|src\/lib\/economy\/free-first-deduction\.ts|src\/routes\/api\/shop\.ts)$/,

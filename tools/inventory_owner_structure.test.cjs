@@ -231,6 +231,24 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         /item-cap-plan|event-trade|mana-capacity|domains\/mail|getDb\(\)\.transaction|SAVEPOINT/,
     )
 
+    const legacyQuest = fs.readFileSync(path.join(projectRoot, "src/lib/quest.ts"), "utf8")
+    const legacyQuestAdapter = fs.readFileSync(
+        path.join(projectRoot, "src/lib/quest/legacy-quest-reward-grant.ts"),
+        "utf8",
+    )
+    assert.doesNotMatch(
+        legacyQuest,
+        /data\/domains\/(?:item|character)|\.\/character|\.\/equipment|\b(?:givePlayerItemSync|givePlayerCharacterSync|givePlayerEquipmentSync|updatePlayerSync)\b/,
+    )
+    assert.match(
+        legacyQuestAdapter,
+        /executeRewardGrantPlanInTransactionOwnerInternalSync\s*\(/,
+    )
+    assert.doesNotMatch(
+        legacyQuestAdapter,
+        /item-cap-plan|event-trade|mana-capacity|domains\/mail|getDb\(\)\.transaction|SAVEPOINT/,
+    )
+
     const legacy = fs.readFileSync(path.join(projectRoot, "src/data/domains/item.ts"), "utf8")
     assert.match(legacy, /export function givePlayerItemSync/)
     assert.match(legacy, /export function givePlayerItemWithinTransactionSync/)
@@ -257,8 +275,6 @@ test("remaining legacy Item mutation references match the staged migration manif
         // W6 primitive definition / maintenance.
         "src/data/domains/item.ts",
         "src/data/domains/player.ts",
-        // W5 legacy Quest rewards.
-        "src/lib/quest.ts",
         // W5 legacy periodic and Carnival reward writers.
         "src/lib/quest/finish/periodic-reward-handler.ts",
         "src/lib/quest/finish/single-settlement-writes.ts",

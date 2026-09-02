@@ -20,19 +20,40 @@ const rareGroupTrace = []
 const randomTrace = []
 let playerExists = true
 const rewardElementMap = require("../assets/reward_element_map.json")
-stubModule("../src/data/domains/character", { getPlayerCharacterSync: () => null })
 stubModule("../src/data/domains/player", {
     getPlayerSync: () => playerExists
-        ? ({ freeMana: 0, totalManaObtained: 0, expPool: 0 })
+        ? ({ freeMana: 0, freeVmoney: 0, totalManaObtained: 0, expPool: 0 })
         : null,
-    updatePlayerSync: values => writeTrace.push(["player", values]),
 })
-stubModule("../src/data/domains/item", {
-    givePlayerItemSync(_playerId, itemId, count) {
-        writeTrace.push(["item", itemId, count])
-        const total = (itemTotals.get(itemId) ?? 0) + count
-        itemTotals.set(itemId, total)
-        return total
+stubModule("../src/lib/reward-grant/owner-executor", {
+    executeRewardGrantPlanInTransactionOwnerInternalSync(_playerId, plan, knownPlayerBefore) {
+        const entries = plan.entries.map(entry => {
+            const rewardResult = {
+                user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
+                character_list: [],
+                joined_character_id_list: [],
+                equipment_list: [],
+                items: {},
+            }
+            if ([0, 6, 7].includes(entry.reward.type)) {
+                writeTrace.push(["item", entry.reward.id, entry.reward.count])
+                const total = (itemTotals.get(entry.reward.id) ?? 0) + entry.reward.count
+                itemTotals.set(entry.reward.id, total)
+                rewardResult.items[entry.reward.id] = total
+            }
+            return { ...entry, result: rewardResult }
+        })
+        return {
+            aggregate: {
+                user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
+                character_list: [],
+                joined_character_id_list: [],
+                equipment_list: [],
+                items: {},
+            },
+            entries,
+            playerAfter: { ...knownPlayerBefore },
+        }
     },
 })
 stubModule("../src/lib/assets", {
@@ -50,8 +71,6 @@ stubModule("../src/lib/assets", {
         ] : null
     },
 })
-stubModule("../src/lib/character", { givePlayerCharacterSync: () => null })
-stubModule("../src/lib/equipment", { givePlayerEquipmentSync: () => ({}) })
 stubModule("../src/lib/event-currency", { resolveEventCurrencyId: id => id })
 stubModule("../src/utils", {
     getDateFromServerTime: () => new Date("2024-08-14T12:00:00.000Z"),
