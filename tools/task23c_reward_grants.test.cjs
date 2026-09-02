@@ -105,7 +105,6 @@ test("Carnival standard callback preserves standard response, degree domain writ
         ],
     }], {
         getPlayer: getPlayerSync,
-        giveItem: givePlayerItemSync,
         giveEquipment: require("../src/lib/equipment").givePlayerEquipmentSync,
         giveDegree: require("../src/data/domains/degree").givePlayerDegreeSync,
         updatePlayer: updatePlayerSync,

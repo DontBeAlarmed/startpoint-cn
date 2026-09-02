@@ -250,6 +250,10 @@ const SOURCE_RULES = [
         ],
     },
     {
+        pattern: /^src\/lib\/quest\/finish\/periodic-reward-handler\.ts$/,
+        groups: ["integration:mission", "integration:party", "quick:quest"],
+    },
+    {
         pattern: /^src\/lib\/quest\/finish\/single-response-projector\.ts$/,
         groups: [
             "integration:compiled",

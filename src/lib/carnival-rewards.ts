@@ -43,7 +43,7 @@ interface CarnivalRewardDependencies {
         expPool: number
         totalManaObtained?: number
     } | null
-    giveItem: (playerId: number, itemId: number, amount: number) => number
+    giveItem?: (playerId: number, itemId: number, amount: number) => number
     giveEquipment: (playerId: number, equipmentId: number, amount: number) => Object
     giveDegree: (playerId: number, degreeId: number) => boolean
     updatePlayer: (player: {
@@ -138,7 +138,11 @@ export function grantCarnivalRewards(
             switch (reward.kind) {
                 case 0:
                     if (reward.id !== undefined) {
-                        result.item_list[String(reward.id)] = dependencies.giveItem(
+                        const giveItem = dependencies.giveItem
+                        if (giveItem === undefined) {
+                            throw new Error("Carnival legacy Item fallback requires giveItem")
+                        }
+                        result.item_list[String(reward.id)] = giveItem(
                             playerId,
                             reward.id,
                             reward.amount,

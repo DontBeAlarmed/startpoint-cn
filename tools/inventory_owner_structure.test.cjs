@@ -86,6 +86,7 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/lib/item-sell.ts",
         "src/lib/item-use-settlement.ts",
         "src/lib/quest/entry-item-inventory.ts",
+        "src/lib/quest/finish/periodic-reward-handler.ts",
         "src/lib/reward-grant/executor.ts",
         "src/lib/reward-grant/inventory-adapter.ts",
         "src/lib/reward-grant/owner-executor.ts",
@@ -214,6 +215,32 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         fs.readFileSync(path.join(projectRoot, "src/lib/quest/entry-lifecycle.ts"), "utf8"),
         /inventory\.restore\([\s\S]*inventory\.flush\(\)[\s\S]*itemList\[prepaidItem\.itemId\] = restored\.afterAmount/,
     )
+    const periodicRewardHandler = fs.readFileSync(
+        path.join(projectRoot, "src/lib/quest/finish/periodic-reward-handler.ts"),
+        "utf8",
+    )
+    assert.match(
+        periodicRewardHandler,
+        /consumePeriodicRewardPointSync\([\s\S]*remainingPoint === null[\s\S]*withInventoryBatchContextWithinTransactionSync\([\s\S]*inventory\.grant\([\s\S]*inventory\.flush\(\)[\s\S]*item\.afterAmount/,
+    )
+    assert.doesNotMatch(
+        periodicRewardHandler,
+        /item-cap-plan|event-trade|mana-capacity|domains\/mail|getDb\(\)\.transaction|SAVEPOINT/,
+    )
+    const singleSettlementWrites = fs.readFileSync(
+        path.join(projectRoot, "src/lib/quest/finish/single-settlement-writes.ts"),
+        "utf8",
+    )
+    assert.match(singleSettlementWrites, /getPlayerItemSync/)
+    assert.doesNotMatch(singleSettlementWrites, /\bgivePlayerItemSync\b/)
+    assert.match(
+        singleSettlementWrites,
+        /grantCarnivalRewards\([\s\S]*standardRewardGrant: standardRewardGrant\.forCarnival/,
+    )
+    assert.doesNotMatch(
+        singleSettlementWrites,
+        /grantCarnivalRewards\([\s\S]*giveItem:/,
+    )
     const missionRewardGranter = fs.readFileSync(
         path.join(projectRoot, "src/lib/mission/grants.ts"),
         "utf8",
@@ -275,9 +302,6 @@ test("remaining legacy Item mutation references match the staged migration manif
         // W6 primitive definition / maintenance.
         "src/data/domains/item.ts",
         "src/data/domains/player.ts",
-        // W5 legacy periodic and Carnival reward writers.
-        "src/lib/quest/finish/periodic-reward-handler.ts",
-        "src/lib/quest/finish/single-settlement-writes.ts",
         // W6 maintenance adapter.
         "src/routes/web_api/player.ts",
     ])

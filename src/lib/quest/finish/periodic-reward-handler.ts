@@ -4,8 +4,8 @@ import bundledPeriodicRewards from "../../../../assets/periodic_reward.json"
 import { getRuntimeContentTableSync } from "../../../content/runtime/table-access"
 import { consumePeriodicRewardPointSync } from "../../../data/domains/campaign"
 import { getPlayerPeriodicRewardPointsSync } from "../../../data/domains/campaign"
-import { givePlayerItemWithinTransactionSync } from "../../../data/domains/item"
 import { getDb } from "../../../data/db"
+import { withInventoryBatchContextWithinTransactionSync } from "../../inventory"
 import { QuestCategory } from "../../types"
 
 interface HardMultiEventDefinition {
@@ -122,14 +122,16 @@ export function settleActivityPeriodicRewardsSync(
     if (reward.kind !== 0) return emptySettlement()
     const remainingPoint = consumePeriodicRewardPointSync(input.playerId, pointId)
     if (remainingPoint === null) return emptySettlement()
-    const amount = givePlayerItemWithinTransactionSync(
-        input.playerId,
-        reward.itemId,
-        reward.count,
-    )
-    return {
-        dropPeriodicRewardIds: [{ group_id: groupId, index, number: reward.count }],
-        periodicRewardPointList: [{ id: pointId, point: remainingPoint }],
-        items: { [reward.itemId]: amount },
-    }
+    return withInventoryBatchContextWithinTransactionSync({
+        playerId: input.playerId,
+        playerExistence: "caller-verified",
+    }, inventory => {
+        const item = inventory.grant(reward.itemId, reward.count)
+        inventory.flush()
+        return {
+            dropPeriodicRewardIds: [{ group_id: groupId, index, number: reward.count }],
+            periodicRewardPointList: [{ id: pointId, point: remainingPoint }],
+            items: { [reward.itemId]: item.afterAmount },
+        }
+    })
 }

@@ -534,6 +534,10 @@ test("maps single finish settlement implementation and regression precisely", ()
         ],
     )
     assert.deepEqual(
+        selectTestGroups(["src/lib/quest/finish/periodic-reward-handler.ts"]),
+        ["integration:mission", "integration:party", "quick:quest"],
+    )
+    assert.deepEqual(
         selectTestGroups(["src/lib/quest/finish/single-settlement-response-state.ts"]),
         [
             "integration:compiled",

@@ -73,7 +73,10 @@ const {
     getPlayerSync,
     insertDefaultPlayerSync,
 } = require("../src/data/domains/player")
-const { getPlayerItemSync } = require("../src/data/domains/item")
+const {
+    getPlayerCollectedItemTotalSync,
+    getPlayerItemSync,
+} = require("../src/data/domains/item")
 const {
     settleActivityPeriodicRewardsSync,
 } = require("../src/lib/quest/finish/periodic-reward-handler")
@@ -168,6 +171,7 @@ function settlePeriodic(player, overrides = {}) {
 
 const normalPlayerId = createPlayer("periodic-normal")
 const normalBefore = getPlayerItemSync(normalPlayerId, 40405) ?? 0
+const normalCollectedBefore = getPlayerCollectedItemTotalSync(normalPlayerId, 40405)
 const normal = settlePeriodic(normalPlayerId)
 assert.deepEqual(normal, {
     dropPeriodicRewardIds: [{ group_id: 10000002, index: 1, number: 9 }],
@@ -175,6 +179,10 @@ assert.deepEqual(normal, {
     items: { 40405: normalBefore + 9 },
 })
 assert.equal(getPlayerItemSync(normalPlayerId, 40405), normalBefore + 9)
+assert.equal(
+    getPlayerCollectedItemTotalSync(normalPlayerId, 40405),
+    normalCollectedBefore + 9,
+)
 
 const finalPlayerId = createPlayer("periodic-final")
 const finalBefore = getPlayerItemSync(finalPlayerId, 40405) ?? 0
@@ -197,6 +205,7 @@ assert.deepEqual(settlePeriodic(exhaustedPlayerId, { random: () => {
 })
 assert.equal(exhaustedRandomCalls, 0, "次数耗尽时不得进入周期奖励抽选")
 assert.equal(getPlayerItemSync(exhaustedPlayerId, 40405), null)
+assert.equal(getPlayerCollectedItemTotalSync(exhaustedPlayerId, 40405), 0)
 
 for (const [label, overrides] of [
     ["failed", { questAccomplished: false }],
@@ -225,5 +234,6 @@ assert.throws(() => db.transaction(() => {
 })(), /rollback periodic settlement/)
 assert.equal(points(settlementRollbackPlayerId)[10000002], 2)
 assert.equal(getPlayerItemSync(settlementRollbackPlayerId, 40405), null)
+assert.equal(getPlayerCollectedItemTotalSync(settlementRollbackPlayerId, 40405), 0)
 
 console.log("periodic reward settlement tests passed")

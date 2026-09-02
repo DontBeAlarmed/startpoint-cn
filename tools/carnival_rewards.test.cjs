@@ -201,6 +201,30 @@ assert.deepEqual(grantResult, {
     new_degree_ids: [61000],
 })
 
+assert.deepEqual(carnivalRewards.grantCarnivalRewards(17, [{
+    ...grantDefinition,
+    rewards: [{ kind: 3, amount: 5 }],
+}], {
+    getPlayer: () => ({ freeVmoney: 10, freeMana: 20, expPool: 30, totalManaObtained: 40 }),
+    giveEquipment: () => { throw new Error("unexpected Equipment fallback") },
+    giveDegree: () => { throw new Error("unexpected Degree fallback") },
+    updatePlayer: () => {},
+}), {
+    user_info: { free_vmoney: 0, free_mana: 5, exp_pool: 0 },
+    item_list: {},
+    equipment_list: [],
+    new_degree_ids: [],
+})
+assert.throws(() => carnivalRewards.grantCarnivalRewards(17, [{
+    ...grantDefinition,
+    rewards: [{ kind: 0, id: 1, amount: 1 }],
+}], {
+    getPlayer: () => ({ freeVmoney: 10, freeMana: 20, expPool: 30, totalManaObtained: 40 }),
+    giveEquipment: () => { throw new Error("unexpected Equipment fallback") },
+    giveDegree: () => { throw new Error("unexpected Degree fallback") },
+    updatePlayer: () => {},
+}), /Carnival legacy Item fallback requires giveItem/)
+
 const db = new Database(":memory:")
 db.exec(`
     CREATE TABLE players_carnival_event_rewards (

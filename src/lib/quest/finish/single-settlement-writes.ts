@@ -1,7 +1,7 @@
 import { deletePlayerActiveQuestSync } from "../../../data/domains/quest_active"
 import { deletePlayerRushEventPlayedPartyListSync, getPlayerRushEventSync, insertPlayerRushEventClearedFolderSync, insertPlayerRushEventPlayedPartySync, updatePlayerRushEventSync } from "../../../data/domains/rushEvent"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
-import { getPlayerItemSync, givePlayerItemSync } from "../../../data/domains/item"
+import { getPlayerItemSync } from "../../../data/domains/item"
 import { getServerGameplaySettingsSync } from "../../../data/domains/server-settings"
 import { getRaidEventBossStateSync, incrementPlayerRaidEventQuestKillCountSync, upsertRaidEventBossStateSync } from "../../../data/domains/raidEvent"
 import { getPlayerSingleQuestProgressSync, insertPlayerQuestProgressSync, updatePlayerQuestProgressSync } from "../../../data/domains/quest"
@@ -233,7 +233,7 @@ export function executeSingleSettlementWrites(
         getRewardDefinitionsFn: eid => getCarnivalRewardDefinitions(eid),
         getClaimedRewardIdsFn: (pid, eid) => getPlayerClaimedCarnivalRewardIdsSync(pid, eid),
         grantRewardsFn: (pid, definitions) => grantCarnivalRewards(pid, definitions, {
-            getPlayer: getPlayerSync, giveItem: givePlayerItemSync,
+            getPlayer: getPlayerSync,
             giveEquipment: givePlayerEquipmentSync, giveDegree: givePlayerDegreeSync,
             updatePlayer: updatePlayerSync,
             standardRewardGrant: standardRewardGrant.forCarnival,
