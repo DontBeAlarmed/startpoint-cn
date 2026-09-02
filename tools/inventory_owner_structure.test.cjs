@@ -108,6 +108,7 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/lib/character-growth/commands/over-limit.ts",
         "src/lib/character-growth/commands/stack-to-exp.ts",
         "src/lib/event-shop-purchase.ts",
+        "src/lib/event-trade-expiry-settlement.ts",
         "src/lib/item-sell.ts",
         "src/lib/item-use-settlement.ts",
         "src/lib/quest/entry-item-inventory.ts",

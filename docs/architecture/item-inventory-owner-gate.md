@@ -1,6 +1,6 @@
 # D16 Item Inventory Owner 与 EventTrade 到期策略
 
-状态：设计已通过独立审查，生产实现尚未开始。本文描述 D16 的目标边界、行为保持合同和 D18 Mail 依赖；在实现与相应 Gate 验证完成前，不得把目标组件视为当前运行时事实。
+状态：设计已通过独立审查，C1–C4 已落地，D16 checkpoint 收尾待执行。本文描述 D16 的目标边界、已落地切片、行为保持合同和 D18 Mail 依赖；尚未完成 D16 验证前，不得把未落地目标组件视为当前运行时事实。
 
 ## 1. 背景
 
@@ -368,9 +368,9 @@ D16 测试只覆盖真实客户端入口、owner/事务不变量和真实旁路�
 ```text
 D16_BASE: b6fd6bbf182a51e2ba2556840873d054b6b1149f
 D16_DESIGN_STATUS: APPROVED
-D16_IMPLEMENTATION_STATUS: IN_PROGRESS (C3 W2 RewardGrant migrated; later writers pending)
+D16_IMPLEMENTATION_STATUS: IN_PROGRESS (C1-C4 landed; D16 checkpoint pending)
 ITEM_CAP_PRODUCTION_STATUS: FORBIDDEN_UNTIL_D18
 EVENT_TRADE_OVERFLOW_MAIL_STATUS: DEFERRED_TO_D18
 ```
 
-D16 设计和正常 writer 清单已经通过独立审查，可以进入实现。完成 D16 不表示 Item cap/overflow Mail 已上线；D18 完成 Mail owner 和领取容量合同后，才能把纯 `accepted/overflow` 与 EventTrade `overflowMana` 接入生产处置。
+D16 设计和正常 writer 清单已经通过独立审查；C1-C4 已进入当前生产实现，D16 checkpoint 验证与收尾仍待完成。完成 D16 不表示 Item cap/overflow Mail 已上线；D18 完成 Mail owner 和领取容量合同后，才能把纯 `accepted/overflow` 与 EventTrade `overflowMana` 接入生产处置。

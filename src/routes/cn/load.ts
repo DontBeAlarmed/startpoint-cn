@@ -53,6 +53,7 @@ import {
 import type { LoginBonusCatalog } from "../../content/converters/login-bonus";
 import { getGameTimeContext } from "../../runtime/time/game-time";
 import { settleScheduledResourcesSync } from "../../lib/scheduled-resource-settlement";
+import { settleEventTradeExpiryOnLoadSync } from "../../lib/event-trade-expiry-settlement";
 import { isGiftCodeEnabledSync } from "../../lib/gift-code/capability";
 import type { ConfigValues } from "../../lib/types/config";
 
@@ -278,6 +279,22 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             ).max_virtual_money,
         })
         if (scheduledResourceSettlement.status === "granted") {
+            const refreshedPlayer = getPlayerSync(playerId);
+            if (refreshedPlayer === null) {
+                return reply.status(500).send({ error: "Internal Server Error", message: "No player data." });
+            }
+            player = refreshedPlayer;
+        }
+
+        const eventTradeExpirySettlement = settleEventTradeExpiryOnLoadSync({
+            playerId,
+            player,
+            nowMs: now.getTime(),
+            maxMana: contentSnapshot.repository.table<ConfigValues>(
+                "config.json",
+            ).max_mana,
+        });
+        if (eventTradeExpirySettlement.status === "converted") {
             const refreshedPlayer = getPlayerSync(playerId);
             if (refreshedPlayer === null) {
                 return reply.status(500).send({ error: "Internal Server Error", message: "No player data." });

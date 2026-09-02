@@ -331,10 +331,13 @@ test("maps representative source files to focused groups", () => {
         "src/lib/inventory/errors.ts",
         "src/lib/inventory/sqlite-repository.ts",
         "src/lib/inventory/batch-context.ts",
+        "src/lib/inventory/expiry-owner.ts",
         "src/lib/inventory/owner.ts",
         "src/lib/inventory/index.ts",
+        "src/lib/event-trade-expiry-settlement.ts",
         "tools/inventory_owner.test.cjs",
         "tools/inventory_owner_structure.test.cjs",
+        "tools/load_event_trade_expiry.test.cjs",
     ]) {
         assert.deepEqual(selectTestGroups([file]), ["integration:database"], file)
     }
@@ -1585,6 +1588,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/history_receive_route.test.cjs",
         "tools/inventory_owner.test.cjs",
         "tools/inventory_owner_structure.test.cjs",
+        "tools/load_event_trade_expiry.test.cjs",
         "tools/mail_receive_transaction.test.cjs",
         "tools/mission_category_batch_read.test.cjs",
         "tools/player_history_profile_route.test.cjs",

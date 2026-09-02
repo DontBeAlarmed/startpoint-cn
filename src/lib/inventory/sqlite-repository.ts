@@ -134,6 +134,30 @@ export class InventorySqliteRepository {
         }
     }
 
+    writeExpectedItemSync(
+        playerId: number,
+        itemId: number,
+        expectedAmount: number,
+        afterAmount: number,
+    ): void {
+        requireActiveTransaction()
+        const ownerId = positiveId(playerId, "INVALID_PLAYER_ID", "playerId")
+        const id = positiveId(itemId, "INVALID_ITEM_ID", "itemId")
+        const beforeAmount = nonNegativeAmount(expectedAmount, `item ${id} expectedAmount`)
+        const nextAmount = nonNegativeAmount(afterAmount, `item ${id} afterAmount`)
+        const result = getDb().prepare(`
+            UPDATE players_items
+            SET amount = ?
+            WHERE player_id = ? AND id = ? AND amount = ?
+        `).run(nextAmount, ownerId, id, beforeAmount)
+        if (result.changes !== 1) {
+            throw new InventoryValidationError(
+                "INVALID_STORED_STATE",
+                `inventory item ${id} changed before its expected write`,
+            )
+        }
+    }
+
     recordPositiveObtainedSync(playerId: number, itemId: number, obtainedAmount: number): void {
         requireActiveTransaction()
         const ownerId = positiveId(playerId, "INVALID_PLAYER_ID", "playerId")

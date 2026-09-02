@@ -24,3 +24,7 @@ export {
     restoreInventoryItemSync,
     restoreInventoryItemWithinTransactionSync,
 } from "./owner"
+export {
+    expireInventoryItemsWithinTransactionSync,
+    type InventoryExpiryItem,
+} from "./expiry-owner"
