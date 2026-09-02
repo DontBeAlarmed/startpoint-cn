@@ -1,0 +1,293 @@
+import { getDb } from "../../data/db"
+import {
+    InventoryInsufficientItemError,
+    InventoryTransactionError,
+    InventoryValidationError,
+} from "./errors"
+import type { InventoryItemResult, InventoryMutationKind } from "./model"
+import {
+    InventorySqliteRepository,
+    type InventoryStoredItem,
+} from "./sqlite-repository"
+
+interface PendingInventoryItem {
+    readonly stored: InventoryStoredItem
+    granted: number
+    deducted: number
+    restored: number
+    touched: boolean
+}
+
+export interface InventoryBatchContextOptions {
+    readonly playerId: number
+    readonly preloadItemIds?: readonly number[]
+}
+
+export interface InventoryBatchContext {
+    read(itemId: number): InventoryItemResult
+    readMany(itemIds: readonly number[]): readonly InventoryItemResult[]
+    grant(itemId: number, amount: number): InventoryItemResult
+    deduct(itemId: number, amount: number): InventoryItemResult
+    restore(itemId: number, amount: number): InventoryItemResult
+    results(): readonly InventoryItemResult[]
+    flush(): readonly InventoryItemResult[]
+}
+
+function positiveId(value: unknown, reason: "INVALID_PLAYER_ID" | "INVALID_ITEM_ID", field: string): number {
+    if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
+        throw new InventoryValidationError(reason, `${field} must be a positive safe integer`)
+    }
+    return value
+}
+
+function mutationAmount(value: unknown): number {
+    if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
+        throw new InventoryValidationError(
+            "INVALID_AMOUNT",
+            "inventory mutation amount must be a non-negative safe integer",
+        )
+    }
+    return value
+}
+
+function addSafe(left: number, right: number, field: string): number {
+    const result = left + right
+    if (!Number.isSafeInteger(result) || result < 0) {
+        throw new InventoryValidationError(
+            "SAFE_INTEGER_OVERFLOW",
+            `${field} exceeds the safe integer range`,
+        )
+    }
+    return result
+}
+
+function subtractSafe(left: number, right: number, field: string): number {
+    const result = left - right
+    if (!Number.isSafeInteger(result) || result < 0) {
+        throw new InventoryValidationError(
+            "INVALID_STORED_STATE",
+            `${field} would be a negative or unsafe integer`,
+        )
+    }
+    return result
+}
+
+function freezeResult(result: InventoryItemResult): InventoryItemResult {
+    return Object.freeze(result)
+}
+
+class InventoryBatchContextImpl implements InventoryBatchContext {
+    private readonly playerId: number
+    private readonly repository: InventorySqliteRepository
+    private readonly pending = new Map<number, PendingInventoryItem>()
+    private closed = false
+
+    constructor(
+        options: InventoryBatchContextOptions,
+        repository: InventorySqliteRepository = new InventorySqliteRepository(),
+    ) {
+        this.assertActiveTransaction()
+        this.playerId = positiveId(options.playerId, "INVALID_PLAYER_ID", "playerId")
+        this.repository = repository
+        this.repository.requirePlayerSync(this.playerId)
+        this.load(options.preloadItemIds ?? [])
+    }
+
+    read(itemId: number): InventoryItemResult {
+        this.assertUsable()
+        return this.toResult(this.requirePending(itemId))
+    }
+
+    readMany(itemIds: readonly number[]): readonly InventoryItemResult[] {
+        this.assertUsable()
+        const ids = this.normalizeItemIds(itemIds)
+        this.load(ids)
+        return Object.freeze(ids.map(itemId => this.toResult(this.pending.get(itemId)!)))
+    }
+
+    grant(itemId: number, amount: number): InventoryItemResult {
+        return this.mutate("grant", itemId, amount)
+    }
+
+    deduct(itemId: number, amount: number): InventoryItemResult {
+        return this.mutate("deduct", itemId, amount)
+    }
+
+    restore(itemId: number, amount: number): InventoryItemResult {
+        return this.mutate("restore", itemId, amount)
+    }
+
+    results(): readonly InventoryItemResult[] {
+        this.assertUsable()
+        return this.projectTouchedResults()
+    }
+
+    flush(): readonly InventoryItemResult[] {
+        this.assertUsable()
+        const rows = [...this.pending.values()]
+            .filter(item => item.touched)
+            .sort((left, right) => left.stored.itemId - right.stored.itemId)
+            .map(item => ({ item, result: this.toResult(item) }))
+        this.closed = true
+        for (const { result } of rows) {
+            this.repository.writeAbsoluteItemSync(
+                this.playerId,
+                result.itemId,
+                result.afterAmount,
+            )
+            if (result.obtainedAmount > 0) {
+                this.repository.recordPositiveObtainedSync(
+                    this.playerId,
+                    result.itemId,
+                    result.obtainedAmount,
+                )
+            }
+        }
+        return Object.freeze(rows.map(({ result }) => result))
+    }
+
+    closeCallbackScope(): void {
+        this.closed = true
+    }
+
+    private mutate(kind: InventoryMutationKind, itemId: number, rawAmount: number): InventoryItemResult {
+        this.assertUsable()
+        const amount = mutationAmount(rawAmount)
+        const item = this.requirePending(itemId)
+        const before = {
+            granted: item.granted,
+            deducted: item.deducted,
+            restored: item.restored,
+            touched: item.touched,
+        }
+        try {
+            switch (kind) {
+                case "grant":
+                    item.granted = addSafe(item.granted, amount, `item ${itemId} requestedGrant`)
+                    break
+                case "deduct": {
+                    const deducted = addSafe(item.deducted, amount, `item ${itemId} deductedAmount`)
+                    if (deducted > item.stored.amount) {
+                        throw new InventoryInsufficientItemError(
+                            this.playerId,
+                            item.stored.itemId,
+                            item.stored.amount,
+                            deducted,
+                        )
+                    }
+                    item.deducted = deducted
+                    break
+                }
+                case "restore":
+                    item.restored = addSafe(item.restored, amount, `item ${itemId} restoredAmount`)
+                    break
+            }
+            item.touched = true
+            return this.toResult(item)
+        } catch (error) {
+            item.granted = before.granted
+            item.deducted = before.deducted
+            item.restored = before.restored
+            item.touched = before.touched
+            throw error
+        }
+    }
+
+    private requirePending(rawItemId: number): PendingInventoryItem {
+        const itemId = positiveId(rawItemId, "INVALID_ITEM_ID", "itemId")
+        const cached = this.pending.get(itemId)
+        if (cached !== undefined) return cached
+        const stored = this.repository.readItemSync(this.playerId, itemId)
+        const pending = this.newPending(stored)
+        this.pending.set(itemId, pending)
+        return pending
+    }
+
+    private load(rawItemIds: readonly number[]): void {
+        const itemIds = this.normalizeItemIds(rawItemIds)
+            .filter(itemId => !this.pending.has(itemId))
+        if (itemIds.length === 0) return
+        const stored = this.repository.readItemsByIdsSync(this.playerId, itemIds)
+        for (const itemId of itemIds) {
+            const row = stored.get(itemId)
+            if (row === undefined) {
+                throw new InventoryValidationError(
+                    "INVALID_STORED_STATE",
+                    `inventory batch read omitted item ${itemId}`,
+                )
+            }
+            this.pending.set(itemId, this.newPending(row))
+        }
+    }
+
+    private newPending(stored: InventoryStoredItem): PendingInventoryItem {
+        return { stored, granted: 0, deducted: 0, restored: 0, touched: false }
+    }
+
+    private toResult(item: PendingInventoryItem): InventoryItemResult {
+        const baseAmount = addSafe(
+            subtractSafe(item.stored.amount, item.deducted, `item ${item.stored.itemId} baseAmount`),
+            item.restored,
+            `item ${item.stored.itemId} baseAmount`,
+        )
+        const afterAmount = addSafe(
+            baseAmount,
+            item.granted,
+            `item ${item.stored.itemId} afterAmount`,
+        )
+        return freezeResult({
+            itemId: item.stored.itemId,
+            beforeAmount: item.stored.amount,
+            afterAmount,
+            obtainedAmount: item.granted,
+        })
+    }
+
+    private projectTouchedResults(): readonly InventoryItemResult[] {
+        return Object.freeze([...this.pending.values()]
+            .filter(item => item.touched)
+            .sort((left, right) => left.stored.itemId - right.stored.itemId)
+            .map(item => this.toResult(item)))
+    }
+
+    private normalizeItemIds(itemIds: readonly number[]): number[] {
+        const ids = [...new Set(itemIds.map(itemId => (
+            positiveId(itemId, "INVALID_ITEM_ID", "itemId")
+        )))]
+        return ids.sort((left, right) => left - right)
+    }
+
+    private assertActiveTransaction(): void {
+        if (!getDb().inTransaction) {
+            throw new InventoryTransactionError(
+                "TRANSACTION_REQUIRED",
+                "inventory batch context requires an active transaction",
+            )
+        }
+    }
+
+    private assertUsable(): void {
+        if (this.closed) {
+            throw new InventoryTransactionError(
+                "BATCH_CONTEXT_CLOSED",
+                "inventory batch context is closed after flush or callback exit",
+            )
+        }
+        this.assertActiveTransaction()
+    }
+}
+
+export function withInventoryBatchContextWithinTransactionSync<T>(
+    options: InventoryBatchContextOptions,
+    callback: (context: InventoryBatchContext) => T,
+): T {
+    if (typeof callback !== "function") {
+        throw new TypeError("inventory batch callback must be a function")
+    }
+    const context = new InventoryBatchContextImpl(options)
+    try {
+        return callback(context)
+    } finally {
+        context.closeCallbackScope()
+    }
+}

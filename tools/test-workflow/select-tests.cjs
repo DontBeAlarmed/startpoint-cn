@@ -316,6 +316,10 @@ const SOURCE_RULES = [
         groups: ["quick:content"],
     },
     {
+        pattern: /^(?:src\/lib\/inventory\/(?:batch-context|errors|index|model|owner|sqlite-repository)\.ts|tools\/inventory_owner(?:_structure)?\.test\.cjs)$/,
+        groups: ["integration:database"],
+    },
+    {
         pattern: /^(?:assets\/additional_reward_rules\.json|src\/lib\/additional-reward\.ts)$/,
         groups: ["integration:rules", "quick:content", "quick:quest"],
     },

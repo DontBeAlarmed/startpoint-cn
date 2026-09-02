@@ -298,6 +298,18 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["assets/item_inventory_policy.json"]),
         ["quick:content"],
     )
+    for (const file of [
+        "src/lib/inventory/model.ts",
+        "src/lib/inventory/errors.ts",
+        "src/lib/inventory/sqlite-repository.ts",
+        "src/lib/inventory/batch-context.ts",
+        "src/lib/inventory/owner.ts",
+        "src/lib/inventory/index.ts",
+        "tools/inventory_owner.test.cjs",
+        "tools/inventory_owner_structure.test.cjs",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["integration:database"], file)
+    }
     assert.deepEqual(
         selectTestGroups(["src/multi/tcp/server.ts"]),
         ["integration:multi-hub", "integration:runtime", "quick:protocol"],
@@ -1534,6 +1546,8 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/admin_mail_expiry.test.cjs",
         "tools/gift_redemption_save_lifecycle.test.cjs",
         "tools/history_receive_route.test.cjs",
+        "tools/inventory_owner.test.cjs",
+        "tools/inventory_owner_structure.test.cjs",
         "tools/mail_receive_transaction.test.cjs",
         "tools/mission_category_batch_read.test.cjs",
         "tools/player_history_profile_route.test.cjs",
