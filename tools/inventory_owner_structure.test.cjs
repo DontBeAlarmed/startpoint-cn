@@ -85,6 +85,7 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/lib/item-use-settlement.ts",
         "src/lib/reward-grant/executor.ts",
         "src/lib/reward-grant/inventory-adapter.ts",
+        "src/routes/api/equipment.ts",
         "src/routes/api/exBoost.ts",
         "src/routes/api/sell.ts",
     ]
@@ -129,4 +130,47 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
     assert.match(legacy, /export function givePlayerItemSync/)
     assert.match(legacy, /export function givePlayerItemWithinTransactionSync/)
     assert.match(legacy, /export function setPlayerItemSync/)
+})
+
+test("remaining legacy Item mutation references match the staged migration manifest", () => {
+    const sourceRoot = path.join(projectRoot, "src")
+    const legacyMutation = /\b(?:givePlayerItemSync|givePlayerItemWithinTransactionSync|insertPlayerItemsSync|setPlayerItemSync|setPlayerItemWithinTransactionSync|updatePlayerItemSync|recordPlayerCollectedItemWithinTransactionSync)\b/
+    const remaining = []
+    const visit = directory => {
+        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+            const absolute = path.join(directory, entry.name)
+            if (entry.isDirectory()) visit(absolute)
+            else if (entry.isFile() && entry.name.endsWith(".ts")
+                && legacyMutation.test(fs.readFileSync(absolute, "utf8"))) {
+                remaining.push(path.relative(projectRoot, absolute))
+            }
+        }
+    }
+    visit(sourceRoot)
+
+    assert.deepEqual(remaining.sort(), [
+        // W6 primitive definition / maintenance.
+        "src/data/domains/item.ts",
+        "src/data/domains/player.ts",
+        // W5 legacy Quest / Mission rewards.
+        "src/lib/mission/grants.ts",
+        "src/lib/quest.ts",
+        // W4 Battle entry / restore / settlement.
+        "src/lib/quest/active-quest-service.ts",
+        "src/lib/quest/finish/periodic-reward-handler.ts",
+        "src/lib/quest/finish/single-entry-resource-settlement.ts",
+        "src/lib/quest/finish/single-settlement-writes.ts",
+        "src/multi/http/battle.ts",
+        "src/multi/settlement/orchestrator.ts",
+        // Remaining W3 source adapters.
+        "src/routes/api/boxGacha.ts",
+        "src/routes/api/exchange.ts",
+        "src/routes/api/gacha.ts",
+        "src/routes/api/questUnlock.ts",
+        "src/routes/api/shop.ts",
+        // W4 Battle route.
+        "src/routes/api/singleBattleQuest.ts",
+        // W6 maintenance adapter.
+        "src/routes/web_api/player.ts",
+    ])
 })

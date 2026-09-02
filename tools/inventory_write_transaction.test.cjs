@@ -186,6 +186,41 @@ test("sell_equipment sells the base equipment when duplicate stack is zero", asy
     assert.equal(getPlayerItemSync(playerId, equipmentId), beforeSoul + 1)
 })
 
+test("equipment upgrade atomically deducts the client-selected crystal and craft points", async () => {
+    const { playerId, viewerId } = await createPlayer("single-equipment-upgrade")
+    const equipmentId = 3010006
+    const crystalItemId = 12001
+    const craftPointItemId = 100000
+    addEquipment(playerId, equipmentId, 0)
+    givePlayerItemSync(playerId, crystalItemId, 2)
+    givePlayerItemSync(playerId, craftPointItemId, 1000)
+
+    const beforeCraftPoints = getPlayerItemSync(playerId, craftPointItemId)
+    const beforeSoul = getPlayerItemSync(playerId, equipmentId) ?? 0
+    const response = await app.inject({
+        method: "POST",
+        url: "/equipment/upgrade",
+        payload: {
+            viewer_id: viewerId,
+            equipment_id: equipmentId,
+            use_stack: false,
+            item_id: crystalItemId,
+            upgrade_count: 1,
+        },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    assert.equal(getPlayerItemSync(playerId, crystalItemId), 1)
+    assert.ok(getPlayerItemSync(playerId, craftPointItemId) < beforeCraftPoints)
+    assert.equal(getPlayerItemSync(playerId, equipmentId), beforeSoul + 1)
+    assert.deepEqual(getPlayerEquipmentSync(playerId, equipmentId), {
+        enhancementLevel: 0,
+        level: 2,
+        protection: false,
+        stack: 0,
+    })
+})
+
 test("bulk_upgrade rolls equipment rewards and mission facts back on a late mission failure", async t => {
     const { playerId, viewerId } = await createPlayer("bulk-upgrade-late-rollback")
     const equipmentIds = [3010006, 4050030]

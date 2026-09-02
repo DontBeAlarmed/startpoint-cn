@@ -7,7 +7,7 @@ import {
     normalizeEquipmentBatchIds, updatePlayerEquipmentSync,
 } from "../../data/domains/equipment";
 import {
-    getPlayerItemSync, givePlayerItemSync, updatePlayerItemSync,
+    getPlayerItemSync,
 } from "../../data/domains/item";
 import { getPlayerSync } from "../../data/domains/player";
 import { getSession } from "../../data/domains/session";
@@ -21,6 +21,7 @@ import { canUseEquipmentAwakeningCrystal } from "../../lib/equipment-upgrade";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { settleMissionOperationFactsSync } from "../../lib/mission/operation-fact-settlement";
 import { mergeMissionSettlementResponse } from "../../lib/mission";
+import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
 
 interface SetProtectionBody {
     protection: boolean
@@ -100,13 +101,23 @@ const routes = async (fastify: FastifyInstance) => {
 
         const dissolveInfo = getEquipmentDissolveSync(equipmentId)
         const operationResult = getDb().transaction(() => {
-            if (!useStack && itemId !== undefined) {
-                returnItemList[itemId] = newItemCount
-                updatePlayerItemSync(playerId, itemId, newItemCount)
-            }
+            withInventoryBatchContextWithinTransactionSync({
+                playerId,
+                preloadItemIds: [
+                    wrightpieceItemId(),
+                    ...(!useStack && itemId !== undefined ? [itemId] : []),
+                ],
+            }, inventory => {
+                if (!useStack && itemId !== undefined) {
+                    returnItemList[itemId] = inventory.deduct(itemId, upgradeCount).afterAmount
+                }
+                returnItemList[wrightpieceItemId()] = inventory.deduct(
+                    wrightpieceItemId(),
+                    upgradeCost * upgradeCount,
+                ).afterAmount
+                inventory.flush()
+            })
 
-            returnItemList[wrightpieceItemId()] = newWrightPieces
-            updatePlayerItemSync(playerId, wrightpieceItemId(), newWrightPieces)
             updatePlayerEquipmentSync(playerId, equipmentId, { stack: newStack, level: newLevel })
             const equipmentSnapshot = getPlayerEquipmentListSync(playerId)
             const missionSettlement = settleMissionOperationFactsSync(
@@ -117,8 +128,17 @@ const routes = async (fastify: FastifyInstance) => {
                 equipmentSnapshot,
             )
 
-            if (dissolveInfo && dissolveInfo.generate_ability_soul) {
-                returnItemList[dissolveInfo.ability_soul_id] = givePlayerItemSync(playerId, dissolveInfo.ability_soul_id, upgradeCount)
+            if (dissolveInfo?.generate_ability_soul) {
+                withInventoryBatchContextWithinTransactionSync({
+                    playerId,
+                    preloadItemIds: [dissolveInfo.ability_soul_id],
+                }, inventory => {
+                    returnItemList[dissolveInfo.ability_soul_id] = inventory.grant(
+                        dissolveInfo.ability_soul_id,
+                        upgradeCount,
+                    ).afterAmount
+                    inventory.flush()
+                })
             }
             return { equipmentSnapshot, missionSettlement }
         })()
@@ -218,35 +238,45 @@ const routes = async (fastify: FastifyInstance) => {
 
         const returnItemList: Record<number, number> = {}
 
-        const newCraftPoints = currentCraftPoints - totalCraftPointCost
-        const operationResult = getDb().transaction(() => {
-            for (const upgrade of upgrades) {
-                updatePlayerEquipmentSync(playerId, upgrade.equipmentId, {
-                    level: upgrade.newLevel,
-                    stack: upgrade.newStack,
-                })
-                if (upgrade.abilitySoulId !== null) {
-                    returnItemList[upgrade.abilitySoulId] = givePlayerItemSync(
-                        playerId,
-                        upgrade.abilitySoulId,
-                        upgrade.upgradeCount,
-                    )
-                }
-            }
-            updatePlayerItemSync(playerId, wrightpieceItemId(), newCraftPoints)
-            const equipmentSnapshot = getPlayerEquipmentListSync(playerId)
-            const missionSettlement = settleMissionOperationFactsSync(
+        const operationResult = getDb().transaction(() => (
+            withInventoryBatchContextWithinTransactionSync({
                 playerId,
-                "equipment_upgrade",
-                upgrades.reduce((total, entry) => total + entry.upgradeCount, 0),
-                getServerDate(),
-                equipmentSnapshot,
-            )
-            return { equipmentSnapshot, missionSettlement }
-        })()
-        returnItemList[wrightpieceItemId()] = newCraftPoints
+                preloadItemIds: [
+                    wrightpieceItemId(),
+                    ...upgrades.flatMap(upgrade => (
+                        upgrade.abilitySoulId === null ? [] : [upgrade.abilitySoulId]
+                    )),
+                ],
+            }, inventory => {
+                for (const upgrade of upgrades) {
+                    updatePlayerEquipmentSync(playerId, upgrade.equipmentId, {
+                        level: upgrade.newLevel,
+                        stack: upgrade.newStack,
+                    })
+                    if (upgrade.abilitySoulId !== null) {
+                        returnItemList[upgrade.abilitySoulId] = inventory.grant(
+                            upgrade.abilitySoulId,
+                            upgrade.upgradeCount,
+                        ).afterAmount
+                    }
+                }
+                const craftPointResult = inventory.deduct(wrightpieceItemId(), totalCraftPointCost)
+                returnItemList[wrightpieceItemId()] = craftPointResult.afterAmount
+                inventory.flush()
 
-        console.log(`[BULK_UPGRADE] account=${accountId} player=${playerId}: ${upgrades.length} equipment upgraded, craft points ${currentCraftPoints} -> ${newCraftPoints}`)
+                const equipmentSnapshot = getPlayerEquipmentListSync(playerId)
+                const missionSettlement = settleMissionOperationFactsSync(
+                    playerId,
+                    "equipment_upgrade",
+                    upgrades.reduce((total, entry) => total + entry.upgradeCount, 0),
+                    getServerDate(),
+                    equipmentSnapshot,
+                )
+                return { equipmentSnapshot, missionSettlement }
+            })
+        ))()
+
+        console.log(`[BULK_UPGRADE] account=${accountId} player=${playerId}: ${upgrades.length} equipment upgraded, craft points ${currentCraftPoints} -> ${returnItemList[wrightpieceItemId()]}`)
 
         const returnEquipmentList = serializeFullEquipmentList(operationResult.equipmentSnapshot)
 
