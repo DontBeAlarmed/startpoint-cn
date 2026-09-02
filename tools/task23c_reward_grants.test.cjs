@@ -376,7 +376,7 @@ test("Mission standard callback preserves mixed domain rewards, duplicate compen
     assert.equal(granter.getUserInfo().free_mana, playerAfter.freeMana)
 })
 
-test("RewardGrant owner currency admission does not increase writer SQL", () => {
+test("default Mission RewardGrant owner is no heavier than an explicitly injected owner", () => {
     const itemId = 990104
     const equipmentId = 5060042
     const rewards = [
@@ -386,23 +386,23 @@ test("RewardGrant owner currency admission does not increase writer SQL", () => 
         { kind: 3, amount: 11 },
         { kind: 5, amount: 13 },
     ]
-    const legacyPlayerId = createPlayer("mission-sql-legacy")
-    const ownerPlayerId = createPlayer("mission-sql-owner")
+    const defaultPlayerId = createPlayer("mission-sql-default")
+    const injectedPlayerId = createPlayer("mission-sql-injected")
     let ownerCallbackCalls = 0
 
-    const legacy = captureSql(() => db.transaction(() => {
-        const granter = new MissionRewardGranter(legacyPlayerId, getPlayerSync(legacyPlayerId))
+    const defaultOwner = captureSql(() => db.transaction(() => {
+        const granter = new MissionRewardGranter(defaultPlayerId, getPlayerSync(defaultPlayerId))
         granter.grant(rewards.slice(0, 2))
         granter.grant(rewards.slice(2))
         granter.persistPlayer()
     })())
-    const owner = captureSql(() => db.transaction(() => {
-        const granter = new MissionRewardGranter(ownerPlayerId, getPlayerSync(ownerPlayerId))
+    const injectedOwner = captureSql(() => db.transaction(() => {
+        const granter = new MissionRewardGranter(injectedPlayerId, getPlayerSync(injectedPlayerId))
         const context = {
             standardRewardGrant: (plan, known, playerUpdate) => {
                 ownerCallbackCalls++
                 return executeRewardGrantPlanInTransactionOwnerSync(
-                    ownerPlayerId,
+                    injectedPlayerId,
                     plan,
                     known,
                     playerUpdate,
@@ -414,15 +414,52 @@ test("RewardGrant owner currency admission does not increase writer SQL", () => 
         granter.persistPlayer()
     })())
     const writeCount = statements => statements.filter(sql => /^\s*(?:INSERT|UPDATE|DELETE)\b/i.test(sql)).length
-    assert.ok(owner.statements.length <= legacy.statements.length, {
-        legacy: legacy.statements,
-        owner: owner.statements,
+    assert.ok(defaultOwner.statements.length <= injectedOwner.statements.length, {
+        defaultOwner: defaultOwner.statements,
+        injectedOwner: injectedOwner.statements,
     })
     assert.equal(ownerCallbackCalls, 1)
-    assert.ok(writeCount(owner.statements) <= writeCount(legacy.statements), {
-        legacy: legacy.statements,
-        owner: owner.statements,
+    assert.ok(writeCount(defaultOwner.statements) <= writeCount(injectedOwner.statements), {
+        defaultOwner: defaultOwner.statements,
+        injectedOwner: injectedOwner.statements,
     })
+})
+
+test("default Mission owner rejects mixed rewards before any domain write without a caller transaction", () => {
+    const cases = [
+        {
+            label: "degree",
+            directReward: { kind: 6, degreeId: 61040, amount: 1 },
+            context: {},
+        },
+        {
+            label: "pass",
+            directReward: { kind: 7, amount: 10 },
+            context: { passCardEventId: 3 },
+        },
+    ]
+
+    for (const testCase of cases) {
+        const playerId = createPlayer(`mission-missing-transaction-${testCase.label}`)
+        const itemId = testCase.label === "degree" ? 990105 : 990106
+        const before = getPlayerSync(playerId)
+        const granter = new MissionRewardGranter(playerId, before)
+
+        assert.throws(
+            () => granter.grant([
+                { kind: 1, itemId, amount: 1 },
+                { kind: 3, amount: 7 },
+                testCase.directReward,
+            ], testCase.context),
+            error => error?.name === "RewardGrantTransactionRequiredError",
+        )
+        assert.equal(getPlayerItemSync(playerId, itemId), null)
+        assert.deepEqual(getPlayerDegreeIdsSync(playerId), [])
+        assert.equal(getPlayerPassCardStateSync(playerId, 3).point, 0)
+        const after = getPlayerSync(playerId)
+        assert.equal(after.freeMana, before.freeMana)
+        assert.equal(after.totalManaObtained, before.totalManaObtained)
+    }
 })
 
 test("single outer transaction rolls back Carnival and Mission standard plus domain writes", () => {

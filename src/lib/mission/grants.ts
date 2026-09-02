@@ -1,8 +1,5 @@
 import type { Player } from "../../data/types"
-import { getPlayerItemSync, givePlayerItemSync } from "../../data/domains/item"
 import { updatePlayerSync } from "../../data/domains/player"
-import { givePlayerCharacterSync } from "../character"
-import { givePlayerEquipmentSync } from "../equipment"
 import type { ActiveMissionReward } from "./rewards"
 import { givePlayerDegreeSync } from "../../data/domains/degree"
 import { addPlayerPassCardPointWithChangeSync } from "../../data/domains/pass-card"
@@ -16,6 +13,10 @@ import type {
     RewardGrantResult,
     RewardGrantReward,
 } from "../reward-grant"
+import {
+    assertRewardGrantTransactionOwnerSync,
+    executeRewardGrantPlanInTransactionOwnerSync,
+} from "../reward-grant/owner-executor"
 
 type MissionRewardPlayer = Pick<
     Player,
@@ -55,66 +56,56 @@ export class MissionRewardGranter {
         source: MissionRewardSource
         reward: RewardGrantReward
     }[] = []
-    private standardRewardGrant: MissionRewardGrantContext["standardRewardGrant"]
+    private standardRewardGrant: NonNullable<MissionRewardGrantContext["standardRewardGrant"]>
+    private standardRewardGrantRequiresTransaction = true
 
     constructor(private readonly playerId: number, private readonly player: MissionRewardPlayer) {
         this.freeVmoney = player.freeVmoney
         this.freeMana = player.freeMana
         this.expPool = player.expPool
+        this.standardRewardGrant = (plan, knownPlayerBefore, playerUpdate) => (
+            executeRewardGrantPlanInTransactionOwnerSync(
+                this.playerId,
+                plan,
+                knownPlayerBefore,
+                playerUpdate,
+            )
+        )
     }
 
     grant(rewards: ActiveMissionReward[], context: MissionRewardGrantContext = {}): readonly FactKey[] {
         if (context.standardRewardGrant !== undefined) {
             this.standardRewardGrant = context.standardRewardGrant
+            this.standardRewardGrantRequiresTransaction = false
+        }
+        if (this.standardRewardGrantRequiresTransaction
+            && rewards.some(reward => this.canMutatePlayerState(reward, context))) {
+            assertRewardGrantTransactionOwnerSync()
         }
 
         for (const [rewardIndex, reward] of rewards.entries()) {
-            if (this.standardRewardGrant !== undefined) {
-                const standardReward = this.toStandardRewardEntries(
-                    reward,
-                    rewardIndex,
-                    context.definitionId,
-                )
-                if (standardReward.length > 0) {
-                    this.pendingStandardEntries.push(...standardReward)
-                    continue
-                }
+            const standardReward = this.toStandardRewardEntries(
+                reward,
+                rewardIndex,
+                context.definitionId,
+            )
+            if (standardReward.length > 0) {
+                this.pendingStandardEntries.push(...standardReward)
+                continue
             }
             switch (reward.kind) {
                 case 0:
                     this.freeVmoney += reward.amount
                     break
                 case 1:
-                    if (reward.itemId !== undefined && reward.amount > 0) {
-                        const next = givePlayerItemSync(this.playerId, reward.itemId, reward.amount)
-                        this.itemList[String(reward.itemId)] = next
-                        this.invalidateItem(reward.itemId)
-                    }
                     break
                 case 2:
-                    if (reward.equipmentId !== undefined && reward.amount > 0) {
-                        const equipment = givePlayerEquipmentSync(this.playerId, reward.equipmentId, reward.amount)
-                        this.equipmentMap.set(reward.equipmentId, equipment)
-                        this.addInvalidation({ kind: "equipment" })
-                    }
                     break
                 case 3:
                     this.freeMana += reward.amount
                     this.totalManaGained += reward.amount
                     break
                 case 4:
-                    if (reward.characterId === undefined) break
-                    for (let count = 0; count < reward.amount; count++) {
-                        const result = givePlayerCharacterSync(this.playerId, reward.characterId)
-                        if (!result) continue
-                        this.addInvalidation({ kind: "characters" })
-                        this.characterMap.set(reward.characterId, result.character)
-                        if (result.item) {
-                            const itemAmount = getPlayerItemSync(this.playerId, result.item.id) ?? 0
-                            this.itemList[String(result.item.id)] = itemAmount
-                            this.invalidateItem(result.item.id)
-                        }
-                    }
                     break
                 case 5:
                     this.expPool += reward.amount
@@ -153,8 +144,32 @@ export class MissionRewardGranter {
         return this.invalidatedFactKeys
     }
 
+    private canMutatePlayerState(
+        reward: ActiveMissionReward,
+        context: MissionRewardGrantContext,
+    ): boolean {
+        switch (reward.kind) {
+            case 0:
+            case 3:
+            case 5:
+                return reward.amount !== 0
+            case 1:
+                return reward.itemId !== undefined && reward.amount > 0
+            case 2:
+                return reward.equipmentId !== undefined && reward.amount > 0
+            case 4:
+                return reward.characterId !== undefined && reward.amount > 0
+            case 6:
+                return reward.degreeId !== undefined
+            case 7:
+                return context.passCardEventId !== undefined && reward.amount > 0
+            default:
+                return false
+        }
+    }
+
     private flushStandardRewards(): void {
-        if (this.pendingStandardEntries.length === 0 || this.standardRewardGrant === undefined) return
+        if (this.pendingStandardEntries.length === 0) return
         const grant = this.standardRewardGrant(
             createRewardGrantPlan(this.pendingStandardEntries),
             {

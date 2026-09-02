@@ -39,7 +39,10 @@ restoreContentSnapshot = installBundledGameplaySnapshot()
 const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { getPlayerItemSync } = require("../src/data/domains/item")
+const {
+    getPlayerCollectedItemTotalSync,
+    getPlayerItemSync,
+} = require("../src/data/domains/item")
 const { addPlayerPassCardPointSync } = require("../src/data/domains/pass-card")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const passCardRoutes = require("../src/routes/api/passCard").default
@@ -129,12 +132,15 @@ async function main() {
             },
         })
         assert.equal(receiveResponse.statusCode, 200, receiveResponse.body)
-        assert.deepEqual(unpack(Buffer.from(receiveResponse.body, "base64")).data.all_received_record, [{
+        const receiveData = unpack(Buffer.from(receiveResponse.body, "base64")).data
+        assert.deepEqual(receiveData.all_received_record, [{
             reward_id: 121,
             is_received_1: 1,
             is_received_2: 0,
         }])
+        assert.equal(receiveData.item_list[999003], 1)
         assert.equal(getPlayerItemSync(playerId, 999003), 1)
+        assert.equal(getPlayerCollectedItemTotalSync(playerId, 999003), 1)
 
         const repeatedResponse = await fastify.inject({
             method: "POST",
@@ -149,6 +155,7 @@ async function main() {
         })
         assert.equal(repeatedResponse.statusCode, 200, repeatedResponse.body)
         assert.equal(getPlayerItemSync(playerId, 999003), 1)
+        assert.equal(getPlayerCollectedItemTotalSync(playerId, 999003), 1)
 
         const lockedResponse = await fastify.inject({
             method: "POST",

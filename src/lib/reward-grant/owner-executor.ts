@@ -18,6 +18,10 @@ import type {
     RewardGrantResult,
 } from "./types"
 
+export function assertRewardGrantTransactionOwnerSync(): void {
+    if (!getDb().inTransaction) throw new RewardGrantTransactionRequiredError()
+}
+
 /**
  * Internal Score-only detail path. Keep direct imports named Internal and out of the barrel.
  */
@@ -27,8 +31,7 @@ export function executeRewardGrantPlanInTransactionOwnerInternalSync<TSource>(
     knownPlayerBefore: RewardGrantPlayerAfter,
     playerUpdate: RewardGrantOwnerPlayerUpdate = {},
 ): InternalRewardGrantResult<TSource> {
-    const db = getDb()
-    if (!db.inTransaction) throw new RewardGrantTransactionRequiredError()
+    assertRewardGrantTransactionOwnerSync()
     return executeNormalizedRewardGrantPlanAsTransactionOwnerInternalSync(
         playerId,
         normalizeRewardGrantPlanInternal(plan),
@@ -82,8 +85,7 @@ export function executeRewardGrantPlanInTransactionOwnerWithInventoryInternalSyn
     inventory: InventoryBatchContext,
     playerUpdate: RewardGrantOwnerPlayerUpdate = {},
 ): InternalRewardGrantResult<TSource> {
-    const db = getDb()
-    if (!db.inTransaction) throw new RewardGrantTransactionRequiredError()
+    assertRewardGrantTransactionOwnerSync()
     return executeNormalizedRewardGrantPlanAsTransactionOwnerWithExternalInventoryInternalSync(
         playerId,
         normalizeRewardGrantPlanInternal(plan),

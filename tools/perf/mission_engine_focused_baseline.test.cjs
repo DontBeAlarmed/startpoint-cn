@@ -25,7 +25,7 @@ const EXPECTED_SCENARIO_KEYS = [
     "multi-battle-finish",
 ]
 const APPROVED_SETTLEMENT_SHA256 =
-    "defbe19c1f93564967f98526447f87b8397cf796a1456d5d515ba5b6f0250b06"
+    "8dc7a2aaf98d93b1e7285f4968bed570694ad3f39b0c5f3846c9e94fce77670d"
 const snapshotPath = path.join(
     __dirname,
     "__snapshots__",
@@ -354,7 +354,7 @@ test("current focused mission engine behavior matches the checked-in behavior", 
     )
     for (const name of ["single-battle-finish", "get-progress-no-invalidation"]) {
         const regressed = structuredClone(current)
-        regressed.scenarios[name].sqlReads++
+        regressed.scenarios[name].sqlReads = snapshot.scenarios[name].sqlReads + 1
         const regressionAdmission = admitFocusedMissionReport(regressed, {
             snapshotPath,
             write: false,

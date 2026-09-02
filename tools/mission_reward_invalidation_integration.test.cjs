@@ -17,7 +17,11 @@ delete process.env.WDFP_DATABASE_DIR
 
 const { initializeDatabase } = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { getPlayerItemSync, getPlayerItemsSync } = require("../src/data/domains/item")
+const {
+    getPlayerCollectedItemTotalSync,
+    getPlayerItemSync,
+    getPlayerItemsSync,
+} = require("../src/data/domains/item")
 const { getPlayerPassCardStateSync } = require("../src/data/domains/pass-card")
 const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getPlayerCharacterSync } = require("../src/data/domains/character")
@@ -55,8 +59,12 @@ test("real duplicate character reward invalidates characters and the generated i
 
     const beforeCharacter = getPlayerCharacterSync(playerId, characterId)
     const beforeItems = getPlayerItemsSync(playerId)
-    const granter = new MissionRewardGranter(playerId, getPlayerSync(playerId))
-    granter.grant([{ kind: 4, characterId, amount: 1 }])
+    const granter = db.transaction(() => {
+        const rewardGranter = new MissionRewardGranter(playerId, getPlayerSync(playerId))
+        rewardGranter.grant([{ kind: 4, characterId, amount: 1 }])
+        rewardGranter.persistPlayer()
+        return rewardGranter
+    })()
 
     const afterCharacter = getPlayerCharacterSync(playerId, characterId)
     const changedItems = Object.entries(getPlayerItemsSync(playerId)).filter(([itemId, amount]) => (
@@ -65,7 +73,9 @@ test("real duplicate character reward invalidates characters and the generated i
     assert.equal(afterCharacter.stack, beforeCharacter.stack + 1)
     assert.equal(changedItems.length, 1)
 
-    const [itemId] = changedItems[0]
+    const [itemId, itemAmount] = changedItems[0]
+    assert.equal(granter.itemList[itemId], itemAmount)
+    assert.equal(getPlayerCollectedItemTotalSync(playerId, Number(itemId)), itemAmount)
     assert.deepEqual(
         granter.invalidatedFactKeys.map(getFactKeyId).sort(),
         ["characters", "collectedItems:" + itemId, "items"].sort(),
@@ -73,8 +83,12 @@ test("real duplicate character reward invalidates characters and the generated i
 })
 
 test("real Pass point writes invalidate only when passState changes", () => {
-    const changed = new MissionRewardGranter(playerId, getPlayerSync(playerId))
-    changed.grant([{ kind: 7, amount: 10 }], { passCardEventId: 3 })
+    const changed = db.transaction(() => {
+        const granter = new MissionRewardGranter(playerId, getPlayerSync(playerId))
+        granter.grant([{ kind: 7, amount: 10 }], { passCardEventId: 3 })
+        granter.persistPlayer()
+        return granter
+    })()
     assert.equal(getPlayerPassCardStateSync(playerId, 3).point, 10)
     assert.deepEqual(changed.invalidatedFactKeys.map(getFactKeyId), ["passState:3"])
 
@@ -82,8 +96,12 @@ test("real Pass point writes invalidate only when passState changes", () => {
         UPDATE players_pass_cards SET point = 6000
         WHERE player_id = ? AND event_id = 3
     `).run(playerId)
-    const capped = new MissionRewardGranter(playerId, getPlayerSync(playerId))
-    capped.grant([{ kind: 7, amount: 10 }], { passCardEventId: 3 })
+    const capped = db.transaction(() => {
+        const granter = new MissionRewardGranter(playerId, getPlayerSync(playerId))
+        granter.grant([{ kind: 7, amount: 10 }], { passCardEventId: 3 })
+        granter.persistPlayer()
+        return granter
+    })()
     assert.equal(getPlayerPassCardStateSync(playerId, 3).point, 6000)
     assert.deepEqual(capped.invalidatedFactKeys, [])
 })

@@ -80,6 +80,39 @@ const player = Object.freeze({
     totalManaObtained: 40,
 })
 
+function standardRewardResult(plan, knownPlayerBefore) {
+    const item = { 100: 2 }
+    const equipment = { equipment_id: 200, stack: 1 }
+    const character = { character_id: 300, stack: 1 }
+    const entryResults = [
+        { items: item },
+        { equipment_list: [equipment] },
+        { character_list: [character] },
+        { user_info: { free_vmoney: 5 } },
+    ]
+    const result = values => ({
+        user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
+        character_list: [],
+        joined_character_id_list: [],
+        equipment_list: [],
+        items: {},
+        ...values,
+    })
+    return {
+        aggregate: result({
+            user_info: { free_mana: 0, free_vmoney: 5, exp_pool: 0 },
+            character_list: [character],
+            equipment_list: [equipment],
+            items: item,
+        }),
+        entries: plan.entries.map((entry, index) => ({
+            ...entry,
+            result: result(entryResults[index]),
+        })),
+        playerAfter: { ...knownPlayerBefore, freeVmoney: knownPlayerBefore.freeVmoney + 5 },
+    }
+}
+
 function factIds(granter) {
     return granter.invalidatedFactKeys.map(key => {
         if (key.kind === "collectedItems") {
@@ -101,11 +134,16 @@ test("empty and zero-effect rewards do not create invalidation", () => {
 
 test("item, character, equipment, player, and pass rewards expose only real changes", () => {
     const granter = new MissionRewardGranter(1, player)
-    granter.grant([{ kind: 1, itemId: 100, amount: 2 }])
-    granter.grant([{ kind: 2, equipmentId: 200, amount: 1 }])
-    granter.grant([{ kind: 4, characterId: 300, amount: 1 }])
-    granter.grant([{ kind: 0, amount: 5 }])
-    granter.grant([{ kind: 7, amount: 10 }], { passCardEventId: 77 })
+    granter.grant([
+        { kind: 1, itemId: 100, amount: 2 },
+        { kind: 2, equipmentId: 200, amount: 1 },
+        { kind: 4, characterId: 300, amount: 1 },
+        { kind: 0, amount: 5 },
+        { kind: 7, amount: 10 },
+    ], {
+        passCardEventId: 77,
+        standardRewardGrant: standardRewardResult,
+    })
     granter.persistPlayer()
 
     assert.deepEqual(factIds(granter), [
@@ -123,7 +161,10 @@ test("item, character, equipment, player, and pass rewards expose only real chan
 test("duplicate pass points capped at the current value do not invalidate twice", () => {
     state.passPoints.set(88, 100)
     const granter = new MissionRewardGranter(1, player)
-    granter.grant([{ kind: 7, amount: 10 }], { passCardEventId: 88 })
+    granter.grant([{ kind: 7, amount: 10 }], {
+        passCardEventId: 88,
+        standardRewardGrant: standardRewardResult,
+    })
     granter.persistPlayer()
 
     assert.deepEqual(factIds(granter), [])

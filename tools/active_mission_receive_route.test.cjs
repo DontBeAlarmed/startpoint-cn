@@ -54,6 +54,9 @@ rewardRow[3] = "1"
 rewardRow[4] = "(None)"
 rewardRow[7] = "0"
 rewardRow[8] = "5"
+rewardRow[13] = "1"
+rewardRow[14] = "2"
+rewardRow[15] = "880002"
 
 const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 restoreSnapshot = installBundledGameplaySnapshot({
@@ -72,6 +75,10 @@ const {
     updatePlayerActiveMissionStageSync,
     updatePlayerActiveMissionSync,
 } = require("../src/data/domains/mission")
+const {
+    getPlayerCollectedItemTotalSync,
+    getPlayerItemSync,
+} = require("../src/data/domains/item")
 const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { insertPlayerQuestProgressSync } = require("../src/data/domains/quest")
 const activeMissionRoutes = require("../src/routes/api/activeMission").default
@@ -150,18 +157,24 @@ async function main() {
         const vmoneyBefore = getPlayerSync(playerId).freeVmoney
         const unlocked = await request()
         assert.equal(unlocked.statusCode, 200, unlocked.body)
-        assert.deepEqual(decodeResponse(unlocked).data.active_mission_list, [{
+        const unlockedData = decodeResponse(unlocked).data
+        assert.deepEqual(unlockedData.active_mission_list, [{
             mission_id: 99001,
             progress_value: 1,
             stages: [{ stage: 1, received: true }],
         }])
+        assert.equal(unlockedData.item_list[880002], 2)
         assert.equal(getPlayerActiveMissionsSync(playerId)[99001].stages[1], true)
         assert.equal(getPlayerSync(playerId).freeVmoney, vmoneyBefore + 5)
+        assert.equal(getPlayerItemSync(playerId, 880002), 2)
+        assert.equal(getPlayerCollectedItemTotalSync(playerId, 880002), 2)
 
         const repeated = await request()
         assert.equal(repeated.statusCode, 200, repeated.body)
         assert.deepEqual(decodeResponse(repeated).data.active_mission_list, [])
         assert.equal(getPlayerSync(playerId).freeVmoney, vmoneyBefore + 5)
+        assert.equal(getPlayerItemSync(playerId, 880002), 2)
+        assert.equal(getPlayerCollectedItemTotalSync(playerId, 880002), 2)
         assert.equal(
             warnings.some(message => /character\.json/i.test(message)),
             false,

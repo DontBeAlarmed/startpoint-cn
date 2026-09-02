@@ -32,7 +32,10 @@ const {
     insertPlayerCharacterManaNodesSync,
     updatePlayerCharacterSync,
 } = require("../src/data/domains/character")
-const { getPlayerItemSync } = require("../src/data/domains/item")
+const {
+    getPlayerCollectedItemTotalSync,
+    getPlayerItemSync,
+} = require("../src/data/domains/item")
 const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getDb } = require("../src/data/db")
 const { getCharacterDataSync, getCharacterManaNodesSync } = require("../src/lib/assets")
@@ -111,13 +114,14 @@ test("Awake category 9 standard rewards use the owner with mission definition so
     ])
     assert.equal(result.settlement.itemList[AWAKE_ITEM_ID], 2)
     assert.equal(getPlayerItemSync(playerId, AWAKE_ITEM_ID), 2)
+    assert.equal(getPlayerCollectedItemTotalSync(playerId, AWAKE_ITEM_ID), 2)
     assert.equal(result.settlement.userInfo.free_mana, after.freeMana)
     assert.equal(after.freeMana, before.freeMana + 7)
     assert.equal(after.freeVmoney, before.freeVmoney + 13)
     assert.equal(after.expPool, before.expPool + 11)
 })
 
-test("Awake settlement without an owner keeps the legacy granter behavior", () => {
+test("Awake settlement without an injected callback uses the default RewardGrant owner", () => {
     const playerId = createEligiblePlayer("awake-legacy")
     const before = getPlayerSync(playerId)
 
@@ -130,6 +134,7 @@ test("Awake settlement without an owner keeps the legacy granter behavior", () =
     const after = getPlayerSync(playerId)
     assert.equal(result.settlement.itemList[AWAKE_ITEM_ID], 2)
     assert.equal(getPlayerItemSync(playerId, AWAKE_ITEM_ID), 2)
+    assert.equal(getPlayerCollectedItemTotalSync(playerId, AWAKE_ITEM_ID), 2)
     assert.equal(result.settlement.userInfo.free_mana, after.freeMana)
     assert.equal(after.freeMana, before.freeMana + 7)
     assert.equal(after.freeVmoney, before.freeVmoney + 13)

@@ -222,8 +222,8 @@
           },
           "players_collected_items": {
             "reads": 1,
-            "statements": 8,
-            "writes": 7
+            "statements": 4,
+            "writes": 3
           },
           "players_degree_battle_stats": {
             "reads": 1,
@@ -236,9 +236,9 @@
             "writes": 1
           },
           "players_items": {
-            "reads": 7,
-            "statements": 14,
-            "writes": 7
+            "reads": 1,
+            "statements": 4,
+            "writes": 3
           },
           "players_mission_battle_counters": {
             "reads": 1,
@@ -261,10 +261,10 @@
             "writes": 0
           }
         },
-        "selectStatements": 26,
-        "statements": 64,
-        "transactionStatements": 16,
-        "writeStatements": 22
+        "selectStatements": 20,
+        "statements": 36,
+        "transactionStatements": 2,
+        "writeStatements": 14
       }
     },
     {
@@ -353,8 +353,8 @@
           },
           "players_collected_items": {
             "reads": 1,
-            "statements": 30,
-            "writes": 29
+            "statements": 4,
+            "writes": 3
           },
           "players_degree_battle_stats": {
             "reads": 1,
@@ -367,9 +367,9 @@
             "writes": 6
           },
           "players_items": {
-            "reads": 29,
-            "statements": 58,
-            "writes": 29
+            "reads": 1,
+            "statements": 4,
+            "writes": 3
           },
           "players_mission_battle_counters": {
             "reads": 1,
@@ -392,13 +392,13 @@
             "writes": 0
           }
         },
-        "selectStatements": 53,
-        "statements": 185,
-        "transactionStatements": 60,
-        "writeStatements": 72
+        "selectStatements": 25,
+        "statements": 47,
+        "transactionStatements": 2,
+        "writeStatements": 20
       }
     }
   ],
   "version": 2,
-  "sha256": "defbe19c1f93564967f98526447f87b8397cf796a1456d5d515ba5b6f0250b06"
+  "sha256": "8dc7a2aaf98d93b1e7285f4968bed570694ad3f39b0c5f3846c9e94fce77670d"
 }
