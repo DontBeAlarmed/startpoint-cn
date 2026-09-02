@@ -1,12 +1,10 @@
-import {
-    getPlayerItemSync,
-    recordPlayerCollectedItemWithinTransactionSync,
-    setPlayerItemWithinTransactionSync,
-    updatePlayerItemSync,
-} from "../data/domains/item"
 import { getPlayerSync, updatePlayerSync } from "../data/domains/player"
 import { getDb } from "../data/db"
 import { getItemEffectSync, ItemEffectEntry } from "./assets"
+import {
+    type InventoryItemResult,
+    withInventoryBatchContextWithinTransactionSync,
+} from "./inventory"
 import { computeRealTimeStamina } from "./stamina"
 import { Player } from "../data/types"
 import { getRealNow } from "../runtime/time/game-time"
@@ -16,7 +14,6 @@ const AS3_INT_MAX = 2_147_483_647
 export interface ItemUseInventoryChange {
     readonly id: number
     readonly beforeCount: number
-    readonly hasExistingRow: boolean
     readonly deductionCount: number
     readonly rewardCount: number
     readonly finalCount: number
@@ -61,8 +58,11 @@ export interface ItemUseSettlementResult {
 
 export interface ItemUseSettlementDependencies {
     readonly getPlayerSync: typeof getPlayerSync
-    readonly createItemUsePlan: typeof createItemUsePlan
-    readonly applyItemUsePlanSync: typeof applyItemUsePlanSync
+    readonly createItemUseIntent: typeof createItemUseIntent
+    readonly createItemUseStaminaPlan: typeof createItemUseStaminaPlan
+    readonly updatePlayerSync: typeof updatePlayerSync
+    readonly withInventoryBatchContextWithinTransactionSync:
+        typeof withInventoryBatchContextWithinTransactionSync
 }
 
 interface ParsedItemRequest {
@@ -74,6 +74,17 @@ interface ParsedItemRequest {
 interface StaminaSummary {
     recovery: number
     hasItem: boolean
+}
+
+interface ItemUseStaminaIntent {
+    readonly recovery: number
+}
+
+interface ItemUseIntent {
+    readonly affectedItemIds: readonly number[]
+    readonly deductions: readonly ItemUseRewardDelta[]
+    readonly rewards: readonly ItemUseRewardDelta[]
+    readonly stamina: ItemUseStaminaIntent | null
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -160,11 +171,10 @@ function addSafeCount(map: Map<number, number>, itemId: number, count: number): 
     map.set(itemId, next)
 }
 
-function createItemUsePlan(
+function createItemUseIntent(
     body: unknown,
-    player: Player,
     maxStaminaOverflow: number,
-): ItemUsePlan {
+): ItemUseIntent {
     const requests = parseRequest(body)
     const requestedCounts = new Map<number, number>()
     const selectedIndexes = new Map<number, number>()
@@ -202,86 +212,85 @@ function createItemUsePlan(
         if (effect.effectKind === 22) addSafeCount(requestedCounts, request.id, request.count)
     }
 
-    const inventoryChanges: ItemUseInventoryChange[] = []
     const affectedItemIds = new Set([...requestedCounts.keys(), ...rewardCounts.keys()])
-    for (const itemId of affectedItemIds) {
-        const deductionCount = requestedCounts.get(itemId) ?? 0
-        const rewardCount = rewardCounts.get(itemId) ?? 0
-        const beforeAmount = getPlayerItemSync(player.id, itemId)
-        const beforeCount = beforeAmount ?? 0
+    if (stamina.hasItem) {
+        if (stamina.recovery <= 0) throw new ItemUseValidationError("Zero recovery.")
+    }
+
+    if (affectedItemIds.size === 0) {
+        throw new ItemUseValidationError("No supported items.")
+    }
+
+    return {
+        affectedItemIds: [...affectedItemIds],
+        deductions: [...requestedCounts].map(([id, count]) => ({ id, count })),
+        rewards: [...rewardCounts].map(([id, count]) => ({ id, count })),
+        stamina: stamina.hasItem ? { recovery: stamina.recovery } : null,
+    }
+}
+
+function createItemUseStaminaPlan(
+    player: Player,
+    intent: ItemUseStaminaIntent | null,
+    maxStaminaOverflow: number,
+): ItemUseStaminaPlan | null {
+    if (intent === null) return null
+    const current = computeRealTimeStamina(player)
+    if (current >= maxStaminaOverflow) {
+        throw new ItemUseValidationError("Already at max stamina.", 2102)
+    }
+    return {
+        current,
+        recovery: intent.recovery,
+        after: Math.min(current + intent.recovery, maxStaminaOverflow),
+        recoveryTime: getRealNow(),
+    }
+}
+
+function planInventoryChanges(
+    intent: ItemUseIntent,
+    inventory: readonly InventoryItemResult[],
+): readonly ItemUseInventoryChange[] {
+    const beforeByItemId = new Map(inventory.map(item => [item.itemId, item.beforeAmount]))
+    const deductionByItemId = new Map(intent.deductions.map(item => [item.id, item.count]))
+    const rewardByItemId = new Map(intent.rewards.map(item => [item.id, item.count]))
+
+    return intent.affectedItemIds.map(itemId => {
+        const beforeCount = beforeByItemId.get(itemId)
+        if (beforeCount === undefined) {
+            throw new Error(`Inventory preload omitted item ${itemId}.`)
+        }
+        const deductionCount = deductionByItemId.get(itemId) ?? 0
+        const rewardCount = rewardByItemId.get(itemId) ?? 0
         if (beforeCount < deductionCount) throw new ItemUseValidationError("Insufficient items.")
         const finalCount = beforeCount - deductionCount + rewardCount
         if (!Number.isSafeInteger(finalCount) || finalCount < 0 || finalCount > AS3_INT_MAX) {
             throw new ItemUseValidationError(`Final item count is out of range for item ${itemId}.`)
         }
-        inventoryChanges.push({
-            id: itemId,
-            beforeCount,
-            hasExistingRow: beforeAmount !== null,
-            deductionCount,
-            rewardCount,
-            finalCount,
-        })
-    }
-
-    let staminaPlan: ItemUseStaminaPlan | null = null
-    if (stamina.hasItem) {
-        if (stamina.recovery <= 0) throw new ItemUseValidationError("Zero recovery.")
-        const current = computeRealTimeStamina(player)
-        if (current >= maxStaminaOverflow) {
-            throw new ItemUseValidationError("Already at max stamina.", 2102)
-        }
-        const after = Math.min(current + stamina.recovery, maxStaminaOverflow)
-        staminaPlan = {
-            current,
-            recovery: stamina.recovery,
-            after,
-            recoveryTime: getRealNow(),
-        }
-    }
-
-    const rewards = [...rewardCounts].map(([id, count]): ItemUseRewardDelta => ({ id, count }))
-    if (inventoryChanges.length === 0) {
-        throw new ItemUseValidationError("No supported items.")
-    }
-
-    return { inventoryChanges, rewards, stamina: staminaPlan }
+        return { id: itemId, beforeCount, deductionCount, rewardCount, finalCount }
+    })
 }
 
-function applyItemUsePlanSync(playerId: number, plan: ItemUsePlan): Record<string, number> {
-    for (const item of plan.inventoryChanges) {
-        if (item.deductionCount > 0 && item.rewardCount === 0) {
-            updatePlayerItemSync(playerId, item.id, item.beforeCount - item.deductionCount)
+function projectItemList(
+    changes: readonly ItemUseInventoryChange[],
+    results: readonly InventoryItemResult[],
+): Record<string, number> {
+    const resultByItemId = new Map(results.map(result => [result.itemId, result]))
+    return Object.fromEntries(changes.map(change => {
+        const result = resultByItemId.get(change.id)
+        if (result === undefined || result.afterAmount !== change.finalCount) {
+            throw new Error(`Inventory flush result did not match item use plan for item ${change.id}.`)
         }
-    }
-    if (plan.stamina !== null) {
-        updatePlayerSync({
-            id: playerId,
-            stamina: plan.stamina.after,
-            staminaHealTime: plan.stamina.recoveryTime,
-        })
-    }
-    for (const item of plan.inventoryChanges) {
-        if (item.rewardCount <= 0) continue
-        setPlayerItemWithinTransactionSync(
-            playerId,
-            item.id,
-            item.finalCount,
-            item.hasExistingRow,
-        )
-        recordPlayerCollectedItemWithinTransactionSync(playerId, item.id, item.rewardCount)
-    }
-
-    return Object.fromEntries(plan.inventoryChanges.map(item => [
-        String(item.id),
-        item.finalCount,
-    ]))
+        return [String(change.id), result.afterAmount]
+    }))
 }
 
 const DEFAULT_SETTLEMENT_DEPENDENCIES: ItemUseSettlementDependencies = {
     getPlayerSync,
-    createItemUsePlan,
-    applyItemUsePlanSync,
+    createItemUseIntent,
+    createItemUseStaminaPlan,
+    updatePlayerSync,
+    withInventoryBatchContextWithinTransactionSync,
 }
 
 export function settleItemUseInCallerTransactionSync(
@@ -295,7 +304,33 @@ export function settleItemUseInCallerTransactionSync(
     }
     const player = dependencies.getPlayerSync(playerId)
     if (!player) throw new ItemUsePlayerNotFoundError()
-    const plan = dependencies.createItemUsePlan(body, player, maxStaminaOverflow)
-    const itemList = dependencies.applyItemUsePlanSync(playerId, plan)
-    return { plan, itemList }
+    const intent = dependencies.createItemUseIntent(body, maxStaminaOverflow)
+
+    return dependencies.withInventoryBatchContextWithinTransactionSync({
+        playerId,
+        preloadItemIds: intent.affectedItemIds,
+    }, inventory => {
+        const changes = planInventoryChanges(intent, inventory.readMany(intent.affectedItemIds))
+        const staminaPlan = dependencies.createItemUseStaminaPlan(
+            player,
+            intent.stamina,
+            maxStaminaOverflow,
+        )
+        for (const deduction of intent.deductions) inventory.deduct(deduction.id, deduction.count)
+        for (const reward of intent.rewards) inventory.grant(reward.id, reward.count)
+        if (staminaPlan !== null) {
+            dependencies.updatePlayerSync({
+                id: playerId,
+                stamina: staminaPlan.after,
+                staminaHealTime: staminaPlan.recoveryTime,
+            })
+        }
+        const results = inventory.flush()
+        const plan: ItemUsePlan = {
+            inventoryChanges: changes,
+            rewards: intent.rewards,
+            stamina: staminaPlan,
+        }
+        return { plan, itemList: projectItemList(changes, results) }
+    })
 }

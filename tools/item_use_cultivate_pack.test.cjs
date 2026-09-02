@@ -275,12 +275,17 @@ test("stamina items and cultivate packs settle in one response and transaction",
     updatePlayerSync({ id: playerId, stamina: 0, staminaHealTime: new Date() })
     givePlayerItemSync(playerId, 100, 1)
     givePlayerItemSync(playerId, 999102, 1)
+    const start = sqlStatements.length
 
     const responseData = decodeSuccess(await useItem(viewerId, [
         { id: 100, number: 1, selectIndex: 0 },
         { id: 999102, number: 1, selectIndex: 1 },
     ])).data
+    const itemReads = sqlStatements
+        .slice(start)
+        .filter(sql => /\bFROM\s+players_items\b/i.test(sql))
 
+    assert.equal(itemReads.length, 1, itemReads.join("\n---\n"))
     assert.equal(getPlayerItemSync(playerId, 100), 0)
     assert.equal(getPlayerItemSync(playerId, 999102), 0)
     assert.equal(getPlayerItemSync(playerId, 4), 30)
@@ -320,16 +325,65 @@ test("stamina use at max returns 2102 without deduction", async () => {
     assert.equal(getPlayerItemSync(playerId, 100), 1)
 })
 
+test("inventory shortage is reported before full-stamina 2102", async () => {
+    const { playerId, viewerId } = await createPlayer("stamina-shortage-before-full")
+    const originalHealTime = new Date("2026-09-01T00:00:00.000Z")
+    updatePlayerSync({
+        id: playerId,
+        stamina: 999,
+        staminaHealTime: originalHealTime,
+    })
+
+    const response = await useItem(viewerId, [{ id: 100, number: 1, selectIndex: 0 }])
+    const error = response.json()
+    const afterPlayer = getPlayerSync(playerId)
+
+    assert.equal(response.statusCode, 400)
+    assert.equal(error.message, "Insufficient items.")
+    assert.equal(Object.hasOwn(error, "code"), false)
+    assert.equal(getPlayerItemSync(playerId, 100), null)
+    assert.equal(afterPlayer.stamina, 999)
+    assert.equal(afterPlayer.staminaHealTime.getTime(), originalHealTime.getTime())
+})
+
 test("item use validation errors carry a stable optional result code", () => {
     const error = new itemUseSettlement.ItemUseValidationError("stamina full", 2102)
     assert.equal(error.resultCode, 2102)
 })
 
-test("settlement entry keeps player read, planning, and apply inside caller transaction", () => {
+test("settlement entry follows the callback-scoped Inventory batch topology", () => {
     assert.equal(typeof itemUseSettlement.settleItemUseInCallerTransactionSync, "function")
     const calls = []
-    const fakePlan = { marker: "plan" }
-    const fakeItemList = { "999102": 0, "4": 30 }
+    const recoveryTime = new Date("2026-09-02T00:00:00.000Z")
+    const fakeIntent = {
+        affectedItemIds: [999102, 4],
+        deductions: [{ id: 999102, count: 1 }],
+        rewards: [{ id: 4, count: 30 }],
+        stamina: { recovery: 2 },
+    }
+    const fakeStaminaPlan = { current: 1, recovery: 2, after: 3, recoveryTime }
+    const fakeContext = {
+        readMany(itemIds) {
+            calls.push(`read-many:${itemIds.join(",")}`)
+            return [
+                { itemId: 999102, beforeAmount: 1, afterAmount: 1, obtainedAmount: 0 },
+                { itemId: 4, beforeAmount: 0, afterAmount: 0, obtainedAmount: 0 },
+            ]
+        },
+        deduct(itemId, amount) {
+            calls.push(`deduct:${itemId}:${amount}`)
+        },
+        grant(itemId, amount) {
+            calls.push(`grant:${itemId}:${amount}`)
+        },
+        flush() {
+            calls.push("flush")
+            return [
+                { itemId: 4, beforeAmount: 0, afterAmount: 30, obtainedAmount: 30 },
+                { itemId: 999102, beforeAmount: 1, afterAmount: 0, obtainedAmount: 0 },
+            ]
+        },
+    }
 
     const result = database.transaction(() => (
         itemUseSettlement.settleItemUseInCallerTransactionSync(7, { items: [] }, 999, {
@@ -338,22 +392,73 @@ test("settlement entry keeps player read, planning, and apply inside caller tran
                 calls.push(`read:${playerId}`)
                 return { id: playerId }
             },
-            createItemUsePlan(body, player, maxStaminaOverflow) {
+            createItemUseIntent(body, maxStaminaOverflow) {
                 assert.equal(database.inTransaction, true)
-                calls.push(`plan:${player.id}:${body.items.length}:${maxStaminaOverflow}`)
-                return fakePlan
+                calls.push(`intent:${body.items.length}:${maxStaminaOverflow}`)
+                return fakeIntent
             },
-            applyItemUsePlanSync(playerId, plan) {
+            withInventoryBatchContextWithinTransactionSync(options, callback) {
                 assert.equal(database.inTransaction, true)
-                assert.equal(plan, fakePlan)
-                calls.push(`apply:${playerId}`)
-                return fakeItemList
+                assert.deepEqual(options, { playerId: 7, preloadItemIds: [999102, 4] })
+                calls.push("batch")
+                return callback(fakeContext)
+            },
+            createItemUseStaminaPlan(player, staminaIntent, maxStaminaOverflow) {
+                assert.equal(database.inTransaction, true)
+                assert.equal(player.id, 7)
+                assert.deepEqual(staminaIntent, { recovery: 2 })
+                assert.equal(maxStaminaOverflow, 999)
+                assert.deepEqual(calls, [
+                    "read:7",
+                    "intent:0:999",
+                    "batch",
+                    "read-many:999102,4",
+                ], "inventory snapshot and final-count planning must precede the stamina plan")
+                calls.push("stamina-plan")
+                return fakeStaminaPlan
+            },
+            updatePlayerSync(update) {
+                assert.equal(database.inTransaction, true)
+                assert.deepEqual(update, { id: 7, stamina: 3, staminaHealTime: recoveryTime })
+                calls.push("stamina")
             },
         })
     ))()
 
-    assert.deepEqual(calls, ["read:7", "plan:7:0:999", "apply:7"])
-    assert.deepEqual(result, { plan: fakePlan, itemList: fakeItemList })
+    assert.deepEqual(calls, [
+        "read:7",
+        "intent:0:999",
+        "batch",
+        "read-many:999102,4",
+        "stamina-plan",
+        "deduct:999102:1",
+        "grant:4:30",
+        "stamina",
+        "flush",
+    ])
+    assert.deepEqual(result, {
+        plan: {
+            inventoryChanges: [
+                {
+                    id: 999102,
+                    beforeCount: 1,
+                    deductionCount: 1,
+                    rewardCount: 0,
+                    finalCount: 0,
+                },
+                {
+                    id: 4,
+                    beforeCount: 0,
+                    deductionCount: 0,
+                    rewardCount: 30,
+                    finalCount: 30,
+                },
+            ],
+            rewards: [{ id: 4, count: 30 }],
+            stamina: fakeStaminaPlan,
+        },
+        itemList: { "999102": 0, "4": 30 },
+    })
 
     const routeSource = fs.readFileSync(path.join(__dirname, "../src/routes/api/item.ts"), "utf8")
     const useItemBlock = routeSource.split('fastify.post("/use_item"')[1]
@@ -363,8 +468,8 @@ test("settlement entry keeps player read, planning, and apply inside caller tran
     assert.ok(transactionIndex >= 0)
     assert.ok(settlementIndex > transactionIndex)
     assert.equal(useItemBlock.includes("getPlayerSync("), false)
-    assert.equal(useItemBlock.includes("createItemUsePlan("), false)
-    assert.equal(useItemBlock.includes("applyItemUsePlanSync("), false)
+    assert.equal(useItemBlock.includes("createItemUseIntent("), false)
+    assert.equal(useItemBlock.includes("withInventoryBatchContextWithinTransactionSync("), false)
 })
 
 test("settlement entry rejects use outside an active caller transaction", () => {
@@ -372,11 +477,34 @@ test("settlement entry rejects use outside an active caller transaction", () => 
     assert.throws(
         () => itemUseSettlement.settleItemUseInCallerTransactionSync(7, {}, 999, {
             getPlayerSync: unexpected,
-            createItemUsePlan: unexpected,
-            applyItemUsePlanSync: unexpected,
+            createItemUseIntent: unexpected,
+            createItemUseStaminaPlan: unexpected,
+            updatePlayerSync: unexpected,
+            withInventoryBatchContextWithinTransactionSync: unexpected,
         }),
         /active caller transaction/i,
     )
+})
+
+test("item use and sell production paths have no legacy Item writer dependency", () => {
+    const productionFiles = [
+        "../src/lib/item-use-settlement.ts",
+        "../src/lib/item-sell.ts",
+    ]
+    const forbidden = [
+        "getPlayerItemSync",
+        "updatePlayerItemSync",
+        "setPlayerItemWithinTransactionSync",
+        "recordPlayerCollectedItemWithinTransactionSync",
+    ]
+
+    for (const relativeFile of productionFiles) {
+        const source = fs.readFileSync(path.join(__dirname, relativeFile), "utf8")
+        assert.match(source, /from "\.\/inventory"/)
+        for (const primitive of forbidden) {
+            assert.equal(source.includes(primitive), false, `${relativeFile} still uses ${primitive}`)
+        }
+    }
 })
 
 test("caller-transaction item grant rejects use outside an active transaction", async () => {

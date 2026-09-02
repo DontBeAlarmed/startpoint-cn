@@ -76,6 +76,50 @@ const database = {
     },
 }
 stubModule("../src/data/db", { getDb: () => database })
+class ItemUseValidationError extends Error {
+    constructor(message, resultCode) {
+        super(message)
+        this.resultCode = resultCode
+    }
+}
+class ItemUsePlayerNotFoundError extends Error {}
+stubModule("../src/lib/item-use-settlement", {
+    ItemUseValidationError,
+    ItemUsePlayerNotFoundError,
+    settleItemUseInCallerTransactionSync(playerId, body, maxStaminaOverflow) {
+        assert.equal(database.inTransaction, true)
+        assert.equal(playerId, 7)
+        assert.equal(maxStaminaOverflow, 999)
+        assert.deepEqual(body.items, [{ id: 100, number: 1, selectIndex: 0 }])
+
+        const beforeCount = staminaItemCount
+        const beforeStamina = player.stamina
+        const recoveryTime = new Date(1_000)
+        staminaItemCount -= 1
+        player.stamina += 1
+        player.staminaHealTime = recoveryTime
+
+        return {
+            plan: {
+                inventoryChanges: [{
+                    id: 100,
+                    beforeCount,
+                    deductionCount: 1,
+                    rewardCount: 0,
+                    finalCount: staminaItemCount,
+                }],
+                rewards: [],
+                stamina: {
+                    current: beforeStamina,
+                    recovery: 1,
+                    after: player.stamina,
+                    recoveryTime,
+                },
+            },
+            itemList: { "100": staminaItemCount },
+        }
+    },
+})
 stubModule("../src/lib/mail-notification", {
     getMailArrivedSync(playerId) {
         mailLookups.push(playerId)
