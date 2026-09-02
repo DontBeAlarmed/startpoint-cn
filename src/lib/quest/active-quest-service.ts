@@ -6,7 +6,6 @@ import {
     updatePlayerActiveQuestContinueCountSync,
 } from "../../data/domains/quest_active"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
-import { getPlayerItemSync, setPlayerItemSync } from "../../data/domains/item"
 import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json"
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 import { getRealNow } from "../../runtime/time/game-time"
@@ -16,6 +15,7 @@ import {
 } from "./entry-lifecycle"
 import type { StartEntryCost } from "./start-entry"
 import type { MultiCoordinatorOrigin } from "../../multi/coordinator/contracts"
+import { withEntryItemInventoryWithinTransactionSync } from "./entry-item-inventory"
 
 export interface ActiveQuest {
     questId: number
@@ -191,8 +191,7 @@ export function runAbortActiveQuestTransaction(
         getPlayer: getPlayerSync,
         computeStamina: computeEntryLifecycleStamina,
         updatePlayer: updatePlayerSync,
-        getItemCount: getPlayerItemSync,
-        setItemCount: setPlayerItemSync,
+        withEntryItemInventory: withEntryItemInventoryWithinTransactionSync,
         deleteActiveQuest: deletePlayerActiveQuestSync,
         clearActiveQuest: clearPublishedActiveQuest,
         getEntryCost: (category, questId) => (

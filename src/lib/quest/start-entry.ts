@@ -1,3 +1,5 @@
+import type { WithEntryItemInventory } from "./entry-item-inventory"
+
 export interface StartEntryCost {
     itemId: number
     itemCount: number
@@ -28,8 +30,7 @@ export interface StartEntryDependencies<TActiveQuest> {
     getActiveQuest?(playerId: number): unknown | null
     getPlayer(playerId: number): StartEntryPlayer | null
     computeStamina(player: StartEntryPlayer): number
-    getItemCount(playerId: number, itemId: number): number | null
-    updateItemCount(playerId: number, itemId: number, amount: number): void
+    withEntryItemInventory: WithEntryItemInventory
     updatePlayer(update: Partial<StartEntryPlayer> & Pick<StartEntryPlayer, "id">): void
     persistActiveQuest(playerId: number, activeQuest: TActiveQuest): void
     beforePersist?(playerId: number): void
@@ -105,27 +106,42 @@ export function runStartEntryTransaction<TActiveQuest>(
             ? input.entryCost
             : null
         const entryItemId = entryItemCost?.itemId ?? null
-        const currentItemCount = entryItemCost
-            ? dependencies.getItemCount(input.playerId, entryItemCost.itemId) ?? 0
-            : null
-        const currentStamina = dependencies.computeStamina(player)
-
-        if (entryItemCost && (currentItemCount ?? 0) < entryItemCost.itemCount) {
-            throw new InsufficientEntryItemError(
-                entryItemCost.itemId,
-                entryItemCost.itemCount,
-                currentItemCount ?? 0,
+        let currentStamina: number
+        let entryItemCount: number | null = null
+        if (entryItemCost) {
+            const entrySettlement = dependencies.withEntryItemInventory(
+                input.playerId,
+                inventory => {
+                    const currentItemCount = inventory.readAmount(entryItemCost.itemId)
+                    const transactionStamina = dependencies.computeStamina(player)
+                    if (currentItemCount < entryItemCost.itemCount) {
+                        throw new InsufficientEntryItemError(
+                            entryItemCost.itemId,
+                            entryItemCost.itemCount,
+                            currentItemCount,
+                        )
+                    }
+                    if (transactionStamina < input.staminaCost) {
+                        throw new InsufficientStaminaError(input.staminaCost, transactionStamina)
+                    }
+                    const itemResult = inventory.deduct(
+                        entryItemCost.itemId,
+                        entryItemCost.itemCount,
+                    )
+                    inventory.flush()
+                    return {
+                        currentStamina: transactionStamina,
+                        entryItemCount: itemResult.afterAmount,
+                    }
+                },
             )
-        }
-        if (currentStamina < input.staminaCost) {
-            throw new InsufficientStaminaError(input.staminaCost, currentStamina)
-        }
-
-        const entryItemCount = entryItemCost
-            ? (currentItemCount ?? 0) - entryItemCost.itemCount
-            : null
-        if (entryItemId !== null) {
-            dependencies.updateItemCount(input.playerId, entryItemId, entryItemCount ?? 0)
+            currentStamina = entrySettlement.currentStamina
+            entryItemCount = entrySettlement.entryItemCount
+        } else {
+            currentStamina = dependencies.computeStamina(player)
+            if (currentStamina < input.staminaCost) {
+                throw new InsufficientStaminaError(input.staminaCost, currentStamina)
+            }
         }
 
         const afterStamina = currentStamina - input.staminaCost

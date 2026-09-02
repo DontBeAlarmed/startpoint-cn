@@ -499,7 +499,11 @@ const restoreContentSnapshot = installBundledGameplaySnapshot({
 const { closeDatabase, initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { getPlayerItemSync, givePlayerItemSync } = require("../src/data/domains/item")
+const {
+    getPlayerCollectedItemTotalSync,
+    getPlayerItemSync,
+    givePlayerItemSync,
+} = require("../src/data/domains/item")
 const { getPlayerPeriodicRewardPointsSync } = require("../src/data/domains/campaign")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const {
@@ -1049,6 +1053,34 @@ function observableSettlementState(db, playerId) {
     }
 }
 
+function installEntryItemWriteAudit(db, playerId) {
+    db.exec(`
+        CREATE TABLE w4_multi_entry_item_write_audit (after_amount INTEGER NOT NULL);
+        CREATE TRIGGER w4_multi_audit_entry_item_update
+        AFTER UPDATE OF amount ON players_items
+        WHEN NEW.player_id = ${playerId} AND NEW.id = ${productionQuest.ticketId}
+        BEGIN
+            INSERT INTO w4_multi_entry_item_write_audit VALUES (NEW.amount);
+        END;
+        CREATE TRIGGER w4_multi_audit_entry_item_insert
+        AFTER INSERT ON players_items
+        WHEN NEW.player_id = ${playerId} AND NEW.id = ${productionQuest.ticketId}
+        BEGIN
+            INSERT INTO w4_multi_entry_item_write_audit VALUES (NEW.amount);
+        END;
+    `)
+}
+
+function entryItemWriteAudit(db) {
+    return db.prepare(`
+        SELECT after_amount AS afterAmount FROM w4_multi_entry_item_write_audit ORDER BY rowid
+    `).all()
+}
+
+function resetEntryItemWriteAudit(db) {
+    db.prepare("DELETE FROM w4_multi_entry_item_write_audit").run()
+}
+
 test("production /start rejects a changed compatibility profile before local entry writes", async () => {
     let home
     try {
@@ -1101,6 +1133,11 @@ test("production /start charges only the host in isolated SQLite home saves", as
             battleSessionId,
             coordinatorOrigin: "remote",
         })
+        assert.equal(
+            getPlayerCollectedItemTotalSync(home.playerId, productionQuest.ticketId),
+            1,
+            "host entry deduct must not increase collected total",
+        )
         assert.equal(home.coordinatorCalls.every(call => (
             !Object.hasOwn(call, "database") && !Object.hasOwn(call, "grantRewards")
         )), true)
@@ -1127,10 +1164,98 @@ test("production /start charges only the host in isolated SQLite home saves", as
             battleSessionId,
             coordinatorOrigin: "remote",
         })
+        assert.equal(
+            getPlayerCollectedItemTotalSync(home.playerId, productionQuest.ticketId),
+            1,
+            "guest no-cost start must not change collected total",
+        )
     } finally {
         await closeProductionHome(home)
     }
 })
+
+for (const [label, participant, isHost] of [
+    ["host", host, true],
+    ["guest", guest, false],
+]) {
+    const expectation = isHost
+        ? "restores the host prepaid entry Item"
+        : "leaves the guest Item untouched"
+    test(`production failed /finish ${expectation}`, async () => {
+        let home
+        try {
+            home = await openProductionHome(
+                `failed-finish-${label}`,
+                participant,
+                isHost,
+                { verify: async () => ({ ok: true, isHost }) },
+            )
+            installEntryItemWriteAudit(home.db, home.playerId)
+            const collectedBefore = getPlayerCollectedItemTotalSync(
+                home.playerId,
+                productionQuest.ticketId,
+            )
+            const playId = `failed-finish-${label}`
+            const started = await home.app.inject({
+                method: "POST",
+                url: "/start",
+                payload: startPayload(participant.viewerId, playId),
+            })
+            assert.equal(started.statusCode, 200, started.body)
+            assert.deepEqual(
+                entryItemWriteAudit(home.db),
+                isHost ? [{ afterAmount: 0 }] : [],
+            )
+            resetEntryItemWriteAudit(home.db)
+
+            if (isHost) {
+                home.db.exec(`
+                    CREATE TRIGGER reject_w4_multi_active_quest_delete
+                    BEFORE DELETE ON players_active_quests
+                    WHEN OLD.player_id = ${home.playerId}
+                    BEGIN SELECT RAISE(ABORT, 'forced W4 multi Item restore rollback'); END;
+                `)
+                const failed = await home.app.inject({
+                    method: "POST",
+                    url: "/finish",
+                    payload: finishPayload(participant.viewerId, playId, {
+                        is_accomplished: false,
+                    }),
+                })
+                assert.equal(failed.statusCode, 500, failed.body)
+                assert.equal(getPlayerItemSync(home.playerId, productionQuest.ticketId), 0)
+                assert.deepEqual(entryItemWriteAudit(home.db), [])
+                assert.equal(
+                    getPlayerCollectedItemTotalSync(home.playerId, productionQuest.ticketId),
+                    collectedBefore,
+                )
+                assert.notEqual(getPlayerActiveQuestSync(home.playerId), null)
+                home.db.exec("DROP TRIGGER reject_w4_multi_active_quest_delete")
+            }
+
+            const finished = await home.app.inject({
+                method: "POST",
+                url: "/finish",
+                payload: finishPayload(participant.viewerId, playId, {
+                    is_accomplished: false,
+                }),
+            })
+            assert.equal(finished.statusCode, 200, finished.body)
+            assert.equal(getPlayerItemSync(home.playerId, productionQuest.ticketId), 1)
+            assert.deepEqual(
+                entryItemWriteAudit(home.db),
+                isHost ? [{ afterAmount: 1 }] : [],
+            )
+            assert.equal(
+                getPlayerCollectedItemTotalSync(home.playerId, productionQuest.ticketId),
+                collectedBefore,
+            )
+            assert.equal(getPlayerActiveQuestSync(home.playerId), null)
+        } finally {
+            await closeProductionHome(home)
+        }
+    })
+}
 
 test("production /finish settles through a real HubClient session rotation", async t => {
     const hub = createRotatingHub(t)

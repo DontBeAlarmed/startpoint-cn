@@ -576,6 +576,7 @@ const TEST_GROUPS = Object.freeze({
         timeoutMs: 120_000,
         tests: [
             "tools/auto_start_stamina_stop.test.cjs",
+            "tools/battle_entry_inventory_route.test.cjs",
             "tools/perf/single_battle_settlement_admission.test.cjs",
             "tools/perf/single_battle_settlement_baseline.test.cjs",
             "tools/quest_entry_lifecycle.test.cjs",

@@ -85,6 +85,7 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/lib/event-shop-purchase.ts",
         "src/lib/item-sell.ts",
         "src/lib/item-use-settlement.ts",
+        "src/lib/quest/entry-item-inventory.ts",
         "src/lib/reward-grant/executor.ts",
         "src/lib/reward-grant/inventory-adapter.ts",
         "src/lib/reward-grant/owner-executor.ts",
@@ -178,6 +179,42 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         /rewardPlayerBoxGachaResultSync/,
     )
 
+    const battleEntryAdapter = fs.readFileSync(
+        path.join(projectRoot, "src/lib/quest/entry-item-inventory.ts"),
+        "utf8",
+    )
+    assert.match(battleEntryAdapter, /withInventoryBatchContextWithinTransactionSync\(/)
+    assert.match(battleEntryAdapter, /inventory\.deduct\(/)
+    assert.match(battleEntryAdapter, /inventory\.restore\(/)
+    assert.doesNotMatch(
+        battleEntryAdapter,
+        /InventoryItemSync\(|item-cap-plan|event-trade|mana-capacity|domains\/mail|getDb\(\)\.transaction|SAVEPOINT/,
+    )
+    const battleEntryMigrationFiles = [
+        "src/lib/quest/active-quest-service.ts",
+        "src/lib/quest/finish/single-entry-resource-settlement.ts",
+        "src/lib/quest/start-entry.ts",
+        "src/multi/http/battle.ts",
+        "src/multi/settlement/orchestrator.ts",
+        "src/routes/api/singleBattleQuest.ts",
+    ]
+    for (const relativePath of battleEntryMigrationFiles) {
+        const contents = fs.readFileSync(path.join(projectRoot, relativePath), "utf8")
+        assert.doesNotMatch(
+            contents,
+            /\b(?:givePlayerItemSync|givePlayerItemWithinTransactionSync|insertPlayerItemsSync|setPlayerItemSync|setPlayerItemWithinTransactionSync|updatePlayerItemSync|recordPlayerCollectedItemWithinTransactionSync)\b/,
+            relativePath,
+        )
+    }
+    assert.match(
+        fs.readFileSync(path.join(projectRoot, "src/lib/quest/start-entry.ts"), "utf8"),
+        /inventory\.readAmount\([\s\S]*dependencies\.computeStamina\([\s\S]*InsufficientEntryItemError[\s\S]*InsufficientStaminaError[\s\S]*inventory\.deduct\([\s\S]*inventory\.flush\(\)/,
+    )
+    assert.match(
+        fs.readFileSync(path.join(projectRoot, "src/lib/quest/entry-lifecycle.ts"), "utf8"),
+        /inventory\.restore\([\s\S]*inventory\.flush\(\)[\s\S]*itemList\[prepaidItem\.itemId\] = restored\.afterAmount/,
+    )
+
     const legacy = fs.readFileSync(path.join(projectRoot, "src/data/domains/item.ts"), "utf8")
     assert.match(legacy, /export function givePlayerItemSync/)
     assert.match(legacy, /export function givePlayerItemWithinTransactionSync/)
@@ -207,15 +244,9 @@ test("remaining legacy Item mutation references match the staged migration manif
         // W5 legacy Quest / Mission rewards.
         "src/lib/mission/grants.ts",
         "src/lib/quest.ts",
-        // W4 Battle entry / restore / settlement.
-        "src/lib/quest/active-quest-service.ts",
+        // W5 legacy periodic and Carnival reward writers.
         "src/lib/quest/finish/periodic-reward-handler.ts",
-        "src/lib/quest/finish/single-entry-resource-settlement.ts",
         "src/lib/quest/finish/single-settlement-writes.ts",
-        "src/multi/http/battle.ts",
-        "src/multi/settlement/orchestrator.ts",
-        // W4 Battle route.
-        "src/routes/api/singleBattleQuest.ts",
         // W6 maintenance adapter.
         "src/routes/web_api/player.ts",
     ])

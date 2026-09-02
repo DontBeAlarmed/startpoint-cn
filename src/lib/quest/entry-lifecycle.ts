@@ -3,6 +3,7 @@ import { assertDailyChallengePointAvailable } from "./daily-challenge"
 import { STAMINA_OVERFLOW_MAX, computeRealTimeStamina } from "../stamina"
 import type { StartEntryCost } from "./start-entry"
 import { PlayerNotFoundError } from "./start-entry"
+import type { WithEntryItemInventory } from "./entry-item-inventory"
 
 export interface EntryLifecycleActiveQuest {
     playId: string
@@ -28,8 +29,7 @@ export interface AbortEntryDependencies<TActiveQuest extends EntryLifecycleActiv
     getPlayer(playerId: number): EntryLifecyclePlayer | null
     computeStamina(player: EntryLifecyclePlayer): number
     updatePlayer(update: Partial<EntryLifecyclePlayer> & Pick<EntryLifecyclePlayer, "id">): void
-    getItemCount(playerId: number, itemId: number): number | null
-    setItemCount(playerId: number, itemId: number, amount: number): void
+    withEntryItemInventory: WithEntryItemInventory
     deleteActiveQuest(playerId: number): void
     clearActiveQuest(playerId: number): void
     getEntryCost(category: number, questId: number): StartEntryCost | undefined
@@ -101,8 +101,7 @@ export interface ReleaseEntryResourcesDependencies {
     getPlayer(playerId: number): EntryLifecyclePlayer | null
     computeStamina(player: EntryLifecyclePlayer): number
     updatePlayer(update: Partial<EntryLifecyclePlayer> & Pick<EntryLifecyclePlayer, "id">): void
-    getItemCount(playerId: number, itemId: number): number | null
-    setItemCount(playerId: number, itemId: number, amount: number): void
+    withEntryItemInventory: WithEntryItemInventory
     deleteActiveQuest(playerId: number): void
     getEntryCost?(
         category: number,
@@ -309,10 +308,12 @@ export function releaseEntryResources<TActiveQuest extends EntryLifecycleActiveQ
         ? resolvePrepaidEntryItem(activeQuest, dependencies.getEntryCost ?? (() => undefined))
         : null
     if (prepaidItem) {
-        const afterCount = (dependencies.getItemCount(playerId, prepaidItem.itemId) ?? 0)
-            + prepaidItem.itemCount
-        dependencies.setItemCount(playerId, prepaidItem.itemId, afterCount)
-        itemList[prepaidItem.itemId] = afterCount
+        const restored = dependencies.withEntryItemInventory(playerId, inventory => {
+            const itemResult = inventory.restore(prepaidItem.itemId, prepaidItem.itemCount)
+            inventory.flush()
+            return itemResult
+        })
+        itemList[prepaidItem.itemId] = restored.afterAmount
     }
 
     dependencies.deleteActiveQuest(playerId)

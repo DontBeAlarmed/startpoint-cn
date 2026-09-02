@@ -111,8 +111,8 @@ test("abort complete and recovery identities each read stored active once", asyn
                 if (measured.error) throw measured.error
                 assert.equal(measured.value.statusCode, 200)
                 assertSql(measured.sql, {
-                    statements: 10,
-                    selectStatements: 6,
+                    statements: 9,
+                    selectStatements: 5,
                     writeStatements: 2,
                     transactionStatements: 2,
                     playerReads: 2,

@@ -5,7 +5,6 @@ import {
     updatePlayerDailyChallengePointSync,
     updatePlayerSync,
 } from "../../../data/domains/player"
-import { getPlayerItemSync, setPlayerItemSync } from "../../../data/domains/item"
 import { deletePlayerActiveQuestSync } from "../../../data/domains/quest_active"
 import { getRealNow } from "../../../runtime/time/game-time"
 import { computeEntryLifecycleStamina } from "../entry-lifecycle"
@@ -15,6 +14,7 @@ import {
     releaseEntryResources,
     type ChallengePointProjection,
 } from "../entry-lifecycle"
+import { withEntryItemInventoryWithinTransactionSync } from "../entry-item-inventory"
 
 export interface SingleEntryResourceSettlementInput {
     playerId: number
@@ -66,8 +66,7 @@ export function settleSingleEntryResources(
         getPlayer: getPlayerSync,
         computeStamina: computeEntryLifecycleStamina,
         updatePlayer: updatePlayerSync,
-        getItemCount: getPlayerItemSync,
-        setItemCount: setPlayerItemSync,
+        withEntryItemInventory: withEntryItemInventoryWithinTransactionSync,
         deleteActiveQuest: deletePlayerActiveQuestSync,
     })
     return {

@@ -78,16 +78,34 @@ function createResourceFixture({
             writes.push(["player", structuredClone(update)])
             state.player = { ...state.player, ...update }
         },
-        getItemCount(playerId, itemId) {
+        withEntryItemInventory(playerId, operation) {
             dependencies.assertInsideTransaction()
             assert.equal(playerId, 7)
-            assert.equal(itemId, activeQuest.entryItemId)
-            return state.itemCount
-        },
-        setItemCount(playerId, itemId, amount) {
-            dependencies.assertInsideTransaction()
-            writes.push(["item", itemId, amount])
-            state.itemCount = amount
+            let afterAmount = state.itemCount
+            let touched = false
+            return operation({
+                readAmount(itemId) {
+                    assert.equal(itemId, activeQuest.entryItemId)
+                    return afterAmount
+                },
+                deduct(itemId, amount) {
+                    assert.equal(itemId, activeQuest.entryItemId)
+                    afterAmount -= amount
+                    touched = true
+                    return { afterAmount, obtainedAmount: 0 }
+                },
+                restore(itemId, amount) {
+                    assert.equal(itemId, activeQuest.entryItemId)
+                    afterAmount += amount
+                    touched = true
+                    return { afterAmount, obtainedAmount: 0 }
+                },
+                flush() {
+                    if (!touched) return
+                    writes.push(["item", activeQuest.entryItemId, afterAmount])
+                    state.itemCount = afterAmount
+                },
+            })
         },
         deleteActiveQuest(playerId) {
             dependencies.assertInsideTransaction()
@@ -143,10 +161,7 @@ function createResourceFixture({
             partySlot: 1,
         }),
         computeStamina: player => player.stamina + 3,
-        getItemCount: () => 4,
-        updateItemCount: (_playerId, _itemId, amount) => {
-            fixture.dependencies.setItemCount(7, 500000, amount)
-        },
+        withEntryItemInventory: fixture.dependencies.withEntryItemInventory,
         updatePlayer: update => fixture.dependencies.updatePlayer(update),
         persistActiveQuest: (_playerId, quest) => { persisted = structuredClone(quest) },
         publishActiveQuest: () => {},

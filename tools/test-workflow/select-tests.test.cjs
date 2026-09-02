@@ -11,6 +11,21 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["src/lib/quest/finish/session-validator.ts"]),
         ["integration:quest", "quick:quest"],
     )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest/entry-item-inventory.ts"]),
+        [
+            "integration:multi-hub",
+            "integration:party",
+            "integration:quest",
+            "integration:rules",
+            "quick:protocol",
+            "quick:quest",
+        ],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/battle_entry_inventory_route.test.cjs"]),
+        ["integration:quest"],
+    )
     for (const file of [
         "src/lib/quest/abort-request-validation.ts",
         "src/lib/quest/entry-lifecycle.ts",
@@ -1749,6 +1764,7 @@ test("splits isolated integration tests into focused domains", () => {
     ])
     assert.deepEqual(TEST_GROUPS["integration:quest"].tests, [
         "tools/auto_start_stamina_stop.test.cjs",
+        "tools/battle_entry_inventory_route.test.cjs",
         "tools/perf/single_battle_settlement_admission.test.cjs",
         "tools/perf/single_battle_settlement_baseline.test.cjs",
         "tools/quest_entry_lifecycle.test.cjs",

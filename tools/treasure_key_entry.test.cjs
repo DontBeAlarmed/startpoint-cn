@@ -38,6 +38,7 @@ function createFixture({
     let publishedWithinTransaction = false
     let transactionActive = false
     let transactionCount = 0
+    let inventoryContextCount = 0
     const writes = []
 
     function persistActiveQuest(_playerId, activeQuest) {
@@ -76,13 +77,29 @@ function createFixture({
         computeStamina(player) {
             return player.stamina
         },
-        getItemCount() {
-            return databaseState.itemCount
-        },
-        updateItemCount(_playerId, _itemId, amount) {
+        withEntryItemInventory(_playerId, operation) {
             assert.equal(transactionActive, true)
-            writes.push("item")
-            databaseState.itemCount = amount
+            inventoryContextCount++
+            let afterAmount = databaseState.itemCount
+            let touched = false
+            return operation({
+                readAmount() { return afterAmount },
+                deduct(_itemId, amount) {
+                    afterAmount -= amount
+                    touched = true
+                    return { afterAmount, obtainedAmount: 0 }
+                },
+                restore(_itemId, amount) {
+                    afterAmount += amount
+                    touched = true
+                    return { afterAmount, obtainedAmount: 0 }
+                },
+                flush() {
+                    if (!touched) return
+                    writes.push("item")
+                    databaseState.itemCount = afterAmount
+                },
+            })
         },
         updatePlayer(update) {
             assert.equal(transactionActive, true)
@@ -111,6 +128,7 @@ function createFixture({
         }),
         getPublishedWithinTransaction: () => publishedWithinTransaction,
         getTransactionCount: () => transactionCount,
+        getInventoryContextCount: () => inventoryContextCount,
         writes,
     }
 }
@@ -183,6 +201,16 @@ function createInput() {
     assert.equal(fixture.getState().player.stamina, 40)
     assert.equal(fixture.getState().activeQuest, null)
     assert.equal(fixture.getState().publishedActiveQuest, null)
+}
+
+{
+    const fixture = createFixture({ itemCount: 0, stamina: 0 })
+    assert.throws(
+        () => runStartEntryTransaction(createInput(), fixture.dependencies),
+        InsufficientEntryItemError,
+        "entry Item shortage must remain higher priority than stamina shortage",
+    )
+    assert.deepEqual(fixture.writes, [])
 }
 
 {
@@ -270,6 +298,81 @@ function createInput() {
 
 assert.deepEqual(buildStartEntryItemList({ entryItemId: 500000, entryItemCount: 0 }), { 500000: 0 })
 assert.deepEqual(buildStartEntryItemList({ entryItemId: null, entryItemCount: null }), {})
+
+{
+    const fixture = createFixture()
+    const input = createInput()
+    input.entryCost = undefined
+    input.staminaCost = 0
+    input.activeQuest.entryItemId = undefined
+    const result = runStartEntryTransaction(input, fixture.dependencies)
+    assert.equal(result.entryItemId, null)
+    assert.equal(result.entryItemCount, null)
+    assert.equal(fixture.getInventoryContextCount(), 0)
+    assert.equal(fixture.writes.includes("item"), false)
+}
+
+{
+    const order = []
+    let transactionActive = false
+    runStartEntryTransaction(createInput(), {
+        transaction(operation) {
+            order.push("transaction:start")
+            transactionActive = true
+            try { return operation() } finally {
+                transactionActive = false
+                order.push("transaction:end")
+            }
+        },
+        getActiveQuest() {
+            order.push("activeQuest")
+            return null
+        },
+        getPlayer() {
+            order.push("player")
+            return {
+                id: 7, stamina: 40, staminaHealTime: new Date(0),
+                rankPoint: 0, totalStaminaUsed: 0, partySlot: 1,
+            }
+        },
+        beforePersist() { order.push("beforePersist") },
+        withEntryItemInventory(_playerId, operation) {
+            assert.equal(transactionActive, true)
+            return operation({
+                readAmount() { order.push("item:read"); return 4 },
+                deduct() {
+                    order.push("item:deduct")
+                    return { afterAmount: 3, obtainedAmount: 0 }
+                },
+                restore() { throw new Error("start must not restore") },
+                flush() { order.push("item:flush") },
+            })
+        },
+        computeStamina() { order.push("stamina"); return 40 },
+        updatePlayer() { order.push("player:update") },
+        persistActiveQuest() { order.push("activeQuest:persist") },
+        afterPersist() { order.push("afterPersist") },
+        publishActiveQuest() {
+            assert.equal(transactionActive, false)
+            order.push("activeQuest:publish")
+        },
+    })
+    assert.deepEqual(order, [
+        "transaction:start",
+        "activeQuest",
+        "player",
+        "beforePersist",
+        "item:read",
+        "stamina",
+        "item:deduct",
+        "item:flush",
+        "player:update",
+        "activeQuest:persist",
+        "afterPersist",
+        "transaction:end",
+        "activeQuest:publish",
+    ])
+}
 
 const routeSource = fs.readFileSync(
     path.join(projectRoot, "src/routes/api/singleBattleQuest.ts"),

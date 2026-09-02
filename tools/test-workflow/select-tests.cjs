@@ -203,6 +203,17 @@ const SOURCE_RULES = [
         groups: ["integration:quest", "quick:quest"],
     },
     {
+        pattern: /^src\/lib\/quest\/entry-item-inventory\.ts$/,
+        groups: [
+            "integration:multi-hub",
+            "integration:party",
+            "integration:quest",
+            "integration:rules",
+            "quick:protocol",
+            "quick:quest",
+        ],
+    },
+    {
         pattern: /^(?:src\/lib\/quest\/single-continue-request\.ts|tools\/single_continue_request\.test\.cjs)$/,
         groups: ["quick:quest"],
     },

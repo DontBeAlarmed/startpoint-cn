@@ -24,12 +24,17 @@ const restoreContentSnapshot = installBundledGameplaySnapshot({
 const { closeDatabase, initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { getPlayerItemSync, givePlayerItemSync } = require("../src/data/domains/item")
+const {
+    getPlayerCollectedItemTotalSync,
+    getPlayerItemSync,
+    givePlayerItemSync,
+} = require("../src/data/domains/item")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getPlayerActiveQuestSync } = require("../src/data/domains/quest_active")
 const {
     activeQuests,
     insertActiveQuest,
+    releaseAbandonedMultiActiveQuest,
     runAbortActiveQuestTransaction,
 } = require("../src/lib/quest/active-quest-service")
 const { MultiSettlementVerifier } = require("../src/multi/settlement/verifier")
@@ -233,6 +238,11 @@ for (const [role, entry] of [
         assert.equal(getPlayerActiveQuestSync(home.playerId), null)
         assert.equal(activeQuests[home.playerId], undefined)
         assert.equal(getPlayerItemSync(home.playerId, QUEST.ticketId), entry.expectedItems)
+        assert.equal(
+            getPlayerCollectedItemTotalSync(home.playerId, QUEST.ticketId),
+            3,
+            "load recovery restore must not increase collected total",
+        )
         assert.equal(getDb().prepare(
             "SELECT COUNT(*) AS count FROM players_receive_history WHERE player_id = ?",
         ).get(home.playerId).count, 0)
@@ -264,6 +274,39 @@ test("load recovery exposes refunded stamina in the same response", async t => {
     assert.equal(getPlayerItemSync(home.playerId, QUEST.ticketId), 5)
 })
 
+test("authoritative missing load rolls Item restore back when active deletion fails late", async t => {
+    const quest = activeQuest("missing-rollback")
+    const home = await openHome("missing-rollback", quest)
+    const app = await buildLoadApp({ inspect: async () => ({ state: "missing" }) })
+    t.after(async () => {
+        delete activeQuests[home.playerId]
+        await app.close()
+    })
+    getDb().exec(`
+        CREATE TRIGGER reject_w4_load_active_delete
+        BEFORE DELETE ON players_active_quests
+        WHEN OLD.player_id = ${home.playerId}
+        BEGIN SELECT RAISE(ABORT, 'forced W4 load recovery rollback'); END;
+    `)
+
+    const failed = await load(app)
+
+    assert.equal(failed.response.statusCode, 500, failed.response.body)
+    assert.equal(getPlayerItemSync(home.playerId, QUEST.ticketId), 3)
+    assert.equal(getPlayerCollectedItemTotalSync(home.playerId, QUEST.ticketId), 3)
+    assert.notEqual(getPlayerActiveQuestSync(home.playerId), null)
+    assert.equal(getDb().prepare(
+        "SELECT COUNT(*) AS count FROM players_receive_history WHERE player_id = ?",
+    ).get(home.playerId).count, 0)
+
+    getDb().exec("DROP TRIGGER reject_w4_load_active_delete")
+    const retried = await load(app)
+    assert.equal(retried.response.statusCode, 200, retried.response.body)
+    assert.equal(getPlayerItemSync(home.playerId, QUEST.ticketId), 5)
+    assert.equal(getPlayerCollectedItemTotalSync(home.playerId, QUEST.ticketId), 3)
+    assert.equal(getPlayerActiveQuestSync(home.playerId), null)
+})
+
 test("concurrent missing load and abort refund a stored cost once", async t => {
     const quest = activeQuest("concurrent-missing")
     const home = await openHome("concurrent-missing", quest)
@@ -288,6 +331,25 @@ test("concurrent missing load and abort refund a stored cost once", async t => {
     assert.equal(aborted.cancelled, true)
     assert.equal(loaded.response.statusCode, 200, loaded.response.body)
     assert.equal(getPlayerActiveQuestSync(home.playerId), null)
+    assert.equal(getPlayerItemSync(home.playerId, QUEST.ticketId), 5)
+})
+
+test("abandoned multi room restores the host prepaid Item once", async () => {
+    const quest = activeQuest("abandoned-room")
+    const home = await openHome("abandoned-room", quest)
+
+    assert.equal(
+        releaseAbandonedMultiActiveQuest(home.playerId, "654321"),
+        false,
+        "a different room must not release this active quest",
+    )
+    assert.equal(getPlayerItemSync(home.playerId, QUEST.ticketId), 3)
+    assert.equal(releaseAbandonedMultiActiveQuest(home.playerId, quest.roomNumber), true)
+    assert.equal(getPlayerItemSync(home.playerId, QUEST.ticketId), 5)
+    assert.equal(getPlayerCollectedItemTotalSync(home.playerId, QUEST.ticketId), 3)
+    assert.equal(getPlayerActiveQuestSync(home.playerId), null)
+    assert.equal(activeQuests[home.playerId], undefined)
+    assert.equal(releaseAbandonedMultiActiveQuest(home.playerId, quest.roomNumber), false)
     assert.equal(getPlayerItemSync(home.playerId, QUEST.ticketId), 5)
 })
 

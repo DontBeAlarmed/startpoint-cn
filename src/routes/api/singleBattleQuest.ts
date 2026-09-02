@@ -1,7 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { getPlayerActiveQuestSync } from "../../data/domains/quest_active"
 import { getPlayerDailyChallengePointListSync, getPlayerSync, refreshPlayerDailyChallengePointsForRealDaySync, updatePlayerSync } from "../../data/domains/player"
-import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
 import { getPlayerMailCountSync } from "../../data/domains/mail"
 import {
     getConfigSync,
@@ -66,6 +65,7 @@ import {
     DailyChallengePointUnavailableError,
     getDailyChallengePointId,
 } from "../../lib/quest/daily-challenge"
+import { withEntryItemInventoryWithinTransactionSync } from "../../lib/quest/entry-item-inventory"
 
 export interface SingleBattleQuestRouteOptions {
     readonly dailyResetHour?: number
@@ -326,8 +326,7 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
                 getActiveQuest: getPlayerActiveQuestSync,
                 getPlayer: getPlayerSync,
                 computeStamina: computeRealTimeStamina,
-                getItemCount: getPlayerItemSync,
-                updateItemCount: updatePlayerItemSync,
+                withEntryItemInventory: withEntryItemInventoryWithinTransactionSync,
                 updatePlayer: updatePlayerSync,
                 persistActiveQuest,
                 beforePersist: pointPlayerId => {

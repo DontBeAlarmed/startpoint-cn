@@ -132,8 +132,8 @@
       },
       "behaviorSha256": "d917487d4b4fddb977228b9708c35aefe6ea6298a840636c4502073f51346a3d",
       "sql": {
-        "statements": 43,
-        "selectStatements": 28,
+        "statements": 42,
+        "selectStatements": 27,
         "writeStatements": 7,
         "transactionStatements": 8,
         "byTable": {
@@ -188,8 +188,8 @@
             "writes": 0
           },
           "players_items": {
-            "statements": 5,
-            "reads": 3,
+            "statements": 4,
+            "reads": 2,
             "writes": 2
           },
           "players_mails": {

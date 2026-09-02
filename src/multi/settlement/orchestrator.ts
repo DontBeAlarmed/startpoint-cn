@@ -46,7 +46,6 @@ import {
 } from "../../lib/reward-campaign"
 import { getCommonScoreRewardCount } from "../../lib/score-reward-lottery"
 import { addStaminaWithOverflowCap, getMaxStamina, getRankDegree } from "../../lib/stamina"
-import { getPlayerItemSync, setPlayerItemSync } from "../../data/domains/item"
 import { PlayerNotFoundError } from "../../lib/quest/start-entry"
 import { QuestCategory, type BattleQuest } from "../../lib/types"
 import { formatHardMultiMissionDiagnostic } from "../../lib/mission/client-check-diagnostics"
@@ -63,6 +62,7 @@ import type { MultiFinishBody } from "../types"
 import {
     settleRescueFragmentReward,
 } from "../rescue-fragment-reward"
+import { withEntryItemInventoryWithinTransactionSync } from "../../lib/quest/entry-item-inventory"
 
 export interface MultiplayerSettlementPreparationInput {
     readonly body: MultiFinishBody
@@ -269,8 +269,7 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
                 getPlayer: getPlayerSync,
                 computeStamina: computeEntryLifecycleStamina,
                 updatePlayer: updatePlayerSync,
-                getItemCount: getPlayerItemSync,
-                setItemCount: setPlayerItemSync,
+                withEntryItemInventory: withEntryItemInventoryWithinTransactionSync,
                 deleteActiveQuest,
             })
         player.totalStaminaUsed = (player.totalStaminaUsed ?? 0) + entryResourceResult.staminaUsed

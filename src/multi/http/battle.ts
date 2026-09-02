@@ -17,7 +17,6 @@ import {
     getPlayerSync,
     updatePlayerSync,
 } from "../../data/domains/player";
-import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item";
 import { getQuestConfigurationErrorResponse, getQuestFromCategorySync } from "../../lib/assets";
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings";
 import { computeRealTimeStamina } from "../../lib/stamina";
@@ -49,6 +48,7 @@ import {
 } from "../settlement/orchestrator";
 import { projectMultiplayerFinishResponse } from "../settlement/response";
 import { resolveLocalRescueFragmentEligibility } from "../rescue-fragment-reward";
+import { withEntryItemInventoryWithinTransactionSync } from "../../lib/quest/entry-item-inventory";
 
 export function canAbortMultiBattle(
     roomNumber: string,
@@ -241,8 +241,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 getActiveQuest: getPlayerActiveQuestSync,
                 getPlayer: getPlayerSync,
                 computeStamina: computeRealTimeStamina,
-                getItemCount: getPlayerItemSync,
-                updateItemCount: updatePlayerItemSync,
+                withEntryItemInventory: withEntryItemInventoryWithinTransactionSync,
                 updatePlayer: updatePlayerSync,
                 persistActiveQuest,
                 publishActiveQuest,

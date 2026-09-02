@@ -90,14 +90,28 @@ function createFixture({
             activeReads++
             return databaseState.activeQuest
         },
-        getItemCount() {
+        withEntryItemInventory(_playerId, operation) {
             assert.equal(transactionActive, true)
-            return databaseState.itemCount
-        },
-        setItemCount(_playerId, _itemId, amount) {
-            assert.equal(transactionActive, true)
-            writes.push("item")
-            databaseState.itemCount = amount
+            let afterAmount = databaseState.itemCount
+            let touched = false
+            return operation({
+                readAmount() { return afterAmount },
+                deduct(_itemId, amount) {
+                    afterAmount -= amount
+                    touched = true
+                    return { afterAmount, obtainedAmount: 0 }
+                },
+                restore(_itemId, amount) {
+                    afterAmount += amount
+                    touched = true
+                    return { afterAmount, obtainedAmount: 0 }
+                },
+                flush() {
+                    if (!touched) return
+                    writes.push("item")
+                    databaseState.itemCount = afterAmount
+                },
+            })
         },
         deleteActiveQuest() {
             assert.equal(transactionActive, true)
@@ -413,15 +427,35 @@ const transactionDependencies = {
             entryItemCount: row.entry_item_count,
         }) : null
     },
-    getItemCount(playerId, itemId) {
-        return transactionDb.prepare(`
-            SELECT amount FROM players_items WHERE player_id = ? AND id = ?
-        `).get(playerId, itemId)?.amount ?? null
-    },
-    setItemCount(playerId, itemId, amount) {
-        transactionDb.prepare(`
-            UPDATE players_items SET amount = ? WHERE player_id = ? AND id = ?
-        `).run(amount, playerId, itemId)
+    withEntryItemInventory(playerId, operation) {
+        let afterAmount = null
+        let touched = false
+        return operation({
+            readAmount(itemId) {
+                afterAmount = transactionDb.prepare(`
+                    SELECT amount FROM players_items WHERE player_id = ? AND id = ?
+                `).get(playerId, itemId)?.amount ?? 0
+                return afterAmount
+            },
+            deduct(itemId, amount) {
+                if (afterAmount === null) this.readAmount(itemId)
+                afterAmount -= amount
+                touched = true
+                return { afterAmount, obtainedAmount: 0 }
+            },
+            restore(itemId, amount) {
+                if (afterAmount === null) this.readAmount(itemId)
+                afterAmount += amount
+                touched = true
+                return { afterAmount, obtainedAmount: 0 }
+            },
+            flush() {
+                if (!touched) return
+                transactionDb.prepare(`
+                    UPDATE players_items SET amount = ? WHERE player_id = ? AND id = ?
+                `).run(afterAmount, playerId, 10000072)
+            },
+        })
     },
     deleteActiveQuest(playerId) {
         transactionDb.prepare(`DELETE FROM players_active_quests WHERE player_id = ?`).run(playerId)
