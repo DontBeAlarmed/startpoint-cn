@@ -109,13 +109,16 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/lib/character-growth/commands/stack-to-exp.ts",
         "src/lib/event-shop-purchase.ts",
         "src/lib/event-trade-expiry-settlement.ts",
+        "src/lib/gacha-reward-grant.ts",
         "src/lib/item-sell.ts",
         "src/lib/item-use-settlement.ts",
         "src/lib/quest/entry-item-inventory.ts",
         "src/lib/quest/finish/periodic-reward-handler.ts",
+        "src/lib/reward-grant/execution-engine.ts",
         "src/lib/reward-grant/executor.ts",
         "src/lib/reward-grant/inventory-adapter.ts",
         "src/lib/reward-grant/owner-executor.ts",
+        "src/lib/reward-grant/transaction-executor.ts",
         "src/lib/shop-reward-grant.ts",
         "src/routes/api/boxGacha.ts",
         "src/routes/api/equipment.ts",
@@ -178,7 +181,19 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
     assert.match(gachaRoute, /inventory\.deduct\([\s\S]*execPlan\.ticket\.useTicketCount/)
     assert.match(
         gachaRoute,
-        /executeRewardGrantPlanInTransactionOwnerWithInventoryInternalSync\([\s\S]*knownPlayerBefore,[\s\S]*inventory/,
+        /grantGachaRewardPlanInTransactionOwnerWithInventorySync\([\s\S]*id:\s*player\.id[\s\S]*inventory/,
+    )
+    const gachaRewardGrant = fs.readFileSync(
+        path.join(projectRoot, "src/lib/gacha-reward-grant.ts"),
+        "utf8",
+    )
+    assert.match(
+        gachaRewardGrant,
+        /function validateGrant\([\s\S]*snapshotRewardGrantExecutionResultForPlan\(playerId, plan, grant\)/,
+    )
+    assert.match(
+        gachaRewardGrant,
+        /withRewardGrantExecutionPlanAsTransactionOwnerWithInventorySync\([\s\S]*knownPlayerBefore\.id[\s\S]*const result = validateGrant\([\s\S]*execution\.finalize\(\)/,
     )
     const boxGachaRoute = fs.readFileSync(
         path.join(projectRoot, "src/routes/api/boxGacha.ts"),
@@ -198,7 +213,7 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
     assert.match(boxGachaRewardGrant, /inventory\.readMany\(\[\.\.\.drawResult\.items\.keys\(\)\]\)/)
     assert.match(
         boxGachaRewardGrant,
-        /executeRewardGrantPlanInTransactionOwnerWithInventoryInternalSync\([\s\S]*knownPlayerBefore,[\s\S]*inventory/,
+        /withRewardGrantExecutionPlanAsTransactionOwnerWithInventorySync\([\s\S]*knownPlayerBefore\.id[\s\S]*snapshotRewardGrantExecutionResultForPlan\([\s\S]*execution\.finalize\(\)/,
     )
     assert.doesNotMatch(boxGachaRoute, /\bgetPlayerItemSync\b/)
     assert.doesNotMatch(
@@ -332,7 +347,7 @@ test("caller-verified late migration paths establish transaction-local Player ex
     )
     assert.match(
         scheduled,
-        /getDb\(\)\.transaction\(\(\) => \{[\s\S]*const currentPlayer = getPlayerSync\(input\.player\.id\)[\s\S]*executeRewardGrantPlanInTransactionOwnerSync\([\s\S]*currentPlayer\.freeMana/,
+        /getDb\(\)\.transaction\(\(\) => \{[\s\S]*const currentPlayer = getPlayerSync\(input\.player\.id\)[\s\S]*executeRewardGrantExecutionPlanAsTransactionOwnerSync\([\s\S]*currentPlayer\.freeMana/,
     )
 })
 

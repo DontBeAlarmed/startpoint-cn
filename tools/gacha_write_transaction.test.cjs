@@ -39,11 +39,10 @@ const gachaRoutes = require("../src/routes/api/gacha").default
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 const { rewardPlayerGachaDrawResultSync } = require("../src/lib/gacha")
 const { getDefaultGachaSeedQuarantine } = require("../src/lib/gacha-seed-quarantine")
-const {
-    executeRewardGrantPlanInTransactionOwnerInternalSync,
-} = require("../src/lib/reward-grant/owner-executor")
 const { GachaType } = require("../src/lib/types")
-const { RewardGrantExecutionError } = require("../src/lib/reward-grant")
+const {
+    executeRewardGrantExecutionPlanAsTransactionOwnerSync,
+} = require("../src/lib/reward-grant")
 
 let database
 let app
@@ -88,6 +87,7 @@ async function captureGachaLogs(operation) {
 function rewardGrantPlayerSnapshot(playerId) {
     const player = getPlayerSync(playerId)
     return {
+        playerId: player.id,
         freeMana: player.freeMana,
         freeVmoney: player.freeVmoney,
         expPool: player.expPool,
@@ -445,7 +445,7 @@ test("legacy fallback result remains equal to the pre-migration fixture", async 
     assert.deepEqual(normalized, require("./fixtures/gacha-reward-legacy.json"))
 })
 
-test("character owner plan preserves per-draw source movies duplicate deltas and merged state", async () => {
+test("character owner plan preserves per-draw movie order duplicate deltas and merged state", async () => {
     const { playerId } = await createPlayer("gacha-owner-character-plan")
     const existingCharacterId = 1
     const newCharacterId = 251001
@@ -493,7 +493,7 @@ test("character owner plan preserves per-draw source movies duplicate deltas and
                 {
                     ownerGrant: plan => {
                         capturedPlan = plan
-                        return executeRewardGrantPlanInTransactionOwnerInternalSync(
+                        return executeRewardGrantExecutionPlanAsTransactionOwnerSync(
                             playerId,
                             plan,
                             knownPlayerBefore,
@@ -508,12 +508,7 @@ test("character owner plan preserves per-draw source movies duplicate deltas and
     }
 
     assert.ok(capturedPlan, "owner callback must receive the character reward plan")
-    assert.deepEqual(capturedPlan.entries.map(entry => entry.source), drawResult.map((rewardId, drawIndex) => ({
-        drawIndex,
-        kind: "character",
-        rewardId,
-    })))
-    assert.deepEqual(capturedPlan.entries.map(entry => entry.reward.id), drawResult)
+    assert.deepEqual(capturedPlan.entries.map(entry => entry.id), drawResult)
     assert.equal(measured.result.draw.length, drawResult.length)
     assert.deepEqual(measured.result.draw[3], {
         character_id: specialMovieCharacterId,
@@ -596,7 +591,7 @@ test("equipment owner plan preserves draw order metadata effects and last equipm
             {
                 ownerGrant: plan => {
                     capturedPlan = plan
-                    return executeRewardGrantPlanInTransactionOwnerInternalSync(
+                    return executeRewardGrantExecutionPlanAsTransactionOwnerSync(
                         playerId,
                         plan,
                         knownPlayerBefore,
@@ -610,11 +605,7 @@ test("equipment owner plan preserves draw order metadata effects and last equipm
 
     assert.deepEqual(movieInputs, metadata.map(({ id, rank, isGuarantee }) => ({ id, rank, isGuarantee })))
     assert.ok(capturedPlan, "owner callback must receive the equipment reward plan")
-    assert.deepEqual(capturedPlan.entries.map(entry => entry.source), drawResult.map((rewardId, drawIndex) => ({
-        drawIndex,
-        kind: "equipment",
-        rewardId,
-    })))
+    assert.deepEqual(capturedPlan.entries.map(entry => entry.id), drawResult)
     assert.deepEqual(result.draw, [
         { equipment_id: drawResult[0], treasure_up_type: 3 },
         { equipment_id: drawResult[1], treasure_up_type: 0 },
@@ -627,7 +618,7 @@ test("equipment owner plan preserves draw order metadata effects and last equipm
     ])
 })
 
-test("owner path rejects metadata and returned source mismatches with no committed rewards", async () => {
+test("owner path rejects metadata and returned typed reward mismatches with no committed rewards", async () => {
     const movieMismatchPlayer = await createPlayer("gacha-owner-movie-mismatch")
     let movieMismatchOwnerCalls = 0
     assert.throws(
@@ -658,7 +649,7 @@ test("owner path rejects metadata and returned source mismatches with no committ
             [{ id: 5040016, rank: 4, isGuarantee: false }],
             undefined,
             {
-                ownerGrant: plan => executeRewardGrantPlanInTransactionOwnerInternalSync(
+                ownerGrant: plan => executeRewardGrantExecutionPlanAsTransactionOwnerSync(
                     metadataMismatchPlayer.playerId,
                     plan,
                     rewardGrantPlayerSnapshot(metadataMismatchPlayer.playerId),
@@ -669,10 +660,10 @@ test("owner path rejects metadata and returned source mismatches with no committ
     )
     assert.deepEqual(getPlayerEquipmentListSync(metadataMismatchPlayer.playerId), {})
 
-    const sourceMismatchPlayer = await createPlayer("gacha-owner-source-mismatch")
+    const resultMismatchPlayer = await createPlayer("gacha-owner-result-mismatch")
     assert.throws(
         database.transaction(() => rewardPlayerGachaDrawResultSync(
-            sourceMismatchPlayer.playerId,
+            resultMismatchPlayer.playerId,
             { type: GachaType.WEAPON },
             [5040016, 5020008],
             [
@@ -682,23 +673,23 @@ test("owner path rejects metadata and returned source mismatches with no committ
             undefined,
             {
                 ownerGrant: plan => {
-                    const granted = executeRewardGrantPlanInTransactionOwnerInternalSync(
-                        sourceMismatchPlayer.playerId,
+                    const granted = executeRewardGrantExecutionPlanAsTransactionOwnerSync(
+                        resultMismatchPlayer.playerId,
                         plan,
-                        rewardGrantPlayerSnapshot(sourceMismatchPlayer.playerId),
+                        rewardGrantPlayerSnapshot(resultMismatchPlayer.playerId),
                     )
                     return {
                         ...granted,
                         entries: granted.entries.map((entry, index) => index === 0
-                            ? { ...entry, source: { ...entry.source, drawIndex: 9 } }
+                            ? { ...entry, reward: { ...entry.reward, id: 999999999 } }
                             : entry),
                     }
                 },
             },
         )),
-        /source.*draw result/i,
+        /Invalid RewardGrant contract at entry 0: reward/,
     )
-    assert.deepEqual(getPlayerEquipmentListSync(sourceMismatchPlayer.playerId), {})
+    assert.deepEqual(getPlayerEquipmentListSync(resultMismatchPlayer.playerId), {})
 })
 
 test("owner path rolls a valid earlier draw back when a later character is unknown", async () => {
@@ -716,7 +707,7 @@ test("owner path rolls a valid earlier draw back when a later character is unkno
                 { characterId: 999999996, rarity: 4, movieId: "normal", seed: 1002, requiresVerification: true },
             ],
             {
-                ownerGrant: plan => executeRewardGrantPlanInTransactionOwnerInternalSync(
+                ownerGrant: plan => executeRewardGrantExecutionPlanAsTransactionOwnerSync(
                     playerId,
                     plan,
                     knownPlayerBefore,
@@ -724,7 +715,7 @@ test("owner path rolls a valid earlier draw back when a later character is unkno
                 deferCharacterSampledLog: () => assert.fail("failed grants must not schedule a success log"),
             },
         )),
-        RewardGrantExecutionError,
+        /RewardGrant entry 1 failed: unknown Character 999999996/,
     )
     assert.equal(getPlayerCharacterSync(playerId, 251001), null)
 })

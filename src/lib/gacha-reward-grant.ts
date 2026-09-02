@@ -1,6 +1,11 @@
-import { createRewardGrantPlan } from "./reward-grant"
-import type { RewardGrantPlan } from "./reward-grant"
-import type { InternalRewardGrantResult } from "./reward-grant/entry-result"
+import {
+    createRewardGrantExecutionPlan,
+    snapshotRewardGrantExecutionResultForPlan,
+    withRewardGrantExecutionPlanAsTransactionOwnerWithInventorySync,
+    type RewardGrantExecutionPlan,
+    type RewardGrantExecutionResult,
+} from "./reward-grant"
+import type { InventoryBatchContext } from "./inventory"
 import { RewardType } from "./types/rewards"
 import type {
     Gacha,
@@ -26,14 +31,15 @@ export interface PlannedCharacterGachaMovie {
     requiresVerification: boolean
 }
 
-export interface GachaRewardSource {
-    readonly drawIndex: number
-    readonly kind: "character" | "equipment"
-    readonly rewardId: number
+export interface GachaRewardKnownPlayerState {
+    readonly id: number
+    readonly freeMana: number
+    readonly freeVmoney: number
+    readonly expPool: number
 }
 export type GachaRewardGrantOwner = (
-    plan: RewardGrantPlan<GachaRewardSource>,
-) => InternalRewardGrantResult<GachaRewardSource>
+    plan: RewardGrantExecutionPlan,
+) => RewardGrantExecutionResult
 
 export interface GachaRewardGrantOptions {
     readonly ownerGrant?: GachaRewardGrantOwner
@@ -49,21 +55,20 @@ export class GachaRewardGrantMismatchError extends Error {
 const gachaSeedQuarantine = getDefaultGachaSeedQuarantine()
 
 function createPlan(
-    kind: GachaRewardSource["kind"],
+    kind: "character" | "equipment",
     drawResult: readonly number[],
-): RewardGrantPlan<GachaRewardSource> {
+): RewardGrantExecutionPlan {
     const rewardType = kind === "character" ? RewardType.CHARACTER : RewardType.EQUIPMENT
-    return createRewardGrantPlan(drawResult.map((rewardId, drawIndex) => ({
-        source: { drawIndex, kind, rewardId },
-        reward: kind === "character"
+    return createRewardGrantExecutionPlan(drawResult.map(rewardId => (
+        kind === "character"
             ? { type: rewardType as RewardType.CHARACTER, id: rewardId }
-            : { type: rewardType as RewardType.EQUIPMENT, id: rewardId, count: 1 },
-    })))
+            : { type: rewardType as RewardType.EQUIPMENT, id: rewardId, count: 1 }
+    )))
 }
 
 function assertPlanMatchesDrawResult(
-    plan: RewardGrantPlan<GachaRewardSource>,
-    kind: GachaRewardSource["kind"],
+    plan: RewardGrantExecutionPlan,
+    kind: "character" | "equipment",
     drawResult: readonly number[],
 ): void {
     if (plan.entries.length !== drawResult.length) {
@@ -71,13 +76,11 @@ function assertPlanMatchesDrawResult(
     }
     for (let index = 0; index < drawResult.length; index += 1) {
         const entry = plan.entries[index]
-        if (entry.source.drawIndex !== index
-            || entry.source.kind !== kind
-            || entry.source.rewardId !== drawResult[index]
-            || !("id" in entry.reward)
-            || entry.reward.id !== drawResult[index]) {
+        if (!("id" in entry)
+            || entry.id !== drawResult[index]
+            || entry.type !== (kind === "character" ? RewardType.CHARACTER : RewardType.EQUIPMENT)) {
             throw new GachaRewardGrantMismatchError(
-                `Gacha reward plan source at index ${index} does not match draw result`,
+                `Gacha reward plan at index ${index} does not match draw result`,
             )
         }
     }
@@ -108,29 +111,36 @@ function assertEquipmentMetadata(
     }
 }
 
-function assertGrantMatchesPlan(
-    plan: RewardGrantPlan<GachaRewardSource>,
-    grant: InternalRewardGrantResult<GachaRewardSource>,
-): void {
-    if (grant.entries.length !== plan.entries.length) {
-        throw new GachaRewardGrantMismatchError("Gacha reward entry count does not match plan")
-    }
-    for (let index = 0; index < plan.entries.length; index += 1) {
-        const expected = plan.entries[index]
-        const actual = grant.entries[index]
-        const source = actual?.source
-        if (source?.drawIndex !== index
-            || source.kind !== expected.source.kind
-            || source.rewardId !== expected.source.rewardId
-            || actual.reward.type !== expected.reward.type
-            || !("id" in actual.reward)
-            || !("id" in expected.reward)
-            || actual.reward.id !== expected.reward.id) {
-            throw new GachaRewardGrantMismatchError(
-                `Gacha reward source at index ${index} does not match draw result`,
-            )
-        }
-    }
+function validateGrant(
+    playerId: number,
+    plan: RewardGrantExecutionPlan,
+    grant: RewardGrantExecutionResult,
+): RewardGrantExecutionResult {
+    return snapshotRewardGrantExecutionResultForPlan(playerId, plan, grant)
+}
+
+export function grantGachaRewardPlanInTransactionOwnerWithInventorySync(
+    playerId: number,
+    plan: RewardGrantExecutionPlan,
+    knownPlayerBefore: GachaRewardKnownPlayerState,
+    inventory: InventoryBatchContext,
+): RewardGrantExecutionResult {
+    return withRewardGrantExecutionPlanAsTransactionOwnerWithInventorySync(
+        playerId,
+        plan,
+        {
+            playerId: knownPlayerBefore.id,
+            freeMana: knownPlayerBefore.freeMana,
+            freeVmoney: knownPlayerBefore.freeVmoney,
+            expPool: knownPlayerBefore.expPool,
+        },
+        inventory,
+        execution => {
+            const result = validateGrant(playerId, plan, execution.result)
+            execution.finalize()
+            return result
+        },
+    )
 }
 
 function scheduleCharacterLog(
@@ -158,7 +168,8 @@ function scheduleCharacterLog(
 
 function projectCharacters(
     playerId: number,
-    grant: InternalRewardGrantResult<GachaRewardSource>,
+    grant: RewardGrantExecutionResult,
+    drawResult: readonly number[],
     moviePlan: readonly PlannedCharacterGachaMovie[],
     deferLog: GachaRewardGrantOptions["deferCharacterSampledLog"],
 ): RewardPlayerGachaDrawResult {
@@ -169,13 +180,13 @@ function projectCharacters(
     for (let index = 0; index < grant.entries.length; index += 1) {
         const entry = grant.entries[index]
         const plannedMovie = moviePlan[index]
-        if (entry.result.character_list.length !== 1) {
+        if (entry.outcome.kind !== "character") {
             throw new GachaRewardGrantMismatchError(
                 `Character gacha reward result at index ${index} is invalid`,
             )
         }
-        const characterId = entry.source.rewardId
-        const character = entry.result.character_list[0]
+        const characterId = drawResult[index]
+        const character = entry.outcome.after
         const draw: GachaCharacterDraw = {
             character_id: characterId,
             movie_id: plannedMovie.movieId,
@@ -194,23 +205,13 @@ function projectCharacters(
             plannedMovie.seed,
             plannedMovie.rarity,
         )
-        const itemDeltas = Object.entries(entry.itemDeltas ?? {})
-        if (itemDeltas.length > 1) {
-            throw new GachaRewardGrantMismatchError(
-                `Character gacha compensation at index ${index} is invalid`,
-            )
-        }
-        if (itemDeltas.length === 1) {
-            const [itemIdText, count] = itemDeltas[0]
-            const itemId = Number(itemIdText)
-            const finalCount = entry.result.items[itemId]
-            if (!Number.isSafeInteger(itemId) || finalCount === undefined) {
-                throw new GachaRewardGrantMismatchError(
-                    `Character gacha compensation at index ${index} is invalid`,
-                )
+        const compensation = entry.outcome.compensationItem
+        if (compensation !== null) {
+            draw.ex_boost_item = {
+                id: compensation.itemId,
+                count: compensation.acceptedAmount,
             }
-            draw.ex_boost_item = { id: itemId, count }
-            items[itemId] = finalCount
+            items[compensation.itemId] = compensation.afterAmount
         }
 
         const existingCharacter = characters.get(characterId)
@@ -230,20 +231,21 @@ function projectCharacters(
 }
 
 function projectEquipment(
-    grant: InternalRewardGrantResult<GachaRewardSource>,
+    grant: RewardGrantExecutionResult,
+    drawResult: readonly number[],
     effects: ReturnType<typeof computeEquipmentGachaMovieEffectsForGacha>,
 ): RewardPlayerGachaDrawResult {
     const draws: GachaDraws = []
     const equipment = new Map<number, Object>()
     for (let index = 0; index < grant.entries.length; index += 1) {
         const entry = grant.entries[index]
-        if (entry.result.equipment_list.length !== 1) {
+        if (entry.outcome.kind !== "equipment") {
             throw new GachaRewardGrantMismatchError(
                 `Equipment gacha reward result at index ${index} is invalid`,
             )
         }
-        const equipmentId = entry.source.rewardId
-        equipment.set(equipmentId, entry.result.equipment_list[0])
+        const equipmentId = drawResult[index]
+        equipment.set(equipmentId, entry.outcome.after)
         draws.push({
             equipment_id: equipmentId,
             treasure_up_type: effects.draws[index]?.treasureUpType ?? 0,
@@ -274,11 +276,11 @@ export function rewardGachaDrawResultThroughGrantOwnerSync(
         assertCharacterMoviePlan(drawResult, characterMoviePlan)
         const plan = createPlan("character", drawResult)
         assertPlanMatchesDrawResult(plan, "character", drawResult)
-        const grant = options.ownerGrant(plan)
-        assertGrantMatchesPlan(plan, grant)
+        const grant = validateGrant(playerId, plan, options.ownerGrant(plan))
         return projectCharacters(
             playerId,
             grant,
+            drawResult,
             characterMoviePlan,
             options.deferCharacterSampledLog,
         )
@@ -293,7 +295,6 @@ export function rewardGachaDrawResultThroughGrantOwnerSync(
     const effects = computeEquipmentGachaMovieEffectsForGacha(gacha, movieInputs)
     const plan = createPlan("equipment", drawResult)
     assertPlanMatchesDrawResult(plan, "equipment", drawResult)
-    const grant = options.ownerGrant(plan)
-    assertGrantMatchesPlan(plan, grant)
-    return projectEquipment(grant, effects)
+    const grant = validateGrant(playerId, plan, options.ownerGrant(plan))
+    return projectEquipment(grant, drawResult, effects)
 }

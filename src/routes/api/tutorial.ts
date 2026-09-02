@@ -11,7 +11,7 @@ import {
 import { getPlayerCharacterSync } from "../../data/domains/character"
 import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
-import { executeRewardGrantPlanInTransactionOwnerInternalSync } from "../../lib/reward-grant/owner-executor"
+import { executeRewardGrantExecutionPlanAsTransactionOwnerSync } from "../../lib/reward-grant"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { getGachaSync } from "../../lib/assets";
@@ -327,10 +327,11 @@ const routes = async (fastify: FastifyInstance) => {
                     undefined,
                     undefined,
                     {
-                        ownerGrant: plan => executeRewardGrantPlanInTransactionOwnerInternalSync(
+                        ownerGrant: plan => executeRewardGrantExecutionPlanAsTransactionOwnerSync(
                             playerId,
                             plan,
                             {
+                                playerId: currentPlayer.id,
                                 freeMana: currentPlayer.freeMana,
                                 freeVmoney: currentPlayer.freeVmoney,
                                 expPool: currentPlayer.expPool,

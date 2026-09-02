@@ -102,6 +102,13 @@ const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
 const boxGachaRoutes = require("../src/routes/api/boxGacha").default
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
+const { givePlayerCharacterSync } = require("../src/lib/character")
+const {
+    grantBoxGachaDrawInTransactionOwnerWithInventorySync,
+} = require("../src/lib/box-gacha-reward-grant")
+const {
+    withDeferredInventoryBatchContextWithinTransactionSync,
+} = require("../src/lib/inventory")
 
 let database
 let app
@@ -237,6 +244,52 @@ test("box gacha exec rolls flushed Inventory and rewards back on late drawn-hist
         measured.statements.filter(sql => /^\s*(?:SAVEPOINT|RELEASE)\b/i.test(sql)).length,
         0,
     )
+})
+
+test("box reward adapter preserves mixed absolute Item and duplicate compensation projection", async () => {
+    const { playerId } = await createPlayer("box-mixed-reward")
+    const characterId = 1
+    const compensationItemId = 14002
+    givePlayerCharacterSync(playerId, characterId)
+    setInventoryFixtureItemExactSync(playerId, compensationItemId, 5)
+    const player = getPlayerSync(playerId)
+
+    const result = database.transaction(() => (
+        withDeferredInventoryBatchContextWithinTransactionSync({
+            playerId,
+            preloadItemIds: [compensationItemId],
+            playerExistence: "caller-verified",
+        }, inventory => grantBoxGachaDrawInTransactionOwnerWithInventorySync(
+            playerId,
+            {
+                rewards: [],
+                mana: 4,
+                exp: 3,
+                characters: new Map([[characterId, 1]]),
+                equipment: new Map(),
+                items: new Map([[compensationItemId, 2]]),
+            },
+            player,
+            inventory,
+        ))
+    ))()
+
+    assert.equal(getPlayerItemSync(playerId, compensationItemId), 8)
+    assert.deepEqual(result.rewardResult.items, { [compensationItemId]: 8 })
+    assert.deepEqual(result.rewardResult.user_info, {
+        free_mana: 4,
+        free_vmoney: 0,
+        exp_pool: 3,
+    })
+    assert.equal(result.rewardResult.character_list.length, 1)
+    assert.deepEqual(result.rewardResult.joined_character_id_list, [])
+    assert.deepEqual(result.playerAfter, {
+        freeMana: player.freeMana + 4,
+        freeVmoney: player.freeVmoney,
+        expPool: player.expPool + 3,
+    })
+    assert.equal(JSON.stringify(result).includes("source"), false)
+    assert.equal(JSON.stringify(result).includes("itemDeltas"), false)
 })
 
 for (const invalid of [

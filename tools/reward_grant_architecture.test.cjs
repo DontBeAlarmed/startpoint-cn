@@ -197,7 +197,6 @@ test("only approved standard reward domains and single settlement paths consume 
         "src/lib/scheduled-resource-settlement.ts",
         "src/lib/shop-reward-grant.ts",
         "src/routes/api/boxGacha.ts",
-        "src/routes/api/gacha.ts",
         "src/routes/api/mail.ts",
         "src/routes/api/shop.ts",
         "src/routes/api/tutorial.ts",

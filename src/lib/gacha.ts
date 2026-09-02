@@ -18,6 +18,7 @@ import { rewardPlayerGachaDrawResultLegacySync } from "./gacha-reward-legacy";
 
 export { drawGachaSync, drawGachaWithMetadataSync, selectWeightedIndexByRoll } from "./gacha-draw";
 export type { GachaDrawMetadata } from "./gacha-draw";
+export { grantGachaRewardPlanInTransactionOwnerWithInventorySync } from "./gacha-reward-grant"
 
 const gachaSeedCatalog = getDefaultGachaSeedCatalog();
 

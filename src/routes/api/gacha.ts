@@ -4,7 +4,12 @@ import { getPlayerGachaCampaignSync, getPlayerGachaInfoListSync, getPlayerGachaI
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { generateDataHeaders } from "../../utils";
-import { drawGachaWithMetadataSync, planCharacterGachaMovies, rewardPlayerGachaDrawResultSync } from "../../lib/gacha";
+import {
+    drawGachaWithMetadataSync,
+    grantGachaRewardPlanInTransactionOwnerWithInventorySync,
+    planCharacterGachaMovies,
+    rewardPlayerGachaDrawResultSync,
+} from "../../lib/gacha";
 import { getGachaCampaignIdSync, getGachaSync } from "../../lib/assets";
 import { CharacterGacha, GachaType } from "../../lib/types";
 import { serializeGachaCampaign } from "../../data/utils";
@@ -22,7 +27,6 @@ import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
 import { withDeferredInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
-import { executeRewardGrantPlanInTransactionOwnerWithInventoryInternalSync } from "../../lib/reward-grant/owner-executor";
 
 interface ExecBody {
     api_count: number,
@@ -316,11 +320,6 @@ const routes = async (fastify: FastifyInstance) => {
         const transactionResult = getDb().transaction(() => {
             const player = getPlayerSync(playerId)
             if (player === null) throw new Error("Gacha player disappeared during execution")
-            const knownPlayerBefore = {
-                freeMana: player.freeMana,
-                freeVmoney: player.freeVmoney,
-                expPool: player.expPool,
-            }
             return withDeferredInventoryBatchContextWithinTransactionSync({
                 playerId,
                 playerExistence: "caller-verified",
@@ -408,10 +407,15 @@ const routes = async (fastify: FastifyInstance) => {
                     drawMetadata,
                     characterMoviePlan,
                     {
-                        ownerGrant: plan => executeRewardGrantPlanInTransactionOwnerWithInventoryInternalSync(
+                        ownerGrant: plan => grantGachaRewardPlanInTransactionOwnerWithInventorySync(
                             playerId,
                             plan,
-                            knownPlayerBefore,
+                            {
+                                id: player.id,
+                                freeMana: player.freeMana,
+                                freeVmoney: playerFreeVmoney,
+                                expPool: player.expPool,
+                            },
                             inventory,
                         ),
                         deferCharacterSampledLog: log => { deferredCharacterSampledLog = log },

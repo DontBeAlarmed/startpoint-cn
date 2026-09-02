@@ -107,7 +107,7 @@ const AUTHORITATIVE_WRITE_SETS = Object.freeze({
         "updatePlayerQuestProgressSync", "reconcileActiveMissionFacts",
     ]),
     "tutorial/update_step:15": Object.freeze([
-        "rewardPlayerGachaDrawResultSync", "executeRewardGrantPlanInTransactionOwnerInternalSync",
+        "rewardPlayerGachaDrawResultSync", "executeRewardGrantExecutionPlanAsTransactionOwnerSync",
         "insertReceiveHistorySync", "updatePlayerSync",
     ]),
     "tutorial/update_step:16": Object.freeze([
@@ -139,7 +139,7 @@ const SINGLE_SYNC_AUTHORITATIVE_CALLBACKS = Object.freeze({
     insertProgress: Object.freeze(["insertPlayerQuestProgressSync"]),
 })
 const TUTORIAL_STEP_15_SYNC_AUTHORITATIVE_CALLBACKS = Object.freeze({
-    ownerGrant: Object.freeze(["executeRewardGrantPlanInTransactionOwnerInternalSync"]),
+    ownerGrant: Object.freeze(["executeRewardGrantExecutionPlanAsTransactionOwnerSync"]),
 })
 const LEARN_MANA_SYNC_AUTHORITATIVE_CALLBACKS = Object.freeze({
     withInventoryBatchContextWithinTransactionSync: Object.freeze([
