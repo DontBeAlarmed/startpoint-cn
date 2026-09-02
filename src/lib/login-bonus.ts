@@ -18,9 +18,9 @@ import {
 } from "../content/converters/login-bonus"
 import { getDayBucket } from "./time-utils"
 import {
-    createRewardGrantPlan,
-    executeRewardGrantPlanWithinTransactionSync,
-    type RewardGrantResult,
+    createRewardGrantExecutionPlan,
+    executeRewardGrantExecutionPlanWithinTransactionSync,
+    type RewardGrantExecutionResult,
 } from "./reward-grant"
 import { RewardType } from "./types/rewards"
 
@@ -31,13 +31,6 @@ export interface LoginBonusStatus {
     readonly groupType: LoginBonusGroupType
     readonly index: number
     readonly receivedAt: number
-}
-
-interface LoginBonusSource {
-    readonly groupId: string
-    readonly groupType: LoginBonusGroupType
-    readonly index: number
-    readonly slot: number
 }
 
 export type LoginBonusSettlement = Readonly<
@@ -51,7 +44,7 @@ export type LoginBonusSettlement = Readonly<
         status: "granted"
         bonuses: readonly LoginBonusStatus[]
         bonus: LoginBonusStatus
-        grant: RewardGrantResult<LoginBonusSource>
+        grant: RewardGrantExecutionResult
     }
 >
 
@@ -113,20 +106,8 @@ function toRewardGrantReward(reward: LoginBonusReward) {
     }
 }
 
-function createLoginBonusRewardPlan(
-    group: LoginBonusGroup,
-    groupId: string,
-    entry: LoginBonusEntry,
-) {
-    return createRewardGrantPlan(entry.rewards.map((reward, slot) => ({
-        source: {
-            groupId,
-            groupType: group.groupType,
-            index: entry.index,
-            slot: slot + 1,
-        },
-        reward: toRewardGrantReward(reward),
-    })))
+function createLoginBonusRewardPlan(entry: LoginBonusEntry) {
+    return createRewardGrantExecutionPlan(entry.rewards.map(toRewardGrantReward))
 }
 
 function isComebackType(groupType: LoginBonusGroupType): boolean {
@@ -280,10 +261,10 @@ export function settleLoginBonusesSync(input: SettleLoginBonusInput): LoginBonus
         if (selected.length === 0) return { status: "none" } as const
 
         const receivedAt = Math.floor(input.virtualNowMs / 1000)
-        const plan = createRewardGrantPlan(selected.flatMap(({ groupId, group, entry }) => (
-            createLoginBonusRewardPlan(group, groupId, entry).entries
+        const plan = createRewardGrantExecutionPlan(selected.flatMap(({ entry }) => (
+            createLoginBonusRewardPlan(entry).entries
         )))
-        const grant = executeRewardGrantPlanWithinTransactionSync(input.playerId, plan)
+        const grant = executeRewardGrantExecutionPlanWithinTransactionSync(input.playerId, plan)
         const bonuses = selected.map(({ groupId, group, entry }) => {
             const progress: PlayerLoginBonusProgress = {
                 playerId: input.playerId,

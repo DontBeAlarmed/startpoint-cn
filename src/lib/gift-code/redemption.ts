@@ -1,8 +1,9 @@
 import { getDb } from "../../data/db"
 import { insertReceiveHistorySync } from "../../data/domains/mail"
 import {
-    createRewardGrantPlan,
-    executeRewardGrantPlanWithinTransactionSync,
+    createRewardGrantExecutionPlan,
+    executeRewardGrantExecutionPlanWithinTransactionSync,
+    type RewardGrantCommand,
 } from "../reward-grant"
 import { getRealNow } from "../../runtime/time/game-time"
 import { GIFT_TO_REWARD_TYPE, validateGiftCode, validateGiftRewards } from "./validation"
@@ -40,6 +41,24 @@ function requireGiftInteger(value: unknown, label: string): number {
         throw new Error(`${label} is invalid`)
     }
     return value
+}
+
+function toRewardGrantCommand(reward: GiftReward): RewardGrantCommand {
+    switch (reward.type) {
+        case 1:
+        case 6:
+            return {
+                type: GIFT_TO_REWARD_TYPE[reward.type],
+                id: reward.typeId as number,
+                count: reward.number,
+            }
+        case 5:
+            return { type: GIFT_TO_REWARD_TYPE[reward.type], id: reward.typeId as number }
+        case 4:
+        case 8:
+        case 9:
+            return { type: GIFT_TO_REWARD_TYPE[reward.type], count: reward.number }
+    }
 }
 
 export function receiveGiftCodeSync(playerId: number, rawKey: unknown): GiftReceiveResult {
@@ -114,20 +133,8 @@ export function receiveGiftCodeSync(playerId: number, rawKey: unknown): GiftRece
             throw error
         }
 
-        const plan = createRewardGrantPlan(rewards.map(reward => ({
-            source: { giftId, position: reward.position },
-            reward: reward.type === 5
-                ? {
-                    type: GIFT_TO_REWARD_TYPE[reward.type],
-                    id: reward.typeId as number,
-                }
-                : {
-                    type: GIFT_TO_REWARD_TYPE[reward.type],
-                    id: reward.typeId as number,
-                    count: reward.number,
-                },
-        })))
-        executeRewardGrantPlanWithinTransactionSync(playerId, plan)
+        const plan = createRewardGrantExecutionPlan(rewards.map(toRewardGrantCommand))
+        executeRewardGrantExecutionPlanWithinTransactionSync(playerId, plan)
 
         for (const reward of rewards) {
             insertReceiveHistorySync(playerId, {

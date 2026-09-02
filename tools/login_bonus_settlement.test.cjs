@@ -103,7 +103,12 @@ test("Normal login reward grant is atomic and pending loads are idempotent", () 
         index: 1,
         receivedAt: Math.floor(virtualNowMs / 1000),
     })
-    assert.equal(first.grant.aggregate.user_info.free_vmoney, 50)
+    assert.deepEqual(first.grant.assets.currencies, [{
+        currency: "freeVmoney",
+        requestedAmount: 50,
+        beforeAmount: before.freeVmoney,
+        afterAmount: before.freeVmoney + 50,
+    }])
     assert.equal(getPlayerSync(playerId).freeVmoney, before.freeVmoney + 50)
     assert.equal(repeated.status, "pending")
     assert.deepEqual(repeated.bonus, first.bonus)

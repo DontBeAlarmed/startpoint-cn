@@ -9,9 +9,11 @@ import {
     type ScheduledResourceRule,
 } from "../data/domains/scheduled-resource"
 import { getBusinessDayKey } from "./time-utils"
-import { createRewardGrantPlan } from "./reward-grant"
-import { executeRewardGrantPlanInTransactionOwnerSync } from "./reward-grant/owner-executor"
-import type { RewardGrantResult } from "./reward-grant/types"
+import {
+    createRewardGrantExecutionPlan,
+    executeRewardGrantExecutionPlanAsTransactionOwnerSync,
+    type RewardGrantExecutionResult,
+} from "./reward-grant"
 import { RewardType } from "./types/rewards"
 import { validateScheduledResourceRuleInput } from "./scheduled-resource-rules"
 
@@ -25,10 +27,6 @@ export interface ScheduledResourceSettlementInput {
     readonly maxFreeVmoney: number
 }
 
-interface ScheduledResourceGrantSource {
-    readonly ruleId: number
-}
-
 export type ScheduledResourceSettlementResult =
     | {
         readonly status: "none"
@@ -37,7 +35,7 @@ export type ScheduledResourceSettlementResult =
     | {
         readonly status: "granted"
         readonly grantedRuleIds: readonly number[]
-        readonly rewardResult: RewardGrantResult<ScheduledResourceGrantSource>
+        readonly rewardResult: RewardGrantExecutionResult
     }
 
 function isActiveAt(rule: ScheduledResourceRule, nowMs: number): boolean {
@@ -84,26 +82,25 @@ export function settleScheduledResourcesSync(
     })
     if (grantedRules.length === 0) return { status: "none", grantedRuleIds: [] }
 
-    const plan = createRewardGrantPlan(grantedRules.map(rule => ({
-        source: { ruleId: rule.id },
-        reward: rule.rewardType === "free_vmoney"
+    const plan = createRewardGrantExecutionPlan(grantedRules.map(rule => (
+        rule.rewardType === "free_vmoney"
             ? { type: RewardType.BEADS, count: rule.grantAmount }
-            : { type: RewardType.ITEM, id: rule.rewardId as number, count: rule.grantAmount },
-    })))
+            : { type: RewardType.ITEM, id: rule.rewardId as number, count: rule.grantAmount }
+    )))
     return getDb().transaction(() => {
         const currentPlayer = getPlayerSync(input.player.id)
         if (currentPlayer === null) {
             throw new Error("No player data during scheduled resource settlement.")
         }
-        const rewardResult = executeRewardGrantPlanInTransactionOwnerSync(
+        const rewardResult = executeRewardGrantExecutionPlanAsTransactionOwnerSync(
             input.player.id,
             plan,
             {
+                playerId: input.player.id,
                 freeMana: currentPlayer.freeMana,
                 freeVmoney: currentPlayer.freeVmoney,
                 expPool: currentPlayer.expPool,
             },
-            {},
         )
         const grantedRuleIds = grantedRules.map(rule => rule.id)
         recordScheduledResourceGrantsWithinTransactionSync(
