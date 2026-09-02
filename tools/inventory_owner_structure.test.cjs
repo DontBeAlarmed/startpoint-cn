@@ -75,7 +75,10 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
     visit(sourceRoot)
     const reviewedMigrations = [
         "src/lib/character-growth/commands/awake-mana-nodes.ts",
+        "src/lib/character-growth/commands/bulk-stack-to-exp.ts",
         "src/lib/character-growth/commands/learn-mana-nodes.ts",
+        "src/lib/character-growth/commands/over-limit.ts",
+        "src/lib/character-growth/commands/stack-to-exp.ts",
         "src/lib/item-sell.ts",
         "src/lib/item-use-settlement.ts",
     ]

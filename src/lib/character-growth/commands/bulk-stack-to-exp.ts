@@ -2,11 +2,7 @@ import { getDb } from "../../../data/db"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
 import { getPlayerCharacterGrowthSeedsSync } from "../../../data/domains/character"
 import type { PlayerCharacterProjectionData } from "../../../data/types"
-import {
-    getPlayerItemSync,
-    recordPlayerCollectedItemWithinTransactionSync,
-    setPlayerItemWithinTransactionSync,
-} from "../../../data/domains/item"
+import { withInventoryBatchContextWithinTransactionSync } from "../../inventory"
 import { createCharacterGrowthBatchContext } from "../batch-context"
 import { growthError } from "../errors"
 import {
@@ -75,27 +71,24 @@ export function executeBulkStackToExp(command: BulkStackToExpCommand): BulkStack
             selected.push(observedCore(character, { stack: 0 }))
         }
         const afterPool = addSafeInteger(player.expPool, addExp, "player.expPool")
-        const existingItem = getPlayerItemSync(command.playerId, STACK_CONVERSION_REWARD_ITEM_ID)
-        const currentItem = existingItem ?? 0
-        const afterItem = addSafeInteger(currentItem, addStarGrain, "item.amount")
-        const updateTime = updateCharacterGrowthRowsSync(command.playerId, selected.map(character => ({
-            characterId: character.characterId,
-            stack: 0,
-        })))
-        updatePlayerSync({ id: command.playerId, expPool: afterPool })
-        if (addStarGrain > 0) {
-            setPlayerItemWithinTransactionSync(
-                command.playerId,
-                STACK_CONVERSION_REWARD_ITEM_ID,
-                afterItem,
-                existingItem !== null,
-            )
-            recordPlayerCollectedItemWithinTransactionSync(
-                command.playerId,
-                STACK_CONVERSION_REWARD_ITEM_ID,
-                addStarGrain,
-            )
-        }
+        const settlement = withInventoryBatchContextWithinTransactionSync({
+            playerId: command.playerId,
+            preloadItemIds: [STACK_CONVERSION_REWARD_ITEM_ID],
+        }, inventory => {
+            const existingItem = inventory.read(STACK_CONVERSION_REWARD_ITEM_ID)
+            const afterItem = addSafeInteger(existingItem.beforeAmount, addStarGrain, "item.amount")
+            const updateTime = updateCharacterGrowthRowsSync(command.playerId, selected.map(character => ({
+                characterId: character.characterId,
+                stack: 0,
+            })))
+            updatePlayerSync({ id: command.playerId, expPool: afterPool })
+            if (addStarGrain > 0) {
+                inventory.grant(STACK_CONVERSION_REWARD_ITEM_ID, addStarGrain)
+                inventory.flush()
+            }
+            return { afterItem, updateTime }
+        })
+        const { afterItem, updateTime } = settlement
         return {
             command: "bulk_stack_to_exp",
             characters: selected,

@@ -76,3 +76,24 @@ test("bulk_stack_to_exp reads and writes all eligible characters as one growth o
         fixture.cleanup()
     }
 })
+
+test("bulk_stack_to_exp with no eligible character preserves the existing Item and collected total", () => {
+    const fixture = createCharacterGrowthC4Fixture()
+    try {
+        const playerId = fixture.createPlayer()
+        fixture.giveItem(playerId, 990008, 7)
+        const beforeCollected = collectedItemTotal(fixture, playerId, 990008)
+        const result = bulk.executeBulkStackToExp({
+            playerId,
+            evaluationTime: new Date("2026-08-31T00:00:00.000Z"),
+        })
+        assert.deepEqual(result.characters, [])
+        assert.equal(result.addExp, 0)
+        assert.equal(result.addStarGrain, 0)
+        assert.equal(result.itemCount, 7)
+        assert.equal(fixture.item(playerId, 990008), 7)
+        assert.equal(collectedItemTotal(fixture, playerId, 990008), beforeCollected)
+    } finally {
+        fixture.cleanup()
+    }
+})

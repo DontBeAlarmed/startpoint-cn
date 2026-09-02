@@ -1,6 +1,6 @@
 import { getDb } from "../../../data/db"
 import { getPlayerSync } from "../../../data/domains/player"
-import { getPlayerItemSync, setPlayerItemWithinTransactionSync } from "../../../data/domains/item"
+import { withInventoryBatchContextWithinTransactionSync } from "../../inventory"
 import { createCharacterGrowthRequestContext } from "../request-context"
 import { growthError } from "../errors"
 import { characterMaxOverLimits, OVER_LIMIT_ITEM_BY_RARITY } from "../limits"
@@ -81,22 +81,29 @@ export function executeOverLimit(command: OverLimitCommand): OverLimitResult {
             } as OverLimitResult
         }
         const itemId = validateItemId(before.rarity, command.itemId)
-        const currentItem = getPlayerItemSync(command.playerId, itemId)
-        const afterItem = (currentItem ?? 0) - command.overLimitCount
-        if (afterItem < 0) throw growthError("INSUFFICIENT_ITEM", `player does not have enough item ${itemId}.`)
-        setPlayerItemWithinTransactionSync(command.playerId, itemId, afterItem, currentItem !== null)
-        updateCharacterGrowthRowsSync(command.playerId, [{
-            characterId: command.characterId,
-            overLimitStep: nextOverLimit,
-        }])
-        return {
-            command: "over_limit",
-            before,
-            after: observedCore(before, { overLimitStep: nextOverLimit }),
-            itemId,
-            itemCount: afterItem,
-            replayed: false,
-        } as OverLimitResult
+        return withInventoryBatchContextWithinTransactionSync({
+            playerId: command.playerId,
+            preloadItemIds: [itemId],
+        }, inventory => {
+            const currentItem = inventory.read(itemId)
+            if (currentItem.beforeAmount < command.overLimitCount) {
+                throw growthError("INSUFFICIENT_ITEM", `player does not have enough item ${itemId}.`)
+            }
+            const itemResult = inventory.deduct(itemId, command.overLimitCount)
+            inventory.flush()
+            updateCharacterGrowthRowsSync(command.playerId, [{
+                characterId: command.characterId,
+                overLimitStep: nextOverLimit,
+            }])
+            return {
+                command: "over_limit",
+                before,
+                after: observedCore(before, { overLimitStep: nextOverLimit }),
+                itemId,
+                itemCount: itemResult.afterAmount,
+                replayed: false,
+            } as OverLimitResult
+        })
     })()
 }
 

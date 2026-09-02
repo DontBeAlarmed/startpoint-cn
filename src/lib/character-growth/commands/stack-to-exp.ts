@@ -1,10 +1,6 @@
 import { getDb } from "../../../data/db"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
-import {
-    getPlayerItemSync,
-    recordPlayerCollectedItemWithinTransactionSync,
-    setPlayerItemWithinTransactionSync,
-} from "../../../data/domains/item"
+import { withInventoryBatchContextWithinTransactionSync } from "../../inventory"
 import { createCharacterGrowthRequestContext } from "../request-context"
 import { growthError } from "../errors"
 import { validateCharacterStackConversion } from "../../character-stack"
@@ -66,34 +62,30 @@ export function executeStackToExp(command: StackToExpCommand): StackToExpResult 
         const addExp = expPerStack * command.useStackCount
         const addStarGrain = itemPerStack * command.useStackCount
         const afterPool = addSafeInteger(player.expPool, addExp, "player.expPool")
-        const existingItem = getPlayerItemSync(command.playerId, STACK_CONVERSION_REWARD_ITEM_ID)
-        const afterItem = addSafeInteger(existingItem ?? 0, addStarGrain, "item.amount")
-        updateCharacterGrowthRowsSync(command.playerId, [{
-            characterId: command.characterId,
-            stack: before.stack - command.useStackCount,
-        }])
-        updatePlayerSync({ id: command.playerId, expPool: afterPool })
-        setPlayerItemWithinTransactionSync(
-            command.playerId,
-            STACK_CONVERSION_REWARD_ITEM_ID,
-            afterItem,
-            existingItem !== null,
-        )
-        recordPlayerCollectedItemWithinTransactionSync(
-            command.playerId,
-            STACK_CONVERSION_REWARD_ITEM_ID,
-            addStarGrain,
-        )
-        return {
-            command: "stack_to_exp",
-            before,
-            after: observedCore(before, { stack: before.stack - command.useStackCount }),
-            addExp,
-            addStarGrain,
-            expPool: afterPool,
-            itemCount: afterItem,
-            replayed: false,
-        } as StackToExpResult
+        return withInventoryBatchContextWithinTransactionSync({
+            playerId: command.playerId,
+            preloadItemIds: [STACK_CONVERSION_REWARD_ITEM_ID],
+        }, inventory => {
+            const existingItem = inventory.read(STACK_CONVERSION_REWARD_ITEM_ID)
+            const afterItem = addSafeInteger(existingItem.beforeAmount, addStarGrain, "item.amount")
+            updateCharacterGrowthRowsSync(command.playerId, [{
+                characterId: command.characterId,
+                stack: before.stack - command.useStackCount,
+            }])
+            updatePlayerSync({ id: command.playerId, expPool: afterPool })
+            const itemResult = inventory.grant(STACK_CONVERSION_REWARD_ITEM_ID, addStarGrain)
+            inventory.flush()
+            return {
+                command: "stack_to_exp",
+                before,
+                after: observedCore(before, { stack: before.stack - command.useStackCount }),
+                addExp,
+                addStarGrain,
+                expPool: afterPool,
+                itemCount: itemResult.afterAmount,
+                replayed: false,
+            } as StackToExpResult
+        })
     })()
 }
 

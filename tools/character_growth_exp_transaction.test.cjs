@@ -212,6 +212,37 @@ test("inject_exp maps persisted Growth corruption to HTTP 500", async () => {
     }
 })
 
+test("over_limit keeps reachable Item shortage as HTTP 400 after Inventory migration", async () => {
+    const fixture = createCharacterGrowthC4Fixture()
+    const app = Fastify({ logger: false })
+    try {
+        const playerId = fixture.createPlayer()
+        const viewerId = await fixture.createViewer(playerId, 890000010)
+        fixture.addCharacter(playerId, 341003, { overLimitStep: 0 })
+        await app.register(characterRoutes)
+        await app.ready()
+
+        const response = await app.inject({
+            method: "POST",
+            url: "/over_limit",
+            payload: {
+                viewer_id: viewerId,
+                character_id: 341003,
+                use_stack: false,
+                item_id: 10001,
+                over_limit_count: 1,
+            },
+        })
+        assert.equal(response.statusCode, 400, response.body)
+        assert.match(response.body, /INSUFFICIENT_ITEM/)
+        assert.equal(fixture.addCharacter(playerId, 341003).overLimitStep, 0)
+        assert.equal(fixture.item(playerId, 10001) ?? 0, 0)
+    } finally {
+        await app.close()
+        fixture.cleanup()
+    }
+})
+
 test("all five CN growth routes keep their transport response shape", async () => {
     const fixture = createCharacterGrowthC4Fixture()
     const app = Fastify({ logger: false })
