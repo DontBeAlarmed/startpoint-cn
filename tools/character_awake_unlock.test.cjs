@@ -468,7 +468,7 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
         "[existingCharacterList]",
         "{ invalidatedFactKeys: granter.invalidatedFactKeys }",
         '"active-mission/receive"',
-        "new Date(getServerTime() * 1000)",
+        "new Date(evaluationTime)",
     ])
     assert.equal(activeMissionCall.position > activeReceiveBlock.indexOf("if (!validation.ok)"), true)
     assert.equal(activeMissionCall.position > getLastCallPosition(activeReceiveBlock, "updatePlayerActiveMissionStageSync"), true)
@@ -478,8 +478,8 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     assert.deepEqual(activeMissionCall.enclosingLoops, [])
     assert.deepEqual(activeMissionCall.enclosingTransactionCallbacks, ["getDb().transaction"])
     const activeMissionTransactionCall = getOnlyCall(activeReceiveBlock, "transaction")
-    assert.equal(activeMissionTransactionCall.assignedVariable, "characterList")
-    assert.deepEqual(findPropertyAssignmentValues(activeReceiveBlock, "character_list"), ["characterList"])
+    assert.equal(activeMissionTransactionCall.assignedVariable, "settlement")
+    assert.deepEqual(findPropertyAssignmentValues(activeReceiveBlock, "character_list"), ["settlement.characterList"])
 
     const boxCloseBlock = getRouteBlock(boxGachaSource, "/close", "/exec")
     const boxExecBlock = getRouteBlock(boxGachaSource, "/exec", "/get_box_list")

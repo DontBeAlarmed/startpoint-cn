@@ -91,7 +91,7 @@ test("runtime wrapper preserves settings then server time dependency order", () 
     assert.deepEqual(runtimeReadCalls.slice(0, 3), ["settings", "time", "date"])
 })
 
-test("selection preserves common then rare draw order and emits normalized grant sources", () => {
+test("selection preserves common then rare order with typed commands and local drop metadata", () => {
     const { selectScoreRewardGrantPlan } = loadSelection()
     const randomCalls = []
     const scoreRewards = [
@@ -132,22 +132,16 @@ test("selection preserves common then rare draw order and emits normalized grant
     const aetherItemId = Number(rewardElementMap["2"]["4"]["3"][0][0])
     assert.deepEqual(randomCalls, [0.95, 0.2, 0, 0, 0.4, 0.8])
     assert.deepEqual(selection.plan.entries, [
-        {
-            source: { kind: "score_common", groupId: 8001, index: 2, number: 10 },
-            reward: { type: RewardType.ITEM, id: 500001, count: 10 },
-        },
-        {
-            source: { kind: "score_common", groupId: 8001, index: 5, number: 14 },
-            reward: { type: RewardType.ELEMENT, id: elementItemId, count: 14 },
-        },
-        {
-            source: { kind: "score_rare", groupId: 3014, index: 6, number: 10 },
-            reward: { type: RewardType.AETHER, id: aetherItemId, count: 10 },
-        },
-        {
-            source: { kind: "score_rare", groupId: 3013, index: 9, number: 1 },
-            reward: { type: RewardType.CHARACTER, id: 310009 },
-        },
+        { type: RewardType.ITEM, id: 500001, count: 10 },
+        { type: RewardType.ELEMENT, id: elementItemId, count: 14 },
+        { type: RewardType.AETHER, id: aetherItemId, count: 10 },
+        { type: RewardType.CHARACTER, id: 310009 },
+    ])
+    assert.deepEqual(selection.dropMetadata.map(({ rewardFingerprint, ...metadata }) => metadata), [
+        { entryIndex: 0, kind: "score_common", groupId: 8001, dropIndex: 2, number: 10 },
+        { entryIndex: 1, kind: "score_common", groupId: 8001, dropIndex: 5, number: 14 },
+        { entryIndex: 2, kind: "score_rare", groupId: 3014, dropIndex: 6, number: 10 },
+        { entryIndex: 3, kind: "score_rare", groupId: 3013, dropIndex: 9, number: 1 },
     ])
     assert.equal(Object.isFrozen(selection.plan), true)
     assert.equal(Object.isFrozen(selection.plan.entries), true)
@@ -182,35 +176,52 @@ test("omitted common count selects every common without consuming common random 
     })
 
     assert.deepEqual(randomCalls, [0, 0])
-    assert.deepEqual(selection.plan.entries.map(entry => entry.source), [
-        { kind: "score_common", groupId: 8002, index: 4, number: 18 },
-        { kind: "score_common", groupId: 8002, index: 2, number: 20 },
-        { kind: "score_rare", groupId: 3014, index: 6, number: 4 },
+    assert.deepEqual(selection.dropMetadata.map(({ rewardFingerprint, ...metadata }) => metadata), [
+        { entryIndex: 0, kind: "score_common", groupId: 8002, dropIndex: 4, number: 18 },
+        { entryIndex: 1, kind: "score_common", groupId: 8002, dropIndex: 2, number: 20 },
+        { entryIndex: 2, kind: "score_rare", groupId: 3014, dropIndex: 6, number: 4 },
     ])
     assert.deepEqual(forbiddenPlayerWrites, [])
 })
 
-test("drop ids are projected from the same source facts as grant entries", () => {
+test("drop ids are projected from metadata bound to the typed grant entries", () => {
     const { projectScoreRewardDropIds } = loadSelection()
+    const {
+        createRewardGrantExecutionPlan,
+        rewardGrantFingerprint,
+    } = require("../src/lib/reward-grant")
+    const commands = [
+        { type: RewardType.MANA, count: 3 },
+        { type: RewardType.CHARACTER, id: 300001 },
+    ]
     const selection = {
-        plan: {
-            entries: [
-                {
-                    source: { kind: "score_common", groupId: 81, index: 2, number: 3 },
-                    reward: { type: RewardType.MANA, count: 3 },
-                },
-                {
-                    source: { kind: "score_rare", groupId: 91, index: 7, number: 1 },
-                    reward: { type: RewardType.CHARACTER, id: 300001 },
-                },
-            ],
-        },
+        plan: createRewardGrantExecutionPlan(commands),
+        dropMetadata: [
+            {
+                entryIndex: 0, kind: "score_common", groupId: 81, dropIndex: 2, number: 3,
+                rewardFingerprint: rewardGrantFingerprint(commands[0]),
+            },
+            {
+                entryIndex: 1, kind: "score_rare", groupId: 91, dropIndex: 7, number: 1,
+                rewardFingerprint: rewardGrantFingerprint(commands[1]),
+            },
+        ],
     }
 
     assert.deepEqual(projectScoreRewardDropIds(selection), {
         drop_score_reward_ids: [{ group_id: 81, index: 2, number: 3 }],
         drop_rare_reward_ids: [{ group_id: 91, index: 7, number: 1 }],
     })
+
+    assert.throws(
+        () => projectScoreRewardDropIds({
+            ...selection,
+            dropMetadata: selection.dropMetadata.map((entry, index) => index === 1
+                ? { ...entry, entryIndex: 0 }
+                : entry),
+        }),
+        /metadata does not match grant entry 1/,
+    )
 })
 
 test("malformed Rare rewards fail closed with typed fields before player writes", () => {

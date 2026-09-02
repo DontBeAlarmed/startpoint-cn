@@ -66,8 +66,11 @@ stubModule("../src/lib/pass-card", {
 })
 
 const { MissionRewardGranter } = require("../src/lib/mission/grants")
+const { createRewardGrantExecutionResult } = require("../src/lib/reward-grant")
+const { RewardType } = require("../src/lib/types/rewards")
 
 const player = Object.freeze({
+    id: 1,
     freeVmoney: 10,
     freeMana: 20,
     expPool: 30,
@@ -75,36 +78,55 @@ const player = Object.freeze({
 })
 
 function standardRewardResult(plan, knownPlayerBefore) {
-    const item = { 100: 2 }
     const equipment = { equipment_id: 200, stack: 1 }
     const character = { character_id: 300, stack: 1 }
-    const entryResults = [
-        { items: item },
-        { equipment_list: [equipment] },
-        { character_list: [character] },
-        { user_info: { free_vmoney: 5 } },
-    ]
-    const result = values => ({
-        user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
-        character_list: [],
-        joined_character_id_list: [],
-        equipment_list: [],
-        items: {},
-        ...values,
+    const outcomes = plan.entries.map(entry => {
+        switch (entry.type) {
+            case RewardType.ITEM:
+                return {
+                    kind: "item",
+                    item: {
+                        itemId: entry.id,
+                        requestedAmount: entry.count,
+                        acceptedAmount: entry.count,
+                        overflowAmount: 0,
+                        beforeAmount: 0,
+                        afterAmount: entry.count,
+                    },
+                }
+            case RewardType.EQUIPMENT:
+                return {
+                    kind: "equipment",
+                    equipmentId: entry.id,
+                    requestedAmount: entry.count,
+                    after: equipment,
+                }
+            case RewardType.CHARACTER:
+                return {
+                    kind: "character",
+                    characterId: entry.id,
+                    isNew: true,
+                    after: character,
+                    compensationItem: null,
+                }
+            case RewardType.BEADS:
+                return {
+                    kind: "currency",
+                    currency: "freeVmoney",
+                    requestedAmount: entry.count,
+                    beforeAmount: knownPlayerBefore.freeVmoney,
+                    afterAmount: knownPlayerBefore.freeVmoney + entry.count,
+                }
+            default:
+                throw new Error(`unexpected reward type ${entry.type}`)
+        }
     })
-    return {
-        aggregate: result({
-            user_info: { free_mana: 0, free_vmoney: 5, exp_pool: 0 },
-            character_list: [character],
-            equipment_list: [equipment],
-            items: item,
-        }),
-        entries: plan.entries.map((entry, index) => ({
-            ...entry,
-            result: result(entryResults[index]),
-        })),
-        playerAfter: { ...knownPlayerBefore, freeVmoney: knownPlayerBefore.freeVmoney + 5 },
-    }
+    return createRewardGrantExecutionResult(
+        knownPlayerBefore.playerId,
+        plan,
+        outcomes,
+        { ...knownPlayerBefore, freeVmoney: knownPlayerBefore.freeVmoney + 5 },
+    )
 }
 
 function factIds(granter) {

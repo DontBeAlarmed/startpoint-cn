@@ -1,4 +1,4 @@
-import type { RewardGrantReward } from "../reward-grant"
+import type { RewardGrantCommand } from "../reward-grant"
 import {
     RewardType,
 } from "../types"
@@ -160,31 +160,25 @@ export function normalizeRareScoreRewardGroup(
     return normalized
 }
 
-function rewardName(reward: { readonly name?: string }): { readonly name?: string } {
-    return reward.name === undefined ? {} : { name: reward.name }
-}
-
 export function normalizeRareReward(
     reward: NormalizedRareScoreReward,
     amount: number,
     questElement: number | undefined,
     resolveContextualItemId: ScoreRewardContextualItemResolver,
-): RewardGrantReward {
-    const name = rewardName(reward)
+): RewardGrantCommand {
     switch (reward.type) {
         case RewardType.CHARACTER:
-            return { ...name, type: reward.type, id: reward.id }
+            return { type: reward.type, id: reward.id }
         case RewardType.BEADS:
         case RewardType.MANA:
         case RewardType.EXP:
-            return { ...name, type: reward.type, count: amount }
+            return { type: reward.type, count: amount }
         case RewardType.ITEM:
         case RewardType.EQUIPMENT:
-            return { ...name, type: reward.type, id: reward.id, count: amount }
+            return { type: reward.type, id: reward.id, count: amount }
         case RewardType.ELEMENT:
         case RewardType.AETHER:
             return {
-                ...name,
                 type: reward.type,
                 id: resolveContextualItemId(
                     reward.type === RewardType.ELEMENT ? "element" : "aether",

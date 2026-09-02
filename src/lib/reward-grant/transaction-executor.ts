@@ -42,6 +42,12 @@ export interface RewardGrantExternalFinalization {
     finalize(): RewardGrantExecutionResult
 }
 
+export function assertRewardGrantExecutionTransactionOwnerSync(): void {
+    if (!getDb().inTransaction) {
+        throw new RewardGrantExecutionTransactionError("TRANSACTION_REQUIRED")
+    }
+}
+
 function directItemIds(plan: RewardGrantExecutionPlan): number[] {
     return [...new Set(plan.entries.flatMap(entry => {
         switch (entry.type) {

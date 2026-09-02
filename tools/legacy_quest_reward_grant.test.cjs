@@ -90,7 +90,7 @@ test("reachable legacy rewards require the source transaction and fail before wr
             { type: RewardType.MANA, count: 3 },
             { type: RewardType.EQUIPMENT, id: EQUIPMENT_ID, count: 1 },
         ]),
-        error => error?.name === "RewardGrantTransactionRequiredError",
+        error => error?.name === "RewardGrantExecutionTransactionError",
     )
     assert.deepEqual(rewardState(playerId), before)
 })

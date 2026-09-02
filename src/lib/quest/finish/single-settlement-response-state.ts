@@ -1,12 +1,12 @@
 import type { Player } from "../../../data/types"
 import type {
-    RewardGrantPlayerAfter,
-    RewardGrantResult,
+    RewardGrantExecutionResult,
+    RewardGrantKnownPlayerState,
 } from "../../reward-grant"
 import type { Reward } from "../../types"
 import {
     grantSingleSettlementRewardsWithinTransactionSync,
-    type SingleSettlementRewardSourceKind,
+    projectSingleSettlementRewardGrant,
 } from "./single-settlement-reward-grant"
 
 export interface SingleSettlementFinalPlayerProjection {
@@ -24,7 +24,7 @@ export interface SingleSettlementFinalPlayerProjection {
 
 export interface SingleSettlementFinalPlayerProjectionInput {
     readonly initialPlayer: Player
-    readonly rewardPlayerState: RewardGrantPlayerAfter
+    readonly rewardPlayerState: RewardGrantKnownPlayerState
     readonly rankPoint: number
     readonly degreeId: number
     readonly stamina: number
@@ -44,7 +44,9 @@ export function buildSingleSettlementFinalPlayerProjection({
     bossBoostPoint,
 }: SingleSettlementFinalPlayerProjectionInput): SingleSettlementFinalPlayerProjection {
     return {
-        ...rewardPlayerState,
+        freeMana: rewardPlayerState.freeMana,
+        freeVmoney: rewardPlayerState.freeVmoney,
+        expPool: rewardPlayerState.expPool,
         expPooledTime: initialPlayer.expPooledTime,
         rankPoint,
         degreeId,
@@ -61,7 +63,11 @@ interface SingleSettlementObservedResult {
 }
 
 export function createSingleSettlementResponseState(playerId: number, player: Player) {
-    let playerState: RewardGrantPlayerAfter = {
+    if (player.id !== playerId) {
+        throw new Error(`Single settlement Player ${player.id} does not match owner ${playerId}`)
+    }
+    let playerState: RewardGrantKnownPlayerState = {
+        playerId: player.id,
         freeMana: player.freeMana,
         freeVmoney: player.freeVmoney,
         expPool: player.expPool,
@@ -71,15 +77,18 @@ export function createSingleSettlementResponseState(playerId: number, player: Pl
     const observeItems = (items: Readonly<Record<string, number>> | undefined): void => {
         if (items !== undefined) Object.assign(itemList, items)
     }
-    const observeGrant = <TSource>(grant: RewardGrantResult<TSource>): void => {
+    const observeGrant = (grant: RewardGrantExecutionResult): void => {
         playerState = grant.playerAfter
-        observeItems(grant.aggregate.items)
+        observeItems(Object.fromEntries(grant.assets.items.map(item => [
+            String(item.itemId),
+            item.afterAmount,
+        ])))
     }
     return {
-        get playerState(): RewardGrantPlayerAfter {
+        get playerState(): RewardGrantKnownPlayerState {
             return playerState
         },
-        setPlayerState(state: RewardGrantPlayerAfter): void {
+        setPlayerState(state: RewardGrantKnownPlayerState): void {
             playerState = state
         },
         setExpPool(expPool: number): void {
@@ -87,19 +96,17 @@ export function createSingleSettlementResponseState(playerId: number, player: Pl
         },
         grant(
             targetPlayerId: number,
-            kind: SingleSettlementRewardSourceKind,
             rewards: readonly Reward[],
         ) {
             const grant = grantSingleSettlementRewardsWithinTransactionSync(
                 targetPlayerId,
-                kind,
                 rewards,
                 playerState,
             )
             observeGrant(grant)
-            return grant.aggregate
+            return projectSingleSettlementRewardGrant(grant)
         },
-        observeGrant<TSource>(grant: RewardGrantResult<TSource>): void {
+        observeGrant(grant: RewardGrantExecutionResult): void {
             observeGrant(grant)
         },
         observeResult(result: SingleSettlementObservedResult | undefined): void {
@@ -107,6 +114,7 @@ export function createSingleSettlementResponseState(playerId: number, player: Pl
             observeItems(result.itemList)
             if (result.userInfo !== undefined) {
                 playerState = {
+                    playerId: playerState.playerId,
                     freeMana: result.userInfo.free_mana ?? playerState.freeMana,
                     freeVmoney: result.userInfo.free_vmoney ?? playerState.freeVmoney,
                     expPool: result.userInfo.exp_pool ?? playerState.expPool,

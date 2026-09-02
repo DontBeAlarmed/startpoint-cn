@@ -70,15 +70,14 @@ test("core selects normalized common and Rare grants from explicit dependencies 
         ["context", "aether", 4, 4],
     ])
     assert.deepEqual(selection.plan.entries, [
-        {
-            source: { kind: "score_common", groupId: 8801, index: 3, number: 10 },
-            reward: { name: "common", type: RewardType.ITEM, id: 500001, count: 10 },
-        },
-        {
-            source: { kind: "score_rare", groupId: 9901, index: 7, number: 14 },
-            reward: { name: "aether", type: RewardType.AETHER, id: 600004, count: 14 },
-        },
+        { type: RewardType.ITEM, id: 500001, count: 10 },
+        { type: RewardType.AETHER, id: 600004, count: 14 },
     ])
+    assert.deepEqual(selection.dropMetadata.map(({ rewardFingerprint, ...metadata }) => metadata), [
+        { entryIndex: 0, kind: "score_common", groupId: 8801, dropIndex: 3, number: 10 },
+        { entryIndex: 1, kind: "score_rare", groupId: 9901, dropIndex: 7, number: 14 },
+    ])
+    assert.equal(selection.dropMetadata.every(entry => typeof entry.rewardFingerprint === "string"), true)
 })
 
 test("core source has no runtime content, server settings, time or event currency imports", () => {

@@ -1,7 +1,8 @@
 import {
-    createRewardGrantPlan,
-    type RewardGrantPlan,
-    type RewardGrantReward,
+    createRewardGrantExecutionPlan,
+    rewardGrantFingerprint,
+    type RewardGrantCommand,
+    type RewardGrantExecutionPlan,
 } from "../reward-grant"
 import {
     calculateScoreRewardAmount,
@@ -36,16 +37,19 @@ export type {
 
 export type ScoreRewardSourceKind = "score_common" | "score_rare"
 
-export interface ScoreRewardSource {
+export interface ScoreRewardDropMetadata {
+    readonly entryIndex: number
     readonly kind: ScoreRewardSourceKind
     readonly groupId: number
-    readonly index: number
+    readonly dropIndex: number
     readonly number: number
+    readonly rewardFingerprint: string
 }
 
 export interface ScoreRewardSelection {
     readonly groupId?: number
-    readonly plan: RewardGrantPlan<ScoreRewardSource>
+    readonly plan: RewardGrantExecutionPlan
+    readonly dropMetadata: readonly ScoreRewardDropMetadata[]
 }
 
 export interface ScoreRewardSelectionCoreInput {
@@ -66,20 +70,15 @@ export interface ScoreRewardSelectionCoreDependencies {
     readonly resolveContextualItemId: ScoreRewardContextualItemResolver
 }
 
-function rewardName(reward: { readonly name?: string }): { readonly name?: string } {
-    return reward.name === undefined ? {} : { name: reward.name }
-}
-
 function normalizeCommonReward(
     reward: CommonScoreReward,
     amount: number,
     input: ScoreRewardSelectionCoreInput,
     dependencies: ScoreRewardSelectionCoreDependencies,
-): RewardGrantReward {
+): RewardGrantCommand {
     switch (reward.reward_type) {
         case RewardType.ITEM:
             return {
-                ...rewardName(reward),
                 type: reward.reward_type,
                 id: dependencies.resolveEventCurrencyId(
                     (reward as ItemScoreReward).id,
@@ -89,11 +88,10 @@ function normalizeCommonReward(
             }
         case RewardType.MANA:
         case RewardType.EXP:
-            return { ...rewardName(reward), type: reward.reward_type, count: amount }
+            return { type: reward.reward_type, count: amount }
         case RewardType.ELEMENT:
         case RewardType.AETHER:
             return {
-                ...rewardName(reward),
                 type: reward.reward_type,
                 id: dependencies.resolveContextualItemId(
                     reward.reward_type === RewardType.ELEMENT ? "element" : "aether",
@@ -111,10 +109,8 @@ export function selectScoreRewardGrantPlanCore(
     input: ScoreRewardSelectionCoreInput,
     dependencies: ScoreRewardSelectionCoreDependencies,
 ): ScoreRewardSelection {
-    const entries: Array<{
-        source: ScoreRewardSource
-        reward: RewardGrantReward
-    }> = []
+    const entries: RewardGrantCommand[] = []
+    const dropMetadata: ScoreRewardDropMetadata[] = []
     const commonRewards = input.commonRewardCount === undefined
         ? input.scoreRewards.filter((reward): reward is CommonScoreReward => (
             reward.type === ScoreRewardType.ITEM
@@ -129,15 +125,16 @@ export function selectScoreRewardGrantPlanCore(
             input.boostPointUsed,
             input.dropMultiplier,
         )
-        entries.push({
-            source: Object.freeze({
-                kind: "score_common",
-                groupId: input.groupId,
-                index: reward.position ?? input.scoreRewards.indexOf(reward) + 1,
-                number: amount,
-            }),
-            reward: normalizeCommonReward(reward, amount, input, dependencies),
-        })
+        const command = normalizeCommonReward(reward, amount, input, dependencies)
+        dropMetadata.push(Object.freeze({
+            entryIndex: entries.length,
+            kind: "score_common",
+            groupId: input.groupId,
+            dropIndex: reward.position ?? input.scoreRewards.indexOf(reward) + 1,
+            number: amount,
+            rewardFingerprint: rewardGrantFingerprint(command),
+        }))
+        entries.push(command)
     }
 
     const rareRewards = selectRareScoreRewards(
@@ -159,21 +156,26 @@ export function selectScoreRewardGrantPlanCore(
                 input.boostPointUsed,
                 input.dropMultiplier,
             )
-        entries.push({
-            source: Object.freeze({
-                kind: "score_rare",
-                groupId: selected.groupId,
-                index: selected.index,
-                number: amount,
-            }),
-            reward: normalizeRareReward(
-                reward,
-                amount,
-                input.questElement,
-                dependencies.resolveContextualItemId,
-            ),
-        })
+        const command = normalizeRareReward(
+            reward,
+            amount,
+            input.questElement,
+            dependencies.resolveContextualItemId,
+        )
+        dropMetadata.push(Object.freeze({
+            entryIndex: entries.length,
+            kind: "score_rare",
+            groupId: selected.groupId,
+            dropIndex: selected.index,
+            number: amount,
+            rewardFingerprint: rewardGrantFingerprint(command),
+        }))
+        entries.push(command)
     }
 
-    return { groupId: input.groupId, plan: createRewardGrantPlan(entries) }
+    return {
+        groupId: input.groupId,
+        plan: createRewardGrantExecutionPlan(entries),
+        dropMetadata: Object.freeze(dropMetadata),
+    }
 }

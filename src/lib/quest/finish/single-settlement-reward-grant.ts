@@ -1,95 +1,89 @@
-import type {
-    RewardGrantPlan,
-    RewardGrantPlayerAfter,
-    RewardGrantResult,
-    RewardGrantReward,
+import {
+    createRewardGrantExecutionPlan,
+    executeRewardGrantExecutionPlanAsTransactionOwnerSync,
+    type RewardGrantExecutionPlan,
+    type RewardGrantExecutionResult,
+    type RewardGrantCommand,
+    type RewardGrantKnownPlayerState,
 } from "../../reward-grant"
-import {
-    createRewardGrantPlan,
-} from "../../reward-grant"
-import {
-    executeRewardGrantPlanInTransactionOwnerInternalSync,
-    executeRewardGrantPlanInTransactionOwnerSync,
-} from "../../reward-grant/owner-executor"
-import {
-    projectPublicRewardGrantResult,
-    type InternalRewardGrantResult,
-} from "../../reward-grant/entry-result"
-import type { GivePlayerScoreRewardsResult, Reward } from "../../types"
+import type { GivePlayerScoreRewardsResult, PlayerRewardResult, Reward } from "../../types"
 import {
     projectGrantedScoreRewardSettlementResult,
 } from "../score-reward-settlement"
-import type {
-    ScoreRewardSelection,
-    ScoreRewardSource,
-} from "../score-reward-selection"
-
-export type SingleSettlementRewardSourceKind =
-    | "clear"
-    | "s_plus"
-    | "additional"
-    | "rush"
-    | "score_attack"
-
-export interface SingleSettlementRewardSource {
-    readonly kind: SingleSettlementRewardSourceKind
-    readonly index: number
-}
+import type { ScoreRewardSelection } from "../score-reward-selection"
+import { validateScoreRewardSelection } from "../score-reward-projection"
 
 export function withSingleSettlementExpPool(
-    state: RewardGrantPlayerAfter,
+    state: RewardGrantKnownPlayerState,
     expPool: number,
-): RewardGrantPlayerAfter {
+): RewardGrantKnownPlayerState {
     return { ...state, expPool }
 }
 
+export function projectSingleSettlementRewardGrant(
+    grant: RewardGrantExecutionResult,
+): PlayerRewardResult {
+    const currency = Object.fromEntries(grant.assets.currencies.map(entry => [
+        entry.currency,
+        entry.requestedAmount,
+    ]))
+    return {
+        user_info: {
+            free_mana: currency.freeMana ?? 0,
+            free_vmoney: currency.freeVmoney ?? 0,
+            exp_pool: currency.expPool ?? 0,
+        },
+        character_list: grant.assets.characters.map(entry => entry.after),
+        joined_character_id_list: grant.assets.characters
+            .filter(entry => entry.joined)
+            .map(entry => entry.characterId),
+        equipment_list: grant.assets.equipment.map(entry => entry.after),
+        items: Object.fromEntries(grant.assets.items.map(entry => [
+            String(entry.itemId),
+            entry.afterAmount,
+        ])),
+    }
+}
+
 export interface SingleSettlementScoreRewardGrant {
-    readonly grant: RewardGrantResult<ScoreRewardSource>
+    readonly grant: RewardGrantExecutionResult
     readonly result: GivePlayerScoreRewardsResult
 }
 
 export function grantSingleSettlementScoreRewardsWithinTransactionSync(
     playerId: number,
     selection: ScoreRewardSelection,
-    knownPlayerBefore: RewardGrantPlayerAfter,
+    knownPlayerBefore: RewardGrantKnownPlayerState,
 ): SingleSettlementScoreRewardGrant {
-    // Internal detail stays local to Score projection; the adapter's grant remains public.
-    const detailedGrant: InternalRewardGrantResult<ScoreRewardSource> =
-        executeRewardGrantPlanInTransactionOwnerInternalSync(
-            playerId,
-            selection.plan,
-            knownPlayerBefore,
-        )
-    const grant = projectPublicRewardGrantResult(detailedGrant)
+    validateScoreRewardSelection(selection)
+    const grant = executeRewardGrantExecutionPlanAsTransactionOwnerSync(
+        playerId,
+        selection.plan,
+        knownPlayerBefore,
+    )
     return {
         grant,
-        result: projectGrantedScoreRewardSettlementResult(selection, detailedGrant),
+        result: projectGrantedScoreRewardSettlementResult(selection, grant),
     }
 }
 
 export function grantSingleSettlementRewardsWithinTransactionSync(
     playerId: number,
-    kind: SingleSettlementRewardSourceKind,
     rewards: readonly Reward[],
-    knownPlayerBefore: RewardGrantPlayerAfter,
-): RewardGrantResult<SingleSettlementRewardSource> {
-    const plan = createRewardGrantPlan(rewards.map((reward, index) => ({
-        source: { kind, index },
-        reward: reward as RewardGrantReward,
-    })))
+    knownPlayerBefore: RewardGrantKnownPlayerState,
+): RewardGrantExecutionResult {
+    const plan = createRewardGrantExecutionPlan(rewards as readonly RewardGrantCommand[])
     return grantSingleSettlementPlanWithinTransactionSync(playerId, plan, knownPlayerBefore)
 }
 
-export function grantSingleSettlementPlanWithinTransactionSync<TSource>(
+export function grantSingleSettlementPlanWithinTransactionSync(
     playerId: number,
-    plan: RewardGrantPlan<TSource>,
-    knownPlayerBefore: RewardGrantPlayerAfter,
-    playerUpdate: { readonly degreeId?: number } = {},
-): RewardGrantResult<TSource> {
-    return executeRewardGrantPlanInTransactionOwnerSync(
+    plan: RewardGrantExecutionPlan,
+    knownPlayerBefore: RewardGrantKnownPlayerState,
+): RewardGrantExecutionResult {
+    return executeRewardGrantExecutionPlanAsTransactionOwnerSync(
         playerId,
         plan,
         knownPlayerBefore,
-        playerUpdate,
     )
 }

@@ -4,7 +4,7 @@ import { getServerGameplaySettingsSync } from "../../data/domains/server-setting
 import { getDateFromServerTime, getServerTime } from "../../utils"
 import { getRareScoreRewardGroup } from "../assets"
 import { resolveEventCurrencyId } from "../event-currency"
-import { createRewardGrantPlan } from "../reward-grant"
+import { createRewardGrantExecutionPlan } from "../reward-grant"
 import type { RewardCampaignRates } from "../reward-campaign"
 import type { UnitRandom } from "../score-reward-lottery"
 import type { ScoreReward } from "../types"
@@ -48,7 +48,7 @@ export function selectScoreRewardGrantPlan(
     options?: ScoreRewardSelectionOptions,
 ): ScoreRewardSelection {
     if (scoreRewards == null || groupId == null) {
-        return { plan: createRewardGrantPlan([]) }
+        return { plan: createRewardGrantExecutionPlan([]), dropMetadata: Object.freeze([]) }
     }
 
     const dropMultiplier = getServerGameplaySettingsSync().dropMultiplier

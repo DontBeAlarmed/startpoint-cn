@@ -6,37 +6,28 @@ import { addPlayerPassCardPointWithChangeSync } from "../../data/domains/pass-ca
 import { getPassCardEventDefinition } from "../pass-card"
 import { getFactKeyId, normalizeFactKey, type FactKey } from "./facts/fact-key"
 import { RewardType } from "../types/rewards"
-import { createRewardGrantPlan } from "../reward-grant"
-import type {
-    RewardGrantPlan,
-    RewardGrantPlayerAfter,
-    RewardGrantResult,
-    RewardGrantReward,
-} from "../reward-grant"
 import {
-    assertRewardGrantTransactionOwnerSync,
-    executeRewardGrantPlanInTransactionOwnerSync,
-} from "../reward-grant/owner-executor"
+    assertRewardGrantExecutionTransactionOwnerSync,
+    createRewardGrantExecutionPlan,
+    executeRewardGrantExecutionPlanAsTransactionOwnerSync,
+    snapshotRewardGrantExecutionResultForPlan,
+    type RewardGrantCommand,
+    type RewardGrantExecutionPlan,
+    type RewardGrantExecutionResult,
+    type RewardGrantKnownPlayerState,
+} from "../reward-grant"
 
 type MissionRewardPlayer = Pick<
     Player,
-    "freeVmoney" | "freeMana" | "expPool" | "totalManaObtained"
+    "id" | "freeVmoney" | "freeMana" | "expPool" | "totalManaObtained"
 >
 
-export interface MissionRewardSource {
-    readonly kind: "mission"
-    readonly definitionId?: number
-    readonly rewardIndex: number
-}
-
 export interface MissionRewardGrantContext {
-    definitionId?: number
     passCardEventId?: number
     standardRewardGrant?: (
-        plan: RewardGrantPlan<MissionRewardSource>,
-        knownPlayerBefore: RewardGrantPlayerAfter,
-        playerUpdate: { readonly degreeId?: number },
-    ) => RewardGrantResult<MissionRewardSource>
+        plan: RewardGrantExecutionPlan,
+        knownPlayerBefore: RewardGrantKnownPlayerState,
+    ) => RewardGrantExecutionResult
 }
 
 export class MissionRewardGranter {
@@ -52,23 +43,22 @@ export class MissionRewardGranter {
     private latestDegreeId: number | undefined
     private readonly invalidatedFacts = new Map<string, FactKey>()
     private standardRewardGranted = false
-    private readonly pendingStandardEntries: {
-        source: MissionRewardSource
-        reward: RewardGrantReward
-    }[] = []
+    private readonly pendingStandardEntries: RewardGrantCommand[] = []
     private standardRewardGrant: NonNullable<MissionRewardGrantContext["standardRewardGrant"]>
     private standardRewardGrantRequiresTransaction = true
 
     constructor(private readonly playerId: number, private readonly player: MissionRewardPlayer) {
+        if (player.id !== playerId) {
+            throw new Error(`Mission reward Player ${player.id} does not match owner ${playerId}`)
+        }
         this.freeVmoney = player.freeVmoney
         this.freeMana = player.freeMana
         this.expPool = player.expPool
-        this.standardRewardGrant = (plan, knownPlayerBefore, playerUpdate) => (
-            executeRewardGrantPlanInTransactionOwnerSync(
+        this.standardRewardGrant = (plan, knownPlayerBefore) => (
+            executeRewardGrantExecutionPlanAsTransactionOwnerSync(
                 this.playerId,
                 plan,
                 knownPlayerBefore,
-                playerUpdate,
             )
         )
     }
@@ -80,15 +70,11 @@ export class MissionRewardGranter {
         }
         if (this.standardRewardGrantRequiresTransaction
             && rewards.some(reward => this.canMutatePlayerState(reward, context))) {
-            assertRewardGrantTransactionOwnerSync()
+            assertRewardGrantExecutionTransactionOwnerSync()
         }
 
-        for (const [rewardIndex, reward] of rewards.entries()) {
-            const standardReward = this.toStandardRewardEntries(
-                reward,
-                rewardIndex,
-                context.definitionId,
-            )
+        for (const reward of rewards) {
+            const standardReward = this.toStandardRewardCommands(reward)
             if (standardReward.length > 0) {
                 this.pendingStandardEntries.push(...standardReward)
                 continue
@@ -170,83 +156,67 @@ export class MissionRewardGranter {
 
     private flushStandardRewards(): void {
         if (this.pendingStandardEntries.length === 0) return
-        const grant = this.standardRewardGrant(
-            createRewardGrantPlan(this.pendingStandardEntries),
-            {
-                freeMana: this.freeMana,
-                freeVmoney: this.freeVmoney,
-                expPool: this.expPool,
-            },
-            { degreeId: this.latestDegreeId },
+        const plan = createRewardGrantExecutionPlan(this.pendingStandardEntries)
+        const grant = snapshotRewardGrantExecutionResultForPlan(
+            this.playerId,
+            plan,
+            this.standardRewardGrant(
+                plan,
+                {
+                    playerId: this.player.id,
+                    freeMana: this.freeMana,
+                    freeVmoney: this.freeVmoney,
+                    expPool: this.expPool,
+                },
+            ),
         )
         this.pendingStandardEntries.length = 0
         this.standardRewardGranted = true
         this.freeMana = grant.playerAfter.freeMana
         this.freeVmoney = grant.playerAfter.freeVmoney
         this.expPool = grant.playerAfter.expPool
-        Object.assign(this.itemList, grant.aggregate.items)
-
-        for (const entry of grant.entries) {
-            switch (entry.reward.type) {
-                case RewardType.ITEM:
-                    this.invalidateItem(entry.reward.id)
-                    break
-                case RewardType.EQUIPMENT: {
-                    const equipment = entry.result.equipment_list[0]
-                    if (equipment !== undefined) this.equipmentMap.set(entry.reward.id, equipment)
-                    this.addInvalidation({ kind: "equipment" })
-                    break
-                }
-                case RewardType.CHARACTER:
-                    if (entry.result.character_list.length > 0) {
-                        this.addInvalidation({ kind: "characters" })
-                    }
-                    for (const itemId of Object.keys(entry.result.items)) {
-                        this.invalidateItem(Number(itemId))
-                    }
-                    for (const character of entry.result.character_list) {
-                        this.characterMap.set(entry.reward.id, character)
-                    }
-                    break
-            }
+        for (const item of grant.assets.items) {
+            this.itemList[String(item.itemId)] = item.afterAmount
+            this.invalidateItem(item.itemId)
+        }
+        for (const equipment of grant.assets.equipment) {
+            this.equipmentMap.set(equipment.equipmentId, equipment.after)
+            this.addInvalidation({ kind: "equipment" })
+        }
+        if (grant.assets.characters.length > 0) {
+            this.addInvalidation({ kind: "characters" })
+        }
+        for (const character of grant.assets.characters) {
+            this.characterMap.set(character.characterId, character.after)
         }
     }
 
-    private toStandardRewardEntries(
+    private toStandardRewardCommands(
         reward: ActiveMissionReward,
-        rewardIndex: number,
-        definitionId: number | undefined,
-    ): { source: MissionRewardSource, reward: RewardGrantReward }[] {
-        const source = {
-            kind: "mission" as const,
-            ...(definitionId === undefined ? {} : { definitionId }),
-            rewardIndex,
-        }
+    ): RewardGrantCommand[] {
         if (reward.amount <= 0) return []
         switch (reward.kind) {
             case 0:
-                return [{ source, reward: { type: RewardType.BEADS, count: reward.amount } }]
+                return [{ type: RewardType.BEADS, count: reward.amount }]
             case 1:
                 return reward.itemId === undefined ? [] : [{
-                    source,
-                    reward: { type: RewardType.ITEM, id: reward.itemId, count: reward.amount },
+                    type: RewardType.ITEM, id: reward.itemId, count: reward.amount,
                 }]
             case 2:
                 return reward.equipmentId === undefined ? [] : [{
-                    source,
-                    reward: { type: RewardType.EQUIPMENT, id: reward.equipmentId, count: reward.amount },
+                    type: RewardType.EQUIPMENT, id: reward.equipmentId, count: reward.amount,
                 }]
             case 3:
-                return [{ source, reward: { type: RewardType.MANA, count: reward.amount } }]
+                return [{ type: RewardType.MANA, count: reward.amount }]
             case 4:
                 if (reward.characterId === undefined) return []
                 const characterId = reward.characterId
                 return Array.from(
                     { length: reward.amount },
-                    () => ({ source, reward: { type: RewardType.CHARACTER, id: characterId } }),
+                    () => ({ type: RewardType.CHARACTER, id: characterId }),
                 )
             case 5:
-                return [{ source, reward: { type: RewardType.EXP, count: reward.amount } }]
+                return [{ type: RewardType.EXP, count: reward.amount }]
             default:
                 return []
         }
@@ -264,6 +234,8 @@ export class MissionRewardGranter {
                 ...(this.latestDegreeId !== undefined ? { degreeId: this.latestDegreeId } : {}),
                 totalManaObtained: (this.player.totalManaObtained ?? 0) + this.totalManaGained,
             })
+        } else if (this.latestDegreeId !== undefined) {
+            updatePlayerSync({ id: this.playerId, degreeId: this.latestDegreeId })
         }
         this.addInvalidation({ kind: "player" })
         return this.invalidatedFactKeys

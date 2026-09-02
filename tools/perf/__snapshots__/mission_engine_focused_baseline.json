@@ -333,7 +333,7 @@
     },
     "single-battle-finish": {
       "sqlReads": 31,
-      "sqlWrites": 31,
+      "sqlWrites": 32,
       "missionComputes": 425,
       "behavior": {
         "adapter": "mission-finish-boundary",
@@ -432,7 +432,7 @@
     },
     "multi-battle-finish": {
       "sqlReads": 32,
-      "sqlWrites": 37,
+      "sqlWrites": 38,
       "missionComputes": 425,
       "behavior": {
         "adapter": "mission-finish-boundary",

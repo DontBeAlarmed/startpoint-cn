@@ -188,13 +188,12 @@ export function settleAwakeMissionRewards(
             missionId,
         ))
 
-    const player = getPlayerSync(playerId)
-    if (!player) throw new Error(`Player ${playerId} not found during CharacterAwake settlement.`)
-
-    const persistedMissions = getPlayerCategoryMissionsSync(playerId, 9)
-    const granter = new MissionRewardGranter(playerId, player)
-    const missionInfo: AwakeMissionInfo[] = []
-    getDb().transaction(() => {
+    return getDb().transaction(() => {
+        const player = getPlayerSync(playerId)
+        if (!player) throw new Error(`Player ${playerId} not found during CharacterAwake settlement.`)
+        const persistedMissions = getPlayerCategoryMissionsSync(playerId, 9)
+        const granter = new MissionRewardGranter(playerId, player)
+        const missionInfo: AwakeMissionInfo[] = []
         for (const entry of aggregatedProgressList) {
             updatePlayerCategoryMissionSync(playerId, 9, entry.missionId, entry.progress)
         }
@@ -219,15 +218,14 @@ export function settleAwakeMissionRewards(
         }
 
         granter.persistPlayer()
+        return {
+            missionInfo,
+            itemList: granter.itemList,
+            characterList: granter.characterList as Record<string, unknown>[],
+            equipmentList: granter.equipmentList,
+            degreeIds: granter.degreeList,
+            passCardPoints: {},
+            ...(granter.hasPlayerChanges() ? { userInfo: granter.getUserInfo() } : {}),
+        }
     })()
-
-    return {
-        missionInfo,
-        itemList: granter.itemList,
-        characterList: granter.characterList as Record<string, unknown>[],
-        equipmentList: granter.equipmentList,
-        degreeIds: granter.degreeList,
-        passCardPoints: {},
-        ...(granter.hasPlayerChanges() ? { userInfo: granter.getUserInfo() } : {}),
-    }
 }

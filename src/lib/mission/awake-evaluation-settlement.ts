@@ -66,7 +66,6 @@ export function settleAwakeMissionEvaluationWithInvalidations(
                 true,
             )
             granter.grant(definition.rewards, {
-                definitionId: definition.missionRewardId,
                 standardRewardGrant: dependencies.standardRewardGrant,
             })
             missionInfo.push({

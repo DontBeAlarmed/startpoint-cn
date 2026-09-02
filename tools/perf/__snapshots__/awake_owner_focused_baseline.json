@@ -866,12 +866,12 @@
       "rereadReason": "earlier awake settlement precedes later authoritative reward, active-mission, response-state and active-quest writes",
       "freshPostWriteEvaluationRequired": true,
       "sqlReads": 57,
-      "sqlWrites": 33,
+      "sqlWrites": 34,
       "sqlByTable": {
         "players": {
           "reads": 7,
-          "statements": 12,
-          "writes": 5
+          "statements": 13,
+          "writes": 6
         },
         "players_active_mission_battle_facts": {
           "reads": 0,
@@ -1189,12 +1189,12 @@
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
       "sqlReads": 48,
-      "sqlWrites": 27,
+      "sqlWrites": 28,
       "sqlByTable": {
         "players": {
           "reads": 8,
-          "statements": 13,
-          "writes": 5
+          "statements": 14,
+          "writes": 6
         },
         "players_active_mission_battle_facts": {
           "reads": 0,

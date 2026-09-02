@@ -1,7 +1,7 @@
 import type {
-    RewardGrantPlan,
-    RewardGrantPlayerAfter,
-    RewardGrantResult,
+    RewardGrantExecutionPlan,
+    RewardGrantExecutionResult,
+    RewardGrantKnownPlayerState,
 } from "../../reward-grant"
 import { grantSingleSettlementPlanWithinTransactionSync } from "./single-settlement-reward-grant"
 
@@ -17,30 +17,27 @@ export class SingleSettlementRewardTargetMismatchError extends Error {
 
 export function createSingleSettlementStandardRewardGrant(
     playerId: number,
-    updatePlayerState: (state: RewardGrantPlayerAfter) => void,
+    updatePlayerState: (state: RewardGrantKnownPlayerState) => void,
 ): {
     assertTargetPlayer: (targetPlayerId: number) => void
-    forCarnival: <TSource>(
+    forCarnival: (
         targetPlayerId: number,
-        plan: RewardGrantPlan<TSource>,
-        knownPlayerBefore: RewardGrantPlayerAfter,
-    ) => RewardGrantResult<TSource>
-    forMission: <TSource>(
-        plan: RewardGrantPlan<TSource>,
-        knownPlayerBefore: RewardGrantPlayerAfter,
-        playerUpdate: { readonly degreeId?: number },
-    ) => RewardGrantResult<TSource>
+        plan: RewardGrantExecutionPlan,
+        knownPlayerBefore: RewardGrantKnownPlayerState,
+    ) => RewardGrantExecutionResult
+    forMission: (
+        plan: RewardGrantExecutionPlan,
+        knownPlayerBefore: RewardGrantKnownPlayerState,
+    ) => RewardGrantExecutionResult
 } {
-    const grant = <TSource>(
-        plan: RewardGrantPlan<TSource>,
-        knownPlayerBefore: RewardGrantPlayerAfter,
-        playerUpdate: { readonly degreeId?: number } = {},
-    ): RewardGrantResult<TSource> => {
+    const grant = (
+        plan: RewardGrantExecutionPlan,
+        knownPlayerBefore: RewardGrantKnownPlayerState,
+    ): RewardGrantExecutionResult => {
         const result = grantSingleSettlementPlanWithinTransactionSync(
             playerId,
             plan,
             knownPlayerBefore,
-            playerUpdate,
         )
         updatePlayerState(result.playerAfter)
         return result
@@ -56,10 +53,6 @@ export function createSingleSettlementStandardRewardGrant(
             assertTargetPlayer(targetPlayerId)
             return grant(plan, knownPlayerBefore)
         },
-        forMission: (plan, knownPlayerBefore, playerUpdate) => grant(
-            plan,
-            knownPlayerBefore,
-            playerUpdate,
-        ),
+        forMission: grant,
     }
 }

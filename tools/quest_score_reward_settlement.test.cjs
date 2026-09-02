@@ -21,37 +21,41 @@ const randomTrace = []
 let playerExists = true
 const rewardElementMap = require("../assets/reward_element_map.json")
 stubModule("../src/data/domains/player", {
-    getPlayerSync: () => playerExists
-        ? ({ freeMana: 0, freeVmoney: 0, totalManaObtained: 0, expPool: 0 })
+    getPlayerSync: playerId => playerExists
+        ? ({ id: playerId, freeMana: 0, freeVmoney: 0, totalManaObtained: 0, expPool: 0 })
         : null,
 })
-stubModule("../src/lib/reward-grant/owner-executor", {
-    executeRewardGrantPlanInTransactionOwnerInternalSync(_playerId, plan, knownPlayerBefore) {
-        const entries = plan.entries.map(entry => {
-            const rewardResult = {
-                user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
-                character_list: [],
-                joined_character_id_list: [],
-                equipment_list: [],
-                items: {},
+stubModule("../src/lib/reward-grant", {
+    rewardGrantFingerprint: reward => `${reward.type}:${reward.id ?? ""}:${reward.count ?? 1}`,
+    createRewardGrantExecutionPlan: entries => ({ entries: Object.freeze([...entries]) }),
+    executeRewardGrantExecutionPlanAsTransactionOwnerSync(_playerId, plan, knownPlayerBefore) {
+        const finalItems = new Map()
+        const entries = plan.entries.map((reward, index) => {
+            writeTrace.push(["item", reward.id, reward.count])
+            const beforeAmount = itemTotals.get(reward.id) ?? 0
+            const afterAmount = beforeAmount + reward.count
+            itemTotals.set(reward.id, afterAmount)
+            const item = {
+                itemId: reward.id,
+                requestedAmount: reward.count,
+                acceptedAmount: reward.count,
+                overflowAmount: 0,
+                beforeAmount,
+                afterAmount,
             }
-            if ([0, 6, 7].includes(entry.reward.type)) {
-                writeTrace.push(["item", entry.reward.id, entry.reward.count])
-                const total = (itemTotals.get(entry.reward.id) ?? 0) + entry.reward.count
-                itemTotals.set(entry.reward.id, total)
-                rewardResult.items[entry.reward.id] = total
-            }
-            return { ...entry, result: rewardResult }
+            finalItems.set(reward.id, finalItems.has(reward.id)
+                ? { ...finalItems.get(reward.id), afterAmount }
+                : item)
+            return { index, reward, outcome: { kind: "item", item } }
         })
         return {
-            aggregate: {
-                user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
-                character_list: [],
-                joined_character_id_list: [],
-                equipment_list: [],
-                items: {},
-            },
             entries,
+            assets: {
+                items: [...finalItems.values()],
+                characters: [],
+                equipment: [],
+                currencies: [],
+            },
             playerAfter: { ...knownPlayerBefore },
         }
     },

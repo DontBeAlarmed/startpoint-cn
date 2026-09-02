@@ -96,7 +96,6 @@ export function settleMissionEvaluationWithInvalidations(
             ? getMissionMasterDefinition(category, missionId)?.eventId
             : undefined
         granter.grant(definition.rewards, {
-            definitionId: definition.missionRewardId,
             passCardEventId,
             standardRewardGrant: dependencies.standardRewardGrant,
         })

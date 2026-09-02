@@ -24,7 +24,6 @@ import { settleAdditionalRewardsSync, type AdditionalRewardTable } from "../../a
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../rush"
 import { recordMissionBattleFacts } from "../../mission/battle-facts"
 import { getCarnivalRewardDefinitions, grantCarnivalRewards } from "../../carnival-rewards"
-import { givePlayerEquipmentSync } from "../../equipment"
 import { getRaidEventRequiredKillCount } from "../../raid-event-master"
 import { buildScoreAttackBattleHistoryRecord } from "../score-attack-history"
 import { buildPracticeBattleHistoryRecord } from "../practice-battle-history"
@@ -144,14 +143,15 @@ export function executeSingleSettlementWrites(
         ...(didLevelUp ? { stamina: afterStamina, staminaHealTime: afterStaminaHealTime } : {}),
     })
     responseState.setPlayerState({
+        playerId: responseState.playerState.playerId,
         freeMana: newMana,
         freeVmoney: responseState.playerState.freeVmoney,
         expPool: settlementPlayer.expPool + fixedPoolExpReward,
     })
     const clearReward = !isScoreAttackEvent && rewardEligibility.firstClear && questData.clearReward !== undefined
-        ? grantDirectRewards(playerId, "clear", [questData.clearReward]) : null
+        ? grantDirectRewards(playerId, [questData.clearReward]) : null
     const sPlusClearReward = !isScoreAttackEvent && rewardEligibility.sPlus && questData.sPlusReward !== undefined
-        ? grantDirectRewards(playerId, "s_plus", [questData.sPlusReward]) : null
+        ? grantDirectRewards(playerId, [questData.sPlusReward]) : null
     if (didLevelUp) console.log(`[BATTLE-FINISH] player ${playerId} leveled up: ${oldRkDegree} -> ${newDegreeId}, stamina refilled`)
 
     const dailyChallengePointList = entryResourceResult.kind === "committed"
@@ -183,7 +183,7 @@ export function executeSingleSettlementWrites(
                 rewardCampaignRates, boostPointUsed: useBoostPoint,
                 serverDropMultiplier: getServerGameplaySettingsSync().dropMultiplier,
             },
-            { grantRewards: rewards => grantDirectRewards(playerId, "additional", rewards) },
+            { grantRewards: rewards => grantDirectRewards(playerId, rewards) },
         )
         : { dropAdditionalRewardIds: [], rewardResult: null }
     const missionBattleFacts = recordMissionBattleFacts(finishCtx, settlementTime)
@@ -208,7 +208,7 @@ export function executeSingleSettlementWrites(
         deletePartyList: (pid: number, eid: number, battleType: number) => deletePlayerRushEventPlayedPartyListSync(pid, eid, battleType),
         getSerializedParties: (pid: number, eid: number) => getSerializedPlayerRushEventPlayedPartiesSync(pid, eid),
         getFolderRewards: (eid: number, fid: number) => getRushEventFolderClearRewards(eid, fid),
-        giveRewards: (pid: number, rewards: any[]) => grantDirectRewards(pid, "rush", rewards),
+        giveRewards: (pid: number, rewards: any[]) => grantDirectRewards(pid, rewards),
         transaction: (operation: () => any) => getDb().transaction(operation)(),
     }
     const { rushEventData, rushEventRewardsResult } = handleRushEventFinish(rushFinishParams)
@@ -234,8 +234,7 @@ export function executeSingleSettlementWrites(
         getClaimedRewardIdsFn: (pid, eid) => getPlayerClaimedCarnivalRewardIdsSync(pid, eid),
         grantRewardsFn: (pid, definitions) => grantCarnivalRewards(pid, definitions, {
             getPlayer: getPlayerSync,
-            giveEquipment: givePlayerEquipmentSync, giveDegree: givePlayerDegreeSync,
-            updatePlayer: updatePlayerSync,
+            giveDegree: givePlayerDegreeSync,
             standardRewardGrant: standardRewardGrant.forCarnival,
         }),
         claimRewardIdsFn: (pid, eid, rewardIds) => insertPlayerClaimedCarnivalRewardIdsSync(pid, eid, rewardIds),
@@ -268,7 +267,7 @@ export function executeSingleSettlementWrites(
     }, {
         transaction: operation => operation(),
         getProgress: (pid, category, qid) => getPlayerSingleQuestProgressSync(pid, category, qid),
-        grantRewards: (pid, rewards) => grantDirectRewards(pid, "score_attack", rewards),
+        grantRewards: (pid, rewards) => grantDirectRewards(pid, rewards),
         updateProgress: (pid, category, progress) => updatePlayerQuestProgressSync(pid, category, progress),
         insertProgress: (pid, category, progress) => insertPlayerQuestProgressSync(pid, category, progress),
         deleteActiveQuest: pid => deletePlayerActiveQuestSync(pid),

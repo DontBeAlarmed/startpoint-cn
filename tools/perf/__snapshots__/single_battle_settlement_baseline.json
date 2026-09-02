@@ -1118,15 +1118,15 @@
       },
       "behaviorSha256": "b343e04faad64d5c7fb0bd2f5fd81f127fd05d156b55d77f810a7d99eca335cd",
       "sql": {
-        "statements": 114,
+        "statements": 115,
         "selectStatements": 58,
-        "writeStatements": 48,
+        "writeStatements": 49,
         "transactionStatements": 8,
         "byTable": {
           "players": {
-            "statements": 13,
+            "statements": 14,
             "reads": 7,
-            "writes": 6
+            "writes": 7
           },
           "players_active_mission_counters": {
             "statements": 1,
@@ -1394,15 +1394,15 @@
       },
       "behaviorSha256": "ece93a5759d57939832dd018021034f586638e6c14584eb71c241c6f4ff00a9e",
       "sql": {
-        "statements": 102,
+        "statements": 103,
         "selectStatements": 47,
-        "writeStatements": 47,
+        "writeStatements": 48,
         "transactionStatements": 8,
         "byTable": {
           "players": {
-            "statements": 12,
+            "statements": 13,
             "reads": 6,
-            "writes": 6
+            "writes": 7
           },
           "players_active_mission_counters": {
             "statements": 1,
@@ -2101,15 +2101,15 @@
       },
       "behaviorSha256": "7119d703719536544a456203d74027cf0c1ab32e82b4007ee55993d47c430a2e",
       "sql": {
-        "statements": 95,
+        "statements": 96,
         "selectStatements": 57,
-        "writeStatements": 28,
+        "writeStatements": 29,
         "transactionStatements": 10,
         "byTable": {
           "players": {
-            "statements": 12,
+            "statements": 13,
             "reads": 7,
-            "writes": 5
+            "writes": 6
           },
           "players_active_mission_battle_facts": {
             "statements": 1,

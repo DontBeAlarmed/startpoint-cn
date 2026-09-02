@@ -24,8 +24,7 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerDegreeIdsSync } = require("../src/data/domains/degree")
 const { getPlayerEquipmentSync } = require("../src/data/domains/equipment")
 const { getPlayerItemSync } = require("../src/data/domains/item")
-const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
-const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
+const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getPlayerPassCardStateSync } = require("../src/data/domains/pass-card")
 const {
     getPlayerCarnivalEventRecordsSync,
@@ -40,8 +39,7 @@ const { grantCarnivalRewards } = require("../src/lib/carnival-rewards")
 const { handleCarnivalEventFinish } = require("../src/lib/quest/finish/carnival-handler")
 const { createSingleSettlementStandardRewardGrant } = require("../src/lib/quest/finish/single-standard-reward-callbacks")
 const { QuestCategory } = require("../src/lib/types")
-const { executeRewardGrantPlanInTransactionOwnerSync } = require("../src/lib/reward-grant/owner-executor")
-const { createRewardGrantPlan } = require("../src/lib/reward-grant")
+const { executeRewardGrantExecutionPlanAsTransactionOwnerSync } = require("../src/lib/reward-grant")
 const { RewardType } = require("../src/lib/types/rewards")
 
 const sqlTrace = { active: false, statements: [] }
@@ -88,7 +86,7 @@ test("Carnival standard callback preserves standard response, degree domain writ
     const degreeId = 61030
     const playerBefore = getPlayerSync(playerId)
     let callbackCalls = 0
-    let callbackSources
+    let callbackCommands
 
     const result = db.transaction(() => grantCarnivalRewards(playerId, [{
         id: 1,
@@ -106,26 +104,18 @@ test("Carnival standard callback preserves standard response, degree domain writ
         ],
     }], {
         getPlayer: getPlayerSync,
-        giveEquipment: require("../src/lib/equipment").givePlayerEquipmentSync,
         giveDegree: require("../src/data/domains/degree").givePlayerDegreeSync,
-        updatePlayer: updatePlayerSync,
         standardRewardGrant: (pid, plan, knownPlayerBefore) => {
             callbackCalls++
-            callbackSources = plan.entries.map(entry => entry.source)
-            return executeRewardGrantPlanInTransactionOwnerSync(pid, plan, knownPlayerBefore)
+            callbackCommands = plan.entries
+            return executeRewardGrantExecutionPlanAsTransactionOwnerSync(pid, plan, knownPlayerBefore)
         },
     }))()
 
     const playerAfter = getPlayerSync(playerId)
     assert.equal(callbackCalls, 1)
-    assert.deepEqual(callbackSources, [
-        { kind: "carnival", definitionId: 1, rewardIndex: 0 },
-        { kind: "carnival", definitionId: 1, rewardIndex: 1 },
-        { kind: "carnival", definitionId: 1, rewardIndex: 2 },
-        { kind: "carnival", definitionId: 1, rewardIndex: 3 },
-        { kind: "carnival", definitionId: 1, rewardIndex: 4 },
-        { kind: "carnival", definitionId: 1, rewardIndex: 5 },
-    ])
+    assert.deepEqual(callbackCommands.map(entry => entry.type), [0, 1, 1, 3, 4, 5])
+    assert.equal(JSON.stringify(callbackCommands).includes("source"), false)
     assert.deepEqual(result, {
         user_info: { free_vmoney: 7, free_mana: 11, exp_pool: 13 },
         item_list: { [itemId]: 2 },
@@ -155,6 +145,7 @@ test("reused Carnival callback rejects another player before any reward or domai
     const ownerBefore = getPlayerSync(ownerPlayerId)
     const targetBefore = getPlayerSync(targetPlayerId)
     let ownerRewardState = {
+        playerId: ownerBefore.id,
         freeMana: ownerBefore.freeMana,
         freeVmoney: ownerBefore.freeVmoney,
         expPool: ownerBefore.expPool,
@@ -190,10 +181,7 @@ test("reused Carnival callback rejects another player before any reward or domai
         getClaimedRewardIdsFn: getPlayerClaimedCarnivalRewardIdsSync,
         grantRewardsFn: (pid, definitions) => grantCarnivalRewards(pid, definitions, {
             getPlayer: getPlayerSync,
-            giveItem: grantInventoryFixtureItemSync,
-            giveEquipment: require("../src/lib/equipment").givePlayerEquipmentSync,
             giveDegree: require("../src/data/domains/degree").givePlayerDegreeSync,
-            updatePlayer: updatePlayerSync,
             standardRewardGrant: standardRewardGrant.forCarnival,
         }),
         claimRewardIdsFn: insertPlayerClaimedCarnivalRewardIdsSync,
@@ -204,6 +192,7 @@ test("reused Carnival callback rejects another player before any reward or domai
     assert.deepEqual(getPlayerSync(ownerPlayerId), ownerBefore)
     assert.deepEqual(getPlayerSync(targetPlayerId), targetBefore)
     assert.deepEqual(ownerRewardState, {
+        playerId: ownerBefore.id,
         freeMana: ownerBefore.freeMana,
         freeVmoney: ownerBefore.freeVmoney,
         expPool: ownerBefore.expPool,
@@ -252,13 +241,10 @@ function runMismatchedCarnivalFinish(rewards) {
         getClaimedRewardIdsFn: getPlayerClaimedCarnivalRewardIdsSync,
         grantRewardsFn: (pid, definitions) => grantCarnivalRewards(pid, definitions, {
             getPlayer: getPlayerSync,
-            giveItem: grantInventoryFixtureItemSync,
-            giveEquipment: require("../src/lib/equipment").givePlayerEquipmentSync,
             giveDegree: (id, degreeId) => {
                 calls.degree++
                 return require("../src/data/domains/degree").givePlayerDegreeSync(id, degreeId)
             },
-            updatePlayer: updatePlayerSync,
             standardRewardGrant: standardRewardGrant.forCarnival,
         }),
         claimRewardIdsFn: (pid, eventId, rewardIds) => {
@@ -316,7 +302,7 @@ test("Mission standard callback preserves mixed domain rewards, duplicate compen
     assert.ok(givePlayerCharacterSync(playerId, characterId))
     const playerBefore = getPlayerSync(playerId)
     let callbackCalls = 0
-    let callbackSources
+    let callbackCommands
 
     const granter = new MissionRewardGranter(playerId, playerBefore)
     db.transaction(() => {
@@ -332,16 +318,14 @@ test("Mission standard callback preserves mixed domain rewards, duplicate compen
             { kind: 6, degreeId, amount: 1 },
             { kind: 7, amount: 10 },
         ], {
-            definitionId: 88001,
             passCardEventId: 3,
-            standardRewardGrant: (plan, knownPlayerBefore, playerUpdate) => {
+            standardRewardGrant: (plan, knownPlayerBefore) => {
                 callbackCalls++
-                callbackSources = plan.entries.map(entry => entry.source)
-                return executeRewardGrantPlanInTransactionOwnerSync(
+                callbackCommands = plan.entries
+                return executeRewardGrantExecutionPlanAsTransactionOwnerSync(
                     playerId,
                     plan,
                     knownPlayerBefore,
-                    playerUpdate,
                 )
             },
         })
@@ -350,17 +334,8 @@ test("Mission standard callback preserves mixed domain rewards, duplicate compen
 
     const playerAfter = getPlayerSync(playerId)
     assert.equal(callbackCalls, 1)
-    assert.deepEqual(callbackSources, [
-        { kind: "mission", definitionId: 88001, rewardIndex: 0 },
-        { kind: "mission", definitionId: 88001, rewardIndex: 1 },
-        { kind: "mission", definitionId: 88001, rewardIndex: 2 },
-        { kind: "mission", definitionId: 88001, rewardIndex: 3 },
-        { kind: "mission", definitionId: 88001, rewardIndex: 4 },
-        { kind: "mission", definitionId: 88001, rewardIndex: 5 },
-        { kind: "mission", definitionId: 88001, rewardIndex: 6 },
-        { kind: "mission", definitionId: 88001, rewardIndex: 6 },
-        { kind: "mission", definitionId: 88001, rewardIndex: 7 },
-    ])
+    assert.deepEqual(callbackCommands.map(entry => entry.type), [3, 0, 0, 1, 1, 4, 2, 2, 5])
+    assert.equal(JSON.stringify(callbackCommands).includes("source"), false)
     assert.equal(getPlayerItemSync(playerId, itemId), 5)
     assert.equal(granter.itemList[String(itemId)], 5)
     assert.equal(getPlayerEquipmentSync(playerId, equipmentId).stack, 2)
@@ -368,6 +343,7 @@ test("Mission standard callback preserves mixed domain rewards, duplicate compen
     assert.equal(granter.characterList.length, 1)
     assert.equal(Object.hasOwn(granter.characterList[0], "isNew"), false)
     assert.deepEqual(granter.degreeList, [degreeId])
+    assert.equal(playerAfter.degreeId, degreeId)
     assert.equal(getPlayerPassCardStateSync(playerId, 3).point, 10)
     assert.equal(playerAfter.freeVmoney, playerBefore.freeVmoney + 7)
     assert.equal(playerAfter.freeMana, playerBefore.freeMana + 11)
@@ -399,13 +375,12 @@ test("default Mission RewardGrant owner is no heavier than an explicitly injecte
     const injectedOwner = captureSql(() => db.transaction(() => {
         const granter = new MissionRewardGranter(injectedPlayerId, getPlayerSync(injectedPlayerId))
         const context = {
-            standardRewardGrant: (plan, known, playerUpdate) => {
+            standardRewardGrant: (plan, known) => {
                 ownerCallbackCalls++
-                return executeRewardGrantPlanInTransactionOwnerSync(
+                return executeRewardGrantExecutionPlanAsTransactionOwnerSync(
                     injectedPlayerId,
                     plan,
                     known,
-                    playerUpdate,
                 )
             },
         }
@@ -451,7 +426,7 @@ test("default Mission owner rejects mixed rewards before any domain write withou
                 { kind: 3, amount: 7 },
                 testCase.directReward,
             ], testCase.context),
-            error => error?.name === "RewardGrantTransactionRequiredError",
+            error => error?.name === "RewardGrantExecutionTransactionError",
         )
         assert.equal(getPlayerItemSync(playerId, itemId), null)
         assert.deepEqual(getPlayerDegreeIdsSync(playerId), [])
@@ -467,7 +442,6 @@ test("single outer transaction rolls back Carnival and Mission standard plus dom
     const missionPlayerId = createPlayer("mission-rollback")
     const itemId = 990103
     const degreeId = 61040
-    const makePlan = (source, reward) => createRewardGrantPlan([{ source, reward }])
     let callbackCalls = 0
 
     assert.throws(() => db.transaction(() => {
@@ -482,12 +456,9 @@ test("single outer transaction rolls back Carnival and Mission standard plus dom
             ],
         }], {
             getPlayer: getPlayerSync,
-            giveItem: grantInventoryFixtureItemSync,
-            giveEquipment: require("../src/lib/equipment").givePlayerEquipmentSync,
             giveDegree: require("../src/data/domains/degree").givePlayerDegreeSync,
-            updatePlayer: updatePlayerSync,
             standardRewardGrant: (pid, plan, known) => (
-                (callbackCalls++, executeRewardGrantPlanInTransactionOwnerSync(pid, plan, known))
+                (callbackCalls++, executeRewardGrantExecutionPlanAsTransactionOwnerSync(pid, plan, known))
             ),
         })
         const granter = new MissionRewardGranter(missionPlayerId, getPlayerSync(missionPlayerId))
@@ -495,12 +466,11 @@ test("single outer transaction rolls back Carnival and Mission standard plus dom
             { kind: 1, itemId, amount: 3 },
             { kind: 6, degreeId, amount: 1 },
         ], {
-            standardRewardGrant: (plan, known, playerUpdate) => (
-                (callbackCalls++, executeRewardGrantPlanInTransactionOwnerSync(
+            standardRewardGrant: (plan, known) => (
+                (callbackCalls++, executeRewardGrantExecutionPlanAsTransactionOwnerSync(
                     missionPlayerId,
                     plan,
                     known,
-                    playerUpdate,
                 ))
             ),
         })

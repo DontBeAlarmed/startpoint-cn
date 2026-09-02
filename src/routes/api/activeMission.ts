@@ -42,32 +42,29 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "No players bound to account."
         })
 
-        const player = getPlayerSync(playerId)
-        if (!player) return reply.status(500).send({
-            "error": "Internal Server Error",
-            "message": "Player not found."
-        })
-
-        const activeMissions = getPlayerActiveMissionsSync(playerId)
         const requestList = body.active_mission_list || []
-        const validation = validateMissionRewardClaims(activeMissions, requestList, {
-            repository: getContentSnapshot().repository,
-            now: getServerTime() * 1000,
-            questProgress: getPlayerQuestProgressSync(playerId),
-        })
-        if (!validation.ok) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": validation.message
-        })
-
-        const granter = new MissionRewardGranter(playerId, player)
-        const resultByMission = new Map<number, {
-            mission_id: number,
-            progress_value: number,
-            stages: { stage: number, received: boolean }[]
-        }>()
-
-        const characterList = getDb().transaction(() => {
+        const evaluationTime = getServerTime() * 1000
+        const settlement = getDb().transaction(() => {
+            const player = getPlayerSync(playerId)
+            if (!player) return { ok: false as const, status: 500 as const, message: "Player not found." }
+            const validation = validateMissionRewardClaims(
+                getPlayerActiveMissionsSync(playerId),
+                requestList,
+                {
+                    repository: getContentSnapshot().repository,
+                    now: evaluationTime,
+                    questProgress: getPlayerQuestProgressSync(playerId),
+                },
+            )
+            if (!validation.ok) {
+                return { ok: false as const, status: 400 as const, message: validation.message }
+            }
+            const granter = new MissionRewardGranter(playerId, player)
+            const resultByMission = new Map<number, {
+                mission_id: number,
+                progress_value: number,
+                stages: { stage: number, received: boolean }[]
+            }>()
             for (const claim of validation.claims) {
                 updatePlayerActiveMissionStageSync(playerId, claim.stage, claim.missionId, true)
                 let result = resultByMission.get(claim.missionId)
@@ -80,7 +77,7 @@ const routes = async (fastify: FastifyInstance) => {
             }
             granter.persistPlayer()
             const existingCharacterList = granter.characterList as unknown as Record<string, unknown>[]
-            return validation.claims.length > 0
+            const characterList = validation.claims.length > 0
                 ? (() => {
                     return publishCharacterGrowthOwnerStateBestEffort(
                         playerId,
@@ -88,28 +85,41 @@ const routes = async (fastify: FastifyInstance) => {
                         [existingCharacterList],
                         { invalidatedFactKeys: granter.invalidatedFactKeys },
                         "active-mission/receive",
-                        new Date(getServerTime() * 1000),
+                        new Date(evaluationTime),
                     ).characterList
                 })()
                 : existingCharacterList
+            return {
+                ok: true as const,
+                player,
+                resultList: [...resultByMission.values()],
+                characterList,
+                userInfo: granter.getUserInfo(),
+                equipmentList: granter.equipmentList,
+                itemList: granter.itemList,
+                degreeList: granter.degreeList,
+            }
         })()
+        if (!settlement.ok) return reply.status(settlement.status).send({
+            "error": settlement.status === 400 ? "Bad Request" : "Internal Server Error",
+            "message": settlement.message,
+        })
 
-        const resultList = [...resultByMission.values()]
-        console.log(`[ACTIVE_MISSION] receive viewer=${viewerId} missions=${requestList.length} items=${Object.keys(granter.itemList).length}`)
+        console.log(`[ACTIVE_MISSION] receive viewer=${viewerId} missions=${requestList.length} items=${Object.keys(settlement.itemList).length}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
-                "active_mission_list": resultList,
+                "active_mission_list": settlement.resultList,
                 "user_info": {
-                    ...granter.getUserInfo(),
-                    "exp_pooled_time": expPoolRealDateToClientTimestamp(player.expPooledTime)
+                    ...settlement.userInfo,
+                    "exp_pooled_time": expPoolRealDateToClientTimestamp(settlement.player.expPooledTime)
                 },
-                "character_list": characterList,
-                "equipment_list": granter.equipmentList,
-                "item_list": granter.itemList,
-                "degree_list": granter.degreeList.map(degreeId => ({ viewer_id: viewerId, degree_id: degreeId })),
+                "character_list": settlement.characterList,
+                "equipment_list": settlement.equipmentList,
+                "item_list": settlement.itemList,
+                "degree_list": settlement.degreeList.map(degreeId => ({ viewer_id: viewerId, degree_id: degreeId })),
                 "mail_arrived": getPlayerMailCountSync(playerId, true) > 0
             }
         })

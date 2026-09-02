@@ -274,19 +274,24 @@ const withInventory = (options, operation) => {
         obtainedAmount,
     })
     const inventory = {
+        __playerId: playerId,
+        __revision: 0,
         read: itemId => result(itemId),
         readMany: itemIds => itemIds.map(itemId => result(itemId)),
         grant(itemId, count) {
+            this.__revision++
             set(itemId, amount(itemId) + count)
             touched.set(itemId, (touched.get(itemId) ?? 0) + count)
             return result(itemId, touched.get(itemId))
         },
         deduct(itemId, count) {
+            this.__revision++
             set(itemId, amount(itemId) - count)
             touched.set(itemId, touched.get(itemId) ?? 0)
             return result(itemId, touched.get(itemId))
         },
         restore(itemId, count) {
+            this.__revision++
             set(itemId, amount(itemId) + count)
             touched.set(itemId, touched.get(itemId) ?? 0)
             return result(itemId, touched.get(itemId))
@@ -297,6 +302,10 @@ const withInventory = (options, operation) => {
     return operation(inventory)
 }
 stubModule("../src/lib/inventory", {
+    getInventoryBatchCheckpoint: inventory => ({
+        playerId: inventory.__playerId,
+        revision: inventory.__revision,
+    }),
     withDeferredInventoryBatchContextWithinTransactionSync: withInventory,
     withInventoryBatchContextWithinTransactionSync: withInventory,
 })

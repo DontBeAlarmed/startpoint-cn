@@ -44,8 +44,8 @@ const {
     settleAwakeMissionCandidatesWithEvaluation,
 } = require("../src/lib/mission/awake-settlement")
 const {
-    executeRewardGrantPlanInTransactionOwnerSync,
-} = require("../src/lib/reward-grant/owner-executor")
+    executeRewardGrantExecutionPlanAsTransactionOwnerSync,
+} = require("../src/lib/reward-grant")
 
 initializeDatabase()
 const db = getDb()
@@ -79,11 +79,11 @@ function createEligiblePlayer(label) {
     return playerId
 }
 
-test("Awake category 9 standard rewards use the owner with mission definition sources", () => {
+test("Awake category 9 standard rewards use ordered typed commands without mission sources", () => {
     const playerId = createEligiblePlayer("awake-owner")
     const before = getPlayerSync(playerId)
     let callbackCalls = 0
-    let callbackSources
+    let callbackCommands
 
     const result = settleAwakeMissionCandidatesWithEvaluation(
         playerId,
@@ -91,14 +91,13 @@ test("Awake category 9 standard rewards use the owner with mission definition so
         evaluationTime,
         undefined,
         {
-            standardRewardGrant: (plan, knownPlayerBefore, playerUpdate) => {
+            standardRewardGrant: (plan, knownPlayerBefore) => {
                 callbackCalls++
-                callbackSources = plan.entries.map(entry => entry.source)
-                return executeRewardGrantPlanInTransactionOwnerSync(
+                callbackCommands = plan.entries
+                return executeRewardGrantExecutionPlanAsTransactionOwnerSync(
                     playerId,
                     plan,
                     knownPlayerBefore,
-                    playerUpdate,
                 )
             },
         },
@@ -106,12 +105,8 @@ test("Awake category 9 standard rewards use the owner with mission definition so
 
     const after = getPlayerSync(playerId)
     assert.equal(callbackCalls, 1)
-    assert.deepEqual(callbackSources, [
-        { kind: "mission", definitionId: 34100511, rewardIndex: 0 },
-        { kind: "mission", definitionId: 34100511, rewardIndex: 1 },
-        { kind: "mission", definitionId: 34100511, rewardIndex: 2 },
-        { kind: "mission", definitionId: 34100511, rewardIndex: 3 },
-    ])
+    assert.deepEqual(callbackCommands.map(entry => entry.type), [0, 3, 4, 5])
+    assert.equal(JSON.stringify(callbackCommands).includes("source"), false)
     assert.equal(result.settlement.itemList[AWAKE_ITEM_ID], 2)
     assert.equal(getPlayerItemSync(playerId, AWAKE_ITEM_ID), 2)
     assert.equal(getPlayerCollectedItemTotalSync(playerId, AWAKE_ITEM_ID), 2)
@@ -121,8 +116,8 @@ test("Awake category 9 standard rewards use the owner with mission definition so
     assert.equal(after.expPool, before.expPool + 11)
 })
 
-test("Awake settlement without an injected callback uses the default RewardGrant owner", () => {
-    const playerId = createEligiblePlayer("awake-legacy")
+test("Awake settlement without an injected callback uses the default typed RewardGrant owner", () => {
+    const playerId = createEligiblePlayer("awake-default")
     const before = getPlayerSync(playerId)
 
     const result = settleAwakeMissionCandidatesWithEvaluation(

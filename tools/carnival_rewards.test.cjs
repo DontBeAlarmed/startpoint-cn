@@ -162,38 +162,73 @@ assert.equal(runtimeDefinitions.length, 1451)
 assert.equal(new Set(runtimeDefinitions.map(value => value.eventId)).size, 19)
 assert.equal(carnivalRewards.getCarnivalRewardDefinitions(250604).length, 79)
 
-const writes = { items: [], equipment: [], degrees: [], player: null }
+const { createRewardGrantExecutionResult } = require("../src/lib/reward-grant")
+const writes = { commands: [], degrees: [] }
+function standardRewardGrant(_playerId, plan, knownPlayerBefore) {
+    writes.commands.push(...plan.entries)
+    const state = { ...knownPlayerBefore }
+    const itemTotals = new Map([[1, 500]])
+    const outcomes = plan.entries.map(entry => {
+        if ([0, 6, 7].includes(entry.type)) {
+            const beforeAmount = itemTotals.get(entry.id) ?? 0
+            const afterAmount = beforeAmount + entry.count
+            itemTotals.set(entry.id, afterAmount)
+            return {
+                kind: "item",
+                item: {
+                    itemId: entry.id,
+                    requestedAmount: entry.count,
+                    acceptedAmount: entry.count,
+                    overflowAmount: 0,
+                    beforeAmount,
+                    afterAmount,
+                },
+            }
+        }
+        if (entry.type === 1) {
+            return {
+                kind: "equipment",
+                equipmentId: entry.id,
+                requestedAmount: entry.count,
+                after: { id: entry.id, stack: entry.count },
+            }
+        }
+        const currency = entry.type === 3
+            ? "freeVmoney"
+            : entry.type === 4 ? "freeMana" : "expPool"
+        const beforeAmount = state[currency]
+        state[currency] += entry.count
+        return {
+            kind: "currency",
+            currency,
+            requestedAmount: entry.count,
+            beforeAmount,
+            afterAmount: state[currency],
+        }
+    })
+    return createRewardGrantExecutionResult(
+        knownPlayerBefore.playerId,
+        plan,
+        outcomes,
+        state,
+    )
+}
 const grantDefinition = {
     ...definition,
     rewards: [...definition.rewards, { kind: 1, id: 5060042, amount: 2 }],
 }
 const grantResult = carnivalRewards.grantCarnivalRewards(17, [grantDefinition], {
-    getPlayer: () => ({ freeVmoney: 10, freeMana: 20, expPool: 30, totalManaObtained: 40 }),
-    giveItem: (_playerId, id, amount) => {
-        writes.items.push([id, amount])
-        return 500 + amount
-    },
-    giveEquipment: (_playerId, id, amount) => {
-        writes.equipment.push([id, amount])
-        return { id, stack: amount }
-    },
+    getPlayer: () => ({ id: 17, freeVmoney: 10, freeMana: 20, expPool: 30, totalManaObtained: 40 }),
     giveDegree: (_playerId, id) => {
         writes.degrees.push(id)
         return true
     },
-    updatePlayer: value => { writes.player = value },
+    standardRewardGrant,
 })
 
-assert.deepEqual(writes.items, [[1, 50]])
-assert.deepEqual(writes.equipment, [[5060042, 1], [5060042, 2]])
+assert.equal(writes.commands.length, 6)
+assert.equal(writes.commands.every(entry => !("source" in entry)), true)
 assert.deepEqual(writes.degrees, [61000])
-assert.deepEqual(writes.player, {
-    id: 17,
-    freeVmoney: 110,
-    freeMana: 10020,
-    expPool: 30030,
-    totalManaObtained: 10040,
-})
 assert.deepEqual(grantResult, {
     user_info: { free_vmoney: 100, free_mana: 10000, exp_pool: 30000 },
     item_list: { 1: 550 },
@@ -205,10 +240,9 @@ assert.deepEqual(carnivalRewards.grantCarnivalRewards(17, [{
     ...grantDefinition,
     rewards: [{ kind: 3, amount: 5 }],
 }], {
-    getPlayer: () => ({ freeVmoney: 10, freeMana: 20, expPool: 30, totalManaObtained: 40 }),
-    giveEquipment: () => { throw new Error("unexpected Equipment fallback") },
+    getPlayer: () => ({ id: 17, freeVmoney: 10, freeMana: 20, expPool: 30, totalManaObtained: 40 }),
     giveDegree: () => { throw new Error("unexpected Degree fallback") },
-    updatePlayer: () => {},
+    standardRewardGrant,
 }), {
     user_info: { free_vmoney: 0, free_mana: 5, exp_pool: 0 },
     item_list: {},
@@ -219,11 +253,9 @@ assert.throws(() => carnivalRewards.grantCarnivalRewards(17, [{
     ...grantDefinition,
     rewards: [{ kind: 0, id: 1, amount: 1 }],
 }], {
-    getPlayer: () => ({ freeVmoney: 10, freeMana: 20, expPool: 30, totalManaObtained: 40 }),
-    giveEquipment: () => { throw new Error("unexpected Equipment fallback") },
+    getPlayer: () => ({ id: 17, freeVmoney: 10, freeMana: 20, expPool: 30, totalManaObtained: 40 }),
     giveDegree: () => { throw new Error("unexpected Degree fallback") },
-    updatePlayer: () => {},
-}), /Carnival legacy Item fallback requires giveItem/)
+}), /Carnival rewards require a typed RewardGrant owner/)
 
 const db = new Database(":memory:")
 db.exec(`

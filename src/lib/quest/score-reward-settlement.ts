@@ -1,40 +1,34 @@
 import { formatQuestScoreRewardsSummary } from "../hot-path-log-formatters"
-import type {
-    RewardGrantEntry,
-} from "../reward-grant"
-import type { InternalRewardGrantEntryResult, InternalRewardGrantResult } from "../reward-grant/entry-result"
+import type { RewardGrantExecutionResult } from "../reward-grant"
 import { sampledLog } from "../sampled-log"
-import { RewardType, type GivePlayerScoreRewardsResult, type PlayerRewardResult } from "../types"
+import type { GivePlayerScoreRewardsResult, PlayerRewardResult } from "../types"
 import { projectScoreRewardDropIds } from "./score-reward-projection"
 import {
     type ScoreRewardSelection,
-    type ScoreRewardSource,
 } from "./score-reward-selection"
 
 export function projectScoreRewardSettlementResult(
     selection: ScoreRewardSelection,
     aggregate: PlayerRewardResult,
-    entries?: readonly RewardGrantEntry<ScoreRewardSource>[],
 ): GivePlayerScoreRewardsResult {
     return {
-        ...projectScoreRewardDropIds(selection, entries),
+        ...projectScoreRewardDropIds(selection),
         ...aggregate,
     }
 }
 
 export function projectGrantedScoreRewardSettlementResult(
     selection: ScoreRewardSelection,
-    grant: InternalRewardGrantResult<ScoreRewardSource>,
+    grant: RewardGrantExecutionResult,
 ): GivePlayerScoreRewardsResult {
     return projectScoreRewardSettlementResult(
         selection,
         aggregateScoreRewardEntries(grant.entries),
-        grant.entries,
     )
 }
 
 function aggregateScoreRewardEntries(
-    entries: readonly InternalRewardGrantEntryResult<ScoreRewardSource>[],
+    entries: RewardGrantExecutionResult["entries"],
 ): PlayerRewardResult {
     const aggregate: PlayerRewardResult = {
         user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
@@ -44,18 +38,23 @@ function aggregateScoreRewardEntries(
         items: {},
     }
     for (const entry of entries) {
-        const result = entry.result
-        aggregate.user_info.free_mana += result.user_info.free_mana
-        aggregate.user_info.free_vmoney += result.user_info.free_vmoney
-        aggregate.user_info.exp_pool += result.user_info.exp_pool
-        aggregate.character_list.push(...result.character_list)
-        aggregate.equipment_list.push(...result.equipment_list)
-        Object.assign(
-            aggregate.items,
-            entry.reward.type === RewardType.CHARACTER
-                ? entry.itemDeltas ?? {}
-                : result.items,
-        )
+        const outcome = entry.outcome
+        if (outcome.kind === "currency") {
+            const field = outcome.currency === "freeMana"
+                ? "free_mana"
+                : outcome.currency === "freeVmoney" ? "free_vmoney" : "exp_pool"
+            aggregate.user_info[field] += outcome.requestedAmount
+        } else if (outcome.kind === "item") {
+            aggregate.items[outcome.item.itemId] = outcome.item.afterAmount
+        } else if (outcome.kind === "character") {
+            aggregate.character_list.push(outcome.after)
+            if (outcome.compensationItem !== null) {
+                aggregate.items[outcome.compensationItem.itemId]
+                    = outcome.compensationItem.acceptedAmount
+            }
+        } else {
+            aggregate.equipment_list.push(outcome.after)
+        }
     }
     return aggregate
 }

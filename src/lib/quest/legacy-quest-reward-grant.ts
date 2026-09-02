@@ -1,42 +1,38 @@
 import { getPlayerSync } from "../../data/domains/player"
 import {
-    createRewardGrantPlan,
-    type RewardGrantPlan,
-    type RewardGrantReward,
+    createRewardGrantExecutionPlan,
+    executeRewardGrantExecutionPlanAsTransactionOwnerSync,
+    type RewardGrantCommand,
+    type RewardGrantExecutionPlan,
+    type RewardGrantExecutionResult,
 } from "../reward-grant"
-import type {
-    InternalRewardGrantEntryResult,
-    InternalRewardGrantResult,
-} from "../reward-grant/entry-result"
 import {
-    emptyPlayerRewardResult,
-} from "../reward-grant/entry-result"
-import {
-    executeRewardGrantPlanInTransactionOwnerInternalSync,
-} from "../reward-grant/owner-executor"
-import {
-    RewardType,
     type GivePlayerScoreRewardsResult,
     type PlayerRewardResult,
     type Reward,
 } from "../types"
 import {
     projectGrantedScoreRewardSettlementResult,
-    projectScoreRewardSettlementResult,
 } from "./score-reward-settlement"
 import type {
     ScoreRewardSelection,
-    ScoreRewardSource,
 } from "./score-reward-selection"
+import { validateScoreRewardSelection } from "./score-reward-projection"
 
-export interface LegacyQuestRewardSource {
-    readonly index: number
+function emptyLegacyQuestRewardResult(): PlayerRewardResult {
+    return {
+        user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
+        character_list: [],
+        joined_character_id_list: [],
+        equipment_list: [],
+        items: {},
+    }
 }
 
-function executeLegacyQuestRewardPlanWithinTransactionSync<TSource>(
+function executeLegacyQuestRewardPlanWithinTransactionSync(
     playerId: number,
-    plan: RewardGrantPlan<TSource>,
-): InternalRewardGrantResult<TSource> | null {
+    plan: RewardGrantExecutionPlan,
+): RewardGrantExecutionResult | null {
     if (plan.entries.length === 0) return null
 
     // Legacy callers grant several reward phases in sequence. Read the current
@@ -44,10 +40,11 @@ function executeLegacyQuestRewardPlanWithinTransactionSync<TSource>(
     const player = getPlayerSync(playerId)
     if (player === null) return null
 
-    return executeRewardGrantPlanInTransactionOwnerInternalSync(
+    return executeRewardGrantExecutionPlanAsTransactionOwnerSync(
         playerId,
         plan,
         {
+            playerId: player.id,
             freeMana: player.freeMana,
             freeVmoney: player.freeVmoney,
             expPool: player.expPool,
@@ -56,35 +53,36 @@ function executeLegacyQuestRewardPlanWithinTransactionSync<TSource>(
 }
 
 function projectLegacyQuestRewardEntries(
-    entries: readonly InternalRewardGrantEntryResult<LegacyQuestRewardSource>[],
+    entries: RewardGrantExecutionResult["entries"],
 ): PlayerRewardResult {
-    const result = emptyPlayerRewardResult()
+    const result = emptyLegacyQuestRewardResult()
     const characters = new Map<number, Object>()
     const equipment = new Map<number, Object>()
     const items = new Map<number, number>()
 
     for (const entry of entries) {
-        result.user_info.free_mana += entry.result.user_info.free_mana
-        result.user_info.free_vmoney += entry.result.user_info.free_vmoney
-        result.user_info.exp_pool += entry.result.user_info.exp_pool
-
-        if (entry.reward.type === RewardType.CHARACTER) {
-            for (const character of entry.result.character_list) {
-                characters.set(entry.reward.id, character)
+        const outcome = entry.outcome
+        if (outcome.kind === "currency") {
+            const field = outcome.currency === "freeMana"
+                ? "free_mana"
+                : outcome.currency === "freeVmoney" ? "free_vmoney" : "exp_pool"
+            result.user_info[field] += outcome.requestedAmount
+        } else if (outcome.kind === "item") {
+            items.set(
+                outcome.item.itemId,
+                (items.get(outcome.item.itemId) ?? 0) + outcome.item.afterAmount,
+            )
+        } else if (outcome.kind === "character") {
+            characters.set(outcome.characterId, outcome.after)
+            if (outcome.compensationItem !== null) {
+                const compensation = outcome.compensationItem
+                items.set(
+                    compensation.itemId,
+                    (items.get(compensation.itemId) ?? 0) + compensation.acceptedAmount,
+                )
             }
-        }
-        if (entry.reward.type === RewardType.EQUIPMENT) {
-            for (const grantedEquipment of entry.result.equipment_list) {
-                equipment.set(entry.reward.id, grantedEquipment)
-            }
-        }
-
-        const projectedItems = entry.reward.type === RewardType.CHARACTER
-            ? entry.itemDeltas ?? {}
-            : entry.result.items
-        for (const [itemIdText, count] of Object.entries(projectedItems)) {
-            const itemId = Number(itemIdText)
-            items.set(itemId, (items.get(itemId) ?? 0) + count)
+        } else {
+            equipment.set(outcome.equipmentId, outcome.after)
         }
     }
 
@@ -101,12 +99,9 @@ export function grantLegacyQuestRewardsWithinTransactionSync(
     playerId: number,
     rewards: readonly Reward[],
 ): PlayerRewardResult | null {
-    if (rewards.length === 0) return emptyPlayerRewardResult()
+    if (rewards.length === 0) return emptyLegacyQuestRewardResult()
 
-    const plan = createRewardGrantPlan(rewards.map((reward, index) => ({
-        source: { index },
-        reward: reward as RewardGrantReward,
-    })))
+    const plan = createRewardGrantExecutionPlan(rewards as readonly RewardGrantCommand[])
     const grant = executeLegacyQuestRewardPlanWithinTransactionSync(playerId, plan)
     return grant === null ? null : projectLegacyQuestRewardEntries(grant.entries)
 }
@@ -115,11 +110,17 @@ export function grantLegacyQuestScoreRewardsWithinTransactionSync(
     playerId: number,
     selection: ScoreRewardSelection,
 ): GivePlayerScoreRewardsResult {
-    const grant = executeLegacyQuestRewardPlanWithinTransactionSync<ScoreRewardSource>(
+    validateScoreRewardSelection(selection)
+    const grant = executeLegacyQuestRewardPlanWithinTransactionSync(
         playerId,
         selection.plan,
     )
-    return grant === null
-        ? projectScoreRewardSettlementResult(selection, emptyPlayerRewardResult(), [])
-        : projectGrantedScoreRewardSettlementResult(selection, grant)
+    if (grant === null) {
+        return {
+            drop_score_reward_ids: [],
+            drop_rare_reward_ids: [],
+            ...emptyLegacyQuestRewardResult(),
+        }
+    }
+    return projectGrantedScoreRewardSettlementResult(selection, grant)
 }

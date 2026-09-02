@@ -110,37 +110,31 @@ test.after(() => {
     else process.env.DATA_DIR = previousDataDirectory
 })
 
-test("adapter preserves the finite settlement source kind and original reward index", () => {
+test("adapter preserves typed reward order without settlement source metadata", () => {
     const { grantSingleSettlementRewardsWithinTransactionSync } = loadAdapter()
-    const sourceKinds = ["clear", "s_plus", "additional", "rush", "score_attack"]
+    const playerId = createPlayer("typed-direct")
+    const itemId = 920000
+    const player = getPlayerSync(playerId)
+    const result = database.transaction(() =>
+        grantSingleSettlementRewardsWithinTransactionSync(playerId, [
+            { type: RewardType.ITEM, id: itemId, count: 2 },
+            { type: RewardType.MANA, count: 3 },
+        ], {
+            playerId: player.id,
+            freeMana: player.freeMana,
+            freeVmoney: player.freeVmoney,
+            expPool: player.expPool,
+        }))()
 
-    for (const sourceKind of sourceKinds) {
-        const playerId = createPlayer(sourceKind)
-        const itemId = 920000 + sourceKinds.indexOf(sourceKind)
-        const player = getPlayerSync(playerId)
-        const result = database.transaction(() =>
-            grantSingleSettlementRewardsWithinTransactionSync(playerId, sourceKind, [
-                { type: RewardType.ITEM, id: itemId, count: 2 },
-                { type: RewardType.MANA, count: 3 },
-            ], {
-                freeMana: player.freeMana,
-                freeVmoney: player.freeVmoney,
-                expPool: player.expPool,
-            }))()
-
-        assert.deepEqual(result.entries.map(entry => entry.source), [
-            { kind: sourceKind, index: 0 },
-            { kind: sourceKind, index: 1 },
-        ])
-        assert.deepEqual(result.aggregate.user_info, {
-            free_mana: 3,
-            free_vmoney: 0,
-            exp_pool: 0,
-        })
-        assert.equal(result.aggregate.items[itemId], 2)
-        assert.equal(getPlayerItemSync(playerId, itemId), 2)
-        assert.equal(result.playerAfter.freeMana, 2003)
-    }
+    assert.deepEqual(result.entries.map(entry => entry.reward), [
+        { type: RewardType.ITEM, id: itemId, count: 2 },
+        { type: RewardType.MANA, count: 3 },
+    ])
+    assert.equal(JSON.stringify(result).includes("source"), false)
+    assert.equal(result.assets.items[0].afterAmount, 2)
+    assert.equal(result.assets.currencies[0].requestedAmount, 3)
+    assert.equal(getPlayerItemSync(playerId, itemId), 2)
+    assert.equal(result.playerAfter.freeMana, 2003)
 })
 
 test("adapter requires the caller transaction supplied by single finish", () => {
@@ -149,12 +143,13 @@ test("adapter requires the caller transaction supplied by single finish", () => 
     const player = getPlayerSync(playerId)
 
     assert.throws(
-        () => grantSingleSettlementRewardsWithinTransactionSync(playerId, "clear", [], {
+        () => grantSingleSettlementRewardsWithinTransactionSync(playerId, [], {
+            playerId: player.id,
             freeMana: player.freeMana,
             freeVmoney: player.freeVmoney,
             expPool: player.expPool,
         }),
-        error => error?.name === "RewardGrantTransactionRequiredError",
+        error => error?.name === "RewardGrantExecutionTransactionError",
     )
 })
 
@@ -185,6 +180,7 @@ test("real equipment Score group 2924 preserves every compatibility response ent
             singlePlayerId,
             selection,
             {
+                playerId: playerBefore.id,
                 freeMana: playerBefore.freeMana,
                 freeVmoney: playerBefore.freeVmoney,
                 expPool: playerBefore.expPool,
@@ -230,6 +226,7 @@ test("real character Score group 3001 matches compatibility response without ext
                 singlePlayerId,
                 selection,
                 {
+                    playerId: playerBefore.id,
                     freeMana: playerBefore.freeMana,
                     freeVmoney: playerBefore.freeVmoney,
                     expPool: playerBefore.expPool,
@@ -286,6 +283,7 @@ test("real duplicate character Score group projects compensation delta while DB 
             singlePlayerId,
             selection,
             {
+                playerId: playerBefore.id,
                 freeMana: playerBefore.freeMana,
                 freeVmoney: playerBefore.freeVmoney,
                 expPool: playerBefore.expPool,
@@ -326,6 +324,7 @@ test("real settlement state chain carries score currency and character overflow 
 
     database.transaction(() => {
         let state = {
+            playerId: before.id,
             freeMana: before.freeMana,
             freeVmoney: before.freeVmoney,
             expPool: before.expPool,
@@ -345,7 +344,6 @@ test("real settlement state chain carries score currency and character overflow 
         state = withSingleSettlementExpPool(state, characterExpResult.exp_pool)
         directResult = grantSingleSettlementRewardsWithinTransactionSync(
             playerId,
-            "additional",
             [
                 { type: RewardType.BEADS, count: 5 },
                 { type: RewardType.EXP, count: 7 },
@@ -363,29 +361,24 @@ test("real settlement state chain carries score currency and character overflow 
         { group_id: 990023, index: 1, number: 17 },
     ])
     assert.deepEqual(scoreResult.drop_rare_reward_ids, [])
-    assert.deepEqual(scoreGrantResult.entries.map(entry => ({
-        source: entry.source,
-        reward: entry.reward,
-        userInfo: entry.result.user_info,
-    })), [{
-        source: { kind: "score_common", groupId: 990023, index: 1, number: 17 },
+    assert.deepEqual(scoreGrantResult.entries, [{
+        index: 0,
         reward: { type: RewardType.MANA, count: 17 },
-        userInfo: { free_mana: 17, free_vmoney: 0, exp_pool: 0 },
+        outcome: {
+            kind: "currency",
+            currency: "freeMana",
+            requestedAmount: 17,
+            beforeAmount: before.freeMana,
+            afterAmount: before.freeMana + 17,
+        },
     }])
-    assert.deepEqual(scoreGrantResult.aggregate, {
-        user_info: scoreResult.user_info,
-        character_list: scoreResult.character_list,
-        joined_character_id_list: scoreResult.joined_character_id_list,
-        equipment_list: scoreResult.equipment_list,
-        items: scoreResult.items,
-    })
     assert.equal(characterExpResult.add_exp_list[0].add_exp_pool, 13)
-    assert.deepEqual(directResult.aggregate.user_info, {
-        free_mana: 0,
-        free_vmoney: 5,
-        exp_pool: 7,
-    })
+    assert.deepEqual(directResult.assets.currencies.map(entry => [
+        entry.currency,
+        entry.requestedAmount,
+    ]), [["freeVmoney", 5], ["expPool", 7]])
     assert.deepEqual(directResult.playerAfter, {
+        playerId,
         freeMana: before.freeMana + 17,
         freeVmoney: before.freeVmoney + 5,
         expPool: before.expPool + 13 + 7,
@@ -395,7 +388,11 @@ test("real settlement state chain carries score currency and character overflow 
         freeMana: after.freeMana,
         freeVmoney: after.freeVmoney,
         expPool: after.expPool,
-    }, directResult.playerAfter)
+    }, {
+        freeMana: directResult.playerAfter.freeMana,
+        freeVmoney: directResult.playerAfter.freeVmoney,
+        expPool: directResult.playerAfter.expPool,
+    })
 })
 
 test("a later owner reward failure rolls the real settlement state chain back", () => {
@@ -411,6 +408,7 @@ test("a later owner reward failure rolls the real settlement state chain back", 
 
     assert.throws(database.transaction(() => {
         let state = {
+            playerId: before.id,
             freeMana: before.freeMana,
             freeVmoney: before.freeVmoney,
             expPool: before.expPool,
@@ -428,7 +426,6 @@ test("a later owner reward failure rolls the real settlement state chain back", 
         state = withSingleSettlementExpPool(state, characterExpResult.exp_pool)
         grantSingleSettlementRewardsWithinTransactionSync(
             playerId,
-            "rush",
             [
                 { type: RewardType.ITEM, id: itemId, count: 1 },
                 { type: RewardType.BEADS, count: 3 },
@@ -436,7 +433,7 @@ test("a later owner reward failure rolls the real settlement state chain back", 
             ],
             state,
         )
-    }), error => error?.name === "RewardGrantExecutionError")
+    }), error => error?.name === "RewardGrantAssetExecutionError")
 
     const after = getPlayerSync(playerId)
     assert.deepEqual({
@@ -458,8 +455,8 @@ test("single settlement migrates score while preserving multiplayer, Carnival an
     const missionPublication = readSource("src/lib/quest/finish/single-mission-publication.ts")
     const responseState = readSource("src/lib/quest/finish/single-settlement-response-state.ts")
 
-    assert.match(adapter, /createRewardGrantPlan\s*\(/)
-    assert.match(adapter, /executeRewardGrantPlanInTransactionOwnerSync\s*\(/)
+    assert.match(adapter, /createRewardGrantExecutionPlan\s*\(/)
+    assert.match(adapter, /executeRewardGrantExecutionPlanAsTransactionOwnerSync\s*\(/)
     assert.doesNotMatch(adapter, /executeRewardGrantPlanWithinTransactionSync\s*\(/)
     assert.doesNotMatch(adapter, /executeRewardGrantPlanSync\s*\(/)
     assert.doesNotMatch(adapter, /\.transaction\s*\(/)
@@ -467,13 +464,11 @@ test("single settlement migrates score while preserving multiplayer, Carnival an
 
     assert.doesNotMatch(writes, /\bgivePlayerRewardsSync\b/)
     assert.doesNotMatch(writes, /\bgivePlayerRewardSync\b/)
-    for (const kind of ["clear", "s_plus", "additional", "rush", "score_attack"]) {
-        assert.match(writes, new RegExp(`grantDirectRewards\\([^\\n]*"${kind}"`), kind)
-    }
-    assert.match(responseState, /let playerState:\s*RewardGrantPlayerAfter\s*=\s*\{\s*freeMana:\s*player\.freeMana,\s*freeVmoney:\s*player\.freeVmoney,\s*expPool:\s*player\.expPool,?\s*\}/)
+    assert.doesNotMatch(writes, /grantDirectRewards\([^\n]*"(?:clear|s_plus|additional|rush|score_attack)"/)
+    assert.match(responseState, /let playerState:\s*RewardGrantKnownPlayerState\s*=\s*\{\s*playerId:\s*player\.id,/)
     assert.match(responseState, /playerState = grant\.playerAfter/)
-    assert.match(responseState, /observeItems\(grant\.aggregate\.items\)/)
-    assert.match(writes, /responseState\.setPlayerState\(\{\s*freeMana:\s*newMana,\s*freeVmoney:\s*responseState\.playerState\.freeVmoney,\s*expPool:\s*settlementPlayer\.expPool \+ fixedPoolExpReward,?\s*\}\)/)
+    assert.match(responseState, /grant\.assets\.items\.map/)
+    assert.match(writes, /responseState\.setPlayerState\(\{\s*playerId:\s*responseState\.playerState\.playerId,\s*freeMana:\s*newMana,/)
     assert.match(writes, /selectScoreRewardGrantPlan\s*\(/)
     assert.match(writes, /grantSingleSettlementScoreRewardsWithinTransactionSync\s*\(/)
     assert.match(writes, /responseState\.observeGrant\(scoreRewardGrant\.grant\)/)

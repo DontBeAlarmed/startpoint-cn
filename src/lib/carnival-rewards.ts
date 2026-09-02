@@ -1,12 +1,15 @@
 import carnivalRewardData from "../../assets/carnival_event_total_score_reward.json"
 import { getRuntimeContentTableSync } from "../content/runtime/table-access"
-import { createRewardGrantPlan } from "./reward-grant"
+import {
+    createRewardGrantExecutionPlan,
+    snapshotRewardGrantExecutionResultForPlan,
+} from "./reward-grant"
 import { RewardType } from "./types/rewards"
 import type {
-    RewardGrantPlan,
-    RewardGrantPlayerAfter,
-    RewardGrantResult,
-    RewardGrantReward,
+    RewardGrantCommand,
+    RewardGrantExecutionPlan,
+    RewardGrantExecutionResult,
+    RewardGrantKnownPlayerState,
 } from "./reward-grant"
 import type { CarnivalRewardDefinition } from "./carnival-reward-parser"
 
@@ -24,43 +27,29 @@ export interface CarnivalRewardGrantResult {
     new_degree_ids: number[]
 }
 
-export interface CarnivalRewardSource {
-    readonly kind: "carnival"
-    readonly definitionId: number
-    readonly rewardIndex: number
-}
-
 type StandardRewardGrant = (
     playerId: number,
-    plan: RewardGrantPlan<CarnivalRewardSource>,
-    knownPlayerBefore: RewardGrantPlayerAfter,
-) => RewardGrantResult<CarnivalRewardSource>
+    plan: RewardGrantExecutionPlan,
+    knownPlayerBefore: RewardGrantKnownPlayerState,
+) => RewardGrantExecutionResult
 
 interface CarnivalRewardDependencies {
     getPlayer: (playerId: number) => {
+        id: number
         freeVmoney: number
         freeMana: number
         expPool: number
         totalManaObtained?: number
     } | null
-    giveItem?: (playerId: number, itemId: number, amount: number) => number
-    giveEquipment: (playerId: number, equipmentId: number, amount: number) => Object
     giveDegree: (playerId: number, degreeId: number) => boolean
-    updatePlayer: (player: {
-        id: number
-        freeVmoney: number
-        freeMana: number
-        expPool: number
-        totalManaObtained: number
-    }) => void
-    standardRewardGrant?: StandardRewardGrant
+    standardRewardGrant: StandardRewardGrant
 }
 
-function toRewardGrantReward(
+function toRewardGrantCommand(
     kind: number,
     id: number | undefined,
     amount: number,
-): RewardGrantReward | null {
+): RewardGrantCommand | null {
     switch (kind) {
         case 0:
             return id === undefined ? null : { type: RewardType.ITEM, id, count: amount }
@@ -103,8 +92,14 @@ export function grantCarnivalRewards(
     definitions: CarnivalRewardDefinition[],
     dependencies: CarnivalRewardDependencies,
 ): CarnivalRewardGrantResult {
+    if (typeof dependencies.standardRewardGrant !== "function") {
+        throw new Error("Carnival rewards require a typed RewardGrant owner")
+    }
     const player = dependencies.getPlayer(playerId)
     if (player === null) throw new Error(`Player ${playerId} does not exist`)
+    if (player.id !== playerId) {
+        throw new Error(`Carnival reward Player ${player.id} does not match owner ${playerId}`)
+    }
 
     const result: CarnivalRewardGrantResult = {
         user_info: { free_vmoney: 0, free_mana: 0, exp_pool: 0 },
@@ -112,91 +107,54 @@ export function grantCarnivalRewards(
         equipment_list: [],
         new_degree_ids: [],
     }
-    const equipmentMap = new Map<number, Object>()
     const pendingDegreeIds: number[] = []
-    const standardEntries: {
-        source: CarnivalRewardSource
-        reward: RewardGrantReward
-    }[] = []
+    const standardEntries: RewardGrantCommand[] = []
 
     for (const definition of definitions) {
-        for (const [rewardIndex, reward] of definition.rewards.entries()) {
-            const standardReward = dependencies.standardRewardGrant === undefined
-                ? null
-                : toRewardGrantReward(reward.kind, reward.id, reward.amount)
+        for (const reward of definition.rewards) {
+            const standardReward = toRewardGrantCommand(reward.kind, reward.id, reward.amount)
             if (standardReward !== null) {
-                standardEntries.push({
-                    source: {
-                        kind: "carnival",
-                        definitionId: definition.id,
-                        rewardIndex,
-                    },
-                    reward: standardReward,
-                })
+                standardEntries.push(standardReward)
                 continue
             }
-            switch (reward.kind) {
-                case 0:
-                    if (reward.id !== undefined) {
-                        const giveItem = dependencies.giveItem
-                        if (giveItem === undefined) {
-                            throw new Error("Carnival legacy Item fallback requires giveItem")
-                        }
-                        result.item_list[String(reward.id)] = giveItem(
-                            playerId,
-                            reward.id,
-                            reward.amount,
-                        )
-                    }
-                    break
-                case 1:
-                    if (reward.id !== undefined) {
-                        equipmentMap.set(reward.id, dependencies.giveEquipment(
-                            playerId,
-                            reward.id,
-                            reward.amount,
-                        ))
-                    }
-                    break
-                case 2:
-                    result.user_info.free_vmoney += reward.amount
-                    break
-                case 3:
-                    result.user_info.free_mana += reward.amount
-                    break
-                case 4:
-                    result.user_info.exp_pool += reward.amount
-                    break
-                case 7:
-                    if (reward.id === undefined) break
-                    if (dependencies.standardRewardGrant !== undefined) {
-                        pendingDegreeIds.push(reward.id)
-                    } else if (!result.new_degree_ids.includes(reward.id)
-                        && dependencies.giveDegree(playerId, reward.id)) {
-                        result.new_degree_ids.push(reward.id)
-                    }
-                    break
+            if (reward.kind === 7 && reward.id !== undefined) {
+                pendingDegreeIds.push(reward.id)
             }
         }
     }
 
-    if (standardEntries.length > 0 && dependencies.standardRewardGrant !== undefined) {
-        const standardGrant = dependencies.standardRewardGrant(
+    if (standardEntries.length > 0) {
+        const plan = createRewardGrantExecutionPlan(standardEntries)
+        const standardGrant = snapshotRewardGrantExecutionResultForPlan(
             playerId,
-            createRewardGrantPlan(standardEntries),
-            {
-                freeMana: player.freeMana,
-                freeVmoney: player.freeVmoney,
-                expPool: player.expPool,
-            },
+            plan,
+            dependencies.standardRewardGrant(
+                playerId,
+                plan,
+                {
+                    playerId: player.id,
+                    freeMana: player.freeMana,
+                    freeVmoney: player.freeVmoney,
+                    expPool: player.expPool,
+                },
+            ),
         )
         result.user_info = {
-            free_vmoney: standardGrant.aggregate.user_info.free_vmoney,
-            free_mana: standardGrant.aggregate.user_info.free_mana,
-            exp_pool: standardGrant.aggregate.user_info.exp_pool,
+            free_vmoney: standardGrant.assets.currencies
+                .filter(entry => entry.currency === "freeVmoney")
+                .reduce((sum, entry) => sum + entry.requestedAmount, 0),
+            free_mana: standardGrant.assets.currencies
+                .filter(entry => entry.currency === "freeMana")
+                .reduce((sum, entry) => sum + entry.requestedAmount, 0),
+            exp_pool: standardGrant.assets.currencies
+                .filter(entry => entry.currency === "expPool")
+                .reduce((sum, entry) => sum + entry.requestedAmount, 0),
         }
-        result.item_list = { ...standardGrant.aggregate.items }
-        result.equipment_list = [...standardGrant.aggregate.equipment_list]
+        result.item_list = Object.fromEntries(standardGrant.assets.items.map(entry => [
+            String(entry.itemId),
+            entry.afterAmount,
+        ]))
+        result.equipment_list = standardGrant.assets.equipment.map(entry => entry.after)
     }
 
     for (const degreeId of pendingDegreeIds) {
@@ -204,23 +162,6 @@ export function grantCarnivalRewards(
             && dependencies.giveDegree(playerId, degreeId)) {
             result.new_degree_ids.push(degreeId)
         }
-    }
-
-    if (result.equipment_list.length === 0) {
-        result.equipment_list = [...equipmentMap.values()]
-    }
-
-    if (dependencies.standardRewardGrant === undefined
-        && (result.user_info.free_vmoney !== 0
-        || result.user_info.free_mana !== 0
-        || result.user_info.exp_pool !== 0)) {
-        dependencies.updatePlayer({
-            id: playerId,
-            freeVmoney: player.freeVmoney + result.user_info.free_vmoney,
-            freeMana: player.freeMana + result.user_info.free_mana,
-            expPool: player.expPool + result.user_info.exp_pool,
-            totalManaObtained: (player.totalManaObtained ?? 0) + result.user_info.free_mana,
-        })
     }
 
     return result
