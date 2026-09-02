@@ -56,7 +56,7 @@ test("SQLite row-existence facts remain inside repository and batch context", ()
     }
 })
 
-test("C2 does not migrate legacy business callsites or remove legacy helpers", () => {
+test("C3 Inventory imports match the reviewed writer migration inventory", () => {
     const sourceRoot = path.join(projectRoot, "src")
     const importedOutsideInventory = []
     const visit = directory => {
@@ -73,7 +73,17 @@ test("C2 does not migrate legacy business callsites or remove legacy helpers", (
         }
     }
     visit(sourceRoot)
-    assert.deepEqual(importedOutsideInventory, [])
+    const reviewedMigrations = [
+        "src/lib/character-growth/commands/awake-mana-nodes.ts",
+        "src/lib/character-growth/commands/learn-mana-nodes.ts",
+        "src/lib/item-sell.ts",
+        "src/lib/item-use-settlement.ts",
+    ]
+    assert.deepEqual(importedOutsideInventory.sort(), reviewedMigrations)
+    for (const relativePath of reviewedMigrations) {
+        const contents = fs.readFileSync(path.join(projectRoot, relativePath), "utf8")
+        assert.doesNotMatch(contents, /data\/domains\/item/, relativePath)
+    }
 
     const legacy = fs.readFileSync(path.join(projectRoot, "src/data/domains/item.ts"), "utf8")
     assert.match(legacy, /export function givePlayerItemSync/)

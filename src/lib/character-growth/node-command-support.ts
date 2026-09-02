@@ -3,7 +3,6 @@ import { parseCharacterLevelTable, getCharacterLevelByExperience } from "../../c
 import { buildCharacterManaMutationContent } from "../character-mana-mutation-content"
 import { ManaNodeMutationValidationError } from "../character-mana-mutation-types"
 import type { CharacterManaMutationContent } from "../character-mana-mutation-types"
-import type { CharacterGrowthRequestContext } from "./request-context"
 import { growthError, CharacterGrowthError } from "./errors"
 
 export function validateNodeCommandIds(
@@ -93,8 +92,7 @@ export function growthMutationError(error: unknown): never {
 }
 
 export function snapshotItems(
-    context: CharacterGrowthRequestContext,
-    itemIds: readonly number[],
+    itemBalances: ReadonlyMap<number, number>,
 ): Record<string, number> {
-    return Object.fromEntries([...context.requiredItems(itemIds)].map(([id, amount]) => [String(id), amount]))
+    return Object.fromEntries([...itemBalances].map(([id, amount]) => [String(id), amount]))
 }

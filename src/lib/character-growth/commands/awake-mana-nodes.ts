@@ -7,9 +7,9 @@ import {
 import type { PlayerCharacter } from "../../../data/types"
 import { incrementActiveMissionUsedManaCountSync } from "../../../data/domains/active_mission_counters"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
-import { setPlayerItemWithinTransactionSync } from "../../../data/domains/item"
 import { getManaNodeAwakeCost } from "../../assets"
 import { buildCharacterEvolutionResponse } from "../../character-evolution"
+import { withInventoryBatchContextWithinTransactionSync } from "../../inventory"
 import type { BondTokenStatus, CharacterGrowthCoreFact } from "../model"
 import type { CharacterGrowthCommandResult, CharacterGrowthObservedState } from "../result"
 import { createCharacterGrowthRequestContext } from "../request-context"
@@ -111,63 +111,68 @@ export function executeAwakeManaNodes(command: AwakeManaNodesCommand): AwakeMana
             }
         }
         const itemIds = requiredItemIds(content, requestedNodeIds, awakeCosts)
-        const itemBalances = context.requiredItems(itemIds)
-        const level = characterLevelFromContent(command.characterId, character.rarity, character.exp)
-        let plan
-        try {
-            plan = planAwakeManaNodeMutation({
-                characterId: command.characterId,
-                boardId: 1,
-                characterRarity: character.rarity,
-                characterLevel: level,
-                requestedNodeIds,
-                targetAwakeLevel: command.targetAwakeLevel,
-                awakeCosts,
-                content,
-                snapshot: {
-                    mana: player.freeMana + player.paidMana,
-                    items: snapshotItems(context, itemIds),
-                    nodeAwakeLevels: Object.fromEntries(boardLevels),
-                },
-            })
-        } catch (error) {
-            growthMutationError(error)
-        }
-        const nextNodes = applyManaNodePlan(allNodeLevels, plan)
-        const plannedEvolutionLevel = Math.max(
-            character.evolutionLevel,
-            deriveEvolutionLevel(content, nextNodes),
-        )
-        const before = observed(character, context.bondTokens(), allNodeLevels, context.awakeUnlocks())
+        const settlement = withInventoryBatchContextWithinTransactionSync({
+            playerId: command.playerId,
+            preloadItemIds: itemIds,
+        }, inventory => {
+            const itemBalances = new Map(
+                inventory.readMany(itemIds).map(item => [item.itemId, item.beforeAmount]),
+            )
+            const level = characterLevelFromContent(command.characterId, character.rarity, character.exp)
+            let plan
+            try {
+                plan = planAwakeManaNodeMutation({
+                    characterId: command.characterId,
+                    boardId: 1,
+                    characterRarity: character.rarity,
+                    characterLevel: level,
+                    requestedNodeIds,
+                    targetAwakeLevel: command.targetAwakeLevel,
+                    awakeCosts,
+                    content,
+                    snapshot: {
+                        mana: player.freeMana + player.paidMana,
+                        items: snapshotItems(itemBalances),
+                        nodeAwakeLevels: Object.fromEntries(boardLevels),
+                    },
+                })
+            } catch (error) {
+                growthMutationError(error)
+            }
+            const nextNodes = applyManaNodePlan(allNodeLevels, plan)
+            const plannedEvolutionLevel = Math.max(
+                character.evolutionLevel,
+                deriveEvolutionLevel(content, nextNodes),
+            )
+            const before = observed(character, context.bondTokens(), allNodeLevels, context.awakeUnlocks())
 
-        let resources
-        if (plan.hasResourceWrites) {
-            resources = planCharacterGrowthResources({
-                mutationPlan: plan,
-                freeMana: player.freeMana,
-                paidMana: player.paidMana,
-                itemBalances,
-            })
-            updatePlayerSync({
-                id: command.playerId,
-                freeMana: resources.freeManaAfter,
-                paidMana: resources.paidManaAfter,
-            })
-            incrementActiveMissionUsedManaCountSync(command.playerId, resources.totalManaCost)
-            for (const [itemId, amount] of resources.itemsAfter) {
-                setPlayerItemWithinTransactionSync(
+            let resources
+            if (plan.hasResourceWrites) {
+                resources = planCharacterGrowthResources({
+                    mutationPlan: plan,
+                    freeMana: player.freeMana,
+                    paidMana: player.paidMana,
+                    itemBalances,
+                })
+                updatePlayerSync({
+                    id: command.playerId,
+                    freeMana: resources.freeManaAfter,
+                    paidMana: resources.paidManaAfter,
+                })
+                incrementActiveMissionUsedManaCountSync(command.playerId, resources.totalManaCost)
+                for (const [itemId, amount] of resources.totalItemCosts) {
+                    inventory.deduct(itemId, amount)
+                }
+                inventory.flush()
+                updatePlayerCharacterManaNodeAwakeLevelsBatchSync(
                     command.playerId,
-                    itemId,
-                    amount,
-                    resources.itemsBefore.has(itemId),
+                    command.characterId,
+                    plan.nodeUpdates,
                 )
             }
-            updatePlayerCharacterManaNodeAwakeLevelsBatchSync(
-                command.playerId,
-                command.characterId,
-                plan.nodeUpdates,
-            )
-        }
+            return { plan, nextNodes, plannedEvolutionLevel, before, resources }
+        })
+        const { plan, nextNodes, plannedEvolutionLevel, before, resources } = settlement
         if (plannedEvolutionLevel !== character.evolutionLevel) {
             updatePlayerCharacterSync(command.playerId, command.characterId, {
                 evolutionLevel: plannedEvolutionLevel,

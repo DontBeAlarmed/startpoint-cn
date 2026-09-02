@@ -44,6 +44,7 @@ const {
 const { upsertPlayerCharacterAwakeUnlockSync } = require("../src/data/domains/character_awake")
 const itemDomain = require("../src/data/domains/item")
 const { getPlayerItemsSync, givePlayerItemSync } = itemDomain
+const { InventorySqliteRepository } = require("../src/lib/inventory/sqlite-repository")
 const { updatePlayerCategoryMissionSync } = require("../src/data/domains/mission")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
@@ -551,16 +552,16 @@ test("awake_mana_node rejects a malformed awake cost instead of granting it for 
     }
 })
 
-test("awake_mana_node reads one item snapshot for planning and settlement", async () => {
+test("awake_mana_node reads one Inventory item snapshot for planning and settlement", async () => {
     const singleSnapshot = await createPlayer(12)
     seedBoardNodes(singleSnapshot.playerId)
     upsertPlayerCharacterAwakeUnlockSync(singleSnapshot.playerId, CHARACTER_ID, 1, 1)
     grantAwakeCost(singleSnapshot.playerId, SKILL_EVOLUTION_NODE_ID)
-    const originalGetPlayerItemsByIdsSync = itemDomain.getPlayerItemsByIdsSync
+    const originalReadItemsByIdsSync = InventorySqliteRepository.prototype.readItemsByIdsSync
     let readCount = 0
-    itemDomain.getPlayerItemsByIdsSync = (...args) => {
-        if (args[0] === singleSnapshot.playerId) readCount += 1
-        return originalGetPlayerItemsByIdsSync(...args)
+    InventorySqliteRepository.prototype.readItemsByIdsSync = function (playerId, ...args) {
+        if (playerId === singleSnapshot.playerId) readCount += 1
+        return originalReadItemsByIdsSync.call(this, playerId, ...args)
     }
     try {
         const response = await app.inject({
@@ -577,7 +578,7 @@ test("awake_mana_node reads one item snapshot for planning and settlement", asyn
         assert.equal(response.statusCode, 200, response.body)
         assert.equal(readCount, 1)
     } finally {
-        itemDomain.getPlayerItemsByIdsSync = originalGetPlayerItemsByIdsSync
+        InventorySqliteRepository.prototype.readItemsByIdsSync = originalReadItemsByIdsSync
     }
 })
 

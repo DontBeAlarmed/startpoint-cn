@@ -8,8 +8,8 @@ import {
 import { incrementActiveMissionUsedManaCountSync } from "../../../data/domains/active_mission_counters"
 import { recordSecondManaBoardCompletionMilestoneSync } from "../../../lib/player-history-milestones"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
-import { setPlayerItemWithinTransactionSync } from "../../../data/domains/item"
 import { isCharacterSecondManaBoardAvailable } from "../../mana-board-availability"
+import { withInventoryBatchContextWithinTransactionSync } from "../../inventory"
 import {
     updateBondTokenForCompletedBoardFromGrowthState,
 } from "../../character-helpers"
@@ -119,62 +119,67 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
         const itemIds = requiredItemIds(content, requestedNodeIds)
         const player = getPlayerSync(command.playerId)
         if (player === null) throw growthError("INVALID_GROWTH_STATE", "player is unavailable.")
-        const itemBalances = context.requiredItems(itemIds)
-
-        let plan
-        try {
-            plan = planLearnManaNodeMutation({
-                characterId: command.characterId,
-                boardId,
-                characterRarity: character.rarity,
-                characterLevel: level,
-                requestedNodeIds,
-                content,
-                snapshot: {
-                    mana: player.freeMana + player.paidMana,
-                    items: snapshotItems(context, itemIds),
-                    nodeAwakeLevels: Object.fromEntries(boardLevels),
-                },
-            })
-        } catch (error) {
-            growthMutationError(error)
-        }
-        const resources = planCharacterGrowthResources({
-            mutationPlan: plan,
-            freeMana: player.freeMana,
-            paidMana: player.paidMana,
-            itemBalances,
-        })
-        const nextNodes = applyManaNodePlan(beforeNormalManaNodes, plan)
-        const isBoardComplete = [...Object.keys(content.nodes).map(Number)].every(nodeId => nextNodes.has(nodeId))
-        const bond = updateBondTokenForCompletedBoardFromGrowthState(
-            command.playerId,
-            command.characterId,
-            beforeBondTokens,
-            boardId,
-            isBoardComplete,
-        )
-        const boardOneContent = mutationContent(command.characterId, 1)
-        const plannedEvolutionLevel = Math.max(
-            character.evolutionLevel,
-            deriveEvolutionLevel(boardOneContent, nextNodes),
-        )
-        if (plan.hasResourceWrites) {
-            updatePlayerSync({
-                id: command.playerId,
-                freeMana: resources.freeManaAfter,
-                paidMana: resources.paidManaAfter,
-            })
-            incrementActiveMissionUsedManaCountSync(command.playerId, resources.totalManaCost)
-            for (const [itemId, amount] of resources.itemsAfter) {
-                setPlayerItemWithinTransactionSync(
-                    command.playerId,
-                    itemId,
-                    amount,
-                    resources.itemsBefore.has(itemId),
-                )
+        const settlement = withInventoryBatchContextWithinTransactionSync({
+            playerId: command.playerId,
+            preloadItemIds: itemIds,
+        }, inventory => {
+            const itemBalances = new Map(
+                inventory.readMany(itemIds).map(item => [item.itemId, item.beforeAmount]),
+            )
+            let plan
+            try {
+                plan = planLearnManaNodeMutation({
+                    characterId: command.characterId,
+                    boardId,
+                    characterRarity: character.rarity,
+                    characterLevel: level,
+                    requestedNodeIds,
+                    content,
+                    snapshot: {
+                        mana: player.freeMana + player.paidMana,
+                        items: snapshotItems(itemBalances),
+                        nodeAwakeLevels: Object.fromEntries(boardLevels),
+                    },
+                })
+            } catch (error) {
+                growthMutationError(error)
             }
-        }
+            const resources = planCharacterGrowthResources({
+                mutationPlan: plan,
+                freeMana: player.freeMana,
+                paidMana: player.paidMana,
+                itemBalances,
+            })
+            const nextNodes = applyManaNodePlan(beforeNormalManaNodes, plan)
+            const isBoardComplete = [...Object.keys(content.nodes).map(Number)]
+                .every(nodeId => nextNodes.has(nodeId))
+            const bond = updateBondTokenForCompletedBoardFromGrowthState(
+                command.playerId,
+                command.characterId,
+                beforeBondTokens,
+                boardId,
+                isBoardComplete,
+            )
+            const boardOneContent = mutationContent(command.characterId, 1)
+            const plannedEvolutionLevel = Math.max(
+                character.evolutionLevel,
+                deriveEvolutionLevel(boardOneContent, nextNodes),
+            )
+            if (plan.hasResourceWrites) {
+                updatePlayerSync({
+                    id: command.playerId,
+                    freeMana: resources.freeManaAfter,
+                    paidMana: resources.paidManaAfter,
+                })
+                incrementActiveMissionUsedManaCountSync(command.playerId, resources.totalManaCost)
+                for (const [itemId, amount] of resources.totalItemCosts) {
+                    inventory.deduct(itemId, amount)
+                }
+                inventory.flush()
+            }
+            return { plan, resources, nextNodes, isBoardComplete, bond, plannedEvolutionLevel }
+        })
+        const { plan, resources, nextNodes, isBoardComplete, bond, plannedEvolutionLevel } = settlement
         insertPlayerCharacterManaNodesSync(
             command.playerId,
             command.characterId,
