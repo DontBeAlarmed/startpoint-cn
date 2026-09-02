@@ -203,11 +203,19 @@ const gachaRouteSource = fs.readFileSync(
     path.join(__dirname, "..", "src", "routes", "api", "gacha.ts"),
     "utf8",
 )
-assert.equal(
-    gachaRouteSource.indexOf("const characterMoviePlan = isCharacterGacha")
-        < gachaRouteSource.indexOf("updatePlayerItemSync(playerId"),
-    true,
-    "the regular route must plan seeds before ticket or campaign writes",
+const regularRouteMoviePlanPosition = gachaRouteSource.indexOf(
+    "const characterMoviePlan = isCharacterGacha",
 )
+for (const writeAnchor of [
+    "inventory.deduct(",
+    "insertPlayerGachaCampaignSync(playerId",
+    "updatePlayerGachaCampaignSync(playerId",
+]) {
+    assert.equal(
+        regularRouteMoviePlanPosition < gachaRouteSource.indexOf(writeAnchor),
+        true,
+        `the regular route must plan seeds before ${writeAnchor}`,
+    )
+}
 
 console.log("gacha seed catalog runtime tests passed")

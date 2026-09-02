@@ -91,6 +91,7 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/routes/api/equipment.ts",
         "src/routes/api/exBoost.ts",
         "src/routes/api/exchange.ts",
+        "src/routes/api/gacha.ts",
         "src/routes/api/questUnlock.ts",
         "src/routes/api/sell.ts",
         "src/routes/api/shop.ts",
@@ -138,6 +139,17 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
     assert.doesNotMatch(shopPurchase, /\b(?:getItem|setItem)\s*:/)
     assert.match(shopPurchase, /dependencies\.withInventory\(/)
     assert.match(shopPurchase, /dependencies\.grantRewards\([\s\S]*inventory/)
+    const gachaRoute = fs.readFileSync(
+        path.join(projectRoot, "src/routes/api/gacha.ts"),
+        "utf8",
+    )
+    assert.match(gachaRoute, /withDeferredInventoryBatchContextWithinTransactionSync\(/)
+    assert.match(gachaRoute, /getTicketCount:\s*itemId\s*=>\s*inventory\.read\(itemId\)\.afterAmount/)
+    assert.match(gachaRoute, /inventory\.deduct\([\s\S]*execPlan\.ticket\.useTicketCount/)
+    assert.match(
+        gachaRoute,
+        /executeRewardGrantPlanInTransactionOwnerWithInventoryInternalSync\([\s\S]*knownPlayerBefore,[\s\S]*inventory/,
+    )
 
     const legacy = fs.readFileSync(path.join(projectRoot, "src/data/domains/item.ts"), "utf8")
     assert.match(legacy, /export function givePlayerItemSync/)
@@ -177,7 +189,6 @@ test("remaining legacy Item mutation references match the staged migration manif
         "src/multi/settlement/orchestrator.ts",
         // Remaining W3 source adapters.
         "src/routes/api/boxGacha.ts",
-        "src/routes/api/gacha.ts",
         // W4 Battle route.
         "src/routes/api/singleBattleQuest.ts",
         // W6 maintenance adapter.

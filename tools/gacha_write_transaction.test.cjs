@@ -23,7 +23,12 @@ const { getActiveMissionCountersSync } = require("../src/data/domains/active_mis
 const { getPlayerCharacterSync, getPlayerCharactersSync } = require("../src/data/domains/character")
 const { getPlayerEquipmentSync, getPlayerEquipmentListSync } = require("../src/data/domains/equipment")
 const { getPlayerGachaInfoSync, insertPlayerGachaInfoSync } = require("../src/data/domains/gacha")
-const { getPlayerItemSync, getPlayerItemsSync, givePlayerItemSync } = require("../src/data/domains/item")
+const {
+    getPlayerCollectedItemTotalSync,
+    getPlayerItemSync,
+    getPlayerItemsSync,
+    givePlayerItemSync,
+} = require("../src/data/domains/item")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
@@ -259,7 +264,7 @@ test("gacha exec commits charge reward history points and mission fact together"
     const { playerId, viewerId } = await createPlayer("gacha-exec-success")
     updatePlayerSync({ id: playerId, freeVmoney: 1000, vmoney: 0 })
 
-    const captured = await captureGachaLogs(() => app.inject({
+    const routeSql = await captureSqlAsync(() => captureGachaLogs(() => app.inject({
         method: "POST",
         url: "/gacha/exec",
         payload: {
@@ -270,7 +275,8 @@ test("gacha exec commits charge reward history points and mission fact together"
             type: 1,
             api_count: 1,
         },
-    }))
+    })))
+    const captured = routeSql.result
     const response = captured.result
 
     assert.equal(response.statusCode, 200, response.body)
@@ -282,13 +288,23 @@ test("gacha exec commits charge reward history points and mission fact together"
     assert.equal(after.historyCount, 1)
     assert.equal(after.activeMissionCounters.totalGachaCharacterCount, 1)
     assert.equal(captured.logs.length, 1)
+    assert.equal(
+        routeSql.statements.filter(sql => /^\s*SELECT[\s\S]*\bFROM\s+players_items\b/i.test(sql)).length,
+        0,
+        "a first-character non-ticket draw must not activate deferred Inventory",
+    )
+    assert.equal(
+        routeSql.statements.filter(sql => /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql)).length,
+        0,
+    )
 })
 
 test("newbie ten-ticket gacha consumes the configured 70030 ticket", async () => {
     const { playerId, viewerId } = await createPlayer("gacha-newbie-ten-ticket")
     givePlayerItemSync(playerId, 70030, 1)
+    const collectedBefore = getPlayerCollectedItemTotalSync(playerId, 70030)
 
-    const response = await app.inject({
+    const routeSql = await captureSqlAsync(() => app.inject({
         method: "POST",
         url: "/gacha/exec",
         payload: {
@@ -299,7 +315,8 @@ test("newbie ten-ticket gacha consumes the configured 70030 ticket", async () =>
             type: 4,
             api_count: 1,
         },
-    })
+    }))
+    const response = routeSql.result
 
     assert.equal(response.statusCode, 200, response.body)
     const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
@@ -307,6 +324,70 @@ test("newbie ten-ticket gacha consumes the configured 70030 ticket", async () =>
     assert.equal(payload.data.item_list[70030], 0)
     assert.equal(payload.data.draw.length, 10)
     assert.equal(getPlayerGachaInfoSync(playerId, 1613).gachaExchangePoint, 10)
+    assert.equal(getPlayerCollectedItemTotalSync(playerId, 70030), collectedBefore)
+    const ticketWrites = routeSql.statements.filter(sql => (
+        /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql)
+        && /VALUES\s*\(70030(?:\.0+)?,\s*0(?:\.0+)?,/i.test(sql)
+    ))
+    assert.equal(ticketWrites.length, 1, routeSql.statements.filter(sql => (
+        /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql)
+    )).join("\n---\n"))
+    const ticketCollectedWrites = routeSql.statements.filter(sql => (
+        /^\s*INSERT\s+INTO\s+players_collected_items\b/i.test(sql)
+        && /VALUES\s*\([^,]+,\s*70030(?:\.0+)?,/i.test(sql)
+    ))
+    assert.equal(ticketCollectedWrites.length, 0, ticketCollectedWrites.join("\n---\n"))
+    assert.equal(
+        routeSql.statements.filter(sql => /^\s*(?:SAVEPOINT|RELEASE)\b/i.test(sql)).length,
+        0,
+    )
+})
+
+test("ticket gacha rolls its ticket and rewards back on a late mission failure", async t => {
+    const { playerId, viewerId } = await createPlayer("gacha-ticket-late-failure")
+    givePlayerItemSync(playerId, 70030, 1)
+    const before = drawState(playerId, 1613)
+    const collectedBefore = getPlayerCollectedItemTotalSync(playerId, 70030)
+    database.exec(`
+        CREATE TRIGGER reject_ticket_gacha_mission_counter
+        BEFORE INSERT ON players_active_mission_counters
+        WHEN NEW.player_id = ${playerId}
+        BEGIN SELECT RAISE(ABORT, 'forced ticket gacha mission counter failure'); END;
+    `)
+    t.after(() => database.exec("DROP TRIGGER IF EXISTS reject_ticket_gacha_mission_counter"))
+
+    const routeSql = await captureSqlAsync(() => app.inject({
+        method: "POST",
+        url: "/gacha/exec",
+        payload: {
+            viewer_id: viewerId,
+            gacha_id: 1613,
+            payment_type: 3,
+            number_of_exec: 1,
+            type: 4,
+            api_count: 1,
+        },
+    }))
+    const response = routeSql.result
+
+    assert.equal(response.statusCode, 500)
+    assert.match(response.body, /forced ticket gacha mission counter failure/)
+    assert.deepEqual(drawState(playerId, 1613), before)
+    assert.equal(getPlayerCollectedItemTotalSync(playerId, 70030), collectedBefore)
+    assert.equal(
+        routeSql.statements.filter(sql => (
+            /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql)
+            && /VALUES\s*\(70030(?:\.0+)?,\s*0(?:\.0+)?,/i.test(sql)
+        )).length,
+        1,
+        routeSql.statements.filter(sql => (
+            /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql)
+        )).join("\n---\n"),
+    )
+    assert.equal(
+        routeSql.statements.filter(sql => /^\s*(?:SAVEPOINT|RELEASE)\b/i.test(sql)).length,
+        0,
+    )
 })
 
 test("character duplicate gacha item_list reports the post-reward inventory", async () => {

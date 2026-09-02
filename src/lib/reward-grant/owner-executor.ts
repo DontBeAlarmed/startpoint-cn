@@ -60,15 +60,35 @@ export function executeRewardGrantPlanInTransactionOwnerWithInventorySync<TSourc
     inventory: InventoryBatchContext,
     playerUpdate: RewardGrantOwnerPlayerUpdate = {},
 ): RewardGrantResult<TSource> {
-    const db = getDb()
-    if (!db.inTransaction) throw new RewardGrantTransactionRequiredError()
     return projectPublicRewardGrantResult(
-        executeNormalizedRewardGrantPlanAsTransactionOwnerWithExternalInventoryInternalSync(
+        executeRewardGrantPlanInTransactionOwnerWithInventoryInternalSync(
             playerId,
-            normalizeRewardGrantPlanInternal(plan),
-            snapshotKnownRewardGrantPlayer(knownPlayerBefore),
+            plan,
+            knownPlayerBefore,
             inventory,
             playerUpdate,
         ),
+    )
+}
+
+/**
+ * Internal source-owner path for projections that require per-entry Item deltas.
+ * The caller remains the transaction and Inventory owner.
+ */
+export function executeRewardGrantPlanInTransactionOwnerWithInventoryInternalSync<TSource>(
+    playerId: number,
+    plan: RewardGrantPlan<TSource>,
+    knownPlayerBefore: RewardGrantPlayerAfter,
+    inventory: InventoryBatchContext,
+    playerUpdate: RewardGrantOwnerPlayerUpdate = {},
+): InternalRewardGrantResult<TSource> {
+    const db = getDb()
+    if (!db.inTransaction) throw new RewardGrantTransactionRequiredError()
+    return executeNormalizedRewardGrantPlanAsTransactionOwnerWithExternalInventoryInternalSync(
+        playerId,
+        normalizeRewardGrantPlanInternal(plan),
+        snapshotKnownRewardGrantPlayer(knownPlayerBefore),
+        inventory,
+        playerUpdate,
     )
 }
