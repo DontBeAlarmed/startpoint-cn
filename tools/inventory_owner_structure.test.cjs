@@ -42,6 +42,7 @@ test("public Inventory business API excludes maintenance absolute set and delete
     assert.match(barrel, /deductInventoryItemSync/)
     assert.match(barrel, /restoreInventoryItemSync/)
     assert.match(barrel, /withInventoryBatchContextWithinTransactionSync/)
+    assert.match(barrel, /withDeferredInventoryBatchContextWithinTransactionSync/)
     assert.doesNotMatch(barrel, /createInventoryBatchContextWithinTransactionSync/)
 })
 
@@ -82,6 +83,8 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/lib/character-growth/commands/stack-to-exp.ts",
         "src/lib/item-sell.ts",
         "src/lib/item-use-settlement.ts",
+        "src/lib/reward-grant/executor.ts",
+        "src/lib/reward-grant/inventory-adapter.ts",
     ]
     assert.deepEqual(importedOutsideInventory.sort(), reviewedMigrations)
     for (const relativePath of reviewedMigrations) {
@@ -93,6 +96,23 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         /data\/domains\/item/,
         "src/lib/character.ts",
     )
+    assert.equal(
+        fs.existsSync(path.join(projectRoot, "src/lib/reward-grant/owner-inventory.ts")),
+        false,
+        "RewardGrant must not retain a second Item cache owner",
+    )
+    const rewardInventoryAdapter = fs.readFileSync(
+        path.join(projectRoot, "src/lib/reward-grant/inventory-adapter.ts"),
+        "utf8",
+    )
+    assert.doesNotMatch(rewardInventoryAdapter, /data\/domains\/item/)
+    assert.doesNotMatch(rewardInventoryAdapter, /item-cap-plan|event-trade|mana-capacity|domains\/mail/)
+    const rewardExecutor = fs.readFileSync(
+        path.join(projectRoot, "src/lib/reward-grant/executor.ts"),
+        "utf8",
+    )
+    assert.doesNotMatch(rewardExecutor, /data\/domains\/item/)
+    assert.match(rewardExecutor, /givePlayerCharacterWithinTransactionSync[\s\S]*inventory\.grant/)
 
     const legacy = fs.readFileSync(path.join(projectRoot, "src/data/domains/item.ts"), "utf8")
     assert.match(legacy, /export function givePlayerItemSync/)

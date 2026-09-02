@@ -68,10 +68,10 @@ function mail(id, type, typeId, number) {
     }
 }
 
-function assertOwnerSql(statements) {
+function assertOwnerSql(statements, expectedPlayerSelects = 0) {
     assert.equal(
         statements.filter(statement => /^\s*SELECT[\s\S]*\bFROM\s+players\b/i.test(statement)).length,
-        0,
+        expectedPlayerSelects,
         statements.join("\n---\n"),
     )
     assert.equal(

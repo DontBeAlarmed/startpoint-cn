@@ -1,4 +1,5 @@
 export {
+    withDeferredInventoryBatchContextWithinTransactionSync,
     withInventoryBatchContextWithinTransactionSync,
     type InventoryBatchContext,
     type InventoryBatchContextOptions,

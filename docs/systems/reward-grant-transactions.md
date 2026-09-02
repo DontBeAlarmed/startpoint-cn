@@ -22,7 +22,7 @@
 
 独立执行器在规范化 Plan 后，仅包装一次 `getDb().transaction` 并直接调用同一个私有执行体，不调用事务内执行器，因此公共模块不会形成“外层事务加计划 savepoint”的两层包装。两个入口都不提交或吞掉执行错误；调用方仍可通过抛错或显式回滚撤销包含奖励在内的整个外层事务。
 
-事务拥有者入口同样要求活动事务，并在首笔写入前重新规范化完整 Plan，但不查询玩家前后态，也不建立 savepoint。它先各读取一次 `knownPlayerBefore.freeMana`、`freeVmoney` 和 `expPool`，复制为不含额外字段的普通对象；三字段必须是非负安全整数，否则抛出带 `field` 的 `RewardGrantKnownPlayerValidationError` 且零写入。每条 MANA、BEADS 或 EXP 奖励都先计算对应最终值，确认仍是非负安全整数后，才修改内存中的 `playerAfter` 与累计 delta；溢出时分别以 `freeMana`、`freeVmoney` 或 `expPool` 标识错误，并由事务拥有者回滚此前写入。执行过程最后用一条 `players` UPDATE 写入本 Plan 的最终三项余额与 mana 累计，并返回完整 `entries`、`aggregate` 和 `playerAfter`，不增加玩家 `SELECT` 或事务语句。owner CHARACTER 发放使用事务内 item/character writer，避免重复角色补偿为每抽建立 savepoint；它仍复用角色写入返回的首次获得事实，不为了 `joined_character_id_list` 预查一次角色所有权。
+事务拥有者入口同样要求活动事务，并在首笔写入前重新规范化完整 Plan，但不查询完整玩家前后态，也不建立 savepoint。它先各读取一次 `knownPlayerBefore.freeMana`、`freeVmoney` 和 `expPool`，复制为不含额外字段的普通对象；三字段必须是非负安全整数，否则抛出带 `field` 的 `RewardGrantKnownPlayerValidationError` 且零写入。每条 MANA、BEADS 或 EXP 奖励都先计算对应最终值，确认仍是非负安全整数后，才修改内存中的 `playerAfter` 与累计 delta；溢出时分别以 `freeMana`、`freeVmoney` 或 `expPool` 标识错误，并由事务拥有者回滚此前写入。纯货币、纯装备、空计划和首次角色获得不会激活 Inventory；发生 direct Item 或运行时重复角色补偿时，Inventory 在当前事务中读取明确 Item 前态，但通过 `caller-verified` 复用 RewardGrant 入口已有的玩家存在性合同，不重复查询 Player。执行过程最后在 Inventory flush 后用一条 `players` UPDATE 写入本 Plan 的最终三项余额与 mana 累计。owner CHARACTER 继续复用角色写入返回的首次获得事实，不为了 `joined_character_id_list` 预查一次角色所有权。
 
 单人 Mission 适配器可向未公开的 owner direct 调用附带当前 `degreeId`，使 Mission 标准货币和领域称号选择继续合并为旧 writer 的一条玩家 UPDATE。该 patch 不属于 `RewardGrantPlan`、`RewardGrantResult` 或公共 barrel；degree 授予、响应和 invalidation 仍由 Mission granter 决定。
 
@@ -36,7 +36,7 @@
 - `items` 是每个物品 ID 提交后的最终库存，同一 ID 多次出现时保留最后后态；
 - 角色和装备按 ID 去重，保留首次出现顺序并以最新结果替换内容；
 - `joined_character_id_list` 稳定去重；
-- 重复角色补偿会在同一事务中回读物品最终库存后态。
+- 重复角色补偿从同一计划级 Inventory batch 取得该条 mutation 当时的绝对库存后态，不额外回读数据库。
 
 `playerAfter` 同时返回执行后的 `freeMana`、`freeVmoney` 和 `expPool`，后续调用方不需要为这些字段再次查询玩家。
 
@@ -57,7 +57,7 @@ Player/item 投影并删除数据库 active，提交后再删除内存 active；
 
 owner 返回的 item、角色、装备最终状态与货币后态直接用于商店响应，不再为最终 `user_info` 查询玩家；同一 item 多次奖励及重复角色补偿均返回数据库最终库存。purchase count、mana mission fact、pass-card point 或奖励执行失败必须离开事务回调，使成本、奖励和后续写入由同一个外层事务回滚。`TREASURE_EQUIPMENT` 强化商店继续执行专用装备成长事务，不经过 shop reward adapter。
 
-事务拥有者路径对同一请求内重复发放的道具使用 `OwnerInventoryWriteCache`：每个物品 ID 只读取一次，在内存中累计最终数量和 `total_obtained`，事务末尾再写入一次库存和一次收集总量。它只作用于已经由外层事务拥有的奖励计划；独立旧 writer 的行为不变，角色逐抽响应仍读取缓存中的当前数量。
+RewardGrant 的 transaction-owner、within 和 standalone 三条路径都通过同一个惰性 Inventory batch 发放 Item。静态 direct Item ID 首次激活时一次批读；重复角色补偿通过显式 port 加入同一 batch，不触发 Growth 自建 Item owner。每个物品 ID 在内存中累计最终数量和 `total_obtained`，计划末尾只写入一次库存和一次收集总量；逐条响应仍保留每次 mutation 当时的绝对数量。纯货币、纯装备、空计划和首次获得角色不激活 Inventory。
 
 ## 邮件标准奖励
 

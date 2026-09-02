@@ -89,10 +89,6 @@ export function settleScheduledResourcesSync(
             ? { type: RewardType.BEADS, count: rule.grantAmount }
             : { type: RewardType.ITEM, id: rule.rewardId as number, count: rule.grantAmount },
     })))
-    const knownItemsBefore = Object.fromEntries([...new Set(grantedRules.flatMap(rule => (
-        rule.rewardType === "item" && rule.rewardId !== null ? [rule.rewardId] : []
-    )))].map(itemId => [String(itemId), itemAmounts[String(itemId)] ?? null]))
-
     return getDb().transaction(() => {
         const rewardResult = executeRewardGrantPlanInTransactionOwnerSync(
             input.player.id,
@@ -103,7 +99,6 @@ export function settleScheduledResourcesSync(
                 expPool: input.player.expPool,
             },
             {},
-            knownItemsBefore,
         )
         const grantedRuleIds = grantedRules.map(rule => rule.id)
         recordScheduledResourceGrantsWithinTransactionSync(

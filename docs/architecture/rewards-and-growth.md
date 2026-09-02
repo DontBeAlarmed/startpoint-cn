@@ -13,7 +13,7 @@ flowchart LR
 
     subgraph EXECUTION["执行区：owner / within 由调用方持有事务；standalone 自建 SQLite 事务"]
         ENTRY["执行入口<br/>transaction-owner / within / standalone"]
-        CACHE["Owner 执行上下文<br/>OwnerInventoryWriteCache 仅缓存道具<br/>同批先累加再有界写入"]
+        BATCH["惰性 Inventory batch<br/>首次真实 Item 时激活<br/>同计划一次 flush"]
         CURRENCY["玩家货币 / 经验池"]
         ITEMS["道具库存 / 收集历史"]
         OWNED["角色 / 装备"]
@@ -24,13 +24,10 @@ flowchart LR
     ENTRIES --> PLAN
     PLAN --> VALIDATE
     VALIDATE --> ENTRY
-    ENTRY -->|"owner：货币累计"| CURRENCY
-    ENTRY -->|"owner：道具"| CACHE
-    ENTRY -->|"owner：领域写入"| OWNED
-    ENTRY -->|"within / standalone"| CURRENCY
-    ENTRY -->|"within / standalone"| ITEMS
-    ENTRY -->|"within / standalone"| OWNED
-    CACHE --> ITEMS
+    ENTRY -->|"owner：货币累计；公共路径保持原写法"| CURRENCY
+    ENTRY -->|"三种入口：Item / 重复角色补偿"| BATCH
+    ENTRY -->|"角色 / 装备领域写入"| OWNED
+    BATCH --> ITEMS
     CURRENCY --> PROJECTION
     ITEMS --> PROJECTION
     OWNED --> PROJECTION
@@ -40,8 +37,9 @@ flowchart LR
 
 - planner 规范化、校验并冻结 entries，不读写数据库；执行器在写入前再次校验整个 plan。
 - `transaction-owner` 与 `within` 使用调用方已有事务，`standalone` 自建 SQLite 事务。
-- owner 模式先累计货币和道具；`OwnerInventoryWriteCache` 只合并道具写入，不缓存角色、装备或货币。
-- 角色、装备、道具和货币分别由领域写入器落库，再聚合为统一结果投影。
+- 三种执行入口的 Item 都进入计划级惰性 Inventory batch；纯货币、纯装备、空计划和首次角色获得不会激活 Inventory。
+- 重复角色补偿通过显式 port 进入同一 batch，不建立第二个 Growth Item owner；角色、装备、道具和货币仍由各自领域落库。
+- 普通来源对象不能作为 Inventory 的可信库存快照；Item mutation 前态必须在当前事务内读取。
 
 ### 精简证据
 
@@ -49,9 +47,9 @@ flowchart LR
 |---|---|
 | planner 复制、校验并冻结奖励计划 | `src/lib/reward-grant/plan.ts` |
 | 执行器提供 owner、within 和 standalone 事务入口 | `src/lib/reward-grant/executor.ts`、`src/lib/reward-grant/owner-executor.ts` |
-| owner 模式先累计货币与道具再落库 | `src/lib/reward-grant/executor.ts` |
-| 道具缓存按 item 合并增量并记录收集历史 | `src/lib/reward-grant/owner-inventory.ts` |
-| entry 结果聚合为角色、装备、道具、货币和 `playerAfter` | `src/lib/reward-grant/executor.ts` |
+| owner 模式先累计货币，Item batch 先 flush 再持久化货币 | `src/lib/reward-grant/executor.ts` |
+| RewardGrant 适配惰性 Inventory batch、预加载 direct Item 并合并重复角色补偿 | `src/lib/reward-grant/inventory-adapter.ts` |
+| entry 结果聚合为角色、装备、道具、货币和 `playerAfter` | `src/lib/reward-grant/entry-result.ts`、`src/lib/reward-grant/executor.ts` |
 | 战斗、任务、抽卡、商店和邮件调用 RewardGrant | `src/lib/quest/finish/single-settlement-reward-grant.ts`、`src/lib/mission/grants.ts`、`src/routes/api/gacha.ts`、`src/lib/shop-reward-grant.ts`、`src/lib/mail-reward-grant.ts` |
 
 ### 本图不表达

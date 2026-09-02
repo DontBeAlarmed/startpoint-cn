@@ -114,7 +114,7 @@ export function givePlayerCharacterSync(
 export function givePlayerCharacterWithinTransactionSync(
     playerId: number,
     characterId: number,
-    grantCompensation?: CharacterStackCompensationGrant,
+    grantCompensation: CharacterStackCompensationGrant,
 ): GivePlayerCharacterResult | null {
     if (!getDb().inTransaction) {
         throw new Error("givePlayerCharacterWithinTransactionSync requires an active caller transaction")

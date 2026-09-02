@@ -21,6 +21,7 @@ interface PendingInventoryItem {
 export interface InventoryBatchContextOptions {
     readonly playerId: number
     readonly preloadItemIds?: readonly number[]
+    readonly playerExistence?: "verify" | "caller-verified"
 }
 
 export interface InventoryBatchContext {
@@ -33,11 +34,111 @@ export interface InventoryBatchContext {
     flush(): readonly InventoryItemResult[]
 }
 
+/**
+ * A callback-scoped batch that does not read Player or Item state until the
+ * first real Inventory operation. Calling flush before activation is a no-op.
+ * This is intended for mixed plans whose Item branch is only known at runtime.
+ */
+class DeferredInventoryBatchContext implements InventoryBatchContext {
+    private readonly options: InventoryBatchContextOptions
+    private active: InventoryBatchContextImpl | null = null
+    private closed = false
+
+    constructor(options: InventoryBatchContextOptions) {
+        this.options = {
+            playerId: positiveId(options.playerId, "INVALID_PLAYER_ID", "playerId"),
+            preloadItemIds: Object.freeze(normalizeItemIds(options.preloadItemIds ?? [])),
+            playerExistence: normalizePlayerExistence(options.playerExistence),
+        }
+    }
+
+    read(itemId: number): InventoryItemResult {
+        return this.requireActive().read(itemId)
+    }
+
+    readMany(itemIds: readonly number[]): readonly InventoryItemResult[] {
+        return this.requireActive().readMany(itemIds)
+    }
+
+    grant(itemId: number, amount: number): InventoryItemResult {
+        return this.requireActive().grant(itemId, amount)
+    }
+
+    deduct(itemId: number, amount: number): InventoryItemResult {
+        return this.requireActive().deduct(itemId, amount)
+    }
+
+    restore(itemId: number, amount: number): InventoryItemResult {
+        return this.requireActive().restore(itemId, amount)
+    }
+
+    results(): readonly InventoryItemResult[] {
+        this.assertUsable()
+        return this.active?.results() ?? Object.freeze([])
+    }
+
+    flush(): readonly InventoryItemResult[] {
+        this.assertUsable()
+        if (this.active === null) {
+            this.closed = true
+            return Object.freeze([])
+        }
+        this.closed = true
+        return this.active.flush()
+    }
+
+    closeCallbackScope(): void {
+        this.closed = true
+        this.active?.closeCallbackScope()
+    }
+
+    private requireActive(): InventoryBatchContextImpl {
+        this.assertUsable()
+        if (this.active === null) {
+            this.active = new InventoryBatchContextImpl(this.options)
+        }
+        return this.active
+    }
+
+    private assertUsable(): void {
+        if (this.closed) {
+            throw new InventoryTransactionError(
+                "BATCH_CONTEXT_CLOSED",
+                "inventory batch context is closed after flush or callback exit",
+            )
+        }
+        assertActiveTransaction()
+    }
+}
+
 function positiveId(value: unknown, reason: "INVALID_PLAYER_ID" | "INVALID_ITEM_ID", field: string): number {
     if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
         throw new InventoryValidationError(reason, `${field} must be a positive safe integer`)
     }
     return value
+}
+
+function normalizeItemIds(itemIds: readonly number[]): number[] {
+    return [...new Set(itemIds.map(itemId => (
+        positiveId(itemId, "INVALID_ITEM_ID", "itemId")
+    )))].sort((left, right) => left - right)
+}
+
+function assertActiveTransaction(): void {
+    if (!getDb().inTransaction) {
+        throw new InventoryTransactionError(
+            "TRANSACTION_REQUIRED",
+            "inventory batch context requires an active transaction",
+        )
+    }
+}
+
+function normalizePlayerExistence(
+    value: InventoryBatchContextOptions["playerExistence"],
+): "verify" | "caller-verified" {
+    if (value === undefined || value === "verify") return "verify"
+    if (value === "caller-verified") return value
+    throw new TypeError("invalid inventory player existence mode")
 }
 
 function mutationAmount(value: unknown): number {
@@ -89,7 +190,9 @@ class InventoryBatchContextImpl implements InventoryBatchContext {
         this.assertActiveTransaction()
         this.playerId = positiveId(options.playerId, "INVALID_PLAYER_ID", "playerId")
         this.repository = repository
-        this.repository.requirePlayerSync(this.playerId)
+        if (normalizePlayerExistence(options.playerExistence) === "verify") {
+            this.repository.requirePlayerSync(this.playerId)
+        }
         this.load(options.preloadItemIds ?? [])
     }
 
@@ -251,19 +354,11 @@ class InventoryBatchContextImpl implements InventoryBatchContext {
     }
 
     private normalizeItemIds(itemIds: readonly number[]): number[] {
-        const ids = [...new Set(itemIds.map(itemId => (
-            positiveId(itemId, "INVALID_ITEM_ID", "itemId")
-        )))]
-        return ids.sort((left, right) => left - right)
+        return normalizeItemIds(itemIds)
     }
 
     private assertActiveTransaction(): void {
-        if (!getDb().inTransaction) {
-            throw new InventoryTransactionError(
-                "TRANSACTION_REQUIRED",
-                "inventory batch context requires an active transaction",
-            )
-        }
+        assertActiveTransaction()
     }
 
     private assertUsable(): void {
@@ -285,6 +380,22 @@ export function withInventoryBatchContextWithinTransactionSync<T>(
         throw new TypeError("inventory batch callback must be a function")
     }
     const context = new InventoryBatchContextImpl(options)
+    try {
+        return callback(context)
+    } finally {
+        context.closeCallbackScope()
+    }
+}
+
+export function withDeferredInventoryBatchContextWithinTransactionSync<T>(
+    options: InventoryBatchContextOptions,
+    callback: (context: InventoryBatchContext) => T,
+): T {
+    if (typeof callback !== "function") {
+        throw new TypeError("inventory batch callback must be a function")
+    }
+    assertActiveTransaction()
+    const context = new DeferredInventoryBatchContext(options)
     try {
         return callback(context)
     } finally {

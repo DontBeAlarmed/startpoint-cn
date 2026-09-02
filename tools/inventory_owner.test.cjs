@@ -31,6 +31,7 @@ const {
     grantInventoryItemWithinTransactionSync,
     restoreInventoryItemSync,
     restoreInventoryItemWithinTransactionSync,
+    withDeferredInventoryBatchContextWithinTransactionSync,
     withInventoryBatchContextWithinTransactionSync,
 } = require("../src/lib/inventory")
 const { InventorySqliteRepository } = require("../src/lib/inventory/sqlite-repository")
@@ -396,6 +397,75 @@ test("batch callback scope guards entry, escape, callback failure and one flush"
             }
         })
     ))()
+})
+
+test("deferred batch stays query-free until first use and closes an unused escaped scope", () => {
+    const playerId = createPlayer("deferred-batch")
+    const itemId = 815051
+    let playerReads = 0
+    let itemReads = 0
+    const originalRequirePlayer = InventorySqliteRepository.prototype.requirePlayerSync
+    const originalBatchRead = InventorySqliteRepository.prototype.readItemsByIdsSync
+    InventorySqliteRepository.prototype.requirePlayerSync = function (...args) {
+        playerReads += 1
+        return originalRequirePlayer.apply(this, args)
+    }
+    InventorySqliteRepository.prototype.readItemsByIdsSync = function (...args) {
+        itemReads += 1
+        return originalBatchRead.apply(this, args)
+    }
+
+    let escaped
+    try {
+        database.transaction(() => (
+            withDeferredInventoryBatchContextWithinTransactionSync({
+                playerId,
+                preloadItemIds: [itemId],
+            }, context => {
+                escaped = context
+                assert.deepEqual(context.results(), [])
+            })
+        ))()
+        assert.equal(playerReads, 0)
+        assert.equal(itemReads, 0)
+
+        database.transaction(() => (
+            withDeferredInventoryBatchContextWithinTransactionSync({
+                playerId,
+                preloadItemIds: [itemId],
+            }, context => {
+                context.grant(itemId, 2)
+                context.flush()
+            })
+        ))()
+    } finally {
+        InventorySqliteRepository.prototype.requirePlayerSync = originalRequirePlayer
+        InventorySqliteRepository.prototype.readItemsByIdsSync = originalBatchRead
+    }
+
+    assert.equal(playerReads, 1)
+    assert.equal(itemReads, 1)
+    assert.equal(getPlayerItemSync(playerId, itemId), 2)
+    database.transaction(() => {
+        assert.throws(() => escaped.grant(itemId, 1), error => (
+            error instanceof InventoryTransactionError
+            && error.reason === "BATCH_CONTEXT_CLOSED"
+        ))
+    })()
+})
+
+test("caller-verified deferred batch still fails closed for an unknown player", () => {
+    const unknownPlayerId = Number.MAX_SAFE_INTEGER - 1051
+    assert.throws(() => database.transaction(() => (
+        withDeferredInventoryBatchContextWithinTransactionSync({
+            playerId: unknownPlayerId,
+            preloadItemIds: [1],
+            playerExistence: "caller-verified",
+        }, context => {
+            context.grant(1, 1)
+            context.flush()
+        })
+    ))(), /FOREIGN KEY constraint failed/)
 })
 
 test("batch context captured from transaction A stays closed across later transactions", () => {

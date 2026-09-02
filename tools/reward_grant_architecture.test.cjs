@@ -10,6 +10,7 @@ const productionFiles = [
     "src/lib/reward-grant/types.ts",
     "src/lib/reward-grant/plan.ts",
     "src/lib/reward-grant/executor.ts",
+    "src/lib/reward-grant/inventory-adapter.ts",
     "src/lib/reward-grant/owner-currency.ts",
     "src/lib/reward-grant/owner-executor.ts",
     "src/lib/reward-grant/known-player.ts",

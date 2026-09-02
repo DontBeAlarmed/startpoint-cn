@@ -249,6 +249,11 @@ test("character grants report ownership transition and RewardGrant reuses it wit
         /^\s*SELECT/i.test(sql) && /\bFROM\s+players_characters\b/i.test(sql)
     ))
     assert.equal(characterReads.length, 1)
+    assert.equal(
+        measured.statements.filter(sql => /FROM\s+players_items/i.test(sql)).length,
+        0,
+        "first character acquisition must not activate Inventory",
+    )
     assert.deepEqual(measured.result.entries[0].result.joined_character_id_list, [CHARACTER_ID])
 
     const duplicatePlayerId = createPlayer("owner-character-duplicate-no-pre-read")
@@ -268,6 +273,20 @@ test("character grants report ownership transition and RewardGrant reuses it wit
         /^\s*SELECT/i.test(sql) && /\bFROM\s+players_characters\b/i.test(sql)
     ))
     assert.equal(duplicateCharacterReads.length, 1)
+    assert.equal(
+        duplicateMeasured.statements.filter(sql => /FROM\s+players_items/i.test(sql)).length,
+        1,
+        "runtime duplicate activates one compensation Item read",
+    )
+    assert.equal(
+        duplicateMeasured.statements.filter(sql => /^\s*SELECT[\s\S]*\bFROM\s+players\b/i.test(sql)).length,
+        0,
+        "RewardGrant reuses caller-owned player existence evidence",
+    )
+    assert.equal(
+        duplicateMeasured.statements.filter(sql => /INSERT INTO players_items/i.test(sql)).length,
+        1,
+    )
     assert.equal(
         duplicateMeasured.result.entries[0].result.character_list[0].stack,
         1,
@@ -668,7 +687,8 @@ test("duplicate character compensation reports final item inventory post-state",
         { source: "second", reward: { type: RewardType.CHARACTER, id: DUPLICATE_CHARACTER_ID } },
     ])
 
-    const result = executeRewardGrantPlanSync(playerId, plan)
+    const measured = captureSql(() => executeRewardGrantPlanSync(playerId, plan))
+    const result = measured.result
 
     assert.equal(result.entries[0].result.items[DUPLICATE_CHARACTER_ITEM_ID], 1)
     assert.equal(result.entries[1].result.items[DUPLICATE_CHARACTER_ITEM_ID], 2)
@@ -678,6 +698,18 @@ test("duplicate character compensation reports final item inventory post-state",
     assert.equal(result.aggregate.character_list.length, 1)
     assert.deepEqual(result.aggregate.joined_character_id_list, [])
     assert.equal(getPlayerItemSync(playerId, DUPLICATE_CHARACTER_ITEM_ID), 2)
+    assert.equal(
+        measured.statements.filter(sql => /FROM\s+players_items/i.test(sql)).length,
+        1,
+    )
+    assert.equal(
+        measured.statements.filter(sql => /INSERT INTO players_items/i.test(sql)).length,
+        1,
+    )
+    assert.equal(
+        measured.statements.filter(sql => /INSERT INTO players_collected_items/i.test(sql)).length,
+        1,
+    )
 })
 
 test("transaction owner coalesces a direct Item reward with duplicate compensation", () => {
@@ -713,6 +745,39 @@ test("transaction owner coalesces a direct Item reward with duplicate compensati
     `).get(playerId, DUPLICATE_CHARACTER_ITEM_ID).total_obtained, 4)
     assert.equal(
         measured.statements.filter(sql => /SELECT[\s\S]*FROM\s+players_items/i.test(sql)).length,
+        1,
+    )
+    assert.equal(
+        measured.statements.filter(sql => /INSERT INTO players_items/i.test(sql)).length,
+        1,
+    )
+    assert.equal(
+        measured.statements.filter(sql => /INSERT INTO players_collected_items/i.test(sql)).length,
+        1,
+    )
+})
+
+test("public within execution coalesces direct Item and duplicate compensation", () => {
+    const playerId = createPlayer("within-mixed-duplicate-compensation")
+    const plan = createRewardGrantPlan([
+        {
+            source: "direct-item",
+            reward: { type: RewardType.ITEM, id: DUPLICATE_CHARACTER_ITEM_ID, count: 3 },
+        },
+        {
+            source: "duplicate-character",
+            reward: { type: RewardType.CHARACTER, id: DUPLICATE_CHARACTER_ID },
+        },
+    ])
+    let measured
+    database.transaction(() => {
+        measured = captureSql(() => executeRewardGrantPlanWithinTransactionSync(playerId, plan))
+    })()
+
+    assert.equal(measured.result.entries[0].result.items[DUPLICATE_CHARACTER_ITEM_ID], 3)
+    assert.equal(measured.result.entries[1].result.items[DUPLICATE_CHARACTER_ITEM_ID], 4)
+    assert.equal(
+        measured.statements.filter(sql => /FROM\s+players_items/i.test(sql)).length,
         1,
     )
     assert.equal(

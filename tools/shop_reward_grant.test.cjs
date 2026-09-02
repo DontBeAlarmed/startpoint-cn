@@ -219,8 +219,11 @@ test("owner adapter preserves source order and has no nested transaction SQL", (
     })
     assert.equal(JSON.stringify(measured.result).includes("rewardIndex"), false)
     assert.equal(
-        measured.statements.some(statement => /^\s*SELECT[\s\S]*\bFROM\s+players\b/i.test(statement)),
-        false,
+        measured.statements.filter(statement => (
+            /^\s*SELECT[\s\S]*\bFROM\s+players\b/i.test(statement)
+        )).length,
+        0,
+        "RewardGrant reuses the owner-bound player snapshot",
     )
     assert.equal(measured.statements.some(statement => /^\s*(?:BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)\b/i.test(statement)), false)
 })

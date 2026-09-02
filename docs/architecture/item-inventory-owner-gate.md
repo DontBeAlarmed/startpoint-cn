@@ -237,7 +237,12 @@ Inventory 只提供实际消费者需要的聚焦入口：
 - standalone command：只允许在没有活动事务时调用，自己建立并拥有一个 SQLite transaction；若已有事务则立即拒绝，调用方必须显式选择 within/batch；
 - within-transaction command：要求调用方已有活动事务，否则立即拒绝；
 - caller-owned batch context：创建、读取、mutation 和 flush 均要求活动事务；同一 Item 的 grant/deduct/restore 在内存中按语义合并，flush 一次 absolute after-state，并单独累计正向 obtained；flush 后 context 失效，重复 flush 或继续 mutation 必须拒绝；
+- deferred caller-owned batch：入口仍立即要求活动事务，但只在首笔真实 Item 访问时创建同一个 batch context；纯货币、纯装备、空计划和首次角色获得不读取 Inventory。callback 退出后，无论是否激活，context 都不能逃逸到后续事务；
 - read/batch-read：一次读取明确 Item IDs，不建立跨请求玩家缓存。
+
+RewardGrant 使用 deferred batch 覆盖 transaction-owner、within 和 standalone 三条执行路径。规范化 Plan 中静态可知的 direct Item ID 一次预加载；运行时重复角色补偿通过同一 callback-scoped port 惰性加入。三条入口在进入 Inventory 前都已经由各自事务契约确认玩家存在，因此 adapter 显式使用 `caller-verified`，不重复查询 Player；其他 Inventory 调用仍默认自行验证。每条响应在 mutation 当时记录绝对后态，最终每个 Item 只执行一次 absolute write 和一次累计获得写入。旧 `OwnerInventoryWriteCache` 已删除，RewardGrant 不再拥有第二份 Item 状态。
+
+Inventory 不接受来源模块传入的普通 `Record` 作为可信库存快照。原 scheduled-resource 的 `knownItemsBefore` 在事务开始前读取，不能证明属于当前事务；W2 已删除该参数。scheduled-resource 仍以事务前批读判断来源阈值，真正发放时由 Inventory 在当前事务内再次批读 mutation 前态。这是避免旧快照 absolute write 的固定正确性成本，不是 N+1。
 
 持久层继续是具体 SQLite repository，不为不存在的第二数据库定义通用 repository interface。Repository 负责：
 
@@ -363,7 +368,7 @@ D16 测试只覆盖真实客户端入口、owner/事务不变量和真实旁路�
 ```text
 D16_BASE: b6fd6bbf182a51e2ba2556840873d054b6b1149f
 D16_DESIGN_STATUS: APPROVED
-D16_IMPLEMENTATION_STATUS: NOT_STARTED
+D16_IMPLEMENTATION_STATUS: IN_PROGRESS (C3 W2 RewardGrant migrated; later writers pending)
 ITEM_CAP_PRODUCTION_STATUS: FORBIDDEN_UNTIL_D18
 EVENT_TRADE_OVERFLOW_MAIL_STATUS: DEFERRED_TO_D18
 ```

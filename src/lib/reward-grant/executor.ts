@@ -1,10 +1,6 @@
 import { getDb } from "../../data/db"
-import {
-    getPlayerItemSync,
-    givePlayerItemSync,
-} from "../../data/domains/item"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
-import { givePlayerCharacterSync, givePlayerCharacterWithinTransactionSync } from "../character"
+import { givePlayerCharacterWithinTransactionSync } from "../character"
 import { givePlayerEquipmentSync } from "../equipment"
 import { PlayerRewardResult, RewardType } from "../types/rewards"
 import { createRewardGrantPlan } from "./plan"
@@ -14,12 +10,15 @@ import {
     type RewardGrantOwnerPlayerUpdate,
 } from "./owner-currency"
 import {
+    aggregateRewardGrantEntryResults,
     createRewardGrantEntryResult,
+    emptyPlayerRewardResult,
     projectPublicRewardGrantResult,
     type InternalRewardGrantEntryResult,
     type InternalRewardGrantResult,
     type RewardGrantEntryExecution,
 } from "./entry-result"
+import { withRewardGrantInventoryBatchSync } from "./inventory-adapter"
 import {
     RewardGrantEntry,
     RewardGrantPlan,
@@ -27,7 +26,6 @@ import {
     RewardGrantResult,
     RewardGrantReward,
 } from "./types"
-import { OwnerInventoryWriteCache } from "./owner-inventory"
 
 export { RewardGrantKnownPlayerValidationError } from "./known-player"
 
@@ -71,16 +69,6 @@ export function normalizeRewardGrantPlanInternal<TSource>(
     )
 }
 
-function emptyPlayerRewardResult(): PlayerRewardResult {
-    return {
-        user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
-        character_list: [],
-        joined_character_id_list: [],
-        equipment_list: [],
-        items: {},
-    }
-}
-
 function getExistingPlayer(playerId: number) {
     const player = getPlayerSync(playerId)
     if (player === null) throw new RewardGrantPlayerNotFoundError(playerId)
@@ -118,17 +106,20 @@ function grantEntrySync(
     playerId: number,
     reward: RewardGrantReward,
     entryIndex: number,
-    grantCurrency: typeof grantCurrencySync = grantCurrencySync,
-    grantItem: typeof givePlayerItemSync = givePlayerItemSync,
-    grantCharacter: typeof givePlayerCharacterSync = givePlayerCharacterSync,
-    getGrantedItemCount: typeof getPlayerItemSync = getPlayerItemSync,
+    grantCurrency: typeof grantCurrencySync,
+    grantItem: (itemId: number, amount: number) => number,
+    grantCharacter: (
+        playerId: number,
+        characterId: number,
+    ) => ReturnType<typeof givePlayerCharacterWithinTransactionSync>,
+    getGrantedItemCount: (itemId: number) => number | null,
 ): RewardGrantEntryExecution {
     const result = emptyPlayerRewardResult()
     switch (reward.type) {
         case RewardType.ITEM:
         case RewardType.ELEMENT:
         case RewardType.AETHER:
-            result.items[reward.id] = grantItem(playerId, reward.id, reward.count)
+            result.items[reward.id] = grantItem(reward.id, reward.count)
             return { result }
         case RewardType.EQUIPMENT:
             result.equipment_list.push(
@@ -147,7 +138,7 @@ function grantEntrySync(
             result.character_list.push(granted.character)
             if (granted.isNew) result.joined_character_id_list.push(reward.id)
             if (granted.item !== undefined) {
-                const finalCount = getGrantedItemCount(playerId, granted.item.id)
+                const finalCount = getGrantedItemCount(granted.item.id)
                 if (finalCount === null) {
                     throw new RewardGrantExecutionError(
                         entryIndex,
@@ -172,62 +163,43 @@ function grantEntrySync(
     }
 }
 
-function aggregateEntryResults<TSource>(
-    entries: readonly InternalRewardGrantEntryResult<TSource>[],
-): PlayerRewardResult {
-    const aggregate = emptyPlayerRewardResult()
-    const characters = new Map<number, Object>()
-    const equipment = new Map<number, Object>()
-    const joinedCharacterIds = new Set<number>()
-
-    for (const entry of entries) {
-        const result = entry.result
-        aggregate.user_info.free_mana += result.user_info.free_mana
-        aggregate.user_info.free_vmoney += result.user_info.free_vmoney
-        aggregate.user_info.exp_pool += result.user_info.exp_pool
-        Object.assign(aggregate.items, result.items)
-
-        if (entry.reward.type === RewardType.CHARACTER) {
-            for (const character of result.character_list) {
-                characters.set(entry.reward.id, character)
-            }
-        }
-        if (entry.reward.type === RewardType.EQUIPMENT) {
-            for (const item of result.equipment_list) {
-                equipment.set(entry.reward.id, item)
-            }
-        }
-        for (const characterId of result.joined_character_id_list) {
-            joinedCharacterIds.add(characterId)
-        }
-    }
-
-    aggregate.character_list = [...characters.values()]
-    aggregate.equipment_list = [...equipment.values()]
-    aggregate.joined_character_id_list = [...joinedCharacterIds]
-    return aggregate
-}
-
 function executeNormalizedRewardGrantPlanSync<TSource>(
     playerId: number,
     plan: RewardGrantPlan<TSource>,
 ): InternalRewardGrantResult<TSource> {
     if (getPlayerSync(playerId) === null) throw new RewardGrantPlayerNotFoundError(playerId)
 
-    const entries = plan.entries.map((entry, entryIndex) => createRewardGrantEntryResult(
-        entry,
-        grantEntrySync(playerId, entry.reward, entryIndex),
-    ))
-    const playerAfter = getExistingPlayer(playerId)
-    return {
-        aggregate: aggregateEntryResults(entries),
-        entries,
-        playerAfter: {
-            freeMana: playerAfter.freeMana,
-            freeVmoney: playerAfter.freeVmoney,
-            expPool: playerAfter.expPool,
-        },
-    }
+    return withRewardGrantInventoryBatchSync(playerId, plan, inventory => {
+        const entries = plan.entries.map((entry, entryIndex) => createRewardGrantEntryResult(
+            entry,
+            grantEntrySync(
+                playerId,
+                entry.reward,
+                entryIndex,
+                grantCurrencySync,
+                (itemId, amount) => inventory.grant(itemId, amount),
+                (pid, characterId) => givePlayerCharacterWithinTransactionSync(
+                    pid,
+                    characterId,
+                    (_itemOwnerId, itemId, amount) => {
+                        inventory.grant(itemId, amount)
+                    },
+                ),
+                itemId => inventory.readGranted(itemId),
+            ),
+        ))
+        inventory.flush()
+        const playerAfter = getExistingPlayer(playerId)
+        return {
+            aggregate: aggregateRewardGrantEntryResults(entries),
+            entries,
+            playerAfter: {
+                freeMana: playerAfter.freeMana,
+                freeVmoney: playerAfter.freeVmoney,
+                expPool: playerAfter.expPool,
+            },
+        }
+    })
 }
 
 export function executeNormalizedRewardGrantPlanAsTransactionOwnerInternalSync<TSource>(
@@ -235,34 +207,32 @@ export function executeNormalizedRewardGrantPlanAsTransactionOwnerInternalSync<T
     plan: RewardGrantPlan<TSource>,
     knownPlayerBefore: RewardGrantPlayerAfter,
     playerUpdate: RewardGrantOwnerPlayerUpdate = {},
-    knownItemsBefore: Readonly<Record<string, number | null>> = {},
 ): InternalRewardGrantResult<TSource> {
     const playerAfter = { ...knownPlayerBefore }
     const currencyDeltas = { freeMana: 0, freeVmoney: 0, expPool: 0 }
-    const itemCache = new OwnerInventoryWriteCache(knownItemsBefore)
-    const entries = plan.entries.map((entry, entryIndex) => createRewardGrantEntryResult(
-        entry,
-        grantEntrySync(
-            playerId,
-            entry.reward,
-            entryIndex,
-            (pid, reward) => grantOwnerCurrency(reward, playerAfter, currencyDeltas),
-            (pid, itemId, amount) => itemCache.giveItem(pid, Number(itemId), amount),
-            (pid, characterId) => givePlayerCharacterWithinTransactionSync(
+    return withRewardGrantInventoryBatchSync(playerId, plan, inventory => {
+        const entries = plan.entries.map((entry, entryIndex) => createRewardGrantEntryResult(
+            entry,
+            grantEntrySync(
+                playerId,
+                entry.reward,
+                entryIndex,
+                (_pid, reward) => grantOwnerCurrency(reward, playerAfter, currencyDeltas),
+                (itemId, amount) => inventory.grant(itemId, amount),
+                (pid, characterId) => givePlayerCharacterWithinTransactionSync(
                     pid,
                     characterId,
-                    (itemOwnerId, itemId, amount) => itemCache.giveItem(
-                        itemOwnerId,
-                        Number(itemId),
-                        amount,
-                    ),
+                    (_itemOwnerId, itemId, amount) => {
+                        inventory.grant(itemId, amount)
+                    },
+                ),
+                itemId => inventory.readGranted(itemId),
             ),
-            (pid, itemId) => itemCache.getItemCount(Number(itemId)) ?? getPlayerItemSync(pid, itemId),
-        ),
-    ))
-    itemCache.flush(playerId)
-    persistOwnerCurrency(playerId, playerAfter, currencyDeltas, playerUpdate)
-    return { aggregate: aggregateEntryResults(entries), entries, playerAfter }
+        ))
+        inventory.flush()
+        persistOwnerCurrency(playerId, playerAfter, currencyDeltas, playerUpdate)
+        return { aggregate: aggregateRewardGrantEntryResults(entries), entries, playerAfter }
+    })
 }
 
 export function executeRewardGrantPlanWithinTransactionSync<TSource>(
