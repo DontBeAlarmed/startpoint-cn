@@ -23,7 +23,8 @@ const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snaps
     .installBundledGameplaySnapshot()
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { getPlayerItemSync, givePlayerItemSync } = require("../src/data/domains/item")
+const { getPlayerItemSync } = require("../src/data/domains/item")
+const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { givePlayerCharacterSync, givePlayerCharactersExpSync } = require("../src/lib/character")
 const { getScoreRewardGroup } = require("../src/lib/assets")
@@ -258,7 +259,7 @@ test("real duplicate character Score group projects compensation delta while DB 
         const playerId = createPlayer(label)
         const character = givePlayerCharacterSync(playerId, 341003)
         assert.equal(character?.isNew, true)
-        assert.equal(givePlayerItemSync(playerId, 14010, 1), 1)
+        assert.equal(grantInventoryFixtureItemSync(playerId, 14010, 1), 1)
         return playerId
     }
     const compatibilityPlayerId = prepareDuplicate("score-200009-compatibility")

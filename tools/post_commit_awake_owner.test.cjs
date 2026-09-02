@@ -28,7 +28,8 @@ const {
     updatePlayerCharacterSync,
 } = require("../src/data/domains/character")
 const { getPlayerCategoryMissionsSync, updatePlayerCategoryMissionSync } = require("../src/data/domains/mission")
-const { getPlayerItemSync, givePlayerItemSync } = require("../src/data/domains/item")
+const { getPlayerItemSync } = require("../src/data/domains/item")
+const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const {
     getPlayerCharacterAwakeUnlocksSync,
@@ -154,7 +155,7 @@ test("post-commit publication failure keeps duplicate-character compensation and
     const beforeItemCount = getPlayerItemSync(playerId, duplicate.item.id) ?? 0
 
     const response = withPublicationFailure(playerId, () => {
-        database.transaction(() => givePlayerItemSync(playerId, duplicate.item.id, 3))()
+        database.transaction(() => grantInventoryFixtureItemSync(playerId, duplicate.item.id, 3))()
         return publishAwakeCharacterListBestEffort(
             playerId,
             [1],

@@ -32,11 +32,13 @@ const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const {
-    givePlayerItemSync,
     getPlayerCollectedItemTotalSync,
     getPlayerItemSync,
-    updatePlayerItemSync,
 } = require("../src/data/domains/item")
+const {
+    grantInventoryFixtureItemSync,
+    setInventoryFixtureItemExactSync,
+} = require("./helpers/inventory-fixture.cjs")
 const {
     getPlayerClearedCollectItemEventMissionListSync,
     updatePlayerCategoryMissionStageSync,
@@ -68,21 +70,21 @@ const playerId = createPlayer("mission-collect")
 assert.equal(getCollectMissionItemId(1500), 80001)
 assert.equal(getPlayerCollectedItemTotalSync(playerId, 80001), 0)
 
-assert.equal(givePlayerItemSync(playerId, 80001, 10), 10)
+assert.equal(grantInventoryFixtureItemSync(playerId, 80001, 10), 10)
 assert.equal(getPlayerCollectedItemTotalSync(playerId, 80001), 10)
 
-updatePlayerItemSync(playerId, 80001, 3)
+setInventoryFixtureItemExactSync(playerId, 80001, 3)
 assert.equal(getPlayerItemSync(playerId, 80001), 3)
 assert.equal(getPlayerCollectedItemTotalSync(playerId, 80001), 10)
 
-assert.equal(givePlayerItemSync(playerId, 80001, 4), 7)
+assert.equal(grantInventoryFixtureItemSync(playerId, 80001, 4), 7)
 assert.equal(getPlayerCollectedItemTotalSync(playerId, 80001), 14)
 
 const collectContext = CollectComputer.buildContext(playerId, 4)
 assert.equal(CollectComputer.compute(1500, collectContext, 0), 14)
 
 assert.throws(() => db.transaction(() => {
-    givePlayerItemSync(playerId, 80001, 5)
+    grantInventoryFixtureItemSync(playerId, 80001, 5)
     throw new Error("injected collect rollback")
 })(), /injected collect rollback/)
 assert.equal(getPlayerItemSync(playerId, 80001), 7)

@@ -21,8 +21,8 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const {
     getPlayerCollectedItemTotalSync,
     getPlayerItemSync,
-    givePlayerItemSync,
 } = require("../src/data/domains/item")
+const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const {
     addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
@@ -136,7 +136,7 @@ test.after(() => {
 test("single shop purchase uses owner snapshot and returns final mixed reward state", () => {
     const playerId = createPlayer("single")
     updatePlayerSync({ id: playerId, freeMana: 500, freeVmoney: 20, expPool: 10 })
-    givePlayerItemSync(playerId, COST_ITEM_ID, 10)
+    grantInventoryFixtureItemSync(playerId, COST_ITEM_ID, 10)
     givePlayerCharacterSync(playerId, CHARACTER_ID)
     const duplicateItemBefore = getPlayerItemSync(playerId, DUPLICATE_ITEM_ID) ?? 0
     const beforeCost = getPlayerSync(playerId)
@@ -191,7 +191,7 @@ test("single shop purchase uses owner snapshot and returns final mixed reward st
 test("cost-only shop purchase flushes the shared Inventory context", () => {
     const playerId = createPlayer("cost-only")
     updatePlayerSync({ id: playerId, freeMana: 500 })
-    givePlayerItemSync(playerId, COST_ITEM_ID, 10)
+    grantInventoryFixtureItemSync(playerId, COST_ITEM_ID, 10)
 
     const result = executeGenericShopPurchaseSync({
         playerId,
@@ -278,7 +278,7 @@ test("owner adapter preserves source order and has no nested transaction SQL", (
 
 test("bulk shop rewards cannot pay its costs and final duplicate item equals database", () => {
     const playerId = createPlayer("bulk")
-    givePlayerItemSync(playerId, COST_ITEM_ID, 10)
+    grantInventoryFixtureItemSync(playerId, COST_ITEM_ID, 10)
     const measured = captureSql(() => executeGenericShopBatchPurchaseSync({
         playerId,
         shopType: ShopType.EVENT_ITEM,
@@ -394,7 +394,7 @@ test("batch purchase writes count snapshots without per-item rereads", () => {
 
 test("invalid reward rolls the shop cost back before purchase counts", () => {
     const playerId = createPlayer("invalid-reward")
-    givePlayerItemSync(playerId, COST_ITEM_ID, 10)
+    grantInventoryFixtureItemSync(playerId, COST_ITEM_ID, 10)
 
     assert.throws(() => executeGenericShopPurchaseSync({
         playerId,
@@ -416,7 +416,7 @@ test("invalid reward rolls the shop cost back before purchase counts", () => {
 
 test("unknown character rolls the shop cost and reward back", () => {
     const playerId = createPlayer("unknown-character")
-    givePlayerItemSync(playerId, COST_ITEM_ID, 10)
+    grantInventoryFixtureItemSync(playerId, COST_ITEM_ID, 10)
     const before = getPlayerSync(playerId)
 
     assert.throws(() => executeGenericShopPurchaseSync({

@@ -21,9 +21,6 @@ stubModule("../src/data/domains/player", {
     getPlayerSync: () => forbiddenPlayerWrites.push("get-player"),
     updatePlayerSync: () => forbiddenPlayerWrites.push("update-player"),
 })
-stubModule("../src/data/domains/item", {
-    givePlayerItemSync: () => forbiddenPlayerWrites.push("give-item"),
-})
 stubModule("../src/lib/character", {
     givePlayerCharacterSync: () => forbiddenPlayerWrites.push("give-character"),
 })

@@ -27,7 +27,8 @@ const {
     MAX_EQUIPMENT_BATCH_IDS,
     normalizeEquipmentBatchIds,
 } = require("../src/data/domains/equipment")
-const { getPlayerItemSync, givePlayerItemSync } = require("../src/data/domains/item")
+const { getPlayerItemSync } = require("../src/data/domains/item")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
@@ -206,7 +207,7 @@ test("bulk_upgrade reads unique requested equipment once and returns the full in
     addEquipment(playerId, EQUIPMENT_A, { stack: 2 })
     addEquipment(playerId, EQUIPMENT_B, { stack: 1 })
     addEquipment(playerId, UNRELATED_EQUIPMENT, { stack: 0 })
-    givePlayerItemSync(playerId, CRAFT_POINT_ITEM_ID, 1000)
+    setInventoryFixtureItemExactSync(playerId, CRAFT_POINT_ITEM_ID, 1000)
 
     const { result: response, statements } = await captureSql(() => app.inject({
         method: "POST",

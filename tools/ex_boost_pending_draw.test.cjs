@@ -19,7 +19,8 @@ const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snaps
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerCharacterSync, updatePlayerCharacterSync } = require("../src/data/domains/character")
-const { givePlayerItemSync, getPlayerItemSync } = require("../src/data/domains/item")
+const { getPlayerItemSync } = require("../src/data/domains/item")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const { getPendingExBoostDrawSync } = require("../src/data/domains/ex_boost")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
@@ -56,7 +57,7 @@ async function main() {
         type: SessionType.VIEWER,
     })
     updatePlayerCharacterSync(playerId, 1, { overLimitStep: 6 })
-    givePlayerItemSync(playerId, 10002, 1)
+    setInventoryFixtureItemExactSync(playerId, 10002, 1)
 
     const drawApp = await createApp()
     const drawResponse = await drawApp.inject({
@@ -110,7 +111,7 @@ async function main() {
     const selectedExBoost = getPlayerCharacterSync(playerId, 1).exBoost
     assert.notEqual(selectedExBoost, undefined)
 
-    givePlayerItemSync(playerId, 10002, 1)
+    setInventoryFixtureItemExactSync(playerId, 10002, 1)
     const firstDrawReplay = await selectApp.inject({
         method: "POST",
         url: "/ex/first_draw",

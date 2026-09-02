@@ -46,10 +46,8 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const {
     getPlayerCollectedItemTotalSync,
     getPlayerItemSync,
-    givePlayerItemSync,
-    givePlayerItemWithinTransactionSync,
-    setPlayerItemSync,
 } = require("../src/data/domains/item")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
@@ -128,7 +126,7 @@ test("999102 selectIndex 1 through 6 returns the corresponding reward item", asy
     const rewardItemIds = [4, 8, 12, 16, 45, 49]
     for (const [offset, rewardItemId] of rewardItemIds.entries()) {
         const { playerId, viewerId } = await createPlayer(`select-${offset}`)
-        givePlayerItemSync(playerId, 999102, 1)
+        setInventoryFixtureItemExactSync(playerId, 999102, 1)
 
         const responseData = decodeSuccess(await useItem(viewerId, [{
             id: 999102,
@@ -147,7 +145,7 @@ test("999102 selectIndex 1 through 6 returns the corresponding reward item", asy
 
 test("duplicate cultivate pack entries with the same selection are aggregated", async () => {
     const { playerId, viewerId } = await createPlayer("duplicate-pack")
-    givePlayerItemSync(playerId, 999102, 2)
+    setInventoryFixtureItemExactSync(playerId, 999102, 2)
 
     const responseData = decodeSuccess(await useItem(viewerId, [
         { id: 999102, number: 1, selectIndex: 1 },
@@ -163,7 +161,7 @@ test("duplicate cultivate pack entries with the same selection are aggregated", 
 
 test("same item deduction and reward use one before count and one final count", async () => {
     const { playerId, viewerId } = await createPlayer("self-reward")
-    givePlayerItemSync(playerId, 990004, 1)
+    setInventoryFixtureItemExactSync(playerId, 990004, 1)
     const collectedBefore = getPlayerCollectedItemTotalSync(playerId, 990004)
 
     const responseData = decodeSuccess(await useItem(viewerId, [
@@ -177,7 +175,7 @@ test("same item deduction and reward use one before count and one final count", 
 
 test("same item reward reuses the planned inventory state without a second item read", async () => {
     const { playerId, viewerId } = await createPlayer("planned-final-count")
-    givePlayerItemSync(playerId, 990004, 1)
+    setInventoryFixtureItemExactSync(playerId, 990004, 1)
     const start = sqlStatements.length
 
     const response = decodeSuccess(await useItem(viewerId, [
@@ -194,8 +192,8 @@ test("same item reward reuses the planned inventory state without a second item 
 
 test("reward final count may reach the AS3 int maximum", async () => {
     const { playerId, viewerId } = await createPlayer("int32-boundary")
-    givePlayerItemSync(playerId, 999102, 1)
-    setPlayerItemSync(playerId, 4, AS3_INT_MAX - 30)
+    setInventoryFixtureItemExactSync(playerId, 999102, 1)
+    setInventoryFixtureItemExactSync(playerId, 4, AS3_INT_MAX - 30)
 
     const responseData = decodeSuccess(await useItem(viewerId, [
         { id: 999102, number: 1, selectIndex: 1 },
@@ -208,8 +206,8 @@ test("reward final count may reach the AS3 int maximum", async () => {
 
 test("reward final count above the AS3 int maximum rejects without writes", async () => {
     const { playerId, viewerId } = await createPlayer("int32-overflow")
-    givePlayerItemSync(playerId, 999102, 1)
-    setPlayerItemSync(playerId, 4, AS3_INT_MAX - 29)
+    setInventoryFixtureItemExactSync(playerId, 999102, 1)
+    setInventoryFixtureItemExactSync(playerId, 4, AS3_INT_MAX - 29)
     const collectedBefore = getPlayerCollectedItemTotalSync(playerId, 4)
 
     const response = await useItem(viewerId, [
@@ -224,7 +222,7 @@ test("reward final count above the AS3 int maximum rejects without writes", asyn
 
 test("duplicate cultivate pack entries with different selections reject without writes", async () => {
     const { playerId, viewerId } = await createPlayer("different-selection")
-    givePlayerItemSync(playerId, 999102, 2)
+    setInventoryFixtureItemExactSync(playerId, 999102, 2)
 
     const response = await useItem(viewerId, [
         { id: 999102, number: 1, selectIndex: 1 },
@@ -263,7 +261,7 @@ test("invalid cultivate pack requests reject without writes", async () => {
 
 test("cultivate pack inventory shortage rejects without writes", async () => {
     const { playerId, viewerId } = await createPlayer("shortage")
-    givePlayerItemSync(playerId, 999102, 1)
+    setInventoryFixtureItemExactSync(playerId, 999102, 1)
 
     const response = await useItem(viewerId, [{ id: 999102, number: 2, selectIndex: 1 }])
 
@@ -273,8 +271,8 @@ test("cultivate pack inventory shortage rejects without writes", async () => {
 test("stamina items and cultivate packs settle in one response and transaction", async () => {
     const { playerId, viewerId } = await createPlayer("mixed")
     updatePlayerSync({ id: playerId, stamina: 0, staminaHealTime: new Date() })
-    givePlayerItemSync(playerId, 100, 1)
-    givePlayerItemSync(playerId, 999102, 1)
+    setInventoryFixtureItemExactSync(playerId, 100, 1)
+    setInventoryFixtureItemExactSync(playerId, 999102, 1)
     const start = sqlStatements.length
 
     const responseData = decodeSuccess(await useItem(viewerId, [
@@ -299,7 +297,7 @@ test("stamina items and cultivate packs settle in one response and transaction",
 test("stamina rate items preserve percentage recovery semantics", async () => {
     const { playerId, viewerId } = await createPlayer("stamina-rate")
     updatePlayerSync({ id: playerId, stamina: 0, staminaHealTime: new Date() })
-    givePlayerItemSync(playerId, 990100, 1)
+    setInventoryFixtureItemExactSync(playerId, 990100, 1)
 
     const responseData = decodeSuccess(await useItem(viewerId, [
         { id: 990100, number: 1, selectIndex: 0 },
@@ -316,7 +314,7 @@ test("stamina use at max returns 2102 without deduction", async () => {
         stamina: 999,
         staminaHealTime: new Date(Date.now() - 300_000),
     })
-    givePlayerItemSync(playerId, 100, 1)
+    setInventoryFixtureItemExactSync(playerId, 100, 1)
 
     const response = await useItem(viewerId, [{ id: 100, number: 1, selectIndex: 0 }])
 
@@ -486,16 +484,15 @@ test("settlement entry rejects use outside an active caller transaction", () => 
     )
 })
 
-test("item use and sell production paths have no legacy Item writer dependency", () => {
+test("item use and sell production paths have no direct Item persistence dependency", () => {
     const productionFiles = [
         "../src/lib/item-use-settlement.ts",
         "../src/lib/item-sell.ts",
     ]
     const forbidden = [
-        "getPlayerItemSync",
-        "updatePlayerItemSync",
-        "setPlayerItemWithinTransactionSync",
-        "recordPlayerCollectedItemWithinTransactionSync",
+        "data/domains/item",
+        "players_items",
+        "players_collected_items",
     ]
 
     for (const relativeFile of productionFiles) {
@@ -507,19 +504,10 @@ test("item use and sell production paths have no legacy Item writer dependency",
     }
 })
 
-test("caller-transaction item grant rejects use outside an active transaction", async () => {
-    const { playerId } = await createPlayer("transaction-guard")
-    assert.throws(
-        () => givePlayerItemWithinTransactionSync(playerId, 4, 1),
-        /active caller transaction/i,
-    )
-    assert.equal(getPlayerItemSync(playerId, 4), null)
-})
-
 test("later reward write failure rolls back packs, earlier rewards, and collected facts", async t => {
     const { playerId, viewerId } = await createPlayer("reward-rollback")
-    givePlayerItemSync(playerId, 999102, 1)
-    givePlayerItemSync(playerId, 999101, 1)
+    setInventoryFixtureItemExactSync(playerId, 999102, 1)
+    setInventoryFixtureItemExactSync(playerId, 999101, 1)
     database.exec(`
         CREATE TRIGGER reject_cultivate_reward
         BEFORE INSERT ON players_items
@@ -546,8 +534,8 @@ test("mixed stamina and pack settlement fully rolls back when reward SQL fails",
     const { playerId, viewerId } = await createPlayer("mixed-reward-rollback")
     const originalHealTime = new Date(Date.now() - 60_000)
     updatePlayerSync({ id: playerId, stamina: 0, staminaHealTime: originalHealTime })
-    givePlayerItemSync(playerId, 100, 1)
-    givePlayerItemSync(playerId, 999102, 1)
+    setInventoryFixtureItemExactSync(playerId, 100, 1)
+    setInventoryFixtureItemExactSync(playerId, 999102, 1)
     database.exec(`
         CREATE TRIGGER reject_mixed_cultivate_reward
         BEFORE INSERT ON players_items

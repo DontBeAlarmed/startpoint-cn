@@ -26,7 +26,8 @@ const {
 } = require("../src/data/domains/character")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { characterExpCaps } = require("../src/lib/character")
-const { givePlayerItemSync, getPlayerItemsSync } = require("../src/data/domains/item")
+const { getPlayerItemsSync } = require("../src/data/domains/item")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const { getDb } = require("../src/data/db")
 const { getCharacterManaNodesSync } = require("../src/lib/assets")
 const { getManaNodeAwakeCost } = require("../src/lib/assets")
@@ -80,7 +81,7 @@ function grantNodeCost(playerId, nodeIds) {
         }
     }
     updatePlayerSync({ id: playerId, freeMana: mana, paidMana: 0 })
-    for (const [itemId, amount] of items) givePlayerItemSync(playerId, itemId, amount)
+    for (const [itemId, amount] of items) setInventoryFixtureItemExactSync(playerId, itemId, amount)
 }
 
 function grantBoardNodeCosts(playerId, boardId, nodeIds) {
@@ -96,14 +97,16 @@ function grantBoardNodeCosts(playerId, boardId, nodeIds) {
         }
     }
     updatePlayerSync({ id: playerId, freeMana: mana, paidMana: 0 })
-    for (const [itemId, amount] of items) givePlayerItemSync(playerId, itemId, amount)
+    for (const [itemId, amount] of items) setInventoryFixtureItemExactSync(playerId, itemId, amount)
 }
 
 function grantAwakeNodeCost(playerId, nodeId) {
     const cost = getManaNodeAwakeCost(1, nodeId, 4)
     assert.ok(cost, `missing Awake cost for ${nodeId}`)
     updatePlayerSync({ id: playerId, freeMana: cost.manaAmount, paidMana: 0 })
-    for (const [itemId, amount] of Object.entries(cost.items)) givePlayerItemSync(playerId, itemId, amount)
+    for (const [itemId, amount] of Object.entries(cost.items)) {
+        setInventoryFixtureItemExactSync(playerId, itemId, amount)
+    }
 }
 
 function seedBoardOne(playerId) {

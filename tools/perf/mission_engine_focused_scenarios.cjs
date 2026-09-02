@@ -1,5 +1,7 @@
 "use strict"
 
+const { grantInventoryFixtureItemSync } = require("../helpers/inventory-fixture.cjs")
+
 const {
     VIEWER_ID,
     createMissionProgressSummary,
@@ -264,7 +266,7 @@ function executeEventBehaviorCharacterization(runtime, playerId, fixedTime) {
 
 function prepareEventPlayer(runtime) {
     const playerId = createPlayer(runtime)
-    runtime.givePlayerItemSync(playerId, 80111, 10)
+    grantInventoryFixtureItemSync(playerId, 80111, 10)
     return playerId
 }
 

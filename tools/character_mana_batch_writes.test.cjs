@@ -29,9 +29,8 @@ const {
 const { upsertPlayerCharacterAwakeUnlockSync } = require("../src/data/domains/character_awake")
 const {
     getPlayerItemsSync,
-    givePlayerItemSync,
-    setPlayerItemWithinTransactionSync,
 } = require("../src/data/domains/item")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
@@ -116,7 +115,7 @@ function grantLearnCosts(playerId, nodeIds) {
     }
     updatePlayerSync({ id: playerId, freeMana: mana, paidMana: 0 })
     for (const [itemId, amount] of Object.entries(items)) {
-        givePlayerItemSync(playerId, itemId, amount)
+        setInventoryFixtureItemExactSync(playerId, itemId, amount)
     }
 }
 
@@ -134,7 +133,7 @@ function grantAwakeCosts(playerId, nodeIds) {
     }
     updatePlayerSync({ id: playerId, freeMana: mana, paidMana: 0 })
     for (const [itemId, amount] of Object.entries(items)) {
-        givePlayerItemSync(playerId, itemId, amount)
+        setInventoryFixtureItemExactSync(playerId, itemId, amount)
     }
 }
 
@@ -192,19 +191,6 @@ test.after(async () => {
     fs.rmSync(databaseDirectory, { recursive: true, force: true })
     if (previousDataDirectory === undefined) delete process.env.DATA_DIR
     else process.env.DATA_DIR = previousDataDirectory
-})
-
-test("transaction-owned item setter handles existing and missing zero rows without SELECT", async () => {
-    const { playerId } = await createPlayer("item-snapshot")
-    givePlayerItemSync(playerId, 99, 5)
-
-    const { statements } = await captureSql(() => database.transaction(() => {
-        setPlayerItemWithinTransactionSync(playerId, 99, 0, true)
-        setPlayerItemWithinTransactionSync(playerId, 70047, 0, false)
-    })())
-
-    assert.equal(itemInventorySelects(statements).length, 0, statements.join("\n---\n"))
-    assert.deepEqual(getPlayerItemsSync(playerId), { "99": 0, "70047": 0 })
 })
 
 test("mana node insert validates, deduplicates, and emits one multi-value INSERT", async () => {
@@ -507,6 +493,6 @@ test("Growth node routes delegate persistent node writes to their commands", () 
         assert.doesNotMatch(source, /insertPlayerCharacterManaNodesSync/)
         assert.doesNotMatch(source, /updatePlayerCharacterManaNodeAwakeLevelsBatchSync/)
         assert.doesNotMatch(source, /updatePlayerCharacterSync/)
-        assert.doesNotMatch(source, /setPlayerItemWithinTransactionSync/)
+        assert.doesNotMatch(source, /data\/domains\/item/)
     }
 })

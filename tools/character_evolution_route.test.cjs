@@ -43,7 +43,8 @@ const {
 } = require("../src/data/domains/character")
 const { upsertPlayerCharacterAwakeUnlockSync } = require("../src/data/domains/character_awake")
 const itemDomain = require("../src/data/domains/item")
-const { getPlayerItemsSync, givePlayerItemSync } = itemDomain
+const { getPlayerItemsSync } = itemDomain
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const { InventorySqliteRepository } = require("../src/lib/inventory/sqlite-repository")
 const { updatePlayerCategoryMissionSync } = require("../src/data/domains/mission")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
@@ -141,7 +142,7 @@ function grantLearnCost(playerId, nodeId, characterId = CHARACTER_ID) {
     const node = getCharacterManaNodesSync(characterId, 1)[String(nodeId)]
     updatePlayerSync({ id: playerId, freeMana: node.manaCost, paidMana: 0 })
     for (const [itemId, amount] of Object.entries(node.items)) {
-        givePlayerItemSync(playerId, itemId, amount)
+        setInventoryFixtureItemExactSync(playerId, itemId, amount)
     }
 }
 
@@ -151,7 +152,7 @@ function grantAwakeCost(playerId, nodeId) {
     assert.ok(cost)
     updatePlayerSync({ id: playerId, freeMana: cost.manaAmount, paidMana: 0 })
     for (const [itemId, amount] of Object.entries(cost.items)) {
-        givePlayerItemSync(playerId, itemId, amount)
+        setInventoryFixtureItemExactSync(playerId, itemId, amount)
     }
 }
 

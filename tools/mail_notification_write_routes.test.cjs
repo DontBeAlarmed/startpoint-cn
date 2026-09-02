@@ -31,10 +31,6 @@ stubModule("../src/data/domains/player", {
 })
 stubModule("../src/data/domains/item", {
     getPlayerItemSync: (_playerId, itemId) => itemId === 100 ? staminaItemCount : 0,
-    updatePlayerItemSync(_playerId, itemId, amount) {
-        if (itemId === 100) staminaItemCount = amount
-    },
-    givePlayerItemSync: () => 0,
 })
 stubModule("../src/data/domains/equipment", {
     getPlayerEquipmentSync: () => null,

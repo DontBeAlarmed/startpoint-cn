@@ -18,7 +18,7 @@ delete process.env.WDFP_DATABASE_DIR
 const oracle = require("./fixtures/mission-event/legacy-d594854.json")
 const { initializeDatabase } = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { givePlayerItemSync } = require("../src/data/domains/item")
+const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 const {
     getPlayerCategoryMissionsSync,
 } = require("../src/data/domains/mission")
@@ -90,7 +90,7 @@ test.after(() => {
 
 test("Event Session compute matches the pre-migration oracle across mission classes", () => {
     const playerId = createPlayer("event-session-compute")
-    givePlayerItemSync(playerId, 80111, 12)
+    grantInventoryFixtureItemSync(playerId, 80111, 12)
     insertPlayerQuestProgressSync(playerId, 13, { questId: 1001, finished: true })
     insertPlayerQuestProgressSync(playerId, 13, { questId: 1002, finished: true })
 
@@ -166,7 +166,7 @@ test("Event Session current-state compute matches the independent d594854 oracle
 
 test("Event Session first and repeated settlement match the full legacy oracle", () => {
     const playerId = createPlayer("event-session-settlement-oracle")
-    givePlayerItemSync(playerId, 80111, 10)
+    grantInventoryFixtureItemSync(playerId, 80111, 10)
     const scope = [{ category: 3, missionIds: [2316] }]
     const evaluationTime = new Date("2023-11-30T04:00:00.000Z")
 

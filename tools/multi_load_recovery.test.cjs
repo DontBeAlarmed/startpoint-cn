@@ -27,8 +27,8 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const {
     getPlayerCollectedItemTotalSync,
     getPlayerItemSync,
-    givePlayerItemSync,
 } = require("../src/data/domains/item")
+const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getPlayerActiveQuestSync } = require("../src/data/domains/quest_active")
 const {
@@ -121,7 +121,7 @@ async function openHome(label, quest) {
         account.id,
         new Date("2099-12-31T23:59:59.000Z").toISOString(),
     )
-    givePlayerItemSync(playerId, QUEST.ticketId, 3)
+    grantInventoryFixtureItemSync(playerId, QUEST.ticketId, 3)
     if (quest) insertActiveQuest(playerId, quest)
     return { accountId: account.id, playerId }
 }

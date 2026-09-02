@@ -502,8 +502,8 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const {
     getPlayerCollectedItemTotalSync,
     getPlayerItemSync,
-    givePlayerItemSync,
 } = require("../src/data/domains/item")
+const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 const { getPlayerPeriodicRewardPointsSync } = require("../src/data/domains/campaign")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const {
@@ -701,7 +701,7 @@ async function openProductionHome(label, participant, isHost, settlementVerifier
         totalStaminaUsed: 0,
     })
     const quest = options.quest ?? productionQuest
-    if (quest.ticketId !== undefined) givePlayerItemSync(playerId, quest.ticketId, 1)
+    if (quest.ticketId !== undefined) grantInventoryFixtureItemSync(playerId, quest.ticketId, 1)
     const entryStamina = computeRealTimeStamina(getPlayerSync(playerId))
 
     const effectiveRoomNumber = options.roomNumber ?? roomNumber
@@ -1391,7 +1391,7 @@ for (const [label, participant, isHost] of [
             })
             assert.equal(finished.statusCode, 200, finished.body)
             finalized = true
-            givePlayerItemSync(home.playerId, productionQuest.ticketId, 1)
+            grantInventoryFixtureItemSync(home.playerId, productionQuest.ticketId, 1)
             const settledOnce = observableSettlementState(home.db, home.playerId)
             assert.equal(settledOnce.questHistory.length, 1)
             assert.ok(settledOnce.inventory.length > 0)
@@ -1427,7 +1427,7 @@ test("production /start atomically occupies an empty SQLite active quest", async
                 }),
             },
         )
-        givePlayerItemSync(home.playerId, productionQuest.ticketId, 1)
+        grantInventoryFixtureItemSync(home.playerId, productionQuest.ticketId, 1)
         const firstPending = home.app.inject({
             method: "POST",
             url: "/start",

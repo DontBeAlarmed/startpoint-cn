@@ -27,8 +27,11 @@ const {
     getPlayerCollectedItemTotalSync,
     getPlayerItemSync,
     getPlayerItemsSync,
-    givePlayerItemSync,
 } = require("../src/data/domains/item")
+const {
+    grantInventoryFixtureItemSync,
+    setInventoryFixtureItemExactSync,
+} = require("./helpers/inventory-fixture.cjs")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
@@ -301,7 +304,7 @@ test("gacha exec commits charge reward history points and mission fact together"
 
 test("newbie ten-ticket gacha consumes the configured 70030 ticket", async () => {
     const { playerId, viewerId } = await createPlayer("gacha-newbie-ten-ticket")
-    givePlayerItemSync(playerId, 70030, 1)
+    grantInventoryFixtureItemSync(playerId, 70030, 1)
     const collectedBefore = getPlayerCollectedItemTotalSync(playerId, 70030)
 
     const routeSql = await captureSqlAsync(() => app.inject({
@@ -345,7 +348,7 @@ test("newbie ten-ticket gacha consumes the configured 70030 ticket", async () =>
 
 test("ticket gacha rolls its ticket and rewards back on a late mission failure", async t => {
     const { playerId, viewerId } = await createPlayer("gacha-ticket-late-failure")
-    givePlayerItemSync(playerId, 70030, 1)
+    grantInventoryFixtureItemSync(playerId, 70030, 1)
     const before = drawState(playerId, 1613)
     const collectedBefore = getPlayerCollectedItemTotalSync(playerId, 70030)
     database.exec(`
@@ -394,7 +397,7 @@ test("character duplicate gacha item_list reports the post-reward inventory", as
     const { playerId } = await createPlayer("gacha-duplicate-item-list")
     const characterId = 1
     const exBoostItemId = 14002
-    givePlayerItemSync(playerId, exBoostItemId, 20)
+    setInventoryFixtureItemExactSync(playerId, exBoostItemId, 20)
 
     const result = rewardPlayerGachaDrawResultSync(
         playerId,
@@ -417,7 +420,7 @@ test("character duplicate gacha item_list reports the post-reward inventory", as
 
 test("legacy fallback result remains equal to the pre-migration fixture", async () => {
     const { playerId } = await createPlayer("gacha-legacy-fixture")
-    givePlayerItemSync(playerId, 14002, 20)
+    setInventoryFixtureItemExactSync(playerId, 14002, 20)
 
     const result = rewardPlayerGachaDrawResultSync(
         playerId,
@@ -468,8 +471,8 @@ test("character owner plan preserves per-draw source movies duplicate deltas and
         seed: 1000 + drawIndex,
         requiresVerification: drawIndex !== 3,
     }))
-    givePlayerItemSync(playerId, existingCompensationItemId, 20)
-    givePlayerItemSync(playerId, newCharacterCompensationItemId, 5)
+    setInventoryFixtureItemExactSync(playerId, existingCompensationItemId, 20)
+    setInventoryFixtureItemExactSync(playerId, newCharacterCompensationItemId, 5)
     const knownPlayerBefore = rewardGrantPlayerSnapshot(playerId)
     let capturedPlan
     let deferredLog

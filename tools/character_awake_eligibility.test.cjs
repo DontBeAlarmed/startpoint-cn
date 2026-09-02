@@ -49,7 +49,7 @@ const {
     getPlayerCharacterAwakeUnlocksSync,
     upsertPlayerCharacterAwakeUnlockSync,
 } = require("../src/data/domains/character_awake")
-const { givePlayerItemSync } = require("../src/data/domains/item")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const characterAssets = require("../src/lib/assets")
 const { getCharacterDataSync, getCharacterManaNodesSync } = characterAssets
@@ -386,7 +386,7 @@ async function testLastLearnedNodePublishesUnlock() {
     const finalNodeId = boardOneNodeIds[0]
     learnBoardOne(playerId, boardOneNodeIds.slice(1))
     updatePlayerSync({ id: playerId, freeMana: 1_000_000, paidMana: 0 })
-    givePlayerItemSync(playerId, 13, 1_000)
+    setInventoryFixtureItemExactSync(playerId, 13, 1_000)
 
     const viewerId = 800000242
     db.prepare("INSERT INTO sessions (token, account_id, expires, type) VALUES (?, ?, ?, ?)")

@@ -92,7 +92,6 @@ stubModule("../src/data/domains/character", {
 })
 stubModule("../src/data/domains/item", {
     getPlayerItemsSync: () => ({}),
-    givePlayerItemSync: () => 0,
 })
 stubModule("../src/routes/api/character", { characterMaxOverLimits: () => 0 })
 stubModule("../src/lib/assets", { getCharacterDataSync: () => null })

@@ -127,6 +127,17 @@ function updatePlayer(data) {
     }
 }
 
+function grantTestItem(playerId, itemId, count) {
+    writeAttempts++
+    db.prepare(`
+        INSERT INTO item_state VALUES (?, ?, ?)
+        ON CONFLICT(player_id, item_id) DO UPDATE SET count = count + excluded.count
+    `).run(playerId, itemId, count)
+    return db.prepare(
+        "SELECT count FROM item_state WHERE player_id = ? AND item_id = ?",
+    ).get(playerId, itemId).count
+}
+
 let writeAttempts = 0
 let failActiveDeleteAfterWrite = false
 const rewardCampaignCalls = []
@@ -237,26 +248,6 @@ stubModule("../src/data/domains/item", {
     getPlayerItemSync(playerId, itemId) {
         return db.prepare("SELECT count FROM item_state WHERE player_id = ? AND item_id = ?").get(playerId, itemId)?.count ?? null
     },
-    givePlayerItemSync(playerId, itemId, count) {
-        writeAttempts++
-        db.prepare(`
-            INSERT INTO item_state VALUES (?, ?, ?)
-            ON CONFLICT(player_id, item_id) DO UPDATE SET count = count + excluded.count
-        `).run(playerId, itemId, count)
-        return db.prepare("SELECT count FROM item_state WHERE player_id = ? AND item_id = ?").get(playerId, itemId).count
-    },
-    setPlayerItemWithinTransactionSync(playerId, itemId, amount, hasExistingRow) {
-        writeAttempts++
-        if (hasExistingRow) {
-            db.prepare("UPDATE item_state SET count = ? WHERE player_id = ? AND item_id = ?")
-                .run(amount, playerId, itemId)
-        } else {
-            db.prepare("INSERT INTO item_state (player_id, item_id, count) VALUES (?, ?, ?)")
-                .run(playerId, itemId, amount)
-        }
-    },
-    recordPlayerCollectedItemWithinTransactionSync() {},
-    updatePlayerItemSync() {},
 })
 const withInventory = (options, operation) => {
     const playerId = options.playerId
@@ -420,9 +411,7 @@ stubModule("../src/lib/quest", {
     givePlayerRewardsSync(playerId, rewards) {
         const items = {}
         for (const reward of rewards) {
-            items[String(reward.id)] = require("../src/data/domains/item").givePlayerItemSync(
-                playerId, reward.id, reward.count,
-            )
+            items[String(reward.id)] = grantTestItem(playerId, reward.id, reward.count)
         }
         return {
             user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },

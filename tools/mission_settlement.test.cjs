@@ -29,7 +29,7 @@ const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerCategoryMissionsSync, updatePlayerCategoryMissionSync } = require("../src/data/domains/mission")
 const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
-const { givePlayerItemSync } = require("../src/data/domains/item")
+const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 const { settleMissionCategories } = require("../src/lib/mission/settlement")
 const { takeSnapshot } = require("../src/lib/mission/snapshot")
 
@@ -71,7 +71,7 @@ assert.deepEqual(repeated.itemList, {})
 assert.equal(getPlayerSync(playerId).freeVmoney, initialVmoney + 15)
 
 const collectPlayerId = createPlayer("mission-collect-settlement")
-givePlayerItemSync(collectPlayerId, 80001, 50)
+grantInventoryFixtureItemSync(collectPlayerId, 80001, 50)
 const collectSettlement = settleMissionCategories(
     collectPlayerId,
     [{ category: 4, eventId: 1 }],
@@ -86,7 +86,7 @@ assert.deepEqual(getPlayerCategoryMissionsSync(collectPlayerId, 4)[1500], {
 })
 
 const wrongEventPlayerId = createPlayer("mission-collect-wrong-event")
-givePlayerItemSync(wrongEventPlayerId, 80001, 50)
+grantInventoryFixtureItemSync(wrongEventPlayerId, 80001, 50)
 const wrongEventSettlement = settleMissionCategories(
     wrongEventPlayerId,
     [{ category: 4, eventId: 2 }],

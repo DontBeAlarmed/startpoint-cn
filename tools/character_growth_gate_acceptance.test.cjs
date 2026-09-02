@@ -68,7 +68,7 @@ test("D14 route adapters delegate Growth writes to the unified commands", () => 
         assert.doesNotMatch(route, /insertPlayerCharacterManaNodesSync/)
         assert.doesNotMatch(route, /updatePlayerCharacterManaNodeAwakeLevelsBatchSync/)
         assert.doesNotMatch(route, /updatePlayerCharacterBondTokenSync/)
-        assert.doesNotMatch(route, /updatePlayerItemSync/)
+        assert.doesNotMatch(route, /data\/domains\/item/)
         assert.doesNotMatch(route, /updatePlayerSync/)
     }
 })

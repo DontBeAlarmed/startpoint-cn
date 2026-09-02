@@ -130,14 +130,14 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         const contents = fs.readFileSync(path.join(projectRoot, relativePath), "utf8")
         assert.doesNotMatch(
             contents,
-            /\b(?:givePlayerItemSync|givePlayerItemWithinTransactionSync|insertPlayerItemsSync|setPlayerItemSync|setPlayerItemWithinTransactionSync|updatePlayerItemSync|recordPlayerCollectedItemWithinTransactionSync)\b/,
+            /(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+players_(?:items|collected_items)/i,
             relativePath,
         )
     }
     assert.match(
         fs.readFileSync(path.join(projectRoot, "src/routes/api/exBoost.ts"), "utf8"),
         /getPlayerItemSync/,
-        "W3 migrates EX Boost writes while its response and validation reader remains until W6",
+        "EX Boost retains its read-only validation dependency",
     )
     assert.doesNotMatch(
         fs.readFileSync(path.join(projectRoot, "src/lib/character.ts"), "utf8"),
@@ -199,7 +199,7 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         boxGachaRewardGrant,
         /executeRewardGrantPlanInTransactionOwnerWithInventoryInternalSync\([\s\S]*knownPlayerBefore,[\s\S]*inventory/,
     )
-    assert.doesNotMatch(boxGachaRoute, /\b(?:getPlayerItemSync|updatePlayerItemSync)\b/)
+    assert.doesNotMatch(boxGachaRoute, /\bgetPlayerItemSync\b/)
     assert.doesNotMatch(
         fs.readFileSync(path.join(projectRoot, "src/lib/gacha.ts"), "utf8"),
         /rewardPlayerBoxGachaResultSync/,
@@ -228,7 +228,7 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         const contents = fs.readFileSync(path.join(projectRoot, relativePath), "utf8")
         assert.doesNotMatch(
             contents,
-            /\b(?:givePlayerItemSync|givePlayerItemWithinTransactionSync|insertPlayerItemsSync|setPlayerItemSync|setPlayerItemWithinTransactionSync|updatePlayerItemSync|recordPlayerCollectedItemWithinTransactionSync)\b/,
+            /(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+players_(?:items|collected_items)/i,
             relativePath,
         )
     }
@@ -257,7 +257,6 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "utf8",
     )
     assert.match(singleSettlementWrites, /getPlayerItemSync/)
-    assert.doesNotMatch(singleSettlementWrites, /\bgivePlayerItemSync\b/)
     assert.match(
         singleSettlementWrites,
         /grantCarnivalRewards\([\s\S]*standardRewardGrant: standardRewardGrant\.forCarnival/,
@@ -272,7 +271,7 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
     )
     assert.doesNotMatch(
         missionRewardGranter,
-        /data\/domains\/item|\b(?:getPlayerItemSync|givePlayerItemSync|givePlayerItemWithinTransactionSync|setPlayerItemSync|updatePlayerItemSync)\b/,
+        /data\/domains\/item/,
     )
     assert.match(
         missionRewardGranter,
@@ -290,7 +289,7 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
     )
     assert.doesNotMatch(
         legacyQuest,
-        /data\/domains\/(?:item|character)|\.\/character|\.\/equipment|\b(?:givePlayerItemSync|givePlayerCharacterSync|givePlayerEquipmentSync|updatePlayerSync)\b/,
+        /data\/domains\/(?:item|character)|\.\/character|\.\/equipment|\b(?:givePlayerCharacterSync|givePlayerEquipmentSync|updatePlayerSync)\b/,
     )
     assert.match(
         legacyQuestAdapter,
@@ -301,30 +300,47 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         /item-cap-plan|event-trade|mana-capacity|domains\/mail|getDb\(\)\.transaction|SAVEPOINT/,
     )
 
-    const legacy = fs.readFileSync(path.join(projectRoot, "src/data/domains/item.ts"), "utf8")
-    assert.match(legacy, /export function givePlayerItemSync/)
-    assert.match(legacy, /export function givePlayerItemWithinTransactionSync/)
-    assert.match(legacy, /export function setPlayerItemSync/)
+    const readers = fs.readFileSync(path.join(projectRoot, "src/data/domains/item.ts"), "utf8")
+    assert.deepEqual(
+        [...readers.matchAll(/export function (\w+)/g)].map(match => match[1]),
+        [
+            "getPlayerItemSync",
+            "getPlayerItemsSync",
+            "getPlayerItemsByIdsSync",
+            "getPlayerCollectedItemTotalSync",
+            "getPlayerCollectedItemTotalsSync",
+            "getPlayerCollectedItemTotalsByIdsSync",
+        ],
+    )
 })
 
-test("remaining legacy Item mutation references match the staged migration manifest", () => {
+test("production Item direct SQL stays inside the final persistence whitelist", () => {
     const sourceRoot = path.join(projectRoot, "src")
-    const legacyMutation = /\b(?:givePlayerItemSync|givePlayerItemWithinTransactionSync|insertPlayerItemsSync|setPlayerItemSync|setPlayerItemWithinTransactionSync|updatePlayerItemSync|recordPlayerCollectedItemWithinTransactionSync)\b/
-    const remaining = []
+    const directMutation = /(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+players_(?:items|collected_items)/i
+    const directSqlFiles = []
     const visit = directory => {
         for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
             const absolute = path.join(directory, entry.name)
             if (entry.isDirectory()) visit(absolute)
             else if (entry.isFile() && entry.name.endsWith(".ts")
-                && legacyMutation.test(fs.readFileSync(absolute, "utf8"))) {
-                remaining.push(path.relative(projectRoot, absolute))
+                && directMutation.test(fs.readFileSync(absolute, "utf8"))) {
+                directSqlFiles.push(path.relative(projectRoot, absolute))
             }
         }
     }
     visit(sourceRoot)
 
-    assert.deepEqual(remaining.sort(), [
-        // W6b removes the old primitive definitions.
-        "src/data/domains/item.ts",
+    assert.deepEqual(directSqlFiles.sort(), [
+        "src/data/domains/item-maintenance.ts",
+        "src/lib/inventory/sqlite-repository.ts",
     ])
+
+    const fixture = fs.readFileSync(
+        path.join(projectRoot, "tools/helpers/inventory-fixture.cjs"),
+        "utf8",
+    )
+    assert.match(fixture, /getDb\(\)\.inTransaction/)
+    assert.match(fixture, /grantInventoryItemWithinTransactionSync/)
+    assert.match(fixture, /grantInventoryItemSync/)
+    assert.match(fixture, /setPlayerItemForMaintenanceSync/)
 })

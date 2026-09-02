@@ -29,7 +29,6 @@ stubModule("../src/data/domains/quest_active", {
 })
 stubModule("../src/data/domains/item", {
     getPlayerItemSync() { return null },
-    setPlayerItemSync() {},
 })
 
 delete require.cache[servicePath]

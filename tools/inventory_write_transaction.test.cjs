@@ -22,7 +22,8 @@ const {
     getPlayerEquipmentSync,
     insertPlayerEquipmentSync,
 } = require("../src/data/domains/equipment")
-const { getPlayerItemSync, givePlayerItemSync } = require("../src/data/domains/item")
+const { getPlayerItemSync } = require("../src/data/domains/item")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
@@ -105,7 +106,7 @@ test.after(async () => {
 test("duplicate stamina item ids are aggregated before deduction", async () => {
     const { playerId, viewerId } = await createPlayer("duplicate-stamina")
     updatePlayerSync({ id: playerId, stamina: 0, staminaHealTime: new Date() })
-    givePlayerItemSync(playerId, 100, 2)
+    setInventoryFixtureItemExactSync(playerId, 100, 2)
 
     const response = await app.inject({
         method: "POST",
@@ -126,7 +127,7 @@ test("duplicate stamina item ids are aggregated before deduction", async () => {
 test("stamina recovery rolls item deduction back when player update fails", async t => {
     const { playerId, viewerId } = await createPlayer("stamina-rollback")
     updatePlayerSync({ id: playerId, stamina: 0, staminaHealTime: new Date() })
-    givePlayerItemSync(playerId, 100, 1)
+    setInventoryFixtureItemExactSync(playerId, 100, 1)
     database.exec(`
         CREATE TRIGGER reject_stamina_update
         BEFORE UPDATE OF stamina ON players
@@ -148,7 +149,7 @@ test("stamina recovery rolls item deduction back when player update fails", asyn
 
 test("item sale rolls item deduction back when mana update fails", async t => {
     const { playerId, viewerId } = await createPlayer("item-sell-rollback")
-    givePlayerItemSync(playerId, 30005, 10)
+    setInventoryFixtureItemExactSync(playerId, 30005, 10)
     const beforeMana = getPlayerSync(playerId).freeMana
     database.exec(`
         CREATE TRIGGER reject_item_sale_mana
@@ -192,8 +193,8 @@ test("equipment upgrade atomically deducts the client-selected crystal and craft
     const crystalItemId = 12001
     const craftPointItemId = 100000
     addEquipment(playerId, equipmentId, 0)
-    givePlayerItemSync(playerId, crystalItemId, 2)
-    givePlayerItemSync(playerId, craftPointItemId, 1000)
+    setInventoryFixtureItemExactSync(playerId, crystalItemId, 2)
+    setInventoryFixtureItemExactSync(playerId, craftPointItemId, 1000)
 
     const beforeCraftPoints = getPlayerItemSync(playerId, craftPointItemId)
     const beforeSoul = getPlayerItemSync(playerId, equipmentId) ?? 0
@@ -225,7 +226,7 @@ test("bulk_upgrade rolls equipment rewards and mission facts back on a late miss
     const { playerId, viewerId } = await createPlayer("bulk-upgrade-late-rollback")
     const equipmentIds = [3010006, 4050030]
     for (const equipmentId of equipmentIds) addEquipment(playerId, equipmentId, 1)
-    givePlayerItemSync(playerId, 100000, 1000)
+    setInventoryFixtureItemExactSync(playerId, 100000, 1000)
 
     const beforeEquipment = Object.fromEntries(equipmentIds.map(equipmentId => [
         equipmentId,

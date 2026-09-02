@@ -17,7 +17,7 @@ delete process.env.WDFP_DATABASE_DIR
 
 const { initializeDatabase } = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { givePlayerItemSync } = require("../src/data/domains/item")
+const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getDb } = require("../src/data/db")
@@ -47,7 +47,7 @@ test("Category 4 settlement uses Session then computes and writes without more f
         status: "normal",
     })
     const playerId = insertDefaultPlayerSync(account.id).id
-    givePlayerItemSync(playerId, 80001, 50)
+    grantInventoryFixtureItemSync(playerId, 80001, 50)
 
     const originalLegacy = CollectComputer.buildContext
     const originalSession = CollectComputer.buildContextFromSession
@@ -115,7 +115,7 @@ test("malformed Catalog selector cannot load collected facts, write progress, or
         status: "normal",
     })
     const playerId = insertDefaultPlayerSync(account.id).id
-    givePlayerItemSync(playerId, 1, 100)
+    grantInventoryFixtureItemSync(playerId, 1, 100)
     const baseCatalog = catalogModule.getMissionCatalog()
     const baseDefinition = baseCatalog.getDefinition(4, 1500)
     const malformedDefinition = Object.freeze({

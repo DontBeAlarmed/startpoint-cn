@@ -22,7 +22,8 @@ function createCharacterGrowthC4Fixture() {
         insertDefaultPlayerCharacterSync,
         updatePlayerCharacterSync,
     } = require("../../src/data/domains/character")
-    const { getPlayerItemSync, givePlayerItemSync } = require("../../src/data/domains/item")
+    const { getPlayerItemSync } = require("../../src/data/domains/item")
+    const { grantInventoryFixtureItemSync } = require("./inventory-fixture.cjs")
     const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../../src/data/domains/player")
     const { insertSessionWithToken } = require("../../src/data/domains/session")
     const { SessionType } = require("../../src/data/types")
@@ -60,7 +61,7 @@ function createCharacterGrowthC4Fixture() {
     }
 
     function giveItem(playerId, itemId, amount) {
-        return givePlayerItemSync(playerId, itemId, amount)
+        return grantInventoryFixtureItemSync(playerId, itemId, amount)
     }
 
     async function createViewer(playerId, viewerId) {

@@ -23,7 +23,7 @@ const {
 } = require("../src/data/domains/character")
 const { recordDegreeBattleStatsSync } = require("../src/data/domains/degree_battle_stats")
 const { insertPlayerEquipmentSync } = require("../src/data/domains/equipment")
-const { givePlayerItemSync } = require("../src/data/domains/item")
+const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 const { recordMissionBattleResultSync } = require("../src/data/domains/mission_battle_facts")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { insertPlayerQuestProgressSync } = require("../src/data/domains/quest")
@@ -86,7 +86,7 @@ function replaceWithNonzeroFacts(playerId) {
         protection: false,
         stack: 0,
     })
-    givePlayerItemSync(playerId, 100000, 31)
+    grantInventoryFixtureItemSync(playerId, 100000, 31)
     recordDegreeBattleStatsSync(playerId, {
         feverCount: 7,
         feverMs: 8,
@@ -177,7 +177,7 @@ test("legacy and Session contexts compute every Category 1 mission equivalently 
 test("Session Regular derivation reads character, mana board and config from its Catalog source", () => {
     const playerId = createPlayer("regular-catalog-source")
     replaceWithNonzeroFacts(playerId)
-    givePlayerItemSync(playerId, 777777, 41)
+    grantInventoryFixtureItemSync(playerId, 777777, 41)
     const tables = {
         "character.json": { 1: { rarity: 0 } },
         "mana_board.json": { 1: { 2: { 1: [[999999]] } } },

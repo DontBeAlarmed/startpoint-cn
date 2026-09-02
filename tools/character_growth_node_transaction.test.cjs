@@ -23,7 +23,8 @@ const {
     updatePlayerCharacterBondTokenSync,
 } = require("../src/data/domains/character")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
-const { givePlayerItemSync, getPlayerItemsSync } = require("../src/data/domains/item")
+const { getPlayerItemsSync } = require("../src/data/domains/item")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const { getCharacterManaNodesSync } = require("../src/lib/assets")
 const { characterExpCaps } = require("../src/lib/character")
 const { getDb } = require("../src/data/db")
@@ -59,7 +60,9 @@ function grantNodeCost(playerId, nodeId) {
     const node = getCharacterManaNodesSync(1, 1)[String(nodeId)]
     assert.ok(node)
     updatePlayerSync({ id: playerId, freeMana: node.manaCost, paidMana: 0 })
-    for (const [itemId, amount] of Object.entries(node.items)) givePlayerItemSync(playerId, itemId, amount)
+    for (const [itemId, amount] of Object.entries(node.items)) {
+        setInventoryFixtureItemExactSync(playerId, itemId, amount)
+    }
 }
 
 function state(playerId) {

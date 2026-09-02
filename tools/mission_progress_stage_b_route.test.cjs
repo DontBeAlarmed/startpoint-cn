@@ -42,8 +42,8 @@ const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const {
     getPlayerItemSync,
-    givePlayerItemWithinTransactionSync,
 } = require("../src/data/domains/item")
+const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 const {
     mergeMissionSettlementResponse,
 } = require("../src/lib/mission/response")
@@ -116,7 +116,7 @@ stubModule("../src/lib/mission/index", {
     settleAwakeMissionCandidatesWithEvaluation: (actualPlayerId, missionIds) => {
         assert.equal(actualPlayerId, playerId)
         assert.deepEqual(missionIds, [901])
-        const amount = givePlayerItemWithinTransactionSync(actualPlayerId, rewardItemId, 10)
+        const amount = grantInventoryFixtureItemSync(actualPlayerId, rewardItemId, 10)
         return {
             evaluation: {
                 playerId: actualPlayerId,
@@ -150,7 +150,7 @@ stubModule("../src/lib/mission/index", {
     },
     settleMissionCategoriesWithEvaluation: actualPlayerId => {
         assert.equal(actualPlayerId, playerId)
-        const amount = givePlayerItemWithinTransactionSync(actualPlayerId, rewardItemId, 100)
+        const amount = grantInventoryFixtureItemSync(actualPlayerId, rewardItemId, 100)
         stageAEvaluation.settlement = {
             missionInfo: [{ mission_category_id: 1, mission_id: 101, mission_reward_id: 1011 }],
             itemList: { [rewardItemId]: amount },

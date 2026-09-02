@@ -21,7 +21,7 @@ const {
 const restoreBundledSnapshot = installBundledGameplaySnapshot()
 const { initializeDatabase } = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { givePlayerItemSync } = require("../src/data/domains/item")
+const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getDb } = require("../src/data/db")
 const masterData = require("../src/lib/mission/master-data")
@@ -70,8 +70,8 @@ test("legacy context precomputes only requested selectors or all valid Category 
 
 test("legacy compute is Catalog and DB free after context build and snapshot replacement", () => {
     const playerId = createPlayer("collect-legacy-pure")
-    givePlayerItemSync(playerId, 80001, 11)
-    givePlayerItemSync(playerId, 80002, 29)
+    grantInventoryFixtureItemSync(playerId, 80001, 11)
+    grantInventoryFixtureItemSync(playerId, 80002, 29)
     const context = CollectComputer.buildContext(playerId, 4, evaluationTime, [1500])
     const changedCollectTable = structuredClone(require("../assets/mission_collect_item.json"))
     changedCollectTable[1500][0][14] = "80002"

@@ -17,7 +17,7 @@ delete process.env.WDFP_DATABASE_DIR
 
 const { initializeDatabase } = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { givePlayerItemSync } = require("../src/data/domains/item")
+const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getDb } = require("../src/data/db")
 const {
@@ -60,7 +60,7 @@ test("legacy and Session compute every Category 4 mission equivalently", () => {
         [51002, 17], [80001, 19], [80002, 23], [80003, 29],
     ])
     for (const [itemId, amount] of Object.entries(totals)) {
-        givePlayerItemSync(playerId, Number(itemId), amount)
+        grantInventoryFixtureItemSync(playerId, Number(itemId), amount)
     }
     const catalog = getMissionCatalog()
     const missionIds = catalog.getMissionIds(4)

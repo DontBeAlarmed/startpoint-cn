@@ -31,7 +31,7 @@ let insertDefaultPlayerCharacterSync
 let insertPlayerCharacterManaNodesSync
 let updatePlayerCharacterSync
 let getPlayerCharacterAwakeUnlocksSync
-let givePlayerItemSync
+let setInventoryFixtureItemExactSync
 let getPlayerItemSync
 let updatePlayerCategoryMissionSync
 let getPlayerSync
@@ -144,7 +144,7 @@ async function createAwakeReadyPlayer(label, itemCount = 1) {
     updatePlayerCategoryMissionSync(playerId, 9, 2630021, 3)
     updatePlayerCategoryMissionSync(playerId, 9, 2630023, 1)
     updatePlayerSync({ id: playerId, totalManaObtained: MANA_THRESHOLD - 5 })
-    givePlayerItemSync(playerId, ITEM_ID, itemCount)
+    setInventoryFixtureItemExactSync(playerId, ITEM_ID, itemCount)
 
     return { playerId, viewerId }
 }
@@ -194,7 +194,8 @@ test.before(async () => {
         ;({
             getPlayerCharacterAwakeUnlocksSync,
         } = require("../src/data/domains/character_awake"))
-        ;({ givePlayerItemSync, getPlayerItemSync } = require("../src/data/domains/item"))
+        ;({ getPlayerItemSync } = require("../src/data/domains/item"))
+        ;({ setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs"))
         ;({ updatePlayerCategoryMissionSync } = require("../src/data/domains/mission"))
         ;({
             getPlayerSync,

@@ -14,7 +14,8 @@ require("ts-node/register/transpile-only")
 const data = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { getPlayerItemSync, setPlayerItemSync } = require("../src/data/domains/item")
+const { getPlayerItemSync } = require("../src/data/domains/item")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const {
     getScheduledResourceStatesByRuleIdsSync,
@@ -85,7 +86,7 @@ test.after(() => {
 
 test("global and player rules grant independently and coalesce the same item", () => {
     const player = createPlayer("scheduled-settlement-combined")
-    setPlayerItemSync(player.id, 1, 5)
+    setInventoryFixtureItemExactSync(player.id, 1, 5)
     const globalRule = insertRule()
     const playerRule = insertRule({
         scope: "player",
@@ -106,14 +107,14 @@ test("global and player rules grant independently and coalesce the same item", (
 
 test("a rule records only successful grants and can trigger after same-day consumption", () => {
     const player = createPlayer("scheduled-settlement-threshold")
-    setPlayerItemSync(player.id, 2, 50)
+    setInventoryFixtureItemExactSync(player.id, 2, 50)
     const rule = insertRule({ rewardId: 2, inventoryCap: 9999 })
     const now = new Date("2026-08-26T02:00:00.000Z")
 
     assert.equal(settle(player.id, now).status, "none")
     assert.deepEqual(getScheduledResourceStatesByRuleIdsSync(player.id, [rule.id]), {})
 
-    setPlayerItemSync(player.id, 2, 5)
+    setInventoryFixtureItemExactSync(player.id, 2, 5)
     assert.equal(settle(player.id, now).status, "granted")
     assert.equal(getPlayerItemSync(player.id, 2), 15)
     assert.equal(settle(player.id, now).status, "none")
@@ -170,7 +171,7 @@ test("free vmoney grants use the same daily state", () => {
 test("state write failure rolls reward and state back together", () => {
     const player = createPlayer("scheduled-settlement-rollback")
     const rule = insertRule({ rewardId: 2, inventoryCap: 9999 })
-    setPlayerItemSync(player.id, 2, 1)
+    setInventoryFixtureItemExactSync(player.id, 2, 1)
     getDb().exec(`
         CREATE TRIGGER fail_scheduled_resource_state
         BEFORE INSERT ON players_scheduled_resource_state

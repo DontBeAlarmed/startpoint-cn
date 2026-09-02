@@ -23,7 +23,8 @@ const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerDegreeIdsSync } = require("../src/data/domains/degree")
 const { getPlayerEquipmentSync } = require("../src/data/domains/equipment")
-const { getPlayerItemSync, givePlayerItemSync } = require("../src/data/domains/item")
+const { getPlayerItemSync } = require("../src/data/domains/item")
+const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { getPlayerPassCardStateSync } = require("../src/data/domains/pass-card")
 const {
@@ -189,7 +190,7 @@ test("reused Carnival callback rejects another player before any reward or domai
         getClaimedRewardIdsFn: getPlayerClaimedCarnivalRewardIdsSync,
         grantRewardsFn: (pid, definitions) => grantCarnivalRewards(pid, definitions, {
             getPlayer: getPlayerSync,
-            giveItem: givePlayerItemSync,
+            giveItem: grantInventoryFixtureItemSync,
             giveEquipment: require("../src/lib/equipment").givePlayerEquipmentSync,
             giveDegree: require("../src/data/domains/degree").givePlayerDegreeSync,
             updatePlayer: updatePlayerSync,
@@ -251,7 +252,7 @@ function runMismatchedCarnivalFinish(rewards) {
         getClaimedRewardIdsFn: getPlayerClaimedCarnivalRewardIdsSync,
         grantRewardsFn: (pid, definitions) => grantCarnivalRewards(pid, definitions, {
             getPlayer: getPlayerSync,
-            giveItem: givePlayerItemSync,
+            giveItem: grantInventoryFixtureItemSync,
             giveEquipment: require("../src/lib/equipment").givePlayerEquipmentSync,
             giveDegree: (id, degreeId) => {
                 calls.degree++
@@ -481,7 +482,7 @@ test("single outer transaction rolls back Carnival and Mission standard plus dom
             ],
         }], {
             getPlayer: getPlayerSync,
-            giveItem: givePlayerItemSync,
+            giveItem: grantInventoryFixtureItemSync,
             giveEquipment: require("../src/lib/equipment").givePlayerEquipmentSync,
             giveDegree: require("../src/data/domains/degree").givePlayerDegreeSync,
             updatePlayer: updatePlayerSync,

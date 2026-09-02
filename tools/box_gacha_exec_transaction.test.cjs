@@ -95,8 +95,8 @@ const {
     getPlayerCollectedItemTotalsSync,
     getPlayerItemSync,
     getPlayerItemsSync,
-    givePlayerItemSync,
 } = require("../src/data/domains/item")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
@@ -128,7 +128,7 @@ async function createPlayer(label, currency = 1000) {
     })
     const playerId = insertDefaultPlayerSync(account.id).id
     const viewerId = nextViewerId++
-    givePlayerItemSync(playerId, CURRENCY_ITEM_ID, currency)
+    setInventoryFixtureItemExactSync(playerId, CURRENCY_ITEM_ID, currency)
     await insertSessionWithToken({
         token: String(viewerId),
         accountId: account.id,

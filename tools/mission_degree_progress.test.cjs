@@ -42,7 +42,7 @@ const {
 } = require("../src/data/domains/mission")
 const { addPlayerShopPurchaseCountSync } = require("../src/data/domains/shopPurchase")
 const { insertPlayerEquipmentSync } = require("../src/data/domains/equipment")
-const { givePlayerItemSync } = require("../src/data/domains/item")
+const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const {
     countFinishedPlayerQuestsByCategorySync,
@@ -304,10 +304,10 @@ const treasureShopItemIds = Object.keys(require("../assets/treasure_shop.json"))
 addPlayerShopPurchaseCountSync(playerId, treasureShopItemIds[0], 40)
 addPlayerShopPurchaseCountSync(playerId, treasureShopItemIds[1], 60)
 addPlayerShopPurchaseCountSync(playerId, 999999, 100)
-givePlayerItemSync(playerId, 100000, 1500)
-givePlayerItemSync(playerId, 999999, 5000)
-givePlayerItemSync(playerId, 70014, 3000)
-givePlayerItemSync(playerId, 70048, 1000)
+grantInventoryFixtureItemSync(playerId, 100000, 1500)
+grantInventoryFixtureItemSync(playerId, 999999, 5000)
+grantInventoryFixtureItemSync(playerId, 70014, 3000)
+grantInventoryFixtureItemSync(playerId, 70048, 1000)
 
 recordDegreeBattleStatisticsSync({
     playerId,

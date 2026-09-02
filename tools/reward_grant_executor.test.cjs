@@ -20,7 +20,8 @@ const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerCharacterSync } = require("../src/data/domains/character")
 const { getPlayerEquipmentSync } = require("../src/data/domains/equipment")
-const { getPlayerItemSync, givePlayerItemSync } = require("../src/data/domains/item")
+const { getPlayerItemSync } = require("../src/data/domains/item")
+const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { givePlayerCharacterSync } = require("../src/lib/character")
 const {
@@ -411,7 +412,7 @@ test("transaction-owner execution rejects final freeMana overflow and rolls oute
     try {
         assert.throws(
             database.transaction(() => {
-                givePlayerItemSync(playerId, callerItemId, 1)
+                grantInventoryFixtureItemSync(playerId, callerItemId, 1)
                 executeRewardGrantPlanInTransactionOwnerSync(
                     playerId,
                     createRewardGrantPlan([
@@ -455,7 +456,7 @@ test("transaction-owner execution rejects final freeVmoney overflow and rolls ou
     try {
         assert.throws(
             database.transaction(() => {
-                givePlayerItemSync(playerId, callerItemId, 1)
+                grantInventoryFixtureItemSync(playerId, callerItemId, 1)
                 executeRewardGrantPlanInTransactionOwnerSync(
                     playerId,
                     createRewardGrantPlan([
@@ -529,7 +530,7 @@ test("transaction-owner execution relies on propagated errors for whole outer ro
     ])
 
     assert.throws(database.transaction(() => {
-        givePlayerItemSync(playerId, callerItemId, 1)
+        grantInventoryFixtureItemSync(playerId, callerItemId, 1)
         executeRewardGrantPlanInTransactionOwnerSync(playerId, plan, before)
     }), RewardGrantExecutionError)
     assert.equal(getPlayerItemSync(playerId, callerItemId), null)
@@ -851,7 +852,7 @@ test("within-transaction execution rolls its plan back when the caller catches a
         } catch (error) {
             caught = error
         }
-        givePlayerItemSync(playerId, callerItemId, 1)
+        grantInventoryFixtureItemSync(playerId, callerItemId, 1)
     })()
 
     assert.ok(caught instanceof RewardGrantExecutionError)
@@ -883,7 +884,7 @@ test("within-transaction execution rolls its plan back when the caller catches a
         } catch (error) {
             caught = error
         }
-        givePlayerItemSync(playerId, callerItemId, 1)
+        grantInventoryFixtureItemSync(playerId, callerItemId, 1)
     })()
 
     assert.match(caught.message, /forced reward grant failure/)

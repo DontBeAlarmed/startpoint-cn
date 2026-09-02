@@ -34,8 +34,8 @@ const {
 } = characterDomain
 const { insertPlayerEquipmentSync } = require("../src/data/domains/equipment")
 const equipmentDomain = require("../src/data/domains/equipment")
-const { setPlayerItemSync } = require("../src/data/domains/item")
 const itemDomain = require("../src/data/domains/item")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const partyDomain = require("../src/data/domains/party")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { insertPlayerQuestProgressSync } = require("../src/data/domains/quest")
@@ -195,7 +195,7 @@ function resetValidState() {
     insertFinishedQuest(3, characterStoryQuestId)
 
     db.prepare("DELETE FROM players_items WHERE player_id = ?").run(playerId)
-    setPlayerItemSync(playerId, validAbilitySoulId, 1)
+    setInventoryFixtureItemExactSync(playerId, validAbilitySoulId, 1)
     setEquippedAbilitySoul(validAbilitySoulId)
 }
 
@@ -296,7 +296,7 @@ test("Event ability-soul facts validate each party preset independently", () => 
     assert.equal(EventSafeComputer.compute(1220, buildContext(), 0), 0)
 
     resetValidState()
-    setPlayerItemSync(playerId, nonAbilitySoulItemId, 1)
+    setInventoryFixtureItemExactSync(playerId, nonAbilitySoulItemId, 1)
     setEquippedAbilitySoul(nonAbilitySoulItemId)
     assert.equal(EventSafeComputer.compute(1220, buildContext(), 0), 0)
 

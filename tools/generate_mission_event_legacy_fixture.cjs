@@ -48,12 +48,38 @@ const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "event-legacy-fi
 process.env.DATA_DIR = databaseDirectory
 delete process.env.WDFP_DATABASE_DIR
 const { closeDatabase, initializeDatabase } = require("../src/data")
+const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { givePlayerItemSync } = require("../src/data/domains/item")
 const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { EventSafeComputer } = require("../src/lib/mission/computer-event-safe")
 const { settleMissionCategories } = require("../src/lib/mission/settlement")
+
+// This probe runs against the pinned pre-Session source archive. Keep its
+// setup self-contained so it does not depend on helpers introduced later.
+function grantLegacyProbeItemSync(playerId, itemId, amount) {
+    const database = getDb()
+    const existing = database.prepare(
+        "SELECT amount FROM players_items WHERE player_id = ? AND id = ?",
+    ).get(playerId, itemId)
+    const nextAmount = (existing?.amount ?? 0) + amount
+    if (existing === undefined) {
+        database.prepare(
+            "INSERT INTO players_items (id, amount, player_id) VALUES (?, ?, ?)",
+        ).run(itemId, nextAmount, playerId)
+    } else {
+        database.prepare(
+            "UPDATE players_items SET amount = ? WHERE player_id = ? AND id = ?",
+        ).run(nextAmount, playerId, itemId)
+    }
+    database.prepare(
+        "INSERT INTO players_collected_items (player_id, item_id, total_obtained) " +
+        "VALUES (?, ?, ?) " +
+        "ON CONFLICT(player_id, item_id) DO UPDATE SET " +
+        "total_obtained = total_obtained + excluded.total_obtained",
+    ).run(playerId, itemId, amount)
+    return nextAmount
+}
 
 function context(extra = {}) {
     return {
@@ -144,7 +170,7 @@ try {
         idpId: "event-legacy-fixture-" + randomUUID(), status: "normal",
     })
     const playerId = insertDefaultPlayerSync(account.id).id
-    givePlayerItemSync(playerId, 80111, 10)
+    grantLegacyProbeItemSync(playerId, 80111, 10)
     const scope = [{ category: 3, missionIds: [2316] }]
     const evaluationTime = new Date("2023-11-30T04:00:00.000Z")
     const firstResult = settleMissionCategories(playerId, scope, evaluationTime)

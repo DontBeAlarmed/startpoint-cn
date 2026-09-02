@@ -45,7 +45,8 @@ const {
 } = require("../src/data/domains/character")
 const { getPlayerCharacterAwakeUnlocksSync } = require("../src/data/domains/character_awake")
 const { recordMissionBattleResultSync } = require("../src/data/domains/mission_battle_facts")
-const { getPlayerItemSync, givePlayerItemSync } = require("../src/data/domains/item")
+const { getPlayerItemSync } = require("../src/data/domains/item")
+const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { getPlayerActiveQuestSync } = require("../src/data/domains/quest_active")
 const {
@@ -544,7 +545,7 @@ async function main() {
         assert.equal(weeklyData.mail_arrived, true)
 
         setServerTimeOffset(Date.parse("2020-02-21T04:00:00.000Z") - Date.now())
-        givePlayerItemSync(playerId, 80001, 50)
+        grantInventoryFixtureItemSync(playerId, 80001, 50)
         const collectPage = await fastify.inject({
             method: "POST",
             url: "/api/index.php/mission/get_mission_progress",
@@ -602,7 +603,7 @@ async function main() {
         ])
 
         setServerTimeOffset(Date.parse("2023-12-01T04:00:00.000Z") - Date.now())
-        givePlayerItemSync(playerId, 80111, 10)
+        grantInventoryFixtureItemSync(playerId, 80111, 10)
         const eventItemPage = await fastify.inject({
             method: "POST",
             url: "/api/index.php/mission/get_mission_progress",

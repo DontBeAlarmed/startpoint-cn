@@ -37,7 +37,8 @@ const {
     updatePlayerCharacterBondTokenSync,
     updatePlayerCharacterSync,
 } = require("../src/data/domains/character")
-const { givePlayerItemSync, getPlayerItemSync } = require("../src/data/domains/item")
+const { getPlayerItemSync } = require("../src/data/domains/item")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const { insertDefaultPlayerSync, getPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
@@ -121,7 +122,7 @@ async function main() {
 
     const learn = await createPlayer(1)
     updatePlayerSync({ id: learn.playerId, freeMana: 1000, paidMana: 0 })
-    givePlayerItemSync(learn.playerId, 1, 10)
+    setInventoryFixtureItemExactSync(learn.playerId, 1, 10)
     const beforeLearn = characterState(learn.playerId)
     db.exec(`
         CREATE TRIGGER reject_learn_node
@@ -144,7 +145,7 @@ async function main() {
 
     const parentGuard = await createPlayer(9)
     updatePlayerSync({ id: parentGuard.playerId, freeMana: 1000, paidMana: 0 })
-    givePlayerItemSync(parentGuard.playerId, 1, 10)
+    setInventoryFixtureItemExactSync(parentGuard.playerId, 1, 10)
     const parentGuardResponse = await app.inject({
         method: "POST",
         url: "/mana/learn_mana_node",
@@ -405,7 +406,7 @@ async function main() {
     db.exec("DROP TRIGGER reject_open_reward_failure")
 
     const overLimit = await createPlayer(4)
-    givePlayerItemSync(overLimit.playerId, 10002, 1)
+    setInventoryFixtureItemExactSync(overLimit.playerId, 10002, 1)
     const beforeOverLimit = getPlayerCharacterSync(overLimit.playerId, 1)
     db.exec(`
         CREATE TRIGGER reject_over_limit
@@ -451,7 +452,7 @@ async function main() {
 
     const firstDraw = await createPlayer(6)
     updatePlayerCharacterSync(firstDraw.playerId, 1, { overLimitStep: 6 })
-    givePlayerItemSync(firstDraw.playerId, 10002, 1)
+    setInventoryFixtureItemExactSync(firstDraw.playerId, 10002, 1)
     const beforeFirstDraw = getPlayerCharacterSync(firstDraw.playerId, 1)
     db.exec(`
         CREATE TRIGGER reject_first_ex_boost
@@ -470,7 +471,7 @@ async function main() {
 
     const select = await createPlayer(7)
     updatePlayerCharacterSync(select.playerId, 1, { overLimitStep: 6 })
-    givePlayerItemSync(select.playerId, 10002, 1)
+    setInventoryFixtureItemExactSync(select.playerId, 10002, 1)
     const drawResponse = await app.inject({
         method: "POST",
         url: "/ex/draw",

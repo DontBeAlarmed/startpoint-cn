@@ -18,7 +18,8 @@ const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snaps
     .installBundledGameplaySnapshot()
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { getPlayerItemSync, givePlayerItemSync } = require("../src/data/domains/item")
+const { getPlayerItemSync } = require("../src/data/domains/item")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { getPlayerActiveQuestSync } = require("../src/data/domains/quest_active")
 const { getPlayerQuestProgressSync } = require("../src/data/domains/quest")
@@ -76,7 +77,7 @@ test.after(async () => {
 
 test("quest unlock rolls item deductions back when progress persistence fails", async t => {
     const { playerId, viewerId } = await createPlayer("quest-unlock-rollback")
-    givePlayerItemSync(playerId, 60001, 1)
+    setInventoryFixtureItemExactSync(playerId, 60001, 1)
     database.exec(`
         CREATE TRIGGER reject_quest_unlock_progress
         BEFORE INSERT ON players_quest_progress

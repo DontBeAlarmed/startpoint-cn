@@ -26,7 +26,7 @@ const {
 } = require("../src/data/domains/character")
 const { upsertPlayerCharacterAwakeUnlockSync } = require("../src/data/domains/character_awake")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
-const { givePlayerItemSync } = require("../src/data/domains/item")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const { getCharacterDataSync, getCharacterManaNodesSync, getManaNodeAwakeCost } = require("../src/lib/assets")
 const { characterExpCaps } = require("../src/lib/character")
 const { getDb } = require("../src/data/db")
@@ -100,7 +100,9 @@ function grantAwakeCost(playerId, nodeId, targetAwakeLevel = 1) {
     const cost = getManaNodeAwakeCost(1, nodeId, rarity)
     assert.ok(cost, `missing awake cost for ${nodeId}`)
     updatePlayerSync({ id: playerId, freeMana: cost.manaAmount, paidMana: 0 })
-    for (const [itemId, amount] of Object.entries(cost.items)) givePlayerItemSync(playerId, itemId, amount)
+    for (const [itemId, amount] of Object.entries(cost.items)) {
+        setInventoryFixtureItemExactSync(playerId, itemId, amount)
+    }
 }
 
 test("awakeManaNodes writes Awake levels on fixed board one and keeps normal board ownership", () => {

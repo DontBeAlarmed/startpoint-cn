@@ -1,5 +1,7 @@
 "use strict"
 
+const { setInventoryFixtureItemExactSync } = require("../helpers/inventory-fixture.cjs")
+
 const SINGLE_REREAD_REASON = "earlier awake settlement precedes later authoritative reward, active-mission, response-state and active-quest writes"
 const FRESH_REREAD_REASON = "no owner snapshot is injected; load the bounded post-write scope"
 
@@ -333,7 +335,7 @@ function createAwakeOwnerFocusedScenarios(runtime) {
         scenario("box-gacha-exec", {
             async prepare() {
                 const player = await fixture.createPlayer("owner-focused-box")
-                runtime.itemDomain.givePlayerItemSync(player.playerId, 999001, 10)
+                setInventoryFixtureItemExactSync(player.playerId, 999001, 10)
                 return player
             },
             request: value => ({
@@ -419,7 +421,7 @@ function createAwakeOwnerFocusedScenarios(runtime) {
                     id: player.playerId, freeMana: node.manaCost, paidMana: 0,
                 })
                 for (const [itemId, amount] of Object.entries(node.items)) {
-                    runtime.itemDomain.givePlayerItemSync(player.playerId, itemId, amount)
+                    setInventoryFixtureItemExactSync(player.playerId, itemId, amount)
                 }
                 return { ...player, characterId, finalNodeId }
             },
@@ -496,7 +498,7 @@ function createAwakeOwnerFocusedScenarios(runtime) {
             async prepare() {
                 const player = await fixture.createPlayer("owner-focused-item-sell")
                 fixture.prepareForManaUnlock(player.playerId, manaThreshold - 5)
-                runtime.itemDomain.givePlayerItemSync(player.playerId, 1, 1)
+                setInventoryFixtureItemExactSync(player.playerId, 1, 1)
                 return player
             },
             request: value => ({

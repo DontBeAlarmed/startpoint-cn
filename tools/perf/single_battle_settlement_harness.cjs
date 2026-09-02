@@ -10,7 +10,8 @@ const BetterSqlite3 = require("better-sqlite3")
 
 const { closeDatabase, initializeDatabase } = require("../../src/data")
 const { getDb } = require("../../src/data/db")
-const { getPlayerItemSync, setPlayerItemSync } = require("../../src/data/domains/item")
+const { getPlayerItemSync } = require("../../src/data/domains/item")
+const { setInventoryFixtureItemExactSync } = require("../helpers/inventory-fixture.cjs")
 const { getPlayerSync, updatePlayerSync } = require("../../src/data/domains/player")
 const {
     activeQuests,
@@ -96,7 +97,7 @@ async function withSingleBattleHarness(name, operation, {
             }),
             getPlayer: () => getPlayerSync(playerId),
             getItem: itemId => getPlayerItemSync(playerId, itemId) ?? 0,
-            setItem: (itemId, amount) => setPlayerItemSync(playerId, itemId, amount),
+            setItem: (itemId, amount) => setInventoryFixtureItemExactSync(playerId, itemId, amount),
             updatePlayer: values => updatePlayerSync({ id: playerId, ...values }),
         })
     } catch (error) {

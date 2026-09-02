@@ -35,6 +35,7 @@ const missionBattleDomain = require("../src/data/domains/mission_battle_facts")
 const degreeBattleDomain = require("../src/data/domains/degree_battle_stats")
 const shopDomain = require("../src/data/domains/shopPurchase")
 const itemDomain = require("../src/data/domains/item")
+const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 const questDomain = require("../src/data/domains/quest")
 const equipmentDomain = require("../src/data/domains/equipment")
 const playerDomain = require("../src/data/domains/player")
@@ -100,7 +101,7 @@ questDomain.insertPlayerQuestProgressSync(playerId, 21, {
     questId: 1001,
     finished: true,
 })
-itemDomain.givePlayerItemSync(playerId, 70014, 9)
+grantInventoryFixtureItemSync(playerId, 70014, 9)
 
 const calls = []
 function instrument(domain, functionName, family) {

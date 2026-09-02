@@ -73,7 +73,7 @@
 ## 收集任务与称号任务
 
 - category 4 的 `row[14]` 是目标物品 ID，进度语义为累计获得量，不是当前库存。
-  `givePlayerItemSync` 在同一 SQLite 事务中更新库存和 `players_collected_items`；消费物品、后台直接设置库存和存档导入
+  Inventory owner 的奖励写入层在同一 SQLite 事务中更新库存和 `players_collected_items`；消费物品、后台直接设置库存和存档导入
   不伪造累计历史，事务失败时两项写入一起回滚。
 - category 4 任务页必须携带 `event_id`。通用结算只扫描该活动和服务器时间下已开放的任务，跨活动同 pattern 不会写入。
   `/load` 的 `cleared_collect_item_event_mission_list` 按 CN 1.8.1 协议返回 `{ missionId: 已领取阶段 }` 整数映射，

@@ -34,7 +34,7 @@ const bondRoutes = require("../src/routes/api/character/bond").default
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
-const { givePlayerItemSync } = require("../src/data/domains/item")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const { getClientSerializedData } = require("../src/data/utils/player-data")
 const {
     MANA_CHARACTER_GROWTH_FIELDS,
@@ -359,7 +359,7 @@ test("a real mana-node route can complete board one before the Growth command op
     updatePlayerSync({ id: playerId, freeMana: 1_000_000, paidMana: 0 })
     const boardNodes = getCharacterManaNodesSync(1, 1)
     const itemIds = new Set(Object.values(boardNodes).flatMap(node => Object.keys(node.items).map(Number)))
-    for (const itemId of itemIds) givePlayerItemSync(playerId, itemId, 100_000)
+    for (const itemId of itemIds) setInventoryFixtureItemExactSync(playerId, itemId, 100_000)
     const response = await app.inject({
         method: "POST",
         url: "/mana/learn_mana_node",

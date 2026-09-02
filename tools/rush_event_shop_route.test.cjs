@@ -285,7 +285,6 @@ stubModule("../src/data/domains/equipment", {
 })
 stubModule("../src/data/domains/item", {
     getPlayerItemSync: getItem,
-    updatePlayerItemSync: setItem,
 })
 stubModule("../src/lib/inventory", {
     withDeferredInventoryBatchContextWithinTransactionSync(options, operation) {

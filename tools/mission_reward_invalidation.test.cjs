@@ -27,12 +27,6 @@ stubModule("../src/data/domains/item", {
     getPlayerItemSync: (_playerId, itemId) => state.items.has(Number(itemId))
         ? state.items.get(Number(itemId))
         : null,
-    givePlayerItemSync: (_playerId, itemId, amount) => {
-        const key = Number(itemId)
-        const next = (state.items.get(key) ?? 0) + amount
-        state.items.set(key, next)
-        return next
-    },
 })
 stubModule("../src/data/domains/player", {
     updatePlayerSync: () => { state.playerUpdates++ },

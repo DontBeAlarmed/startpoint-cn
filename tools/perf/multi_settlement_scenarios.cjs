@@ -14,7 +14,7 @@ const Fastify = require("fastify")
 const { closeDatabase, initializeDatabase } = require("../../src/data")
 const { getDb } = require("../../src/data/db")
 const { insertAccountSync } = require("../../src/data/domains/account")
-const { givePlayerItemSync } = require("../../src/data/domains/item")
+const { setInventoryFixtureItemExactSync } = require("../helpers/inventory-fixture.cjs")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../../src/data/domains/player")
 const { getPlayerActiveQuestSync } = require("../../src/data/domains/quest_active")
 const { activeQuests } = require("../../src/lib/quest/active-quest-service")
@@ -176,7 +176,7 @@ async function runFinishScenario() {
             staminaHealTime: new Date(Math.floor(Date.now() / 1_000) * 1_000),
             totalStaminaUsed: 0,
         })
-        givePlayerItemSync(playerId, QUEST.ticketId, 1)
+        setInventoryFixtureItemExactSync(playerId, QUEST.ticketId, 1)
         computeRealTimeStamina(getPlayerSync(playerId))
 
         const battle = Object.freeze({
