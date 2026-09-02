@@ -1,6 +1,6 @@
 # D15 全项目领域边界蓝图
 
-状态：D15 边界识别、决策和后续实施路线已经完成并通过独立审查；本文件描述经确认的目标边界。D16 及以后实现尚未开始，因此本文不能用来宣称当前服务端已经完成 Inventory、Mail、Shop、Gacha、Mission、Battle、Event、Content 或 Common Response 的后续收口。当前已落地架构仍以本目录的“当前”图和 D12-D14 Gate 文档为准。
+状态：D15 边界识别、决策和后续实施路线已经完成并通过独立审查；本文件描述经确认的目标边界。D16 设计已经通过但生产实现尚未开始，因此本文不能用来宣称当前服务端已经完成 Inventory、Mail、Shop、Gacha、Mission、Battle、Event、Content 或 Common Response 的后续收口。当前已落地架构仍以本目录的“当前”图和 D12-D14 Gate 文档为准。
 
 ## 1. 目标与证据纪律
 
@@ -143,10 +143,10 @@ Content 字段按以下状态处理：
 以下是目标私服行为，不得写成已确认官服实现：
 
 - Item 超过 `max_count` 时，实际入库部分与 overflow 必须在同一用例事务中无损处置；只有实际进入 Inventory 的数量增加 `total_obtained`。
-- overflow 进入 Mail；overflow Mail 默认保留 31 天。Inventory 只计算 Item 结果，Mail owner 创建邮件。
+- overflow 进入 Mail；overflow Mail 默认保留 31 天。Inventory 只计算 Item 结果，Mail owner 创建邮件。若一份 overflow 超过单封未来可领取容量，必须按稳定顺序拆为多封：Item 每封不超过该 Item `max_count`，Mana 每封不超过 `max_mana`，并同时受客户端 int32 限制；所有拆分与来源状态同一事务，任一失败全部回滚。
 - Mail 在业务层不设置会拒绝新邮件的数量上限，不淘汰有效未领取邮件。
 - 邮件领取成功后从活动主表删除并写入独立 history；邮箱 `receive_all` 按邮件尝试，装不下的邮件保持未领取且不阻止其他邮件。
-- EventTrade 在 Item 兑换结束时间后，于 `/load` 原子转换为 Mana；邮件中的过期 EventTrade 在领取时直接转换。Inventory 负责 Item 后态，Mana 后态必须由 Currency owner 在调用方外层事务中执行；Inventory 不得直接写 Currency。该规则不泛化到所有 Item。
+- EventTrade 在 Item 兑换结束时间后，于 `/load` 原子转换为 Mana；邮件中的过期 EventTrade 在领取时直接转换。Mana 容量按 `free_mana + paid_mana` 计算；立即进入余额的部分才增加 `total_mana_obtained`，overflow Mail 在以后实际领取时再逐封累计。Inventory 负责 Item 后态，Mana 后态必须由 Currency owner 在调用方外层事务中执行；Inventory 不得直接写 Currency。该规则不泛化到所有 Item。
 - Shop 一键兑换整批原子，不允许部分商品成功；若 overflow Mail 写入失败，整批成本和奖励回滚。
 - 未知官服负向结果使用有限、可观测的 fail-closed 响应，不猜测精确 result code 或文案。
 
@@ -188,7 +188,7 @@ D15 明确拒绝：
 
 ```text
 D15_MAP_STATUS: COMPLETE
-BOUNDARY_MAINLINE_STATUS: NOT_STARTED
+BOUNDARY_MAINLINE_STATUS: IN_PROGRESS (D16 design approved; production implementation not started)
 ```
 
 D15 完成表示：CDN 分类、客户端可达性、服务端 owner/write/transaction、19 项边界决策、测试债务、私服策略和后续依赖路线已经闭环。它不表示本文目标架构已实现。
