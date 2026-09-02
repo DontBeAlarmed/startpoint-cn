@@ -276,6 +276,10 @@ const SOURCE_RULES = [
         groups: ["integration:reward-grant"],
     },
     {
+        pattern: /^src\/lib\/player-resource-grant\.ts$/,
+        groups: ["integration:reward-grant"],
+    },
+    {
         pattern: /^tools\/legacy_quest_reward_grant\.test\.cjs$/,
         groups: ["integration:reward-grant"],
     },

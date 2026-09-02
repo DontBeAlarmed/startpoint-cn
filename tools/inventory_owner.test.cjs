@@ -26,6 +26,7 @@ const {
     InventoryInsufficientItemError,
     InventoryTransactionError,
     InventoryValidationError,
+    getInventoryBatchCheckpoint,
     deductInventoryItemSync,
     grantInventoryItemSync,
     grantInventoryItemWithinTransactionSync,
@@ -397,6 +398,72 @@ test("batch callback scope guards entry, escape, callback failure and one flush"
             }
         })
     ))()
+})
+
+test("dirty batch callbacks fail closed when normal return omits flush", () => {
+    const playerId = createPlayer("unflushed-batch")
+    const directItemId = 815051
+    const deferredItemId = 815052
+
+    for (const [itemId, createBatch] of [
+        [directItemId, withInventoryBatchContextWithinTransactionSync],
+        [deferredItemId, withDeferredInventoryBatchContextWithinTransactionSync],
+    ]) {
+        assert.throws(
+            () => database.transaction(() => createBatch({ playerId }, context => {
+                context.grant(itemId, 2)
+                return "forgotten flush"
+            }))(),
+            error => error instanceof InventoryTransactionError
+                && error.reason === "UNFLUSHED_BATCH",
+        )
+        assert.equal(getPlayerItemSync(playerId, itemId), null)
+    }
+
+    assert.throws(
+        () => database.transaction(() => withInventoryBatchContextWithinTransactionSync(
+            { playerId },
+            context => {
+                context.grant(directItemId, 1)
+                throw new Error("source failed before flush")
+            },
+        ))(),
+        /source failed before flush/,
+        "callback errors must not be replaced by the unflushed guard",
+    )
+})
+
+test("batch checkpoint binds player identity revision and unsuccessful flush state", t => {
+    const playerId = createPlayer("batch-checkpoint")
+    const firstItemId = 815061
+    const secondItemId = 815062
+    const triggerName = "reject_checkpoint_second_item"
+    database.exec(`
+        CREATE TRIGGER ${triggerName}
+        BEFORE INSERT ON players_items
+        WHEN NEW.player_id = ${playerId} AND NEW.id = ${secondItemId}
+        BEGIN SELECT RAISE(ABORT, 'forced checkpoint flush failure'); END;
+    `)
+    t.after(() => database.exec(`DROP TRIGGER IF EXISTS ${triggerName}`))
+
+    assert.throws(() => database.transaction(() => (
+        withInventoryBatchContextWithinTransactionSync({ playerId }, context => {
+            assert.deepEqual(getInventoryBatchCheckpoint(context), { playerId, revision: 0 })
+            context.grant(firstItemId, 1)
+            context.grant(secondItemId, 1)
+            context.grant(firstItemId, 0)
+            assert.deepEqual(getInventoryBatchCheckpoint(context), { playerId, revision: 3 })
+            try {
+                context.flush()
+            } catch (error) {
+                assert.match(error.message, /forced checkpoint flush failure/)
+            }
+            return "source swallowed the flush failure"
+        })
+    ))(), error => error instanceof InventoryTransactionError
+        && error.reason === "UNFLUSHED_BATCH")
+    assert.equal(getPlayerItemSync(playerId, firstItemId), null)
+    assert.equal(getPlayerItemSync(playerId, secondItemId), null)
 })
 
 test("deferred batch stays query-free until first use and closes an unused escaped scope", () => {

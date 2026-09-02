@@ -679,6 +679,8 @@ test("maps the public reward grant layer and its regressions to one focused leaf
         "tools/reward_grant_plan.test.cjs",
         "tools/reward_grant_typed_contract.test.cjs",
         "tools/reward_grant_typed_contract_adversarial.test.cjs",
+        "tools/reward_grant_typed_executor.test.cjs",
+        "tools/reward_grant_typed_executor_failures.test.cjs",
         "tools/reward_grant_executor.test.cjs",
         "tools/login_bonus_settlement.test.cjs",
         "tools/reward_grant_architecture.test.cjs",
@@ -706,6 +708,7 @@ test("maps the public reward grant layer and its regressions to one focused leaf
         "src/lib/reward-grant/plan.ts",
         "src/lib/reward-grant/executor.ts",
         "src/lib/reward-grant/index.ts",
+        "src/lib/player-resource-grant.ts",
         "docs/systems/reward-grant-transactions.md",
         ...tests,
     ]) {

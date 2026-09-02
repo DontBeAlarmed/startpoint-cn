@@ -16,6 +16,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
+export function normalizeRewardGrantExecutionPlan(
+    value: unknown,
+): RewardGrantExecutionPlan {
+    if (!isRecord(value)) throw new RewardGrantContractValidationError(-1, "plan")
+    return createRewardGrantExecutionPlan(
+        value.entries as readonly RewardGrantCommand[],
+    )
+}
+
 function positiveSafeInteger(
     value: unknown,
     entryIndex: number,

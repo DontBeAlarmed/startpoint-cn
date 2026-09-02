@@ -19,6 +19,7 @@ export type InventoryTransactionReason =
     | "TRANSACTION_REQUIRED"
     | "ACTIVE_TRANSACTION_NOT_ALLOWED"
     | "BATCH_CONTEXT_CLOSED"
+    | "UNFLUSHED_BATCH"
 
 export class InventoryTransactionError extends Error {
     readonly reason: InventoryTransactionReason

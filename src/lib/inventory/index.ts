@@ -2,7 +2,9 @@ export {
     withDeferredInventoryBatchContextWithinTransactionSync,
     withInventoryBatchContextWithinTransactionSync,
     type InventoryBatchContext,
+    type InventoryBatchCheckpoint,
     type InventoryBatchContextOptions,
+    getInventoryBatchCheckpoint,
 } from "./batch-context"
 export {
     InventoryInsufficientItemError,

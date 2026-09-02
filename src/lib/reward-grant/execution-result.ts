@@ -7,10 +7,7 @@ import {
     type RewardGrantKnownPlayerState,
 } from "./execution-contract"
 import { aggregateRewardGrantAssets } from "./execution-assets"
-import {
-    createRewardGrantExecutionPlan,
-    rewardGrantFingerprint,
-} from "./execution-plan"
+import { normalizeRewardGrantExecutionPlan, rewardGrantFingerprint } from "./execution-plan"
 import {
     normalizeRewardGrantEntryOutcome,
     normalizeRewardGrantKnownPlayerState,
@@ -27,7 +24,7 @@ export function createRewardGrantExecutionResult(
     outcomes: readonly RewardGrantEntryOutcome[],
     playerAfter: RewardGrantKnownPlayerState,
 ): RewardGrantExecutionResult {
-    const normalizedPlan = createRewardGrantExecutionPlan(plan.entries)
+    const normalizedPlan = normalizeRewardGrantExecutionPlan(plan)
     if (!Array.isArray(outcomes) || outcomes.length !== normalizedPlan.entries.length) {
         throw new RewardGrantContractValidationError(-1, "entries")
     }
@@ -66,7 +63,7 @@ export function snapshotRewardGrantExecutionResultForPlan(
     if (!isRecord(value) || !Array.isArray(value.entries)) {
         throw new RewardGrantContractValidationError(-1, "entries")
     }
-    const normalizedPlan = createRewardGrantExecutionPlan(plan.entries)
+    const normalizedPlan = normalizeRewardGrantExecutionPlan(plan)
     if (value.entries.length !== normalizedPlan.entries.length) {
         throw new RewardGrantContractValidationError(-1, "entries")
     }
@@ -79,7 +76,9 @@ export function snapshotRewardGrantExecutionResultForPlan(
         if (!isRecord(raw) || raw.index !== index) {
             throw new RewardGrantContractValidationError(index, "index")
         }
-        const rewardPlan = createRewardGrantExecutionPlan([raw.reward as RewardGrantCommand])
+        const rewardPlan = normalizeRewardGrantExecutionPlan({
+            entries: [raw.reward as RewardGrantCommand],
+        })
         if (rewardGrantFingerprint(rewardPlan.entries[0])
             !== rewardGrantFingerprint(normalizedPlan.entries[index])) {
             throw new RewardGrantContractValidationError(index, "reward")

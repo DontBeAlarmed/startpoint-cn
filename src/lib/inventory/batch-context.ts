@@ -34,6 +34,41 @@ export interface InventoryBatchContext {
     flush(): readonly InventoryItemResult[]
 }
 
+export interface InventoryBatchCheckpoint {
+    readonly playerId: number
+    readonly revision: number
+}
+
+interface InventoryBatchRuntimeState {
+    readonly playerId: number
+    revision: number
+}
+
+const inventoryBatchRuntimeStates = new WeakMap<object, InventoryBatchRuntimeState>()
+
+function registerInventoryBatchContext(context: object, playerId: number): void {
+    inventoryBatchRuntimeStates.set(context, { playerId, revision: 0 })
+}
+
+function recordInventoryBatchMutation(context: object): void {
+    const state = inventoryBatchRuntimeStates.get(context)
+    if (state === undefined) throw new Error("Inventory batch context is not registered")
+    state.revision++
+}
+
+export function getInventoryBatchCheckpoint(
+    context: InventoryBatchContext,
+): InventoryBatchCheckpoint {
+    const state = inventoryBatchRuntimeStates.get(context as object)
+    if (state === undefined) {
+        throw new InventoryTransactionError(
+            "BATCH_CONTEXT_CLOSED",
+            "inventory batch context is not owned by the Inventory runtime",
+        )
+    }
+    return Object.freeze({ playerId: state.playerId, revision: state.revision })
+}
+
 /**
  * A callback-scoped batch that does not read Player or Item state until the
  * first real Inventory operation. Calling flush before activation is a no-op.
@@ -50,6 +85,7 @@ class DeferredInventoryBatchContext implements InventoryBatchContext {
             preloadItemIds: Object.freeze(normalizeItemIds(options.preloadItemIds ?? [])),
             playerExistence: normalizePlayerExistence(options.playerExistence),
         }
+        registerInventoryBatchContext(this, this.options.playerId)
     }
 
     read(itemId: number): InventoryItemResult {
@@ -61,15 +97,21 @@ class DeferredInventoryBatchContext implements InventoryBatchContext {
     }
 
     grant(itemId: number, amount: number): InventoryItemResult {
-        return this.requireActive().grant(itemId, amount)
+        const result = this.requireActive().grant(itemId, amount)
+        recordInventoryBatchMutation(this)
+        return result
     }
 
     deduct(itemId: number, amount: number): InventoryItemResult {
-        return this.requireActive().deduct(itemId, amount)
+        const result = this.requireActive().deduct(itemId, amount)
+        recordInventoryBatchMutation(this)
+        return result
     }
 
     restore(itemId: number, amount: number): InventoryItemResult {
-        return this.requireActive().restore(itemId, amount)
+        const result = this.requireActive().restore(itemId, amount)
+        recordInventoryBatchMutation(this)
+        return result
     }
 
     results(): readonly InventoryItemResult[] {
@@ -87,9 +129,9 @@ class DeferredInventoryBatchContext implements InventoryBatchContext {
         return this.active.flush()
     }
 
-    closeCallbackScope(): void {
+    closeCallbackScope(completedNormally: boolean): void {
         this.closed = true
-        this.active?.closeCallbackScope()
+        this.active?.closeCallbackScope(completedNormally)
     }
 
     private requireActive(): InventoryBatchContextImpl {
@@ -182,6 +224,7 @@ class InventoryBatchContextImpl implements InventoryBatchContext {
     private readonly repository: InventorySqliteRepository
     private readonly pending = new Map<number, PendingInventoryItem>()
     private closed = false
+    private flushed = false
 
     constructor(
         options: InventoryBatchContextOptions,
@@ -189,6 +232,7 @@ class InventoryBatchContextImpl implements InventoryBatchContext {
     ) {
         this.assertActiveTransaction()
         this.playerId = positiveId(options.playerId, "INVALID_PLAYER_ID", "playerId")
+        registerInventoryBatchContext(this, this.playerId)
         this.repository = repository
         if (normalizePlayerExistence(options.playerExistence) === "verify") {
             this.repository.requirePlayerSync(this.playerId)
@@ -246,11 +290,19 @@ class InventoryBatchContextImpl implements InventoryBatchContext {
                 )
             }
         }
+        this.flushed = true
         return Object.freeze(rows.map(({ result }) => result))
     }
 
-    closeCallbackScope(): void {
+    closeCallbackScope(completedNormally: boolean): void {
+        const dirty = [...this.pending.values()].some(item => item.touched)
         this.closed = true
+        if (completedNormally && dirty && !this.flushed) {
+            throw new InventoryTransactionError(
+                "UNFLUSHED_BATCH",
+                "inventory batch callback returned with unflushed mutations",
+            )
+        }
     }
 
     private mutate(kind: InventoryMutationKind, itemId: number, rawAmount: number): InventoryItemResult {
@@ -286,7 +338,9 @@ class InventoryBatchContextImpl implements InventoryBatchContext {
                     break
             }
             item.touched = true
-            return this.toResult(item)
+            const result = this.toResult(item)
+            recordInventoryBatchMutation(this)
+            return result
         } catch (error) {
             item.granted = before.granted
             item.deducted = before.deducted
@@ -380,10 +434,13 @@ export function withInventoryBatchContextWithinTransactionSync<T>(
         throw new TypeError("inventory batch callback must be a function")
     }
     const context = new InventoryBatchContextImpl(options)
+    let completedNormally = false
     try {
-        return callback(context)
+        const result = callback(context)
+        completedNormally = true
+        return result
     } finally {
-        context.closeCallbackScope()
+        context.closeCallbackScope(completedNormally)
     }
 }
 
@@ -396,9 +453,12 @@ export function withDeferredInventoryBatchContextWithinTransactionSync<T>(
     }
     assertActiveTransaction()
     const context = new DeferredInventoryBatchContext(options)
+    let completedNormally = false
     try {
-        return callback(context)
+        const result = callback(context)
+        completedNormally = true
+        return result
     } finally {
-        context.closeCallbackScope()
+        context.closeCallbackScope(completedNormally)
     }
 }

@@ -7,12 +7,15 @@ const test = require("node:test")
 
 const projectRoot = path.resolve(__dirname, "..")
 const productionFiles = [
+    "src/lib/player-resource-grant.ts",
     "src/lib/reward-grant/execution-assets.ts",
     "src/lib/reward-grant/execution-contract.ts",
+    "src/lib/reward-grant/execution-engine.ts",
     "src/lib/reward-grant/execution-outcome.ts",
     "src/lib/reward-grant/execution-plan.ts",
     "src/lib/reward-grant/execution-result.ts",
     "src/lib/reward-grant/snapshot.ts",
+    "src/lib/reward-grant/transaction-executor.ts",
     "src/lib/reward-grant/types.ts",
     "src/lib/reward-grant/plan.ts",
     "src/lib/reward-grant/executor.ts",
