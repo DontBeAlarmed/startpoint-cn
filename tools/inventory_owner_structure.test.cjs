@@ -315,6 +315,27 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
     )
 })
 
+test("caller-verified late migration paths establish transaction-local Player existence", () => {
+    const shop = fs.readFileSync(path.join(projectRoot, "src/routes/api/shop.ts"), "utf8")
+    const equipmentEnhancementTransaction = shop.match(
+        /\/\/ Equipment enhancement shop:[\s\S]*?getDb\(\)\.transaction\(\(\) => \{([\s\S]*?)\n\s*\}\)\(\)/,
+    )?.[1]
+    assert.ok(equipmentEnhancementTransaction)
+    assert.match(
+        equipmentEnhancementTransaction,
+        /const currentPlayer = getPlayerSync\(playerId\)[\s\S]*withShopInventorySync\(/,
+    )
+
+    const scheduled = fs.readFileSync(
+        path.join(projectRoot, "src/lib/scheduled-resource-settlement.ts"),
+        "utf8",
+    )
+    assert.match(
+        scheduled,
+        /getDb\(\)\.transaction\(\(\) => \{[\s\S]*const currentPlayer = getPlayerSync\(input\.player\.id\)[\s\S]*executeRewardGrantPlanInTransactionOwnerSync\([\s\S]*currentPlayer\.freeMana/,
+    )
+})
+
 test("production Item direct SQL stays inside the final persistence whitelist", () => {
     const sourceRoot = path.join(projectRoot, "src")
     const directMutation = /(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+players_(?:items|collected_items)/i

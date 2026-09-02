@@ -41,6 +41,7 @@ productionContentSnapshotProvider.snapshot = {
             if (tableName === "mission_event.json") return require("../assets/mission_event.json")
             if (tableName === "mission_event_reward.json") return require("../assets/mission_event_reward.json")
             if (tableName === "character.json") return require("../assets/character.json")
+            if (tableName === "item_inventory_policy.json") return require("../assets/item_inventory_policy.json")
             if (tableName === "mana_node.json") return require("../assets/mana_node.json")
             return {}
         },

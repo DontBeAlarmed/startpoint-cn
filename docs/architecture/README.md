@@ -28,7 +28,7 @@
 | D13 | 拉芙觉醒任务与单人复活目标架构 | [觉醒任务与复活 Gate](./character-awake-and-continue-gate.md) | 拉芙任务 exact quest 与单人星导石复活协议；玛纳板独立性延期 |
 | D14 | 统一角色成长状态服务（已落地，待实机验收） | [角色成长状态 Gate](./character-growth-state-gate.md) | Growth commands、事务、任务事实、投影、`/load`、存档与性能合同 |
 | D15 | 全项目领域边界蓝图（识别完成，实施主线进行中） | [领域边界蓝图](./domain-boundary-blueprint.md) | CDN/客户端/服务端三层边界；owner、有限 shared core、adapter、projector 与独立模块 |
-| D16 | Item Inventory Owner（C1–C4 已落地，待 D16 收尾） | [Item Inventory Owner Gate](./item-inventory-owner-gate.md) | typed Item Content、唯一 Item writer、cap 纯计划与 EventTrade 到期策略 |
+| D16 | Item Inventory Owner（已落地，待大 Gate A 与客户端验收） | [Item Inventory Owner Gate](./item-inventory-owner-gate.md) | typed Item Content、唯一 Item writer、cap 纯计划与 EventTrade 到期策略 |
 
 ## 阅读顺序
 
@@ -40,7 +40,7 @@
 
 D12、D13 与 D14 已完成服务端实现和自动化 Gate，等待客户端实机验收。三份 Gate 文档保留设计依据，同时作为相应已落地边界的架构与验证证据；它们不取代上述当前架构总览的阅读顺序。
 
-D15 已完成领域边界识别、决策和后续实施路线。D16 设计已通过独立审查，C1–C4 已修改生产实现，D16 checkpoint 收尾仍未完成；阅读 D15/D16 时必须区分目标边界、设计状态、已落地切片和当前运行时事实。
+D15 已完成领域边界识别、决策和后续实施路线。D16 设计、C1–C4 生产实现和 checkpoint 自动验证已经完成，等待 D17/D18 后统一执行大 Gate A 综合验收；阅读 D15/D16 时仍需区分当前已落地边界和 D18 才会激活的 overflow 目标。
 
 ## 统一图例
 

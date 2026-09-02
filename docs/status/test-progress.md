@@ -42,6 +42,7 @@
 | 7 | NPC 完整回归 | 基础 NPC 房主流程已有实际使用；继续验证重赛、贡献昵称显示和 TCP 会话中断后的完整行为 |
 | 8 | 奖励活动倍率 | 把服务器时间设到 1.5 倍或 2 倍活动期，分别验证普通/Rare 掉落、Additional Reward 等级累计档、Boost 加法、固定 Mana、角色战斗经验、field Mana 不放大、单人/联机响应与 load 后库存一致 |
 | 9 | 礼包码兑换 | 服务端 exact code、active capability、每存档一次兑换、RewardGrant 事务、后台管理和自动测试已完成；待验证入口出现、成功弹窗、奖励到账、6101/6103/6104 提示、后台启停/停止/删除和 load 持久化。详细边界见[公共礼包码](../systems/gift-codes.md) |
+| 10 | Item Inventory 与 EventTrade 到期 | 准备仍在兑换期内、已过兑换期和无结束时间的活动代币；登录后确认只转换已过期 EventTrade，数量清零、Mana 按 `sale_price` 增加、重登不重复。另在 `free_mana + paid_mana` 接近 `max_mana` 时确认 D16 整批 defer，不丢 Item；overflow Mail 留 D18 后再验收 |
 
 ## 普通关卡与内容覆盖
 

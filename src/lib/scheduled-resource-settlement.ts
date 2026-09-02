@@ -1,6 +1,7 @@
 import type { Player } from "../data/types"
 import { getDb } from "../data/db"
 import { getPlayerItemsByIdsSync } from "../data/domains/item"
+import { getPlayerSync } from "../data/domains/player"
 import {
     getScheduledResourceStatesByRuleIdsSync,
     listScheduledResourceRulesForPlayerSync,
@@ -90,13 +91,17 @@ export function settleScheduledResourcesSync(
             : { type: RewardType.ITEM, id: rule.rewardId as number, count: rule.grantAmount },
     })))
     return getDb().transaction(() => {
+        const currentPlayer = getPlayerSync(input.player.id)
+        if (currentPlayer === null) {
+            throw new Error("No player data during scheduled resource settlement.")
+        }
         const rewardResult = executeRewardGrantPlanInTransactionOwnerSync(
             input.player.id,
             plan,
             {
-                freeMana: input.player.freeMana,
-                freeVmoney: input.player.freeVmoney,
-                expPool: input.player.expPool,
+                freeMana: currentPlayer.freeMana,
+                freeVmoney: currentPlayer.freeVmoney,
+                expPool: currentPlayer.expPool,
             },
             {},
         )

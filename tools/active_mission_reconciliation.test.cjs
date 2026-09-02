@@ -130,6 +130,7 @@ const tables = {
     "mission_char_awake_reward.json": require("../assets/mission_char_awake_reward.json"),
     "character.json": require("../assets/character.json"),
     "config.json": require("../assets/config.json"),
+    "item_inventory_policy.json": require("../assets/item_inventory_policy.json"),
     "item_max_count.json": require("../assets/item_max_count.json"),
     "login_bonus.json": require("../assets/login_bonus.json"),
     "mana_node.json": require("../assets/mana_node.json"),

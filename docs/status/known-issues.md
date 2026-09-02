@@ -25,6 +25,12 @@ PassDaily、PassWeek、PassEvent 主数据、核心进度、点数、6 条 type 
 
 邮件附件领取已覆盖 12 种受支持类型；单领、全领、重复 ID、重复角色和异常回滚已有事务测试。枚举中的 13、14、16、17 缺少当前支持语义，继续 fail closed；客户端对 12 种附件和通知刷新的完整体验仍需专项验收。详见[邮件系统](../systems/mail.md)。
 
+## Inventory cap 与 EventTrade overflow
+
+D16 已把正常业务 Item writer 收口到 Inventory owner，并实现 EventTrade 在 `/load` 到期转 Mana。当前生产 grant 仍保持完整入库，不应用 `max_count` 截断；Item overflow 转 Mail、Mana overflow 转 Mail、Mail 中过期 EventTrade 的领取转换和 `receive_all` 容量策略都依赖 D18 Mail owner。
+
+在 D18 完成前，如果 EventTrade 整批出售所得会使 `free_mana + paid_mana` 超过 `max_mana`，本次 `/load` 会整批 defer：登录成功，Item 与 Mana 保持不变，不创建 Mail。该过渡策略避免丢失资产，但仍待客户端确认页面体验；最终 overflow 行为以 D18 为准。详见[Inventory owner 与写入事务](../systems/inventory-write-transactions.md)。
+
 ## 特殊关卡与联机
 
 ### 狂热激战常驻批次为推测性回退

@@ -1,15 +1,32 @@
-# 背包与装备写入事务
+# Item Inventory Owner 与写入事务
 
-本文记录体力道具、普通道具出售、装备保护和装备分解的数据库一致性边界。
+本文记录当前 Item Inventory owner、EventTrade 到期转换，以及体力道具、普通道具出售、装备保护和装备分解的数据库一致性边界。
+
+## Inventory owner
+
+正常业务的 Item grant、deduct 和 restore 统一通过 `lib/inventory` 写入。standalone 命令自行拥有事务；within-transaction 命令和 callback-scoped batch 必须复用来源用例的活动事务。Shop、Gacha、Exchange、Mission、Battle、Character Growth 和 RewardGrant 可以提供来源规划或调用 Inventory adapter，但不能直接写 `players_items` 或 `players_collected_items`。
+
+同一 batch 内相同 Item 的重复 grant/deduct/restore 会先归一化，再按 Item ID 稳定写入最终绝对数量。正向 grant 只按实际进入 Inventory 的数量增加 `players_collected_items.total_obtained`；deduct、战斗资源 restore、后台精确设置、存档恢复和过期清零都不增加累计获得量。调用方已经在当前事务读取并验证 Player 时，必须显式选择 `caller-verified`，不能依赖隐式信任。
+
+后台精确 set/delete、旧存档导入和 V2 registry restore 保持独立 maintenance/save 权限，不伪装成玩家业务 grant。D16 仍保持合法奖励完整入库，没有在生产 grant 中启用 `max_count` 截断；Item overflow 转 Mail 留在 D18。
+
+## EventTrade 到期转换
+
+`/load` 在登录奖励和定时资源结算之后、最终完整序列化之前，读取冻结的 `item_inventory_policy.json`。只有持有量大于 0、`effect_kind=9`、存在结束时间且虚拟业务时间按秒已经超过结束时间的 EventTrade 才会转换；`sellable=false` 不排除自动转换，无结束时间和非 EventTrade Item 保持不变。
+
+到期计划先批量读取玩家可能持有的 EventTrade，再按各 Item 的 `sale_price` 计算 Mana。容量使用 `free_mana + paid_mana` 与 `config.max_mana`；D16 只有在整批 Mana 都能立即进入余额时，才在一个事务中清零 Item、增加 `free_mana` 和 `total_mana_obtained`。任一写入失败会整体回滚，重复 `/load` 自然 no-op。
+
+若整批存在 Mana overflow，D16 登录继续成功但 Item 与 Mana 都不变，也不创建 Mail。D18 建立 Mail owner 和领取容量合同后，才会把立即可容纳部分入账并把 overflow 放入 Mail。缺失或非法 Item policy 属于 Content 完整性错误，继续 fail closed。
 
 ## 体力道具
 
 `/item/use_item` 的请求是数组。服务端先按道具 ID 合并数量，再校验效果、持有数和体力上限；同一 ID 出现两次
 不会分别读取旧库存并只扣最后一次。全部道具扣除与玩家体力、恢复时间更新在一个 SQLite 事务中提交。
 
-规划阶段会同时记录受影响道具是否已有库存行及最终数量。应用阶段对仅扣除的道具保留扣除写入；对有返还的道具
-直接写入规划出的最终数量，并单独记录本次新增数量的累计获得事实，不再在奖励写入前重新读取同一道具。这样同一道具
-同时被扣除和返还时只保留一次最终库存更新，响应中的 `item_list` 与事务内最终状态一致。
+规划阶段基于 Inventory transaction snapshot 计算每个受影响 Item 的最终数量。deduct 与返还 grant 进入同一 batch，
+最后由 Inventory repository 对每个 distinct Item 执行一次 absolute flush；库存行是否存在不离开 Inventory。返还部分
+单独增加本次正向 grant 的累计获得事实，不在奖励写入前重新读取同一道具。这样同一道具同时被扣除和返还时只保留
+一次最终库存更新，响应中的 `item_list` 与事务内最终状态一致。
 
 ## 普通道具出售
 
@@ -34,8 +51,12 @@
 
 奖励计算公式没有在本轮改变。任何奖励 INSERT/UPDATE 失败都会回滚装备扣除。
 
-## 回归
+## 回归与性能
 
 `tools/inventory_write_transaction.test.cjs` 与 `tools/item_use_cultivate_pack.test.cjs` 使用真实 Fastify 路由和 SQLite
 trigger，覆盖重复体力道具、计划态最终库存写入、体力更新失败、道具售出玛纳失败、三种装备分解奖励失败以及批量保护
 第二项失败，以及保护装备拒绝。所有故障都要求请求前后存档快照一致；同道具扣返场景还锁定结算阶段只读取一次 `players_items`。
+
+Inventory owner 测试另外覆盖 standalone/within/batch 生命周期、同 Item 合并、累计获得量、maintenance/save 边界和中途故障回滚。EventTrade `/load` 测试覆盖首次转换、重复幂等、paid+free 容量、overflow 整批 defer、非 EventTrade/no-end、提交后响应和 late failure rollback。
+
+性能准入锁定合法 N=0、N=1 和批量到期状态：N=0 只有一次候选库存批读，不建立结算事务、不写数据库；N=1 与批量都只读取一次候选库存、固定次数读取 Player 和更新一次 Mana，只有 distinct 到期 Item 写入按 N 线性增长，不产生 N+1 Player 或 Currency 操作。

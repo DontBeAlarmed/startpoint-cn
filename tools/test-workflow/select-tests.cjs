@@ -339,7 +339,7 @@ const SOURCE_RULES = [
         groups: ["quick:content"],
     },
     {
-        pattern: /^(?:src\/lib\/inventory\/(?:batch-context|errors|expiry-owner|index|model|owner|sqlite-repository)\.ts|tools\/inventory_owner(?:_structure)?\.test\.cjs)$/,
+        pattern: /^(?:src\/lib\/inventory\/(?:batch-context|errors|expiry-owner|index|model|owner|sqlite-repository)\.ts|tools\/(?:inventory_owner(?:_structure)?|perf\/item_inventory_expiry_admission)\.test\.cjs)$/,
         groups: ["integration:database"],
     },
     {

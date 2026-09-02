@@ -280,6 +280,10 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
             const equipmentId = enhancementEquipmentId!
             const newLevel = enhancementNewLevel!
             getDb().transaction(() => {
+                const currentPlayer = getPlayerSync(playerId)
+                if (currentPlayer === null) {
+                    throw new Error("No player data during equipment enhancement purchase.")
+                }
                 withShopInventorySync(playerId, [...itemCosts.keys()], inventory => {
                     for (const [itemId, cost] of itemCosts) {
                         itemList[String(itemId)] = inventory.deduct(itemId, cost).afterAmount

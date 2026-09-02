@@ -16,7 +16,7 @@ import bundledStarCrumbExchange from "../../../assets/star_crumb_exchange.json";
 import bundledStarCrumbExchangeCost from "../../../assets/star_crumb_exchange_cost.json";
 import { getDb } from "../../data/db";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
-import { grantInventoryItemWithinTransactionSync } from "../../lib/inventory";
+import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
 
 interface ExchangeBody {
     viewer_id: number;
@@ -135,11 +135,18 @@ const routes = async (fastify: FastifyInstance) => {
                         break
                     }
                     case 1: {
-                        itemList[String(targetId)] = grantInventoryItemWithinTransactionSync({
+                        itemList[String(targetId)] = withInventoryBatchContextWithinTransactionSync({
                             playerId,
-                            itemId: targetId,
-                            amount: 1,
-                        }).afterAmount
+                            preloadItemIds: [targetId],
+                            playerExistence: "caller-verified",
+                        }, inventory => {
+                            inventory.grant(targetId, 1)
+                            const [result] = inventory.flush()
+                            if (result === undefined) {
+                                throw new Error("Star Crumb exchange Item grant did not produce a result.")
+                            }
+                            return result.afterAmount
+                        })
                         break
                     }
                     case 2: {
