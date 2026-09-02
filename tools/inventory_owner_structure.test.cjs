@@ -85,12 +85,23 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/lib/item-use-settlement.ts",
         "src/lib/reward-grant/executor.ts",
         "src/lib/reward-grant/inventory-adapter.ts",
+        "src/routes/api/exBoost.ts",
+        "src/routes/api/sell.ts",
     ]
     assert.deepEqual(importedOutsideInventory.sort(), reviewedMigrations)
     for (const relativePath of reviewedMigrations) {
         const contents = fs.readFileSync(path.join(projectRoot, relativePath), "utf8")
-        assert.doesNotMatch(contents, /data\/domains\/item/, relativePath)
+        assert.doesNotMatch(
+            contents,
+            /\b(?:givePlayerItemSync|givePlayerItemWithinTransactionSync|insertPlayerItemsSync|setPlayerItemSync|setPlayerItemWithinTransactionSync|updatePlayerItemSync|recordPlayerCollectedItemWithinTransactionSync)\b/,
+            relativePath,
+        )
     }
+    assert.match(
+        fs.readFileSync(path.join(projectRoot, "src/routes/api/exBoost.ts"), "utf8"),
+        /getPlayerItemSync/,
+        "W3 migrates EX Boost writes while its response and validation reader remains until W6",
+    )
     assert.doesNotMatch(
         fs.readFileSync(path.join(projectRoot, "src/lib/character.ts"), "utf8"),
         /data\/domains\/item/,

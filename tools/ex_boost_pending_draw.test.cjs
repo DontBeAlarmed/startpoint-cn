@@ -39,7 +39,7 @@ async function createApp() {
 
 async function main() {
     assert.deepEqual(deserializeNumberList(serializeNumberList([])), [])
-    data.initializeDatabase()
+    const database = data.initializeDatabase()
     const account = insertAccountSync({
         appId: "wf_cn",
         idpAlias: "",
@@ -128,6 +128,22 @@ async function main() {
     assert.equal(repeatedFirstDrawReplay.statusCode, 200, repeatedFirstDrawReplay.body)
     assert.equal(getPlayerItemSync(playerId, 10002), 1)
     assert.deepEqual(getPlayerCharacterSync(playerId, 1).exBoost, selectedExBoost)
+
+    database.exec(`
+        CREATE TRIGGER reject_ex_boost_pending_draw
+        BEFORE INSERT ON players_ex_boost_pending_draws
+        WHEN NEW.player_id = ${playerId}
+        BEGIN SELECT RAISE(ABORT, 'forced EX boost pending failure'); END;
+    `)
+    const failedDraw = await selectApp.inject({
+        method: "POST",
+        url: "/ex/draw",
+        payload: { viewer_id: viewerId, character_id: 1, cost_item_id: 10002 },
+    })
+    database.exec("DROP TRIGGER reject_ex_boost_pending_draw")
+    assert.equal(failedDraw.statusCode, 500, failedDraw.body)
+    assert.equal(getPlayerItemSync(playerId, 10002), 1)
+    assert.equal(getPendingExBoostDrawSync(playerId), null)
     await selectApp.close()
 
     data.closeDatabase()

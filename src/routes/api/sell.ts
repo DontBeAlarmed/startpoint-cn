@@ -6,7 +6,6 @@ import {
     deletePlayerEquipmentSync, getPlayerEquipmentSync, getPlayerEquipmentsByIdsSync,
     normalizeEquipmentBatchIds, updatePlayerEquipmentSync,
 } from "../../data/domains/equipment";
-import { givePlayerItemSync } from "../../data/domains/item";
 import { getSession } from "../../data/domains/session";
 import { generateDataHeaders } from "../../utils";
 import { clientSerializeEquipment, buildFullEquipmentList } from "../../lib/equipment";
@@ -16,6 +15,7 @@ import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getConfigSync } from "../../lib/assets";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
+import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
 
 interface SellEquipmentListItem {
     equipment_id: number
@@ -39,6 +39,35 @@ interface BulkSellStackBody {
 
 const wrightpieceItemId = () => getConfigSync().craft_point_item_id || 100000
 const starGrainItemId = () => getConfigSync().star_grain_item_id || 990008
+
+function grantDissolveRewardsWithinTransactionSync(
+    playerId: number,
+    craftPoints: number,
+    starGrains: number,
+    abilitySouls: Readonly<Record<number, number>>,
+): Record<number, number> {
+    const grants = [
+        ...(craftPoints > 0 ? [{ itemId: wrightpieceItemId(), amount: craftPoints }] : []),
+        ...(starGrains > 0 ? [{ itemId: starGrainItemId(), amount: starGrains }] : []),
+        ...Object.entries(abilitySouls).map(([itemId, amount]) => ({
+            itemId: Number(itemId),
+            amount,
+        })),
+    ]
+    if (grants.length === 0) return {}
+
+    return withInventoryBatchContextWithinTransactionSync({
+        playerId,
+        preloadItemIds: grants.map(grant => grant.itemId),
+    }, inventory => {
+        const itemList: Record<number, number> = {}
+        for (const grant of grants) {
+            itemList[grant.itemId] = inventory.grant(grant.itemId, grant.amount).afterAmount
+        }
+        inventory.flush()
+        return itemList
+    })
+}
 
 const routes = async (fastify: FastifyInstance) => {
 
@@ -91,20 +120,16 @@ const routes = async (fastify: FastifyInstance) => {
             soldIds.push(equipmentId)
         }
 
-            const returnItemList: Record<number, number> = {}
-        getDb().transaction(() => {
+        const returnItemList = getDb().transaction(() => {
             for (const equipmentId of soldIds) {
                 deletePlayerEquipmentSync(playerId, equipmentId)
             }
-            if (totalCraftPoints > 0) {
-                returnItemList[wrightpieceItemId()] = givePlayerItemSync(playerId, wrightpieceItemId(), totalCraftPoints)
-            }
-            if (totalStarGrains > 0) {
-                returnItemList[starGrainItemId()] = givePlayerItemSync(playerId, starGrainItemId(), totalStarGrains)
-            }
-            for (const [soulId, count] of Object.entries(totalAbilitySouls)) {
-                returnItemList[parseInt(soulId)] = givePlayerItemSync(playerId, parseInt(soulId), count)
-            }
+            return grantDissolveRewardsWithinTransactionSync(
+                playerId,
+                totalCraftPoints,
+                totalStarGrains,
+                totalAbilitySouls,
+            )
         })()
 
         const returnEquipmentList = buildFullEquipmentList(playerId)
@@ -192,20 +217,16 @@ const routes = async (fastify: FastifyInstance) => {
             stackUpdates.push({ equipmentId, newStack })
         }
 
-        const returnItemList: Record<number, number> = {}
-        getDb().transaction(() => {
+        const returnItemList = getDb().transaction(() => {
             for (const update of stackUpdates) {
                 updatePlayerEquipmentSync(playerId, update.equipmentId, { stack: update.newStack })
             }
-            if (totalCraftPoints > 0) {
-                returnItemList[wrightpieceItemId()] = givePlayerItemSync(playerId, wrightpieceItemId(), totalCraftPoints)
-            }
-            if (totalStarGrains > 0) {
-                returnItemList[starGrainItemId()] = givePlayerItemSync(playerId, starGrainItemId(), totalStarGrains)
-            }
-            for (const [soulId, count] of Object.entries(totalAbilitySouls)) {
-                returnItemList[parseInt(soulId)] = givePlayerItemSync(playerId, parseInt(soulId), count)
-            }
+            return grantDissolveRewardsWithinTransactionSync(
+                playerId,
+                totalCraftPoints,
+                totalStarGrains,
+                totalAbilitySouls,
+            )
         })()
 
         const returnEquipmentList = buildFullEquipmentList(playerId)
@@ -281,20 +302,16 @@ const routes = async (fastify: FastifyInstance) => {
             })
         }
 
-        const returnItemList: Record<number, number> = {}
-        getDb().transaction(() => {
+        const returnItemList = getDb().transaction(() => {
             for (const equipmentId of toSell) {
                 updatePlayerEquipmentSync(playerId, equipmentId, { stack: 0 })
             }
-            if (totalCraftPoints > 0) {
-                returnItemList[wrightpieceItemId()] = givePlayerItemSync(playerId, wrightpieceItemId(), totalCraftPoints)
-            }
-            if (totalStarGrains > 0) {
-                returnItemList[starGrainItemId()] = givePlayerItemSync(playerId, starGrainItemId(), totalStarGrains)
-            }
-            for (const [soulId, count] of Object.entries(totalAbilitySouls)) {
-                returnItemList[parseInt(soulId)] = givePlayerItemSync(playerId, parseInt(soulId), count)
-            }
+            return grantDissolveRewardsWithinTransactionSync(
+                playerId,
+                totalCraftPoints,
+                totalStarGrains,
+                totalAbilitySouls,
+            )
         })()
 
         const returnEquipmentList = buildFullEquipmentList(playerId)

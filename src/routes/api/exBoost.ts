@@ -3,7 +3,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { getAccountPlayers } from "../../data/domains/account"
 import { getPlayerCharacterSync, playerOwnsCharacterSync, updatePlayerCharacterSync } from "../../data/domains/character"
-import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
+import { getPlayerItemSync } from "../../data/domains/item"
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { getCharacterDataSync, getExBoostItemSync, getExStatusPoolSync } from "../../lib/assets"
@@ -24,6 +24,7 @@ import {
     characterGrowthProjectionStateFromPlayerCharacter,
     projectCharacterGrowthEntry,
 } from "../../lib/character-growth/response-projector"
+import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory"
 
 interface ExBoostDrawBody {
     character_id: number,
@@ -325,10 +326,17 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
         const characterUpdate: Parameters<typeof updatePlayerCharacterSync>[2] = {
             exBoost: { statusId: drawResult.statusId, abilityIdList: drawResult.abilityIdList },
         }
-        getDb().transaction(() => {
-            updatePlayerItemSync(playerId, costItemId, afterCostItemAmount)
-            updatePlayerCharacterSync(playerId, characterId, characterUpdate)
-        })()
+        const settledCostItemAmount = getDb().transaction(() => (
+            withInventoryBatchContextWithinTransactionSync({
+                playerId,
+                preloadItemIds: [costItemId],
+            }, inventory => {
+                const itemResult = inventory.deduct(costItemId, costItemData.count)
+                inventory.flush()
+                updatePlayerCharacterSync(playerId, characterId, characterUpdate)
+                return itemResult.afterAmount
+            })
+        ))()
         const updateTime = characterUpdate.updateTime
         if (updateTime === undefined) throw new Error("EX Boost update did not record update time")
         return reply.status(200).send({
@@ -341,21 +349,28 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
                     drawResult,
                     updateTime,
                 )],
-                item_list: { [String(costItemId)]: afterCostItemAmount },
+                item_list: { [String(costItemId)]: settledCostItemAmount },
                 mail_arrived: getMailArrivedSync(playerId),
             },
         })
     } else {
-        getDb().transaction(() => {
-            updatePlayerItemSync(playerId, costItemId, afterCostItemAmount)
-            upsertPendingExBoostDrawSync(playerId, drawResult)
-        })()
+        const settledCostItemAmount = getDb().transaction(() => (
+            withInventoryBatchContextWithinTransactionSync({
+                playerId,
+                preloadItemIds: [costItemId],
+            }, inventory => {
+                const itemResult = inventory.deduct(costItemId, costItemData.count)
+                inventory.flush()
+                upsertPendingExBoostDrawSync(playerId, drawResult)
+                return itemResult.afterAmount
+            })
+        ))()
         return reply.status(200).send({
             data_headers: headers,
             data: {
                 character_id: characterId,
                 draw_result: { status_id: drawResult.statusId, ability_id_list: drawResult.abilityIdList },
-                item_list: { [String(costItemId)]: afterCostItemAmount },
+                item_list: { [String(costItemId)]: settledCostItemAmount },
                 mail_arrived: getMailArrivedSync(playerId),
             },
         })
