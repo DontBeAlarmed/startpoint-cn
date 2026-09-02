@@ -18,7 +18,12 @@ import {
     type InternalRewardGrantResult,
     type RewardGrantEntryExecution,
 } from "./entry-result"
-import { withRewardGrantInventoryBatchSync } from "./inventory-adapter"
+import {
+    withExternalRewardGrantInventoryBatchSync,
+    withRewardGrantInventoryBatchSync,
+    type RewardGrantInventoryBatch,
+} from "./inventory-adapter"
+import type { InventoryBatchContext } from "../inventory"
 import {
     RewardGrantEntry,
     RewardGrantPlan,
@@ -202,37 +207,71 @@ function executeNormalizedRewardGrantPlanSync<TSource>(
     })
 }
 
+function executeNormalizedRewardGrantPlanAsTransactionOwnerWithInventoryInternalSync<TSource>(
+    playerId: number,
+    plan: RewardGrantPlan<TSource>,
+    knownPlayerBefore: RewardGrantPlayerAfter,
+    playerUpdate: RewardGrantOwnerPlayerUpdate,
+    inventory: RewardGrantInventoryBatch,
+): InternalRewardGrantResult<TSource> {
+    const playerAfter = { ...knownPlayerBefore }
+    const currencyDeltas = { freeMana: 0, freeVmoney: 0, expPool: 0 }
+    const entries = plan.entries.map((entry, entryIndex) => createRewardGrantEntryResult(
+        entry,
+        grantEntrySync(
+            playerId,
+            entry.reward,
+            entryIndex,
+            (_pid, reward) => grantOwnerCurrency(reward, playerAfter, currencyDeltas),
+            (itemId, amount) => inventory.grant(itemId, amount),
+            (pid, characterId) => givePlayerCharacterWithinTransactionSync(
+                pid,
+                characterId,
+                (_itemOwnerId, itemId, amount) => {
+                    inventory.grant(itemId, amount)
+                },
+            ),
+            itemId => inventory.readGranted(itemId),
+        ),
+    ))
+    inventory.flush()
+    persistOwnerCurrency(playerId, playerAfter, currencyDeltas, playerUpdate)
+    return { aggregate: aggregateRewardGrantEntryResults(entries), entries, playerAfter }
+}
+
 export function executeNormalizedRewardGrantPlanAsTransactionOwnerInternalSync<TSource>(
     playerId: number,
     plan: RewardGrantPlan<TSource>,
     knownPlayerBefore: RewardGrantPlayerAfter,
     playerUpdate: RewardGrantOwnerPlayerUpdate = {},
 ): InternalRewardGrantResult<TSource> {
-    const playerAfter = { ...knownPlayerBefore }
-    const currencyDeltas = { freeMana: 0, freeVmoney: 0, expPool: 0 }
-    return withRewardGrantInventoryBatchSync(playerId, plan, inventory => {
-        const entries = plan.entries.map((entry, entryIndex) => createRewardGrantEntryResult(
-            entry,
-            grantEntrySync(
-                playerId,
-                entry.reward,
-                entryIndex,
-                (_pid, reward) => grantOwnerCurrency(reward, playerAfter, currencyDeltas),
-                (itemId, amount) => inventory.grant(itemId, amount),
-                (pid, characterId) => givePlayerCharacterWithinTransactionSync(
-                    pid,
-                    characterId,
-                    (_itemOwnerId, itemId, amount) => {
-                        inventory.grant(itemId, amount)
-                    },
-                ),
-                itemId => inventory.readGranted(itemId),
-            ),
-        ))
-        inventory.flush()
-        persistOwnerCurrency(playerId, playerAfter, currencyDeltas, playerUpdate)
-        return { aggregate: aggregateRewardGrantEntryResults(entries), entries, playerAfter }
-    })
+    return withRewardGrantInventoryBatchSync(playerId, plan, inventory => (
+        executeNormalizedRewardGrantPlanAsTransactionOwnerWithInventoryInternalSync(
+            playerId,
+            plan,
+            knownPlayerBefore,
+            playerUpdate,
+            inventory,
+        )
+    ))
+}
+
+export function executeNormalizedRewardGrantPlanAsTransactionOwnerWithExternalInventoryInternalSync<TSource>(
+    playerId: number,
+    plan: RewardGrantPlan<TSource>,
+    knownPlayerBefore: RewardGrantPlayerAfter,
+    inventoryContext: InventoryBatchContext,
+    playerUpdate: RewardGrantOwnerPlayerUpdate = {},
+): InternalRewardGrantResult<TSource> {
+    return withExternalRewardGrantInventoryBatchSync(inventoryContext, inventory => (
+        executeNormalizedRewardGrantPlanAsTransactionOwnerWithInventoryInternalSync(
+            playerId,
+            plan,
+            knownPlayerBefore,
+            playerUpdate,
+            inventory,
+        )
+    ))
 }
 
 export function executeRewardGrantPlanWithinTransactionSync<TSource>(

@@ -258,6 +258,57 @@ stubModule("../src/data/domains/item", {
     recordPlayerCollectedItemWithinTransactionSync() {},
     updatePlayerItemSync() {},
 })
+const withInventory = (options, operation) => {
+    const playerId = options.playerId
+    const initial = new Map()
+    const touched = new Map()
+    const amount = itemId => db.prepare(
+        "SELECT count FROM item_state WHERE player_id = ? AND item_id = ?",
+    ).get(playerId, itemId)?.count ?? 0
+    const before = itemId => {
+        if (!initial.has(itemId)) initial.set(itemId, amount(itemId))
+        return initial.get(itemId)
+    }
+    const set = (itemId, count) => {
+        writeAttempts++
+        db.prepare(`
+            INSERT INTO item_state VALUES (?, ?, ?)
+            ON CONFLICT(player_id, item_id) DO UPDATE SET count = excluded.count
+        `).run(playerId, itemId, count)
+    }
+    const result = (itemId, obtainedAmount = 0) => ({
+        itemId,
+        beforeAmount: before(itemId),
+        afterAmount: amount(itemId),
+        obtainedAmount,
+    })
+    const inventory = {
+        read: itemId => result(itemId),
+        readMany: itemIds => itemIds.map(itemId => result(itemId)),
+        grant(itemId, count) {
+            set(itemId, amount(itemId) + count)
+            touched.set(itemId, (touched.get(itemId) ?? 0) + count)
+            return result(itemId, touched.get(itemId))
+        },
+        deduct(itemId, count) {
+            set(itemId, amount(itemId) - count)
+            touched.set(itemId, touched.get(itemId) ?? 0)
+            return result(itemId, touched.get(itemId))
+        },
+        restore(itemId, count) {
+            set(itemId, amount(itemId) + count)
+            touched.set(itemId, touched.get(itemId) ?? 0)
+            return result(itemId, touched.get(itemId))
+        },
+        results: () => [...touched.keys()].map(itemId => result(itemId, touched.get(itemId))),
+        flush() { return this.results() },
+    }
+    return operation(inventory)
+}
+stubModule("../src/lib/inventory", {
+    withDeferredInventoryBatchContextWithinTransactionSync: withInventory,
+    withInventoryBatchContextWithinTransactionSync: withInventory,
+})
 stubModule("../src/data/domains/mail", { getPlayerMailCountSync: () => 0 })
 stubModule("../src/data/domains/quest", {
     getPlayerSingleQuestProgressSync(playerId, category, questId) {

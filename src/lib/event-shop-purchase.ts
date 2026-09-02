@@ -21,6 +21,7 @@ import type {
 } from "../data/domains/shopPurchase"
 import { getDayBucket } from "./time-utils"
 import { planFreeFirstDeduction } from "./economy/free-first-deduction"
+import type { InventoryBatchContext } from "./inventory"
 
 export const ITEM_SHOP_PERIOD_ERROR_CODE = 2053
 
@@ -50,8 +51,11 @@ export interface GenericShopPurchaseDependencies {
     transaction<T>(operation: () => T): T
     getPlayer(playerId: number): GenericShopPlayerState | null
     updatePlayer(player: GenericShopPlayerState): void
-    getItem(playerId: number, itemId: number): number
-    setItem(playerId: number, itemId: number, amount: number): void
+    withInventory<T>(
+        playerId: number,
+        preloadItemIds: readonly number[],
+        operation: (inventory: InventoryBatchContext) => T,
+    ): T
     getPurchaseCounts(
         playerId: number,
         shopType: number,
@@ -71,6 +75,7 @@ export interface GenericShopPurchaseDependencies {
         playerId: number,
         rewards: Reward[],
         knownPlayerBefore: GenericShopPlayerState,
+        inventory: InventoryBatchContext,
     ): GenericShopRewardGrantResult
     grantPassCardPoints?(playerId: number, amount: number): void
 }
@@ -369,6 +374,19 @@ function buildRewards(shopItem: ShopItem, purchaseAmount: number): Reward[] {
     return rewards
 }
 
+function directItemRewardIds(rewards: readonly Reward[]): number[] {
+    return [...new Set(rewards.flatMap(reward => {
+        switch (reward.type) {
+            case RewardType.ITEM:
+            case RewardType.ELEMENT:
+            case RewardType.AETHER:
+                return [reward.id!]
+            default:
+                return []
+        }
+    }))]
+}
+
 export function executeGenericShopPurchaseSync(
     input: GenericShopPurchaseInput,
     dependencies: GenericShopPurchaseDependencies,
@@ -434,65 +452,71 @@ export function executeGenericShopPurchaseSync(
         for (const cost of input.shopItem.costs) {
             costTotals.set(cost.id, (costTotals.get(cost.id) ?? 0) + cost.amount * purchaseAmount)
         }
+        const rewards = buildRewards(input.shopItem, purchaseAmount)
 
-        const itemList: Record<string, number> = {}
-        for (const [itemId, cost] of costTotals) {
-            const nextAmount = dependencies.getItem(input.playerId, itemId) - cost
-            if (nextAmount < 0) {
-                throw new ShopBalanceError(`Not enough of item ${itemId}.`)
-            }
-            itemList[String(itemId)] = nextAmount
-        }
-
-        dependencies.updatePlayer(nextPlayer)
-        for (const [itemId, nextAmount] of Object.entries(itemList)) {
-            dependencies.setItem(input.playerId, Number(itemId), nextAmount)
-        }
-
-        const rewardGrant = dependencies.grantRewards(
+        return dependencies.withInventory(
             input.playerId,
-            buildRewards(input.shopItem, purchaseAmount),
-            nextPlayer,
+            [...costTotals.keys(), ...directItemRewardIds(rewards)],
+            inventory => {
+                for (const [itemId, cost] of costTotals) {
+                    if (inventory.read(itemId).afterAmount < cost) {
+                        throw new ShopBalanceError(`Not enough of item ${itemId}.`)
+                    }
+                }
+
+                dependencies.updatePlayer(nextPlayer)
+                const itemList: Record<string, number> = {}
+                for (const [itemId, cost] of costTotals) {
+                    itemList[String(itemId)] = inventory.deduct(itemId, cost).afterAmount
+                }
+
+                const rewardGrant = dependencies.grantRewards(
+                    input.playerId,
+                    rewards,
+                    nextPlayer,
+                    inventory,
+                )
+                const rewardResult = rewardGrant.rewardResult
+                if (input.shopItem.passCardPoints !== undefined) {
+                    if (!dependencies.grantPassCardPoints) {
+                        throw new ShopPurchaseError("Pass card point rewards are unavailable.")
+                    }
+                    dependencies.grantPassCardPoints(
+                        input.playerId,
+                        input.shopItem.passCardPoints * purchaseAmount,
+                    )
+                }
+
+                const purchaseCount = dependencies.addPurchaseCounts(
+                    input.playerId,
+                    input.shopType,
+                    input.shopItemId,
+                    purchaseAmount,
+                    periodKeys,
+                    counts,
+                ).total
+                if (userCost?.type === ShopItemUserCostType.MANA) {
+                    dependencies.recordManaSpent(
+                        input.playerId,
+                        userCost.amount * purchaseAmount,
+                    )
+                }
+                const finalPlayer = {
+                    ...nextPlayer,
+                    ...rewardGrant.playerAfter,
+                }
+
+                return {
+                    player: finalPlayer,
+                    rewardResult,
+                    itemList: {
+                        ...itemList,
+                        ...rewardResult.items,
+                    },
+                    purchaseCount,
+                }
+            }
         )
-        const rewardResult = rewardGrant.rewardResult
-        if (input.shopItem.passCardPoints !== undefined) {
-            if (!dependencies.grantPassCardPoints) {
-                throw new ShopPurchaseError("Pass card point rewards are unavailable.")
-            }
-            dependencies.grantPassCardPoints(
-                input.playerId,
-                input.shopItem.passCardPoints * purchaseAmount,
-            )
-        }
-
-        const purchaseCount = dependencies.addPurchaseCounts(
-            input.playerId,
-            input.shopType,
-            input.shopItemId,
-            purchaseAmount,
-            periodKeys,
-            counts,
-        ).total
-        if (userCost?.type === ShopItemUserCostType.MANA) {
-            dependencies.recordManaSpent(
-                input.playerId,
-                userCost.amount * purchaseAmount,
-            )
-        }
-        const finalPlayer = {
-            ...nextPlayer,
-            ...rewardGrant.playerAfter,
-        }
-
-        return {
-            player: finalPlayer,
-            rewardResult,
-            itemList: {
-                ...itemList,
-                ...rewardResult.items,
-            },
-            purchaseCount,
-        }
     })
 }
 
@@ -605,43 +629,54 @@ export function executeGenericShopBatchPurchaseSync(
         if (nextPlayer.vmoney < 0) throw new ShopBalanceError("Not enough paid beads.")
         if (nextPlayer.bondToken < 0) throw new ShopBalanceError("Not enough amity scrolls.")
 
-        const itemList: Record<string, number> = {}
-        for (const [itemId, cost] of itemCosts) {
-            const nextAmount = dependencies.getItem(input.playerId, itemId) - cost
-            if (nextAmount < 0) throw new ShopBalanceError(`Not enough of item ${itemId}.`)
-            itemList[String(itemId)] = nextAmount
-        }
+        return dependencies.withInventory(
+            input.playerId,
+            [...itemCosts.keys(), ...directItemRewardIds(rewards)],
+            inventory => {
+                for (const [itemId, cost] of itemCosts) {
+                    if (inventory.read(itemId).afterAmount < cost) {
+                        throw new ShopBalanceError(`Not enough of item ${itemId}.`)
+                    }
+                }
 
-        dependencies.updatePlayer(nextPlayer)
-        for (const [itemId, nextAmount] of Object.entries(itemList)) {
-            dependencies.setItem(input.playerId, Number(itemId), nextAmount)
-        }
+                dependencies.updatePlayer(nextPlayer)
+                const itemList: Record<string, number> = {}
+                for (const [itemId, cost] of itemCosts) {
+                    itemList[String(itemId)] = inventory.deduct(itemId, cost).afterAmount
+                }
 
-        const rewardGrant = dependencies.grantRewards(input.playerId, rewards, nextPlayer)
-        const rewardResult = rewardGrant.rewardResult
+                const rewardGrant = dependencies.grantRewards(
+                    input.playerId,
+                    rewards,
+                    nextPlayer,
+                    inventory,
+                )
+                const rewardResult = rewardGrant.rewardResult
 
-        const purchaseCounts: Record<string, number> = {}
-        for (const entry of purchasesWithQueries) {
-            purchaseCounts[String(entry.shopItemId)] = dependencies.addPurchaseCountsFromSnapshot(
-                input.playerId,
-                input.shopType,
-                entry.shopItemId,
-                entry.purchaseAmount,
-                entry.periodKeys,
-                currentCountsByItem.get(entry.shopItemId)!,
-            ).total
-        }
-        if (manaSpent > 0) dependencies.recordManaSpent(input.playerId, manaSpent)
+                const purchaseCounts: Record<string, number> = {}
+                for (const entry of purchasesWithQueries) {
+                    purchaseCounts[String(entry.shopItemId)] = dependencies.addPurchaseCountsFromSnapshot(
+                        input.playerId,
+                        input.shopType,
+                        entry.shopItemId,
+                        entry.purchaseAmount,
+                        entry.periodKeys,
+                        currentCountsByItem.get(entry.shopItemId)!,
+                    ).total
+                }
+                if (manaSpent > 0) dependencies.recordManaSpent(input.playerId, manaSpent)
 
-        const finalPlayer = {
-            ...nextPlayer,
-            ...rewardGrant.playerAfter,
-        }
-        return {
-            player: finalPlayer,
-            rewardResult,
-            itemList: { ...itemList, ...rewardResult.items },
-            purchaseCounts,
-        }
+                const finalPlayer = {
+                    ...nextPlayer,
+                    ...rewardGrant.playerAfter,
+                }
+                return {
+                    player: finalPlayer,
+                    rewardResult,
+                    itemList: { ...itemList, ...rewardResult.items },
+                    purchaseCounts,
+                }
+            },
+        )
     })
 }

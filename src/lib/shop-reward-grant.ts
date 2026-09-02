@@ -1,5 +1,8 @@
 import { createRewardGrantPlan } from "./reward-grant"
-import { executeRewardGrantPlanInTransactionOwnerSync } from "./reward-grant/owner-executor"
+import {
+    executeRewardGrantPlanInTransactionOwnerWithInventorySync,
+} from "./reward-grant/owner-executor"
+import type { InventoryBatchContext } from "./inventory"
 import type {
     GenericShopPlayerState,
     GenericShopRewardGrantResult,
@@ -21,15 +24,17 @@ export function createShopRewardPlan(
     })))
 }
 
-export function grantShopRewardsInTransactionOwnerSync(
+export function grantShopRewardsInTransactionOwnerWithInventorySync(
     playerId: number,
     rewards: readonly Reward[],
     knownPlayerBefore: GenericShopPlayerState,
+    inventory: InventoryBatchContext,
 ): GenericShopRewardGrantResult {
-    const result = executeRewardGrantPlanInTransactionOwnerSync(
+    const result = executeRewardGrantPlanInTransactionOwnerWithInventorySync(
         playerId,
         createShopRewardPlan(rewards),
         knownPlayerBefore,
+        inventory,
     )
     return {
         rewardResult: result.aggregate,

@@ -111,6 +111,46 @@ function createHarness(itemBalance = 20) {
     const getItem = (playerId, itemId) => db.prepare(
         "SELECT amount FROM item_state WHERE player_id = ? AND item_id = ?",
     ).get(playerId, itemId)?.amount ?? 0
+    const setItem = (playerId, itemId, amount) => db.prepare(`
+        INSERT INTO item_state VALUES (?, ?, ?)
+        ON CONFLICT(player_id, item_id) DO UPDATE SET amount = excluded.amount
+    `).run(playerId, itemId, amount)
+    const withInventory = (playerId, _preloadItemIds, operation) => {
+        const initial = new Map()
+        const touched = new Map()
+        const before = itemId => {
+            if (!initial.has(itemId)) initial.set(itemId, getItem(playerId, itemId))
+            return initial.get(itemId)
+        }
+        const result = (itemId, obtainedAmount = 0) => ({
+            itemId,
+            beforeAmount: before(itemId),
+            afterAmount: getItem(playerId, itemId),
+            obtainedAmount,
+        })
+        const inventory = {
+            read: itemId => result(itemId),
+            readMany: itemIds => itemIds.map(itemId => result(itemId)),
+            deduct(itemId, amount) {
+                setItem(playerId, itemId, getItem(playerId, itemId) - amount)
+                touched.set(itemId, touched.get(itemId) ?? 0)
+                return result(itemId, touched.get(itemId))
+            },
+            grant(itemId, amount) {
+                setItem(playerId, itemId, getItem(playerId, itemId) + amount)
+                touched.set(itemId, (touched.get(itemId) ?? 0) + amount)
+                return result(itemId, touched.get(itemId))
+            },
+            restore(itemId, amount) {
+                setItem(playerId, itemId, getItem(playerId, itemId) + amount)
+                touched.set(itemId, touched.get(itemId) ?? 0)
+                return result(itemId, touched.get(itemId))
+            },
+            results: () => [...touched.keys()].map(itemId => result(itemId, touched.get(itemId))),
+            flush() { return this.results() },
+        }
+        return operation(inventory)
+    }
     const readPurchaseCounts = (playerId, shopType, shopItemId, keys) => {
         const get = (periodType, periodKey) => db.prepare(`
             SELECT count FROM purchase_state
@@ -164,13 +204,7 @@ function createHarness(itemBalance = 20) {
                     player.id,
                 )
             },
-            getItem,
-            setItem(playerId, itemId, amount) {
-                db.prepare(`
-                    INSERT INTO item_state VALUES (?, ?, ?)
-                    ON CONFLICT(player_id, item_id) DO UPDATE SET amount = excluded.amount
-                `).run(playerId, itemId, amount)
-            },
+            withInventory,
             getPurchaseCounts() {
                 individualPurchaseCountReads++
                 throw new Error("batch prevalidation must not use individual purchase-count reads")
@@ -189,15 +223,15 @@ function createHarness(itemBalance = 20) {
             },
             addPurchaseCountsFromSnapshot,
             recordManaSpent(_playerId, amount) { manaSpent += amount },
-            grantRewards(playerId, rewards, knownPlayerBefore) {
+            grantRewards(_playerId, rewards, knownPlayerBefore, inventory) {
                 if (failGrant) throw new Error("injected reward failure")
                 const items = {}
                 for (const reward of rewards) {
                     if (reward.type !== 0) throw new Error("unexpected reward type")
-                    const total = getItem(playerId, reward.id) + reward.count
-                    this.setItem(playerId, reward.id, total)
+                    const total = inventory.grant(reward.id, reward.count).afterAmount
                     items[String(reward.id)] = total
                 }
+                inventory.flush()
                 const rewardResult = {
                     user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
                     character_list: [],

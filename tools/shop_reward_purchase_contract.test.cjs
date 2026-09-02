@@ -54,6 +54,46 @@ function createHarness(failAt, playerOverrides = {}) {
         }
     }
 
+    function withInventory(_playerId, _preloadItemIds, operation) {
+        const initial = new Map()
+        const touched = new Map()
+        const before = itemId => {
+            if (!initial.has(itemId)) initial.set(itemId, state.items[itemId] ?? 0)
+            return initial.get(itemId)
+        }
+        const result = (itemId, obtainedAmount = 0) => ({
+            itemId,
+            beforeAmount: before(itemId),
+            afterAmount: state.items[itemId] ?? 0,
+            obtainedAmount,
+        })
+        const inventory = {
+            read(itemId) { return result(itemId) },
+            readMany(itemIds) { return itemIds.map(itemId => result(itemId)) },
+            deduct(itemId, amount) {
+                before(itemId)
+                state.items[itemId] = (state.items[itemId] ?? 0) - amount
+                touched.set(itemId, 0)
+                return result(itemId)
+            },
+            grant(itemId, amount) {
+                before(itemId)
+                state.items[itemId] = (state.items[itemId] ?? 0) + amount
+                touched.set(itemId, (touched.get(itemId) ?? 0) + amount)
+                return result(itemId, touched.get(itemId))
+            },
+            restore(itemId, amount) {
+                before(itemId)
+                state.items[itemId] = (state.items[itemId] ?? 0) + amount
+                touched.set(itemId, touched.get(itemId) ?? 0)
+                return result(itemId, touched.get(itemId))
+            },
+            results() { return [...touched.keys()].map(itemId => result(itemId, touched.get(itemId))) },
+            flush() { return this.results() },
+        }
+        return operation(inventory)
+    }
+
     const dependencies = {
         transaction(operation) {
             const before = cloneState()
@@ -69,8 +109,7 @@ function createHarness(failAt, playerOverrides = {}) {
             return { ...state.player }
         },
         updatePlayer(player) { state.player = { ...player } },
-        getItem: (_playerId, itemId) => state.items[itemId] ?? 0,
-        setItem(_playerId, itemId, amount) { state.items[itemId] = amount },
+        withInventory,
         getPurchaseCounts(_playerId, _shopType, shopItemId) {
             const count = state.purchaseCounts[shopItemId] ?? 0
             return { daily: count, monthly: count, total: count }
@@ -110,7 +149,7 @@ function createHarness(failAt, playerOverrides = {}) {
             state.passCardPoints += amount
             if (failAt === "pass-card") throw new Error("injected pass-card failure")
         },
-        grantRewards(playerId, rewards, knownPlayerBefore) {
+        grantRewards(playerId, rewards, knownPlayerBefore, inventory) {
             grantCalls.push({ playerId, rewards, knownPlayerBefore })
             const result = {
                 user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
@@ -122,8 +161,7 @@ function createHarness(failAt, playerOverrides = {}) {
             for (const reward of rewards) {
                 switch (reward.type) {
                     case RewardType.ITEM: {
-                        const next = (state.items[reward.id] ?? 0) + reward.count
-                        state.items[reward.id] = next
+                        const next = inventory.grant(reward.id, reward.count).afterAmount
                         result.items[String(reward.id)] = next
                         break
                     }
@@ -141,8 +179,7 @@ function createHarness(failAt, playerOverrides = {}) {
                         break
                     case RewardType.CHARACTER:
                         if (state.characters.has(reward.id)) {
-                            const next = (state.items[DUPLICATE_ITEM_ID] ?? 0) + 1
-                            state.items[DUPLICATE_ITEM_ID] = next
+                            const next = inventory.grant(DUPLICATE_ITEM_ID, 1).afterAmount
                             result.items[String(DUPLICATE_ITEM_ID)] = next
                         } else {
                             state.characters.add(reward.id)
@@ -152,6 +189,7 @@ function createHarness(failAt, playerOverrides = {}) {
                         break
                 }
             }
+            inventory.flush()
             const playerAfter = {
                 vmoney: state.player.vmoney,
                 paidMana: state.player.paidMana,

@@ -5,9 +5,11 @@ import {
 } from "./entry-result"
 import {
     executeNormalizedRewardGrantPlanAsTransactionOwnerInternalSync,
+    executeNormalizedRewardGrantPlanAsTransactionOwnerWithExternalInventoryInternalSync,
     normalizeRewardGrantPlanInternal,
     RewardGrantTransactionRequiredError,
 } from "./executor"
+import type { InventoryBatchContext } from "../inventory"
 import { snapshotKnownRewardGrantPlayer } from "./known-player"
 import type { RewardGrantOwnerPlayerUpdate } from "./owner-currency"
 import type {
@@ -46,6 +48,26 @@ export function executeRewardGrantPlanInTransactionOwnerSync<TSource>(
             playerId,
             plan,
             knownPlayerBefore,
+            playerUpdate,
+        ),
+    )
+}
+
+export function executeRewardGrantPlanInTransactionOwnerWithInventorySync<TSource>(
+    playerId: number,
+    plan: RewardGrantPlan<TSource>,
+    knownPlayerBefore: RewardGrantPlayerAfter,
+    inventory: InventoryBatchContext,
+    playerUpdate: RewardGrantOwnerPlayerUpdate = {},
+): RewardGrantResult<TSource> {
+    const db = getDb()
+    if (!db.inTransaction) throw new RewardGrantTransactionRequiredError()
+    return projectPublicRewardGrantResult(
+        executeNormalizedRewardGrantPlanAsTransactionOwnerWithExternalInventoryInternalSync(
+            playerId,
+            normalizeRewardGrantPlanInternal(plan),
+            snapshotKnownRewardGrantPlayer(knownPlayerBefore),
+            inventory,
             playerUpdate,
         ),
     )

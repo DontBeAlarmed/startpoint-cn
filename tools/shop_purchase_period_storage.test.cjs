@@ -268,15 +268,31 @@ const batchDependencies = {
         expPool: 0,
     }),
     updatePlayer() {},
-    getItem() { return 0 },
-    setItem() {},
+    withInventory(_id, _preloadItemIds, operation) {
+        const result = itemId => ({
+            itemId,
+            beforeAmount: 0,
+            afterAmount: 0,
+            obtainedAmount: 0,
+        })
+        return operation({
+            read: result,
+            readMany: itemIds => itemIds.map(result),
+            grant: result,
+            deduct: result,
+            restore: result,
+            results: () => [],
+            flush: () => [],
+        })
+    },
     getPurchaseCounts() {
         throw new Error("batch purchase must not use the individual count reader")
     },
     getPurchaseCountsBulk: getPlayerShopPurchaseCountsByTypeBulkSync,
     addPurchaseCountsFromSnapshot: addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
     recordManaSpent() {},
-    grantRewards(_id, _rewards, knownPlayerBefore) {
+    grantRewards(_id, _rewards, knownPlayerBefore, inventory) {
+        inventory.flush()
         return {
             rewardResult: {
                 user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },

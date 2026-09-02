@@ -364,14 +364,14 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     )
     assert.deepEqual(
         findPropertyAssignmentValues(shopBuyBlock, "grantRewards"),
-        ["grantShopRewardsInTransactionOwnerSync"]
+        ["grantShopRewardsInTransactionOwnerWithInventorySync"]
     )
     assert.deepEqual(
         getOnlyCall(
             shopRewardGrantSource,
-            "executeRewardGrantPlanInTransactionOwnerSync"
-        ).arguments.slice(0, 3),
-        ["playerId", "createShopRewardPlan(rewards)", "knownPlayerBefore"]
+            "executeRewardGrantPlanInTransactionOwnerWithInventorySync"
+        ).arguments.slice(0, 4),
+        ["playerId", "createShopRewardPlan(rewards)", "knownPlayerBefore", "inventory"]
     )
     assert.equal(shopReadOnlyBlock.includes("reconcileAwakeUnlockCharacterList("), false)
     assert.equal(

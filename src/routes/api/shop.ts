@@ -14,7 +14,7 @@ import {
 } from "../../data/domains/shop-campaign-lineup"
 import { getAccountPlayers } from "../../data/domains/account"
 import { getPlayerEquipmentListSync, getPlayerEquipmentSync, updatePlayerEquipmentSync } from "../../data/domains/equipment"
-import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
+import { getPlayerItemSync } from "../../data/domains/item"
 import { incrementActiveMissionUsedManaCountSync } from "../../data/domains/active_mission_counters";
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
@@ -23,7 +23,7 @@ import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getBossCoinShopItemsSync, getConfigSync, getEventShopItemsSync, getGenericShopItemsSync, getShopItemSync, getShopSelectItemCampaignsSync } from "../../lib/assets";
 import { ShopItem, ShopItems, ShopItemUserCostType, ShopType } from "../../lib/types";
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
-import { grantShopRewardsInTransactionOwnerSync } from "../../lib/shop-reward-grant";
+import { grantShopRewardsInTransactionOwnerWithInventorySync } from "../../lib/shop-reward-grant";
 import { computeRealTimeStamina } from "../../lib/stamina";
 import { clientSerializeEquipment } from "../../lib/equipment";
 import { planEquipmentEnhancementPurchase } from "../../lib/equipment-enhancement";
@@ -55,6 +55,10 @@ import {
 import { getActivePassCardEventDefinitionAt } from "../../lib/pass-card"
 import { getGameTimeContext, getRealNow, getVirtualNow } from "../../runtime/time/game-time"
 import { planFreeFirstDeduction } from "../../lib/economy/free-first-deduction"
+import {
+    withDeferredInventoryBatchContextWithinTransactionSync,
+    type InventoryBatchContext,
+} from "../../lib/inventory"
 
 interface GetSalesListBody {
     equipment_enhancement_shop_category_ids: number[],
@@ -86,6 +90,18 @@ interface BulkBuyBody {
 
 export interface ShopRoutesOptions {
     readonly dailyResetHour?: number
+}
+
+function withShopInventorySync<T>(
+    playerId: number,
+    preloadItemIds: readonly number[],
+    operation: (inventory: InventoryBatchContext) => T,
+): T {
+    return withDeferredInventoryBatchContextWithinTransactionSync({
+        playerId,
+        preloadItemIds,
+        playerExistence: "caller-verified",
+    }, operation)
 }
 
 const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {}) => {
@@ -249,8 +265,11 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
                     "message": "Not enough currency to purchase shop item."
                 })
             }
+            const itemCosts = new Map<number, number>()
             for (const cost of shopItemData.costs) {
-                const nextAmount = (getPlayerItemSync(playerId, cost.id) ?? 0) - cost.amount * purchaseAmount
+                const amount = (itemCosts.get(cost.id) ?? 0) + cost.amount * purchaseAmount
+                itemCosts.set(cost.id, amount)
+                const nextAmount = (getPlayerItemSync(playerId, cost.id) ?? 0) - amount
                 if (nextAmount < 0) return reply.status(400).send({
                     "error": "Bad Request",
                     "message": `Not enough of item with id ${cost.id} to purchase shop item.`
@@ -261,30 +280,33 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
             const equipmentId = enhancementEquipmentId!
             const newLevel = enhancementNewLevel!
             getDb().transaction(() => {
-                for (const [itemId, nextAmount] of Object.entries(itemList)) {
-                    updatePlayerItemSync(playerId, itemId, nextAmount)
-                }
-                updatePlayerSync({
-                    id: playerId,
-                    vmoney,
-                    paidMana,
-                    freeMana,
-                    freeVmoney,
-                    bondToken: bondTokens,
-                })
-                updatePlayerEquipmentSync(playerId, equipmentId, { enhancementLevel: newLevel })
-                incrementActiveMissionUsedManaCountSync(playerId, manaSpent)
-                recordEquipmentEnhancementPurchaseSync({
-                    playerId,
-                    shopType,
-                    shopItemId,
-                    purchaseAmount,
-                    nowMs: gameTime.realNowMs,
-                    resetHour: dailyResetHour,
-                    specifiedMonths: shopItemData.specifiedMonths,
-                }, {
-                    getShopPurchasePeriodKeys,
-                    addPurchaseCounts: addPlayerShopPurchaseCountsByTypeSync,
+                withShopInventorySync(playerId, [...itemCosts.keys()], inventory => {
+                    for (const [itemId, cost] of itemCosts) {
+                        itemList[String(itemId)] = inventory.deduct(itemId, cost).afterAmount
+                    }
+                    inventory.flush()
+                    updatePlayerSync({
+                        id: playerId,
+                        vmoney,
+                        paidMana,
+                        freeMana,
+                        freeVmoney,
+                        bondToken: bondTokens,
+                    })
+                    updatePlayerEquipmentSync(playerId, equipmentId, { enhancementLevel: newLevel })
+                    incrementActiveMissionUsedManaCountSync(playerId, manaSpent)
+                    recordEquipmentEnhancementPurchaseSync({
+                        playerId,
+                        shopType,
+                        shopItemId,
+                        purchaseAmount,
+                        nowMs: gameTime.realNowMs,
+                        resetHour: dailyResetHour,
+                        specifiedMonths: shopItemData.specifiedMonths,
+                    }, {
+                        getShopPurchasePeriodKeys,
+                        addPurchaseCounts: addPlayerShopPurchaseCountsByTypeSync,
+                    })
                 })
             })()
 
@@ -328,8 +350,7 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
                 transaction: operation => getDb().transaction(operation)(),
                 getPlayer: getPlayerSync,
                 updatePlayer: nextPlayer => updatePlayerSync(nextPlayer),
-                getItem: (id, itemId) => getPlayerItemSync(id, itemId) ?? 0,
-                setItem: updatePlayerItemSync,
+                withInventory: withShopInventorySync,
                 getPurchaseCounts: getPlayerShopPurchaseCountSnapshotSync,
                 addPurchaseCounts: addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
                 recordManaSpent: (id, amount) => {
@@ -343,7 +364,7 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
                         )
                     }
                 },
-                grantRewards: grantShopRewardsInTransactionOwnerSync,
+                grantRewards: grantShopRewardsInTransactionOwnerWithInventorySync,
                 grantPassCardPoints: (id, amount) => {
                     const activeEvent = getActivePassCardEventDefinitionAt(gameTime.virtualNow)
                     if (!activeEvent) throw new ShopPurchaseError("No active pass card.")
@@ -664,12 +685,11 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
                 transaction: operation => getDb().transaction(operation)(),
                 getPlayer: getPlayerSync,
                 updatePlayer: nextPlayer => updatePlayerSync(nextPlayer),
-                getItem: (id, itemId) => getPlayerItemSync(id, itemId) ?? 0,
-                setItem: updatePlayerItemSync,
+                withInventory: withShopInventorySync,
                 getPurchaseCountsBulk: getPlayerShopPurchaseCountsByTypeBulkSync,
                 addPurchaseCountsFromSnapshot: addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
                 recordManaSpent: incrementActiveMissionUsedManaCountSync,
-                grantRewards: grantShopRewardsInTransactionOwnerSync,
+                grantRewards: grantShopRewardsInTransactionOwnerWithInventorySync,
             })
         } catch (error) {
             if (error instanceof ShopPeriodError) {

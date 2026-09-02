@@ -222,6 +222,46 @@ function createPurchaseHarness(options = {}) {
     const getItem = (playerId, itemId) => db.prepare(
         "SELECT amount FROM item_state WHERE player_id = ? AND item_id = ?",
     ).get(playerId, itemId)?.amount ?? 0
+    const setItem = (playerId, itemId, amount) => db.prepare(`
+        INSERT INTO item_state VALUES (?, ?, ?)
+        ON CONFLICT(player_id, item_id) DO UPDATE SET amount = excluded.amount
+    `).run(playerId, itemId, amount)
+    const withInventory = (playerId, _preloadItemIds, operation) => {
+        const initial = new Map()
+        const touched = new Map()
+        const before = itemId => {
+            if (!initial.has(itemId)) initial.set(itemId, getItem(playerId, itemId))
+            return initial.get(itemId)
+        }
+        const result = (itemId, obtainedAmount = 0) => ({
+            itemId,
+            beforeAmount: before(itemId),
+            afterAmount: getItem(playerId, itemId),
+            obtainedAmount,
+        })
+        const inventory = {
+            read: itemId => result(itemId),
+            readMany: itemIds => itemIds.map(itemId => result(itemId)),
+            deduct(itemId, amount) {
+                setItem(playerId, itemId, getItem(playerId, itemId) - amount)
+                touched.set(itemId, touched.get(itemId) ?? 0)
+                return result(itemId, touched.get(itemId))
+            },
+            grant(itemId, amount) {
+                setItem(playerId, itemId, getItem(playerId, itemId) + amount)
+                touched.set(itemId, (touched.get(itemId) ?? 0) + amount)
+                return result(itemId, touched.get(itemId))
+            },
+            restore(itemId, amount) {
+                setItem(playerId, itemId, getItem(playerId, itemId) + amount)
+                touched.set(itemId, touched.get(itemId) ?? 0)
+                return result(itemId, touched.get(itemId))
+            },
+            results: () => [...touched.keys()].map(itemId => result(itemId, touched.get(itemId))),
+            flush() { return this.results() },
+        }
+        return operation(inventory)
+    }
 
     const dependencies = {
         transaction: operation => db.transaction(operation)(),
@@ -244,13 +284,7 @@ function createPurchaseHarness(options = {}) {
             maybeFail("cost")
         },
         getItem,
-        setItem(playerId, itemId, amount) {
-            db.prepare(`
-                INSERT INTO item_state VALUES (?, ?, ?)
-                ON CONFLICT(player_id, item_id) DO UPDATE SET amount = excluded.amount
-            `).run(playerId, itemId, amount)
-            maybeFail("cost")
-        },
+        withInventory,
         getPurchaseCounts(playerId, _shopType, shopItemId, _keys) {
             const total = db.prepare(
                 "SELECT count FROM purchase_state WHERE player_id = ? AND shop_item_id = ?",
@@ -277,17 +311,13 @@ function createPurchaseHarness(options = {}) {
             `).run(playerId, amount)
             maybeFail("counter")
         },
-        grantRewards(playerId, rewards, knownPlayerBefore) {
+        grantRewards(playerId, rewards, knownPlayerBefore, inventory) {
             const items = {}
             let mana = 0
             let expPool = 0
             for (const reward of rewards) {
                 if (reward.type === 0) {
-                    const amount = getItem(playerId, reward.id) + reward.count
-                    db.prepare(`
-                        INSERT INTO item_state VALUES (?, ?, ?)
-                        ON CONFLICT(player_id, item_id) DO UPDATE SET amount = excluded.amount
-                    `).run(playerId, reward.id, amount)
+                    const amount = inventory.grant(reward.id, reward.count).afterAmount
                     items[String(reward.id)] = amount
                 } else if (reward.type === 4) {
                     db.prepare("UPDATE player_state SET free_mana = free_mana + ? WHERE id = ?")
@@ -300,6 +330,7 @@ function createPurchaseHarness(options = {}) {
                 }
             }
             maybeFail("reward")
+            inventory.flush()
             const rewardResult = {
                 user_info: { free_mana: mana, free_vmoney: 0, exp_pool: expPool },
                 character_list: [],

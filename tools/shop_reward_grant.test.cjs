@@ -18,7 +18,11 @@ const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snaps
 const data = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { getPlayerItemSync, givePlayerItemSync, updatePlayerItemSync } = require("../src/data/domains/item")
+const {
+    getPlayerCollectedItemTotalSync,
+    getPlayerItemSync,
+    givePlayerItemSync,
+} = require("../src/data/domains/item")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const {
     addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
@@ -34,8 +38,11 @@ const {
 } = require("../src/lib/event-shop-purchase")
 const {
     createShopRewardPlan,
-    grantShopRewardsInTransactionOwnerSync,
+    grantShopRewardsInTransactionOwnerWithInventorySync,
 } = require("../src/lib/shop-reward-grant")
+const {
+    withDeferredInventoryBatchContextWithinTransactionSync,
+} = require("../src/lib/inventory")
 const {
     RewardType,
     ShopItemRewardType,
@@ -92,14 +99,19 @@ function dependencies() {
         transaction: operation => database.transaction(operation)(),
         getPlayer: getPlayerSync,
         updatePlayer: updatePlayerSync,
-        getItem: (playerId, itemId) => getPlayerItemSync(playerId, itemId) ?? 0,
-        setItem: updatePlayerItemSync,
+        withInventory: (playerId, preloadItemIds, operation) => (
+            withDeferredInventoryBatchContextWithinTransactionSync({
+                playerId,
+                preloadItemIds,
+                playerExistence: "caller-verified",
+            }, operation)
+        ),
         getPurchaseCounts: getPlayerShopPurchaseCountSnapshotSync,
         getPurchaseCountsBulk: getPlayerShopPurchaseCountsByTypeBulkSync,
         addPurchaseCounts: addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
         addPurchaseCountsFromSnapshot: addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
         recordManaSpent: () => {},
-        grantRewards: grantShopRewardsInTransactionOwnerSync,
+        grantRewards: grantShopRewardsInTransactionOwnerWithInventorySync,
     }
 }
 
@@ -152,6 +164,8 @@ test("single shop purchase uses owner snapshot and returns final mixed reward st
     })
     assert.equal(measured.result.itemList[COST_ITEM_ID], 9)
     assert.equal(measured.result.itemList[REWARD_ITEM_ID], 2)
+    assert.equal(getPlayerCollectedItemTotalSync(playerId, COST_ITEM_ID), 10)
+    assert.equal(getPlayerCollectedItemTotalSync(playerId, REWARD_ITEM_ID), 2)
     assert.equal(measured.result.itemList[DUPLICATE_ITEM_ID], getPlayerItemSync(playerId, DUPLICATE_ITEM_ID))
     assert.equal(measured.result.itemList[DUPLICATE_ITEM_ID], duplicateItemBefore + 1)
     assert.equal(measured.result.rewardResult.equipment_list[0].equipment_id, EQUIPMENT_ID)
@@ -159,10 +173,39 @@ test("single shop purchase uses owner snapshot and returns final mixed reward st
         /^\s*SELECT[\s\S]*\bFROM\s+players\b/i.test(statement)
     ))
     assert.equal(playerSelects.length, 1, playerSelects.join("\n---\n"))
+    assert.equal(measured.statements.filter(statement => (
+        /^\s*SELECT[\s\S]*\bFROM\s+players_items\b/i.test(statement)
+    )).length, 2, "shop preloads static cost/reward Items and lazily reads one duplicate compensation")
+    assert.equal(measured.statements.filter(statement => (
+        /^\s*INSERT\s+INTO\s+players_items\b/i.test(statement)
+    )).length, 3, "each final Item id must receive one absolute write")
+    assert.equal(measured.statements.filter(statement => (
+        /^\s*INSERT\s+INTO\s+players_collected_items\b/i.test(statement)
+    )).length, 2, "only the direct reward and duplicate compensation increase obtained totals")
     assert.equal(
         measured.statements.filter(statement => /^\s*(?:SAVEPOINT|RELEASE)\b/i.test(statement)).length,
         0,
     )
+})
+
+test("cost-only shop purchase flushes the shared Inventory context", () => {
+    const playerId = createPlayer("cost-only")
+    updatePlayerSync({ id: playerId, freeMana: 500 })
+    givePlayerItemSync(playerId, COST_ITEM_ID, 10)
+
+    const result = executeGenericShopPurchaseSync({
+        playerId,
+        shopType: ShopType.EVENT_ITEM,
+        shopItemId: 9102,
+        purchaseAmount: 1,
+        shopItem: shopItem([]),
+        nowMs: NOW_MS,
+        enforcePeriod: true,
+    }, dependencies())
+
+    assert.equal(getPlayerItemSync(playerId, COST_ITEM_ID), 9)
+    assert.equal(result.itemList[COST_ITEM_ID], 9)
+    assert.deepEqual(result.rewardResult.items, {})
 })
 
 test("owner adapter preserves source order and has no nested transaction SQL", () => {
@@ -187,21 +230,26 @@ test("owner adapter preserves source order and has no nested transaction SQL", (
     const before = getPlayerSync(playerId)
     let measured
     database.transaction(() => {
-        measured = captureSql(() => grantShopRewardsInTransactionOwnerSync(playerId, [
-            { type: RewardType.ITEM, id: REWARD_ITEM_ID, count: 2 },
-            { type: RewardType.ITEM, id: REWARD_ITEM_ID, count: 3 },
-            { type: RewardType.MANA, count: 4 },
-            { type: RewardType.ELEMENT, id: ELEMENT_ITEM_ID, count: 6 },
-            { type: RewardType.AETHER, id: AETHER_ITEM_ID, count: 7 },
-            { type: RewardType.BEADS, count: 8 },
-        ], {
-            id: playerId,
-            vmoney: before.vmoney,
-            freeMana: before.freeMana,
-            freeVmoney: before.freeVmoney,
-            bondToken: before.bondToken,
-            expPool: before.expPool,
-        }))
+        measured = captureSql(() => withDeferredInventoryBatchContextWithinTransactionSync({
+            playerId,
+            preloadItemIds: [REWARD_ITEM_ID, ELEMENT_ITEM_ID, AETHER_ITEM_ID],
+            playerExistence: "caller-verified",
+        }, inventory => grantShopRewardsInTransactionOwnerWithInventorySync(playerId, [
+                { type: RewardType.ITEM, id: REWARD_ITEM_ID, count: 2 },
+                { type: RewardType.ITEM, id: REWARD_ITEM_ID, count: 3 },
+                { type: RewardType.MANA, count: 4 },
+                { type: RewardType.ELEMENT, id: ELEMENT_ITEM_ID, count: 6 },
+                { type: RewardType.AETHER, id: AETHER_ITEM_ID, count: 7 },
+                { type: RewardType.BEADS, count: 8 },
+            ], {
+                id: playerId,
+                vmoney: before.vmoney,
+                freeMana: before.freeMana,
+                freeVmoney: before.freeVmoney,
+                bondToken: before.bondToken,
+                expPool: before.expPool,
+            }, inventory)),
+        )
     })()
 
     assert.deepEqual(measured.result.rewardResult.items, {
@@ -231,7 +279,7 @@ test("owner adapter preserves source order and has no nested transaction SQL", (
 test("bulk shop rewards cannot pay its costs and final duplicate item equals database", () => {
     const playerId = createPlayer("bulk")
     givePlayerItemSync(playerId, COST_ITEM_ID, 10)
-    const result = executeGenericShopBatchPurchaseSync({
+    const measured = captureSql(() => executeGenericShopBatchPurchaseSync({
         playerId,
         shopType: ShopType.EVENT_ITEM,
         purchases: [
@@ -253,12 +301,23 @@ test("bulk shop rewards cannot pay its costs and final duplicate item equals dat
         ],
         nowMs: NOW_MS,
         enforcePeriod: true,
-    }, dependencies())
+    }, dependencies()))
+    const result = measured.result
 
     assert.equal(getPlayerItemSync(playerId, COST_ITEM_ID), 107)
+    assert.equal(getPlayerCollectedItemTotalSync(playerId, COST_ITEM_ID), 110)
     assert.equal(result.itemList[COST_ITEM_ID], 107)
     assert.equal(result.itemList[REWARD_ITEM_ID], getPlayerItemSync(playerId, REWARD_ITEM_ID))
     assert.equal(result.itemList[REWARD_ITEM_ID], 5)
+    assert.equal(measured.statements.filter(statement => (
+        /^\s*SELECT[\s\S]*\bFROM\s+players_items\b/i.test(statement)
+    )).length, 1, "bulk shop must preload all static cost/reward Items once")
+    assert.equal(measured.statements.filter(statement => (
+        /^\s*INSERT\s+INTO\s+players_items\b/i.test(statement)
+    )).length, 2, "overlapping cost/reward Items must still write once per final Item id")
+    assert.equal(measured.statements.filter(statement => (
+        /^\s*INSERT\s+INTO\s+players_collected_items\b/i.test(statement)
+    )).length, 2)
 })
 
 test("batch purchase writes count snapshots without per-item rereads", () => {

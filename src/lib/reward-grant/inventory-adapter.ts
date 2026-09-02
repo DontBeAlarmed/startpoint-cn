@@ -1,4 +1,7 @@
-import { withDeferredInventoryBatchContextWithinTransactionSync } from "../inventory"
+import {
+    withDeferredInventoryBatchContextWithinTransactionSync,
+    type InventoryBatchContext,
+} from "../inventory"
 import { RewardType } from "../types/rewards"
 import type { RewardGrantPlan } from "./types"
 
@@ -6,6 +9,26 @@ export interface RewardGrantInventoryBatch {
     grant(itemId: number, amount: number): number
     readGranted(itemId: number): number | null
     flush(): void
+}
+
+export function withExternalRewardGrantInventoryBatchSync<TResult>(
+    context: InventoryBatchContext,
+    callback: (inventory: RewardGrantInventoryBatch) => TResult,
+): TResult {
+    const grantedItemIds = new Set<number>()
+    return callback({
+        grant(itemId, amount) {
+            const result = context.grant(itemId, amount)
+            grantedItemIds.add(itemId)
+            return result.afterAmount
+        },
+        readGranted(itemId) {
+            return grantedItemIds.has(itemId) ? context.read(itemId).afterAmount : null
+        },
+        flush() {
+            context.flush()
+        },
+    })
 }
 
 function directRewardItemIds<TSource>(plan: RewardGrantPlan<TSource>): number[] {

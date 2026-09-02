@@ -81,15 +81,19 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/lib/character-growth/commands/learn-mana-nodes.ts",
         "src/lib/character-growth/commands/over-limit.ts",
         "src/lib/character-growth/commands/stack-to-exp.ts",
+        "src/lib/event-shop-purchase.ts",
         "src/lib/item-sell.ts",
         "src/lib/item-use-settlement.ts",
         "src/lib/reward-grant/executor.ts",
         "src/lib/reward-grant/inventory-adapter.ts",
+        "src/lib/reward-grant/owner-executor.ts",
+        "src/lib/shop-reward-grant.ts",
         "src/routes/api/equipment.ts",
         "src/routes/api/exBoost.ts",
         "src/routes/api/exchange.ts",
         "src/routes/api/questUnlock.ts",
         "src/routes/api/sell.ts",
+        "src/routes/api/shop.ts",
     ]
     assert.deepEqual(importedOutsideInventory.sort(), reviewedMigrations)
     for (const relativePath of reviewedMigrations) {
@@ -127,6 +131,13 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
     )
     assert.doesNotMatch(rewardExecutor, /data\/domains\/item/)
     assert.match(rewardExecutor, /givePlayerCharacterWithinTransactionSync[\s\S]*inventory\.grant/)
+    const shopPurchase = fs.readFileSync(
+        path.join(projectRoot, "src/lib/event-shop-purchase.ts"),
+        "utf8",
+    )
+    assert.doesNotMatch(shopPurchase, /\b(?:getItem|setItem)\s*:/)
+    assert.match(shopPurchase, /dependencies\.withInventory\(/)
+    assert.match(shopPurchase, /dependencies\.grantRewards\([\s\S]*inventory/)
 
     const legacy = fs.readFileSync(path.join(projectRoot, "src/data/domains/item.ts"), "utf8")
     assert.match(legacy, /export function givePlayerItemSync/)
@@ -167,7 +178,6 @@ test("remaining legacy Item mutation references match the staged migration manif
         // Remaining W3 source adapters.
         "src/routes/api/boxGacha.ts",
         "src/routes/api/gacha.ts",
-        "src/routes/api/shop.ts",
         // W4 Battle route.
         "src/routes/api/singleBattleQuest.ts",
         // W6 maintenance adapter.
