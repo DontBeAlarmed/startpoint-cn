@@ -476,12 +476,12 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     assert.match(boxGachaCall.arguments[3], /invalidatedFactKeys: getAwakeFactKeysFromLegacyRewardResults/)
     assert.equal(boxGachaCall.position > boxExecBlock.indexOf("if (playerBoxData !== null && playerBoxData.isClosed)"), true)
     for (const persistenceCall of [
-        "rewardPlayerBoxGachaResultSync",
+        "grantBoxGachaDrawInTransactionOwnerWithInventorySync",
         "insertPlayerBoxGachaSync",
         "updatePlayerBoxGachaSync",
         "insertPlayerBoxGachaDrawnRewardSync",
         "updatePlayerBoxGachaDrawnRewardSync",
-        "updatePlayerItemSync",
+        "deduct",
     ]) {
         assert.equal(boxGachaCall.position > getLastCallPosition(boxExecBlock, persistenceCall), true)
     }

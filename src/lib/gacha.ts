@@ -5,9 +5,8 @@
 import { randomInt } from "crypto";
 import { getDefaultGachaSeedCatalog, reserveUniquePlaceholderSeed } from "./gacha-seed-catalog";
 import { PlayerBoxGachaDrawnReward } from "../data/types";
-import { givePlayerRewardsSync } from "./quest";
 import { getCharacterDataSync } from "./assets";
-import { BoxGachaBox, BoxGachaDrawResult, BoxGachaIdReward, BoxGachaRewardTier, BoxGachaRewardType, CharacterGacha, CharacterReward, CurrencyReward, EquipmentItemReward, Gacha, GachaDrawResult, GachaMovieType, GachaType, PlayerRewardResult, Reward, RewardPlayerGachaDrawResult, RewardType } from "./types";
+import { BoxGachaBox, BoxGachaDrawResult, BoxGachaIdReward, BoxGachaRewardTier, BoxGachaRewardType, CharacterGacha, Gacha, GachaDrawResult, GachaMovieType, GachaType, RewardPlayerGachaDrawResult } from "./types";
 import { drawGachaWithMetadataSync } from "./gacha-draw";
 import type { GachaDrawMetadata } from "./gacha-draw";
 import {
@@ -217,65 +216,4 @@ export function drawBoxGachaSync(
         items: drawnItems,
         rewards: returnSessionDrawnRewards
     }
-}
-
-/**
- * Rewards a player with the results of a box gacha draw.
- * 
- * @param playerId The ID of the player.
- * @param drawResult The box gacha draw result.
- * @returns A PlayerRewardResult.
- */
-export function rewardPlayerBoxGachaResultSync(
-    playerId: number,
-    drawResult: BoxGachaDrawResult
-): PlayerRewardResult | null {
-    const rewards: Reward[] = []
-
-    // convert draw results into rewards
-
-    // items
-    for (const [itemId, number] of drawResult.items) {
-        rewards.push({
-            name: '',
-            type: RewardType.ITEM,
-            id: itemId,
-            count: number
-        } as EquipmentItemReward)
-    }
-
-    // equipment
-    for (const [equipmentId, number] of drawResult.equipment) {
-        rewards.push({
-            name: '',
-            type: RewardType.EQUIPMENT,
-            id: equipmentId,
-            count: number
-        } as EquipmentItemReward)
-    }
-
-    // characters
-    for (const [characterId, number] of drawResult.characters) {
-        for (let i = 0; i < number; i++) {
-            rewards.push({
-                name: '',
-                type: RewardType.CHARACTER,
-                id: characterId,
-            } as CharacterReward)
-        }
-    }
-
-    // mana & exp
-    rewards.push({
-        name: '',
-        type: RewardType.EXP,
-        count: drawResult.exp,
-    } as CurrencyReward)
-    rewards.push({
-        name: '',
-        type: RewardType.MANA,
-        count: drawResult.mana,
-    } as CurrencyReward)
-
-    return givePlayerRewardsSync(playerId, rewards)
 }

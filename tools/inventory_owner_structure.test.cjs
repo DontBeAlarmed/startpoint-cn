@@ -75,6 +75,7 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
     }
     visit(sourceRoot)
     const reviewedMigrations = [
+        "src/lib/box-gacha-reward-grant.ts",
         "src/lib/character-growth/commands/awake-mana-nodes.ts",
         "src/lib/character-growth/commands/bulk-stack-to-exp.ts",
         "src/lib/character-growth/commands/grant-character-stack.ts",
@@ -88,6 +89,7 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/lib/reward-grant/inventory-adapter.ts",
         "src/lib/reward-grant/owner-executor.ts",
         "src/lib/shop-reward-grant.ts",
+        "src/routes/api/boxGacha.ts",
         "src/routes/api/equipment.ts",
         "src/routes/api/exBoost.ts",
         "src/routes/api/exchange.ts",
@@ -150,6 +152,31 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         gachaRoute,
         /executeRewardGrantPlanInTransactionOwnerWithInventoryInternalSync\([\s\S]*knownPlayerBefore,[\s\S]*inventory/,
     )
+    const boxGachaRoute = fs.readFileSync(
+        path.join(projectRoot, "src/routes/api/boxGacha.ts"),
+        "utf8",
+    )
+    assert.match(boxGachaRoute, /withDeferredInventoryBatchContextWithinTransactionSync\(/)
+    assert.match(boxGachaRoute, /inventory\.read\(pullCurrencyId\)\.afterAmount/)
+    assert.match(boxGachaRoute, /inventory\.deduct\([\s\S]*pullCurrencyId,[\s\S]*actualDrawCount/)
+    assert.match(
+        boxGachaRoute,
+        /grantBoxGachaDrawInTransactionOwnerWithInventorySync\([\s\S]*drawResult,[\s\S]*player,[\s\S]*inventory/,
+    )
+    const boxGachaRewardGrant = fs.readFileSync(
+        path.join(projectRoot, "src/lib/box-gacha-reward-grant.ts"),
+        "utf8",
+    )
+    assert.match(boxGachaRewardGrant, /inventory\.readMany\(\[\.\.\.drawResult\.items\.keys\(\)\]\)/)
+    assert.match(
+        boxGachaRewardGrant,
+        /executeRewardGrantPlanInTransactionOwnerWithInventoryInternalSync\([\s\S]*knownPlayerBefore,[\s\S]*inventory/,
+    )
+    assert.doesNotMatch(boxGachaRoute, /\b(?:getPlayerItemSync|updatePlayerItemSync)\b/)
+    assert.doesNotMatch(
+        fs.readFileSync(path.join(projectRoot, "src/lib/gacha.ts"), "utf8"),
+        /rewardPlayerBoxGachaResultSync/,
+    )
 
     const legacy = fs.readFileSync(path.join(projectRoot, "src/data/domains/item.ts"), "utf8")
     assert.match(legacy, /export function givePlayerItemSync/)
@@ -187,8 +214,6 @@ test("remaining legacy Item mutation references match the staged migration manif
         "src/lib/quest/finish/single-settlement-writes.ts",
         "src/multi/http/battle.ts",
         "src/multi/settlement/orchestrator.ts",
-        // Remaining W3 source adapters.
-        "src/routes/api/boxGacha.ts",
         // W4 Battle route.
         "src/routes/api/singleBattleQuest.ts",
         // W6 maintenance adapter.

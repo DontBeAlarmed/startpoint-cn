@@ -95,6 +95,10 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["src/routes/api/tutorial.ts"]), ["full", "integration:quest", "integration:reward-grant", "quick:gacha"])
     assert.deepEqual(selectTestGroups(["src/routes/api/boxGacha.ts"]), ["full", "integration:event"])
     assert.deepEqual(
+        selectTestGroups(["src/lib/box-gacha-reward-grant.ts"]),
+        ["integration:event", "integration:reward-grant"],
+    )
+    assert.deepEqual(
         selectTestGroups(["src/lib/gacha-seed-quarantine.ts"]),
         ["quick:gacha", "quick:seed"],
     )

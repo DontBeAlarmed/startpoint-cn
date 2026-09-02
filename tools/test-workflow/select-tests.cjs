@@ -533,6 +533,10 @@ const SOURCE_RULES = [
         groups: ["integration:event"],
     },
     {
+        pattern: /^src\/lib\/box-gacha-reward-grant\.ts$/,
+        groups: ["integration:event", "integration:reward-grant"],
+    },
+    {
         pattern: /^src\/(?:lib\/(?:how-to-get|shop-sales-list)|routes\/api\/howToGet)\.ts$/,
         groups: ["integration:event"],
     },

@@ -145,6 +145,7 @@ test("public barrel excludes the internal transaction-owner entry", () => {
     assert.doesNotMatch(index, /export \* from ["']\.\/executor["']/)
     assert.doesNotMatch(index, /executeRewardGrantPlanInTransactionOwnerSync/)
     assert.doesNotMatch(index, /executeRewardGrantPlanInTransactionOwnerInternalSync/)
+    assert.doesNotMatch(index, /executeRewardGrantPlanInTransactionOwnerWithInventoryInternalSync/)
     assert.doesNotMatch(types, /itemDeltas/)
     assert.match(owner, /executeRewardGrantPlanInTransactionOwnerInternalSync/)
     assert.match(index, /executeRewardGrantPlanWithinTransactionSync/)
@@ -157,6 +158,7 @@ test("only approved standard reward domains and single settlement paths consume 
         .filter(relativePath => /reward-grant/.test(readSource(relativePath)))
 
     assert.deepEqual(consumers, [
+        "src/lib/box-gacha-reward-grant.ts",
         "src/lib/carnival-rewards.ts",
         "src/lib/gacha-reward-grant.ts",
         "src/lib/gacha-reward-legacy.ts",
@@ -176,6 +178,7 @@ test("only approved standard reward domains and single settlement paths consume 
         "src/lib/quest/score-reward-settlement.ts",
         "src/lib/scheduled-resource-settlement.ts",
         "src/lib/shop-reward-grant.ts",
+        "src/routes/api/boxGacha.ts",
         "src/routes/api/gacha.ts",
         "src/routes/api/mail.ts",
         "src/routes/api/shop.ts",

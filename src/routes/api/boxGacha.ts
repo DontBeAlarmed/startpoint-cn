@@ -4,7 +4,6 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getDb } from "../../data/db";
 import { getAccountPlayers } from "../../data/domains/account"
 import { deletePlayerBoxGachaDrawnRewardsSync, getPlayerBoxGachaDrawnRewardsSync, getPlayerBoxGachaSync, insertPlayerBoxGachaDrawnRewardSync, insertPlayerBoxGachaSync, updatePlayerBoxGachaDrawnRewardSync, updatePlayerBoxGachaSync } from "../../data/domains/boxGacha"
-import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { playerOwnsEquipmentSync, updatePlayerEquipmentSync } from "../../data/domains/equipment"
@@ -14,9 +13,11 @@ import { generateDataHeaders, getServerTime } from "../../utils";
 import { getBoxGachaSync } from "../../lib/assets";
 import { parseBoxGachaResetRequest, sendBoxGachaResultCode } from "../../lib/box-gacha-protocol";
 import { BoxGachaInvalidPeriodError, BoxGachaResetError, resetBoxGachaSync, validateBoxGachaPeriod } from "../../lib/box-gacha-reset";
-import { drawBoxGachaSync, rewardPlayerBoxGachaResultSync } from "../../lib/gacha";
+import { grantBoxGachaDrawInTransactionOwnerWithInventorySync } from "../../lib/box-gacha-reward-grant";
+import { drawBoxGachaSync } from "../../lib/gacha";
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
-import { BoxGachaBoxes } from "../../lib/types";
+import { withDeferredInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
+import { BoxGachaBoxes, PlayerRewardResult } from "../../lib/types";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time";
 import { getAwakeFactKeysFromLegacyRewardResults } from "../../lib/mission/awake-reward-facts";
@@ -308,7 +309,7 @@ const routes = async (fastify: FastifyInstance) => {
             player: NonNullable<ReturnType<typeof getPlayerSync>>
             playerBoxData: ReturnType<typeof getPlayerBoxGachaSync>
             drawnRewards: ReturnType<typeof drawBoxGachaSync>["rewards"]
-            rewardResult: ReturnType<typeof rewardPlayerBoxGachaResultSync>
+            rewardResult: PlayerRewardResult
             newPullCurrency: number
             remainingDrawsNumber: number
             shouldClose: boolean
@@ -318,100 +319,111 @@ const routes = async (fastify: FastifyInstance) => {
                 const player = getPlayerSync(playerId)
                 if (player === null) throw new Error("Player disappeared during box gacha exec.")
 
-                const playerBoxData = getPlayerBoxGachaSync(playerId, boxGachaId, boxId)
-                if (playerBoxData?.isClosed) throw new BoxGachaExecError("Box is closed.")
-                if (settings.requiredBoxId !== null) {
-                    const requiredBox = getPlayerBoxGachaSync(
-                        playerId,
-                        boxGachaId,
-                        settings.requiredBoxId,
-                    )
-                    if (!requiredBox || (!requiredBox.isClosed && requiredBox.remainingNumber > 0)) {
-                        throw new BoxGachaExecError("Box is locked.")
-                    }
-                }
-
-                const playerDrawnRewards = getPlayerBoxGachaDrawnRewardsSync(playerId, boxGachaId, boxId)
-                const existingDrawCount = playerDrawnRewards.reduce(
-                    (sum, reward) => sum + reward.number,
-                    0,
-                )
-                const remainingBefore = availableCount - existingDrawCount
-                if (remainingBefore < 0) throw new Error("Box gacha drawn history exceeds inventory.")
-                if (pullCount > remainingBefore) {
-                    throw new BoxGachaExecError("Requested draw count exceeds remaining inventory.")
-                }
-
-                const playerPullCurrency = getPlayerItemSync(playerId, pullCurrencyId)
-                if (playerPullCurrency === null) throw new BoxGachaExecError("No pull currency.")
-                const requestedCost = pullCount * boxGachaData.redeemItemCount
-                if (playerPullCurrency < requestedCost) {
-                    throw new BoxGachaExecError("Not enough pull currency.")
-                }
-
-                const effectiveStop = stopOnFeaturedRewards && settings.resetKind === 0
-                const drawResult = drawBoxGachaSync(
-                    boxRewards,
-                    playerDrawnRewards,
-                    pullCount,
-                    effectiveStop,
-                )
-                const drawnRewards = drawResult.rewards
-                const actualDrawCount = drawnRewards.reduce((sum, reward) => sum + reward.number, 0)
-                if (actualDrawCount <= 0 || actualDrawCount > pullCount) {
-                    throw new Error("Box gacha produced an invalid draw count.")
-                }
-                const newPullCurrency = playerPullCurrency
-                    - actualDrawCount * boxGachaData.redeemItemCount
-                const rewardResult = rewardPlayerBoxGachaResultSync(playerId, drawResult)
-
-                const playerDrawnRewardMap = new Map(
-                    playerDrawnRewards.map(reward => [reward.id, reward.number]),
-                )
-                const remainingDrawsNumber = remainingBefore - actualDrawCount
-                const shouldClose = remainingDrawsNumber === 0
-                if (playerBoxData === null) {
-                    insertPlayerBoxGachaSync(playerId, boxGachaId, {
-                        boxId,
-                        isClosed: shouldClose,
-                        remainingNumber: remainingDrawsNumber,
-                        resetTimes: 0,
-                    })
-                } else {
-                    updatePlayerBoxGachaSync(playerId, boxGachaId, {
-                        boxId,
-                        isClosed: shouldClose,
-                        remainingNumber: remainingDrawsNumber,
-                    })
-                }
-
-                for (const drawnReward of drawnRewards) {
-                    const existing = playerDrawnRewardMap.get(drawnReward.id)
-                    if (existing === undefined) {
-                        insertPlayerBoxGachaDrawnRewardSync(playerId, boxGachaId, boxId, {
-                            id: drawnReward.id,
-                            number: drawnReward.number,
-                        })
-                    } else {
-                        updatePlayerBoxGachaDrawnRewardSync(
+                return withDeferredInventoryBatchContextWithinTransactionSync({
+                    playerId,
+                    playerExistence: "caller-verified",
+                }, inventory => {
+                    const playerBoxData = getPlayerBoxGachaSync(playerId, boxGachaId, boxId)
+                    if (playerBoxData?.isClosed) throw new BoxGachaExecError("Box is closed.")
+                    if (settings.requiredBoxId !== null) {
+                        const requiredBox = getPlayerBoxGachaSync(
                             playerId,
                             boxGachaId,
-                            boxId,
-                            drawnReward.id,
-                            existing + drawnReward.number,
+                            settings.requiredBoxId,
                         )
+                        if (!requiredBox || (!requiredBox.isClosed && requiredBox.remainingNumber > 0)) {
+                            throw new BoxGachaExecError("Box is locked.")
+                        }
                     }
-                }
-                updatePlayerItemSync(playerId, pullCurrencyId, newPullCurrency)
-                return {
-                    player,
-                    playerBoxData,
-                    drawnRewards,
-                    rewardResult,
-                    newPullCurrency,
-                    remainingDrawsNumber,
-                    shouldClose,
-                }
+
+                    const playerDrawnRewards = getPlayerBoxGachaDrawnRewardsSync(playerId, boxGachaId, boxId)
+                    const existingDrawCount = playerDrawnRewards.reduce(
+                        (sum, reward) => sum + reward.number,
+                        0,
+                    )
+                    const remainingBefore = availableCount - existingDrawCount
+                    if (remainingBefore < 0) throw new Error("Box gacha drawn history exceeds inventory.")
+                    if (pullCount > remainingBefore) {
+                        throw new BoxGachaExecError("Requested draw count exceeds remaining inventory.")
+                    }
+
+                    const playerPullCurrency = inventory.read(pullCurrencyId).afterAmount
+                    if (playerPullCurrency === 0) throw new BoxGachaExecError("No pull currency.")
+                    const requestedCost = pullCount * boxGachaData.redeemItemCount
+                    if (playerPullCurrency < requestedCost) {
+                        throw new BoxGachaExecError("Not enough pull currency.")
+                    }
+
+                    const effectiveStop = stopOnFeaturedRewards && settings.resetKind === 0
+                    const drawResult = drawBoxGachaSync(
+                        boxRewards,
+                        playerDrawnRewards,
+                        pullCount,
+                        effectiveStop,
+                    )
+                    const drawnRewards = drawResult.rewards
+                    const actualDrawCount = drawnRewards.reduce((sum, reward) => sum + reward.number, 0)
+                    if (actualDrawCount <= 0 || actualDrawCount > pullCount) {
+                        throw new Error("Box gacha produced an invalid draw count.")
+                    }
+                    const newPullCurrency = inventory.deduct(
+                        pullCurrencyId,
+                        actualDrawCount * boxGachaData.redeemItemCount,
+                    ).afterAmount
+                    const { rewardResult } = grantBoxGachaDrawInTransactionOwnerWithInventorySync(
+                        playerId,
+                        drawResult,
+                        player,
+                        inventory,
+                    )
+
+                    const playerDrawnRewardMap = new Map(
+                        playerDrawnRewards.map(reward => [reward.id, reward.number]),
+                    )
+                    const remainingDrawsNumber = remainingBefore - actualDrawCount
+                    const shouldClose = remainingDrawsNumber === 0
+                    if (playerBoxData === null) {
+                        insertPlayerBoxGachaSync(playerId, boxGachaId, {
+                            boxId,
+                            isClosed: shouldClose,
+                            remainingNumber: remainingDrawsNumber,
+                            resetTimes: 0,
+                        })
+                    } else {
+                        updatePlayerBoxGachaSync(playerId, boxGachaId, {
+                            boxId,
+                            isClosed: shouldClose,
+                            remainingNumber: remainingDrawsNumber,
+                        })
+                    }
+
+                    for (const drawnReward of drawnRewards) {
+                        const existing = playerDrawnRewardMap.get(drawnReward.id)
+                        if (existing === undefined) {
+                            insertPlayerBoxGachaDrawnRewardSync(playerId, boxGachaId, boxId, {
+                                id: drawnReward.id,
+                                number: drawnReward.number,
+                            })
+                        } else {
+                            updatePlayerBoxGachaDrawnRewardSync(
+                                playerId,
+                                boxGachaId,
+                                boxId,
+                                drawnReward.id,
+                                existing + drawnReward.number,
+                            )
+                        }
+                    }
+                    return {
+                        player,
+                        playerBoxData,
+                        drawnRewards,
+                        rewardResult,
+                        newPullCurrency,
+                        remainingDrawsNumber,
+                        shouldClose,
+                    }
+                })
             })()
         } catch (error) {
             if (error instanceof BoxGachaExecError) {

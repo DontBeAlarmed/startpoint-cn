@@ -3,6 +3,7 @@
 require("ts-node/register/transpile-only")
 
 const assert = require("node:assert/strict")
+const BetterSqlite3 = require("better-sqlite3")
 const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")
 const os = require("node:os")
@@ -17,12 +18,13 @@ process.env.DATA_DIR = databaseDirectory
 const BOX_GACHA_ID = 99001
 const CURRENCY_ITEM_ID = 999001
 const REWARD_ITEM_ID = 10002
+const REWARD_CHARACTER_ID = 151006
 const tableOverrides = {
     "box_gacha.json": {
         [BOX_GACHA_ID]: {
             itemId: CURRENCY_ITEM_ID,
             count: 10,
-            availableCounts: { 1: 10, 2: 10, 3: 10 },
+            availableCounts: { 1: 10, 2: 10, 3: 10, 4: 1 },
         },
     },
     "box_reward.json": {
@@ -35,6 +37,9 @@ const tableOverrides = {
             },
             3: {
                 99001003: { type: 0, count: 1, available: 10, tier: 2, id: REWARD_ITEM_ID },
+            },
+            4: {
+                99001004: { type: 5, count: 1, available: 1, tier: 2, id: REWARD_CHARACTER_ID },
             },
         },
     },
@@ -64,6 +69,14 @@ const tableOverrides = {
                 availableUntil: "2199-12-31 23:59:59",
                 closeKind: 1,
             },
+            4: {
+                requiredBoxId: null,
+                resetKind: 0,
+                resetLimit: null,
+                availableFrom: "2010-01-01 00:00:00",
+                availableUntil: "2199-12-31 23:59:59",
+                closeKind: 1,
+            },
         },
     },
 }
@@ -75,9 +88,15 @@ const {
     getPlayerBoxGachaDrawnRewardsSync,
     getPlayerBoxGachaSync,
 } = require("../src/data/domains/boxGacha")
-const { getPlayerCharactersSync } = require("../src/data/domains/character")
+const { getPlayerCharacterSync, getPlayerCharactersSync } = require("../src/data/domains/character")
 const { getPlayerEquipmentListSync } = require("../src/data/domains/equipment")
-const { getPlayerItemsSync, givePlayerItemSync } = require("../src/data/domains/item")
+const {
+    getPlayerCollectedItemTotalSync,
+    getPlayerCollectedItemTotalsSync,
+    getPlayerItemSync,
+    getPlayerItemsSync,
+    givePlayerItemSync,
+} = require("../src/data/domains/item")
 const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
@@ -87,6 +106,17 @@ const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 let database
 let app
 let nextViewerId = 870000000
+const sqlTrace = { active: false, statements: [] }
+
+async function captureSqlAsync(operation) {
+    sqlTrace.statements = []
+    sqlTrace.active = true
+    try {
+        return { result: await operation(), statements: [...sqlTrace.statements] }
+    } finally {
+        sqlTrace.active = false
+    }
+}
 
 async function createPlayer(label, currency = 1000) {
     const account = insertAccountSync({
@@ -116,6 +146,7 @@ function snapshot(playerId, boxId) {
         characters: getPlayerCharactersSync(playerId),
         equipment: getPlayerEquipmentListSync(playerId),
         items: getPlayerItemsSync(playerId),
+        collectedItems: getPlayerCollectedItemTotalsSync(playerId),
         box: getPlayerBoxGachaSync(playerId, BOX_GACHA_ID, boxId),
         drawn: getPlayerBoxGachaDrawnRewardsSync(playerId, BOX_GACHA_ID, boxId),
     }
@@ -137,7 +168,11 @@ async function execBox(viewerId, boxId, number, stopOnFeaturedRewards) {
 }
 
 test.before(async () => {
-    database = data.initializeDatabase()
+    database = data.initializeDatabase({
+        databaseFactory: databasePath => new BetterSqlite3(databasePath, {
+            verbose: sql => { if (sqlTrace.active) sqlTrace.statements.push(sql) },
+        }),
+    })
     app = Fastify({ logger: false })
     registerCnMsgpackOnSend(app)
     await app.register(boxGachaRoutes, { prefix: "/box_gacha" })
@@ -171,6 +206,39 @@ test("box gacha exec rolls rewards box history and currency back together", asyn
     assert.deepEqual(snapshot(playerId, 1), before)
 })
 
+test("box gacha exec rolls flushed Inventory and rewards back on late drawn-history failure", async t => {
+    const { playerId, viewerId } = await createPlayer("box-exec-late-history")
+    const before = snapshot(playerId, 1)
+    database.exec(`
+        CREATE TRIGGER reject_box_gacha_drawn_history
+        BEFORE INSERT ON players_box_gacha_drawn_rewards
+        WHEN NEW.player_id = ${playerId}
+        BEGIN SELECT RAISE(ABORT, 'forced box drawn history failure'); END;
+    `)
+    t.after(() => database.exec("DROP TRIGGER IF EXISTS reject_box_gacha_drawn_history"))
+
+    const measured = await captureSqlAsync(() => execBox(viewerId, 1, 1, false))
+
+    assert.equal(measured.result.statusCode, 500)
+    assert.match(measured.result.body, /forced box drawn history failure/)
+    assert.deepEqual(snapshot(playerId, 1), before)
+    const itemWrites = measured.statements.filter(sql => (
+        /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql)
+    ))
+    assert.equal(itemWrites.length, 2, itemWrites.join("\n---\n"))
+    const historyWriteIndex = measured.statements.findIndex(sql => (
+        /^\s*INSERT\s+INTO\s+players_box_gacha_drawn_rewards\b/i.test(sql)
+    ))
+    assert.notEqual(historyWriteIndex, -1)
+    assert.equal(measured.statements.findLastIndex(sql => (
+        /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql)
+    )) < historyWriteIndex, true, "RewardGrant Inventory flush must precede the forced late history failure")
+    assert.equal(
+        measured.statements.filter(sql => /^\s*(?:SAVEPOINT|RELEASE)\b/i.test(sql)).length,
+        0,
+    )
+})
+
 for (const invalid of [
     { name: "zero", number: 0, stop: false },
     { name: "negative", number: -1, stop: false },
@@ -191,15 +259,69 @@ for (const invalid of [
 
 test("featured early stop charges only the actual draw count", async () => {
     const { playerId, viewerId } = await createPlayer("box-featured-stop")
+    const currencyObtainedBefore = getPlayerCollectedItemTotalSync(playerId, CURRENCY_ITEM_ID)
+    const rewardObtainedBefore = getPlayerCollectedItemTotalSync(playerId, REWARD_ITEM_ID)
 
-    const response = await execBox(viewerId, 1, 10, true)
+    const measured = await captureSqlAsync(() => execBox(viewerId, 1, 10, true))
+    const response = measured.result
 
     assert.equal(response.statusCode, 200, response.body)
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
     const after = snapshot(playerId, 1)
     assert.equal(after.items[String(CURRENCY_ITEM_ID)], 990)
     assert.equal(after.items[String(REWARD_ITEM_ID)], 1)
+    assert.equal(getPlayerItemSync(playerId, CURRENCY_ITEM_ID), 990)
+    assert.equal(getPlayerItemSync(playerId, REWARD_ITEM_ID), 1)
+    assert.equal(payload.data.item_list[CURRENCY_ITEM_ID], 990)
+    assert.equal(payload.data.item_list[REWARD_ITEM_ID], 1)
+    assert.deepEqual(payload.data.joined_character_id_list, [])
+    assert.equal(getPlayerCollectedItemTotalSync(playerId, CURRENCY_ITEM_ID), currencyObtainedBefore)
+    assert.equal(getPlayerCollectedItemTotalSync(playerId, REWARD_ITEM_ID), rewardObtainedBefore + 1)
     assert.equal(after.drawn.reduce((sum, reward) => sum + reward.number, 0), 1)
     assert.equal(after.box.remainingNumber, 9)
+    assert.equal(
+        measured.statements.filter(sql => /^\s*SELECT[\s\S]*\bFROM\s+players_items\b/i.test(sql)).length,
+        2,
+        "Box reads pull currency once and direct reward Items in one stable batch",
+    )
+    const itemWrites = measured.statements.filter(sql => (
+        /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql)
+    ))
+    assert.equal(itemWrites.length, 2, itemWrites.join("\n---\n"))
+    assert.equal(itemWrites.filter(sql => new RegExp(
+        `VALUES\\s*\\(${CURRENCY_ITEM_ID}(?:\\.0+)?,\\s*990(?:\\.0+)?,`,
+        "i",
+    ).test(sql)).length, 1)
+    assert.equal(itemWrites.filter(sql => new RegExp(
+        `VALUES\\s*\\(${REWARD_ITEM_ID}(?:\\.0+)?,\\s*1(?:\\.0+)?,`,
+        "i",
+    ).test(sql)).length, 1)
+    const collectedWrites = measured.statements.filter(sql => (
+        /^\s*INSERT\s+INTO\s+players_collected_items\b/i.test(sql)
+    ))
+    assert.equal(collectedWrites.length, 1, collectedWrites.join("\n---\n"))
+    assert.equal(new RegExp(
+        `VALUES\\s*\\([^,]+,\\s*${REWARD_ITEM_ID}(?:\\.0+)?,\\s*1(?:\\.0+)?`,
+        "i",
+    ).test(collectedWrites[0]), true)
+    assert.equal(
+        measured.statements.filter(sql => /^\s*(?:SAVEPOINT|RELEASE)\b/i.test(sql)).length,
+        0,
+    )
+})
+
+test("box gacha keeps its legacy empty joined-character projection for a real new-character draw", async () => {
+    const { playerId, viewerId } = await createPlayer("box-character-projection")
+
+    const response = await execBox(viewerId, 4, 1, false)
+
+    assert.equal(response.statusCode, 200, response.body)
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
+    assert.notEqual(getPlayerCharacterSync(playerId, REWARD_CHARACTER_ID), null)
+    assert.deepEqual(payload.data.joined_character_id_list, [])
+    assert.equal(payload.data.character_list.length, 1)
+    assert.equal(payload.data.character_list[0].character_id, REWARD_CHARACTER_ID)
+    assert.equal(payload.data.item_list[CURRENCY_ITEM_ID], 990)
 })
 
 test("resettable box ignores featured early stop and empties the requested inventory", async () => {
