@@ -6,7 +6,6 @@ import {
     updatePlayerSync,
 } from "../../data/domains/player";
 import { getSession } from "../../data/domains/session";
-import { givePlayerItemSync } from "../../data/domains/item";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders } from "../../utils";
 import { givePlayerCharacterSync } from "../../lib/character";
@@ -17,6 +16,7 @@ import bundledStarCrumbExchange from "../../../assets/star_crumb_exchange.json";
 import bundledStarCrumbExchangeCost from "../../../assets/star_crumb_exchange_cost.json";
 import { getDb } from "../../data/db";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
+import { grantInventoryItemWithinTransactionSync } from "../../lib/inventory";
 
 interface ExchangeBody {
     viewer_id: number;
@@ -135,7 +135,11 @@ const routes = async (fastify: FastifyInstance) => {
                         break
                     }
                     case 1: {
-                        itemList[String(targetId)] = givePlayerItemSync(playerId, targetId, 1)
+                        itemList[String(targetId)] = grantInventoryItemWithinTransactionSync({
+                            playerId,
+                            itemId: targetId,
+                            amount: 1,
+                        }).afterAmount
                         break
                     }
                     case 2: {

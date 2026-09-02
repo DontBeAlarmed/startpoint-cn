@@ -87,6 +87,8 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/lib/reward-grant/inventory-adapter.ts",
         "src/routes/api/equipment.ts",
         "src/routes/api/exBoost.ts",
+        "src/routes/api/exchange.ts",
+        "src/routes/api/questUnlock.ts",
         "src/routes/api/sell.ts",
     ]
     assert.deepEqual(importedOutsideInventory.sort(), reviewedMigrations)
@@ -164,9 +166,7 @@ test("remaining legacy Item mutation references match the staged migration manif
         "src/multi/settlement/orchestrator.ts",
         // Remaining W3 source adapters.
         "src/routes/api/boxGacha.ts",
-        "src/routes/api/exchange.ts",
         "src/routes/api/gacha.ts",
-        "src/routes/api/questUnlock.ts",
         "src/routes/api/shop.ts",
         // W4 Battle route.
         "src/routes/api/singleBattleQuest.ts",

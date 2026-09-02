@@ -1,5 +1,4 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getPlayerItemSync, updatePlayerItemSync } from "../../data/domains/item"
 import { getPlayerQuestProgressSync, insertPlayerQuestProgressSync, updatePlayerQuestProgressSync } from "../../data/domains/quest"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
@@ -10,6 +9,7 @@ import bundledQuestUnlockCosts from "../../../assets/quest_unlock_costs.json";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
+import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
 
 interface UnlockBody {
     category: number
@@ -96,31 +96,34 @@ const routes = async (fastify: FastifyInstance) => {
                 itemCosts.set(itemId, (itemCosts.get(itemId) ?? 0) + cost)
             }
 
-            const currentItemCounts = new Map<number, number>()
-            for (const [itemId, cost] of itemCosts) {
-                const current = getPlayerItemSync(playerId, itemId) ?? 0
-                if (current < cost) {
-                    return {
-                        ok: false,
-                        message: `Not enough of item ${itemId} to unlock quest.`,
+            const inventoryResult = withInventoryBatchContextWithinTransactionSync({
+                playerId,
+                preloadItemIds: [...itemCosts.keys()],
+            }, inventory => {
+                for (const [itemId, cost] of itemCosts) {
+                    if (inventory.read(itemId).afterAmount < cost) {
+                        return {
+                            ok: false as const,
+                            message: `Not enough of item ${itemId} to unlock quest.`,
+                        }
                     }
                 }
-                currentItemCounts.set(itemId, current)
-            }
 
-            const updatedItems: Record<string, number> = {}
-            for (const [itemId, cost] of itemCosts) {
-                const afterCount = (currentItemCounts.get(itemId) ?? 0) - cost
-                updatePlayerItemSync(playerId, itemId, afterCount)
-                updatedItems[String(itemId)] = afterCount
-            }
+                const updatedItems: Record<string, number> = {}
+                for (const [itemId, cost] of itemCosts) {
+                    updatedItems[String(itemId)] = inventory.deduct(itemId, cost).afterAmount
+                }
+                inventory.flush()
+                return { ok: true as const, itemList: updatedItems }
+            })
+            if (!inventoryResult.ok) return inventoryResult
 
             if (existing) {
                 updatePlayerQuestProgressSync(playerId, category, { questId, unlocked: true })
             } else {
                 insertPlayerQuestProgressSync(playerId, category, { questId, finished: false, unlocked: true })
             }
-            return { ok: true, itemList: updatedItems }
+            return inventoryResult
         })()
         if (!result.ok) {
             return reply.status(400).send({
