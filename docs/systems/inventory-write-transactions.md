@@ -8,7 +8,9 @@
 
 同一 batch 内相同 Item 的重复 grant/deduct/restore 会先归一化，再按 Item ID 稳定写入最终绝对数量。正向 grant 只按实际进入 Inventory 的数量增加 `players_collected_items.total_obtained`；deduct、战斗资源 restore、后台精确设置、存档恢复和过期清零都不增加累计获得量。调用方已经在当前事务读取并验证 Player 时，必须显式选择 `caller-verified`，不能依赖隐式信任。
 
-后台精确 set/delete、旧存档导入和 V2 registry restore 保持独立 maintenance/save 权限，不伪装成玩家业务 grant。D18 已在已盘点的正常正向 Item grant 入口启用 `grantWithCapacity`：读取 runtime Item policy 的 `max_count`，只让 accepted 数量进入 Inventory，其余交给来源的 overflow Mail adapter。deduct、restore、maintenance 和 save/import 仍保持原语义。
+后台精确 set/delete、旧存档导入和 V2 registry restore 保持独立 maintenance/save 权限，不伪装成玩家业务 grant。D18 已在已盘点的正常正向 Item grant 入口启用 `grantWithCapacity`：读取 runtime Item policy 的 `max_count`，只让 accepted 数量进入 Inventory。D18b 再按同一 policy 的 `sellable` 处置差值：可出售 Item 直接换为 Mana，不可出售 Item 进入无限容量 Mail；两者都通过来源响应的 `data.over_max` 发布。deduct、restore、maintenance 和 save/import 仍保持原语义。
+
+自动出售所得 Mana 使用 `free_mana + paid_mana` 与 `max_mana` 计算容量；accepted 部分增加 `free_mana` 和 `total_mana_obtained`，Mana 差值进入 FREE_MANA Mail。`amount_sold` 始终表示完整出售金额。Mail/Sold、来源 receipt/history 和 Item accepted 写入共享来源最外层事务。
 
 ## EventTrade 到期转换
 

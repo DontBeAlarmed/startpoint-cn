@@ -1,6 +1,6 @@
 # D18b Item Overflow Disposition 与客户端 Toast
 
-状态：设计已确认，生产实现尚未开始。本文修订 D18 “所有 Item overflow 一律进入 Mail”的私服策略；D16 Inventory owner、D17 RewardGrant typed core 和 D18 capacity allocation 继续有效。
+状态：生产实现与聚焦自动验证已完成，等待独立终审、服务重启和 CN 客户端实机验收。本文修订 D18 “所有 Item overflow 一律进入 Mail”的旧私服策略；D16 Inventory owner、D17 RewardGrant typed core 和 D18 capacity allocation 继续有效。
 
 ## 1. 目标
 
@@ -225,6 +225,8 @@ Sold：
 
 Shop 正常客户端请求仍受客户端购买前上限约束；其服务端 disposition 是并发、旧状态或异常请求的防御边界，不构造官方客户端正常 overflow 场景。
 
+Scheduled 的合法管理配置还要求 `trigger_threshold + grant_amount < inventory_cap <= max_count`，因此正常配置不会主动产生 overflow。该来源仍安装统一 policy，作为旧规则、跨进程并发或状态漂移的最终写入边界；测试不伪造违反配置约束的 Scheduled overflow。
+
 ## 8. 明确不实施
 
 - 不建立 Mail 最大条数或淘汰队列；
@@ -265,10 +267,12 @@ Shop 正常客户端请求仍受客户端购买前上限约束；其服务端 di
 
 ```text
 D18B_DESIGN_STATUS: APPROVED
-D18B_IMPLEMENTATION_STATUS: NOT_STARTED
-ITEM_OVERFLOW_DISPOSITION: TARGET_SELLABLE_SOLD_UNSELLABLE_MAIL
-OVER_MAX_TOAST: TARGET_CN_COMMON_RESPONSE
+D18B_IMPLEMENTATION_STATUS: COMPLETE (focused verification passed; final review pending)
+ITEM_OVERFLOW_DISPOSITION: ACTIVE_SELLABLE_SOLD_UNSELLABLE_MAIL
+OVER_MAX_TOAST: ACTIVE_CN_COMMON_RESPONSE
 MAIL_CAPACITY: PRIVATE_UNLIMITED
 ```
 
-实现完成后必须经过 focused tests、类型检查、文档检查、卫生检查、diff check、独立审查和客户端实机复测；不重跑已经完成的 Gate A broad，除非用户明确改变该约束。
+实现提交为 `52a16817`、`c0fd8f30`、`c1863a54`、`892824a2`、`a083e022` 与 `30afb2e6`。聚焦验证覆盖 pure disposition/projector、RewardGrant、Mail、Gift、Login、Mission、Raid、Single/Multi、数据库、规则、协议和活动；任务组的旧虚构 Item 夹具已换成真实 Content Item 或完整 Content overlay。Gate A broad 在 D18b 前已经唯一运行并闭环，本补丁按批准约束只运行受影响聚焦组和失败叶子，不重跑 broad。
+
+剩余退出项是文档/卫生检查、独立 whole-range 审查、服务重启与 CN 客户端实机复测；自动验证不能替代 Toast、页面状态和重登体验。

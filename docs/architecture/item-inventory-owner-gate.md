@@ -1,6 +1,6 @@
 # D16 Item Inventory Owner 与 EventTrade 到期策略
 
-状态：D16 设计/C1–C4、D18 C1–C5 生产实现和各 checkpoint 自动验证已完成，等待大 Gate A 综合审查与客户端验收。本文描述 Item owner、D18 cap/overflow 与 Mail disposition 的当前运行时合同；官方语义未知项仍按私服策略标注。
+状态：D16、D18 与 D18b 生产实现和聚焦自动验证已完成；Gate A broad 已完成并闭环，当前等待 D18b 独立终审、服务重启和客户端验收。本文描述 Item owner、cap、overflow disposition 与 Mail 的当前运行时合同；官方语义未知项仍按私服策略标注。
 
 ## 1. 背景
 
@@ -171,11 +171,11 @@ overflowAmount
 - 所有输入、乘法、加法和输出必须是非负 safe integer；
 - 函数无数据库、事务、日志、Content 读取或响应职责。
 
-D16 生产 grant 不调用 capped plan；D18 通过 `grantWithCapacity` 和 identity-bound overflow policy 激活生产 cap。普通来源在 Inventory flush 后写 overflow Mail，Mail 领取则使用 reject policy，避免原邮件再次包装成 overflow Mail。
+D16 生产 grant 不调用 capped plan；D18 通过 `grantWithCapacity` 和 identity-bound overflow policy 激活生产 cap。D18b 在 Inventory flush 后按 Content `sellable` 处置真实 overflow：可出售 Item 直接换为 Mana，不可出售 Item 才创建 overflow Mail。出售所得 Mana 再走 `free_mana + paid_mana` 上限，差值进入 FREE_MANA Mail。
 
-D18 对 Item overflow 创建一封或多封确定性拆分的 Mail attachment；每封数量必须满足 `0 < number <= min(item.maxCount, 2147483647)`。所有拆分邮件与来源成本、accepted Item 和来源业务状态同一外层事务提交，任一创建失败全部回滚。Mail 领取仍保持整封原子，不引入单封部分领取状态。
+D18b 对不可出售 Item overflow 创建一封或多封确定性拆分的 Mail attachment；每封数量必须满足 `0 < number <= min(item.maxCount, 2147483647)`。所有 Mail/Sold disposition 与来源成本、accepted Item 和来源业务状态同一外层事务提交，任一写入失败全部回滚。普通 Item Mail 仍保持整封 exact claim；只有客户端可达的 `category=6 && sellable=true` Mail 可部分入包并出售差值。
 
-Gate A 实机验收补充确认：Shop 在客户端发送购买请求前已经按 `current + purchase <= max_count` 限制购买数量，正常 Shop 购买不应产生 overflow；单人战斗的 score、首通、S+、additional 及战斗关联标准奖励则由服务端生成，不能依赖客户端购买前校验。`single finish` 已接入同一场结算的 identity-bound Item overflow policy，历史 over-cap 不倒扣，超出部分在原有战斗外层事务中写入 Mail。
+Gate A 实机验收补充确认：Shop 在客户端发送购买请求前已经按 `current + purchase <= max_count` 限制购买数量，正常 Shop 购买不应产生 overflow；单人战斗的 score、首通、S+、additional 及战斗关联标准奖励则由服务端生成，不能依赖客户端购买前校验。`single finish` 已接入同一场结算的 identity-bound Item overflow policy，历史 over-cap 不倒扣，超出部分在原有战斗外层事务中按 `sellable` 进入 Sold 或 Mail disposition，并通过 `data.over_max` 发布客户端 Toast。
 
 ### 6.2 Inventory Item result
 
@@ -368,8 +368,10 @@ D16_BASE: b6fd6bbf182a51e2ba2556840873d054b6b1149f
 D16_DESIGN_STATUS: APPROVED
 D16_IMPLEMENTATION_STATUS: COMPLETE (C1-C4 landed; checkpoint validated)
 D18_IMPLEMENTATION_STATUS: COMPLETE (C1-C5 landed; checkpoint validated)
+D18B_IMPLEMENTATION_STATUS: COMPLETE (disposition + common response; final review pending)
 ITEM_CAP_PRODUCTION_STATUS: ACTIVE (explicit grant-only policy)
+ITEM_OVERFLOW_DISPOSITION_STATUS: ACTIVE (sellable Sold; unsellable Mail)
 EVENT_TRADE_OVERFLOW_MAIL_STATUS: ACTIVE (private-server strategy)
 ```
 
-D16 设计、正常 writer 清单、C1-C4 生产实现、D18 C1-C5、focused groups 和结构性能准入已经完成；大 Gate A 的唯一 broad、整体终审、服务重启和客户端验收仍待 D18 后执行。D18 的 cap/overflow 与 Mail 领取是已落地私服策略，不等同于已证明的官服后端实现。
+D16 设计、正常 writer 清单、C1-C4 生产实现、D18 C1-C5、D18b disposition/common-response、focused groups 和结构性能准入已经完成；Gate A 的唯一 broad 已运行并闭环，D18b 不重复 broad。当前只剩 D18b 独立终审、服务重启和客户端验收。cap、Sold/Mail disposition、邮箱无限和 31 天 Mail TTL 是已批准私服策略，不等同于已证明的官服后端实现。

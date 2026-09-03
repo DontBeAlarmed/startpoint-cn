@@ -150,7 +150,7 @@ category 9 持久事实，旧持久进度始终为下限。
 `2630023` 是拉芙挑战的 exact-quest 例外，不在上表的多 quest ID 或 category 19 规则内。进度只会在一次
 成功单人 finish 同时满足 category `18`、quest `400001104`、贝瑞塔 `151006` 位于
 `statistics.party.characters[0]` 主位 0 时增加；unison、非主位 0、玩家全局 leader、联机或失败结算都不算。
-该修复只闭合这一任务事实，不声明玛纳板/觉醒路径独立性和两种完成顺序；它们属于后续独立 Gate。
+该路径已由 CN 客户端实机确认任务完成并可领取。该修复只闭合这一任务事实，不声明玛纳板/觉醒路径独立性和两种完成顺序；后者已由 D14 统一角色成长状态服务实现，仍待独立实机验收。
 
 `2310013` 的 CN `character_awake_mission` 行使用 `single_battle_clear_time`，`quest_kind=14`
 （`ExpertSingleEvent`）、event `1`、节点 `6`。客户端按 `WITHOUT_STAGE_NODE` 生成 quest `1006`，并解析为

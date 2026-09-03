@@ -27,11 +27,11 @@ PassDaily、PassWeek、PassEvent 主数据、核心进度、点数、6 条 type 
 
 ## Inventory cap 与 EventTrade overflow
 
-D16 已把正常业务 Item writer 收口到 Inventory owner；D18 已启用正常正向 grant 的 `max_count` allocation、Item/Mana overflow Mail、Mail exact claim、过期 EventTrade Mail 自动出售和 receive_all 容量跳过。
+D16 已把正常业务 Item writer 收口到 Inventory owner；D18/D18b 已启用正常正向 grant 的 `max_count` allocation，并把真实 overflow 按 Content `sellable` 分流为直接出售或无限 Mail。普通 Mail exact claim、category 6 可出售 Item 差值出售、过期 EventTrade Mail 自动出售和 receive_all 容量跳过均已接入。
 
-Gate A 实机验收曾发现单人战斗生成型 Item 奖励仍走 preserve-all，已由 `8ebd97c4` 接入 cap + overflow Mail；商店客户端购买前置校验与战斗服务端奖励生成属于不同边界，不能用商店合法购买测试替代战斗 overflow 验收。该修复的 CN 客户端复测仍待执行。
+Gate A 实机验收曾发现单人战斗生成型 Item 奖励仍走 preserve-all，已由 `8ebd97c4` 接入 cap；后续 D18b 将其 disposition 修订为“可出售则 Sold、不可出售才 Mail”。商店客户端购买前置校验与战斗服务端奖励生成属于不同边界，不能用商店合法购买测试替代战斗 overflow 验收。新的 Sold/Mail Toast 与数量守恒仍待 CN 客户端复测。
 
-D18 当前按已批准私服策略处理：`/load` 清除过期 EventTrade Item，accepted Mana 立即入账，overflow Mana 创建 31 天 FREE_MANA Mail；Mail 中过期 EventTrade Item 在领取时按同一 sale 规则转换。官方 overflow 去向、reason、期限和提示文案仍未知，CN 客户端验收待完成。详见[Inventory owner 与写入事务](../systems/inventory-write-transactions.md)。
+D18 当前按已批准私服策略处理：`/load` 清除过期 EventTrade Item，accepted Mana 立即入账，overflow Mana 创建 31 天 FREE_MANA Mail；Mail 中过期 EventTrade Item 在领取时按同一 sale 规则转换。D18b 的出售资格只读 `sellable`，不以 `sale_price > 0`、名称或邮箱是否已满替代；邮箱不设业务上限，也不淘汰旧邮件。官服邮箱容量、31 天期限和更多资产的 overflow 语义仍未知。详见[D18b disposition](../architecture/item-overflow-disposition-gate.md)与[Inventory owner 与写入事务](../systems/inventory-write-transactions.md)。
 
 ## 特殊关卡与联机
 

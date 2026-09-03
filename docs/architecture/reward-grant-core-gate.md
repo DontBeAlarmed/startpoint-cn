@@ -216,6 +216,8 @@ afterAmount == beforeAmount + acceptedAmount
 
 D17 preserve-all 的 contract test 同时覆盖直接 Item 与 Character 补偿的 `requested=accepted`、`overflow=0`。D18 再用 cap-1、cap-full 和历史 over-cap 的真实 Inventory allocation验证非零 overflow、Mail disposition 和只按 accepted 增加 `total_obtained`；D17 不提前激活 cap。
 
+D18b 已在 RewardGrant 外围 policy 激活最终 disposition：`sellable=true` 的 overflow 直接出售为 Mana，`sellable=false` 才进入 Item Mail；typed execution result 保留 disposition，来源 adapter 再投影 `data.over_max`。RewardGrant core 不读取 HTTP DTO，也不把 Toast 变成资产 owner。Mission、Login、Gift、Scheduled、Story、Raid、Single/Multi、Gacha、Box 与 Shop 的生产 Item 来源均显式安装 policy；Scheduled 正常配置由阈值不变量保证不可达 overflow，但仍保留最终写入保护。
+
 ### 6.5 Currency
 
 Mana、免费星导石和 EXP pool 在同一 plan 内使用一个事务内 Player after-state accumulator，最终最多执行一次 Player update。每 entry outcome 可以表达本 entry 的 before/after；`playerAfter` 表达计划最终绝对值。Mana 的 `total_mana_obtained` 只按实际 Mana grant 增加。

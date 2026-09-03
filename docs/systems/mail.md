@@ -15,7 +15,7 @@
 
 邮件有效期沿用客户端协议的 `reward_period_limited` 与 `reward_limit_time` 字段。`reward_period_limited=0` 或没有到期时间表示永久有效；后台发送的邮件默认有效 31 天，也允许配置 1～3650 天。到期时间使用发送时的虚拟服务器时间计算，服务端在邮箱列表、单封领取和批量领取入口以同一规则批量删除过期邮件；已领取历史不会随邮件过期删除，只由独立的保留任务做有界清理（见下文）。
 
-单领和全领都以 SQLite 外层事务覆盖附件发放、`players_receive_history`、邮件领取 CAS/删除和角色觉醒解锁响应。标准 Item 使用 runtime `max_count` 的 reject policy；FREE_MANA 与过期 EventTrade sale 使用 `free_mana + paid_mana` 容量预检。单领容量不足返回有限 400 且邮件不变；receive_all 对容量阻塞邮件回滚当前 savepoint 后继续其他合法邮件。任一步非容量错误会回滚整个请求；重复 `mail_id` 只处理一次，不会重复发奖。
+单领和全领都以 SQLite 外层事务覆盖附件发放、`players_receive_history`、邮件领取 CAS/删除和角色觉醒解锁响应。普通 Item 使用 runtime `max_count` 的 exact reject policy；只有 CN 客户端允许满仓请求的 `category=6 && sellable=true` Item Mail 可把可容纳部分入包并将差值出售为 Mana。FREE_MANA 与过期 EventTrade sale 使用 `free_mana + paid_mana` 容量预检。单领容量不足返回有限 400 且邮件不变；receive_all 对容量阻塞邮件回滚当前 savepoint 后继续其他合法邮件。任一步非容量错误会回滚整个请求；重复 `mail_id` 只处理一次，不会重复发奖。
 
 `src/lib/mail-reward-grant.ts` 是邮件领域 adapter。它先校验同批全部有效邮件，再按请求中的有效邮件顺序建立一个标准 typed plan。邮件 ID 和附件序号只保留在 adapter 的本地顺序中；角色 `number > 1` 展开为多条 CHARACTER entry，其他标准附件各一条。RewardGrant 的身份、执行字段和来源 metadata 都不会进入邮件协议响应。
 
@@ -49,9 +49,9 @@
 
 `type_id` 只允许并要求用于道具、角色和装备；其他附件带 `type_id` 会被拒绝，不会静默忽略。三类 ID 分别按当前道具、角色和装备资源集合校验。
 
-角色和装备每封只能发送 1 个。普通道具附件创建时数量使用当前 Content Snapshot 的 `item_max_count.json`；领取时再使用 `item_inventory_policy.json` 的 `max_count` 做 exact capacity claim。overflow Mail 使用私服默认 31 天 TTL；Mail 期限与 Item `end_time` 分离。普通非 EventTrade 限时 Item 不自动转 Mana；只有具备 EventTrade effect、sale price 和有效结束时间的 Item 才在过期时按私服策略自动出售。角色附件统一调用正常角色发放器：重复角色增加 `stack` 并发放对应重复素材，不再错误增加 `entry_count`。
+角色和装备每封只能发送 1 个。普通道具附件创建时数量使用当前 Content Snapshot 的 `item_max_count.json`；领取时再使用 `item_inventory_policy.json` 的 `max_count` 做 capacity claim。新产生的不可出售 Item overflow Mail 使用私服默认 31 天 TTL；可出售 Item overflow 不创建 Item Mail，而是立即出售。邮箱不设置业务条数上限，不淘汰最早邮件。Mail 期限与 Item `end_time` 分离。普通非 EventTrade 限时 Item 不自动转 Mana；只有具备 EventTrade effect、sale price 和有效结束时间的 Item 才在过期时按私服策略自动出售。角色附件统一调用正常角色发放器：重复角色增加 `stack` 并发放对应重复素材，不再错误增加 `entry_count`。
 
-领取响应继续使用旧字段：`user_info` 只包含本次涉及的余额字段，并返回提交后的绝对余额；`item_list` 对同一 ID 只保留数据库最终库存，重复角色补偿亦然；角色和装备列表沿用 RewardGrant 的稳定顺序与去重结果，再在原有时点执行 Awake unlock reconcile。响应不新增 RewardGrant source 或其他内部字段。
+领取响应继续使用旧字段：`user_info` 只包含本次涉及的余额字段，并返回提交后的绝对余额；`item_list` 对同一 ID 只保留数据库最终库存，重复角色补偿亦然；角色和装备列表沿用 RewardGrant 的稳定顺序与去重结果，再在原有时点执行 Awake unlock reconcile。实际 Mail/Sold disposition 额外通过客户端已有的 `data.over_max` 发布，内部 RewardGrant source 和 typed outcome 不进入协议。
 
 ## 后台发送目标
 
@@ -91,7 +91,7 @@ V2 完整存档快照通过玩家领域 Registry 包含 `players_mails` 和 `pla
 
 ## 已知边界
 
-- 游戏 12 种历史附件已有单领与混合批量的服务端协议 fixture；Item/Mana 容量阻塞、EventTrade 过期出售、overflow Mail 和 receive_all 跳过已有专项覆盖；后台新建白名单收紧为 8 种；13、14、16、17 继续明确拒绝，不推测发奖语义；
+- 游戏 12 种历史附件已有单领与混合批量的服务端协议 fixture；Item/Mana 容量阻塞、EventTrade 过期出售、不可出售 Item overflow Mail、category 6 差值出售、`over_max` 和 receive_all 跳过已有专项覆盖；后台新建白名单收紧为 8 种；13、14、16、17 继续明确拒绝，不推测发奖语义；
 - `mail_arrived` 已在主要成功写响应统一；读取、stub 和非成功 `result_code` 响应仍可能不携带该字段，且客户端提示刷新仍需逐类确认；
 - 全服发送不是跨收件人事务，也没有持久审计历史；
 - 后台发送历史只记录在内存中；过期邮件采用访问时惰性删除，不运行独立定时清理任务；

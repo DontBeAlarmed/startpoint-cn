@@ -28,6 +28,7 @@
 | 活动扭蛋箱 | 最终箱抽空后重置、2732 库存恢复、次数加一、非空时拒绝、load 后保持 | 其他活动与其他箱规则全集 |
 | 歼灭者房主解锁 | 三个前置关卡房主通关、最高难度立即解锁、load 后保持 | 成员不解锁与最高难度门票 |
 | 宝物域与星之粒素材箱 | 示宝金钥匙实际扣除；属性培育素材箱购买后道具进包 | 其他入场道具与全部商店商品 |
+| 拉芙觉醒任务 `2630023` | 贝瑞塔主位通关单人女王拉芙超级+后任务完成并可领取 | 其余 143 条觉醒任务条件全集 |
 
 ## 优先待测
 
@@ -42,7 +43,7 @@
 | 7 | NPC 完整回归 | 基础 NPC 房主流程已有实际使用；继续验证重赛、贡献昵称显示和 TCP 会话中断后的完整行为 |
 | 8 | 奖励活动倍率 | 把服务器时间设到 1.5 倍或 2 倍活动期，分别验证普通/Rare 掉落、Additional Reward 等级累计档、Boost 加法、固定 Mana、角色战斗经验、field Mana 不放大、单人/联机响应与 load 后库存一致 |
 | 9 | 礼包码兑换 | 服务端 exact code、active capability、每存档一次兑换、RewardGrant 事务、后台管理和自动测试已完成；待验证入口出现、成功弹窗、奖励到账、6101/6103/6104 提示、后台启停/停止/删除和 load 持久化。详细边界见[公共礼包码](../systems/gift-codes.md) |
-| 10 | Item Inventory、Overflow Mail 与 EventTrade 到期 | 服务端已完成 Item cap/overflow Mail、单人战斗生成型奖励 cap 接入、Mail exact claim、receive_all skip、EventTrade 登录转换和 Mana overflow Mail；自动测试与性能准入通过。仍待 CN 客户端验收背包满、战斗 overflow Mail 展示/领取、过期 EventTrade、重登幂等和通知提示；31 天、reason 0、邮箱无限为私服策略，不作为官服事实 |
+| 10 | Item Inventory、Overflow disposition 与 EventTrade 到期 | 服务端已完成 Item cap，并按 `sellable` 将差值直接出售或送入无限 Mail；Mail/Sold 使用 `data.over_max`，category 6 Mail 可部分入包并出售差值，出售 Mana 二次超限进入 FREE_MANA Mail。待验证两种右上角 Toast、category 6 邮件、Mana 二次超限、过期 EventTrade 和重登幂等；31 天、邮箱无限为私服策略，不作为官服事实 |
 
 ## 普通关卡与内容覆盖
 
