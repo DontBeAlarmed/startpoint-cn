@@ -20,7 +20,7 @@ const {
     createRewardGrantExecutionPlan,
     executeRewardGrantExecutionPlanAsTransactionOwnerSync,
 } = require("../src/lib/reward-grant")
-const { getPlayerMailSync, MailType } = require("../src/data/domains/mail")
+const { getPlayerMailSync, getPlayerMailsSync, MailType } = require("../src/data/domains/mail")
 const { createRewardGrantItemOverflowPolicy } = require("../src/lib/reward-grant-item-overflow")
 const { RewardType } = require("../src/lib/types")
 
@@ -99,6 +99,22 @@ assert.equal(realOverflowMail.type, MailType.ITEM)
 assert.equal(realOverflowMail.type_id, realPolicyItemId)
 assert.equal(realOverflowMail.number, 1)
 assert.equal(getPlayerItemSync(playerId, realPolicyItemId), 10)
+
+const splitResult = database.transaction(() => executeRewardGrantExecutionPlanAsTransactionOwnerSync(
+    playerId,
+    createRewardGrantExecutionPlan([{ type: RewardType.ITEM, id: realPolicyItemId, count: 25 }]),
+    {
+        playerId: realPolicyBefore.id,
+        freeMana: realPolicyBefore.freeMana,
+        freeVmoney: realPolicyBefore.freeVmoney,
+        expPool: realPolicyBefore.expPool,
+    },
+    { itemOverflow: realPolicy },
+))()
+assert.equal(splitResult.assets.items[0].overflowAmount, 25)
+assert.deepEqual(getPlayerMailsSync(playerId, 1, 100, true)
+    .filter(mail => mail.type_id === realPolicyItemId)
+    .map(mail => mail.number).sort((a, b) => a - b), [1, 5, 10, 10])
 
 const identityBefore = getPlayerSync(playerId)
 assert.throws(() => database.transaction(() => executeRewardGrantExecutionPlanAsTransactionOwnerSync(

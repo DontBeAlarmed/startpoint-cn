@@ -1,5 +1,5 @@
 import { findItemInventoryPolicy, getItemInventoryPolicyCatalog } from "./inventory/item-inventory-policy"
-import { insertItemOverflowMailWithinTransactionSync } from "./mail-overflow"
+import { insertItemOverflowMailsWithinTransactionSync } from "./mail-overflow"
 import { getVirtualNow } from "../runtime/time/game-time"
 import type { RewardGrantItemOverflowPolicy } from "./reward-grant"
 
@@ -8,15 +8,22 @@ export function createRewardGrantItemOverflowPolicy(
     now: Date = getVirtualNow(),
 ): RewardGrantItemOverflowPolicy {
     const catalog = getItemInventoryPolicyCatalog()
-    return Object.freeze({
-        playerId,
-        maxCount(itemId: number): number {
+    const maxCount = (itemId: number): number => {
             const policy = findItemInventoryPolicy(catalog, itemId)
             if (policy === null) throw new Error(`Item ${itemId} is missing inventory policy.`)
             return policy.maxCount
-        },
+        }
+    return Object.freeze({
+        playerId,
+        maxCount,
         writeOverflow(itemId: number, amount: number): void {
-            insertItemOverflowMailWithinTransactionSync(playerId, itemId, amount, now)
+            insertItemOverflowMailsWithinTransactionSync(
+                playerId,
+                itemId,
+                amount,
+                Math.min(maxCount(itemId), 2_147_483_647),
+                now,
+            )
         },
     })
 }
