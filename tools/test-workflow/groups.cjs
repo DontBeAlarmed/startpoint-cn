@@ -333,6 +333,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/reward_campaign.test.cjs",
             "tools/shop_bulk_purchase.test.cjs",
             "tools/shop_purchase_plan.test.cjs",
+            "tools/shop_purchase_owner.test.cjs",
             "tools/shop_reward_purchase_contract.test.cjs",
             "tools/mail_notification.test.cjs",
             "tools/mail_notification_write_routes.test.cjs",

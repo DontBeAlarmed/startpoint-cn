@@ -14,6 +14,8 @@ import type {
 } from "./event-shop-purchase"
 import type { Reward } from "./types"
 import type { PlayerRewardResult } from "./types/rewards"
+import type { FactKey } from "./mission/facts/fact-key"
+import type { PlannedItemOverflowDisposition } from "./item-overflow"
 import { getAwakeFactKeysFromRewardGrants } from "./mission/awake-reward-facts"
 import { createRewardGrantItemOverflowPolicy } from "./reward-grant-item-overflow"
 
@@ -52,7 +54,52 @@ export function grantShopRewardsInTransactionOwnerWithInventorySync(
     rewards: readonly Reward[],
     knownPlayerBefore: GenericShopPlayerState,
     inventory: InventoryBatchContext,
+    options: {
+        readonly virtualNow?: Date
+        readonly knownPaidMana?: number
+    } = {},
 ): GenericShopRewardGrantResult {
+    const typed = grantShopRewardsTypedInTransactionOwnerWithInventorySync(
+        playerId,
+        rewards,
+        knownPlayerBefore,
+        inventory,
+        options,
+    )
+    return {
+        rewardResult: projectShopRewardResult(typed.execution),
+        rewardInvalidatedFactKeys: typed.invalidatedFactKeys,
+        playerAfter: {
+            freeMana: typed.execution.playerAfter.freeMana,
+            freeVmoney: typed.execution.playerAfter.freeVmoney,
+            expPool: typed.execution.playerAfter.expPool,
+        },
+    }
+}
+
+export interface ShopTypedRewardPlayerBefore {
+    readonly id: number
+    readonly freeMana: number
+    readonly freeVmoney: number
+    readonly expPool: number
+}
+
+export interface ShopTypedRewardGrantResult {
+    readonly execution: RewardGrantExecutionResult
+    readonly invalidatedFactKeys: readonly FactKey[]
+    readonly itemOverflowDispositions: readonly PlannedItemOverflowDisposition[]
+}
+
+export function grantShopRewardsTypedInTransactionOwnerWithInventorySync(
+    playerId: number,
+    rewards: readonly Reward[],
+    knownPlayerBefore: ShopTypedRewardPlayerBefore,
+    inventory: InventoryBatchContext,
+    options: {
+        readonly virtualNow?: Date
+        readonly knownPaidMana?: number
+    } = {},
+): ShopTypedRewardGrantResult {
     const plan = createShopRewardPlan(rewards)
     return withRewardGrantExecutionPlanAsTransactionOwnerWithInventorySync(
         playerId,
@@ -72,15 +119,17 @@ export function grantShopRewardsInTransactionOwnerWithInventorySync(
             )
             execution.finalize()
             return {
-                rewardResult: projectShopRewardResult(result),
-                rewardInvalidatedFactKeys: getAwakeFactKeysFromRewardGrants(result),
-                playerAfter: {
-                    freeMana: result.playerAfter.freeMana,
-                    freeVmoney: result.playerAfter.freeVmoney,
-                    expPool: result.playerAfter.expPool,
-                },
+                execution: result,
+                invalidatedFactKeys: getAwakeFactKeysFromRewardGrants(result),
+                itemOverflowDispositions: collectRewardGrantItemOverflowDispositions(result),
             }
         },
-        { itemOverflow: createRewardGrantItemOverflowPolicy(playerId) },
+        {
+            itemOverflow: createRewardGrantItemOverflowPolicy(
+                playerId,
+                options.virtualNow,
+                options.knownPaidMana,
+            ),
+        },
     )
 }

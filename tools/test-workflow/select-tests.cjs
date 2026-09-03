@@ -387,6 +387,10 @@ const SOURCE_RULES = [
         groups: ["integration:rules"],
     },
     {
+        pattern: /^(?:src\/lib\/shop\/(?:owner|purchase-owner|payment-adapter|equipment-enhancement-adapter|pass-card-adapter|result)\.ts|tools\/shop_purchase_owner\.test\.cjs)$/,
+        groups: ["integration:rules"],
+    },
+    {
         pattern: /^(?:src\/lib\/mail-reward-grant\.ts|src\/routes\/api\/mail\.ts|docs\/systems\/mail\.md)$/,
         groups: ["integration:reward-grant", "integration:rules"],
     },
