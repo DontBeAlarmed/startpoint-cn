@@ -30,6 +30,7 @@
 | D15 | 全项目领域边界蓝图（识别完成，实施主线进行中） | [领域边界蓝图](./domain-boundary-blueprint.md) | CDN/客户端/服务端三层边界；owner、有限 shared core、adapter、projector 与独立模块 |
 | D16 | Item Inventory Owner（已落地，待大 Gate A 与客户端验收） | [Item Inventory Owner Gate](./item-inventory-owner-gate.md) | typed Item Content、唯一 Item writer、cap 纯计划与 EventTrade 到期策略 |
 | D17 | RewardGrant 正向协调核（实现完成，待大 Gate A 与客户端验收） | [RewardGrant Core Gate](./reward-grant-core-gate.md) | 正向 Reward plan、资产 owner executors 与 Typed Grant Result；不成为 Economy bus |
+| D18b | Item Overflow Disposition 与 Toast（设计已确认，待实现） | [Item Overflow Disposition Gate](./item-overflow-disposition-gate.md) | `sellable` 驱动 Sold/Mail、Mana 二次 overflow 与官方 `data.over_max` Toast |
 
 ## 阅读顺序
 
