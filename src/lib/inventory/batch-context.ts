@@ -297,6 +297,7 @@ class InventoryBatchContextImpl implements InventoryBatchContext {
             recordInventoryBatchMutation(this as unknown as object)
             return Object.freeze({
                 ...mutation,
+                beforeAmount: baseAmount,
                 requestedAmount,
                 acceptedAmount,
                 overflowAmount: requestedAmount - acceptedAmount,

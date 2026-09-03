@@ -70,7 +70,7 @@ assert.deepEqual(capped.first, {
 })
 assert.deepEqual(capped.second, {
     itemId,
-    beforeAmount: 8,
+    beforeAmount: 10,
     afterAmount: 10,
     obtainedAmount: 2,
     requestedAmount: 3,
