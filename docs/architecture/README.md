@@ -31,6 +31,7 @@
 | D16 | Item Inventory Owner（已落地，Gate A 自动验证已完成） | [Item Inventory Owner Gate](./item-inventory-owner-gate.md) | typed Item Content、唯一 Item writer、cap 纯计划与 EventTrade 到期策略 |
 | D17 | RewardGrant 正向协调核（已落地，Gate A 自动验证已完成） | [RewardGrant Core Gate](./reward-grant-core-gate.md) | 正向 Reward plan、资产 owner executors 与 Typed Grant Result；不成为 Economy bus |
 | D18b | Item Overflow Disposition 与 Toast（服务端 Gate 已完成，实机统一延期） | [Item Overflow Disposition Gate](./item-overflow-disposition-gate.md) | `sellable` 驱动 Sold/Mail、Mana 二次 overflow 与官方 `data.over_max` Toast |
+| D19 | Shop Purchase Owner（目标架构） | [Shop Purchase Owner Gate](./shop-purchase-owner-gate.md) | 8 类真实 single、4/7 bulk、完整 Shop Content、统一 purchase plan/transaction owner 与局部索引 |
 
 ## 阅读顺序
 
