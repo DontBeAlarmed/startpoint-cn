@@ -17,6 +17,7 @@ import {
     validateGrowthCommandIds,
     validatePositiveAmount,
 } from "../mutation-support"
+import { createRewardGrantItemOverflowPolicy } from "../../reward-grant-item-overflow"
 
 export interface StackToExpCommand {
     readonly playerId: number
@@ -66,15 +67,22 @@ export function executeStackToExp(command: StackToExpCommand): StackToExpResult 
             playerId: command.playerId,
             preloadItemIds: [STACK_CONVERSION_REWARD_ITEM_ID],
         }, inventory => {
+            const overflowPolicy = createRewardGrantItemOverflowPolicy(command.playerId)
             const existingItem = inventory.read(STACK_CONVERSION_REWARD_ITEM_ID)
-            const afterItem = addSafeInteger(existingItem.beforeAmount, addStarGrain, "item.amount")
             updateCharacterGrowthRowsSync(command.playerId, [{
                 characterId: command.characterId,
                 stack: before.stack - command.useStackCount,
             }])
             updatePlayerSync({ id: command.playerId, expPool: afterPool })
-            const itemResult = inventory.grant(STACK_CONVERSION_REWARD_ITEM_ID, addStarGrain)
+            const itemResult = inventory.grantWithCapacity(
+                STACK_CONVERSION_REWARD_ITEM_ID,
+                addStarGrain,
+                overflowPolicy.maxCount(STACK_CONVERSION_REWARD_ITEM_ID),
+            )
             inventory.flush()
+            if (itemResult.overflowAmount > 0) {
+                overflowPolicy.writeOverflow(STACK_CONVERSION_REWARD_ITEM_ID, itemResult.overflowAmount)
+            }
             return {
                 command: "stack_to_exp",
                 before,

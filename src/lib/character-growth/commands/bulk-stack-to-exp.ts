@@ -19,6 +19,7 @@ import {
     validateEvaluationTime,
     validateGrowthPlayerId,
 } from "../mutation-support"
+import { createRewardGrantItemOverflowPolicy } from "../../reward-grant-item-overflow"
 
 export interface BulkStackToExpCommand {
     readonly playerId: number
@@ -75,16 +76,25 @@ export function executeBulkStackToExp(command: BulkStackToExpCommand): BulkStack
             playerId: command.playerId,
             preloadItemIds: [STACK_CONVERSION_REWARD_ITEM_ID],
         }, inventory => {
+            const overflowPolicy = createRewardGrantItemOverflowPolicy(command.playerId)
             const existingItem = inventory.read(STACK_CONVERSION_REWARD_ITEM_ID)
-            const afterItem = addSafeInteger(existingItem.beforeAmount, addStarGrain, "item.amount")
+            let afterItem = existingItem.beforeAmount
             const updateTime = updateCharacterGrowthRowsSync(command.playerId, selected.map(character => ({
                 characterId: character.characterId,
                 stack: 0,
             })))
             updatePlayerSync({ id: command.playerId, expPool: afterPool })
             if (addStarGrain > 0) {
-                inventory.grant(STACK_CONVERSION_REWARD_ITEM_ID, addStarGrain)
+                const itemResult = inventory.grantWithCapacity(
+                    STACK_CONVERSION_REWARD_ITEM_ID,
+                    addStarGrain,
+                    overflowPolicy.maxCount(STACK_CONVERSION_REWARD_ITEM_ID),
+                )
+                afterItem = itemResult.afterAmount
                 inventory.flush()
+                if (itemResult.overflowAmount > 0) {
+                    overflowPolicy.writeOverflow(STACK_CONVERSION_REWARD_ITEM_ID, itemResult.overflowAmount)
+                }
             }
             return { afterItem, updateTime }
         })

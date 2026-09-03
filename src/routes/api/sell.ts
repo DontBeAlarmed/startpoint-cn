@@ -16,6 +16,7 @@ import { getConfigSync } from "../../lib/assets";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
 import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
+import { createRewardGrantItemOverflowPolicy } from "../../lib/reward-grant-item-overflow";
 
 interface SellEquipmentListItem {
     equipment_id: number
@@ -61,10 +62,23 @@ function grantDissolveRewardsWithinTransactionSync(
         preloadItemIds: grants.map(grant => grant.itemId),
     }, inventory => {
         const itemList: Record<number, number> = {}
+        const overflowPolicy = createRewardGrantItemOverflowPolicy(playerId)
+        const pendingOverflows: Array<{ itemId: number, amount: number }> = []
         for (const grant of grants) {
-            itemList[grant.itemId] = inventory.grant(grant.itemId, grant.amount).afterAmount
+            const item = inventory.grantWithCapacity(
+                grant.itemId,
+                grant.amount,
+                overflowPolicy.maxCount(grant.itemId),
+            )
+            itemList[grant.itemId] = item.afterAmount
+            if (item.overflowAmount > 0) {
+                pendingOverflows.push({ itemId: grant.itemId, amount: item.overflowAmount })
+            }
         }
         inventory.flush()
+        for (const overflow of pendingOverflows) {
+            overflowPolicy.writeOverflow(overflow.itemId, overflow.amount)
+        }
         return itemList
     })
 }

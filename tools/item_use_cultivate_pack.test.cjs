@@ -17,9 +17,17 @@ const previousDataDirectory = process.env.DATA_DIR
 process.env.DATA_DIR = databaseDirectory
 
 const bundledItemData = require("../assets/item_data.json")
+const bundledItemPolicy = structuredClone(require("../assets/item_inventory_policy.json"))
+for (const itemId of [4, 990003, 990004]) {
+    bundledItemPolicy.byItemId[itemId] = {
+        ...bundledItemPolicy.byItemId[14002],
+        maxCount: 2_147_483_647,
+    }
+}
 const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
     .installBundledGameplaySnapshot({
         tableOverrides: {
+            "item_inventory_policy.json": bundledItemPolicy,
             "item_data.json": {
                 ...bundledItemData,
                 990001: { effectKind: 22, effectValue: 0, selectRewards: [] },
@@ -48,6 +56,8 @@ const {
     getPlayerItemSync,
 } = require("../src/data/domains/item")
 const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
+const { getPlayerMailsSync, MailType } = require("../src/data/domains/mail")
+const { createRewardGrantItemOverflowPolicy } = require("../src/lib/reward-grant-item-overflow")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
@@ -141,6 +151,30 @@ test("999102 selectIndex 1 through 6 returns the corresponding reward item", asy
         assert.equal(responseData.item_list[String(rewardItemId)], 30)
         assert.equal("user_info" in responseData, false)
     }
+})
+
+test("cultivate pack sends capped reward overflow to Mail", async () => {
+    const { playerId, viewerId } = await createPlayer("cultivate-overflow")
+    const rewardItemId = 8
+    const policy = createRewardGrantItemOverflowPolicy(playerId)
+    setInventoryFixtureItemExactSync(playerId, 999102, 1)
+    setInventoryFixtureItemExactSync(playerId, rewardItemId, policy.maxCount(rewardItemId))
+    const collectedBefore = getPlayerCollectedItemTotalSync(playerId, rewardItemId)
+
+    const responseData = decodeSuccess(await useItem(viewerId, [{
+        id: 999102,
+        number: 1,
+        selectIndex: 2,
+    }])).data
+
+    assert.equal(responseData.item_list[String(rewardItemId)], policy.maxCount(rewardItemId))
+    assert.equal(getPlayerItemSync(playerId, rewardItemId), policy.maxCount(rewardItemId))
+    assert.equal(getPlayerCollectedItemTotalSync(playerId, rewardItemId), collectedBefore)
+    assert.deepEqual(getPlayerMailsSync(playerId, 1, 100, true).map(mail => ({
+        type: mail.type,
+        type_id: mail.type_id,
+        number: mail.number,
+    })), [{ type: MailType.ITEM, type_id: rewardItemId, number: 30 }])
 })
 
 test("duplicate cultivate pack entries with the same selection are aggregated", async () => {
@@ -374,6 +408,18 @@ test("settlement entry follows the callback-scoped Inventory batch topology", ()
         grant(itemId, amount) {
             calls.push(`grant:${itemId}:${amount}`)
         },
+        grantWithCapacity(itemId, amount, maxCount) {
+            calls.push(`grant-cap:${itemId}:${amount}:${maxCount}`)
+            return {
+                itemId,
+                beforeAmount: 0,
+                afterAmount: amount,
+                obtainedAmount: amount,
+                requestedAmount: amount,
+                acceptedAmount: amount,
+                overflowAmount: 0,
+            }
+        },
         flush() {
             calls.push("flush")
             return [
@@ -430,7 +476,7 @@ test("settlement entry follows the callback-scoped Inventory batch topology", ()
         "read-many:999102,4",
         "stamina-plan",
         "deduct:999102:1",
-        "grant:4:30",
+        "grant-cap:4:30:2147483647",
         "stamina",
         "flush",
     ])

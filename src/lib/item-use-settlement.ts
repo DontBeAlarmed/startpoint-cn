@@ -5,6 +5,7 @@ import {
     type InventoryItemResult,
     withInventoryBatchContextWithinTransactionSync,
 } from "./inventory"
+import { createRewardGrantItemOverflowPolicy } from "./reward-grant-item-overflow"
 import { computeRealTimeStamina } from "./stamina"
 import { Player } from "../data/types"
 import { getRealNow } from "../runtime/time/game-time"
@@ -278,7 +279,15 @@ function projectItemList(
     const resultByItemId = new Map(results.map(result => [result.itemId, result]))
     return Object.fromEntries(changes.map(change => {
         const result = resultByItemId.get(change.id)
-        if (result === undefined || result.afterAmount !== change.finalCount) {
+        const baseAfter = change.beforeCount - change.deductionCount
+        const acceptedReward = result === undefined
+            ? null
+            : result.afterAmount - baseAfter
+        if (result === undefined
+            || !Number.isSafeInteger(acceptedReward)
+            || (acceptedReward as number) < 0
+            || (acceptedReward as number) > change.rewardCount
+            || result.afterAmount > AS3_INT_MAX) {
             throw new Error(`Inventory flush result did not match item use plan for item ${change.id}.`)
         }
         return [String(change.id), result.afterAmount]
@@ -317,7 +326,18 @@ export function settleItemUseInCallerTransactionSync(
             maxStaminaOverflow,
         )
         for (const deduction of intent.deductions) inventory.deduct(deduction.id, deduction.count)
-        for (const reward of intent.rewards) inventory.grant(reward.id, reward.count)
+        const overflowPolicy = createRewardGrantItemOverflowPolicy(playerId)
+        const pendingOverflows: Array<{ itemId: number, amount: number }> = []
+        for (const reward of intent.rewards) {
+            const grant = inventory.grantWithCapacity(
+                reward.id,
+                reward.count,
+                overflowPolicy.maxCount(reward.id),
+            )
+            if (grant.overflowAmount > 0) {
+                pendingOverflows.push({ itemId: reward.id, amount: grant.overflowAmount })
+            }
+        }
         if (staminaPlan !== null) {
             dependencies.updatePlayerSync({
                 id: playerId,
@@ -326,6 +346,9 @@ export function settleItemUseInCallerTransactionSync(
             })
         }
         const results = inventory.flush()
+        for (const overflow of pendingOverflows) {
+            overflowPolicy.writeOverflow(overflow.itemId, overflow.amount)
+        }
         const plan: ItemUsePlan = {
             inventoryChanges: changes,
             rewards: intent.rewards,

@@ -4,6 +4,7 @@ import type { PlayerCharacter } from "../../../data/types"
 import { getCharacterDataSync } from "../../assets"
 import { withInventoryBatchContextWithinTransactionSync } from "../../inventory"
 import type { Element, GivePlayerCharacterResult } from "../../types"
+import { createRewardGrantItemOverflowPolicy } from "../../reward-grant-item-overflow"
 import { addSafeInteger, assertInsideTransaction, updateCharacterGrowthRowsSync, validateGrowthCommandIds } from "../mutation-support"
 import {
     STACK_CHARACTER_GROWTH_FIELDS,
@@ -71,8 +72,12 @@ export function grantCharacterStackWithinTransactionSync(
         playerId: command.playerId,
         preloadItemIds: [itemId],
     }, inventory => {
-        inventory.grant(itemId, 1)
+        const overflowPolicy = createRewardGrantItemOverflowPolicy(command.playerId)
+        const grant = inventory.grantWithCapacity(itemId, 1, overflowPolicy.maxCount(itemId))
         inventory.flush()
+        if (grant.overflowAmount > 0) {
+            overflowPolicy.writeOverflow(itemId, grant.overflowAmount)
+        }
         return updateStack()
     })
 }

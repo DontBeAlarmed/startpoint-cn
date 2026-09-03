@@ -22,6 +22,7 @@ import { getMailArrivedSync } from "../../lib/mail-notification";
 import { settleMissionOperationFactsSync } from "../../lib/mission/operation-fact-settlement";
 import { mergeMissionSettlementResponse } from "../../lib/mission";
 import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
+import { createRewardGrantItemOverflowPolicy } from "../../lib/reward-grant-item-overflow";
 
 interface SetProtectionBody {
     protection: boolean
@@ -133,11 +134,17 @@ const routes = async (fastify: FastifyInstance) => {
                     playerId,
                     preloadItemIds: [dissolveInfo.ability_soul_id],
                 }, inventory => {
-                    returnItemList[dissolveInfo.ability_soul_id] = inventory.grant(
+                    const overflowPolicy = createRewardGrantItemOverflowPolicy(playerId)
+                    const grant = inventory.grantWithCapacity(
                         dissolveInfo.ability_soul_id,
                         upgradeCount,
-                    ).afterAmount
+                        overflowPolicy.maxCount(dissolveInfo.ability_soul_id),
+                    )
                     inventory.flush()
+                    if (grant.overflowAmount > 0) {
+                        overflowPolicy.writeOverflow(dissolveInfo.ability_soul_id, grant.overflowAmount)
+                    }
+                    returnItemList[dissolveInfo.ability_soul_id] = grant.afterAmount
                 })
             }
             return { equipmentSnapshot, missionSettlement }
@@ -248,21 +255,34 @@ const routes = async (fastify: FastifyInstance) => {
                     )),
                 ],
             }, inventory => {
+                const overflowPolicy = createRewardGrantItemOverflowPolicy(playerId)
+                const pendingOverflows: Array<{ itemId: number, amount: number }> = []
                 for (const upgrade of upgrades) {
                     updatePlayerEquipmentSync(playerId, upgrade.equipmentId, {
                         level: upgrade.newLevel,
                         stack: upgrade.newStack,
                     })
                     if (upgrade.abilitySoulId !== null) {
-                        returnItemList[upgrade.abilitySoulId] = inventory.grant(
+                        const grant = inventory.grantWithCapacity(
                             upgrade.abilitySoulId,
                             upgrade.upgradeCount,
-                        ).afterAmount
+                            overflowPolicy.maxCount(upgrade.abilitySoulId),
+                        )
+                        returnItemList[upgrade.abilitySoulId] = grant.afterAmount
+                        if (grant.overflowAmount > 0) {
+                            pendingOverflows.push({
+                                itemId: upgrade.abilitySoulId,
+                                amount: grant.overflowAmount,
+                            })
+                        }
                     }
                 }
                 const craftPointResult = inventory.deduct(wrightpieceItemId(), totalCraftPointCost)
                 returnItemList[wrightpieceItemId()] = craftPointResult.afterAmount
                 inventory.flush()
+                for (const overflow of pendingOverflows) {
+                    overflowPolicy.writeOverflow(overflow.itemId, overflow.amount)
+                }
 
                 const equipmentSnapshot = getPlayerEquipmentListSync(playerId)
                 const missionSettlement = settleMissionOperationFactsSync(
