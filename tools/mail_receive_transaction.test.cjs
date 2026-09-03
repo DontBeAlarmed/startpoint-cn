@@ -185,6 +185,20 @@ test("receive_all grants each requested mail id at most once", async () => {
     assert.equal(receiveHistoryCount(playerId), 1)
 })
 
+test("receive_all rejects an unbounded or invalid ID list before writing", async () => {
+    const { playerId, viewerId } = await createPlayer("invalid-id-list")
+    const mailId = addMail(playerId, MailType.ITEM, 14002, 1)
+    const before = getPlayerItemSync(playerId, 14002) ?? 0
+    const response = await app.inject({
+        method: "POST",
+        url: "/receive_all",
+        payload: { viewer_id: viewerId, mail_ids: Array.from({ length: 501 }, (_, index) => index + 1) },
+    })
+    assert.equal(response.statusCode, 400, response.body)
+    assert.equal(getPlayerItemSync(playerId, 14002) ?? 0, before)
+    assert.equal(mailState(mailId), "0000-00-00 00:00:00")
+})
+
 test("single receive keeps an Item mail when the Inventory is full", async () => {
     const { playerId, viewerId } = await createPlayer("capacity-blocked-single")
     const itemId = 14002

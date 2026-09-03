@@ -32,6 +32,7 @@ interface ReceiveAllBody {
 }
 
 class MailNotAvailableError extends Error {}
+const MAX_RECEIVE_ALL_MAIL_IDS = 500
 
 function getMailAwakeInvalidatedFactKeys(
     mails: readonly RawPlayerMail[],
@@ -227,7 +228,9 @@ const routes = async (fastify: FastifyInstance) => {
         const body = request.body as ReceiveAllBody
         const viewerId = body.viewer_id
         const mailIds = body.mail_ids
-        if (!viewerId || isNaN(viewerId) || !mailIds || !Array.isArray(mailIds)) return reply.status(400).send({
+        if (!viewerId || isNaN(viewerId) || !mailIds || !Array.isArray(mailIds)
+            || mailIds.length > MAX_RECEIVE_ALL_MAIL_IDS
+            || mailIds.some(mailId => !Number.isSafeInteger(mailId) || mailId <= 0)) return reply.status(400).send({
             error: "Bad Request",
             message: "Invalid request body"
         })
@@ -267,8 +270,9 @@ const routes = async (fastify: FastifyInstance) => {
                 const expiredMailIds = expiredMails.map(mail => mail.id)
                 deletePlayerMailsByIdsSync(playerId, expiredMailIds)
                 const expiredMailIdSet = new Set(expiredMailIds)
+                const mailMap = new Map(unreceivedMails.map(mail => [mail.id, mail]))
                 const validMails = uniqueMailIds
-                    .map(mailId => unreceivedMails.find(mail => mail.id === mailId))
+                    .map(mailId => mailMap.get(mailId))
                     .filter((mail): mail is RawPlayerMail => (
                         mail !== undefined && !expiredMailIdSet.has(mail.id)
                     ))
@@ -309,7 +313,6 @@ const routes = async (fastify: FastifyInstance) => {
                         throw error
                     }
                 }
-                const mailMap = new Map(validMails.map(mail => [mail.id, mail]))
                 const finalized = finalizeMailReceiveAllAwakePublicationWrites(
                     playerId,
                     claimed,
