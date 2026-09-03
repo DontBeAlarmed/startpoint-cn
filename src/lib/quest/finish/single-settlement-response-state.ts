@@ -1,5 +1,6 @@
 import type { Player } from "../../../data/types"
 import type {
+    RewardGrantExecutionOptions,
     RewardGrantExecutionResult,
     RewardGrantKnownPlayerState,
 } from "../../reward-grant"
@@ -64,7 +65,11 @@ interface SingleSettlementObservedResult {
     readonly userInfo?: Readonly<Record<string, number>>
 }
 
-export function createSingleSettlementResponseState(playerId: number, player: Player) {
+export function createSingleSettlementResponseState(
+    playerId: number,
+    player: Player,
+    options: RewardGrantExecutionOptions = {},
+) {
     if (player.id !== playerId) {
         throw new Error(`Single settlement Player ${player.id} does not match owner ${playerId}`)
     }
@@ -110,6 +115,7 @@ export function createSingleSettlementResponseState(playerId: number, player: Pl
                 targetPlayerId,
                 rewards,
                 playerState,
+                options,
             )
             observeGrant(grant)
             return projectSingleSettlementRewardGrant(grant)

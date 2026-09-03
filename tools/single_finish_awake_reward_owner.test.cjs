@@ -7,6 +7,7 @@ const test = require("node:test")
 
 const mainQuests = require("../assets/main_quest.json")
 const clearRewards = require("../assets/clear_reward.json")
+const itemInventoryPolicy = require("../assets/item_inventory_policy.json")
 const {
     AWAKE_ITEM_ID,
     AWAKE_MISSION_ID,
@@ -44,6 +45,18 @@ function tableOverrides() {
         manaReward: 0,
         poolExpReward: 0,
     }
+    const itemPolicy = structuredClone(itemInventoryPolicy)
+    for (const itemId of [AWAKE_ITEM_ID, 920272, 920273]) {
+        itemPolicy.byItemId[String(itemId)] = {
+            effectKind: 0,
+            category: 2,
+            salePrice: 0,
+            maxCount: 9999,
+            sellable: true,
+            startTimeMs: 0,
+            endTimeMs: null,
+        }
+    }
     return {
         ...EMPTY_MISSION_OVERRIDES,
         "main_quest.json": quests,
@@ -53,6 +66,7 @@ function tableOverrides() {
             [S_PLUS_REWARD_ID]: { name: "unrelated S+", type: 0, id: 920273, count: 1 },
         },
         "score_reward.json": {},
+        "item_inventory_policy.json": itemPolicy,
         "additional_reward_rules.json": {
             groups: {},
             collectItemRules: [],

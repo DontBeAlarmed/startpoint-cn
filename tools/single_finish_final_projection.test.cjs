@@ -6,6 +6,7 @@ const test = require("node:test")
 require("ts-node/register/transpile-only")
 
 const clearRewards = require("../assets/clear_reward.json")
+const itemInventoryPolicy = require("../assets/item_inventory_policy.json")
 const mainQuests = require("../assets/main_quest.json")
 const rushEventQuestFolders = require("../assets/rush_event_quest_folder.json")
 const {
@@ -50,6 +51,19 @@ function rewardOverrides(clearReward, sPlusReward) {
         clearRewardId: CLEAR_REWARD_ID,
         sPlusRewardId: S_PLUS_REWARD_ID,
     }
+    const itemPolicy = structuredClone(itemInventoryPolicy)
+    for (const reward of [clearReward, sPlusReward]) {
+        if (reward.type !== RewardType.ITEM || reward.id === undefined) continue
+        itemPolicy.byItemId[String(reward.id)] = {
+            effectKind: 0,
+            category: 2,
+            salePrice: 0,
+            maxCount: 9999,
+            sellable: true,
+            startTimeMs: 0,
+            endTimeMs: null,
+        }
+    }
     return {
         "main_quest.json": quests,
         "clear_reward.json": {
@@ -58,6 +72,7 @@ function rewardOverrides(clearReward, sPlusReward) {
             [S_PLUS_REWARD_ID]: sPlusReward,
         },
         "score_reward.json": {},
+        "item_inventory_policy.json": itemPolicy,
         "additional_reward_rules.json": {
             groups: {},
             collectItemRules: [],
@@ -66,6 +81,56 @@ function rewardOverrides(clearReward, sPlusReward) {
         ...EMPTY_MISSION_OVERRIDES,
     }
 }
+
+test("single finish sends generated Item overflow to Mail without increasing Inventory", async () => {
+    const overflowAmount = 470
+    await withSingleBattleHarness("item-overflow", async harness => {
+        harness.setItem(1, 9999)
+
+        const data = await finishFirstClear(harness, "task-26d2-item-overflow")
+
+        assert.equal(data.item_list[1], 9999)
+        assert.deepEqual(harness.db.prepare(`
+            SELECT type, type_id, number
+            FROM players_mails
+            WHERE player_id = ? AND type = 1 AND type_id = 1
+            ORDER BY id
+        `).all(harness.playerId), [{ type: 1, type_id: 1, number: overflowAmount }])
+        assert.equal(harness.db.prepare(`
+            SELECT total_obtained
+            FROM players_collected_items
+            WHERE player_id = ? AND item_id = 1
+        `).get(harness.playerId)?.total_obtained ?? 0, 0)
+    }, {
+        tableOverrides: rewardOverrides(
+            { name: "overflow item", type: RewardType.ITEM, id: 1, count: overflowAmount },
+            { name: "S+ mana", type: RewardType.MANA, count: 1 },
+        ),
+    })
+})
+
+test("single finish routes new rewards to Mail when legacy Inventory is already over cap", async () => {
+    const legacyAmount = 24529
+    const overflowAmount = 470
+    await withSingleBattleHarness("legacy-item-overflow", async harness => {
+        harness.setItem(1, legacyAmount)
+
+        const data = await finishFirstClear(harness, "task-26d2-legacy-item-overflow")
+
+        assert.equal(data.item_list[1], legacyAmount)
+        assert.deepEqual(harness.db.prepare(`
+            SELECT type, type_id, number
+            FROM players_mails
+            WHERE player_id = ? AND type = 1 AND type_id = 1
+            ORDER BY id
+        `).all(harness.playerId), [{ type: 1, type_id: 1, number: overflowAmount }])
+    }, {
+        tableOverrides: rewardOverrides(
+            { name: "legacy overflow item", type: RewardType.ITEM, id: 1, count: overflowAmount },
+            { name: "S+ mana", type: RewardType.MANA, count: 1 },
+        ),
+    })
+})
 
 function noIncidentalRewardOverrides() {
     return {

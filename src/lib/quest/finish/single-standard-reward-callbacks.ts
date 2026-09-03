@@ -1,4 +1,5 @@
 import type {
+    RewardGrantExecutionOptions,
     RewardGrantExecutionPlan,
     RewardGrantExecutionResult,
     RewardGrantKnownPlayerState,
@@ -19,6 +20,7 @@ export function createSingleSettlementStandardRewardGrant(
     playerId: number,
     updatePlayerState: (state: RewardGrantKnownPlayerState) => void,
     observeGrant?: (grant: RewardGrantExecutionResult) => void,
+    options: RewardGrantExecutionOptions = {},
 ): {
     assertTargetPlayer: (targetPlayerId: number) => void
     forCarnival: (
@@ -39,6 +41,7 @@ export function createSingleSettlementStandardRewardGrant(
             playerId,
             plan,
             knownPlayerBefore,
+            options,
         )
         updatePlayerState(result.playerAfter)
         observeGrant?.(result)

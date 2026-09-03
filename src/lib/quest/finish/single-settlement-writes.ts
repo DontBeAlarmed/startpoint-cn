@@ -42,6 +42,7 @@ import { selectScoreRewardGrantPlan } from "../score-reward-selection"
 import { grantSingleSettlementScoreRewardsWithinTransactionSync } from "./single-settlement-reward-grant"
 import { createSingleSettlementStandardRewardGrant } from "./single-standard-reward-callbacks"
 import { createSingleSettlementResponseState } from "./single-settlement-response-state"
+import { createRewardGrantItemOverflowPolicy } from "../../reward-grant-item-overflow"
 import {
     prepareSingleGrowthPublication,
     publishPreparedSingleGrowthPublication,
@@ -88,12 +89,14 @@ export function executeSingleSettlementWrites(
         dailyResetHour,
     })
     settlementPlayer.totalStaminaUsed += entryResourceResult.staminaUsed
-    const responseState = createSingleSettlementResponseState(playerId, settlementPlayer)
+    const rewardGrantOptions = { itemOverflow: createRewardGrantItemOverflowPolicy(playerId, settlementTime) }
+    const responseState = createSingleSettlementResponseState(playerId, settlementPlayer, rewardGrantOptions)
     const grantDirectRewards = responseState.grant
     const standardRewardGrant = createSingleSettlementStandardRewardGrant(
         playerId,
         responseState.setPlayerState,
         responseState.observeGrant,
+        rewardGrantOptions,
     )
 
     if (questAccomplished && !isScoreAttackEvent) {
@@ -165,7 +168,7 @@ export function executeSingleSettlementWrites(
         },
     )
     const scoreRewardGrant = grantSingleSettlementScoreRewardsWithinTransactionSync(
-        playerId, scoreRewardSelection, responseState.playerState,
+        playerId, scoreRewardSelection, responseState.playerState, rewardGrantOptions,
     )
     responseState.observeGrant(scoreRewardGrant.grant)
     const scoreRewardsResult = scoreRewardGrant.result

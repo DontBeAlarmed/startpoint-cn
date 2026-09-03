@@ -1,6 +1,7 @@
 import {
     createRewardGrantExecutionPlan,
     executeRewardGrantExecutionPlanAsTransactionOwnerSync,
+    type RewardGrantExecutionOptions,
     type RewardGrantExecutionPlan,
     type RewardGrantExecutionResult,
     type RewardGrantCommand,
@@ -54,12 +55,14 @@ export function grantSingleSettlementScoreRewardsWithinTransactionSync(
     playerId: number,
     selection: ScoreRewardSelection,
     knownPlayerBefore: RewardGrantKnownPlayerState,
+    options: RewardGrantExecutionOptions = {},
 ): SingleSettlementScoreRewardGrant {
     validateScoreRewardSelection(selection)
     const grant = executeRewardGrantExecutionPlanAsTransactionOwnerSync(
         playerId,
         selection.plan,
         knownPlayerBefore,
+        options,
     )
     return {
         grant,
@@ -71,19 +74,22 @@ export function grantSingleSettlementRewardsWithinTransactionSync(
     playerId: number,
     rewards: readonly Reward[],
     knownPlayerBefore: RewardGrantKnownPlayerState,
+    options: RewardGrantExecutionOptions = {},
 ): RewardGrantExecutionResult {
     const plan = createRewardGrantExecutionPlan(rewards as readonly RewardGrantCommand[])
-    return grantSingleSettlementPlanWithinTransactionSync(playerId, plan, knownPlayerBefore)
+    return grantSingleSettlementPlanWithinTransactionSync(playerId, plan, knownPlayerBefore, options)
 }
 
 export function grantSingleSettlementPlanWithinTransactionSync(
     playerId: number,
     plan: RewardGrantExecutionPlan,
     knownPlayerBefore: RewardGrantKnownPlayerState,
+    options: RewardGrantExecutionOptions = {},
 ): RewardGrantExecutionResult {
     return executeRewardGrantExecutionPlanAsTransactionOwnerSync(
         playerId,
         plan,
         knownPlayerBefore,
+        options,
     )
 }

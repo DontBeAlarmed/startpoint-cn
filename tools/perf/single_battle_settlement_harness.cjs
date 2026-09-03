@@ -32,6 +32,22 @@ const {
     createSingleBattleApp,
 } = require("./single_battle_settlement_request_runner.cjs")
 
+function defaultItemInventoryPolicy() {
+    const policy = structuredClone(require("../../assets/item_inventory_policy.json"))
+    for (const itemId of [910001, 910002]) {
+        policy.byItemId[String(itemId)] = {
+            effectKind: 0,
+            category: 2,
+            salePrice: 0,
+            maxCount: 9999,
+            sellable: true,
+            startTimeMs: 0,
+            endTimeMs: null,
+        }
+    }
+    return policy
+}
+
 async function withSingleBattleHarness(name, operation, {
     additionalSettlementOverride,
     tableOverrides = {},
@@ -51,6 +67,7 @@ async function withSingleBattleHarness(name, operation, {
         setServerTimeOffset(Date.parse(SINGLE_BATTLE_FIXED_TIME) - Date.now())
         restoreContent = installBundledGameplaySnapshot({
             tableOverrides: {
+                "item_inventory_policy.json": defaultItemInventoryPolicy(),
                 "score_reward.json": fixture.DETERMINISTIC_SCORE_REWARDS,
                 "additional_reward_rules.json": fixture.DETERMINISTIC_ADDITIONAL_REWARDS,
                 ...tableOverrides,
