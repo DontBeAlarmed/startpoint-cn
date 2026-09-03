@@ -138,7 +138,6 @@
   ],
   "multi/finish": [
     "anchor-to-publication:import:../../lib/mission/awake-candidate-character-ids#collectAwakeCandidateCharacterIds=1",
-    "anchor-to-publication:import:../../lib/mission/awake-reward-facts#getAwakeFactKeysFromLegacyRewardResults=1",
     "before-anchor:import:../../content/runtime/table-access#getRuntimeContentTableSync=1",
     "before-anchor:import:../../data/domains/player#getPlayerSync=1",
     "before-anchor:import:../../data/domains/player#updatePlayerSync=1",
@@ -162,9 +161,6 @@
     "before-anchor:import:../../lib/quest/first-clear-reward#resolveQuestRewardEligibility=1",
     "before-anchor:import:../../lib/quest/host-finish#resolveHostFinished=1",
     "before-anchor:import:../../lib/quest/multi-battle-validation#validateMultiFinishRequest=1",
-    "before-anchor:import:../../lib/quest#givePlayerRewardsSync=2",
-    "before-anchor:import:../../lib/quest#givePlayerRewardSync=2",
-    "before-anchor:import:../../lib/quest#givePlayerScoreRewardsSync=1",
     "before-anchor:import:../../lib/reward-campaign#calculateCharacterBattleExp=1",
     "before-anchor:import:../../lib/reward-campaign#calculateFixedQuestMana=1",
     "before-anchor:import:../../lib/reward-campaign#calculateFixedQuestPoolExp=1",
@@ -178,6 +174,9 @@
     "before-anchor:import:../rescue-fragment-reward#settleRescueFragmentReward=1",
     "before-anchor:member:Math#max=3",
     "before-anchor:member:Math#min=1",
+    "before-anchor:member:rewardGranter#grantReward=2",
+    "before-anchor:member:rewardGranter#grantRewards=2",
+    "before-anchor:member:rewardGranter#grantScoreRewards=1",
     "before-anchor:member:settlementTime#getTime=1",
     "final-anchor:local-function:finalizeMultiAwakePublicationWrites=1",
     "inside-publication:member:awakeMissionEvaluation?.evaluation.missions#map=1",
@@ -267,7 +266,6 @@
     "final-anchor:member:getDb()#transaction=1",
     "inside-final-anchor:import:../../data/domains/player#getPlayerSync=1",
     "inside-final-anchor:import:../../lib/inventory#withDeferredInventoryBatchContextWithinTransactionSync=1",
-    "inside-publication:import:../../lib/mission/awake-reward-facts#getAwakeFactKeysFromLegacyRewardResults=1",
     "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "character/add_character_from_town": [
@@ -613,7 +611,6 @@
     "final-anchor-evaluation:import:../../data/domains/raidEvent#upsertPlayerRaidEventSync=1",
     "final-anchor-evaluation:import:../../lib/mission/event-entry-facts#recordRaidSummaryMissionFactSync=1",
     "final-anchor-evaluation:import:../../lib/mission/settlement#settleMissionCategories=1",
-    "final-anchor-evaluation:import:../../lib/quest#givePlayerRewardsSync=1",
     "final-anchor:member:getDb()#transaction=1",
     "inside-final-anchor:call-result:member:getDb()#transaction=1",
     "inside-final-anchor:identifier:String=1",
@@ -626,7 +623,6 @@
     "inside-final-anchor:import:../../lib/raid-event-summary#settleRaidEventSummary=1",
     "inside-final-anchor:member:console#warn=1",
     "inside-final-anchor:member:getDb()#transaction=1",
-    "inside-publication:import:../../lib/mission/awake-reward-facts#getAwakeFactKeysFromLegacyRewardResults=1",
     "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "shop/buy": [
@@ -695,7 +691,6 @@
     "final-anchor-evaluation:import:../../lib/pass-card#getActivePassCardEventDefinitionAt=1",
     "final-anchor-evaluation:member:getDb()#transaction=1",
     "final-anchor:import:../../lib/event-shop-purchase#executeGenericShopPurchaseSync=1",
-    "inside-publication:import:../../lib/mission/awake-reward-facts#getAwakeFactKeysFromLegacyRewardResults=1",
     "inside-publication:import:../../runtime/time/game-time#getVirtualNow=1",
     "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
@@ -732,7 +727,6 @@
     "final-anchor-evaluation:import:../../data/domains/player#updatePlayerSync=1",
     "final-anchor-evaluation:member:getDb()#transaction=1",
     "final-anchor:import:../../lib/event-shop-purchase#executeGenericShopBatchPurchaseSync=1",
-    "inside-publication:import:../../lib/mission/awake-reward-facts#getAwakeFactKeysFromLegacyRewardResults=1",
     "inside-publication:import:../../runtime/time/game-time#getVirtualNow=1",
     "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
@@ -751,8 +745,8 @@
     "before-anchor:import:../../lib/character#givePlayerCharacterSync=1",
     "before-anchor:import:../../lib/mission/story-fact-settlement#settleCharacterStoryFactMissions=1",
     "before-anchor:import:../../lib/player-history-milestones#recordCompletedMainChapterMilestoneSync=1",
-    "before-anchor:import:../../lib/quest#givePlayerRewardSync=1",
     "before-anchor:import:../../lib/story-join-character#getQuestJoinCharacterIds=1",
+    "before-anchor:import:../../lib/story-reward-grant#grantStoryRewardWithinTransactionSync=1",
     "before-anchor:import:../../utils#getServerTime=1",
     "before-anchor:member:console#log=2",
     "before-anchor:member:storyCharacterList#push=1",
@@ -760,7 +754,6 @@
     "final-anchor-evaluation:import:../../content/runtime/content-snapshot#getContentSnapshot=1",
     "final-anchor-evaluation:member:evaluationTime#getTime=1",
     "final-anchor:import:../../lib/mission#reconcileActiveMissionFacts=1",
-    "inside-publication:import:../../lib/mission/awake-reward-facts#getAwakeFactKeysFromLegacyRewardResults=1",
     "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "tutorial/update_step:15": [

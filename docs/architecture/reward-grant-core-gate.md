@@ -1,17 +1,16 @@
 # D17 RewardGrant 正向协调核与 Typed Grant Result
 
-状态：B0 设计已经通过独立审查，可以进入 D17 生产实现。C1-C5 未完成前，当前运行时仍以 `docs/systems/reward-grant-transactions.md` 和现有代码为事实。
+状态：B0 设计、C1、C2、C3、C4 已通过独立审查并完成本地提交；C5 尚未开始。本文保留 D17 的边界与迁移记录，当前 typed contract 以本架构规格和 `src/lib/reward-grant/` 实现为准。
 
 ## 1. 背景
 
-D16 已把正常业务 Item 写入迁移到唯一 Inventory owner，并让 RewardGrant 的 Item 分支复用同一 caller-owned batch。当前 RewardGrant 已有 immutable plan、standalone/within/transaction-owner 三类入口和请求内 Item 合并，但结果仍以客户端形状 `PlayerRewardResult` 为主体：
+D16 已把正常业务 Item 写入迁移到唯一 Inventory owner，并让 RewardGrant 的 Item 分支复用同一 caller-owned batch。D17 C1-C3 已建立 immutable typed plan/result、资产 executors 和真实来源迁移；各来源仍在本地投影客户端形状：
 
-- `aggregate.user_info` 表示本次奖励增量，不是玩家绝对后态；
-- `aggregate.items` 表示 Item 绝对后态；
-- Character/Equipment 是客户端对象数组；
-- `playerAfter` 只有三种玩家资源绝对值；
-- Gacha、Score Reward 和 legacy Quest 为取得逐 entry 补偿 Item 增量而直接依赖私有 `InternalRewardGrantResult.itemDeltas`；
-- consumer whitelist 和多处源码形状断言承担迁移期边界，新增合法 adapter 时需要同步修改。
+- typed `playerAfter` 绑定 `playerId`，并携带三种玩家资源绝对后态；
+- typed Item outcome 同时携带 requested/accepted/overflow/before/after；
+- Character/Equipment 以 typed entry outcome 返回，来源 adapter 决定客户端数组、增量和绝对后态语义；
+- Gacha、Score、legacy Quest、Mission、Shop、Mail、Box、Story、Raid、Multi 的生产消费者已不再读取私有 `itemDeltas` 或 generic source；
+- `reward_grant_architecture` 等精确 whitelist 仍属于迁移期 guard，C5 才替换为零 internal import 和依赖方向 guard。
 
 D17 不重写各来源业务，而是把 RewardGrant 收敛为有限的正向协调核：计划只保留正向资产命令和稳定顺序，执行委托各资产 owner，结果明确区分请求量、实际正向获得量、执行期 after-state 和最终聚合 after-state。来源 adapter 通过同长度、同顺序的本地 metadata 与 entry outcome 关联，继续拥有客户端响应、receipt、progress、payment 和 publication。
 
@@ -31,11 +30,12 @@ CN 客户端通过不同 Remote 和页面进入 Login、Mail、Mission、Shop、
 
 当前服务端已经有以下共同事实：
 
-- `RewardGrantPlan<TSource>` 当前捕获 reward 并冻结 entry 外壳，但任意 `source` 仍是可变引用；
+- target `RewardGrantExecutionPlan` 只捕获并冻结正向 asset command；legacy `RewardGrantPlan<TSource>` 仅留在迁移兼容实现目录；
 - standalone 自有事务，within 要求外层事务并使用计划级 savepoint，transaction-owner 不建立额外事务；
 - Item 使用 D16 Inventory batch；Character、Equipment 和 Currency/EXP 使用各自当前写入边界；
 - 同一计划任一执行失败必须回滚本计划或来源外层事务；
-- Gacha、Box 和 Score 需要逐 entry 对齐，而最终资产结果需要按资产 ID 聚合；其他多数 source metadata 没有运行时消费者。
+- Gacha、Box、Score 的 entry-local metadata 仍由各自 adapter 保留，最终 typed assets 可按资产 ID 聚合；
+- Story/Raid/Multi 已改为 source-local adapter，C4 已清理 typed result → legacy fact bridge；C5 仍负责旧 facade/core 的物理删除。
 
 当前分歧集中在 result shape 和 internal API，而不是需要另建跨资产持久化 aggregate。
 
@@ -287,9 +287,9 @@ Currency/EXP 的最终 SQL 必须移出 RewardGrant core，成为窄 Player reso
 | Pass receive-all | indirect via Mission granter | owner | 否 | 否 | pass record/Growth | Pass receive-all |
 | Single finish | direct adapters | owner | 否 | Score 是 | Battle/Event/Mission/active | Single reward + score |
 | Carnival | direct/Single adapter | owner | 否 | 否 | threshold/claimed/record | Carnival settlement |
-| Story finish | indirect legacy facade | owner | 否 | legacy | quest/Mission/Growth | Story finish |
-| Raid summary | indirect legacy facade | owner | 否 | legacy | cursor/Growth | Raid summary |
-| Multi finish | indirect legacy facade | owner | 否 | legacy | room/Event/Mission/active | Multi settlement |
+| Story finish | Story-local typed adapter | owner | 否 | Story DTO | quest/Mission/Growth | Story finish |
+| Raid summary | Raid-local typed adapter | owner | 否 | Raid DTO | cursor/Growth | Raid summary |
+| Multi finish | Multi-local typed adapter | owner | 否 | Multi/Score DTO | room/Event/Mission/active | Multi settlement |
 | Tutorial Gacha | direct Gacha adapter | owner | 是 | 是 | history/tutorial receipt/log | Tutorial replay |
 | 无生产消费者 Awake helper | Mission barrel export | 事务外快照后自建事务 | 否 | 否 | Awake reward | 删除或事务内重构证明 |
 
@@ -300,6 +300,7 @@ Currency/EXP 的最终 SQL 必须移出 RewardGrant core，成为窄 Player reso
 3. transaction-owner 且共享来源 Inventory：Shop、Gacha、Box Gacha；
 4. 需要逐 entry source projection：Score Reward、legacy Quest、Single settlement、Gacha movie/log；
 5. Carnival、Tutorial、Event 和剩余真实消费者。
+6. C4：Story/Raid/Multi source-local adapter 与 typed Awake fact 收口；C5 再删除 legacy facade/core。
 
 每波只把 consumer 改为公共 typed contract。来源仍负责把 typed result 转为现有 endpoint DTO，并保持 receipt、history、progress、任务事实、post-commit publication 和错误映射。
 
@@ -419,7 +420,10 @@ D17 checkpoint 要求 direct/focused、正式性能 admission、类型/文档/�
 ```text
 D17_BASE: 4ab383a69dc8d9b1cc3801579f0107b25710e6bc
 D17_DESIGN_STATUS: APPROVED
-D17_IMPLEMENTATION_STATUS: NOT_STARTED
+D17_IMPLEMENTATION_STATUS: C4_COMPLETE
+D17_C3_CONSUMERS_STATUS: COMPLETE
+D17_C4_TYPED_ADAPTER_STATUS: COMPLETE
+D17_C5_CLEANUP_STATUS: PENDING
 COMPLETE_ACQUISITION_OUTCOME_STATUS: DEFERRED_TO_D28
 ITEM_CAP_AND_OVERFLOW_STATUS: DEFERRED_TO_D18
 ```

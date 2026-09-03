@@ -22,6 +22,7 @@ import type {
 import { getDayBucket } from "./time-utils"
 import { planFreeFirstDeduction } from "./economy/free-first-deduction"
 import type { InventoryBatchContext } from "./inventory"
+import type { FactKey } from "./mission/facts/fact-key"
 
 export const ITEM_SHOP_PERIOD_ERROR_CODE = 2053
 
@@ -102,6 +103,7 @@ export interface GenericShopBatchPurchaseDependencies
 export interface GenericShopRewardGrantResult {
     rewardResult: PlayerRewardResult
     playerAfter: Pick<GenericShopPlayerState, "freeMana" | "freeVmoney" | "expPool">
+    rewardInvalidatedFactKeys: readonly FactKey[]
 }
 
 export interface GenericShopPurchaseResult {
@@ -109,6 +111,7 @@ export interface GenericShopPurchaseResult {
     rewardResult: PlayerRewardResult
     itemList: Record<string, number>
     purchaseCount: number
+    rewardInvalidatedFactKeys: readonly FactKey[]
 }
 
 export interface GenericShopBatchPurchaseEntry {
@@ -132,6 +135,7 @@ export interface GenericShopBatchPurchaseResult {
     rewardResult: PlayerRewardResult
     itemList: Record<string, number>
     purchaseCounts: Record<string, number>
+    rewardInvalidatedFactKeys: readonly FactKey[]
 }
 
 export class ShopPurchaseError extends Error {}
@@ -514,6 +518,7 @@ export function executeGenericShopPurchaseSync(
                         ...rewardResult.items,
                     },
                     purchaseCount,
+                    rewardInvalidatedFactKeys: rewardGrant.rewardInvalidatedFactKeys,
                 }
             }
         )
@@ -675,6 +680,7 @@ export function executeGenericShopBatchPurchaseSync(
                     rewardResult,
                     itemList: { ...itemList, ...rewardResult.items },
                     purchaseCounts,
+                    rewardInvalidatedFactKeys: rewardGrant.rewardInvalidatedFactKeys,
                 }
             },
         )

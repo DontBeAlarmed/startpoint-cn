@@ -18,8 +18,13 @@ const {
     runAwakeOwnerFactPublicationCleanup,
 } = require("./helpers/awake-owner-fact-publication-fixture.cjs")
 const {
-    getAwakeFactKeysFromLegacyRewardResults,
+    getAwakeFactKeysFromRewardGrants,
 } = require("../src/lib/mission/awake-reward-facts")
+const {
+    createRewardGrantExecutionPlan,
+    createRewardGrantExecutionResult,
+} = require("../src/lib/reward-grant")
+const { RewardType } = require("../src/lib/types/rewards")
 const {
     publishCharacterGrowthOwnerStateBestEffort,
 } = require("../src/lib/character-growth/owner-publication")
@@ -117,36 +122,32 @@ test("fixture cleanup continues after failure and retains the original setup err
     assert.deepEqual(cleanupSteps, ["failing cleanup", "later cleanup"])
 })
 
-test("legacy reward fallback maps positive, zero, non-Mana, and mixed results exactly", () => {
+function currencyGrant(type, currency, count) {
+    const plan = createRewardGrantExecutionPlan([{ type, count }])
+    return createRewardGrantExecutionResult(1, plan, [{
+        kind: "currency",
+        currency,
+        requestedAmount: count,
+        beforeAmount: 0,
+        afterAmount: count,
+    }], {
+        playerId: 1,
+        freeMana: currency === "freeMana" ? count : 0,
+        freeVmoney: currency === "freeVmoney" ? count : 0,
+        expPool: currency === "expPool" ? count : 0,
+    })
+}
+
+test("typed reward facts map Mana grants without reading response DTOs", () => {
+    const mana = currencyGrant(RewardType.MANA, "freeMana", 5)
+    const beads = currencyGrant(RewardType.BEADS, "freeVmoney", 9)
     assert.deepEqual(
-        getAwakeFactKeysFromLegacyRewardResults({ user_info: { free_mana: 5 } }),
+        getAwakeFactKeysFromRewardGrants(mana),
         [{ kind: "player" }],
     )
+    assert.deepEqual(getAwakeFactKeysFromRewardGrants(beads, null, undefined), [])
     assert.deepEqual(
-        getAwakeFactKeysFromLegacyRewardResults(
-            { user_info: { free_mana: 0 } },
-            { user_info: { free_mana: undefined } },
-            null,
-        ),
-        [],
-    )
-    assert.deepEqual(
-        getAwakeFactKeysFromLegacyRewardResults({ user_info: { free_vmoney: 5 } }),
-        [],
-    )
-    for (const value of [0.5, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
-        assert.deepEqual(
-            getAwakeFactKeysFromLegacyRewardResults({ user_info: { free_mana: value } }),
-            [],
-            `non-safe Mana value ${String(value)} must not invalidate player facts`,
-        )
-    }
-    assert.deepEqual(
-        getAwakeFactKeysFromLegacyRewardResults(
-            { user_info: { free_mana: 0 } },
-            { user_info: { free_vmoney: 9 } },
-            { user_info: { free_mana: 2 } },
-        ),
+        getAwakeFactKeysFromRewardGrants(beads, mana),
         [{ kind: "player" }],
     )
 })

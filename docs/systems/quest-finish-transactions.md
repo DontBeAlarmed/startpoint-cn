@@ -43,11 +43,14 @@ active quest 没有 `stamina_cost` 时禁止猜测体力退款；已有 `entry_i
 `src/lib/quest/finish/single-settlement-writes.ts` 执行全部持久写入。该总事务适用于
 `getQuestFromCategorySync()` 支持的所有通用战斗分类，不依赖分类是否另有专用响应字段。
 
-clear、S+、普通与 Rare Score、additional、rush 和 score-attack 的标准奖励由该最外层事务的拥有者通过
-executor 模块内部的 `executeRewardGrantPlanInTransactionOwnerSync()` 发放；该入口不从 reward-grant 公共 barrel 导出。只有 Score 单人适配器 direct import 名为 `Internal` 的详细 owner 入口，用于读取 CHARACTER 补偿增量；该 metadata 不进入公共 `RewardGrantResult`、HTTP/TCP 响应或其他结算模块。入口在首写前把调用方维护的 `freeMana`、`freeVmoney` 和 `expPool` 各读取一次，校验为非负安全整数并复制为精确三字段快照，再规范化 Plan。它不查询玩家前后态，也不增加计划 savepoint；奖励异常不得在结算回调内捕获，必须继续向外传播并回滚整个 finish。需要允许调用方捕获错误并继续提交时，仍应使用带计划 savepoint 的
-`executeRewardGrantPlanWithinTransactionSync()`。
+clear、S+、普通与 Rare Score、additional、rush、score-attack、Mission 和 Carnival 的标准奖励由该最外层事务的拥有者通过
+各来源 adapter 调用 public typed `executeRewardGrantExecutionPlanAsTransactionOwnerSync()` 发放；共享来源
+Inventory 的 Shop/Gacha/Box 另由 source adapter 显式完成 validate → finalize。typed owner 不增加计划 savepoint，也不读取
+完整玩家前后态；known state 必须绑定真实 `playerId`。Score 的 drop metadata、Gacha 动画 metadata 和其他来源字段均留在来源
+adapter，不能进入 RewardGrant plan/result。奖励异常不得在结算回调内捕获，必须继续向外传播并回滚整个 finish。需要允许调用方
+捕获错误并继续提交时，仍应使用带计划 savepoint 的 typed within API。
 
-Score 的抽取、倍率和 ELEMENT/AETHER 上下文 ID 在进入 owner 前由纯选择核心一次完成；运行时 wrapper 只负责读取内容、服务器设置和服务器时间并注入核心。Plan source 以 `score_common`、`score_rare` 保留 group、客户端 index 和最终数量，响应 drop IDs 与执行结果共同使用这些 source。执行后协调器直接采用 owner 返回的 `playerAfter`，不再从响应 `user_info` 重复推导货币后态。采样日志只在最外层事务提交成功后记录一次，任一后续写入失败并回滚时不记录。
+Score 的抽取、倍率和 ELEMENT/AETHER 上下文 ID 在进入 owner 前由纯选择核心一次完成；运行时 wrapper 只负责读取内容、服务器设置和服务器时间并注入核心。Score selection 同时保存 typed plan 与本地 `dropMetadata`，其中 `entryIndex` 与客户端 `dropIndex` 分离并以 reward fingerprint 校验；响应 drop IDs 只使用本地 metadata。执行后协调器直接采用 typed owner 的 `playerAfter`，不再从响应 `user_info` 重复推导货币后态。采样日志只在最外层事务提交成功后记录一次，任一后续写入失败并回滚时不记录。
 
 事务成功结果携带写入前旧 progress，以及由同一事务的奖励 owner 后态、Rank/体力写入值和已持久化当前称号形成的最终
 Player 投影；该投影覆盖 `free_mana`、`free_vmoney`、`exp_pool`、`exp_pooled_time`、`rank_point`、`degree_id`、

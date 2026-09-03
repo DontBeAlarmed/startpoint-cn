@@ -93,6 +93,7 @@ export function executeSingleSettlementWrites(
     const standardRewardGrant = createSingleSettlementStandardRewardGrant(
         playerId,
         responseState.setPlayerState,
+        responseState.observeGrant,
     )
 
     if (questAccomplished && !isScoreAttackEvent) {
@@ -278,17 +279,13 @@ export function executeSingleSettlementWrites(
         directAwakeMissionIds: missionBattleFacts.awakeMissionIds,
         directDegreeMissionIds: missionBattleFacts.degreeMissionIds,
         rewardDependencies: { standardRewardGrant: standardRewardGrant.forMission },
+        rewardInvalidatedFactKeys: responseState.rewardInvalidatedFactKeys,
         characterLists: [
             rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
             (clearReward?.character_list || []) as Record<string, unknown>[],
             (sPlusClearReward?.character_list || []) as Record<string, unknown>[],
             scoreRewardsResult.character_list as Record<string, unknown>[],
             (scoreAttackRewardResult?.character_list ?? []) as Record<string, unknown>[],
-        ],
-        legacyRewardResults: [
-            clearReward, sPlusClearReward, scoreRewardsResult,
-            additionalRewardSettlement.rewardResult,
-            rushEventRewardsResult, carnivalRewardResult, scoreAttackRewardResult,
         ],
         manaObtained, questCategory, questPreviouslyCompleted,
     })

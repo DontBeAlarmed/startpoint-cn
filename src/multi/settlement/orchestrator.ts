@@ -18,7 +18,6 @@ import {
 } from "../../lib/mission"
 import { collectAwakeCandidateCharacterIds } from "../../lib/mission/awake-candidate-character-ids"
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication"
-import { getAwakeFactKeysFromLegacyRewardResults } from "../../lib/mission/awake-reward-facts"
 import type { FactKey } from "../../lib/mission/facts/fact-key"
 import {
     ActiveQuestSettlementConflictError,
@@ -37,7 +36,6 @@ import { settleActivityPeriodicRewardsSync } from "../../lib/quest/finish/period
 import type { FinishContext } from "../../lib/quest/finish/types"
 import { resolveHostFinished } from "../../lib/quest/host-finish"
 import { validateMultiFinishRequest, type ValidatedMultiFinish } from "../../lib/quest/multi-battle-validation"
-import { givePlayerRewardSync, givePlayerRewardsSync, givePlayerScoreRewardsSync } from "../../lib/quest"
 import {
     calculateCharacterBattleExp,
     calculateFixedQuestMana,
@@ -58,6 +56,7 @@ import {
 } from "../../lib/player-history-milestones"
 import type { BattleSessionId } from "../coordinator/contracts"
 import type { MultiHttpContext } from "../http/context"
+import { MultiSettlementRewardGranter } from "./reward-grant"
 import type { MultiFinishBody } from "../types"
 import {
     settleRescueFragmentReward,
@@ -221,6 +220,7 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
     ) => {
         const player = getPlayerSync(input.playerId)
         if (!player) throw new PlayerNotFoundError(input.playerId)
+        const rewardGranter = new MultiSettlementRewardGranter(input.playerId)
         const freshValidation = validateMultiFinishRequest(
             body as unknown as Record<string, unknown>,
             activeQuest,
@@ -318,10 +318,10 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
         const manaObtained = fixedManaReward + fieldMana
         finishCtx.manaObtained = manaObtained
         const clearReward = rewardEligibility.firstClear && (questData as any).clearReward !== undefined
-            ? givePlayerRewardSync(input.playerId, (questData as any).clearReward)
+            ? rewardGranter.grantReward((questData as any).clearReward)
             : null
         const sPlusClearReward = rewardEligibility.sPlus && (questData as any).sPlusReward !== undefined
-            ? givePlayerRewardSync(input.playerId, (questData as any).sPlusReward)
+            ? rewardGranter.grantReward((questData as any).sPlusReward)
             : null
 
         if (questAccomplished) {
@@ -385,8 +385,7 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             playerData.staminaHealTime = getRealNow()
         }
 
-        const scoreRewardsResult = givePlayerScoreRewardsSync(
-            input.playerId,
+        const scoreRewardsResult = rewardGranter.grantScoreRewards(
             questData.scoreRewardGroupId || 0,
             questData.scoreRewardGroup,
             useBoostPoint,
@@ -425,7 +424,7 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
                     boostPointUsed: useBoostPoint,
                     serverDropMultiplier,
                 },
-                { grantRewards: rewards => givePlayerRewardsSync(input.playerId, rewards) },
+                { grantRewards: rewards => rewardGranter.grantRewards(rewards) },
             )
             : { dropAdditionalRewardIds: [], rewardResult: null }
         const rescueFragmentSettlement = settleRescueFragmentReward({
@@ -433,7 +432,7 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             questAccomplished,
             questCategory,
             questId,
-        }, rewards => givePlayerRewardsSync(input.playerId, [...rewards]))
+        }, rewards => rewardGranter.grantRewards([...rewards]))
         const periodicRewardSettlement = settleActivityPeriodicRewardsSync({
             playerId: input.playerId,
             questCategory,
@@ -492,12 +491,7 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
         const invalidatedFactKeys: FactKey[] = [
             ...(missionEvaluation?.invalidatedFactKeys ?? []),
             ...(awakeMissionEvaluation?.invalidatedFactKeys ?? []),
-            ...getAwakeFactKeysFromLegacyRewardResults(
-                clearReward,
-                sPlusClearReward,
-                scoreRewardsResult,
-                additionalRewardSettlement.rewardResult,
-            ),
+            ...rewardGranter.invalidatedFactKeys,
             ...(manaObtained > 0 ? [{ kind: "player" as const }] : []),
             ...(questAccomplished
                 && questCategory === QuestCategory.CHARACTER

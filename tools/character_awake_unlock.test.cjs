@@ -491,7 +491,7 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
         "settlement.rewardResult?.joined_character_id_list ?? []",
         "[existingCharacterList]",
     ])
-    assert.match(boxGachaCall.arguments[3], /invalidatedFactKeys: getAwakeFactKeysFromLegacyRewardResults/)
+    assert.match(boxGachaCall.arguments[3], /invalidatedFactKeys: settlement\.rewardInvalidatedFactKeys/)
     assert.equal(boxGachaCall.position > boxExecBlock.indexOf("if (playerBoxData !== null && playerBoxData.isClosed)"), true)
     for (const persistenceCall of [
         "grantBoxGachaDrawInTransactionOwnerWithInventorySync",

@@ -70,8 +70,8 @@ const AUTHORITATIVE_WRITE_SETS = Object.freeze({
         "deletePlayerActiveQuestSync",
     ]),
     "multi/finish": Object.freeze([
-        "givePlayerRewardSync", "updatePlayerQuestProgressSync", "insertPlayerQuestProgressSync",
-        "updatePlayerSync", "givePlayerScoreRewardsSync", "settleAdditionalRewardsSync",
+        "updatePlayerQuestProgressSync", "insertPlayerQuestProgressSync",
+        "updatePlayerSync", "settleAdditionalRewardsSync",
         "settleRescueFragmentReward", "settleActivityPeriodicRewardsSync", "recordMissionBattleFacts",
         "givePlayerCharactersExpSync", "settleMissionCategoriesWithEvaluation",
         "settleAwakeMissionCandidatesWithEvaluation", "finalizeMultiAwakePublicationWrites",
@@ -103,7 +103,7 @@ const AUTHORITATIVE_WRITE_SETS = Object.freeze({
     "shop/buy": Object.freeze(["executeGenericShopPurchaseSync"]),
     "shop/bulk_buy": Object.freeze(["executeGenericShopBatchPurchaseSync"]),
     "story_quest/finish": Object.freeze([
-        "givePlayerRewardSync", "givePlayerCharacterSync", "insertPlayerQuestProgressSync",
+        "grantStoryRewardWithinTransactionSync", "givePlayerCharacterSync", "insertPlayerQuestProgressSync",
         "updatePlayerQuestProgressSync", "reconcileActiveMissionFacts",
     ]),
     "tutorial/update_step:15": Object.freeze([
@@ -301,7 +301,7 @@ const EXPECTED_MATRIX = Object.freeze([
     matrixRow({ relativeFile: "src/lib/quest/finish/single-settlement-writes.ts", owner: "single/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "partyCharacterIds", actualFactSeeds: "preparedGrowthPublication.publication.invalidatedFactKeys", directMissionSeed: "preparedGrowthPublication.publication.directMissionIds", finalAuthoritativeWrite: "deletePlayerActiveQuestSync", finalWriteRule: "single-active-quest-finalization", runtimeEvidenceKey: "single-finish", changesGlobalFacts: true, rereadReason: SINGLE_REREAD_REASON }),
     matrixRow({ relativeFile: "src/multi/settlement/orchestrator.ts", owner: "multi/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "candidateCharacterIds", actualFactSeeds: "invalidatedFactKeys", directMissionSeed: "[ ...missionBattleFacts.awakeMissionIds, ...(awakeMissionEvaluation?.evaluation.missions.map(mission => mission.missionId) ?? []), ]", finalAuthoritativeWrite: "finalizeMultiAwakePublicationWrites", runtimeEvidenceKey: "multi-finish", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/activeMission.ts", owner: "active_mission/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "[]", actualFactSeeds: "granter.invalidatedFactKeys", finalAuthoritativeWrite: "persistPlayer", runtimeEvidenceKey: "active-mission-receive", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/boxGacha.ts", owner: "box_gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "settlement.rewardResult?.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "box-gacha-exec", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/boxGacha.ts", owner: "box_gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "settlement.rewardResult?.joined_character_id_list ?? []", actualFactSeeds: "settlement.rewardInvalidatedFactKeys", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "box-gacha-exec", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/character.ts", owner: "character/add_character_from_town", boundary: "best-effort-post-commit", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "character-town-grant" }),
     matrixRow({ relativeFile: "src/routes/api/character/bond.ts", owner: "character/receive_bond_token", boundary: "best-effort-in-tx", actualCharacterSeed: "[body.character_id]", finalAuthoritativeWrite: "receiveBondToken", runtimeEvidenceKey: "bond-success" }),
     matrixRow({ relativeFile: "src/routes/api/exchange.ts", owner: "exchange/star_crumb", boundary: "best-effort-post-commit", actualCharacterSeed: "kind === 0 ? [targetId] : []", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "exchange-star-crumb" }),
@@ -312,9 +312,9 @@ const EXPECTED_MATRIX = Object.freeze([
     matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive_all", boundary: "best-effort-in-tx", actualCharacterSeed: "[]", actualFactSeeds: "mail", finalAuthoritativeWrite: "finalizeMailReceiveAllAwakePublicationWrites", runtimeEvidenceKey: "mail-receive-all", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/mission.ts", owner: "mission/update_mission_progress", boundary: "best-effort-post-commit", actualCharacterSeed: "awakeCandidateCharacterIds", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "category9-update-progress" }),
     matrixRow({ relativeFile: "src/routes/api/passCard.ts", owner: "pass_card/receive_all", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "result.invalidatedFactKeys", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "pass-card-receive-all", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/raidEvent.ts", owner: "raid_event/summary", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "raid-event-summary", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/shop.ts", owner: "shop/buy", boundary: "best-effort-post-commit", actualCharacterSeed: "rewardResult.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "executeGenericShopPurchaseSync", runtimeEvidenceKey: "shop-buy", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/shop.ts", owner: "shop/bulk_buy", boundary: "best-effort-post-commit", actualCharacterSeed: "rewardResult.joined_character_id_list ?? []", actualFactSeeds: "reward-result", finalAuthoritativeWrite: "executeGenericShopBatchPurchaseSync", runtimeEvidenceKey: "shop-bulk-buy", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/raidEvent.ts", owner: "raid_event/summary", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "summary.settlement.invalidatedFactKeys", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "raid-event-summary", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/shop.ts", owner: "shop/buy", boundary: "best-effort-post-commit", actualCharacterSeed: "rewardResult.joined_character_id_list ?? []", actualFactSeeds: "purchaseResult.rewardInvalidatedFactKeys", finalAuthoritativeWrite: "executeGenericShopPurchaseSync", runtimeEvidenceKey: "shop-buy", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/shop.ts", owner: "shop/bulk_buy", boundary: "best-effort-post-commit", actualCharacterSeed: "rewardResult.joined_character_id_list ?? []", actualFactSeeds: "purchaseResult.rewardInvalidatedFactKeys", finalAuthoritativeWrite: "executeGenericShopBatchPurchaseSync", runtimeEvidenceKey: "shop-bulk-buy", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/storyQuest.ts", owner: "story_quest/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "storyCandidateCharacterIds", actualFactSeeds: "story-reward+quest-progress", finalAuthoritativeWrite: "reconcileActiveMissionFacts", runtimeEvidenceKey: "story-finish", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/tutorial.ts", owner: "tutorial/update_step:15", boundary: "best-effort-in-tx", actualCharacterSeed: "[randomCharacterId]", finalAuthoritativeWrite: "updatePlayerSync", runtimeEvidenceKey: "tutorial-step-15" }),
     matrixRow({ relativeFile: "src/routes/api/tutorial.ts", owner: "tutorial/update_step:16", boundary: "best-effort-in-tx", actualCharacterSeed: "[freeTutorialCharacterId]", finalAuthoritativeWrite: "updatePlayerSync", runtimeEvidenceKey: "tutorial-step-16" }),
@@ -1196,6 +1196,7 @@ function classifyFactSeeds(scope, sourceFile) {
     const text = compactExpression(factSeeds, sourceFile)
     if (/^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(text)) return text
     const hasRewardFacts = text.includes("getAwakeFactKeysFromLegacyRewardResults")
+        || text.includes("invalidatedFactKeys")
     if (hasRewardFacts && text.includes("questProgress")) return "story-reward+quest-progress"
     if (hasRewardFacts) return "reward-result"
     if (text.includes("getMailAwakeInvalidatedFactKeys")) return "mail"

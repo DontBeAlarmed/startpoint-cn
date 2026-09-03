@@ -12,6 +12,8 @@ import type {
     PlayerRewardResult,
 } from "./types"
 import { RewardType } from "./types"
+import { getAwakeFactKeysFromRewardGrants } from "./mission/awake-reward-facts"
+import type { FactKey } from "./mission/facts/fact-key"
 
 export interface BoxGachaRewardKnownPlayerState {
     readonly id: number
@@ -23,6 +25,7 @@ export interface BoxGachaRewardKnownPlayerState {
 export interface BoxGachaRewardGrantResult {
     readonly rewardResult: PlayerRewardResult
     readonly playerAfter: Omit<BoxGachaRewardKnownPlayerState, "id">
+    readonly rewardInvalidatedFactKeys: readonly FactKey[]
 }
 
 function createBoxGachaRewardPlan(
@@ -115,6 +118,7 @@ export function grantBoxGachaDrawInTransactionOwnerWithInventorySync(
 
     return {
         rewardResult: projectBoxGachaRewardResult(result),
+        rewardInvalidatedFactKeys: getAwakeFactKeysFromRewardGrants(result),
         playerAfter: {
             freeMana: result.playerAfter.freeMana,
             freeVmoney: result.playerAfter.freeVmoney,

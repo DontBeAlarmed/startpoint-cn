@@ -15,7 +15,16 @@ const first = settleRaidEventSummary({
     definitions,
     giveRewards: (_playerId, rewards) => {
         given.push(rewards)
-        return { user_info: { free_mana: 500, free_vmoney: 0, exp_pool: 0 } }
+        return {
+            rewardResult: {
+                user_info: { free_mana: 500, free_vmoney: 0, exp_pool: 0 },
+                character_list: [],
+                joined_character_id_list: [],
+                equipment_list: [],
+                items: { 100000: 25 },
+            },
+            invalidatedFactKeys: [{ kind: "player" }],
+        }
     },
     updateReceivedUpTo: value => { cursor = value },
 })
@@ -26,6 +35,8 @@ assert.deepEqual(first.grants.map(grant => [grant.kind, grant.itemId, grant.amou
 ])
 assert.equal(given.length, 1)
 assert.equal(given[0].length, 2, "同一 summary 的奖励应先聚合后统一发放")
+assert.deepEqual(first.rewardResult.items, { 100000: 25 })
+assert.deepEqual(first.invalidatedFactKeys, [{ kind: "player" }])
 
 const repeated = settleRaidEventSummary({
     playerId: 7,
@@ -37,5 +48,6 @@ const repeated = settleRaidEventSummary({
 })
 assert.deepEqual(repeated.grants, [])
 assert.equal(cursor, 1)
+assert.deepEqual(repeated.invalidatedFactKeys, [])
 
 console.log("raid event summary tests passed")

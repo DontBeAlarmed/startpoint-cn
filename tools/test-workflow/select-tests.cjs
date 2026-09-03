@@ -382,6 +382,18 @@ const SOURCE_RULES = [
         ],
     },
     {
+        pattern: /^src\/lib\/story-reward-grant\.ts$/,
+        groups: ["integration:mission", "integration:quest"],
+    },
+    {
+        pattern: /^src\/lib\/raid-event-reward-grant\.ts$/,
+        groups: ["integration:event", "integration:mission"],
+    },
+    {
+        pattern: /^src\/multi\/settlement\/reward-grant\.ts$/,
+        groups: ["integration:mission", "integration:party"],
+    },
+    {
         pattern: /^(?:src\/lib\/(?:event-shop-purchase|shop-reward-grant)\.ts|src\/lib\/economy\/free-first-deduction\.ts|src\/routes\/api\/shop\.ts)$/,
         groups: ["integration:reward-grant", "integration:rules"],
     },

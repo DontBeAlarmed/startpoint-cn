@@ -20,7 +20,7 @@ import {
     upsertPlayerRaidEventSync,
 } from "../../data/domains/raidEvent";
 import { getDb } from "../../data/db";
-import { givePlayerRewardsSync } from "../../lib/quest";
+import { grantRaidEventRewardsWithinTransactionSync } from "../../lib/raid-event-reward-grant"
 import {
     getRaidEventOverallRewardDefinitions,
     toRaidEventRewardResponse,
@@ -34,7 +34,6 @@ import {
     recordRaidSummaryMissionFactSync,
 } from "../../lib/mission/event-entry-facts";
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
-import { getAwakeFactKeysFromLegacyRewardResults } from "../../lib/mission/awake-reward-facts";
 import { settleMissionCategories, type MissionSettlementResult } from "../../lib/mission/settlement";
 import { mergeMissionSettlementResponse } from "../../lib/mission/response";
 
@@ -107,7 +106,7 @@ const routes = async (fastify: FastifyInstance) => {
                 totalKillCount: raidBossState.totalKillCount,
                 receivedUpTo: playerState?.receivedUpTo ?? 0,
                 definitions: rewardDefinitions,
-                giveRewards: (pid, rewards) => givePlayerRewardsSync(pid, rewards),
+                giveRewards: grantRaidEventRewardsWithinTransactionSync,
                 updateReceivedUpTo: receivedUpTo => {
                     upsertPlayerRaidEventSync(
                         playerId,
@@ -153,9 +152,7 @@ const routes = async (fastify: FastifyInstance) => {
                 [],
                 [rewardCharacterList],
                 {
-                    invalidatedFactKeys: getAwakeFactKeysFromLegacyRewardResults(
-                        rewardResult,
-                    ),
+                    invalidatedFactKeys: summary.settlement.invalidatedFactKeys,
                 },
                 "raid-event/summary",
             ).characterList

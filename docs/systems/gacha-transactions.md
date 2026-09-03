@@ -23,7 +23,7 @@
 - 免费/付费星导石余额；
 - Active Mission 的角色抽取次数或活动抽取次数。
 
-角色和装备奖励先转换为 `src/lib/gacha-reward-grant.ts` 的逐抽 `RewardGrantPlan`。每条 source 只保留 `drawIndex`、`kind` 和 `rewardId`，并严格对应同序的 draw、角色电影计划或装备 movie metadata；计划长度、source index、奖励 ID 或 metadata 不一致时在首笔奖励写入前 fail closed。`/gacha/exec` 在已有最外层事务内调用未公开的 transaction-owner detailed executor，不建立额外 savepoint，也不查询玩家前后态；owner 使用事务上下文中的三项已知余额快照。RewardGrant 的 `itemDeltas`、`isNew` 和 joined 内部事实只用于 projection，不进入响应。
+角色和装备奖励先转换为 `src/lib/gacha-reward-grant.ts` 的逐抽 typed execution plan。抽取序号、角色电影计划和装备 movie metadata 保留在 Gacha adapter 本地，并以连续 entry index 与 typed outcome 关联；plan 长度、奖励 ID 或 metadata 不一致时在首笔奖励写入前 fail closed。`/gacha/exec` 在已有最外层事务内通过 Gacha source adapter 调用 typed external-finalization API，不建立额外 savepoint，也不查询玩家前后态；owner 使用带真实 `playerId` 的事务上下文余额快照。RewardGrant 的内部执行字段不进入响应。
 
 角色 projection 按抽次保留 `movie_id`、`seed`、`entry_count`、`rarity_5_guarantee` 特殊路径、quarantine `markSent` 次数、重复角色的 `ex_boost_item` 本次增量和 `item_list` 最终库存；同角色对象按抽取顺序合并。装备 projection 保留每抽 `draw_equipment` 顺序、`treasure_up_type`、`is_erupt`，装备列表按 ID 只保留最后状态。未提供 owner callback 的直接内部调用仍使用 `gacha-reward-legacy.ts`，其结果由迁移前 fixture 锁定。
 

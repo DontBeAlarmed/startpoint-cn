@@ -8,7 +8,7 @@ import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getQuestFromCategorySync } from "../../lib/assets";
 import { givePlayerCharacterSync } from "../../lib/character";
 import { getMailArrivedSync } from "../../lib/mail-notification";
-import { givePlayerRewardSync } from "../../lib/quest";
+import { grantStoryRewardWithinTransactionSync } from "../../lib/story-reward-grant"
 import {
     mergeMissionSettlementResponse,
     reconcileActiveMissionFacts,
@@ -18,7 +18,6 @@ import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-
 import { getQuestJoinCharacterIds } from "../../lib/story-join-character";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { getContentSnapshot } from "../../content/runtime/content-snapshot";
-import { getAwakeFactKeysFromLegacyRewardResults } from "../../lib/mission/awake-reward-facts";
 import { QuestCategory } from "../../lib/types";
 import { recordCompletedMainChapterMilestoneSync } from "../../lib/player-history-milestones";
 
@@ -60,9 +59,10 @@ function processStoryQuestFinish(
 
         const questProgress = getPlayerSingleQuestProgressSync(playerId, questSection, questId)
         const firstClear = questProgress?.finished !== true
-        const rewardResult = firstClear && questData.clearReward !== undefined
-            ? givePlayerRewardSync(playerId, questData.clearReward)
+        const rewardGrant = firstClear && questData.clearReward !== undefined
+            ? grantStoryRewardWithinTransactionSync(playerId, questData.clearReward)
             : null
+        const rewardResult = rewardGrant?.rewardResult ?? null
         const storyJoinCharacterIds: number[] = []
         const storyCandidateCharacterIds = getQuestJoinCharacterIds(questSection, questId)
         const storyCharacterList: Record<string, unknown>[] = []
@@ -117,7 +117,7 @@ function processStoryQuestFinish(
             [existingCharacterList],
             {
                 invalidatedFactKeys: [
-                    ...getAwakeFactKeysFromLegacyRewardResults(rewardResult),
+                    ...(rewardGrant?.invalidatedFactKeys ?? []),
                     ...(firstClear && questSection === QuestCategory.CHARACTER
                         ? [{ kind: "questProgress" as const, sections: [QuestCategory.CHARACTER] }]
                         : []),

@@ -6,10 +6,6 @@ import {
     settleMissionCategoriesWithEvaluation,
 } from "../../mission"
 import { buildBattleMissionSettlementScopes } from "../../mission/battle-facts"
-import {
-    getAwakeFactKeysFromLegacyRewardResults,
-    type LegacyAwakeRewardResult,
-} from "../../mission/awake-reward-facts"
 import type { FactKey } from "../../mission/facts/fact-key"
 import type { MissionSettlementResult } from "../../mission/settlement"
 import type { MissionSettlementRewardDependencies } from "../../mission/settlement-write"
@@ -74,7 +70,7 @@ export function settleSingleMissionEvaluations(input: {
 export function prepareSingleAwakePublication(input: {
     readonly characterLists: readonly (readonly Record<string, unknown>[])[]
     readonly invalidatedFactKeys: readonly FactKey[]
-    readonly legacyRewardResults: readonly (LegacyAwakeRewardResult | null | undefined)[]
+    readonly rewardInvalidatedFactKeys: readonly FactKey[]
     readonly manaObtained: number
     readonly questCategory: number
     readonly questAccomplished: boolean
@@ -87,7 +83,7 @@ export function prepareSingleAwakePublication(input: {
 }) {
     const invalidatedFactKeys: FactKey[] = [
         ...input.invalidatedFactKeys,
-        ...getAwakeFactKeysFromLegacyRewardResults(...input.legacyRewardResults),
+        ...input.rewardInvalidatedFactKeys,
         ...(input.manaObtained > 0 ? [{ kind: "player" as const }] : []),
         ...(input.questAccomplished
             && input.questCategory === QuestCategory.CHARACTER

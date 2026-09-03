@@ -1,5 +1,5 @@
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../character-growth/owner-publication"
-import type { LegacyAwakeRewardResult } from "../../mission/awake-reward-facts"
+import type { FactKey } from "../../mission/facts/fact-key"
 import type { MissionSettlementRewardDependencies } from "../../mission/settlement-write"
 import { prepareSingleAwakePublication, settleSingleMissionEvaluations } from "./single-mission-publication"
 
@@ -12,7 +12,7 @@ export interface PrepareSingleGrowthPublicationInput {
     readonly directDegreeMissionIds: readonly number[]
     readonly rewardDependencies: MissionSettlementRewardDependencies
     readonly characterLists: readonly (readonly Record<string, unknown>[])[]
-    readonly legacyRewardResults: readonly (LegacyAwakeRewardResult | null | undefined)[]
+    readonly rewardInvalidatedFactKeys: readonly FactKey[]
     readonly manaObtained: number
     readonly questCategory: number
     readonly questPreviouslyCompleted: boolean
@@ -35,7 +35,7 @@ export function prepareSingleGrowthPublication(input: PrepareSingleGrowthPublica
             missionEvaluation.awakeMissionSettlement.characterList as Record<string, unknown>[],
         ],
         invalidatedFactKeys: missionEvaluation.invalidatedFactKeys,
-        legacyRewardResults: input.legacyRewardResults,
+        rewardInvalidatedFactKeys: input.rewardInvalidatedFactKeys,
         manaObtained: input.manaObtained,
         questCategory: input.questCategory,
         questAccomplished: input.questAccomplished,

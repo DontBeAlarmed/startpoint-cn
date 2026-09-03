@@ -28,7 +28,6 @@ import { computeRealTimeStamina } from "../../lib/stamina";
 import { clientSerializeEquipment } from "../../lib/equipment";
 import { planEquipmentEnhancementPurchase } from "../../lib/equipment-enhancement";
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
-import { getAwakeFactKeysFromLegacyRewardResults } from "../../lib/mission/awake-reward-facts";
 import {
     executeGenericShopBatchPurchaseSync,
     executeGenericShopPurchaseSync,
@@ -400,7 +399,7 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
             playerId,
             rewardResult.joined_character_id_list ?? [],
             [rewardResult.character_list as Record<string, unknown>[]],
-            { invalidatedFactKeys: getAwakeFactKeysFromLegacyRewardResults(rewardResult) },
+            { invalidatedFactKeys: purchaseResult.rewardInvalidatedFactKeys },
             "shop/buy",
             getVirtualNow(),
         ).characterList
@@ -718,7 +717,7 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
             playerId,
             rewardResult.joined_character_id_list ?? [],
             [rewardResult.character_list as Record<string, unknown>[]],
-            { invalidatedFactKeys: getAwakeFactKeysFromLegacyRewardResults(rewardResult) },
+            { invalidatedFactKeys: purchaseResult.rewardInvalidatedFactKeys },
             "shop/bulk-buy",
             getVirtualNow(),
         ).characterList

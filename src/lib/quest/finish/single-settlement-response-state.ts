@@ -4,6 +4,8 @@ import type {
     RewardGrantKnownPlayerState,
 } from "../../reward-grant"
 import type { Reward } from "../../types"
+import { getAwakeFactKeysFromRewardGrants } from "../../mission/awake-reward-facts"
+import type { FactKey } from "../../mission/facts/fact-key"
 import {
     grantSingleSettlementRewardsWithinTransactionSync,
     projectSingleSettlementRewardGrant,
@@ -73,12 +75,15 @@ export function createSingleSettlementResponseState(playerId: number, player: Pl
         expPool: player.expPool,
     }
     let degreeId = player.degreeId
+    let rewardInvalidatedFactKeys: readonly FactKey[] = Object.freeze([])
     const itemList: Record<string, number> = {}
     const observeItems = (items: Readonly<Record<string, number>> | undefined): void => {
         if (items !== undefined) Object.assign(itemList, items)
     }
     const observeGrant = (grant: RewardGrantExecutionResult): void => {
         playerState = grant.playerAfter
+        const invalidated = getAwakeFactKeysFromRewardGrants(grant)
+        if (invalidated.length > 0) rewardInvalidatedFactKeys = invalidated
         observeItems(Object.fromEntries(grant.assets.items.map(item => [
             String(item.itemId),
             item.afterAmount,
@@ -87,6 +92,9 @@ export function createSingleSettlementResponseState(playerId: number, player: Pl
     return {
         get playerState(): RewardGrantKnownPlayerState {
             return playerState
+        },
+        get rewardInvalidatedFactKeys(): readonly FactKey[] {
+            return rewardInvalidatedFactKeys
         },
         setPlayerState(state: RewardGrantKnownPlayerState): void {
             playerState = state

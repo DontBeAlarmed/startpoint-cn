@@ -13,6 +13,7 @@ import type {
 } from "./event-shop-purchase"
 import type { Reward } from "./types"
 import type { PlayerRewardResult } from "./types/rewards"
+import { getAwakeFactKeysFromRewardGrants } from "./mission/awake-reward-facts"
 
 export function createShopRewardPlan(
     rewards: readonly Reward[],
@@ -69,6 +70,7 @@ export function grantShopRewardsInTransactionOwnerWithInventorySync(
             execution.finalize()
             return {
                 rewardResult: projectShopRewardResult(result),
+                rewardInvalidatedFactKeys: getAwakeFactKeysFromRewardGrants(result),
                 playerAfter: {
                     freeMana: result.playerAfter.freeMana,
                     freeVmoney: result.playerAfter.freeVmoney,

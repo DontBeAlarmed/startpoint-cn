@@ -18,6 +18,7 @@ export class SingleSettlementRewardTargetMismatchError extends Error {
 export function createSingleSettlementStandardRewardGrant(
     playerId: number,
     updatePlayerState: (state: RewardGrantKnownPlayerState) => void,
+    observeGrant?: (grant: RewardGrantExecutionResult) => void,
 ): {
     assertTargetPlayer: (targetPlayerId: number) => void
     forCarnival: (
@@ -40,6 +41,7 @@ export function createSingleSettlementStandardRewardGrant(
             knownPlayerBefore,
         )
         updatePlayerState(result.playerAfter)
+        observeGrant?.(result)
         return result
     }
     const assertTargetPlayer = (targetPlayerId: number): void => {

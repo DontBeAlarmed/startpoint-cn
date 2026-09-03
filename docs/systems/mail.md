@@ -17,7 +17,7 @@
 
 单领和全领都以 SQLite 外层事务覆盖附件发放、`players_receive_history`、邮件领取时间和角色觉醒解锁响应。事务内读取一次权威 Player 前态，标准附件交给 RewardGrant owner 执行，专用附件复用同一前态；owner 不查询 Player，也不建立 plan savepoint。任一步骤异常会回滚整个请求；批量请求中的重复 `mail_id` 只处理一次，不会重复发奖。已经领取或不存在的 ID 仍计入 `already_mail_count`，不会使其他合法邮件失败。
 
-`src/lib/mail-reward-grant.ts` 是邮件领域 adapter。它先校验同批全部有效邮件，再按请求中的有效邮件顺序建立一个标准奖励 plan。plan source 只含 `{ mailId, attachmentIndex }`；角色 `number > 1` 展开为多条 CHARACTER entry，其他标准附件各一条。source、RewardGrant 的 `joined_character_id_list`、`isNew` 和内部 `itemDeltas` 都不会进入邮件协议响应。
+`src/lib/mail-reward-grant.ts` 是邮件领域 adapter。它先校验同批全部有效邮件，再按请求中的有效邮件顺序建立一个标准 typed plan。邮件 ID 和附件序号只保留在 adapter 的本地顺序中；角色 `number > 1` 展开为多条 CHARACTER entry，其他标准附件各一条。RewardGrant 的身份、执行字段和来源 metadata 都不会进入邮件协议响应。
 
 成功后每封邮件恰好写一条领取历史。奖励、专用余额、history、领取标记、角色觉醒解锁 reconcile 任一步骤失败，或角色不存在、余额超出安全整数范围时，错误都会离开最外层事务并回滚整次请求；批量中的不支持附件也会使全部有效邮件回滚。
 

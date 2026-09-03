@@ -20,7 +20,7 @@ import { withDeferredInventoryBatchContextWithinTransactionSync } from "../../li
 import { BoxGachaBoxes, PlayerRewardResult } from "../../lib/types";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time";
-import { getAwakeFactKeysFromLegacyRewardResults } from "../../lib/mission/awake-reward-facts";
+import type { FactKey } from "../../lib/mission/facts/fact-key"
 
 interface GetBoxListBody {
     box_gacha_id: number
@@ -310,6 +310,7 @@ const routes = async (fastify: FastifyInstance) => {
             playerBoxData: ReturnType<typeof getPlayerBoxGachaSync>
             drawnRewards: ReturnType<typeof drawBoxGachaSync>["rewards"]
             rewardResult: PlayerRewardResult
+            rewardInvalidatedFactKeys: readonly FactKey[]
             newPullCurrency: number
             remainingDrawsNumber: number
             shouldClose: boolean
@@ -370,7 +371,7 @@ const routes = async (fastify: FastifyInstance) => {
                         pullCurrencyId,
                         actualDrawCount * boxGachaData.redeemItemCount,
                     ).afterAmount
-                    const { rewardResult } = grantBoxGachaDrawInTransactionOwnerWithInventorySync(
+                    const { rewardResult, rewardInvalidatedFactKeys } = grantBoxGachaDrawInTransactionOwnerWithInventorySync(
                         playerId,
                         drawResult,
                         player,
@@ -419,6 +420,7 @@ const routes = async (fastify: FastifyInstance) => {
                         playerBoxData,
                         drawnRewards,
                         rewardResult,
+                        rewardInvalidatedFactKeys,
                         newPullCurrency,
                         remainingDrawsNumber,
                         shouldClose,
@@ -454,9 +456,7 @@ const routes = async (fastify: FastifyInstance) => {
             settlement.rewardResult?.joined_character_id_list ?? [],
             [existingCharacterList],
             {
-                invalidatedFactKeys: getAwakeFactKeysFromLegacyRewardResults(
-                    settlement.rewardResult,
-                ),
+                invalidatedFactKeys: settlement.rewardInvalidatedFactKeys,
             },
             "box-gacha/exec",
         ).characterList
