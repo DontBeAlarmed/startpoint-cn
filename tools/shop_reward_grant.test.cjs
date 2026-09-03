@@ -13,8 +13,17 @@ const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "shop-reward-gra
 const previousDataDirectory = process.env.DATA_DIR
 process.env.DATA_DIR = databaseDirectory
 
+const testItemPolicy = structuredClone(require("../assets/item_inventory_policy.json"))
+for (const itemId of [910101, 910102, 910103, 910104]) {
+    testItemPolicy.byItemId[itemId] = {
+        ...testItemPolicy.byItemId[14002],
+        maxCount: 1000,
+    }
+}
 const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
-    .installBundledGameplaySnapshot()
+    .installBundledGameplaySnapshot({
+        tableOverrides: { "item_inventory_policy.json": testItemPolicy },
+    })
 const data = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
@@ -22,7 +31,12 @@ const {
     getPlayerCollectedItemTotalSync,
     getPlayerItemSync,
 } = require("../src/data/domains/item")
-const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
+const {
+    grantInventoryFixtureItemSync,
+    setInventoryFixtureItemExactSync,
+} = require("./helpers/inventory-fixture.cjs")
+const { getPlayerMailsSync, MailType } = require("../src/data/domains/mail")
+const { createRewardGrantItemOverflowPolicy } = require("../src/lib/reward-grant-item-overflow")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const {
     addPlayerShopPurchaseCountsByTypeFromSnapshotSync,
@@ -274,6 +288,43 @@ test("owner adapter preserves reward order and has no nested transaction SQL", (
         "RewardGrant reuses the owner-bound player snapshot",
     )
     assert.equal(measured.statements.some(statement => /^\s*(?:BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)\b/i.test(statement)), false)
+})
+
+test("shop source adapter sends capped Item overflow to Mail and rolls it back with the source", () => {
+    const playerId = createPlayer("capped-overflow")
+    const policy = createRewardGrantItemOverflowPolicy(playerId)
+    setInventoryFixtureItemExactSync(playerId, REWARD_ITEM_ID, policy.maxCount(REWARD_ITEM_ID))
+    const before = getPlayerSync(playerId)
+    const run = () => withDeferredInventoryBatchContextWithinTransactionSync({
+        playerId,
+        preloadItemIds: [REWARD_ITEM_ID],
+        playerExistence: "caller-verified",
+    }, inventory => grantShopRewardsInTransactionOwnerWithInventorySync(
+        playerId,
+        [{ type: RewardType.ITEM, id: REWARD_ITEM_ID, count: 2 }],
+        {
+            id: playerId,
+            vmoney: before.vmoney,
+            freeMana: before.freeMana,
+            freeVmoney: before.freeVmoney,
+            bondToken: before.bondToken,
+            expPool: before.expPool,
+        },
+        inventory,
+    ))
+
+    const result = database.transaction(run)()
+    assert.equal(result.rewardResult.items[REWARD_ITEM_ID], policy.maxCount(REWARD_ITEM_ID))
+    assert.deepEqual(getPlayerMailsSync(playerId, 1, 100, true)
+        .filter(mail => mail.type === MailType.ITEM && mail.type_id === REWARD_ITEM_ID)
+        .map(mail => mail.number), [2])
+
+    assert.throws(() => database.transaction(() => {
+        run()
+        throw new Error("late shop source failure")
+    })(), /late shop source failure/)
+    assert.equal(getPlayerMailsSync(playerId, 1, 100, true).length, 1)
+    assert.equal(getPlayerItemSync(playerId, REWARD_ITEM_ID), policy.maxCount(REWARD_ITEM_ID))
 })
 
 test("owner adapter rejects another player's snapshot and rolls shared Inventory back", () => {

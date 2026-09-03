@@ -14,6 +14,7 @@ import type {
 import type { Reward } from "./types"
 import type { PlayerRewardResult } from "./types/rewards"
 import { getAwakeFactKeysFromRewardGrants } from "./mission/awake-reward-facts"
+import { createRewardGrantItemOverflowPolicy } from "./reward-grant-item-overflow"
 
 export function createShopRewardPlan(
     rewards: readonly Reward[],
@@ -78,5 +79,6 @@ export function grantShopRewardsInTransactionOwnerWithInventorySync(
                 },
             }
         },
+        { itemOverflow: createRewardGrantItemOverflowPolicy(playerId) },
     )
 }
