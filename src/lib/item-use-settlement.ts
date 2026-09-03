@@ -265,7 +265,7 @@ function planInventoryChanges(
         const rewardCount = rewardByItemId.get(itemId) ?? 0
         if (beforeCount < deductionCount) throw new ItemUseValidationError("Insufficient items.")
         const finalCount = beforeCount - deductionCount + rewardCount
-        if (!Number.isSafeInteger(finalCount) || finalCount < 0 || finalCount > AS3_INT_MAX) {
+        if (!Number.isSafeInteger(finalCount) || finalCount < 0) {
             throw new ItemUseValidationError(`Final item count is out of range for item ${itemId}.`)
         }
         return { id: itemId, beforeCount, deductionCount, rewardCount, finalCount }

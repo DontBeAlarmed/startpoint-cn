@@ -238,20 +238,25 @@ test("reward final count may reach the AS3 int maximum", async () => {
     assert.equal(responseData.item_list["4"], AS3_INT_MAX)
 })
 
-test("reward final count above the AS3 int maximum rejects without writes", async () => {
+test("reward final count above the AS3 int maximum moves only the overflow to Mail", async () => {
     const { playerId, viewerId } = await createPlayer("int32-overflow")
     setInventoryFixtureItemExactSync(playerId, 999102, 1)
     setInventoryFixtureItemExactSync(playerId, 4, AS3_INT_MAX - 29)
     const collectedBefore = getPlayerCollectedItemTotalSync(playerId, 4)
 
-    const response = await useItem(viewerId, [
+    const responseData = decodeSuccess(await useItem(viewerId, [
         { id: 999102, number: 1, selectIndex: 1 },
-    ])
+    ])).data
 
-    assert.equal(response.statusCode, 400, response.body)
-    assert.equal(getPlayerItemSync(playerId, 999102), 1)
-    assert.equal(getPlayerItemSync(playerId, 4), AS3_INT_MAX - 29)
-    assert.equal(getPlayerCollectedItemTotalSync(playerId, 4), collectedBefore)
+    assert.equal(getPlayerItemSync(playerId, 999102), 0)
+    assert.equal(getPlayerItemSync(playerId, 4), AS3_INT_MAX)
+    assert.equal(responseData.item_list["4"], AS3_INT_MAX)
+    assert.equal(getPlayerCollectedItemTotalSync(playerId, 4), collectedBefore + 29)
+    assert.deepEqual(getPlayerMailsSync(playerId, 1, 100, true).map(mail => ({
+        type: mail.type,
+        type_id: mail.type_id,
+        number: mail.number,
+    })), [{ type: MailType.ITEM, type_id: 4, number: 1 }])
 })
 
 test("duplicate cultivate pack entries with different selections reject without writes", async () => {

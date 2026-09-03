@@ -112,8 +112,10 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/lib/gacha-reward-grant.ts",
         "src/lib/item-sell.ts",
         "src/lib/item-use-settlement.ts",
+        "src/lib/mail-reward-grant.ts",
         "src/lib/quest/entry-item-inventory.ts",
         "src/lib/quest/finish/periodic-reward-handler.ts",
+        "src/lib/reward-grant-item-overflow.ts",
         "src/lib/reward-grant/execution-engine.ts",
         "src/lib/reward-grant/transaction-executor.ts",
         "src/lib/shop-reward-grant.ts",
@@ -260,7 +262,7 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
     )
     assert.match(
         periodicRewardHandler,
-        /consumePeriodicRewardPointSync\([\s\S]*remainingPoint === null[\s\S]*withInventoryBatchContextWithinTransactionSync\([\s\S]*inventory\.grant\([\s\S]*inventory\.flush\(\)[\s\S]*item\.afterAmount/,
+        /consumePeriodicRewardPointSync\([\s\S]*remainingPoint === null[\s\S]*withInventoryBatchContextWithinTransactionSync\([\s\S]*inventory\.grantWithCapacity\([\s\S]*inventory\.flush\(\)[\s\S]*item\.afterAmount/,
     )
     assert.doesNotMatch(
         periodicRewardHandler,
