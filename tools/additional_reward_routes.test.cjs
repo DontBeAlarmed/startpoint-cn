@@ -42,7 +42,7 @@ test("single finish grants and publishes additional rewards atomically", () => {
     assert.match(writes, /const grantDirectRewards = responseState\.grant/)
     assert.match(
         writes,
-        /grantRewards:\s*rewards\s*=>\s*grantDirectRewards\(playerId,\s*"additional",\s*rewards\)/,
+        /grantRewards:\s*rewards\s*=>\s*grantDirectRewards\(playerId,\s*rewards\)/,
     )
     assert.match(
         projector,

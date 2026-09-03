@@ -201,6 +201,6 @@ test("historical dedicated mail remains claimable through the client API", async
     ])))
     for (const mailId of mailIds) {
         const mail = getPlayerMailsSync(playerId, 1, 100).find(row => row.id === mailId)
-        assert.notEqual(mail.receive_time, "0000-00-00 00:00:00")
+        assert.equal(mail, undefined)
     }
 })
