@@ -1,4 +1,11 @@
 import { getDb } from "../db";
+import {
+    getShopPurchaseQueryKey,
+    type ShopPurchasePeriodKeys,
+} from "../../lib/shop/purchase-period"
+
+export { getShopPurchaseQueryKey } from "../../lib/shop/purchase-period"
+export type { ShopPurchasePeriodKeys } from "../../lib/shop/purchase-period"
 
 export interface ShopPurchaseCount {
     shopItemId: number
@@ -6,11 +13,6 @@ export interface ShopPurchaseCount {
 }
 
 export type ShopPurchaseMap = Readonly<Record<number, number>>
-
-export interface ShopPurchasePeriodKeys {
-    readonly daily: string
-    readonly monthly: string
-}
 
 export interface ShopPurchasePeriodCounts {
     readonly daily: number
@@ -33,10 +35,6 @@ const legacyPurchaseMetadata = Symbol("legacyPurchaseMetadata")
 
 export interface ShopPurchaseCountSnapshot extends ShopPurchasePeriodCounts {
     readonly [legacyPurchaseMetadata]: LegacyPurchaseMetadata
-}
-
-export function getShopPurchaseQueryKey(query: ShopPurchaseQuery): string {
-    return `${query.shopType}:${query.shopItemId}:${query.keys.daily}:${query.keys.monthly}`
 }
 
 function getCounterKey(

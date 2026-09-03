@@ -148,6 +148,23 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["src/routes/api/shop.ts"]),
         ["full", "integration:reward-grant", "integration:rules"],
     )
+    for (const file of [
+        "src/lib/shop/index.ts",
+        "src/lib/shop/purchase-plan.ts",
+        "src/lib/shop/purchase-period.ts",
+        "src/lib/shop/purchase-rewards.ts",
+        "src/lib/shop/purchase-validation.ts",
+    ]) {
+        assert.deepEqual(
+            selectTestGroups([file]),
+            ["integration:rules", "quick:content"],
+            file,
+        )
+    }
+    assert.deepEqual(
+        selectTestGroups(["tools/shop_purchase_plan.test.cjs"]),
+        ["integration:rules"],
+    )
     assert.deepEqual(
         selectTestGroups(["src/routes/api/mail.ts"]),
         ["full", "integration:reward-grant", "integration:rules"],
@@ -1905,6 +1922,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/score_reward_lottery.test.cjs",
         "tools/reward_campaign.test.cjs",
         "tools/shop_bulk_purchase.test.cjs",
+        "tools/shop_purchase_plan.test.cjs",
         "tools/shop_reward_purchase_contract.test.cjs",
         "tools/mail_notification.test.cjs",
         "tools/mail_notification_write_routes.test.cjs",

@@ -19,7 +19,6 @@ import type {
     ShopPurchaseCountSnapshot,
     ShopPurchaseQuery,
 } from "../data/domains/shopPurchase"
-import { getDayBucket } from "./time-utils"
 import { planFreeFirstDeduction } from "./economy/free-first-deduction"
 import type { InventoryBatchContext } from "./inventory"
 import type { FactKey } from "./mission/facts/fact-key"
@@ -27,8 +26,14 @@ import {
     isShopItemAvailable,
     parseShopCnTimestamp,
 } from "./shop/period"
+import {
+    getShopPurchasePeriodKeys,
+    type ShopPurchasePeriodKeys,
+} from "./shop/purchase-period"
 
 export { isShopItemAvailable, parseShopCnTimestamp } from "./shop/period"
+export { getShopPurchasePeriodKeys } from "./shop/purchase-period"
+export type { ShopPurchasePeriodKeys } from "./shop/purchase-period"
 
 export const ITEM_SHOP_PERIOD_ERROR_CODE = 2053
 
@@ -182,11 +187,6 @@ export interface ShopPurchaseCounts {
     readonly total: number
 }
 
-export interface ShopPurchasePeriodKeys {
-    readonly daily: string
-    readonly monthly: string
-}
-
 export interface EquipmentEnhancementPurchaseCountInput {
     readonly playerId: number
     readonly shopType: number
@@ -228,34 +228,6 @@ export function recordEquipmentEnhancementPurchaseSync(
         input.purchaseAmount,
         periodKeys,
     )
-}
-
-function pad2(value: number): string {
-    return String(value).padStart(2, "0")
-}
-
-export function getShopPurchasePeriodKeys(
-    nowMs: number,
-    specifiedMonths: readonly number[] | undefined,
-    resetHour = 5,
-): ShopPurchasePeriodKeys {
-    const bucket = getDayBucket(new Date(nowMs), resetHour)
-    const year = bucket.y
-    const month = bucket.m + 1
-    const daily = `${year}-${pad2(month)}-${pad2(bucket.d)}`
-    if (!specifiedMonths || specifiedMonths.length === 0) {
-        return { daily, monthly: `${year}-${pad2(month)}` }
-    }
-    const validMonths = specifiedMonths.filter(value => (
-        Number.isSafeInteger(value) && value >= 1 && value <= 12
-    ))
-    if (validMonths.length !== specifiedMonths.length) {
-        throw new ShopPurchaseError("Shop specified months are invalid.")
-    }
-    const previous = [...validMonths].reverse().find(value => value <= month)
-    const periodYear = previous === undefined ? year - 1 : year
-    const periodMonth = previous ?? validMonths[validMonths.length - 1]
-    return { daily, monthly: `specified:${periodYear}-${pad2(periodMonth)}` }
 }
 
 export function validateShopStock(
