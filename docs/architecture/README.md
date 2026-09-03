@@ -58,7 +58,7 @@ D15 已完成领域边界识别、决策和后续实施路线。D16、D17、D18�
 - 本目录已收录的 D1-D11b 全部描述当前实现，图节标题统一带“当前”。
 - D12、D13 与 D14 描述已落地、待客户端实机验收的 Gate 架构；其中的实施状态和证据路径可以用于解释当前实现，仍需与功能支持矩阵区分自动验证和人工验收。
 - D15 描述经审查确认、但尚未实施的目标领域边界；其图和表不能替代 D1-D11b 的当前架构事实。
-- D16 的 C1–C4 与 D18 C1–C5 已描述并实现 typed Item policy、Inventory writer、Item cap/overflow Mail、Item expiry owner、`/load` EventTrade 到期转换和 Mail exact claim；不得据此宣称这些私服策略已经被官服后端证实，D19–D28 仍未实施。
+- D16、D18 与 D18b 已描述并实现 typed Item policy、Inventory writer、Item cap、按 `sellable` 的 Sold/Mail disposition、Item expiry owner、`/load` EventTrade 到期转换和 Mail claim；不得据此宣称这些私服策略已经被官服后端证实，D19–D28 仍未实施。
 - 当前图不混入未来组件、迁移步骤或完成度信息；功能状态仍由 `docs/status/` 维护。
 - 目标架构必须使用独立图和独立证据，不得用虚线叠加到当前图。
 
