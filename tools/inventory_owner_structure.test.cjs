@@ -107,7 +107,6 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/lib/character-growth/commands/learn-mana-nodes.ts",
         "src/lib/character-growth/commands/over-limit.ts",
         "src/lib/character-growth/commands/stack-to-exp.ts",
-        "src/lib/event-shop-purchase.ts",
         "src/lib/event-trade-expiry-settlement.ts",
         "src/lib/gacha-reward-grant.ts",
         "src/lib/item-overflow/disposition.ts",
@@ -120,6 +119,7 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/lib/reward-grant/execution-engine.ts",
         "src/lib/reward-grant/transaction-executor.ts",
         "src/lib/shop-reward-grant.ts",
+        "src/lib/shop/purchase-owner.ts",
         "src/routes/api/boxGacha.ts",
         "src/routes/api/equipment.ts",
         "src/routes/api/exBoost.ts",
@@ -127,7 +127,6 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/routes/api/gacha.ts",
         "src/routes/api/questUnlock.ts",
         "src/routes/api/sell.ts",
-        "src/routes/api/shop.ts",
     ]
     assert.deepEqual(importedOutsideInventory.sort(), reviewedMigrations)
     for (const relativePath of reviewedMigrations) {
@@ -167,12 +166,12 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
     assert.doesNotMatch(rewardTransactionExecutor, /data\/domains\/item/)
     assert.match(rewardTransactionExecutor, /getInventoryBatchCheckpoint[\s\S]*inventory\.flush/)
     const shopPurchase = fs.readFileSync(
-        path.join(projectRoot, "src/lib/event-shop-purchase.ts"),
+        path.join(projectRoot, "src/lib/shop/purchase-owner.ts"),
         "utf8",
     )
     assert.doesNotMatch(shopPurchase, /\b(?:getItem|setItem)\s*:/)
-    assert.match(shopPurchase, /dependencies\.withInventory\(/)
-    assert.match(shopPurchase, /dependencies\.grantRewards\([\s\S]*inventory/)
+    assert.match(shopPurchase, /withDeferredInventoryBatchContextWithinTransactionSync\(/)
+    assert.match(shopPurchase, /grantShopRewardsTypedInTransactionOwnerWithInventorySync\([\s\S]*inventory/)
     const gachaRoute = fs.readFileSync(
         path.join(projectRoot, "src/routes/api/gacha.ts"),
         "utf8",
@@ -320,14 +319,13 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
 })
 
 test("caller-verified late migration paths establish transaction-local Player existence", () => {
-    const shop = fs.readFileSync(path.join(projectRoot, "src/routes/api/shop.ts"), "utf8")
-    const equipmentEnhancementTransaction = shop.match(
-        /\/\/ Equipment enhancement shop:[\s\S]*?getDb\(\)\.transaction\(\(\) => \{([\s\S]*?)\n\s*\}\)\(\)/,
-    )?.[1]
-    assert.ok(equipmentEnhancementTransaction)
+    const shop = fs.readFileSync(
+        path.join(projectRoot, "src/lib/shop/purchase-owner.ts"),
+        "utf8",
+    )
     assert.match(
-        equipmentEnhancementTransaction,
-        /const currentPlayer = getPlayerSync\(playerId\)[\s\S]*withShopInventorySync\(/,
+        shop,
+        /getDb\(\)\.transaction\(\(\) => \{[\s\S]*const player = getPlayerSync\(input\.playerId\)[\s\S]*withDeferredInventoryBatchContextWithinTransactionSync\(/,
     )
 
     const scheduled = fs.readFileSync(

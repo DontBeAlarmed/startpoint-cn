@@ -1188,12 +1188,12 @@
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 48,
+      "sqlReads": 49,
       "sqlWrites": 28,
       "sqlByTable": {
         "players": {
-          "reads": 8,
-          "statements": 14,
+          "reads": 9,
+          "statements": 15,
           "writes": 6
         },
         "players_active_mission_battle_facts": {
@@ -4207,12 +4207,17 @@
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 18,
+      "sqlReads": 16,
       "sqlWrites": 8,
       "sqlByTable": {
+        "json_each": {
+          "reads": 2,
+          "statements": 2,
+          "writes": 0
+        },
         "players": {
-          "reads": 4,
-          "statements": 5,
+          "reads": 3,
+          "statements": 4,
           "writes": 1
         },
         "players_category_mission_stages": {
@@ -4259,11 +4264,6 @@
           "reads": 0,
           "statements": 1,
           "writes": 1
-        },
-        "players_shop_campaign_lineups": {
-          "reads": 1,
-          "statements": 1,
-          "writes": 0
         },
         "players_shop_purchase_counters": {
           "reads": 1,
@@ -4443,7 +4443,7 @@
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 18,
+      "sqlReads": 17,
       "sqlWrites": 15,
       "sqlByTable": {
         "json_each": {
@@ -4500,11 +4500,6 @@
           "reads": 0,
           "statements": 2,
           "writes": 2
-        },
-        "players_shop_campaign_lineups": {
-          "reads": 1,
-          "statements": 1,
-          "writes": 0
         },
         "players_shop_purchase_counters": {
           "reads": 1,

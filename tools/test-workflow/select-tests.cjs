@@ -15,6 +15,10 @@ const HUB_AUTHENTICATION_GROUPS = [
 
 const SOURCE_RULES = [
     {
+        pattern: /^(?:src\/data\/domains\/shopPurchase\.ts|tools\/shop_purchase_count_storage\.test\.cjs)$/,
+        groups: ["integration:database"],
+    },
+    {
         pattern: /^tools\/character_growth_(?:lavu_orderings|gate_acceptance)\.test\.cjs$/,
         groups: ["quick:character-growth"],
     },
@@ -379,7 +383,7 @@ const SOURCE_RULES = [
         groups: ["integration:mission", "integration:party"],
     },
     {
-        pattern: /^(?:src\/lib\/(?:event-shop-purchase|shop-reward-grant)\.ts|src\/lib\/economy\/free-first-deduction\.ts|src\/routes\/api\/shop\.ts)$/,
+        pattern: /^(?:src\/lib\/shop-reward-grant\.ts|src\/lib\/economy\/free-first-deduction\.ts|src\/routes\/api\/shop\.ts)$/,
         groups: ["integration:reward-grant", "integration:rules"],
     },
     {
@@ -397,6 +401,10 @@ const SOURCE_RULES = [
     {
         pattern: /^src\/lib\/shop\/sales-catalog\.ts$/,
         groups: ["integration:event", "integration:rules"],
+    },
+    {
+        pattern: /^src\/lib\/shop\/sales-stock\.ts$/,
+        groups: ["integration:event", "quick:content"],
     },
     {
         pattern: /^src\/routes\/api\/shop\/purchase-routes\.ts$/,

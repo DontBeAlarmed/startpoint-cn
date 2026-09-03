@@ -19,31 +19,13 @@ const shopRouteSource = fs.readFileSync(
     path.join(__dirname, "../src/routes/api/shop.ts"),
     "utf8",
 )
-assert.doesNotMatch(
-    shopRouteSource,
-    /getBulkPurchaseCountsForRoute|getPlayerShopPurchasesMapSync/,
-    "shop route must not retain a bulk purchase-count compatibility fallback",
+const purchaseRouteSource = fs.readFileSync(
+    path.join(__dirname, "../src/routes/api/shop/purchase-routes.ts"),
+    "utf8",
 )
-assert.match(
-    shopRouteSource,
-    /getPurchaseCounts:\s*getPlayerShopPurchaseCountSnapshotSync/,
-    "buy route must directly inject the typed single-item snapshot reader",
-)
-assert.match(
-    shopRouteSource,
-    /addPurchaseCounts:\s*addPlayerShopPurchaseCountsByTypeFromSnapshotSync/,
-    "buy route must reuse the validated single-item snapshot",
-)
-assert.match(
-    shopRouteSource,
-    /getPurchaseCountsBulk:\s*getPlayerShopPurchaseCountsByTypeBulkSync/,
-    "bulk_buy route must directly inject the typed bulk reader",
-)
-assert.match(
-    shopRouteSource,
-    /addPurchaseCountsFromSnapshot:\s*addPlayerShopPurchaseCountsByTypeFromSnapshotSync/,
-    "bulk_buy route must directly inject the snapshot-owned writer",
-)
+assert.match(shopRouteSource, /registerShopPurchaseRoutes\(fastify, dailyResetHour\)/)
+assert.doesNotMatch(shopRouteSource, /executeGenericShop|getShopItemSync|recordEquipmentEnhancement/)
+assert.equal((purchaseRouteSource.match(/executeShopPurchaseSync\(/g) ?? []).length, 2)
 
 function stubModule(relativePath, exports) {
     const modulePath = require.resolve(relativePath)
@@ -433,7 +415,6 @@ function grantStubShopRewards(
         }
 }
 stubModule("../src/lib/shop-reward-grant", {
-    grantShopRewardsInTransactionOwnerWithInventorySync: grantStubShopRewards,
     grantShopRewardsTypedInTransactionOwnerWithInventorySync(
         playerId,
         rewards,
@@ -486,6 +467,13 @@ stubModule("../src/lib/mission", {
 const shopRoutes = require("../src/routes/api/shop.ts").default
 const eventItemShopAsset = require("../assets/event_item_shop.json")
 const equipmentEnhancementShopAsset = require("../assets/equipment_enhancement_shop.json")
+const treasureShopAsset = require("../assets/treasure_shop.json")
+const specialPackShopAsset = require("../assets/special_pack_shop.json")
+const manaShopAsset = require("../assets/mana_shop.json")
+const bossCoinShopAsset = require("../assets/boss_coin_shop.json")
+const generalShopAsset = require("../assets/general_shop.json")
+const starGrainShopAsset = require("../assets/star_grain_shop.json")
+const shopCostScheduleAsset = require("../assets/shop_cost_item_schedule.json")
 
 async function createServer() {
     const fastify = Fastify()
@@ -571,6 +559,83 @@ async function main() {
             assert.equal(decode(response).data_headers.result_code, 1)
         }
         setItem(17, 40000, 100)
+
+        const periodProducts = [
+            [2, 200001, treasureShopAsset["200001"]],
+            [3, 220040, specialPackShopAsset["220040"]],
+            [4, 700000, eventItemShopAsset["11"]["700001"]["700000"]],
+            [5, 200001, manaShopAsset["200001"]],
+            [7, 200103, Object.values(bossCoinShopAsset).map(items => items["200103"]).find(Boolean)],
+            [8, 100001, generalShopAsset["100001"]],
+            [9, 100000, starGrainShopAsset["100000"]],
+            [10, 2001, equipmentEnhancementShopAsset["2001"]],
+        ]
+        const originalPeriods = periodProducts.map(([, , product]) => product.availableUntil)
+        for (const [, , product] of periodProducts) product.availableUntil = "2020-01-01 00:00:00"
+        const periodSnapshot = productionContentSnapshotProvider.snapshot
+        productionContentSnapshotProvider.snapshot = {
+            ...periodSnapshot,
+            repository: {
+                info: () => periodSnapshot.repository.info(),
+                table: tableName => periodSnapshot.repository.table(tableName),
+            },
+        }
+        try {
+            const beforePeriods = snapshot()
+            for (const [shopType, shopItemId] of periodProducts) {
+                const response = await fastify.inject({
+                    method: "POST",
+                    url: "/buy",
+                    payload: { viewer_id: 123, shop_type: shopType, shop_item_id: shopItemId, number: 1 },
+                })
+                assert.equal(response.statusCode, 200)
+                assert.equal(decode(response).data_headers.result_code, 2053, `shop type ${shopType}`)
+                assert.deepEqual(snapshot(), beforePeriods)
+            }
+        } finally {
+            productionContentSnapshotProvider.snapshot = periodSnapshot
+            periodProducts.forEach(([, , product], index) => {
+                product.availableUntil = originalPeriods[index]
+            })
+        }
+
+        globalNowSeconds = Date.parse("2024-08-12T12:00:00+08:00") / 1000
+        setItem(17, 40122, 75)
+        setItem(17, 40052, 75)
+        const scheduledPurchase = await fastify.inject({
+            method: "POST",
+            url: "/buy",
+            payload: { viewer_id: 123, shop_type: 8, shop_item_id: 220032, number: 1 },
+        })
+        assert.equal(scheduledPurchase.statusCode, 200, scheduledPurchase.body)
+        assert.equal(getItem(17, 40122), 0)
+        assert.equal(getItem(17, 40052), 0)
+
+        const scheduleRows = shopCostScheduleAsset.equipment_awaking_crystal_piece
+        shopCostScheduleAsset.equipment_awaking_crystal_piece = scheduleRows.filter(row => row.month !== 8)
+        const scheduleSnapshot = productionContentSnapshotProvider.snapshot
+        productionContentSnapshotProvider.snapshot = {
+            ...scheduleSnapshot,
+            repository: {
+                info: () => scheduleSnapshot.repository.info(),
+                table: tableName => scheduleSnapshot.repository.table(tableName),
+            },
+        }
+        try {
+            setItem(17, 40122, 75)
+            setItem(17, 40052, 75)
+            const beforeMissingSchedule = snapshot()
+            const missingSchedule = await fastify.inject({
+                method: "POST",
+                url: "/buy",
+                payload: { viewer_id: 123, shop_type: 8, shop_item_id: 220032, number: 1 },
+            })
+            assert.equal(missingSchedule.statusCode, 500)
+            assert.deepEqual(snapshot(), beforeMissingSchedule)
+        } finally {
+            productionContentSnapshotProvider.snapshot = scheduleSnapshot
+            shopCostScheduleAsset.equipment_awaking_crystal_piece = scheduleRows
+        }
         globalNowSeconds = Date.parse("2022-12-23T12:00:00+08:00") / 1000
         const campaignBefore = await fastify.inject({
             method: "POST",
@@ -820,6 +885,20 @@ async function main() {
         assert.equal(insufficientBulk.statusCode, 400)
         assert.deepEqual(snapshot(), beforeInsufficientBulk)
 
+        setItem(17, 40000, 0)
+        const beforeBossFailure = snapshot()
+        const failedBossBulk = await fastify.inject({
+            method: "POST",
+            url: "/bulk_buy",
+            payload: {
+                viewer_id: 123,
+                shop_type: 7,
+                buy_item_list: { 200101: 1, 200102: 1 },
+            },
+        })
+        assert.equal(failedBossBulk.statusCode, 400)
+        assert.deepEqual(snapshot(), beforeBossFailure)
+        setItem(17, 40000, 100)
         const bossBulk = await fastify.inject({
             method: "POST",
             url: "/bulk_buy",

@@ -11,7 +11,7 @@ const root = path.resolve(__dirname, "..")
 const ownerFiles = [
     "src/routes/api/activeMission.ts",
     "src/routes/api/mail.ts",
-    "src/routes/api/shop.ts",
+    "src/routes/api/shop/purchase-routes.ts",
     "src/routes/api/gacha.ts",
     "src/routes/api/storyQuest.ts",
     "src/routes/api/tutorial.ts",

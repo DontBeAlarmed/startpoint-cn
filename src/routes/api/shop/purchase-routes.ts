@@ -101,24 +101,6 @@ function sendPurchaseError(
     throw error
 }
 
-function projectCommittedPurchase(
-    result: ReturnType<typeof executeShopPurchaseSync>,
-    viewerId: number,
-    publicationSource: "shop/buy" | "shop/bulk-buy",
-) {
-    const responseData = projectShopPurchaseResponse(result, viewerId)
-    responseData.character_list = publishCharacterGrowthOwnerStateBestEffort(
-        result.playerId,
-        result.joinedCharacterIds,
-        [responseData.character_list],
-        { invalidatedFactKeys: result.rewardInvalidatedFactKeys },
-        publicationSource,
-        getGameTimeContext().virtualNow,
-    ).characterList
-    responseData.mail_arrived = getMailArrivedSync(result.playerId)
-    return responseData
-}
-
 export function registerShopPurchaseRoutes(
     fastify: FastifyInstance,
     dailyResetHour: number,
@@ -145,10 +127,20 @@ export function registerShopPurchaseRoutes(
                 purchasePeriodNowMs: gameTime.realNowMs,
                 resetHour: dailyResetHour,
             })
+            const responseData = projectShopPurchaseResponse(result, body.viewer_id)
+            responseData.character_list = publishCharacterGrowthOwnerStateBestEffort(
+                result.playerId,
+                result.joinedCharacterIds,
+                [responseData.character_list],
+                { invalidatedFactKeys: result.rewardInvalidatedFactKeys },
+                "shop/buy",
+                gameTime.virtualNow,
+            ).characterList
+            responseData.mail_arrived = getMailArrivedSync(result.playerId)
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 data_headers: generateDataHeaders({ viewer_id: body.viewer_id }),
-                data: projectCommittedPurchase(result, body.viewer_id, "shop/buy"),
+                data: responseData,
             })
         } catch (error) {
             return sendPurchaseError(error, body.viewer_id, reply)
@@ -192,10 +184,20 @@ export function registerShopPurchaseRoutes(
                 purchasePeriodNowMs: gameTime.realNowMs,
                 resetHour: dailyResetHour,
             })
+            const responseData = projectShopPurchaseResponse(result, body.viewer_id)
+            responseData.character_list = publishCharacterGrowthOwnerStateBestEffort(
+                result.playerId,
+                result.joinedCharacterIds,
+                [responseData.character_list],
+                { invalidatedFactKeys: result.rewardInvalidatedFactKeys },
+                "shop/bulk-buy",
+                gameTime.virtualNow,
+            ).characterList
+            responseData.mail_arrived = getMailArrivedSync(result.playerId)
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 data_headers: generateDataHeaders({ viewer_id: body.viewer_id }),
-                data: projectCommittedPurchase(result, body.viewer_id, "shop/bulk-buy"),
+                data: responseData,
             })
         } catch (error) {
             return sendPurchaseError(error, body.viewer_id, reply)

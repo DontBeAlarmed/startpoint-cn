@@ -29,6 +29,8 @@ const {
     ShopOfferScheduleError,
 } = shop
 const { ShopType } = require("../src/lib/types")
+const { selectShopSalesCatalogItems } = require("../src/lib/shop/sales-catalog")
+const { buildShopSalesListSync } = require("../src/lib/shop-sales-list")
 
 function item(overrides = {}) {
     return {
@@ -355,6 +357,30 @@ test("catalog rejects invalid navigation product invariants", () => {
     const missingCampaign = fixtureTables()
     missingCampaign["special_pack_shop.json"]["200001"].specialExchangeCampaignId = 0
     assert.throws(() => buildShopCatalog(repository(missingCampaign)), /Invalid special exchange link/)
+})
+
+test("runtime repository whitelist is the only General listing authority", () => {
+    const tables = fixtureTables()
+    tables["cdn_general_shop_whitelist.json"] = [999999]
+    const catalog = buildShopCatalog(repository(tables))
+    const selected = selectShopSalesCatalogItems(catalog, {
+        shopTypes: [ShopType.GENERAL],
+        eventList: [],
+        bossCategoryIds: [],
+    })
+    assert.deepEqual(Object.keys(selected[ShopType.GENERAL]), ["999999"])
+    const sales = buildShopSalesListSync({
+        playerId: 1,
+        itemsByType: selected,
+        nowMs: Date.parse("2024-08-01T00:00:00Z"),
+        isItemVisible: () => true,
+    }, {
+        getPurchaseCountsBulk: (_playerId, queries) => new Map(queries.map(query => [
+            `${query.shopType}:${query.shopItemId}:${query.keys.daily}:${query.keys.monthly}`,
+            { daily: 0, monthly: 0, total: 0 },
+        ])),
+    }).salesList
+    assert.deepEqual(sales.map(sale => sale.shop_item_id), [999999])
 })
 
 test("bundled shop content builds one complete immutable catalog", () => {

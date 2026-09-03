@@ -423,6 +423,8 @@ Save/admin/corrupt-state、真实 rollback、D18b disposition、purchase-count c
 
 若为正确性增加固定 O(1) 读取，必须在 snapshot 中显式说明；不得接受随产品数增长的额外 Player、Content 或 purchase-count 查询。
 
+Gate A 在 D19 基线之前为 Multi settlement 增加了一次事务内最终 Player 绝对快照读取，用于防止 clear/S+ Sold Mana 被成本前 Player 状态覆盖。owner-focused 基线因此把 `multi-finish` 的 Player read 上界从 8 调整为 9（总 SQL read 48→49）；这是既有正确性修复的固定 O(1) 读取，不由 D19 Shop 热路径引入。D19 的 `shop-buy`/`shop-bulk-buy` 读取则分别从 18 降至 16、18 降至 17。
+
 ## 11. 明确不实施
 
 - 不实现或猜测 `3010 ShopStepOverDay`；

@@ -48,7 +48,7 @@ const POST_COMMIT_35_3_OWNER_INVENTORY = Object.freeze({
     "src/routes/api/mission.ts": ["category9-delta-missions"],
     "src/routes/api/passCard.ts": ["pass-card-reward-facts"],
     "src/routes/api/raidEvent.ts": ["raid-summary-reward-facts"],
-    "src/routes/api/shop.ts": ["shop-reward-characters", "shop-reward-characters"],
+    "src/routes/api/shop/purchase-routes.ts": ["shop-reward-characters", "shop-reward-characters"],
 })
 
 const TRANSACTION_INTERNAL_35_2_OWNER_INVENTORY = Object.freeze({

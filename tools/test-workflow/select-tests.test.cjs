@@ -136,7 +136,6 @@ test("maps representative source files to focused groups", () => {
         ["quick:gacha", "quick:quest"],
     )
     for (const file of [
-        "src/lib/event-shop-purchase.ts",
         "src/lib/shop-reward-grant.ts",
     ]) {
         assert.deepEqual(
@@ -195,6 +194,10 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(
         selectTestGroups(["src/lib/shop/sales-catalog.ts"]),
         ["integration:event", "integration:rules", "quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/shop/sales-stock.ts"]),
+        ["integration:event", "quick:content"],
     )
     assert.deepEqual(
         selectTestGroups(["src/routes/api/shop/purchase-routes.ts"]),
@@ -773,7 +776,6 @@ test("maps the public reward grant layer and its regressions to one focused leaf
         "tools/score_reward_selection.test.cjs",
         "tools/single_settlement_reward_grant.test.cjs",
         "tools/task23c_reward_grants.test.cjs",
-        "tools/shop_reward_grant.test.cjs",
         "tools/mail_reward_grant.test.cjs",
         "tools/mail_reward_owner.test.cjs",
         "tools/load_scheduled_resource_settlement.test.cjs",
@@ -1668,6 +1670,7 @@ test("keeps isolated test groups parallel while infrastructure groups stay seria
 
 test("splits isolated integration tests into focused domains", () => {
     assert.deepEqual(TEST_GROUPS["integration:database"].tests, [
+        "tools/shop_purchase_count_storage.test.cjs",
         "tools/account_cleanup_admin.test.cjs",
         "tools/account_cleanup_takeover.test.cjs",
         "tools/admin_scheduled_resource_routes.test.cjs",
@@ -1690,8 +1693,6 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/receive_history_retention.test.cjs",
         "tools/scheduled_resource_storage.test.cjs",
         "tools/server_gameplay_settings.test.cjs",
-        "tools/shop_purchase_period_storage.test.cjs",
-        "tools/shop_purchase_snapshot_contract.test.cjs",
         "tools/news_storage.test.cjs",
         "tools/schema23_news_migration.test.cjs",
         "tools/schema24_gift_migration.test.cjs",
@@ -1716,7 +1717,6 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/raid_event_summary_route.test.cjs",
         "tools/ranking_event_route.test.cjs",
         "tools/rush_event_battle_flow.test.cjs",
-        "tools/rush_event_shop.test.cjs",
         "tools/rush_event_shop_route.test.cjs",
         "tools/rush_event_reset_route.test.cjs",
         "tools/shop_campaign_lineup.test.cjs",
@@ -1960,11 +1960,9 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/single_continue_route_errors.test.cjs",
         "tools/score_reward_lottery.test.cjs",
         "tools/reward_campaign.test.cjs",
-        "tools/shop_bulk_purchase.test.cjs",
         "tools/shop_purchase_plan.test.cjs",
         "tools/shop_purchase_owner.test.cjs",
         "tools/shop_response_projector.test.cjs",
-        "tools/shop_reward_purchase_contract.test.cjs",
         "tools/mail_notification.test.cjs",
         "tools/mail_notification_write_routes.test.cjs",
         "tools/mail_reward_fixture.test.cjs",

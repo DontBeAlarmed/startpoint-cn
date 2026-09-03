@@ -100,8 +100,8 @@ const AUTHORITATIVE_WRITE_SETS = Object.freeze({
     "mission/update_mission_progress": Object.freeze(["transaction"]),
     "pass_card/receive_all": Object.freeze(["transaction"]),
     "raid_event/summary": Object.freeze(["transaction"]),
-    "shop/buy": Object.freeze(["executeGenericShopPurchaseSync"]),
-    "shop/bulk_buy": Object.freeze(["executeGenericShopBatchPurchaseSync"]),
+    "shop/buy": Object.freeze(["executeShopPurchaseSync"]),
+    "shop/bulk_buy": Object.freeze(["executeShopPurchaseSync"]),
     "story_quest/finish": Object.freeze([
         "grantStoryRewardWithinTransactionSync", "givePlayerCharacterSync", "insertPlayerQuestProgressSync",
         "updatePlayerQuestProgressSync", "reconcileActiveMissionFacts",
@@ -118,8 +118,8 @@ const OWNER_TRANSACTION_ANCHORS = Object.freeze({
     "box_gacha/exec": "transaction",
     "exchange/star_crumb": "transaction",
     "gacha/exchange_character": "transaction",
-    "shop/buy": "executeGenericShopPurchaseSync",
-    "shop/bulk_buy": "executeGenericShopBatchPurchaseSync",
+    "shop/buy": "executeShopPurchaseSync",
+    "shop/bulk_buy": "executeShopPurchaseSync",
 })
 const TUTORIAL_OWNER_SCOPE_CONTRACTS = Object.freeze({
     "tutorial/update_step:15": Object.freeze({
@@ -230,7 +230,7 @@ const ROUTE_OWNERS = Object.freeze({
     },
     "src/routes/api/passCard.ts": { "/receive_all": "pass_card/receive_all" },
     "src/routes/api/raidEvent.ts": { "/summary": "raid_event/summary" },
-    "src/routes/api/shop.ts": { "/buy": "shop/buy", "/bulk_buy": "shop/bulk_buy" },
+    "src/routes/api/shop/purchase-routes.ts": { "/buy": "shop/buy", "/bulk_buy": "shop/bulk_buy" },
     "src/routes/api/storyQuest.ts": { "/finish": "story_quest/finish" },
 })
 
@@ -319,8 +319,8 @@ const EXPECTED_MATRIX = Object.freeze([
     matrixRow({ relativeFile: "src/routes/api/mission.ts", owner: "mission/update_mission_progress", boundary: "best-effort-post-commit", actualCharacterSeed: "awakeCandidateCharacterIds", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "category9-update-progress" }),
     matrixRow({ relativeFile: "src/routes/api/passCard.ts", owner: "pass_card/receive_all", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "result.invalidatedFactKeys", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "pass-card-receive-all", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/raidEvent.ts", owner: "raid_event/summary", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "summary.settlement.invalidatedFactKeys", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "raid-event-summary", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/shop.ts", owner: "shop/buy", boundary: "best-effort-post-commit", actualCharacterSeed: "rewardResult.joined_character_id_list ?? []", actualFactSeeds: "purchaseResult.rewardInvalidatedFactKeys", finalAuthoritativeWrite: "executeGenericShopPurchaseSync", runtimeEvidenceKey: "shop-buy", changesGlobalFacts: true }),
-    matrixRow({ relativeFile: "src/routes/api/shop.ts", owner: "shop/bulk_buy", boundary: "best-effort-post-commit", actualCharacterSeed: "rewardResult.joined_character_id_list ?? []", actualFactSeeds: "purchaseResult.rewardInvalidatedFactKeys", finalAuthoritativeWrite: "executeGenericShopBatchPurchaseSync", runtimeEvidenceKey: "shop-bulk-buy", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/shop/purchase-routes.ts", owner: "shop/buy", boundary: "best-effort-post-commit", actualCharacterSeed: "result.joinedCharacterIds", actualFactSeeds: "result.rewardInvalidatedFactKeys", finalAuthoritativeWrite: "executeShopPurchaseSync", runtimeEvidenceKey: "shop-buy", changesGlobalFacts: true }),
+    matrixRow({ relativeFile: "src/routes/api/shop/purchase-routes.ts", owner: "shop/bulk_buy", boundary: "best-effort-post-commit", actualCharacterSeed: "result.joinedCharacterIds", actualFactSeeds: "result.rewardInvalidatedFactKeys", finalAuthoritativeWrite: "executeShopPurchaseSync", runtimeEvidenceKey: "shop-bulk-buy", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/storyQuest.ts", owner: "story_quest/finish", boundary: "best-effort-in-tx", actualCharacterSeed: "storyCandidateCharacterIds", actualFactSeeds: "story-reward+quest-progress", finalAuthoritativeWrite: "reconcileActiveMissionFacts", runtimeEvidenceKey: "story-finish", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/tutorial.ts", owner: "tutorial/update_step:15", boundary: "best-effort-in-tx", actualCharacterSeed: "[randomCharacterId]", finalAuthoritativeWrite: "updatePlayerSync", runtimeEvidenceKey: "tutorial-step-15" }),
     matrixRow({ relativeFile: "src/routes/api/tutorial.ts", owner: "tutorial/update_step:16", boundary: "best-effort-in-tx", actualCharacterSeed: "[freeTutorialCharacterId]", finalAuthoritativeWrite: "updatePlayerSync", runtimeEvidenceKey: "tutorial-step-16" }),

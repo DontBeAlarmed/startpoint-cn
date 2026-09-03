@@ -57,9 +57,9 @@ Player/item 投影并删除数据库 active，提交后再删除内存 active；
 
 ## 商店标准奖励
 
-普通 `/shop/buy` 与 `/shop/bulk_buy` 继续由 `event-shop-purchase.ts` 拥有最外层事务。商店先整体校验并扣除 user cost、item cost，再把扣款后的 `freeMana`、`freeVmoney` 和 `expPool` 作为带真实身份的 `knownPlayerBefore` 交给 `shop-reward-grant.ts`；因此同批奖励不能支付同批成本。shop adapter 保留本地奖励顺序并只返回兼容 DTO 与 typed invalidation facts，source 不进入客户端协议。
+普通 `/shop/buy`、`/shop/bulk_buy` 与 `TREASURE_EQUIPMENT` 由 `shop/purchase-owner.ts` 拥有唯一最外层事务。商店先整体校验并扣除 user cost、item cost，再把扣款后的 `freeMana`、`freeVmoney` 和 `expPool` 作为带真实身份的 `knownPlayerBefore` 交给 typed `shop-reward-grant.ts`；因此同批奖励不能支付同批成本。shop adapter 保留本地奖励顺序并返回 typed absolute facts，客户端 DTO 只由提交后的 Shop response projector 生成。
 
-owner 返回的 item、角色、装备最终状态与货币后态直接用于商店响应，不再为最终 `user_info` 查询玩家；同一 item 多次奖励及重复角色补偿均返回数据库最终库存。purchase count、mana mission fact、pass-card point 或奖励执行失败必须离开事务回调，使成本、奖励和后续写入由同一个外层事务回滚。`TREASURE_EQUIPMENT` 强化商店继续执行专用装备成长事务，不经过 shop reward adapter。
+owner 返回的 item、角色、装备奖励、装备强化与货币后态直接用于商店响应，不再为最终 `user_info` 查询玩家；同一 item 多次奖励及重复角色补偿均返回数据库最终库存。purchase count、mana mission fact、pass-card point 或奖励执行失败必须离开事务回调，使成本、奖励和后续写入由同一个外层事务回滚。`TREASURE_EQUIPMENT` 由同一 Shop owner 中先验证后应用的窄 Equipment effect adapter 写入，不伪装为普通装备奖励。
 
 RewardGrant 的 transaction-owner、within 和 standalone 三条路径都通过同一个惰性 Inventory batch 发放 Item。静态 direct Item ID 首次激活时一次批读；重复角色补偿通过显式 port 加入同一 batch，不触发 Growth 自建 Item owner。每个物品 ID 在内存中累计最终数量和 `total_obtained`，计划末尾只写入一次库存和一次收集总量；逐条响应仍保留每次 mutation 当时的绝对数量。纯货币、纯装备、空计划和首次获得角色不激活 Inventory。
 

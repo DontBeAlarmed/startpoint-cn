@@ -437,7 +437,7 @@ test("all existing global-fact owners pass bounded invalidations into fresh publ
     assert.match(source("src/routes/api/passCard.ts"), /invalidatedFactKeys:\s*result\.invalidatedFactKeys/)
     assert.match(source("src/routes/api/raidEvent.ts"), /invalidatedFactKeys:[\s\S]*rewardResult/)
     assert.match(source("src/routes/api/boxGacha.ts"), /invalidatedFactKeys:[\s\S]*rewardResult/)
-    assert.equal((source("src/routes/api/shop.ts").match(/invalidatedFactKeys:/g) ?? []).length, 2)
+    assert.equal((source("src/routes/api/shop/purchase-routes.ts").match(/invalidatedFactKeys:/g) ?? []).length, 1)
     assert.equal((source("src/routes/api/mail.ts").match(/invalidatedFactKeys:/g) ?? []).length, 2)
     assert.match(single, /invalidatedFactKeys/)
     assert.match(singlePublication, /input\.questCategory\s*===\s*QuestCategory\.CHARACTER/)

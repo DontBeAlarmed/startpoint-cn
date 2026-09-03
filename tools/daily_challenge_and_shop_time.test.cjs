@@ -14,7 +14,7 @@ const {
 } = require("../src/lib/quest/daily-challenge")
 const {
     getShopPurchasePeriodKeys,
-} = require("../src/lib/event-shop-purchase")
+} = require("../src/lib/shop/purchase-period")
 const { QuestCategory } = require("../src/lib/types")
 
 const at = value => new Date(value)

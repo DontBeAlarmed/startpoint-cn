@@ -1,21 +1,16 @@
-import CDN_GENERAL_SHOP_WHITELIST from "../../assets/cdn_general_shop_whitelist.json"
 import {
     getPlayerShopPurchaseCountsByTypeBulkSync,
-    getPlayerShopPurchaseCountsByTypeSync,
     getShopPurchaseQueryKey,
     ShopPurchaseQuery,
 } from "../data/domains/shopPurchase"
 import {
-    calculateShopStockQuantity,
     getShopPurchasePeriodKeys,
-} from "./event-shop-purchase"
+} from "./shop/purchase-period"
+import { calculateShopStockQuantity } from "./shop/sales-stock"
 import { isShopItemAvailable } from "./shop/period"
 import { ShopItem, ShopItems, ShopType } from "./types"
 
-const GENERAL_SHOP_CDN_KEYS: Set<number> = new Set(CDN_GENERAL_SHOP_WHITELIST)
-
 export interface ShopSalesListDependencies {
-    getPurchaseCounts?: typeof getPlayerShopPurchaseCountsByTypeSync
     getPurchaseCountsBulk?: typeof getPlayerShopPurchaseCountsByTypeBulkSync
     getEquipmentEnhancementLevel?: (playerId: number, equipmentId: number) => number
 }
@@ -99,7 +94,6 @@ export function buildShopSalesListSync(
     input: BuildShopSalesListInput,
     dependencies: ShopSalesListDependencies = {},
 ): ShopSalesListBuildResult {
-    const getPurchaseCounts = dependencies.getPurchaseCounts ?? getPlayerShopPurchaseCountsByTypeSync
     const getPurchaseCountsBulk = dependencies.getPurchaseCountsBulk
     const getEquipmentEnhancementLevel = dependencies.getEquipmentEnhancementLevel ?? (() => -1)
     const salesList: Object[] = []
@@ -115,10 +109,6 @@ export function buildShopSalesListSync(
     for (const [shopTypeText, items] of Object.entries(input.itemsByType)) {
         const shopType = Number(shopTypeText)
         for (const [itemId, item] of Object.entries(items)) {
-            if (shopType === ShopType.GENERAL && !GENERAL_SHOP_CDN_KEYS.has(Number(itemId))) {
-                filteredGeneralCount++
-                continue
-            }
             if (shopType === ShopType.TREASURE_EQUIPMENT
                 && input.equipmentEnhancementCategoryIds?.length
                 && (item.shopCategoryId === undefined
@@ -147,7 +137,7 @@ export function buildShopSalesListSync(
         }
     }
 
-    const appendSale = ({ itemId, item, shopType, query }: typeof pendingSales[number], counts: ReturnType<typeof getPurchaseCounts>) => {
+    const appendSale = ({ itemId, item, shopType, query }: typeof pendingSales[number], counts: { daily: number; monthly: number; total: number }) => {
             const stockQuantity = calculateShopStockQuantity(item, counts)
             salesList.push({
                 shop_item_id: itemId,
@@ -164,7 +154,10 @@ export function buildShopSalesListSync(
             })
     }
 
-    if (getPurchaseCountsBulk !== undefined) {
+    if (pendingSales.length > 0) {
+        if (getPurchaseCountsBulk === undefined) {
+            throw new Error("Shop sales list requires the bulk purchase-count reader.")
+        }
         const countsByKey = getPurchaseCountsBulk(
             input.playerId,
             pendingSales.map(sale => sale.query),
@@ -175,18 +168,6 @@ export function buildShopSalesListSync(
                 throw new Error(`Missing bulk purchase counts for shop item ${sale.itemId}.`)
             }
             appendSale(sale, counts)
-        }
-    } else {
-        for (const sale of pendingSales) {
-            appendSale(
-                sale,
-                getPurchaseCounts(
-                    input.playerId,
-                    sale.shopType,
-                    sale.itemId,
-                    sale.query.keys,
-                ),
-            )
         }
     }
 
