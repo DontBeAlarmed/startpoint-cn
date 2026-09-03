@@ -1,6 +1,6 @@
 # D18b Item Overflow Disposition 与客户端 Toast
 
-状态：生产实现与聚焦自动验证已完成，等待独立终审、服务重启和 CN 客户端实机验收。本文修订 D18 “所有 Item overflow 一律进入 Mail”的旧私服策略；D16 Inventory owner、D17 RewardGrant typed core 和 D18 capacity allocation 继续有效。
+状态：服务端实现、聚焦自动验证、独立终审与服务重启已完成；CN 客户端实机验收按用户决定统一延期到 D28 后。本文修订 D18 “所有 Item overflow 一律进入 Mail”的旧私服策略；D16 Inventory owner、D17 RewardGrant typed core 和 D18 capacity allocation 继续有效。
 
 ## 1. 目标
 
@@ -267,7 +267,7 @@ Scheduled 的合法管理配置还要求 `trigger_threshold + grant_amount < inv
 
 ```text
 D18B_DESIGN_STATUS: APPROVED
-D18B_IMPLEMENTATION_STATUS: COMPLETE (focused verification passed; final review pending)
+D18B_IMPLEMENTATION_STATUS: COMPLETE (focused verification + final review + restart passed)
 ITEM_OVERFLOW_DISPOSITION: ACTIVE_SELLABLE_SOLD_UNSELLABLE_MAIL
 OVER_MAX_TOAST: ACTIVE_CN_COMMON_RESPONSE
 MAIL_CAPACITY: PRIVATE_UNLIMITED
@@ -275,4 +275,4 @@ MAIL_CAPACITY: PRIVATE_UNLIMITED
 
 实现提交为 `52a16817`、`c0fd8f30`、`c1863a54`、`892824a2`、`a083e022` 与 `30afb2e6`。聚焦验证覆盖 pure disposition/projector、RewardGrant、Mail、Gift、Login、Mission、Raid、Single/Multi、数据库、规则、协议和活动；任务组的旧虚构 Item 夹具已换成真实 Content Item 或完整 Content overlay。Gate A broad 在 D18b 前已经唯一运行并闭环，本补丁按批准约束只运行受影响聚焦组和失败叶子，不重跑 broad。
 
-剩余退出项是文档/卫生检查、独立 whole-range 审查、服务重启与 CN 客户端实机复测；自动验证不能替代 Toast、页面状态和重登体验。
+独立 whole-range 审查初次发现 1 Critical / 1 Important / 1 Minor；`2f3a79e9` 修复 Multi Sold Mana 旧快照覆盖、Gacha 角色兑换 disposition 丢失和架构索引旧状态，并补充 import-cycle 修复。原审查代理 scoped re-review 最终 `APPROVED 0/0/0`。服务使用受支持入口重启，healthz 为 ready、schema 24，HTTP/TCP/Admin/Multiplayer 均可用。Toast、页面状态和重登体验保留在仓库外统一客户端验收账本，自动验证不替代该实测。

@@ -30,7 +30,7 @@
 | D15 | 全项目领域边界蓝图（识别完成，实施主线进行中） | [领域边界蓝图](./domain-boundary-blueprint.md) | CDN/客户端/服务端三层边界；owner、有限 shared core、adapter、projector 与独立模块 |
 | D16 | Item Inventory Owner（已落地，Gate A 自动验证已完成） | [Item Inventory Owner Gate](./item-inventory-owner-gate.md) | typed Item Content、唯一 Item writer、cap 纯计划与 EventTrade 到期策略 |
 | D17 | RewardGrant 正向协调核（已落地，Gate A 自动验证已完成） | [RewardGrant Core Gate](./reward-grant-core-gate.md) | 正向 Reward plan、资产 owner executors 与 Typed Grant Result；不成为 Economy bus |
-| D18b | Item Overflow Disposition 与 Toast（已实现，待终审与实机验收） | [Item Overflow Disposition Gate](./item-overflow-disposition-gate.md) | `sellable` 驱动 Sold/Mail、Mana 二次 overflow 与官方 `data.over_max` Toast |
+| D18b | Item Overflow Disposition 与 Toast（服务端 Gate 已完成，实机统一延期） | [Item Overflow Disposition Gate](./item-overflow-disposition-gate.md) | `sellable` 驱动 Sold/Mail、Mana 二次 overflow 与官方 `data.over_max` Toast |
 
 ## 阅读顺序
 
@@ -42,7 +42,7 @@
 
 D12、D13 与 D14 已完成服务端实现和自动化 Gate，等待客户端实机验收。三份 Gate 文档保留设计依据，同时作为相应已落地边界的架构与验证证据；它们不取代上述当前架构总览的阅读顺序。
 
-D15 已完成领域边界识别、决策和后续实施路线。D16、D17、D18 生产实现和 Gate A broad closure 已完成；D18b 的独立终审与服务重启仍在收尾，客户端实测统一延期到 D28 后。阅读这些 Gate 时仍需区分当前已落地私服策略、官方未知语义和客户端实机验收。
+D15 已完成领域边界识别、决策和后续实施路线。D16、D17、D18、D18b 的服务端实现、Gate A broad closure、D18b scoped final review 和服务重启均已完成；客户端实测统一延期到 D28 后。阅读这些 Gate 时仍需区分当前已落地私服策略、官方未知语义和客户端实机验收。
 
 ## 统一图例
 

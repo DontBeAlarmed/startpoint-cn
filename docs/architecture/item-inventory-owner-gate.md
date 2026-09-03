@@ -1,6 +1,6 @@
 # D16 Item Inventory Owner 与 EventTrade 到期策略
 
-状态：D16、D18 与 D18b 生产实现和聚焦自动验证已完成；Gate A broad 已完成并闭环，当前等待 D18b 独立终审、服务重启和客户端验收。本文描述 Item owner、cap、overflow disposition 与 Mail 的当前运行时合同；官方语义未知项仍按私服策略标注。
+状态：D16、D18 与 D18b 服务端实现、Gate A broad closure、D18b 聚焦验证、独立终审和服务重启均已完成；客户端验收统一延期到 D28 后。本文描述 Item owner、cap、overflow disposition 与 Mail 的当前运行时合同；官方语义未知项仍按私服策略标注。
 
 ## 1. 背景
 
@@ -368,10 +368,10 @@ D16_BASE: b6fd6bbf182a51e2ba2556840873d054b6b1149f
 D16_DESIGN_STATUS: APPROVED
 D16_IMPLEMENTATION_STATUS: COMPLETE (C1-C4 landed; checkpoint validated)
 D18_IMPLEMENTATION_STATUS: COMPLETE (C1-C5 landed; checkpoint validated)
-D18B_IMPLEMENTATION_STATUS: COMPLETE (disposition + common response; final review pending)
+D18B_IMPLEMENTATION_STATUS: COMPLETE (disposition + common response + final review + restart)
 ITEM_CAP_PRODUCTION_STATUS: ACTIVE (explicit grant-only policy)
 ITEM_OVERFLOW_DISPOSITION_STATUS: ACTIVE (sellable Sold; unsellable Mail)
 EVENT_TRADE_OVERFLOW_MAIL_STATUS: ACTIVE (private-server strategy)
 ```
 
-D16 设计、正常 writer 清单、C1-C4 生产实现、D18 C1-C5、D18b disposition/common-response、focused groups 和结构性能准入已经完成；Gate A 的唯一 broad 已运行并闭环，D18b 不重复 broad。当前只剩 D18b 独立终审、服务重启和客户端验收。cap、Sold/Mail disposition、邮箱无限和 31 天 Mail TTL 是已批准私服策略，不等同于已证明的官服后端实现。
+D16 设计、正常 writer 清单、C1-C4 生产实现、D18 C1-C5、D18b disposition/common-response、focused groups、结构性能准入、独立终审和服务重启已经完成；Gate A 的唯一 broad 已运行并闭环，D18b 未重复 broad。客户端验收统一延期到 D28 后。cap、Sold/Mail disposition、邮箱无限和 31 天 Mail TTL 是已批准私服策略，不等同于已证明的官服后端实现。
