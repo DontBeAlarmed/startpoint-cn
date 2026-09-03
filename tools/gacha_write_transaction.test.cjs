@@ -38,11 +38,19 @@ const { SessionType } = require("../src/data/types")
 const gachaRoutes = require("../src/routes/api/gacha").default
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 const { rewardPlayerGachaDrawResultSync } = require("../src/lib/gacha")
+const { givePlayerCharacterSync } = require("../src/lib/character")
+const { getPlayerMailsSync } = require("../src/data/domains/mail")
+const { createRewardGrantItemOverflowPolicy } = require("../src/lib/reward-grant-item-overflow")
 const { getDefaultGachaSeedQuarantine } = require("../src/lib/gacha-seed-quarantine")
-const { GachaType } = require("../src/lib/types")
+const { GachaType, RewardType } = require("../src/lib/types")
 const {
     executeRewardGrantExecutionPlanAsTransactionOwnerSync,
+    createRewardGrantExecutionPlan,
 } = require("../src/lib/reward-grant")
+const {
+    grantGachaRewardPlanInTransactionOwnerWithInventorySync,
+} = require("../src/lib/gacha-reward-grant")
+const { withDeferredInventoryBatchContextWithinTransactionSync } = require("../src/lib/inventory")
 
 let database
 let app
@@ -423,6 +431,120 @@ test("character duplicate gacha item_list reports the post-reward inventory", as
     assert.equal(getPlayerItemSync(playerId, exBoostItemId), 21)
     assert.equal(result.draw[0].ex_boost_item.count, 1)
     assert.equal(result.items[exBoostItemId], 21)
+})
+
+test("gacha duplicate compensation sends capped overflow to Mail", async () => {
+    const { playerId } = await createPlayer("gacha-capped-overflow")
+    const characterId = 1
+    const exBoostItemId = 14002
+    givePlayerCharacterSync(playerId, characterId)
+    const policy = createRewardGrantItemOverflowPolicy(playerId)
+    setInventoryFixtureItemExactSync(playerId, exBoostItemId, policy.maxCount(exBoostItemId))
+
+    const result = database.transaction(() => rewardPlayerGachaDrawResultSync(
+        playerId,
+        { type: GachaType.CHARACTER },
+        [characterId],
+        undefined,
+        [{ characterId, rarity: 4, movieId: "normal", seed: 2, requiresVerification: true }],
+        {
+            ownerGrant: plan => executeRewardGrantExecutionPlanAsTransactionOwnerSync(
+                playerId,
+                plan,
+                rewardGrantPlayerSnapshot(playerId),
+                { itemOverflow: policy },
+            ),
+        },
+    ))()
+
+    assert.equal(result.draw[0].ex_boost_item.count, 0)
+    assert.equal(result.items[exBoostItemId], policy.maxCount(exBoostItemId))
+    const overflowMails = getPlayerMailsSync(playerId, 1, 100, true)
+        .filter(mail => mail.type_id === exBoostItemId)
+    assert.deepEqual(overflowMails.map(mail => mail.number), [1])
+})
+
+test("gacha capped overflow rolls back with a later source failure", async () => {
+    const { playerId } = await createPlayer("gacha-capped-overflow-rollback")
+    const characterId = 1
+    const exBoostItemId = 14002
+    givePlayerCharacterSync(playerId, characterId)
+    const policy = createRewardGrantItemOverflowPolicy(playerId)
+    setInventoryFixtureItemExactSync(playerId, exBoostItemId, policy.maxCount(exBoostItemId))
+
+    assert.throws(() => database.transaction(() => {
+        rewardPlayerGachaDrawResultSync(
+            playerId,
+            { type: GachaType.CHARACTER },
+            [characterId],
+            undefined,
+            [{ characterId, rarity: 4, movieId: "normal", seed: 3, requiresVerification: true }],
+            {
+                ownerGrant: plan => executeRewardGrantExecutionPlanAsTransactionOwnerSync(
+                    playerId,
+                    plan,
+                    rewardGrantPlayerSnapshot(playerId),
+                    { itemOverflow: policy },
+                ),
+            },
+        )
+        throw new Error("late gacha source failure")
+    })(), /late gacha source failure/)
+    assert.equal(getPlayerItemSync(playerId, exBoostItemId), policy.maxCount(exBoostItemId))
+    assert.deepEqual(getPlayerMailsSync(playerId, 1, 100, true), [])
+})
+
+test("gacha source adapter writes capped overflow after external finalize", async () => {
+    const { playerId } = await createPlayer("gacha-adapter-capped-overflow")
+    const characterId = 1
+    const exBoostItemId = 14002
+    givePlayerCharacterSync(playerId, characterId)
+    const policy = createRewardGrantItemOverflowPolicy(playerId)
+    setInventoryFixtureItemExactSync(playerId, exBoostItemId, policy.maxCount(exBoostItemId))
+    const player = getPlayerSync(playerId)
+    const plan = createRewardGrantExecutionPlan([{ type: RewardType.CHARACTER, id: characterId }])
+
+    const result = database.transaction(() => withDeferredInventoryBatchContextWithinTransactionSync({
+        playerId,
+        preloadItemIds: [exBoostItemId],
+        playerExistence: "caller-verified",
+    }, inventory => grantGachaRewardPlanInTransactionOwnerWithInventorySync(
+        playerId,
+        plan,
+        {
+            id: player.id,
+            freeMana: player.freeMana,
+            freeVmoney: player.freeVmoney,
+            expPool: player.expPool,
+        },
+        inventory,
+    )))()
+
+    assert.equal(result.assets.items[0].acceptedAmount, 0)
+    assert.equal(result.assets.items[0].overflowAmount, 1)
+    assert.equal(getPlayerMailsSync(playerId, 1, 100, true).length, 1)
+    assert.equal(getPlayerItemSync(playerId, exBoostItemId), policy.maxCount(exBoostItemId))
+
+    assert.throws(() => database.transaction(() => {
+        withDeferredInventoryBatchContextWithinTransactionSync({
+            playerId,
+            preloadItemIds: [exBoostItemId],
+            playerExistence: "caller-verified",
+        }, inventory => grantGachaRewardPlanInTransactionOwnerWithInventorySync(
+            playerId,
+            plan,
+            {
+                id: player.id,
+                freeMana: player.freeMana,
+                freeVmoney: player.freeVmoney,
+                expPool: player.expPool,
+            },
+            inventory,
+        ))
+        throw new Error("late gacha adapter failure")
+    })(), /late gacha adapter failure/)
+    assert.equal(getPlayerMailsSync(playerId, 1, 100, true).length, 1)
+    assert.equal(getPlayerItemSync(playerId, exBoostItemId), policy.maxCount(exBoostItemId))
 })
 
 test("character owner plan preserves per-draw movie order duplicate deltas and merged state", async () => {

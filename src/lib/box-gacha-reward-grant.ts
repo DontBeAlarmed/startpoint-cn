@@ -14,6 +14,7 @@ import type {
 import { RewardType } from "./types"
 import { getAwakeFactKeysFromRewardGrants } from "./mission/awake-reward-facts"
 import type { FactKey } from "./mission/facts/fact-key"
+import { createRewardGrantItemOverflowPolicy } from "./reward-grant-item-overflow"
 
 export interface BoxGachaRewardKnownPlayerState {
     readonly id: number
@@ -114,6 +115,7 @@ export function grantBoxGachaDrawInTransactionOwnerWithInventorySync(
             execution.finalize()
             return validated
         },
+        { itemOverflow: createRewardGrantItemOverflowPolicy(playerId) },
     )
 
     return {

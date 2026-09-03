@@ -97,6 +97,8 @@ const {
     getPlayerItemsSync,
 } = require("../src/data/domains/item")
 const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
+const { createRewardGrantItemOverflowPolicy } = require("../src/lib/reward-grant-item-overflow")
+const { getPlayerMailsSync, MailType } = require("../src/data/domains/mail")
 const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
@@ -290,6 +292,74 @@ test("box reward adapter preserves mixed absolute Item and duplicate compensatio
     })
     assert.equal(JSON.stringify(result).includes("source"), false)
     assert.equal(JSON.stringify(result).includes("itemDeltas"), false)
+})
+
+test("box direct Item and duplicate compensation both overflow through the source adapter", async () => {
+    const { playerId } = await createPlayer("box-capped-overflow")
+    const characterId = 1
+    const itemId = 14002
+    givePlayerCharacterSync(playerId, characterId)
+    const policy = createRewardGrantItemOverflowPolicy(playerId)
+    setInventoryFixtureItemExactSync(playerId, itemId, policy.maxCount(itemId))
+    const player = getPlayerSync(playerId)
+
+    const result = database.transaction(() => (
+        withDeferredInventoryBatchContextWithinTransactionSync({
+            playerId,
+            preloadItemIds: [itemId],
+            playerExistence: "caller-verified",
+        }, inventory => grantBoxGachaDrawInTransactionOwnerWithInventorySync(
+            playerId,
+            {
+                rewards: [],
+                mana: 0,
+                exp: 0,
+                characters: new Map([[characterId, 1]]),
+                equipment: new Map(),
+                items: new Map([[itemId, 2]]),
+            },
+            player,
+            inventory,
+        ))
+    ))()
+
+    assert.equal(result.rewardResult.items[itemId], policy.maxCount(itemId))
+    const overflowMails = getPlayerMailsSync(playerId, 1, 100, true)
+        .filter(mail => mail.type === MailType.ITEM && mail.type_id === itemId)
+    assert.deepEqual(overflowMails.map(mail => mail.number).sort((a, b) => a - b), [1, 2])
+})
+
+test("box capped overflow rolls back with a later source failure", async () => {
+    const { playerId } = await createPlayer("box-capped-overflow-rollback")
+    const characterId = 1
+    const itemId = 14002
+    givePlayerCharacterSync(playerId, characterId)
+    const policy = createRewardGrantItemOverflowPolicy(playerId)
+    setInventoryFixtureItemExactSync(playerId, itemId, policy.maxCount(itemId))
+    const player = getPlayerSync(playerId)
+
+    assert.throws(() => database.transaction(() => {
+        withDeferredInventoryBatchContextWithinTransactionSync({
+            playerId,
+            preloadItemIds: [itemId],
+            playerExistence: "caller-verified",
+        }, inventory => grantBoxGachaDrawInTransactionOwnerWithInventorySync(
+            playerId,
+            {
+                rewards: [],
+                mana: 0,
+                exp: 0,
+                characters: new Map([[characterId, 1]]),
+                equipment: new Map(),
+                items: new Map([[itemId, 2]]),
+            },
+            player,
+            inventory,
+        ))
+        throw new Error("late box source failure")
+    })(), /late box source failure/)
+    assert.equal(getPlayerItemSync(playerId, itemId), policy.maxCount(itemId))
+    assert.deepEqual(getPlayerMailsSync(playerId, 1, 100, true), [])
 })
 
 for (const invalid of [

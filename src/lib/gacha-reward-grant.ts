@@ -22,6 +22,7 @@ import {
 import { getDefaultGachaSeedQuarantine } from "./gacha-seed-quarantine"
 import { formatGachaCharacterDrawsSummary } from "./hot-path-log-formatters"
 import { sampledLog } from "./sampled-log"
+import { createRewardGrantItemOverflowPolicy } from "./reward-grant-item-overflow"
 
 export interface PlannedCharacterGachaMovie {
     characterId: number
@@ -140,6 +141,7 @@ export function grantGachaRewardPlanInTransactionOwnerWithInventorySync(
             execution.finalize()
             return result
         },
+        { itemOverflow: createRewardGrantItemOverflowPolicy(playerId) },
     )
 }
 
