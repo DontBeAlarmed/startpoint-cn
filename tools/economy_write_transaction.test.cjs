@@ -28,6 +28,9 @@ const {
     getPlayerCollectedItemTotalSync,
     getPlayerItemSync,
 } = require("../src/data/domains/item")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
+const { getPlayerMailsSync, MailType } = require("../src/data/domains/mail")
+const { createRewardGrantItemOverflowPolicy } = require("../src/lib/reward-grant-item-overflow")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
@@ -171,6 +174,29 @@ test("star crumb item exchange preserves the successful response state", async (
     assert.equal(getPlayerSync(playerId).starCrumb, 700)
     assert.equal(getPlayerItemSync(playerId, 10002), 1)
     assert.equal(getPlayerCollectedItemTotalSync(playerId, 10002), 1)
+})
+
+test("star crumb Item exchange sends capped overflow to Mail", async () => {
+    const { playerId, viewerId } = await createPlayer("star-crumb-item-overflow")
+    updatePlayerSync({ id: playerId, starCrumb: 1000 })
+    const itemId = 10002
+    const policy = createRewardGrantItemOverflowPolicy(playerId)
+    setInventoryFixtureItemExactSync(playerId, itemId, policy.maxCount(itemId))
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/exchange/star_crumb",
+        payload: { viewer_id: viewerId, exchange_id: 9000001, api_count: 1 },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    assert.equal(getPlayerItemSync(playerId, itemId), policy.maxCount(itemId))
+    assert.deepEqual(getPlayerMailsSync(playerId, 1, 100, true).map(mail => ({
+        type: mail.type,
+        type_id: mail.type_id,
+        number: mail.number,
+    })), [{ type: MailType.ITEM, type_id: itemId, number: 1 }])
+    assert.equal(getPlayerSync(playerId).starCrumb, 700)
 })
 
 test("bulk stack conversion commits the complete planned result", async () => {

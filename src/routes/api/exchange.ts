@@ -17,6 +17,7 @@ import bundledStarCrumbExchangeCost from "../../../assets/star_crumb_exchange_co
 import { getDb } from "../../data/db";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
+import { createRewardGrantItemOverflowPolicy } from "../../lib/reward-grant-item-overflow";
 
 interface ExchangeBody {
     viewer_id: number;
@@ -140,10 +141,18 @@ const routes = async (fastify: FastifyInstance) => {
                             preloadItemIds: [targetId],
                             playerExistence: "caller-verified",
                         }, inventory => {
-                            inventory.grant(targetId, 1)
+                            const overflowPolicy = createRewardGrantItemOverflowPolicy(playerId)
+                            const grant = inventory.grantWithCapacity(
+                                targetId,
+                                1,
+                                overflowPolicy.maxCount(targetId),
+                            )
                             const [result] = inventory.flush()
                             if (result === undefined) {
                                 throw new Error("Star Crumb exchange Item grant did not produce a result.")
+                            }
+                            if (grant.overflowAmount > 0) {
+                                overflowPolicy.writeOverflow(targetId, grant.overflowAmount)
                             }
                             return result.afterAmount
                         })

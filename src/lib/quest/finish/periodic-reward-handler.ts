@@ -7,6 +7,7 @@ import { getPlayerPeriodicRewardPointsSync } from "../../../data/domains/campaig
 import { getDb } from "../../../data/db"
 import { withInventoryBatchContextWithinTransactionSync } from "../../inventory"
 import { QuestCategory } from "../../types"
+import { createRewardGrantItemOverflowPolicy } from "../../reward-grant-item-overflow"
 
 interface HardMultiEventDefinition {
     periodicPointId?: number
@@ -126,8 +127,16 @@ export function settleActivityPeriodicRewardsSync(
         playerId: input.playerId,
         playerExistence: "caller-verified",
     }, inventory => {
-        const item = inventory.grant(reward.itemId, reward.count)
+        const overflowPolicy = createRewardGrantItemOverflowPolicy(input.playerId)
+        const item = inventory.grantWithCapacity(
+            reward.itemId,
+            reward.count,
+            overflowPolicy.maxCount(reward.itemId),
+        )
         inventory.flush()
+        if (item.overflowAmount > 0) {
+            overflowPolicy.writeOverflow(reward.itemId, item.overflowAmount)
+        }
         return {
             dropPeriodicRewardIds: [{ group_id: groupId, index, number: reward.count }],
             periodicRewardPointList: [{ id: pointId, point: remainingPoint }],

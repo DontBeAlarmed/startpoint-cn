@@ -77,6 +77,9 @@ const {
     getPlayerCollectedItemTotalSync,
     getPlayerItemSync,
 } = require("../src/data/domains/item")
+const { getPlayerMailsSync, MailType } = require("../src/data/domains/mail")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
+const { createRewardGrantItemOverflowPolicy } = require("../src/lib/reward-grant-item-overflow")
 const {
     settleActivityPeriodicRewardsSync,
 } = require("../src/lib/quest/finish/periodic-reward-handler")
@@ -192,6 +195,19 @@ assert.deepEqual(final, {
     periodicRewardPointList: [{ id: 90000000, point: 1 }],
     items: { 40405: finalBefore + 9 },
 })
+
+const cappedPlayerId = createPlayer("periodic-capped")
+const cappedPolicy = createRewardGrantItemOverflowPolicy(cappedPlayerId)
+setInventoryFixtureItemExactSync(cappedPlayerId, 40405, cappedPolicy.maxCount(40405))
+const cappedCollectedBefore = getPlayerCollectedItemTotalSync(cappedPlayerId, 40405)
+const capped = settlePeriodic(cappedPlayerId)
+assert.deepEqual(capped.items, { 40405: cappedPolicy.maxCount(40405) })
+assert.equal(getPlayerCollectedItemTotalSync(cappedPlayerId, 40405), cappedCollectedBefore)
+assert.deepEqual(getPlayerMailsSync(cappedPlayerId, 1, 100, true).map(mail => ({
+    type: mail.type,
+    type_id: mail.type_id,
+    number: mail.number,
+})), [{ type: MailType.ITEM, type_id: 40405, number: 9 }])
 
 const exhaustedPlayerId = createPlayer("periodic-exhausted")
 db.prepare(`UPDATE players_periodic_reward_points SET point = 0 WHERE player_id = ? AND id = 10000002`)
