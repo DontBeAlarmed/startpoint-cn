@@ -192,13 +192,6 @@ assert.equal(
     true,
     "all seeds must be planned before owner reward execution",
 )
-assert.equal(
-    gachaSource.indexOf("const characterMoviePlan = gacha.type")
-        < gachaSource.indexOf("return rewardPlayerGachaDrawResultLegacySync"),
-    true,
-    "all seeds must be planned before legacy reward execution",
-)
-
 const gachaRouteSource = fs.readFileSync(
     path.join(__dirname, "..", "src", "routes", "api", "gacha.ts"),
     "utf8",

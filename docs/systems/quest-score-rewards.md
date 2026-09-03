@@ -28,7 +28,7 @@ Rare 的 ELEMENT/AETHER 行中 `id` 表示素材稀有度，不是背包物品 I
 
 `src/lib/quest/score-reward-selection-core.ts` 是无玩家写入、无运行时读取的纯选择核心。它显式接收服务器掉落倍率、奖励日期、campaign、随机源以及 Rare group、活动货币和关卡属性素材解析器，按上述顺序完成普通与 Rare 抽取并输出不可变 typed execution plan 与本地 `dropMetadata`。`src/lib/quest/score-reward-selection.ts` 是轻量运行时适配层，负责读取内容表、服务器设置和服务器时间后调用核心，不能称为纯函数。`dropMetadata` 使用连续 `entryIndex` 绑定 RewardGrant command，同时保留客户端 `dropIndex`、group ID 和最终数量；投影前校验 fingerprint 与数量，`drop_score_reward_ids` 与 `drop_rare_reward_ids` 只从该本地 metadata 投影。
 
-单人和 Multi finish 在最外层事务内执行该 typed plan，并采用带 `playerId` 的 `playerAfter` 维护后续奖励货币状态。Score 专用 projection 按 entry 顺序保留普通物品的最终库存，同时对 CHARACTER 补偿使用 typed `acceptedAmount` 复现旧 writer 的 `item_list` 语义；该 metadata 不进入协议。旧 `givePlayerScoreRewardsSync()` facade 目前仅为 C5 前兼容入口，生产 Single/Multi 已分别使用 source-local typed adapter。兼容路径在写入成功后记录一次 `quest-score-rewards` 采样摘要；结算路径只在最外层事务提交后记录一次，后续写入失败并回滚时不记录。选择核心、运行时适配层和响应投影都不记录日志。
+单人和 Multi finish 在最外层事务内执行该 typed plan，并采用带 `playerId` 的 `playerAfter` 维护后续奖励货币状态。Score 专用 projection 按 entry 顺序保留普通物品的最终库存，同时对 CHARACTER 补偿使用 typed `acceptedAmount` 复现旧 writer 的 `item_list` 语义；该 metadata 不进入协议。生产 Single/Multi 分别使用 source-local typed adapter。奖励在写入成功后记录一次 `quest-score-rewards` 采样摘要；结算路径只在最外层事务提交后记录一次，后续写入失败并回滚时不记录。选择核心、运行时适配层和响应投影都不记录日志。
 
 ## 仍独立处理的机制
 

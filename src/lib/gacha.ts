@@ -14,7 +14,6 @@ import {
     type GachaRewardGrantOptions,
     type PlannedCharacterGachaMovie,
 } from "./gacha-reward-grant";
-import { rewardPlayerGachaDrawResultLegacySync } from "./gacha-reward-legacy";
 
 export { drawGachaSync, drawGachaWithMetadataSync, selectWeightedIndexByRoll } from "./gacha-draw";
 export type { GachaDrawMetadata } from "./gacha-draw";
@@ -101,30 +100,21 @@ export function rewardPlayerGachaDrawResultSync(
     playerId: number,
     gacha: Gacha,
     gachaDrawResult: number[],
-    gachaDrawMetadata?: GachaDrawMetadata[],
-    plannedCharacterMovies?: PlannedCharacterGachaMovie[],
-    options: GachaRewardGrantOptions = {},
+    gachaDrawMetadata: GachaDrawMetadata[] | undefined,
+    plannedCharacterMovies: PlannedCharacterGachaMovie[] | undefined,
+    options: GachaRewardGrantOptions,
 ): RewardPlayerGachaDrawResult {
     const characterMoviePlan = gacha.type === GachaType.CHARACTER
         ? plannedCharacterMovies
             ?? planCharacterGachaMovies(gacha as CharacterGacha, gachaDrawResult)
         : undefined
-    if (options.ownerGrant !== undefined) {
-        return rewardGachaDrawResultThroughGrantOwnerSync(
-            playerId,
-            gacha,
-            gachaDrawResult,
-            gachaDrawMetadata,
-            characterMoviePlan,
-            { ...options, ownerGrant: options.ownerGrant },
-        )
-    }
-    return rewardPlayerGachaDrawResultLegacySync(
+    return rewardGachaDrawResultThroughGrantOwnerSync(
         playerId,
         gacha,
         gachaDrawResult,
         gachaDrawMetadata,
         characterMoviePlan,
+        options,
     )
 }
 

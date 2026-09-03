@@ -1,6 +1,6 @@
 # StarPoint CN 奖励与养成
 
-本页展示当前通用奖励写入边界，以及角色节点、普通装备觉醒和追忆强化的写前规划与事务写入关系。
+本页展示当前通用奖励写入边界，以及角色节点、普通装备觉醒和追忆强化的写前规划与事务写入关系。RewardGrant 只提供 typed 正向协调结果；客户端 DTO 仍由各来源的 source-local adapter 投影，不存在跨来源的统一 response projector。
 
 ## D4 当前奖励与库存写入
 
@@ -8,7 +8,7 @@
 flowchart LR
     CALLERS["调用方聚合<br/>任务 / 战斗 / 抽卡 / 商店 / 邮件"]
     ENTRIES["Reward entries"]
-    PLAN["不可变 RewardGrantPlan<br/>planner 不读写 DB"]
+    PLAN["不可变 RewardGrantExecutionPlan<br/>planner 不读写 DB"]
     VALIDATE["规范化 / 全量校验"]
 
     subgraph EXECUTION["执行区：owner / within 由调用方持有事务；standalone 自建 SQLite 事务"]
@@ -17,7 +17,7 @@ flowchart LR
         CURRENCY["玩家货币 / 经验池"]
         ITEMS["道具库存 / 收集历史"]
         OWNED["角色 / 装备"]
-        PROJECTION["统一结果投影<br/>aggregate + entries + playerAfter"]
+        PROJECTION["typed result<br/>assets + entries + playerAfter"]
     end
 
     CALLERS --> ENTRIES
@@ -45,11 +45,11 @@ flowchart LR
 
 | 图中事实 | 仓库相对证据路径 |
 |---|---|
-| planner 复制、校验并冻结奖励计划 | `src/lib/reward-grant/plan.ts` |
-| 执行器提供 owner、within 和 standalone 事务入口 | `src/lib/reward-grant/executor.ts`、`src/lib/reward-grant/owner-executor.ts` |
-| owner 模式先累计货币，Item batch 先 flush 再持久化货币 | `src/lib/reward-grant/executor.ts` |
-| RewardGrant 适配惰性 Inventory batch、预加载 direct Item 并合并重复角色补偿 | `src/lib/reward-grant/inventory-adapter.ts` |
-| entry 结果聚合为角色、装备、道具、货币和 `playerAfter` | `src/lib/reward-grant/entry-result.ts`、`src/lib/reward-grant/executor.ts` |
+| planner 复制、校验并冻结奖励计划 | `src/lib/reward-grant/execution-plan.ts` |
+| 执行器提供 owner、within 和 standalone 事务入口 | `src/lib/reward-grant/execution-engine.ts`、`src/lib/reward-grant/transaction-executor.ts` |
+| owner 模式先累计货币，Item batch 先 flush 再持久化货币 | `src/lib/reward-grant/execution-engine.ts` |
+| RewardGrant 适配惰性 Inventory batch、预加载 direct Item 并合并重复角色补偿 | `src/lib/reward-grant/execution-assets.ts` |
+| entry 结果聚合为角色、装备、道具、货币和 `playerAfter` | `src/lib/reward-grant/execution-result.ts`、`src/lib/reward-grant/execution-engine.ts` |
 | 战斗、任务、抽卡、商店和邮件调用 RewardGrant | `src/lib/quest/finish/single-settlement-reward-grant.ts`、`src/lib/mission/grants.ts`、`src/routes/api/gacha.ts`、`src/lib/shop-reward-grant.ts`、`src/lib/mail-reward-grant.ts` |
 
 ### 本图不表达

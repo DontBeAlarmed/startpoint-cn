@@ -223,7 +223,7 @@ test("quest score rewards use the persisted multiplier instead of DROP_MULTIPLIE
     const { insertAccountSync } = require("../src/data/domains/account")
     const { insertDefaultPlayerSync } = require("../src/data/domains/player")
     const { updateServerGameplaySettingsSync } = require(domainPath)
-    const { givePlayerScoreRewardsSync } = require("../src/lib/quest")
+    const { MultiSettlementRewardGranter } = require("../src/multi/settlement/reward-grant")
     const { RewardType, ScoreRewardType } = require("../src/lib/types")
     const account = insertAccountSync({
         appId: "wf_cn",
@@ -236,7 +236,7 @@ test("quest score rewards use the persisted multiplier instead of DROP_MULTIPLIE
     updateServerGameplaySettingsSync({ dropMultiplier: 4 })
     process.env.DROP_MULTIPLIER = "99"
 
-    const result = getDb().transaction(() => givePlayerScoreRewardsSync(playerId, 7001, [{
+    const result = getDb().transaction(() => new MultiSettlementRewardGranter(playerId).grantScoreRewards(7001, [{
         name: "test mana",
         type: ScoreRewardType.ITEM,
         reward_type: RewardType.MANA,

@@ -2,7 +2,7 @@
 
 `src/lib/reward-grant/` 提供有限的 typed 正向奖励计划和同步执行器。Login、Gift、Scheduled、Mail、Shop、Gacha、Box、Single/Multi 结算、Mission、Carnival、Story、Raid 和 Score 的生产奖励消费者均已迁移到 target typed contract；每个来源仍保留自己的事务、receipt、响应和事实投影。box gacha、`TREASURE_EQUIPMENT` 强化商店、角色成长和活动状态仍由各自领域 writer 负责。
 
-`src/lib/quest.ts` 与 `legacy-quest-reward-grant.ts` 只作为 C5 前的兼容 facade 保留，当前没有 Story、Raid、Multi 生产入口继续调用它们。`gacha-reward-legacy.ts` 也只作为 C5 前的无 owner 兼容分支保留。
+C5 已删除迁移期的 Quest reward facade、Gacha 无 owner fallback 以及旧 RewardGrant core。生产代码只通过目标 typed public barrel 和各来源 source-local adapter 进入奖励协调核；`src/legacy/multiBattleQuest.ts.bak` 仅作为历史归档，不属于生产运行路径。
 
 ## 安全公共 API
 
@@ -10,11 +10,11 @@
 - `executeRewardGrantExecutionPlanWithinTransactionSync(playerId, plan)`：在调用方已经开启的 SQLite 事务中执行计划。
 - `executeRewardGrantExecutionPlanSync(playerId, plan)`：为独立调用建立一次 SQLite 事务并执行计划。
 
-`executeRewardGrantExecutionPlanAsTransactionOwnerSync(playerId, plan, knownPlayerBefore)` 是公共 typed transaction-owner 契约，要求 known state 携带同一 `playerId`，不建立计划 savepoint。需要共享来源 Inventory 的 Shop、Gacha、Box 使用各自 source adapter 调用 external-finalization API，并由来源在验证后显式 finalize；其他来源使用 RewardGrant 自有 Inventory。旧 owner/internal API 只留在迁移兼容实现目录，C5 再删除。
+`executeRewardGrantExecutionPlanAsTransactionOwnerSync(playerId, plan, knownPlayerBefore)` 是公共 typed transaction-owner 契约，要求 known state 携带同一 `playerId`，不建立计划 savepoint。需要共享来源 Inventory 的 Shop、Gacha、Box 使用各自 source adapter 调用 external-finalization API，并由来源在验证后显式 finalize；其他来源使用 RewardGrant 自有 Inventory。旧 owner/internal API 已删除。
 
 target 计划条目只包含正向资产 command 和连续数组位置。抽取序号、邮件 ID、Score drop index、活动 definition 等 source metadata 留在来源 adapter，并按本地 entry index 关联；不会进入 RewardGrant plan/result。奖励对象、条目数组和计划本身会被冻结，额外展示字段不会进入资产 identity。
 
-计划允许为空。target typed 计划会校验所有已知奖励类型：要求 ID 的类型必须提供正安全整数 ID，要求数量的类型必须提供正安全整数数量。未知类型以及缺失、非有限数、小数、零、负数或超出安全整数范围的字段会抛出 `RewardGrantContractValidationError`，不会产生写入；旧兼容计划的 `RewardGrantPlanValidationError` 仅保留至 C5。
+计划允许为空。target typed 计划会校验所有已知奖励类型：要求 ID 的类型必须提供正安全整数 ID，要求数量的类型必须提供正安全整数数量。未知类型以及缺失、非有限数、小数、零、负数或超出安全整数范围的字段会抛出 `RewardGrantContractValidationError`，不会产生写入。
 
 ## 事务边界
 
@@ -53,7 +53,7 @@ Player/item 投影并删除数据库 active，提交后再删除内存 active；
 
 普通抽卡的 target plan 只携带 Character/Equipment asset command，不携带 gacha、movie 或 source 大对象。Gacha adapter 以本地 `drawResult` 数组位置关联 typed entries：角色 entry 的 compensation `acceptedAmount` 只成为当前 draw 的 `ex_boost_item` 增量，`afterAmount` 成为对应 ID 的最终 `item_list`；角色对象按同 ID 的出现顺序合并，特殊 `rarity_5_guarantee` 路径保持独立。装备 entry 按抽次生成 `draw_equipment`，movie effect 的 rank/guarantee metadata 同样按抽次匹配，响应中的 equipment list 对重复 ID 保留最后状态。
 
-`rewardPlayerGachaDrawResultSync` 当前保留直接调用兼容性：生产 `/gacha/exec` 与 Tutorial 路径都显式使用 typed owner；无 owner 的 legacy fallback 只留到 C5 删除。生产路径捕获 log closure，并在最外层事务提交成功后调用。Tutorial receipt replay 不经过 reward plan，因此不会重复奖励或 sampled success log。
+`rewardPlayerGachaDrawResultSync` 的生产调用要求显式提供 typed owner；`/gacha/exec` 与 Tutorial 路径都在各自来源事务内使用 owner contract。生产路径捕获 log closure，并在最外层事务提交成功后调用。Tutorial receipt replay 不经过 reward plan，因此不会重复奖励或 sampled success log。
 
 ## 商店标准奖励
 
@@ -73,4 +73,4 @@ RewardGrant 的 transaction-owner、within 和 standalone 三条路径都通过�
 
 ## 后续迁移
 
-单人 finish、Multi、Mission、Carnival、Story 和 Raid 已通过各自 source-local adapter 使用 typed target；各领域仍负责 clear/S+、任务进度、活动状态、receipt、Mission facts、Growth publication 和响应。Mission 的 degree patch 已回到 Mission/Player adapter；含 degree+standard 的 batch 固定增加一次窄 Player UPDATE。普通/bulk shop、Gacha、Box 和邮件标准附件已在各自最外层事务中启用 typed owner；无 owner 的 Gacha fallback 与旧 Quest facade 留给 C5 删除，`TREASURE_EQUIPMENT` 继续使用装备强化专用路径。所有回滚仍由最外层事务拥有者负责，本模块不提供 Unit of Work、事件总线或插件扩展。
+单人 finish、Multi、Mission、Carnival、Story 和 Raid 已通过各自 source-local adapter 使用 typed target；各领域仍负责 clear/S+、任务进度、活动状态、receipt、Mission facts、Growth publication 和响应。Mission 的 degree patch 已回到 Mission/Player adapter；含 degree+standard 的 batch 固定增加一次窄 Player UPDATE。普通/bulk shop、Gacha、Box 和邮件标准附件已在各自最外层事务中启用 typed owner；`TREASURE_EQUIPMENT` 继续使用装备强化专用路径。所有回滚仍由最外层事务拥有者负责，本模块不提供 Unit of Work、事件总线或插件扩展。

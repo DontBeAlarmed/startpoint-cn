@@ -280,10 +280,6 @@ const SOURCE_RULES = [
         groups: ["integration:reward-grant"],
     },
     {
-        pattern: /^tools\/legacy_quest_reward_grant\.test\.cjs$/,
-        groups: ["integration:reward-grant"],
-    },
-    {
         pattern: /^(?:src\/lib\/quest\/finish\/(?:single-settlement-reward-grant|single-standard-reward-callbacks)\.ts|tools\/(?:single_settlement_reward_grant|task23c_reward_grants)\.test\.cjs)$/,
         groups: ["integration:reward-grant"],
     },
@@ -363,23 +359,12 @@ const SOURCE_RULES = [
         groups: ["quick:content"],
     },
     {
-        pattern: /^src\/lib\/(?:gacha|gacha-reward-(?:grant|legacy))\.ts$/,
+        pattern: /^src\/lib\/(?:gacha|gacha-reward-grant)\.ts$/,
         groups: ["integration:reward-grant", "integration:rules", "quick:gacha"],
     },
     {
         pattern: /^src\/lib\/(?:gacha-draw|gacha-equipment-movie|gacha-exec-plan|gacha-rules|gacha-seed-catalog|gacha-ticket)\.ts$/,
         groups: ["quick:gacha"],
-    },
-    {
-        pattern: /^(?:src\/lib\/quest\.ts|src\/lib\/quest\/legacy-quest-reward-grant\.ts)$/,
-        groups: [
-            "integration:event",
-            "integration:party",
-            "integration:quest",
-            "integration:reward-grant",
-            "integration:rules",
-            "quick:quest",
-        ],
     },
     {
         pattern: /^src\/lib\/story-reward-grant\.ts$/,

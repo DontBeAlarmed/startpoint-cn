@@ -1,6 +1,6 @@
 # D17 RewardGrant 正向协调核与 Typed Grant Result
 
-状态：B0 设计、C1、C2、C3、C4 已通过独立审查并完成本地提交；C5 尚未开始。本文保留 D17 的边界与迁移记录，当前 typed contract 以本架构规格和 `src/lib/reward-grant/` 实现为准。
+状态：B0 设计、C1、C2、C3、C4、C5 已通过独立审查并完成本地提交；D17 CHECKPOINT 待执行。本文保留 D17 的边界与迁移记录，当前 typed contract 以本架构规格和 `src/lib/reward-grant/` 实现为准。
 
 ## 1. 背景
 
@@ -10,7 +10,7 @@ D16 已把正常业务 Item 写入迁移到唯一 Inventory owner，并让 Rewar
 - typed Item outcome 同时携带 requested/accepted/overflow/before/after；
 - Character/Equipment 以 typed entry outcome 返回，来源 adapter 决定客户端数组、增量和绝对后态语义；
 - Gacha、Score、legacy Quest、Mission、Shop、Mail、Box、Story、Raid、Multi 的生产消费者已不再读取私有 `itemDeltas` 或 generic source；
-- `reward_grant_architecture` 等精确 whitelist 仍属于迁移期 guard，C5 才替换为零 internal import 和依赖方向 guard。
+- `reward_grant_architecture` 等精确 guard 已收敛为目标 core 存在性、旧文件消失、public barrel、依赖方向和 source-local adapter 检查，不再为迁移期 facade 保留白名单。
 
 D17 不重写各来源业务，而是把 RewardGrant 收敛为有限的正向协调核：计划只保留正向资产命令和稳定顺序，执行委托各资产 owner，结果明确区分请求量、实际正向获得量、执行期 after-state 和最终聚合 after-state。来源 adapter 通过同长度、同顺序的本地 metadata 与 entry outcome 关联，继续拥有客户端响应、receipt、progress、payment 和 publication。
 
@@ -30,12 +30,12 @@ CN 客户端通过不同 Remote 和页面进入 Login、Mail、Mission、Shop、
 
 当前服务端已经有以下共同事实：
 
-- target `RewardGrantExecutionPlan` 只捕获并冻结正向 asset command；legacy `RewardGrantPlan<TSource>` 仅留在迁移兼容实现目录；
+- target `RewardGrantExecutionPlan` 只捕获并冻结正向 asset command；迁移期 generic `RewardGrantPlan<TSource>` 已随 C5 删除；
 - standalone 自有事务，within 要求外层事务并使用计划级 savepoint，transaction-owner 不建立额外事务；
 - Item 使用 D16 Inventory batch；Character、Equipment 和 Currency/EXP 使用各自当前写入边界；
 - 同一计划任一执行失败必须回滚本计划或来源外层事务；
 - Gacha、Box、Score 的 entry-local metadata 仍由各自 adapter 保留，最终 typed assets 可按资产 ID 聚合；
-- Story/Raid/Multi 已改为 source-local adapter，C4 已清理 typed result → legacy fact bridge；C5 仍负责旧 facade/core 的物理删除。
+- Story/Raid/Multi 已改为 source-local adapter，C4 已清理 typed result → legacy fact bridge；C5 已完成旧 facade/core 的物理删除。
 
 当前分歧集中在 result shape 和 internal API，而不是需要另建跨资产持久化 aggregate。
 
@@ -124,7 +124,7 @@ RewardGrant 不写一个自己的 aggregate 表，也不成为来源事务 owner
 
 ## 5. Reward plan
 
-目标 `RewardGrantPlan` 满足：
+目标 `RewardGrantExecutionPlan` 满足：
 
 - 只允许当前已经支持的正向奖励类型；
 - ID 和 count 是正 safe integer；
@@ -291,7 +291,7 @@ Currency/EXP 的最终 SQL 必须移出 RewardGrant core，成为窄 Player reso
 | Raid summary | Raid-local typed adapter | owner | 否 | Raid DTO | cursor/Growth | Raid summary |
 | Multi finish | Multi-local typed adapter | owner | 否 | Multi/Score DTO | room/Event/Mission/active | Multi settlement |
 | Tutorial Gacha | direct Gacha adapter | owner | 是 | 是 | history/tutorial receipt/log | Tutorial replay |
-| 无生产消费者 Awake helper | Mission barrel export | 事务外快照后自建事务 | 否 | 否 | Awake reward | 删除或事务内重构证明 |
+| 无生产消费者 Awake helper | Mission barrel export | 已删除 | 否 | 否 | Awake reward | C4 已由事务内事实/typed publication 替代 |
 
 实现波次为：
 
@@ -300,7 +300,7 @@ Currency/EXP 的最终 SQL 必须移出 RewardGrant core，成为窄 Player reso
 3. transaction-owner 且共享来源 Inventory：Shop、Gacha、Box Gacha；
 4. 需要逐 entry source projection：Score Reward、legacy Quest、Single settlement、Gacha movie/log；
 5. Carnival、Tutorial、Event 和剩余真实消费者。
-6. C4：Story/Raid/Multi source-local adapter 与 typed Awake fact 收口；C5 再删除 legacy facade/core。
+6. C4：Story/Raid/Multi source-local adapter 与 typed Awake fact 收口；C5 删除 legacy facade/core。
 
 每波只把 consumer 改为公共 typed contract。来源仍负责把 typed result 转为现有 endpoint DTO，并保持 receipt、history、progress、任务事实、post-commit publication 和错误映射。
 
@@ -310,7 +310,7 @@ Inventory callback-scoped context 增加可执行的 fail-closed 不变量：记
 
 Shop/Gacha/Box 保留当前顺序：来源先完成 Item 成本 mutation → RewardGrant 登记正向 grant并返回 typed outcome → 来源验证 outcome → 来源立即且只调用一次 `flush()` → 再写 receipt/history/overflow Mail/其他来源状态 → 最外层 commit。RewardGrant 返回后、flush 前不得再增加 Inventory mutation。flush 前或 flush 后的任意来源失败都必须传播并由最外层事务回滚；Box 继续保持 flush 早于 drawn-history fault 点。
 
-Active Mission 必须在其既有外层事务内重新读取 Player 并创建或刷新 granter；不能继续把 route 事务外快照作为 transaction-owner currency 前态。当前没有生产调用者、但仍从 Mission barrel 导出的 `settleAwakeMissionRewards()` 具有相同事务外快照问题，必须改为事务内事实，或在证明无消费者后删除。
+Active Mission 必须在其既有外层事务内重新读取 Player 并创建或刷新 granter；不能把 route 事务外快照作为 transaction-owner currency 前态。原先无生产消费者的 `settleAwakeMissionRewards()` 已在 C4 清理，不再从 Mission barrel 导出；当前 Awake publication 使用事务内事实和 typed result。
 
 ## 10. 行为保持合同
 
@@ -369,16 +369,16 @@ Pre-execution metadata/plan mismatch 必须在调用 RewardGrant 和任何来源
 
 公共 core 已证明某类资产 rollback 后，其他来源只需证明自己把奖励、receipt 和来源状态放在同一事务。
 
-## 13. DEBT-T06
+## 13. DEBT-T06（已关闭）
 
-`reward_grant_architecture.test.cjs` 当前完整 consumer whitelist、函数体字符串顺序、300 行上限和内部文件形状属于迁移期债务。D17 只有在所有真实 consumers 迁移后才能：
+`reward_grant_architecture.test.cjs` 的完整 consumer whitelist、函数体字符串顺序、300 行上限和内部文件形状属于已清理的迁移期债务。C5 在所有真实 consumers 迁移后完成了：
 
 - 删除精确 consumer 文件白名单；
 - 删除针对 internal function name/source shape 的断言；
-- 用公共 barrel API、禁止反向依赖、禁止内部模块直接导入和零资产直写 guard 替代；
+- 用公共 barrel API、禁止反向依赖、禁止内部模块直接导入和旧文件消失 guard 替代；
 - 保留 plan validation、事务身份、rollback、typed result、真实来源和性能测试。
 
-DEBT-T06 只有在上方 consumer ledger 每一行都有明确的“已迁移”或“已证明无消费者并删除”状态和替代测试后才能关闭。替代结构 guard 必须验证：全项目禁止导入 RewardGrant internal 模块；消费者只通过 public barrel；RewardGrant core 不反向依赖来源域；legacy facade 已删除或明确保留为真实 adapter。
+上方 consumer ledger 每一行均已有明确的“已迁移”或“已证明无消费者并删除”状态和替代测试。当前结构 guard 验证：生产代码禁止导入 RewardGrant internal 模块；消费者只通过 public barrel；RewardGrant core 不反向依赖来源域；迁移 facade 已删除，真实 source-local adapter 继续保留。
 
 现有 `awake_reconcile_callsite_matrix` 保护 Mission/Awake 的事务与 publication，不属于 DEBT-T06；D17 只更新它识别的 RewardGrant owner symbol，不删除。Inventory 的零 direct-SQL/第二 Item owner 守卫同样保留。
 
@@ -420,10 +420,10 @@ D17 checkpoint 要求 direct/focused、正式性能 admission、类型/文档/�
 ```text
 D17_BASE: 4ab383a69dc8d9b1cc3801579f0107b25710e6bc
 D17_DESIGN_STATUS: APPROVED
-D17_IMPLEMENTATION_STATUS: C4_COMPLETE
+D17_IMPLEMENTATION_STATUS: C5_COMPLETE_PENDING_CHECKPOINT
 D17_C3_CONSUMERS_STATUS: COMPLETE
 D17_C4_TYPED_ADAPTER_STATUS: COMPLETE
-D17_C5_CLEANUP_STATUS: PENDING
+D17_C5_CLEANUP_STATUS: COMPLETE
 COMPLETE_ACQUISITION_OUTCOME_STATUS: DEFERRED_TO_D28
 ITEM_CAP_AND_OVERFLOW_STATUS: DEFERRED_TO_D18
 ```

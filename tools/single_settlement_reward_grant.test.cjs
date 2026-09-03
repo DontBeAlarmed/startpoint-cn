@@ -28,7 +28,7 @@ const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.c
 const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { givePlayerCharacterSync, givePlayerCharactersExpSync } = require("../src/lib/character")
 const { getScoreRewardGroup } = require("../src/lib/assets")
-const { givePlayerScoreRewardsSync } = require("../src/lib/quest")
+const { MultiSettlementRewardGranter } = require("../src/multi/settlement/reward-grant")
 const { selectScoreRewardGrantPlan } = require("../src/lib/quest/score-reward-selection")
 const { RewardType, ScoreRewardType } = require("../src/lib/types/rewards")
 const {
@@ -159,8 +159,9 @@ test("real equipment Score group 2924 preserves every compatibility response ent
     assert.notEqual(scoreRewards, null)
     const compatibilityPlayerId = createPlayer("score-2924-compatibility")
     const singlePlayerId = createPlayer("score-2924-single")
-    const compatibility = database.transaction(() => givePlayerScoreRewardsSync(
+    const compatibility = database.transaction(() => new MultiSettlementRewardGranter(
         compatibilityPlayerId,
+    ).grantScoreRewards(
         2924,
         scoreRewards,
         false,
@@ -203,8 +204,7 @@ test("real character Score group 3001 matches compatibility response without ext
     const compatibilityPlayerId = createPlayer("score-3001-compatibility")
     const singlePlayerId = createPlayer("score-3001-single")
     const compatibilityMeasured = captureSql(() => database.transaction(() => (
-        givePlayerScoreRewardsSync(
-            compatibilityPlayerId,
+        new MultiSettlementRewardGranter(compatibilityPlayerId).grantScoreRewards(
             3001,
             scoreRewards,
             false,
@@ -262,8 +262,9 @@ test("real duplicate character Score group projects compensation delta while DB 
     const compatibilityPlayerId = prepareDuplicate("score-200009-compatibility")
     const singlePlayerId = prepareDuplicate("score-200009-single")
     const randomValues = [0.9, 0.9, 0, 0]
-    const compatibility = database.transaction(() => givePlayerScoreRewardsSync(
+    const compatibility = database.transaction(() => new MultiSettlementRewardGranter(
         compatibilityPlayerId,
+    ).grantScoreRewards(
         200009,
         scoreRewards,
         false,

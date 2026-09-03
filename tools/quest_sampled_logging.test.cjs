@@ -5,12 +5,12 @@ const fs = require("node:fs")
 const path = require("node:path")
 const test = require("node:test")
 
-const source = fs.readFileSync(path.join(__dirname, "../src/lib/quest.ts"), "utf8")
-const functionStart = source.indexOf("export function givePlayerScoreRewardsSync(")
-const functionEnd = source.indexOf("/**\n * Batch gives", functionStart)
-const functionSource = source.slice(functionStart, functionEnd)
 const settlementSource = fs.readFileSync(
     path.join(__dirname, "../src/lib/quest/score-reward-settlement.ts"),
+    "utf8",
+)
+const multiRewardSource = fs.readFileSync(
+    path.join(__dirname, "../src/multi/settlement/reward-grant.ts"),
     "utf8",
 )
 const selectionSource = fs.readFileSync(
@@ -61,7 +61,7 @@ test("score reward settlement emits one sampled lazy summary instead of per-rewa
         /import\s+\{\s*projectScoreRewardDropIds[^\n]*from "\.\/score-reward-selection"/,
     )
     assert.equal(settlementSource.match(/sampledLog\("quest-score-rewards"/g)?.length, 1)
-    assert.equal(functionSource.match(/recordScoreRewardSettlement\s*\(/g)?.length, 1)
+    assert.equal(multiRewardSource.match(/recordScoreRewardSettlement\s*\(/g)?.length, 1)
     assert.equal(singleWritesSource.match(/recordScoreRewardSettlement\s*\(/g)?.length ?? 0, 0)
     assert.equal(singleOrchestratorSource.match(/recordScoreRewardSettlement\s*\(/g)?.length, 1)
 

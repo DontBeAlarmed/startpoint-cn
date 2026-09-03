@@ -121,8 +121,8 @@ ID，避免遍历其他角色任务。旧 unlock cleanup 只在基础资格可�
 - 拉芙(2630022) type_2 使用 `player.totalManaObtained`
 - DB 列 `total_mana_obtained`，所有玛纳发放点累加：
   - 单人固定结算与协力基础结算：`single-settlement-writes.ts` + `multi/http/battle.ts`
-  - 标准奖励计划：`reward-grant/owner-currency.ts`（单人奖励、生产抽卡、普通/bulk shop、邮件标准附件）
-  - 兼容或独立奖励路径：`lib/quest.ts`（协力、Raid summary 与 standalone gacha fallback）
+  - 标准奖励计划：`reward-grant/transaction-executor.ts` 与各来源 adapter（单人奖励、生产抽卡、普通/bulk shop、邮件标准附件）
+  - 兼容或独立奖励路径：Story、Raid、Multi 各自的 source-local adapter；不再存在通用 Quest facade 或 standalone gacha fallback
   - 普通、觉醒与 Active Mission：`mission/grants.ts`
   - 物品出售：`item-sell.ts`
 

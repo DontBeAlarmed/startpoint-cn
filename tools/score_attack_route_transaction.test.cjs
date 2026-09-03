@@ -127,17 +127,6 @@ function updatePlayer(data) {
     }
 }
 
-function grantTestItem(playerId, itemId, count) {
-    writeAttempts++
-    db.prepare(`
-        INSERT INTO item_state VALUES (?, ?, ?)
-        ON CONFLICT(player_id, item_id) DO UPDATE SET count = count + excluded.count
-    `).run(playerId, itemId, count)
-    return db.prepare(
-        "SELECT count FROM item_state WHERE player_id = ? AND item_id = ?",
-    ).get(playerId, itemId).count
-}
-
 let writeAttempts = 0
 let failActiveDeleteAfterWrite = false
 const rewardCampaignCalls = []
@@ -400,34 +389,6 @@ stubModule("../src/lib/character", {
             character_list: [],
             bond_token_status_list: {},
             exp_pool: playerRow().expPool,
-        }
-    },
-})
-stubModule("../src/lib/quest", {
-    givePlayerRewardSync: () => null,
-    givePlayerScoreRewardsSync: (...args) => {
-        scoreRewardOptions = args[5]
-        return ({
-        drop_score_reward_ids: [],
-        drop_rare_reward_ids: [],
-        user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
-        character_list: [],
-        joined_character_id_list: [],
-        equipment_list: [],
-        items: {},
-        })
-    },
-    givePlayerRewardsSync(playerId, rewards) {
-        const items = {}
-        for (const reward of rewards) {
-            items[String(reward.id)] = grantTestItem(playerId, reward.id, reward.count)
-        }
-        return {
-            user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
-            character_list: [],
-            joined_character_id_list: [],
-            equipment_list: [],
-            items,
         }
     },
 })

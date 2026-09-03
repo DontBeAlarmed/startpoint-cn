@@ -278,7 +278,8 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     assert.equal(storyCall > storySource.indexOf("updatePlayerQuestProgressSync("), true)
     assert.equal(storySource.includes("return getDb().transaction(() =>"), true)
     assert.equal(storySource.includes("const firstClear = questProgress?.finished !== true"), true)
-    assert.equal(storySource.includes("const rewardResult = firstClear &&"), true)
+    assert.equal(storySource.includes("const rewardGrant = firstClear &&"), true)
+    assert.equal(storySource.includes("const rewardResult = rewardGrant?.rewardResult ?? null"), true)
     assert.equal(storySource.includes("if (firstClear)"), true)
 
     const bondReceiveBlock = bondSource.split('fastify.post("/receive_bond_token"')[1]
@@ -443,7 +444,7 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
         "insertPlayerQuestProgressSync",
         "updatePlayerQuestProgressSync",
         "updatePlayerSync",
-        "givePlayerScoreRewardsSync",
+        "grantScoreRewards",
         "recordMissionBattleFacts",
         "givePlayerCharactersExpSync",
     ]) {

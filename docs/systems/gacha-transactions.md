@@ -25,7 +25,7 @@
 
 角色和装备奖励先转换为 `src/lib/gacha-reward-grant.ts` 的逐抽 typed execution plan。抽取序号、角色电影计划和装备 movie metadata 保留在 Gacha adapter 本地，并以连续 entry index 与 typed outcome 关联；plan 长度、奖励 ID 或 metadata 不一致时在首笔奖励写入前 fail closed。`/gacha/exec` 在已有最外层事务内通过 Gacha source adapter 调用 typed external-finalization API，不建立额外 savepoint，也不查询玩家前后态；owner 使用带真实 `playerId` 的事务上下文余额快照。RewardGrant 的内部执行字段不进入响应。
 
-角色 projection 按抽次保留 `movie_id`、`seed`、`entry_count`、`rarity_5_guarantee` 特殊路径、quarantine `markSent` 次数、重复角色的 `ex_boost_item` 本次增量和 `item_list` 最终库存；同角色对象按抽取顺序合并。装备 projection 保留每抽 `draw_equipment` 顺序、`treasure_up_type`、`is_erupt`，装备列表按 ID 只保留最后状态。未提供 owner callback 的直接内部调用仍使用 `gacha-reward-legacy.ts`，其结果由迁移前 fixture 锁定。
+角色 projection 按抽次保留 `movie_id`、`seed`、`entry_count`、`rarity_5_guarantee` 特殊路径、quarantine `markSent` 次数、重复角色的 `ex_boost_item` 本次增量和 `item_list` 最终库存；同角色对象按抽取顺序合并。装备 projection 保留每抽 `draw_equipment` 顺序、`treasure_up_type`、`is_erupt`，装备列表按 ID 只保留最后状态。所有生产抽卡奖励都必须通过显式 owner callback 进入 typed adapter，不再保留无 owner 的 legacy fallback。
 
 装备动画字段由服务端显式决定，客户端不会根据最终装备自动纠正：`treasure_up_type=1` 表示 `3→5`，`2` 表示 `4→5`，`3` 表示 `3→4`。因此类型的目标星级必须等于实际抽中装备的星级：3 星只能返回 `0`，4 星只能返回 `0/3`，5 星只能返回 `0/1/2`。`is_erupt` 只在整批至少包含一个 5 星装备时计算；爆发成立时全批 `treasure_up_type` 均为 `0`。概率来自当前 Content Snapshot 的 `equipment_gacha_movie_probability.json`；概率 `0` 按禁用处理。
 
@@ -41,4 +41,4 @@ CN 客户端 Dummy 的反编译代码含一处与上述结果工厂、宝箱起�
 
 ## 自动回归
 
-`tools/gacha_write_transaction.test.cjs` 使用 SQLite trigger 注入角色历史、装备积分和最终任务事实失败，校验所有玩家持久状态回滚；同时覆盖 owner 十抽 projection、装备 metadata、unknown character、source mismatch、SQL/savepoint 约束、legacy fixture 和正常单抽的费用、奖励、历史、积分和任务计数。`tools/tutorial_update_step.test.cjs` 覆盖 Tutorial gacha 的失败日志、成功日志和 replay 不重复奖励/日志。
+`tools/gacha_write_transaction.test.cjs` 使用 SQLite trigger 注入角色历史、装备积分和最终任务事实失败，校验所有玩家持久状态回滚；同时覆盖 owner 十抽 projection、装备 metadata、unknown character、source mismatch、SQL/savepoint 约束和正常单抽的费用、奖励、历史、积分和任务计数。`tools/tutorial_update_step.test.cjs` 覆盖 Tutorial gacha 的失败日志、成功日志和 replay 不重复奖励/日志。

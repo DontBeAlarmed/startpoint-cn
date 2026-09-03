@@ -36,7 +36,6 @@ const runtimeBoundaryCandidates = new Set([
     "src/lib/mission/rewards.ts",
     "src/lib/mission/stages.ts",
     "src/lib/pass-card.ts",
-    "src/lib/quest.ts",
     "src/lib/stamina-campaign.ts",
     "src/multi/player-context.ts",
     "src/routes/api/exBoost.ts",

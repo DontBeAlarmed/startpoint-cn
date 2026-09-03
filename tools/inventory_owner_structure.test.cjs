@@ -115,9 +115,6 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/lib/quest/entry-item-inventory.ts",
         "src/lib/quest/finish/periodic-reward-handler.ts",
         "src/lib/reward-grant/execution-engine.ts",
-        "src/lib/reward-grant/executor.ts",
-        "src/lib/reward-grant/inventory-adapter.ts",
-        "src/lib/reward-grant/owner-executor.ts",
         "src/lib/reward-grant/transaction-executor.ts",
         "src/lib/shop-reward-grant.ts",
         "src/routes/api/boxGacha.ts",
@@ -153,18 +150,19 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         false,
         "RewardGrant must not retain a second Item cache owner",
     )
-    const rewardInventoryAdapter = fs.readFileSync(
-        path.join(projectRoot, "src/lib/reward-grant/inventory-adapter.ts"),
+    const rewardExecutionEngine = fs.readFileSync(
+        path.join(projectRoot, "src/lib/reward-grant/execution-engine.ts"),
         "utf8",
     )
-    assert.doesNotMatch(rewardInventoryAdapter, /data\/domains\/item/)
-    assert.doesNotMatch(rewardInventoryAdapter, /item-cap-plan|event-trade|mana-capacity|domains\/mail/)
-    const rewardExecutor = fs.readFileSync(
-        path.join(projectRoot, "src/lib/reward-grant/executor.ts"),
+    assert.doesNotMatch(rewardExecutionEngine, /data\/domains\/item/)
+    assert.doesNotMatch(rewardExecutionEngine, /item-cap-plan|event-trade|mana-capacity|domains\/mail/)
+    assert.match(rewardExecutionEngine, /givePlayerCharacterWithinTransactionSync[\s\S]*inventory\.grant/)
+    const rewardTransactionExecutor = fs.readFileSync(
+        path.join(projectRoot, "src/lib/reward-grant/transaction-executor.ts"),
         "utf8",
     )
-    assert.doesNotMatch(rewardExecutor, /data\/domains\/item/)
-    assert.match(rewardExecutor, /givePlayerCharacterWithinTransactionSync[\s\S]*inventory\.grant/)
+    assert.doesNotMatch(rewardTransactionExecutor, /data\/domains\/item/)
+    assert.match(rewardTransactionExecutor, /getInventoryBatchCheckpoint[\s\S]*inventory\.flush/)
     const shopPurchase = fs.readFileSync(
         path.join(projectRoot, "src/lib/event-shop-purchase.ts"),
         "utf8",
@@ -299,23 +297,10 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         /item-cap-plan|event-trade|mana-capacity|domains\/mail|getDb\(\)\.transaction|SAVEPOINT/,
     )
 
-    const legacyQuest = fs.readFileSync(path.join(projectRoot, "src/lib/quest.ts"), "utf8")
-    const legacyQuestAdapter = fs.readFileSync(
+    assert.equal(fs.existsSync(path.join(projectRoot, "src/lib/quest.ts")), false)
+    assert.equal(fs.existsSync(
         path.join(projectRoot, "src/lib/quest/legacy-quest-reward-grant.ts"),
-        "utf8",
-    )
-    assert.doesNotMatch(
-        legacyQuest,
-        /data\/domains\/(?:item|character)|\.\/character|\.\/equipment|\b(?:givePlayerCharacterSync|givePlayerEquipmentSync|updatePlayerSync)\b/,
-    )
-    assert.match(
-        legacyQuestAdapter,
-        /executeRewardGrantExecutionPlanAsTransactionOwnerSync\s*\(/,
-    )
-    assert.doesNotMatch(
-        legacyQuestAdapter,
-        /item-cap-plan|event-trade|mana-capacity|domains\/mail|getDb\(\)\.transaction|SAVEPOINT/,
-    )
+    ), false)
 
     const readers = fs.readFileSync(path.join(projectRoot, "src/data/domains/item.ts"), "utf8")
     assert.deepEqual(

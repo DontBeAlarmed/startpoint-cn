@@ -6,207 +6,108 @@ const path = require("node:path")
 const test = require("node:test")
 
 const projectRoot = path.resolve(__dirname, "..")
-const productionFiles = [
-    "src/lib/player-resource-grant.ts",
-    "src/lib/reward-grant/execution-assets.ts",
-    "src/lib/reward-grant/execution-contract.ts",
-    "src/lib/reward-grant/execution-engine.ts",
-    "src/lib/reward-grant/execution-outcome.ts",
-    "src/lib/reward-grant/execution-plan.ts",
-    "src/lib/reward-grant/execution-result.ts",
-    "src/lib/reward-grant/snapshot.ts",
-    "src/lib/reward-grant/transaction-executor.ts",
-    "src/lib/reward-grant/types.ts",
-    "src/lib/reward-grant/plan.ts",
-    "src/lib/reward-grant/executor.ts",
-    "src/lib/reward-grant/inventory-adapter.ts",
-    "src/lib/reward-grant/owner-currency.ts",
-    "src/lib/reward-grant/owner-executor.ts",
-    "src/lib/reward-grant/known-player.ts",
-    "src/lib/reward-grant/index.ts",
+const targetCoreFiles = [
+    "execution-assets.ts",
+    "execution-contract.ts",
+    "execution-engine.ts",
+    "execution-outcome.ts",
+    "execution-plan.ts",
+    "execution-result.ts",
+    "snapshot.ts",
+    "transaction-executor.ts",
+]
+const removedCoreFiles = [
+    "plan.ts",
+    "types.ts",
+    "executor.ts",
+    "entry-result.ts",
+    "owner-executor.ts",
+    "owner-currency.ts",
+    "known-player.ts",
+    "inventory-adapter.ts",
+]
+const sourceAdapters = [
+    "src/lib/mail-reward-grant.ts",
+    "src/lib/shop-reward-grant.ts",
+    "src/lib/gacha-reward-grant.ts",
+    "src/lib/box-gacha-reward-grant.ts",
+    "src/lib/story-reward-grant.ts",
+    "src/lib/raid-event-reward-grant.ts",
+    "src/multi/settlement/reward-grant.ts",
 ]
 
-function readSource(relativePath) {
+function read(relativePath) {
     return fs.readFileSync(path.join(projectRoot, relativePath), "utf8")
 }
 
-function exportedFunctionSource(source, functionName, nextMarker) {
-    const start = source.indexOf(`export function ${functionName}`)
-    const end = nextMarker === null ? source.length : source.indexOf(nextMarker, start)
-    assert.ok(start >= 0 && end > start, `${functionName} source must be present`)
-    return source.slice(start, end)
+function productionTsFiles() {
+    const root = path.join(projectRoot, "src")
+    const files = []
+    const visit = directory => {
+        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+            const absolute = path.join(directory, entry.name)
+            if (entry.isDirectory()) visit(absolute)
+            else if (entry.isFile() && entry.name.endsWith(".ts")) files.push(absolute)
+        }
+    }
+    visit(root)
+    return files
 }
 
-function sourceBetween(source, startMarker, endMarker, label) {
-    const start = source.indexOf(startMarker)
-    const end = source.indexOf(endMarker, start)
-    assert.ok(start >= 0 && end > start, `${label} source must be present`)
-    return source.slice(start, end)
-}
+test("target RewardGrant core exists and migration-only files are gone", () => {
+    for (const file of targetCoreFiles) {
+        assert.equal(fs.existsSync(path.join(projectRoot, "src/lib/reward-grant", file)), true, file)
+    }
+    for (const file of removedCoreFiles) {
+        assert.equal(fs.existsSync(path.join(projectRoot, "src/lib/reward-grant", file)), false, file)
+    }
+    assert.equal(fs.existsSync(path.join(projectRoot, "src/lib/quest.ts")), false)
+    assert.equal(fs.existsSync(path.join(projectRoot, "src/lib/quest/legacy-quest-reward-grant.ts")), false)
+    assert.equal(fs.existsSync(path.join(projectRoot, "src/lib/gacha-reward-legacy.ts")), false)
+})
 
-function sourceFilesBelow(relativeDirectory) {
-    const directory = path.join(projectRoot, relativeDirectory)
-    return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
-        const relativePath = path.join(relativeDirectory, entry.name)
-        if (entry.isDirectory()) return sourceFilesBelow(relativePath)
-        return entry.isFile() && entry.name.endsWith(".ts") ? [relativePath] : []
-    })
-}
+test("public RewardGrant barrel exposes only the target typed contract", () => {
+    const index = read("src/lib/reward-grant/index.ts")
+    assert.match(index, /export \* from "\.\/execution-contract"/)
+    assert.match(index, /export \* from "\.\/execution-plan"/)
+    assert.match(index, /export \* from "\.\/execution-result"/)
+    assert.match(index, /export \* from "\.\/transaction-executor"/)
+    assert.doesNotMatch(index, /\.\/executor|\.\/plan|\.\/types|owner-executor|entry-result/)
+    assert.match(read("src/lib/reward-grant/execution-plan.ts"), /createRewardGrantExecutionPlan/)
+    assert.match(read("src/lib/reward-grant/transaction-executor.ts"), /executeRewardGrantExecutionPlanSync/)
+})
 
-test("reward grant public production files stay focused and avoid quest dependencies", () => {
-    for (const relativePath of productionFiles) {
-        const source = readSource(relativePath)
-        const lineCount = source.split("\n").length
-        assert.ok(lineCount <= 300, `${relativePath} exceeds 300 lines: ${lineCount}`)
-        assert.doesNotMatch(source, /from\s+["'][^"']*quest(?:\.ts)?["']/)
-        assert.doesNotMatch(source, /\bany\b/)
+test("production consumers use the public barrel and contain no legacy result fields", () => {
+    const forbidden = /reward-grant\/(?:executor|plan|types|entry-result|owner-executor|owner-currency|known-player|inventory-adapter)|\b(?:createRewardGrantPlan|RewardGrantPlan|RewardGrantResult|RewardGrantPlayerAfter|InternalRewardGrantResult|InternalRewardGrantEntryResult|itemDeltas|givePlayerRewardSync|givePlayerRewardsSync|givePlayerScoreRewardsSync|rewardPlayerGachaDrawResultLegacySync)\b/
+    for (const file of productionTsFiles()) {
+        const relative = path.relative(projectRoot, file)
+        if (relative.startsWith("src/legacy/")) continue
+        assert.doesNotMatch(read(relative), forbidden, relative)
     }
 })
 
-test("within-transaction execution normalizes before one plan savepoint", () => {
-    const executor = readSource("src/lib/reward-grant/executor.ts")
-    const withinTransaction = exportedFunctionSource(
-        executor,
-        "executeRewardGrantPlanWithinTransactionSync",
-        "export function executeRewardGrantPlanSync",
-    )
-
-    assert.match(withinTransaction, /(?:getDb\(\)|db)\.inTransaction/)
-    assert.match(withinTransaction, /normalizeRewardGrantPlanInternal\s*\(/)
-    assert.equal((withinTransaction.match(/\.transaction\s*\(/g) ?? []).length, 1)
-    assert.match(withinTransaction, /executeNormalizedRewardGrantPlanSync\s*\(/)
-    assert.ok(
-        withinTransaction.indexOf("inTransaction") < withinTransaction.indexOf("normalizeRewardGrantPlan"),
-        "transaction state must be checked before normalization",
-    )
-    assert.ok(
-        withinTransaction.indexOf("normalizeRewardGrantPlan") < withinTransaction.indexOf(".transaction"),
-        "normalization must finish before opening the plan savepoint",
-    )
+test("production consumers cannot import RewardGrant target internals directly", () => {
+    const directTargetImport = /(?:from\s*["'][^"']*reward-grant\/(?:execution-(?:assets|contract|engine|outcome|plan|result)|snapshot|transaction-executor)|require\(\s*["'][^"']*reward-grant\/(?:execution-(?:assets|contract|engine|outcome|plan|result)|snapshot|transaction-executor))/
+    for (const file of productionTsFiles()) {
+        const relative = path.relative(projectRoot, file)
+        if (relative.startsWith("src/legacy/") || relative.startsWith("src/lib/reward-grant/")) continue
+        assert.doesNotMatch(read(relative), directTargetImport, relative)
+    }
 })
 
-test("standalone execution normalizes before one transaction without calling within", () => {
-    const executor = readSource("src/lib/reward-grant/executor.ts")
-    const standalone = exportedFunctionSource(
-        executor,
-        "executeRewardGrantPlanSync",
-        null,
-    )
-
-    assert.equal((standalone.match(/\.transaction\s*\(/g) ?? []).length, 1)
-    assert.match(standalone, /normalizeRewardGrantPlanInternal\s*\(/)
-    assert.match(standalone, /executeNormalizedRewardGrantPlanSync\s*\(/)
-    assert.doesNotMatch(standalone, /executeRewardGrantPlanWithinTransactionSync\s*\(/)
-    assert.ok(
-        standalone.indexOf("normalizeRewardGrantPlan") < standalone.indexOf(".transaction"),
-        "standalone normalization must finish before opening its transaction",
-    )
+test("target core keeps dependency direction below source domains", () => {
+    const forbidden = /(?:\/mission|\/quest|\/shop|\/gacha|\/mail|\/story|\/raid|\/multi|\/routes|carnival)/
+    for (const file of targetCoreFiles) {
+        assert.doesNotMatch(read(path.join("src/lib/reward-grant", file)), forbidden, file)
+    }
 })
 
-test("transaction-owner execution is strongly named and adds no savepoint or player reads", () => {
-    const executor = readSource("src/lib/reward-grant/owner-executor.ts")
-    const transactionAssertion = exportedFunctionSource(
-        executor,
-        "assertRewardGrantTransactionOwnerSync",
-        "export function executeRewardGrantPlanInTransactionOwnerInternalSync",
-    )
-    const internalOwner = exportedFunctionSource(
-        executor,
-        "executeRewardGrantPlanInTransactionOwnerInternalSync",
-        "export function executeRewardGrantPlanInTransactionOwnerSync",
-    )
-    const publicOwner = exportedFunctionSource(
-        executor,
-        "executeRewardGrantPlanInTransactionOwnerSync",
-        null,
-    )
-
-    assert.match(transactionAssertion, /(?:getDb\(\)|db)\.inTransaction/)
-    assert.match(internalOwner, /assertRewardGrantTransactionOwnerSync\s*\(\)/)
-    assert.match(internalOwner, /normalizeRewardGrantPlanInternal\s*\(/)
-    assert.match(internalOwner, /knownPlayerBefore/)
-    assert.doesNotMatch(internalOwner, /\.transaction\s*\(/)
-    assert.doesNotMatch(internalOwner, /getPlayerSync\s*\(/)
-    assert.ok(
-        internalOwner.indexOf("assertRewardGrantTransactionOwnerSync")
-            < internalOwner.indexOf("normalizeRewardGrantPlan"),
-        "transaction state must be checked before normalization",
-    )
-    assert.match(publicOwner, /projectPublicRewardGrantResult\s*\(/)
-    assert.match(publicOwner, /executeRewardGrantPlanInTransactionOwnerInternalSync\s*\(/)
+test("source-local reward adapters remain explicit and do not become a common projector", () => {
+    for (const file of sourceAdapters) {
+        const source = read(file)
+        assert.match(source, /RewardGrantExecutionPlan|RewardGrantExecutionResult/, file)
+    }
+    assert.doesNotMatch(read("src/lib/reward-grant/execution-engine.ts"), /PlayerRewardResult|user_info|character_list|equipment_list/)
 })
 
-test("safe within and standalone executors share a private body that checks the player first", () => {
-    const executor = readSource("src/lib/reward-grant/executor.ts")
-    const privateBody = sourceBetween(
-        executor,
-        "function executeNormalizedRewardGrantPlanSync",
-        "export function executeRewardGrantPlanWithinTransactionSync",
-        "normalized reward grant private body",
-    )
-
-    assert.match(privateBody, /getPlayerSync\s*\(/)
-    assert.match(privateBody, /grantEntrySync\s*\(/)
-    assert.ok(
-        privateBody.indexOf("getPlayerSync") < privateBody.indexOf("grantEntrySync"),
-        "player existence must be checked before grant writes",
-    )
-})
-
-test("public barrel excludes the internal transaction-owner entry", () => {
-    const index = readSource("src/lib/reward-grant/index.ts")
-    const types = readSource("src/lib/reward-grant/types.ts")
-    const owner = readSource("src/lib/reward-grant/owner-executor.ts")
-
-    assert.doesNotMatch(index, /export \* from ["']\.\/executor["']/)
-    assert.doesNotMatch(index, /executeRewardGrantPlanInTransactionOwnerSync/)
-    assert.doesNotMatch(index, /executeRewardGrantPlanInTransactionOwnerInternalSync/)
-    assert.doesNotMatch(index, /executeRewardGrantPlanInTransactionOwnerWithInventoryInternalSync/)
-    assert.doesNotMatch(types, /itemDeltas/)
-    assert.match(owner, /executeRewardGrantPlanInTransactionOwnerInternalSync/)
-    assert.match(index, /executeRewardGrantPlanWithinTransactionSync/)
-    assert.match(index, /executeRewardGrantPlanSync/)
-})
-
-test("only approved standard reward domains and single settlement paths consume reward grants", () => {
-    const consumers = sourceFilesBelow("src")
-        .filter(relativePath => !relativePath.startsWith("src/lib/reward-grant/"))
-        .filter(relativePath => /reward-grant/.test(readSource(relativePath)))
-
-    assert.deepEqual(consumers, [
-        "src/lib/box-gacha-reward-grant.ts",
-        "src/lib/carnival-rewards.ts",
-        "src/lib/gacha-reward-grant.ts",
-        "src/lib/gacha-reward-legacy.ts",
-        "src/lib/gacha.ts",
-        "src/lib/gift-code/redemption.ts",
-        "src/lib/login-bonus.ts",
-        "src/lib/mail-reward-grant.ts",
-        "src/lib/mission/awake-reward-facts.ts",
-        "src/lib/mission/grants.ts",
-        "src/lib/quest/finish/single-settlement-response-state.ts",
-        "src/lib/quest/finish/single-settlement-reward-grant.ts",
-        "src/lib/quest/finish/single-settlement-writes.ts",
-        "src/lib/quest/finish/single-standard-reward-callbacks.ts",
-        "src/lib/quest/legacy-quest-reward-grant.ts",
-        "src/lib/quest/score-reward-normalization.ts",
-        "src/lib/quest/score-reward-projection.ts",
-        "src/lib/quest/score-reward-selection-core.ts",
-        "src/lib/quest/score-reward-selection.ts",
-        "src/lib/quest/score-reward-settlement.ts",
-        "src/lib/quest.ts",
-        "src/lib/raid-event-reward-grant.ts",
-        "src/lib/raid-event-summary.ts",
-        "src/lib/scheduled-resource-settlement.ts",
-        "src/lib/shop-reward-grant.ts",
-        "src/lib/story-reward-grant.ts",
-        "src/multi/settlement/orchestrator.ts",
-        "src/multi/settlement/reward-grant.ts",
-        "src/routes/api/boxGacha.ts",
-        "src/routes/api/mail.ts",
-        "src/routes/api/raidEvent.ts",
-        "src/routes/api/shop.ts",
-        "src/routes/api/storyQuest.ts",
-        "src/routes/api/tutorial.ts",
-    ])
-})
+console.log("reward grant architecture tests loaded")

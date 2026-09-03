@@ -399,7 +399,7 @@ test("character duplicate gacha item_list reports the post-reward inventory", as
     const exBoostItemId = 14002
     setInventoryFixtureItemExactSync(playerId, exBoostItemId, 20)
 
-    const result = rewardPlayerGachaDrawResultSync(
+    const result = database.transaction(() => rewardPlayerGachaDrawResultSync(
         playerId,
         { type: GachaType.CHARACTER },
         [characterId],
@@ -411,38 +411,18 @@ test("character duplicate gacha item_list reports the post-reward inventory", as
             seed: 1,
             requiresVerification: true,
         }],
-    )
+        {
+            ownerGrant: plan => executeRewardGrantExecutionPlanAsTransactionOwnerSync(
+                playerId,
+                plan,
+                rewardGrantPlayerSnapshot(playerId),
+            ),
+        },
+    ))()
 
     assert.equal(getPlayerItemSync(playerId, exBoostItemId), 21)
     assert.equal(result.draw[0].ex_boost_item.count, 1)
     assert.equal(result.items[exBoostItemId], 21)
-})
-
-test("legacy fallback result remains equal to the pre-migration fixture", async () => {
-    const { playerId } = await createPlayer("gacha-legacy-fixture")
-    setInventoryFixtureItemExactSync(playerId, 14002, 20)
-
-    const result = rewardPlayerGachaDrawResultSync(
-        playerId,
-        { type: GachaType.CHARACTER },
-        [1],
-        undefined,
-        [{
-            characterId: 1,
-            rarity: 4,
-            movieId: "normal",
-            seed: 1,
-            requiresVerification: true,
-        }],
-    )
-    const normalized = JSON.parse(JSON.stringify(result))
-    for (const character of normalized.characters) {
-        delete character.create_time
-        delete character.update_time
-        delete character.join_time
-    }
-
-    assert.deepEqual(normalized, require("./fixtures/gacha-reward-legacy.json"))
 })
 
 test("character owner plan preserves per-draw movie order duplicate deltas and merged state", async () => {

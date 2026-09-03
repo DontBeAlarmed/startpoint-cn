@@ -92,7 +92,7 @@ const cnServerSource = fs.readFileSync(path.join(__dirname, "..", "src", "cn-ser
 assert.match(cnServerSource, /quarantineIfRecentlySent/)
 assert.doesNotMatch(cnServerSource, /parsePlayBeacon|moveToVerified|addPending|recordPlay/)
 
-for (const file of ["gacha-reward-grant.ts", "gacha-reward-legacy.ts"]) {
+for (const file of ["gacha-reward-grant.ts"]) {
     const gachaRewardSource = fs.readFileSync(
         path.join(__dirname, "..", "src", "lib", file),
         "utf8",

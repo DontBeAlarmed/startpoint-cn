@@ -99,7 +99,6 @@ test("maps representative source files to focused groups", () => {
     for (const file of [
         "src/lib/gacha.ts",
         "src/lib/gacha-reward-grant.ts",
-        "src/lib/gacha-reward-legacy.ts",
     ]) {
         assert.deepEqual(
             selectTestGroups([file]),
@@ -136,19 +135,6 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["src/lib/hot-path-log-formatters.ts"]),
         ["quick:gacha", "quick:quest"],
     )
-    for (const file of [
-        "src/lib/quest.ts",
-        "src/lib/quest/legacy-quest-reward-grant.ts",
-    ]) {
-        assert.deepEqual(selectTestGroups([file]), [
-            "integration:event",
-            "integration:party",
-            "integration:quest",
-            "integration:reward-grant",
-            "integration:rules",
-            "quick:quest",
-        ], file)
-    }
     for (const file of [
         "src/lib/event-shop-purchase.ts",
         "src/lib/shop-reward-grant.ts",
@@ -688,26 +674,23 @@ test("maps single continue statistics parser to the quest leaf", () => {
 test("maps the public reward grant layer and its regressions to one focused leaf", () => {
     const group = "integration:reward-grant"
     const tests = [
-        "tools/reward_grant_plan.test.cjs",
         "tools/reward_grant_typed_contract.test.cjs",
         "tools/reward_grant_typed_contract_adversarial.test.cjs",
         "tools/reward_grant_typed_executor.test.cjs",
         "tools/reward_grant_typed_executor_failures.test.cjs",
-        "tools/reward_grant_executor.test.cjs",
         "tools/login_bonus_settlement.test.cjs",
         "tools/reward_grant_architecture.test.cjs",
         "tools/score_reward_selection_core.test.cjs",
         "tools/score_reward_selection.test.cjs",
         "tools/single_settlement_reward_grant.test.cjs",
-        "tools/legacy_quest_reward_grant.test.cjs",
         "tools/task23c_reward_grants.test.cjs",
-            "tools/shop_reward_grant.test.cjs",
-            "tools/mail_reward_grant.test.cjs",
-            "tools/mail_reward_owner.test.cjs",
-            "tools/load_scheduled_resource_settlement.test.cjs",
-            "tools/scheduled_resource_rules.test.cjs",
-            "tools/scheduled_resource_settlement.test.cjs",
-            "tools/gift_receive_transaction.test.cjs",
+        "tools/shop_reward_grant.test.cjs",
+        "tools/mail_reward_grant.test.cjs",
+        "tools/mail_reward_owner.test.cjs",
+        "tools/load_scheduled_resource_settlement.test.cjs",
+        "tools/scheduled_resource_rules.test.cjs",
+        "tools/scheduled_resource_settlement.test.cjs",
+        "tools/gift_receive_transaction.test.cjs",
     ]
 
     assert.deepEqual(TEST_GROUPS[group], {
@@ -716,9 +699,8 @@ test("maps the public reward grant layer and its regressions to one focused leaf
         tests,
     })
     for (const file of [
-        "src/lib/reward-grant/types.ts",
-        "src/lib/reward-grant/plan.ts",
-        "src/lib/reward-grant/executor.ts",
+        "src/lib/reward-grant/execution-contract.ts",
+        "src/lib/reward-grant/execution-engine.ts",
         "src/lib/reward-grant/index.ts",
         "src/lib/player-resource-grant.ts",
         "docs/systems/reward-grant-transactions.md",
@@ -1884,7 +1866,6 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/single_continue_route.test.cjs",
         "tools/single_continue_route_errors.test.cjs",
         "tools/score_reward_lottery.test.cjs",
-        "tools/quest_score_reward_settlement.test.cjs",
         "tools/reward_campaign.test.cjs",
         "tools/shop_bulk_purchase.test.cjs",
         "tools/shop_reward_purchase_contract.test.cjs",

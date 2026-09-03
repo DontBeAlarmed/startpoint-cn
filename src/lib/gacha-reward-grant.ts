@@ -42,7 +42,7 @@ export type GachaRewardGrantOwner = (
 ) => RewardGrantExecutionResult
 
 export interface GachaRewardGrantOptions {
-    readonly ownerGrant?: GachaRewardGrantOwner
+    readonly ownerGrant: GachaRewardGrantOwner
     readonly deferCharacterSampledLog?: (log: () => void) => void
 }
 
