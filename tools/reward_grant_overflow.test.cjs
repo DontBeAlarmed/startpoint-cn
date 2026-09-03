@@ -15,7 +15,7 @@ const BetterSqlite3 = require("better-sqlite3")
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerItemSync } = require("../src/data/domains/item")
-const { insertDefaultPlayerSync, getPlayerSync } = require("../src/data/domains/player")
+const { insertDefaultPlayerSync, getPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const {
     createRewardGrantExecutionPlan,
     executeRewardGrantExecutionPlanAsTransactionOwnerSync,
@@ -23,6 +23,7 @@ const {
 const { getPlayerMailSync, getPlayerMailsSync, MailType } = require("../src/data/domains/mail")
 const { createRewardGrantItemOverflowPolicy } = require("../src/lib/reward-grant-item-overflow")
 const { RewardType } = require("../src/lib/types")
+const maxMana = require("../assets/config.json").max_mana
 
 const database = data.initializeDatabase({
     databaseFactory: databasePath => new BetterSqlite3(databasePath),
@@ -37,12 +38,16 @@ const account = insertAccountSync({
 const playerId = insertDefaultPlayerSync(account.id).id
 const itemId = 30005
 const realPolicyItemId = 14041
+const unsellableItemId = 30102
 database.prepare(
     "INSERT INTO players_items (id, amount, player_id) VALUES (?, ?, ?)",
 ).run(itemId, 8, playerId)
 database.prepare(
     "INSERT INTO players_items (id, amount, player_id) VALUES (?, ?, ?)",
 ).run(realPolicyItemId, 10, playerId)
+database.prepare(
+    "INSERT INTO players_items (id, amount, player_id) VALUES (?, ?, ?)",
+).run(unsellableItemId, 99999, playerId)
 
 const overflow = []
 const plan = createRewardGrantExecutionPlan([
@@ -63,7 +68,16 @@ const result = database.transaction(() => executeRewardGrantExecutionPlanAsTrans
         itemOverflow: {
             playerId,
             maxCount: () => 10,
-            writeOverflow: (id, amount) => overflow.push([id, amount]),
+            planOverflow: (id, amount) => ({
+                kind: "mail",
+                itemId: id,
+                overflowAmount: amount,
+            }),
+            finalizeOverflow: disposition => overflow.push([
+                disposition.itemId,
+                disposition.overflowAmount,
+            ]),
+            writeOverflow() {},
         },
     },
 ))()
@@ -75,6 +89,10 @@ assert.deepEqual(result.assets.items, [{
     overflowAmount: 6,
     beforeAmount: 8,
     afterAmount: 10,
+    overflowDispositions: [
+        { kind: "mail", itemId, overflowAmount: 3 },
+        { kind: "mail", itemId, overflowAmount: 3 },
+    ],
 }])
 assert.deepEqual(overflow, [[itemId, 3], [itemId, 3]])
 assert.equal(getPlayerItemSync(playerId, itemId), 10)
@@ -94,27 +112,110 @@ const realPolicyResult = database.transaction(() => executeRewardGrantExecutionP
 ))()
 assert.equal(realPolicyResult.assets.items[0].acceptedAmount, 0)
 assert.equal(realPolicyResult.assets.items[0].overflowAmount, 1)
-const realOverflowMail = getPlayerMailSync(playerId, 1, true)
-assert.equal(realOverflowMail.type, MailType.ITEM)
-assert.equal(realOverflowMail.type_id, realPolicyItemId)
-assert.equal(realOverflowMail.number, 1)
+assert.deepEqual(realPolicyResult.assets.items[0].overflowDispositions, [{
+    kind: "sold",
+    itemId: realPolicyItemId,
+    overflowAmount: 1,
+    soldMana: 500,
+    manaBefore: realPolicyBefore.freeMana,
+    acceptedMana: 500,
+    overflowMana: 0,
+    manaAfter: realPolicyBefore.freeMana + 500,
+}])
+assert.equal(realPolicyResult.playerAfter.freeMana, realPolicyBefore.freeMana + 500)
+assert.equal(getPlayerSync(playerId).freeMana, realPolicyBefore.freeMana + 500)
+assert.equal(getPlayerMailsSync(playerId, 1, 100, true)
+    .some(mail => mail.type === MailType.ITEM && mail.type_id === realPolicyItemId), false)
 assert.equal(getPlayerItemSync(playerId, realPolicyItemId), 10)
 
-const splitResult = database.transaction(() => executeRewardGrantExecutionPlanAsTransactionOwnerSync(
+const unsellableBefore = getPlayerSync(playerId)
+const unsellableResult = database.transaction(() => executeRewardGrantExecutionPlanAsTransactionOwnerSync(
     playerId,
-    createRewardGrantExecutionPlan([{ type: RewardType.ITEM, id: realPolicyItemId, count: 25 }]),
+    createRewardGrantExecutionPlan([{ type: RewardType.ITEM, id: unsellableItemId, count: 25 }]),
     {
-        playerId: realPolicyBefore.id,
-        freeMana: realPolicyBefore.freeMana,
-        freeVmoney: realPolicyBefore.freeVmoney,
-        expPool: realPolicyBefore.expPool,
+        playerId: unsellableBefore.id,
+        freeMana: unsellableBefore.freeMana,
+        freeVmoney: unsellableBefore.freeVmoney,
+        expPool: unsellableBefore.expPool,
     },
     { itemOverflow: realPolicy },
 ))()
-assert.equal(splitResult.assets.items[0].overflowAmount, 25)
+assert.equal(unsellableResult.assets.items[0].overflowAmount, 25)
+assert.deepEqual(unsellableResult.assets.items[0].overflowDispositions, [{
+    kind: "mail",
+    itemId: unsellableItemId,
+    overflowAmount: 25,
+}])
 assert.deepEqual(getPlayerMailsSync(playerId, 1, 100, true)
-    .filter(mail => mail.type_id === realPolicyItemId)
-    .map(mail => mail.number).sort((a, b) => a - b), [1, 5, 10, 10])
+    .filter(mail => mail.type_id === unsellableItemId)
+    .map(mail => mail.number), [25])
+
+const manaBeforeItem = getPlayerSync(playerId)
+const manaBeforeItemResult = database.transaction(() => executeRewardGrantExecutionPlanAsTransactionOwnerSync(
+    playerId,
+    createRewardGrantExecutionPlan([
+        { type: RewardType.MANA, count: 10 },
+        { type: RewardType.ITEM, id: realPolicyItemId, count: 1 },
+    ]),
+    {
+        playerId: manaBeforeItem.id,
+        freeMana: manaBeforeItem.freeMana,
+        freeVmoney: manaBeforeItem.freeVmoney,
+        expPool: manaBeforeItem.expPool,
+    },
+    { itemOverflow: realPolicy },
+))()
+assert.deepEqual(manaBeforeItemResult.assets.currencies, [{
+    currency: "freeMana",
+    requestedAmount: 510,
+    beforeAmount: manaBeforeItem.freeMana,
+    afterAmount: manaBeforeItem.freeMana + 510,
+}])
+
+const itemBeforeMana = getPlayerSync(playerId)
+const itemBeforeManaResult = database.transaction(() => executeRewardGrantExecutionPlanAsTransactionOwnerSync(
+    playerId,
+    createRewardGrantExecutionPlan([
+        { type: RewardType.ITEM, id: realPolicyItemId, count: 1 },
+        { type: RewardType.MANA, count: 10 },
+    ]),
+    {
+        playerId: itemBeforeMana.id,
+        freeMana: itemBeforeMana.freeMana,
+        freeVmoney: itemBeforeMana.freeVmoney,
+        expPool: itemBeforeMana.expPool,
+    },
+    { itemOverflow: realPolicy },
+))()
+assert.deepEqual(itemBeforeManaResult.assets.currencies, [{
+    currency: "freeMana",
+    requestedAmount: 510,
+    beforeAmount: itemBeforeMana.freeMana,
+    afterAmount: itemBeforeMana.freeMana + 510,
+}])
+
+const capacityPlayer = getPlayerSync(playerId)
+updatePlayerSync({
+    id: playerId,
+    freeMana: maxMana - capacityPlayer.paidMana - 100,
+})
+const capacityBefore = getPlayerSync(playerId)
+const capacityResult = database.transaction(() => executeRewardGrantExecutionPlanAsTransactionOwnerSync(
+    playerId,
+    createRewardGrantExecutionPlan([{ type: RewardType.ITEM, id: realPolicyItemId, count: 1 }]),
+    {
+        playerId: capacityBefore.id,
+        freeMana: capacityBefore.freeMana,
+        freeVmoney: capacityBefore.freeVmoney,
+        expPool: capacityBefore.expPool,
+    },
+    { itemOverflow: createRewardGrantItemOverflowPolicy(playerId) },
+))()
+assert.equal(capacityResult.playerAfter.freeMana, capacityBefore.freeMana + 100)
+assert.equal(getPlayerSync(playerId).totalManaObtained, capacityBefore.totalManaObtained + 100)
+assert.deepEqual(getPlayerMailsSync(playerId, 1, 100, true)
+    .filter(mail => mail.type === MailType.FREE_MANA)
+    .map(mail => mail.number), [400])
 
 const identityBefore = getPlayerSync(playerId)
 assert.throws(() => database.transaction(() => executeRewardGrantExecutionPlanAsTransactionOwnerSync(
@@ -130,6 +231,8 @@ assert.throws(() => database.transaction(() => executeRewardGrantExecutionPlanAs
         itemOverflow: {
             playerId: playerId + 1,
             maxCount: () => 10,
+            planOverflow: (id, amount) => ({ kind: "mail", itemId: id, overflowAmount: amount }),
+            finalizeOverflow() {},
             writeOverflow() {},
         },
     },
@@ -150,7 +253,9 @@ assert.throws(() => database.transaction(() => executeRewardGrantExecutionPlanAs
         itemOverflow: {
             playerId,
             maxCount: () => 10,
-            writeOverflow: () => { throw new Error("overflow sink failed") },
+            planOverflow: (id, amount) => ({ kind: "mail", itemId: id, overflowAmount: amount }),
+            finalizeOverflow: () => { throw new Error("overflow sink failed") },
+            writeOverflow() {},
         },
     },
 ))(), /overflow sink failed/)

@@ -14,7 +14,14 @@ const {
 } = require("../src/lib/reward-grant")
 const { RewardType } = require("../src/lib/types/rewards")
 
-function item(itemId, requestedAmount, acceptedAmount, overflowAmount, beforeAmount) {
+function item(
+    itemId,
+    requestedAmount,
+    acceptedAmount,
+    overflowAmount,
+    beforeAmount,
+    overflowDispositions = [],
+) {
     return {
         itemId,
         requestedAmount,
@@ -22,6 +29,7 @@ function item(itemId, requestedAmount, acceptedAmount, overflowAmount, beforeAmo
         overflowAmount,
         beforeAmount,
         afterAmount: beforeAmount + acceptedAmount,
+        ...(overflowDispositions.length > 0 ? { overflowDispositions } : {}),
     }
 }
 
@@ -98,7 +106,11 @@ test("typed result preserves entry outcomes and aggregates final assets in first
         { type: RewardType.CHARACTER, id: 201 },
     ])
     const result = createRewardGrantExecutionResult(7, plan, [
-        { kind: "item", item: item(101, 5, 3, 2, 10) },
+        { kind: "item", item: item(101, 5, 3, 2, 10, [{
+            kind: "mail",
+            itemId: 101,
+            overflowAmount: 2,
+        }]) },
         {
             kind: "character",
             characterId: 201,
@@ -127,7 +139,7 @@ test("typed result preserves entry outcomes and aggregates final assets in first
 
     assert.deepEqual(result.entries.map(entry => entry.index), [0, 1, 2, 3, 4, 5, 6, 7])
     assert.deepEqual(result.assets.items, [
-        item(101, 9, 7, 2, 10),
+        item(101, 9, 7, 2, 10, [{ kind: "mail", itemId: 101, overflowAmount: 2 }]),
         item(102, 2, 2, 0, 0),
     ])
     assert.deepEqual(result.assets.characters, [{
@@ -182,6 +194,9 @@ test("typed result rejects outcome identity allocation and sequence mismatches",
         [{ kind: "currency", currency: "freeMana", requestedAmount: 2, beforeAmount: 0, afterAmount: 2 }, { kind: "item", item: item(101, 3, 3, 0, 2) }],
         [{ kind: "item", item: item(101, 2, 1, 0, 0) }, { kind: "item", item: item(101, 3, 3, 0, 1) }],
         [{ kind: "item", item: item(101, 2, 2, 0, 0) }, { kind: "item", item: item(101, 3, 3, 0, 7) }],
+        [{ kind: "item", item: item(101, 2, 1, 1, 0, [{
+            kind: "mail", itemId: 999, overflowAmount: 1,
+        }]) }, { kind: "item", item: item(101, 3, 3, 0, 1) }],
     ]) {
         assert.throws(
             () => createRewardGrantExecutionResult(9, plan, outcomes, playerAfter),

@@ -1,5 +1,9 @@
 import { RewardType } from "../types/rewards"
 import {
+    normalizePlannedItemOverflowDisposition,
+    type PlannedItemOverflowDisposition,
+} from "../item-overflow"
+import {
     RewardGrantContractValidationError,
     type RewardGrantCommand,
     type RewardGrantCurrencyKind,
@@ -65,13 +69,45 @@ export function normalizeRewardGrantItemOutcome(
     const overflowAmount = amount(value.overflowAmount, entryIndex, "overflowAmount")
     const beforeAmount = amount(value.beforeAmount, entryIndex, "beforeAmount")
     const afterAmount = amount(value.afterAmount, entryIndex, "afterAmount")
+    const overflowDispositions = value.overflowDispositions === undefined
+        ? []
+        : (() => {
+            if (!Array.isArray(value.overflowDispositions)) {
+                throw new RewardGrantContractValidationError(entryIndex, "overflowAmount")
+            }
+            return value.overflowDispositions.map(disposition => {
+                try {
+                    const normalized = normalizePlannedItemOverflowDisposition(disposition)
+                    if (normalized.itemId !== itemId) {
+                        throw new TypeError("overflow disposition Item identity mismatch")
+                    }
+                    return normalized
+                } catch {
+                    throw new RewardGrantContractValidationError(entryIndex, "overflowAmount")
+                }
+            })
+        })()
+    const dispositionOverflowAmount = overflowDispositions.reduce(
+        (sum: number, disposition: PlannedItemOverflowDisposition) => (
+            addRewardGrantAmount(
+                sum,
+                disposition.overflowAmount,
+                entryIndex,
+                "overflowAmount",
+            )
+        ),
+        0,
+    )
     const expectedAfter = beforeAmount + acceptedAmount
     if (addRewardGrantAmount(
         acceptedAmount,
         overflowAmount,
         entryIndex,
         "requestedAmount",
-    ) !== requestedAmount || !Number.isSafeInteger(expectedAfter) || expectedAfter !== afterAmount) {
+    ) !== requestedAmount
+        || dispositionOverflowAmount !== overflowAmount
+        || !Number.isSafeInteger(expectedAfter)
+        || expectedAfter !== afterAmount) {
         throw new RewardGrantContractValidationError(entryIndex, "afterAmount")
     }
     return Object.freeze({
@@ -81,6 +117,9 @@ export function normalizeRewardGrantItemOutcome(
         overflowAmount,
         beforeAmount,
         afterAmount,
+        ...(overflowDispositions.length > 0
+            ? { overflowDispositions: Object.freeze(overflowDispositions) }
+            : {}),
     })
 }
 

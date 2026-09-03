@@ -16,6 +16,10 @@ import {
 } from "../player-resource-grant"
 import { RewardType } from "../types/rewards"
 import {
+    normalizePlannedItemOverflowDisposition,
+    type PlannedItemOverflowDisposition,
+} from "../item-overflow"
+import {
     type RewardGrantCommand,
     type RewardGrantEntryOutcome,
     type RewardGrantExecutionPlan,
@@ -51,8 +55,9 @@ function grantItem(
     inventory: InventoryBatchContext,
     itemId: number,
     requestedAmount: number,
+    resources: MutablePlayerResourceGrantState,
     options: RewardGrantExecutionOptions,
-    pendingItemOverflows: Array<{ itemId: number, amount: number }>,
+    pendingItemOverflows: PlannedItemOverflowDisposition[],
 ): RewardGrantItemOutcome {
     if (options.itemOverflow === undefined) {
         const mutation = inventory.grant(itemId, requestedAmount)
@@ -71,8 +76,31 @@ function grantItem(
     }
     const maxCount = options.itemOverflow.maxCount(itemId)
     const mutation = inventory.grantWithCapacity(itemId, requestedAmount, maxCount)
+    let overflowDisposition: PlannedItemOverflowDisposition | null = null
     if (mutation.overflowAmount > 0) {
-        pendingItemOverflows.push({ itemId, amount: mutation.overflowAmount })
+        overflowDisposition = normalizePlannedItemOverflowDisposition(
+            options.itemOverflow.planOverflow(
+                itemId,
+                mutation.overflowAmount,
+                resources.freeMana,
+            ),
+        )
+        if (overflowDisposition.itemId !== itemId
+            || overflowDisposition.overflowAmount !== mutation.overflowAmount) {
+            throw new RewardGrantAssetExecutionError(-1, `invalid Item ${itemId} overflow disposition`)
+        }
+        if (overflowDisposition.kind === "sold" && overflowDisposition.acceptedMana > 0) {
+            const mana = grantPlayerResource(
+                resources,
+                "freeMana",
+                overflowDisposition.acceptedMana,
+            )
+            if (mana.beforeAmount !== overflowDisposition.manaBefore
+                || mana.afterAmount !== overflowDisposition.manaAfter) {
+                throw new RewardGrantAssetExecutionError(-1, `invalid Item ${itemId} sold Mana state`)
+            }
+        }
+        pendingItemOverflows.push(overflowDisposition)
     }
     return Object.freeze({
         itemId,
@@ -81,6 +109,9 @@ function grantItem(
         overflowAmount: mutation.overflowAmount,
         beforeAmount: mutation.beforeAmount,
         afterAmount: mutation.afterAmount,
+        ...(overflowDisposition === null
+            ? {}
+            : { overflowDispositions: Object.freeze([overflowDisposition]) }),
     })
 }
 
@@ -100,7 +131,7 @@ function executeEntry(
     inventory: InventoryBatchContext,
     resources: MutablePlayerResourceGrantState,
     options: RewardGrantExecutionOptions,
-    pendingItemOverflows: Array<{ itemId: number, amount: number }>,
+    pendingItemOverflows: PlannedItemOverflowDisposition[],
 ): RewardGrantEntryOutcome {
     switch (reward.type) {
         case RewardType.ITEM:
@@ -108,7 +139,14 @@ function executeEntry(
         case RewardType.AETHER:
             return {
                 kind: "item",
-                item: grantItem(inventory, reward.id, reward.count, options, pendingItemOverflows),
+                item: grantItem(
+                    inventory,
+                    reward.id,
+                    reward.count,
+                    resources,
+                    options,
+                    pendingItemOverflows,
+                ),
             }
         case RewardType.EQUIPMENT:
             return {
@@ -134,7 +172,14 @@ function executeEntry(
                         )
                     }
                     compensationItems.push(
-                        grantItem(inventory, itemId, amount, options, pendingItemOverflows),
+                        grantItem(
+                            inventory,
+                            itemId,
+                            amount,
+                            resources,
+                            options,
+                            pendingItemOverflows,
+                        ),
                     )
                 },
             )
@@ -187,7 +232,7 @@ export function prepareRewardGrantExecution(
     const known = normalizeRewardGrantKnownPlayerState(playerId, knownPlayerBefore)
     const resourceBefore: PlayerResourceGrantState = known
     const resources = createPlayerResourceGrantState(resourceBefore)
-    const pendingItemOverflows: Array<{ itemId: number, amount: number }> = []
+    const pendingItemOverflows: PlannedItemOverflowDisposition[] = []
     const outcomes = plan.entries.map((reward, entryIndex) => executeEntry(
         playerId,
         reward,
@@ -219,7 +264,7 @@ export function prepareRewardGrantExecution(
         },
         writeItemOverflows() {
             for (const overflow of pendingItemOverflows) {
-                options.itemOverflow?.writeOverflow(overflow.itemId, overflow.amount)
+                options.itemOverflow?.finalizeOverflow(overflow)
             }
         },
     })

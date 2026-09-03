@@ -1,4 +1,5 @@
 import { RewardType } from "../types/rewards"
+import type { PlannedItemOverflowDisposition } from "../item-overflow"
 
 export type RewardGrantItemCommand = Readonly<{
     readonly type: RewardType.ITEM | RewardType.ELEMENT | RewardType.AETHER
@@ -35,6 +36,13 @@ export interface RewardGrantExecutionPlan {
 export interface RewardGrantItemOverflowPolicy {
     readonly playerId: number
     readonly maxCount: (itemId: number) => number
+    readonly planOverflow: (
+        itemId: number,
+        overflowAmount: number,
+        currentFreeMana: number,
+    ) => PlannedItemOverflowDisposition
+    readonly finalizeOverflow: (disposition: PlannedItemOverflowDisposition) => void
+    /** Temporary compatibility for direct Inventory callers; removed in D18b Task 4. */
     readonly writeOverflow: (itemId: number, amount: number) => void
 }
 
@@ -56,6 +64,7 @@ export interface RewardGrantItemOutcome {
     readonly overflowAmount: number
     readonly beforeAmount: number
     readonly afterAmount: number
+    readonly overflowDispositions?: readonly PlannedItemOverflowDisposition[]
 }
 
 export type RewardGrantSnapshot =

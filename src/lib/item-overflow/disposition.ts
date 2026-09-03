@@ -27,6 +27,10 @@ export interface PlanItemOverflowDispositionInput {
     readonly maxMana: number
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
 function positiveSafeInteger(value: unknown, field: string): number {
     if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
         throw new TypeError(`${field} must be a positive safe integer`)
@@ -39,6 +43,41 @@ function nonNegativeSafeInteger(value: unknown, field: string): number {
         throw new TypeError(`${field} must be a non-negative safe integer`)
     }
     return value
+}
+
+export function normalizePlannedItemOverflowDisposition(
+    value: unknown,
+): PlannedItemOverflowDisposition {
+    if (!isRecord(value)) throw new TypeError("overflow disposition must be an object")
+    const itemId = positiveSafeInteger(value.itemId, "itemId")
+    const overflowAmount = positiveSafeInteger(value.overflowAmount, "overflowAmount")
+    if (value.kind === "mail") {
+        return Object.freeze({ kind: "mail", itemId, overflowAmount })
+    }
+    if (value.kind !== "sold") {
+        throw new TypeError("overflow disposition kind is unsupported")
+    }
+    const soldMana = nonNegativeSafeInteger(value.soldMana, "soldMana")
+    const manaBefore = nonNegativeSafeInteger(value.manaBefore, "manaBefore")
+    const acceptedMana = nonNegativeSafeInteger(value.acceptedMana, "acceptedMana")
+    const overflowMana = nonNegativeSafeInteger(value.overflowMana, "overflowMana")
+    const manaAfter = nonNegativeSafeInteger(value.manaAfter, "manaAfter")
+    if (!Number.isSafeInteger(acceptedMana + overflowMana)
+        || acceptedMana + overflowMana !== soldMana
+        || !Number.isSafeInteger(manaBefore + acceptedMana)
+        || manaBefore + acceptedMana !== manaAfter) {
+        throw new TypeError("sold overflow disposition is inconsistent")
+    }
+    return Object.freeze({
+        kind: "sold",
+        itemId,
+        overflowAmount,
+        soldMana,
+        manaBefore,
+        acceptedMana,
+        overflowMana,
+        manaAfter,
+    })
 }
 
 export function planItemOverflowDisposition(
@@ -71,7 +110,7 @@ export function planItemOverflowDisposition(
     if (!Number.isSafeInteger(manaAfter)) {
         throw new RangeError("manaAfter exceeds the safe integer range")
     }
-    return Object.freeze({
+    return normalizePlannedItemOverflowDisposition({
         kind: "sold",
         itemId,
         overflowAmount,

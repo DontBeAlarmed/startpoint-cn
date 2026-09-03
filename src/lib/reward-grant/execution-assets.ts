@@ -22,6 +22,53 @@ export function aggregateRewardGrantAssets(
     const currencies: RewardGrantFinalCurrency[] = []
     const currencyIndices = new Map<RewardGrantCurrencyKind, number>()
 
+    const observeCurrency = (
+        currency: RewardGrantCurrencyKind,
+        requestedAmount: number,
+        beforeAmount: number,
+        afterAmount: number,
+        entryIndex: number,
+    ) => {
+        if (requestedAmount === 0) return
+        const existingIndex = currencyIndices.get(currency)
+        if (existingIndex === undefined) {
+            currencyIndices.set(currency, currencies.length)
+            currencies.push(Object.freeze({ currency, requestedAmount, beforeAmount, afterAmount }))
+            return
+        }
+        const previous = currencies[existingIndex]
+        if (beforeAmount !== previous.afterAmount) {
+            throw new RewardGrantContractValidationError(entryIndex, "beforeAmount")
+        }
+        currencies[existingIndex] = Object.freeze({
+            currency,
+            requestedAmount: addRewardGrantAmount(
+                previous.requestedAmount,
+                requestedAmount,
+                entryIndex,
+                "requestedAmount",
+            ),
+            beforeAmount: previous.beforeAmount,
+            afterAmount,
+        })
+    }
+
+    const observeItemDispositionCurrencies = (
+        item: RewardGrantItemOutcome,
+        entryIndex: number,
+    ) => {
+        for (const disposition of item.overflowDispositions ?? []) {
+            if (disposition.kind !== "sold") continue
+            observeCurrency(
+                "freeMana",
+                disposition.acceptedMana,
+                disposition.manaBefore,
+                disposition.manaAfter,
+                entryIndex,
+            )
+        }
+    }
+
     const observeItem = (item: RewardGrantItemOutcome, entryIndex: number) => {
         const existingIndex = itemIndices.get(item.itemId)
         if (existingIndex === undefined) {
@@ -33,6 +80,10 @@ export function aggregateRewardGrantAssets(
         if (item.beforeAmount !== previous.afterAmount) {
             throw new RewardGrantContractValidationError(entryIndex, "beforeAmount")
         }
+        const overflowDispositions = [
+            ...(previous.overflowDispositions ?? []),
+            ...(item.overflowDispositions ?? []),
+        ]
         items[existingIndex] = Object.freeze({
             itemId: item.itemId,
             requestedAmount: addRewardGrantAmount(
@@ -46,6 +97,9 @@ export function aggregateRewardGrantAssets(
             ),
             beforeAmount: previous.beforeAmount,
             afterAmount: item.afterAmount,
+            ...(overflowDispositions.length > 0
+                ? { overflowDispositions: Object.freeze(overflowDispositions) }
+                : {}),
         })
     }
 
@@ -53,6 +107,7 @@ export function aggregateRewardGrantAssets(
         const outcome = entry.outcome
         if (outcome.kind === "item") {
             observeItem(outcome.item, entry.index)
+            observeItemDispositionCurrencies(outcome.item, entry.index)
         } else if (outcome.kind === "character") {
             const existingIndex = characterIndices.get(outcome.characterId)
             if (existingIndex !== undefined && outcome.isNew) {
@@ -71,6 +126,7 @@ export function aggregateRewardGrantAssets(
             }
             if (outcome.compensationItem !== null) {
                 observeItem(outcome.compensationItem, entry.index)
+                observeItemDispositionCurrencies(outcome.compensationItem, entry.index)
             }
         } else if (outcome.kind === "equipment") {
             const existingIndex = equipmentIndices.get(outcome.equipmentId)
@@ -91,32 +147,13 @@ export function aggregateRewardGrantAssets(
                 equipment[existingIndex] = final
             }
         } else {
-            const existingIndex = currencyIndices.get(outcome.currency)
-            if (existingIndex === undefined) {
-                currencyIndices.set(outcome.currency, currencies.length)
-                currencies.push(Object.freeze({
-                    currency: outcome.currency,
-                    requestedAmount: outcome.requestedAmount,
-                    beforeAmount: outcome.beforeAmount,
-                    afterAmount: outcome.afterAmount,
-                }))
-            } else {
-                const previous = currencies[existingIndex]
-                if (outcome.beforeAmount !== previous.afterAmount) {
-                    throw new RewardGrantContractValidationError(entry.index, "beforeAmount")
-                }
-                currencies[existingIndex] = Object.freeze({
-                    currency: outcome.currency,
-                    requestedAmount: addRewardGrantAmount(
-                        previous.requestedAmount,
-                        outcome.requestedAmount,
-                        entry.index,
-                        "requestedAmount",
-                    ),
-                    beforeAmount: previous.beforeAmount,
-                    afterAmount: outcome.afterAmount,
-                })
-            }
+            observeCurrency(
+                outcome.currency,
+                outcome.requestedAmount,
+                outcome.beforeAmount,
+                outcome.afterAmount,
+                entry.index,
+            )
         }
     }
     return Object.freeze({

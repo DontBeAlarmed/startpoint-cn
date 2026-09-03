@@ -23,6 +23,7 @@ import {
 } from "./reward-grant"
 import { RewardType } from "./types/rewards"
 import { getVirtualNow } from "../runtime/time/game-time"
+import type { PlannedItemOverflowDisposition } from "./item-overflow"
 
 export interface MailRewardSettlement {
     readonly characterList: Record<string, unknown>[]
@@ -204,6 +205,18 @@ function createMailClaimItemPolicy(
             const policy = findItemInventoryPolicy(catalog, itemId)
             if (policy === null) throw new MailRewardCapacityError(`Item ${itemId} policy is unavailable.`)
             return policy.maxCount
+        },
+        planOverflow(itemId: number, amount: number) {
+            return Object.freeze({
+                kind: "mail" as const,
+                itemId,
+                overflowAmount: amount,
+            })
+        },
+        finalizeOverflow(disposition: PlannedItemOverflowDisposition) {
+            throw new MailRewardCapacityError(
+                `Mail Item ${disposition.itemId} cannot fit ${disposition.overflowAmount} additional unit(s).`,
+            )
         },
         writeOverflow(itemId: number, amount: number): void {
             throw new MailRewardCapacityError(
