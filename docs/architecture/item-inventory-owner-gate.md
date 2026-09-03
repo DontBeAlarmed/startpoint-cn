@@ -175,6 +175,8 @@ D16 生产 grant 不调用 capped plan；D18 通过 `grantWithCapacity` 和 iden
 
 D18 对 Item overflow 创建一封或多封确定性拆分的 Mail attachment；每封数量必须满足 `0 < number <= min(item.maxCount, 2147483647)`。所有拆分邮件与来源成本、accepted Item 和来源业务状态同一外层事务提交，任一创建失败全部回滚。Mail 领取仍保持整封原子，不引入单封部分领取状态。
 
+Gate A 实机验收补充确认：Shop 在客户端发送购买请求前已经按 `current + purchase <= max_count` 限制购买数量，正常 Shop 购买不应产生 overflow；单人战斗的 score、首通、S+、additional 及战斗关联标准奖励则由服务端生成，不能依赖客户端购买前校验。`single finish` 已接入同一场结算的 identity-bound Item overflow policy，历史 over-cap 不倒扣，超出部分在原有战斗外层事务中写入 Mail。
+
 ### 6.2 Inventory Item result
 
 每次 Item mutation 返回绝对后态，而不是把调用方绑定到 SQL helper：
