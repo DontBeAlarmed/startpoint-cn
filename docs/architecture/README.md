@@ -32,6 +32,7 @@
 | D17 | RewardGrant 正向协调核（已落地，Gate A 自动验证已完成） | [RewardGrant Core Gate](./reward-grant-core-gate.md) | 正向 Reward plan、资产 owner executors 与 Typed Grant Result；不成为 Economy bus |
 | D18b | Item Overflow Disposition 与 Toast（服务端 Gate 已完成，实机统一延期） | [Item Overflow Disposition Gate](./item-overflow-disposition-gate.md) | `sellable` 驱动 Sold/Mail、Mana 二次 overflow 与官方 `data.over_max` Toast |
 | D19 | Shop Purchase Owner（已实现） | [Shop Purchase Owner Gate](./shop-purchase-owner-gate.md) | 8 类真实 single、4/7 bulk、完整 Shop Content、统一 purchase plan/transaction owner 与局部索引 |
+| D20 | Gacha Owner 与域内 Exchange（目标架构） | [Gacha Owner Gate](./gacha-owner-gate.md) | actual banner、draw payment plan与prize dispatch、typed campaign/rate、普通owner、域内exchange、Crazy、conversion与Gacha-local projector |
 
 ## 阅读顺序
 
