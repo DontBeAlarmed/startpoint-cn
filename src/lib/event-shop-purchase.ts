@@ -23,6 +23,12 @@ import { getDayBucket } from "./time-utils"
 import { planFreeFirstDeduction } from "./economy/free-first-deduction"
 import type { InventoryBatchContext } from "./inventory"
 import type { FactKey } from "./mission/facts/fact-key"
+import {
+    isShopItemAvailable,
+    parseShopCnTimestamp,
+} from "./shop/period"
+
+export { isShopItemAvailable, parseShopCnTimestamp } from "./shop/period"
 
 export const ITEM_SHOP_PERIOD_ERROR_CODE = 2053
 
@@ -282,47 +288,6 @@ export function validateShopPurchaseAmount(value: unknown): number {
         throw new InvalidShopPurchaseAmountError()
     }
     return value as number
-}
-
-export function parseShopCnTimestamp(value: string): number {
-    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value)
-    if (match === null) {
-        throw new ShopPurchaseError(`Invalid shop period: ${value}.`)
-    }
-
-    const [, yearText, monthText, dayText, hourText, minuteText, secondText] = match
-    const parts = [yearText, monthText, dayText, hourText, minuteText, secondText].map(Number)
-    const [year, month, day, hour, minute, second] = parts
-    const localDate = new Date(0)
-    localDate.setUTCFullYear(year, month - 1, day)
-    localDate.setUTCHours(hour, minute, second, 0)
-    const normalized = [
-        localDate.getUTCFullYear(),
-        localDate.getUTCMonth() + 1,
-        localDate.getUTCDate(),
-        localDate.getUTCHours(),
-        localDate.getUTCMinutes(),
-        localDate.getUTCSeconds(),
-    ]
-    if (parts.some((part, index) => part !== normalized[index])) {
-        throw new ShopPurchaseError(`Invalid shop period: ${value}.`)
-    }
-    return localDate.getTime() - (8 * 60 * 60 * 1000)
-}
-
-export function isShopItemAvailable(shopItem: ShopItem, nowMs: number): boolean {
-    const periods = [{
-        availableFrom: shopItem.availableFrom,
-        availableUntil: shopItem.availableUntil,
-    }, ...(shopItem.compatibilityPeriods ?? [])]
-
-    return periods.some(period => {
-        const availableFromMs = parseShopCnTimestamp(period.availableFrom)
-        const availableUntilMs = period.availableUntil === null
-            ? Infinity
-            : parseShopCnTimestamp(period.availableUntil)
-        return nowMs >= availableFromMs && nowMs <= availableUntilMs
-    })
 }
 
 function buildRewards(shopItem: ShopItem, purchaseAmount: number): Reward[] {

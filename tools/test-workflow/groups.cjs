@@ -239,6 +239,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/content_shop_converter.test.cjs",
             "tools/gacha_repository.test.cjs",
             "tools/shop_repository.test.cjs",
+            "tools/shop_catalog.test.cjs",
             "tools/content_repository.test.cjs",
             "tools/content_snapshot_configuration.test.cjs",
             "tools/content_startup.test.cjs",

@@ -8,8 +8,8 @@ import {
 import {
     calculateShopStockQuantity,
     getShopPurchasePeriodKeys,
-    isShopItemAvailable,
 } from "./event-shop-purchase"
+import { isShopItemAvailable } from "./shop/period"
 import { ShopItem, ShopItems, ShopType } from "./types"
 
 const GENERAL_SHOP_CDN_KEYS: Set<number> = new Set(CDN_GENERAL_SHOP_WHITELIST)

@@ -18,6 +18,12 @@ import itemIdsData from "../../assets/item_ids.json"
 import itemLookupData from "../../assets/item_lookup.json"
 import equipmentCraftData from "../../assets/equipment_craft.json"
 import { AssetCharacter, BattleQuest, BossCoinShopItems, BoxGacha, ClearRewards, ConfigValues, EquipmentCraftEntry, EquipmentDissolveEntry, EventItemShopIdMapItem, EventShopItems, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, Gacha, Gachas, ItemSaleEntry, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawBoxGachas, RawBoxRewards, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, ShopItem, ShopItemCampaignMap, ShopItemCampaignReference, ShopItems, ShopSelectItemCampaigns, ShopType, StoryQuest } from "./types";
+import {
+    addRushCompatibilityPeriod,
+    addRushCompatibilityPeriods,
+    getRushCompatibilityEvent,
+    RUSH_COMPATIBILITY_EVENTS,
+} from "./shop/rush-compatibility"
 import { RawBoxGachaSettings } from "./types/box-gacha";
 import {
     ContentSnapshotError,
@@ -751,51 +757,6 @@ function addSingleShopItemCampaignReference(
         "shop_item_campaign.json",
     )[String(shopType)] ?? {}
     return addShopItemCampaignReference(item, itemId, references)
-}
-
-interface RushCompatibilityEvent {
-    sourceEventId: number
-    availableFrom: string
-    availableUntil: string
-}
-
-const RUSH_COMPATIBILITY_EVENTS: Record<number, RushCompatibilityEvent> = Object.fromEntries(
-    Array.from({ length: 7 }, (_, index) => [700011 + index, {
-        sourceEventId: 700001 + index,
-        availableFrom: "2025-06-26 12:00:00",
-        availableUntil: "2025-08-14 23:59:59",
-    }]),
-)
-
-function getRushCompatibilityEvent(eventId: number | string): RushCompatibilityEvent | null {
-    const numericEventId = Number(eventId)
-    return Number.isInteger(numericEventId) ? RUSH_COMPATIBILITY_EVENTS[numericEventId] ?? null : null
-}
-
-function addRushCompatibilityPeriod(item: ShopItem, compatibility: RushCompatibilityEvent): ShopItem {
-    const compatibilityPeriod = {
-        availableFrom: compatibility.availableFrom,
-        availableUntil: compatibility.availableUntil,
-    }
-    const existingPeriods = item.compatibilityPeriods ?? []
-    const compatibilityPeriods = existingPeriods.some(period => (
-        period.availableFrom === compatibilityPeriod.availableFrom
-        && period.availableUntil === compatibilityPeriod.availableUntil
-    ))
-        ? existingPeriods
-        : [...existingPeriods, compatibilityPeriod]
-
-    return {
-        ...item,
-        compatibilityPeriods,
-    }
-}
-
-function addRushCompatibilityPeriods(items: ShopItems, compatibility: RushCompatibilityEvent): ShopItems {
-    return Object.fromEntries(Object.entries(items).map(([itemId, item]) => [
-        itemId,
-        addRushCompatibilityPeriod(item, compatibility),
-    ]))
 }
 
 function hasShopItems(items: ShopItems | undefined): items is ShopItems {

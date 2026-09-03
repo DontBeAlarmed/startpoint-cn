@@ -1,4 +1,4 @@
-import { parseShopCnTimestamp } from "./event-shop-purchase"
+import { parseShopCnTimestamp } from "./shop/period"
 import type {
     ShopItem,
     ShopSelectItemCampaign,

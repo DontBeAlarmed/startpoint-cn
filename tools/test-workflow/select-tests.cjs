@@ -403,6 +403,10 @@ const SOURCE_RULES = [
         groups: ["quick:content"],
     },
     {
+        pattern: /^(?:src\/lib\/shop\/.*\.ts|tools\/shop_catalog\.test\.cjs)$/,
+        groups: ["quick:content"],
+    },
+    {
         pattern: /^(?:src\/lib\/item-overflow\/direct-settlement\.ts|tools\/item_overflow_direct_settlement\.test\.cjs)$/,
         groups: ["integration:database", "integration:rules"],
     },
