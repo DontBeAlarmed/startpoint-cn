@@ -114,6 +114,8 @@ const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
     "star_crumb_exchange.json",
     "star_crumb_exchange_cost.json",
     "special_pack_shop.json",
+    "mana_shop.json",
+    "shop_cost_item_schedule.json",
     "story_join_character.json",
     "treasure_shop.json",
 ]

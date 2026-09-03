@@ -2824,6 +2824,7 @@
   },
   "220032": {
     "costs": [],
+    "costScheduleId": "equipment_awaking_crystal_piece",
     "rewards": [
       {
         "type": 0,

@@ -1,0 +1,184 @@
+{
+    "equipment_awaking_crystal_piece": [
+        {
+            "availableFrom": "2023-01-01 05:00:00",
+            "availableUntil": null,
+            "month": 1,
+            "costs": [
+                {
+                    "id": 40265,
+                    "amount": 75
+                },
+                {
+                    "id": 40277,
+                    "amount": 75
+                }
+            ]
+        },
+        {
+            "availableFrom": "2023-01-01 05:00:00",
+            "availableUntil": null,
+            "month": 2,
+            "costs": [
+                {
+                    "id": 40301,
+                    "amount": 75
+                },
+                {
+                    "id": 40162,
+                    "amount": 75
+                }
+            ]
+        },
+        {
+            "availableFrom": "2023-01-01 05:00:00",
+            "availableUntil": null,
+            "month": 3,
+            "costs": [
+                {
+                    "id": 40265,
+                    "amount": 75
+                },
+                {
+                    "id": 40132,
+                    "amount": 75
+                }
+            ]
+        },
+        {
+            "availableFrom": "2023-01-01 05:00:00",
+            "availableUntil": null,
+            "month": 4,
+            "costs": [
+                {
+                    "id": 40182,
+                    "amount": 75
+                },
+                {
+                    "id": 40152,
+                    "amount": 75
+                }
+            ]
+        },
+        {
+            "availableFrom": "2023-01-01 05:00:00",
+            "availableUntil": null,
+            "month": 5,
+            "costs": [
+                {
+                    "id": 40112,
+                    "amount": 75
+                },
+                {
+                    "id": 40162,
+                    "amount": 75
+                }
+            ]
+        },
+        {
+            "availableFrom": "2023-01-01 05:00:00",
+            "availableUntil": null,
+            "month": 6,
+            "costs": [
+                {
+                    "id": 40092,
+                    "amount": 75
+                },
+                {
+                    "id": 40277,
+                    "amount": 75
+                }
+            ]
+        },
+        {
+            "availableFrom": "2023-01-01 05:00:00",
+            "availableUntil": null,
+            "month": 7,
+            "costs": [
+                {
+                    "id": 40301,
+                    "amount": 75
+                },
+                {
+                    "id": 40152,
+                    "amount": 75
+                }
+            ]
+        },
+        {
+            "availableFrom": "2023-01-01 05:00:00",
+            "availableUntil": null,
+            "month": 8,
+            "costs": [
+                {
+                    "id": 40122,
+                    "amount": 75
+                },
+                {
+                    "id": 40052,
+                    "amount": 75
+                }
+            ]
+        },
+        {
+            "availableFrom": "2023-01-01 05:00:00",
+            "availableUntil": null,
+            "month": 9,
+            "costs": [
+                {
+                    "id": 40052,
+                    "amount": 75
+                },
+                {
+                    "id": 40092,
+                    "amount": 75
+                }
+            ]
+        },
+        {
+            "availableFrom": "2023-01-01 05:00:00",
+            "availableUntil": null,
+            "month": 10,
+            "costs": [
+                {
+                    "id": 40182,
+                    "amount": 75
+                },
+                {
+                    "id": 40162,
+                    "amount": 75
+                }
+            ]
+        },
+        {
+            "availableFrom": "2023-01-01 05:00:00",
+            "availableUntil": null,
+            "month": 11,
+            "costs": [
+                {
+                    "id": 40022,
+                    "amount": 75
+                },
+                {
+                    "id": 40277,
+                    "amount": 75
+                }
+            ]
+        },
+        {
+            "availableFrom": "2023-01-01 05:00:00",
+            "availableUntil": null,
+            "month": 12,
+            "costs": [
+                {
+                    "id": 40122,
+                    "amount": 75
+                },
+                {
+                    "id": 40132,
+                    "amount": 75
+                }
+            ]
+        }
+    ]
+}

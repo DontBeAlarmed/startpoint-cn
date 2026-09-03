@@ -95,7 +95,10 @@ const EXPECTED_CDN_TABLES = Object.freeze({
         "master/skill/action_skill.orderedmap",
         "master/skill/switched_action_skill.orderedmap",
     ]],
-    "general_shop.json": ["shop", ["master/shop/general_shop.orderedmap"]],
+    "general_shop.json": ["shop", [
+        "master/shop/general_shop.orderedmap",
+        "master/shop/shop_cost_item_schedule.orderedmap",
+    ]],
     "event_item_shop.json": ["shop", ["master/shop/event_item_shop.orderedmap"]],
     "event_item_shop_id_map.json": ["shop", ["master/shop/event_item_shop.orderedmap"]],
     "boss_coin_shop.json": ["shop", [
@@ -124,6 +127,14 @@ const EXPECTED_CDN_TABLES = Object.freeze({
     ]],
     "special_pack_shop.json": ["shop", [
         "master/shop/special_pack_shop.orderedmap",
+        "master/shop/shop_cost_item_schedule.orderedmap",
+    ]],
+    "mana_shop.json": ["shop", [
+        "master/shop/mana_shop.orderedmap",
+        "master/shop/shop_cost_item_schedule.orderedmap",
+    ]],
+    "shop_cost_item_schedule.json": ["shop", [
+        "master/shop/shop_cost_item_schedule.orderedmap",
     ]],
 })
 
@@ -687,7 +698,7 @@ test("registry independently covers static CN runtime JSON references", () => {
 })
 
 test("every registry table has an explicit existing bundled fallback", () => {
-    assert.equal(TABLE_SOURCES.length, 128)
+    assert.equal(TABLE_SOURCES.length, 130)
     for (const entry of TABLE_SOURCES) {
         const sourcePath = path.resolve(projectRoot, entry.bundledPath)
         assert.ok(fs.existsSync(sourcePath), `${entry.tableName} source must exist`)

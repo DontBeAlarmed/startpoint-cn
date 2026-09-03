@@ -14,7 +14,7 @@ export enum ShopType {
     TREASURE,
     SPECIAL_PACK,
     EVENT_ITEM,
-    U5,
+    MANA,
     U6,
     BOSS_COIN,
     GENERAL,
@@ -60,7 +60,19 @@ export interface ShopItem {
     campaignId?: number
     lineupId?: number
     passCardPoints?: number
+    costScheduleId?: string
+    purchaseKind?: "purchase" | "specialExchangeLink"
+    specialExchangeCampaignId?: number
 }
+
+export interface ShopCostItemScheduleRow {
+    availableFrom: string
+    availableUntil: string | null
+    month: number
+    costs: ShopItemCost[]
+}
+
+export type ShopCostItemScheduleRows = Record<string, ShopCostItemScheduleRow[]>
 
 export interface ShopSelectItemCampaign {
     availableFrom: string

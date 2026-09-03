@@ -27,6 +27,8 @@ const PATHS = Object.freeze({
     equipmentCategory:
         "master/equipment_enhancement/equipment_enhancement_shop_category.orderedmap",
     specialPack: "master/shop/special_pack_shop.orderedmap",
+    mana: "master/shop/mana_shop.orderedmap",
+    costSchedule: "master/shop/shop_cost_item_schedule.orderedmap",
 })
 
 function encodeCsv(fields) {
@@ -70,6 +72,15 @@ function createFixture() {
             32: 1,
             33: "",
             34: 50,
+        })), row("220032", fields(47, {
+            11: "equipment_awaking_crystal_piece",
+            20: "2023-01-01 05:00:00",
+            21: "(None)",
+            23: 1,
+            27: 1,
+            29: 0,
+            30: 13001,
+            31: 1,
         }))]],
         [PATHS.event, [row("30", fields(51, {
             0: 6,
@@ -191,9 +202,47 @@ function createFixture() {
             8: "2024-06-01 12:00:00",
             9: "(None)",
         }))]],
-        [PATHS.specialPack, [row("220040", fields(46, {
+        [PATHS.specialPack, [row("200003", fields(46, {
+            1: 0,
+            9: 0,
+            10: 400,
+            11: "(None)",
+            20: "2022-12-15 12:00:00",
+            21: "2024-02-22 11:59:59",
+            23: 1,
+            24: 1,
+            25: "(None)",
+            26: "(None)",
+            27: 0,
+            28: 101,
+            29: 10,
+            30: 0,
+            31: 102,
+            32: 5,
+            33: 1,
+            35: 2500,
+        })), row("200001", fields(46, {
+            1: 11,
+            9: 0,
+            10: 1500,
+            11: "(None)",
+            20: "2022-12-15 12:00:00",
+            21: "(None)",
+            23: 1,
+            24: 1,
+            25: "(None)",
+            26: "(None)",
+            27: 0,
+            28: 999010,
+            29: 1,
+            30: 0,
+            31: 999001,
+            32: 1,
+        })), row("220040", fields(46, {
+            1: 0,
             9: 0,
             10: 50,
+            11: "(None)",
             20: "2024-06-01 05:00:00",
             21: "(None)",
             23: 99,
@@ -203,15 +252,52 @@ function createFixture() {
             27: 6,
             29: 100,
         }))]],
+        [PATHS.mana, [row("200001", fields(24, {
+            3: 0,
+            4: 50,
+            5: "(None)",
+            14: "2015-03-01 15:00:00",
+            15: "(None)",
+            16: 1,
+            17: 1,
+            18: "(None)",
+            19: "(None)",
+            20: 5000,
+            21: 0,
+            22: "2015-03-01 15:00:00",
+            23: "2015-03-01 15:00:00",
+        }))]],
+    ])
+    const nestedSources = new Map([
+        [PATHS.costSchedule, [{
+            key: "equipment_awaking_crystal_piece",
+            rows: [row("8", fields(11, {
+                0: "2023-01-01 05:00:00",
+                1: "(None)",
+                2: 8,
+                3: 40122,
+                4: 75,
+                5: 40052,
+                6: 75,
+                7: "(None)",
+                9: "(None)",
+            }))],
+        }]],
     ])
     return {
         requested,
         sources,
+        nestedSources,
         reader: {
             async read(logicalPath) {
                 requested.push(logicalPath)
                 if (!sources.has(logicalPath)) throw new Error(`missing fixture ${logicalPath}`)
                 return sources.get(logicalPath)
+            },
+            async readNested(logicalPath) {
+                requested.push(logicalPath)
+                if (!nestedSources.has(logicalPath)) throw new Error(`missing nested fixture ${logicalPath}`)
+                return nestedSources.get(logicalPath)
             },
         },
     }
@@ -242,6 +328,15 @@ test("shop converter reads all verified sources and emits runtime-compatible tab
             dailyStock: 1,
             specifiedMonths: [1, 4, 7, 10],
             monthlyStock: 5,
+        },
+        "220032": {
+            costs: [],
+            costScheduleId: "equipment_awaking_crystal_piece",
+            rewards: [{ type: 0, id: 13001, count: 1 }],
+            availableFrom: "2023-01-01 05:00:00",
+            availableUntil: null,
+            stock: 1,
+            monthlyStock: 1,
         },
     })
     assert.deepEqual(output["event_item_shop.json"], {
@@ -334,6 +429,35 @@ test("shop converter reads all verified sources and emits runtime-compatible tab
         },
     })
     assert.deepEqual(output["special_pack_shop.json"], {
+        "200001": {
+            costs: [],
+            rewards: [
+                { type: 0, id: 999010, count: 1 },
+                { type: 0, id: 999001, count: 1 },
+            ],
+            availableFrom: "2022-12-15 12:00:00",
+            availableUntil: null,
+            stock: 1,
+            userCost: { type: 3, amount: 1500 },
+            maxFrequency: 1,
+            purchaseKind: "specialExchangeLink",
+            specialExchangeCampaignId: 11,
+        },
+        "200003": {
+            costs: [],
+            rewards: [
+                { type: 0, id: 101, count: 10 },
+                { type: 0, id: 102, count: 5 },
+                { type: 1, count: 2500 },
+            ],
+            availableFrom: "2022-12-15 12:00:00",
+            availableUntil: "2024-02-22 11:59:59",
+            stock: 1,
+            userCost: { type: 3, amount: 400 },
+            maxFrequency: 1,
+            purchaseKind: "purchase",
+            specialExchangeCampaignId: 0,
+        },
         "220040": {
             costs: [],
             rewards: [],
@@ -342,7 +466,27 @@ test("shop converter reads all verified sources and emits runtime-compatible tab
             stock: 99,
             userCost: { type: 3, amount: 50 },
             passCardPoints: 100,
+            purchaseKind: "purchase",
+            specialExchangeCampaignId: 0,
         },
+    })
+    assert.deepEqual(output["mana_shop.json"], {
+        "200001": {
+            costs: [],
+            rewards: [{ type: 2, count: 5000 }],
+            availableFrom: "2015-03-01 15:00:00",
+            availableUntil: null,
+            stock: 1,
+            userCost: { type: 0, amount: 50 },
+        },
+    })
+    assert.deepEqual(output["shop_cost_item_schedule.json"], {
+        equipment_awaking_crystal_piece: [{
+            availableFrom: "2023-01-01 05:00:00",
+            availableUntil: null,
+            month: 8,
+            costs: [{ id: 40122, amount: 75 }, { id: 40052, amount: 75 }],
+        }],
     })
     assert.equal(output["event_item_shop.json"]["11"]["700011"], undefined)
     assertDeepFrozen(output)
@@ -351,6 +495,7 @@ test("shop converter reads all verified sources and emits runtime-compatible tab
 test("shop converter preserves empty official shops without synthesizing rows", async () => {
     const fixture = createFixture()
     for (const source of fixture.sources.keys()) fixture.sources.set(source, [])
+    for (const source of fixture.nestedSources.keys()) fixture.nestedSources.set(source, [])
 
     const output = await convertShops(fixture.reader)
 
@@ -366,6 +511,8 @@ test("shop converter preserves empty official shops without synthesizing rows", 
         "treasure_shop.json": {},
         "equipment_enhancement_shop.json": {},
         "special_pack_shop.json": {},
+        "mana_shop.json": {},
+        "shop_cost_item_schedule.json": {},
     })
 })
 
@@ -428,6 +575,51 @@ test("shop converter rejects duplicate keys, malformed shapes, and unknown categ
         fixture.sources.set(PATHS.equipmentCategory, [])
         await assert.rejects(convertShops(fixture.reader), /equipment_enhancement_shop.*category.*3/i)
     })
+    await t.test("schedule month matches its nested key", async () => {
+        const fixture = createFixture()
+        const groups = structuredClone(fixture.nestedSources.get(PATHS.costSchedule))
+        groups[0].rows[0].text = encodeCsv(fields(11, {
+            0: "2023-01-01 05:00:00",
+            1: "(None)",
+            2: 7,
+            3: 40122,
+            4: 75,
+        }))
+        fixture.nestedSources.set(PATHS.costSchedule, groups)
+        await assert.rejects(convertShops(fixture.reader), /month must match key/i)
+    })
+    await t.test("schedule groups are unique", async () => {
+        const fixture = createFixture()
+        const groups = fixture.nestedSources.get(PATHS.costSchedule)
+        fixture.nestedSources.set(PATHS.costSchedule, [...groups, structuredClone(groups[0])])
+        await assert.rejects(convertShops(fixture.reader), /invalid or duplicate group/i)
+    })
+    await t.test("schedule rows contain an actual Item cost", async () => {
+        const fixture = createFixture()
+        const groups = structuredClone(fixture.nestedSources.get(PATHS.costSchedule))
+        groups[0].rows[0].text = encodeCsv(fields(11, {
+            0: "2023-01-01 05:00:00",
+            1: "(None)",
+            2: 8,
+        }))
+        fixture.nestedSources.set(PATHS.costSchedule, groups)
+        await assert.rejects(convertShops(fixture.reader), /costs must not be empty/i)
+    })
+    await t.test("product keys stay within the safe integer range", async () => {
+        const validFields = fields(47, {
+            20: "2024-01-01 00:00:00",
+            21: "(None)",
+            23: 1,
+        })
+        const valid = createFixture()
+        valid.sources.set(PATHS.general, [row(String(Number.MAX_SAFE_INTEGER), validFields)])
+        const output = await convertShops(valid.reader)
+        assert.ok(output["general_shop.json"][String(Number.MAX_SAFE_INTEGER)])
+
+        const invalid = createFixture()
+        invalid.sources.set(PATHS.general, [row(String(Number.MAX_SAFE_INTEGER + 1), validFields)])
+        await assert.rejects(convertShops(invalid.reader), /canonical positive integer/i)
+    })
 })
 
 test("bundled 1.4.54 fallback preserves authoritative total and periodic limits", () => {
@@ -438,6 +630,9 @@ test("bundled 1.4.54 fallback preserves authoritative total and periodic limits"
     const treasure = require("../assets/treasure_shop.json")
     const itemCampaigns = require("../assets/shop_item_campaign.json")
     const selectCampaigns = require("../assets/shop_select_item_campaign.json")
+    const mana = require("../assets/mana_shop.json")
+    const specialPack = require("../assets/special_pack_shop.json")
+    const schedules = require("../assets/shop_cost_item_schedule.json")
 
     assert.equal(general[100001].maxFrequency, 1)
     assert.equal(event[2][100006][310194].maxFrequency, 10)
@@ -451,6 +646,14 @@ test("bundled 1.4.54 fallback preserves authoritative total and periodic limits"
     assert.equal(Object.keys(selectCampaigns[4]).length, 6)
     assert.equal(Object.values(selectCampaigns[4]).flatMap(campaign => campaign.lineupIds).length, 27)
     assert.deepEqual(selectCampaigns[7], {})
+    assert.equal(Object.keys(mana).length, 3)
+    assert.equal(Object.keys(specialPack).length, 158)
+    assert.equal(Object.values(specialPack).filter(item => item.purchaseKind === "purchase").length, 156)
+    assert.equal(Object.values(specialPack).filter(item => item.purchaseKind === "specialExchangeLink").length, 2)
+    assert.deepEqual(schedules.equipment_awaking_crystal_piece.find(row => row.month === 8).costs, [
+        { id: 40122, amount: 75 },
+        { id: 40052, amount: 75 },
+    ])
 })
 
 test("quick:content includes the shop converter regression suite", () => {

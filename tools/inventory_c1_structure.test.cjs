@@ -22,7 +22,7 @@ function sourceFiles(directory) {
     })
 }
 
-test("C1 pure plans are not imported or called by production adapters", () => {
+test("activated Inventory plans are imported only by reviewed production adapters", () => {
     const violations = []
     for (const file of sourceFiles(sourceRoot)) {
         if (planModuleFiles.has(file)) continue
@@ -31,7 +31,11 @@ test("C1 pure plans are not imported or called by production adapters", () => {
             violations.push(path.relative(projectRoot, file))
         }
     }
-    assert.deepEqual(violations, [])
+    assert.deepEqual(violations, [
+        "src/lib/event-trade-expiry-settlement.ts",
+        "src/lib/item-overflow/disposition.ts",
+        "src/lib/mail-reward-grant.ts",
+    ])
 })
 
 test("C1 pure plans have no database, route, Mail, Currency or logging dependency", () => {

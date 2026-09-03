@@ -33,10 +33,16 @@ const SHOP_TABLES = Object.freeze([
     "star_grain_shop.json",
     "treasure_shop.json",
     "equipment_enhancement_shop.json",
+    "special_pack_shop.json",
+    "mana_shop.json",
+    "shop_cost_item_schedule.json",
 ])
-const SHOP_RUNTIME_TABLES = Object.freeze([...SHOP_TABLES, "item_lookup.json"])
+const SHOP_RUNTIME_TABLES = Object.freeze([
+    ...SHOP_TABLES.filter(tableName => tableName !== "shop_cost_item_schedule.json"),
+    "item_lookup.json",
+])
 
-test("shop runtime facades read all ten tables from one initialized snapshot", () => {
+test("shop runtime facades read all twelve product tables from one initialized snapshot", () => {
     const previousSnapshot = productionContentSnapshotProvider.snapshot
     const requested = []
     const item = Object.freeze({
@@ -67,6 +73,12 @@ test("shop runtime facades read all ten tables from one initialized snapshot", (
         "star_grain_shop.json": Object.freeze({ "104": item }),
         "treasure_shop.json": Object.freeze({ "105": item }),
         "equipment_enhancement_shop.json": Object.freeze({ "106": item }),
+        "special_pack_shop.json": Object.freeze({
+            "107": Object.freeze({ ...item, purchaseKind: "purchase", specialExchangeCampaignId: 0 }),
+            "108": Object.freeze({ ...item, purchaseKind: "specialExchangeLink", specialExchangeCampaignId: 11 }),
+        }),
+        "mana_shop.json": Object.freeze({ "109": item }),
+        "shop_cost_item_schedule.json": Object.freeze({}),
         "item_lookup.json": Object.freeze({ "70001": "活动代币" }),
     })
     const repository = Object.freeze({
@@ -92,6 +104,9 @@ test("shop runtime facades read all ten tables from one initialized snapshot", (
         assert.strictEqual(getGenericShopItemsSync(ShopType.STAR_GRAIN)["104"], item)
         assert.strictEqual(getGenericShopItemsSync(ShopType.TREASURE)["105"], item)
         assert.strictEqual(getGenericShopItemsSync(ShopType.TREASURE_EQUIPMENT)["106"], item)
+        assert.equal(getGenericShopItemsSync(ShopType.SPECIAL_PACK)["107"].purchaseKind, "purchase")
+        assert.strictEqual(getGenericShopItemsSync(ShopType.MANA)["109"], item)
+        assert.equal(getShopItemSync(ShopType.SPECIAL_PACK, 108), null)
         assert.strictEqual(getEventShopItemsSync(11, 700001)["102"], eventItem)
         assert.strictEqual(getBossCoinShopItemsSync(5)["103"], item)
         const directEventItem = getShopItemSync(ShopType.EVENT_ITEM, 102)
@@ -112,7 +127,7 @@ test("shop runtime facades read all ten tables from one initialized snapshot", (
     }
 })
 
-test("bundled ContentRepository exposes all ten controlled shop imports", async t => {
+test("bundled ContentRepository exposes all thirteen controlled shop imports", async t => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "shop-repository-"))
     t.after(() => fs.rmSync(root, { recursive: true, force: true }))
     const controlled = Object.fromEntries(SHOP_TABLES.map((tableName, index) => [

@@ -925,6 +925,55 @@ test("商店比较锁定 ID/category/event 边界，Treasure 只比较 ID", () =
     )
 })
 
+test("商店正式基线深比较新增 Shop 表与 General 动态成本", () => {
+    const item = () => ({ costs: [], rewards: [] })
+    const bundled = {
+        "general_shop.json": {
+            "220032": { ...item(), costScheduleId: "equipment_awaking_crystal_piece" },
+        },
+        "special_pack_shop.json": {
+            "200003": { ...item(), rewards: [{ type: 0, id: 101, count: 10 }] },
+        },
+        "mana_shop.json": {
+            "200002": { ...item(), rewards: [{ type: 2, count: 30000 }] },
+        },
+        "shop_cost_item_schedule.json": {
+            equipment_awaking_crystal_piece: [{
+                availableFrom: "2023-01-01 05:00:00",
+                availableUntil: null,
+                month: 8,
+                costs: [{ id: 40122, amount: 75 }, { id: 40052, amount: 75 }],
+            }],
+        },
+        "event_item_shop.json": { "11": { "700001": { "2": item() } } },
+        "event_item_shop_id_map.json": { "2": { eventType: 11, eventId: 700001 } },
+        "boss_coin_shop.json": { "5": { "3": item() } },
+        "boss_coin_shop_item_category_map.json": { "3": 5 },
+        "star_grain_shop.json": { "4": item() },
+        "treasure_shop.json": { "5": item() },
+        "equipment_enhancement_shop.json": { "6": { ...item(), shopCategoryId: 9 } },
+    }
+    assert.doesNotThrow(() => smoke.validateShops({
+        bundled,
+        release: structuredClone(bundled),
+        rushEventIds: [700011],
+    }))
+
+    for (const mutate of [
+        release => { delete release["general_shop.json"]["220032"].costScheduleId },
+        release => { release["special_pack_shop.json"]["200003"].rewards = [] },
+        release => { release["mana_shop.json"]["200002"].rewards[0].count = 25000 },
+        release => { release["shop_cost_item_schedule.json"].equipment_awaking_crystal_piece[0].costs = [] },
+    ]) {
+        const release = structuredClone(bundled)
+        mutate(release)
+        assert.throws(
+            () => smoke.validateShops({ bundled, release, rushEventIds: [700011] }),
+            error => error?.code === "CONTENT_SYNC_SMOKE_SHOP_BASELINE",
+        )
+    }
+})
+
 test("商店可用 tracked 官方 raw 基线锁定 Boss，并精确列出 Star Grain 官方额外 ID", () => {
     const item = () => ({ costs: [], rewards: [] })
     const bundled = {

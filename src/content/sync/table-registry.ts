@@ -478,10 +478,13 @@ const definitionInputs: TableSourceInput[] = [
     {
         tableName: "general_shop.json",
         scope: "cdn",
-        sourceOrderedMaps: ["master/shop/general_shop.orderedmap"],
+        sourceOrderedMaps: [
+            "master/shop/general_shop.orderedmap",
+            "master/shop/shop_cost_item_schedule.orderedmap",
+        ],
         converterId: "shop",
-        converterVersion: 2,
-        outputShapeVersion: 2,
+        converterVersion: 3,
+        outputShapeVersion: 3,
     },
     {
         tableName: "event_item_shop.json",
@@ -575,10 +578,32 @@ const definitionInputs: TableSourceInput[] = [
     {
         tableName: "special_pack_shop.json",
         scope: "cdn",
-        sourceOrderedMaps: ["master/shop/special_pack_shop.orderedmap"],
+        sourceOrderedMaps: [
+            "master/shop/special_pack_shop.orderedmap",
+            "master/shop/shop_cost_item_schedule.orderedmap",
+        ],
         converterId: "shop",
-        converterVersion: 4,
-        outputShapeVersion: 4,
+        converterVersion: 5,
+        outputShapeVersion: 5,
+    },
+    {
+        tableName: "mana_shop.json",
+        scope: "cdn",
+        sourceOrderedMaps: [
+            "master/shop/mana_shop.orderedmap",
+            "master/shop/shop_cost_item_schedule.orderedmap",
+        ],
+        converterId: "shop",
+        converterVersion: 1,
+        outputShapeVersion: 1,
+    },
+    {
+        tableName: "shop_cost_item_schedule.json",
+        scope: "cdn",
+        sourceOrderedMaps: ["master/shop/shop_cost_item_schedule.orderedmap"],
+        converterId: "shop",
+        converterVersion: 1,
+        outputShapeVersion: 1,
     },
     ...DIRECT_ORDERED_MAP_TABLES.map(([tableName, nestingDepth, sourceOrderedMap]) => (
         directOrderedMapDefinition(tableName, nestingDepth, sourceOrderedMap)
