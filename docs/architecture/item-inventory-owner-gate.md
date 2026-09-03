@@ -1,6 +1,6 @@
 # D16 Item Inventory Owner 与 EventTrade 到期策略
 
-状态：设计、C1–C4 生产实现和 D16 checkpoint 自动验证已完成，等待大 Gate A 综合审查与客户端验收。本文描述 D16 已落地边界、行为保持合同和 D18 Mail 依赖；不得把 D18 才会激活的 overflow 组件视为当前运行时事实。
+状态：D16 设计/C1–C4、D18 C1–C5 生产实现和各 checkpoint 自动验证已完成，等待大 Gate A 综合审查与客户端验收。本文描述 Item owner、D18 cap/overflow 与 Mail disposition 的当前运行时合同；官方语义未知项仍按私服策略标注。
 
 ## 1. 背景
 
@@ -171,7 +171,7 @@ overflowAmount
 - 所有输入、乘法、加法和输出必须是非负 safe integer；
 - 函数无数据库、事务、日志、Content 读取或响应职责。
 
-D16 生产 grant 不调用 capped plan。正常业务 owner 仍使用无损、无上限的现有 grant 语义；结构测试必须证明 capped plan 没有被生产 adapter 导入。D18 在 Mail owner/port 就位后才允许激活。
+D16 生产 grant 不调用 capped plan；D18 通过 `grantWithCapacity` 和 identity-bound overflow policy 激活生产 cap。普通来源在 Inventory flush 后写 overflow Mail，Mail 领取则使用 reject policy，避免原邮件再次包装成 overflow Mail。
 
 D18 对 Item overflow 创建一封或多封确定性拆分的 Mail attachment；每封数量必须满足 `0 < number <= min(item.maxCount, 2147483647)`。所有拆分邮件与来源成本、accepted Item 和来源业务状态同一外层事务提交，任一创建失败全部回滚。Mail 领取仍保持整封原子，不引入单封部分领取状态。
 
@@ -225,7 +225,7 @@ obtainedAmount = acceptedGrant
 
 - deduct 的充足性只按请求开始前的 `beforeAmount` 验证，不能用同请求尚未获得的 grant 支付成本；
 - restore 先进入 `baseAmount`，不应用 cap、不计 obtained；
-- 只有 grant 在 D18 应用 cap；D16 仍完整 accepted；
+- 只有 grant 应用 cap；D18 已激活，D16 preserve-all 的历史语义仍保留在未启用 policy 的内部路径；
 - maintenance absolute set/delete 不得混入业务 batch；
 - 多个 grant/deduct/restore 条目的排列不改变规范化结果；
 - 每个受影响 Item 最终只执行一次 absolute write 和一次正向 obtained 记录。
@@ -298,17 +298,13 @@ acceptedMana = min(totalMana, capacityMana)
 overflowMana = totalMana - acceptedMana
 ```
 
-所有 Currency 输入、求和和结果必须是非负 safe integer；历史状态已经超过 `max_mana` 时容量为 0。D16 因 overflow 非零而整批 no-op；D18 把 `acceptedMana` 立即计入余额，只把 `overflowMana` 进入拆分后的 Mail。
+所有 Currency 输入、求和和结果必须是非负 safe integer；历史状态已经超过 `max_mana` 时容量为 0。D18 把 `acceptedMana` 立即计入余额，只把 `overflowMana` 进入拆分后的 Mail。
 
 最终私服策略是：Item 清零、`acceptedMana` 加入玩家余额、`overflowMana` 在同一事务内进入一封或多封确定性拆分的 31 天 `FREE_MANA` 邮件。每封附件必须满足 `0 < number <= min(maxMana, 2147483647)`，使玩家把总 Mana 消耗到足够低时每封都存在合法领取状态；不把一封邮件改成可部分领取。任一邮件创建失败时，Item、余额、累计量和全部邮件都回滚。
 
 转换事务只把立即进入余额的 `acceptedMana` 计入 `total_mana_obtained`；创建邮件不计入，未领取或过期也不计入。以后每封 overflow Mail 真正领取并进入余额时，再由 Currency owner 按该封成功领取数量恰好增加一次。Inventory 不计算 Currency 容量，Currency adapter 也不能修改 Item。
 
-当前 Mail 领取路径尚未校验 `max_mana`，所以 D16 不提前创建 overflow 邮件：
-
-- `overflowMana == 0`：D16 在 `/load` 完成 Item 与 Currency 原子转换；
-- `overflowMana > 0`：D16 整批 no-op，登录继续成功，Item 与 Mana 均不变；
-- D18 先建立 Mail owner 和不可容纳邮件保持未领取的约束，再激活最终邮件处置。
+D18 已建立 Mail 领取的 `max_mana` exact claim：FREE_MANA 与过期 EventTrade sale Mana 在领取前按 `free_mana + paid_mana` 预检，容量不足时邮件保持未领取。`/load` 的 EventTrade overflow 则在同一事务内清 Item、入账 accepted Mana 并创建 overflow Mail。
 
 该分阶段合同避免丢值、越界、账号登录锁死、临时 Mail facade 和尚未定义的部分 Item 出售顺序。
 
@@ -353,7 +349,7 @@ D16 测试只覆盖真实客户端入口、owner/事务不变量和真实旁路�
 - restore：战斗预付资源返还恢复数量，但不增加 `total_obtained`、不应用 cap；
 - maintenance/save：后台 set/delete 与 V2 双表 round-trip 不应用业务 policy；
 - writer migration：代表来源保持原 endpoint after-state 和现有最外层事务；
-- `/load`：首次转换、重复 no-op、paid+free 总容量、overflow 整批 defer、非 EventTrade 不处理、事务故障回滚和最终完整投影；
+- `/load`：首次转换、重复 no-op、paid+free 总容量、Mana overflow Mail、非 EventTrade 不处理、事务故障回滚和最终完整投影；
 - D18 admission：Mana overflow 大于 `max_mana`、Item overflow 大于 `max_count`、确定性多封拆分、中途故障全回滚、逐封领取、`receive_all` 跳过当前装不下邮件并继续其他邮件、累计量分次且恰好一次；
 - performance：N=0、N=1、批量 Item 的 SQL/事务/Content lookup admission；
 - admin/save/bootstrap：独立 adapter 和 round-trip 不回归；
@@ -369,8 +365,9 @@ D16 测试只覆盖真实客户端入口、owner/事务不变量和真实旁路�
 D16_BASE: b6fd6bbf182a51e2ba2556840873d054b6b1149f
 D16_DESIGN_STATUS: APPROVED
 D16_IMPLEMENTATION_STATUS: COMPLETE (C1-C4 landed; checkpoint validated)
-ITEM_CAP_PRODUCTION_STATUS: FORBIDDEN_UNTIL_D18
-EVENT_TRADE_OVERFLOW_MAIL_STATUS: DEFERRED_TO_D18
+D18_IMPLEMENTATION_STATUS: COMPLETE (C1-C5 landed; checkpoint validated)
+ITEM_CAP_PRODUCTION_STATUS: ACTIVE (explicit grant-only policy)
+EVENT_TRADE_OVERFLOW_MAIL_STATUS: ACTIVE (private-server strategy)
 ```
 
-D16 设计、正常 writer 清单、C1-C4 生产实现、focused groups 和结构性能准入已经完成；大 Gate A 的唯一 broad、整体终审、服务重启和客户端验收仍按计划留到 D18 之后。完成 D16 不表示 Item cap/overflow Mail 已上线；D18 完成 Mail owner 和领取容量合同后，才能把纯 `accepted/overflow` 与 EventTrade `overflowMana` 接入生产处置。
+D16 设计、正常 writer 清单、C1-C4 生产实现、D18 C1-C5、focused groups 和结构性能准入已经完成；大 Gate A 的唯一 broad、整体终审、服务重启和客户端验收仍待 D18 后执行。D18 的 cap/overflow 与 Mail 领取是已落地私服策略，不等同于已证明的官服后端实现。

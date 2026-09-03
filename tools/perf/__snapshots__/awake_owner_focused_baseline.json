@@ -1684,12 +1684,12 @@
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 18,
+      "sqlReads": 17,
       "sqlWrites": 4,
       "sqlByTable": {
         "players": {
-          "reads": 4,
-          "statements": 5,
+          "reads": 3,
+          "statements": 4,
           "writes": 1
         },
         "players_box_gacha": {
@@ -3162,12 +3162,7 @@
           }
         ],
         "items": [],
-        "mails": [
-          {
-            "id": 1,
-            "received": 1
-          }
-        ],
+        "mails": [],
         "player": {
           "bondToken": 10,
           "expPool": 0,
@@ -3217,7 +3212,7 @@
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
       "sqlReads": 15,
-      "sqlWrites": 4,
+      "sqlWrites": 5,
       "sqlByTable": {
         "players": {
           "reads": 3,
@@ -3256,8 +3251,8 @@
         },
         "players_mails": {
           "reads": 3,
-          "statements": 4,
-          "writes": 1
+          "statements": 5,
+          "writes": 2
         },
         "players_quest_progress": {
           "reads": 1,
@@ -3368,12 +3363,7 @@
           }
         ],
         "items": [],
-        "mails": [
-          {
-            "id": 2,
-            "received": 1
-          }
-        ],
+        "mails": [],
         "player": {
           "bondToken": 10,
           "expPool": 0,
@@ -3423,7 +3413,7 @@
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
       "sqlReads": 15,
-      "sqlWrites": 4,
+      "sqlWrites": 5,
       "sqlByTable": {
         "players": {
           "reads": 3,
@@ -3462,8 +3452,8 @@
         },
         "players_mails": {
           "reads": 3,
-          "statements": 4,
-          "writes": 1
+          "statements": 5,
+          "writes": 2
         },
         "players_quest_progress": {
           "reads": 1,

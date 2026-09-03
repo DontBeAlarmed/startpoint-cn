@@ -8,7 +8,7 @@
 
 同一 batch 内相同 Item 的重复 grant/deduct/restore 会先归一化，再按 Item ID 稳定写入最终绝对数量。正向 grant 只按实际进入 Inventory 的数量增加 `players_collected_items.total_obtained`；deduct、战斗资源 restore、后台精确设置、存档恢复和过期清零都不增加累计获得量。调用方已经在当前事务读取并验证 Player 时，必须显式选择 `caller-verified`，不能依赖隐式信任。
 
-后台精确 set/delete、旧存档导入和 V2 registry restore 保持独立 maintenance/save 权限，不伪装成玩家业务 grant。D16 仍保持合法奖励完整入库，没有在生产 grant 中启用 `max_count` 截断；Item overflow 转 Mail 留在 D18。
+后台精确 set/delete、旧存档导入和 V2 registry restore 保持独立 maintenance/save 权限，不伪装成玩家业务 grant。D18 已在已盘点的正常正向 Item grant 入口启用 `grantWithCapacity`：读取 runtime Item policy 的 `max_count`，只让 accepted 数量进入 Inventory，其余交给来源的 overflow Mail adapter。deduct、restore、maintenance 和 save/import 仍保持原语义。
 
 ## EventTrade 到期转换
 
@@ -16,7 +16,7 @@
 
 到期计划先批量读取玩家可能持有的 EventTrade，再按各 Item 的 `sale_price` 计算 Mana。容量使用 `free_mana + paid_mana` 与 `config.max_mana`；D16 只有在整批 Mana 都能立即进入余额时，才在一个事务中清零 Item、增加 `free_mana` 和 `total_mana_obtained`。任一写入失败会整体回滚，重复 `/load` 自然 no-op。
 
-若整批存在 Mana overflow，D16 登录继续成功但 Item 与 Mana 都不变，也不创建 Mail。D18 建立 Mail owner 和领取容量合同后，才会把立即可容纳部分入账并把 overflow 放入 Mail。缺失或非法 Item policy 属于 Content 完整性错误，继续 fail closed。
+若整批存在 Mana overflow，D18 登录仍成功，但会在同一事务中清除 EventTrade Item、把 accepted Mana 入账，并把 overflow 拆分为 FREE_MANA Mail。缺失或非法 Item policy 属于 Content 完整性错误，继续 fail closed。
 
 ## 体力道具
 
@@ -57,6 +57,6 @@
 trigger，覆盖重复体力道具、计划态最终库存写入、体力更新失败、道具售出玛纳失败、三种装备分解奖励失败以及批量保护
 第二项失败，以及保护装备拒绝。所有故障都要求请求前后存档快照一致；同道具扣返场景还锁定结算阶段只读取一次 `players_items`。
 
-Inventory owner 测试另外覆盖 standalone/within/batch 生命周期、同 Item 合并、累计获得量、maintenance/save 边界和中途故障回滚。EventTrade `/load` 测试覆盖首次转换、重复幂等、paid+free 容量、overflow 整批 defer、非 EventTrade/no-end、提交后响应和 late failure rollback。
+Inventory owner 测试另外覆盖 standalone/within/batch 生命周期、同 Item 合并、累计获得量、maintenance/save 边界和中途故障回滚。EventTrade `/load` 测试覆盖首次转换、重复幂等、paid+free 容量、overflow Mail、非 EventTrade/no-end、提交后响应和 late failure rollback；Mail claim 测试覆盖 Item/Mana 容量阻塞、receive_all 跳过和过期 EventTrade 自动出售。
 
 性能准入锁定合法 N=0、N=1 和批量到期状态：N=0 只有一次候选库存批读，不建立结算事务、不写数据库；N=1 与批量都只读取一次候选库存、固定次数读取 Player 和更新一次 Mana，只有 distinct 到期 Item 写入按 N 线性增长，不产生 N+1 Player 或 Currency 操作。

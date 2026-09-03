@@ -65,6 +65,7 @@ function createCases({ pool, mailFixtureByIdentity }, dependencies) {
     const shop = requireIdentity(pool, "shop")
     const gacha = requireIdentity(pool, "gacha")
     const mail = requireIdentity(pool, "mail")
+    const { MAIL_ITEM_ID } = require("./non_multi_mixed_mail.cjs")
     const mailId = integer(mailFixtureByIdentity[mail.playerId]?.mailId, "rollback mail id")
     return [{
         name: "single-battle",
@@ -170,7 +171,7 @@ function createCases({ pool, mailFixtureByIdentity }, dependencies) {
             observations: [{
                 name: "itemCount",
                 sql: `COALESCE((SELECT amount FROM players_items
-                    WHERE player_id = OLD.player_id AND id = 30005), 0)`,
+                    WHERE player_id = OLD.player_id AND id = ${MAIL_ITEM_ID}), 0)`,
             }],
         },
         request: app => postCnRequest(app, "/api/index.php/mail/receive", {

@@ -27,9 +27,9 @@ PassDaily、PassWeek、PassEvent 主数据、核心进度、点数、6 条 type 
 
 ## Inventory cap 与 EventTrade overflow
 
-D16 已把正常业务 Item writer 收口到 Inventory owner，并实现 EventTrade 在 `/load` 到期转 Mana。当前生产 grant 仍保持完整入库，不应用 `max_count` 截断；Item overflow 转 Mail、Mana overflow 转 Mail、Mail 中过期 EventTrade 的领取转换和 `receive_all` 容量策略都依赖 D18 Mail owner。
+D16 已把正常业务 Item writer 收口到 Inventory owner；D18 已启用正常正向 grant 的 `max_count` allocation、Item/Mana overflow Mail、Mail exact claim、过期 EventTrade Mail 自动出售和 receive_all 容量跳过。
 
-在 D18 完成前，如果 EventTrade 整批出售所得会使 `free_mana + paid_mana` 超过 `max_mana`，本次 `/load` 会整批 defer：登录成功，Item 与 Mana 保持不变，不创建 Mail。该过渡策略避免丢失资产，但仍待客户端确认页面体验；最终 overflow 行为以 D18 为准。详见[Inventory owner 与写入事务](../systems/inventory-write-transactions.md)。
+D18 当前按已批准私服策略处理：`/load` 清除过期 EventTrade Item，accepted Mana 立即入账，overflow Mana 创建 31 天 FREE_MANA Mail；Mail 中过期 EventTrade Item 在领取时按同一 sale 规则转换。官方 overflow 去向、reason、期限和提示文案仍未知，CN 客户端验收待完成。详见[Inventory owner 与写入事务](../systems/inventory-write-transactions.md)。
 
 ## 特殊关卡与联机
 

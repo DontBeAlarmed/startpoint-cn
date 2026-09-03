@@ -6,7 +6,7 @@ const {
     requireSuccessfulCnResponse,
 } = require("./non_multi_mixed_http.cjs")
 
-const MAIL_ITEM_ID = 30005
+const MAIL_ITEM_ID = 14002
 const MAIL_ITEM_TYPE = 1
 const UNRECEIVED_TIME = "0000-00-00 00:00:00"
 
@@ -60,7 +60,7 @@ async function executeMailScenario(app, identity, context = {}) {
     assert.equal(after.unreceivedMailCount, before.unreceivedMailCount - 1)
     assert.equal(after.receiveHistoryCount, before.receiveHistoryCount + 1)
     assert.equal(receivePayload.data?.item_list?.[MAIL_ITEM_ID], after.itemCount)
-    assert.equal(receivePayload.data?.total_count, mailList.length)
+    assert.equal(receivePayload.data?.total_count, 0)
     assert.equal(receivePayload.data?.mail_arrived, false)
 
     return {

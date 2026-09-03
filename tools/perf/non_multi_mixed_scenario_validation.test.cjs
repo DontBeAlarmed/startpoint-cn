@@ -259,8 +259,8 @@ test("mail rejects a listed fixture mail with mismatched attachment fields", asy
         }, {
             data_headers: { result_code: 1, viewer_id: identity.viewerId },
             data: {
-                item_list: { 30005: 2 },
-                total_count: 1,
+                item_list: { 14002: 2 },
+                total_count: 0,
                 mail_arrived: false,
             },
         }]), identity, context),

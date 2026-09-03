@@ -7,15 +7,15 @@
 | 端点 | 当前行为 |
 |---|---|
 | `/mail/index` | 先删除当前存档已到期的限时邮件，再按页返回邮件，默认每页最多 100 条 |
-| `/mail/receive` | 先清理当前存档已到期的限时邮件，再在单一事务中校验并发放一封附件、写领取历史、标记 receive time |
-| `/mail/receive_all` | 先清理当前存档已到期的限时邮件，再对请求 ID 去重，并在单一事务中完成全部附件、历史和领取标记 |
+| `/mail/receive` | 先清理当前存档已到期的限时邮件，再在单一事务中 exact 领取一封附件；容量不足保持未领取，成功后写 history、CAS 并物理移除邮件 |
+| `/mail/receive_all` | 在单一外层事务中限制并去重请求 ID；容量不足的邮件使用 savepoint 跳过，其他邮件继续，成功邮件统一写 history、CAS 并物理移除 |
 | `/history/receive` | 按 `page` 返回最近 7 天领取记录，固定每页 100 条，并返回该时间窗内真实总数 |
 
-邮件是否未领取以 `receive_time = '0000-00-00 00:00:00'` 判断。领取记录会写入 `players_receive_history`。
+邮件是否未领取以 `receive_time = '0000-00-00 00:00:00'` 判断。成功领取会写入 `players_receive_history`，随后退出活动邮箱；`receive_time` 只用于领取过程的 compare-and-set 和兼容字段，不作为长期已领取活动邮件状态。
 
 邮件有效期沿用客户端协议的 `reward_period_limited` 与 `reward_limit_time` 字段。`reward_period_limited=0` 或没有到期时间表示永久有效；后台发送的邮件默认有效 31 天，也允许配置 1～3650 天。到期时间使用发送时的虚拟服务器时间计算，服务端在邮箱列表、单封领取和批量领取入口以同一规则批量删除过期邮件；已领取历史不会随邮件过期删除，只由独立的保留任务做有界清理（见下文）。
 
-单领和全领都以 SQLite 外层事务覆盖附件发放、`players_receive_history`、邮件领取时间和角色觉醒解锁响应。事务内读取一次权威 Player 前态，标准附件交给 RewardGrant owner 执行，专用附件复用同一前态；owner 不查询 Player，也不建立 plan savepoint。任一步骤异常会回滚整个请求；批量请求中的重复 `mail_id` 只处理一次，不会重复发奖。已经领取或不存在的 ID 仍计入 `already_mail_count`，不会使其他合法邮件失败。
+单领和全领都以 SQLite 外层事务覆盖附件发放、`players_receive_history`、邮件领取 CAS/删除和角色觉醒解锁响应。标准 Item 使用 runtime `max_count` 的 reject policy；FREE_MANA 与过期 EventTrade sale 使用 `free_mana + paid_mana` 容量预检。单领容量不足返回有限 400 且邮件不变；receive_all 对容量阻塞邮件回滚当前 savepoint 后继续其他合法邮件。任一步非容量错误会回滚整个请求；重复 `mail_id` 只处理一次，不会重复发奖。
 
 `src/lib/mail-reward-grant.ts` 是邮件领域 adapter。它先校验同批全部有效邮件，再按请求中的有效邮件顺序建立一个标准 typed plan。邮件 ID 和附件序号只保留在 adapter 的本地顺序中；角色 `number > 1` 展开为多条 CHARACTER entry，其他标准附件各一条。RewardGrant 的身份、执行字段和来源 metadata 都不会进入邮件协议响应。
 
@@ -49,7 +49,7 @@
 
 `type_id` 只允许并要求用于道具、角色和装备；其他附件带 `type_id` 会被拒绝，不会静默忽略。三类 ID 分别按当前道具、角色和装备资源集合校验。
 
-角色和装备每封只能发送 1 个。普通道具附件数量使用当前 Content Snapshot 的 `item_max_count.json`，其权威来源是 `master/item/item.orderedmap` 的 `max_count` 字段；不再按 ID 范围推测。该校验只保证单封附件数量合法，不读取收件人背包，也不预演领取后的库存；超过玩家当前可持有空间时沿用客户端领取拦截，服务端不实现部分领取或溢出转存。其他资源使用 int32 安全范围。最终规则以 `src/lib/admin-mail-rules.ts` 为唯一事实来源。角色附件统一调用正常角色发放器：重复角色增加 `stack` 并发放对应重复素材，不再错误增加 `entry_count`。
+角色和装备每封只能发送 1 个。普通道具附件创建时数量使用当前 Content Snapshot 的 `item_max_count.json`；领取时再使用 `item_inventory_policy.json` 的 `max_count` 做 exact capacity claim。overflow Mail 使用私服默认 31 天 TTL；Mail 期限与 Item `end_time` 分离。普通非 EventTrade 限时 Item 不自动转 Mana；只有具备 EventTrade effect、sale price 和有效结束时间的 Item 才在过期时按私服策略自动出售。角色附件统一调用正常角色发放器：重复角色增加 `stack` 并发放对应重复素材，不再错误增加 `entry_count`。
 
 领取响应继续使用旧字段：`user_info` 只包含本次涉及的余额字段，并返回提交后的绝对余额；`item_list` 对同一 ID 只保留数据库最终库存，重复角色补偿亦然；角色和装备列表沿用 RewardGrant 的稳定顺序与去重结果，再在原有时点执行 Awake unlock reconcile。响应不新增 RewardGrant source 或其他内部字段。
 
@@ -77,7 +77,7 @@
 
 单封领取使用 `getPlayerMailSync(playerId, mailId, true)` 定点读取目标邮件，不再为了查找一个 ID 扫描最多 1000 封未领取邮件。`receive_all` 使用一次 `id IN (...)` 查询请求中的唯一 ID 集合，再复用已读到的邮件对象完成奖励和条件更新；因此不会对每封邮件再次执行状态查询。邮件领取仍由 `receive_time` 条件更新确认并发，状态变化会使最外层事务回滚。
 
-本次优化保持列表分页接口不变，也保持重复、已领取和不存在 ID 的原有计数语义。默认混合基线中邮件入口仍为 0 错误、行为签名稳定、回滚验证通过；该小基线不是正式并发准入测试。
+本次优化保持列表分页接口不变；receive_all 最多接受 500 个正安全整数 ID，复用单次 ID 查询 Map，避免 O(n²) 查找。默认混合基线中邮件入口仍为 0 错误、行为签名稳定、回滚验证通过；该小基线不是正式并发准入测试。
 
 ## 领取历史保留
 
@@ -91,7 +91,7 @@ V2 完整存档快照通过玩家领域 Registry 包含 `players_mails` 和 `pla
 
 ## 已知边界
 
-- 游戏 12 种历史附件已有单领与混合批量的服务端协议 fixture；后台新建白名单收紧为 8 种；13、14、16、17 继续明确拒绝，不推测发奖语义；
+- 游戏 12 种历史附件已有单领与混合批量的服务端协议 fixture；Item/Mana 容量阻塞、EventTrade 过期出售、overflow Mail 和 receive_all 跳过已有专项覆盖；后台新建白名单收紧为 8 种；13、14、16、17 继续明确拒绝，不推测发奖语义；
 - `mail_arrived` 已在主要成功写响应统一；读取、stub 和非成功 `result_code` 响应仍可能不携带该字段，且客户端提示刷新仍需逐类确认；
 - 全服发送不是跨收件人事务，也没有持久审计历史；
 - 后台发送历史只记录在内存中；过期邮件采用访问时惰性删除，不运行独立定时清理任务；
