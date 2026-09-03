@@ -305,7 +305,7 @@ export function executeSingleSettlementWrites(
                 settlementActiveQuest.entryItemId) ?? 0,
         })
     }
-    const { itemList, finalPlayerProjection } = responseState.finalize({
+    const { itemList, itemOverflowDispositions, finalPlayerProjection } = responseState.finalize({
         rankPoint: newRankPoint, stamina: afterStamina, staminaHealTime: afterStaminaHealTime,
         boostPoint: newBoostPoint, bossBoostPoint: newBossBoostPoint,
     })
@@ -323,6 +323,7 @@ export function executeSingleSettlementWrites(
         missionSettlement, awakeMissionSettlement, activeMissionList, fixedManaReward,
         fixedPoolExpReward, newMana, beforeRankPoint, newRankPoint, newBoostPoint,
         newBossBoostPoint, finalPlayerProjection,
+        itemOverflowDispositions,
     }
 }
 export type SingleSettlementWritesResult = ReturnType<typeof executeSingleSettlementWrites>

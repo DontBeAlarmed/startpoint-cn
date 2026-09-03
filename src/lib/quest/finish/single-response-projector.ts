@@ -1,5 +1,6 @@
 import { mergeMissionSettlementResponse } from "../../mission/response"
 import type { SingleFinishSuccess } from "./single-orchestrator"
+import { projectItemOverflowCommonResponse } from "../../item-overflow"
 
 export interface SingleFinishResponseFinalPlayerProjection {
     readonly freeMana: number
@@ -75,6 +76,7 @@ export interface SingleFinishResponseData {
     mission_info: unknown[]
     degree_list: Array<{ viewer_id: number; degree_id: number }>
     mail_arrived: boolean
+    over_max?: ReturnType<typeof projectItemOverflowCommonResponse>
 }
 
 export interface SingleFinishResponseEnvelope {
@@ -184,6 +186,8 @@ export function buildSingleFinishResponse({
         "degree_list": [],
         "mail_arrived": mailArrived,
     }
+    const overMax = projectItemOverflowCommonResponse(result.itemOverflowDispositions ?? [])
+    if (overMax.length > 0) responseData.over_max = overMax
     // The legacy mission adapter mutates a dynamic response shape. Keep that
     // conversion local so the projector's public input and output remain strict.
     const missionResponseTarget = responseData as unknown as Parameters<
@@ -193,11 +197,13 @@ export function buildSingleFinishResponse({
         ...missionSettlement,
         itemList: {},
         userInfo: undefined,
+        itemOverflowDispositions: [],
     }, viewerId)
     mergeMissionSettlementResponse(missionResponseTarget, {
         ...awakeMissionSettlement,
         itemList: {},
         userInfo: undefined,
+        itemOverflowDispositions: [],
     }, viewerId)
 
     return {

@@ -13,6 +13,7 @@ import {
     normalizeRewardGrantKnownPlayerState,
 } from "./execution-outcome"
 import { rewardGrantSnapshotsEqual } from "./snapshot"
+import type { PlannedItemOverflowDisposition } from "../item-overflow"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -95,4 +96,20 @@ export function snapshotRewardGrantExecutionResultForPlan(
         throw new RewardGrantContractValidationError(-1, "assets")
     }
     return canonical
+}
+
+export function collectRewardGrantItemOverflowDispositions(
+    result: RewardGrantExecutionResult,
+): readonly PlannedItemOverflowDisposition[] {
+    const dispositions: PlannedItemOverflowDisposition[] = []
+    for (const entry of result.entries) {
+        const outcome = entry.outcome
+        const item = outcome.kind === "item"
+            ? outcome.item
+            : outcome.kind === "character"
+                ? outcome.compensationItem
+                : null
+        if (item !== null) dispositions.push(...(item.overflowDispositions ?? []))
+    }
+    return Object.freeze(dispositions)
 }

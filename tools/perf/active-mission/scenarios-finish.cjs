@@ -49,6 +49,18 @@ function singleTableOverrides() {
     if (officialMissions[FINISH_MISSION_ID] || officialEvents[FINISH_EVENT_ID]) {
         throw new Error("focused finish fixture collides with official Active Mission content")
     }
+    const itemPolicy = structuredClone(require("../../../assets/item_inventory_policy.json"))
+    for (const itemId of [910001, 910002]) {
+        itemPolicy.byItemId[String(itemId)] = {
+            effectKind: 0,
+            category: 2,
+            salePrice: 1,
+            maxCount: 9999,
+            sellable: true,
+            startTimeMs: 0,
+            endTimeMs: null,
+        }
+    }
     return {
         "mission_active.json": {
             ...officialMissions,
@@ -64,6 +76,7 @@ function singleTableOverrides() {
         },
         "score_reward.json": singleFixture.DETERMINISTIC_SCORE_REWARDS,
         "additional_reward_rules.json": singleFixture.DETERMINISTIC_ADDITIONAL_REWARDS,
+        "item_inventory_policy.json": itemPolicy,
     }
 }
 

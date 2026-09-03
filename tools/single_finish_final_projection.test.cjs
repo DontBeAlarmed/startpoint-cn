@@ -54,6 +54,7 @@ function rewardOverrides(clearReward, sPlusReward) {
     const itemPolicy = structuredClone(itemInventoryPolicy)
     for (const reward of [clearReward, sPlusReward]) {
         if (reward.type !== RewardType.ITEM || reward.id === undefined) continue
+        if (itemPolicy.byItemId[String(reward.id)] !== undefined) continue
         itemPolicy.byItemId[String(reward.id)] = {
             effectKind: 0,
             category: 2,
@@ -82,10 +83,11 @@ function rewardOverrides(clearReward, sPlusReward) {
     }
 }
 
-test("single finish sends generated Item overflow to Mail without increasing Inventory", async () => {
+test("single finish sells generated sellable Item overflow without increasing Inventory", async () => {
     const overflowAmount = 470
     await withSingleBattleHarness("item-overflow", async harness => {
         harness.setItem(1, 9999)
+        const before = harness.getPlayer()
 
         const data = await finishFirstClear(harness, "task-26d2-item-overflow")
 
@@ -95,7 +97,16 @@ test("single finish sends generated Item overflow to Mail without increasing Inv
             FROM players_mails
             WHERE player_id = ? AND type = 1 AND type_id = 1
             ORDER BY id
-        `).all(harness.playerId), [{ type: 1, type_id: 1, number: overflowAmount }])
+        `).all(harness.playerId), [])
+        assert.deepEqual(data.over_max, [{
+            process_type: 2,
+            amount_sold: overflowAmount * 5,
+            item: { item_id: 1, number: overflowAmount },
+        }])
+        assert.equal(
+            harness.getPlayer().freeMana,
+            before.freeMana + 20 + 11 + overflowAmount * 5 + 1,
+        )
         assert.equal(harness.db.prepare(`
             SELECT total_obtained
             FROM players_collected_items
@@ -109,7 +120,7 @@ test("single finish sends generated Item overflow to Mail without increasing Inv
     })
 })
 
-test("single finish routes new rewards to Mail when legacy Inventory is already over cap", async () => {
+test("single finish sells new rewards when legacy Inventory is already over cap", async () => {
     const legacyAmount = 24529
     const overflowAmount = 470
     await withSingleBattleHarness("legacy-item-overflow", async harness => {
@@ -123,10 +134,42 @@ test("single finish routes new rewards to Mail when legacy Inventory is already 
             FROM players_mails
             WHERE player_id = ? AND type = 1 AND type_id = 1
             ORDER BY id
-        `).all(harness.playerId), [{ type: 1, type_id: 1, number: overflowAmount }])
+        `).all(harness.playerId), [])
+        assert.deepEqual(data.over_max, [{
+            process_type: 2,
+            amount_sold: overflowAmount * 5,
+            item: { item_id: 1, number: overflowAmount },
+        }])
     }, {
         tableOverrides: rewardOverrides(
             { name: "legacy overflow item", type: RewardType.ITEM, id: 1, count: overflowAmount },
+            { name: "S+ mana", type: RewardType.MANA, count: 1 },
+        ),
+    })
+})
+
+test("single finish sends unsellable Item overflow to Mail and publishes Mail Toast", async () => {
+    const itemId = 30102
+    const overflowAmount = 20
+    await withSingleBattleHarness("unsellable-item-overflow", async harness => {
+        harness.setItem(itemId, 99999)
+
+        const data = await finishFirstClear(harness, "task-26d2-unsellable-item-overflow")
+
+        assert.equal(data.item_list[itemId], 99999)
+        assert.deepEqual(harness.db.prepare(`
+            SELECT type, type_id, number
+            FROM players_mails
+            WHERE player_id = ? AND type = 1 AND type_id = ?
+            ORDER BY id
+        `).all(harness.playerId, itemId), [{ type: 1, type_id: itemId, number: overflowAmount }])
+        assert.deepEqual(data.over_max, [{
+            process_type: 1,
+            item: { item_id: itemId, number: overflowAmount },
+        }])
+    }, {
+        tableOverrides: rewardOverrides(
+            { name: "unsellable overflow item", type: RewardType.ITEM, id: itemId, count: overflowAmount },
             { name: "S+ mana", type: RewardType.MANA, count: 1 },
         ),
     })

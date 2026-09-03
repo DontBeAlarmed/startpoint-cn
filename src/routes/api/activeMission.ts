@@ -15,6 +15,7 @@ import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-
 import { MissionRewardGranter } from "../../lib/mission/grants";
 import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time";
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow";
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/receive", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -98,6 +99,7 @@ const routes = async (fastify: FastifyInstance) => {
                 equipmentList: granter.equipmentList,
                 itemList: granter.itemList,
                 degreeList: granter.degreeList,
+                itemOverflowDispositions: granter.itemOverflowDispositions,
             }
         })()
         if (!settlement.ok) return reply.status(settlement.status).send({
@@ -106,6 +108,7 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         console.log(`[ACTIVE_MISSION] receive viewer=${viewerId} missions=${requestList.length} items=${Object.keys(settlement.itemList).length}`)
+        const overMax = projectItemOverflowCommonResponse(settlement.itemOverflowDispositions)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -120,7 +123,8 @@ const routes = async (fastify: FastifyInstance) => {
                 "equipment_list": settlement.equipmentList,
                 "item_list": settlement.itemList,
                 "degree_list": settlement.degreeList.map(degreeId => ({ viewer_id: viewerId, degree_id: degreeId })),
-                "mail_arrived": getPlayerMailCountSync(playerId, true) > 0
+                "mail_arrived": getPlayerMailCountSync(playerId, true) > 0,
+                ...(overMax.length > 0 ? { "over_max": overMax } : {})
             }
         })
     })

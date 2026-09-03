@@ -70,6 +70,12 @@ export interface RewardPlayerGachaDrawResult {
     equipment: Object[],
     items: Record<number, number>,
     isErupt?: boolean
+    itemOverflowDispositions?: readonly import("../item-overflow").PlannedItemOverflowDisposition[]
+    playerAfter?: Readonly<{
+        freeMana: number
+        freeVmoney: number
+        expPool: number
+    }>
 }
 
 

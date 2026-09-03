@@ -6,6 +6,7 @@ import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time"
 import type { ActiveQuest } from "../../lib/quest/active-quest-service"
 import type { MultiFinishBody } from "../types"
 import type { MultiplayerSettlementResult } from "./orchestrator"
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow"
 
 export interface MultiplayerFinishResponseInput {
     readonly activeQuest: ActiveQuest
@@ -115,6 +116,14 @@ export async function projectMultiplayerFinishResponse(input: MultiplayerFinishR
         "host_finished": hostFinished,
         "aborted_play_id": null,
     }
+    const overMax = projectItemOverflowCommonResponse([
+        ...(clearReward?.itemOverflowDispositions ?? []),
+        ...(sPlusClearReward?.itemOverflowDispositions ?? []),
+        ...(scoreRewardsResult.itemOverflowDispositions ?? []),
+        ...(additionalRewardSettlement.rewardResult?.itemOverflowDispositions ?? []),
+        ...(rescueFragmentSettlement?.itemOverflowDispositions ?? []),
+    ])
+    if (overMax.length > 0) responseData.over_max = overMax
     mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)
     mergeMissionSettlementResponse(responseData, awakeMissionSettlement, viewerId)
     responseData.mail_arrived = getPlayerMailCountSync(playerId, true) > 0

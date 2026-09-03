@@ -1,6 +1,7 @@
 import {
     createRewardGrantExecutionPlan,
     snapshotRewardGrantExecutionResultForPlan,
+    collectRewardGrantItemOverflowDispositions,
     withRewardGrantExecutionPlanAsTransactionOwnerWithInventorySync,
     type RewardGrantCommand,
     type RewardGrantExecutionPlan,
@@ -80,6 +81,7 @@ function projectBoxGachaRewardResult(result: RewardGrantExecutionResult): Player
         joined_character_id_list: [],
         equipment_list: result.assets.equipment.map(entry => entry.after),
         items,
+        itemOverflowDispositions: collectRewardGrantItemOverflowDispositions(result),
     }
 }
 

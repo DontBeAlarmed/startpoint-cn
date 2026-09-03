@@ -7,6 +7,8 @@ import type {
 import type { Reward } from "../../types"
 import { getAwakeFactKeysFromRewardGrants } from "../../mission/awake-reward-facts"
 import type { FactKey } from "../../mission/facts/fact-key"
+import type { PlannedItemOverflowDisposition } from "../../item-overflow"
+import { collectRewardGrantItemOverflowDispositions } from "../../reward-grant"
 import {
     grantSingleSettlementRewardsWithinTransactionSync,
     projectSingleSettlementRewardGrant,
@@ -81,6 +83,7 @@ export function createSingleSettlementResponseState(
     }
     let degreeId = player.degreeId
     let rewardInvalidatedFactKeys: readonly FactKey[] = Object.freeze([])
+    const itemOverflowDispositions: PlannedItemOverflowDisposition[] = []
     const itemList: Record<string, number> = {}
     const observeItems = (items: Readonly<Record<string, number>> | undefined): void => {
         if (items !== undefined) Object.assign(itemList, items)
@@ -89,6 +92,7 @@ export function createSingleSettlementResponseState(
         playerState = grant.playerAfter
         const invalidated = getAwakeFactKeysFromRewardGrants(grant)
         if (invalidated.length > 0) rewardInvalidatedFactKeys = invalidated
+        itemOverflowDispositions.push(...collectRewardGrantItemOverflowDispositions(grant))
         observeItems(Object.fromEntries(grant.assets.items.map(item => [
             String(item.itemId),
             item.afterAmount,
@@ -141,6 +145,7 @@ export function createSingleSettlementResponseState(
             "initialPlayer" | "rewardPlayerState" | "degreeId">) {
             return {
                 itemList: { ...itemList },
+                itemOverflowDispositions: Object.freeze([...itemOverflowDispositions]),
                 finalPlayerProjection: buildSingleSettlementFinalPlayerProjection({
                     ...input,
                     initialPlayer: player,

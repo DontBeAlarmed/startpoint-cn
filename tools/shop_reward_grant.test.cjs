@@ -318,6 +318,11 @@ test("shop source adapter sends capped Item overflow to Mail and rolls it back w
     assert.deepEqual(getPlayerMailsSync(playerId, 1, 100, true)
         .filter(mail => mail.type === MailType.ITEM && mail.type_id === REWARD_ITEM_ID)
         .map(mail => mail.number), [2])
+    assert.deepEqual(result.rewardResult.itemOverflowDispositions, [{
+        kind: "mail",
+        itemId: REWARD_ITEM_ID,
+        overflowAmount: 2,
+    }])
 
     assert.throws(() => database.transaction(() => {
         run()
@@ -325,6 +330,46 @@ test("shop source adapter sends capped Item overflow to Mail and rolls it back w
     })(), /late shop source failure/)
     assert.equal(getPlayerMailsSync(playerId, 1, 100, true).length, 1)
     assert.equal(getPlayerItemSync(playerId, REWARD_ITEM_ID), policy.maxCount(REWARD_ITEM_ID))
+})
+
+test("shop defensive overflow sells a sellable Item without creating Item Mail", () => {
+    const playerId = createPlayer("sellable-defensive-overflow")
+    const policy = createRewardGrantItemOverflowPolicy(playerId)
+    setInventoryFixtureItemExactSync(playerId, 1, policy.maxCount(1))
+    const before = getPlayerSync(playerId)
+    const result = database.transaction(() => withDeferredInventoryBatchContextWithinTransactionSync({
+        playerId,
+        preloadItemIds: [1],
+        playerExistence: "caller-verified",
+    }, inventory => grantShopRewardsInTransactionOwnerWithInventorySync(
+        playerId,
+        [{ type: RewardType.ITEM, id: 1, count: 2 }],
+        {
+            id: playerId,
+            vmoney: before.vmoney,
+            paidMana: before.paidMana,
+            freeMana: before.freeMana,
+            freeVmoney: before.freeVmoney,
+            bondToken: before.bondToken,
+            expPool: before.expPool,
+        },
+        inventory,
+    )))()
+
+    assert.equal(result.rewardResult.items[1], policy.maxCount(1))
+    assert.equal(result.playerAfter.freeMana, before.freeMana + 10)
+    assert.deepEqual(result.rewardResult.itemOverflowDispositions, [{
+        kind: "sold",
+        itemId: 1,
+        overflowAmount: 2,
+        soldMana: 10,
+        manaBefore: before.freeMana,
+        acceptedMana: 10,
+        overflowMana: 0,
+        manaAfter: before.freeMana + 10,
+    }])
+    assert.deepEqual(getPlayerMailsSync(playerId, 1, 100, true)
+        .filter(mail => mail.type === MailType.ITEM && mail.type_id === 1), [])
 })
 
 test("owner adapter rejects another player's snapshot and rolls shared Inventory back", () => {

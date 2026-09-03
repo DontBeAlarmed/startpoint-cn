@@ -1,6 +1,7 @@
 import { getDb } from "../../data/db"
 import type { FactKey } from "./facts/fact-key"
 import type { Player } from "../../data/types"
+import type { PlannedItemOverflowDisposition } from "../item-overflow"
 import { evaluateMissionCandidates } from "./settlement-evaluate"
 import {
     prepareMissionSettlement,
@@ -25,6 +26,7 @@ export interface MissionSettlementResult {
     degreeIds: number[]
     passCardPoints: Record<string, number>
     userInfo?: Record<string, number>
+    itemOverflowDispositions?: readonly PlannedItemOverflowDisposition[]
 }
 
 export interface MissionSettlementScope {

@@ -1,5 +1,6 @@
 import {
     createRewardGrantExecutionPlan,
+    collectRewardGrantItemOverflowDispositions,
     snapshotRewardGrantExecutionResultForPlan,
     withRewardGrantExecutionPlanAsTransactionOwnerWithInventorySync,
     type RewardGrantExecutionPlan,
@@ -229,6 +230,8 @@ function projectCharacters(
         characters: [...characters.values()],
         equipment: [],
         items,
+        itemOverflowDispositions: collectRewardGrantItemOverflowDispositions(grant),
+        playerAfter: grant.playerAfter,
     }
 }
 
@@ -259,6 +262,8 @@ function projectEquipment(
         equipment: [...equipment.values()],
         items: {},
         isErupt: effects.isErupt,
+        itemOverflowDispositions: collectRewardGrantItemOverflowDispositions(grant),
+        playerAfter: grant.playerAfter,
     }
 }
 

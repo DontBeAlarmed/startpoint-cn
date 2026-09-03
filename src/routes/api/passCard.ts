@@ -14,6 +14,7 @@ import { MissionRewardGranter } from "../../lib/mission/grants"
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication"
 import { getPassCardEventDefinition, getPassCardRewardDefinition, isPassCardEventActiveAt } from "../../lib/pass-card"
 import { generateDataHeaders, getServerTime } from "../../utils"
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow"
 
 interface PassCardBody {
     viewer_id: number
@@ -166,6 +167,7 @@ export default async function passCardRoutes(fastify: FastifyInstance): Promise<
             { invalidatedFactKeys: result.invalidatedFactKeys },
             "pass-card/receive_all",
         ).characterList
+        const overMax = projectItemOverflowCommonResponse(result.itemOverflowDispositions)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.send({
@@ -181,6 +183,7 @@ export default async function passCardRoutes(fastify: FastifyInstance): Promise<
                 })),
                 ...(result.hasPlayerChanges() ? { user_info: result.getUserInfo() } : {}),
                 mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
+                ...(overMax.length > 0 ? { over_max: overMax } : {}),
             },
         })
     })

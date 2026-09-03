@@ -1,6 +1,7 @@
 import {
     createRewardGrantExecutionPlan,
     snapshotRewardGrantExecutionResultForPlan,
+    collectRewardGrantItemOverflowDispositions,
     withRewardGrantExecutionPlanAsTransactionOwnerWithInventorySync,
     type RewardGrantCommand,
     type RewardGrantExecutionPlan,
@@ -42,6 +43,7 @@ function projectShopRewardResult(result: RewardGrantExecutionResult): PlayerRewa
             String(entry.itemId),
             entry.afterAmount,
         ])),
+        itemOverflowDispositions: collectRewardGrantItemOverflowDispositions(result),
     }
 }
 

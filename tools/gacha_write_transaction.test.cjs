@@ -462,6 +462,11 @@ test("gacha duplicate compensation sends capped overflow to Mail", async () => {
     const overflowMails = getPlayerMailsSync(playerId, 1, 100, true)
         .filter(mail => mail.type_id === exBoostItemId)
     assert.deepEqual(overflowMails.map(mail => mail.number), [1])
+    assert.deepEqual(result.itemOverflowDispositions, [{
+        kind: "mail",
+        itemId: exBoostItemId,
+        overflowAmount: 1,
+    }])
 })
 
 test("gacha capped overflow rolls back with a later source failure", async () => {

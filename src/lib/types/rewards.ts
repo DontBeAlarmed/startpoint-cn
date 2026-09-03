@@ -126,6 +126,7 @@ export interface PlayerRewardResult {
     joined_character_id_list: number[]
     equipment_list: Object[]
     items: Record<string, number>
+    itemOverflowDispositions?: readonly import("../item-overflow").PlannedItemOverflowDisposition[]
 }
 
 

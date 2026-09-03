@@ -9,6 +9,7 @@ const {
     RewardGrantContractValidationError,
     createRewardGrantExecutionPlan,
     createRewardGrantExecutionResult,
+    collectRewardGrantItemOverflowDispositions,
     rewardGrantFingerprint,
     snapshotRewardGrantExecutionResultForPlan,
 } = require("../src/lib/reward-grant")
@@ -161,6 +162,32 @@ test("typed result preserves entry outcomes and aggregates final assets in first
     assertDeepFrozen(result)
     assert.throws(() => { result.entries[0].index = 9 }, TypeError)
     assert.throws(() => { result.assets.characters[0].after.bond_token_list[0].status = 2 }, TypeError)
+})
+
+test("collects direct and Character compensation dispositions in execution order", () => {
+    const plan = createRewardGrantExecutionPlan([
+        { type: RewardType.ITEM, id: 101, count: 2 },
+        { type: RewardType.CHARACTER, id: 201 },
+    ])
+    const result = createRewardGrantExecutionResult(70, plan, [
+        { kind: "item", item: item(101, 2, 1, 1, 0, [{
+            kind: "mail", itemId: 101, overflowAmount: 1,
+        }]) },
+        {
+            kind: "character",
+            characterId: 201,
+            isNew: false,
+            after: { character_id: 201, stack: 1 },
+            compensationItem: item(102, 1, 0, 1, 0, [{
+                kind: "mail", itemId: 102, overflowAmount: 1,
+            }]),
+        },
+    ], { playerId: 70, freeMana: 0, freeVmoney: 0, expPool: 0 })
+
+    assert.deepEqual(collectRewardGrantItemOverflowDispositions(result), [
+        { kind: "mail", itemId: 101, overflowAmount: 1 },
+        { kind: "mail", itemId: 102, overflowAmount: 1 },
+    ])
 })
 
 test("direct Item and character compensation share one continuous final Item result", () => {

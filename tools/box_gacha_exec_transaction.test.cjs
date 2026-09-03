@@ -24,7 +24,7 @@ const tableOverrides = {
         [BOX_GACHA_ID]: {
             itemId: CURRENCY_ITEM_ID,
             count: 10,
-            availableCounts: { 1: 10, 2: 10, 3: 10, 4: 1 },
+            availableCounts: { 1: 10, 2: 10, 3: 10, 4: 1, 5: 1 },
         },
     },
     "box_reward.json": {
@@ -40,6 +40,9 @@ const tableOverrides = {
             },
             4: {
                 99001004: { type: 5, count: 1, available: 1, tier: 2, id: REWARD_CHARACTER_ID },
+            },
+            5: {
+                99001005: { type: 0, count: 105, available: 1, tier: 2, id: 1 },
             },
         },
     },
@@ -70,6 +73,14 @@ const tableOverrides = {
                 closeKind: 1,
             },
             4: {
+                requiredBoxId: null,
+                resetKind: 0,
+                resetLimit: null,
+                availableFrom: "2010-01-01 00:00:00",
+                availableUntil: "2199-12-31 23:59:59",
+                closeKind: 1,
+            },
+            5: {
                 requiredBoxId: null,
                 resetKind: 0,
                 resetLimit: null,
@@ -327,6 +338,29 @@ test("box direct Item and duplicate compensation both overflow through the sourc
     const overflowMails = getPlayerMailsSync(playerId, 1, 100, true)
         .filter(mail => mail.type === MailType.ITEM && mail.type_id === itemId)
     assert.deepEqual(overflowMails.map(mail => mail.number).sort((a, b) => a - b), [1, 2])
+})
+
+test("box gacha sells only the Item remainder and publishes the Sold Toast", async () => {
+    const { playerId, viewerId } = await createPlayer("box-sellable-partial-overflow")
+    setInventoryFixtureItemExactSync(playerId, 1, 9895)
+    const before = getPlayerSync(playerId)
+
+    const response = await execBox(viewerId, 5, 1, false)
+
+    assert.equal(response.statusCode, 200, response.body)
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
+    assert.equal(getPlayerItemSync(playerId, 1), 9999)
+    assert.equal(getPlayerSync(playerId).freeMana, before.freeMana + 5)
+    assert.equal(getPlayerCollectedItemTotalSync(playerId, 1), 104)
+    assert.deepEqual(getPlayerMailsSync(playerId, 1, 100, true)
+        .filter(mail => mail.type === MailType.ITEM && mail.type_id === 1), [])
+    assert.deepEqual(payload.data.over_max, [{
+        process_type: 2,
+        amount_sold: 5,
+        item: { item_id: 1, number: 1 },
+    }])
+    assert.equal(payload.data.item_list[1], 9999)
+    assert.equal(payload.data.user_info.free_mana, before.freeMana + 5)
 })
 
 test("box capped overflow rolls back with a later source failure", async () => {

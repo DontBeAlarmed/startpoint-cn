@@ -115,6 +115,9 @@ export function settleMissionEvaluationWithInvalidations(
             equipmentList: granter.equipmentList,
             degreeIds: granter.degreeList,
             passCardPoints: granter.passCardPoints,
+            ...(granter.itemOverflowDispositions.length > 0
+                ? { itemOverflowDispositions: granter.itemOverflowDispositions }
+                : {}),
             ...(granter.hasPlayerChanges() ? { userInfo: granter.getUserInfo() } : {}),
         },
         invalidatedFactKeys: granter.invalidatedFactKeys,

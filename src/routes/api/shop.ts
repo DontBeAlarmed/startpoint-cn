@@ -40,6 +40,7 @@ import {
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { settleMissionOperationFactsSync } from "../../lib/mission/operation-fact-settlement";
 import { mergeMissionSettlementResponse } from "../../lib/mission/response";
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow";
 import type { MissionSettlementResult } from "../../lib/mission/settlement";
 import {
     isShopItemVisibleForCampaign,
@@ -424,6 +425,10 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
             "degree_list": [],
             "mail_arrived": getMailArrivedSync(playerId)
         }
+        const overMax = projectItemOverflowCommonResponse(
+            rewardResult.itemOverflowDispositions ?? [],
+        )
+        if (overMax.length > 0) responseData.over_max = overMax
         if (missionSettlement) {
             mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)
         }
@@ -721,6 +726,9 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
             "shop/bulk-buy",
             getVirtualNow(),
         ).characterList
+        const overMax = projectItemOverflowCommonResponse(
+            rewardResult.itemOverflowDispositions ?? [],
+        )
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
@@ -737,6 +745,7 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
                 "equipment_list": rewardResult.equipment_list,
                 "item_list": purchaseResult.itemList,
                 "mail_arrived": getMailArrivedSync(playerId),
+                ...(overMax.length > 0 ? { "over_max": overMax } : {}),
             }
         })
     })

@@ -27,6 +27,7 @@ import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
 import { withDeferredInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow";
 
 interface ExecBody {
     api_count: number,
@@ -463,6 +464,9 @@ const routes = async (fastify: FastifyInstance) => {
             })
         }
         deferredCharacterSampledLog?.()
+        const overMax = projectItemOverflowCommonResponse(
+            rewardResult.itemOverflowDispositions ?? [],
+        )
 
         reply.header("content-type", "application/x-msgpack")
         if (isCharacterGacha) {
@@ -488,7 +492,10 @@ const routes = async (fastify: FastifyInstance) => {
                 "data": {
                     "user_info": {
                         "free_vmoney": playerFreeVmoney,
-                        "vmoney": playerPaidVmoney
+                        "vmoney": playerPaidVmoney,
+                        ...(rewardResult.playerAfter === undefined
+                            ? {}
+                            : { "free_mana": rewardResult.playerAfter.freeMana }),
                     },
                     "draw": rewardResult.draw,
                     "character_list": characterList,
@@ -506,7 +513,8 @@ const routes = async (fastify: FastifyInstance) => {
                         }
                     ],
                     "encyclopedia_info": [],
-                    "mail_arrived": getMailArrivedSync(playerId)
+                    "mail_arrived": getMailArrivedSync(playerId),
+                    ...(overMax.length > 0 ? { "over_max": overMax } : {})
                 }
             })
         } else {
@@ -517,7 +525,10 @@ const routes = async (fastify: FastifyInstance) => {
                 "data": {
                     "user_info": {
                         "free_vmoney": playerFreeVmoney,
-                        "vmoney": playerPaidVmoney
+                        "vmoney": playerPaidVmoney,
+                        ...(rewardResult.playerAfter === undefined
+                            ? {}
+                            : { "free_mana": rewardResult.playerAfter.freeMana }),
                     },
                     "is_erupt": rewardResult.isErupt ?? false,
                     "draw_equipment": rewardResult.draw,
@@ -535,7 +546,8 @@ const routes = async (fastify: FastifyInstance) => {
                         }
                     ],
                     "encyclopedia_info": [],
-                    "mail_arrived": getMailArrivedSync(playerId)
+                    "mail_arrived": getMailArrivedSync(playerId),
+                    ...(overMax.length > 0 ? { "over_max": overMax } : {})
                 }
             })
         }

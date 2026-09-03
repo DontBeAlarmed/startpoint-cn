@@ -1,11 +1,13 @@
 import { getPlayerSync } from "../../data/domains/player"
 import {
     createRewardGrantExecutionPlan,
+    collectRewardGrantItemOverflowDispositions,
     executeRewardGrantExecutionPlanAsTransactionOwnerSync,
     type RewardGrantCommand,
     type RewardGrantExecutionPlan,
     type RewardGrantExecutionResult,
 } from "../../lib/reward-grant"
+import { createRewardGrantItemOverflowPolicy } from "../../lib/reward-grant-item-overflow"
 import { getAwakeFactKeysFromRewardGrants } from "../../lib/mission/awake-reward-facts"
 import type { FactKey } from "../../lib/mission/facts/fact-key"
 import {
@@ -38,14 +40,15 @@ function projectMultiRewardGrant(grant: RewardGrantExecutionResult): PlayerRewar
     const result = emptyRewardResult()
     const characters = new Map<number, Object>()
     const equipment = new Map<number, Object>()
+    for (const currency of grant.assets.currencies) {
+        const field = currency.currency === "freeMana"
+            ? "free_mana"
+            : currency.currency === "freeVmoney" ? "free_vmoney" : "exp_pool"
+        result.user_info[field] = currency.requestedAmount
+    }
     for (const entry of grant.entries) {
         const outcome = entry.outcome
-        if (outcome.kind === "currency") {
-            const field = outcome.currency === "freeMana"
-                ? "free_mana"
-                : outcome.currency === "freeVmoney" ? "free_vmoney" : "exp_pool"
-            result.user_info[field] += outcome.requestedAmount
-        } else if (outcome.kind === "item") {
+        if (outcome.kind === "item") {
             result.items[outcome.item.itemId]
                 = (result.items[outcome.item.itemId] ?? 0) + outcome.item.afterAmount
         } else if (outcome.kind === "character") {
@@ -55,12 +58,13 @@ function projectMultiRewardGrant(grant: RewardGrantExecutionResult): PlayerRewar
                 result.items[compensation.itemId]
                     = (result.items[compensation.itemId] ?? 0) + compensation.acceptedAmount
             }
-        } else {
+        } else if (outcome.kind === "equipment") {
             equipment.set(outcome.equipmentId, outcome.after)
         }
     }
     result.character_list = [...characters.values()]
     result.equipment_list = [...equipment.values()]
+    result.itemOverflowDispositions = collectRewardGrantItemOverflowDispositions(grant)
     return result
 }
 
@@ -88,6 +92,7 @@ export class MultiSettlementRewardGranter {
                 freeVmoney: player.freeVmoney,
                 expPool: player.expPool,
             },
+            { itemOverflow: createRewardGrantItemOverflowPolicy(this.playerId) },
         )
         if (getAwakeFactKeysFromRewardGrants(grant).length > 0) {
             this.playerFactInvalidated = true
@@ -125,6 +130,9 @@ export class MultiSettlementRewardGranter {
         const result = grant === null
             ? { drop_score_reward_ids: [], drop_rare_reward_ids: [], ...emptyRewardResult() }
             : projectGrantedScoreRewardSettlementResult(selection, grant)
+        if (grant !== null) {
+            result.itemOverflowDispositions = collectRewardGrantItemOverflowDispositions(grant)
+        }
         recordScoreRewardSettlement(this.playerId, selection, result)
         return result
     }

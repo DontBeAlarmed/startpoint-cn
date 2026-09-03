@@ -21,6 +21,7 @@ import { BoxGachaBoxes, PlayerRewardResult } from "../../lib/types";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time";
 import type { FactKey } from "../../lib/mission/facts/fact-key"
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow"
 
 interface GetBoxListBody {
     box_gacha_id: number
@@ -460,6 +461,9 @@ const routes = async (fastify: FastifyInstance) => {
             },
             "box-gacha/exec",
         ).characterList
+        const overMax = projectItemOverflowCommonResponse(
+            settlement.rewardResult?.itemOverflowDispositions ?? [],
+        )
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -486,7 +490,8 @@ const routes = async (fastify: FastifyInstance) => {
                     [pullCurrencyId]: settlement.newPullCurrency,
                     ...(settlement.rewardResult?.items ?? {})
                 },
-                "mail_arrived": getMailArrivedSync(playerId)
+                "mail_arrived": getMailArrivedSync(playerId),
+                ...(overMax.length > 0 ? { "over_max": overMax } : {})
             }
         })
     })

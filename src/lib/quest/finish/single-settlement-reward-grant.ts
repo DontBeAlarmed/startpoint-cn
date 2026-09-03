@@ -1,5 +1,6 @@
 import {
     createRewardGrantExecutionPlan,
+    collectRewardGrantItemOverflowDispositions,
     executeRewardGrantExecutionPlanAsTransactionOwnerSync,
     type RewardGrantExecutionOptions,
     type RewardGrantExecutionPlan,
@@ -43,6 +44,7 @@ export function projectSingleSettlementRewardGrant(
             String(entry.itemId),
             entry.afterAmount,
         ])),
+        itemOverflowDispositions: collectRewardGrantItemOverflowDispositions(grant),
     }
 }
 

@@ -1,4 +1,5 @@
 import type { MissionSettlementResult } from "./settlement"
+import { projectItemOverflowCommonResponse } from "../item-overflow"
 
 type ResponseRecord = Record<string, any>
 
@@ -70,6 +71,10 @@ export function mergeMissionSettlementResponse(
     }
     if (settlement.userInfo) {
         data.user_info = { ...(data.user_info ?? {}), ...settlement.userInfo }
+    }
+    const overMax = projectItemOverflowCommonResponse(settlement.itemOverflowDispositions ?? [])
+    if (overMax.length > 0) {
+        data.over_max = [...(data.over_max ?? []), ...overMax]
     }
 
     const degreeById = new Map<number, ResponseRecord>()

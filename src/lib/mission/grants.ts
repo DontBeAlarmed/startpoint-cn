@@ -8,6 +8,7 @@ import { getFactKeyId, normalizeFactKey, type FactKey } from "./facts/fact-key"
 import { RewardType } from "../types/rewards"
 import {
     assertRewardGrantExecutionTransactionOwnerSync,
+    collectRewardGrantItemOverflowDispositions,
     createRewardGrantExecutionPlan,
     executeRewardGrantExecutionPlanAsTransactionOwnerSync,
     snapshotRewardGrantExecutionResultForPlan,
@@ -16,6 +17,7 @@ import {
     type RewardGrantExecutionResult,
     type RewardGrantKnownPlayerState,
 } from "../reward-grant"
+import type { PlannedItemOverflowDisposition } from "../item-overflow"
 
 type MissionRewardPlayer = Pick<
     Player,
@@ -44,6 +46,7 @@ export class MissionRewardGranter {
     private readonly invalidatedFacts = new Map<string, FactKey>()
     private standardRewardGranted = false
     private readonly pendingStandardEntries: RewardGrantCommand[] = []
+    private readonly itemOverflowDispositionList: PlannedItemOverflowDisposition[] = []
     private standardRewardGrant: NonNullable<MissionRewardGrantContext["standardRewardGrant"]>
     private standardRewardGrantRequiresTransaction = true
 
@@ -172,6 +175,7 @@ export class MissionRewardGranter {
         )
         this.pendingStandardEntries.length = 0
         this.standardRewardGranted = true
+        this.itemOverflowDispositionList.push(...collectRewardGrantItemOverflowDispositions(grant))
         this.freeMana = grant.playerAfter.freeMana
         this.freeVmoney = grant.playerAfter.freeVmoney
         this.expPool = grant.playerAfter.expPool
@@ -277,5 +281,9 @@ export class MissionRewardGranter {
 
     get equipmentList(): Object[] {
         return [...this.equipmentMap.values()]
+    }
+
+    get itemOverflowDispositions(): readonly PlannedItemOverflowDisposition[] {
+        return Object.freeze([...this.itemOverflowDispositionList])
     }
 }

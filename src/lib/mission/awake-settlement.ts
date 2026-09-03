@@ -25,6 +25,7 @@ import type {
     PreparedMissionSettlement,
 } from "./settlement"
 import type { FactKey } from "./facts/fact-key"
+import type { PlannedItemOverflowDisposition } from "../item-overflow"
 import type { MissionSettlementRewardDependencies } from "./settlement-write"
 
 export interface AwakeMissionComputedProgress {
@@ -46,6 +47,7 @@ export interface AwakeMissionSettlementResult {
     degreeIds: number[]
     passCardPoints: Record<string, number>
     userInfo?: Record<string, number>
+    itemOverflowDispositions?: readonly PlannedItemOverflowDisposition[]
 }
 
 export interface AwakeMissionSettlementEvaluation {
@@ -225,6 +227,9 @@ export function settleAwakeMissionRewards(
             equipmentList: granter.equipmentList,
             degreeIds: granter.degreeList,
             passCardPoints: {},
+            ...(granter.itemOverflowDispositions.length > 0
+                ? { itemOverflowDispositions: granter.itemOverflowDispositions }
+                : {}),
             ...(granter.hasPlayerChanges() ? { userInfo: granter.getUserInfo() } : {}),
         }
     })()
