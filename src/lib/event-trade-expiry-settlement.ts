@@ -11,6 +11,7 @@ import {
     type EventTradeExpiryEntry,
 } from "./inventory/event-trade-expiry-plan"
 import { planManaCapacity } from "./inventory/mana-capacity-plan"
+import { insertManaOverflowMailsWithinTransactionSync } from "./mail-overflow"
 
 interface EventTradeExpirySettlementInput {
     readonly playerId: number
@@ -30,16 +31,11 @@ export type EventTradeExpirySettlementResult =
         readonly status: "none"
     }
     | {
-        readonly status: "deferred"
-        readonly entries: readonly EventTradeExpiryEntry[]
-        readonly totalMana: number
-        readonly overflowMana: number
-    }
-    | {
         readonly status: "converted"
         readonly entries: readonly EventTradeExpiryEntry[]
         readonly totalMana: number
         readonly acceptedMana: number
+        readonly overflowMana?: number
     }
 
 function requirePlayerId(value: number): void {
@@ -63,19 +59,6 @@ function addSafe(left: number, right: number, field: string): number {
     return result
 }
 
-function deferredResult(
-    entries: readonly EventTradeExpiryEntry[],
-    totalMana: number,
-    overflowMana: number,
-): EventTradeExpirySettlementResult {
-    return Object.freeze({
-        status: "deferred" as const,
-        entries,
-        totalMana,
-        overflowMana,
-    })
-}
-
 export function settleEventTradeExpiryOnLoadSync(
     input: EventTradeExpirySettlementInput,
 ): EventTradeExpirySettlementResult {
@@ -96,20 +79,6 @@ export function settleEventTradeExpiryOnLoadSync(
     )
     if (expiryPlan.entries.length === 0) return { status: "none" }
 
-    const initialCapacity = planManaCapacity({
-        freeMana: input.player.freeMana,
-        paidMana: input.player.paidMana,
-        maxMana: input.maxMana,
-        requestedMana: expiryPlan.totalMana,
-    })
-    if (initialCapacity.overflowMana > 0) {
-        return deferredResult(
-            expiryPlan.entries,
-            expiryPlan.totalMana,
-            initialCapacity.overflowMana,
-        )
-    }
-
     return getDb().transaction(() => {
         const currentPlayer = getPlayerSync(input.playerId)
         if (currentPlayer === null) {
@@ -121,14 +90,6 @@ export function settleEventTradeExpiryOnLoadSync(
             maxMana: input.maxMana,
             requestedMana: expiryPlan.totalMana,
         })
-        if (capacity.overflowMana > 0) {
-            return deferredResult(
-                expiryPlan.entries,
-                expiryPlan.totalMana,
-                capacity.overflowMana,
-            )
-        }
-
         const currentTotalManaObtained = requireSafeAmount(
             currentPlayer.totalManaObtained ?? 0,
             "totalManaObtained",
@@ -150,11 +111,24 @@ export function settleEventTradeExpiryOnLoadSync(
             freeMana: currentPlayer.freeMana + capacity.acceptedMana,
             totalManaObtained: nextTotalManaObtained,
         })
+        if (capacity.overflowMana > 0) {
+            const maxAttachmentNumber = Math.max(
+                1,
+                Math.min(input.maxMana, 2_147_483_647),
+            )
+            insertManaOverflowMailsWithinTransactionSync(
+                input.playerId,
+                capacity.overflowMana,
+                maxAttachmentNumber,
+                new Date(input.nowMs),
+            )
+        }
         return Object.freeze({
             status: "converted" as const,
             entries: expiryPlan.entries,
             totalMana: expiryPlan.totalMana,
             acceptedMana: capacity.acceptedMana,
+            ...(capacity.overflowMana > 0 ? { overflowMana: capacity.overflowMana } : {}),
         })
     })()
 }

@@ -81,6 +81,7 @@ const { closeDatabase, initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerItemSync } = require("../src/data/domains/item")
+const { getPlayerMailsSync, MailType } = require("../src/data/domains/mail")
 const { insertDefaultPlayerSync, getPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { setPlayerItemForMaintenanceSync } = require("../src/data/domains/item-maintenance")
 const { getTimeOffset, setServerTime, setServerTimeOffset } = require("../src/utils")
@@ -226,7 +227,7 @@ test("load converts expired EventTrade items atomically and exposes committed po
     }
 })
 
-test("load defers the whole expired batch when paid plus free Mana has no capacity", async () => {
+test("load moves expired EventTrade Mana overflow into Mail when Mana is full", async () => {
     const app = await buildLoadApp()
     try {
         setServerTime(beforeExpiry)
@@ -236,21 +237,28 @@ test("load defers the whole expired batch when paid plus free Mana has no capaci
         setEventItems(playerId, { [EVENT_ITEM_A]: 2, [EVENT_ITEM_B]: 1 })
         setServerTime(afterExpiry)
 
-        const deferred = await load(app)
-        assert.equal(deferred.response.statusCode, 200, deferred.response.body)
-        assert.equal(getPlayerItemSync(playerId, EVENT_ITEM_A), 2)
-        assert.equal(getPlayerItemSync(playerId, EVENT_ITEM_B), 1)
-        const unchanged = getPlayerSync(playerId)
-        assert.ok(unchanged)
-        assert.equal(unchanged.freeMana, 90)
-        assert.equal(unchanged.paidMana, 10)
+        const converted = await load(app)
+        assert.equal(converted.response.statusCode, 200, converted.response.body)
+        assert.equal(getPlayerItemSync(playerId, EVENT_ITEM_A), 0)
+        assert.equal(getPlayerItemSync(playerId, EVENT_ITEM_B), 0)
+        const convertedPlayer = getPlayerSync(playerId)
+        assert.ok(convertedPlayer)
+        assert.equal(convertedPlayer.freeMana, 90)
+        assert.equal(convertedPlayer.paidMana, 10)
+        assert.equal(convertedPlayer.totalManaObtained, 0)
+        assert.deepEqual(getPlayerMailsSync(playerId, 1, 100, true).map(mail => ({
+            type: mail.type,
+            type_id: mail.type_id,
+            number: mail.number,
+        })), [{ type: MailType.FREE_MANA, type_id: null, number: 7 }])
 
         updatePlayerSync({ id: playerId, freeMana: 80 })
         const retried = await load(app)
         assert.equal(retried.response.statusCode, 200, retried.response.body)
         assert.equal(getPlayerItemSync(playerId, EVENT_ITEM_A), 0)
         assert.equal(getPlayerItemSync(playerId, EVENT_ITEM_B), 0)
-        assert.equal(getPlayerSync(playerId).freeMana, 87)
+        assert.equal(getPlayerSync(playerId).freeMana, 80)
+        assert.equal(getPlayerSync(playerId).totalManaObtained, 0)
     } finally {
         await app.close()
     }

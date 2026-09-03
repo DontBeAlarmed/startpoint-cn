@@ -14,10 +14,11 @@ process.env.WDFP_DATABASE_DIR = databaseDirectory
 const BetterSqlite3 = require("better-sqlite3")
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { getPlayerMailSync, MailType } = require("../src/data/domains/mail")
+const { getPlayerMailCountSync, getPlayerMailSync, MailType } = require("../src/data/domains/mail")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const {
     insertItemOverflowMailWithinTransactionSync,
+    insertManaOverflowMailsWithinTransactionSync,
     insertManaOverflowMailWithinTransactionSync,
     MailOverflowValidationError,
 } = require("../src/lib/mail-overflow")
@@ -60,13 +61,23 @@ assert.equal(result.mana.number, 17)
 assert.equal(getPlayerMailSync(playerId, result.item.mailId, true).number, 9)
 assert.equal(getPlayerMailSync(playerId, result.mana.mailId, true).number, 17)
 
+const splitMails = database.transaction(() => insertManaOverflowMailsWithinTransactionSync(
+    playerId,
+    7,
+    3,
+    now,
+))()
+assert.deepEqual(splitMails.map(mail => mail.number), [3, 3, 1])
+assert.deepEqual(splitMails.map(mail => getPlayerMailSync(playerId, mail.mailId, true).number), [3, 3, 1])
+
+const mailCountBeforeRollback = getPlayerMailCountSync(playerId, true)
 assert.throws(() => {
     database.transaction(() => {
         insertManaOverflowMailWithinTransactionSync(playerId, 3, now)
         throw new Error("rollback")
     })()
 }, /rollback/)
-assert.equal(getPlayerMailSync(playerId, result.mana.mailId + 1, true), null)
+assert.equal(getPlayerMailCountSync(playerId, true), mailCountBeforeRollback)
 
 database.close()
 if (previousDatabaseDirectory === undefined) delete process.env.WDFP_DATABASE_DIR

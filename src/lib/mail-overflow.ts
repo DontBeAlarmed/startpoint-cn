@@ -100,6 +100,26 @@ function insertOverflowMail(
     })
 }
 
+function insertOverflowMails(
+    playerId: number,
+    type: MailType.ITEM | MailType.FREE_MANA,
+    typeId: number | null,
+    amount: number,
+    maxAttachmentNumber: number,
+    now: Date,
+): readonly OverflowMailResult[] {
+    const normalizedAmount = positiveInteger(amount, "amount")
+    const chunkSize = attachmentNumber(maxAttachmentNumber)
+    const result: OverflowMailResult[] = []
+    let remaining = normalizedAmount
+    while (remaining > 0) {
+        const chunk = Math.min(remaining, chunkSize)
+        result.push(insertOverflowMail(playerId, type, typeId, chunk, now))
+        remaining -= chunk
+    }
+    return Object.freeze(result)
+}
+
 export function insertItemOverflowMailWithinTransactionSync(
     playerId: number,
     itemId: number,
@@ -115,4 +135,37 @@ export function insertManaOverflowMailWithinTransactionSync(
     now: Date = getVirtualNow(),
 ): OverflowMailResult {
     return insertOverflowMail(playerId, MailType.FREE_MANA, null, number, now)
+}
+
+export function insertItemOverflowMailsWithinTransactionSync(
+    playerId: number,
+    itemId: number,
+    number: number,
+    maxAttachmentNumber: number,
+    now: Date = getVirtualNow(),
+): readonly OverflowMailResult[] {
+    return insertOverflowMails(
+        playerId,
+        MailType.ITEM,
+        positiveInteger(itemId, "itemId"),
+        number,
+        maxAttachmentNumber,
+        now,
+    )
+}
+
+export function insertManaOverflowMailsWithinTransactionSync(
+    playerId: number,
+    number: number,
+    maxAttachmentNumber: number,
+    now: Date = getVirtualNow(),
+): readonly OverflowMailResult[] {
+    return insertOverflowMails(
+        playerId,
+        MailType.FREE_MANA,
+        null,
+        number,
+        maxAttachmentNumber,
+        now,
+    )
 }
