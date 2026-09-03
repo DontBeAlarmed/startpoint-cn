@@ -391,6 +391,10 @@ const SOURCE_RULES = [
         groups: ["integration:database"],
     },
     {
+        pattern: /^(?:src\/lib\/mail-overflow\.ts|tools\/mail_overflow\.test\.cjs)$/,
+        groups: ["integration:database"],
+    },
+    {
         pattern: /^src\/routes\/api\/gacha\.ts$/,
         groups: ["integration:reward-grant", "integration:rules", "quick:gacha"],
     },

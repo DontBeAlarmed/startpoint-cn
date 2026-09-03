@@ -374,6 +374,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/inventory_owner_structure.test.cjs",
             "tools/perf/item_inventory_expiry_admission.test.cjs",
             "tools/load_event_trade_expiry.test.cjs",
+            "tools/mail_overflow.test.cjs",
             "tools/mail_receive_transaction.test.cjs",
             "tools/mission_category_batch_read.test.cjs",
             "tools/player_history_profile_route.test.cjs",
