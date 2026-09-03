@@ -399,6 +399,10 @@ const SOURCE_RULES = [
         groups: ["integration:database"],
     },
     {
+        pattern: /^tools\/reward_grant_overflow\.test\.cjs$/,
+        groups: ["integration:reward-grant"],
+    },
+    {
         pattern: /^src\/routes\/api\/gacha\.ts$/,
         groups: ["integration:reward-grant", "integration:rules", "quick:gacha"],
     },

@@ -20,6 +20,7 @@ import {
     type RewardGrantEntryOutcome,
     type RewardGrantExecutionPlan,
     type RewardGrantExecutionResult,
+    type RewardGrantExecutionOptions,
     type RewardGrantItemOutcome,
     type RewardGrantKnownPlayerState,
     type RewardGrantObjectSnapshot,
@@ -43,24 +44,42 @@ export interface PreparedRewardGrantExecution {
     readonly result: RewardGrantExecutionResult
     readonly inventoryCheckpoint: InventoryBatchCheckpoint
     persistPlayerResources(): void
+    writeItemOverflows(): void
 }
 
 function grantItem(
     inventory: InventoryBatchContext,
     itemId: number,
     requestedAmount: number,
+    options: RewardGrantExecutionOptions,
+    pendingItemOverflows: Array<{ itemId: number, amount: number }>,
 ): RewardGrantItemOutcome {
-    const mutation = inventory.grant(itemId, requestedAmount)
-    const beforeAmount = mutation.afterAmount - requestedAmount
-    if (!Number.isSafeInteger(beforeAmount) || beforeAmount < 0) {
-        throw new RewardGrantAssetExecutionError(-1, `invalid Item ${itemId} after-state`)
+    if (options.itemOverflow === undefined) {
+        const mutation = inventory.grant(itemId, requestedAmount)
+        const beforeAmount = mutation.afterAmount - requestedAmount
+        if (!Number.isSafeInteger(beforeAmount) || beforeAmount < 0) {
+            throw new RewardGrantAssetExecutionError(-1, `invalid Item ${itemId} after-state`)
+        }
+        return Object.freeze({
+            itemId,
+            requestedAmount,
+            acceptedAmount: requestedAmount,
+            overflowAmount: 0,
+            beforeAmount,
+            afterAmount: mutation.afterAmount,
+        })
+    }
+    const maxCount = options.itemOverflow.maxCount(itemId)
+    const mutation = inventory.grantWithCapacity(itemId, requestedAmount, maxCount)
+    if (mutation.overflowAmount > 0) {
+        pendingItemOverflows.push({ itemId, amount: mutation.overflowAmount })
     }
     return Object.freeze({
         itemId,
         requestedAmount,
-        acceptedAmount: requestedAmount,
-        overflowAmount: 0,
-        beforeAmount,
+        acceptedAmount: mutation.acceptedAmount,
+        overflowAmount: mutation.overflowAmount,
+        beforeAmount: mutation.beforeAmount,
         afterAmount: mutation.afterAmount,
     })
 }
@@ -80,12 +99,17 @@ function executeEntry(
     entryIndex: number,
     inventory: InventoryBatchContext,
     resources: MutablePlayerResourceGrantState,
+    options: RewardGrantExecutionOptions,
+    pendingItemOverflows: Array<{ itemId: number, amount: number }>,
 ): RewardGrantEntryOutcome {
     switch (reward.type) {
         case RewardType.ITEM:
         case RewardType.ELEMENT:
         case RewardType.AETHER:
-            return { kind: "item", item: grantItem(inventory, reward.id, reward.count) }
+            return {
+                kind: "item",
+                item: grantItem(inventory, reward.id, reward.count, options, pendingItemOverflows),
+            }
         case RewardType.EQUIPMENT:
             return {
                 kind: "equipment",
@@ -109,7 +133,9 @@ function executeEntry(
                             "Character produced more than one compensation Item",
                         )
                     }
-                    compensationItems.push(grantItem(inventory, itemId, amount))
+                    compensationItems.push(
+                        grantItem(inventory, itemId, amount, options, pendingItemOverflows),
+                    )
                 },
             )
             if (granted === null) {
@@ -155,17 +181,21 @@ export function prepareRewardGrantExecution(
     rawPlan: RewardGrantExecutionPlan,
     knownPlayerBefore: RewardGrantKnownPlayerState,
     inventory: InventoryBatchContext,
+    options: RewardGrantExecutionOptions = {},
 ): PreparedRewardGrantExecution {
     const plan = normalizeRewardGrantExecutionPlan(rawPlan)
     const known = normalizeRewardGrantKnownPlayerState(playerId, knownPlayerBefore)
     const resourceBefore: PlayerResourceGrantState = known
     const resources = createPlayerResourceGrantState(resourceBefore)
+    const pendingItemOverflows: Array<{ itemId: number, amount: number }> = []
     const outcomes = plan.entries.map((reward, entryIndex) => executeEntry(
         playerId,
         reward,
         entryIndex,
         inventory,
         resources,
+        options,
+        pendingItemOverflows,
     ))
     const resourceAfter = snapshotPlayerResourceGrantState(resources)
     const result = createRewardGrantExecutionResult(
@@ -186,6 +216,11 @@ export function prepareRewardGrantExecution(
             }
             persistPlayerResourceGrantsWithinTransactionSync(resourceBefore, resourceAfter)
             persisted = true
+        },
+        writeItemOverflows() {
+            for (const overflow of pendingItemOverflows) {
+                options.itemOverflow?.writeOverflow(overflow.itemId, overflow.amount)
+            }
         },
     })
 }

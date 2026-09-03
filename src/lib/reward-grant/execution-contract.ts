@@ -32,6 +32,16 @@ export interface RewardGrantExecutionPlan {
     readonly entries: readonly RewardGrantCommand[]
 }
 
+export interface RewardGrantItemOverflowPolicy {
+    readonly playerId: number
+    readonly maxCount: (itemId: number) => number
+    readonly writeOverflow: (itemId: number, amount: number) => void
+}
+
+export interface RewardGrantExecutionOptions {
+    readonly itemOverflow?: RewardGrantItemOverflowPolicy
+}
+
 export interface RewardGrantKnownPlayerState {
     readonly playerId: number
     readonly freeMana: number

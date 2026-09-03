@@ -8,6 +8,7 @@ import {
 import { RewardType } from "../types/rewards"
 import {
     type RewardGrantExecutionPlan,
+    type RewardGrantExecutionOptions,
     type RewardGrantExecutionResult,
     type RewardGrantKnownPlayerState,
 } from "./execution-contract"
@@ -25,6 +26,7 @@ export type RewardGrantExecutionTransactionReason =
     | "FINALIZATION_REQUIRED"
     | "ALREADY_FINALIZED"
     | "INVENTORY_PLAYER_MISMATCH"
+    | "ITEM_OVERFLOW_PLAYER_MISMATCH"
     | "INVENTORY_CHANGED_AFTER_GRANT"
 
 export class RewardGrantExecutionTransactionError extends Error {
@@ -85,20 +87,31 @@ function finalizeOwnedExecution(
     }
     inventory.flush()
     prepared.persistPlayerResources()
+    prepared.writeItemOverflows()
     return prepared.result
+}
+
+function validateExecutionOptions(
+    playerId: number,
+    options: RewardGrantExecutionOptions,
+): void {
+    if (options.itemOverflow !== undefined && options.itemOverflow.playerId !== playerId) {
+        throw new RewardGrantExecutionTransactionError("ITEM_OVERFLOW_PLAYER_MISMATCH")
+    }
 }
 
 function executeWithOwnedInventory(
     playerId: number,
     plan: RewardGrantExecutionPlan,
     knownPlayerBefore: RewardGrantKnownPlayerState,
+    options: RewardGrantExecutionOptions,
 ): RewardGrantExecutionResult {
     return withDeferredInventoryBatchContextWithinTransactionSync({
         playerId,
         preloadItemIds: directItemIds(plan),
         playerExistence: "caller-verified",
     }, inventory => finalizeOwnedExecution(
-        prepareRewardGrantExecution(playerId, plan, knownPlayerBefore, inventory),
+        prepareRewardGrantExecution(playerId, plan, knownPlayerBefore, inventory, options),
         inventory,
     ))
 }
@@ -106,32 +119,38 @@ function executeWithOwnedInventory(
 export function executeRewardGrantExecutionPlanSync(
     playerId: number,
     rawPlan: RewardGrantExecutionPlan,
+    options: RewardGrantExecutionOptions = {},
 ): RewardGrantExecutionResult {
     const db = getDb()
     if (db.inTransaction) {
         throw new RewardGrantExecutionTransactionError("ACTIVE_TRANSACTION_NOT_ALLOWED")
     }
     const plan = normalizeRewardGrantExecutionPlan(rawPlan)
+    validateExecutionOptions(playerId, options)
     return db.transaction(() => executeWithOwnedInventory(
         playerId,
         plan,
         playerState(playerId),
+        options,
     ))()
 }
 
 export function executeRewardGrantExecutionPlanWithinTransactionSync(
     playerId: number,
     rawPlan: RewardGrantExecutionPlan,
+    options: RewardGrantExecutionOptions = {},
 ): RewardGrantExecutionResult {
     const db = getDb()
     if (!db.inTransaction) {
         throw new RewardGrantExecutionTransactionError("TRANSACTION_REQUIRED")
     }
     const plan = normalizeRewardGrantExecutionPlan(rawPlan)
+    validateExecutionOptions(playerId, options)
     return db.transaction(() => executeWithOwnedInventory(
         playerId,
         plan,
         playerState(playerId),
+        options,
     ))()
 }
 
@@ -139,13 +158,15 @@ export function executeRewardGrantExecutionPlanAsTransactionOwnerSync(
     playerId: number,
     rawPlan: RewardGrantExecutionPlan,
     knownPlayerBefore: RewardGrantKnownPlayerState,
+    options: RewardGrantExecutionOptions = {},
 ): RewardGrantExecutionResult {
     if (!getDb().inTransaction) {
         throw new RewardGrantExecutionTransactionError("TRANSACTION_REQUIRED")
     }
     const plan = normalizeRewardGrantExecutionPlan(rawPlan)
     const known = normalizeRewardGrantKnownPlayerState(playerId, knownPlayerBefore)
-    return executeWithOwnedInventory(playerId, plan, known)
+    validateExecutionOptions(playerId, options)
+    return executeWithOwnedInventory(playerId, plan, known, options)
 }
 
 export function withRewardGrantExecutionPlanAsTransactionOwnerWithInventorySync<T>(
@@ -154,6 +175,7 @@ export function withRewardGrantExecutionPlanAsTransactionOwnerWithInventorySync<
     knownPlayerBefore: RewardGrantKnownPlayerState,
     inventory: InventoryBatchContext,
     callback: (execution: RewardGrantExternalFinalization) => T,
+    options: RewardGrantExecutionOptions = {},
 ): T {
     if (!getDb().inTransaction) {
         throw new RewardGrantExecutionTransactionError("TRANSACTION_REQUIRED")
@@ -161,11 +183,12 @@ export function withRewardGrantExecutionPlanAsTransactionOwnerWithInventorySync<
     if (typeof callback !== "function") throw new TypeError("RewardGrant finalization callback required")
     const plan = normalizeRewardGrantExecutionPlan(rawPlan)
     const known = normalizeRewardGrantKnownPlayerState(playerId, knownPlayerBefore)
+    validateExecutionOptions(playerId, options)
     const checkpoint = getInventoryBatchCheckpoint(inventory)
     if (checkpoint.playerId !== playerId) {
         throw new RewardGrantExecutionTransactionError("INVENTORY_PLAYER_MISMATCH")
     }
-    const prepared = prepareRewardGrantExecution(playerId, plan, known, inventory)
+    const prepared = prepareRewardGrantExecution(playerId, plan, known, inventory, options)
     let finalized = false
     const execution = Object.freeze({
         result: prepared.result,
