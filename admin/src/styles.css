@@ -4,43 +4,23 @@
 }
 
 :root {
-  --admin-bg: #101827;
-  --admin-bg-deep: #09111f;
-  --admin-surface: #172133;
-  --admin-surface-raised: #1d2a41;
-  --admin-border: #2e4263;
-  --admin-border-strong: #4b6d9f;
-  --admin-text: #f5f8ff;
-  --admin-muted: #afbdd1;
-  --admin-primary: #48d6d2;
-  --admin-primary-strong: #8df4ee;
-  --admin-accent: #ffd34f;
-  --admin-accent-strong: #fff08a;
-  --admin-info: #67a7ff;
-  --admin-danger: #ff6b91;
-  --admin-success: #64e6a2;
-  --admin-warning: #ffb84a;
-  --admin-shadow: 0 12px 26px rgb(3 9 21 / 28%);
+    --bg:#F3F7FC; --panel:#FFFFFF; --line:#D6E2F0; --line-strong:#B9CCE4;
+    --ink:#1F2D4D; --ink-soft:#5A6B8C;
+    --star:#FFD335; --star-deep:#EAB308; --sky:#4FA8E8; --water:#2E7FD6;
+    --fire:#E8544A; --wind:#2FA85C; --thunder:#D99A00;
+    --ok-bg:#EAF8F0; --info-bg:#EAF3FC; --warn-bg:#FFF8E4;
+    --hover:#EDF3FB; --stat-bg:#FBFDFF; --th-bg:#F0F5FB;
+    --radius: 12px;
 }
 
-html[data-admin-theme="dark"] {
-  --admin-bg: #070c18;
-  --admin-bg-deep: #030711;
-  --admin-surface: #10182a;
-  --admin-surface-raised: #16223a;
-  --admin-border: #263a5b;
-  --admin-border-strong: #4b77b8;
-  --admin-text: #f7fbff;
-  --admin-muted: #aebbd2;
-  --admin-primary: #39d9e6;
-  --admin-primary-strong: #93f6ff;
-  --admin-accent: #ffd94c;
-  --admin-accent-strong: #fff19a;
-  --admin-info: #6ba9ff;
-  --admin-danger: #ff6c9d;
-  --admin-success: #65eca7;
-  --admin-warning: #ffc15d;
-  --admin-shadow: 0 14px 32px rgb(0 0 0 / 42%);
+html[data-theme="dark"] {
+    --bg:#141B2E; --panel:#1D2740; --line:#32405F; --line-strong:#465579;
+    --ink:#E6ECFF; --ink-soft:#8E9EC7;
+    --star:#FFD335; --star-deep:#8A6D00;
+    --water:#5AA7E8; --wind:#4ED47E; --thunder:#FFC53D; --fire:#FF8577;
+    --ok-bg: rgba(78, 212, 126, 0.12); --info-bg: rgba(90, 167, 232, 0.12);
+    --warn-bg: rgba(255, 197, 61, 0.1);
+    --hover:#232F4E; --stat-bg:#182136; --th-bg:#232F4E;
 }
 
 * {
@@ -50,26 +30,8 @@ html[data-admin-theme="dark"] {
 body {
   min-width: 320px;
   margin: 0;
-  color: var(--admin-text);
-  background:
-    radial-gradient(circle at 18% 8%, color-mix(in srgb, var(--admin-primary) 18%, transparent) 0 1px, transparent 2px),
-    radial-gradient(circle at 82% 18%, color-mix(in srgb, var(--admin-accent) 24%, transparent) 0 1px, transparent 2px),
-    linear-gradient(90deg, rgb(255 255 255 / 4%) 1px, transparent 1px),
-    linear-gradient(rgb(255 255 255 / 4%) 1px, transparent 1px),
-    linear-gradient(180deg, var(--admin-bg) 0%, var(--admin-bg-deep) 100%),
-    var(--admin-bg);
-  background-size: 360px 220px, 420px 260px, 24px 24px, 24px 24px, auto, auto;
-}
-
-html[data-admin-theme="dark"] body {
-  background:
-    radial-gradient(circle at 18% 8%, color-mix(in srgb, var(--admin-primary) 20%, transparent) 0 1px, transparent 2px),
-    radial-gradient(circle at 82% 18%, color-mix(in srgb, var(--admin-accent) 25%, transparent) 0 1px, transparent 2px),
-    linear-gradient(90deg, rgb(255 255 255 / 4%) 1px, transparent 1px),
-    linear-gradient(rgb(255 255 255 / 4%) 1px, transparent 1px),
-    linear-gradient(180deg, var(--admin-bg) 0%, var(--admin-bg-deep) 100%),
-    var(--admin-bg);
-  background-size: 360px 220px, 420px 260px, 24px 24px, 24px 24px, auto, auto;
+  color: var(--ink);
+  background: var(--bg);
 }
 
 .admin-app {
@@ -78,9 +40,8 @@ html[data-admin-theme="dark"] body {
 }
 
 .admin-sider {
-  background: var(--admin-surface) !important;
-  border-inline-end: 1px solid var(--admin-border);
-  box-shadow: var(--admin-shadow);
+  background: var(--panel) !important;
+  border-inline-end: 1px solid var(--line);
 }
 
 .admin-brand {
@@ -89,7 +50,7 @@ html[data-admin-theme="dark"] body {
   align-items: center;
   min-height: 72px;
   padding: 14px 16px;
-  border-bottom: 1px solid var(--admin-border);
+  border-bottom: 1px solid var(--line);
 }
 
 .admin-brand-copy {
@@ -103,9 +64,9 @@ html[data-admin-theme="dark"] body {
   width: 34px;
   height: 34px;
   flex: 0 0 auto;
-  border: 2px solid var(--admin-accent);
-  background: #10100f;
-  box-shadow: 3px 3px 0 var(--admin-primary), 0 0 14px color-mix(in srgb, var(--admin-accent) 35%, transparent);
+  border: 2px solid var(--star);
+  background: var(--ink);
+  box-shadow: 3px 3px 0 var(--water);
 }
 
 .admin-brand-mark img {
@@ -116,7 +77,7 @@ html[data-admin-theme="dark"] body {
 
 .admin-brand-title {
   display: block;
-  color: var(--admin-text);
+  color: var(--ink);
   font-size: 16px;
   font-weight: 800;
   line-height: 1.1;
@@ -128,7 +89,7 @@ html[data-admin-theme="dark"] body {
 .admin-brand-subtitle {
   display: block;
   margin-top: 3px;
-  color: var(--admin-muted);
+  color: var(--ink-soft);
   font-size: 12px;
   line-height: 1.2;
   overflow: hidden;
@@ -158,9 +119,14 @@ html[data-admin-theme="dark"] body {
 }
 
 .admin-menu .ant-menu-item-selected {
-  color: var(--admin-primary-strong);
-  background: linear-gradient(90deg, color-mix(in srgb, var(--admin-primary) 20%, transparent), color-mix(in srgb, var(--admin-accent) 10%, transparent));
+  color: var(--water);
+  background: var(--hover);
   font-weight: 700;
+}
+
+.admin-sider .ant-menu-item-selected::before {
+    content: ""; position: absolute; left: -14px; top: 5px; bottom: 5px; width: 5px;
+    background: var(--star); border: 1.5px solid var(--ink); border-radius: 4px;
 }
 
 .admin-topbar {
@@ -172,8 +138,8 @@ html[data-admin-theme="dark"] body {
   min-height: 56px;
   padding: 0 18px;
   gap: 10px;
-  background: color-mix(in srgb, var(--admin-bg-deep) 88%, transparent) !important;
-  border-bottom: 1px solid var(--admin-border);
+  background: color-mix(in srgb, var(--panel) 88%, transparent) !important;
+  border-bottom: 1px solid var(--line);
   backdrop-filter: blur(12px);
 }
 
@@ -181,7 +147,7 @@ html[data-admin-theme="dark"] body {
   min-width: 0;
   flex: 1;
   overflow: hidden;
-  color: var(--admin-text);
+  color: var(--ink);
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -214,9 +180,9 @@ html[data-admin-theme="dark"] body {
   align-items: center;
   margin-bottom: 7px;
   padding: 2px 6px;
-  border: 1px solid color-mix(in srgb, var(--admin-accent) 72%, var(--admin-border));
-  color: var(--admin-accent-strong);
-  background: color-mix(in srgb, var(--admin-accent) 10%, transparent);
+  border: 1px solid var(--line-strong);
+  color: var(--thunder);
+  background: var(--warn-bg);
   font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
   font-weight: 800;
@@ -227,7 +193,7 @@ html[data-admin-theme="dark"] body {
 
 .admin-page-title {
   margin: 0 !important;
-  color: var(--admin-text) !important;
+  color: var(--ink) !important;
   font-size: 24px !important;
   line-height: 1.2 !important;
 }
@@ -235,7 +201,7 @@ html[data-admin-theme="dark"] body {
 .admin-page-description {
   max-width: 760px;
   margin-top: 7px;
-  color: var(--admin-muted);
+  color: var(--ink-soft);
   line-height: 1.6;
 }
 
@@ -316,9 +282,9 @@ html[data-admin-theme="dark"] body {
   flex-direction: column;
   gap: 7px;
   padding: 10px 12px;
-  border: 1px solid var(--admin-border);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--admin-surface-raised) 55%, transparent);
+  border: 2px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--panel);
 }
 
 .admin-mail-type-group {
@@ -360,7 +326,7 @@ html[data-admin-theme="dark"] body {
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--admin-text);
+  color: var(--ink);
   cursor: pointer;
   font: inherit;
   font-size: 30px;
@@ -372,8 +338,8 @@ html[data-admin-theme="dark"] body {
 
 .admin-time-value:hover,
 .admin-time-value:focus-visible {
-  color: var(--admin-primary-strong);
-  outline: 2px solid color-mix(in srgb, var(--admin-primary) 28%, transparent);
+  color: var(--water);
+  outline: 2px solid color-mix(in srgb, var(--water) 28%, transparent);
   outline-offset: 4px;
 }
 
@@ -401,9 +367,9 @@ html[data-admin-theme="dark"] body {
   align-items: center;
   gap: 5px;
   padding: 4px;
-  border: 1px solid color-mix(in srgb, var(--admin-border) 70%, transparent);
+  border: 1px solid var(--line);
   border-radius: 7px;
-  background: color-mix(in srgb, var(--admin-surface) 70%, transparent);
+  background: var(--stat-bg);
 }
 
 .admin-time-segment-main {
@@ -416,10 +382,10 @@ html[data-admin-theme="dark"] body {
   min-width: 46px;
   min-height: 42px;
   padding: 4px 7px;
-  border: 1px solid var(--admin-border-strong);
+  border: 1px solid var(--line-strong);
   border-radius: 6px;
-  background: color-mix(in srgb, var(--admin-surface-raised) 82%, transparent);
-  color: var(--admin-text);
+  background: var(--panel);
+  color: var(--ink);
   cursor: pointer;
   font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 24px;
@@ -439,14 +405,14 @@ html[data-admin-theme="dark"] body {
 
 .admin-time-segment:hover,
 .admin-time-segment:focus-visible {
-  border-color: var(--admin-primary);
-  color: var(--admin-primary-strong);
-  outline: 2px solid color-mix(in srgb, var(--admin-primary) 28%, transparent);
+  border-color: var(--water);
+  color: var(--water);
+  outline: 2px solid color-mix(in srgb, var(--water) 28%, transparent);
   outline-offset: 2px;
 }
 
 .admin-time-segment-label {
-  color: var(--admin-muted);
+  color: var(--ink-soft);
   font-size: 13px;
   font-weight: 700;
 }
@@ -504,14 +470,14 @@ html[data-admin-theme="dark"] body {
 
 .admin-account-mobile-list .ant-list-items {
   overflow: hidden;
-  border: 1px solid var(--admin-border);
+  border: 1px solid var(--line);
   border-radius: 6px;
 }
 
 .admin-account-mobile-list .admin-mobile-list-item {
   display: block;
   padding: 14px;
-  border-block-end: 1px solid var(--admin-border);
+  border-block-end: 1px solid var(--line);
 }
 
 .admin-account-mobile-list .admin-mobile-list-item:last-child {
@@ -524,8 +490,8 @@ html[data-admin-theme="dark"] body {
 
 .admin-mobile-list-item-clickable:hover,
 .admin-mobile-list-item-clickable:focus-visible {
-  background: color-mix(in srgb, var(--admin-primary) 8%, transparent);
-  outline: 2px solid var(--admin-primary);
+  background: var(--hover);
+  outline: 2px solid var(--water);
   outline-offset: -2px;
 }
 
@@ -547,7 +513,7 @@ html[data-admin-theme="dark"] body {
 }
 
 .admin-mobile-detail-list span {
-  color: var(--admin-muted);
+  color: var(--ink-soft);
 }
 
 .admin-mobile-tags,
@@ -636,23 +602,23 @@ html[data-admin-theme="dark"] body {
   gap: 4px;
   align-items: center;
   padding: 4px 0;
-  border-bottom: 1px solid var(--admin-border);
+  border-bottom: 1px solid var(--line);
   font-size: 12px;
 }
 
 .admin-seed-id {
   width: 66px;
-  color: var(--admin-primary-strong);
+  color: var(--water);
   font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .admin-chip-button {
   min-height: 22px;
   padding: 0 6px;
-  border: 1px solid var(--admin-border);
+  border: 1px solid var(--line);
   border-radius: 6px;
-  background: var(--admin-surface);
-  color: var(--admin-text);
+  background: var(--panel);
+  color: var(--ink);
   cursor: pointer;
   font: inherit;
   font-size: 11px;
@@ -661,14 +627,14 @@ html[data-admin-theme="dark"] body {
 
 .admin-chip-button:hover,
 .admin-chip-button:focus-visible {
-  border-color: var(--admin-primary);
-  outline: 2px solid color-mix(in srgb, var(--admin-primary) 25%, transparent);
+  border-color: var(--water);
+  outline: 2px solid color-mix(in srgb, var(--water) 25%, transparent);
   outline-offset: 1px;
 }
 
 .admin-chip-button.is-active {
-  border-color: var(--chip-color, var(--admin-primary));
-  background: var(--chip-color, var(--admin-primary));
+  border-color: var(--chip-color, var(--water));
+  background: var(--chip-color, var(--water));
   color: #fff;
 }
 
@@ -678,19 +644,22 @@ html[data-admin-theme="dark"] body {
 }
 
 .admin-muted {
-  color: var(--admin-muted);
+  color: var(--ink-soft);
 }
 
 .ant-card {
-  border-color: var(--admin-border);
-  box-shadow: var(--admin-shadow);
-  background: color-mix(in srgb, var(--admin-surface) 96%, transparent);
+  border: 2px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--panel);
 }
 
 .ant-card-head {
   min-height: 44px !important;
-  border-bottom-color: var(--admin-border) !important;
+  border-bottom-color: var(--line) !important;
 }
+
+.wf-line { height: 3px; background: linear-gradient(90deg, var(--sky), var(--star)); flex: none; }
+.ant-statistic-content-value, .ant-table-cell, .admin-mono { font-variant-numeric: tabular-nums; }
 
 .ant-table-cell {
   overflow-wrap: anywhere;
