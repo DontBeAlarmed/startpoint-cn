@@ -5,6 +5,12 @@ export interface InventoryItemResult {
     readonly obtainedAmount: number
 }
 
+export interface InventoryGrantResult extends InventoryItemResult {
+    readonly requestedAmount: number
+    readonly acceptedAmount: number
+    readonly overflowAmount: number
+}
+
 export interface InventoryItemMutationCommand {
     readonly playerId: number
     readonly itemId: number

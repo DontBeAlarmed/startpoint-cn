@@ -4,7 +4,7 @@ import {
     InventoryTransactionError,
     InventoryValidationError,
 } from "./errors"
-import type { InventoryItemResult, InventoryMutationKind } from "./model"
+import type { InventoryGrantResult, InventoryItemResult, InventoryMutationKind } from "./model"
 import {
     InventorySqliteRepository,
     type InventoryStoredItem,
@@ -28,6 +28,7 @@ export interface InventoryBatchContext {
     read(itemId: number): InventoryItemResult
     readMany(itemIds: readonly number[]): readonly InventoryItemResult[]
     grant(itemId: number, amount: number): InventoryItemResult
+    grantWithCapacity(itemId: number, amount: number, maxCount: number): InventoryGrantResult
     deduct(itemId: number, amount: number): InventoryItemResult
     restore(itemId: number, amount: number): InventoryItemResult
     results(): readonly InventoryItemResult[]
@@ -98,6 +99,12 @@ class DeferredInventoryBatchContext implements InventoryBatchContext {
 
     grant(itemId: number, amount: number): InventoryItemResult {
         const result = this.requireActive().grant(itemId, amount)
+        recordInventoryBatchMutation(this)
+        return result
+    }
+
+    grantWithCapacity(itemId: number, amount: number, maxCount: number): InventoryGrantResult {
+        const result = this.requireActive().grantWithCapacity(itemId, amount, maxCount)
         recordInventoryBatchMutation(this)
         return result
     }
@@ -254,6 +261,53 @@ class InventoryBatchContextImpl implements InventoryBatchContext {
 
     grant(itemId: number, amount: number): InventoryItemResult {
         return this.mutate("grant", itemId, amount)
+    }
+
+    grantWithCapacity(itemId: number, amount: number, maxCount: number): InventoryGrantResult {
+        this.assertUsable()
+        const requestedAmount = mutationAmount(amount)
+        const capacityLimit = mutationAmount(maxCount)
+        const item = this.requirePending(itemId)
+        const before = {
+            granted: item.granted,
+            deducted: item.deducted,
+            restored: item.restored,
+            touched: item.touched,
+        }
+        try {
+            const currentAmount = addSafe(
+                subtractSafe(item.stored.amount, item.deducted, `item ${item.stored.itemId} baseAmount`),
+                item.restored,
+                `item ${item.stored.itemId} baseAmount`,
+            )
+            const baseAmount = addSafe(
+                currentAmount,
+                item.granted,
+                `item ${item.stored.itemId} currentAmount`,
+            )
+            const capacity = Math.max(0, capacityLimit - baseAmount)
+            const acceptedAmount = Math.min(requestedAmount, capacity)
+            item.granted = addSafe(
+                item.granted,
+                acceptedAmount,
+                `item ${itemId} acceptedGrant`,
+            )
+            item.touched = true
+            const mutation = this.toResult(item)
+            recordInventoryBatchMutation(this as unknown as object)
+            return Object.freeze({
+                ...mutation,
+                requestedAmount,
+                acceptedAmount,
+                overflowAmount: requestedAmount - acceptedAmount,
+            })
+        } catch (error) {
+            item.granted = before.granted
+            item.deducted = before.deducted
+            item.restored = before.restored
+            item.touched = before.touched
+            throw error
+        }
     }
 
     deduct(itemId: number, amount: number): InventoryItemResult {

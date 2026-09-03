@@ -395,6 +395,10 @@ const SOURCE_RULES = [
         groups: ["integration:database"],
     },
     {
+        pattern: /^tools\/inventory_cap\.test\.cjs$/,
+        groups: ["integration:database"],
+    },
+    {
         pattern: /^src\/routes\/api\/gacha\.ts$/,
         groups: ["integration:reward-grant", "integration:rules", "quick:gacha"],
     },

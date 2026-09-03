@@ -14,6 +14,7 @@ export {
     type InventoryValidationReason,
 } from "./errors"
 export type {
+    InventoryGrantResult,
     InventoryItemMutationCommand,
     InventoryItemResult,
     InventoryMutationKind,

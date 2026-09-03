@@ -336,6 +336,7 @@ test("maps representative source files to focused groups", () => {
         "tools/inventory_owner.test.cjs",
         "tools/inventory_owner_structure.test.cjs",
         "tools/perf/item_inventory_expiry_admission.test.cjs",
+        "tools/inventory_cap.test.cjs",
         "tools/load_event_trade_expiry.test.cjs",
     ]) {
         assert.deepEqual(selectTestGroups([file]), ["integration:database"], file)
@@ -1589,6 +1590,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/inventory_owner.test.cjs",
         "tools/inventory_owner_structure.test.cjs",
         "tools/perf/item_inventory_expiry_admission.test.cjs",
+        "tools/inventory_cap.test.cjs",
         "tools/load_event_trade_expiry.test.cjs",
         "tools/mail_overflow.test.cjs",
         "tools/mail_receive_transaction.test.cjs",
