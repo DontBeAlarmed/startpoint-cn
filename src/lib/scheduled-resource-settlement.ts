@@ -14,6 +14,7 @@ import {
     executeRewardGrantExecutionPlanAsTransactionOwnerSync,
     type RewardGrantExecutionResult,
 } from "./reward-grant"
+import { createRewardGrantItemOverflowPolicy } from "./reward-grant-item-overflow"
 import { RewardType } from "./types/rewards"
 import { validateScheduledResourceRuleInput } from "./scheduled-resource-rules"
 
@@ -101,6 +102,7 @@ export function settleScheduledResourcesSync(
                 freeVmoney: currentPlayer.freeVmoney,
                 expPool: currentPlayer.expPool,
             },
+            { itemOverflow: createRewardGrantItemOverflowPolicy(input.player.id) },
         )
         const grantedRuleIds = grantedRules.map(rule => rule.id)
         recordScheduledResourceGrantsWithinTransactionSync(

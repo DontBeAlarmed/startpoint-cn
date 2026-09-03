@@ -1,10 +1,12 @@
 import { getDb } from "../../data/db"
 import { insertReceiveHistorySync } from "../../data/domains/mail"
 import {
+    collectRewardGrantItemOverflowDispositions,
     createRewardGrantExecutionPlan,
     executeRewardGrantExecutionPlanWithinTransactionSync,
     type RewardGrantCommand,
 } from "../reward-grant"
+import { createRewardGrantItemOverflowPolicy } from "../reward-grant-item-overflow"
 import { getRealNow } from "../../runtime/time/game-time"
 import { GIFT_TO_REWARD_TYPE, validateGiftCode, validateGiftRewards } from "./validation"
 import type { GiftReceiveResult, GiftReward } from "./types"
@@ -134,7 +136,11 @@ export function receiveGiftCodeSync(playerId: number, rawKey: unknown): GiftRece
         }
 
         const plan = createRewardGrantExecutionPlan(rewards.map(toRewardGrantCommand))
-        executeRewardGrantExecutionPlanWithinTransactionSync(playerId, plan)
+        const grant = executeRewardGrantExecutionPlanWithinTransactionSync(
+            playerId,
+            plan,
+            { itemOverflow: createRewardGrantItemOverflowPolicy(playerId) },
+        )
 
         for (const reward of rewards) {
             insertReceiveHistorySync(playerId, {
@@ -144,6 +150,23 @@ export function receiveGiftCodeSync(playerId: number, rawKey: unknown): GiftRece
             })
         }
 
-        return { resultCode: 1, rewards }
+        const dispositions = collectRewardGrantItemOverflowDispositions(grant)
+        return {
+            resultCode: 1,
+            rewards,
+            ...(dispositions.length === 0
+                ? {}
+                : {
+                    itemOverflow: Object.freeze({
+                        dispositions,
+                        itemList: Object.freeze(Object.fromEntries(
+                            grant.assets.items.map(item => [String(item.itemId), item.afterAmount]),
+                        )),
+                        freeManaAfter: dispositions.some(disposition => disposition.kind === "sold")
+                            ? grant.playerAfter.freeMana
+                            : null,
+                    }),
+                }),
+        }
     })()
 }

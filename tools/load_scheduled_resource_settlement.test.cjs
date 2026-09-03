@@ -34,4 +34,19 @@ test("CN load refreshes the player only after a successful scheduled grant", () 
     assert.equal(source.includes("scheduled_resource_banner"), false)
 })
 
+test("CN load projects login and scheduled Item overflow through the common response", () => {
+    assert.match(
+        source,
+        /loginBonusSettlement\.status === ["']granted["'][\s\S]*?collectRewardGrantItemOverflowDispositions\(loginBonusSettlement\.grant\)/,
+    )
+    assert.match(
+        source,
+        /scheduledResourceSettlement\.status === ["']granted["'][\s\S]*?collectRewardGrantItemOverflowDispositions\([\s\S]*?scheduledResourceSettlement\.rewardResult/,
+    )
+    assert.match(
+        source,
+        /projectItemOverflowCommonResponse\(itemOverflowDispositions\)[\s\S]*?clientData\.over_max = overMax/,
+    )
+})
+
 console.log("load scheduled resource settlement tests loaded")

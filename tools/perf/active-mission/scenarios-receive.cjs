@@ -3,10 +3,16 @@
 const officialMissions = require("../../../assets/mission_active.json")
 const officialEvents = require("../../../assets/mission_active_event.json")
 const officialRewards = require("../../../assets/mission_active_reward.json")
+const officialItemPolicy = require("../../../assets/item_inventory_policy.json")
 
 const RECEIVE_EVENT_ID = 992
 const FIRST_MISSION_ID = 99201
-const FIRST_ITEM_ID = 992001
+const RECEIVE_ITEM_IDS = Object.freeze(
+    Object.keys(officialItemPolicy.byItemId).map(Number).slice(0, 32),
+)
+if (RECEIVE_ITEM_IDS.length !== 32) {
+    throw new Error("focused receive fixture requires 32 official Item IDs")
+}
 const RECEIVE_ROLLBACK_MARKER = "ACTIVE_MISSION_RECEIVE_REWARD_ROLLBACK_34_2"
 
 function missionRow(missionId) {
@@ -65,7 +71,7 @@ function tableOverrides(count) {
             ...officialRewards,
             ...Object.fromEntries(ids.map((id, index) => [
                 id,
-                { 1: [rewardRow(FIRST_ITEM_ID + index)] },
+                { 1: [rewardRow(RECEIVE_ITEM_IDS[index])] },
             ])),
         },
     }
@@ -117,7 +123,7 @@ async function runReceiveScenario(runtime, count) {
 async function runReceiveRollback(runtime) {
     const count = 8
     const ids = missionIds(count)
-    const lastItemId = FIRST_ITEM_ID + count - 1
+    const lastItemId = RECEIVE_ITEM_IDS[count - 1]
     return runtime.runIsolated({
         name: "rollback-receive",
         tableOverrides: tableOverrides(count),

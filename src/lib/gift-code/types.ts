@@ -35,5 +35,13 @@ export interface GiftDefinitionPage {
 }
 
 export type GiftReceiveResult =
-    | { readonly resultCode: 1; readonly rewards: readonly GiftReward[] }
+    | {
+        readonly resultCode: 1
+        readonly rewards: readonly GiftReward[]
+        readonly itemOverflow?: Readonly<{
+            dispositions: readonly import("../item-overflow").PlannedItemOverflowDisposition[]
+            itemList: Readonly<Record<string, number>>
+            freeManaAfter: number | null
+        }>
+    }
     | { readonly resultCode: 6101 | 6103 | 6104; readonly rewards: readonly [] }

@@ -16,6 +16,7 @@ const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerItemSync } = require("../src/data/domains/item")
 const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const {
     incrementPlayerRaidEventQuestKillCountSync,
     upsertRaidEventBossStateSync,
@@ -33,6 +34,7 @@ async function main() {
     })
     const playerId = insertDefaultPlayerSync(account.id).id
     const initialMana = getPlayerSync(playerId).freeMana
+    setInventoryFixtureItemExactSync(playerId, 100000, 999998)
     getDb().prepare("INSERT INTO sessions (token, account_id, expires, type) VALUES (?, ?, ?, ?)")
         .run("123", account.id, "2999-01-01T00:00:00.000Z", 2)
     upsertRaidEventBossStateSync(4, { weightedKillCount: 0, totalKillCount: 1 })
@@ -60,10 +62,14 @@ async function main() {
         assert.deepEqual(first.quest_list, { 4001: { kill_count: 1 } })
         assert.equal(first.kill_count_reward_data.reward_list.length, 2)
         assert.equal(first.user_info.free_mana, initialMana + 500)
-        assert.deepEqual(first.item_list, { 100000: 25 })
+        assert.deepEqual(first.item_list, { 100000: 999999 })
+        assert.deepEqual(first.over_max, [{
+            process_type: 1,
+            item: { item_id: 100000, number: 24 },
+        }])
         assert.equal("items" in first, false)
         assert.equal(getPlayerSync(playerId).freeMana, initialMana + 500)
-        assert.equal(getPlayerItemSync(playerId, 100000), 25)
+        assert.equal(getPlayerItemSync(playerId, 100000), 999999)
 
         const secondResponse = await fastify.inject({
             method: "POST",
@@ -74,7 +80,7 @@ async function main() {
         const second = unpack(secondResponse.rawPayload).data
         assert.deepEqual(second.kill_count_reward_data.reward_list, [])
         assert.equal(getPlayerSync(playerId).freeMana, initialMana + 500)
-        assert.equal(getPlayerItemSync(playerId, 100000), 25)
+        assert.equal(getPlayerItemSync(playerId, 100000), 999999)
 
         upsertRaidEventBossStateSync(4, { weightedKillCount: 0, totalKillCount: 2 })
         getDb().exec(`
@@ -92,7 +98,7 @@ async function main() {
         assert.equal(failedResponse.statusCode, 500)
         getDb().exec("DROP TRIGGER fail_raid_reward_cursor")
         assert.equal(getPlayerSync(playerId).freeMana, initialMana + 500)
-        assert.equal(getPlayerItemSync(playerId, 100000), 25)
+        assert.equal(getPlayerItemSync(playerId, 100000), 999999)
         assert.equal(
             getDb().prepare("SELECT received_up_to FROM players_raid_events WHERE player_id = ? AND event_id = 4")
                 .get(playerId).received_up_to,

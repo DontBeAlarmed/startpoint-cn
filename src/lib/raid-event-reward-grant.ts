@@ -1,10 +1,12 @@
 import { getPlayerSync } from "../data/domains/player"
 import {
+    collectRewardGrantItemOverflowDispositions,
     createRewardGrantExecutionPlan,
     executeRewardGrantExecutionPlanAsTransactionOwnerSync,
     type RewardGrantCommand,
     type RewardGrantExecutionResult,
 } from "./reward-grant"
+import { createRewardGrantItemOverflowPolicy } from "./reward-grant-item-overflow"
 import { getAwakeFactKeysFromRewardGrants } from "./mission/awake-reward-facts"
 import type { FactKey } from "./mission/facts/fact-key"
 import type { PlayerRewardResult, Reward } from "./types"
@@ -47,6 +49,10 @@ function projectRaidEventRewards(grant: RewardGrantExecutionResult): PlayerRewar
     }
     result.character_list = [...characters.values()]
     result.equipment_list = [...equipment.values()]
+    const itemOverflowDispositions = collectRewardGrantItemOverflowDispositions(grant)
+    if (itemOverflowDispositions.length > 0) {
+        result.itemOverflowDispositions = itemOverflowDispositions
+    }
     return result
 }
 
@@ -66,6 +72,7 @@ export function grantRaidEventRewardsWithinTransactionSync(
             freeVmoney: player.freeVmoney,
             expPool: player.expPool,
         },
+        { itemOverflow: createRewardGrantItemOverflowPolicy(playerId) },
     )
     return {
         rewardResult: projectRaidEventRewards(grant),

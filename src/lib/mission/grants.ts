@@ -18,6 +18,7 @@ import {
     type RewardGrantKnownPlayerState,
 } from "../reward-grant"
 import type { PlannedItemOverflowDisposition } from "../item-overflow"
+import { createRewardGrantItemOverflowPolicy } from "../reward-grant-item-overflow"
 
 type MissionRewardPlayer = Pick<
     Player,
@@ -62,6 +63,7 @@ export class MissionRewardGranter {
                 this.playerId,
                 plan,
                 knownPlayerBefore,
+                { itemOverflow: createRewardGrantItemOverflowPolicy(this.playerId) },
             )
         )
     }

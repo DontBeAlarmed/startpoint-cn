@@ -20,6 +20,9 @@ const data = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
+const { getPlayerSync } = require("../src/data/domains/player")
+const { getPlayerItemSync } = require("../src/data/domains/item")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
 const {
@@ -112,6 +115,31 @@ test("receives a Chinese code once and projects all six rewards in protocol orde
     assert.equal(getDb().prepare(
         "SELECT COUNT(*) AS count FROM players_gift_redemptions WHERE gift_id = ? AND player_id = ?",
     ).get(gift.id, playerId).count, 1)
+})
+
+test("sellable Item overflow publishes final inventory, Mana and Sold Toast", async () => {
+    const gift = createGiftSync({
+        code: "礼包超限",
+        note: null,
+        rewards: [{ position: 0, type: 1, typeId: 1, number: 3 }],
+    })
+    const activeGift = startGiftSync(gift.id, gift.revision)
+    const { playerId, viewerId } = await createPlayer("overflow")
+    setInventoryFixtureItemExactSync(playerId, 1, 9998)
+    const before = getPlayerSync(playerId)
+
+    const response = await receive(viewerId, activeGift.code)
+
+    assert.equal(response.result_code, 1)
+    assert.equal(getPlayerItemSync(playerId, 1), 9999)
+    assert.equal(getPlayerSync(playerId).freeMana, before.freeMana + 10)
+    assert.deepEqual(response.item_list, { 1: 9999 })
+    assert.deepEqual(response.user_info, { free_mana: before.freeMana + 10 })
+    assert.deepEqual(response.over_max, [{
+        process_type: 2,
+        amount_sold: 10,
+        item: { item_id: 1, number: 2 },
+    }])
 })
 
 test("uses viewer sessions and rejects exact-code variants without redeeming", async () => {

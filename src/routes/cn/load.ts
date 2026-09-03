@@ -56,6 +56,8 @@ import { settleScheduledResourcesSync } from "../../lib/scheduled-resource-settl
 import { settleEventTradeExpiryOnLoadSync } from "../../lib/event-trade-expiry-settlement";
 import { isGiftCodeEnabledSync } from "../../lib/gift-code/capability";
 import type { ConfigValues } from "../../lib/types/config";
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow";
+import { collectRewardGrantItemOverflowDispositions } from "../../lib/reward-grant";
 
 interface CnLoadBody {
     device_id: number;
@@ -412,6 +414,18 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                 clientData.login_bonus_received_at = loginBonusSettlement.bonuses[0].receivedAt;
             }
             clientData.mission_info = [];
+            const itemOverflowDispositions = [
+                ...(loginBonusSettlement.status === "granted"
+                    ? collectRewardGrantItemOverflowDispositions(loginBonusSettlement.grant)
+                    : []),
+                ...(scheduledResourceSettlement.status === "granted"
+                    ? collectRewardGrantItemOverflowDispositions(
+                        scheduledResourceSettlement.rewardResult,
+                    )
+                    : []),
+            ];
+            const overMax = projectItemOverflowCommonResponse(itemOverflowDispositions);
+            if (overMax.length > 0) clientData.over_max = overMax;
 
             // Inject unfinished quest lists for battle recovery
             if (activeQuest) {

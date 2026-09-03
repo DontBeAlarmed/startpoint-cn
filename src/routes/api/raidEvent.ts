@@ -21,6 +21,7 @@ import {
 } from "../../data/domains/raidEvent";
 import { getDb } from "../../data/db";
 import { grantRaidEventRewardsWithinTransactionSync } from "../../lib/raid-event-reward-grant"
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow"
 import {
     getRaidEventOverallRewardDefinitions,
     toRaidEventRewardResponse,
@@ -194,6 +195,10 @@ const routes = async (fastify: FastifyInstance) => {
                 "rush_battle_played_party_list": serializedPlayedParties.folderParties,
                 "endless_battle_my_ranking": getPlayerRushEventEndlessBattleRankingSync(playerId, eventId, { rushEventData }),
         }
+        const overMax = projectItemOverflowCommonResponse(
+            rewardResult?.itemOverflowDispositions ?? [],
+        )
+        if (overMax.length > 0) responseData.over_max = overMax
         if (summary.missionSettlement) {
             mergeMissionSettlementResponse(responseData, summary.missionSettlement, viewerId)
         }

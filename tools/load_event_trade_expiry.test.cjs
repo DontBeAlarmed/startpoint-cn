@@ -26,6 +26,7 @@ const NO_END_EVENT_ITEM = 904
 const NORMAL_ITEM = 903
 
 const config = require("../assets/config.json")
+const officialItemPolicy = require("../assets/item_inventory_policy.json")
 const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 const restoreContentSnapshot = installBundledGameplaySnapshot({
     tableOverrides: {
@@ -35,6 +36,7 @@ const restoreContentSnapshot = installBundledGameplaySnapshot({
         },
         "item_inventory_policy.json": {
             byItemId: {
+                ...officialItemPolicy.byItemId,
                 [EVENT_ITEM_A]: {
                     effectKind: 9,
                     category: 3,
@@ -72,7 +74,12 @@ const restoreContentSnapshot = installBundledGameplaySnapshot({
                     endTimeMs,
                 },
             },
-            eventTradeItemIds: [EVENT_ITEM_A, EVENT_ITEM_B, NO_END_EVENT_ITEM],
+            eventTradeItemIds: [
+                EVENT_ITEM_A,
+                EVENT_ITEM_B,
+                NO_END_EVENT_ITEM,
+                ...officialItemPolicy.eventTradeItemIds,
+            ].sort((left, right) => left - right),
         },
     },
 })

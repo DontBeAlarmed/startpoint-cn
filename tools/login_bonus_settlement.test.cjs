@@ -22,6 +22,7 @@ const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerItemSync } = require("../src/data/domains/item")
 const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const {
     confirmNormalLoginBonusShownSync,
     confirmLoginBonusesShownSync,
@@ -122,6 +123,40 @@ test("Normal login reward grant is atomic and pending loads are idempotent", () 
         receivedAt: Math.floor(virtualNowMs / 1000),
         shownAt: null,
     })
+})
+
+test("login Item overflow uses the shared sellable disposition", () => {
+    const playerId = createPlayer("item-overflow")
+    const virtualNowMs = at("2024-08-14T12:00:00.000Z")
+    setInventoryFixtureItemExactSync(playerId, 1, 9998)
+    const before = getPlayerSync(playerId)
+    const itemCatalog = {
+        item: genericGroup("Normal", [{
+            index: 1,
+            rewards: [{ kind: 1, id: 1, count: 3 }],
+        }]),
+    }
+
+    const result = settleLoginBonusesSync({
+        playerId,
+        virtualNowMs,
+        dailyResetHour: 5,
+        catalog: itemCatalog,
+    })
+
+    assert.equal(result.status, "granted")
+    assert.equal(getPlayerItemSync(playerId, 1), 9999)
+    assert.equal(getPlayerSync(playerId).freeMana, before.freeMana + 10)
+    assert.deepEqual(result.grant.entries[0].outcome.item.overflowDispositions, [{
+        kind: "sold",
+        itemId: 1,
+        overflowAmount: 2,
+        soldMana: 10,
+        manaBefore: before.freeMana,
+        acceptedMana: 10,
+        overflowMana: 0,
+        manaAfter: before.freeMana + 10,
+    }])
 })
 
 test("login rewards advance at the real 05:00 business-day boundary", () => {

@@ -2,7 +2,7 @@
 
 const AWAKE_CHARACTER_ID = 341005
 const AWAKE_MISSION_ID = 3410051
-const AWAKE_ITEM_ID = 920271
+const AWAKE_ITEM_ID = 1
 
 function awakeRewardRow(rewardId, targetProgress, rewards) {
     const row = []

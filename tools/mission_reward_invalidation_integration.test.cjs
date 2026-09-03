@@ -32,6 +32,7 @@ const { givePlayerCharacterSync } = require("../src/lib/character")
 const { MissionRewardGranter } = require("../src/lib/mission/grants")
 const { getFactKeyId } = require("../src/lib/mission/facts/fact-key")
 const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const restoreContentSnapshot = installBundledGameplaySnapshot()
 
 initializeDatabase()
@@ -104,6 +105,31 @@ test("real Pass point writes invalidate only when passState changes", () => {
     })()
     assert.equal(getPlayerPassCardStateSync(playerId, 3).point, 6000)
     assert.deepEqual(capped.invalidatedFactKeys, [])
+})
+
+test("default mission Item grants settle sellable overflow", () => {
+    setInventoryFixtureItemExactSync(playerId, 1, 9998)
+    const before = getPlayerSync(playerId)
+
+    const granter = db.transaction(() => {
+        const rewardGranter = new MissionRewardGranter(playerId, getPlayerSync(playerId))
+        rewardGranter.grant([{ kind: 1, itemId: 1, amount: 3 }])
+        rewardGranter.persistPlayer()
+        return rewardGranter
+    })()
+
+    assert.equal(getPlayerItemSync(playerId, 1), 9999)
+    assert.equal(getPlayerSync(playerId).freeMana, before.freeMana + 10)
+    assert.deepEqual(granter.itemOverflowDispositions, [{
+        kind: "sold",
+        itemId: 1,
+        overflowAmount: 2,
+        soldMana: 10,
+        manaBefore: before.freeMana,
+        acceptedMana: 10,
+        overflowMana: 0,
+        manaAfter: before.freeMana + 10,
+    }])
 })
 
 test.after(() => {

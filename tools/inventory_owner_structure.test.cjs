@@ -419,3 +419,29 @@ test("capped positive grants expose one reviewed overflow disposition path", () 
         }
     }
 })
+
+test("production RewardGrant Item sources install one overflow policy", () => {
+    const directPolicyOwners = [
+        "src/lib/gift-code/redemption.ts",
+        "src/lib/login-bonus.ts",
+        "src/lib/mail-reward-grant.ts",
+        "src/lib/mission/grants.ts",
+        "src/lib/raid-event-reward-grant.ts",
+        "src/lib/scheduled-resource-settlement.ts",
+        "src/lib/story-reward-grant.ts",
+        "src/multi/settlement/reward-grant.ts",
+        "src/routes/api/tutorial.ts",
+    ]
+    for (const relative of directPolicyOwners) {
+        const contents = fs.readFileSync(path.join(projectRoot, relative), "utf8")
+        assert.match(contents, /createRewardGrantItemOverflowPolicy\(/, relative)
+        assert.match(contents, /itemOverflow:/, relative)
+    }
+
+    const singleWrites = fs.readFileSync(
+        path.join(projectRoot, "src/lib/quest/finish/single-settlement-writes.ts"),
+        "utf8",
+    )
+    assert.match(singleWrites, /createRewardGrantItemOverflowPolicy\(/)
+    assert.match(singleWrites, /itemOverflow:/)
+})

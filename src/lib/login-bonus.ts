@@ -22,6 +22,7 @@ import {
     executeRewardGrantExecutionPlanWithinTransactionSync,
     type RewardGrantExecutionResult,
 } from "./reward-grant"
+import { createRewardGrantItemOverflowPolicy } from "./reward-grant-item-overflow"
 import { RewardType } from "./types/rewards"
 
 export { getPlayerNormalLoginBonusProgressSync } from "../data/domains/login-bonus"
@@ -264,7 +265,16 @@ export function settleLoginBonusesSync(input: SettleLoginBonusInput): LoginBonus
         const plan = createRewardGrantExecutionPlan(selected.flatMap(({ entry }) => (
             createLoginBonusRewardPlan(entry).entries
         )))
-        const grant = executeRewardGrantExecutionPlanWithinTransactionSync(input.playerId, plan)
+        const grant = executeRewardGrantExecutionPlanWithinTransactionSync(
+            input.playerId,
+            plan,
+            {
+                itemOverflow: createRewardGrantItemOverflowPolicy(
+                    input.playerId,
+                    new Date(input.virtualNowMs),
+                ),
+            },
+        )
         const bonuses = selected.map(({ groupId, group, entry }) => {
             const progress: PlayerLoginBonusProgress = {
                 playerId: input.playerId,

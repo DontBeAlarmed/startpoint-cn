@@ -50,13 +50,14 @@ eventRow[15] = "(None)"
 eventRow[22] = "123"
 
 const rewardRow = []
+const ACTIVE_MISSION_ITEM_ID = 1
 rewardRow[3] = "1"
 rewardRow[4] = "(None)"
 rewardRow[7] = "0"
 rewardRow[8] = "5"
 rewardRow[13] = "1"
 rewardRow[14] = "2"
-rewardRow[15] = "880002"
+rewardRow[15] = String(ACTIVE_MISSION_ITEM_ID)
 
 const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 restoreSnapshot = installBundledGameplaySnapshot({
@@ -163,18 +164,18 @@ async function main() {
             progress_value: 1,
             stages: [{ stage: 1, received: true }],
         }])
-        assert.equal(unlockedData.item_list[880002], 2)
+        assert.equal(unlockedData.item_list[ACTIVE_MISSION_ITEM_ID], 2)
         assert.equal(getPlayerActiveMissionsSync(playerId)[99001].stages[1], true)
         assert.equal(getPlayerSync(playerId).freeVmoney, vmoneyBefore + 5)
-        assert.equal(getPlayerItemSync(playerId, 880002), 2)
-        assert.equal(getPlayerCollectedItemTotalSync(playerId, 880002), 2)
+        assert.equal(getPlayerItemSync(playerId, ACTIVE_MISSION_ITEM_ID), 2)
+        assert.equal(getPlayerCollectedItemTotalSync(playerId, ACTIVE_MISSION_ITEM_ID), 2)
 
         const repeated = await request()
         assert.equal(repeated.statusCode, 200, repeated.body)
         assert.deepEqual(decodeResponse(repeated).data.active_mission_list, [])
         assert.equal(getPlayerSync(playerId).freeVmoney, vmoneyBefore + 5)
-        assert.equal(getPlayerItemSync(playerId, 880002), 2)
-        assert.equal(getPlayerCollectedItemTotalSync(playerId, 880002), 2)
+        assert.equal(getPlayerItemSync(playerId, ACTIVE_MISSION_ITEM_ID), 2)
+        assert.equal(getPlayerCollectedItemTotalSync(playerId, ACTIVE_MISSION_ITEM_ID), 2)
         assert.equal(
             warnings.some(message => /character\.json/i.test(message)),
             false,

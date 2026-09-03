@@ -353,7 +353,7 @@ test("Mission standard callback preserves mixed domain rewards, duplicate compen
 })
 
 test("default Mission RewardGrant owner is no heavier than an explicitly injected owner", () => {
-    const itemId = 990104
+    const itemId = 1
     const equipmentId = 5060042
     const rewards = [
         { kind: 1, itemId, amount: 2 },

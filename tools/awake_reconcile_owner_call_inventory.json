@@ -598,6 +598,7 @@
   ],
   "raid_event/summary": [
     "after-publication:import:../../data/utils#clientSerializeDate=1",
+    "after-publication:import:../../lib/item-overflow#projectItemOverflowCommonResponse=1",
     "after-publication:import:../../lib/mail-notification#getMailArrivedSync=1",
     "after-publication:import:../../lib/mission/response#mergeMissionSettlementResponse=1",
     "after-publication:import:../../lib/quest/finish/raid-handler#getRaidBossHpPercentage=1",
