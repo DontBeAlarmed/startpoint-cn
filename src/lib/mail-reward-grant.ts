@@ -16,6 +16,7 @@ import { isEventTradeExpiredAt } from "./inventory/event-trade-expiry-plan"
 import { planManaCapacity } from "./inventory/mana-capacity-plan"
 import {
     createRewardGrantExecutionPlan,
+    collectRewardGrantItemOverflowDispositions,
     executeRewardGrantExecutionPlanAsTransactionOwnerSync,
     type RewardGrantCommand,
     type RewardGrantExecutionPlan,
@@ -24,6 +25,7 @@ import {
 import { RewardType } from "./types/rewards"
 import { getVirtualNow } from "../runtime/time/game-time"
 import type { PlannedItemOverflowDisposition } from "./item-overflow"
+import { createRewardGrantItemOverflowPolicy } from "./reward-grant-item-overflow"
 
 export interface MailRewardSettlement {
     readonly characterList: Record<string, unknown>[]
@@ -32,6 +34,7 @@ export interface MailRewardSettlement {
     readonly userInfo: Record<string, number>
     readonly autoSaleExpiredMailCount: number
     readonly playerAfter: Player
+    readonly itemOverflowDispositions?: readonly PlannedItemOverflowDisposition[]
 }
 
 const SUPPORTED_MAIL_TYPES = new Set<number>([
@@ -197,8 +200,11 @@ function createMailSettlementPlan(
 
 function createMailClaimItemPolicy(
     playerId: number,
+    now: Date,
+    knownPaidMana: number,
 ): RewardGrantItemOverflowPolicy {
     const catalog = getItemInventoryPolicyCatalog()
+    const overflowPolicy = createRewardGrantItemOverflowPolicy(playerId, now, knownPaidMana)
     return Object.freeze({
         playerId,
         maxCount(itemId: number): number {
@@ -206,7 +212,12 @@ function createMailClaimItemPolicy(
             if (policy === null) throw new MailRewardCapacityError(`Item ${itemId} policy is unavailable.`)
             return policy.maxCount
         },
-        planOverflow(itemId: number, amount: number) {
+        planOverflow(itemId: number, amount: number, currentFreeMana: number) {
+            const policy = findItemInventoryPolicy(catalog, itemId)
+            if (policy === null) throw new MailRewardCapacityError(`Item ${itemId} policy is unavailable.`)
+            if (policy.sellable && policy.category === 6) {
+                return overflowPolicy.planOverflow(itemId, amount, currentFreeMana)
+            }
             return Object.freeze({
                 kind: "mail" as const,
                 itemId,
@@ -214,6 +225,10 @@ function createMailClaimItemPolicy(
             })
         },
         finalizeOverflow(disposition: PlannedItemOverflowDisposition) {
+            if (disposition.kind === "sold") {
+                overflowPolicy.finalizeOverflow(disposition)
+                return
+            }
             throw new MailRewardCapacityError(
                 `Mail Item ${disposition.itemId} cannot fit ${disposition.overflowAmount} additional unit(s).`,
             )
@@ -353,8 +368,9 @@ export function settleMailRewardsInTransactionOwnerSync(
             freeVmoney: knownPlayerBefore.freeVmoney,
             expPool: knownPlayerBefore.expPool,
         },
-        { itemOverflow: createMailClaimItemPolicy(playerId) },
+        { itemOverflow: createMailClaimItemPolicy(playerId, now, knownPlayerBefore.paidMana) },
     )
+    const itemOverflowDispositions = collectRewardGrantItemOverflowDispositions(grant)
     if (Object.keys(dedicated.update).length > 0) {
         updatePlayerSync({ id: playerId, ...dedicated.update })
     }
@@ -364,6 +380,15 @@ export function settleMailRewardsInTransactionOwnerSync(
             type_id: mail.type_id,
             number: mail.number,
         })
+    }
+    const userInfo = projectMailUserInfo(
+        mails,
+        grant.playerAfter,
+        dedicated.balance,
+        settlementPlan.autoSaleExpiredMailCount,
+    )
+    if (itemOverflowDispositions.some(disposition => disposition.kind === "sold")) {
+        userInfo.free_mana = grant.playerAfter.freeMana
     }
     return {
         characterList: grant.assets.characters.map(entry => (
@@ -376,12 +401,7 @@ export function settleMailRewardsInTransactionOwnerSync(
             String(item.itemId),
             item.afterAmount,
         ])),
-        userInfo: projectMailUserInfo(
-            mails,
-            grant.playerAfter,
-            dedicated.balance,
-            settlementPlan.autoSaleExpiredMailCount,
-        ),
+        userInfo,
         autoSaleExpiredMailCount: settlementPlan.autoSaleExpiredMailCount,
         playerAfter: {
             ...knownPlayerBefore,
@@ -395,5 +415,6 @@ export function settleMailRewardsInTransactionOwnerSync(
             boostPoint: dedicated.balance.boostPoint,
             rankPoint: dedicated.balance.rankPoint,
         },
+        ...(itemOverflowDispositions.length > 0 ? { itemOverflowDispositions } : {}),
     }
 }

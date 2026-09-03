@@ -12,6 +12,10 @@ import {
     MailRewardCapacityError,
     UnsupportedMailAttachmentError,
 } from "../../lib/mail-reward-grant";
+import {
+    projectItemOverflowCommonResponse,
+    type PlannedItemOverflowDisposition,
+} from "../../lib/item-overflow";
 
 interface IndexBody {
     api_count: number
@@ -211,6 +215,10 @@ const routes = async (fastify: FastifyInstance) => {
             total_count: totalCount,
             mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
         }
+        const overMax = projectItemOverflowCommonResponse(
+            settlement.itemOverflowDispositions ?? [],
+        )
+        if (overMax.length > 0) responseData.over_max = overMax
 
         if (reconciledCharacterList.length > 0) responseData.character_list = reconciledCharacterList
         if (equipmentList.length > 0) responseData.equipment_list = equipmentList
@@ -259,6 +267,7 @@ const routes = async (fastify: FastifyInstance) => {
             equipmentList: any[]
             itemList: Record<string, number>
             userInfo: Record<string, any>
+            itemOverflowDispositions: readonly PlannedItemOverflowDisposition[]
         }
         try {
             const evaluationTime = getVirtualNow()
@@ -286,17 +295,18 @@ const routes = async (fastify: FastifyInstance) => {
                 const userInfo: Record<string, number> = {}
                 let blockedCount = 0
                 let autoSaleExpiredMailCount = 0
+                const itemOverflowDispositions: PlannedItemOverflowDisposition[] = []
                 for (const mail of validMails) {
                     try {
-                            const mailSettlement = getDb().transaction(() => {
-                                const reward = settleMailRewardsInTransactionOwnerSync(
+                        const mailSettlement = getDb().transaction(() => {
+                            const reward = settleMailRewardsInTransactionOwnerSync(
                                 playerId,
                                 [mail],
                                 player!,
-                                    evaluationTime,
-                                )
-                                return reward
-                            })()
+                                evaluationTime,
+                            )
+                            return reward
+                        })()
                         claimed.push(mail.id)
                         claimedMails.push(mail)
                         characters.push(...mailSettlement.characterList)
@@ -304,6 +314,9 @@ const routes = async (fastify: FastifyInstance) => {
                         Object.assign(itemList, mailSettlement.itemList)
                         Object.assign(userInfo, mailSettlement.userInfo)
                         autoSaleExpiredMailCount += mailSettlement.autoSaleExpiredMailCount
+                        itemOverflowDispositions.push(...(
+                            mailSettlement.itemOverflowDispositions ?? []
+                        ))
                         player = mailSettlement.playerAfter
                     } catch (error) {
                         if (error instanceof MailRewardCapacityError) {
@@ -347,6 +360,7 @@ const routes = async (fastify: FastifyInstance) => {
                     equipmentList: equipment,
                     itemList,
                     userInfo,
+                    itemOverflowDispositions: Object.freeze(itemOverflowDispositions),
                 }
             })()
         } catch (error) {
@@ -369,6 +383,7 @@ const routes = async (fastify: FastifyInstance) => {
             equipmentList,
             itemList,
             userInfo,
+            itemOverflowDispositions,
         } = settlement
 
         const responseData: Record<string, any> = {
@@ -388,6 +403,8 @@ const routes = async (fastify: FastifyInstance) => {
         if (equipmentList.length > 0) responseData.equipment_list = equipmentList
         if (Object.keys(itemList).length > 0) responseData.item_list = itemList
         if (Object.keys(userInfo).length > 0) responseData.user_info = userInfo
+        const overMax = projectItemOverflowCommonResponse(itemOverflowDispositions)
+        if (overMax.length > 0) responseData.over_max = overMax
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

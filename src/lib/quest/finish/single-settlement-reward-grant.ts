@@ -29,6 +29,7 @@ export function projectSingleSettlementRewardGrant(
         entry.currency,
         entry.requestedAmount,
     ]))
+    const itemOverflowDispositions = collectRewardGrantItemOverflowDispositions(grant)
     return {
         user_info: {
             free_mana: currency.freeMana ?? 0,
@@ -44,7 +45,9 @@ export function projectSingleSettlementRewardGrant(
             String(entry.itemId),
             entry.afterAmount,
         ])),
-        itemOverflowDispositions: collectRewardGrantItemOverflowDispositions(grant),
+        ...(itemOverflowDispositions.length === 0
+            ? {}
+            : { itemOverflowDispositions }),
     }
 }
 

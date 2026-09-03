@@ -64,7 +64,10 @@ function projectMultiRewardGrant(grant: RewardGrantExecutionResult): PlayerRewar
     }
     result.character_list = [...characters.values()]
     result.equipment_list = [...equipment.values()]
-    result.itemOverflowDispositions = collectRewardGrantItemOverflowDispositions(grant)
+    const itemOverflowDispositions = collectRewardGrantItemOverflowDispositions(grant)
+    if (itemOverflowDispositions.length > 0) {
+        result.itemOverflowDispositions = itemOverflowDispositions
+    }
     return result
 }
 
@@ -131,7 +134,10 @@ export class MultiSettlementRewardGranter {
             ? { drop_score_reward_ids: [], drop_rare_reward_ids: [], ...emptyRewardResult() }
             : projectGrantedScoreRewardSettlementResult(selection, grant)
         if (grant !== null) {
-            result.itemOverflowDispositions = collectRewardGrantItemOverflowDispositions(grant)
+            const itemOverflowDispositions = collectRewardGrantItemOverflowDispositions(grant)
+            if (itemOverflowDispositions.length > 0) {
+                result.itemOverflowDispositions = itemOverflowDispositions
+            }
         }
         recordScoreRewardSettlement(this.playerId, selection, result)
         return result

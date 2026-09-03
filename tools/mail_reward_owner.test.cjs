@@ -21,6 +21,7 @@ const { getPlayerItemSync } = require("../src/data/domains/item")
 const { MailType } = require("../src/data/domains/mail")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 
 const CHARACTER_ID = 1
 const EQUIPMENT_ID = 3010006
@@ -202,6 +203,35 @@ test("batch mail owner callback uses one snapshot and projects final mixed state
     for (const field of ["source", "mailId", "attachmentIndex", "isNew", "itemDeltas", "joined_character_id_list"]) {
         assert.equal(serialized.includes(`\"${field}\"`), false, serialized)
     }
+})
+
+test("category 6 sellable Item Mail accepts capacity and sells only the remainder", () => {
+    const { settleMailRewardsInTransactionOwnerSync } = require("../src/lib/mail-reward-grant")
+    const playerId = createPlayer("category-six-overflow")
+    const itemId = 40090
+    setInventoryFixtureItemExactSync(playerId, itemId, 9998)
+    const player = getPlayerSync(playerId)
+
+    const result = database.transaction(() => settleMailRewardsInTransactionOwnerSync(
+        playerId,
+        [mail(25, MailType.ITEM, itemId, 48)],
+        player,
+    ))()
+
+    assert.equal(getPlayerItemSync(playerId, itemId), 9999)
+    assert.equal(result.playerAfter.freeMana, player.freeMana + 141)
+    assert.equal(getPlayerSync(playerId).totalManaObtained, player.totalManaObtained + 141)
+    assert.deepEqual(result.itemOverflowDispositions, [{
+        kind: "sold",
+        itemId,
+        overflowAmount: 47,
+        soldMana: 141,
+        manaBefore: player.freeMana,
+        acceptedMana: 141,
+        overflowMana: 0,
+        manaAfter: player.freeMana + 141,
+    }])
+    assert.deepEqual(result.userInfo, { free_mana: player.freeMana + 141 })
 })
 
 test("mail owner rejects a snapshot from another player before rewards or history", () => {

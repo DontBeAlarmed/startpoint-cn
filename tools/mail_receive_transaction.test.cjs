@@ -21,7 +21,7 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const { getPlayerCharactersSync } = require("../src/data/domains/character")
 const { getPlayerItemSync } = require("../src/data/domains/item")
 const { insertMailSync, MailType } = require("../src/data/domains/mail")
-const { insertDefaultPlayerSync } = require("../src/data/domains/player")
+const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { updatePlayerSync } = require("../src/data/domains/player")
 const { SessionType } = require("../src/data/types")
@@ -217,6 +217,34 @@ test("single receive keeps an Item mail when the Inventory is full", async () =>
     assert.equal(receiveHistoryCount(playerId), 0)
 })
 
+test("single receive sells only category 6 Item overflow and publishes Sold Toast", async () => {
+    const { playerId, viewerId } = await createPlayer("category-six-single")
+    const itemId = 40090
+    setInventoryFixtureItemExactSync(playerId, itemId, 9998)
+    const before = getPlayerSync(playerId)
+    const mailId = addMail(playerId, MailType.ITEM, itemId, 48)
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/receive",
+        payload: { viewer_id: viewerId, mail_id: mailId },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    const result = decode(response).data
+    assert.equal(getPlayerItemSync(playerId, itemId), 9999)
+    assert.equal(getPlayerSync(playerId).freeMana, before.freeMana + 141)
+    assert.equal(mailState(mailId), null)
+    assert.equal(receiveHistoryCount(playerId), 1)
+    assert.equal(result.item_list[itemId], 9999)
+    assert.equal(result.user_info.free_mana, before.freeMana + 141)
+    assert.deepEqual(result.over_max, [{
+        process_type: 2,
+        amount_sold: 141,
+        item: { item_id: itemId, number: 47 },
+    }])
+})
+
 test("receive_all skips a full Item mail and continues with other mail", async () => {
     const { playerId, viewerId } = await createPlayer("capacity-blocked-all")
     const itemId = 14002
@@ -238,6 +266,42 @@ test("receive_all skips a full Item mail and continues with other mail", async (
     assert.equal(mailState(validMailId), null)
     assert.equal(getPlayerItemSync(playerId, itemId), policy.maxCount(itemId))
     assert.equal(receiveHistoryCount(playerId), 1)
+})
+
+test("receive_all sells category 6 overflow while retaining a blocked normal Item mail", async () => {
+    const { playerId, viewerId } = await createPlayer("category-six-all")
+    const categorySixItemId = 40090
+    const normalItemId = 14002
+    setInventoryFixtureItemExactSync(playerId, categorySixItemId, 9999)
+    const normalPolicy = createRewardGrantItemOverflowPolicy(playerId)
+    setInventoryFixtureItemExactSync(playerId, normalItemId, normalPolicy.maxCount(normalItemId))
+    const categorySixMailId = addMail(playerId, MailType.ITEM, categorySixItemId, 48)
+    const blockedMailId = addMail(playerId, MailType.ITEM, normalItemId, 2)
+    const validMailId = addMail(playerId, MailType.FREE_VMONEY, null, 3)
+    const manaBefore = getPlayerSync(playerId).freeMana
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/receive_all",
+        payload: {
+            viewer_id: viewerId,
+            mail_ids: [categorySixMailId, blockedMailId, validMailId],
+        },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    const result = decode(response).data
+    assert.deepEqual(result.mail_ids, [categorySixMailId, validMailId])
+    assert.equal(result.max_overed_mail_count, 1)
+    assert.equal(mailState(categorySixMailId), null)
+    assert.equal(mailState(blockedMailId), "0000-00-00 00:00:00")
+    assert.equal(mailState(validMailId), null)
+    assert.equal(getPlayerSync(playerId).freeMana, manaBefore + 144)
+    assert.deepEqual(result.over_max, [{
+        process_type: 2,
+        amount_sold: 144,
+        item: { item_id: categorySixItemId, number: 48 },
+    }])
 })
 
 test("single receive keeps a FREE_MANA mail when total Mana is full", async () => {
