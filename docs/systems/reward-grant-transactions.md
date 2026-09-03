@@ -20,11 +20,11 @@ target 计划条目只包含正向资产 command 和连续数组位置。抽取�
 
 所有执行入口都不信任传入对象的 TypeScript 结构类型，会在首笔写入前读取 `plan.entries`，并通过 `createRewardGrantExecutionPlan` 重新规范化和完整校验。伪造、畸形或带 getter 的运行时 Plan 与普通输入遵循同一快照规则；校验失败抛出 `RewardGrantContractValidationError`，不会产生写入。
 
-事务内执行器首先确认存在调用方活动事务，规范化 Plan，再通过嵌套的 `getDb().transaction` 建立计划级 SQLite savepoint。共享私有执行体在 savepoint 内先确认玩家存在，之后才按计划顺序发放奖励。未处于事务时抛出 `RewardGrantTransactionRequiredError`；玩家不存在时抛出 `RewardGrantPlayerNotFoundError`；角色配置等执行期错误抛出 `RewardGrantExecutionError`。任一错误都会回滚本计划的全部写入，即使调用方捕获错误并正常提交外层事务，也不会留下部分奖励；调用方在计划外的其他写入不受该 savepoint 回滚影响。
+事务内执行器首先确认存在调用方活动事务，规范化 Plan，再通过嵌套的 `getDb().transaction` 建立计划级 SQLite savepoint。共享私有执行体在 savepoint 内先确认玩家存在，之后才按计划顺序发放奖励。未处于事务时抛出 `RewardGrantExecutionTransactionError`；计划或 known-player 快照不符合 typed contract 时抛出 `RewardGrantContractValidationError`；角色、装备、Item 或其他资产执行失败时抛出对应的资产执行错误。任一错误都会回滚本计划的全部写入，即使调用方捕获错误并正常提交外层事务，也不会留下部分奖励；调用方在计划外的其他写入不受该 savepoint 回滚影响。
 
 独立执行器在规范化 Plan 后，仅包装一次 `getDb().transaction` 并直接调用同一个私有执行体，不调用事务内执行器，因此公共模块不会形成“外层事务加计划 savepoint”的两层包装。两个入口都不提交或吞掉执行错误；调用方仍可通过抛错或显式回滚撤销包含奖励在内的整个外层事务。
 
-事务拥有者入口同样要求活动事务，并在首笔写入前重新规范化完整 Plan，但不查询完整玩家前后态，也不建立 savepoint。它先各读取一次 `knownPlayerBefore.freeMana`、`freeVmoney` 和 `expPool`，复制为不含额外字段的普通对象；三字段必须是非负安全整数，否则抛出带 `field` 的 `RewardGrantKnownPlayerValidationError` 且零写入。每条 MANA、BEADS 或 EXP 奖励都先计算对应最终值，确认仍是非负安全整数后，才修改内存中的 `playerAfter` 与累计 delta；溢出时分别以 `freeMana`、`freeVmoney` 或 `expPool` 标识错误，并由事务拥有者回滚此前写入。纯货币、纯装备、空计划和首次角色获得不会激活 Inventory；发生 direct Item 或运行时重复角色补偿时，Inventory 在当前事务中读取明确 Item 前态，但通过 `caller-verified` 复用 RewardGrant 入口已有的玩家存在性合同，不重复查询 Player。执行过程最后在 Inventory flush 后用一条 `players` UPDATE 写入本 Plan 的最终三项余额与 mana 累计。owner CHARACTER 继续复用角色写入返回的首次获得事实，不为了 `joined_character_id_list` 预查一次角色所有权。
+事务拥有者入口同样要求活动事务，并在首笔写入前重新规范化完整 Plan，但不查询完整玩家前后态，也不建立 savepoint。它先各读取一次 `knownPlayerBefore.freeMana`、`freeVmoney` 和 `expPool`，复制为不含额外字段的普通对象；身份、字段缺失或非负安全整数校验失败时抛出 `RewardGrantContractValidationError` 且零写入。每条 MANA、BEADS 或 EXP 奖励都先计算对应最终值，确认仍是非负安全整数后，才修改内存中的 `playerAfter` 与累计 delta；溢出时分别以 `freeMana`、`freeVmoney` 或 `expPool` 标识错误，并由事务拥有者回滚此前写入。纯货币、纯装备、空计划和首次角色获得不会激活 Inventory；发生 direct Item 或运行时重复角色补偿时，Inventory 在当前事务中读取明确 Item 前态，但通过 `caller-verified` 复用 RewardGrant 入口已有的玩家存在性合同，不重复查询 Player。执行过程最后在 Inventory flush 后用一条 `players` UPDATE 写入本 Plan 的最终三项余额与 mana 累计。owner CHARACTER 继续复用角色写入返回的首次获得事实，不为了 `joined_character_id_list` 预查一次角色所有权。
 
 Mission 的 `degreeId` 不再传入 RewardGrant。RewardGrant 先完成标准资产和 Player resource update，Mission source 随后以窄 Player update 写入当前 degree；degree、标准奖励和 stage receipt 仍处于同一外层事务。含 degree+standard 的 batch 因 owner 分离固定增加一次 `players` UPDATE，属于已审查接受的 `O(1)` 性能成本。
 

@@ -29,7 +29,7 @@
 | D14 | 统一角色成长状态服务（已落地，待实机验收） | [角色成长状态 Gate](./character-growth-state-gate.md) | Growth commands、事务、任务事实、投影、`/load`、存档与性能合同 |
 | D15 | 全项目领域边界蓝图（识别完成，实施主线进行中） | [领域边界蓝图](./domain-boundary-blueprint.md) | CDN/客户端/服务端三层边界；owner、有限 shared core、adapter、projector 与独立模块 |
 | D16 | Item Inventory Owner（已落地，待大 Gate A 与客户端验收） | [Item Inventory Owner Gate](./item-inventory-owner-gate.md) | typed Item Content、唯一 Item writer、cap 纯计划与 EventTrade 到期策略 |
-| D17 | RewardGrant 正向协调核（设计审计中） | [RewardGrant Core Gate](./reward-grant-core-gate.md) | 正向 Reward plan、资产 owner executors 与 Typed Grant Result；不成为 Economy bus |
+| D17 | RewardGrant 正向协调核（实现完成，待大 Gate A 与客户端验收） | [RewardGrant Core Gate](./reward-grant-core-gate.md) | 正向 Reward plan、资产 owner executors 与 Typed Grant Result；不成为 Economy bus |
 
 ## 阅读顺序
 
