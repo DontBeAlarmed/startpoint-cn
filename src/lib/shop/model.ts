@@ -44,6 +44,13 @@ export interface ShopNavigationProduct extends ShopCatalogEntryBase {
     readonly kind: "specialExchangeLink"
     readonly shopType: ShopType.SPECIAL_PACK
     readonly specialExchangeCampaignId: number
+    readonly listing: Readonly<Pick<ShopItem,
+        | "stock"
+        | "dailyStock"
+        | "monthlyStock"
+        | "maxFrequency"
+        | "specifiedMonths"
+    >>
 }
 
 export type ShopCatalogEntry = ShopPurchaseProduct | ShopNavigationProduct

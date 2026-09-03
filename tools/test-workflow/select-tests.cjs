@@ -391,6 +391,18 @@ const SOURCE_RULES = [
         groups: ["integration:rules"],
     },
     {
+        pattern: /^(?:src\/lib\/shop\/response-projector\.ts|tools\/shop_response_projector\.test\.cjs)$/,
+        groups: ["integration:rules"],
+    },
+    {
+        pattern: /^src\/lib\/shop\/sales-catalog\.ts$/,
+        groups: ["integration:event", "integration:rules"],
+    },
+    {
+        pattern: /^src\/routes\/api\/shop\/purchase-routes\.ts$/,
+        groups: ["integration:event", "integration:mission", "integration:rules"],
+    },
+    {
         pattern: /^(?:src\/lib\/mail-reward-grant\.ts|src\/routes\/api\/mail\.ts|docs\/systems\/mail\.md)$/,
         groups: ["integration:reward-grant", "integration:rules"],
     },

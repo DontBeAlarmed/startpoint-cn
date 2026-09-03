@@ -8,6 +8,7 @@ const {
 } = require("../../src/content/runtime/content-snapshot")
 
 const tableNames = [
+    "cdn_general_shop_whitelist.json",
     "general_shop.json",
     "event_item_shop.json",
     "event_item_shop_id_map.json",

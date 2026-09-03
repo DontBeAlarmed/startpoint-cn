@@ -8,7 +8,9 @@ import {
 } from "./period"
 
 export class ShopOfferNotPurchasableError extends Error {}
-export class ShopOfferPeriodError extends Error {}
+export class ShopOfferPeriodError extends Error {
+    readonly resultCode = 2053
+}
 export class ShopOfferScheduleError extends Error {}
 
 export function resolveEffectiveShopOffer(

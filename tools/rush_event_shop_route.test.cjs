@@ -9,6 +9,9 @@ require("ts-node/register/transpile-only")
 
 const { after } = require("node:test")
 const { installBundledShopSnapshot } = require("./helpers/install-bundled-shop-snapshot.cjs")
+const {
+    productionContentSnapshotProvider,
+} = require("../src/content/runtime/content-snapshot")
 const restoreBundledShopSnapshot = installBundledShopSnapshot()
 after(restoreBundledShopSnapshot)
 
@@ -387,8 +390,7 @@ stubModule("../src/runtime/time/game-time", {
     getVirtualNowMs: () => globalNowSeconds * 1000,
     getVirtualNow: () => new Date(globalNowSeconds * 1000),
 })
-stubModule("../src/lib/shop-reward-grant", {
-    grantShopRewardsInTransactionOwnerWithInventorySync(
+function grantStubShopRewards(
         playerId,
         rewards,
         knownPlayerBefore,
@@ -428,6 +430,45 @@ stubModule("../src/lib/shop-reward-grant", {
                 freeVmoney: knownPlayerBefore.freeVmoney,
                 expPool: knownPlayerBefore.expPool + expPool,
             },
+        }
+}
+stubModule("../src/lib/shop-reward-grant", {
+    grantShopRewardsInTransactionOwnerWithInventorySync: grantStubShopRewards,
+    grantShopRewardsTypedInTransactionOwnerWithInventorySync(
+        playerId,
+        rewards,
+        knownPlayerBefore,
+        inventory,
+    ) {
+        const legacy = grantStubShopRewards(
+            playerId,
+            rewards,
+            knownPlayerBefore,
+            inventory,
+        )
+        return {
+            execution: {
+                entries: [],
+                assets: {
+                    items: Object.entries(legacy.rewardResult.items).map(([itemId, afterAmount]) => ({
+                        itemId: Number(itemId),
+                        requestedAmount: 0,
+                        acceptedAmount: 0,
+                        overflowAmount: 0,
+                        beforeAmount: 0,
+                        afterAmount,
+                    })),
+                    characters: [],
+                    equipment: [],
+                    currencies: [],
+                },
+                playerAfter: {
+                    playerId,
+                    ...legacy.playerAfter,
+                },
+            },
+            invalidatedFactKeys: [],
+            itemOverflowDispositions: [],
         }
     },
 })
@@ -483,6 +524,53 @@ async function getRushSales(fastify, eventType, eventId) {
 async function main() {
     const fastify = await createServer()
     try {
+        globalNowSeconds = Date.parse("2022-12-23T12:00:00+08:00") / 1000
+        for (const url of ["/buy", "/bulk_buy"]) {
+            const malformed = await fastify.inject({ method: "POST", url, payload: null })
+            assert.equal(malformed.statusCode, 400)
+        }
+        const specialSalesResponse = await fastify.inject({
+            method: "POST",
+            url: "/get_sales_list",
+            payload: {
+                viewer_id: 123,
+                shop_types: [3],
+                boss_coin_shop_category_ids: [],
+                equipment_enhancement_shop_category_ids: [],
+                browse_treasure_flag: false,
+                event_list: [],
+            },
+        })
+        const specialSales = decode(specialSalesResponse).data.sales_list
+        assert.equal(specialSales.some(item => item.shop_item_id === 200001), true)
+        assert.equal(specialSales.some(item => item.shop_item_id === 200002), true)
+        const beforeNavigationBuy = snapshot()
+        const navigationBuy = await fastify.inject({
+            method: "POST",
+            url: "/buy",
+            payload: { viewer_id: 123, shop_type: 3, shop_item_id: 200001, number: 1 },
+        })
+        assert.equal(navigationBuy.statusCode, 400)
+        assert.deepEqual(snapshot(), beforeNavigationBuy)
+
+        globalNowSeconds = Date.parse("2024-10-12T12:00:00+08:00") / 1000
+        db.prepare("UPDATE player_state SET free_vmoney = 100, bond_token = 100 WHERE id = 17").run()
+        setItem(17, 990008, 100)
+        for (const [shopType, shopItemId] of [
+            [5, 200001],
+            [7, 200103],
+            [8, 100001],
+            [9, 100000],
+        ]) {
+            const response = await fastify.inject({
+                method: "POST",
+                url: "/buy",
+                payload: { viewer_id: 123, shop_type: shopType, shop_item_id: shopItemId, number: 1 },
+            })
+            assert.equal(response.statusCode, 200, `shop type ${shopType}: ${response.body}`)
+            assert.equal(decode(response).data_headers.result_code, 1)
+        }
+        setItem(17, 40000, 100)
         globalNowSeconds = Date.parse("2022-12-23T12:00:00+08:00") / 1000
         const campaignBefore = await fastify.inject({
             method: "POST",
@@ -575,6 +663,14 @@ async function main() {
         eventItemShopAsset["11"]["700011"] = {
             "999999": eventItemShopAsset["11"]["700001"]["700000"],
         }
+        const previousTargetSnapshot = productionContentSnapshotProvider.snapshot
+        productionContentSnapshotProvider.snapshot = {
+            ...previousTargetSnapshot,
+            repository: {
+                info: () => previousTargetSnapshot.repository.info(),
+                table: tableName => previousTargetSnapshot.repository.table(tableName),
+            },
+        }
         try {
             const beforeExactShopPurchase = snapshot()
             const oldItemPurchase = await fastify.inject({
@@ -590,6 +686,7 @@ async function main() {
             )
             assert.deepEqual(snapshot(), beforeExactShopPurchase)
         } finally {
+            productionContentSnapshotProvider.snapshot = previousTargetSnapshot
             delete eventItemShopAsset["11"]["700011"]
         }
 
@@ -781,7 +878,16 @@ async function main() {
 
         const enhancementItem = equipmentEnhancementShopAsset["2001"]
         enhancementItem.userCost = { type: 1, amount: 30 }
+        const previousEquipmentSnapshot = productionContentSnapshotProvider.snapshot
+        productionContentSnapshotProvider.snapshot = {
+            ...previousEquipmentSnapshot,
+            repository: {
+                info: () => previousEquipmentSnapshot.repository.info(),
+                table: tableName => previousEquipmentSnapshot.repository.table(tableName),
+            },
+        }
         const grantsBeforeEnhancement = shopRewardGrantCalls
+        globalNowSeconds = Date.parse("2024-10-12T12:00:00+08:00") / 1000
         db.prepare("UPDATE player_state SET free_mana = 10, paid_mana = 100 WHERE id = 17").run()
         try {
             const enhancementPurchase = await fastify.inject({
@@ -802,12 +908,14 @@ async function main() {
             )
             assert.equal(
                 shopRewardGrantCalls,
-                grantsBeforeEnhancement,
-                "追忆强化专用分支不得迁移到标准 RewardGrant adapter",
+                grantsBeforeEnhancement + 1,
+                "追忆强化必须通过空 RewardGrant 计划统一 flush shared Inventory",
             )
         } finally {
+            productionContentSnapshotProvider.snapshot = previousEquipmentSnapshot
             delete enhancementItem.userCost
         }
+        globalNowSeconds = Date.parse("2023-12-01T00:00:00+08:00") / 1000
 
         const reloadedServer = await createServer()
         try {

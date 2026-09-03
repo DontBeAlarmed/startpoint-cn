@@ -116,6 +116,15 @@ function addEntry(
             periods,
             listed,
             specialExchangeCampaignId: item.specialExchangeCampaignId!,
+            listing: {
+                stock: item.stock,
+                ...(item.dailyStock === undefined ? {} : { dailyStock: item.dailyStock }),
+                ...(item.monthlyStock === undefined ? {} : { monthlyStock: item.monthlyStock }),
+                ...(item.maxFrequency === undefined ? {} : { maxFrequency: item.maxFrequency }),
+                ...(item.specifiedMonths === undefined
+                    ? {}
+                    : { specifiedMonths: [...item.specifiedMonths] }),
+            },
         }
         catalog.entries[key] = entry
         append(catalog.productIdsByType, String(shopType), shopItemId)

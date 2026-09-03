@@ -1,13 +1,11 @@
 import { getContentSnapshot } from "../content/runtime/content-snapshot"
 import { getPlayerShopCampaignLineupsSync } from "../data/domains/shop-campaign-lineup"
-import { getPlayerEquipmentSync, playerOwnsEquipmentSync } from "../data/domains/equipment"
+import { getPlayerEquipmentsByIdsSync } from "../data/domains/equipment"
+import { getPlayerShopPurchaseCountsByTypeBulkSync } from "../data/domains/shopPurchase"
 import {
-    getBossCoinShopItemsSync,
     getBoxGachaSync,
-    getEventShopItemsSync,
-    getGenericShopItemsSync,
-    getShopSelectItemCampaignsSync,
 } from "./assets"
+import { getShopCatalog } from "./shop"
 import { buildShopSalesListSync } from "./shop-sales-list"
 import { validateBoxGachaPeriod } from "./box-gacha-reset"
 import {
@@ -15,10 +13,8 @@ import {
     requireAvailableShopCampaign,
 } from "./shop-select-campaign"
 import {
-    BossCoinShopItems,
     BoxGachaIdReward,
     BoxGachaRewardType,
-    EventShopItems,
     RawBoxRewards,
     ShopItem,
     ShopItemRewardType,
@@ -42,82 +38,31 @@ interface SalesListItemIdentity {
     readonly shop_type: number
 }
 
-function mergeShopItems(
-    itemsByType: Record<number, ShopItems>,
-    shopType: ShopType,
-    items: ShopItems | null,
-): void {
-    if (items === null) return
-    itemsByType[shopType] = { ...(itemsByType[shopType] ?? {}), ...items }
-}
-
-function getAllAuthoritativeShopItemsSync(): Record<number, ShopItems> {
-    const itemsByType: Record<number, ShopItems> = {}
-    for (const shopType of [
-        ShopType.TREASURE,
-        ShopType.GENERAL,
-        ShopType.STAR_GRAIN,
-        ShopType.TREASURE_EQUIPMENT,
-    ]) {
-        mergeShopItems(itemsByType, shopType, getGenericShopItemsSync(shopType))
-    }
-
-    const repository = getContentSnapshot().repository
-    const eventShops = repository.table<EventShopItems>("event_item_shop.json")
-    for (const [eventType, events] of Object.entries(eventShops)) {
-        for (const eventId of Object.keys(events)) {
-            mergeShopItems(
-                itemsByType,
-                ShopType.EVENT_ITEM,
-                getEventShopItemsSync(eventType, eventId),
-            )
-        }
-    }
-    const bossCoinShops = repository.table<BossCoinShopItems>("boss_coin_shop.json")
-    for (const categoryId of Object.keys(bossCoinShops)) {
-        mergeShopItems(
-            itemsByType,
-            ShopType.BOSS_COIN,
-            getBossCoinShopItemsSync(categoryId),
-        )
-    }
-    return itemsByType
-}
-
-function shopItemMatchesTarget(item: ShopItem, target: HowToGetTarget): boolean {
-    // Only explicit reward rows are authoritative. Costs and display metadata are not sources.
+function getRelevantShopItemsFromCatalog(
+    target: HowToGetTarget,
+): { readonly itemsByType: Record<number, ShopItems>, readonly matchingKeys: Set<string> } {
+    const catalog = getShopCatalog()
     const expectedType = target.kind === "item"
         ? ShopItemRewardType.ITEM
         : ShopItemRewardType.EQUIPMENT
-    return item.rewards.some(reward => (
-        reward.type === expectedType
-        && (reward as { readonly id?: number }).id === target.id
-    ))
-}
-
-function getRelevantShopItems(
-    itemsByType: Readonly<Record<number, ShopItems>>,
-    target: HowToGetTarget,
-): { readonly itemsByType: Record<number, ShopItems>, readonly matchingKeys: Set<string> } {
+    const matchedKeys = catalog.rewardProductKeys[`${expectedType}:${target.id}`] ?? []
     const relevantItemsByType: Record<number, ShopItems> = {}
-    const matchingKeys = new Set<string>()
-    for (const [shopTypeText, items] of Object.entries(itemsByType)) {
-        const shopType = Number(shopTypeText)
-        const matchingEnhancementGroups = new Set<number>()
-        for (const [shopItemId, item] of Object.entries(items)) {
-            if (shopItemMatchesTarget(item, target)) {
-                matchingKeys.add(`${shopType}:${Number(shopItemId)}`)
-                if (shopType === ShopType.TREASURE_EQUIPMENT) {
-                    matchingEnhancementGroups.add(item.groupId ?? 0)
-                }
-            }
+    const matchingKeys = new Set(matchedKeys)
+    const includeKeys = new Set(matchedKeys)
+    for (const key of matchedKeys) {
+        const entry = catalog.entries[key]
+        if (entry?.kind !== "purchase") continue
+        if (entry.scope.kind !== "equipmentEnhancement") continue
+        const groupKey = `${entry.scope.categoryId}:${entry.scope.groupId}:${entry.scope.equipmentId}`
+        for (const stageId of catalog.equipmentGroupProductIds[groupKey] ?? []) {
+            includeKeys.add(`${ShopType.TREASURE_EQUIPMENT}:${stageId}`)
         }
-        const relevantItems = Object.fromEntries(Object.entries(items).filter(([, item]) => (
-            shopItemMatchesTarget(item, target)
-            || (shopType === ShopType.TREASURE_EQUIPMENT
-                && matchingEnhancementGroups.has(item.groupId ?? 0))
-        )))
-        if (Object.keys(relevantItems).length > 0) relevantItemsByType[shopType] = relevantItems
+    }
+    for (const key of includeKeys) {
+        const entry = catalog.entries[key]
+        if (entry?.kind !== "purchase") continue
+        const items = relevantItemsByType[entry.shopType] ??= {}
+        items[String(entry.shopItemId)] = entry.item
     }
     return { itemsByType: relevantItemsByType, matchingKeys }
 }
@@ -192,14 +137,19 @@ export function getHowToGetListSync(
     purchasePeriodNowMs = nowMs,
     resetHour = 5,
 ): HowToGetList {
-    const relevant = getRelevantShopItems(getAllAuthoritativeShopItemsSync(), target)
+    const relevant = getRelevantShopItemsFromCatalog(target)
     const campaignLineups = getPlayerShopCampaignLineupsSync(playerId)
-    const campaigns = getShopSelectItemCampaignsSync()
+    const campaigns = getContentSnapshot().repository.table<ShopSelectItemCampaigns>(
+        "shop_select_item_campaign.json",
+    )
+    const equipmentIds = Object.values(relevant.itemsByType[ShopType.TREASURE_EQUIPMENT] ?? {})
+        .map(item => item.equipmentId)
+        .filter((equipmentId): equipmentId is number => equipmentId !== undefined)
+    const equipment = getPlayerEquipmentsByIdsSync(playerId, equipmentIds)
     const dependencies = {
-        getEquipmentEnhancementLevel: (ownerId: number, equipmentId: number) => (
-            playerOwnsEquipmentSync(ownerId, equipmentId)
-                ? (getPlayerEquipmentSync(ownerId, equipmentId)?.enhancementLevel ?? 0)
-                : -1
+        getPurchaseCountsBulk: getPlayerShopPurchaseCountsByTypeBulkSync,
+        getEquipmentEnhancementLevel: (_ownerId: number, equipmentId: number) => (
+            equipment[String(equipmentId)]?.enhancementLevel ?? -1
         ),
     }
     const selectedSales = buildShopSalesListSync({

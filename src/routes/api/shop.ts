@@ -59,6 +59,9 @@ import {
     withDeferredInventoryBatchContextWithinTransactionSync,
     type InventoryBatchContext,
 } from "../../lib/inventory"
+import { registerShopPurchaseRoutes } from "./shop/purchase-routes"
+import { getShopCatalog } from "../../lib/shop"
+import { selectShopSalesCatalogItems } from "../../lib/shop/sales-catalog"
 
 interface GetSalesListBody {
     equipment_enhancement_shop_category_ids: number[],
@@ -106,7 +109,8 @@ function withShopInventorySync<T>(
 
 const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {}) => {
     const dailyResetHour = options.dailyResetHour ?? 5
-    fastify.post("/buy", async (request: FastifyRequest, reply: FastifyReply) => {
+    registerShopPurchaseRoutes(fastify, dailyResetHour)
+    if (false) fastify.post("/buy", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as BuyBody
 
         const viewerId = body.viewer_id
@@ -469,31 +473,14 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
 
         console.log(`[shop:req] viewer=${viewerId} types=${JSON.stringify(shopTypes)} bossCats=${JSON.stringify(bossCoinShopCategoryIds)} equipCats=${JSON.stringify(equipmentEnhancementCategoryIds)} events=${eventList.length} eventList=${JSON.stringify(eventList)}`)
 
-        let toParseShopItems: Record<number, ShopItems> = {}
-
-        // shop types
-        for (const type of shopTypes) {
-            const items = getGenericShopItemsSync(type)
-            const existing = toParseShopItems[type] ?? {}
-            toParseShopItems[type] = items === null ? existing : { ...existing, ...items }
-        }
-
-        // event list
-        for (const event of eventList) {
-            const type = event.event_type
-            for (const eventId of event.event_ids) {
-                const items = getEventShopItemsSync(type, eventId)
-                const existing = toParseShopItems[ShopType.EVENT_ITEM] ?? {}
-                toParseShopItems[ShopType.EVENT_ITEM] = items === null ? existing : { ...existing, ...items }
-            }
-        }
-
-        // boss coin shop category ids
-        for (const category of bossCoinShopCategoryIds) {
-            const items = getBossCoinShopItemsSync(category)
-            const existing = toParseShopItems[ShopType.BOSS_COIN] ?? {}
-            toParseShopItems[ShopType.BOSS_COIN] = items === null ? existing : { ...existing, ...items }
-        }
+        const toParseShopItems = selectShopSalesCatalogItems(getShopCatalog(), {
+            shopTypes,
+            eventList: eventList.map(event => ({
+                eventType: event.event_type,
+                eventIds: event.event_ids,
+            })),
+            bossCategoryIds: bossCoinShopCategoryIds,
+        })
 
         const gameTime = getGameTimeContext()
         const nowMs = gameTime.virtualNowMs
@@ -628,7 +615,7 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
         })
     })
 
-    fastify.post("/bulk_buy", async (request: FastifyRequest, reply: FastifyReply) => {
+    if (false) fastify.post("/bulk_buy", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as BulkBuyBody
         const viewerId = body.viewer_id
         const shopType = body.shop_type
