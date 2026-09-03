@@ -62,6 +62,7 @@ export interface GivePlayerCharacterResult {
         id: number,
         count: number
     }
+    itemAfterAmount?: number
     itemOverflowDispositions?: readonly import("../item-overflow").PlannedItemOverflowDisposition[]
     overflowFreeManaAfter?: number
 }

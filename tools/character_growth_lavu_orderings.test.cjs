@@ -111,17 +111,26 @@ function receivedStageNumbers(stages) {
         .sort((left, right) => left - right)
 }
 
-function assertAwakeLoadMatchesDb(playerId, data) {
+function assertAwakeLoadMatchesAuthoritativeState(playerId, data) {
     const entries = new Map((data.active_mission_list ?? [])
         .filter(entry => LAVU_AWAKE_MISSION_IDS.includes(Number(entry.mission_id)))
         .map(entry => [Number(entry.mission_id), entry]))
     assert.equal(entries.size, LAVU_AWAKE_MISSION_IDS.length)
 
     const persisted = getPlayerCategoryMissionsSync(playerId, 9)
+    const player = getPlayerSync(playerId)
     for (const missionId of LAVU_AWAKE_MISSION_IDS) {
         const entry = entries.get(missionId)
         assert.ok(entry, `load must contain Lavu Awake mission ${missionId}`)
-        assert.equal(entry.progress_value, persisted[missionId]?.progress ?? 0)
+        const persistedProgress = currentAwakeMissionState(playerId, missionId).progress
+        const expectedProgress = missionId === 2630022
+            ? Math.max(persistedProgress, player.totalManaObtained)
+            : persistedProgress
+        assert.equal(
+            entry.progress_value,
+            expectedProgress,
+            `load progress must match authoritative Lavu Awake mission ${missionId} facts`,
+        )
         assert.deepEqual(
             (entry.stages ?? [])
                 .filter(stage => stage.received === true)
@@ -251,7 +260,11 @@ function assertCommandResultMatchesDb(playerId, result, responseData) {
     }
 }
 
-function assertClientMatchesDb(playerId, client, { missions = false } = {}) {
+function assertClientMatchesDb(
+    playerId,
+    client,
+    { missions = false, dynamicManaMission = false } = {},
+) {
     const character = getPlayerCharacterSync(playerId, LAVU_ID)
     const player = getPlayerSync(playerId)
     assert.ok(character)
@@ -282,9 +295,20 @@ function assertClientMatchesDb(playerId, client, { missions = false } = {}) {
     )
     if (missions) {
         for (const missionId of LAVU_AWAKE_MISSION_IDS) {
+            const persisted = currentAwakeMissionState(playerId, missionId)
+            const expected = dynamicManaMission && missionId === 2630022
+                ? {
+                    progress: Math.max(persisted.progress, player.totalManaObtained),
+                    stage: getCurrentStage(
+                        9,
+                        missionId,
+                        Math.max(persisted.progress, player.totalManaObtained),
+                    ),
+                }
+                : persisted
             assert.deepEqual(
                 client.awakeMissions.get(missionId),
-                currentAwakeMissionState(playerId, missionId),
+                expected,
             )
         }
     }
@@ -616,9 +640,12 @@ async function runOrdering(app, player, awakeBeforeSecondBoard) {
         platform_os_version: "test",
         storage_directory_path: "test",
     })
-    assertAwakeLoadMatchesDb(player.playerId, loadData)
+    assertAwakeLoadMatchesAuthoritativeState(player.playerId, loadData)
     const loadedClient = clientStateFromLoad(loadData, player.growthItemIds)
-    assertClientMatchesDb(player.playerId, loadedClient, { missions: true })
+    assertClientMatchesDb(player.playerId, loadedClient, {
+        missions: true,
+        dynamicManaMission: true,
+    })
     return finalState(player)
 }
 

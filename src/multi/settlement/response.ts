@@ -33,7 +33,6 @@ export async function projectMultiplayerFinishResponse(input: MultiplayerFinishR
         fieldMana,
         fixedManaReward,
         fixedPoolExpReward,
-        newMana,
         beforeRankPoint,
         newRankPoint,
         newBoostPoint,
@@ -52,19 +51,10 @@ export async function projectMultiplayerFinishResponse(input: MultiplayerFinishR
     )
     const responseData: Record<string, any> = {
         "user_info": {
-            "free_mana": periodicRewardSettlement.overflowFreeManaAfter
-                ?? (newMana
-                    + (clearReward?.user_info.free_mana || 0)
-                    + (sPlusClearReward?.user_info.free_mana || 0)
-                    + scoreRewardsResult.user_info.free_mana),
-            "exp_pool": rewardCharacterExpResult.exp_pool
-                + (clearReward?.user_info.exp_pool || 0)
-                + scoreRewardsResult.user_info.exp_pool,
+            "free_mana": playerData.freeMana,
+            "exp_pool": playerData.expPool,
             "exp_pooled_time": expPoolRealDateToClientTimestamp(playerData.expPooledTime),
-            "free_vmoney": playerData.freeVmoney
-                + (clearReward?.user_info.free_vmoney || 0)
-                + (sPlusClearReward?.user_info.free_vmoney || 0)
-                + scoreRewardsResult.user_info.free_vmoney,
+            "free_vmoney": playerData.freeVmoney,
             "rank_point": newRankPoint,
             "degree_id": 1,
             "stamina": playerData.stamina,
@@ -104,6 +94,8 @@ export async function projectMultiplayerFinishResponse(input: MultiplayerFinishR
         "is_multi": "multi",
         "quest_name": "",
         "item_list": {
+            ...(clearReward?.items ?? {}),
+            ...(sPlusClearReward?.items ?? {}),
             ...scoreRewardsResult.items,
             ...(additionalRewardSettlement.rewardResult?.items ?? {}),
             ...(rescueFragmentSettlement?.items ?? {}) as Record<string, number>,

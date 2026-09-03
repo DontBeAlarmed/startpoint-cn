@@ -140,7 +140,7 @@
   "multi/finish": [
     "anchor-to-publication:import:../../lib/mission/awake-candidate-character-ids#collectAwakeCandidateCharacterIds=1",
     "before-anchor:import:../../content/runtime/table-access#getRuntimeContentTableSync=1",
-    "before-anchor:import:../../data/domains/player#getPlayerSync=1",
+    "before-anchor:import:../../data/domains/player#getPlayerSync=2",
     "before-anchor:import:../../data/domains/player#updatePlayerSync=1",
     "before-anchor:import:../../data/domains/quest#getPlayerSingleQuestProgressSync=2",
     "before-anchor:import:../../data/domains/quest#insertPlayerQuestProgressSync=1",
@@ -167,10 +167,10 @@
     "before-anchor:import:../../lib/reward-campaign#calculateFixedQuestPoolExp=1",
     "before-anchor:import:../../lib/reward-campaign#getRewardCampaignRates=1",
     "before-anchor:import:../../lib/score-reward-lottery#getCommonScoreRewardCount=1",
-    "before-anchor:import:../../lib/stamina#addStaminaWithOverflowCap=2",
-    "before-anchor:import:../../lib/stamina#getMaxStamina=2",
+    "before-anchor:import:../../lib/stamina#addStaminaWithOverflowCap=1",
+    "before-anchor:import:../../lib/stamina#getMaxStamina=1",
     "before-anchor:import:../../lib/stamina#getRankDegree=3",
-    "before-anchor:import:../../runtime/time/game-time#getRealNow=3",
+    "before-anchor:import:../../runtime/time/game-time#getRealNow=2",
     "before-anchor:import:../../utils#getServerTime=1",
     "before-anchor:import:../rescue-fragment-reward#settleRescueFragmentReward=1",
     "before-anchor:member:Math#max=3",
@@ -354,6 +354,7 @@
     "publication:import:../../lib/character-growth/owner-publication#publishCharacterGrowthOwnerStateBestEffort=1"
   ],
   "gacha/exchange_character": [
+    "after-publication:import:../../lib/item-overflow#projectItemOverflowCommonResponse=1",
     "after-publication:import:../../lib/mail-notification#getMailArrivedSync=1",
     "after-publication:import:../../utils#generateDataHeaders=1",
     "after-publication:member:reply.status(200)#send=1",

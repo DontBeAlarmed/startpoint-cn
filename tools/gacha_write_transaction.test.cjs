@@ -39,7 +39,7 @@ const gachaRoutes = require("../src/routes/api/gacha").default
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 const { rewardPlayerGachaDrawResultSync } = require("../src/lib/gacha")
 const { givePlayerCharacterSync } = require("../src/lib/character")
-const { getPlayerMailsSync } = require("../src/data/domains/mail")
+const { getPlayerMailsSync, MailType } = require("../src/data/domains/mail")
 const { createRewardGrantItemOverflowPolicy } = require("../src/lib/reward-grant-item-overflow")
 const { getDefaultGachaSeedQuarantine } = require("../src/lib/gacha-seed-quarantine")
 const { GachaType, RewardType } = require("../src/lib/types")
@@ -194,6 +194,50 @@ test("character pity exchange rolls reward back when history insertion fails", a
     assert.equal(getPlayerCharacterSync(playerId, 151009), null)
     assert.equal(getPlayerGachaInfoSync(playerId, 29).gachaExchangePoint, 250)
     assert.equal(historyCount(playerId), 0)
+})
+
+test("character pity exchange publishes duplicate compensation overflow absolute state", async () => {
+    const { playerId, viewerId } = await createPlayer("gacha-character-exchange-overflow")
+    const characterId = 151009
+    const compensationItemId = 14018
+    assert.equal(givePlayerCharacterSync(playerId, characterId).isNew, true)
+    setInventoryFixtureItemExactSync(playerId, compensationItemId, 99999)
+    insertPlayerGachaInfoSync(playerId, {
+        gachaId: 29,
+        isAccountFirst: false,
+        isDailyFirst: false,
+        gachaExchangePoint: 250,
+    })
+    const stackBefore = getPlayerCharacterSync(playerId, characterId).stack
+    const mailCountBefore = getPlayerMailsSync(playerId, 1, 100, true).length
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/gacha/exchange_character",
+        payload: {
+            viewer_id: viewerId,
+            gacha_id: 29,
+            character_id: characterId,
+            api_count: 1,
+        },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64")).data
+    assert.equal(getPlayerCharacterSync(playerId, characterId).stack, stackBefore + 1)
+    assert.equal(getPlayerItemSync(playerId, compensationItemId), 99999)
+    assert.equal(payload.item_list[compensationItemId], 99999)
+    assert.deepEqual(payload.over_max, [{
+        process_type: 1,
+        item: { item_id: compensationItemId, number: 1 },
+    }])
+    assert.equal(payload.mail_arrived, true)
+    assert.equal(getPlayerGachaInfoSync(playerId, 29).gachaExchangePoint, 0)
+    assert.equal(historyCount(playerId), 1)
+    const newMails = getPlayerMailsSync(playerId, 1, 100, true)
+        .filter(mail => mail.type === MailType.ITEM && mail.type_id === compensationItemId)
+    assert.equal(newMails.length, mailCountBefore + 1)
+    assert.equal(newMails[0].number, 1)
 })
 
 test("equipment pity exchange rolls reward and history back when points fail", async t => {

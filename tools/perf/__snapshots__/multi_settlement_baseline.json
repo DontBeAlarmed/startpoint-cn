@@ -14,7 +14,7 @@
         "transactionStatements": 12,
         "writeStatements": 25,
         "byTable": {
-          "players": { "reads": 10, "statements": 16, "writes": 6 },
+          "players": { "reads": 11, "statements": 17, "writes": 6 },
           "players_active_mission_battle_facts": { "reads": 0, "statements": 1, "writes": 1 },
           "players_active_quests": { "reads": 1, "statements": 2, "writes": 1 },
           "players_category_mission_stages": { "reads": 4, "statements": 5, "writes": 1 },

@@ -12,7 +12,7 @@ import type { ConfigValues } from "./types/config"
 import {
     planItemOverflowDisposition,
     type PlannedItemOverflowDisposition,
-} from "./item-overflow"
+} from "./item-overflow/disposition"
 
 export function createRewardGrantItemOverflowPolicy(
     playerId: number,

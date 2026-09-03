@@ -84,6 +84,7 @@ export function grantCharacterStackWithinTransactionSync(
             : null
         return {
             ...updateStack(),
+            itemAfterAmount: grant.afterAmount,
             ...(overflowSettlement === null ? {} : {
                 itemOverflowDispositions: overflowSettlement.dispositions,
                 overflowFreeManaAfter: overflowSettlement.freeManaAfter,

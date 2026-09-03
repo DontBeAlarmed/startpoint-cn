@@ -317,6 +317,25 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
         const newMana = player.freeMana + fixedManaReward + fieldMana
         const manaObtained = fixedManaReward + fieldMana
         finishCtx.manaObtained = manaObtained
+        updatePlayerSync({
+            id: input.playerId,
+            freeMana: newMana,
+            expPool: player.expPool + fixedPoolExpReward,
+            rankPoint: newRankPoint,
+            boostPoint: newBoostPoint,
+            bossBoostPoint: newBossBoostPoint,
+            totalManaObtained: (player.totalManaObtained ?? 0) + manaObtained,
+            maxComboAchieved: Math.max(
+                player.maxComboAchieved ?? 0,
+                (freshValidation.statistics as any).max_combo_count ?? 0,
+            ),
+            ...(didLevelUp
+                ? {
+                    stamina: addStaminaWithOverflowCap(player.stamina, getMaxStamina(newDegreeId)),
+                    staminaHealTime: getRealNow(),
+                }
+                : {}),
+        })
         const clearReward = rewardEligibility.firstClear && (questData as any).clearReward !== undefined
             ? rewardGranter.grantReward((questData as any).clearReward)
             : null
@@ -358,31 +377,6 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             if (questCategory === QuestCategory.MAIN) {
                 recordCompletedMainChapterMilestoneSync(input.playerId, questId)
             }
-        }
-
-        updatePlayerSync({
-            id: input.playerId,
-            freeMana: newMana,
-            expPool: player.expPool + fixedPoolExpReward,
-            rankPoint: newRankPoint,
-            boostPoint: newBoostPoint,
-            bossBoostPoint: newBossBoostPoint,
-            totalManaObtained: (player.totalManaObtained ?? 0) + manaObtained,
-            maxComboAchieved: Math.max(
-                player.maxComboAchieved ?? 0,
-                (freshValidation.statistics as any).max_combo_count ?? 0,
-            ),
-            ...(didLevelUp
-                ? {
-                    stamina: addStaminaWithOverflowCap(player.stamina, getMaxStamina(newDegreeId)),
-                    staminaHealTime: getRealNow(),
-                }
-                : {}),
-        })
-        const playerData = { ...player }
-        if (didLevelUp) {
-            playerData.stamina = addStaminaWithOverflowCap(playerData.stamina, getMaxStamina(newDegreeId))
-            playerData.staminaHealTime = getRealNow()
         }
 
         const scoreRewardsResult = rewardGranter.grantScoreRewards(
@@ -475,6 +469,8 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             missionInfo: [], itemList: {}, characterList: [], equipmentList: [],
             degreeIds: [], passCardPoints: {},
         }
+        const playerData = getPlayerSync(input.playerId)
+        if (playerData === null) throw new PlayerNotFoundError(input.playerId)
         finalizeMultiAwakePublicationWrites(deleteActiveQuest)
         const existingCharacterList = [
             ...rewardCharacterExpResult.character_list as unknown as Record<string, unknown>[],
@@ -537,7 +533,6 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             fieldMana,
             fixedManaReward,
             fixedPoolExpReward,
-            newMana,
             beforeRankPoint,
             newRankPoint,
             newBoostPoint,

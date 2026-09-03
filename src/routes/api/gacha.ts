@@ -249,6 +249,9 @@ const routes = async (fastify: FastifyInstance) => {
             {},
             "gacha/character-grant",
         ).characterList
+        const overMax = projectItemOverflowCommonResponse(
+            giveResult.itemOverflowDispositions ?? [],
+        )
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -258,7 +261,7 @@ const routes = async (fastify: FastifyInstance) => {
             "data": {
                 "character_list": characterList,
                 "item_list": giveResult.item !== undefined ? {
-                    [giveResult.item.id]: giveResult.item.count
+                    [giveResult.item.id]: giveResult.itemAfterAmount ?? giveResult.item.count
                 } : [],
                 "gacha_info_list": [
                     {
@@ -269,7 +272,11 @@ const routes = async (fastify: FastifyInstance) => {
                     }
                 ],
                 "encyclopedia_info": [],
-                "mail_arrived": getMailArrivedSync(playerId)
+                "mail_arrived": getMailArrivedSync(playerId),
+                ...(overMax.length > 0 ? { "over_max": overMax } : {}),
+                ...(giveResult.overflowFreeManaAfter === undefined
+                    ? {}
+                    : { "user_info": { "free_mana": giveResult.overflowFreeManaAfter } }),
             }
         })
 

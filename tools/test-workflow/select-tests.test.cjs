@@ -1844,6 +1844,7 @@ test("splits isolated integration tests into focused domains", () => {
     ])
     assert.deepEqual(TEST_GROUPS["integration:party"].tests, [
         "tools/multi_battle_lifecycle.test.cjs",
+        "tools/multi_settlement_overflow.test.cjs",
         "tools/perf/multi_settlement_baseline.test.cjs",
         "tools/perf/multi_snapshot_baseline.test.cjs",
         "tools/rescue_fragment_reward.test.cjs",
