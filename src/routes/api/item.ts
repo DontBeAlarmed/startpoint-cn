@@ -15,6 +15,7 @@ import {
     ItemUseValidationError,
     settleItemUseInCallerTransactionSync,
 } from "../../lib/item-use-settlement";
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow";
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/use_item", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -64,11 +65,19 @@ const routes = async (fastify: FastifyInstance) => {
             "item_list": itemListMap,
             "mail_arrived": getMailArrivedSync(playerId),
         }
+        const dispositions = settlement.itemOverflowDispositions ?? []
+        const overMax = projectItemOverflowCommonResponse(dispositions)
+        if (overMax.length > 0) responseData.over_max = overMax
         if (plan.stamina !== null) {
             responseData.user_info = {
                 "stamina": plan.stamina.after,
-                "stamina_heal_time": realToVirtual(recoveryTime)
+                "stamina_heal_time": realToVirtual(recoveryTime),
+                ...(dispositions.some(entry => entry.kind === "sold")
+                    ? { "free_mana": settlement.freeManaAfter }
+                    : {}),
             }
+        } else if (dispositions.some(entry => entry.kind === "sold")) {
+            responseData.user_info = { "free_mana": settlement.freeManaAfter }
         }
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),

@@ -15,6 +15,7 @@ import { generateDataHeaders } from "../../utils"
 import { executeInjectCharacterExp } from "../../lib/character-growth/commands/inject-exp"
 import { executeStackToExp } from "../../lib/character-growth/commands/stack-to-exp"
 import { executeBulkStackToExp } from "../../lib/character-growth/commands/bulk-stack-to-exp"
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow"
 import { sendGrowthMutationError } from "./character/mana-mutation-http"
 import {
     EXP_CHARACTER_GROWTH_FIELDS,
@@ -106,6 +107,7 @@ const routes = async (fastify: FastifyInstance) => {
             })
             const player = getPlayerSync(resolved.playerId)!
             const character = getPlayerCharacterSync(resolved.playerId, characterId)!
+            const overMax = projectItemOverflowCommonResponse(result.itemOverflowDispositions)
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 data_headers: generateDataHeaders({ viewer_id: viewerId }),
@@ -113,6 +115,9 @@ const routes = async (fastify: FastifyInstance) => {
                     user_info: {
                         exp_pool: result.expPool,
                         exp_pooled_time: expPoolRealDateToClientTimestamp(player.expPooledTime),
+                        ...(result.itemOverflowDispositions.some(entry => entry.kind === "sold")
+                            ? { free_mana: result.overflowFreeManaAfter }
+                            : {}),
                     },
                     character_list: [characterListEntry(viewerId, result.after, character, {
                         includeViewer: true, includeStack: true,
@@ -120,6 +125,7 @@ const routes = async (fastify: FastifyInstance) => {
                     converted_exp_info: { add_exp: result.addExp },
                     item_list: { 990008: result.itemCount },
                     mail_arrived: getMailArrivedSync(resolved.playerId),
+                    ...(overMax.length > 0 ? { over_max: overMax } : {}),
                 },
             })
         } catch (error) {
@@ -147,6 +153,7 @@ const routes = async (fastify: FastifyInstance) => {
                     includeOverLimit: true, includeStack: true,
                 })
             ))
+            const overMax = projectItemOverflowCommonResponse(result.itemOverflowDispositions)
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 data_headers: generateDataHeaders({ viewer_id: viewerId }),
@@ -157,8 +164,12 @@ const routes = async (fastify: FastifyInstance) => {
                     user_info: {
                         exp_pool: result.expPool,
                         exp_pooled_time: expPoolRealDateToClientTimestamp(result.expPooledTime),
+                        ...(result.itemOverflowDispositions.some(entry => entry.kind === "sold")
+                            ? { free_mana: result.overflowFreeManaAfter }
+                            : {}),
                     },
                     mail_arrived: getMailArrivedSync(resolved.playerId),
+                    ...(overMax.length > 0 ? { over_max: overMax } : {}),
                 },
             })
         } catch (error) {

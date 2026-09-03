@@ -1,10 +1,12 @@
 import { getPlayerSync } from "../data/domains/player"
 import {
     createRewardGrantExecutionPlan,
+    collectRewardGrantItemOverflowDispositions,
     executeRewardGrantExecutionPlanAsTransactionOwnerSync,
     type RewardGrantCommand,
     type RewardGrantExecutionResult,
 } from "./reward-grant"
+import { createRewardGrantItemOverflowPolicy } from "./reward-grant-item-overflow"
 import {
     getAwakeFactKeysFromRewardGrants,
 } from "./mission/awake-reward-facts"
@@ -23,15 +25,17 @@ function projectStoryRewardGrant(grant: RewardGrantExecutionResult): PlayerRewar
         joined_character_id_list: [],
         equipment_list: [],
         items: {},
+        itemOverflowDispositions: collectRewardGrantItemOverflowDispositions(grant),
+    }
+    for (const currency of grant.assets.currencies) {
+        const field = currency.currency === "freeMana"
+            ? "free_mana"
+            : currency.currency === "freeVmoney" ? "free_vmoney" : "exp_pool"
+        result.user_info[field] = currency.requestedAmount
     }
     for (const entry of grant.entries) {
         const outcome = entry.outcome
-        if (outcome.kind === "currency") {
-            const field = outcome.currency === "freeMana"
-                ? "free_mana"
-                : outcome.currency === "freeVmoney" ? "free_vmoney" : "exp_pool"
-            result.user_info[field] += outcome.requestedAmount
-        } else if (outcome.kind === "item") {
+        if (outcome.kind === "item") {
             result.items[outcome.item.itemId] = outcome.item.afterAmount
         } else if (outcome.kind === "character") {
             result.character_list = [outcome.after]
@@ -39,7 +43,7 @@ function projectStoryRewardGrant(grant: RewardGrantExecutionResult): PlayerRewar
                 result.items[outcome.compensationItem.itemId]
                     = outcome.compensationItem.acceptedAmount
             }
-        } else {
+        } else if (outcome.kind === "equipment") {
             result.equipment_list = [outcome.after]
         }
     }
@@ -62,6 +66,7 @@ export function grantStoryRewardWithinTransactionSync(
             freeVmoney: player.freeVmoney,
             expPool: player.expPool,
         },
+        { itemOverflow: createRewardGrantItemOverflowPolicy(playerId) },
     )
     return {
         rewardResult: projectStoryRewardGrant(grant),

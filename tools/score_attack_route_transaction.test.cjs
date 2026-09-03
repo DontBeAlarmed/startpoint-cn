@@ -273,6 +273,20 @@ const withInventory = (options, operation) => {
             touched.set(itemId, (touched.get(itemId) ?? 0) + count)
             return result(itemId, touched.get(itemId))
         },
+        grantWithCapacity(itemId, count, maxCount) {
+            this.__revision++
+            const beforeAmount = amount(itemId)
+            const acceptedAmount = Math.min(count, Math.max(0, maxCount - beforeAmount))
+            set(itemId, beforeAmount + acceptedAmount)
+            touched.set(itemId, (touched.get(itemId) ?? 0) + acceptedAmount)
+            return {
+                ...result(itemId, touched.get(itemId)),
+                beforeAmount,
+                requestedAmount: count,
+                acceptedAmount,
+                overflowAmount: count - acceptedAmount,
+            }
+        },
         deduct(itemId, count) {
             this.__revision++
             set(itemId, amount(itemId) - count)

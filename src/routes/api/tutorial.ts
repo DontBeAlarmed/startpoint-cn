@@ -12,6 +12,8 @@ import { getPlayerCharacterSync } from "../../data/domains/character"
 import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
 import { executeRewardGrantExecutionPlanAsTransactionOwnerSync } from "../../lib/reward-grant"
+import { createRewardGrantItemOverflowPolicy } from "../../lib/reward-grant-item-overflow"
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { getGachaSync } from "../../lib/assets";
@@ -336,6 +338,7 @@ const routes = async (fastify: FastifyInstance) => {
                                 freeVmoney: currentPlayer.freeVmoney,
                                 expPool: currentPlayer.expPool,
                             },
+                            { itemOverflow: createRewardGrantItemOverflowPolicy(playerId) },
                         ),
                         deferCharacterSampledLog: log => { deferredCharacterSampledLog = log },
                     },
@@ -384,6 +387,9 @@ const routes = async (fastify: FastifyInstance) => {
                     "step": effectiveNextStep,
                     "user_info": {
                         "free_vmoney": newFreeVmoney,
+                        ...(rewardResult.playerAfter === undefined
+                            ? {}
+                            : { "free_mana": rewardResult.playerAfter.freeMana }),
                     },
                     "gacha": {
                         "draw": rewardResult.draw,
@@ -399,7 +405,15 @@ const routes = async (fastify: FastifyInstance) => {
                     "item_list": rewardResult.items,
                     "encyclopedia_info": [],
                     "mail_arrived": getMailArrivedSync(playerId),
-                    "start_time": getServerTime()
+                    "start_time": getServerTime(),
+                    ...(rewardResult.itemOverflowDispositions === undefined
+                        ? {}
+                        : (() => {
+                            const overMax = projectItemOverflowCommonResponse(
+                                rewardResult.itemOverflowDispositions,
+                            )
+                            return overMax.length > 0 ? { "over_max": overMax } : {}
+                        })()),
                 }
                 upsertTutorialStepReceiptSync(playerId, {
                     completedStep,

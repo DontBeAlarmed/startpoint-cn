@@ -18,6 +18,10 @@ import {
     validatePositiveAmount,
 } from "../mutation-support"
 import { createRewardGrantItemOverflowPolicy } from "../../reward-grant-item-overflow"
+import {
+    settleDirectItemOverflowsWithinTransactionSync,
+    type PlannedItemOverflowDisposition,
+} from "../../item-overflow"
 
 export interface StackToExpCommand {
     readonly playerId: number
@@ -35,6 +39,8 @@ export interface StackToExpResult {
     readonly expPool: number
     readonly itemCount: number
     readonly replayed: false
+    readonly itemOverflowDispositions: readonly PlannedItemOverflowDisposition[]
+    readonly overflowFreeManaAfter?: number
 }
 
 export function executeStackToExp(command: StackToExpCommand): StackToExpResult {
@@ -80,9 +86,15 @@ export function executeStackToExp(command: StackToExpCommand): StackToExpResult 
                 overflowPolicy.maxCount(STACK_CONVERSION_REWARD_ITEM_ID),
             )
             inventory.flush()
-            if (itemResult.overflowAmount > 0) {
-                overflowPolicy.writeOverflow(STACK_CONVERSION_REWARD_ITEM_ID, itemResult.overflowAmount)
-            }
+            const overflowSettlement = itemResult.overflowAmount > 0
+                ? settleDirectItemOverflowsWithinTransactionSync({
+                    playerId: command.playerId,
+                    overflows: [{
+                        itemId: STACK_CONVERSION_REWARD_ITEM_ID,
+                        amount: itemResult.overflowAmount,
+                    }],
+                })
+                : null
             return {
                 command: "stack_to_exp",
                 before,
@@ -92,6 +104,10 @@ export function executeStackToExp(command: StackToExpCommand): StackToExpResult 
                 expPool: afterPool,
                 itemCount: itemResult.afterAmount,
                 replayed: false,
+                itemOverflowDispositions: overflowSettlement?.dispositions ?? [],
+                ...(overflowSettlement === null
+                    ? {}
+                    : { overflowFreeManaAfter: overflowSettlement.freeManaAfter }),
             } as StackToExpResult
         })
     })()

@@ -20,6 +20,7 @@ import { generateDataHeaders, getServerTime } from "../../utils";
 import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 import { QuestCategory } from "../../lib/types";
 import { recordCompletedMainChapterMilestoneSync } from "../../lib/player-history-milestones";
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow";
 
 interface FinishBody {
     party_id: number,
@@ -142,6 +143,10 @@ function processStoryQuestFinish(
             active_mission_list: activeMissionList,
             mail_arrived: getMailArrivedSync(playerId),
         }
+        const overMax = projectItemOverflowCommonResponse(
+            rewardResult?.itemOverflowDispositions ?? [],
+        )
+        if (overMax.length > 0) responseData.over_max = overMax
         if (missionSettlement) {
             mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)
         }

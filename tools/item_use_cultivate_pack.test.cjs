@@ -153,13 +153,14 @@ test("999102 selectIndex 1 through 6 returns the corresponding reward item", asy
     }
 })
 
-test("cultivate pack sends capped reward overflow to Mail", async () => {
+test("cultivate pack sells capped sellable reward overflow", async () => {
     const { playerId, viewerId } = await createPlayer("cultivate-overflow")
     const rewardItemId = 8
     const policy = createRewardGrantItemOverflowPolicy(playerId)
     setInventoryFixtureItemExactSync(playerId, 999102, 1)
     setInventoryFixtureItemExactSync(playerId, rewardItemId, policy.maxCount(rewardItemId))
     const collectedBefore = getPlayerCollectedItemTotalSync(playerId, rewardItemId)
+    const manaBefore = getPlayerSync(playerId).freeMana
 
     const responseData = decodeSuccess(await useItem(viewerId, [{
         id: 999102,
@@ -174,7 +175,14 @@ test("cultivate pack sends capped reward overflow to Mail", async () => {
         type: mail.type,
         type_id: mail.type_id,
         number: mail.number,
-    })), [{ type: MailType.ITEM, type_id: rewardItemId, number: 30 }])
+    })), [])
+    assert.equal(getPlayerSync(playerId).freeMana, manaBefore + 4500)
+    assert.equal(responseData.user_info.free_mana, manaBefore + 4500)
+    assert.deepEqual(responseData.over_max, [{
+        process_type: 2,
+        amount_sold: 4500,
+        item: { item_id: rewardItemId, number: 30 },
+    }])
 })
 
 test("duplicate cultivate pack entries with the same selection are aggregated", async () => {
@@ -439,7 +447,7 @@ test("settlement entry follows the callback-scoped Inventory batch topology", ()
             getPlayerSync(playerId) {
                 assert.equal(database.inTransaction, true)
                 calls.push(`read:${playerId}`)
-                return { id: playerId }
+                return { id: playerId, freeMana: 2000 }
             },
             createItemUseIntent(body, maxStaminaOverflow) {
                 assert.equal(database.inTransaction, true)
@@ -507,6 +515,8 @@ test("settlement entry follows the callback-scoped Inventory batch topology", ()
             stamina: fakeStaminaPlan,
         },
         itemList: { "999102": 0, "4": 30 },
+        itemOverflowDispositions: [],
+        freeManaAfter: 2000,
     })
 
     const routeSource = fs.readFileSync(path.join(__dirname, "../src/routes/api/item.ts"), "utf8")

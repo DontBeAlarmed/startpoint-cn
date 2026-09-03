@@ -200,6 +200,7 @@ const cappedPlayerId = createPlayer("periodic-capped")
 const cappedPolicy = createRewardGrantItemOverflowPolicy(cappedPlayerId)
 setInventoryFixtureItemExactSync(cappedPlayerId, 40405, cappedPolicy.maxCount(40405))
 const cappedCollectedBefore = getPlayerCollectedItemTotalSync(cappedPlayerId, 40405)
+const cappedManaBefore = getPlayerSync(cappedPlayerId).freeMana
 const capped = settlePeriodic(cappedPlayerId)
 assert.deepEqual(capped.items, { 40405: cappedPolicy.maxCount(40405) })
 assert.equal(getPlayerCollectedItemTotalSync(cappedPlayerId, 40405), cappedCollectedBefore)
@@ -207,7 +208,19 @@ assert.deepEqual(getPlayerMailsSync(cappedPlayerId, 1, 100, true).map(mail => ({
     type: mail.type,
     type_id: mail.type_id,
     number: mail.number,
-})), [{ type: MailType.ITEM, type_id: 40405, number: 9 }])
+})), [])
+assert.equal(getPlayerSync(cappedPlayerId).freeMana, cappedManaBefore + 2700)
+assert.equal(capped.overflowFreeManaAfter, cappedManaBefore + 2700)
+assert.deepEqual(capped.itemOverflowDispositions, [{
+    kind: "sold",
+    itemId: 40405,
+    overflowAmount: 9,
+    soldMana: 2700,
+    manaBefore: cappedManaBefore,
+    acceptedMana: 2700,
+    overflowMana: 0,
+    manaAfter: cappedManaBefore + 2700,
+}])
 
 const exhaustedPlayerId = createPlayer("periodic-exhausted")
 db.prepare(`UPDATE players_periodic_reward_points SET point = 0 WHERE player_id = ? AND id = 10000002`)

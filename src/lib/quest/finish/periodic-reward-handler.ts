@@ -8,6 +8,10 @@ import { getDb } from "../../../data/db"
 import { withInventoryBatchContextWithinTransactionSync } from "../../inventory"
 import { QuestCategory } from "../../types"
 import { createRewardGrantItemOverflowPolicy } from "../../reward-grant-item-overflow"
+import {
+    settleDirectItemOverflowsWithinTransactionSync,
+    type PlannedItemOverflowDisposition,
+} from "../../item-overflow"
 
 interface HardMultiEventDefinition {
     periodicPointId?: number
@@ -35,6 +39,8 @@ export interface ActivityPeriodicRewardSettlement {
     readonly dropPeriodicRewardIds: readonly PeriodicRewardDrop[]
     readonly periodicRewardPointList: readonly { readonly id: number; readonly point: number }[]
     readonly items: Readonly<Record<string, number>>
+    readonly itemOverflowDispositions?: readonly PlannedItemOverflowDisposition[]
+    readonly overflowFreeManaAfter?: number
 }
 
 export interface ActivityPeriodicRewardSettlementInput {
@@ -49,7 +55,11 @@ export interface ActivityPeriodicRewardSettlementInput {
 const FINAL_OPERATION_EVENT_IDS = new Set([1001, 1002, 1003, 1004, 1005, 1006])
 
 function emptySettlement(): ActivityPeriodicRewardSettlement {
-    return { dropPeriodicRewardIds: [], periodicRewardPointList: [], items: {} }
+    return {
+        dropPeriodicRewardIds: [],
+        periodicRewardPointList: [],
+        items: {},
+    }
 }
 
 function resolvePointId(eventId: number, groupId: number): number | null {
@@ -134,13 +144,22 @@ export function settleActivityPeriodicRewardsSync(
             overflowPolicy.maxCount(reward.itemId),
         )
         inventory.flush()
-        if (item.overflowAmount > 0) {
-            overflowPolicy.writeOverflow(reward.itemId, item.overflowAmount)
-        }
+        const overflowSettlement = item.overflowAmount > 0
+            ? settleDirectItemOverflowsWithinTransactionSync({
+                playerId: input.playerId,
+                overflows: [{ itemId: reward.itemId, amount: item.overflowAmount }],
+            })
+            : null
         return {
             dropPeriodicRewardIds: [{ group_id: groupId, index, number: reward.count }],
             periodicRewardPointList: [{ id: pointId, point: remainingPoint }],
             items: { [reward.itemId]: item.afterAmount },
+            ...(overflowSettlement === null
+                ? {}
+                : { itemOverflowDispositions: overflowSettlement.dispositions }),
+            ...(overflowSettlement === null
+                ? {}
+                : { overflowFreeManaAfter: overflowSettlement.freeManaAfter }),
         }
     })
 }

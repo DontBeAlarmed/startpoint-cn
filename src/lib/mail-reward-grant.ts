@@ -218,11 +218,6 @@ function createMailClaimItemPolicy(
                 `Mail Item ${disposition.itemId} cannot fit ${disposition.overflowAmount} additional unit(s).`,
             )
         },
-        writeOverflow(itemId: number, amount: number): void {
-            throw new MailRewardCapacityError(
-                `Mail Item ${itemId} cannot fit ${amount} additional unit(s).`,
-            )
-        },
     })
 }
 

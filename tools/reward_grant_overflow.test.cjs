@@ -77,7 +77,6 @@ const result = database.transaction(() => executeRewardGrantExecutionPlanAsTrans
                 disposition.itemId,
                 disposition.overflowAmount,
             ]),
-            writeOverflow() {},
         },
     },
 ))()
@@ -233,7 +232,6 @@ assert.throws(() => database.transaction(() => executeRewardGrantExecutionPlanAs
             maxCount: () => 10,
             planOverflow: (id, amount) => ({ kind: "mail", itemId: id, overflowAmount: amount }),
             finalizeOverflow() {},
-            writeOverflow() {},
         },
     },
 ))(), /ITEM_OVERFLOW_PLAYER_MISMATCH/)
@@ -255,7 +253,6 @@ assert.throws(() => database.transaction(() => executeRewardGrantExecutionPlanAs
             maxCount: () => 10,
             planOverflow: (id, amount) => ({ kind: "mail", itemId: id, overflowAmount: amount }),
             finalizeOverflow: () => { throw new Error("overflow sink failed") },
-            writeOverflow() {},
         },
     },
 ))(), /overflow sink failed/)

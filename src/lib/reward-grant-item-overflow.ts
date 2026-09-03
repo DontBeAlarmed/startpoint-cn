@@ -17,13 +17,14 @@ import {
 export function createRewardGrantItemOverflowPolicy(
     playerId: number,
     now: Date = getVirtualNow(),
+    knownPaidMana?: number,
 ): RewardGrantItemOverflowPolicy {
     const catalog = getItemInventoryPolicyCatalog()
     const maxMana = getRuntimeContentTableSync<ConfigValues>(
         "config.json",
         bundledConfig,
     ).max_mana
-    let paidMana: number | null = null
+    let paidMana: number | null = knownPaidMana ?? null
     const policyFor = (itemId: number) => {
         const policy = findItemInventoryPolicy(catalog, itemId)
         if (policy === null) throw new Error(`Item ${itemId} is missing inventory policy.`)
@@ -76,15 +77,6 @@ export function createRewardGrantItemOverflowPolicy(
                     now,
                 )
             }
-        },
-        writeOverflow(itemId: number, amount: number): void {
-            insertItemOverflowMailsWithinTransactionSync(
-                playerId,
-                itemId,
-                amount,
-                Math.min(maxCount(itemId), 2_147_483_647),
-                now,
-            )
         },
     })
 }

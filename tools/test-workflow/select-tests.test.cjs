@@ -689,6 +689,20 @@ test("maps Item overflow disposition and common response to content checks", () 
     ))
 })
 
+test("maps direct Item overflow settlement to database and rules checks", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/lib/item-overflow/direct-settlement.ts"]),
+        ["integration:database", "integration:rules"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/item_overflow_direct_settlement.test.cjs"]),
+        ["integration:database"],
+    )
+    assert.ok(TEST_GROUPS["integration:database"].tests.includes(
+        "tools/item_overflow_direct_settlement.test.cjs",
+    ))
+})
+
 test("maps the public reward grant layer and its regressions to one focused leaf", () => {
     const group = "integration:reward-grant"
     const tests = [
@@ -1609,6 +1623,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/inventory_owner_structure.test.cjs",
         "tools/perf/item_inventory_expiry_admission.test.cjs",
         "tools/inventory_cap.test.cjs",
+        "tools/item_overflow_direct_settlement.test.cjs",
         "tools/load_event_trade_expiry.test.cjs",
         "tools/mail_overflow.test.cjs",
         "tools/mail_receive_transaction.test.cjs",

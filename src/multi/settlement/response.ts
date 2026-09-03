@@ -52,10 +52,11 @@ export async function projectMultiplayerFinishResponse(input: MultiplayerFinishR
     )
     const responseData: Record<string, any> = {
         "user_info": {
-            "free_mana": newMana
-                + (clearReward?.user_info.free_mana || 0)
-                + (sPlusClearReward?.user_info.free_mana || 0)
-                + scoreRewardsResult.user_info.free_mana,
+            "free_mana": periodicRewardSettlement.overflowFreeManaAfter
+                ?? (newMana
+                    + (clearReward?.user_info.free_mana || 0)
+                    + (sPlusClearReward?.user_info.free_mana || 0)
+                    + scoreRewardsResult.user_info.free_mana),
             "exp_pool": rewardCharacterExpResult.exp_pool
                 + (clearReward?.user_info.exp_pool || 0)
                 + scoreRewardsResult.user_info.exp_pool,
@@ -122,6 +123,7 @@ export async function projectMultiplayerFinishResponse(input: MultiplayerFinishR
         ...(scoreRewardsResult.itemOverflowDispositions ?? []),
         ...(additionalRewardSettlement.rewardResult?.itemOverflowDispositions ?? []),
         ...(rescueFragmentSettlement?.itemOverflowDispositions ?? []),
+        ...(periodicRewardSettlement.itemOverflowDispositions ?? []),
     ])
     if (overMax.length > 0) responseData.over_max = overMax
     mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)

@@ -18,6 +18,11 @@ import { getDb } from "../../data/db";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
 import { createRewardGrantItemOverflowPolicy } from "../../lib/reward-grant-item-overflow";
+import {
+    projectItemOverflowCommonResponse,
+    settleDirectItemOverflowsWithinTransactionSync,
+    type PlannedItemOverflowDisposition,
+} from "../../lib/item-overflow";
 
 interface ExchangeBody {
     viewer_id: number;
@@ -40,6 +45,8 @@ interface StarCrumbExchangeSettlement {
     characterList: Record<string, unknown>[]
     itemList: Record<string, number>
     equipmentList: any[]
+    itemOverflowDispositions: readonly PlannedItemOverflowDisposition[]
+    overflowFreeManaAfter: number | null
 }
 
 const routes = async (fastify: FastifyInstance) => {
@@ -125,6 +132,8 @@ const routes = async (fastify: FastifyInstance) => {
                 const characterList: Record<string, unknown>[] = []
                 const itemList: Record<string, number> = {}
                 const equipmentList: any[] = []
+                let itemOverflowDispositions: readonly PlannedItemOverflowDisposition[] = []
+                let overflowFreeManaAfter: number | null = null
 
                 switch (kind) {
                     case 0: {
@@ -152,7 +161,12 @@ const routes = async (fastify: FastifyInstance) => {
                                 throw new Error("Star Crumb exchange Item grant did not produce a result.")
                             }
                             if (grant.overflowAmount > 0) {
-                                overflowPolicy.writeOverflow(targetId, grant.overflowAmount)
+                                const overflowSettlement = settleDirectItemOverflowsWithinTransactionSync({
+                                    playerId,
+                                    overflows: [{ itemId: targetId, amount: grant.overflowAmount }],
+                                })
+                                itemOverflowDispositions = overflowSettlement.dispositions
+                                overflowFreeManaAfter = overflowSettlement.freeManaAfter
                             }
                             return result.afterAmount
                         })
@@ -166,7 +180,14 @@ const routes = async (fastify: FastifyInstance) => {
                         throw new StarCrumbExchangeError(500, `Unsupported exchange kind ${kind}.`)
                 }
 
-                return { newStarCrumb, characterList, itemList, equipmentList }
+                return {
+                    newStarCrumb,
+                    characterList,
+                    itemList,
+                    equipmentList,
+                    itemOverflowDispositions,
+                    overflowFreeManaAfter,
+                }
             })()
         } catch (error) {
             if (error instanceof StarCrumbExchangeError) {
@@ -185,18 +206,24 @@ const routes = async (fastify: FastifyInstance) => {
             {},
             "exchange/star_crumb",
         ).characterList
+        const overMax = projectItemOverflowCommonResponse(settlement.itemOverflowDispositions)
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
             data_headers: generateDataHeaders({ viewer_id: viewerId }),
             data: {
-                user_info: { star_crumb: settlement.newStarCrumb },
+                user_info: {
+                    star_crumb: settlement.newStarCrumb,
+                    ...(settlement.itemOverflowDispositions.some(entry => entry.kind === "sold")
+                        ? { free_mana: settlement.overflowFreeManaAfter }
+                        : {}),
+                },
                 character_list: characterList,
                 item_list: settlement.itemList,
                 equipment_list: settlement.equipmentList,
                 active_mission_list: null,
                 mission_info: null,
-                over_max: null,
+                over_max: overMax.length > 0 ? overMax : null,
                 mail_arrived: getMailArrivedSync(playerId),
                 config: null,
                 user_daily_challenge_point_list: null,

@@ -42,8 +42,6 @@ export interface RewardGrantItemOverflowPolicy {
         currentFreeMana: number,
     ) => PlannedItemOverflowDisposition
     readonly finalizeOverflow: (disposition: PlannedItemOverflowDisposition) => void
-    /** Temporary compatibility for direct Inventory callers; removed in D18b Task 4. */
-    readonly writeOverflow: (itemId: number, amount: number) => void
 }
 
 export interface RewardGrantExecutionOptions {

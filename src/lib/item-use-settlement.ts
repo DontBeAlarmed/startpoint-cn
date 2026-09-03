@@ -6,6 +6,10 @@ import {
     withInventoryBatchContextWithinTransactionSync,
 } from "./inventory"
 import { createRewardGrantItemOverflowPolicy } from "./reward-grant-item-overflow"
+import {
+    settleDirectItemOverflowsWithinTransactionSync,
+    type PlannedItemOverflowDisposition,
+} from "./item-overflow"
 import { computeRealTimeStamina } from "./stamina"
 import { Player } from "../data/types"
 import { getRealNow } from "../runtime/time/game-time"
@@ -55,6 +59,8 @@ export class ItemUsePlayerNotFoundError extends Error {
 export interface ItemUseSettlementResult {
     readonly plan: ItemUsePlan
     readonly itemList: Record<string, number>
+    readonly itemOverflowDispositions: readonly PlannedItemOverflowDisposition[]
+    readonly freeManaAfter: number
 }
 
 export interface ItemUseSettlementDependencies {
@@ -346,14 +352,22 @@ export function settleItemUseInCallerTransactionSync(
             })
         }
         const results = inventory.flush()
-        for (const overflow of pendingOverflows) {
-            overflowPolicy.writeOverflow(overflow.itemId, overflow.amount)
-        }
+        const overflowSettlement = pendingOverflows.length === 0
+            ? { dispositions: Object.freeze([]), freeManaAfter: player.freeMana }
+            : settleDirectItemOverflowsWithinTransactionSync({
+                playerId,
+                overflows: pendingOverflows,
+            })
         const plan: ItemUsePlan = {
             inventoryChanges: changes,
             rewards: intent.rewards,
             stamina: staminaPlan,
         }
-        return { plan, itemList: projectItemList(changes, results) }
+        return {
+            plan,
+            itemList: projectItemList(changes, results),
+            itemOverflowDispositions: overflowSettlement.dispositions,
+            freeManaAfter: overflowSettlement.freeManaAfter,
+        }
     })
 }

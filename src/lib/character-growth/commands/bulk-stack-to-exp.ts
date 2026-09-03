@@ -20,6 +20,10 @@ import {
     validateGrowthPlayerId,
 } from "../mutation-support"
 import { createRewardGrantItemOverflowPolicy } from "../../reward-grant-item-overflow"
+import {
+    settleDirectItemOverflowsWithinTransactionSync,
+    type PlannedItemOverflowDisposition,
+} from "../../item-overflow"
 
 export interface BulkStackToExpCommand {
     readonly playerId: number
@@ -36,6 +40,8 @@ export interface BulkStackToExpResult {
     readonly itemCount: number
     readonly projectionCharacters: Readonly<Record<string, PlayerCharacterProjectionData>>
     readonly replayed: false
+    readonly itemOverflowDispositions: readonly PlannedItemOverflowDisposition[]
+    readonly overflowFreeManaAfter?: number
 }
 
 export function executeBulkStackToExp(command: BulkStackToExpCommand): BulkStackToExpResult {
@@ -84,6 +90,9 @@ export function executeBulkStackToExp(command: BulkStackToExpCommand): BulkStack
                 stack: 0,
             })))
             updatePlayerSync({ id: command.playerId, expPool: afterPool })
+            let overflowSettlement: ReturnType<
+                typeof settleDirectItemOverflowsWithinTransactionSync
+            > | null = null
             if (addStarGrain > 0) {
                 const itemResult = inventory.grantWithCapacity(
                     STACK_CONVERSION_REWARD_ITEM_ID,
@@ -93,12 +102,18 @@ export function executeBulkStackToExp(command: BulkStackToExpCommand): BulkStack
                 afterItem = itemResult.afterAmount
                 inventory.flush()
                 if (itemResult.overflowAmount > 0) {
-                    overflowPolicy.writeOverflow(STACK_CONVERSION_REWARD_ITEM_ID, itemResult.overflowAmount)
+                    overflowSettlement = settleDirectItemOverflowsWithinTransactionSync({
+                        playerId: command.playerId,
+                        overflows: [{
+                            itemId: STACK_CONVERSION_REWARD_ITEM_ID,
+                            amount: itemResult.overflowAmount,
+                        }],
+                    })
                 }
             }
-            return { afterItem, updateTime }
+            return { afterItem, updateTime, overflowSettlement }
         })
-        const { afterItem, updateTime } = settlement
+        const { afterItem, updateTime, overflowSettlement } = settlement
         return {
             command: "bulk_stack_to_exp",
             characters: selected,
@@ -115,6 +130,10 @@ export function executeBulkStackToExp(command: BulkStackToExpCommand): BulkStack
                 return [String(character.characterId), { ...projection, updateTime }]
             })),
             replayed: false,
+            itemOverflowDispositions: overflowSettlement?.dispositions ?? [],
+            ...(overflowSettlement === null
+                ? {}
+                : { overflowFreeManaAfter: overflowSettlement.freeManaAfter }),
         } as BulkStackToExpResult
     })()
 }

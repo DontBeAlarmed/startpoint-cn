@@ -110,6 +110,7 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/lib/event-shop-purchase.ts",
         "src/lib/event-trade-expiry-settlement.ts",
         "src/lib/gacha-reward-grant.ts",
+        "src/lib/item-overflow/disposition.ts",
         "src/lib/item-sell.ts",
         "src/lib/item-use-settlement.ts",
         "src/lib/mail-reward-grant.ts",
@@ -368,4 +369,53 @@ test("production Item direct SQL stays inside the final persistence whitelist", 
     assert.match(fixture, /grantInventoryItemWithinTransactionSync/)
     assert.match(fixture, /grantInventoryItemSync/)
     assert.match(fixture, /setPlayerItemForMaintenanceSync/)
+})
+
+test("capped positive grants expose one reviewed overflow disposition path", () => {
+    const sourceRoot = path.join(projectRoot, "src")
+    const cappedFiles = []
+    const itemMailWriterFiles = []
+    const visit = directory => {
+        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+            const absolute = path.join(directory, entry.name)
+            if (entry.isDirectory()) visit(absolute)
+            else if (entry.isFile() && entry.name.endsWith(".ts")) {
+                const contents = fs.readFileSync(absolute, "utf8")
+                const relative = path.relative(projectRoot, absolute)
+                if (/\.grantWithCapacity\(/.test(contents)
+                    && relative !== "src/lib/inventory/batch-context.ts") {
+                    cappedFiles.push(relative)
+                }
+                if (/insertItemOverflowMailsWithinTransactionSync/.test(contents)) {
+                    itemMailWriterFiles.push(relative)
+                }
+                assert.doesNotMatch(contents, /\.writeOverflow\(/, relative)
+            }
+        }
+    }
+    visit(sourceRoot)
+
+    assert.deepEqual(cappedFiles.sort(), [
+        "src/lib/character-growth/commands/bulk-stack-to-exp.ts",
+        "src/lib/character-growth/commands/grant-character-stack.ts",
+        "src/lib/character-growth/commands/stack-to-exp.ts",
+        "src/lib/item-use-settlement.ts",
+        "src/lib/quest/finish/periodic-reward-handler.ts",
+        "src/lib/reward-grant/execution-engine.ts",
+        "src/routes/api/equipment.ts",
+        "src/routes/api/exchange.ts",
+        "src/routes/api/sell.ts",
+    ])
+    assert.deepEqual(itemMailWriterFiles.sort(), [
+        "src/lib/mail-overflow.ts",
+        "src/lib/reward-grant-item-overflow.ts",
+    ])
+    for (const relative of cappedFiles) {
+        const contents = fs.readFileSync(path.join(projectRoot, relative), "utf8")
+        if (relative === "src/lib/reward-grant/execution-engine.ts") {
+            assert.match(contents, /planOverflow\(/)
+        } else {
+            assert.match(contents, /settleDirectItemOverflowsWithinTransactionSync\(/, relative)
+        }
+    }
 })

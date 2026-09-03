@@ -399,8 +399,12 @@ const SOURCE_RULES = [
         groups: ["integration:database"],
     },
     {
-        pattern: /^(?:src\/lib\/item-overflow\/.*\.ts|tools\/item_overflow_(?:disposition|common_response)\.test\.cjs)$/,
+        pattern: /^(?:src\/lib\/item-overflow\/(?:disposition|common-response|index)\.ts|tools\/item_overflow_(?:disposition|common_response)\.test\.cjs)$/,
         groups: ["quick:content"],
+    },
+    {
+        pattern: /^(?:src\/lib\/item-overflow\/direct-settlement\.ts|tools\/item_overflow_direct_settlement\.test\.cjs)$/,
+        groups: ["integration:database", "integration:rules"],
     },
     {
         pattern: /^tools\/reward_grant_overflow\.test\.cjs$/,

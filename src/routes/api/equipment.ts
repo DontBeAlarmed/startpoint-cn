@@ -23,6 +23,11 @@ import { settleMissionOperationFactsSync } from "../../lib/mission/operation-fac
 import { mergeMissionSettlementResponse } from "../../lib/mission";
 import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
 import { createRewardGrantItemOverflowPolicy } from "../../lib/reward-grant-item-overflow";
+import {
+    projectItemOverflowCommonResponse,
+    settleDirectItemOverflowsWithinTransactionSync,
+    type PlannedItemOverflowDisposition,
+} from "../../lib/item-overflow";
 
 interface SetProtectionBody {
     protection: boolean
@@ -102,6 +107,8 @@ const routes = async (fastify: FastifyInstance) => {
 
         const dissolveInfo = getEquipmentDissolveSync(equipmentId)
         const operationResult = getDb().transaction(() => {
+            let itemOverflowDispositions: readonly PlannedItemOverflowDisposition[] = []
+            let overflowFreeManaAfter: number | null = null
             withInventoryBatchContextWithinTransactionSync({
                 playerId,
                 preloadItemIds: [
@@ -142,12 +149,25 @@ const routes = async (fastify: FastifyInstance) => {
                     )
                     inventory.flush()
                     if (grant.overflowAmount > 0) {
-                        overflowPolicy.writeOverflow(dissolveInfo.ability_soul_id, grant.overflowAmount)
+                        const overflowSettlement = settleDirectItemOverflowsWithinTransactionSync({
+                            playerId,
+                            overflows: [{
+                                itemId: dissolveInfo.ability_soul_id,
+                                amount: grant.overflowAmount,
+                            }],
+                        })
+                        itemOverflowDispositions = overflowSettlement.dispositions
+                        overflowFreeManaAfter = overflowSettlement.freeManaAfter
                     }
                     returnItemList[dissolveInfo.ability_soul_id] = grant.afterAmount
                 })
             }
-            return { equipmentSnapshot, missionSettlement }
+            return {
+                equipmentSnapshot,
+                missionSettlement,
+                itemOverflowDispositions,
+                overflowFreeManaAfter,
+            }
         })()
 
         equipment.level = newLevel
@@ -164,6 +184,11 @@ const routes = async (fastify: FastifyInstance) => {
             mission_info: [],
             degree_list: [],
             mail_arrived: getMailArrivedSync(playerId),
+        }
+        const overMax = projectItemOverflowCommonResponse(operationResult.itemOverflowDispositions)
+        if (overMax.length > 0) responseData.over_max = overMax
+        if (operationResult.itemOverflowDispositions.some(entry => entry.kind === "sold")) {
+            responseData.user_info = { free_mana: operationResult.overflowFreeManaAfter }
         }
         if (operationResult.missionSettlement) {
             mergeMissionSettlementResponse(responseData, operationResult.missionSettlement, viewerId)
@@ -280,9 +305,12 @@ const routes = async (fastify: FastifyInstance) => {
                 const craftPointResult = inventory.deduct(wrightpieceItemId(), totalCraftPointCost)
                 returnItemList[wrightpieceItemId()] = craftPointResult.afterAmount
                 inventory.flush()
-                for (const overflow of pendingOverflows) {
-                    overflowPolicy.writeOverflow(overflow.itemId, overflow.amount)
-                }
+                const overflowSettlement = pendingOverflows.length === 0
+                    ? { dispositions: Object.freeze([]), freeManaAfter: player.freeMana }
+                    : settleDirectItemOverflowsWithinTransactionSync({
+                        playerId,
+                        overflows: pendingOverflows,
+                    })
 
                 const equipmentSnapshot = getPlayerEquipmentListSync(playerId)
                 const missionSettlement = settleMissionOperationFactsSync(
@@ -292,7 +320,12 @@ const routes = async (fastify: FastifyInstance) => {
                     getServerDate(),
                     equipmentSnapshot,
                 )
-                return { equipmentSnapshot, missionSettlement }
+                return {
+                    equipmentSnapshot,
+                    missionSettlement,
+                    itemOverflowDispositions: overflowSettlement.dispositions,
+                    overflowFreeManaAfter: overflowSettlement.freeManaAfter,
+                }
             })
         ))()
 
@@ -307,6 +340,11 @@ const routes = async (fastify: FastifyInstance) => {
             mission_info: [],
             degree_list: [],
             mail_arrived: getMailArrivedSync(playerId),
+        }
+        const overMax = projectItemOverflowCommonResponse(operationResult.itemOverflowDispositions)
+        if (overMax.length > 0) responseData.over_max = overMax
+        if (operationResult.itemOverflowDispositions.some(entry => entry.kind === "sold")) {
+            responseData.user_info = { free_mana: operationResult.overflowFreeManaAfter }
         }
         if (operationResult.missionSettlement) {
             mergeMissionSettlementResponse(responseData, operationResult.missionSettlement, viewerId)

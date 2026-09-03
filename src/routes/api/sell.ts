@@ -17,6 +17,11 @@ import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
 import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
 import { createRewardGrantItemOverflowPolicy } from "../../lib/reward-grant-item-overflow";
+import {
+    projectItemOverflowCommonResponse,
+    settleDirectItemOverflowsWithinTransactionSync,
+    type PlannedItemOverflowDisposition,
+} from "../../lib/item-overflow";
 
 interface SellEquipmentListItem {
     equipment_id: number
@@ -46,7 +51,11 @@ function grantDissolveRewardsWithinTransactionSync(
     craftPoints: number,
     starGrains: number,
     abilitySouls: Readonly<Record<number, number>>,
-): Record<number, number> {
+): {
+    itemList: Record<number, number>
+    itemOverflowDispositions: readonly PlannedItemOverflowDisposition[]
+    overflowFreeManaAfter: number | null
+} {
     const grants = [
         ...(craftPoints > 0 ? [{ itemId: wrightpieceItemId(), amount: craftPoints }] : []),
         ...(starGrains > 0 ? [{ itemId: starGrainItemId(), amount: starGrains }] : []),
@@ -55,7 +64,9 @@ function grantDissolveRewardsWithinTransactionSync(
             amount,
         })),
     ]
-    if (grants.length === 0) return {}
+    if (grants.length === 0) {
+        return { itemList: {}, itemOverflowDispositions: [], overflowFreeManaAfter: null }
+    }
 
     return withInventoryBatchContextWithinTransactionSync({
         playerId,
@@ -76,11 +87,30 @@ function grantDissolveRewardsWithinTransactionSync(
             }
         }
         inventory.flush()
-        for (const overflow of pendingOverflows) {
-            overflowPolicy.writeOverflow(overflow.itemId, overflow.amount)
+        const overflowSettlement = pendingOverflows.length === 0
+            ? null
+            : settleDirectItemOverflowsWithinTransactionSync({
+                playerId,
+                overflows: pendingOverflows,
+            })
+        return {
+            itemList,
+            itemOverflowDispositions: overflowSettlement?.dispositions ?? [],
+            overflowFreeManaAfter: overflowSettlement?.freeManaAfter ?? null,
         }
-        return itemList
     })
+}
+
+function overflowResponseFields(settlement: ReturnType<
+    typeof grantDissolveRewardsWithinTransactionSync
+>): Record<string, unknown> {
+    const overMax = projectItemOverflowCommonResponse(settlement.itemOverflowDispositions)
+    return {
+        ...(overMax.length > 0 ? { over_max: overMax } : {}),
+        ...(settlement.itemOverflowDispositions.some(entry => entry.kind === "sold")
+            ? { user_info: { free_mana: settlement.overflowFreeManaAfter } }
+            : {}),
+    }
 }
 
 const routes = async (fastify: FastifyInstance) => {
@@ -134,7 +164,7 @@ const routes = async (fastify: FastifyInstance) => {
             soldIds.push(equipmentId)
         }
 
-        const returnItemList = getDb().transaction(() => {
+        const rewardSettlement = getDb().transaction(() => {
             for (const equipmentId of soldIds) {
                 deletePlayerEquipmentSync(playerId, equipmentId)
             }
@@ -159,8 +189,9 @@ const routes = async (fastify: FastifyInstance) => {
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
                 "equipment_list": returnEquipmentList,
-                "item_list": returnItemList,
-                "mail_arrived": getMailArrivedSync(playerId)
+                "item_list": rewardSettlement.itemList,
+                "mail_arrived": getMailArrivedSync(playerId),
+                ...overflowResponseFields(rewardSettlement),
             }
         })
     })
@@ -231,7 +262,7 @@ const routes = async (fastify: FastifyInstance) => {
             stackUpdates.push({ equipmentId, newStack })
         }
 
-        const returnItemList = getDb().transaction(() => {
+        const rewardSettlement = getDb().transaction(() => {
             for (const update of stackUpdates) {
                 updatePlayerEquipmentSync(playerId, update.equipmentId, { stack: update.newStack })
             }
@@ -254,8 +285,9 @@ const routes = async (fastify: FastifyInstance) => {
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
                 "equipment_list": returnEquipmentList,
-                "item_list": returnItemList,
-                "mail_arrived": getMailArrivedSync(playerId)
+                "item_list": rewardSettlement.itemList,
+                "mail_arrived": getMailArrivedSync(playerId),
+                ...overflowResponseFields(rewardSettlement),
             }
         })
     })
@@ -316,7 +348,7 @@ const routes = async (fastify: FastifyInstance) => {
             })
         }
 
-        const returnItemList = getDb().transaction(() => {
+        const rewardSettlement = getDb().transaction(() => {
             for (const equipmentId of toSell) {
                 updatePlayerEquipmentSync(playerId, equipmentId, { stack: 0 })
             }
@@ -341,8 +373,9 @@ const routes = async (fastify: FastifyInstance) => {
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
                 "equipment_list": returnEquipmentList,
-                "item_list": returnItemList,
-                "mail_arrived": getMailArrivedSync(playerId)
+                "item_list": rewardSettlement.itemList,
+                "mail_arrived": getMailArrivedSync(playerId),
+                ...overflowResponseFields(rewardSettlement),
             }
         })
     })
