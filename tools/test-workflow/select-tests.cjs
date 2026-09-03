@@ -399,6 +399,10 @@ const SOURCE_RULES = [
         groups: ["integration:database"],
     },
     {
+        pattern: /^(?:src\/lib\/item-overflow\/.*\.ts|tools\/item_overflow_(?:disposition|common_response)\.test\.cjs)$/,
+        groups: ["quick:content"],
+    },
+    {
         pattern: /^tools\/reward_grant_overflow\.test\.cjs$/,
         groups: ["integration:reward-grant"],
     },

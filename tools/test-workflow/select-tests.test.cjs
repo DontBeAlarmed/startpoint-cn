@@ -672,6 +672,23 @@ test("maps single continue statistics parser to the quest leaf", () => {
     )
 })
 
+test("maps Item overflow disposition and common response to content checks", () => {
+    for (const file of [
+        "src/lib/item-overflow/disposition.ts",
+        "src/lib/item-overflow/common-response.ts",
+        "tools/item_overflow_disposition.test.cjs",
+        "tools/item_overflow_common_response.test.cjs",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["quick:content"])
+    }
+    assert.ok(TEST_GROUPS["quick:content"].tests.includes(
+        "tools/item_overflow_disposition.test.cjs",
+    ))
+    assert.ok(TEST_GROUPS["quick:content"].tests.includes(
+        "tools/item_overflow_common_response.test.cjs",
+    ))
+})
+
 test("maps the public reward grant layer and its regressions to one focused leaf", () => {
     const group = "integration:reward-grant"
     const tests = [
