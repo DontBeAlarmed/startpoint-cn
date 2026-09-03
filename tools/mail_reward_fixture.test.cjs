@@ -29,7 +29,7 @@ const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-ga
 
 const CHARACTER_ID = 1
 const EQUIPMENT_ID = 3010006
-const ITEM_ID = 30005
+const ITEM_ID = 14040
 
 let app
 let database
@@ -136,7 +136,7 @@ test("single receive response fixture covers every standard and dedicated mail t
         const result = decode(response)
         assert.equal(result.auto_sale_expired_mail, false)
         assert.equal(result.dispose_expired_mail, false)
-        assert.equal(result.total_count, 1)
+        assert.equal(result.total_count, 0)
         assert.equal(result.mail_arrived, false)
         assert.equal(historyCount(playerId), 1)
 
@@ -204,7 +204,7 @@ test("receive_all response fixture preserves mixed ordering, dedupe, and final i
     assert.deepEqual(result.ex_boost_item_list, [])
     assert.equal(result.max_overed_mail_count, 0)
     assert.equal(result.outdated_mail_count, 0)
-    assert.equal(result.total_count, mails.length)
+    assert.equal(result.total_count, 0)
     assert.equal(result.mail_arrived, false)
     assert.deepEqual(result.user_info, {
         free_vmoney: playerBefore.freeVmoney + 3,

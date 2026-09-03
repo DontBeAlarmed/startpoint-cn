@@ -9,6 +9,7 @@ import { getDb } from "../../data/db";
 import { getVirtualNow } from "../../runtime/time/game-time";
 import {
     settleMailRewardsInTransactionOwnerSync,
+    MailRewardCapacityError,
     UnsupportedMailAttachmentError,
 } from "../../lib/mail-reward-grant";
 
@@ -32,8 +33,12 @@ interface ReceiveAllBody {
 
 class MailNotAvailableError extends Error {}
 
-function getMailAwakeInvalidatedFactKeys(mails: readonly RawPlayerMail[]) {
+function getMailAwakeInvalidatedFactKeys(
+    mails: readonly RawPlayerMail[],
+    autoSaleExpiredMailCount = 0,
+) {
     return mails.some(mail => mail.type === MailType.FREE_MANA)
+        || autoSaleExpiredMailCount > 0
         ? [{ kind: "player" as const }]
         : []
 }
@@ -51,6 +56,9 @@ function finalizeMailReceiveAwakePublicationWrites(
     if (receiveMailSync(playerId, mailId, mail) === null) {
         throw new Error(`Mail ${mailId} changed while it was being received.`)
     }
+    if (deletePlayerMailsByIdsSync(playerId, [mailId]) !== 1) {
+        throw new Error(`Mail ${mailId} could not be removed after receipt.`)
+    }
 }
 
 function finalizeMailReceiveAllAwakePublicationWrites(
@@ -62,6 +70,9 @@ function finalizeMailReceiveAllAwakePublicationWrites(
     for (const mailId of validMailIds) {
         if (receiveMailSync(playerId, mailId, mailMap.get(mailId)) !== null) {
             claimed.push(mailId)
+            if (deletePlayerMailsByIdsSync(playerId, [mailId]) !== 1) {
+                throw new Error(`Mail ${mailId} could not be removed after receipt.`)
+            }
         }
     }
     if (claimed.length !== validMailIds.length) {
@@ -147,6 +158,7 @@ const routes = async (fastify: FastifyInstance) => {
             reconciledCharacterList: Record<string, unknown>[]
         }
         try {
+            const evaluationTime = getVirtualNow()
             const mail = getPlayerMailSync(playerId, mailId, true)
             if (!mail) throw new MailNotAvailableError()
             if (isPlayerMailExpiredAt(mail, getVirtualNow())) {
@@ -156,7 +168,7 @@ const routes = async (fastify: FastifyInstance) => {
             settlement = getDb().transaction(() => {
                 const player = getPlayerSync(playerId)
                 if (!player) throw new Error(`Mail player ${playerId} no longer exists.`)
-                const reward = settleMailRewardsInTransactionOwnerSync(playerId, [mail], player)
+                const reward = settleMailRewardsInTransactionOwnerSync(playerId, [mail], player, evaluationTime)
                 finalizeMailReceiveAwakePublicationWrites(playerId, mailId, mail)
                 return {
                     ...reward,
@@ -164,7 +176,12 @@ const routes = async (fastify: FastifyInstance) => {
                         playerId,
                         [],
                         [reward.characterList],
-                        { invalidatedFactKeys: getMailAwakeInvalidatedFactKeys([mail]) },
+                        {
+                            invalidatedFactKeys: getMailAwakeInvalidatedFactKeys(
+                                [mail],
+                                reward.autoSaleExpiredMailCount,
+                            ),
+                        },
                         "mail/receive",
                         new Date(getVirtualNow()),
                     ).characterList,
@@ -175,6 +192,10 @@ const routes = async (fastify: FastifyInstance) => {
                 error: "Bad Request",
                 message: "Mail not found or already received"
             })
+            if (error instanceof MailRewardCapacityError) return reply.status(400).send({
+                error: "Mail reward cannot fit",
+                message: error.message,
+            })
             const unsupported = unsupportedMailReply(reply, error)
             if (unsupported !== null) return unsupported
             throw error
@@ -184,7 +205,7 @@ const routes = async (fastify: FastifyInstance) => {
         const totalCount = getPlayerMailCountSync(playerId)
 
         const responseData: Record<string, any> = {
-            auto_sale_expired_mail: false,
+            auto_sale_expired_mail: settlement.autoSaleExpiredMailCount > 0,
             dispose_expired_mail: false,
             total_count: totalCount,
             mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
@@ -228,6 +249,8 @@ const routes = async (fastify: FastifyInstance) => {
             alreadyCount: number
             deletedCount: number
             outdatedCount: number
+            blockedCount: number
+            autoSaleExpiredMailCount: number
             claimed: number[]
             reconciledCharacterList: Record<string, unknown>[]
             equipmentList: any[]
@@ -235,47 +258,99 @@ const routes = async (fastify: FastifyInstance) => {
             userInfo: Record<string, any>
         }
         try {
-            const unreceivedMails = getPlayerMailsByIdsSync(playerId, uniqueMailIds, true)
             const evaluationTime = getVirtualNow()
-            const expiredMails = unreceivedMails.filter(mail => (
-                isPlayerMailExpiredAt(mail, evaluationTime)
-            ))
-            const expiredMailIds = expiredMails.map(mail => mail.id)
-            deletePlayerMailsByIdsSync(playerId, expiredMailIds)
-            const outdatedCount = expiredMailIds.length
-            const expiredMailIdSet = new Set(expiredMailIds)
-            const validMails = unreceivedMails.filter(mail => !expiredMailIdSet.has(mail.id))
             settlement = getDb().transaction(() => {
-                const mailMap = new Map(validMails.map(mail => [mail.id, mail]))
-                const validMailIds = uniqueMailIds.filter(mailId => mailMap.has(mailId))
-                const orderedValidMails = validMailIds.map(mailId => mailMap.get(mailId)!)
-                const player = getPlayerSync(playerId)
+                const unreceivedMails = getPlayerMailsByIdsSync(playerId, uniqueMailIds, true)
+                const expiredMails = unreceivedMails.filter(mail => (
+                    isPlayerMailExpiredAt(mail, evaluationTime)
+                ))
+                const expiredMailIds = expiredMails.map(mail => mail.id)
+                deletePlayerMailsByIdsSync(playerId, expiredMailIds)
+                const expiredMailIdSet = new Set(expiredMailIds)
+                const validMails = uniqueMailIds
+                    .map(mailId => unreceivedMails.find(mail => mail.id === mailId))
+                    .filter((mail): mail is RawPlayerMail => (
+                        mail !== undefined && !expiredMailIdSet.has(mail.id)
+                    ))
+                let player = getPlayerSync(playerId)
                 if (!player) throw new Error(`Mail player ${playerId} no longer exists.`)
-                const reward = settleMailRewardsInTransactionOwnerSync(playerId, orderedValidMails, player)
-                const claimed = finalizeMailReceiveAllAwakePublicationWrites(
+                const claimed: number[] = []
+                const claimedMails: RawPlayerMail[] = []
+                const characters: Record<string, unknown>[] = []
+                const equipment: any[] = []
+                const itemList: Record<string, number> = {}
+                const userInfo: Record<string, number> = {}
+                let blockedCount = 0
+                let autoSaleExpiredMailCount = 0
+                for (const mail of validMails) {
+                    try {
+                            const mailSettlement = getDb().transaction(() => {
+                                const reward = settleMailRewardsInTransactionOwnerSync(
+                                playerId,
+                                [mail],
+                                player!,
+                                    evaluationTime,
+                                )
+                                return reward
+                            })()
+                        claimed.push(mail.id)
+                        claimedMails.push(mail)
+                        characters.push(...mailSettlement.characterList)
+                        equipment.push(...mailSettlement.equipmentList)
+                        Object.assign(itemList, mailSettlement.itemList)
+                        Object.assign(userInfo, mailSettlement.userInfo)
+                        autoSaleExpiredMailCount += mailSettlement.autoSaleExpiredMailCount
+                        player = mailSettlement.playerAfter
+                    } catch (error) {
+                        if (error instanceof MailRewardCapacityError) {
+                            blockedCount++
+                            continue
+                        }
+                        throw error
+                    }
+                }
+                const mailMap = new Map(validMails.map(mail => [mail.id, mail]))
+                const finalized = finalizeMailReceiveAllAwakePublicationWrites(
                     playerId,
-                    validMailIds,
+                    claimed,
                     mailMap,
                 )
+                if (finalized.length !== claimed.length) {
+                    throw new Error("Mail state changed while mails were being received.")
+                }
                 return {
-                    alreadyCount: uniqueMailIds.length - validMailIds.length - outdatedCount,
+                    alreadyCount: uniqueMailIds.length
+                        - claimed.length
+                        - blockedCount
+                        - expiredMailIds.length,
                     deletedCount: expiredMailIds.length,
-                    outdatedCount,
+                    outdatedCount: expiredMailIds.length,
+                    blockedCount,
+                    autoSaleExpiredMailCount,
                     claimed,
                     reconciledCharacterList: publishCharacterGrowthOwnerStateBestEffort(
                         playerId,
                         [],
-                        [reward.characterList],
-                        { invalidatedFactKeys: getMailAwakeInvalidatedFactKeys(orderedValidMails) },
+                        [characters],
+                        {
+                            invalidatedFactKeys: getMailAwakeInvalidatedFactKeys(
+                                claimedMails,
+                                autoSaleExpiredMailCount,
+                            ),
+                        },
                         "mail/receive-all",
-                        new Date(getVirtualNow()),
+                        evaluationTime,
                     ).characterList,
-                    equipmentList: reward.equipmentList,
-                    itemList: reward.itemList,
-                    userInfo: reward.userInfo,
+                    equipmentList: equipment,
+                    itemList,
+                    userInfo,
                 }
             })()
         } catch (error) {
+            if (error instanceof MailRewardCapacityError) return reply.status(400).send({
+                error: "Mail reward cannot fit",
+                message: error.message,
+            })
             const unsupported = unsupportedMailReply(reply, error)
             if (unsupported !== null) return unsupported
             throw error
@@ -284,6 +359,8 @@ const routes = async (fastify: FastifyInstance) => {
             alreadyCount,
             deletedCount,
             outdatedCount,
+            blockedCount,
+            autoSaleExpiredMailCount,
             claimed,
             reconciledCharacterList,
             equipmentList,
@@ -293,12 +370,12 @@ const routes = async (fastify: FastifyInstance) => {
 
         const responseData: Record<string, any> = {
             already_mail_count: alreadyCount,
-            auto_sale_expired_mail_count: 0,
+            auto_sale_expired_mail_count: autoSaleExpiredMailCount,
             deleted_mail_count: deletedCount,
             dispose_expired_mail_count: deletedCount,
             ex_boost_item_list: [],
             mail_ids: claimed,
-            max_overed_mail_count: 0,
+            max_overed_mail_count: blockedCount,
             outdated_mail_count: outdatedCount,
             total_count: getPlayerMailCountSync(playerId),
             mail_arrived: getPlayerMailCountSync(playerId, true) > 0,

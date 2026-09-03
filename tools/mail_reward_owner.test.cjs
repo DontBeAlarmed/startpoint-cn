@@ -24,7 +24,7 @@ const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-ga
 
 const CHARACTER_ID = 1
 const EQUIPMENT_ID = 3010006
-const ITEM_ID = 30005
+const ITEM_ID = 14040
 
 let database
 let restoreContentSnapshot
@@ -127,12 +127,15 @@ test("single mail owner callback performs no player SELECT or transaction statem
         false,
         measured.statements.join("\n---\n"),
     )
-    assert.deepEqual(measured.result, {
+    const { playerAfter, autoSaleExpiredMailCount, ...legacyResult } = measured.result
+    assert.deepEqual(legacyResult, {
         characterList: [],
         equipmentList: [],
         itemList: {},
         userInfo: { free_mana: player.freeMana + 5 },
     })
+    assert.equal(autoSaleExpiredMailCount, 0)
+    assert.equal(playerAfter.freeMana, player.freeMana + 5)
     assert.equal(historyCount(playerId), 1)
 })
 

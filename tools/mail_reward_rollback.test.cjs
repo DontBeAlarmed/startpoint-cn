@@ -27,6 +27,11 @@ const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-ga
 
 const ITEM_ID = 930001
 const MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER
+const testItemPolicy = structuredClone(require("../assets/item_inventory_policy.json"))
+testItemPolicy.byItemId[ITEM_ID] = {
+    ...testItemPolicy.byItemId[14002],
+    maxCount: 100,
+}
 
 let app
 let database
@@ -89,7 +94,9 @@ async function receiveAll(viewerId, mailIds) {
 }
 
 test.before(async () => {
-    restoreContentSnapshot = installBundledGameplaySnapshot()
+    restoreContentSnapshot = installBundledGameplaySnapshot({
+        tableOverrides: { "item_inventory_policy.json": testItemPolicy },
+    })
     database = data.initializeDatabase()
     app = Fastify({ logger: false })
     registerCnMsgpackOnSend(app)

@@ -5,19 +5,32 @@ import {
 } from "../data/domains/mail"
 import { updatePlayerSync } from "../data/domains/player"
 import type { Player } from "../data/types"
+import bundledConfig from "../../assets/config.json"
+import { getRuntimeContentTableSync } from "../content/runtime/table-access"
+import type { ConfigValues } from "./types/config"
+import {
+    findItemInventoryPolicy,
+    getItemInventoryPolicyCatalog,
+} from "./inventory/item-inventory-policy"
+import { isEventTradeExpiredAt } from "./inventory/event-trade-expiry-plan"
+import { planManaCapacity } from "./inventory/mana-capacity-plan"
 import {
     createRewardGrantExecutionPlan,
     executeRewardGrantExecutionPlanAsTransactionOwnerSync,
     type RewardGrantCommand,
     type RewardGrantExecutionPlan,
+    type RewardGrantItemOverflowPolicy,
 } from "./reward-grant"
 import { RewardType } from "./types/rewards"
+import { getVirtualNow } from "../runtime/time/game-time"
 
 export interface MailRewardSettlement {
     readonly characterList: Record<string, unknown>[]
     readonly equipmentList: Record<string, unknown>[]
     readonly itemList: Record<string, number>
     readonly userInfo: Record<string, number>
+    readonly autoSaleExpiredMailCount: number
+    readonly playerAfter: Player
 }
 
 const SUPPORTED_MAIL_TYPES = new Set<number>([
@@ -49,6 +62,13 @@ export class MailRewardBalanceOverflowError extends Error {
         super(`Mail reward balance overflow: ${field}`)
         this.name = "MailRewardBalanceOverflowError"
         this.field = field
+    }
+}
+
+export class MailRewardCapacityError extends Error {
+    constructor(message: string) {
+        super(message)
+        this.name = "MailRewardCapacityError"
     }
 }
 
@@ -119,6 +139,80 @@ export function createMailRewardPlan(
     return createRewardGrantExecutionPlan(entries)
 }
 
+function addSafe(left: number, right: number, field: string): number {
+    const result = left + right
+    if (!Number.isSafeInteger(result) || result < 0) {
+        throw new UnsupportedMailAttachmentError(`${field} exceeds the safe integer range.`)
+    }
+    return result
+}
+
+function settlementReward(
+    mail: RawPlayerMail,
+    now: Date,
+): { reward: RewardGrantCommand | null, autoSold: boolean } {
+    const reward = standardReward(mail)
+    if (mail.type !== MailType.ITEM) return { reward, autoSold: false }
+    const catalog = getItemInventoryPolicyCatalog()
+    const policy = findItemInventoryPolicy(catalog, requireMailTypeId(mail))
+    if (policy === null) {
+        throw new UnsupportedMailAttachmentError(`Mail ${mail.id} Item policy is unavailable.`)
+    }
+    if (policy.effectKind !== 9
+        || policy.endTimeMs === null
+        || !isEventTradeExpiredAt(now.getTime(), policy.endTimeMs)) {
+        return { reward, autoSold: false }
+    }
+    return {
+        reward: {
+            type: RewardType.MANA,
+            count: addSafe(0, mail.number * policy.salePrice, `Mail ${mail.id} sale Mana`),
+        },
+        autoSold: true,
+    }
+}
+
+function createMailSettlementPlan(
+    mails: readonly RawPlayerMail[],
+    now: Date,
+): { plan: RewardGrantExecutionPlan, autoSaleExpiredMailCount: number } {
+    const entries: RewardGrantCommand[] = []
+    let autoSaleExpiredMailCount = 0
+    for (const mail of mails) {
+        validateMailReward(mail)
+        const settlement = settlementReward(mail, now)
+        if (settlement.autoSold) autoSaleExpiredMailCount++
+        if (settlement.reward === null) continue
+        const attachmentCount = mail.type === MailType.CHARACTER ? mail.number : 1
+        for (let attachmentIndex = 0; attachmentIndex < attachmentCount; attachmentIndex++) {
+            entries.push(settlement.reward)
+        }
+    }
+    return {
+        plan: createRewardGrantExecutionPlan(entries),
+        autoSaleExpiredMailCount,
+    }
+}
+
+function createMailClaimItemPolicy(
+    playerId: number,
+): RewardGrantItemOverflowPolicy {
+    const catalog = getItemInventoryPolicyCatalog()
+    return Object.freeze({
+        playerId,
+        maxCount(itemId: number): number {
+            const policy = findItemInventoryPolicy(catalog, itemId)
+            if (policy === null) throw new MailRewardCapacityError(`Item ${itemId} policy is unavailable.`)
+            return policy.maxCount
+        },
+        writeOverflow(itemId: number, amount: number): void {
+            throw new MailRewardCapacityError(
+                `Mail Item ${itemId} cannot fit ${amount} additional unit(s).`,
+            )
+        },
+    })
+}
+
 function addDedicatedReward(
     balance: DedicatedMailBalance,
     field: keyof DedicatedMailBalance,
@@ -177,6 +271,7 @@ function projectMailUserInfo(
     mails: readonly RawPlayerMail[],
     playerAfter: { freeMana: number, freeVmoney: number, expPool: number },
     dedicatedAfter: DedicatedMailBalance,
+    autoSaleExpiredMailCount: number,
 ): Record<string, number> {
     const userInfo: Record<string, number> = {}
     for (const mail of mails) {
@@ -210,6 +305,7 @@ function projectMailUserInfo(
                 break
         }
     }
+    if (autoSaleExpiredMailCount > 0) userInfo.free_mana = playerAfter.freeMana
     return userInfo
 }
 
@@ -217,9 +313,29 @@ export function settleMailRewardsInTransactionOwnerSync(
     playerId: number,
     mails: readonly RawPlayerMail[],
     knownPlayerBefore: Player,
+    now: Date = getVirtualNow(),
 ): MailRewardSettlement {
-    const plan = createMailRewardPlan(mails)
+    const settlementPlan = createMailSettlementPlan(mails, now)
+    const plan = settlementPlan.plan
     const dedicated = settleDedicatedMailBalance(mails, knownPlayerBefore)
+    let manaRequested = 0
+    for (const entry of plan.entries) {
+        if (entry.type === RewardType.MANA) {
+            manaRequested = addSafe(manaRequested, entry.count, "Mail Mana")
+        }
+    }
+    const manaCapacity = planManaCapacity({
+        freeMana: knownPlayerBefore.freeMana,
+        paidMana: knownPlayerBefore.paidMana,
+        maxMana: getRuntimeContentTableSync<ConfigValues>(
+            "config.json",
+            bundledConfig,
+        ).max_mana,
+        requestedMana: manaRequested,
+    })
+    if (manaCapacity.overflowMana > 0) {
+        throw new MailRewardCapacityError("Mail Mana cannot fit in the player's Mana capacity.")
+    }
     const grant = executeRewardGrantExecutionPlanAsTransactionOwnerSync(
         playerId,
         plan,
@@ -229,6 +345,7 @@ export function settleMailRewardsInTransactionOwnerSync(
             freeVmoney: knownPlayerBefore.freeVmoney,
             expPool: knownPlayerBefore.expPool,
         },
+        { itemOverflow: createMailClaimItemPolicy(playerId) },
     )
     if (Object.keys(dedicated.update).length > 0) {
         updatePlayerSync({ id: playerId, ...dedicated.update })
@@ -251,6 +368,24 @@ export function settleMailRewardsInTransactionOwnerSync(
             String(item.itemId),
             item.afterAmount,
         ])),
-        userInfo: projectMailUserInfo(mails, grant.playerAfter, dedicated.balance),
+        userInfo: projectMailUserInfo(
+            mails,
+            grant.playerAfter,
+            dedicated.balance,
+            settlementPlan.autoSaleExpiredMailCount,
+        ),
+        autoSaleExpiredMailCount: settlementPlan.autoSaleExpiredMailCount,
+        playerAfter: {
+            ...knownPlayerBefore,
+            freeMana: grant.playerAfter.freeMana,
+            freeVmoney: grant.playerAfter.freeVmoney,
+            expPool: grant.playerAfter.expPool,
+            vmoney: dedicated.balance.vmoney,
+            starCrumb: dedicated.balance.starCrumb,
+            bondToken: dedicated.balance.bondToken,
+            bossBoostPoint: dedicated.balance.bossBoostPoint,
+            boostPoint: dedicated.balance.boostPoint,
+            rankPoint: dedicated.balance.rankPoint,
+        },
     }
 }

@@ -11,7 +11,10 @@ const {
     parseItemInventoryPolicyCatalog,
 } = require("../src/lib/inventory/item-inventory-policy")
 const { planItemCap } = require("../src/lib/inventory/item-cap-plan")
-const { planEventTradeExpiry } = require("../src/lib/inventory/event-trade-expiry-plan")
+const {
+    isEventTradeExpiredAt,
+    planEventTradeExpiry,
+} = require("../src/lib/inventory/event-trade-expiry-plan")
 const { planManaCapacity } = require("../src/lib/inventory/mana-capacity-plan")
 const {
     installBundledGameplaySnapshot,
@@ -204,6 +207,8 @@ test("Item cap rejects negative, fractional and unsafe inputs", () => {
 })
 
 test("EventTrade expiry keeps the ending second valid and returns stable expired entries", () => {
+    assert.equal(isEventTradeExpiredAt(9_999, 9_000), false)
+    assert.equal(isEventTradeExpiredAt(10_000, 9_000), true)
     const typedCatalog = catalog({
         "101": policy({ effectKind: 0, endTimeMs: null }),
         "102": policy({ endTimeMs: null }),

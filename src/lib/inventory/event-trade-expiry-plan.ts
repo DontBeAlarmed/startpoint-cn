@@ -25,6 +25,12 @@ function requireNonNegativeSafeInteger(value: number, name: string): number {
     return value
 }
 
+export function isEventTradeExpiredAt(nowMs: number, endTimeMs: number): boolean {
+    requireNonNegativeSafeInteger(nowMs, "nowMs")
+    requireNonNegativeSafeInteger(endTimeMs, "endTimeMs")
+    return Math.floor(nowMs / 1000) > Math.floor(endTimeMs / 1000)
+}
+
 export function planEventTradeExpiry(
     ownedAmounts: readonly OwnedItemAmount[],
     catalog: ItemInventoryPolicyCatalog,
@@ -49,7 +55,7 @@ export function planEventTradeExpiry(
         if (amount === 0) continue
         const policy = catalog.byItemId[String(itemId)]
         if (!policy || policy.effectKind !== 9 || policy.endTimeMs === null) continue
-        if (Math.floor(nowMs / 1000) <= Math.floor(policy.endTimeMs / 1000)) continue
+        if (!isEventTradeExpiredAt(nowMs, policy.endTimeMs)) continue
         const mana = amount * policy.salePrice
         if (!Number.isSafeInteger(mana)) {
             throw new RangeError(`item[${itemId}] expiry Mana must be a safe integer`)

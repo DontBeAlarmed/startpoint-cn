@@ -172,28 +172,34 @@ const FINAL_WRITE_HELPERS = Object.freeze({
     "mail/receive": Object.freeze({
         helperName: "finalizeMailReceiveAwakePublicationWrites",
         callInventory: Object.freeze([
+            "import:../../data/domains/mail#deletePlayerMailsByIdsSync=1",
             "import:../../data/domains/mail#receiveMailSync=1",
         ]),
         executionInventory: Object.freeze([
+            "sync:import:../../data/domains/mail#deletePlayerMailsByIdsSync=1",
             "sync:import:../../data/domains/mail#receiveMailSync=1",
         ]),
         internalWrites: Object.freeze([
+            Object.freeze({ kind: "import", name: "deletePlayerMailsByIdsSync" }),
             Object.freeze({ kind: "import", name: "receiveMailSync" }),
         ]),
     }),
     "mail/receive_all": Object.freeze({
         helperName: "finalizeMailReceiveAllAwakePublicationWrites",
         callInventory: Object.freeze([
+            "import:../../data/domains/mail#deletePlayerMailsByIdsSync=1",
             "import:../../data/domains/mail#receiveMailSync=1",
             "member:claimed#push=1",
             "member:mailMap#get=1",
         ]),
         executionInventory: Object.freeze([
+            "sync:import:../../data/domains/mail#deletePlayerMailsByIdsSync=1",
             "sync:import:../../data/domains/mail#receiveMailSync=1",
             "sync:member:claimed#push=1",
             "sync:member:mailMap#get=1",
         ]),
         internalWrites: Object.freeze([
+            Object.freeze({ kind: "import", name: "deletePlayerMailsByIdsSync" }),
             Object.freeze({ kind: "import", name: "receiveMailSync" }),
         ]),
     }),
@@ -1499,6 +1505,16 @@ function isExactOwnerTransactionCallbackWrite(call, ownerRoot, publicationCall) 
 }
 
 function isReviewedSyncCallbackWrite(call, ownerRoot, ownerLabel) {
+    if (ownerLabel === "mail/receive_all") {
+        const nestedFunctions = nonImmediateFunctionAncestors(call, ownerRoot)
+        return nestedFunctions.some(callback => {
+            const transactionCall = callback.parent
+            return ts.isCallExpression(transactionCall)
+                && callTerminalName(transactionCall) === "transaction"
+                && transactionCall.arguments[0] === callback
+                && !hasOptionalCalleeChain(transactionCall)
+        })
+    }
     if (ownerLabel === "character/learn_mana_node") {
         const nestedFunctions = nonImmediateFunctionAncestors(call, ownerRoot)
         if (nestedFunctions.length !== 2) return false
