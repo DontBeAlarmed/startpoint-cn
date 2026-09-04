@@ -127,6 +127,15 @@ function parsePositiveInteger(value: string, fieldName: string, source: string):
     return parsed
 }
 
+// Official odds tables legitimately carry weight 0 (a tier or entry that can
+// never drop, e.g. rare_rarity pools without rarity-2 drops), so weights are
+// only required to be non-negative; permille math already maps 0 to 0‰.
+function parseNonNegativeWeight(value: string, source: string): number {
+    const parsed = parseStrictInteger(value, "weight", source)
+    if (parsed < 0) invalidGacha(`weight must be non-negative in ${source}: ${value}`)
+    return parsed
+}
+
 function parseStrictBoolean(value: string, fieldName: string, source: string): boolean {
     if (value === "true") return true
     if (value === "false") return false
@@ -140,7 +149,7 @@ function parseRarityOdds(rows: readonly OrderedMapTextRow[], oddsId: string): Ra
         if (fields.length !== 2) invalidGacha(`rarity odds row must have 2 columns in ${source}`)
         return {
             rarity: parsePositiveInteger(fields[0], "rarity", source),
-            weight: parsePositiveInteger(fields[1], "weight", source),
+            weight: parseNonNegativeWeight(fields[1], source),
         }
     })
 }
@@ -156,7 +165,7 @@ function parseCharacterOdds(
         return {
             characterId: parsePositiveInteger(fields[0], "characterId", source),
             rarity: parsePositiveInteger(fields[1], "rarity", source),
-            weight: parsePositiveInteger(fields[2], "weight", source),
+            weight: parseNonNegativeWeight(fields[2], source),
             oddsUp: parseStrictBoolean(fields[3], "oddsUp", source),
             isLimited: parseStrictBoolean(fields[4], "isLimited", source),
             isExchangeable: parseStrictBoolean(fields[5], "isExchangeable", source),
@@ -176,7 +185,7 @@ function parseEquipmentOdds(
         return {
             equipmentId: parsePositiveInteger(fields[0], "equipmentId", source),
             rarity: parsePositiveInteger(fields[1], "rarity", source),
-            weight: parsePositiveInteger(fields[2], "weight", source),
+            weight: parseNonNegativeWeight(fields[2], source),
             oddsUp: parseStrictBoolean(fields[3], "oddsUp", source),
             isLimited: parseStrictBoolean(fields[4], "isLimited", source),
             isExchangeable: parseStrictBoolean(fields[5], "isExchangeable", source),
