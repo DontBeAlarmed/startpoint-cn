@@ -15,14 +15,14 @@
 }
 
 html[data-theme="dark"] {
-    --bg:#141B2E; --panel:#1D2740; --line:#32405F; --line-strong:#465579;
-    --ink:#E6ECFF; --ink-soft:#8E9EC7;
-    --brand-chip: #14203A;
+    --bg:#0D1117; --panel:#161B22; --line:#30363D; --line-strong:#3D444D;
+    --ink:#E6EDF3; --ink-soft:#8B949E;
+    --brand-chip: #0B0F14;
     --star:#FFD335; --star-deep:#8A6D00;
     --water:#5AA7E8; --wind:#4ED47E; --thunder:#FFC53D; --fire:#FF8577;
     --ok-bg: rgba(78, 212, 126, 0.12); --info-bg: rgba(90, 167, 232, 0.12);
     --warn-bg: rgba(255, 197, 61, 0.1);
-    --hover:#232F4E; --stat-bg:#182136; --th-bg:#232F4E;
+    --hover:#1F262E; --stat-bg:#10151C; --th-bg:#21262D;
 }
 
 * {

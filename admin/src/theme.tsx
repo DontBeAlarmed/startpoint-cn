@@ -34,10 +34,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
                         colorTextLightSolid: "#1F2D4D",
                         borderRadius: 8,
                         ...(mode === "dark" ? {
-                            colorBgContainer: "#1D2740",      // 卡/表/输入框容器底 → 藏青
-                            colorBgElevated: "#232F4E",       // 弹层/下拉/模态浮层底
-                            colorBgLayout: "#141B2E",         // 布局底
-                            colorBorderSecondary: "#32405F",  // 内部描边
+                            colorBgContainer: "#161B22",      // 卡/表/输入框容器底 → 石墨
+                            colorBgElevated: "#21262D",       // 弹层/下拉/模态浮层底
+                            colorBgLayout: "#0D1117",         // 布局底
+                            colorBorderSecondary: "#30363D",  // 内部描边
                         } : {}),
                     },
                 }}

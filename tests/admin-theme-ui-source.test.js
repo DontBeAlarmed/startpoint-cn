@@ -7,7 +7,7 @@ for (const v of ["--bg:#F3F7FC", "--panel:#FFFFFF", "--star:#FFD335", "--ink:#1F
     assert.ok(css.includes(v), `缺少明色 token ${v}`)
 }
 assert.ok(css.includes('html[data-theme="dark"]'), "缺少暗色 token 块")
-assert.ok(css.includes("--bg:#141B2E"), "缺少暗色页面底色")
+assert.ok(css.includes("--bg:#0D1117"), "缺少暗色页面底色")
 for (const banned of ["#1890ff", "#faad14", "#ff4d4f"]) {
     assert.equal(css.includes(banned), false, `不得残留 AntD 旧默认色 ${banned}`)
 }
