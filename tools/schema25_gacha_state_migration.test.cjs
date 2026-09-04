@@ -72,7 +72,7 @@ test("literal schema 24 migrates through 25 to 26 without rewriting existing Gac
     fs.writeFileSync(path.join(process.env.DATA_DIR, "wdfp_data.version"), "24")
 
     const migrated = data.initializeDatabase()
-    assert.equal(migrated.pragma("user_version", { simple: true }), 26)
+    assert.equal(migrated.pragma("user_version", { simple: true }), 27)
     assert.equal(
         migrated.pragma("table_info(players_gacha_info)")
             .some(column => column.name === "crazy_draw_count"),

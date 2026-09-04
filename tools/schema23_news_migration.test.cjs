@@ -50,7 +50,7 @@ test("migrates schema 22, creates an empty news table, and removes forced delive
     fs.writeFileSync(path.join(process.env.DATA_DIR, "wdfp_data.version"), "22")
 
     const migrated = data.initializeDatabase()
-    assert.equal(migrated.pragma("user_version", { simple: true }), 26)
+    assert.equal(migrated.pragma("user_version", { simple: true }), 27)
     assert.deepEqual(migrated.prepare("SELECT * FROM server_news").all(), [])
     assert.equal(forcedNewsCount(migrated), 0)
     assert.equal(migrated.prepare(
@@ -67,7 +67,7 @@ test("creates a new database with an empty server-owned news table", () => {
     process.env.DATA_DIR = path.join(freshDirectory, "data")
 
     const fresh = data.initializeDatabase()
-    assert.equal(fresh.pragma("user_version", { simple: true }), 26)
+    assert.equal(fresh.pragma("user_version", { simple: true }), 27)
     assert.deepEqual(fresh.prepare("SELECT * FROM server_news").all(), [])
     assert.equal(hasNewsAsset(path.join(freshDirectory, "assets")), false)
 })
