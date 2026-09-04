@@ -101,7 +101,7 @@ export default function Accounts() {
                 return (
                     <Space size={6} wrap>
                         <span>{row.defaultPlayerName ?? `#${row.defaultPlayerId}`}</span>
-                        <Tag color={isActive ? "green" : "blue"}>{isActive ? "当前活动" : "账号默认"}</Tag>
+                        <span className={isActive ? "admin-badge-ok" : "admin-badge-info"}>{isActive ? "当前活动" : "账号默认"}</span>
                     </Space>
                 )
             },
@@ -199,8 +199,8 @@ export default function Accounts() {
             title: "状态", width: 80, responsive: ["sm"] as any,
             render: (_: unknown, row: PlayerBrief) => (
                 <Space size={4} wrap>
-                    {row.isDefault && <Tag color="blue">账号默认</Tag>}
-                    {row.isActive && <Tag color="green">当前活动</Tag>}
+                    {row.isDefault && <span className="admin-badge-info">账号默认</span>}
+                    {row.isActive && <span className="admin-badge-ok">当前活动</span>}
                 </Space>
             ),
         },

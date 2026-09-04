@@ -584,7 +584,7 @@ body {
 .admin-edit-compact {
   display: grid;
   grid-template-columns: minmax(120px, 1fr) auto auto;
-  gap: 0;
+  gap: 6px;
 }
 
 .admin-seed-grid {
@@ -674,6 +674,15 @@ body {
 
 .ant-table-thead > tr > th {
   white-space: nowrap;
+}
+
+.admin-app .ant-table-wrapper .ant-table-thead > tr > th {
+  background: var(--th-bg);
+}
+
+.admin-app .ant-table-wrapper .ant-table-tbody > tr.ant-table-row:hover > td,
+.admin-app .ant-table-wrapper .ant-table-tbody > tr > td.ant-table-cell-row-hover {
+  background: var(--hover);
 }
 
 @media (max-width: 767px) {

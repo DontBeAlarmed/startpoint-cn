@@ -113,8 +113,8 @@ export function AccountsMobileView({
                                             </div>
                                             <Typography.Text type="secondary">存档 #{player.id}</Typography.Text>
                                             <div className="admin-mobile-tags">
-                                                {player.isDefault && <Tag color="blue">账号默认</Tag>}
-                                                {player.isActive && <Tag color="green">当前活动</Tag>}
+                                                {player.isDefault && <span className="admin-badge-info">账号默认</span>}
+                                                {player.isActive && <span className="admin-badge-ok">当前活动</span>}
                                             </div>
                                             <div className="admin-mobile-actions" onClick={event => event.stopPropagation()}>
                                                 <Button type="primary" icon={<Pencil size={15} />} onClick={() => onOpenPlayer(player.id)}>
