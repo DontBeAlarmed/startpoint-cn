@@ -106,7 +106,7 @@
       ],
       "seedContract": {
         "characterSeeds": [
-          151009
+          121087
         ],
         "directMissionSeeds": [],
         "factSeeds": []
@@ -433,7 +433,7 @@
       ],
       "seedContract": {
         "characterSeeds": [
-          151009
+          121087
         ],
         "directMissionSeeds": [],
         "factSeeds": []
@@ -2520,19 +2520,19 @@
       "runtimeEvidenceKey": "gacha-exchange-character",
       "request": {
         "api_count": 1,
-        "character_id": 151009,
-        "gacha_id": 29,
+        "character_id": 121087,
+        "gacha_id": 1638,
         "viewer_id": 880000008
       },
       "response": {
         "characterList": [
           {
-            "characterId": 151009
+            "characterId": 121087
           }
         ],
         "statusCode": 200
       },
-      "behaviorSha256": "f5fe5036f9b534f31565254dac4707160e230f5a5206bd92795f9a00c59d4c13",
+      "behaviorSha256": "5d00a36bbed39e413b49d92b37e7b0aae3f3b96eeda4f81ac0cb9ff0d6670e4b",
       "dbBefore": {
         "category9": [],
         "characters": [
@@ -2545,7 +2545,7 @@
         ],
         "gacha": {
           "gachaExchangePoint": 250,
-          "gachaId": 29,
+          "gachaId": 1638,
           "isAccountFirst": false,
           "isDailyFirst": false
         },
@@ -2572,7 +2572,7 @@
             "stack": 0
           },
           {
-            "characterId": 151009,
+            "characterId": 121087,
             "evolutionLevel": 0,
             "exp": 0,
             "stack": 0
@@ -2580,7 +2580,7 @@
         ],
         "gacha": {
           "gachaExchangePoint": 0,
-          "gachaId": 29,
+          "gachaId": 1638,
           "isAccountFirst": false,
           "isDailyFirst": false
         },
@@ -2598,21 +2598,21 @@
         "unlocks": []
       },
       "characterSeeds": [
-        151009
+        121087
       ],
       "factSeeds": [],
       "directMissionSeeds": [],
       "publicationObservation": {
         "kind": "publish-wrapper",
         "explicitCharacterSeeds": [
-          151009
+          121087
         ],
         "characterListSeeds": [
-          151009
+          121087
         ],
         "contextCandidateCharacterSeeds": [],
         "characterSeeds": [
-          151009
+          121087
         ],
         "factSeeds": [],
         "directMissionSeeds": []
@@ -2624,12 +2624,12 @@
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 10,
-      "sqlWrites": 6,
+      "sqlReads": 12,
+      "sqlWrites": 5,
       "sqlByTable": {
         "players": {
-          "reads": 1,
-          "statements": 1,
+          "reads": 2,
+          "statements": 2,
           "writes": 0
         },
         "players_character_awake_unlocks": {
@@ -2644,8 +2644,8 @@
         },
         "players_characters_bond_tokens": {
           "reads": 1,
-          "statements": 3,
-          "writes": 2
+          "statements": 2,
+          "writes": 1
         },
         "players_characters_mana_nodes": {
           "reads": 2,
@@ -2656,6 +2656,11 @@
           "reads": 1,
           "statements": 2,
           "writes": 1
+        },
+        "players_items": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
         },
         "players_mails": {
           "reads": 1,
@@ -2785,7 +2790,7 @@
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
       "sqlReads": 11,
-      "sqlWrites": 8,
+      "sqlWrites": 7,
       "sqlByTable": {
         "players": {
           "reads": 2,
@@ -2809,8 +2814,8 @@
         },
         "players_characters_bond_tokens": {
           "reads": 1,
-          "statements": 3,
-          "writes": 2
+          "statements": 2,
+          "writes": 1
         },
         "players_characters_mana_nodes": {
           "reads": 2,

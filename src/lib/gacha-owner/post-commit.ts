@@ -1,52 +1,53 @@
-import { publishCharacterGrowthOwnerStateBestEffort } from "../character-growth/owner-publication"
 import { getDefaultGachaSeedQuarantine } from "../gacha-seed-quarantine"
 import { formatGachaCharacterDrawsSummary } from "../hot-path-log-formatters"
 import { sampledLog } from "../sampled-log"
-import type { GachaExecSuccess, GachaPostCommitResult } from "./model"
+import type { GachaExchangeSuccess, GachaExecSuccess, GachaPostCommitResult } from "./model"
 
 export interface GachaPostCommitDependencies {
-    readonly markSeed: (movieId: string, seed: number, rarity: number) => void
-    readonly sampledCharacterLog: (result: Extract<
+    readonly markSeed?: (movieId: string, seed: number, rarity: number) => void
+    readonly sampledCharacterLog?: (result: Extract<
         GachaExecSuccess["postCommitEffects"][number],
         { readonly kind: "sampledLog" }
     >) => void
     readonly publishGrowth: (
         playerId: number,
+        characterIds: readonly number[],
         characters: readonly Record<string, unknown>[],
+        source: "gacha/exec" | "gacha/exchange_character",
     ) => readonly Record<string, unknown>[]
 }
 
-const defaultDependencies: GachaPostCommitDependencies = {
-    markSeed: (movieId, seed, rarity) => {
+const defaultMarkSeed = (movieId: string, seed: number, rarity: number) => {
         getDefaultGachaSeedQuarantine().markSent(movieId, seed, rarity)
-    },
-    sampledCharacterLog: effect => {
+}
+const defaultSampledCharacterLog = (effect: Extract<
+    GachaExecSuccess["postCommitEffects"][number],
+    { readonly kind: "sampledLog" }
+>) => {
         sampledLog("gacha-character-draws", () => formatGachaCharacterDrawsSummary(effect))
-    },
-    publishGrowth: (playerId, characters) => publishCharacterGrowthOwnerStateBestEffort(
-        playerId,
-        [],
-        [[...characters]],
-        {},
-        "gacha/exec",
-    ).characterList,
 }
 
 export function runGachaPostCommitEffects(
-    result: GachaExecSuccess,
-    dependencies: GachaPostCommitDependencies = defaultDependencies,
+    result: GachaExecSuccess | GachaExchangeSuccess,
+    dependencies: GachaPostCommitDependencies,
 ): GachaPostCommitResult {
     let characterList = result.kind === "character" ? result.characters : []
     for (const effect of result.postCommitEffects) {
         try {
             if (effect.kind === "seedMark") {
-                dependencies.markSeed(effect.movieId, effect.seed, effect.rarity)
+                ;(dependencies.markSeed ?? defaultMarkSeed)(
+                    effect.movieId,
+                    effect.seed,
+                    effect.rarity,
+                )
             } else if (effect.kind === "sampledLog") {
-                dependencies.sampledCharacterLog(effect)
+                ;(dependencies.sampledCharacterLog ?? defaultSampledCharacterLog)(effect)
             } else {
                 characterList = dependencies.publishGrowth(
                     effect.playerId,
+                    effect.characterIds,
                     effect.characters,
+                    effect.source,
                 )
             }
         } catch {

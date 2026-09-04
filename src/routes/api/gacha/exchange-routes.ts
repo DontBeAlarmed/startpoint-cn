@@ -1,40 +1,36 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
-import { resolvePlayerIdSync } from "../../data/activeAccount"
-import { getSession } from "../../data/domains/session"
+import { resolvePlayerIdSync } from "../../../data/activeAccount"
+import { getSession } from "../../../data/domains/session"
 import {
-    executeGachaDrawSync,
-    projectGachaExecResponse,
+    executeGachaExchangeSync,
+    projectGachaExchangeResponse,
     runGachaPostCommitEffects,
-} from "../../lib/gacha-owner"
-import { getVirtualNow } from "../../runtime/time/game-time"
-import { generateDataHeaders } from "../../utils"
-import { registerGachaExchangeRoutes } from "./gacha/exchange-routes"
-import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication"
+} from "../../../lib/gacha-owner"
+import { getVirtualNow } from "../../../runtime/time/game-time"
+import { generateDataHeaders } from "../../../utils"
+import { publishCharacterGrowthOwnerStateBestEffort } from "../../../lib/character-growth/owner-publication"
 
-interface ExecBody {
+interface ExchangeBody {
     readonly viewer_id: number
     readonly gacha_id: number
-    readonly payment_type: number
-    readonly number_of_exec: number
-    readonly type: number
+    readonly character_id?: number
+    readonly equipment_id?: number
 }
 
 function positiveInteger(value: unknown): value is number {
     return Number.isSafeInteger(value) && (value as number) > 0
 }
 
-async function handleExec(request: FastifyRequest, reply: FastifyReply) {
-    const body = request.body as ExecBody
+async function handleExchange(
+    request: FastifyRequest,
+    reply: FastifyReply,
+    kind: "character" | "equipment",
+) {
+    const body = request.body as ExchangeBody
     const viewerId = body.viewer_id
     const gachaId = body.gacha_id
-    const paymentType = body.payment_type
-    const numberOfExec = body.number_of_exec
-    const execType = body.type
-    if (!positiveInteger(viewerId)
-        || !positiveInteger(gachaId)
-        || !positiveInteger(paymentType)
-        || !positiveInteger(numberOfExec)
-        || !positiveInteger(execType)) {
+    const targetId = kind === "character" ? body.character_id : body.equipment_id
+    if (!positiveInteger(viewerId) || !positiveInteger(gachaId) || !positiveInteger(targetId)) {
         return reply.status(400).send({ error: "Bad Request", message: "Invalid request body." })
     }
     const session = await getSession(String(viewerId))
@@ -48,13 +44,11 @@ async function handleExec(request: FastifyRequest, reply: FastifyReply) {
             message: "No players bound to account.",
         })
     }
-
-    const result = executeGachaDrawSync({
+    const result = executeGachaExchangeSync({
         playerId,
         gachaId,
-        paymentType,
-        execType,
-        numberOfExec,
+        targetId,
+        kind,
         nowMs: getVirtualNow().getTime(),
     })
     if (!result.ok) {
@@ -82,14 +76,18 @@ async function handleExec(request: FastifyRequest, reply: FastifyReply) {
         ),
     })
     reply.header("content-type", "application/x-msgpack")
-    return reply.status(200).send(projectGachaExecResponse({
+    return reply.status(200).send(projectGachaExchangeResponse({
         dataHeaders: generateDataHeaders({ viewer_id: viewerId }),
         result,
         postCommit,
     }))
 }
 
-export default async function gachaRoutes(fastify: FastifyInstance): Promise<void> {
-    registerGachaExchangeRoutes(fastify)
-    fastify.post("/exec", handleExec)
+export function registerGachaExchangeRoutes(fastify: FastifyInstance): void {
+    fastify.post("/exchange_character", (request, reply) => (
+        handleExchange(request, reply, "character")
+    ))
+    fastify.post("/exchange_equipment", (request, reply) => (
+        handleExchange(request, reply, "equipment")
+    ))
 }

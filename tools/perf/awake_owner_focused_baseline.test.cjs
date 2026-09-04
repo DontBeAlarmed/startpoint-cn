@@ -412,7 +412,7 @@ test("current owner-focused evidence exactly matches the checked snapshot", asyn
     )
     assert.equal(report.scenarios["single-finish"].loaderCalls.length > 1, true)
     assert.deepEqual(report.scenarios["exchange-star-crumb"].characterSeeds, [])
-    assert.deepEqual(report.scenarios["gacha-exchange-character"].characterSeeds, [151009])
+    assert.deepEqual(report.scenarios["gacha-exchange-character"].characterSeeds, [121087])
     assert.deepEqual(report.scenarios["shop-bulk-buy"].characterSeeds, [341005, 341006])
     assert.deepEqual(report.scenarios["multi-finish"].factSeeds, [
         "collectedItems:100000", "items", "passState:3", "player",

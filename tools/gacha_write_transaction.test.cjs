@@ -35,6 +35,7 @@ const {
     getPlayerGachaInfoSync,
     insertPlayerGachaCampaignSync,
     insertPlayerGachaInfoSync,
+    updatePlayerGachaInfoSync,
 } = require("../src/data/domains/gacha")
 const {
     getPlayerCollectedItemTotalSync,
@@ -64,7 +65,15 @@ const {
     grantGachaRewardPlanInTransactionOwnerWithInventorySync,
 } = require("../src/lib/gacha-reward-grant")
 const { withDeferredInventoryBatchContextWithinTransactionSync } = require("../src/lib/inventory")
-const { executeGachaDrawSync, runGachaPostCommitEffects } = require("../src/lib/gacha-owner")
+const {
+    executeGachaDrawSync,
+    executeGachaExchangeSync,
+    runGachaPostCommitEffects: runGachaPostCommitEffectsWithDependencies,
+} = require("../src/lib/gacha-owner")
+const runGachaPostCommitEffects = result => runGachaPostCommitEffectsWithDependencies(result, {
+    publishGrowth: (_playerId, _characterIds, characters) => characters,
+})
+const { getGachaCatalog } = require("../src/lib/gacha-catalog")
 const {
     grantPlayerComebackGachaPeriodSync,
     grantPlayerStarsGachaCampaignSync,
@@ -82,6 +91,9 @@ let database
 let app
 let nextViewerId = 860000000
 const ACTIVE_CHARACTER_GACHA_ID = 1638
+const ACTIVE_CHARACTER_EXCHANGE_ID = 121087
+const ACTIVE_EQUIPMENT_GACHA_ID = 25030
+const ACTIVE_EQUIPMENT_EXCHANGE_ID = 5070036
 const sqlTrace = { active: false, statements: [] }
 const previousTimeOffset = getTimeOffset()
 
@@ -195,7 +207,7 @@ test.after(async () => {
 test("character pity exchange rolls reward back when history insertion fails", async t => {
     const { playerId, viewerId } = await createPlayer("gacha-character-exchange")
     insertPlayerGachaInfoSync(playerId, {
-        gachaId: 29,
+        gachaId: ACTIVE_CHARACTER_GACHA_ID,
         isAccountFirst: false,
         isDailyFirst: false,
         gachaExchangePoint: 250,
@@ -203,7 +215,7 @@ test("character pity exchange rolls reward back when history insertion fails", a
     database.exec(`
         CREATE TRIGGER reject_character_exchange_history
         BEFORE INSERT ON players_receive_history
-        WHEN NEW.player_id = ${playerId} AND NEW.type_id = 151009
+        WHEN NEW.player_id = ${playerId} AND NEW.type_id = ${ACTIVE_CHARACTER_EXCHANGE_ID}
         BEGIN SELECT RAISE(ABORT, 'forced character exchange history failure'); END;
     `)
     t.after(() => database.exec("DROP TRIGGER IF EXISTS reject_character_exchange_history"))
@@ -213,27 +225,27 @@ test("character pity exchange rolls reward back when history insertion fails", a
         url: "/gacha/exchange_character",
         payload: {
             viewer_id: viewerId,
-            gacha_id: 29,
-            character_id: 151009,
+            gacha_id: ACTIVE_CHARACTER_GACHA_ID,
+            character_id: ACTIVE_CHARACTER_EXCHANGE_ID,
             api_count: 1,
         },
     })
 
     assert.equal(response.statusCode, 500)
     assert.match(response.body, /forced character exchange history failure/)
-    assert.equal(getPlayerCharacterSync(playerId, 151009), null)
-    assert.equal(getPlayerGachaInfoSync(playerId, 29).gachaExchangePoint, 250)
+    assert.equal(getPlayerCharacterSync(playerId, ACTIVE_CHARACTER_EXCHANGE_ID), null)
+    assert.equal(getPlayerGachaInfoSync(playerId, ACTIVE_CHARACTER_GACHA_ID).gachaExchangePoint, 250)
     assert.equal(historyCount(playerId), 0)
 })
 
 test("character pity exchange publishes duplicate compensation overflow absolute state", async () => {
     const { playerId, viewerId } = await createPlayer("gacha-character-exchange-overflow")
-    const characterId = 151009
-    const compensationItemId = 14018
+    const characterId = ACTIVE_CHARACTER_EXCHANGE_ID
+    const compensationItemId = 14006
     assert.equal(givePlayerCharacterSync(playerId, characterId).isNew, true)
     setInventoryFixtureItemExactSync(playerId, compensationItemId, 99999)
     insertPlayerGachaInfoSync(playerId, {
-        gachaId: 29,
+        gachaId: ACTIVE_CHARACTER_GACHA_ID,
         isAccountFirst: false,
         isDailyFirst: false,
         gachaExchangePoint: 250,
@@ -246,7 +258,7 @@ test("character pity exchange publishes duplicate compensation overflow absolute
         url: "/gacha/exchange_character",
         payload: {
             viewer_id: viewerId,
-            gacha_id: 29,
+            gacha_id: ACTIVE_CHARACTER_GACHA_ID,
             character_id: characterId,
             api_count: 1,
         },
@@ -262,7 +274,7 @@ test("character pity exchange publishes duplicate compensation overflow absolute
         item: { item_id: compensationItemId, number: 1 },
     }])
     assert.equal(payload.mail_arrived, true)
-    assert.equal(getPlayerGachaInfoSync(playerId, 29).gachaExchangePoint, 0)
+    assert.equal(getPlayerGachaInfoSync(playerId, ACTIVE_CHARACTER_GACHA_ID).gachaExchangePoint, 0)
     assert.equal(historyCount(playerId), 1)
     const newMails = getPlayerMailsSync(playerId, 1, 100, true)
         .filter(mail => mail.type === MailType.ITEM && mail.type_id === compensationItemId)
@@ -273,7 +285,7 @@ test("character pity exchange publishes duplicate compensation overflow absolute
 test("equipment pity exchange rolls reward and history back when points fail", async t => {
     const { playerId, viewerId } = await createPlayer("gacha-equipment-exchange")
     insertPlayerGachaInfoSync(playerId, {
-        gachaId: 5000,
+        gachaId: ACTIVE_EQUIPMENT_GACHA_ID,
         isAccountFirst: false,
         isDailyFirst: false,
         gachaExchangePoint: 250,
@@ -281,7 +293,7 @@ test("equipment pity exchange rolls reward and history back when points fail", a
     database.exec(`
         CREATE TRIGGER reject_equipment_exchange_points
         BEFORE UPDATE OF gacha_exchange_point ON players_gacha_info
-        WHEN OLD.player_id = ${playerId} AND OLD.gacha_id = 5000
+        WHEN OLD.player_id = ${playerId} AND OLD.gacha_id = ${ACTIVE_EQUIPMENT_GACHA_ID}
         BEGIN SELECT RAISE(ABORT, 'forced equipment exchange points failure'); END;
     `)
     t.after(() => database.exec("DROP TRIGGER IF EXISTS reject_equipment_exchange_points"))
@@ -291,17 +303,324 @@ test("equipment pity exchange rolls reward and history back when points fail", a
         url: "/gacha/exchange_equipment",
         payload: {
             viewer_id: viewerId,
-            gacha_id: 5000,
-            equipment_id: 5040016,
+            gacha_id: ACTIVE_EQUIPMENT_GACHA_ID,
+            equipment_id: ACTIVE_EQUIPMENT_EXCHANGE_ID,
             api_count: 1,
         },
     })
 
     assert.equal(response.statusCode, 500)
     assert.match(response.body, /forced equipment exchange points failure/)
-    assert.equal(getPlayerEquipmentSync(playerId, 5040016), null)
-    assert.equal(getPlayerGachaInfoSync(playerId, 5000).gachaExchangePoint, 250)
+    assert.equal(getPlayerEquipmentSync(playerId, ACTIVE_EQUIPMENT_EXCHANGE_ID), null)
+    assert.equal(getPlayerGachaInfoSync(playerId, ACTIVE_EQUIPMENT_GACHA_ID).gachaExchangePoint, 250)
     assert.equal(historyCount(playerId), 0)
+})
+
+test("equipment exchange uses typed rate and preserves cost boundary", async () => {
+    const success = await createPlayer("gacha-equipment-exchange-success")
+    insertPlayerGachaInfoSync(success.playerId, {
+        gachaId: ACTIVE_EQUIPMENT_GACHA_ID,
+        isAccountFirst: true,
+        isDailyFirst: true,
+        gachaExchangePoint: 251,
+    })
+    const response = await app.inject({
+        method: "POST",
+        url: "/gacha/exchange_equipment",
+        payload: {
+            viewer_id: success.viewerId,
+            gacha_id: ACTIVE_EQUIPMENT_GACHA_ID,
+            equipment_id: ACTIVE_EQUIPMENT_EXCHANGE_ID,
+            api_count: 1,
+        },
+    })
+    assert.equal(response.statusCode, 200, response.body)
+    assert.equal(getPlayerGachaInfoSync(
+        success.playerId,
+        ACTIVE_EQUIPMENT_GACHA_ID,
+    ).gachaExchangePoint, 1)
+    assert.notEqual(getPlayerEquipmentSync(success.playerId, ACTIVE_EQUIPMENT_EXCHANGE_ID), null)
+    assert.equal(historyCount(success.playerId), 1)
+    updatePlayerGachaInfoSync(success.playerId, {
+        gachaId: ACTIVE_EQUIPMENT_GACHA_ID,
+        gachaExchangePoint: 250,
+    })
+    const repeated = await app.inject({
+        method: "POST",
+        url: "/gacha/exchange_equipment",
+        payload: {
+            viewer_id: success.viewerId,
+            gacha_id: ACTIVE_EQUIPMENT_GACHA_ID,
+            equipment_id: ACTIVE_EQUIPMENT_EXCHANGE_ID,
+            api_count: 2,
+        },
+    })
+    assert.equal(repeated.statusCode, 200, repeated.body)
+    const repeatedPayload = require("msgpackr").unpack(
+        Buffer.from(repeated.body, "base64"),
+    ).data
+    assert.equal(repeatedPayload.equipment_list[0].stack, 1)
+    assert.equal(repeatedPayload.gacha_info_list[0].gacha_exchange_point, 0)
+    assert.equal("character_list" in repeatedPayload, false)
+    assert.equal("item_list" in repeatedPayload, false)
+    assert.deepEqual(repeatedPayload.encyclopedia_info, [])
+    assert.equal(typeof repeatedPayload.mail_arrived, "boolean")
+    assert.equal(getPlayerEquipmentSync(success.playerId, ACTIVE_EQUIPMENT_EXCHANGE_ID).stack, 1)
+    assert.equal(historyCount(success.playerId), 2)
+
+    const insufficient = await createPlayer("gacha-equipment-exchange-insufficient")
+    insertPlayerGachaInfoSync(insufficient.playerId, {
+        gachaId: ACTIVE_EQUIPMENT_GACHA_ID,
+        isAccountFirst: true,
+        isDailyFirst: true,
+        gachaExchangePoint: 249,
+    })
+    const rejected = await app.inject({
+        method: "POST",
+        url: "/gacha/exchange_equipment",
+        payload: {
+            viewer_id: insufficient.viewerId,
+            gacha_id: ACTIVE_EQUIPMENT_GACHA_ID,
+            equipment_id: ACTIVE_EQUIPMENT_EXCHANGE_ID,
+            api_count: 1,
+        },
+    })
+    assert.equal(rejected.statusCode, 400)
+    assert.equal(getPlayerGachaInfoSync(
+        insufficient.playerId,
+        ACTIVE_EQUIPMENT_GACHA_ID,
+    ).gachaExchangePoint, 249)
+    assert.equal(getPlayerEquipmentSync(insufficient.playerId, ACTIVE_EQUIPMENT_EXCHANGE_ID), null)
+})
+
+test("exchange cost is read from the injected typed rate instead of a protocol constant", async () => {
+    const { playerId } = await createPlayer("gacha-exchange-injected-rate")
+    insertPlayerGachaInfoSync(playerId, {
+        gachaId: ACTIVE_CHARACTER_GACHA_ID,
+        isAccountFirst: true,
+        isDailyFirst: true,
+        gachaExchangePoint: 251,
+    })
+    const catalog = getGachaCatalog()
+    const customCatalog = {
+        ...catalog,
+        exchangeRates: {
+            ...catalog.exchangeRates,
+            character: { ...catalog.exchangeRates.character, 5: 251 },
+        },
+    }
+    const result = executeGachaExchangeSync({
+        playerId,
+        gachaId: ACTIVE_CHARACTER_GACHA_ID,
+        targetId: ACTIVE_CHARACTER_EXCHANGE_ID,
+        kind: "character",
+        nowMs: Date.parse("2024-08-14T12:00:00.000Z"),
+    }, { catalog: customCatalog })
+    assert.equal(result.ok, true)
+    assert.equal(getPlayerGachaInfoSync(playerId, ACTIVE_CHARACTER_GACHA_ID).gachaExchangePoint, 0)
+})
+
+test("new Character exchange keeps the client empty item-list shape", async () => {
+    const { playerId, viewerId } = await createPlayer("gacha-character-exchange-new")
+    insertPlayerGachaInfoSync(playerId, {
+        gachaId: ACTIVE_CHARACTER_GACHA_ID,
+        isAccountFirst: true,
+        isDailyFirst: true,
+        gachaExchangePoint: 250,
+    })
+    const response = await app.inject({
+        method: "POST",
+        url: "/gacha/exchange_character",
+        payload: {
+            viewer_id: viewerId,
+            gacha_id: ACTIVE_CHARACTER_GACHA_ID,
+            character_id: ACTIVE_CHARACTER_EXCHANGE_ID,
+            api_count: 1,
+        },
+    })
+    assert.equal(response.statusCode, 200, response.body)
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64")).data
+    assert.deepEqual(payload.item_list, [])
+    assert.equal(payload.gacha_info_list[0].gacha_exchange_point, 0)
+})
+
+test("exchange rejects an active but non-exchangeable pool target", async () => {
+    const { playerId, viewerId } = await createPlayer("gacha-nonexchangeable")
+    insertPlayerGachaInfoSync(playerId, {
+        gachaId: ACTIVE_CHARACTER_GACHA_ID,
+        isAccountFirst: true,
+        isDailyFirst: true,
+        gachaExchangePoint: 250,
+    })
+    const response = await app.inject({
+        method: "POST",
+        url: "/gacha/exchange_character",
+        payload: {
+            viewer_id: viewerId,
+            gacha_id: ACTIVE_CHARACTER_GACHA_ID,
+            character_id: 111135,
+            api_count: 1,
+        },
+    })
+    assert.equal(response.statusCode, 400)
+    assert.equal(getPlayerGachaInfoSync(playerId, ACTIVE_CHARACTER_GACHA_ID).gachaExchangePoint, 250)
+})
+
+test("expired exchange returns 1351 and keeps state unchanged", async () => {
+    const { playerId, viewerId } = await createPlayer("gacha-exchange-expired")
+    insertPlayerGachaInfoSync(playerId, {
+        gachaId: 29,
+        isAccountFirst: true,
+        isDailyFirst: true,
+        gachaExchangePoint: 250,
+    })
+    const response = await app.inject({
+        method: "POST",
+        url: "/gacha/exchange_character",
+        payload: {
+            viewer_id: viewerId,
+            gacha_id: 29,
+            character_id: 151009,
+            api_count: 1,
+        },
+    })
+    assert.equal(response.statusCode, 200)
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
+    assert.equal(payload.data_headers.result_code, 1351)
+    assert.equal(getPlayerCharacterSync(playerId, 151009), null)
+    assert.equal(getPlayerGachaInfoSync(playerId, 29).gachaExchangePoint, 250)
+})
+
+test("25009 exchange follows the actual held-ticket extension window", async () => {
+    const withTicket = await createPlayer("gacha-exchange-25009-ticket")
+    grantInventoryFixtureItemSync(withTicket.playerId, 999004, 1)
+    insertPlayerGachaInfoSync(withTicket.playerId, {
+        gachaId: 25009,
+        isAccountFirst: true,
+        isDailyFirst: true,
+        gachaExchangePoint: 250,
+    })
+    const success = await app.inject({
+        method: "POST",
+        url: "/gacha/exchange_equipment",
+        payload: {
+            viewer_id: withTicket.viewerId,
+            gacha_id: 25009,
+            equipment_id: 5070023,
+            api_count: 1,
+        },
+    })
+    assert.equal(success.statusCode, 200, success.body)
+    assert.notEqual(getPlayerEquipmentSync(withTicket.playerId, 5070023), null)
+    assert.equal(getPlayerItemSync(withTicket.playerId, 999004), 1)
+    assert.equal(getPlayerGachaInfoSync(withTicket.playerId, 25009).gachaExchangePoint, 0)
+
+    const withoutTicket = await createPlayer("gacha-exchange-25009-no-ticket")
+    insertPlayerGachaInfoSync(withoutTicket.playerId, {
+        gachaId: 25009,
+        isAccountFirst: true,
+        isDailyFirst: true,
+        gachaExchangePoint: 250,
+    })
+    const rejected = await app.inject({
+        method: "POST",
+        url: "/gacha/exchange_equipment",
+        payload: {
+            viewer_id: withoutTicket.viewerId,
+            gacha_id: 25009,
+            equipment_id: 5070023,
+            api_count: 1,
+        },
+    })
+    assert.equal(rejected.statusCode, 200)
+    const payload = require("msgpackr").unpack(Buffer.from(rejected.body, "base64"))
+    assert.equal(payload.data_headers.result_code, 1351)
+    assert.equal(getPlayerEquipmentSync(withoutTicket.playerId, 5070023), null)
+    assert.equal(getPlayerGachaInfoSync(withoutTicket.playerId, 25009).gachaExchangePoint, 250)
+})
+
+test("Comeback exchange consumes the explicit player period instead of Master base time", async () => {
+    const { playerId } = await createPlayer("gacha-exchange-comeback")
+    grantPlayerComebackGachaPeriodSync({
+        playerId,
+        gachaId: 700000,
+        periodStartTime: Math.floor(Date.parse("2024-08-14T00:00:00.000Z") / 1000),
+        periodEndTime: Math.floor(Date.parse("2024-08-15T00:00:00.000Z") / 1000),
+    })
+    updatePlayerGachaInfoSync(playerId, {
+        gachaId: 700000,
+        gachaExchangePoint: 250,
+    })
+    const result = executeGachaExchangeSync({
+        playerId,
+        gachaId: 700000,
+        targetId: 111039,
+        kind: "character",
+        nowMs: Date.parse("2024-08-14T12:00:00.000Z"),
+    })
+    assert.equal(result.ok, true)
+    assert.notEqual(getPlayerCharacterSync(playerId, 111039), null)
+    assert.equal(getPlayerGachaInfoSync(playerId, 700000).gachaExchangePoint, 0)
+})
+
+test("Stars exchange uses its independent player period and preserves cumulative counters", async () => {
+    const granted = await createPlayer("gacha-exchange-stars")
+    grantPlayerStarsGachaCampaignSync({
+        playerId: granted.playerId,
+        campaignId: 1,
+        gachaId: 80000,
+        periodStartTime: Math.floor(Date.parse("2023-09-01T00:00:00.000Z") / 1000),
+        periodEndTime: Math.floor(Date.parse("2023-09-10T00:00:00.000Z") / 1000),
+        freeOneTimes: 1,
+        freeTenTimes: 2,
+    })
+    updatePlayerGachaInfoSync(granted.playerId, {
+        gachaId: 80000,
+        gachaExchangePoint: 250,
+    })
+    const result = executeGachaExchangeSync({
+        playerId: granted.playerId,
+        gachaId: 80000,
+        targetId: 111039,
+        kind: "character",
+        nowMs: Date.parse("2023-09-02T00:00:00.000Z"),
+    })
+    assert.equal(result.ok, true)
+    assert.notEqual(getPlayerCharacterSync(granted.playerId, 111039), null)
+    assert.equal(getPlayerGachaInfoSync(granted.playerId, 80000).gachaExchangePoint, 0)
+    assert.deepEqual(getPlayerStarsGachaCampaignByGachaSync(granted.playerId, 80000), {
+        campaignId: 1,
+        gachaId: 80000,
+        periodStartTime: Math.floor(Date.parse("2023-09-01T00:00:00.000Z") / 1000),
+        periodEndTime: Math.floor(Date.parse("2023-09-10T00:00:00.000Z") / 1000),
+        freeOneTimes: 1,
+        freeTenTimes: 2,
+    })
+    assert.equal(historyCount(granted.playerId), 1)
+
+    const missing = await createPlayer("gacha-exchange-stars-missing")
+    insertPlayerGachaInfoSync(missing.playerId, {
+        gachaId: 80000,
+        isAccountFirst: true,
+        isDailyFirst: true,
+        gachaExchangePoint: 250,
+    })
+    const rejected = executeGachaExchangeSync({
+        playerId: missing.playerId,
+        gachaId: 80000,
+        targetId: 111039,
+        kind: "character",
+        nowMs: Date.parse("2023-09-02T00:00:00.000Z"),
+    })
+    assert.deepEqual(rejected, {
+        ok: false,
+        kind: "protocolResultCode",
+        resultCode: 1351,
+        message: "Gacha exchange period is unavailable.",
+    })
+    assert.equal(getPlayerCharacterSync(missing.playerId, 111039), null)
+    assert.equal(getPlayerGachaInfoSync(missing.playerId, 80000).gachaExchangePoint, 250)
+    assert.equal(historyCount(missing.playerId), 0)
 })
 
 test("gacha exec rolls every persistent result back on late mission failure", async t => {

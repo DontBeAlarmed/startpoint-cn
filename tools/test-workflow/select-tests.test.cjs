@@ -110,6 +110,7 @@ test("maps representative source files to focused groups", () => {
         )
     }
     assert.deepEqual(selectTestGroups(["src/routes/api/gacha.ts"]), ["full", "integration:reward-grant", "integration:rules", "quick:content", "quick:gacha"])
+    assert.deepEqual(selectTestGroups(["src/routes/api/gacha/exchange-routes.ts"]), ["full", "integration:reward-grant", "integration:rules", "quick:content", "quick:gacha"])
     assert.deepEqual(selectTestGroups(["src/routes/api/tutorial.ts"]), ["full", "integration:quest", "integration:reward-grant", "quick:gacha"])
     assert.deepEqual(selectTestGroups(["src/routes/api/boxGacha.ts"]), ["full", "integration:event"])
     assert.deepEqual(
@@ -137,6 +138,10 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(
         selectTestGroups(["src/lib/gacha-owner/execute.ts"]),
         ["integration:rules", "quick:gacha"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/gacha-owner/post-commit.ts"]),
+        ["integration:mission", "integration:rules", "quick:gacha"],
     )
     assert.deepEqual(
         selectTestGroups(["src/data/domains/reward-acquisition.ts"]),

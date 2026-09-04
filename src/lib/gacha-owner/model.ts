@@ -23,8 +23,9 @@ export type GachaPostCommitEffect =
     | {
         readonly kind: "characterGrowthPublication"
         readonly playerId: number
+        readonly characterIds: readonly number[]
         readonly characters: readonly Readonly<Record<string, unknown>>[]
-        readonly source: "gacha/exec"
+        readonly source: "gacha/exec" | "gacha/exchange_character"
     }
 
 export interface GachaCampaignAfter {
@@ -91,6 +92,38 @@ export interface GachaExecProtocolRejected {
 }
 
 export type GachaExecResult = GachaExecSuccess | GachaExecRejected | GachaExecProtocolRejected
+
+interface GachaExchangeSuccessBase {
+    readonly ok: true
+    readonly playerId: number
+    readonly gachaId: number
+    readonly targetId: number
+    readonly exchangePoint: number
+    readonly isDailyFirst: boolean
+    readonly isAccountFirst: boolean
+    readonly mailArrived: boolean
+    readonly rewardItems: Readonly<Record<number, number>>
+    readonly playerAfter?: Readonly<{
+        readonly freeMana: number
+        readonly freeVmoney: number
+        readonly expPool: number
+    }>
+    readonly itemOverflowDispositions: readonly PlannedItemOverflowDisposition[]
+    readonly postCommitEffects: readonly GachaPostCommitEffect[]
+}
+
+export interface CharacterGachaExchangeSuccess extends GachaExchangeSuccessBase {
+    readonly kind: "character"
+    readonly characters: readonly Readonly<Record<string, unknown>>[]
+}
+
+export interface EquipmentGachaExchangeSuccess extends GachaExchangeSuccessBase {
+    readonly kind: "equipment"
+    readonly equipment: readonly Readonly<Record<string, unknown>>[]
+}
+
+export type GachaExchangeSuccess = CharacterGachaExchangeSuccess | EquipmentGachaExchangeSuccess
+export type GachaExchangeResult = GachaExchangeSuccess | GachaExecRejected | GachaExecProtocolRejected
 
 export interface GachaPostCommitResult {
     readonly characterList: readonly Record<string, unknown>[]

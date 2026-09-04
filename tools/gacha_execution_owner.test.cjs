@@ -80,6 +80,7 @@ function characterSuccess() {
             {
                 kind: "characterGrowthPublication",
                 playerId: 9,
+                characterIds: [],
                 characters: [{ character_id: 111001, stack: 0 }],
                 source: "gacha/exec",
             },

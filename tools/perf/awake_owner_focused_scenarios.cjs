@@ -76,7 +76,7 @@ const OWNER_CONTRACTS = Object.freeze({
     "gacha-exchange-character": Object.freeze({
         owner: "gacha/exchange_character",
         boundary: "best-effort-post-commit",
-        observation: wrapperObservation([151009], [151009]),
+        observation: wrapperObservation([121087], [121087]),
     }),
     "gacha-exec": Object.freeze({
         owner: "gacha/exec",
@@ -457,20 +457,20 @@ function createAwakeOwnerFocusedScenarios(runtime) {
             async prepare() {
                 const player = await fixture.createPlayer("owner-focused-gacha-exchange")
                 runtime.gachaDomain.insertPlayerGachaInfoSync(player.playerId, {
-                    gachaId: 29, isAccountFirst: false, isDailyFirst: false,
+                    gachaId: 1638, isAccountFirst: false, isDailyFirst: false,
                     gachaExchangePoint: 250,
                 })
                 return player
             },
             request: value => ({
-                viewer_id: value.viewerId, gacha_id: 29, character_id: 151009, api_count: 1,
+                viewer_id: value.viewerId, gacha_id: 1638, character_id: 121087, api_count: 1,
             }),
             execute: value => post("/gacha", "exchange_character", {
-                viewer_id: value.viewerId, gacha_id: 29, character_id: 151009, api_count: 1,
+                viewer_id: value.viewerId, gacha_id: 1638, character_id: 121087, api_count: 1,
             }),
             response: routeResult,
             state: value => commonState(runtime, value.playerId, {
-                gacha: runtime.gachaDomain.getPlayerGachaInfoSync(value.playerId, 29),
+                gacha: runtime.gachaDomain.getPlayerGachaInfoSync(value.playerId, 1638),
             }),
         }),
         scenario("gacha-exec", {

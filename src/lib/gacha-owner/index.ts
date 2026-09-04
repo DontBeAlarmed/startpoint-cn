@@ -1,6 +1,9 @@
 export { executeGachaDrawSync } from "./execute"
 export { runGachaPostCommitEffects } from "./post-commit"
 export { projectGachaExecResponse } from "./response-projector"
+export { executeGachaExchangeSync } from "./exchange"
+export type { GachaExchangeCommand } from "./exchange"
+export { projectGachaExchangeResponse } from "./exchange-response-projector"
 export {
     grantPlayerComebackGachaPeriodSync,
     grantPlayerStarsGachaCampaignSync,
@@ -17,6 +20,10 @@ export type {
     GachaStarsCampaignAfter,
     GachaExecResult,
     GachaExecSuccess,
+    GachaExchangeResult,
+    GachaExchangeSuccess,
+    CharacterGachaExchangeSuccess,
+    EquipmentGachaExchangeSuccess,
     GachaPostCommitEffect,
     GachaPostCommitResult,
 } from "./model"

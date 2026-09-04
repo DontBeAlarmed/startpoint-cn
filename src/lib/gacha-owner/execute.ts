@@ -263,6 +263,7 @@ export function executeGachaDrawSync(command: GachaExecCommand): GachaExecResult
                     postCommitEffects.push({
                         kind: "characterGrowthPublication",
                         playerId: command.playerId,
+                        characterIds: [],
                         characters: characterSnapshots,
                         source: "gacha/exec",
                     })

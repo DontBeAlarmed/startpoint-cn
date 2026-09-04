@@ -88,8 +88,8 @@ const AUTHORITATIVE_WRITE_SETS = Object.freeze({
         "updateBondTokenForCompletedBoardFromGrowthState", "finalizeLearnManaAwakePublicationWrites",
     ]),
     "exchange/star_crumb": Object.freeze(["transaction"]),
-    "gacha/exchange_character": Object.freeze(["transaction"]),
-    "gacha/exec": Object.freeze(["transaction"]),
+    "gacha/exchange_character": Object.freeze(["executeGachaExchangeSync"]),
+    "gacha/exec": Object.freeze(["executeGachaDrawSync"]),
     "item/sell": Object.freeze(["sellItemSync"]),
     "mail/receive": Object.freeze([
         "settleMailRewardsInTransactionOwnerSync", "finalizeMailReceiveAwakePublicationWrites",
@@ -117,7 +117,6 @@ const AUTHORITATIVE_WRITE_SETS = Object.freeze({
 const OWNER_TRANSACTION_ANCHORS = Object.freeze({
     "box_gacha/exec": "transaction",
     "exchange/star_crumb": "transaction",
-    "gacha/exchange_character": "transaction",
     "shop/buy": "executeShopPurchaseSync",
     "shop/bulk_buy": "executeShopPurchaseSync",
 })
@@ -311,8 +310,8 @@ const EXPECTED_MATRIX = Object.freeze([
     matrixRow({ relativeFile: "src/routes/api/character.ts", owner: "character/add_character_from_town", boundary: "best-effort-post-commit", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "character-town-grant" }),
     matrixRow({ relativeFile: "src/routes/api/character/bond.ts", owner: "character/receive_bond_token", boundary: "best-effort-in-tx", actualCharacterSeed: "[body.character_id]", finalAuthoritativeWrite: "receiveBondToken", runtimeEvidenceKey: "bond-success" }),
     matrixRow({ relativeFile: "src/routes/api/exchange.ts", owner: "exchange/star_crumb", boundary: "best-effort-post-commit", actualCharacterSeed: "kind === 0 ? [targetId] : []", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "exchange-star-crumb" }),
-    matrixRow({ relativeFile: "src/routes/api/gacha.ts", owner: "gacha/exchange_character", boundary: "best-effort-post-commit", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "gacha-exchange-character" }),
-    matrixRow({ relativeFile: "src/routes/api/gacha.ts", owner: "gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "gacha-exec" }),
+    matrixRow({ relativeFile: "src/routes/api/gacha.ts", owner: "gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "[...characterIds]", finalAuthoritativeWrite: "executeGachaDrawSync", runtimeEvidenceKey: "gacha-exec" }),
+    matrixRow({ relativeFile: "src/routes/api/gacha/exchange-routes.ts", owner: "gacha/exchange_character", boundary: "best-effort-post-commit", actualCharacterSeed: "[...characterIds]", finalAuthoritativeWrite: "executeGachaExchangeSync", runtimeEvidenceKey: "gacha-exchange-character" }),
     matrixRow({ relativeFile: "src/routes/api/item.ts", owner: "item/sell", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "player", finalAuthoritativeWrite: "sellItemSync", runtimeEvidenceKey: "mana-item-sell", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "[]", actualFactSeeds: "mail", finalAuthoritativeWrite: "finalizeMailReceiveAwakePublicationWrites", runtimeEvidenceKey: "mail-receive", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive_all", boundary: "best-effort-in-tx", actualCharacterSeed: "[]", actualFactSeeds: "mail", finalAuthoritativeWrite: "finalizeMailReceiveAllAwakePublicationWrites", runtimeEvidenceKey: "mail-receive-all", changesGlobalFacts: true }),
@@ -486,6 +485,14 @@ function classifyOwner(relativeFile, call, sourceFile, checker) {
         ))
         assert.equal(owners.length, 1, "tutorial Awake publication left its exact audited step branch")
         return owners[0]
+    }
+    if (relativeFile === "src/routes/api/gacha.ts") {
+        assert.equal(findEnclosingFunctionName(call), "handleExec")
+        return "gacha/exec"
+    }
+    if (relativeFile === "src/routes/api/gacha/exchange-routes.ts") {
+        assert.equal(findEnclosingFunctionName(call), "handleExchange")
+        return "gacha/exchange_character"
     }
     const routePath = findRoutePath(call)
     const ownerLabel = ROUTE_OWNERS[relativeFile]?.[routePath]

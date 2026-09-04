@@ -391,6 +391,10 @@ const SOURCE_RULES = [
         groups: ["integration:rules", "quick:gacha"],
     },
     {
+        pattern: /^src\/lib\/gacha-owner\/post-commit\.ts$/,
+        groups: ["integration:mission"],
+    },
+    {
         pattern: /^(?:src\/content\/converters\/gacha\.ts|src\/lib\/types\/gacha\.ts|tools\/content_gacha_converter\.test\.cjs|assets\/(?:gacha(?:_campaign(?:_definitions)?|_exchange_rate|_pool)?|stars_gacha_campaign|equipment_lookup)\.json)$/,
         groups: ["quick:content", "quick:gacha"],
     },
@@ -475,7 +479,7 @@ const SOURCE_RULES = [
         groups: ["integration:reward-grant"],
     },
     {
-        pattern: /^src\/routes\/api\/gacha\.ts$/,
+        pattern: /^src\/routes\/api\/gacha(?:\.ts|\/exchange-routes\.ts)$/,
         groups: ["integration:reward-grant", "integration:rules", "quick:content", "quick:gacha"],
     },
     {
