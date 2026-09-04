@@ -124,10 +124,10 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/lib/reward-grant/transaction-executor.ts",
         "src/lib/shop-reward-grant.ts",
         "src/lib/shop/purchase-owner.ts",
+        "src/lib/star-crumb-exchange/owner.ts",
         "src/routes/api/boxGacha.ts",
         "src/routes/api/equipment.ts",
         "src/routes/api/exBoost.ts",
-        "src/routes/api/exchange.ts",
         "src/routes/api/questUnlock.ts",
         "src/routes/api/sell.ts",
     ]
@@ -404,7 +404,6 @@ test("capped positive grants expose one reviewed overflow disposition path", () 
         "src/lib/quest/finish/periodic-reward-handler.ts",
         "src/lib/reward-grant/execution-engine.ts",
         "src/routes/api/equipment.ts",
-        "src/routes/api/exchange.ts",
         "src/routes/api/sell.ts",
     ])
     assert.deepEqual(itemMailWriterFiles.sort(), [

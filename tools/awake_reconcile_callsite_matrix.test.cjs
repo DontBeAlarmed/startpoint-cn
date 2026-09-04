@@ -88,7 +88,7 @@ const AUTHORITATIVE_WRITE_SETS = Object.freeze({
         "withInventoryBatchContextWithinTransactionSync", "insertPlayerCharacterManaNodesSync",
         "updateBondTokenForCompletedBoardFromGrowthState", "finalizeLearnManaAwakePublicationWrites",
     ]),
-    "exchange/star_crumb": Object.freeze(["transaction"]),
+    "exchange/star_crumb": Object.freeze(["executeStarCrumbExchangeSync"]),
     "gacha/exchange_character": Object.freeze(["executeGachaExchangeSync"]),
     "gacha/exec": Object.freeze(["executeGachaDrawSync"]),
     "gacha/crazy_select": Object.freeze(["selectCrazyGachaCandidateSync"]),
@@ -118,7 +118,6 @@ const AUTHORITATIVE_WRITE_SETS = Object.freeze({
 })
 const OWNER_TRANSACTION_ANCHORS = Object.freeze({
     "box_gacha/exec": "transaction",
-    "exchange/star_crumb": "transaction",
     "shop/buy": "executeShopPurchaseSync",
     "shop/bulk_buy": "executeShopPurchaseSync",
 })
@@ -314,7 +313,7 @@ const EXPECTED_MATRIX = Object.freeze([
     matrixRow({ relativeFile: "src/routes/api/boxGacha.ts", owner: "box_gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "settlement.rewardResult?.joined_character_id_list ?? []", actualFactSeeds: "settlement.rewardInvalidatedFactKeys", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "box-gacha-exec", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/character.ts", owner: "character/add_character_from_town", boundary: "best-effort-post-commit", actualCharacterSeed: "[characterId]", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "character-town-grant" }),
     matrixRow({ relativeFile: "src/routes/api/character/bond.ts", owner: "character/receive_bond_token", boundary: "best-effort-in-tx", actualCharacterSeed: "[body.character_id]", finalAuthoritativeWrite: "receiveBondToken", runtimeEvidenceKey: "bond-success" }),
-    matrixRow({ relativeFile: "src/routes/api/exchange.ts", owner: "exchange/star_crumb", boundary: "best-effort-post-commit", actualCharacterSeed: "kind === 0 ? [targetId] : []", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "exchange-star-crumb" }),
+    matrixRow({ relativeFile: "src/routes/api/exchange.ts", owner: "exchange/star_crumb", boundary: "best-effort-post-commit", actualCharacterSeed: 'result.product.kind === "character" ? [result.product.targetId] : []', finalAuthoritativeWrite: "executeStarCrumbExchangeSync", runtimeEvidenceKey: "exchange-star-crumb" }),
     matrixRow({ relativeFile: "src/routes/api/gacha.ts", owner: "gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "[...characterIds]", finalAuthoritativeWrite: "executeGachaDrawSync", runtimeEvidenceKey: "gacha-exec" }),
     matrixRow({ relativeFile: "src/routes/api/gacha/crazy-routes.ts", owner: "gacha/crazy_select", boundary: "best-effort-post-commit", actualCharacterSeed: "[...characterIds]", finalAuthoritativeWrite: "selectCrazyGachaCandidateSync", runtimeEvidenceKey: "gacha-crazy-select" }),
     matrixRow({ relativeFile: "src/routes/api/gacha/exchange-routes.ts", owner: "gacha/exchange_character", boundary: "best-effort-post-commit", actualCharacterSeed: "[...characterIds]", finalAuthoritativeWrite: "executeGachaExchangeSync", runtimeEvidenceKey: "gacha-exchange-character" }),

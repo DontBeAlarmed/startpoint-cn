@@ -28,6 +28,7 @@ const {
     getPlayerCollectedItemTotalSync,
     getPlayerItemSync,
 } = require("../src/data/domains/item")
+const { playerOwnsEquipmentSync } = require("../src/data/domains/equipment")
 const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const { getPlayerMailsSync, MailType } = require("../src/data/domains/mail")
 const { createRewardGrantItemOverflowPolicy } = require("../src/lib/reward-grant-item-overflow")
@@ -197,6 +198,79 @@ test("star crumb Item exchange sends capped overflow to Mail", async () => {
         number: mail.number,
     })), [{ type: MailType.ITEM, type_id: itemId, number: 1 }])
     assert.equal(getPlayerSync(playerId).starCrumb, 700)
+})
+
+test("star crumb character exchange commits typed grant and absolute response", async () => {
+    const { playerId, viewerId } = await createPlayer("star-crumb-character-success")
+    updatePlayerSync({ id: playerId, starCrumb: 1000 })
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/exchange/star_crumb",
+        payload: { viewer_id: viewerId, exchange_id: 1, api_count: 1 },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    const payload = unpack(Buffer.from(response.body, "base64"))
+    assert.equal(payload.data.user_info.star_crumb, 400)
+    assert.equal(payload.data.character_list.length, 1)
+    assert.equal(getPlayerSync(playerId).starCrumb, 400)
+    assert.notEqual(getPlayerCharacterSync(playerId, 111001), null)
+    assert.deepEqual(payload.data.item_list, {})
+    assert.deepEqual(payload.data.equipment_list, [])
+    assert.equal(payload.data.over_max, null)
+})
+
+test("star crumb character exchange rejects an already owned character without writes", async () => {
+    const { playerId, viewerId } = await createPlayer("star-crumb-character-duplicate")
+    updatePlayerSync({ id: playerId, starCrumb: 1000 })
+    insertDefaultPlayerCharacterSync(playerId, 111001)
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/exchange/star_crumb",
+        payload: { viewer_id: viewerId, exchange_id: 1, api_count: 1 },
+    })
+
+    assert.equal(response.statusCode, 400)
+    assert.equal(JSON.parse(response.body).message, "Character already owned.")
+    assert.equal(getPlayerSync(playerId).starCrumb, 1000)
+})
+
+test("star crumb catalog is immutable per repository and resolves cost from typed rows", async () => {
+    const { getStarCrumbExchangeCatalog, resolveStarCrumbExchangeProduct } = require("../src/lib/star-crumb-exchange")
+    // WeakMap 缓存：同 repository 只构建一次，不随请求重复读取 Content 表
+    assert.equal(getStarCrumbExchangeCatalog() === getStarCrumbExchangeCatalog(), true)
+    const character = resolveStarCrumbExchangeProduct(1)
+    const item = resolveStarCrumbExchangeProduct(9000001)
+    const equipment = resolveStarCrumbExchangeProduct(475)
+    assert.deepEqual([character.ok, character.product.kind, character.product.targetId, character.product.cost],
+        [true, "character", 111001, 600])
+    assert.deepEqual([item.ok, item.product.kind, item.product.targetId, item.product.cost],
+        [true, "item", 10002, 300])
+    assert.deepEqual([equipment.ok, equipment.product.kind, equipment.product.targetId, equipment.product.cost],
+        [true, "equipment", 4010010, 200])
+    assert.equal(resolveStarCrumbExchangeProduct(987654321).ok, false)
+})
+
+test("star crumb equipment exchange commits typed grant and absolute response", async () => {
+    const { playerId, viewerId } = await createPlayer("star-crumb-equipment-success")
+    updatePlayerSync({ id: playerId, starCrumb: 1000 })
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/exchange/star_crumb",
+        payload: { viewer_id: viewerId, exchange_id: 475, api_count: 1 },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    const payload = unpack(Buffer.from(response.body, "base64"))
+    assert.equal(payload.data.user_info.star_crumb, 800)
+    assert.equal(payload.data.equipment_list.length, 1)
+    assert.equal(getPlayerSync(playerId).starCrumb, 800)
+    assert.equal(playerOwnsEquipmentSync(playerId, 4010010), true)
+    assert.deepEqual(payload.data.character_list, [])
+    assert.deepEqual(payload.data.item_list, {})
 })
 
 test("bulk stack conversion commits the complete planned result", async () => {

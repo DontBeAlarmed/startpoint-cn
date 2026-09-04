@@ -1,52 +1,19 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { playerOwnsCharacterSync } from "../../data/domains/character";
-import { playerOwnsEquipmentSync } from "../../data/domains/equipment";
-import {
-    getPlayerSync,
-    updatePlayerSync,
-} from "../../data/domains/player";
 import { getSession } from "../../data/domains/session";
+import { getPlayerSync } from "../../data/domains/player";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders } from "../../utils";
-import { givePlayerCharacterSync } from "../../lib/character";
-import { givePlayerEquipmentSync } from "../../lib/equipment";
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { getMailArrivedSync } from "../../lib/mail-notification";
-import bundledStarCrumbExchange from "../../../assets/star_crumb_exchange.json";
-import bundledStarCrumbExchangeCost from "../../../assets/star_crumb_exchange_cost.json";
-import { getDb } from "../../data/db";
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
-import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
-import { createRewardGrantItemOverflowPolicy } from "../../lib/reward-grant-item-overflow";
 import {
-    projectItemOverflowCommonResponse,
-    settleDirectItemOverflowsWithinTransactionSync,
-    type PlannedItemOverflowDisposition,
-} from "../../lib/item-overflow";
+    executeStarCrumbExchangeSync,
+    projectStarCrumbExchangeResponse,
+} from "../../lib/star-crumb-exchange";
 
 interface ExchangeBody {
     viewer_id: number;
     exchange_id: number;
     api_count: number;
-}
-
-class StarCrumbExchangeError extends Error {
-    constructor(
-        public readonly statusCode: 400 | 500,
-        message: string,
-    ) {
-        super(message)
-        this.name = "StarCrumbExchangeError"
-    }
-}
-
-interface StarCrumbExchangeSettlement {
-    newStarCrumb: number
-    characterList: Record<string, unknown>[]
-    itemList: Record<string, number>
-    equipmentList: any[]
-    itemOverflowDispositions: readonly PlannedItemOverflowDisposition[]
-    overflowFreeManaAfter: number | null
 }
 
 const routes = async (fastify: FastifyInstance) => {
@@ -73,166 +40,29 @@ const routes = async (fastify: FastifyInstance) => {
             message: "No players bound to account.",
         });
 
-        // star_crumb_exchange.json: { exchange_id: [["kind","id","desc","start","end","limited","comeback","stars","rarity"]] }
-        const starCrumbExchange = getRuntimeContentTableSync(
-            "star_crumb_exchange.json",
-            bundledStarCrumbExchange as Record<string, string[][]>,
-        );
-        const exchangeList = starCrumbExchange[String(exchangeId)];
-        if (!exchangeList || !exchangeList[0]) return reply.status(400).send({
-            error: "Bad Request",
-            message: `Exchange item with id ${exchangeId} does not exist.`,
-        });
-
-        const entry = exchangeList[0];
-        const kind = Number(entry[0]); // 0=Character, 1=Item, 2=Equipment
-        const targetId = Number(entry[1]);
-        const rarity = Number(entry[8]); // 4 or 5
-
-        // cost table: { "0": [["300","600"]], "1": [["300","600"]], "2": [["200","400"]] }
-        const costTable = getRuntimeContentTableSync(
-            "star_crumb_exchange_cost.json",
-            bundledStarCrumbExchangeCost as Record<string, string[][]>,
-        );
-        const costEntry = costTable[String(kind)];
-        if (!costEntry || !costEntry[0]) return reply.status(500).send({
-            error: "Internal Server Error",
-            message: `No cost data for kind ${kind}.`,
-        });
-
-        const costIdx = rarity === 5 ? 1 : 0;
-        const cost = Number(costEntry[0][costIdx]);
-        if (isNaN(cost) || cost <= 0) return reply.status(500).send({
-            error: "Internal Server Error",
-            message: `Invalid cost for kind=${kind} rarity=${rarity}.`,
-        });
-
-        console.log(`[exchange:star_crumb] player=${playerId} exch=${exchangeId} kind=${kind} id=${targetId} rarity=${rarity} cost=${cost}`);
-
-        let settlement: StarCrumbExchangeSettlement
-        try {
-            settlement = getDb().transaction((): StarCrumbExchangeSettlement => {
-                const currentPlayer = getPlayerSync(playerId)
-                if (!currentPlayer) {
-                    throw new StarCrumbExchangeError(500, "No players bound to account.")
-                }
-                if (currentPlayer.starCrumb < cost) {
-                    throw new StarCrumbExchangeError(400, "Not enough star_crumb.")
-                }
-                if (kind === 0 && playerOwnsCharacterSync(playerId, targetId)) {
-                    throw new StarCrumbExchangeError(400, "Character already owned.")
-                }
-                if (kind === 2 && playerOwnsEquipmentSync(playerId, targetId)) {
-                    throw new StarCrumbExchangeError(400, "Equipment already owned.")
-                }
-
-                const newStarCrumb = currentPlayer.starCrumb - cost
-                updatePlayerSync({ id: playerId, starCrumb: newStarCrumb })
-
-                const characterList: Record<string, unknown>[] = []
-                const itemList: Record<string, number> = {}
-                const equipmentList: any[] = []
-                let itemOverflowDispositions: readonly PlannedItemOverflowDisposition[] = []
-                let overflowFreeManaAfter: number | null = null
-
-                switch (kind) {
-                    case 0: {
-                        const result = givePlayerCharacterSync(playerId, targetId)
-                        if (!result) {
-                            throw new StarCrumbExchangeError(500, "Failed to give character.")
-                        }
-                        if (result.character) characterList.push(result.character as Record<string, unknown>)
-                        break
-                    }
-                    case 1: {
-                        itemList[String(targetId)] = withInventoryBatchContextWithinTransactionSync({
-                            playerId,
-                            preloadItemIds: [targetId],
-                            playerExistence: "caller-verified",
-                        }, inventory => {
-                            const overflowPolicy = createRewardGrantItemOverflowPolicy(playerId)
-                            const grant = inventory.grantWithCapacity(
-                                targetId,
-                                1,
-                                overflowPolicy.maxCount(targetId),
-                            )
-                            const [result] = inventory.flush()
-                            if (result === undefined) {
-                                throw new Error("Star Crumb exchange Item grant did not produce a result.")
-                            }
-                            if (grant.overflowAmount > 0) {
-                                const overflowSettlement = settleDirectItemOverflowsWithinTransactionSync({
-                                    playerId,
-                                    overflows: [{ itemId: targetId, amount: grant.overflowAmount }],
-                                })
-                                itemOverflowDispositions = overflowSettlement.dispositions
-                                overflowFreeManaAfter = overflowSettlement.freeManaAfter
-                            }
-                            return result.afterAmount
-                        })
-                        break
-                    }
-                    case 2: {
-                        equipmentList.push(givePlayerEquipmentSync(playerId, targetId, 1))
-                        break
-                    }
-                    default:
-                        throw new StarCrumbExchangeError(500, `Unsupported exchange kind ${kind}.`)
-                }
-
-                return {
-                    newStarCrumb,
-                    characterList,
-                    itemList,
-                    equipmentList,
-                    itemOverflowDispositions,
-                    overflowFreeManaAfter,
-                }
-            })()
-        } catch (error) {
-            if (error instanceof StarCrumbExchangeError) {
-                return reply.status(error.statusCode).send({
-                    error: error.statusCode === 400 ? "Bad Request" : "Internal Server Error",
-                    message: error.message,
-                })
-            }
-            throw error
+        const result = executeStarCrumbExchangeSync({ playerId, exchangeId });
+        if (!result.ok) {
+            return reply.status(result.kind === "badRequest" ? 400 : 500).send({
+                error: result.kind === "badRequest" ? "Bad Request" : "Internal Server Error",
+                message: result.message,
+            });
         }
 
         const characterList = publishCharacterGrowthOwnerStateBestEffort(
             playerId,
-            kind === 0 ? [targetId] : [],
-            [settlement.characterList],
+            result.product.kind === "character" ? [result.product.targetId] : [],
+            [result.characters],
             {},
             "exchange/star_crumb",
         ).characterList
-        const overMax = projectItemOverflowCommonResponse(settlement.itemOverflowDispositions)
 
         reply.header("content-type", "application/x-msgpack");
-        return reply.status(200).send({
-            data_headers: generateDataHeaders({ viewer_id: viewerId }),
-            data: {
-                user_info: {
-                    star_crumb: settlement.newStarCrumb,
-                    ...(settlement.itemOverflowDispositions.some(entry => entry.kind === "sold")
-                        ? { free_mana: settlement.overflowFreeManaAfter }
-                        : {}),
-                },
-                character_list: characterList,
-                item_list: settlement.itemList,
-                equipment_list: settlement.equipmentList,
-                active_mission_list: null,
-                mission_info: null,
-                over_max: overMax.length > 0 ? overMax : null,
-                mail_arrived: getMailArrivedSync(playerId),
-                config: null,
-                user_daily_challenge_point_list: null,
-                encyclopedia_info: null,
-                fund_receive_list: null,
-                monthly_charge_bonus_info: null,
-                crazy_gacha_result_list: null,
-            },
-        });
+        return reply.status(200).send(projectStarCrumbExchangeResponse({
+            dataHeaders: generateDataHeaders({ viewer_id: viewerId }),
+            result,
+            characterList,
+            mailArrived: getMailArrivedSync(playerId),
+        }));
     });
 };
 

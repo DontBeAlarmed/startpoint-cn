@@ -515,21 +515,27 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
         true,
     )
 
+    // D21 后 Star Crumb 事务整体收敛进 executeStarCrumbExchangeSync owner；
+    // 路由只剩 session 解析、owner 调用、post-commit 发布与 projector
     const starCrumbBlock = getRouteBlock(exchangeSource, "/star_crumb")
     const starCrumbCall = getOnlyCall(starCrumbBlock, "reconcileAwakeUnlockCharacterList")
     assert.equal(findCalls(exchangeSource, "reconcileAwakeUnlockCharacterList").length, 1)
     assert.deepEqual(starCrumbCall.arguments, [
         "playerId",
-        "kind === 0 ? [targetId] : []",
-        "[settlement.characterList]",
+        'result.product.kind === "character" ? [result.product.targetId] : []',
+        "[result.characters]",
         "{}",
         '"exchange/star_crumb"',
     ])
     assert.deepEqual(starCrumbCall.conditionalConditions, [])
-    assert.equal(starCrumbCall.position > getLastCallPosition(starCrumbBlock, "givePlayerCharacterSync"), true)
-    assert.equal(starCrumbCall.position > getLastCallPosition(starCrumbBlock, "updatePlayerSync"), true)
-    assert.equal(starCrumbBlock.includes("if (result.character) characterList.push(result.character"), true)
-    assert.deepEqual(findPropertyAssignmentValues(starCrumbBlock, "character_list"), ["characterList"])
+    assert.equal(
+        starCrumbCall.position > getLastCallPosition(starCrumbBlock, "executeStarCrumbExchangeSync"),
+        true,
+    )
+    assert.equal(starCrumbBlock.includes("getDb().transaction"), false)
+    assert.equal(starCrumbBlock.includes("givePlayerCharacterSync"), false)
+    assert.equal(starCrumbBlock.includes("givePlayerEquipmentSync"), false)
+    assert.equal(starCrumbBlock.includes("updatePlayerSync"), false)
 
     const townReadOnlyBlock = getRouteBlock(characterSource, "/set_illustration_settings", "/over_limit")
     const townOverLimitBlock = getRouteBlock(characterSource, "/over_limit", "/bulk_over_limit")
