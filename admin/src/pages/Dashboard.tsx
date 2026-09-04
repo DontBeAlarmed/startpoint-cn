@@ -144,10 +144,10 @@ const multiStateLabels = {
     unavailable: "未启动",
 } as const
 
-const multiStateColors = {
-    ready: "green",
-    degraded: "orange",
-    unavailable: "default",
+const multiStateBadgeClasses = {
+    ready: "admin-badge-ok",
+    degraded: "admin-badge-warn",
+    unavailable: "admin-badge-info",
 } as const
 
 export default function Dashboard() {
@@ -213,7 +213,7 @@ export default function Dashboard() {
                     description="此管理后台随服务端一同构建，用于统一查看运行状态并执行日常管理操作。"
                 />
 
-                    <div className="admin-card-grid">
+                <div className="admin-card-grid">
                     <Card title="服务端状态">
                         {statusLoading && !status ? (
                             <Alert type="info" showIcon message="正在加载服务端状态" />
@@ -222,13 +222,13 @@ export default function Dashboard() {
                         ) : (
                             <>
                                 <Row gutter={[16, 16]}>
-                                    <Col xs={12} sm={8}>
+                                    <Col xs={12} sm={8} className="admin-stat-tick">
                                         <Statistic title="运行时间" value={formatDuration(status.server.uptimeSeconds)} />
                                     </Col>
-                                    <Col xs={12} sm={8}>
+                                    <Col xs={12} sm={8} className="admin-stat-tick">
                                         <Statistic title="RSS 内存" value={formatBytes(status.server.memory.rss)} />
                                     </Col>
-                                    <Col xs={12} sm={8}>
+                                    <Col xs={12} sm={8} className="admin-stat-tick">
                                         <Statistic title="PID" value={status.server.pid} />
                                     </Col>
                                 </Row>
@@ -240,111 +240,111 @@ export default function Dashboard() {
                                 </Descriptions>
                             </>
                         )}
-                        </Card>
+                    </Card>
 
-                        <Card title="多人联机状态">
-                            {statusLoading && !status ? (
-                                <Alert type="info" showIcon message="正在加载多人联机状态" />
-                            ) : statusError || !status ? (
-                                <Alert type="error" showIcon message="多人联机状态加载失败" />
-                            ) : (
-                                <Space direction="vertical" className="admin-stack">
-                                    <Space wrap>
-                                        <Tag>{multiModeLabels[status.multiplayer.mode]}</Tag>
-                                        <Tag color={multiStateColors[status.multiplayer.state]}>
-                                            {multiStateLabels[status.multiplayer.state]}
-                                        </Tag>
-                                        <Tag color={status.multiplayer.coordinator.available ? "green" : "default"}>
-                                            {status.multiplayer.coordinator.kind === "local" ? "本地协调器" : "远程协调器"}
-                                        </Tag>
-                                    </Space>
-                                    <Row gutter={[16, 16]}>
-                                        <Col xs={12} sm={8}>
-                                            <Statistic title="活跃房间" value={status.multiplayer.activeRooms ?? "未知"} />
-                                        </Col>
-                                        <Col xs={12} sm={8}>
-                                            <Statistic title="进行中事实" value={status.multiplayer.battleFacts?.active ?? "未知"} />
-                                        </Col>
-                                        <Col xs={12} sm={8}>
-                                            <Statistic title="已结束事实" value={status.multiplayer.battleFacts?.finalized ?? "未知"} />
-                                        </Col>
-                                    </Row>
-                                    {(status.multiplayer.activeRooms === null
-                                        || status.multiplayer.battleFacts === null) && (
-                                        <Typography.Text type="secondary">
-                                            权威统计暂不可用。
-                                        </Typography.Text>
-                                    )}
-                                    <Descriptions size="small" column={1}>
-                                        <Descriptions.Item label="控制面连通性">
-                                            {status.multiplayer.hub === null
-                                                ? "不适用"
-                                                : status.multiplayer.hub.available ? "可用" : "不可用"}
-                                        </Descriptions.Item>
-                                        <Descriptions.Item label="控制面地址">
-                                            {status.multiplayer.hub?.endpoint ?? "-"}
-                                        </Descriptions.Item>
-                                        <Descriptions.Item label="TCP 服务">
-                                            {status.multiplayer.tcp.available ? "可用" : "不可用"}
-                                        </Descriptions.Item>
-                                        <Descriptions.Item label="TCP 地址">
-                                            {status.multiplayer.tcp.endpoint ?? "-"}
-                                        </Descriptions.Item>
-                                    </Descriptions>
-                                    <Divider style={{ margin: "4px 0" }} />
-                                    {status.multiplayer.latestCompatibilityRejection ? (
-                                        <Space direction="vertical" size="small" className="admin-stack">
-                                            <Typography.Text strong>最近兼容性拒绝</Typography.Text>
-                                            <Typography.Text type="secondary">
-                                                {new Date(status.multiplayer.latestCompatibilityRejection.timestamp).toLocaleString("zh-CN")}
-                                            </Typography.Text>
-                                            <div className="multi-compatibility-differences">
-                                                {status.multiplayer.latestCompatibilityRejection.differences.length === 0 ? (
-                                                    <Tag>请求版本信息不完整</Tag>
-                                                ) : status.multiplayer.latestCompatibilityRejection.differences.map((difference, index) => (
-                                                    <div
-                                                        key={`${difference.field}-${index}`}
-                                                        className="multi-compatibility-difference"
-                                                    >
-                                                        <Tag color="orange">
-                                                            {difference.field === "contentDigest"
-                                                                ? "多人战斗内容（contentDigest）"
-                                                                : difference.field}
-                                                        </Tag>
-                                                        <div className="multi-compatibility-values">
-                                                            {difference.required !== undefined
-                                                                && difference.received !== undefined ? (
-                                                                <>
-                                                                    <div className="multi-compatibility-value">
-                                                                        <Typography.Text type="secondary">期望</Typography.Text>
-                                                                        <Typography.Text code>{difference.required}</Typography.Text>
-                                                                    </div>
-                                                                    <div className="multi-compatibility-value">
-                                                                        <Typography.Text type="secondary">实际</Typography.Text>
-                                                                        <Typography.Text code>{difference.received}</Typography.Text>
-                                                                    </div>
-                                                                </>
-                                                            ) : (
-                                                                <Typography.Text type="secondary">
-                                                                    {difference.field === "contentDigest"
-                                                                        || difference.field === "modeDigest"
-                                                                        ? "摘要值已隐藏"
-                                                                        : "差异值未提供"}
-                                                                </Typography.Text>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </Space>
-                                    ) : (
-                                        <Typography.Text type="secondary">暂无兼容性拒绝记录。</Typography.Text>
-                                    )}
+                    <Card title="多人联机状态">
+                        {statusLoading && !status ? (
+                            <Alert type="info" showIcon message="正在加载多人联机状态" />
+                        ) : statusError || !status ? (
+                            <Alert type="error" showIcon message="多人联机状态加载失败" />
+                        ) : (
+                            <Space direction="vertical" className="admin-stack">
+                                <Space wrap>
+                                    <Tag>{multiModeLabels[status.multiplayer.mode]}</Tag>
+                                    <span className={multiStateBadgeClasses[status.multiplayer.state]}>
+                                        {multiStateLabels[status.multiplayer.state]}
+                                    </span>
+                                    <span className={status.multiplayer.coordinator.available ? "admin-badge-ok" : "admin-badge-info"}>
+                                        {status.multiplayer.coordinator.kind === "local" ? "本地协调器" : "远程协调器"}
+                                    </span>
                                 </Space>
-                            )}
-                        </Card>
+                                <Row gutter={[16, 16]}>
+                                    <Col xs={12} sm={8} className="admin-stat-tick">
+                                        <Statistic title="活跃房间" value={status.multiplayer.activeRooms ?? "未知"} />
+                                    </Col>
+                                    <Col xs={12} sm={8} className="admin-stat-tick">
+                                        <Statistic title="进行中事实" value={status.multiplayer.battleFacts?.active ?? "未知"} />
+                                    </Col>
+                                    <Col xs={12} sm={8} className="admin-stat-tick">
+                                        <Statistic title="已结束事实" value={status.multiplayer.battleFacts?.finalized ?? "未知"} />
+                                    </Col>
+                                </Row>
+                                {(status.multiplayer.activeRooms === null
+                                    || status.multiplayer.battleFacts === null) && (
+                                    <Typography.Text type="secondary">
+                                        权威统计暂不可用。
+                                    </Typography.Text>
+                                )}
+                                <Descriptions size="small" column={1}>
+                                    <Descriptions.Item label="控制面连通性">
+                                        {status.multiplayer.hub === null
+                                            ? "不适用"
+                                            : status.multiplayer.hub.available ? "可用" : "不可用"}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="控制面地址">
+                                        {status.multiplayer.hub?.endpoint ?? "-"}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="TCP 服务">
+                                        {status.multiplayer.tcp.available ? "可用" : "不可用"}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="TCP 地址">
+                                        {status.multiplayer.tcp.endpoint ?? "-"}
+                                    </Descriptions.Item>
+                                </Descriptions>
+                                <Divider style={{ margin: "4px 0" }} />
+                                {status.multiplayer.latestCompatibilityRejection ? (
+                                    <Space direction="vertical" size="small" className="admin-stack">
+                                        <Typography.Text strong>最近兼容性拒绝</Typography.Text>
+                                        <Typography.Text type="secondary">
+                                            {new Date(status.multiplayer.latestCompatibilityRejection.timestamp).toLocaleString("zh-CN")}
+                                        </Typography.Text>
+                                        <div className="multi-compatibility-differences">
+                                            {status.multiplayer.latestCompatibilityRejection.differences.length === 0 ? (
+                                                <Tag>请求版本信息不完整</Tag>
+                                            ) : status.multiplayer.latestCompatibilityRejection.differences.map((difference, index) => (
+                                                <div
+                                                    key={`${difference.field}-${index}`}
+                                                    className="multi-compatibility-difference"
+                                                >
+                                                    <span className="admin-badge-warn">
+                                                        {difference.field === "contentDigest"
+                                                            ? "多人战斗内容（contentDigest）"
+                                                            : difference.field}
+                                                    </span>
+                                                    <div className="multi-compatibility-values">
+                                                        {difference.required !== undefined
+                                                            && difference.received !== undefined ? (
+                                                            <>
+                                                                <div className="multi-compatibility-value">
+                                                                    <Typography.Text type="secondary">期望</Typography.Text>
+                                                                    <Typography.Text code>{difference.required}</Typography.Text>
+                                                                </div>
+                                                                <div className="multi-compatibility-value">
+                                                                    <Typography.Text type="secondary">实际</Typography.Text>
+                                                                    <Typography.Text code>{difference.received}</Typography.Text>
+                                                                </div>
+                                                            </>
+                                                        ) : (
+                                                            <Typography.Text type="secondary">
+                                                                {difference.field === "contentDigest"
+                                                                    || difference.field === "modeDigest"
+                                                                    ? "摘要值已隐藏"
+                                                                    : "差异值未提供"}
+                                                            </Typography.Text>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </Space>
+                                ) : (
+                                    <Typography.Text type="secondary">暂无兼容性拒绝记录。</Typography.Text>
+                                )}
+                            </Space>
+                        )}
+                    </Card>
 
-                        <Card title="CDN 基线 / 补丁 Overlay">
+                    <Card title="CDN 基线 / 补丁 Overlay">
                         {statusLoading && !status ? (
                             <Alert type="info" showIcon message="正在加载 CDN 状态" />
                         ) : statusError || !status ? (
@@ -358,9 +358,9 @@ export default function Dashboard() {
                                     description={status.cdn.extension.note}
                                 />
                                 <div className="admin-metric-row">
-                                    <Statistic title="国服最终基线" value={status.cdn.baseline.cnFinalVersion} />
-                                    <Statistic title="当前资源版本" value={status.cdn.extension.effectiveVersionPreview} />
-                                    <Statistic title="补丁版本" value={status.cdn.extension.enabledPatchCount} />
+                                    <Statistic className="admin-stat-tick" title="国服最终基线" value={status.cdn.baseline.cnFinalVersion} />
+                                    <Statistic className="admin-stat-tick" title="当前资源版本" value={status.cdn.extension.effectiveVersionPreview} />
+                                    <Statistic className="admin-stat-tick" title="补丁版本" value={status.cdn.extension.enabledPatchCount} />
                                 </div>
                                 <Descriptions size="small" column={1}>
                                     <Descriptions.Item label="资源模式">{status.cdn.storage.mode}</Descriptions.Item>
@@ -400,9 +400,9 @@ export default function Dashboard() {
                                 <Space direction="vertical" size="small" className="admin-stack">
                                     <Typography.Text strong>Snapshot 中已声明补丁</Typography.Text>
                                     <Space wrap>
-                                        <Tag color={status.cdn.extension.runtimeEnabled ? "green" : "default"}>
+                                        <span className={status.cdn.extension.runtimeEnabled ? "admin-badge-ok" : "admin-badge-info"}>
                                             {status.cdn.extension.runtimeEnabled ? "Snapshot 含 Overlay" : "无补丁"}
-                                        </Tag>
+                                        </span>
                                         <Tag>归档 {status.cdn.extension.activePatchArchiveCount}</Tag>
                                         {status.cdn.extension.versions.map(version => (
                                             <Tag key={version} color="blue">{version}</Tag>
@@ -430,10 +430,10 @@ export default function Dashboard() {
                             />
                         ) : (
                             <Row gutter={[16, 16]}>
-                                <Col xs={24} sm={12}>
+                                <Col xs={24} sm={12} className="admin-stat-tick">
                                     <Statistic title="账号总数" value={accountCount} loading={accountsLoading} />
                                 </Col>
-                                <Col xs={24} sm={12}>
+                                <Col xs={24} sm={12} className="admin-stat-tick">
                                     <Statistic title="存档总数" value={saveCount} loading={accountsLoading} />
                                 </Col>
                             </Row>
@@ -453,7 +453,7 @@ export default function Dashboard() {
                             </Typography.Text>
                             {defSave?.exists ? (
                                 <Space wrap>
-                                    <Tag color="green">已设置</Tag>
+                                    <span className="admin-badge-ok">已设置</span>
                                     <Typography.Text>模板玩家：{defSave.playerName || "-"}</Typography.Text>
                                     {defSave.exportedAt && (
                                         <Typography.Text type="secondary">
@@ -462,7 +462,7 @@ export default function Dashboard() {
                                     )}
                                 </Space>
                             ) : (
-                                <Tag>未设置（新建存档为空档）</Tag>
+                                <span className="admin-badge-info">未设置（新建存档为空档）</span>
                             )}
                             <Space wrap>
                                 <Upload

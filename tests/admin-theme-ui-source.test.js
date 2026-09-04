@@ -27,3 +27,7 @@ assert.equal(mainSrc.includes("adminTheme"), false, "main.tsx 残留旧 data-adm
 const appSrc = fs.readFileSync(path.join(__dirname, "../admin/src/App.tsx"), "utf8")
 assert.ok(appSrc.includes("<ThemeToggle"), "顶栏缺少主题切换按钮")
 assert.ok(appSrc.includes('className="wf-line"'), "缺少 WF 渐变线")
+const dash = fs.readFileSync(path.join(__dirname, "../admin/src/pages/Dashboard.tsx"), "utf8")
+assert.ok(css.includes(".admin-stat-tick"), "缺少统计卡星形角标类")
+assert.ok(css.includes(".admin-badge-ok") && css.includes(".admin-badge-warn") && css.includes(".admin-badge-info"), "缺少语义徽章类")
+assert.ok(dash.includes("admin-stat-tick"), "Dashboard 未使用星形角标")
