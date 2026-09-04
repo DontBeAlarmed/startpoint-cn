@@ -222,6 +222,9 @@ async function runNonMultiMixedWorkload({
                 "event_item_shop_id_map.json",
                 "gacha.json",
                 "gacha_pool.json",
+                "gacha_campaign_definitions.json",
+                "stars_gacha_campaign.json",
+                "gacha_exchange_rate.json",
                 "general_shop.json",
             ],
         })

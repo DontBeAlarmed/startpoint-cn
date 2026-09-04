@@ -81,7 +81,7 @@ const OWNER_CONTRACTS = Object.freeze({
     "gacha-exec": Object.freeze({
         owner: "gacha/exec",
         boundary: "best-effort-post-commit",
-        observation: wrapperObservation([], [111001]),
+        observation: wrapperObservation([], [121087]),
     }),
     "mana-item-sell": Object.freeze({
         owner: "item/sell",
@@ -482,16 +482,16 @@ function createAwakeOwnerFocusedScenarios(runtime) {
                 return player
             },
             request: value => ({
-                viewer_id: value.viewerId, gacha_id: 1, payment_type: 1,
+                viewer_id: value.viewerId, gacha_id: 1638, payment_type: 1,
                 number_of_exec: 1, type: 1, api_count: 1,
             }),
             execute: value => post("/gacha", "exec", {
-                viewer_id: value.viewerId, gacha_id: 1, payment_type: 1,
+                viewer_id: value.viewerId, gacha_id: 1638, payment_type: 1,
                 number_of_exec: 1, type: 1, api_count: 1,
             }),
             response: routeResult,
             state: value => commonState(runtime, value.playerId, {
-                gacha: runtime.gachaDomain.getPlayerGachaInfoSync(value.playerId, 1),
+                gacha: runtime.gachaDomain.getPlayerGachaInfoSync(value.playerId, 1638),
             }),
         }),
         scenario("mana-item-sell", {

@@ -122,7 +122,7 @@
       ],
       "seedContract": {
         "characterSeeds": [
-          111001
+          121087
         ],
         "directMissionSeeds": [],
         "factSeeds": []
@@ -445,7 +445,7 @@
       ],
       "seedContract": {
         "characterSeeds": [
-          111001
+          121087
         ],
         "directMissionSeeds": [],
         "factSeeds": []
@@ -2685,7 +2685,7 @@
       "runtimeEvidenceKey": "gacha-exec",
       "request": {
         "api_count": 1,
-        "gacha_id": 1,
+        "gacha_id": 1638,
         "number_of_exec": 1,
         "payment_type": 1,
         "type": 1,
@@ -2694,12 +2694,12 @@
       "response": {
         "characterList": [
           {
-            "characterId": 111001
+            "characterId": 121087
           }
         ],
         "statusCode": 200
       },
-      "behaviorSha256": "8afcd59bcad3b4359072d8a6eff3a377b9d7b7cff17f57ce6f0adbd8046682f2",
+      "behaviorSha256": "f5e7c90af46e724411dae400b365ea545a393171d15042fda2c2adf21ea5dd2d",
       "dbBefore": {
         "category9": [],
         "characters": [
@@ -2734,7 +2734,7 @@
             "stack": 0
           },
           {
-            "characterId": 111001,
+            "characterId": 121087,
             "evolutionLevel": 0,
             "exp": 0,
             "stack": 0
@@ -2742,9 +2742,9 @@
         ],
         "gacha": {
           "gachaExchangePoint": 1,
-          "gachaId": 1,
-          "isAccountFirst": false,
-          "isDailyFirst": false
+          "gachaId": 1638,
+          "isAccountFirst": true,
+          "isDailyFirst": true
         },
         "items": [],
         "player": {
@@ -2760,7 +2760,7 @@
         "unlocks": []
       },
       "characterSeeds": [
-        111001
+        121087
       ],
       "factSeeds": [],
       "directMissionSeeds": [],
@@ -2768,32 +2768,28 @@
         "kind": "publish-wrapper",
         "explicitCharacterSeeds": [],
         "characterListSeeds": [
-          111001
+          121087
         ],
         "contextCandidateCharacterSeeds": [],
         "characterSeeds": [
-          111001
+          121087
         ],
         "factSeeds": [],
         "directMissionSeeds": []
       },
       "loaderCalls": [
-        "player",
-        "questProgress:3",
-        "characterClearCounters",
-        "categoryMissionProgress:9:1110011,1110012,1110013",
         "characters"
       ],
       "missionComputes": 0,
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 16,
+      "sqlReads": 11,
       "sqlWrites": 8,
       "sqlByTable": {
         "players": {
-          "reads": 3,
-          "statements": 4,
+          "reads": 2,
+          "statements": 3,
           "writes": 1
         },
         "players_active_mission_counters": {
@@ -2801,22 +2797,7 @@
           "statements": 1,
           "writes": 1
         },
-        "players_category_mission_stages": {
-          "reads": 1,
-          "statements": 1,
-          "writes": 0
-        },
-        "players_category_missions": {
-          "reads": 1,
-          "statements": 1,
-          "writes": 0
-        },
         "players_character_awake_unlocks": {
-          "reads": 1,
-          "statements": 1,
-          "writes": 0
-        },
-        "players_character_quest_clears": {
           "reads": 1,
           "statements": 1,
           "writes": 0
@@ -2850,11 +2831,6 @@
           "reads": 0,
           "statements": 1,
           "writes": 1
-        },
-        "players_quest_progress": {
-          "reads": 1,
-          "statements": 1,
-          "writes": 0
         },
         "players_receive_history": {
           "reads": 0,

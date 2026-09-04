@@ -12,6 +12,7 @@ import type {
     Gacha,
     GachaCharacterDraw,
     GachaDraws,
+    GachaRuntimeBanner,
     RewardPlayerGachaDrawResult,
 } from "./types"
 import { GachaType } from "./types"
@@ -43,9 +44,23 @@ export type GachaRewardGrantOwner = (
     plan: RewardGrantExecutionPlan,
 ) => RewardGrantExecutionResult
 
+export interface GachaSeedMarkSnapshot {
+    readonly movieId: string
+    readonly seed: number
+    readonly rarity: number
+}
+
+export interface GachaCharacterSampledLogSnapshot {
+    readonly playerId: number
+    readonly draws: readonly GachaCharacterDraw[]
+    readonly moviePlans: readonly PlannedCharacterGachaMovie[]
+}
+
 export interface GachaRewardGrantOptions {
     readonly ownerGrant: GachaRewardGrantOwner
     readonly deferCharacterSampledLog?: (log: () => void) => void
+    readonly collectCharacterSampledLog?: (snapshot: GachaCharacterSampledLogSnapshot) => void
+    readonly collectSeedMark?: (snapshot: GachaSeedMarkSnapshot) => void
 }
 
 export class GachaRewardGrantMismatchError extends Error {
@@ -151,6 +166,7 @@ function scheduleCharacterLog(
     draws: readonly GachaCharacterDraw[],
     moviePlans: readonly PlannedCharacterGachaMovie[],
     deferLog: GachaRewardGrantOptions["deferCharacterSampledLog"],
+    collectLog: GachaRewardGrantOptions["collectCharacterSampledLog"],
 ): void {
     const drawSnapshot = draws.map(draw => ({
         ...draw,
@@ -159,6 +175,10 @@ function scheduleCharacterLog(
             : { ex_boost_item: { ...draw.ex_boost_item } }),
     }))
     const moviePlanSnapshot = moviePlans.map(plan => ({ ...plan }))
+    if (collectLog !== undefined) {
+        collectLog({ playerId, draws: drawSnapshot, moviePlans: moviePlanSnapshot })
+        return
+    }
     const log = () => sampledLog("gacha-character-draws", () =>
         formatGachaCharacterDrawsSummary({
             playerId,
@@ -175,6 +195,8 @@ function projectCharacters(
     drawResult: readonly number[],
     moviePlan: readonly PlannedCharacterGachaMovie[],
     deferLog: GachaRewardGrantOptions["deferCharacterSampledLog"],
+    collectLog: GachaRewardGrantOptions["collectCharacterSampledLog"],
+    collectSeedMark: GachaRewardGrantOptions["collectSeedMark"],
 ): RewardPlayerGachaDrawResult {
     const draws: GachaCharacterDraw[] = []
     const characters = new Map<number, Object>()
@@ -197,17 +219,18 @@ function projectCharacters(
             entry_count: 1,
         }
 
-        if (!plannedMovie.requiresVerification) {
-            characters.set(characterId, character)
-            draws.push(draw)
-            continue
+        if (plannedMovie.requiresVerification) {
+            const mark = {
+                movieId: plannedMovie.movieId,
+                seed: plannedMovie.seed,
+                rarity: plannedMovie.rarity,
+            }
+            if (collectSeedMark === undefined) {
+                gachaSeedQuarantine.markSent(mark.movieId, mark.seed, mark.rarity)
+            } else {
+                collectSeedMark(mark)
+            }
         }
-
-        gachaSeedQuarantine.markSent(
-            plannedMovie.movieId,
-            plannedMovie.seed,
-            plannedMovie.rarity,
-        )
         const compensation = entry.outcome.compensationItem
         if (compensation !== null) {
             draw.ex_boost_item = {
@@ -224,7 +247,7 @@ function projectCharacters(
         draws.push(draw)
     }
 
-    scheduleCharacterLog(playerId, draws, moviePlan, deferLog)
+    scheduleCharacterLog(playerId, draws, moviePlan, deferLog, collectLog)
     return {
         draw: draws,
         characters: [...characters.values()],
@@ -269,13 +292,15 @@ function projectEquipment(
 
 export function rewardGachaDrawResultThroughGrantOwnerSync(
     playerId: number,
-    gacha: Gacha,
+    gacha: Gacha | GachaRuntimeBanner,
     drawResult: readonly number[],
     drawMetadata: readonly GachaDrawMetadata[] | undefined,
     characterMoviePlan: readonly PlannedCharacterGachaMovie[] | undefined,
     options: GachaRewardGrantOptions & { readonly ownerGrant: GachaRewardGrantOwner },
 ): RewardPlayerGachaDrawResult {
-    const isCharacter = gacha.type === GachaType.CHARACTER
+    const isCharacter = "kind" in gacha
+        ? gacha.kind === "character"
+        : gacha.type === GachaType.CHARACTER
     if (isCharacter) {
         if (characterMoviePlan === undefined) {
             throw new GachaRewardGrantMismatchError("Character gacha movie plan is required")
@@ -290,6 +315,8 @@ export function rewardGachaDrawResultThroughGrantOwnerSync(
             drawResult,
             characterMoviePlan,
             options.deferCharacterSampledLog,
+            options.collectCharacterSampledLog,
+            options.collectSeedMark,
         )
     }
 
@@ -299,7 +326,10 @@ export function rewardGachaDrawResultThroughGrantOwnerSync(
         rank: metadata.rank,
         isGuarantee: metadata.isGuarantee,
     }))
-    const effects = computeEquipmentGachaMovieEffectsForGacha(gacha, movieInputs)
+    const effects = computeEquipmentGachaMovieEffectsForGacha(
+        gacha as { equipmentMovieProbabilityId?: string },
+        movieInputs,
+    )
     const plan = createPlan("equipment", drawResult)
     assertPlanMatchesDrawResult(plan, "equipment", drawResult)
     const grant = validateGrant(playerId, plan, options.ownerGrant(plan))

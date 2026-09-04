@@ -1,33 +1,24 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { MailType, insertReceiveHistorySync } from "../../data/domains/mail"
-import { getPlayerGachaCampaignSync, getPlayerGachaInfoListSync, getPlayerGachaInfoSync, insertPlayerGachaCampaignSync, insertPlayerGachaInfoSync, updatePlayerGachaCampaignSync, updatePlayerGachaInfoSync } from "../../data/domains/gacha"
-import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
+import { getPlayerGachaInfoSync, updatePlayerGachaInfoSync } from "../../data/domains/gacha"
 import { getSession } from "../../data/domains/session"
 import { generateDataHeaders } from "../../utils";
-import {
-    drawGachaWithMetadataSync,
-    grantGachaRewardPlanInTransactionOwnerWithInventorySync,
-    planCharacterGachaMovies,
-    rewardPlayerGachaDrawResultSync,
-} from "../../lib/gacha";
-import { getGachaCampaignIdSync, getGachaSync } from "../../lib/assets";
-import { CharacterGacha, GachaType } from "../../lib/types";
-import { serializeGachaCampaign } from "../../data/utils";
-import { PlayerGachaCampaign, UserGachaCampaign } from "../../data/types";
+import { getGachaSync } from "../../lib/assets";
+import { GachaType } from "../../lib/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import {
-    incrementActiveMissionGachaCampaignCountSync,
-    incrementActiveMissionGachaCharacterCountSync,
-} from "../../data/domains/active_mission_counters"
 import { givePlayerCharacterSync } from "../../lib/character";
 import { givePlayerEquipmentSync } from "../../lib/equipment";
-import { buildGachaExecPlan } from "../../lib/gacha-exec-plan";
 import { getExchangeableGachaItem } from "../../lib/gacha-rules";
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
-import { withDeferredInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
 import { projectItemOverflowCommonResponse } from "../../lib/item-overflow";
+import {
+    executeGachaDrawSync,
+    projectGachaExecResponse,
+    runGachaPostCommitEffects,
+} from "../../lib/gacha-owner";
+import { getVirtualNow } from "../../runtime/time/game-time";
 
 interface ExecBody {
     api_count: number,
@@ -84,6 +75,10 @@ class GachaExchangeRewardError extends Error {
         super(message)
         this.name = "GachaExchangeRewardError"
     }
+}
+
+function isPositiveSafeInteger(value: unknown): value is number {
+    return Number.isSafeInteger(value) && (value as number) > 0
 }
 
 const routes = async (fastify: FastifyInstance) => {
@@ -290,7 +285,11 @@ const routes = async (fastify: FastifyInstance) => {
         const paymentType = body.payment_type
         const numberOfExec = body.number_of_exec
         const type = body.type
-        if (isNaN(viewerId) || isNaN(gachaId) || isNaN(paymentType) || isNaN(numberOfExec) || isNaN(type)) {
+        if (!isPositiveSafeInteger(viewerId)
+            || !isPositiveSafeInteger(gachaId)
+            || !isPositiveSafeInteger(paymentType)
+            || !isPositiveSafeInteger(numberOfExec)
+            || !isPositiveSafeInteger(type)) {
             console.log(`[GACHA] Invalid body: v=${viewerId} g=${gachaId} pt=${paymentType} n=${numberOfExec} t=${type}`);
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -307,257 +306,38 @@ const routes = async (fastify: FastifyInstance) => {
         const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!
         if (playerId === null) return reply.status(500).send({ "error": "Internal Server Error", "message": "No players bound to account." })
 
-        // get the gacha
-        const gachaData = getGachaSync(gachaId)
-        if (gachaData === null) {
-            console.log(`[GACHA] Gacha not found: gachaId=${gachaId}`);
+        const result = executeGachaDrawSync({
+            playerId,
+            gachaId,
+            paymentType,
+            execType: type,
+            numberOfExec,
+            nowMs: getVirtualNow().getTime(),
+        })
+        if (!result.ok) {
+            console.log(`[GACHA] Exec rejected: gachaId=${gachaId} paymentType=${paymentType} type=${type} message=${result.message}`)
+            if (result.kind === "protocolResultCode") {
+                reply.header("content-type", "application/x-msgpack")
+                return reply.status(200).send({
+                    data_headers: generateDataHeaders({
+                        viewer_id: viewerId,
+                        result_code: result.resultCode,
+                    }),
+                    data: {},
+                })
+            }
             return reply.status(400).send({
                 "error": "Bad Request",
-                "message": "Gacha doesn't exist."
+                "message": result.message,
             })
         }
-        const isCharacterGacha = gachaData.type == GachaType.CHARACTER
-
-        let gachaCampaigns: UserGachaCampaign[] = []
-        let items: Record<number, number> = {}
-        let playerPaidVmoney = 0
-        let playerFreeVmoney = 0
-        let newGachaExchangePoint = 0
-        let rewardResult!: ReturnType<typeof rewardPlayerGachaDrawResultSync>
-        let deferredCharacterSampledLog: (() => void) | undefined
-        const transactionResult = getDb().transaction(() => {
-            const player = getPlayerSync(playerId)
-            if (player === null) throw new Error("Gacha player disappeared during execution")
-            return withDeferredInventoryBatchContextWithinTransactionSync({
-                playerId,
-                playerExistence: "caller-verified",
-            }, inventory => {
-                let playerGachaData = getPlayerGachaInfoSync(playerId, gachaId)
-                const insertPlayerGachaData = playerGachaData === null
-                playerGachaData = playerGachaData ?? {
-                    gachaId: gachaId,
-                    isAccountFirst: true,
-                    isDailyFirst: true,
-                    gachaExchangePoint: 0,
-                }
-                let plannedCampaign: PlayerGachaCampaign | null = null
-                const planResult = buildGachaExecPlan({
-                    gacha: gachaData,
-                    paymentType,
-                    execType: type,
-                    numberOfExec,
-                    playerFunds: {
-                        freeVmoney: player.freeVmoney,
-                        paidVmoney: player.vmoney,
-                    },
-                    playerGachaData,
-                    getTicketCount: itemId => inventory.read(itemId).afterAmount,
-                    getCampaignState: () => {
-                        const campaignId = getGachaCampaignIdSync(gachaId)
-                        if (campaignId === null) return null
-
-                        const existingCampaign = getPlayerGachaCampaignSync(playerId, gachaId, campaignId)
-                        const campaignForPlan: PlayerGachaCampaign = existingCampaign ?? {
-                            gachaId,
-                            campaignId,
-                            count: 1,
-                        }
-                        plannedCampaign = campaignForPlan
-
-                        return {
-                            campaignId,
-                            count: campaignForPlan.count,
-                            insert: existingCampaign === null,
-                        }
-                    },
-                })
-                if (!planResult.ok) return planResult
-
-                const execPlan = planResult.plan
-                const pullCount = execPlan.pullCount
-                playerPaidVmoney = execPlan.paidVmoney
-                playerFreeVmoney = execPlan.freeVmoney
-                const drawMetadata = drawGachaWithMetadataSync(gachaData, pullCount)
-                const drawResult = drawMetadata.map((draw) => draw.id)
-                const characterMoviePlan = isCharacterGacha
-                    ? planCharacterGachaMovies(gachaData as CharacterGacha, drawResult)
-                    : undefined
-                newGachaExchangePoint = (playerGachaData.gachaExchangePoint ?? 0) + pullCount
-
-                if (execPlan.ticket) {
-                    items[execPlan.ticket.itemId] = inventory.deduct(
-                        execPlan.ticket.itemId,
-                        execPlan.ticket.useTicketCount,
-                    ).afterAmount
-                }
-
-                if (execPlan.campaign) {
-                    const campaignData = plannedCampaign ?? {
-                        gachaId,
-                        campaignId: execPlan.campaign.campaignId,
-                        count: execPlan.campaign.count,
-                    }
-                    campaignData.count = execPlan.campaign.count
-
-                    if (execPlan.campaign.insert) {
-                        insertPlayerGachaCampaignSync(playerId, campaignData)
-                    } else {
-                        updatePlayerGachaCampaignSync(playerId, gachaId, execPlan.campaign.campaignId, execPlan.campaign.count)
-                    }
-
-                    gachaCampaigns.push(serializeGachaCampaign(campaignData))
-                }
-
-                rewardResult = rewardPlayerGachaDrawResultSync(
-                    playerId,
-                    gachaData,
-                    drawResult,
-                    drawMetadata,
-                    characterMoviePlan,
-                    {
-                        ownerGrant: plan => grantGachaRewardPlanInTransactionOwnerWithInventorySync(
-                            playerId,
-                            plan,
-                            {
-                                id: player.id,
-                                freeMana: player.freeMana,
-                                freeVmoney: playerFreeVmoney,
-                                expPool: player.expPool,
-                            },
-                            inventory,
-                        ),
-                        deferCharacterSampledLog: log => { deferredCharacterSampledLog = log },
-                    },
-                )
-
-                const historyType = isCharacterGacha ? MailType.CHARACTER : MailType.EQUIPMENT
-                for (const itemId of drawResult) {
-                    insertReceiveHistorySync(playerId, { type: historyType, type_id: itemId, number: 1 })
-                }
-
-                if (insertPlayerGachaData) {
-                    playerGachaData.isAccountFirst = false
-                    playerGachaData.isDailyFirst = false
-                    playerGachaData.gachaExchangePoint = newGachaExchangePoint
-                    insertPlayerGachaInfoSync(playerId, playerGachaData)
-                } else {
-                    updatePlayerGachaInfoSync(playerId, {
-                        gachaId: gachaId,
-                        isDailyFirst: false,
-                        isAccountFirst: false,
-                        gachaExchangePoint: newGachaExchangePoint
-                    })
-                }
-
-                updatePlayerSync({
-                    id: playerId,
-                    vmoney: playerPaidVmoney,
-                    freeVmoney: playerFreeVmoney
-                })
-                if (isCharacterGacha) {
-                    incrementActiveMissionGachaCharacterCountSync(playerId, drawResult.length)
-                }
-                if (execPlan.campaign) {
-                    incrementActiveMissionGachaCampaignCountSync(playerId)
-                }
-                return { ok: true as const }
-            })
-        })()
-        if (!transactionResult.ok) {
-            console.log(`[GACHA] Exec plan rejected: gachaId=${gachaId} paymentType=${paymentType} type=${type} message=${transactionResult.message}`)
-            return reply.status(transactionResult.status).send({
-                "error": "Bad Request",
-                "message": transactionResult.message,
-            })
-        }
-        deferredCharacterSampledLog?.()
-        const overMax = projectItemOverflowCommonResponse(
-            rewardResult.itemOverflowDispositions ?? [],
-        )
-
+        const postCommit = runGachaPostCommitEffects(result)
         reply.header("content-type", "application/x-msgpack")
-        if (isCharacterGacha) {
-            const existingCharacterList = rewardResult.characters.filter(
-                (character): character is Record<string, unknown> =>
-                    character !== undefined
-                    && character !== null
-                    && typeof character === "object"
-                    && !Array.isArray(character)
-            )
-            const characterList = publishCharacterGrowthOwnerStateBestEffort(
-                playerId,
-                [],
-                [existingCharacterList],
-                {},
-                "gacha/exec",
-            ).characterList
-
-            return reply.status(200).send({
-                "data_headers": generateDataHeaders({
-                    viewer_id: viewerId
-                }),
-                "data": {
-                    "user_info": {
-                        "free_vmoney": playerFreeVmoney,
-                        "vmoney": playerPaidVmoney,
-                        ...(rewardResult.playerAfter === undefined
-                            ? {}
-                            : { "free_mana": rewardResult.playerAfter.freeMana }),
-                    },
-                    "draw": rewardResult.draw,
-                    "character_list": characterList,
-                    "item_list": {
-                        ...items,
-                        ...rewardResult.items
-                    },
-                    "gacha_campaign_list": gachaCampaigns,
-                    "gacha_info_list": [
-                        {
-                            "gacha_id": gachaId,
-                            "is_account_first": false,
-                            "is_daily_first": false,
-                            "gacha_exchange_point": newGachaExchangePoint
-                        }
-                    ],
-                    "encyclopedia_info": [],
-                    "mail_arrived": getMailArrivedSync(playerId),
-                    ...(overMax.length > 0 ? { "over_max": overMax } : {})
-                }
-            })
-        } else {
-            return reply.status(200).send({
-                "data_headers": generateDataHeaders({
-                    viewer_id: viewerId
-                }),
-                "data": {
-                    "user_info": {
-                        "free_vmoney": playerFreeVmoney,
-                        "vmoney": playerPaidVmoney,
-                        ...(rewardResult.playerAfter === undefined
-                            ? {}
-                            : { "free_mana": rewardResult.playerAfter.freeMana }),
-                    },
-                    "is_erupt": rewardResult.isErupt ?? false,
-                    "draw_equipment": rewardResult.draw,
-                    "item_list": {
-                        ...items,
-                        ...rewardResult.items
-                    },
-                    "equipment_list": rewardResult.equipment,
-                    "gacha_info_list": [
-                        {
-                            "gacha_id": gachaId,
-                            "is_account_first": false,
-                            "is_daily_first": false,
-                            "gacha_exchange_point": newGachaExchangePoint
-                        }
-                    ],
-                    "encyclopedia_info": [],
-                    "mail_arrived": getMailArrivedSync(playerId),
-                    ...(overMax.length > 0 ? { "over_max": overMax } : {})
-                }
-            })
-        }
+        return reply.status(200).send(projectGachaExecResponse({
+            dataHeaders: generateDataHeaders({ viewer_id: viewerId }),
+            result,
+            postCommit,
+        }))
         
     })
 }

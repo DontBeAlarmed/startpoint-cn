@@ -17,14 +17,25 @@ process.env.DATA_DIR = databaseDirectory
 
 const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
     .installBundledGameplaySnapshot({
-        additionalTableNames: ["gacha.json", "gacha_pool.json"],
+        additionalTableNames: [
+            "gacha.json",
+            "gacha_pool.json",
+            "gacha_campaign_definitions.json",
+            "stars_gacha_campaign.json",
+            "gacha_exchange_rate.json",
+        ],
     })
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getActiveMissionCountersSync } = require("../src/data/domains/active_mission_counters")
 const { getPlayerCharacterSync, getPlayerCharactersSync } = require("../src/data/domains/character")
 const { getPlayerEquipmentSync, getPlayerEquipmentListSync } = require("../src/data/domains/equipment")
-const { getPlayerGachaInfoSync, insertPlayerGachaInfoSync } = require("../src/data/domains/gacha")
+const {
+    getPlayerGachaCampaignSync,
+    getPlayerGachaInfoSync,
+    insertPlayerGachaCampaignSync,
+    insertPlayerGachaInfoSync,
+} = require("../src/data/domains/gacha")
 const {
     getPlayerCollectedItemTotalSync,
     getPlayerItemSync,
@@ -53,11 +64,15 @@ const {
     grantGachaRewardPlanInTransactionOwnerWithInventorySync,
 } = require("../src/lib/gacha-reward-grant")
 const { withDeferredInventoryBatchContextWithinTransactionSync } = require("../src/lib/inventory")
+const { executeGachaDrawSync, runGachaPostCommitEffects } = require("../src/lib/gacha-owner")
+const { getTimeOffset, setServerTimeOffset } = require("../src/utils")
 
 let database
 let app
 let nextViewerId = 860000000
+const ACTIVE_CHARACTER_GACHA_ID = 1638
 const sqlTrace = { active: false, statements: [] }
+const previousTimeOffset = getTimeOffset()
 
 function captureSql(operation) {
     sqlTrace.statements = []
@@ -144,6 +159,7 @@ function drawState(playerId, gachaId) {
 }
 
 test.before(async () => {
+    setServerTimeOffset(Date.parse("2024-08-14T12:00:00.000Z") - Date.now())
     database = data.initializeDatabase({
         databaseFactory: databasePath => new BetterSqlite3(databasePath, {
             verbose: sql => { if (sqlTrace.active) sqlTrace.statements.push(sql) },
@@ -159,6 +175,7 @@ test.after(async () => {
     await app.close()
     data.closeDatabase()
     restoreContentSnapshot()
+    setServerTimeOffset(previousTimeOffset)
     fs.rmSync(databaseDirectory, { recursive: true, force: true })
     if (previousDataDirectory === undefined) delete process.env.DATA_DIR
     else process.env.DATA_DIR = previousDataDirectory
@@ -278,8 +295,8 @@ test("equipment pity exchange rolls reward and history back when points fail", a
 
 test("gacha exec rolls every persistent result back on late mission failure", async t => {
     const { playerId, viewerId } = await createPlayer("gacha-exec")
-    updatePlayerSync({ id: playerId, freeVmoney: 1000, vmoney: 0 })
-    const before = drawState(playerId, 1)
+    updatePlayerSync({ id: playerId, freeVmoney: 1000, vmoney: 800 })
+    const before = drawState(playerId, ACTIVE_CHARACTER_GACHA_ID)
     database.exec(`
         CREATE TRIGGER reject_gacha_mission_counter
         BEFORE INSERT ON players_active_mission_counters
@@ -288,25 +305,35 @@ test("gacha exec rolls every persistent result back on late mission failure", as
     `)
     t.after(() => database.exec("DROP TRIGGER IF EXISTS reject_gacha_mission_counter"))
 
-    const routeSql = await captureSqlAsync(() => captureGachaLogs(() => app.inject({
-        method: "POST",
-        url: "/gacha/exec",
-        payload: {
-            viewer_id: viewerId,
-            gacha_id: 1,
-            payment_type: 1,
-            number_of_exec: 1,
-            type: 1,
-            api_count: 1,
-        },
-    })))
+    const quarantine = getDefaultGachaSeedQuarantine()
+    const originalMarkSent = quarantine.markSent
+    const markedSeeds = []
+    quarantine.markSent = (...args) => markedSeeds.push(args)
+    let routeSql
+    try {
+        routeSql = await captureSqlAsync(() => captureGachaLogs(() => app.inject({
+            method: "POST",
+            url: "/gacha/exec",
+            payload: {
+                viewer_id: viewerId,
+                gacha_id: ACTIVE_CHARACTER_GACHA_ID,
+                payment_type: 1,
+                number_of_exec: 1,
+                type: 2,
+                api_count: 1,
+            },
+        })))
+    } finally {
+        quarantine.markSent = originalMarkSent
+    }
     const captured = routeSql.result
     const response = captured.result
 
     assert.equal(response.statusCode, 500)
     assert.match(response.body, /forced gacha mission counter failure/)
-    assert.deepEqual(drawState(playerId, 1), before)
+    assert.deepEqual(drawState(playerId, ACTIVE_CHARACTER_GACHA_ID), before)
     assert.deepEqual(captured.logs, [])
+    assert.deepEqual(markedSeeds, [])
     assert.equal(
         routeSql.statements.filter(sql => /^\s*SELECT[\s\S]*\bFROM\s+players\b/i.test(sql)).length,
         2,
@@ -321,7 +348,372 @@ test("gacha exec commits charge reward history points and mission fact together"
     const { playerId, viewerId } = await createPlayer("gacha-exec-success")
     updatePlayerSync({ id: playerId, freeVmoney: 1000, vmoney: 0 })
 
-    const routeSql = await captureSqlAsync(() => captureGachaLogs(() => app.inject({
+    const quarantine = getDefaultGachaSeedQuarantine()
+    const originalMarkSent = quarantine.markSent
+    const markObservations = []
+    quarantine.markSent = () => markObservations.push({
+        historyCount: historyCount(playerId),
+        exchangePoint: getPlayerGachaInfoSync(
+            playerId,
+            ACTIVE_CHARACTER_GACHA_ID,
+        )?.gachaExchangePoint,
+    })
+    let routeSql
+    try {
+        routeSql = await captureSqlAsync(() => captureGachaLogs(() => app.inject({
+            method: "POST",
+            url: "/gacha/exec",
+            payload: {
+                viewer_id: viewerId,
+                gacha_id: ACTIVE_CHARACTER_GACHA_ID,
+                payment_type: 1,
+                number_of_exec: 1,
+                type: 1,
+                api_count: 1,
+            },
+        })))
+    } finally {
+        quarantine.markSent = originalMarkSent
+    }
+    const captured = routeSql.result
+    const response = captured.result
+
+    assert.equal(response.statusCode, 200, response.body)
+    const after = drawState(playerId, ACTIVE_CHARACTER_GACHA_ID)
+    assert.equal(after.freeVmoney, 850)
+    assert.equal(after.vmoney, 0)
+    assert.equal(Object.keys(after.characters).length, 2)
+    assert.equal(after.gachaInfo.gachaExchangePoint, 1)
+    assert.equal(after.gachaInfo.isDailyFirst, true)
+    assert.equal(after.gachaInfo.isAccountFirst, true)
+    assert.equal(after.historyCount, 1)
+    assert.equal(after.activeMissionCounters.totalGachaCharacterCount, 1)
+    assert.equal(captured.logs.length, 1)
+    assert.deepEqual(markObservations, [{ historyCount: 1, exchangePoint: 1 }])
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
+    assert.equal(payload.data.gacha_info_list[0].is_daily_first, true)
+    assert.equal(payload.data.gacha_info_list[0].is_account_first, true)
+    assert.equal(
+        routeSql.statements.filter(sql => /^\s*SELECT[\s\S]*\bFROM\s+players_items\b/i.test(sql)).length,
+        0,
+        "a first-character non-ticket draw must not activate deferred Inventory",
+    )
+    assert.equal(
+        routeSql.statements.filter(sql => /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql)).length,
+        0,
+    )
+})
+
+test("post-commit seed failure cannot turn a committed draw into HTTP 500", async () => {
+    const { playerId, viewerId } = await createPlayer("gacha-seed-postcommit-failure")
+    updatePlayerSync({ id: playerId, freeVmoney: 1000, vmoney: 0 })
+    const quarantine = getDefaultGachaSeedQuarantine()
+    const originalMarkSent = quarantine.markSent
+    quarantine.markSent = () => { throw new Error("fixture seed postcommit failure") }
+    const originalError = console.error
+    console.error = () => {}
+    let response
+    try {
+        response = await app.inject({
+            method: "POST",
+            url: "/gacha/exec",
+            payload: {
+                viewer_id: viewerId,
+                gacha_id: ACTIVE_CHARACTER_GACHA_ID,
+                payment_type: 1,
+                number_of_exec: 1,
+                type: 1,
+                api_count: 1,
+            },
+        })
+    } finally {
+        quarantine.markSent = originalMarkSent
+        console.error = originalError
+    }
+    assert.equal(response.statusCode, 200, response.body)
+    assert.equal(historyCount(playerId), 1)
+    assert.equal(getPlayerSync(playerId).freeVmoney, 850)
+})
+
+test("Character ten draw persists free-first mixed Stone after-state", async () => {
+    const { playerId, viewerId } = await createPlayer("gacha-mixed-stone")
+    updatePlayerSync({ id: playerId, freeVmoney: 1000, vmoney: 800 })
+    const response = await app.inject({
+        method: "POST",
+        url: "/gacha/exec",
+        payload: {
+            viewer_id: viewerId,
+            gacha_id: ACTIVE_CHARACTER_GACHA_ID,
+            payment_type: 1,
+            number_of_exec: 1,
+            type: 2,
+            api_count: 1,
+        },
+    })
+    assert.equal(response.statusCode, 200, response.body)
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64")).data
+    assert.equal(payload.draw.length, 10)
+    assert.equal(payload.user_info.free_vmoney, 0)
+    assert.equal(payload.user_info.vmoney, 300)
+    assert.equal(getPlayerSync(playerId).freeVmoney, 0)
+    assert.equal(getPlayerSync(playerId).vmoney, 300)
+})
+
+test("Gacha HTTP adapter minimally rejects non-integer protocol fields", async () => {
+    const { playerId, viewerId } = await createPlayer("gacha-invalid-body")
+    updatePlayerSync({ id: playerId, freeVmoney: 1000, vmoney: 0 })
+    const before = drawState(playerId, ACTIVE_CHARACTER_GACHA_ID)
+    const response = await app.inject({
+        method: "POST",
+        url: "/gacha/exec",
+        payload: {
+            viewer_id: viewerId,
+            gacha_id: ACTIVE_CHARACTER_GACHA_ID,
+            payment_type: 1,
+            number_of_exec: null,
+            type: 1,
+            api_count: 1,
+        },
+    })
+    assert.equal(response.statusCode, 400)
+    assert.deepEqual(drawState(playerId, ACTIVE_CHARACTER_GACHA_ID), before)
+})
+
+test("daily paid draw only consumes daily-first state", async () => {
+    const { playerId, viewerId } = await createPlayer("gacha-daily-state")
+    updatePlayerSync({ id: playerId, freeVmoney: 0, vmoney: 100 })
+    const first = await app.inject({
+        method: "POST",
+        url: "/gacha/exec",
+        payload: {
+            viewer_id: viewerId,
+            gacha_id: ACTIVE_CHARACTER_GACHA_ID,
+            payment_type: 2,
+            number_of_exec: 1,
+            type: 5,
+            api_count: 1,
+        },
+    })
+    assert.equal(first.statusCode, 200, first.body)
+    const info = getPlayerGachaInfoSync(playerId, ACTIVE_CHARACTER_GACHA_ID)
+    assert.equal(info.isDailyFirst, false)
+    assert.equal(info.isAccountFirst, true)
+    assert.equal(getPlayerSync(playerId).vmoney, 50)
+    const beforeRetry = drawState(playerId, ACTIVE_CHARACTER_GACHA_ID)
+    const retry = await app.inject({
+        method: "POST",
+        url: "/gacha/exec",
+        payload: {
+            viewer_id: viewerId,
+            gacha_id: ACTIVE_CHARACTER_GACHA_ID,
+            payment_type: 2,
+            number_of_exec: 1,
+            type: 5,
+            api_count: 2,
+        },
+    })
+    assert.equal(retry.statusCode, 400)
+    assert.deepEqual(drawState(playerId, ACTIVE_CHARACTER_GACHA_ID), beforeRetry)
+})
+
+test("account-paid ten draw only consumes account-first state", async () => {
+    const { playerId } = await createPlayer("gacha-account-state")
+    updatePlayerSync({ id: playerId, freeVmoney: 0, vmoney: 1500 })
+    const result = executeGachaDrawSync({
+        playerId,
+        gachaId: 800209,
+        paymentType: 2,
+        execType: 7,
+        numberOfExec: 1,
+        nowMs: Date.parse("2024-05-10T00:00:00.000Z"),
+    })
+    assert.equal(result.ok, true)
+    if (!result.ok) return
+    runGachaPostCommitEffects(result)
+    assert.equal(result.draw.length, 10)
+    assert.equal(result.isAccountFirst, false)
+    assert.equal(result.isDailyFirst, true)
+    assert.equal(getPlayerSync(playerId).vmoney, 0)
+    const info = getPlayerGachaInfoSync(playerId, 800209)
+    assert.equal(info.isAccountFirst, false)
+    assert.equal(info.isDailyFirst, true)
+})
+
+test("active campaign ten draw consumes its campaign once inside the owner", async () => {
+    const { playerId } = await createPlayer("gacha-campaign-ten")
+    const result = executeGachaDrawSync({
+        playerId,
+        gachaId: 28,
+        paymentType: 4,
+        execType: 8,
+        numberOfExec: 1,
+        nowMs: Date.parse("2020-05-28T00:00:00.000Z"),
+    })
+    assert.equal(result.ok, true)
+    if (!result.ok) return
+    runGachaPostCommitEffects(result)
+    assert.equal(result.draw.length, 10)
+    assert.deepEqual(result.campaignList, [{ gachaId: 28, campaignId: 1, count: 0 }])
+    assert.equal(getPlayerGachaCampaignSync(playerId, 28, 1).count, 0)
+    assert.equal(result.isDailyFirst, true)
+    assert.equal(result.isAccountFirst, true)
+})
+
+test("campaign single is consumed once and retry leaves state unchanged", async () => {
+    const { playerId } = await createPlayer("gacha-campaign-single")
+    const command = {
+        playerId,
+        gachaId: 46,
+        paymentType: 4,
+        execType: 11,
+        numberOfExec: 1,
+        nowMs: Date.parse("2020-10-31T00:00:00.000Z"),
+    }
+    const first = executeGachaDrawSync(command)
+    assert.equal(first.ok, true)
+    if (!first.ok) return
+    runGachaPostCommitEffects(first)
+    assert.equal(first.draw.length, 1)
+    assert.deepEqual(first.campaignList, [{ gachaId: 46, campaignId: 2, count: 0 }])
+    const beforeRetry = drawState(playerId, 46)
+    const retry = executeGachaDrawSync(command)
+    assert.deepEqual(retry, {
+        ok: false,
+        kind: "badRequest",
+        message: "Already redeemed campaign for this period.",
+    })
+    assert.deepEqual(drawState(playerId, 46), beforeRetry)
+})
+
+test("current campaign identity and late rollback preserve historical campaign rows", async t => {
+    const { playerId } = await createPlayer("gacha-campaign-history")
+    insertPlayerGachaCampaignSync(playerId, {
+        gachaId: 49,
+        campaignId: 2,
+        count: 0,
+    })
+    const command = {
+        playerId,
+        gachaId: 49,
+        paymentType: 4,
+        execType: 8,
+        numberOfExec: 1,
+        nowMs: Date.parse("2020-11-27T00:00:00.000Z"),
+    }
+    const before = drawState(playerId, 49)
+    database.exec(`
+        CREATE TRIGGER reject_current_campaign_mission
+        BEFORE INSERT ON players_active_mission_counters
+        WHEN NEW.player_id = ${playerId}
+        BEGIN SELECT RAISE(ABORT, 'forced current campaign failure'); END;
+    `)
+    t.after(() => database.exec("DROP TRIGGER IF EXISTS reject_current_campaign_mission"))
+    assert.throws(() => executeGachaDrawSync(command), /forced current campaign failure/)
+    assert.deepEqual(drawState(playerId, 49), before)
+    assert.equal(getPlayerGachaCampaignSync(playerId, 49, 2).count, 0)
+    assert.equal(getPlayerGachaCampaignSync(playerId, 49, 3), null)
+
+    database.exec("DROP TRIGGER reject_current_campaign_mission")
+    const result = executeGachaDrawSync(command)
+    assert.equal(result.ok, true)
+    if (!result.ok) return
+    runGachaPostCommitEffects(result)
+    assert.deepEqual(result.campaignList, [{ gachaId: 49, campaignId: 3, count: 0 }])
+    assert.equal(getPlayerGachaCampaignSync(playerId, 49, 2).count, 0)
+    assert.equal(getPlayerGachaCampaignSync(playerId, 49, 3).count, 0)
+})
+
+test("wildcard single ticket supports the client-reachable ten execution batch", async () => {
+    const { playerId, viewerId } = await createPlayer("gacha-wildcard-single-ten")
+    grantInventoryFixtureItemSync(playerId, 999003, 10)
+    const response = await app.inject({
+        method: "POST",
+        url: "/gacha/exec",
+        payload: {
+            viewer_id: viewerId,
+            gacha_id: ACTIVE_CHARACTER_GACHA_ID,
+            payment_type: 3,
+            number_of_exec: 10,
+            type: 10,
+            api_count: 1,
+        },
+    })
+    assert.equal(response.statusCode, 200, response.body)
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64")).data
+    assert.equal(payload.draw.length, 10)
+    assert.equal(payload.item_list[999003], 0)
+    assert.equal(getPlayerItemSync(playerId, 999003), 0)
+})
+
+test("real 25009 ticket extends execution beyond base period without extending no-ticket access", async () => {
+    const withTicket = await createPlayer("gacha-25009-ticket-extension")
+    grantInventoryFixtureItemSync(withTicket.playerId, 999004, 1)
+    const command = {
+        playerId: withTicket.playerId,
+        gachaId: 25009,
+        paymentType: 3,
+        execType: 13,
+        numberOfExec: 1,
+        nowMs: Date.parse("2024-08-14T12:00:00.000Z"),
+    }
+    const result = executeGachaDrawSync(command)
+    assert.equal(result.ok, true)
+    if (!result.ok) return
+    runGachaPostCommitEffects(result)
+    assert.equal(result.kind, "equipment")
+    assert.equal(result.draw.length, 10)
+    assert.equal(result.ticketItemBalances[999004], 0)
+    assert.equal(getPlayerItemSync(withTicket.playerId, 999004), 0)
+    assert.equal(historyCount(withTicket.playerId), 10)
+    assert.equal(getPlayerGachaInfoSync(withTicket.playerId, 25009).gachaExchangePoint, 10)
+
+    const withoutTicket = await createPlayer("gacha-25009-no-ticket")
+    const before = drawState(withoutTicket.playerId, 25009)
+    const rejected = executeGachaDrawSync({ ...command, playerId: withoutTicket.playerId })
+    assert.deepEqual(rejected, {
+        ok: false,
+        kind: "protocolResultCode",
+        resultCode: 1351,
+        message: "Gacha is outside its available period.",
+    })
+    assert.deepEqual(drawState(withoutTicket.playerId, 25009), before)
+})
+
+test("active Equipment ten draw projects only Equipment response facts", async () => {
+    const { playerId, viewerId } = await createPlayer("gacha-equipment-active")
+    updatePlayerSync({ id: playerId, freeVmoney: 1000, vmoney: 0 })
+    const response = await app.inject({
+        method: "POST",
+        url: "/gacha/exec",
+        payload: {
+            viewer_id: viewerId,
+            gacha_id: 25030,
+            payment_type: 1,
+            number_of_exec: 1,
+            type: 2,
+            api_count: 1,
+        },
+    })
+    assert.equal(response.statusCode, 200, response.body)
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64")).data
+    assert.equal(payload.draw_equipment.length, 10)
+    assert.equal(payload.draw_equipment.every(draw => (
+        Number.isInteger(draw.treasure_up_type)
+        && draw.treasure_up_type >= 0
+        && draw.treasure_up_type <= 3
+    )), true)
+    assert.equal(payload.equipment_list.length >= 1, true)
+    assert.equal("draw" in payload, false)
+    assert.equal("character_list" in payload, false)
+    assert.equal(payload.gacha_info_list[0].is_daily_first, true)
+    assert.equal(payload.gacha_info_list[0].is_account_first, true)
+})
+
+test("expired ordinary banner is rejected before any persistent write", async () => {
+    const { playerId, viewerId } = await createPlayer("gacha-expired")
+    updatePlayerSync({ id: playerId, freeVmoney: 1000, vmoney: 0 })
+    const before = drawState(playerId, 1)
+    const response = await app.inject({
         method: "POST",
         url: "/gacha/exec",
         payload: {
@@ -332,28 +724,34 @@ test("gacha exec commits charge reward history points and mission fact together"
             type: 1,
             api_count: 1,
         },
-    })))
-    const captured = routeSql.result
-    const response = captured.result
+    })
+    assert.equal(response.statusCode, 200)
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
+    assert.equal(payload.data_headers.result_code, 1351)
+    assert.deepEqual(payload.data, {})
+    assert.deepEqual(drawState(playerId, 1), before)
+})
 
-    assert.equal(response.statusCode, 200, response.body)
-    const after = drawState(playerId, 1)
-    assert.equal(after.freeVmoney, 850)
-    assert.equal(after.vmoney, 0)
-    assert.equal(Object.keys(after.characters).length, 2)
-    assert.equal(after.gachaInfo.gachaExchangePoint, 1)
-    assert.equal(after.historyCount, 1)
-    assert.equal(after.activeMissionCounters.totalGachaCharacterCount, 1)
-    assert.equal(captured.logs.length, 1)
-    assert.equal(
-        routeSql.statements.filter(sql => /^\s*SELECT[\s\S]*\bFROM\s+players_items\b/i.test(sql)).length,
-        0,
-        "a first-character non-ticket draw must not activate deferred Inventory",
-    )
-    assert.equal(
-        routeSql.statements.filter(sql => /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql)).length,
-        0,
-    )
+test("missing active campaign returns the client-known 1361 result code", async () => {
+    const { playerId, viewerId } = await createPlayer("gacha-campaign-period-error")
+    const before = drawState(playerId, ACTIVE_CHARACTER_GACHA_ID)
+    const response = await app.inject({
+        method: "POST",
+        url: "/gacha/exec",
+        payload: {
+            viewer_id: viewerId,
+            gacha_id: ACTIVE_CHARACTER_GACHA_ID,
+            payment_type: 4,
+            number_of_exec: 1,
+            type: 11,
+            api_count: 1,
+        },
+    })
+    assert.equal(response.statusCode, 200)
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
+    assert.equal(payload.data_headers.result_code, 1361)
+    assert.deepEqual(payload.data, {})
+    assert.deepEqual(drawState(playerId, ACTIVE_CHARACTER_GACHA_ID), before)
 })
 
 test("newbie ten-ticket gacha consumes the configured 70030 ticket", async () => {
@@ -706,6 +1104,48 @@ test("character owner plan preserves per-draw movie order duplicate deltas and m
     assert.deepEqual(playerReads, [], playerReads.join("\n"))
     const transactionStatements = measured.statements.filter(sql => /^\s*(?:BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)\b/i.test(sql))
     assert.deepEqual(transactionStatements, [], transactionStatements.join("\n"))
+})
+
+test("verification-free movie still projects duplicate Character compensation", async () => {
+    const { playerId } = await createPlayer("gacha-verification-free-duplicate")
+    const characterId = 111001
+    const compensationItemId = 14003
+    assert.equal(givePlayerCharacterSync(playerId, characterId).isNew, true)
+    const quarantine = getDefaultGachaSeedQuarantine()
+    const originalMarkSent = quarantine.markSent
+    const markedSeeds = []
+    quarantine.markSent = (...args) => markedSeeds.push(args)
+    let result
+    try {
+        result = database.transaction(() => rewardPlayerGachaDrawResultSync(
+            playerId,
+            { type: GachaType.CHARACTER },
+            [characterId],
+            undefined,
+            [{
+                characterId,
+                rarity: 5,
+                movieId: "rarity_5_guarantee",
+                seed: 1003,
+                requiresVerification: false,
+            }],
+            {
+                ownerGrant: plan => executeRewardGrantExecutionPlanAsTransactionOwnerSync(
+                    playerId,
+                    plan,
+                    rewardGrantPlayerSnapshot(playerId),
+                ),
+            },
+        ))()
+    } finally {
+        quarantine.markSent = originalMarkSent
+    }
+    assert.deepEqual(result.draw[0].ex_boost_item, {
+        id: compensationItemId,
+        count: 1,
+    })
+    assert.equal(result.items[compensationItemId], 1)
+    assert.deepEqual(markedSeeds, [])
 })
 
 test("equipment owner plan preserves draw order metadata effects and last equipment state", async () => {

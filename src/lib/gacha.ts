@@ -6,7 +6,7 @@ import { randomInt } from "crypto";
 import { getDefaultGachaSeedCatalog, reserveUniquePlaceholderSeed } from "./gacha-seed-catalog";
 import { PlayerBoxGachaDrawnReward } from "../data/types";
 import { getCharacterDataSync } from "./assets";
-import { BoxGachaBox, BoxGachaDrawResult, BoxGachaIdReward, BoxGachaRewardTier, BoxGachaRewardType, CharacterGacha, Gacha, GachaDrawResult, GachaMovieType, GachaType, RewardPlayerGachaDrawResult } from "./types";
+import { BoxGachaBox, BoxGachaDrawResult, BoxGachaIdReward, BoxGachaRewardTier, BoxGachaRewardType, CharacterGacha, CharacterGachaRuntimeBanner, Gacha, GachaDrawResult, GachaMovieType, GachaRuntimeBanner, GachaType, RewardPlayerGachaDrawResult } from "./types";
 import { drawGachaWithMetadataSync } from "./gacha-draw";
 import type { GachaDrawMetadata } from "./gacha-draw";
 import {
@@ -51,7 +51,7 @@ export interface SummonResult {
 export type { PlannedCharacterGachaMovie } from "./gacha-reward-grant"
 
 export function planCharacterGachaMovies(
-    gacha: CharacterGacha,
+    gacha: CharacterGacha | CharacterGachaRuntimeBanner,
     characterIds: number[],
 ): PlannedCharacterGachaMovie[] {
     const usedSeeds = new Set<number>()
@@ -98,15 +98,20 @@ export function randomPoolItem(
 
 export function rewardPlayerGachaDrawResultSync(
     playerId: number,
-    gacha: Gacha,
+    gacha: Gacha | GachaRuntimeBanner,
     gachaDrawResult: number[],
     gachaDrawMetadata: GachaDrawMetadata[] | undefined,
     plannedCharacterMovies: PlannedCharacterGachaMovie[] | undefined,
     options: GachaRewardGrantOptions,
 ): RewardPlayerGachaDrawResult {
-    const characterMoviePlan = gacha.type === GachaType.CHARACTER
+    const characterMoviePlan = ("kind" in gacha
+        ? gacha.kind === "character"
+        : gacha.type === GachaType.CHARACTER)
         ? plannedCharacterMovies
-            ?? planCharacterGachaMovies(gacha as CharacterGacha, gachaDrawResult)
+            ?? planCharacterGachaMovies(
+                gacha as CharacterGacha | CharacterGachaRuntimeBanner,
+                gachaDrawResult,
+            )
         : undefined
     return rewardGachaDrawResultThroughGrantOwnerSync(
         playerId,

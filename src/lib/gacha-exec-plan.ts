@@ -1,4 +1,4 @@
-import { Gacha } from "./types";
+import { Gacha, GachaRuntimeBanner } from "./types";
 import { getGachaTicketCost } from "./gacha-ticket";
 import { GACHA_EXEC_TYPES, GACHA_PAYMENT_TYPES, isGachaExecAllowed, isGachaExecCountAllowed } from "./gacha-rules";
 
@@ -45,7 +45,7 @@ export type GachaExecPlanResult =
     | { ok: false, status: 400, message: string }
 
 export interface BuildGachaExecPlanInput {
-    gacha: Gacha
+    gacha: Gacha | GachaRuntimeBanner
     paymentType: number
     execType: number
     numberOfExec: number
@@ -53,6 +53,30 @@ export interface BuildGachaExecPlanInput {
     playerGachaData: GachaExecPlayerGachaData
     getTicketCount?: (itemId: number) => number | null
     getCampaignState?: () => GachaExecCampaignState | null
+}
+
+function freeVmoneyCost(
+    gacha: Gacha | GachaRuntimeBanner,
+    multi: boolean,
+): number | undefined {
+    if ("kind" in gacha) {
+        if (gacha.page.kind !== 0 && gacha.page.kind !== 8) return undefined
+        return multi ? gacha.page.multiCost : gacha.page.singleCost
+    }
+    return multi ? gacha.multiCost : gacha.singleCost
+}
+
+function paidVmoneyCost(
+    gacha: Gacha | GachaRuntimeBanner,
+    accountMulti: boolean,
+): number | undefined {
+    if ("kind" in gacha) {
+        if (accountMulti) {
+            return gacha.page.kind === 1 ? gacha.page.accountPaidTenCost : undefined
+        }
+        return gacha.page.kind === 0 ? gacha.page.dailyPaidCost : undefined
+    }
+    return accountMulti ? gacha.tenTimesPerAccountCost : gacha.discountCost
 }
 
 function ok(plan: GachaExecPlan): GachaExecPlanResult {
@@ -107,7 +131,7 @@ export function buildGachaExecPlan(input: BuildGachaExecPlanInput): GachaExecPla
     switch (paymentType) {
         case GACHA_PAYMENT_TYPES.FREE_VMONEY: {
             const isMulti = execType === GACHA_EXEC_TYPES.VMONEY_MULTI
-            const cost = isMulti ? gacha.multiCost : gacha.singleCost
+            const cost = freeVmoneyCost(gacha, isMulti)
             if (!isPositiveCost(cost)) return badRequest("Gacha cost is invalid.")
             const overflow = cost > plan.freeVmoney ? cost - plan.freeVmoney : 0
             plan.freeVmoney = overflow > 0 ? 0 : plan.freeVmoney - cost
@@ -120,7 +144,7 @@ export function buildGachaExecPlan(input: BuildGachaExecPlanInput): GachaExecPla
                 return badRequest("Already did daily paid summon.")
             }
             const accountMulti = execType === GACHA_EXEC_TYPES.ACCOUNT_PAID_MULTI
-            const cost = accountMulti ? gacha.tenTimesPerAccountCost : gacha.discountCost
+            const cost = paidVmoneyCost(gacha, accountMulti)
             if (!isPositiveCost(cost)) return badRequest("Gacha cost is invalid.")
             plan.paidVmoney -= cost
             plan.pullCount = accountMulti ? 10 : 1

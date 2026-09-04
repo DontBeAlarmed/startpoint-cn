@@ -258,6 +258,9 @@ async function runAwakeOwnerFocusedBaseline() {
             additionalTableNames: [
                 "gacha.json",
                 "gacha_pool.json",
+                "gacha_campaign_definitions.json",
+                "stars_gacha_campaign.json",
+                "gacha_exchange_rate.json",
                 "shop_item_campaign.json",
                 "shop_select_item_campaign.json",
             ],
