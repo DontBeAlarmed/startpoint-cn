@@ -219,7 +219,7 @@ export default function Mail() {
             description="按全体、账号或单个存档发送附件邮件。高风险发送动作会先展示目标和附件摘要。"
         >
         <Space direction="vertical" size="large" className="admin-stack">
-            <Card title="发送邮件" className="admin-form-panel">
+            <Card title="发送邮件">
                 <Alert type={targetMode === "all" ? "warning" : "info"} showIcon style={{ marginBottom: 16 }}
                     message={
                         targetMode === "all" ? `将向全体 ${totalSaves} 个存档发送同一封邮件`

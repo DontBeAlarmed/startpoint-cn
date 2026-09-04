@@ -434,10 +434,6 @@ body {
   font-weight: 700;
 }
 
-.admin-form-panel {
-  width: min(100%, 760px);
-}
-
 .admin-table-card .ant-card-body,
 .admin-table-wrap {
   overflow-x: auto;
@@ -675,7 +671,6 @@ body {
   border-bottom-color: var(--line) !important;
 }
 
-.wf-line { height: 3px; background: linear-gradient(90deg, var(--sky) 0%, var(--sky) 35%, var(--star) 100%); flex: none; }
 .ant-statistic-content-value, .ant-table-cell, .admin-mono { font-variant-numeric: tabular-nums; }
 
 .ant-table-cell {
@@ -733,10 +728,6 @@ body {
   .admin-toolbar .ant-btn,
   .admin-toolbar .ant-input-affix-wrapper {
     max-width: 100%;
-  }
-
-  .admin-form-panel {
-    width: 100%;
   }
 
   .admin-edit-compact {

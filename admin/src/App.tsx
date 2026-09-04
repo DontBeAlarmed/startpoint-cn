@@ -93,7 +93,6 @@ export default function App() {
                 </Sider>
             )}
             <Layout>
-                <div className="wf-line" />
                 <Header className="admin-topbar">
                     {isMobile && (
                         <Button

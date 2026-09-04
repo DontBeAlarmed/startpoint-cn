@@ -8,7 +8,6 @@ for (const v of ["--bg:#F3F7FC", "--panel:#FFFFFF", "--star:#FFD335", "--ink:#1F
 }
 assert.ok(css.includes('html[data-theme="dark"]'), "缺少暗色 token 块")
 assert.ok(css.includes("--bg:#141B2E"), "缺少暗色页面底色")
-assert.ok(css.includes(".wf-line"), "缺少 WF 渐变线")
 for (const banned of ["#1890ff", "#faad14", "#ff4d4f"]) {
     assert.equal(css.includes(banned), false, `不得残留 AntD 旧默认色 ${banned}`)
 }
@@ -26,7 +25,6 @@ assert.ok(themeSrc.includes("◐ 黑夜") && themeSrc.includes("◐ 白昼"), "T
 assert.equal(mainSrc.includes("adminTheme"), false, "main.tsx 残留旧 data-admin-theme 写入")
 const appSrc = fs.readFileSync(path.join(__dirname, "../admin/src/App.tsx"), "utf8")
 assert.ok(appSrc.includes("<ThemeToggle"), "顶栏缺少主题切换按钮")
-assert.ok(appSrc.includes('className="wf-line"'), "缺少 WF 渐变线")
 const dash = fs.readFileSync(path.join(__dirname, "../admin/src/pages/Dashboard.tsx"), "utf8")
 assert.ok(css.includes(".admin-stat-tick"), "缺少统计卡星形角标类")
 assert.ok(css.includes(".admin-badge-ok") && css.includes(".admin-badge-warn") && css.includes(".admin-badge-info"), "缺少语义徽章类")
