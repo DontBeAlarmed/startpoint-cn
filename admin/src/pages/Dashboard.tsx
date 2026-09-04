@@ -206,12 +206,10 @@ export default function Dashboard() {
             }
         >
             <Space direction="vertical" size="large" className="admin-stack">
-                <Alert
-                    type="info"
-                    showIcon
-                    message="唯一内置管理后台"
-                    description="此管理后台随服务端一同构建，用于统一查看运行状态并执行日常管理操作。"
-                />
+                <div className="admin-page-note">
+                    <Typography.Text strong>唯一内置管理后台</Typography.Text>
+                    <Typography.Text type="secondary">此管理后台随服务端一同构建，用于统一查看运行状态并执行日常管理操作。</Typography.Text>
+                </div>
 
                 <div className="admin-card-grid">
                     <Card title="服务端状态">
@@ -351,12 +349,10 @@ export default function Dashboard() {
                             <Alert type="error" showIcon message="CDN 信息加载失败" />
                         ) : (
                             <Space direction="vertical" className="admin-stack">
-                                <Alert
-                                    type={status.cdn.extension.runtimeEnabled ? "success" : "info"}
-                                    showIcon
-                                    message={`当前 Content Snapshot：${status.cdn.extension.effectiveVersionPreview}`}
-                                    description={status.cdn.extension.note}
-                                />
+                                <div className="admin-page-note">
+                                    <Typography.Text strong>当前 Content Snapshot：{status.cdn.extension.effectiveVersionPreview}</Typography.Text>
+                                    <Typography.Text type="secondary">{status.cdn.extension.note}</Typography.Text>
+                                </div>
                                 <div className="admin-metric-row">
                                     <Statistic className="admin-stat-tick" title="国服最终基线" value={status.cdn.baseline.cnFinalVersion} />
                                     <Statistic className="admin-stat-tick" title="当前资源版本" value={status.cdn.extension.effectiveVersionPreview} />

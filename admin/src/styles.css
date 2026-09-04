@@ -210,6 +210,16 @@ body {
   gap: 8px;
 }
 
+.admin-page-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  align-items: baseline;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .admin-stack {
   width: 100%;
 }
