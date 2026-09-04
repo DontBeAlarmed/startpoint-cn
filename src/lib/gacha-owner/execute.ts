@@ -223,6 +223,14 @@ export function executeGachaDrawSync(command: GachaExecCommand): GachaExecResult
                     })
                 }
 
+                // Gate §7 顺序：Stone 扣费落库先于 RewardGrant adapters，
+                // 使 knownPlayerBefore 与 grant 时刻的 DB 真值一致（资源 CAS 依赖）。
+                updatePlayerSync({
+                    id: command.playerId,
+                    vmoney: plan.paidVmoney,
+                    freeVmoney: plan.freeVmoney,
+                })
+
                 const postCommitEffects: GachaPostCommitEffect[] = []
                 const reward = rewardPlayerGachaDrawResultSync(
                     command.playerId,
@@ -293,11 +301,6 @@ export function executeGachaDrawSync(command: GachaExecCommand): GachaExecResult
                 }
                 if (insertPlayerGachaData) insertPlayerGachaInfoSync(command.playerId, nextGachaData)
                 else updatePlayerGachaInfoSync(command.playerId, nextGachaData)
-                updatePlayerSync({
-                    id: command.playerId,
-                    vmoney: plan.paidVmoney,
-                    freeVmoney: plan.freeVmoney,
-                })
                 if (prepared.banner.kind === "character") {
                     incrementActiveMissionGachaCharacterCountSync(command.playerId, drawResult.length)
                 }

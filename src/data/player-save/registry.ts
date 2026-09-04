@@ -82,6 +82,7 @@ export const PLAYER_SAVE_TABLES: readonly PlayerSaveTableDefinition[] = [
     table("players_shop_purchases", "economy", 3),
     table("players_shop_purchase_counters", "economy", 11),
     table("players_shop_campaign_lineups", "economy", 12),
+    table("players_bond_token_exchanges", "economy", 27),
     table("players_receive_history", "economy", 2, ["id"]),
 
     table("players_mails", "mailbox", 2, ["id"]),

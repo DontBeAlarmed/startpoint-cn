@@ -43,7 +43,7 @@ Server Bundle 的可验证形态和格式权威始终是目录。ZIP 只是跨�
 {
   "serverManifestSchemaVersion": 3,
   "runtimeApiVersion": 1,
-  "currentDataSchema": 26,
+  "currentDataSchema": 27,
   "serverEntry": "out/cn-server.js",
   "localPrepareEntry": "out/content/sync/entry.js",
   "adminPath": "web/dist",

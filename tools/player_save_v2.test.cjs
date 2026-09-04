@@ -551,7 +551,7 @@ test("v2 validation rejects future schemas and missing tables that existed in th
     const snapshot = exportPlayerSaveV2Sync(playerId)
 
     const future = cloneJson(snapshot)
-    future.producer.dbSchemaVersion = 27
+    future.producer.dbSchemaVersion = 28
     assert.throws(() => restorePlayerSaveV2Sync(future, playerId), /newer.*schema|future.*schema/i)
 
     const starsState = (gachaId = 80000) => ({
