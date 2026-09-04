@@ -540,16 +540,12 @@ body {
   flex: 1 1 180px;
 }
 
+/* 定时资源弹框：高度交还内容自然流动，超出视口由 AntD wrap 层负责滚动，
+   dvh 仅用于视口越高弹框落点越低的定位护栏，不再裁切 modal body */
 .scheduled-resource-modal {
   max-width: calc(100vw - 32px);
-  top: 24px;
+  top: clamp(24px, calc(100dvh - 820px), 96px);
   padding-bottom: 24px;
-}
-
-.scheduled-resource-modal .ant-modal-body {
-  max-height: calc(100dvh - 210px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
 }
 
 .scheduled-resource-number-grid,
@@ -557,6 +553,12 @@ body {
   display: grid;
   gap: 16px;
   align-items: start;
+}
+
+/* 网格内表单项的纵向节奏交给 grid gap，去掉 AntD 默认 item 底边距 */
+.scheduled-resource-number-grid > .ant-form-item,
+.scheduled-resource-date-grid > .ant-form-item {
+  margin-bottom: 0;
 }
 
 .scheduled-resource-number-grid {
@@ -712,6 +714,10 @@ body {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .admin-dash-kv {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .admin-toolbar {
     align-items: stretch;
   }
@@ -774,11 +780,6 @@ body {
     padding-bottom: 12px;
   }
 
-  .scheduled-resource-modal .ant-modal-body {
-    max-height: calc(100dvh - 170px);
-    padding: 16px;
-  }
-
   .scheduled-resource-modal .ant-radio-group {
     display: flex;
     flex-wrap: wrap;
@@ -797,7 +798,7 @@ body {
   .scheduled-resource-number-grid,
   .scheduled-resource-date-grid {
     grid-template-columns: minmax(0, 1fr);
-    gap: 0;
+    gap: 16px;
   }
 
   .scheduled-resource-modal .ant-modal-footer {
@@ -842,6 +843,83 @@ html[data-theme="dark"] {
 .admin-badge-ok { color: var(--wind); border: 1.5px solid var(--wind); background: var(--ok-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; }
 .admin-badge-info { color: var(--water); border: 1.5px solid var(--water); background: var(--info-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; }
 .admin-badge-warn { color: var(--thunder); border: 1.5px solid var(--thunder); background: var(--warn-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; }
+
+/* dashboard: every card interior reads as the same 「标题行 + 内容区」 section pattern */
+.admin-dash-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.admin-dash-section {
+  min-width: 0;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--stat-bg);
+}
+
+.admin-dash-section-title {
+  margin-bottom: 10px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.admin-dash-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* dashboard: compact 2-column key-value grid for facts that are not statistics */
+.admin-dash-kv {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 18px;
+  min-width: 0;
+}
+
+.admin-dash-kv-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  min-width: 0;
+}
+
+.admin-dash-kv-label {
+  flex: 0 0 auto;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-dash-kv-value {
+  min-width: 0;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* dashboard: digest rows keep sha256 chips aligned on one quiet mono line */
+.admin-dash-digest {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-dash-digest-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 2px;
+  min-width: 0;
+}
 
 /* player detail: edit/read Descriptions share the muted label voice of the old inline editors */
 .admin-detail-descriptions .ant-descriptions-item-label {
