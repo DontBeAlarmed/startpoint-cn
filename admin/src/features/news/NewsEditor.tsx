@@ -94,61 +94,67 @@ export default function NewsEditor({ news, open, onClose, onSaved }: NewsEditorP
             destroyOnClose
         >
             <Form layout="vertical" preserve={false}>
-                <Form.Item label="标题" required>
-                    <Input
-                        value={draft.title}
-                        maxLength={128}
-                        onChange={event => update("title", event.target.value)}
-                    />
-                </Form.Item>
-                <Form.Item label="发布时间" required>
-                    <Input
-                        type="datetime-local"
-                        value={toLocalInputValue(draft.publishedAtReal)}
-                        onChange={event => {
-                            const parsed = new Date(event.target.value)
-                            if (!Number.isNaN(parsed.getTime())) {
-                                update("publishedAtReal", parsed.toISOString())
-                            }
-                        }}
-                    />
-                </Form.Item>
-                <Form.Item label="分类" required>
-                    <Select
-                        options={CATEGORY_OPTIONS}
-                        value={draft.category}
-                        onChange={value => update("category", value)}
-                    />
-                </Form.Item>
-                <Form.Item label="标签" required>
-                    <Select
-                        options={LABEL_OPTIONS}
-                        value={draft.label}
-                        onChange={value => update("label", value)}
-                    />
-                </Form.Item>
-                <Form.Item label="缩略图" required>
-                    <Select
-                        options={THUMBNAIL_OPTIONS}
-                        value={draft.thumbnail}
-                        onChange={value => update("thumbnail", value)}
-                    />
-                </Form.Item>
-                <Form.Item label="启用状态">
-                    <Switch
-                        checked={draft.enabled}
-                        checkedChildren="启用"
-                        unCheckedChildren="停用"
-                        onChange={value => update("enabled", value)}
-                    />
-                </Form.Item>
-                <Form.Item label="公告内容" required extra="使用客户端 RichText 标签，不支持属性和外部链接。">
-                    <TextArea
-                        rows={10}
-                        value={draft.bodyRichText}
-                        onChange={event => update("bodyRichText", event.target.value)}
-                    />
-                </Form.Item>
+                <div className="admin-form-section">
+                    <div className="admin-form-section-title">基本信息</div>
+                    <Form.Item label="标题" required>
+                        <Input
+                            value={draft.title}
+                            maxLength={128}
+                            onChange={event => update("title", event.target.value)}
+                        />
+                    </Form.Item>
+                    <Form.Item label="发布时间" required>
+                        <Input
+                            type="datetime-local"
+                            value={toLocalInputValue(draft.publishedAtReal)}
+                            onChange={event => {
+                                const parsed = new Date(event.target.value)
+                                if (!Number.isNaN(parsed.getTime())) {
+                                    update("publishedAtReal", parsed.toISOString())
+                                }
+                            }}
+                        />
+                    </Form.Item>
+                    <Form.Item label="分类" required>
+                        <Select
+                            options={CATEGORY_OPTIONS}
+                            value={draft.category}
+                            onChange={value => update("category", value)}
+                        />
+                    </Form.Item>
+                    <Form.Item label="标签" required>
+                        <Select
+                            options={LABEL_OPTIONS}
+                            value={draft.label}
+                            onChange={value => update("label", value)}
+                        />
+                    </Form.Item>
+                    <Form.Item label="缩略图" required>
+                        <Select
+                            options={THUMBNAIL_OPTIONS}
+                            value={draft.thumbnail}
+                            onChange={value => update("thumbnail", value)}
+                        />
+                    </Form.Item>
+                    <Form.Item label="启用状态">
+                        <Switch
+                            checked={draft.enabled}
+                            checkedChildren="启用"
+                            unCheckedChildren="停用"
+                            onChange={value => update("enabled", value)}
+                        />
+                    </Form.Item>
+                </div>
+                <div className="admin-form-section">
+                    <div className="admin-form-section-title">内容</div>
+                    <Form.Item label="公告内容" required extra="使用客户端 RichText 标签，不支持属性和外部链接。">
+                        <TextArea
+                            rows={10}
+                            value={draft.bodyRichText}
+                            onChange={event => update("bodyRichText", event.target.value)}
+                        />
+                    </Form.Item>
+                </div>
             </Form>
             <div className="news-editor-preview">
                 <iframe

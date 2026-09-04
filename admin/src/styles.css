@@ -893,3 +893,30 @@ html[data-theme="dark"] {
   border-radius: var(--radius);
   background: var(--panel);
 }
+
+/* news editor: sandboxed preview frame continues the bordered form sections */
+.news-editor-preview {
+  margin-top: 16px;
+}
+
+.news-editor-preview iframe {
+  width: 100%;
+  height: 260px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+/* gifts: reward text and redemption snapshots read as quiet mono data */
+.gift-reward-summary {
+  color: var(--ink-soft);
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.gift-redemption-snapshot {
+  margin: 0;
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+}

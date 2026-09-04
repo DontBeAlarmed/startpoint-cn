@@ -158,7 +158,7 @@ export default function News() {
                                 fixed: "right",
                                 width: 180,
                                 render: (_, row) => (
-                                    <Space>
+                                    <div className="admin-action-row">
                                         <Button
                                             size="small"
                                             icon={<Pencil size={15} />}
@@ -178,7 +178,7 @@ export default function News() {
                                                 删除
                                             </Button>
                                         </Popconfirm>
-                                    </Space>
+                                    </div>
                                 ),
                             },
                         ]}

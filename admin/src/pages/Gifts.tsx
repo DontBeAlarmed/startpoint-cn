@@ -6,7 +6,6 @@ import {
     Popconfirm,
     Space,
     Table,
-    Tag,
     message,
 } from "antd"
 import { Eye, Pencil, Plus, Trash2 } from "lucide-react"
@@ -136,16 +135,18 @@ export default function Gifts() {
                                 dataIndex: "status",
                                 width: 90,
                                 render: (_, row) => (
-                                    <Tag color={row.status === "active" ? "green" : "default"}>
+                                    <span className={row.status === "active" ? "admin-badge-ok" : "admin-badge-warn"}>
                                         {row.status === "active" ? "启用" : "停止"}
-                                    </Tag>
+                                    </span>
                                 ),
                             },
                             {
                                 title: "奖励",
                                 dataIndex: "rewards",
                                 width: 280,
-                                render: (_, row) => rewardSummary(row),
+                                render: (_, row) => (
+                                    <span className="gift-reward-summary">{rewardSummary(row)}</span>
+                                ),
                             },
                             { title: "奖励版本", dataIndex: "rewardRevision", width: 100 },
                             { title: "版本", dataIndex: "revision", width: 80 },
@@ -162,7 +163,7 @@ export default function Gifts() {
                                 width: 250,
                                 render: (_, row) => {
                                     if (row.status === "stopped") return (
-                                        <Space>
+                                        <Space className="admin-action-row">
                                             <Button
                                                 size="small"
                                                 loading={start.isPending && start.variables?.id === row.id}
@@ -202,7 +203,7 @@ export default function Gifts() {
                                         </Space>
                                     )
                                     return (
-                                        <Space>
+                                        <Space className="admin-action-row">
                                             <Button
                                                 size="small"
                                                 loading={stop.isPending && stop.variables?.id === row.id}
