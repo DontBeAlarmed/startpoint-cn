@@ -419,12 +419,12 @@ export default function TimeControl() {
                         <Alert type="error" showIcon message="千里眼数据加载失败" description="接口 /api/server/clairvoyance/gacha 不可用。" />
                     ) : (
                         <Space direction="vertical" size="large" className="admin-stack">
-                            <Alert
-                                type="info"
-                                showIcon
-                                message="当前阶段只追踪短期 UP 角色池"
-                                description="范围限定为固定 CDN 基线内 pageKind=0、持续不超过 60 天且包含 UP 角色的角色扭蛋。"
-                            />
+                            <div className="admin-page-note">
+                                <Typography.Text strong>当前阶段只追踪短期 UP 角色池</Typography.Text>
+                                <Typography.Text type="secondary">
+                                    范围限定为固定 CDN 基线内 pageKind=0、持续不超过 60 天且包含 UP 角色的角色扭蛋。
+                                </Typography.Text>
+                            </div>
 
                             <section>
                                 <Typography.Title level={5}>当前生效卡池</Typography.Title>

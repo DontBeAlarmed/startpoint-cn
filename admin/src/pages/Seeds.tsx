@@ -52,26 +52,30 @@ export default function Seeds() {
         total: movie.rarityCounts["3"] + movie.rarityCounts["4"] + movie.rarityCounts["5"],
         quarantined: data.quarantine.movies[movie.movieId] ?? 0,
     }))
+    const quarantineRows = Object.entries(data.quarantine.samples).map(([movieId, seeds]) => ({
+        movieId,
+        seeds,
+    }))
 
     return (
         <AdminPage eyebrow="GACHA MOVIE" title="动画种子" description="Faithful Catalog 运行状态">
             <Space direction="vertical" size="large" className="admin-stack">
                 <Row gutter={[16, 16]}>
                     <Col xs={12} lg={6}>
-                        <Card size="small"><Statistic title="客户端" value={data.catalog.clientVersion} /></Card>
+                        <Card size="small" className="admin-stat-tick"><Statistic title="客户端" value={data.catalog.clientVersion} /></Card>
                     </Col>
                     <Col xs={12} lg={6}>
-                        <Card size="small"><Statistic title="CDN" value={data.catalog.cdnVersion} /></Card>
+                        <Card size="small" className="admin-stat-tick"><Statistic title="CDN" value={data.catalog.cdnVersion} /></Card>
                     </Col>
                     <Col xs={12} lg={6}>
-                        <Card size="small"><Statistic title="分类记录" value={data.catalog.totalSeedCount} /></Card>
+                        <Card size="small" className="admin-stat-tick"><Statistic title="分类记录" value={data.catalog.totalSeedCount} /></Card>
                     </Col>
                     <Col xs={12} lg={6}>
-                        <Card size="small">
+                        <Card size="small" className="admin-stat-tick">
                             <Statistic
                                 title="本机隔离"
                                 value={data.quarantine.total}
-                                valueStyle={data.quarantine.total > 0 ? { color: "#d29922" } : undefined}
+                                valueStyle={data.quarantine.total > 0 ? { color: "var(--thunder)" } : undefined}
                             />
                         </Card>
                     </Col>
@@ -104,7 +108,9 @@ export default function Seeds() {
                                 dataIndex: "quarantined",
                                 align: "right",
                                 width: 80,
-                                render: (count: number) => count > 0 ? <Tag color="warning">{count}</Tag> : <Tag>0</Tag>,
+                                render: (count: number) => count > 0
+                                    ? <span className="admin-badge-warn">{count}</span>
+                                    : <span className="admin-muted">0</span>,
                             },
                         ]}
                     />
@@ -113,22 +119,38 @@ export default function Seeds() {
                     </Text>
                 </Card>
 
-                <Card title="Quarantine" size="small">
+                <Card title="Quarantine" size="small" className="admin-table-card">
                     {data.quarantine.total === 0 ? (
                         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无隔离记录" />
                     ) : (
-                        <Space direction="vertical" size="middle" className="admin-stack">
-                            {Object.entries(data.quarantine.samples).map(([movieId, seeds]) => (
-                                <div key={movieId}>
-                                    <Text strong>{MOVIE_LABELS[movieId] ?? movieId}</Text>
-                                    <div style={{ marginTop: 8 }}>
+                        <Table
+                            size="small"
+                            pagination={false}
+                            rowKey="movieId"
+                            dataSource={quarantineRows}
+                            columns={[
+                                {
+                                    title: "Movie",
+                                    dataIndex: "movieId",
+                                    width: 190,
+                                    render: (movieId: string) => (
+                                        <Space>
+                                            <Text strong>{MOVIE_LABELS[movieId] ?? movieId}</Text>
+                                            <Text type="secondary">{movieId}</Text>
+                                        </Space>
+                                    ),
+                                },
+                                {
+                                    title: "隔离种子",
+                                    dataIndex: "seeds",
+                                    render: (seeds: number[]) => (
                                         <Space wrap size={[6, 6]}>
                                             {seeds.map(seed => <Tag key={seed}>{seed}</Tag>)}
                                         </Space>
-                                    </div>
-                                </div>
-                            ))}
-                        </Space>
+                                    ),
+                                },
+                            ]}
+                        />
                     )}
                 </Card>
             </Space>

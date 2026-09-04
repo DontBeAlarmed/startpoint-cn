@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Alert, Button, Card, InputNumber, Skeleton, Space, Switch, Tag, Typography, message } from "antd"
+import { Alert, Button, Card, InputNumber, Skeleton, Space, Switch, Typography, message } from "antd"
 import { SaveOutlined } from "@ant-design/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
@@ -77,96 +77,127 @@ export default function GameplaySettings() {
             title="游戏设置"
             description="调整服务端运行时游戏规则，保存后无需重启。"
         >
-            <Card
-                title="关卡固定掉落倍率"
-                extra={currentMultiplier !== undefined && <Tag color="green">当前 {currentMultiplier} 倍</Tag>}
-            >
-                {settings.isLoading ? (
+            {settings.isLoading ? (
+                <Card title="关卡固定掉落倍率">
                     <Skeleton active paragraph={{ rows: 2 }} />
-                ) : settings.isError ? (
-                    <Alert
-                        type="error"
-                        showIcon
-                        message="无法读取游戏设置"
-                        action={<Button onClick={() => settings.refetch()}>重试</Button>}
-                    />
-                ) : (
-                    <Space direction="vertical" size="middle" className="admin-stack">
-                        <Space wrap align="center">
-                            <Typography.Text>倍率</Typography.Text>
-                            <InputNumber
-                                min={1}
-                                max={10}
-                                precision={0}
-                                value={draftMultiplier}
-                                onChange={value => setDraftMultiplier(value)}
-                                aria-label="关卡固定掉落倍率"
-                            />
-                            <Button
-                                type="primary"
-                                icon={<SaveOutlined />}
-                                disabled={unchanged}
-                                loading={saveMultiplier.isPending}
-                                onClick={() => draftMultiplier !== null
-                                    && saveMultiplier.mutate(draftMultiplier)}
-                            >
-                                保存
-                            </Button>
+                </Card>
+            ) : settings.isError ? (
+                <Alert
+                    type="error"
+                    showIcon
+                    message="无法读取游戏设置"
+                    action={<Button onClick={() => settings.refetch()}>重试</Button>}
+                />
+            ) : (
+                <Space direction="vertical" size="large" className="admin-stack">
+                    <Card
+                        title="关卡固定掉落倍率"
+                        extra={currentMultiplier !== undefined
+                            && <span className="admin-badge-ok">当前 {currentMultiplier} 倍</span>}
+                    >
+                        <Space direction="vertical" size="middle" className="admin-stack">
+                            <Space wrap align="center">
+                                <Typography.Text>倍率</Typography.Text>
+                                <InputNumber
+                                    min={1}
+                                    max={10}
+                                    precision={0}
+                                    value={draftMultiplier}
+                                    onChange={value => setDraftMultiplier(value)}
+                                    aria-label="关卡固定掉落倍率"
+                                />
+                                <Button
+                                    type="primary"
+                                    icon={<SaveOutlined />}
+                                    disabled={unchanged}
+                                    loading={saveMultiplier.isPending}
+                                    onClick={() => draftMultiplier !== null
+                                        && saveMultiplier.mutate(draftMultiplier)}
+                                >
+                                    保存
+                                </Button>
+                            </Space>
+                            <div className="admin-page-note">
+                                <Typography.Text type="secondary">
+                                    影响固定道具、玛纳、经验、属性素材和以太素材；不改变稀有掉落概率。
+                                </Typography.Text>
+                            </div>
                         </Space>
-                        <Alert
-                            type="info"
-                            showIcon
-                            message="影响固定道具、玛纳、经验、属性素材和以太素材；不改变稀有掉落概率。"
-                        />
-                        <Space wrap align="center">
-                            <Typography.Text>本服玩家：所有多人房间救援资格</Typography.Text>
-                            <Switch
-                                checked={draftRescueEnabled ?? false}
-                                onChange={value => setDraftRescueEnabled(value)}
-                                aria-label="本服玩家：所有多人房间救援资格"
-                            />
-                            <Button
-                                type="primary"
-                                icon={<SaveOutlined />}
-                                disabled={rescueUnchanged}
-                                loading={saveRescueSetting.isPending}
-                                onClick={() => draftRescueEnabled !== null
-                                    && saveRescueSetting.mutate(draftRescueEnabled)}
+                    </Card>
+                    <Card
+                        title="本服玩家：所有多人房间救援资格"
+                        extra={(
+                            <span className={settings.data?.multiRescueFragmentRewardsEnabled
+                                ? "admin-badge-ok"
+                                : "admin-badge-info"}
                             >
-                                保存
-                            </Button>
+                                {settings.data?.multiRescueFragmentRewardsEnabled ? "已开启" : "已关闭"}
+                            </span>
+                        )}
+                    >
+                        <Space direction="vertical" size="middle" className="admin-stack">
+                            <Space wrap align="center">
+                                <Switch
+                                    checked={draftRescueEnabled ?? false}
+                                    onChange={value => setDraftRescueEnabled(value)}
+                                    aria-label="本服玩家：所有多人房间救援资格"
+                                />
+                                <Button
+                                    type="primary"
+                                    icon={<SaveOutlined />}
+                                    disabled={rescueUnchanged}
+                                    loading={saveRescueSetting.isPending}
+                                    onClick={() => draftRescueEnabled !== null
+                                        && saveRescueSetting.mutate(draftRescueEnabled)}
+                                >
+                                    保存
+                                </Button>
+                            </Space>
+                            <div className="admin-page-note">
+                                <Typography.Text type="secondary">
+                                    开启后只影响本服所属真人玩家，不改变其他服务器、不发布铃铛。
+                                </Typography.Text>
+                            </div>
                         </Space>
-                        <Alert
-                            type="info"
-                            showIcon
-                            message="开启后只影响本服所属真人玩家，不改变其他服务器、不发布铃铛。"
-                        />
-                        <Space wrap align="center">
-                            <Typography.Text>本服玩家：房主允许自救</Typography.Text>
-                            <Switch
-                                checked={draftHostRescueEnabled ?? false}
-                                onChange={value => setDraftHostRescueEnabled(value)}
-                                aria-label="本服玩家：房主允许自救"
-                            />
-                            <Button
-                                type="primary"
-                                icon={<SaveOutlined />}
-                                disabled={hostRescueUnchanged}
-                                loading={saveHostRescueSetting.isPending}
-                                onClick={() => draftHostRescueEnabled !== null
-                                    && saveHostRescueSetting.mutate(draftHostRescueEnabled)}
+                    </Card>
+                    <Card
+                        title="本服玩家：房主允许自救"
+                        extra={(
+                            <span className={settings.data?.multiRescueHostRewardsEnabled
+                                ? "admin-badge-ok"
+                                : "admin-badge-info"}
                             >
-                                保存
-                            </Button>
+                                {settings.data?.multiRescueHostRewardsEnabled ? "已开启" : "已关闭"}
+                            </span>
+                        )}
+                    >
+                        <Space direction="vertical" size="middle" className="admin-stack">
+                            <Space wrap align="center">
+                                <Switch
+                                    checked={draftHostRescueEnabled ?? false}
+                                    onChange={value => setDraftHostRescueEnabled(value)}
+                                    aria-label="本服玩家：房主允许自救"
+                                />
+                                <Button
+                                    type="primary"
+                                    icon={<SaveOutlined />}
+                                    disabled={hostRescueUnchanged}
+                                    loading={saveHostRescueSetting.isPending}
+                                    onClick={() => draftHostRescueEnabled !== null
+                                        && saveHostRescueSetting.mutate(draftHostRescueEnabled)}
+                                >
+                                    保存
+                                </Button>
+                            </Space>
+                            <div className="admin-page-note">
+                                <Typography.Text type="secondary">
+                                    开启后允许本服房主自救；当前还要求第一开关开启。
+                                </Typography.Text>
+                            </div>
                         </Space>
-                        <Alert
-                            type="info"
-                            showIcon
-                            message="开启后允许本服房主自救；当前还要求第一开关开启。"
-                        />
-                    </Space>
-                )}
-            </Card>
+                    </Card>
+                </Space>
+            )}
         </AdminPage>
     )
 }

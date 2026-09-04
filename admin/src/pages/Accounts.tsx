@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Alert, Card, Table, Button, Space, Popconfirm, Input, message, Tag, Grid } from "antd"
+import { Card, Table, Button, Space, Popconfirm, Input, message, Tag, Grid, Typography } from "antd"
 import { PlusOutlined, CopyOutlined, DeleteOutlined, SwapOutlined, EditOutlined, LeftOutlined } from "@ant-design/icons"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
@@ -232,12 +232,12 @@ export default function Accounts() {
             description="查看账号与默认存档关系。账号默认存档决定该账号登录时选用哪个存档；当前活动存档只是管理端最近切换的全局状态。"
         >
         <Space direction="vertical" size="large" className="admin-stack">
-            <Alert
-                type="info"
-                showIcon
-                message="选档状态说明"
-                description="新建和复制存档会设为该账号默认并切换为当前活动；删除默认存档后，服务端会在该账号剩余存档中回退到第一个可用存档。删除最后一个存档会同时删除账号。"
-            />
+            <div className="admin-page-note">
+                <Typography.Text strong>选档状态说明</Typography.Text>
+                <Typography.Text type="secondary">
+                    新建和复制存档会设为该账号默认并切换为当前活动；删除默认存档后，服务端会在该账号剩余存档中回退到第一个可用存档。删除最后一个存档会同时删除账号。
+                </Typography.Text>
+            </div>
             {isMobile ? (
                 <Card
                     title={selectedAccount ? `账号 ${selectedAccount.id} 的存档` : "账号管理"}

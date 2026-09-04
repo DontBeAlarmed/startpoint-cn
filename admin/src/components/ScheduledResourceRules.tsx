@@ -10,10 +10,8 @@ import {
     Popconfirm,
     Radio,
     Select,
-    Space,
     Switch,
     Table,
-    Tag,
     Typography,
     message,
 } from "antd"
@@ -236,7 +234,7 @@ export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps)
                             title: "操作",
                             fixed: "right",
                             render: (_, rule) => (
-                                <Space>
+                                <div className="admin-action-row">
                                     <Button icon={<Pencil size={15} />} onClick={() => openEdit(rule)}>编辑</Button>
                                     <Popconfirm
                                         title="删除这条定时补充规则？"
@@ -247,7 +245,7 @@ export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps)
                                     >
                                         <Button danger icon={<Trash2 size={15} />}>删除</Button>
                                     </Popconfirm>
-                                </Space>
+                                </div>
                             ),
                         },
                     ]}
@@ -267,77 +265,86 @@ export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps)
                 width={720}
             >
                 <Form form={form} layout="vertical" preserve={false}>
-                    <Form.Item name="scope" label="规则范围" rules={[{ required: true }]}>
-                        <Radio.Group optionType="button" buttonStyle="solid">
-                            <Radio.Button value="global">全局规则</Radio.Button>
-                            <Radio.Button value="player">指定存档</Radio.Button>
-                        </Radio.Group>
-                    </Form.Item>
-                    {scope === "player" && (
-                        <Form.Item name="playerId" label="指定存档" rules={[{ required: true, message: "请选择存档" }]}>
-                            <Select
-                                showSearch
-                                optionFilterProp="label"
-                                options={players.map(player => ({ value: player.id, label: `${player.name}（#${player.id}）` }))}
-                            />
+                    <div className="admin-form-section">
+                        <div className="admin-form-section-title">适用范围</div>
+                        <Form.Item name="scope" label="规则范围" rules={[{ required: true }]}>
+                            <Radio.Group optionType="button" buttonStyle="solid">
+                                <Radio.Button value="global">全局规则</Radio.Button>
+                                <Radio.Button value="player">指定存档</Radio.Button>
+                            </Radio.Group>
                         </Form.Item>
-                    )}
-                    <Form.Item name="rewardType" label="资源类型" rules={[{ required: true }]}>
-                        <Radio.Group
-                            optionType="button"
-                            buttonStyle="solid"
-                            onChange={event => form.setFieldsValue({
-                                rewardId: undefined,
-                                inventoryCap: event.target.value === "free_vmoney" ? authority?.maxFreeVmoney : undefined,
-                            })}
-                        >
-                            <Radio.Button value="item">道具</Radio.Button>
-                            <Radio.Button value="free_vmoney">免费星导石</Radio.Button>
-                        </Radio.Group>
-                    </Form.Item>
-                    {rewardType === "item" && (
-                        <Form.Item name="rewardId" label="道具" rules={[{ required: true, message: "请选择道具" }]}>
-                            <Select
-                                showSearch
-                                optionFilterProp="label"
-                                options={itemOptions}
-                                onChange={id => form.setFieldValue("inventoryCap", itemMaxCounts[String(id)])}
-                            />
+                        {scope === "player" && (
+                            <Form.Item name="playerId" label="指定存档" rules={[{ required: true, message: "请选择存档" }]}>
+                                <Select
+                                    showSearch
+                                    optionFilterProp="label"
+                                    options={players.map(player => ({ value: player.id, label: `${player.name}（#${player.id}）` }))}
+                                />
+                            </Form.Item>
+                        )}
+                        <Form.Item name="rewardType" label="资源类型" rules={[{ required: true }]}>
+                            <Radio.Group
+                                optionType="button"
+                                buttonStyle="solid"
+                                onChange={event => form.setFieldsValue({
+                                    rewardId: undefined,
+                                    inventoryCap: event.target.value === "free_vmoney" ? authority?.maxFreeVmoney : undefined,
+                                })}
+                            >
+                                <Radio.Button value="item">道具</Radio.Button>
+                                <Radio.Button value="free_vmoney">免费星导石</Radio.Button>
+                            </Radio.Group>
                         </Form.Item>
-                    )}
-                    <div className="scheduled-resource-number-grid">
-                        <Form.Item name="grantAmount" label="发放数量" rules={[{ required: true }]}>
-                            <InputNumber min={1} precision={0} />
-                        </Form.Item>
-                        <Form.Item name="triggerThreshold" label="触发下限" rules={[{ required: true }]}>
-                            <InputNumber min={0} precision={0} />
-                        </Form.Item>
-                        <Form.Item
-                            name="inventoryCap"
-                            label="持有上限"
-                            extra={officialMax === undefined ? "选择资源后显示官方上限" : `官方上限 ${officialMax}`}
-                            rules={[{ required: true }]}
-                        >
-                            <InputNumber min={1} max={officialMax} precision={0} />
+                        {rewardType === "item" && (
+                            <Form.Item name="rewardId" label="道具" rules={[{ required: true, message: "请选择道具" }]}>
+                                <Select
+                                    showSearch
+                                    optionFilterProp="label"
+                                    options={itemOptions}
+                                    onChange={id => form.setFieldValue("inventoryCap", itemMaxCounts[String(id)])}
+                                />
+                            </Form.Item>
+                        )}
+                    </div>
+                    <div className="admin-form-section">
+                        <div className="admin-form-section-title">数量与限制</div>
+                        <div className="scheduled-resource-number-grid">
+                            <Form.Item name="grantAmount" label="发放数量" rules={[{ required: true }]}>
+                                <InputNumber min={1} precision={0} />
+                            </Form.Item>
+                            <Form.Item name="triggerThreshold" label="触发下限" rules={[{ required: true }]}>
+                                <InputNumber min={0} precision={0} />
+                            </Form.Item>
+                            <Form.Item
+                                name="inventoryCap"
+                                label="持有上限"
+                                extra={officialMax === undefined ? "选择资源后显示官方上限" : `官方上限 ${officialMax}`}
+                                rules={[{ required: true }]}
+                            >
+                                <InputNumber min={1} max={officialMax} precision={0} />
+                            </Form.Item>
+                        </div>
+                        <Form.Item name="enabled" label="启用" valuePropName="checked">
+                            <Switch />
                         </Form.Item>
                     </div>
-                    <Form.Item name="enabled" label="启用" valuePropName="checked">
-                        <Switch />
-                    </Form.Item>
-                    <div className="scheduled-resource-date-grid">
-                        <Form.Item name="startsAtReal" label="开始时间">
-                            <DatePicker showTime />
+                    <div className="admin-form-section">
+                        <div className="admin-form-section-title">生效时间与备注</div>
+                        <div className="scheduled-resource-date-grid">
+                            <Form.Item name="startsAtReal" label="开始时间">
+                                <DatePicker showTime />
+                            </Form.Item>
+                            <Form.Item name="endsAtReal" label="结束时间">
+                                <DatePicker showTime />
+                            </Form.Item>
+                        </div>
+                        <Form.Item name="description" label="备注">
+                            <Input maxLength={200} showCount />
                         </Form.Item>
-                        <Form.Item name="endsAtReal" label="结束时间">
-                            <DatePicker showTime />
-                        </Form.Item>
+                        <Typography.Text type="secondary" className="scheduled-resource-reset-note">
+                            每日边界使用服务端 DAILY_RESET_HOUR
+                        </Typography.Text>
                     </div>
-                    <Form.Item name="description" label="备注">
-                        <Input maxLength={200} showCount />
-                    </Form.Item>
-                    <Tag className="scheduled-resource-reset-note" color="blue">
-                        每日边界使用服务端 DAILY_RESET_HOUR
-                    </Tag>
                 </Form>
             </Modal>
         </>
