@@ -430,16 +430,25 @@ test("Crazy select recalculates duplicate compensation from selection-time state
         getCharacterDataSync(fresh.characterId).element,
     )
     const before = getPlayerItemSync(playerId, compensationItemId) ?? 0
-    // 选择时已持有 = 抽取时已重复（exBoost 有值）∪ 本次外部插入的 fresh；
-    // 同 rarity+element 的重复共用同一补偿道具，按行累计期望值
-    const ownedAtSelect = new Set(rows.filter(row => row.exBoostItemId !== null)
-        .map(row => row.characterId))
-    ownedAtSelect.add(fresh.characterId)
-    const expectedCount = rows.filter(row => ownedAtSelect.has(row.characterId))
-        .filter(row => getCharacterStackCompensationItemId(
-            getCharacterDataSync(row.characterId).rarity,
-            getCharacterDataSync(row.characterId).element,
-        ) === compensationItemId).length
+    // 期望值只能从选择时的权威持有状态顺序模拟；候选 display-only
+    // exBoost 元数据不得参与 acquisition 判定。同一新角色在候选中重复时，
+    // 第一次是新增，后续 occurrence 才产生补偿。
+    const { getCharacterAcquisitionStatesSync } = require("../src/data/domains/reward-acquisition")
+    const ownedAtSelect = new Set(Object.keys(getCharacterAcquisitionStatesSync(
+        playerId,
+        rows.map(row => row.characterId),
+    )).map(Number))
+    let expectedCount = 0
+    for (const row of rows) {
+        if (ownedAtSelect.has(row.characterId)
+            && getCharacterStackCompensationItemId(
+                getCharacterDataSync(row.characterId).rarity,
+                getCharacterDataSync(row.characterId).element,
+            ) === compensationItemId) {
+            expectedCount += 1
+        }
+        ownedAtSelect.add(row.characterId)
+    }
     assert.equal(expectedCount >= 1, true)
 
     const selected = await app.inject({
