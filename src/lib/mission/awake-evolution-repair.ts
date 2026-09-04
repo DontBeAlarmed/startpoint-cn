@@ -1,4 +1,5 @@
 import { getDb } from "../../data/db"
+import { raisePlayerCharacterEvolutionLevelSync } from "../../data/domains/character"
 import type { PlayerCharacter } from "../../data/types"
 import { getCharacterDataSync, getCharacterManaNodesSync } from "../assets"
 import { InvalidManaNodeSemanticsError } from "../../content/mana-node-semantics"
@@ -94,11 +95,6 @@ export function reconcileAwakeEvolutionLevelsSync(
     }
 
     const db = getDb()
-    const updateEvolutionLevel = db.prepare(`
-        UPDATE players_characters
-        SET evolution_level = ?
-        WHERE player_id = ? AND id = ? AND evolution_level < ?
-    `)
     const readEvolutionLevel = db.prepare(`
         SELECT evolution_level
         FROM players_characters
@@ -108,12 +104,11 @@ export function reconcileAwakeEvolutionLevelsSync(
 
     db.transaction(() => {
         for (const repair of repairs) {
-            const changes = updateEvolutionLevel.run(
-                repair.derivedEvolutionLevel,
+            const changed = raisePlayerCharacterEvolutionLevelSync(
                 playerId,
                 repair.characterId,
                 repair.derivedEvolutionLevel,
-            ).changes
+            )
             const persistedCharacter = readEvolutionLevel.get(
                 playerId,
                 repair.characterId,
@@ -128,7 +123,7 @@ export function reconcileAwakeEvolutionLevelsSync(
                 ...snapshot.characters[String(repair.characterId)],
                 evolutionLevel: persistedCharacter.evolution_level,
             }
-            if (changes === 1) repairedCharacterIds.push(repair.characterId)
+            if (changed) repairedCharacterIds.push(repair.characterId)
         }
     })()
 

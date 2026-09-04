@@ -2,7 +2,7 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { getAccountPlayers } from "../../data/domains/account"
-import { getPlayerCharacterSync, playerOwnsCharacterSync, updatePlayerCharacterSync } from "../../data/domains/character"
+import { getPlayerCharacterSync, playerOwnsCharacterSync } from "../../data/domains/character"
 import { getPlayerItemSync } from "../../data/domains/item"
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
@@ -11,6 +11,7 @@ import { generateDataHeaders } from "../../utils"
 import { randomInt } from "crypto"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { characterMaxOverLimits } from "./character"
+import { setCharacterExBoostWithinTransactionSync } from "../../lib/character-growth/commands/set-ex-boost"
 import bundledExAbility from "../../../assets/ex_ability.json"
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 import { getMailArrivedSync } from "../../lib/mail-notification";
@@ -323,22 +324,23 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
 
     reply.header("content-type", "application/x-msgpack")
     if (autoAccept) {
-        const characterUpdate: Parameters<typeof updatePlayerCharacterSync>[2] = {
-            exBoost: { statusId: drawResult.statusId, abilityIdList: drawResult.abilityIdList },
-        }
-        const settledCostItemAmount = getDb().transaction(() => (
+        const settled = getDb().transaction(() => (
             withInventoryBatchContextWithinTransactionSync({
                 playerId,
                 preloadItemIds: [costItemId],
             }, inventory => {
                 const itemResult = inventory.deduct(costItemId, costItemData.count)
                 inventory.flush()
-                updatePlayerCharacterSync(playerId, characterId, characterUpdate)
-                return itemResult.afterAmount
+                const exBoostWrite = setCharacterExBoostWithinTransactionSync({
+                    playerId,
+                    characterId,
+                    statusId: drawResult.statusId,
+                    abilityIdList: drawResult.abilityIdList,
+                })
+                return { afterAmount: itemResult.afterAmount, updateTime: exBoostWrite.updateTime }
             })
         ))()
-        const updateTime = characterUpdate.updateTime
-        if (updateTime === undefined) throw new Error("EX Boost update did not record update time")
+        const updateTime = settled.updateTime
         return reply.status(200).send({
             data_headers: headers,
             data: {
@@ -349,7 +351,7 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
                     drawResult,
                     updateTime,
                 )],
-                item_list: { [String(costItemId)]: settledCostItemAmount },
+                item_list: { [String(costItemId)]: settled.afterAmount },
                 mail_arrived: getMailArrivedSync(playerId),
             },
         })
@@ -407,15 +409,17 @@ const routes = async (fastify: FastifyInstance) => {
         if (characterData === null) return reply.status(400).send({
             "error": "Bad Request", "message": "Player does not own character."
         })
-        const characterUpdate: Parameters<typeof updatePlayerCharacterSync>[2] = {
-            exBoost: { statusId: drawResult.statusId, abilityIdList: drawResult.abilityIdList },
-        }
-        getDb().transaction(() => {
-            updatePlayerCharacterSync(playerId, characterId, characterUpdate)
+        const settled = getDb().transaction(() => {
+            const exBoostWrite = setCharacterExBoostWithinTransactionSync({
+                playerId,
+                characterId,
+                statusId: drawResult.statusId,
+                abilityIdList: drawResult.abilityIdList,
+            })
             deletePendingExBoostDrawSync(playerId)
+            return exBoostWrite
         })()
-        const updateTime = characterUpdate.updateTime
-        if (updateTime === undefined) throw new Error("EX Boost update did not record update time")
+        const updateTime = settled.updateTime
         return reply.status(200).send({
             data_headers: headers,
             data: {

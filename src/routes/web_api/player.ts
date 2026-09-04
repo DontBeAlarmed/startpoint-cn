@@ -4,7 +4,7 @@ import { wantsJson } from "./http";
 import { getAllPlayersSync, getDefaultPlayerPartyGroupsSync, getPlayerDailyChallengePointListSync, getPlayerSync, insertPlayerDailyChallengePointListSync, updatePlayerDailyChallengePointSync, updatePlayerSync } from "../../data/domains/player"
 import { deleteAllPlayerMailSync } from "../../data/domains/mail"
 import { getDb } from "../../data/db"
-import { deletePlayerCharacterSync, getPlayerCharactersSync, insertDefaultPlayerCharacterSync } from "../../data/domains/character"
+import { clearPlayerCharactersExBoostSync, deletePlayerCharacterSync, getPlayerCharactersSync, insertDefaultPlayerCharacterSync } from "../../data/domains/character"
 import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
 import { getPlayerItemsSync } from "../../data/domains/item"
 import {
@@ -242,13 +242,8 @@ const routes = async (fastify: FastifyInstance) => {
             return reply.status(400).send({ error: "Invalid player ID" })
         }
         if (!getPlayerSync(playerId)) return reply.status(404).send({ error: "Player not found" })
-        const result = getDb().prepare(`
-            UPDATE players_characters
-            SET ex_boost_status_id = NULL, ex_boost_ability_id_list = NULL
-            WHERE player_id = ?
-              AND (ex_boost_status_id IS NOT NULL OR ex_boost_ability_id_list IS NOT NULL)
-        `).run(playerId)
-        return reply.status(200).send({ ok: true, clearedCharacters: result.changes })
+        const clearedCharacters = clearPlayerCharactersExBoostSync(playerId)
+        return reply.status(200).send({ ok: true, clearedCharacters })
     })
 
     // Reset parties to defaults

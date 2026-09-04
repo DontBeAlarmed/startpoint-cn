@@ -161,6 +161,33 @@ export function deletePlayerCharacterSync(playerId: number, characterId: number)
     `).run(playerId, characterId).changes > 0
 }
 
+/** Admin bulk EX Boost reset; returns the number of characters cleared. */
+export function clearPlayerCharactersExBoostSync(playerId: number): number {
+    return getDb().prepare(`
+        UPDATE players_characters
+        SET ex_boost_status_id = NULL, ex_boost_ability_id_list = NULL
+        WHERE player_id = ?
+          AND (ex_boost_status_id IS NOT NULL OR ex_boost_ability_id_list IS NOT NULL)
+    `).run(playerId).changes
+}
+
+/**
+ * Load-path compatibility repair: monotonically raises a character's
+ * evolution level toward the derived value and reports whether the row moved.
+ * Never lowers evolution_level; owned by the /load bounded repair adapter.
+ */
+export function raisePlayerCharacterEvolutionLevelSync(
+    playerId: number,
+    characterId: number,
+    derivedEvolutionLevel: number,
+): boolean {
+    return getDb().prepare(`
+        UPDATE players_characters
+        SET evolution_level = ?
+        WHERE player_id = ? AND id = ? AND evolution_level < ?
+    `).run(derivedEvolutionLevel, playerId, characterId, derivedEvolutionLevel).changes === 1
+}
+
 /**
  * Gets a singular character from a player's data.
  * 

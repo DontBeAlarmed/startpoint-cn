@@ -10,6 +10,10 @@ import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDb } from "../../data/db";
 import { executeOverLimit } from "../../lib/character-growth/commands/over-limit"
 import { executeBulkOverLimit } from "../../lib/character-growth/commands/bulk-over-limit"
+import {
+    setCharacterIllustrationSettings,
+    setCharacterProtection,
+} from "../../lib/character-growth/commands/set-character-metadata"
 import { sendGrowthMutationError } from "./character/mana-mutation-http"
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { getMailArrivedSync } from "../../lib/mail-notification";
@@ -88,27 +92,19 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         const uniqueCharacterIds = [...new Set(characterIds)]
-        getDb().transaction(() => {
-            for (const characterId of uniqueCharacterIds) {
-                if (getPlayerCharacterSync(playerId, characterId) !== null) {
-                    updatePlayerCharacterSync(playerId, characterId, {
-                        protection: body.protection
-                    })
-                }
-            }
-        })()
-
-        const characterList = uniqueCharacterIds.flatMap(characterId => {
-            const character = getPlayerCharacterSync(playerId, characterId)
-            if (!character) return []
-            return [projectCharacterGrowthEntry({
-                characterId,
-                character,
-                state: characterGrowthProjectionStateFromPlayerCharacter(characterId, character),
-                fields: [...FULL_CHARACTER_GROWTH_FIELDS, "evolution_img_level"],
-                viewerId,
-            })]
+        const updatedCharacters = setCharacterProtection({
+            playerId,
+            characterIds: uniqueCharacterIds,
+            protection: body.protection,
         })
+
+        const characterList = updatedCharacters.flatMap(({ characterId, character }) => [projectCharacterGrowthEntry({
+            characterId,
+            character,
+            state: characterGrowthProjectionStateFromPlayerCharacter(characterId, character),
+            fields: [...FULL_CHARACTER_GROWTH_FIELDS, "evolution_img_level"],
+            viewerId,
+        })])
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -155,9 +151,10 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "Character not owned."
         })
 
-        // update character
-        updatePlayerCharacterSync(playerId, characterId, {
-            illustrationSettings: illustration_settings
+        setCharacterIllustrationSettings({
+            playerId,
+            characterId,
+            illustrationSettings: illustration_settings,
         })
 
         reply.header("content-type", "application/x-msgpack")
