@@ -848,3 +848,8 @@ html[data-theme="dark"] {
 .admin-badge-ok { color: var(--wind); border: 1.5px solid var(--wind); background: var(--ok-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; }
 .admin-badge-info { color: var(--water); border: 1.5px solid var(--water); background: var(--info-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; }
 .admin-badge-warn { color: var(--thunder); border: 1.5px solid var(--thunder); background: var(--warn-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; }
+
+/* player detail: edit/read Descriptions share the muted label voice of the old inline editors */
+.admin-detail-descriptions .ant-descriptions-item-label {
+  color: var(--ink-soft);
+}

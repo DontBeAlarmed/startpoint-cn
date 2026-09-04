@@ -53,8 +53,6 @@ const resourceFields: { key: string; label: string }[] = [
     { key: "boostPoint", label: "Boost" },
 ]
 
-const gridStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }
-
 export default function PlayerDetail() {
     const { playerId } = useParams()
     const pid = Number(playerId)
@@ -200,8 +198,7 @@ export default function PlayerDetail() {
         const shown = has ? editValues[key] : current
         const changed = has && editValues[key] !== current
         return (
-            <div key={key}>
-                <Text type="secondary" style={{ fontSize: 12 }}>{label}</Text>
+            <Descriptions.Item key={key} label={label}>
                 <Space.Compact style={{ width: "100%" }}>
                     <InputNumber
                         style={{ width: "100%" }}
@@ -217,7 +214,7 @@ export default function PlayerDetail() {
                         />
                     )}
                 </Space.Compact>
-            </div>
+            </Descriptions.Item>
         )
     }
 
@@ -315,7 +312,9 @@ export default function PlayerDetail() {
             label: `装备 (${equipment.length})`,
             children: (
                 <Space direction="vertical" style={{ width: "100%" }}>
-                    {searchBox(searchEquip, setSearchEquip)}
+                    <div className="admin-toolbar">
+                        {searchBox(searchEquip, setSearchEquip)}
+                    </div>
                     <Table rowKey="id" dataSource={fEquip} size="small" pagination={{ pageSize: 50 }}
                         scroll={{ x: "max-content" }}
                         columns={[
@@ -347,10 +346,10 @@ export default function PlayerDetail() {
                             { title: "名字", render: (_, r: QuestRow) => (lookups?.quests as any)?.[`${r.section}_${r.questId}`] ?? "-" },
                             { title: "Section", dataIndex: "section", width: 80 },
                             { title: "Quest", dataIndex: "questId", width: 80 },
-                            { title: "通关", render: (_, r: QuestRow) => r.finished ? "已通关" : "—", width: 72 },
-                            { title: "最高分", dataIndex: "highScore", render: (v: number | null) => v ?? "—", width: 80 },
-                            { title: "评价", dataIndex: "clearRank", render: (v: number | null) => v ?? "—", width: 60 },
-                            { title: "最佳时间", dataIndex: "bestElapsedTimeMs", render: (v: number | null) => v ?? "—", width: 100 },
+                            { title: "通关", render: (_, r: QuestRow) => r.finished ? <span className="admin-badge-ok">已通关</span> : <span className="admin-muted">—</span>, width: 72 },
+                            { title: "最高分", dataIndex: "highScore", render: (v: number | null) => v ?? <span className="admin-muted">—</span>, width: 80 },
+                            { title: "评价", dataIndex: "clearRank", render: (v: number | null) => v ?? <span className="admin-muted">—</span>, width: 60 },
+                            { title: "最佳时间", dataIndex: "bestElapsedTimeMs", render: (v: number | null) => v ?? <span className="admin-muted">—</span>, width: 100 },
                             {
                                 title: "", width: 60,
                                 render: (_, r: QuestRow) => (
@@ -406,59 +405,56 @@ export default function PlayerDetail() {
         >
         <Space direction="vertical" size="large" className="admin-stack">
             <Card title="存档标识">
-                    <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 3 }}>
+                    <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 3 }} className="admin-detail-descriptions">
                         <Descriptions.Item label="存档名">{player.name}</Descriptions.Item>
-                        <Descriptions.Item label="存档 ID">{player.id}</Descriptions.Item>
-                        <Descriptions.Item label="账号 ID">{player.accountId}</Descriptions.Item>
+                        <Descriptions.Item label="存档 ID"><span className="admin-mono">{player.id}</span></Descriptions.Item>
+                        <Descriptions.Item label="账号 ID"><span className="admin-mono">{player.accountId}</span></Descriptions.Item>
                     </Descriptions>
             </Card>
 
             <div className="admin-card-grid">
                     <Card title="资源编辑" size="small">
-                        <div style={gridStyle}>
+                        <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} className="admin-detail-descriptions">
                             {resourceFields.map(f => numField(f.key, f.label, { min: 0 }))}
-                        </div>
+                        </Descriptions>
                     </Card>
 
                     <Card title="账号设置" size="small">
-                        <div style={gridStyle}>
-                            <div>
-                                <Text type="secondary" style={{ fontSize: 12 }}>3x加速</Text>
-                                <div>
-                                    <Switch checked={player.enableAuto3x} loading={editField.isPending}
-                                        onChange={v => editField.mutate({ field: "enableAuto3x", value: v })} />
-                                </div>
-                            </div>
+                        <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} className="admin-detail-descriptions">
+                            <Descriptions.Item key="enableAuto3x" label="3x加速">
+                                <Switch checked={player.enableAuto3x} loading={editField.isPending}
+                                    onChange={v => editField.mutate({ field: "enableAuto3x", value: v })} />
+                            </Descriptions.Item>
                             {numField("degreeId", "等级(称号ID)", { min: 0 })}
                             {numField("leaderCharacterId", "队长角色ID", { min: 0 })}
                             {numField("birth", "生日(birth)", { min: 0 })}
                             {numField("tutorialStep", "教程步骤(空=null)", { min: 0, allowNull: true })}
-                        </div>
+                        </Descriptions>
                     </Card>
 
                     <Card title="工具操作" size="small">
-                        <Space wrap>
+                        <div className="admin-action-row">
                             <Popconfirm title="清除全部 EX Boost？" onConfirm={() => clearExBoost.mutate()} okText="确认" cancelText="取消">
-                                <Button size="small" loading={clearExBoost.isPending}>清除 EX Boost</Button>
+                                <Button size="small" danger loading={clearExBoost.isPending}>清除 EX Boost</Button>
                             </Popconfirm>
                             <Popconfirm title="重置编队到默认？" onConfirm={() => resetParties.mutate()} okText="确认" cancelText="取消">
-                                <Button size="small" icon={<UndoOutlined />}>重置编队</Button>
+                                <Button size="small" danger icon={<UndoOutlined />}>重置编队</Button>
                             </Popconfirm>
                             <Popconfirm title="清空邮箱？" onConfirm={() => clearMail.mutate()} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
                                 <Button size="small" danger>清空邮箱</Button>
                             </Popconfirm>
                             <Popconfirm title="重置每日挑战点？" onConfirm={() => resetChallenge.mutate()} okText="确认" cancelText="取消">
-                                <Button size="small" icon={<UndoOutlined />}>重置每日挑战</Button>
+                                <Button size="small" danger icon={<UndoOutlined />}>重置每日挑战</Button>
                             </Popconfirm>
                             <Popconfirm title="清除接收历史（一次性道具的领取记录）？" onConfirm={() => clearReceiveHistory.mutate()} okText="确认" cancelText="取消">
-                                <Button size="small" loading={clearReceiveHistory.isPending}>清除接收历史</Button>
+                                <Button size="small" danger loading={clearReceiveHistory.isPending}>清除接收历史</Button>
                             </Popconfirm>
                             <Button size="small" icon={<DownloadOutlined />} href={`/api/player/save?id=${pid}`} target="_blank">导出存档</Button>
                             <Upload accept=".json,application/json" showUploadList={false} maxCount={1}
                                 beforeUpload={file => { importSave.mutate(file); return false }}>
                                 <Button size="small" icon={<UploadOutlined />} danger loading={importSave.isPending}>导入存档(覆盖)</Button>
                             </Upload>
-                        </Space>
+                        </div>
                     </Card>
             </div>
 
