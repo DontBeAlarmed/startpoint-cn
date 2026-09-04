@@ -1,6 +1,6 @@
 import bundledAdditionalRewardRules from "../../../assets/additional_reward_rules.json"
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
-import { getPlayerSingleQuestProgressSync, insertPlayerQuestProgressSync, updatePlayerQuestProgressSync } from "../../data/domains/quest"
+import { getPlayerSingleQuestProgressSync, incrementPlayerQuestMultiClearSync, insertPlayerQuestProgressSync, updatePlayerQuestProgressSync } from "../../data/domains/quest"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings"
 import { settleAdditionalRewardsSync, type AdditionalRewardTable } from "../../lib/additional-reward"
@@ -435,6 +435,9 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             isMulti: true,
         })
         const missionBattleFacts = recordMissionBattleFacts(finishCtx, settlementTime)
+        // Quest-domain multi-clear counter lives with the quest finish writer,
+        // not inside the mission fact recorder (D24 writer convergence).
+        incrementPlayerQuestMultiClearSync(input.playerId, questCategory, questId)
         const rewardCharacterExpResult = givePlayerCharactersExpSync(
             input.playerId,
             partyCharacterIdsArray,

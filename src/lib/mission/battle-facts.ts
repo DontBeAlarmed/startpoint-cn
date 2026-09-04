@@ -1,4 +1,3 @@
-import { incrementPlayerQuestMultiClearSync } from "../../data/domains/quest"
 import { recordMissionBattleResultSync } from "../../data/domains/mission_battle_facts"
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { trackCharacterClears } from "../quest/finish/character-clear-tracker"
@@ -142,9 +141,6 @@ export function recordMissionBattleFacts(
     )
     recordActiveMissionSpecificBattleFactsSync(ctx, activeBattleFactContext)
     recordActiveMissionConditionalBattleFactsSync(ctx, activeBattleFactContext)
-    if (ctx.isMulti) {
-        incrementPlayerQuestMultiClearSync(ctx.playerId, ctx.questCategory, ctx.questId)
-    }
     trackCharacterClears(ctx)
     trackLeaderPowerflip(ctx)
     const awakeMissionIds = trackPartyCoClears(ctx)

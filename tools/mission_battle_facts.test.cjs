@@ -172,12 +172,11 @@ assert.deepEqual(calls, [
     ["degree", 1001],
     ["active-specific", 1001],
     ["active-conditional", 1001],
-    ["multi", 1, 1, 1001],
     ["character", 1001],
     ["leader-powerflip", 1001],
     ["party", 1001],
     ["powerflip", 1001],
-])
+], "multi-clear quest counter moved to the multi settlement writer (D24)")
 
 const singleBattleSource = fs.readFileSync(
     path.join(__dirname, "../src/lib/quest/finish/single-settlement-writes.ts"),
