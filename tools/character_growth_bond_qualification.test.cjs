@@ -257,6 +257,44 @@ test("learn-path derivation grants board 1 only when the base cap is also reache
     assert.equal(boardOneStatus(playerId), 1)
 })
 
+test("board 2 completion grants its token without any level condition", () => {
+    const playerId = createPlayer()
+    const boardTwoNodeIds = [...Object.keys(mutationContent(PROTAGONIST_ID, 2).nodes)].map(Number)
+    assert.ok(boardTwoNodeIds.length > 0, "board 2 content must exist for the protagonist")
+
+    // Every board-2 node learned while the character is far below the base
+    // cap — board 2 must still qualify (client rule: nodes only).
+    const granted = convergeBondTokenForLearnedBoardWithinTransaction(
+        playerId, PROTAGONIST_ID, new Map([[1, 1], [2, 0]]),
+        {
+            boardIndex: 2,
+            rarity: PROTAGONIST_RARITY,
+            exp: 10,
+            requiredNodeIds: boardTwoNodeIds,
+            learnedNodeIds: new Set(boardTwoNodeIds),
+        },
+    )
+    assert.equal(granted.bondTokenGranted, true)
+    assert.equal(
+        getPlayerCharacterSync(playerId, PROTAGONIST_ID).bondTokenList
+            .find(token => token.manaBoardIndex === 2).status,
+        1,
+    )
+
+    // An incomplete board 2 below any level must not grant.
+    const incomplete = convergeBondTokenForLearnedBoardWithinTransaction(
+        playerId, PROTAGONIST_ID, new Map([[1, 1], [2, 0]]),
+        {
+            boardIndex: 2,
+            rarity: PROTAGONIST_RARITY,
+            exp: 10,
+            requiredNodeIds: boardTwoNodeIds,
+            learnedNodeIds: new Set(boardTwoNodeIds.slice(1)),
+        },
+    )
+    assert.equal(incomplete.bondTokenGranted, false)
+})
+
 test("missing board-1 row above the base cap fails closed instead of re-granting", () => {
     const playerId = createPlayer()
     learnAllBoardOneNodes(playerId)
