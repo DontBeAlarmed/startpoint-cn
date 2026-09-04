@@ -281,7 +281,8 @@ test("board 2 completion grants its token without any level condition", () => {
         1,
     )
 
-    // An incomplete board 2 below any level must not grant.
+    // An incomplete board 2 below any level must not grant, and must not
+    // roll back the persisted grant from the call above.
     const incomplete = convergeBondTokenForLearnedBoardWithinTransaction(
         playerId, PROTAGONIST_ID, new Map([[1, 1], [2, 0]]),
         {
@@ -293,6 +294,11 @@ test("board 2 completion grants its token without any level condition", () => {
         },
     )
     assert.equal(incomplete.bondTokenGranted, false)
+    assert.equal(
+        getPlayerCharacterSync(playerId, PROTAGONIST_ID).bondTokenList
+            .find(token => token.manaBoardIndex === 2).status,
+        1,
+    )
 })
 
 test("missing board-1 row above the base cap fails closed instead of re-granting", () => {

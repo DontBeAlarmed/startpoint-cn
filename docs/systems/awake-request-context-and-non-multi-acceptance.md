@@ -203,8 +203,7 @@ loader 次数记为相对门禁；“每请求最多一次”由 35.1 的显式 
 `learn_mana_node` 另为 1 个事务内 strict 表达式。提交后的 11 个 best-effort
 表达式为 `boxGacha`、`character/town`、`exchange`、`gacha/exchange_character`、
 `gacha/exec`、`item/sell`、`mission/update_mission_progress`、`shop/buy`、
-`shop/bulk_buy`、`pass_card/receive_all` 和 `raid_event/summary`。静态矩阵固定两组的数量、成员和互斥性；
-`tools/awake_reconcile_callsite_matrix.test.cjs` 固定 35.2 owner 的 publication 仍在事务边界内。
+`shop/bulk_buy`、`pass_card/receive_all` 和 `raid_event/summary`。静态矩阵曾固定两组的数量、成员和互斥性，并固定 35.2 owner 的 publication 仍在事务边界内（D14 迁移期 `awake_reconcile_callsite_matrix.test.cjs`，已按 DEBT-T01 于 D23 删除）；现行等价守卫为 `tools/character_growth_writer_boundary.test.cjs` 的 Awake publication 写入方隔离规则。
 
 35.5C1 只把 owner 实际改变的 `FactKey` 透传到 fresh Awake publication，不迁移 35.2 的事务
 边界，也不把事务内 best-effort 改成 post-commit。publication 仍发生在 owner 最后一次权威

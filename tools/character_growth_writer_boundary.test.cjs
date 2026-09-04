@@ -53,8 +53,12 @@ test("character persistent-table SQL writes exist only in declared adapters", ()
         const relative = relativeToSource(file)
         const source = fs.readFileSync(file, "utf8")
         for (const table of CHARACTER_WRITE_TABLES) {
+            // Covers UPDATE / INSERT [OR IGNORE|REPLACE|ABORT|FAIL|ROLLBACK]
+            // INTO / REPLACE INTO / DELETE FROM, with optional quoted
+            // identifiers, so copy-pasting repo upsert idioms from other
+            // tables cannot silently bypass the scan.
             const pattern = new RegExp(
-                `(UPDATE\\s+|INSERT\\s+INTO\\s+|DELETE\\s+FROM\\s+)${table}\\b`,
+                `(?:UPDATE\\s+|(?:INSERT(?:\\s+OR\\s+(?:IGNORE|REPLACE|ABORT|FAIL|ROLLBACK))?|REPLACE)\\s+INTO\\s+|DELETE\\s+FROM\\s+)(?:["'\`]?(?:[A-Za-z_][A-Za-z0-9_]*\\s*\\.\\s*)?)["'\`]?${table}\\b`,
                 "i",
             )
             if (pattern.test(source) && !DECLARED_SQL_ADAPTERS.has(relative)) {
