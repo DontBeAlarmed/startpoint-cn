@@ -1625,7 +1625,7 @@ test("routes Awake request-context core, baseline, and callsite files to the mis
         "tools/character_growth_owner_publication.test.cjs",
         "tools/character_growth_owner_transactions.test.cjs",
         "tools/awake_request_context.test.cjs",
-        "tools/awake_reconcile_callsite_matrix.test.cjs",
+        "tools/character_growth_writer_boundary.test.cjs",
         "tools/perf/awake_request_context_admission.cjs",
         "tools/perf/awake_request_context_admission.test.cjs",
         "tools/perf/awake_request_context_baseline.cjs",
@@ -1641,7 +1641,6 @@ test("routes Awake request-context core, baseline, and callsite files to the mis
 
 test("routes Awake owner-focused evidence files precisely to the mission group", () => {
     for (const file of [
-        "tools/awake_reconcile_owner_call_inventory.json",
         "tools/perf/awake_owner_focused_admission.cjs",
         "tools/perf/awake_owner_focused_baseline.cjs",
         "tools/perf/awake_owner_focused_baseline.test.cjs",
@@ -1855,7 +1854,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/character_growth_owner_publication.test.cjs",
         "tools/character_growth_owner_transactions.test.cjs",
         "tools/awake_request_context.test.cjs",
-        "tools/awake_reconcile_callsite_matrix.test.cjs",
+        "tools/character_growth_writer_boundary.test.cjs",
         "tools/load_awake_full_recovery.test.cjs",
         "tools/mission_awake_evaluation_settlement.test.cjs",
         "tools/mission_awake_reward_owner.test.cjs",

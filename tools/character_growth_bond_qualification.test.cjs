@@ -80,13 +80,23 @@ test("board 1 with every node learned stays status 0 below the base level cap", 
     learnAllBoardOneNodes(playerId)
     updatePlayerCharacterSync(playerId, PROTAGONIST_ID, { exp: BASE_EXP_CAP - 1 })
 
-    const result = grantCharacterExp({ playerId, characterIds: [PROTAGONIST_ID], amount: 0 })
+    const nodeReads = []
+    const originalProfile = db.profile
+    db.profile = statement => {
+        if (/players_characters_mana_nodes/.test(statement)) nodeReads.push(statement)
+    }
+    try {
+        const result = grantCharacterExp({ playerId, characterIds: [PROTAGONIST_ID], amount: 0 })
+        assert.deepEqual(
+            result.bond_token_status_list[String(PROTAGONIST_ID)].after,
+            [{ mana_board_index: 1, status: 0 }, { mana_board_index: 2, status: 0 }],
+        )
+    } finally {
+        db.profile = originalProfile
+    }
 
     assert.equal(boardOneStatus(playerId), 0)
-    assert.deepEqual(
-        result.bond_token_status_list[String(PROTAGONIST_ID)].after,
-        [{ mana_board_index: 1, status: 0 }, { mana_board_index: 2, status: 0 }],
-    )
+    assert.deepEqual(nodeReads, [], "below-cap convergence must not read mana nodes")
 })
 
 test("battle EXP crossing the base level cap converges board 1 to status 1", () => {

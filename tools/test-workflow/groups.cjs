@@ -448,7 +448,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/character_growth_owner_publication.test.cjs",
             "tools/character_growth_owner_transactions.test.cjs",
             "tools/awake_request_context.test.cjs",
-            "tools/awake_reconcile_callsite_matrix.test.cjs",
+            "tools/character_growth_writer_boundary.test.cjs",
             "tools/load_awake_full_recovery.test.cjs",
             "tools/mission_awake_evaluation_settlement.test.cjs",
             "tools/mission_awake_reward_owner.test.cjs",

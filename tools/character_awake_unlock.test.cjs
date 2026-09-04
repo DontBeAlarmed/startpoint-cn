@@ -493,7 +493,7 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
 
     // D20 后 exec/exchange/crazy select 的 Growth 发布统一经 runGachaPostCommitEffects 的
     // publishGrowth 回调；每个路由文件恰好一处字面发布调用，且位于 owner 同步调用
-    // （事务已提交）之后。精确调用点矩阵由 awake_reconcile_callsite_matrix.test.cjs 维护。
+    // （事务已提交）之后。发布写入方隔离由 character_growth_writer_boundary.test.cjs 守卫。
     const gachaExchangeRoutesSource = readRouteSource("gacha/exchange-routes.ts")
     const gachaCrazyRoutesSource = readRouteSource("gacha/crazy-routes.ts")
     assert.equal(findCalls(gachaSource, "reconcileAwakeUnlockCharacterList").length, 1)

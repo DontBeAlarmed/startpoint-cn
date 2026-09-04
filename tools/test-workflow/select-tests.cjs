@@ -614,11 +614,11 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^(?:tools\/awake_request_context\.test\.cjs|tools\/awake_reconcile_callsite_matrix\.test\.cjs|tools\/perf\/awake_request_context_(?:admission|baseline|report|runner|scenarios)(?:\.test)?\.cjs|tools\/perf\/__snapshots__\/awake_request_context_baseline\.json)$/,
+        pattern: /^(?:tools\/awake_request_context\.test\.cjs|tools\/character_growth_writer_boundary\.test\.cjs|tools\/perf\/awake_request_context_(?:admission|baseline|report|runner|scenarios)(?:\.test)?\.cjs|tools\/perf\/__snapshots__\/awake_request_context_baseline\.json)$/,
         groups: ["integration:mission"],
     },
     {
-        pattern: /^(?:tools\/awake_reconcile_owner_call_inventory\.json|tools\/perf\/awake_owner_focused_(?:admission|baseline(?:\.test)?|fixture|observer|report|scenarios)\.cjs|tools\/perf\/__snapshots__\/awake_owner_focused_baseline\.json)$/,
+        pattern: /^(?:tools\/perf\/awake_owner_focused_(?:admission|baseline(?:\.test)?|fixture|observer|report|scenarios)\.cjs|tools\/perf\/__snapshots__\/awake_owner_focused_baseline\.json)$/,
         groups: ["integration:mission"],
     },
     {

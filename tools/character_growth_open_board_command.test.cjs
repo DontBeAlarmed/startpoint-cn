@@ -391,7 +391,7 @@ test("a real mana-node route can complete board one before the Growth command op
     await app.close()
 })
 
-test("HTTP adapter maps incomplete, true downgrade, and unsupported board three representatives to 400", async () => {
+test("HTTP adapter maps a rejected board request to 400 without writes, and corrupted state fails closed", async () => {
     const app = await createAdapterApp()
     const incomplete = createEligibleIncompletePlayer()
     const incompleteViewerId = 860000000 + incomplete.playerId
@@ -407,32 +407,34 @@ test("HTTP adapter maps incomplete, true downgrade, and unsupported board three 
         url: "/bond/open_mana_board",
         payload: { viewer_id: viewerId, character_id: 1, mana_board_index: targetBoardIndex, api_count: 1 },
     })
+    const readState = playerId => ({
+        character: db.prepare(`
+            SELECT mana_board_index, protection
+            FROM players_characters
+            WHERE player_id = ? AND id = 1
+        `).get(playerId),
+        tokens: db.prepare(`
+            SELECT mana_board_index, status
+            FROM players_characters_bond_tokens
+            WHERE player_id = ? AND character_id = 1
+            ORDER BY mana_board_index
+        `).all(playerId),
+        items: db.prepare(`
+            SELECT id, amount
+            FROM players_items
+            WHERE player_id = ?
+            ORDER BY id
+        `).all(playerId),
+    })
+
+    // One representative rejected request (incomplete board) proves the
+    // adapter maps growth errors to 400; downgrade and nonexistent-board
+    // combos are unreachable client input covered at the command boundary.
+    const incompleteBefore = readState(incomplete.playerId)
     const incompleteResponse = await request(incompleteViewerId, 2)
     assert.equal(incompleteResponse.statusCode, 400)
     assert.match(incompleteResponse.body, /PREVIOUS_BOARD_INCOMPLETE/)
-
-    const opened = createReadyPlayer()
-    openManaBoard({
-        playerId: opened,
-        characterId: 1,
-        targetBoardIndex: 2,
-        evaluationTime: new Date("2024-08-14T12:00:00.000Z"),
-    })
-    const openedViewerId = 861000000 + opened
-    const openedAccount = db.prepare("SELECT account_id FROM players WHERE id = ?").get(opened)
-    await insertSessionWithToken({
-        token: String(openedViewerId),
-        accountId: openedAccount.account_id,
-        expires: new Date("2099-01-01T00:00:00.000Z"),
-        type: SessionType.VIEWER,
-    })
-    const downgradeResponse = await request(openedViewerId, 1)
-    assert.equal(downgradeResponse.statusCode, 400)
-    assert.match(downgradeResponse.body, /BOARD_NOT_AVAILABLE/)
-
-    const unsupportedBoardResponse = await request(openedViewerId, 3)
-    assert.equal(unsupportedBoardResponse.statusCode, 400)
-    assert.match(unsupportedBoardResponse.body, /BOARD_NOT_AVAILABLE/)
+    assert.deepEqual(readState(incomplete.playerId), incompleteBefore)
 
     const corrupted = createReadyPlayer()
     const corruptedViewerId = 862000000 + corrupted
@@ -448,31 +450,12 @@ test("HTTP adapter maps incomplete, true downgrade, and unsupported board three 
         SET protection = 2
         WHERE player_id = ? AND id = 1
     `).run(corrupted)
-    const readCorruptedState = () => ({
-        character: db.prepare(`
-            SELECT mana_board_index, protection
-            FROM players_characters
-            WHERE player_id = ? AND id = 1
-        `).get(corrupted),
-        tokens: db.prepare(`
-            SELECT mana_board_index, status
-            FROM players_characters_bond_tokens
-            WHERE player_id = ? AND character_id = 1
-            ORDER BY mana_board_index
-        `).all(corrupted),
-        items: db.prepare(`
-            SELECT id, amount
-            FROM players_items
-            WHERE player_id = ?
-            ORDER BY id
-        `).all(corrupted),
-    })
-    const corruptedBefore = readCorruptedState()
+    const corruptedBefore = readState(corrupted)
     const corruptedResponse = await request(corruptedViewerId, 2)
     assert.equal(corruptedResponse.statusCode, 500)
     assert.equal(JSON.parse(corruptedResponse.body).error, "Internal Server Error")
     assert.match(JSON.parse(corruptedResponse.body).message, /INVALID_GROWTH_STATE/)
-    assert.deepEqual(readCorruptedState(), corruptedBefore)
+    assert.deepEqual(readState(corrupted), corruptedBefore)
     await app.close()
 })
 
