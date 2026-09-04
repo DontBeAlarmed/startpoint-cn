@@ -1222,6 +1222,14 @@ export default function init(
         FROM players_shop_purchases
     `).run()
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_bond_token_exchanges (
+        player_id INTEGER NOT NULL,
+        equipment_id INTEGER NOT NULL,
+        exchange_count INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (player_id, equipment_id),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_active_quests (
         player_id INTEGER PRIMARY KEY,
         play_id TEXT NOT NULL,

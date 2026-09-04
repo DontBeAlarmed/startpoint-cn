@@ -72,6 +72,7 @@ const QUEST_TABLE_NAMES = [
 ]
 const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
     "additional_reward_rules.json",
+    "bond_token_exchange.json",
     "box_gacha.json",
     "box_gacha_box_settings.json",
     "box_reward.json",

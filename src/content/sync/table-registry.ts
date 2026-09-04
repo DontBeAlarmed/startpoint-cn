@@ -113,6 +113,7 @@ const DIRECT_ORDERED_MAP_TABLES = [
     ["raid_event_overall_reward.json", 1, "master/quest/event/raid_event_overall_reward.orderedmap"],
     ["reward_element_map.json", 3, "master/reward/reward_element_map.orderedmap"],
     ["stamina_campaign.json", 1, "master/campaign/stamina_campaign.orderedmap"],
+    ["bond_token_exchange.json", 1, "master/shop/bond_token_exchange.orderedmap"],
     ["star_crumb_exchange.json", 1, "master/shop/star_crumb_exchange.orderedmap"],
     ["star_crumb_exchange_cost.json", 1, "master/shop/star_crumb_exchange_cost.orderedmap"],
 ] as const satisfies ReadonlyArray<readonly [string, 1 | 2 | 3, string]>

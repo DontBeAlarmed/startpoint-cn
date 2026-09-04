@@ -34,6 +34,7 @@
 | D19 | Shop Purchase Owner（已实现） | [Shop Purchase Owner Gate](./shop-purchase-owner-gate.md) | 8 类真实 single、4/7 bulk、完整 Shop Content、统一 purchase plan/transaction owner 与局部索引 |
 | D20 | Gacha Owner 与域内 Exchange（已实现，实机统一延期） | [Gacha Owner Gate](./gacha-owner-gate.md) | actual banner、draw payment plan与prize dispatch、typed campaign/rate、普通owner、域内exchange、Crazy、conversion与Gacha-local projector |
 | D21 | Star Crumb Exchange 独立用例（已实现，实机统一延期） | [领域边界蓝图](./domain-boundary-blueprint.md) | typed 产品/成本 catalog、唯一事务 owner、Character/Item/Equipment 走 typed reward 执行与 D18b overflow disposition |
+| D22 | Bond Token Exchange 独立用例（已实现，实机统一延期） | [领域边界蓝图](./domain-boundary-blueprint.md) | typed 产品/成本/库存/周期 catalog、list runtime（exchange_count）、唯一事务 owner 与 per-player 兑换计数 |
 
 ## 阅读顺序
 
@@ -45,7 +46,7 @@
 
 D12、D13 与 D14 已完成服务端实现和自动化 Gate，等待客户端实机验收。三份 Gate 文档保留设计依据，同时作为相应已落地边界的架构与验证证据；它们不取代上述当前架构总览的阅读顺序。
 
-D15 已完成领域边界识别、决策和后续实施路线。D16、D17、D18、D18b 的服务端实现、Gate A broad closure、D18b scoped final review 和服务重启均已完成；D19、D20 与 D21 的服务端实现与逐 checkpoint 审查已完成，所属大 Gate B 的 broad closure、整体终审与服务重启统一在其最后一个 checkpoint（D22）后执行；客户端实测统一延期到 D28 后。阅读这些 Gate 时仍需区分当前已落地私服策略、官方未知语义和客户端实机验收。
+D15 已完成领域边界识别、决策和后续实施路线。D16、D17、D18、D18b 的服务端实现、Gate A broad closure、D18b scoped final review 和服务重启均已完成；D19、D20、D21 与 D22 的服务端实现与逐 checkpoint 审查已完成，所属大 Gate B 的 broad closure、整体终审与服务重启在 D22 收口时执行；客户端实测统一延期到 D28 后。阅读这些 Gate 时仍需区分当前已落地私服策略、官方未知语义和客户端实机验收。
 
 ## 统一图例
 
@@ -61,7 +62,7 @@ D15 已完成领域边界识别、决策和后续实施路线。D16、D17、D18�
 - 本目录已收录的 D1-D11b 全部描述当前实现，图节标题统一带“当前”。
 - D12、D13 与 D14 描述已落地、待客户端实机验收的 Gate 架构；其中的实施状态和证据路径可以用于解释当前实现，仍需与功能支持矩阵区分自动验证和人工验收。
 - D15 描述经审查确认、但尚未实施的目标领域边界；其图和表不能替代 D1-D11b 的当前架构事实。
-- D16、D18、D18b、D19、D20 与 D21 已实现 typed Item policy、Inventory writer、Item cap、按 `sellable` 的 Sold/Mail disposition、Item expiry owner、`/load` EventTrade 到期转换、Mail claim、Shop Purchase owner、Gacha owner（普通 draw、域内 exchange、Crazy 生命周期、兑换点转换通知）与 Star Crumb Exchange owner；不得据此宣称这些私服策略已经被官服后端证实，D22–D28 仍未实施。
+- D16、D18、D18b、D19、D20、D21 与 D22 已实现 typed Item policy、Inventory writer、Item cap、按 `sellable` 的 Sold/Mail disposition、Item expiry owner、`/load` EventTrade 到期转换、Mail claim、Shop Purchase owner、Gacha owner（普通 draw、域内 exchange、Crazy 生命周期、兑换点转换通知）、Star Crumb Exchange owner 与 Bond Token Exchange owner（产品/成本/库存/周期、list runtime 与兑换计数）；不得据此宣称这些私服策略已经被官服后端证实，D23–D28 仍未实施。
 - 当前图不混入未来组件、迁移步骤或完成度信息；功能状态仍由 `docs/status/` 维护。
 - 目标架构必须使用独立图和独立证据，不得用虚线叠加到当前图。
 

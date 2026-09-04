@@ -30,6 +30,7 @@ const {
     getPlayerItemSync,
 } = require("../src/data/domains/item")
 const { playerOwnsEquipmentSync } = require("../src/data/domains/equipment")
+const { getPlayerBondTokenExchangeCountSync } = require("../src/data/domains/bondTokenExchange")
 const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const { getPlayerMailsSync, MailType } = require("../src/data/domains/mail")
 const { createRewardGrantItemOverflowPolicy } = require("../src/lib/reward-grant-item-overflow")
@@ -349,6 +350,156 @@ test("star crumb equipment exchange commits typed grant and absolute response", 
     assert.equal(playerOwnsEquipmentSync(playerId, 4010010), true)
     assert.deepEqual(payload.data.character_list, [])
     assert.deepEqual(payload.data.item_list, {})
+})
+
+test("bond token list returns bare array of in-period products with player counts", async () => {
+    const { viewerId } = await createPlayer("bond-token-list")
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/exchange/get_bond_token_exchange_list",
+        payload: { viewer_id: viewerId, api_count: 1 },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    const payload = unpack(Buffer.from(response.body, "base64"))
+    assert.equal(Array.isArray(payload.data), true)
+    assert.deepEqual(
+        payload.data,
+        [
+            { equipment_id: 5010005, exchange_count: 0 },
+            { equipment_id: 5030005, exchange_count: 0 },
+        ],
+    )
+})
+
+test("bond token exchange commits equipment grant, count and absolute response", async () => {
+    const { playerId, viewerId } = await createPlayer("bond-token-success")
+    updatePlayerSync({ id: playerId, bondToken: 100 })
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/exchange/bond_token",
+        payload: { viewer_id: viewerId, equipment_id: 5010005, api_count: 1 },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    const payload = unpack(Buffer.from(response.body, "base64"))
+    assert.equal(payload.data.user_info.bond_token, 50)
+    assert.equal(payload.data.equipment_list.length, 1)
+    assert.deepEqual(payload.data.equipment_list[0], {
+        equipment_id: 5010005,
+        protection: false,
+        level: 1,
+        enhancement_level: 0,
+        stack: 0,
+    })
+    assert.equal(payload.data.character_list, null)
+    assert.equal(payload.data.over_max, null)
+    assert.equal(getPlayerSync(playerId).bondToken, 50)
+    assert.equal(playerOwnsEquipmentSync(playerId, 5010005), true)
+    assert.equal(getPlayerBondTokenExchangeCountSync(playerId, 5010005), 1)
+
+    const listAfter = unpack(Buffer.from((await app.inject({
+        method: "POST",
+        url: "/exchange/get_bond_token_exchange_list",
+        payload: { viewer_id: viewerId, api_count: 1 },
+    })).body, "base64"))
+    assert.deepEqual(listAfter.data, [
+        { equipment_id: 5010005, exchange_count: 1 },
+        { equipment_id: 5030005, exchange_count: 0 },
+    ])
+})
+
+test("bond token exchange rejects stock exhaustion and shortage without writes", async () => {
+    const { playerId, viewerId } = await createPlayer("bond-token-exhausted")
+    updatePlayerSync({ id: playerId, bondToken: 40 })
+    database.exec(`
+        INSERT INTO players_bond_token_exchanges (player_id, equipment_id, exchange_count)
+        VALUES (${playerId}, 5010005, 1)
+    `)
+
+    const outOfStock = await app.inject({
+        method: "POST",
+        url: "/exchange/bond_token",
+        payload: { viewer_id: viewerId, equipment_id: 5010005, api_count: 1 },
+    })
+    assert.equal(outOfStock.statusCode, 400)
+    assert.equal(JSON.parse(outOfStock.body).message, "Bond token exchange is out of stock.")
+    assert.equal(getPlayerSync(playerId).bondToken, 40)
+    assert.equal(playerOwnsEquipmentSync(playerId, 5010005), false)
+
+    const shortage = await app.inject({
+        method: "POST",
+        url: "/exchange/bond_token",
+        payload: { viewer_id: viewerId, equipment_id: 5030005, api_count: 1 },
+    })
+    assert.equal(shortage.statusCode, 400)
+    assert.equal(JSON.parse(shortage.body).message, "Not enough bond_token.")
+    assert.equal(getPlayerSync(playerId).bondToken, 40)
+    assert.equal(getPlayerBondTokenExchangeCountSync(playerId, 5030005), 0)
+
+    const unknown = await app.inject({
+        method: "POST",
+        url: "/exchange/bond_token",
+        payload: { viewer_id: viewerId, equipment_id: 987654321, api_count: 1 },
+    })
+    assert.equal(unknown.statusCode, 400)
+    assert.equal(JSON.parse(unknown.body).message,
+        "Bond token exchange product 987654321 does not exist.")
+    assert.equal(getPlayerSync(playerId).bondToken, 40)
+})
+
+test("bond token exchange rolls charge, count and equipment back together", async t => {
+    const { playerId, viewerId } = await createPlayer("bond-token-rollback")
+    updatePlayerSync({ id: playerId, bondToken: 100 })
+    database.exec(`
+        CREATE TRIGGER reject_bond_token_equipment
+        BEFORE INSERT ON players_equipment
+        WHEN NEW.player_id = ${playerId} AND NEW.id = 5010005
+        BEGIN SELECT RAISE(ABORT, 'forced equipment failure'); END;
+    `)
+    t.after(() => database.exec("DROP TRIGGER IF EXISTS reject_bond_token_equipment"))
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/exchange/bond_token",
+        payload: { viewer_id: viewerId, equipment_id: 5010005, api_count: 1 },
+    })
+
+    assert.equal(response.statusCode, 500)
+    assert.equal(getPlayerSync(playerId).bondToken, 100)
+    assert.equal(playerOwnsEquipmentSync(playerId, 5010005), false)
+    assert.equal(database.prepare(`
+        SELECT COUNT(*) AS count FROM players_bond_token_exchanges
+        WHERE player_id = ${playerId}
+    `).get().count, 0)
+})
+
+test("bond token catalog is immutable per repository with typed cost and stock", async () => {
+    const {
+        getBondTokenExchangeCatalog,
+        resolveBondTokenExchangeProduct,
+        listBondTokenExchangeProducts,
+    } = require("../src/lib/bond-token-exchange")
+    // WeakMap 缓存：同 repository 只构建一次，不随请求重复读取 Content 表
+    assert.equal(getBondTokenExchangeCatalog() === getBondTokenExchangeCatalog(), true)
+    const resolution = resolveBondTokenExchangeProduct(5010005, Date.UTC(2026, 8, 4))
+    assert.deepEqual(
+        [resolution.ok, resolution.product.equipmentId, resolution.product.cost, resolution.product.stock],
+        [true, 5010005, 50, 1],
+    )
+    assert.equal(resolveBondTokenExchangeProduct(987654321, Date.UTC(2026, 8, 4)).ok, false)
+    // period 窗口双端闭区间：start-1ms 拒、start 收、end 收、end+1ms 拒
+    // （CN 口径：start=2019-01-01 05:00:00 → 2018-12-31T21:00:00Z；end=2200-02-05 14:59:59 → 06:59:59Z）
+    const startMs = Date.UTC(2018, 11, 31, 21, 0, 0)
+    const endMs = Date.UTC(2200, 1, 5, 6, 59, 59)
+    assert.equal(resolveBondTokenExchangeProduct(5010005, startMs - 1).ok, false)
+    assert.equal(resolveBondTokenExchangeProduct(5010005, startMs).ok, true)
+    assert.equal(resolveBondTokenExchangeProduct(5010005, endMs).ok, true)
+    assert.equal(resolveBondTokenExchangeProduct(5010005, endMs + 1).ok, false)
+    const listed = listBondTokenExchangeProducts(Date.UTC(2026, 8, 4))
+    assert.deepEqual(listed.map(product => product.equipmentId), [5010005, 5030005])
 })
 
 test("bulk stack conversion commits the complete planned result", async () => {
