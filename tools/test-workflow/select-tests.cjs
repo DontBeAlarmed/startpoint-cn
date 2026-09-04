@@ -15,6 +15,10 @@ const HUB_AUTHENTICATION_GROUPS = [
 
 const SOURCE_RULES = [
     {
+        pattern: /^docs\/(?:architecture\/(?:README|domain-boundary-blueprint)|reference\/routes-status|status\/support-matrix)\.md$/,
+        groups: ["quick:workflow"],
+    },
+    {
         pattern: /^(?:src\/data\/domains\/shopPurchase\.ts|tools\/shop_purchase_count_storage\.test\.cjs)$/,
         groups: ["integration:database"],
     },
@@ -391,6 +395,10 @@ const SOURCE_RULES = [
         groups: ["integration:rules", "quick:gacha"],
     },
     {
+        pattern: /^(?:src\/lib\/star-crumb-exchange\/.*\.ts|src\/routes\/api\/exchange\.ts)$/,
+        groups: ["integration:rules", "quick:content"],
+    },
+    {
         pattern: /^src\/lib\/gacha-owner\/post-commit\.ts$/,
         groups: ["integration:mission"],
     },
@@ -706,7 +714,7 @@ const SOURCE_RULES = [
         groups: ["integration:database", "full"],
     },
     {
-        pattern: /^src\/routes\/(?!api\/(?:gift|news|singleBattleQuest)\.ts$|web_api\/)/,
+        pattern: /^src\/routes\/(?!api\/(?:exchange|gift|news|singleBattleQuest)\.ts$|web_api\/)/,
         groups: ["full"],
     },
 ]

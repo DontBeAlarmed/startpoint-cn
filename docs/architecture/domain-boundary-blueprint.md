@@ -1,6 +1,6 @@
 # D15 全项目领域边界蓝图
 
-状态：D15 边界识别、决策和后续实施路线已经完成并通过独立审查；D16、D17、D18 与 D18b 的服务端 Gate 已完成，D19、D20 与 D21 的服务端实现与逐 checkpoint 审查已完成，但 D22–D28 尚未实施，因此本文不能用来宣称当前服务端已经完成 Exchange、Mission、Battle、Event、Content 或完整 Common Response 的后续收口。D16–D20 已落地边界以对应 Gate 文档和代码为准；其余当前已落地架构仍以本目录的“当前”图和 D12-D14 Gate 文档为准。
+状态：D15 边界识别、决策和后续实施路线已经完成并通过独立审查；D16、D17、D18 与 D18b 的服务端 Gate 已完成，D19、D20 与 D21 的服务端实现与逐 checkpoint 审查已完成，但 D22–D28 尚未实施，因此本文不能用来宣称当前服务端已经完成 Exchange、Mission、Battle、Event、Content 或完整 Common Response 的后续收口。D16–D21 已落地边界以对应 Gate 文档、本文状态行和代码为准；其余当前已落地架构仍以本目录的“当前”图和 D12-D14 Gate 文档为准。
 
 ## 1. 目标与证据纪律
 

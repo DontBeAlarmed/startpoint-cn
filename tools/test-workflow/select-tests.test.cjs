@@ -522,6 +522,28 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["admin/src/App.tsx"]), ["admin"])
 })
 
+test("maps Star Crumb Exchange to its content and transaction leaves without full", () => {
+    for (const file of [
+        "src/lib/star-crumb-exchange/catalog.ts",
+        "src/lib/star-crumb-exchange/owner.ts",
+        "src/routes/api/exchange.ts",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["integration:rules", "quick:content"])
+    }
+    assert.deepEqual(
+        selectTestGroups(["tools/economy_write_transaction.test.cjs"]),
+        ["integration:rules"],
+    )
+    for (const file of [
+        "docs/architecture/README.md",
+        "docs/architecture/domain-boundary-blueprint.md",
+        "docs/reference/routes-status.md",
+        "docs/status/support-matrix.md",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["quick:workflow"])
+    }
+})
+
 test("keeps unknown content files on the full suite", () => {
     assert.deepEqual(selectTestGroups(["src/content/repository.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/content/build/manifest.ts"]), ["full"])

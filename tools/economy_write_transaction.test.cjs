@@ -10,6 +10,7 @@ const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
 const Fastify = require("fastify")
+const BetterSqlite3 = require("better-sqlite3")
 
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "economy-write-tx-"))
 const previousDataDirectory = process.env.DATA_DIR
@@ -43,6 +44,21 @@ const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 let database
 let app
 let nextViewerId = 850000000
+const sqlTrace = { active: false, statements: [] }
+
+async function captureSqlAsync(operation) {
+    sqlTrace.statements = []
+    sqlTrace.active = true
+    try {
+        return { result: await operation(), statements: [...sqlTrace.statements] }
+    } finally {
+        sqlTrace.active = false
+    }
+}
+
+function countSql(statements, pattern) {
+    return statements.filter(statement => pattern.test(statement)).length
+}
 
 async function createPlayer(label) {
     const account = insertAccountSync({
@@ -64,7 +80,11 @@ async function createPlayer(label) {
 }
 
 test.before(async () => {
-    database = data.initializeDatabase()
+    database = data.initializeDatabase({
+        databaseFactory: databasePath => new BetterSqlite3(databasePath, {
+            verbose: sql => { if (sqlTrace.active) sqlTrace.statements.push(sql) },
+        }),
+    })
     app = Fastify({ logger: false })
     registerCnMsgpackOnSend(app)
     await app.register(exchangeRoutes, { prefix: "/exchange" })
@@ -93,11 +113,16 @@ test("star crumb item exchange rolls charge and reward back together", async t =
     `)
     t.after(() => database.exec("DROP TRIGGER IF EXISTS reject_star_crumb_item_fact"))
 
-    const response = await app.inject({
+    const measured = await captureSqlAsync(() => app.inject({
         method: "POST",
         url: "/exchange/star_crumb",
         payload: { viewer_id: viewerId, exchange_id: 9000001, api_count: 1 },
-    })
+    }))
+    const response = measured.result
+    assert.equal(measured.statements.length, 9)
+    assert.equal(countSql(measured.statements, /FROM players\s+WHERE id =/), 1)
+    assert.equal(countSql(measured.statements, /^COMMIT$/), 0)
+    assert.equal(countSql(measured.statements, /^ROLLBACK$/), 1)
 
     assert.equal(response.statusCode, 500)
     assert.equal(getPlayerSync(playerId).starCrumb, 1000)
@@ -165,11 +190,16 @@ test("star crumb item exchange preserves the successful response state", async (
     const { playerId, viewerId } = await createPlayer("star-crumb-item-success")
     updatePlayerSync({ id: playerId, starCrumb: 1000 })
 
-    const response = await app.inject({
+    const measured = await captureSqlAsync(() => app.inject({
         method: "POST",
         url: "/exchange/star_crumb",
         payload: { viewer_id: viewerId, exchange_id: 9000001, api_count: 1 },
-    })
+    }))
+    const response = measured.result
+    assert.equal(measured.statements.length, 13)
+    assert.equal(countSql(measured.statements, /FROM players\s+WHERE id =/), 1)
+    assert.equal(countSql(measured.statements, /^COMMIT$/), 2)
+    assert.equal(countSql(measured.statements, /^ROLLBACK$/), 0)
 
     assert.equal(response.statusCode, 200, response.body)
     assert.equal(getPlayerSync(playerId).starCrumb, 700)
@@ -182,12 +212,21 @@ test("star crumb Item exchange sends capped overflow to Mail", async () => {
     updatePlayerSync({ id: playerId, starCrumb: 1000 })
     const itemId = 10002
     const policy = createRewardGrantItemOverflowPolicy(playerId)
-    setInventoryFixtureItemExactSync(playerId, itemId, policy.maxCount(itemId))
+    setInventoryFixtureItemExactSync(playerId, itemId, policy.maxCount(itemId) - 1)
+
+    const accepted = await app.inject({
+        method: "POST",
+        url: "/exchange/star_crumb",
+        payload: { viewer_id: viewerId, exchange_id: 9000001, api_count: 1 },
+    })
+    assert.equal(accepted.statusCode, 200, accepted.body)
+    assert.equal(getPlayerItemSync(playerId, itemId), policy.maxCount(itemId))
+    assert.equal(getPlayerMailsSync(playerId, 1, 100, true).length, 0)
 
     const response = await app.inject({
         method: "POST",
         url: "/exchange/star_crumb",
-        payload: { viewer_id: viewerId, exchange_id: 9000001, api_count: 1 },
+        payload: { viewer_id: viewerId, exchange_id: 9000001, api_count: 2 },
     })
 
     assert.equal(response.statusCode, 200, response.body)
@@ -197,7 +236,7 @@ test("star crumb Item exchange sends capped overflow to Mail", async () => {
         type_id: mail.type_id,
         number: mail.number,
     })), [{ type: MailType.ITEM, type_id: itemId, number: 1 }])
-    assert.equal(getPlayerSync(playerId).starCrumb, 700)
+    assert.equal(getPlayerSync(playerId).starCrumb, 400)
 })
 
 test("star crumb character exchange commits typed grant and absolute response", async () => {
@@ -240,7 +279,10 @@ test("star crumb character exchange rejects an already owned character without w
 test("star crumb catalog is immutable per repository and resolves cost from typed rows", async () => {
     const { getStarCrumbExchangeCatalog, resolveStarCrumbExchangeProduct } = require("../src/lib/star-crumb-exchange")
     // WeakMap 缓存：同 repository 只构建一次，不随请求重复读取 Content 表
-    assert.equal(getStarCrumbExchangeCatalog() === getStarCrumbExchangeCatalog(), true)
+    const catalog = getStarCrumbExchangeCatalog()
+    assert.equal(catalog === getStarCrumbExchangeCatalog(), true)
+    assert.equal(Object.isFrozen(catalog), true)
+    assert.deepEqual(Object.keys(catalog), ["resolve"])
     const character = resolveStarCrumbExchangeProduct(1)
     const item = resolveStarCrumbExchangeProduct(9000001)
     const equipment = resolveStarCrumbExchangeProduct(475)
@@ -251,6 +293,42 @@ test("star crumb catalog is immutable per repository and resolves cost from type
     assert.deepEqual([equipment.ok, equipment.product.kind, equipment.product.targetId, equipment.product.cost],
         [true, "equipment", 4010010, 200])
     assert.equal(resolveStarCrumbExchangeProduct(987654321).ok, false)
+
+    let tableReads = 0
+    const cachedRepository = {
+        table(name) {
+            tableReads += 1
+            if (name === "star_crumb_exchange.json") {
+                return { "1": [["0", "111001", "", "", "", "", "", "", "5"]] }
+            }
+            if (name === "star_crumb_exchange_cost.json") {
+                return { "0": [["300", "600"]] }
+            }
+            throw new Error(`unexpected table ${name}`)
+        },
+    }
+    const firstCached = getStarCrumbExchangeCatalog(cachedRepository)
+    assert.equal(firstCached, getStarCrumbExchangeCatalog(cachedRepository))
+    assert.equal(tableReads, 2)
+    assert.equal(firstCached.resolve(1).ok, true)
+
+    const malformedRepository = {
+        table(name) {
+            if (name === "star_crumb_exchange.json") {
+                return { "1": [["0", "111001", "", "", "", "", "", "", "5"]] }
+            }
+            if (name === "star_crumb_exchange_cost.json") {
+                return { "0": [["300", "Infinity"]] }
+            }
+            throw new Error(`unexpected table ${name}`)
+        },
+    }
+    assert.deepEqual(getStarCrumbExchangeCatalog(malformedRepository).resolve(1), {
+        ok: false,
+        kind: "invalidCost",
+        rawKind: 0,
+        rarity: 5,
+    })
 })
 
 test("star crumb equipment exchange commits typed grant and absolute response", async () => {

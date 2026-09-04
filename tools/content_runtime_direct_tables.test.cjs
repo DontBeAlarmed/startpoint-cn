@@ -24,10 +24,6 @@ const expectedAccess = Object.freeze({
     "src/multi/player-context.ts": Object.freeze({
         "cdndata/player_rank.json": "bundledPlayerRankTable",
     }),
-    "src/routes/api/exchange.ts": Object.freeze({
-        "star_crumb_exchange.json": "bundledStarCrumbExchange",
-        "star_crumb_exchange_cost.json": "bundledStarCrumbExchangeCost",
-    }),
 })
 
 function isFunctionLike(node) {
@@ -107,4 +103,17 @@ test("low-risk direct CDN table consumers read whole runtime tables per call", (
             }
         }
     }
+})
+
+test("Star Crumb catalog owns its runtime snapshot tables without a bundled bypass", () => {
+    const relativePath = "src/lib/star-crumb-exchange/catalog.ts"
+    const source = fs.readFileSync(path.join(projectRoot, relativePath), "utf8")
+    assert.match(source, /getContentSnapshot\(\)\.repository/)
+    for (const tableName of [
+        "star_crumb_exchange.json",
+        "star_crumb_exchange_cost.json",
+    ]) {
+        assert.match(source, new RegExp(`repository\\.table[\\s\\S]*?"${tableName.replace(".", "\\.")}"`))
+    }
+    assert.doesNotMatch(source, /assets\/star_crumb_exchange|getRuntimeContentTableSync/)
 })

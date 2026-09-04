@@ -322,7 +322,6 @@
     "anchor-to-publication:member:reply#status=1",
     "before-anchor:identifier:isNaN=2",
     "before-anchor:import:../../data/activeAccount#resolvePlayerIdSync=1",
-    "before-anchor:import:../../data/domains/player#getPlayerSync=1",
     "before-anchor:import:../../data/domains/session#getSession=1",
     "before-anchor:member:reply.status(400)#send=2",
     "before-anchor:member:reply.status(500)#send=1",
