@@ -371,6 +371,22 @@ const SOURCE_RULES = [
         groups: ["quick:gacha"],
     },
     {
+        pattern: /^(?:src\/lib\/gacha-catalog\/.*\.ts|tools\/gacha_catalog\.test\.cjs)$/,
+        groups: ["quick:content", "quick:gacha"],
+    },
+    {
+        pattern: /^(?:src\/content\/converters\/gacha\.ts|src\/lib\/types\/gacha\.ts|tools\/content_gacha_converter\.test\.cjs|assets\/(?:gacha(?:_campaign(?:_definitions)?|_exchange_rate|_pool)?|stars_gacha_campaign|equipment_lookup)\.json)$/,
+        groups: ["quick:content", "quick:gacha"],
+    },
+    {
+        pattern: /^src\/lib\/gacha-legacy-content\.ts$/,
+        groups: ["admin", "integration:rules", "quick:content", "quick:gacha"],
+    },
+    {
+        pattern: /^src\/lib\/admin-clairvoyance\.ts$/,
+        groups: ["admin", "quick:content", "quick:gacha"],
+    },
+    {
         pattern: /^src\/lib\/story-reward-grant\.ts$/,
         groups: ["integration:mission", "integration:quest"],
     },

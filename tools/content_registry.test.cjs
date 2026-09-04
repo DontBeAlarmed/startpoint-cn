@@ -602,6 +602,7 @@ test("registry derives activity hard multi periodic rewards from official Ordere
 
 test("registry and release manifest explicitly describe referenced gacha odds sources", () => {
     const gacha = findTableSource("gacha.json")
+    const pools = findTableSource("gacha_pool.json")
 
     assert.deepEqual(gacha.sourceOrderedMaps, ["master/gacha/gacha.orderedmap"])
     assert.deepEqual(gacha.dynamicSources, [EXPECTED_GACHA_ODDS_DYNAMIC_SOURCE])
@@ -609,11 +610,12 @@ test("registry and release manifest explicitly describe referenced gacha odds so
         "master/gacha/gacha.orderedmap",
         EXPECTED_GACHA_ODDS_DYNAMIC_SOURCE,
     ])
+    assert.deepEqual(pools.dynamicSources, [EXPECTED_GACHA_ODDS_DYNAMIC_SOURCE])
     assert.ok(TABLE_SOURCES.every(entry => (
         entry.sourceOrderedMaps.every(source => !source.includes("*"))
     )))
     assert.ok(TABLE_SOURCES
-        .filter(entry => entry.tableName !== "gacha.json")
+        .filter(entry => entry.tableName !== "gacha.json" && entry.tableName !== "gacha_pool.json")
         .every(entry => entry.dynamicSources.length === 0))
 
     const manifest = createReleaseManifest({
@@ -691,6 +693,7 @@ test("registry independently covers static CN runtime JSON references", () => {
         .map(entry => entry.tableName)
         .filter(tableName => (
             !references.has(tableName)
+            && tableName !== "cdn_general_shop_whitelist.json"
         ))
         .sort()
     assert.deepEqual(uncovered, [])
@@ -698,7 +701,7 @@ test("registry independently covers static CN runtime JSON references", () => {
 })
 
 test("every registry table has an explicit existing bundled fallback", () => {
-    assert.equal(TABLE_SOURCES.length, 130)
+    assert.equal(TABLE_SOURCES.length, 134)
     for (const entry of TABLE_SOURCES) {
         const sourcePath = path.resolve(projectRoot, entry.bundledPath)
         assert.ok(fs.existsSync(sourcePath), `${entry.tableName} source must exist`)

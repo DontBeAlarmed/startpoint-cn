@@ -130,6 +130,41 @@ test("maps representative source files to focused groups", () => {
     )
     assert.deepEqual(selectTestGroups(["docs/protocol/seed-verification.md"]), ["quick:seed"])
     assert.deepEqual(selectTestGroups(["src/lib/gacha-draw.ts"]), ["quick:gacha"])
+    for (const file of [
+        "src/content/converters/gacha.ts",
+        "src/lib/types/gacha.ts",
+        "assets/gacha.json",
+        "assets/gacha_campaign_definitions.json",
+        "assets/gacha_exchange_rate.json",
+        "assets/gacha_pool.json",
+        "assets/stars_gacha_campaign.json",
+        "assets/equipment_lookup.json",
+    ]) {
+        assert.deepEqual(
+            selectTestGroups([file]),
+            ["quick:content", "quick:gacha"],
+            file,
+        )
+    }
+    assert.deepEqual(
+        selectTestGroups(["tools/content_gacha_converter.test.cjs"]),
+        ["quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/gacha-legacy-content.ts"]),
+        ["admin", "integration:rules", "quick:content", "quick:gacha"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/admin-clairvoyance.ts"]),
+        ["admin", "quick:content", "quick:gacha"],
+    )
+    for (const sharedFile of [
+        "src/content/sync/table-registry.ts",
+        "src/lib/assets.ts",
+        "src/lib/types/index.ts",
+    ]) {
+        assert.deepEqual(selectTestGroups([sharedFile]), ["full"], sharedFile)
+    }
     assert.deepEqual(selectTestGroups(["src/lib/sampled-log.ts"]), ["quick:workflow"])
     assert.deepEqual(
         selectTestGroups(["src/lib/hot-path-log-formatters.ts"]),

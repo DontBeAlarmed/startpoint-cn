@@ -1,14 +1,18 @@
 import { deepFreeze } from "../deep-freeze"
+import { mapWithConcurrency } from "../concurrency"
 import type {
     NestedOrderedMapTextRows,
     OrderedMapTextRow,
 } from "../sync/ordered-map"
-import type { Gacha, GachaPoolItem } from "../../lib/types/gacha"
+import type { GachaCampaignDefinition, GachaExchangeRates, GachaPoolItem, GachaPools, GachaRuntimeBanner, GachaRuntimeBanners, GachaRuntimePage, StarsGachaCampaignDefinition } from "../../lib/types/gacha"
 import { parseCsvLine } from "./csv"
 
 const GACHA_PATH = "master/gacha/gacha.orderedmap"
 const GACHA_CAMPAIGN_PATH = "master/gacha/gacha_campaign.orderedmap"
 const GACHA_FEATURE_CONTENT_PATH = "master/gacha/gacha_feature_content.orderedmap"
+const STARS_GACHA_CAMPAIGN_PATH = "master/campaign/stars_gacha/stars_gacha_campaign.orderedmap"
+const CHARACTER_EXCHANGE_RATE_PATH = "master/gacha/exchange_point/character_exchange_rate.orderedmap"
+const EQUIPMENT_EXCHANGE_RATE_PATH = "master/gacha/exchange_point/equipment_exchange_rate.orderedmap"
 const GACHA_ODDS_PREFIX = "master/gacha_odds/"
 
 const GACHA_COLUMN_COUNT = 47
@@ -18,16 +22,6 @@ const GACHA_FEATURE_CONTENT_COLUMN_COUNT = 9
 const INTEGER_PATTERN = /^(?:0|-?[1-9]\d*)$/
 const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/
 
-type DeepReadonly<T> = T extends (...args: never[]) => unknown
-    ? T
-    : T extends readonly (infer U)[]
-        ? readonly DeepReadonly<U>[]
-        : T extends object
-            ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
-            : T
-
-type RuntimeGacha = Gacha & { readonly name: string }
-type ReadonlyRuntimeGachas = Readonly<Record<string, DeepReadonly<RuntimeGacha>>>
 type ReadonlyRawRows = Readonly<Record<string, readonly (readonly string[])[]>>
 type ReadonlyNestedRawRows = Readonly<Record<string, ReadonlyRawRows>>
 
@@ -37,8 +31,12 @@ export interface GachaSourceReader {
 }
 
 export interface GachaConversionOutput {
-    readonly "gacha.json": ReadonlyRuntimeGachas
+    readonly "gacha.json": GachaRuntimeBanners
     readonly "gacha_campaign.json": Readonly<Record<string, number>>
+    readonly "gacha_campaign_definitions.json": Readonly<Record<string, GachaCampaignDefinition>>
+    readonly "stars_gacha_campaign.json": Readonly<Record<string, StarsGachaCampaignDefinition>>
+    readonly "gacha_exchange_rate.json": Readonly<GachaExchangeRates>
+    readonly "gacha_pool.json": GachaPools
     readonly "cdndata/gacha.json": ReadonlyRawRows
     readonly "cdndata/gacha_feature_content.json": ReadonlyNestedRawRows
 }
@@ -124,6 +122,12 @@ function parseStrictInteger(value: string, fieldName: string, source: string): n
     return parsed
 }
 
+function parsePositiveInteger(value: string, fieldName: string, source: string): number {
+    const parsed = parseStrictInteger(value, fieldName, source)
+    if (parsed <= 0) invalidGacha(`${fieldName} must be positive in ${source}: ${value}`)
+    return parsed
+}
+
 function parseStrictBoolean(value: string, fieldName: string, source: string): boolean {
     if (value === "true") return true
     if (value === "false") return false
@@ -136,8 +140,8 @@ function parseRarityOdds(rows: readonly OrderedMapTextRow[], oddsId: string): Ra
         const fields = parseCsvLine(row.text, source, invalidGacha)
         if (fields.length !== 2) invalidGacha(`rarity odds row must have 2 columns in ${source}`)
         return {
-            rarity: parseStrictInteger(fields[0], "rarity", source),
-            weight: parseStrictInteger(fields[1], "weight", source),
+            rarity: parsePositiveInteger(fields[0], "rarity", source),
+            weight: parsePositiveInteger(fields[1], "weight", source),
         }
     })
 }
@@ -151,9 +155,9 @@ function parseCharacterOdds(
         const fields = parseCsvLine(row.text, source, invalidGacha)
         if (fields.length !== 7) invalidGacha(`character odds row must have 7 columns in ${source}`)
         return {
-            characterId: parseStrictInteger(fields[0], "characterId", source),
-            rarity: parseStrictInteger(fields[1], "rarity", source),
-            weight: parseStrictInteger(fields[2], "weight", source),
+            characterId: parsePositiveInteger(fields[0], "characterId", source),
+            rarity: parsePositiveInteger(fields[1], "rarity", source),
+            weight: parsePositiveInteger(fields[2], "weight", source),
             oddsUp: parseStrictBoolean(fields[3], "oddsUp", source),
             isLimited: parseStrictBoolean(fields[4], "isLimited", source),
             isExchangeable: parseStrictBoolean(fields[5], "isExchangeable", source),
@@ -171,9 +175,9 @@ function parseEquipmentOdds(
         const fields = parseCsvLine(row.text, source, invalidGacha)
         if (fields.length !== 6) invalidGacha(`equipment odds row must have 6 columns in ${source}`)
         return {
-            equipmentId: parseStrictInteger(fields[0], "equipmentId", source),
-            rarity: parseStrictInteger(fields[1], "rarity", source),
-            weight: parseStrictInteger(fields[2], "weight", source),
+            equipmentId: parsePositiveInteger(fields[0], "equipmentId", source),
+            rarity: parsePositiveInteger(fields[1], "rarity", source),
+            weight: parsePositiveInteger(fields[2], "weight", source),
             oddsUp: parseStrictBoolean(fields[3], "oddsUp", source),
             isLimited: parseStrictBoolean(fields[4], "isLimited", source),
             isExchangeable: parseStrictBoolean(fields[5], "isExchangeable", source),
@@ -229,10 +233,11 @@ async function readOddsGroup<T>(
     kind: OddsKind,
     parse: (rows: readonly OrderedMapTextRow[], id: string) => T[],
 ): Promise<Readonly<Record<string, OddsTable<T>>>> {
-    const entries: Array<readonly [string, OddsTable<T>]> = []
-    for (const oddsId of [...ids].sort()) {
-        entries.push([oddsId, await readOddsTable(reader, oddsId, kind, parse)])
-    }
+    const entries = await mapWithConcurrency(
+        [...ids].sort(),
+        12,
+        async oddsId => [oddsId, await readOddsTable(reader, oddsId, kind, parse)] as const,
+    )
     return Object.fromEntries(entries)
 }
 
@@ -262,24 +267,70 @@ function collectOddsIds(gachaRows: readonly GachaRowEntry[]): {
     return { rarity, character, equipment }
 }
 
-function parseInteger(value: string | undefined, fallback: number): number {
-    const parsed = Number.parseInt(value ?? "", 10)
-    return Number.isFinite(parsed) ? parsed : fallback
-}
-
-function parseOptionalInteger(value: string | undefined): number | undefined {
+function parseOptionalInteger(
+    value: string | undefined,
+    fieldName: string,
+    source: string,
+): number | undefined {
     const text = cleanOptionalId(value)
     if (!text) return undefined
-    const parsed = Number.parseInt(text, 10)
-    return Number.isFinite(parsed) ? parsed : undefined
+    return parsePositiveInteger(text, fieldName, source)
 }
 
-function parseOptionalBoolean(value: string | undefined, fallback = false): boolean {
-    const text = cleanOptionalId(value)?.toLowerCase()
-    if (!text) return fallback
-    if (text === "true") return true
-    if (text === "false") return false
-    return fallback
+function parseOptionalBoolean(value: string | undefined, fieldName: string, source: string): boolean {
+    const text = cleanOptionalId(value)
+    return text === undefined ? false : parseStrictBoolean(text, fieldName, source)
+}
+
+function requireBlank(value: string | undefined, fieldName: string, source: string): void {
+    if (cleanOptionalId(value) !== undefined) {
+        invalidGacha(`${fieldName} must be blank for this page kind in ${source}`)
+    }
+}
+
+function buildPage(row: readonly string[], source: string): GachaRuntimePage {
+    const kind = parseStrictInteger(row[4], "pageKind", source)
+    switch (kind) {
+        case 0:
+            requireBlank(row[8], "tenTimesPerAccountCost", source)
+            return {
+                kind,
+                singleCost: parsePositiveInteger(row[5], "singleCost", source),
+                multiCost: parsePositiveInteger(row[6], "multiCost", source),
+                dailyPaidCost: parsePositiveInteger(row[7], "discountCost", source),
+            }
+        case 1:
+            requireBlank(row[5], "singleCost", source)
+            requireBlank(row[6], "multiCost", source)
+            requireBlank(row[7], "discountCost", source)
+            return {
+                kind,
+                accountPaidTenCost: parsePositiveInteger(
+                    row[8],
+                    "tenTimesPerAccountCost",
+                    source,
+                ),
+            }
+        case 2:
+        case 3:
+        case 4:
+        case 5:
+            requireBlank(row[5], "singleCost", source)
+            requireBlank(row[6], "multiCost", source)
+            requireBlank(row[7], "discountCost", source)
+            requireBlank(row[8], "tenTimesPerAccountCost", source)
+            return { kind }
+        case 8:
+            requireBlank(row[7], "discountCost", source)
+            requireBlank(row[8], "tenTimesPerAccountCost", source)
+            return {
+                kind,
+                singleCost: parsePositiveInteger(row[5], "singleCost", source),
+                multiCost: parsePositiveInteger(row[6], "multiCost", source),
+            }
+        default:
+            return invalidGacha(`pageKind is unreachable in ${source}: ${kind}`)
+    }
 }
 
 function round2(value: number): number {
@@ -312,6 +363,10 @@ function buildRankRates(
 ): { normal: number[]; multiGuarantee: number[] } {
     if (!rarityOdds) invalidGacha("missing rarity odds table")
     const raw = new Map(rarityOdds.entries.map(entry => [entry.rarity, entry.weight]))
+    if (raw.size !== rarityOdds.entries.length
+        || [...raw.keys()].sort((left, right) => left - right).join(",") !== "3,4,5") {
+        invalidGacha(`rarity odds ${rarityOdds.id} must contain each of rarities 3, 4 and 5 once`)
+    }
     const totalWeight = rarityOdds.entries.reduce((sum, entry) => sum + entry.weight, 0)
     const normalWeights = [5, 4, 3].map(rarity => raw.get(rarity) || 0)
     const guaranteeWeights = [5, 4].map(rarity => {
@@ -355,129 +410,225 @@ function normalizePoolEntries<T extends CharacterOddsEntry | EquipmentOddsEntry>
     })
 }
 
-function buildPoolForOddsIds<T extends CharacterOddsEntry | EquipmentOddsEntry>(
-    oddsTables: Readonly<Record<string, OddsTable<T>>>,
-    mapping: Readonly<Record<string, string | undefined>>,
-    idField: "characterId" | "equipmentId",
-): Record<string, GachaPoolItem[]> {
-    const pool: Record<string, GachaPoolItem[]> = {}
-    for (const [poolKey, rawOddsId] of Object.entries(mapping)) {
-        const oddsId = cleanOptionalId(rawOddsId)
-        if (!oddsId) continue
-        const odds = oddsTables[oddsId]
-        if (!odds) invalidGacha(`referenced odds table was not loaded: ${oddsId}`)
-        pool[poolKey] = normalizePoolEntries(odds.entries, idField)
-    }
-    return pool
-}
-
 function buildBanner(
     gachaId: string,
     row: string[],
     rarityOdds: Readonly<Record<string, OddsTable<RarityOddsEntry>>>,
-    characterOdds: Readonly<Record<string, OddsTable<CharacterOddsEntry>>>,
-    equipmentOdds: Readonly<Record<string, OddsTable<EquipmentOddsEntry>>>,
-): RuntimeGacha {
+): GachaRuntimeBanner {
+    const source = `gacha[${gachaId}]`
     const isEquipment = row[13] === "1"
     const name = String(row[1] || `Gacha ${gachaId}`)
-    const pageKind = parseInteger(row[4], 0)
-    const guaranteeRarity = parseInteger(row[10], 4)
+    const page = buildPage(row, source)
+    const guaranteeNumber = parsePositiveInteger(row[9], "guaranteeNumber", source)
+    if (guaranteeNumber !== 1) invalidGacha(`${source}.guaranteeNumber must be 1`)
+    const guaranteeRarity = parsePositiveInteger(row[10], "guaranteeRarity", source)
+    if (guaranteeRarity !== 4 && guaranteeRarity !== 5) {
+        invalidGacha(`${source}.guaranteeRarity must be 4 or 5`)
+    }
     const rarityOddsId = cleanOptionalId(row[11]) as string
     const rankRates = buildRankRates(rarityOdds[rarityOddsId], guaranteeRarity)
-    const singleCost = parseInteger(row[5], isEquipment ? 75 : 150)
-    const multiCost = parseInteger(row[6], isEquipment ? 750 : 1500)
-    const discountCost = parseInteger(row[7], isEquipment ? 25 : 50)
-    const tenTimesPerAccountCost = parseOptionalInteger(row[8])
-    const onceTicketItemId = parseOptionalInteger(row[27])
-    const tenTicketItemId = parseOptionalInteger(row[28])
-    const crazyTenTicketItemId = parseOptionalInteger(row[45])
-    const startDate = String(row[29] || "2000-01-01 00:00:00")
-    const endDate = String(row[30] || "2099-01-01 00:00:00")
+    if (rankRates.normal.reduce((sum, value) => sum + value, 0) !== 1000
+        || rankRates.multiGuarantee.reduce((sum, value) => sum + value, 0) !== 1000) {
+        invalidGacha(`${source}.rankRates must each sum to 1000`)
+    }
+    const onceTicketItemId = parseOptionalInteger(row[27], "onceTicketItemId", source)
+    const tenTicketItemId = parseOptionalInteger(row[28], "tenTicketItemId", source)
+    const crazyTenTicketItemId = parseOptionalInteger(row[45], "crazyTenTicketItemId", source)
+    const startDate = row[29]
+    const endDate = row[30]
+    if (!startDate || !endDate) invalidGacha(`${source}.period must not be blank`)
+    const ticketExpiryTime = cleanOptionalId(row[31])
+    const extended = {
+        guaranteeNumber,
+        ...(ticketExpiryTime ? { ticketExpiryTime } : {}),
+        showPeriod: parseOptionalBoolean(row[32], "showPeriod", source),
+        isComeback: parseOptionalBoolean(row[43], "isComeback", source),
+        freemiumGuaranteeAvailable: parseOptionalBoolean(
+            row[44],
+            "freemiumGuaranteeAvailable",
+            source,
+        ),
+        isStarsGacha: parseOptionalBoolean(row[46], "isStarsGacha", source),
+    }
 
     if (isEquipment) {
         const equipmentMovieProbabilityId = cleanOptionalId(row[25])
+        const poolOddsIds = Object.fromEntries(Object.entries({
+            "1": row[24], "2": row[23], "3": row[22],
+        }).flatMap(([rank, value]) => {
+            const id = cleanOptionalId(value)
+            return id ? [[rank, id]] : []
+        }))
+        if (Object.keys(poolOddsIds).length !== 3) {
+            invalidGacha(`${source}.poolOddsIds must contain all three ranks`)
+        }
+        if (!equipmentMovieProbabilityId) {
+            invalidGacha(`${source}.equipmentMovieProbabilityId must not be blank`)
+        }
         return {
-            type: 1,
-            paymentType: 0,
-            pageKind,
-            singleCost,
-            multiCost,
-            discountCost,
-            ...(tenTimesPerAccountCost ? { tenTimesPerAccountCost } : {}),
+            kind: "equipment",
+            page,
             ...(onceTicketItemId ? { onceTicketItemId } : {}),
             ...(tenTicketItemId ? { tenTicketItemId } : {}),
             ...(crazyTenTicketItemId ? { crazyTenTicketItemId } : {}),
-            wildcardTicketAvailable: parseOptionalBoolean(row[26]),
+            wildcardTicketAvailable: parseOptionalBoolean(
+                row[26],
+                "wildcardTicketAvailable",
+                source,
+            ),
             rarityOddsId,
             guaranteeRarity,
             rankRates,
-            ...(equipmentMovieProbabilityId ? { equipmentMovieProbabilityId } : {}),
+            equipmentMovieProbabilityId,
             startDate,
             endDate,
             name,
-            pool: buildPoolForOddsIds(
-                equipmentOdds,
-                { "1": row[24], "2": row[23], "3": row[22] },
-                "equipmentId",
-            ),
-        } as RuntimeGacha
+            ...extended,
+            poolOddsIds,
+        }
     }
 
+    const poolOddsIds = Object.fromEntries(Object.entries({
+        "1": row[16], "2": row[15], "3": row[14],
+    }).flatMap(([rank, value]) => {
+        const id = cleanOptionalId(value)
+        return id ? [[rank, id]] : []
+    }))
+    if (Object.keys(poolOddsIds).length !== 3) {
+        invalidGacha(`${source}.poolOddsIds must contain all three ranks`)
+    }
+    const movieName = cleanOptionalId(row[17])
+    const guaranteeMovieName = cleanOptionalId(row[18])
+    if (!movieName || !guaranteeMovieName) {
+        invalidGacha(`${source}.movie names must not be blank`)
+    }
     return {
-        type: 0,
-        paymentType: 0,
-        pageKind,
-        singleCost,
-        multiCost,
-        discountCost,
-        ...(tenTimesPerAccountCost ? { tenTimesPerAccountCost } : {}),
+        kind: "character",
+        page,
         ...(onceTicketItemId ? { onceTicketItemId } : {}),
         ...(tenTicketItemId ? { tenTicketItemId } : {}),
         ...(crazyTenTicketItemId ? { crazyTenTicketItemId } : {}),
-        wildcardTicketAvailable: parseOptionalBoolean(row[20]),
+        wildcardTicketAvailable: parseOptionalBoolean(
+            row[20],
+            "wildcardTicketAvailable",
+            source,
+        ),
         rarityOddsId,
         guaranteeRarity,
         rankRates,
-        movieName: String(row[17] || "normal"),
-        guaranteeMovieName: String(row[18] || "normal_guarantee"),
-        toUseOddsUpAsTrialReading: parseOptionalBoolean(row[19]),
-        canBeStartDashExchange: parseOptionalBoolean(row[21]),
+        movieName,
+        guaranteeMovieName,
+        toUseOddsUpAsTrialReading: parseOptionalBoolean(
+            row[19],
+            "toUseOddsUpAsTrialReading",
+            source,
+        ),
+        canBeStartDashExchange: parseOptionalBoolean(
+            row[21],
+            "canBeStartDashExchange",
+            source,
+        ),
         startDate,
         endDate,
         name,
-        pool: buildPoolForOddsIds(
-            characterOdds,
-            { "1": row[16], "2": row[15], "3": row[14] },
-            "characterId",
-        ),
-    } as RuntimeGacha
+        ...extended,
+        poolOddsIds,
+    }
 }
 
-function buildCampaigns(rows: readonly OrderedMapTextRow[]): Record<string, number> {
-    const mappings = new Map<string, number>()
+function buildCampaignDefinitions(
+    rows: readonly OrderedMapTextRow[],
+): Record<string, GachaCampaignDefinition> {
+    const definitions: Record<string, GachaCampaignDefinition> = {}
     for (const [campaignIdText, fields] of requireRows(
         rows,
         "gacha_campaign",
         GACHA_CAMPAIGN_COLUMN_COUNT,
     )) {
         const campaignId = parseStrictInteger(campaignIdText, "campaignId", "gacha_campaign")
-        const gachaIds = fields[5].split(",")
-        if (gachaIds.length === 1 && gachaIds[0] === "") {
+        const kind = parseStrictInteger(fields[2], "kind", `gacha_campaign[${campaignIdText}]`)
+        if (kind !== 1 && kind !== 2) invalidGacha(`gacha_campaign[${campaignIdText}].kind is invalid`)
+        const gachaIdTexts = fields[5].split(",")
+        if (gachaIdTexts.length === 1 && gachaIdTexts[0] === "") {
             invalidGacha(`gacha_campaign[${campaignIdText}].gachaIds must not be empty`)
         }
-        for (const gachaIdText of gachaIds) {
-            const gachaId = parseStrictInteger(
+        const gachaIds = gachaIdTexts.map(gachaIdText => parsePositiveInteger(
                 gachaIdText,
                 "gachaId",
                 `gacha_campaign[${campaignIdText}]`,
-            )
-            const key = String(gachaId)
-            mappings.set(key, campaignId)
+            ))
+        definitions[campaignIdText] = {
+            campaignId,
+            stringId: fields[0],
+            title: fields[1],
+            kind,
+            availableFrom: fields[3],
+            availableUntil: fields[4],
+            gachaIds,
         }
+    }
+    return definitions
+}
+
+function buildLegacyCampaignMap(
+    definitions: Readonly<Record<string, GachaCampaignDefinition>>,
+): Record<string, number> {
+    const mappings = new Map<string, number>()
+    for (const definition of Object.values(definitions)) {
+        for (const gachaId of definition.gachaIds) mappings.set(String(gachaId), definition.campaignId)
     }
     return Object.fromEntries([...mappings].sort((left, right) => (
         compareCanonicalIds(left[0], right[0])
     )))
+}
+
+function buildStarsCampaigns(
+    rows: readonly OrderedMapTextRow[],
+): Record<string, StarsGachaCampaignDefinition> {
+    return Object.fromEntries(requireRows(rows, "stars_gacha_campaign", 8).map(
+        ([campaignIdText, fields]) => [campaignIdText, {
+            campaignId: parsePositiveInteger(campaignIdText, "campaignId", "stars_gacha_campaign"),
+            stringId: fields[0],
+            title: fields[1],
+            gachaId: parsePositiveInteger(fields[2], "gachaId", `stars_gacha_campaign[${campaignIdText}]`),
+            availableFrom: fields[3],
+            availableUntil: fields[4],
+            oldPlayerDays: parsePositiveInteger(fields[5], "oldPlayerDays", `stars_gacha_campaign[${campaignIdText}]`),
+            newPlayerDays: parsePositiveInteger(fields[6], "newPlayerDays", `stars_gacha_campaign[${campaignIdText}]`),
+            maximumFreeGachaTimes: parsePositiveInteger(fields[7], "maximumFreeGachaTimes", `stars_gacha_campaign[${campaignIdText}]`),
+        }],
+    ))
+}
+
+function buildExchangeRates(
+    characterRows: readonly OrderedMapTextRow[],
+    equipmentRows: readonly OrderedMapTextRow[],
+): GachaExchangeRates {
+    const parse = (rows: readonly OrderedMapTextRow[], name: string) => Object.fromEntries(
+        requireRows(rows, name, 1).map(([rarity, fields]) => [
+            rarity,
+            parsePositiveInteger(fields[0], "cost", `${name}[${rarity}]`),
+        ]),
+    )
+    return {
+        character: parse(characterRows, "character_exchange_rate"),
+        equipment: parse(equipmentRows, "equipment_exchange_rate"),
+    }
+}
+
+function buildSharedPools(
+    characterOdds: Readonly<Record<string, OddsTable<CharacterOddsEntry>>>,
+    equipmentOdds: Readonly<Record<string, OddsTable<EquipmentOddsEntry>>>,
+): GachaPools {
+    const pools: Record<string, GachaPoolItem[]> = {}
+    for (const [id, odds] of Object.entries(characterOdds)) {
+        pools[id] = normalizePoolEntries(odds.entries, "characterId")
+    }
+    for (const [id, odds] of Object.entries(equipmentOdds)) {
+        if (pools[id] !== undefined) invalidGacha(`odds identity is shared across prize kinds: ${id}`)
+        pools[id] = normalizePoolEntries(odds.entries, "equipmentId")
+    }
+    return pools
 }
 
 function buildFeatureContent(
@@ -503,10 +654,20 @@ function buildFeatureContent(
 }
 
 export async function convertGachas(reader: GachaSourceReader): Promise<GachaConversionOutput> {
-    const [rawGachaRows, campaignRows, featureRows] = await Promise.all([
+    const [
+        rawGachaRows,
+        campaignRows,
+        featureRows,
+        starsCampaignRows,
+        characterExchangeRows,
+        equipmentExchangeRows,
+    ] = await Promise.all([
         reader.read(GACHA_PATH),
         reader.read(GACHA_CAMPAIGN_PATH),
         reader.readNested(GACHA_FEATURE_CONTENT_PATH),
+        reader.read(STARS_GACHA_CAMPAIGN_PATH),
+        reader.read(CHARACTER_EXCHANGE_RATE_PATH),
+        reader.read(EQUIPMENT_EXCHANGE_RATE_PATH),
     ])
     const gachaRows = requireRows(rawGachaRows, "gacha", GACHA_COLUMN_COUNT)
     const ids = collectOddsIds(gachaRows)
@@ -516,22 +677,39 @@ export async function convertGachas(reader: GachaSourceReader): Promise<GachaCon
         readOddsGroup(reader, ids.equipment, "equipment", parseEquipmentOdds),
     ])
 
-    const gachas: Record<string, RuntimeGacha> = {}
+    const gachas: Record<string, GachaRuntimeBanner> = {}
     const cdnGachas: Record<string, string[][]> = {}
     for (const [gachaId, fields] of gachaRows) {
         gachas[gachaId] = buildBanner(
             gachaId,
             fields,
             rarityOdds,
-            characterOdds,
-            equipmentOdds,
         )
         cdnGachas[gachaId] = [fields]
     }
 
+    const campaignDefinitions = buildCampaignDefinitions(campaignRows)
+    for (const definition of Object.values(campaignDefinitions)) {
+        for (const gachaId of definition.gachaIds) {
+            if (gachas[String(gachaId)] === undefined) {
+                invalidGacha(`campaign ${definition.campaignId} references missing gacha ${gachaId}`)
+            }
+        }
+    }
+    const starsCampaigns = buildStarsCampaigns(starsCampaignRows)
+    for (const definition of Object.values(starsCampaigns)) {
+        if (gachas[String(definition.gachaId)] === undefined) {
+            invalidGacha(`stars campaign ${definition.campaignId} references missing gacha ${definition.gachaId}`)
+        }
+    }
+
     return deepFreeze({
         "gacha.json": gachas,
-        "gacha_campaign.json": buildCampaigns(campaignRows),
+        "gacha_campaign.json": buildLegacyCampaignMap(campaignDefinitions),
+        "gacha_campaign_definitions.json": campaignDefinitions,
+        "stars_gacha_campaign.json": starsCampaigns,
+        "gacha_exchange_rate.json": buildExchangeRates(characterExchangeRows, equipmentExchangeRows),
+        "gacha_pool.json": buildSharedPools(characterOdds, equipmentOdds),
         "cdndata/gacha.json": cdnGachas,
         "cdndata/gacha_feature_content.json": buildFeatureContent(featureRows),
     })

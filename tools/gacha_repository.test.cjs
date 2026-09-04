@@ -24,19 +24,36 @@ test("character and gacha API asset facades read one initialized ContentReposito
     const previousSnapshot = productionContentSnapshotProvider.snapshot
     const character = Object.freeze({ name: "", rarity: 5, element: 1, skill_count: 6 })
     const gacha = Object.freeze({
-        type: 0,
-        paymentType: 0,
-        singleCost: 150,
-        multiCost: 1500,
-        discountCost: 50,
+        kind: "character",
+        name: "fixture",
+        page: Object.freeze({ kind: 0, singleCost: 150, multiCost: 1500, dailyPaidCost: 50 }),
+        wildcardTicketAvailable: false,
+        rarityOddsId: "fixture_rarity",
+        guaranteeRarity: 4,
+        guaranteeNumber: 1,
+        rankRates: Object.freeze({ normal: [50, 250, 700], multiGuarantee: [50, 950] }),
         startDate: "2026-01-01 00:00:00",
         endDate: "2026-01-10 00:00:00",
-        pool: Object.freeze({}),
+        showPeriod: true,
+        isComeback: false,
+        isStarsGacha: false,
+        freemiumGuaranteeAvailable: false,
+        poolOddsIds: Object.freeze({ "1": "fixture_5", "2": "fixture_4", "3": "fixture_3" }),
+        movieName: "normal",
+        guaranteeMovieName: "normal_guarantee",
+        toUseOddsUpAsTrialReading: false,
+        canBeStartDashExchange: false,
+    })
+    const pools = Object.freeze({
+        fixture_5: Object.freeze([]),
+        fixture_4: Object.freeze([]),
+        fixture_3: Object.freeze([]),
     })
     const requestedTables = []
     const tables = Object.freeze({
         "character.json": Object.freeze({ "990001": character }),
         "gacha.json": Object.freeze({ "990002": gacha }),
+        "gacha_pool.json": pools,
         "gacha_campaign.json": Object.freeze({ "990002": 77 }),
     })
     productionContentSnapshotProvider.snapshot = Object.freeze({
@@ -58,11 +75,15 @@ test("character and gacha API asset facades read one initialized ContentReposito
 
     try {
         assert.strictEqual(getCharacterDataSync(990001), character)
-        assert.strictEqual(getGachaSync(990002), gacha)
+        const projectedGacha = getGachaSync(990002)
+        assert.equal(projectedGacha.type, 0)
+        assert.equal(projectedGacha.singleCost, 150)
+        assert.strictEqual(projectedGacha.pool["1"], pools.fixture_5)
         assert.equal(getGachaCampaignIdSync(990002), 77)
         assert.deepEqual(requestedTables, [
             "character.json",
             "gacha.json",
+            "gacha_pool.json",
             "gacha_campaign.json",
         ])
     } finally {

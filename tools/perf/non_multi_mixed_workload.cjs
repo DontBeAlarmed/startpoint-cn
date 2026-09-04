@@ -221,6 +221,7 @@ async function runNonMultiMixedWorkload({
                 "event_item_shop.json",
                 "event_item_shop_id_map.json",
                 "gacha.json",
+                "gacha_pool.json",
                 "general_shop.json",
             ],
         })

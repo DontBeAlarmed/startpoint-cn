@@ -17,7 +17,8 @@ import itemData from "../../assets/item_data.json"
 import itemIdsData from "../../assets/item_ids.json"
 import itemLookupData from "../../assets/item_lookup.json"
 import equipmentCraftData from "../../assets/equipment_craft.json"
-import { AssetCharacter, BattleQuest, BoxGacha, ClearRewards, ConfigValues, EquipmentCraftEntry, EquipmentDissolveEntry, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, Gacha, Gachas, ItemSaleEntry, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawBoxGachas, RawBoxRewards, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, ShopSelectItemCampaigns, StoryQuest } from "./types";
+import { AssetCharacter, BattleQuest, BoxGacha, ClearRewards, ConfigValues, EquipmentCraftEntry, EquipmentDissolveEntry, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, Gacha, ItemSaleEntry, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawBoxGachas, RawBoxRewards, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, ShopSelectItemCampaigns, StoryQuest } from "./types";
+import { getLegacyGachas } from "./gacha-legacy-content";
 import { getRushCompatibilityEvent } from "./shop/rush-compatibility"
 import { RawBoxGachaSettings } from "./types/box-gacha";
 import {
@@ -681,8 +682,7 @@ export function getBoxGachaSync(
 export function getGachaSync(
     id: string | number
 ): Gacha | null {
-    const gachas = getContentSnapshot().repository.table<Gachas>("gacha.json")
-    const data = (gachas as Gachas)[String(id)];
+    const data = getLegacyGachas(getContentSnapshot().repository)[String(id)];
     
     return data ?? null
 }

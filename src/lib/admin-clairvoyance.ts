@@ -4,6 +4,7 @@ import {
     type ReadonlyContentRepository,
 } from "../content/runtime/content-snapshot"
 import { getVirtualNow } from "../runtime/time/game-time"
+import { getLegacyGachas } from "./gacha-legacy-content"
 
 const SHORT_TERM_MAX_DAYS = 60
 const CHARACTER_GACHA_TYPE = 0
@@ -25,7 +26,7 @@ interface RawGacha {
     startDate: string
     endDate: string
     name?: string
-    pool?: Record<string, RawGachaPoolItem[]>
+    pool?: Readonly<Record<string, readonly RawGachaPoolItem[]>>
 }
 
 interface CharacterMeta {
@@ -182,7 +183,7 @@ function buildSearchIndex(timeline: ClairvoyanceGacha[]): ClairvoyanceSearchRow[
 }
 
 function buildStaticTimeline(repository: ReadonlyContentRepository): StaticClairvoyanceTimeline {
-    const gachas = repository.table<Record<string, RawGacha>>("gacha.json")
+    const gachas = getLegacyGachas(repository) as Record<string, RawGacha>
     const characterMeta = repository.table<Record<string, CharacterMeta>>("character.json")
     const characterText = repository.table<CharacterTextRows>("cdndata/character_text.json")
     const timeline = Object.entries(gachas)

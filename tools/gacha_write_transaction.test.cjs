@@ -16,7 +16,9 @@ const previousDataDirectory = process.env.DATA_DIR
 process.env.DATA_DIR = databaseDirectory
 
 const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
-    .installBundledGameplaySnapshot({ additionalTableNames: ["gacha.json"] })
+    .installBundledGameplaySnapshot({
+        additionalTableNames: ["gacha.json", "gacha_pool.json"],
+    })
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getActiveMissionCountersSync } = require("../src/data/domains/active_mission_counters")

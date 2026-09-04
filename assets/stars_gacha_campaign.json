@@ -1,0 +1,57 @@
+{
+  "1": {
+    "campaignId": 1,
+    "stringId": "stars_gacha_campaign_01",
+    "title": "群星扭蛋第一期",
+    "gachaId": 80000,
+    "availableFrom": "2023-08-31 12:00:00",
+    "availableUntil": "2023-12-07 04:59:59",
+    "oldPlayerDays": 3,
+    "newPlayerDays": 14,
+    "maximumFreeGachaTimes": 4
+  },
+  "2": {
+    "campaignId": 2,
+    "stringId": "stars_gacha_campaign_02",
+    "title": "群星扭蛋第二期",
+    "gachaId": 80001,
+    "availableFrom": "2023-12-07 05:00:00",
+    "availableUntil": "2024-02-22 04:59:59",
+    "oldPlayerDays": 3,
+    "newPlayerDays": 14,
+    "maximumFreeGachaTimes": 4
+  },
+  "3": {
+    "campaignId": 3,
+    "stringId": "stars_gacha_campaign_03",
+    "title": "群星扭蛋第三期",
+    "gachaId": 80002,
+    "availableFrom": "2024-02-22 05:00:00",
+    "availableUntil": "2024-05-23 04:59:59",
+    "oldPlayerDays": 3,
+    "newPlayerDays": 14,
+    "maximumFreeGachaTimes": 4
+  },
+  "4": {
+    "campaignId": 4,
+    "stringId": "stars_gacha_campaign_04",
+    "title": "群星扭蛋第四期",
+    "gachaId": 80003,
+    "availableFrom": "2024-05-23 05:00:00",
+    "availableUntil": "2024-07-11 04:59:59",
+    "oldPlayerDays": 3,
+    "newPlayerDays": 14,
+    "maximumFreeGachaTimes": 4
+  },
+  "5": {
+    "campaignId": 5,
+    "stringId": "stars_gacha_campaign_05",
+    "title": "群星扭蛋第五期",
+    "gachaId": 80004,
+    "availableFrom": "2024-07-11 05:00:00",
+    "availableUntil": "2050-10-01 04:59:59",
+    "oldPlayerDays": 3,
+    "newPlayerDays": 14,
+    "maximumFreeGachaTimes": 4
+  }
+}

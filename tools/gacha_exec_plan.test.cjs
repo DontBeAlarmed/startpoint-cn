@@ -28,6 +28,7 @@ const equipmentGacha = {
   type: 1,
   singleCost: 75,
   multiCost: 750,
+  discountCost: 25,
   onceTicketItemId: 20005,
   tenTicketItemId: 20006,
 };
@@ -89,27 +90,13 @@ assert.deepStrictEqual(
   buildGachaExecPlan({
     gacha: characterGacha,
     paymentType: GACHA_PAYMENT_TYPES.TICKET,
-    execType: GACHA_EXEC_TYPES.MULTI_TICKET,
+    execType: GACHA_EXEC_TYPES.MULTI_CONFIGURED_TICKET,
     numberOfExec: 2,
     playerFunds,
     playerGachaData,
     getTicketCount: (itemId) => itemId === 20002 ? 2 : 0,
   }),
-  {
-    ok: true,
-    plan: {
-      pullCount: 20,
-      freeVmoney: 1000,
-      paidVmoney: 800,
-      ticket: {
-        itemId: 20002,
-        beforeCount: 2,
-        afterCount: 0,
-        useTicketCount: 2,
-      },
-      campaign: null,
-    },
-  },
+  { ok: false, status: 400, message: "Invalid number of gacha executions." },
 );
 
 assert.deepStrictEqual(
@@ -149,8 +136,8 @@ assert.deepStrictEqual(
       pageKind: GACHA_PAGE_KINDS.TEN_TIMES_PER_ACCOUNT,
       tenTimesPerAccountCost: 1000,
     },
-    paymentType: GACHA_PAYMENT_TYPES.FREE_VMONEY,
-    execType: GACHA_EXEC_TYPES.VMONEY_MULTI,
+    paymentType: GACHA_PAYMENT_TYPES.VMONEY,
+    execType: GACHA_EXEC_TYPES.ACCOUNT_PAID_MULTI,
     numberOfExec: 1,
     playerFunds,
     playerGachaData: {
@@ -164,5 +151,50 @@ assert.deepStrictEqual(
     message: "Already did account-limited summon.",
   },
 );
+
+assert.deepStrictEqual(
+  buildGachaExecPlan({
+    gacha: {
+      ...characterGacha,
+      pageKind: GACHA_PAGE_KINDS.TEN_TIMES_PER_ACCOUNT,
+      tenTimesPerAccountCost: 600,
+    },
+    paymentType: GACHA_PAYMENT_TYPES.VMONEY,
+    execType: GACHA_EXEC_TYPES.ACCOUNT_PAID_MULTI,
+    numberOfExec: 1,
+    playerFunds,
+    playerGachaData,
+  }),
+  {
+    ok: true,
+    plan: {
+      pullCount: 10,
+      freeVmoney: 1000,
+      paidVmoney: 200,
+      ticket: null,
+      campaign: null,
+    },
+  },
+);
+
+for (const [paymentType, execType] of [
+  [GACHA_PAYMENT_TYPES.FREE_VMONEY, GACHA_EXEC_TYPES.DAILY_SINGLE],
+  [GACHA_PAYMENT_TYPES.VMONEY, GACHA_EXEC_TYPES.VMONEY_MULTI],
+  [GACHA_PAYMENT_TYPES.CAMPAIGN, GACHA_EXEC_TYPES.VMONEY_SINGLE],
+  [GACHA_PAYMENT_TYPES.FREE_VMONEY, GACHA_EXEC_TYPES.CAMPAIGN_MULTI],
+]) {
+  assert.deepStrictEqual(buildGachaExecPlan({
+    gacha: characterGacha,
+    paymentType,
+    execType,
+    numberOfExec: 1,
+    playerFunds,
+    playerGachaData,
+  }), {
+    ok: false,
+    status: 400,
+    message: "Gacha execution type is not allowed for this gacha.",
+  });
+}
 
 console.log("gacha_exec_plan tests passed");

@@ -15,6 +15,9 @@ try {
 const GACHA_PATH = "master/gacha/gacha.orderedmap"
 const CAMPAIGN_PATH = "master/gacha/gacha_campaign.orderedmap"
 const FEATURE_PATH = "master/gacha/gacha_feature_content.orderedmap"
+const STARS_PATH = "master/campaign/stars_gacha/stars_gacha_campaign.orderedmap"
+const CHARACTER_RATE_PATH = "master/gacha/exchange_point/character_exchange_rate.orderedmap"
+const EQUIPMENT_RATE_PATH = "master/gacha/exchange_point/equipment_exchange_rate.orderedmap"
 
 function encodeCsv(fields) {
     return fields.map(field => (
@@ -42,6 +45,7 @@ function gachaRow({
     fields[5] = prizeKind === "1" ? "75" : "150"
     fields[6] = prizeKind === "1" ? "750" : "1500"
     fields[7] = prizeKind === "1" ? "25" : "50"
+    fields[9] = "1"
     fields[10] = guaranteeRarity
     fields[11] = rarityOdds
     fields[13] = prizeKind
@@ -79,14 +83,14 @@ function createFixture(overrides = {}) {
         name: '角色,"精选"',
         prizeKind: "0",
         rank3: "character_3",
-        rank4: "(None)",
+        rank4: "character_4",
         rank5: "character_5",
     })
     const equipment = gachaRow({
         stringId: "equipment_fixture",
         name: "装备精选",
         prizeKind: "1",
-        rank3: " ",
+        rank3: "equipment_3",
         rank4: "equipment_4",
         rank5: "equipment_5",
         guaranteeRarity: "5",
@@ -103,6 +107,12 @@ function createFixture(overrides = {}) {
             "(None)",
             "",
         ])]],
+        [STARS_PATH, [row("1", [
+            "stars_fixture", "群星", "10", "2026-01-01 00:00:00",
+            "2026-01-10 00:00:00", "3", "14", "4",
+        ])]],
+        [CHARACTER_RATE_PATH, [row("3", ["250"]), row("4", ["250"]), row("5", ["250"])]],
+        [EQUIPMENT_RATE_PATH, [row("3", ["250"]), row("4", ["250"]), row("5", ["250"])]],
     ])
     const nested = new Map([
         [FEATURE_PATH, [
@@ -123,6 +133,14 @@ function createFixture(overrides = {}) {
                 row("1", ["1005", "5", "3", "true", "true", "true", "true"]),
                 row("2", ["1006", "5", "2", "false", "false", "false", "false"]),
             ],
+        }]],
+        ["master/gacha_odds/character_4.orderedmap", [{
+            key: "character_4",
+            rows: [row("1", ["1004", "4", "25", "false", "false", "false", "false"])],
+        }]],
+        ["master/gacha_odds/equipment_3.orderedmap", [{
+            key: "equipment_3",
+            rows: [row("1", ["3003", "3", "70", "false", "false", "false"])],
         }]],
         ["master/gacha_odds/equipment_4.orderedmap", [{
             key: "equipment_4",
@@ -171,16 +189,26 @@ test("gacha converter builds character/equipment runtime pools and raw compatibi
     })
 
     const character = output["gacha.json"]["10"]
-    assert.equal(character.type, 0)
+    assert.equal(character.kind, "character")
     assert.equal(character.name, '角色,"精选"')
+    assert.deepEqual(character.page, {
+        kind: 0,
+        singleCost: 150,
+        multiCost: 1500,
+        dailyPaidCost: 50,
+    })
+    assert.equal(character.guaranteeNumber, 1)
     assert.deepEqual(character.rankRates, {
         normal: [50, 250, 700],
         multiGuarantee: [50, 950],
     })
-    assert.deepEqual(Object.fromEntries(
-        Object.entries(character.pool).map(([rank, items]) => [rank, items.length]),
-    ), { "1": 2, "3": 1 })
-    assert.deepEqual(character.pool["1"], [
+    assert.deepEqual(character.poolOddsIds, {
+        "1": "character_5",
+        "2": "character_4",
+        "3": "character_3",
+    })
+    assert.equal("pool" in character, false)
+    assert.deepEqual(output["gacha_pool.json"].character_5, [
         {
             id: 1005,
             rank: 5,
@@ -202,23 +230,38 @@ test("gacha converter builds character/equipment runtime pools and raw compatibi
             rarity: 400,
         },
     ])
-    assert.deepEqual(character.pool["3"].map(item => [item.id, item.odds]), [[1003, 70]])
+    assert.deepEqual(output["gacha_pool.json"].character_3.map(item => [item.id, item.odds]), [[1003, 70]])
 
     const equipment = output["gacha.json"]["20"]
-    assert.equal(equipment.type, 1)
+    assert.equal(equipment.kind, "equipment")
     assert.equal(equipment.equipmentMovieProbabilityId, "movie_fixture")
     assert.deepEqual(equipment.rankRates, {
         normal: [50, 250, 700],
         multiGuarantee: [1000, 0],
     })
-    assert.deepEqual(equipment.pool["1"].map(item => [item.id, item.odds, item.isLimited]), [
+    assert.deepEqual(output["gacha_pool.json"].equipment_5.map(item => [item.id, item.odds, item.isLimited]), [
         [5005, 5, true],
     ])
-    assert.deepEqual(equipment.pool["2"].map(item => [item.id, item.odds, item.isRateUp]), [
+    assert.deepEqual(output["gacha_pool.json"].equipment_4.map(item => [item.id, item.odds, item.isRateUp]), [
         [5004, 25, true],
     ])
 
     assert.deepEqual(output["gacha_campaign.json"], { "10": 7, "20": 7 })
+    assert.deepEqual(output["gacha_campaign_definitions.json"]["7"], {
+        campaignId: 7,
+        stringId: "campaign_fixture",
+        title: '免费,"活动"',
+        kind: 2,
+        availableFrom: "2026-01-01 00:00:00",
+        availableUntil: "2026-01-10 00:00:00",
+        gachaIds: [10, 20],
+    })
+    assert.equal(output["stars_gacha_campaign.json"]["1"].gachaId, 10)
+    assert.equal(output["stars_gacha_campaign.json"]["1"].maximumFreeGachaTimes, 4)
+    assert.deepEqual(output["gacha_exchange_rate.json"], {
+        character: { 3: 250, 4: 250, 5: 250 },
+        equipment: { 3: 250, 4: 250, 5: 250 },
+    })
     assert.deepEqual(output["cdndata/gacha_feature_content.json"], {
         "10": { "2": [["2", "", "", "1", "preview", "1005", "0", "1005", ""]] },
         "20": { "1": [["1", '装备,"横幅"', "", "", "", "", "(None)", "", ""]] },
@@ -238,10 +281,15 @@ test("gacha converter preserves the official crazy ten-ticket field", async () =
             name: "疯狂十连",
             prizeKind: "0",
             rank3: "character_3",
+            rank4: "character_4",
             rank5: "character_5",
             crazyTenTicketItemId: "999012",
         })),
     ])
+    fixture.flat.set(CAMPAIGN_PATH, [row("7", [
+        "campaign_fixture", "免费活动", "2", "2026-01-01 00:00:00",
+        "2026-01-10 00:00:00", "10", "(None)", "",
+    ])])
 
     const output = await convertGachas(fixture.reader)
     assert.equal(output["gacha.json"]["10"].crazyTenTicketItemId, 999012)
@@ -317,6 +365,40 @@ test("gacha converter strictly validates odds integers, booleans, columns, and o
         rows: [row("1", ["1005", "5", "3", "true", "true", "true", "true"])],
     }])
     await assert.rejects(convertGachas(fixture.reader), /outer key.*character_5/i)
+})
+
+test("gacha converter rejects malformed reachable banner costs and booleans", async t => {
+    const cases = [
+        ["cost", 5, "-150", /singleCost.*positive/i],
+        ["boolean", 32, "yes", /showPeriod.*boolean/i],
+    ]
+    for (const [name, column, value, expected] of cases) {
+        await t.test(name, async () => {
+            const fixture = createFixture()
+            fixture.character[column] = value
+            fixture.flat.set(GACHA_PATH, [
+                row("10", fixture.character),
+                row("20", fixture.equipment),
+            ])
+            await assert.rejects(convertGachas(fixture.reader), expected)
+        })
+    }
+
+    const account = createFixture()
+    account.character[4] = "1"
+    account.character[5] = ""
+    account.character[6] = ""
+    account.character[7] = ""
+    account.character[8] = "1500"
+    account.flat.set(GACHA_PATH, [
+        row("10", account.character),
+        row("20", account.equipment),
+    ])
+    const output = await convertGachas(account.reader)
+    assert.deepEqual(output["gacha.json"]["10"].page, {
+        kind: 1,
+        accountPaidTenCost: 1500,
+    })
 })
 
 test("gacha converter requires official fixed table shapes", async () => {

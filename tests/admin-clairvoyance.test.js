@@ -4,6 +4,7 @@ const assert = require("assert")
 const bundledCharacters = require("../assets/character.json")
 const bundledCharacterText = require("../assets/cdndata/character_text.json")
 const bundledGachas = require("../assets/gacha.json")
+const bundledGachaPools = require("../assets/gacha_pool.json")
 
 const {
     productionContentSnapshotProvider,
@@ -14,7 +15,12 @@ const {
     buildShortUpCharacterGachaTimeline,
 } = require("../src/lib/admin-clairvoyance")
 
-function repository(characterMeta, characterText, gachas = bundledGachas) {
+function repository(
+    characterMeta,
+    characterText,
+    gachas = bundledGachas,
+    gachaPools = bundledGachaPools,
+) {
     return Object.freeze({
         info: () => Object.freeze({
             source: "release",
@@ -24,6 +30,7 @@ function repository(characterMeta, characterText, gachas = bundledGachas) {
         }),
         table: (tableName) => {
             if (tableName === "gacha.json") return gachas
+            if (tableName === "gacha_pool.json") return gachaPools
             if (tableName === "character.json") return characterMeta
             if (tableName === "cdndata/character_text.json") return characterText
             throw new Error(`unexpected content table: ${tableName}`)
@@ -32,8 +39,8 @@ function repository(characterMeta, characterText, gachas = bundledGachas) {
 }
 
 const previousSnapshot = productionContentSnapshotProvider.snapshot
-const targetGachaItems = Object.values(bundledGachas["900002"].pool)
-    .flat()
+const targetGachaItems = Object.values(bundledGachas["900002"].poolOddsIds)
+    .flatMap(oddsId => bundledGachaPools[oddsId])
     .filter(item => item.id === 121069)
 const originalRarities = targetGachaItems.map(item => ({
     item,
@@ -74,7 +81,13 @@ try {
     injectedTextRow[3] = "Release角色称号"
     const injectedGacha = structuredClone(bundledGachas["900002"])
     injectedGacha.name = "Release卡池名"
-    const injectedGachaItems = Object.values(injectedGacha.pool)
+    const injectedGachaPools = Object.fromEntries(
+        Object.values(injectedGacha.poolOddsIds).map(oddsId => [
+            oddsId,
+            structuredClone(bundledGachaPools[oddsId]),
+        ]),
+    )
+    const injectedGachaItems = Object.values(injectedGachaPools)
         .flat()
         .filter(item => item.id === 121069)
     productionContentSnapshotProvider.snapshot = Object.freeze({
@@ -83,6 +96,7 @@ try {
             Object.freeze({ "121069": injectedCharacter }),
             Object.freeze({ "121069": Object.freeze([Object.freeze(injectedTextRow)]) }),
             Object.freeze({ "900002": Object.freeze(injectedGacha) }),
+            Object.freeze(injectedGachaPools),
         ),
     })
 
@@ -107,6 +121,7 @@ try {
             Object.freeze({ "121069": injectedCharacter }),
             Object.freeze({ "121069": Object.freeze([Object.freeze(injectedTextRow)]) }),
             Object.freeze({ "900002": Object.freeze(injectedGacha) }),
+            Object.freeze(injectedGachaPools),
         ),
     })
     const releaseTimeline = buildShortUpCharacterGachaTimeline(
@@ -139,6 +154,7 @@ try {
         table: (tableName) => {
             tableReads++
             if (tableName === "gacha.json") return Object.freeze({ "900002": Object.freeze(injectedGacha) })
+            if (tableName === "gacha_pool.json") return Object.freeze(injectedGachaPools)
             if (tableName === "character.json") return Object.freeze({ "121069": injectedCharacter })
             if (tableName === "cdndata/character_text.json") {
                 return Object.freeze({ "121069": Object.freeze([Object.freeze(injectedTextRow)]) })
@@ -153,7 +169,7 @@ try {
 
     const cachedFirst = buildShortUpCharacterGachaTimeline(new Date("2021-10-18T14:00:00.000Z"))
     const cachedSecond = buildShortUpCharacterGachaTimeline(new Date("2021-10-18T15:00:00.000Z"))
-    assert.strictEqual(tableReads, 3, "同一个固定 Repository 只应构建一次静态千里眼数据")
+    assert.strictEqual(tableReads, 4, "同一个固定 Repository 只应构建一次静态千里眼数据")
     assert.notStrictEqual(cachedFirst.currentTime, cachedSecond.currentTime)
 } finally {
     for (const { item, hasRarity, rarity } of originalRarities) {

@@ -257,6 +257,7 @@ async function runAwakeOwnerFocusedBaseline() {
         fixture = await createAwakeOwnerFactPublicationFixture({
             additionalTableNames: [
                 "gacha.json",
+                "gacha_pool.json",
                 "shop_item_campaign.json",
                 "shop_select_item_campaign.json",
             ],
