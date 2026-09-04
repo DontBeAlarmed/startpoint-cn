@@ -343,7 +343,7 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
         true
     )
 
-    assert.equal(countOccurrences(shopPurchaseRouteSource, "reconcileAwakeUnlockCharacterList("), 1)
+    assert.equal(countOccurrences(shopPurchaseRouteSource, "reconcileAwakeUnlockCharacterList("), 2)
     assert.equal(countOccurrences(shopPurchaseRouteSource, "executeShopPurchaseSync("), 2)
     assert.equal(
         shopPurchaseSource.indexOf("addPlayerShopPurchaseCountsByTypeFromSnapshotSync(")
@@ -491,44 +491,29 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
     const characterSource = readRouteSource("character.ts")
     const tutorialSource = readRouteSource("tutorial.ts")
 
-    const gachaEquipmentBlock = getRouteBlock(gachaSource, "/exchange_equipment", "/exchange_character")
-    const gachaCharacterBlock = getRouteBlock(gachaSource, "/exchange_character", "/exec")
-    const gachaExecBlock = getRouteBlock(gachaSource, "/exec")
-    assert.equal(findCalls(gachaSource, "reconcileAwakeUnlockCharacterList").length, 2)
-    assert.equal(findCalls(gachaEquipmentBlock, "reconcileAwakeUnlockCharacterList").length, 0)
-
-    const gachaExchangeCall = getOnlyCall(gachaCharacterBlock, "reconcileAwakeUnlockCharacterList")
-    assert.deepEqual(gachaExchangeCall.arguments, ["playerId", "[characterId]", "[existingCharacterList]", "{}", '"gacha/character-grant"'])
-    assert.deepEqual(gachaExchangeCall.conditionalConditions, [])
-    assert.equal(gachaExchangeCall.position > getLastCallPosition(gachaCharacterBlock, "givePlayerCharacterSync"), true)
-    assert.equal(gachaExchangeCall.position > getLastCallPosition(gachaCharacterBlock, "updatePlayerGachaInfoSync"), true)
-    const gachaExchangeExistingList = findVariableInitializers(gachaCharacterBlock, "existingCharacterList")
-    assert.equal(gachaExchangeExistingList.length, 1)
-    assert.equal(gachaExchangeExistingList[0].startsWith("giveResult.character"), true)
-    assert.equal(gachaExchangeExistingList[0].includes("? [giveResult.character"), true)
-    assert.equal(gachaExchangeExistingList[0].endsWith(": []"), true)
-    assert.deepEqual(findPropertyAssignmentValues(gachaCharacterBlock, "character_list"), ["characterList"])
-
-    const gachaExecCall = getOnlyCall(gachaExecBlock, "reconcileAwakeUnlockCharacterList")
-    assert.deepEqual(gachaExecCall.arguments, ["playerId", "[]", "[existingCharacterList]", "{}", '"gacha/exec"'])
-    assert.deepEqual(gachaExecCall.conditionalConditions, [])
-    for (const persistenceCall of [
-        "rewardPlayerGachaDrawResultSync",
-        "insertReceiveHistorySync",
-        "insertPlayerGachaInfoSync",
-        "updatePlayerGachaInfoSync",
-        "updatePlayerSync",
-    ]) {
-        assert.equal(gachaExecCall.position > getLastCallPosition(gachaExecBlock, persistenceCall), true)
-    }
-    const gachaExecExistingList = findVariableInitializers(gachaExecBlock, "existingCharacterList")
-    assert.equal(gachaExecExistingList.length, 1)
-    assert.equal(gachaExecExistingList[0].startsWith("rewardResult.characters.filter("), true)
-    assert.equal(gachaExecExistingList[0].includes("character !== undefined"), true)
-    assert.equal(gachaExecExistingList[0].includes("character !== null"), true)
-    assert.equal(gachaExecExistingList[0].includes('typeof character === "object"'), true)
-    assert.equal(gachaExecExistingList[0].includes("!Array.isArray(character)"), true)
-    assert.deepEqual(findPropertyAssignmentValues(gachaExecBlock, "character_list"), ["characterList"])
+    // D20 后 exec/exchange/crazy select 的 Growth 发布统一经 runGachaPostCommitEffects 的
+    // publishGrowth 回调；每个路由文件恰好一处字面发布调用，且位于 owner 同步调用
+    // （事务已提交）之后。精确调用点矩阵由 awake_reconcile_callsite_matrix.test.cjs 维护。
+    const gachaExchangeRoutesSource = readRouteSource("gacha/exchange-routes.ts")
+    const gachaCrazyRoutesSource = readRouteSource("gacha/crazy-routes.ts")
+    assert.equal(findCalls(gachaSource, "reconcileAwakeUnlockCharacterList").length, 1)
+    assert.equal(
+        gachaSource.indexOf("reconcileAwakeUnlockCharacterList(")
+            > gachaSource.indexOf("runGachaPostCommitEffects("),
+        true,
+    )
+    assert.equal(findCalls(gachaExchangeRoutesSource, "reconcileAwakeUnlockCharacterList").length, 1)
+    assert.equal(
+        gachaExchangeRoutesSource.indexOf("reconcileAwakeUnlockCharacterList(")
+            > gachaExchangeRoutesSource.indexOf("executeGachaExchangeSync("),
+        true,
+    )
+    assert.equal(findCalls(gachaCrazyRoutesSource, "reconcileAwakeUnlockCharacterList").length, 1)
+    assert.equal(
+        gachaCrazyRoutesSource.indexOf("reconcileAwakeUnlockCharacterList(")
+            > gachaCrazyRoutesSource.indexOf("selectCrazyGachaCandidateSync("),
+        true,
+    )
 
     const starCrumbBlock = getRouteBlock(exchangeSource, "/star_crumb")
     const starCrumbCall = getOnlyCall(starCrumbBlock, "reconcileAwakeUnlockCharacterList")

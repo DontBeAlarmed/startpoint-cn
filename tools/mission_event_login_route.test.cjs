@@ -43,6 +43,10 @@ productionContentSnapshotProvider.snapshot = {
             if (tableName === "character.json") return require("../assets/character.json")
             if (tableName === "item_inventory_policy.json") return require("../assets/item_inventory_policy.json")
             if (tableName === "mana_node.json") return require("../assets/mana_node.json")
+            if (tableName === "config.json") {
+                const config = require("../assets/config.json")
+                return { max_mana: config.max_mana, max_star_crumb: config.max_star_crumb }
+            }
             return {}
         },
     },

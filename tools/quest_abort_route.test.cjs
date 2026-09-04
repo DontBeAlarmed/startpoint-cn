@@ -33,7 +33,6 @@ const unusedRouteDependencies = [
     "../src/lib/equipment",
     "../src/lib/mission",
     "../src/lib/mission/battle-facts",
-    "../src/lib/quest",
     "../src/lib/quest/finish/carnival-handler",
     "../src/lib/quest/finish/challenge-point",
     "../src/lib/quest/finish/character-clear-tracker",

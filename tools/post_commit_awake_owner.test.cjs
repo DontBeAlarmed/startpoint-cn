@@ -43,7 +43,7 @@ const POST_COMMIT_35_3_OWNER_INVENTORY = Object.freeze({
     "src/routes/api/boxGacha.ts": ["drawn-reward-characters"],
     "src/routes/api/character.ts": ["town-granted-character"],
     "src/routes/api/exchange.ts": ["exchange-reward-characters"],
-    "src/routes/api/gacha.ts": ["exchanged-character", "drawn-characters"],
+    "src/routes/api/gacha.ts": ["gacha-post-commit-characters"],
     "src/routes/api/item.ts": ["mana-item-fact"],
     "src/routes/api/mission.ts": ["category9-delta-missions"],
     "src/routes/api/passCard.ts": ["pass-card-reward-facts"],
@@ -209,12 +209,12 @@ test("Mana item sell publishes the invalidated player fact without a character h
     assert.doesNotMatch(publicationCall, /263002|characterId|character_id/)
 })
 
-test("post-commit inventory covers the eleven Character Growth owner expressions", () => {
+test("post-commit inventory covers the ten Character Growth owner expressions", () => {
     const postCommitFiles = new Set(Object.keys(POST_COMMIT_35_3_OWNER_INVENTORY))
     const transactionFiles = new Set(Object.values(TRANSACTION_INTERNAL_35_2_OWNER_INVENTORY).flat())
     assert.equal(
         Object.values(POST_COMMIT_35_3_OWNER_INVENTORY).flat().length,
-        11,
+        10,
         "post-commit Character Growth owner expressions",
     )
     assert.equal(
