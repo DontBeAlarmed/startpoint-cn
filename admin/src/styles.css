@@ -853,3 +853,33 @@ html[data-theme="dark"] {
 .admin-detail-descriptions .ant-descriptions-item-label {
   color: var(--ink-soft);
 }
+
+/* mail: send form reads as three bordered sections (收件人 / 附件 / 正文) */
+.admin-form-section {
+  padding: 14px 14px 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--stat-bg);
+}
+
+.admin-form-section + .admin-form-section {
+  margin-top: 16px;
+}
+
+.admin-form-section-title {
+  margin-bottom: 14px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.admin-form-section > .ant-form-item:last-child {
+  margin-bottom: 0;
+}
+
+/* modals share the bordered panel voice of .ant-card; modals portal to body, so the rule is unscoped */
+.ant-modal .ant-modal-content {
+  border: 2px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
