@@ -676,7 +676,9 @@ body {
   white-space: nowrap;
 }
 
-.admin-app .ant-table-wrapper .ant-table-thead > tr > th {
+.admin-app .ant-table-wrapper .ant-table-thead > tr > th,
+.admin-app .ant-table-wrapper .ant-table-thead > tr > th.ant-table-cell-fix-left,
+.admin-app .ant-table-wrapper .ant-table-thead > tr > th.ant-table-cell-fix-right {
   background: var(--th-bg);
 }
 
