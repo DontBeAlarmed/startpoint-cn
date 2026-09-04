@@ -237,13 +237,6 @@ body {
   max-width: 100%;
 }
 
-.admin-card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
-  gap: 16px;
-  align-items: start;
-}
-
 .admin-metric-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -898,6 +891,11 @@ html[data-theme="dark"] {
   border: 2px solid var(--line-strong);
   border-radius: var(--radius);
   background: var(--panel);
+}
+
+/* the modal header never carries its own surface — the content background shows through */
+.ant-modal .ant-modal-header {
+  background: transparent;
 }
 
 /* news editor: sandboxed preview frame continues the bordered form sections */

@@ -213,7 +213,7 @@ export default function Dashboard() {
 
                 <Row gutter={[16, 16]}>
                     <Col span={12}>
-                        <Card title="服务端状态">
+                        <Card title="服务端状态" style={{ height: "100%" }}>
                             {statusLoading && !status ? (
                                 <Alert type="info" showIcon message="正在加载服务端状态" />
                             ) : statusError || !status ? (
@@ -243,7 +243,7 @@ export default function Dashboard() {
 
                     </Col>
                     <Col span={12}>
-                        <Card title="多人联机状态">
+                        <Card title="多人联机状态" style={{ height: "100%" }}>
                             {statusLoading && !status ? (
                                 <Alert type="info" showIcon message="正在加载多人联机状态" />
                             ) : statusError || !status ? (
@@ -350,7 +350,7 @@ export default function Dashboard() {
 
                 <Row gutter={[16, 16]}>
                     <Col span={24}>
-                        <Card title="CDN 基线 / 补丁 Overlay">
+                        <Card title="CDN 基线 / 补丁 Overlay" style={{ height: "100%" }}>
                             {statusLoading && !status ? (
                                 <Alert type="info" showIcon message="正在加载 CDN 状态" />
                             ) : statusError || !status ? (
@@ -426,7 +426,7 @@ export default function Dashboard() {
 
                 <Row gutter={[16, 16]}>
                     <Col span={12}>
-                        <Card title="账号 / 存档概况">
+                        <Card title="账号 / 存档概况" style={{ height: "100%" }}>
                             {accountsError ? (
                                 <Alert
                                     type="error"
@@ -454,7 +454,7 @@ export default function Dashboard() {
 
                     </Col>
                     <Col span={12}>
-                        <Card title="默认存档">
+                        <Card title="默认存档" style={{ height: "100%" }}>
                             <Space direction="vertical" className="admin-stack">
                                 <Typography.Text type="secondary">
                                     上传玩家详情页「导出存档」得到的 JSON。之后任意账户「新建存档」时，将用它替换空存档。

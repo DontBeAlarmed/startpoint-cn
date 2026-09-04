@@ -33,6 +33,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
                         colorPrimary: "#FFD335",
                         colorTextLightSolid: "#1F2D4D",
                         borderRadius: 8,
+                        ...(mode === "dark" ? {
+                            colorBgContainer: "#1D2740",      // 卡/表/输入框容器底 → 藏青
+                            colorBgElevated: "#232F4E",       // 弹层/下拉/模态浮层底
+                            colorBgLayout: "#141B2E",         // 布局底
+                            colorBorderSecondary: "#32405F",  // 内部描边
+                        } : {}),
                     },
                 }}
             >
