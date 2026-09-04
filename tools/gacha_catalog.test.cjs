@@ -11,8 +11,8 @@ const test = require("node:test")
 const {
     buildGachaCatalog,
     getGachaCatalog,
+    isGachaPeriodAvailable,
     parseGachaJstTimestamp,
-    resolveBaseGachaBanner,
     resolveGachaCampaign,
     GachaPeriodError,
     GachaRequestError,
@@ -215,10 +215,10 @@ test("JST period boundaries are inclusive and standard campaign resolution keeps
     const banner = catalog.banners["1638"]
     const start = parseGachaJstTimestamp(banner.basePeriod.availableFrom)
     const end = parseGachaJstTimestamp(banner.basePeriod.availableUntil)
-    assert.equal(resolveBaseGachaBanner(catalog, 1638, start).gachaId, 1638)
-    assert.equal(resolveBaseGachaBanner(catalog, 1638, end).gachaId, 1638)
-    assert.throws(() => resolveBaseGachaBanner(catalog, 1638, start - 1), GachaPeriodError)
-    assert.throws(() => resolveBaseGachaBanner(catalog, 1638, end + 1), GachaPeriodError)
+    assert.equal(isGachaPeriodAvailable(banner.basePeriod, start), true)
+    assert.equal(isGachaPeriodAvailable(banner.basePeriod, end), true)
+    assert.equal(isGachaPeriodAvailable(banner.basePeriod, start - 1), false)
+    assert.equal(isGachaPeriodAvailable(banner.basePeriod, end + 1), false)
     assert.equal(resolveGachaCampaign(
         catalog,
         80004,

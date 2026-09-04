@@ -14,7 +14,6 @@ const {
 } = require("../src/content/runtime/content-snapshot")
 const {
     getCharacterDataSync,
-    getGachaCampaignIdSync,
     getGachaSync,
 } = require("../src/lib/assets")
 
@@ -54,7 +53,6 @@ test("character and gacha API asset facades read one initialized ContentReposito
         "character.json": Object.freeze({ "990001": character }),
         "gacha.json": Object.freeze({ "990002": gacha }),
         "gacha_pool.json": pools,
-        "gacha_campaign.json": Object.freeze({ "990002": 77 }),
     })
     productionContentSnapshotProvider.snapshot = Object.freeze({
         cdn: Object.freeze({ targetVersion: "test-release" }),
@@ -79,12 +77,10 @@ test("character and gacha API asset facades read one initialized ContentReposito
         assert.equal(projectedGacha.type, 0)
         assert.equal(projectedGacha.singleCost, 150)
         assert.strictEqual(projectedGacha.pool["1"], pools.fixture_5)
-        assert.equal(getGachaCampaignIdSync(990002), 77)
         assert.deepEqual(requestedTables, [
             "character.json",
             "gacha.json",
             "gacha_pool.json",
-            "gacha_campaign.json",
         ])
     } finally {
         productionContentSnapshotProvider.snapshot = previousSnapshot
@@ -95,7 +91,6 @@ test("bundled ContentRepository keeps tracked gacha fallback behavior", async t 
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "gacha-repository-"))
     t.after(() => fs.rmSync(root, { recursive: true, force: true }))
     const trackedGachas = require("../assets/gacha.json")
-    const trackedCampaigns = require("../assets/gacha_campaign.json")
     const placeholder = Object.freeze({ placeholder: true })
     const repository = await ContentRepository.load({
         projectRoot,
@@ -107,16 +102,13 @@ test("bundled ContentRepository keeps tracked gacha fallback behavior", async t 
     }, {
         importBundledTable: async (_root, tableName) => {
             if (tableName === "gacha.json") return trackedGachas
-            if (tableName === "gacha_campaign.json") return trackedCampaigns
             return placeholder
         },
     })
 
     assert.equal(repository.info().source, "bundled")
     assert.equal(Object.keys(trackedGachas).length, 584)
-    assert.equal(Object.keys(trackedCampaigns).length, 145)
     assert.deepEqual(repository.table("gacha.json"), trackedGachas)
-    assert.deepEqual(repository.table("gacha_campaign.json"), trackedCampaigns)
 })
 
 test("Gacha HTTP routes delegate Content ownership to the Gacha catalog", () => {
@@ -137,4 +129,31 @@ test("Gacha HTTP routes delegate Content ownership to the Gacha catalog", () => 
     assert.doesNotMatch(characterRoute, /assets\/character\.json/)
     assert.doesNotMatch(characterOwner, /assets\/character\.json/)
     assert.doesNotMatch(gachaRoute, /assets\/gacha(?:_campaign)?\.json/)
+})
+
+test("Gacha route registration exposes exactly the CN client endpoints", async () => {
+    const Fastify = require("fastify")
+    const gachaRoutes = require("../src/routes/api/gacha").default
+    const app = Fastify({ logger: false })
+    const registered = []
+    app.addHook("onRoute", route => {
+        registered.push(`${route.method} ${route.url}`)
+    })
+    await app.register(gachaRoutes, { prefix: "/gacha" })
+    await app.ready()
+    assert.deepEqual(registered.sort(), [
+        "POST /gacha/crazy_gacha_save",
+        "POST /gacha/crazy_gacha_select",
+        "POST /gacha/exchange_character",
+        "POST /gacha/exchange_equipment",
+        "POST /gacha/exec",
+        "POST /gacha/shown_converted",
+    ])
+    assert.equal(registered.some(entry => (
+        entry === "POST /gacha/index"
+        || entry === "POST /gacha/payment"
+        || entry === "POST /gacha/history"
+        || entry === "POST /gacha/point"
+    )), false)
+    await app.close()
 })

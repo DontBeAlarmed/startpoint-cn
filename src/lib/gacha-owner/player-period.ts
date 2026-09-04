@@ -26,13 +26,6 @@ function period(startTime: number, endTime: number): GachaPeriod {
     }
 }
 
-export function resolvePlayerEffectiveGachaPeriodSync(
-    playerId: number,
-    banner: GachaBanner,
-): GachaPeriod | undefined {
-    return getPlayerGachaExecutionStateSync(playerId, banner).effectivePeriod
-}
-
 export interface PlayerGachaExecutionState {
     readonly effectivePeriod?: GachaPeriod
     readonly starsCampaign?: Readonly<PlayerStarsGachaCampaign>

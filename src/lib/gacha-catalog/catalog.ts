@@ -9,7 +9,7 @@ import type {
     StarsGachaCampaignDefinition,
 } from "../types/gacha"
 import type { GachaBanner, GachaCatalog, GachaWeightedPool } from "./model"
-import { GachaPeriodError, isGachaPeriodAvailable, parseGachaJstTimestamp } from "./period"
+import { isGachaPeriodAvailable, parseGachaJstTimestamp } from "./period"
 
 function positiveInteger(value: unknown, subject: string): number {
     if (!Number.isSafeInteger(value) || (value as number) <= 0) {
@@ -292,18 +292,6 @@ export function getGachaCatalog(
     const catalog = buildGachaCatalog(repository)
     catalogs.set(repository, catalog)
     return catalog
-}
-
-export function resolveBaseGachaBanner(
-    catalog: GachaCatalog,
-    gachaId: number,
-    nowMs: number,
-): GachaBanner {
-    const banner = catalog.banners[String(gachaId)]
-    if (banner === undefined || !isGachaPeriodAvailable(banner.basePeriod, nowMs)) {
-        throw new GachaPeriodError("Gacha is outside its available period.")
-    }
-    return banner
 }
 
 export function resolveGachaCampaign(

@@ -687,21 +687,6 @@ export function getGachaSync(
     return data ?? null
 }
 
-/**
- * Gets the ID of the gacha campaign assigned to a gacha.
- * 
- * @param gachaId The ID of the gacha.
- * @returns The ID of the assigned gacha campaign or null.
- */
-export function getGachaCampaignIdSync(
-    gachaId: string | number
-): number | null {
-    const gachaCampaigns = getContentSnapshot().repository.table<Record<string, number>>(
-        "gacha_campaign.json",
-    )
-    return (gachaCampaigns as Record<string, number>)[String(gachaId)] ?? null
-}
-
 // shop functions
 
 function getShopContentTable<T>(tableName: string): T {

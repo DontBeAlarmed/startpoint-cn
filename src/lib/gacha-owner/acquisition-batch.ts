@@ -23,7 +23,7 @@ import type {
     RewardGrantAssetAcquisition,
     RewardGrantExecutionPlan,
     RewardGrantObjectSnapshot,
-} from "../reward-grant/execution-contract"
+} from "../reward-grant"
 import { RewardType } from "../types/rewards"
 import type { Element } from "../types"
 

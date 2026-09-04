@@ -28,7 +28,6 @@ export {
     grantPlayerComebackGachaPeriodSync,
     grantPlayerStarsGachaCampaignSync,
     getPlayerGachaExecutionStateSync,
-    resolvePlayerEffectiveGachaPeriodSync,
 } from "./player-period"
 export type {
     GachaExecCommand,

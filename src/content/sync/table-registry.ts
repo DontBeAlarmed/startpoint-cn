@@ -424,14 +424,6 @@ const definitionInputs: TableSourceInput[] = [
         outputShapeVersion: 2,
     },
     {
-        tableName: "gacha_campaign.json",
-        scope: "cdn",
-        sourceOrderedMaps: ["master/gacha/gacha_campaign.orderedmap"],
-        converterId: "gacha",
-        converterVersion: 2,
-        outputShapeVersion: 2,
-    },
-    {
         tableName: "gacha_campaign_definitions.json",
         scope: "cdn",
         sourceOrderedMaps: ["master/gacha/gacha_campaign.orderedmap"],

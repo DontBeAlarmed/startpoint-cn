@@ -18,7 +18,7 @@
 
 `src/content/sync/table-registry.ts` 为 `gacha.json` 注册主表和动态 odds 来源。转换器还生成：
 
-- `gacha_campaign.json`；
+- `gacha_campaign_definitions.json`；
 - `cdndata/gacha.json`；
 - `cdndata/gacha_feature_content.json`。
 
@@ -79,7 +79,7 @@ Star Heroes、福袋、crazy ticket 和付费 UI 等特殊分支仍需单独实�
 
 ## bundled fallback
 
-没有可用 Release 时，`ContentRepository` 可以读取 tracked `assets/gacha.json` 与 `assets/gacha_campaign.json` 作为兼容 fallback。它保证旧部署可启动，不是生产 Content 更新流程。
+没有可用 Release 时，`ContentRepository` 可以读取 tracked `assets/gacha.json` 作为兼容 fallback。它保证旧部署可启动，不是生产 Content 更新流程。
 
 需要从官方 `.cdn/cn` 重新维护 bundled fallback 时，可以使用离线工具：
 

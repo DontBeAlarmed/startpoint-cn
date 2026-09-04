@@ -246,7 +246,6 @@ test("gacha converter builds character/equipment runtime pools and raw compatibi
         [5004, 25, true],
     ])
 
-    assert.deepEqual(output["gacha_campaign.json"], { "10": 7, "20": 7 })
     assert.deepEqual(output["gacha_campaign_definitions.json"]["7"], {
         campaignId: 7,
         stringId: "campaign_fixture",
@@ -338,7 +337,13 @@ test("gacha converter does not impose campaign ID reuse policy", async () => {
     fixture.flat.set(CAMPAIGN_PATH, [campaign("8"), campaign("7")])
 
     const output = await convertGachas(fixture.reader)
-    assert.equal(output["gacha_campaign.json"]["10"], 8)
+    // 同一 gacha 的多条 campaign 定义全部保留为独立定义，不折叠成单值映射
+    assert.deepEqual(
+        Object.values(output["gacha_campaign_definitions.json"])
+            .map(definition => definition.campaignId)
+            .sort((left, right) => left - right),
+        [7, 8],
+    )
 })
 
 test("gacha converter strictly validates odds integers, booleans, columns, and outer keys", async t => {

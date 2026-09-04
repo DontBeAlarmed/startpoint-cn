@@ -32,7 +32,6 @@ export interface GachaSourceReader {
 
 export interface GachaConversionOutput {
     readonly "gacha.json": GachaRuntimeBanners
-    readonly "gacha_campaign.json": Readonly<Record<string, number>>
     readonly "gacha_campaign_definitions.json": Readonly<Record<string, GachaCampaignDefinition>>
     readonly "stars_gacha_campaign.json": Readonly<Record<string, StarsGachaCampaignDefinition>>
     readonly "gacha_exchange_rate.json": Readonly<GachaExchangeRates>
@@ -570,18 +569,6 @@ function buildCampaignDefinitions(
     return definitions
 }
 
-function buildLegacyCampaignMap(
-    definitions: Readonly<Record<string, GachaCampaignDefinition>>,
-): Record<string, number> {
-    const mappings = new Map<string, number>()
-    for (const definition of Object.values(definitions)) {
-        for (const gachaId of definition.gachaIds) mappings.set(String(gachaId), definition.campaignId)
-    }
-    return Object.fromEntries([...mappings].sort((left, right) => (
-        compareCanonicalIds(left[0], right[0])
-    )))
-}
-
 function buildStarsCampaigns(
     rows: readonly OrderedMapTextRow[],
 ): Record<string, StarsGachaCampaignDefinition> {
@@ -705,7 +692,6 @@ export async function convertGachas(reader: GachaSourceReader): Promise<GachaCon
 
     return deepFreeze({
         "gacha.json": gachas,
-        "gacha_campaign.json": buildLegacyCampaignMap(campaignDefinitions),
         "gacha_campaign_definitions.json": campaignDefinitions,
         "stars_gacha_campaign.json": starsCampaigns,
         "gacha_exchange_rate.json": buildExchangeRates(characterExchangeRows, equipmentExchangeRows),

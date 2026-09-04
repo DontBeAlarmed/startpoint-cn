@@ -78,7 +78,7 @@ Gacha Master 调用客户端 `ParseTools.parseJstDataToUtcTime`，因此 banner�
 
 Catalog/owner分别解析`stoneDrawPeriod`、`paidDrawPeriod`、`campaignDrawPeriod`、`ticketDrawPeriod`、`exchangePeriod`与`conversionEligibleAt`。Conversion只在玩家已没有任何合法draw/exchange路径继续产生或消费该banner点数时触发。真实`25009`固定覆盖base结束、ticket尚有效且持券的draw/exchange/conversion边界。若以后又获得有效ticket并产生新点数，notification按第10节pending状态机累加或重开，不累计已展示历史，也不让点数滞留。
 
-过期竞态统一使用客户端明确识别的 `1351`。Campaign 无有效定义和跨日分别可使用客户端明确识别的 `1361/1366`；其他失败返回通用有限错误，不猜官服编号。
+过期竞态统一使用客户端明确识别的 `1351`。Campaign 无有效定义和跨日分别可使用客户端明确识别的 `1361/1366`；其他失败返回通用有限错误，不猜官服编号。当前实现对"今日 campaign 次数已耗尽"（跨日 `1366` 场景）返回通用失败而非 `1366`，该客户端兼容点已明确放弃并记录，不作为官服一致声明。
 
 ## 5. Typed Gacha catalog
 
@@ -92,7 +92,7 @@ Catalog 以 `ReadonlyContentRepository` identity 为生命周期并 `WeakMap` �
 - ticket policy、movie profile 与预计算 weighted pool；
 - 5个Stars campaign definition、5个Stars banner flag、5个Comeback banner flag与对应玩家状态投影。
 
-动态状态分为：Regular Campaign的`campaign_id+gacha_id+count`；Stars Campaign独立的`campaign_id+free_one_times+free_ten_times+player period`；Comeback独立player period。Stars/Comeback玩家时期属于状态，Login/account lifecycle通过窄初始化capability显式授予；缺少可证明资格输入时保持不可用，不猜enrolment。Stars两个免费次数不得压入普通campaign count，daily reset也分别更新。
+动态状态分为：Regular Campaign的`campaign_id+gacha_id+count`；Stars Campaign独立的`campaign_id+free_one_times+free_ten_times+player period`；Comeback独立player period。Stars/Comeback玩家时期属于状态，Login/account lifecycle通过窄初始化capability显式授予；缺少可证明资格输入时保持不可用，不猜enrolment。Stars两个免费次数不得压入普通campaign count；官服是否每日清零不可验证（Official-Unknown），本私服按 C3 已审策略在玩家 Stars 窗口内累计、不随 daily reset 清零，客户端只用服务端下发的 free 次数与 `maximumFreeGachaTimes` 比较，不依赖该语义。
 
 Character/Equipment 是判别联合；page kind 是 schema union。Ticket-only/Crazy 等不适用 Stone 费用的页面必须表达为 `notApplicable`，不能用默认 150/1500/50 冒充 CDN 值。raw `cdndata/gacha*.json` 继续供客户端，不被 runtime typed shape 替换。
 
@@ -200,7 +200,7 @@ D20 schema 应支持：
 - converted notification 的原点数、转换时点与 shown 状态；
 - `players_gacha_info(player_id,gacha_id)` 与 `players_gacha_campaigns(player_id,gacha_id,campaign_id)` player-first indexes。
 
-Daily reset外层事务仍由Player/login owner拥有，但通过Gacha state command对普通daily、Regular campaign与Stars one/ten状态分别执行有界集合UPDATE，不先list再逐行UPDATE。实际SQL条数由最终状态表模型和性能admission固定，不预设为恰好两条。
+Daily reset外层事务仍由Player/login owner拥有，但通过Gacha state command对普通daily与Regular campaign状态分别执行有界集合UPDATE，不先list再逐行UPDATE。Stars one/ten免费次数按第5节的窗口累计策略不属于daily reset对象，reset command不触碰`players_stars_gacha_campaigns`。实际SQL条数由最终状态表模型和性能admission固定，不预设为恰好两条。
 
 `api_count` 的跨端点、跨会话和自动重试身份未被客户端源码充分证明。D20 不用它发明 durable receipt；响应丢失后重复抽取继续作为已知边界记录，不伪造幂等保证。
 

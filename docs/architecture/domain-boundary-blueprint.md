@@ -1,6 +1,6 @@
 # D15 全项目领域边界蓝图
 
-状态：D15 边界识别、决策和后续实施路线已经完成并通过独立审查；D16、D17、D18 与 D18b 的服务端 Gate 已完成，但 D19–D28 尚未实施，因此本文不能用来宣称当前服务端已经完成 Shop、Gacha、Exchange、Mission、Battle、Event、Content 或完整 Common Response 的后续收口。D16–D18b 已落地边界以对应 Gate 文档和代码为准；其余当前已落地架构仍以本目录的“当前”图和 D12-D14 Gate 文档为准。
+状态：D15 边界识别、决策和后续实施路线已经完成并通过独立审查；D16、D17、D18 与 D18b 的服务端 Gate 已完成，D19 与 D20 的服务端实现与逐 checkpoint 审查已完成，但 D21–D28 尚未实施，因此本文不能用来宣称当前服务端已经完成 Exchange、Mission、Battle、Event、Content 或完整 Common Response 的后续收口。D16–D20 已落地边界以对应 Gate 文档和代码为准；其余当前已落地架构仍以本目录的“当前”图和 D12-D14 Gate 文档为准。
 
 ## 1. 目标与证据纪律
 
@@ -188,7 +188,7 @@ D15 明确拒绝：
 
 ```text
 D15_MAP_STATUS: COMPLETE
-BOUNDARY_MAINLINE_STATUS: IN_PROGRESS (D16-D18b complete; D19-D28 pending)
+BOUNDARY_MAINLINE_STATUS: IN_PROGRESS (D16-D20 server gates complete; D21-D28 pending)
 ```
 
 D15 完成表示：CDN 分类、客户端可达性、服务端 owner/write/transaction、19 项边界决策、测试债务、私服策略和后续依赖路线已经闭环。它不表示本文目标架构已实现。
