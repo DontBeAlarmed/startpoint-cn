@@ -4,7 +4,7 @@
 
 ## 唯一界面
 
-管理后台源码位于 `admin/`，使用 React、TypeScript、Vite、Ant Design 和 React Query，并构建到 `web/dist/`。服务端始终在 `/admin/` 挂载静态产物，为 `/admin/*` 中不带扩展名的客户端路由回退到同一个 `index.html`；`/admin/assets/*` 和带扩展名路径缺失时返回 404。访问 `/` 或 `/admin` 会进入 `/admin/`。
+管理后台源码位于 `admin/`，使用 React、TypeScript、Vite、Ant Design v5 和 TanStack Query，并构建到 `web/dist/`。视觉层由 CSS 自定义属性（custom property）token 系统驱动，提供明暗两套主题：顶栏切换按钮写入 localStorage（`starpoint-admin-theme`），初始未选择时跟随系统 `prefers-color-scheme`。服务端始终在 `/admin/` 挂载静态产物，为 `/admin/*` 中不带扩展名的客户端路由回退到同一个 `index.html`；`/admin/assets/*` 和带扩展名路径缺失时返回 404。访问 `/` 或 `/admin` 会进入 `/admin/`。
 
 管理后台采用可信网络边界：只允许本机、可信内网、可信 VPN，或部署者自有认证反向代理之后的访问。服务端不内置管理员账号、密码、Cookie、CSRF 或公网会话；管理 HTTP 不得直接暴露到不可信公网。
 
@@ -46,7 +46,7 @@ Server Bundle 始终打包完整 `web/dist/`，manifest 固定为 `admin.require
 
 ## 当前页面与验收边界
 
-后台目前包含总览、时间与千里眼、账号与存档、玩家详情、公告、礼包、邮件、种子管理和游戏设置页面。账号与存档页已接入设备名称修改，所有 React Query 写操作都提供成功和失败反馈。公告和礼包页使用服务端 revision 冲突与业务错误反馈；active 礼包只读并仅提供停止，礼包领取记录只读。源码级测试覆盖 API 契约、EX 能力清除、设备修改、表单规则和页面接线；电脑浏览器的完整破坏性操作回归，以及手机和平板布局验收仍延期。
+后台目前包含总览、时间与千里眼、账号与存档、玩家详情、公告、礼包、邮件、种子管理和游戏设置页面。界面视觉层已完成本轮刷新：基于 CSS token 的明暗双主题（暗色采用石墨配色）、顶栏切换与 localStorage 持久化，并为窄屏提供响应式回退。账号与存档页已接入设备名称修改，所有 React Query 写操作都提供成功和失败反馈。公告和礼包页使用服务端 revision 冲突与业务错误反馈；active 礼包只读并仅提供停止，礼包领取记录只读。源码级测试覆盖 API 契约、EX 能力清除、设备修改、表单规则、页面接线和主题切换约束。明暗两套主题与桌面、平板、手机三端的验收矩阵，以及电脑浏览器的完整破坏性操作回归，正在本分支最终 Gate 中执行。
 
 ## 运行时游戏设置
 
