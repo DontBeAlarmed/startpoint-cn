@@ -305,7 +305,11 @@ export default function TimeControl() {
             <Space direction="vertical" size="large" className="admin-stack">
                 <Card
                     title="服务器模拟时间"
-                    extra={<Tag color={data?.isCustom ? "orange" : "blue"}>{data?.isCustom ? "自定义模拟" : "跟随系统"}</Tag>}
+                    extra={
+                        <span className={data?.isCustom ? "admin-badge-warn" : "admin-badge-info"}>
+                            {data?.isCustom ? "自定义模拟" : "跟随系统"}
+                        </span>
+                    }
                 >
                     {isError ? (
                         <Alert type="error" showIcon message="服务器模拟时间加载失败" description="接口 /api/server/currentTime 不可用。" />
@@ -313,93 +317,96 @@ export default function TimeControl() {
                         <Space direction="vertical" size="large" className="admin-stack">
                             <div className="admin-time-editor">
                                 <Typography.Text type="secondary">当前服务器模拟时间</Typography.Text>
-                                {editingTime ? (
-                                    <div className="admin-time-inline-edit">
-                                        <div
-                                            className="admin-time-segments"
-                                            onBlur={(event) => {
-                                                if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
-                                                applyPickedTime()
-                                            }}
-                                        >
-                                            {timeSegments.map((segment, index) => (
-                                                <span className="admin-time-segment-wrap" key={segment.key}>
-                                                    <Button
-                                                        size="small"
-                                                        className="admin-time-step"
-                                                        aria-label={`${segment.label}减一`}
-                                                        onMouseDown={(event) => event.preventDefault()}
-                                                        onClick={() => adjustSegment(segment.key, -1)}
-                                                    >
-                                                        -
-                                                    </Button>
-                                                    <span className="admin-time-segment-main">
-                                                        <input
-                                                            ref={(node) => { segmentRefs.current[index] = node }}
-                                                            type="text"
-                                                            inputMode="numeric"
-                                                            aria-label={`编辑${segment.label}`}
-                                                            className="admin-time-segment"
-                                                            value={draftSegments?.[segment.key] ?? ""}
-                                                            onChange={(event) => updateSegmentText(segment.key, event.target.value)}
-                                                            onFocus={(event) => event.target.select()}
-                                                            onClick={(event) => event.currentTarget.select()}
-                                                            onKeyDown={(event) => {
-                                                                if (event.key === "ArrowRight") {
-                                                                    event.preventDefault()
-                                                                    focusSegment(index + 1)
-                                                                } else if (event.key === "ArrowLeft") {
-                                                                    event.preventDefault()
-                                                                    focusSegment(index - 1)
-                                                                } else if (event.key === "ArrowUp") {
-                                                                    event.preventDefault()
-                                                                    adjustSegment(segment.key, 1)
-                                                                } else if (event.key === "ArrowDown") {
-                                                                    event.preventDefault()
-                                                                    adjustSegment(segment.key, -1)
-                                                                } else if (event.key === "Enter") {
-                                                                    event.preventDefault()
-                                                                    applyPickedTime()
-                                                                } else if (event.key === "Escape") {
-                                                                    event.preventDefault()
-                                                                    cancelEditingTime()
-                                                                }
-                                                            }}
-                                                        />
-                                                        <span className="admin-time-segment-label">{segment.label}</span>
+                                <div className="admin-time-readout">
+                                    {editingTime ? (
+                                        <div className="admin-time-inline-edit">
+                                            <div
+                                                className="admin-time-segments"
+                                                onBlur={(event) => {
+                                                    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
+                                                    applyPickedTime()
+                                                }}
+                                            >
+                                                {timeSegments.map((segment, index) => (
+                                                    <span className="admin-time-segment-wrap" key={segment.key}>
+                                                        <Button
+                                                            size="small"
+                                                            className="admin-time-step"
+                                                            aria-label={`${segment.label}减一`}
+                                                            onMouseDown={(event) => event.preventDefault()}
+                                                            onClick={() => adjustSegment(segment.key, -1)}
+                                                        >
+                                                            -
+                                                        </Button>
+                                                        <span className="admin-time-segment-main">
+                                                            <input
+                                                                ref={(node) => { segmentRefs.current[index] = node }}
+                                                                type="text"
+                                                                inputMode="numeric"
+                                                                aria-label={`编辑${segment.label}`}
+                                                                className="admin-time-segment"
+                                                                value={draftSegments?.[segment.key] ?? ""}
+                                                                onChange={(event) => updateSegmentText(segment.key, event.target.value)}
+                                                                onFocus={(event) => event.target.select()}
+                                                                onClick={(event) => event.currentTarget.select()}
+                                                                onKeyDown={(event) => {
+                                                                    if (event.key === "ArrowRight") {
+                                                                        event.preventDefault()
+                                                                        focusSegment(index + 1)
+                                                                    } else if (event.key === "ArrowLeft") {
+                                                                        event.preventDefault()
+                                                                        focusSegment(index - 1)
+                                                                    } else if (event.key === "ArrowUp") {
+                                                                        event.preventDefault()
+                                                                        adjustSegment(segment.key, 1)
+                                                                    } else if (event.key === "ArrowDown") {
+                                                                        event.preventDefault()
+                                                                        adjustSegment(segment.key, -1)
+                                                                    } else if (event.key === "Enter") {
+                                                                        event.preventDefault()
+                                                                        applyPickedTime()
+                                                                    } else if (event.key === "Escape") {
+                                                                        event.preventDefault()
+                                                                        cancelEditingTime()
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <span className="admin-time-segment-label">{segment.label}</span>
+                                                        </span>
+                                                        <Button
+                                                            size="small"
+                                                            className="admin-time-step"
+                                                            aria-label={`${segment.label}加一`}
+                                                            onMouseDown={(event) => event.preventDefault()}
+                                                            onClick={() => adjustSegment(segment.key, 1)}
+                                                        >
+                                                            +
+                                                        </Button>
                                                     </span>
-                                                    <Button
-                                                        size="small"
-                                                        className="admin-time-step"
-                                                        aria-label={`${segment.label}加一`}
-                                                        onMouseDown={(event) => event.preventDefault()}
-                                                        onClick={() => adjustSegment(segment.key, 1)}
-                                                    >
-                                                        +
-                                                    </Button>
-                                                </span>
-                                            ))}
+                                                ))}
+                                            </div>
+                                            <Typography.Text type="secondary">
+                                                ↑/↓ 调整数值，←/→ 切换单位；离开编辑区自动应用，Esc 取消。
+                                            </Typography.Text>
                                         </div>
-                                        <Typography.Text type="secondary">
-                                            ↑/↓ 调整数值，←/→ 切换单位；离开编辑区自动应用，Esc 取消。
-                                        </Typography.Text>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            className="admin-time-value admin-mono"
+                                            onClick={startEditingTime}
+                                            disabled={isLoading || !data}
+                                        >
+                                            {timeText}
+                                        </button>
+                                    )}
+                                    <div className="admin-action-row">
+                                        <Button icon={<UndoOutlined />} loading={resetTime.isPending} onClick={() => resetTime.mutate()}>
+                                            跟随系统时间
+                                        </Button>
                                     </div>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        className="admin-time-value"
-                                        onClick={startEditingTime}
-                                        disabled={isLoading || !data}
-                                    >
-                                        {timeText}
-                                    </button>
-                                )}
+                                </div>
                                 <Typography.Text type="secondary">UTC：{isoText}</Typography.Text>
                                 <Typography.Text type="secondary">Unix 秒：{data?.servertime ?? "-"}</Typography.Text>
-                                <Divider style={{ margin: "10px 0" }} />
-                                <Button icon={<UndoOutlined />} loading={resetTime.isPending} onClick={() => resetTime.mutate()}>
-                                    跟随系统时间
-                                </Button>
                             </div>
                         </Space>
                     )}

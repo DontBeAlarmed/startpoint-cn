@@ -280,9 +280,9 @@ body {
   flex-direction: column;
   gap: 7px;
   padding: 10px 12px;
-  border: 2px solid var(--line-strong);
-  border-radius: var(--radius);
-  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--stat-bg);
 }
 
 .admin-mail-type-group {
@@ -318,6 +318,14 @@ body {
   max-width: 100%;
 }
 
+.admin-time-readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  max-width: 100%;
+}
+
 .admin-time-value {
   width: fit-content;
   max-width: 100%;
@@ -327,6 +335,7 @@ body {
   color: var(--ink);
   cursor: pointer;
   font: inherit;
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 30px;
   font-weight: 800;
   line-height: 1.2;
