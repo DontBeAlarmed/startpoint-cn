@@ -124,7 +124,12 @@ import { getPartyGroupLimit } from "../../lib/special-event-parties";
 import { insertPlayerCharactersSync, insertPlayerCharactersManaNodesSync, updatePlayerCharactersManaNodeAwakeLevelsSync } from "./character";
 import { insertPlayerCharacterAwakeUnlocksSync } from "./character_awake";
 import { insertPlayerDrawnQuestsSync, insertPlayerQuestProgressListSync } from "./quest";
-import { insertPlayerGachaInfoListSync, insertPlayerGachaCampaignListSync , getPlayerGachaInfoListSync, updatePlayerGachaInfoSync, getPlayerGachaCampaignListSync, updatePlayerGachaCampaignSync } from "./gacha";
+import { insertPlayerGachaInfoListSync, insertPlayerGachaCampaignListSync } from "./gacha";
+import {
+    resetPlayerGachaDailyStateSync,
+    upsertPlayerGachaDetailSync,
+    upsertPlayerStarsGachaCampaignSync,
+} from "./gacha-state";
 import { insertPlayerBoxGachasSync } from "./boxGacha";
 import { insertPlayerRushEventListSync, insertPlayerRushEventClearedFolderListSync, insertPlayerRushEventPlayedPartyListSync } from "./rushEvent";
 import { deletePlayerCategoryMissionsSync, insertPlayerCategoryMissionListSync, insertPlayerClearedRegularMissionListSync, insertPlayerActiveMissionsSync } from "./mission";
@@ -562,6 +567,12 @@ export function insertMergedPlayerDataSync(
     insertPlayerQuestProgressListSync(playerId, toInsert.questProgress)
     insertPlayerGachaInfoListSync(playerId, toInsert.gachaInfoList)
     insertPlayerGachaCampaignListSync(playerId, toInsert.gachaCampaignList)
+    for (const detail of toInsert.gachaDetailList ?? []) {
+        upsertPlayerGachaDetailSync({ playerId, ...detail })
+    }
+    for (const campaign of toInsert.starsGachaCampaignList ?? []) {
+        upsertPlayerStarsGachaCampaignSync({ playerId, ...campaign })
+    }
     insertPlayerDrawnQuestsSync(playerId, toInsert.drawnQuestList)
     insertPlayerPeriodicRewardPointsListSync(playerId, toInsert.periodicRewardPointList)
     insertPlayerActiveMissionsSync(playerId, toInsert.allActiveMissionList)
@@ -1280,20 +1291,7 @@ export function dailyResetPlayerDataSync(
                 loginDate,
             )
 
-            // reset gacha "isDailyFirst" values.
-            const gachaInfo = getPlayerGachaInfoListSync(playerId)
-            for (const gacha of gachaInfo) {
-                updatePlayerGachaInfoSync(playerId, {
-                    gachaId: gacha.gachaId,
-                    isDailyFirst: true
-                })
-            }
-
-            // reset campaigns
-            const gachaCampaigns = getPlayerGachaCampaignListSync(playerId)
-            for (const campaign of gachaCampaigns) {
-                updatePlayerGachaCampaignSync(playerId, campaign.gachaId, campaign.campaignId, 1)
-            }
+            resetPlayerGachaDailyStateSync(playerId)
 
             recoverActivityPeriodicRewardPointsSync(playerId)
 

@@ -46,7 +46,7 @@ test("migrates literal schema 23 to 24 and creates the public gift tables", () =
     fs.writeFileSync(path.join(process.env.DATA_DIR, "wdfp_data.version"), "23")
 
     const from23 = data.initializeDatabase()
-    assert.equal(from23.pragma("user_version", { simple: true }), 24)
+    assert.equal(from23.pragma("user_version", { simple: true }), 25)
     assert.deepEqual(giftTables(from23), [
         "players_gift_redemptions",
         "server_gift_codes",
@@ -79,27 +79,27 @@ test("gift rewards reject unsupported protocol types", () => {
     )
 })
 
-test("rejects literal schema 25 as newer than this server supports", () => {
+test("rejects literal schema 26 as newer than this server supports", () => {
     data.closeDatabase()
     const paths = resolveRuntimeDataPaths({
-        DATA_DIR: path.join(dataDirectory, "schema25", "data"),
+        DATA_DIR: path.join(dataDirectory, "schema26", "data"),
     })
     fs.mkdirSync(paths.dataDir, { recursive: true })
-    const schema25 = new Sqlite(paths.databaseFile)
-    schema25.exec("CREATE TABLE migration_marker (value TEXT NOT NULL)")
-    schema25.pragma("user_version = 25")
-    schema25.close()
-    fs.writeFileSync(paths.databaseVersionFile, "25")
+    const schema26 = new Sqlite(paths.databaseFile)
+    schema26.exec("CREATE TABLE migration_marker (value TEXT NOT NULL)")
+    schema26.pragma("user_version = 26")
+    schema26.close()
+    fs.writeFileSync(paths.databaseVersionFile, "26")
 
     const initializeFromVersion = version => {
         try {
             return data.initializeDatabase({
                 paths,
-                migrations: { latestVersion: 24 },
+                migrations: { latestVersion: 25 },
             })
         } catch (error) {
             throw error.cause ?? new Error(`unexpected schema ${version} failure`)
         }
     }
-    assert.throws(() => initializeFromVersion(25), /newer than this server supports/i)
+    assert.throws(() => initializeFromVersion(26), /newer than this server supports/i)
 })

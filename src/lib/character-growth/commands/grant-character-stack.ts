@@ -19,6 +19,13 @@ const duplicateItemByRarityAndElement: Readonly<Record<number, Readonly<Record<n
     5: { 0: 14003, 1: 14006, 2: 14009, 3: 14012, 4: 14018, 5: 14015 },
 })
 
+export function getCharacterStackCompensationItemId(
+    rarity: number,
+    element: Element,
+): number | undefined {
+    return duplicateItemByRarityAndElement[rarity]?.[element]
+}
+
 export interface GrantCharacterStackCommand {
     readonly playerId: number
     readonly characterId: number
@@ -42,7 +49,7 @@ export function grantCharacterStackWithinTransactionSync(
     if (character === null) return null
     const asset = getCharacterDataSync(command.characterId)
     if (asset === null) return null
-    const itemId = duplicateItemByRarityAndElement[asset.rarity]?.[asset.element as Element]
+    const itemId = getCharacterStackCompensationItemId(asset.rarity, asset.element as Element)
     const stack = addSafeInteger(character.stack, 1, "character.stack")
 
     const updateStack = (): GivePlayerCharacterResult => {

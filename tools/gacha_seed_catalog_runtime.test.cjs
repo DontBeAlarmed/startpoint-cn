@@ -124,6 +124,18 @@ try {
     })
     assert.equal(filtered.select("normal", 5, new Set()), 101)
 
+    let quarantineChecks = 0
+    const sparse = new GachaSeedCatalog({
+        catalogDir: temporaryRoot,
+        isQuarantined: () => {
+            quarantineChecks += 1
+            return false
+        },
+        randomInt: () => 0,
+    })
+    assert.equal(sparse.select("normal", 5, new Set()), 101)
+    assert.equal(quarantineChecks, 1, "normal selection must not scan the full seed bucket")
+
     const manifestPath = path.join(temporaryRoot, "manifest.json")
     const mutateManifest = mutator => {
         const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"))

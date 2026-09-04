@@ -65,7 +65,18 @@ const {
 } = require("../src/lib/gacha-reward-grant")
 const { withDeferredInventoryBatchContextWithinTransactionSync } = require("../src/lib/inventory")
 const { executeGachaDrawSync, runGachaPostCommitEffects } = require("../src/lib/gacha-owner")
+const {
+    grantPlayerComebackGachaPeriodSync,
+    grantPlayerStarsGachaCampaignSync,
+} = require("../src/lib/gacha-owner")
+const {
+    getPlayerStarsGachaCampaignByGachaSync,
+    getPlayerGachaDetailSync,
+    resetPlayerGachaDailyStateSync,
+    upsertPlayerGachaDetailSync,
+} = require("../src/data/domains/gacha-state")
 const { getTimeOffset, setServerTimeOffset } = require("../src/utils")
+const { getClientSerializedData } = require("../src/data/utils/player-data")
 
 let database
 let app
@@ -679,10 +690,157 @@ test("real 25009 ticket extends execution beyond base period without extending n
     assert.deepEqual(drawState(withoutTicket.playerId, 25009), before)
 })
 
+test("explicit Comeback period enables only the granted player window", async () => {
+    const { playerId } = await createPlayer("gacha-comeback-period")
+    const start = Math.floor(Date.parse("2024-08-14T00:00:00.000Z") / 1000)
+    const end = Math.floor(Date.parse("2024-08-15T00:00:00.000Z") / 1000)
+    grantPlayerComebackGachaPeriodSync({
+        playerId,
+        gachaId: 700000,
+        periodStartTime: start,
+        periodEndTime: end,
+    })
+    updatePlayerSync({ id: playerId, freeVmoney: 150, vmoney: 0 })
+    const result = executeGachaDrawSync({
+        playerId,
+        gachaId: 700000,
+        paymentType: 1,
+        execType: 1,
+        numberOfExec: 1,
+        nowMs: Date.parse("2024-08-14T12:00:00.000Z"),
+    })
+    assert.equal(result.ok, true)
+    if (!result.ok) return
+    runGachaPostCommitEffects(result)
+    assert.equal(result.draw.length, 1)
+    assert.equal(getPlayerSync(playerId).freeVmoney, 0)
+    const loaded = getClientSerializedData(playerId, { viewerId: 0 })
+    assert.deepEqual(
+        loaded.gacha_info_list.find(info => info.gacha_id === 700000).comeback_campaign,
+        { period_start_time: start, period_end_time: end },
+    )
+})
+
+test("Stars free counts accumulate across daily reset and return absolute after-state", async () => {
+    const { playerId } = await createPlayer("gacha-stars-state")
+    const periodStartTime = Math.floor(Date.parse("2023-09-01T00:00:00.000Z") / 1000)
+    const periodEndTime = Math.floor(Date.parse("2023-09-10T00:00:00.000Z") / 1000)
+    grantPlayerStarsGachaCampaignSync({
+        playerId,
+        campaignId: 1,
+        gachaId: 80000,
+        periodStartTime,
+        periodEndTime,
+        freeOneTimes: 0,
+        freeTenTimes: 0,
+    })
+    const command = {
+        playerId,
+        gachaId: 80000,
+        paymentType: 4,
+        execType: 8,
+        numberOfExec: 1,
+        nowMs: Date.parse("2023-09-02T00:00:00.000Z"),
+    }
+    const first = executeGachaDrawSync(command)
+    assert.equal(first.ok, true)
+    if (!first.ok) return
+    runGachaPostCommitEffects(first)
+    assert.deepEqual(first.starsCampaignList, [{
+        campaignId: 1,
+        freeOneTimes: 0,
+        freeTenTimes: 1,
+    }])
+    upsertPlayerGachaDetailSync({
+        playerId,
+        gachaId: 80000,
+        dailyOneCount: 2,
+        dailyTenCount: 3,
+        comebackPeriodStartTime: null,
+        comebackPeriodEndTime: null,
+    })
+    const resetSql = captureSql(() => resetPlayerGachaDailyStateSync(playerId))
+    assert.equal(resetSql.statements.filter(sql => /^\s*UPDATE\s+players_gacha_/i.test(sql)).length, 3)
+    assert.equal(resetSql.statements.filter(sql => /^\s*SELECT\b/i.test(sql)).length, 0)
+    assert.equal(getPlayerStarsGachaCampaignByGachaSync(playerId, 80000).freeTenTimes, 1)
+    assert.equal(getPlayerGachaDetailSync(playerId, 80000).dailyOneCount, 0)
+    assert.equal(getPlayerGachaDetailSync(playerId, 80000).dailyTenCount, 0)
+    assert.equal(getPlayerGachaCampaignSync(playerId, 80000, 12).count, 1)
+    const second = executeGachaDrawSync({
+        ...command,
+        nowMs: Date.parse("2023-09-03T00:00:00.000Z"),
+    })
+    assert.equal(second.ok, true)
+    if (!second.ok) return
+    assert.deepEqual(second.starsCampaignList, [{
+        campaignId: 1,
+        freeOneTimes: 0,
+        freeTenTimes: 2,
+    }])
+    const loaded = getClientSerializedData(playerId, { viewerId: 0 })
+    const loadedInfo = loaded.gacha_info_list.find(info => info.gacha_id === 80000)
+    assert.deepEqual(loadedInfo.stars_campaign, {
+        period_start_time: periodStartTime,
+        period_end_time: periodEndTime,
+    })
+    assert.equal(loadedInfo.daily_one_count, 0)
+    assert.equal(loadedInfo.daily_ten_count, 0)
+    assert.deepEqual(loaded.stars_gacha_campaign_list, [{
+        campaign_id: 1,
+        free_one_times: 0,
+        free_ten_times: 2,
+    }])
+    resetPlayerGachaDailyStateSync(playerId)
+    database.exec(`CREATE TRIGGER reject_stars_mission
+        BEFORE UPDATE ON players_active_mission_counters
+        WHEN OLD.player_id = ${playerId}
+        BEGIN SELECT RAISE(ABORT, 'forced Stars mission failure'); END;`)
+    try {
+        assert.throws(() => executeGachaDrawSync({
+            ...command,
+            nowMs: Date.parse("2023-09-04T00:00:00.000Z"),
+        }), /forced Stars mission failure/)
+    } finally {
+        database.exec("DROP TRIGGER reject_stars_mission")
+    }
+    assert.equal(getPlayerStarsGachaCampaignByGachaSync(playerId, 80000).freeTenTimes, 2)
+    assert.equal(getPlayerGachaCampaignSync(playerId, 80000, 12).count, 1)
+})
+
+test("Stars free single increments only its absolute one-draw counter", async () => {
+    const { playerId } = await createPlayer("gacha-stars-single")
+    grantPlayerStarsGachaCampaignSync({
+        playerId,
+        campaignId: 2,
+        gachaId: 80001,
+        periodStartTime: Math.floor(Date.parse("2024-01-25T04:00:00.000Z") / 1000),
+        periodEndTime: Math.floor(Date.parse("2024-02-03T00:00:00.000Z") / 1000),
+        freeOneTimes: 0,
+        freeTenTimes: 0,
+    })
+    const result = executeGachaDrawSync({
+        playerId,
+        gachaId: 80001,
+        paymentType: 4,
+        execType: 11,
+        numberOfExec: 1,
+        nowMs: Date.parse("2024-01-26T00:00:00.000Z"),
+    })
+    assert.equal(result.ok, true)
+    if (!result.ok) return
+    assert.equal(result.draw.length, 1)
+    assert.deepEqual(result.starsCampaignList, [{
+        campaignId: 2,
+        freeOneTimes: 1,
+        freeTenTimes: 0,
+    }])
+    assert.equal(getPlayerGachaCampaignSync(playerId, 80001, 1013).count, 0)
+})
+
 test("active Equipment ten draw projects only Equipment response facts", async () => {
     const { playerId, viewerId } = await createPlayer("gacha-equipment-active")
     updatePlayerSync({ id: playerId, freeVmoney: 1000, vmoney: 0 })
-    const response = await app.inject({
+    const routeSql = await captureSqlAsync(() => app.inject({
         method: "POST",
         url: "/gacha/exec",
         payload: {
@@ -693,7 +851,8 @@ test("active Equipment ten draw projects only Equipment response facts", async (
             type: 2,
             api_count: 1,
         },
-    })
+    }))
+    const response = routeSql.result
     assert.equal(response.statusCode, 200, response.body)
     const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64")).data
     assert.equal(payload.draw_equipment.length, 10)
@@ -707,6 +866,15 @@ test("active Equipment ten draw projects only Equipment response facts", async (
     assert.equal("character_list" in payload, false)
     assert.equal(payload.gacha_info_list[0].is_daily_first, true)
     assert.equal(payload.gacha_info_list[0].is_account_first, true)
+    assert.equal(historyCount(playerId), 10)
+    assert.deepEqual(
+        database.prepare(`SELECT type_id FROM players_receive_history
+            WHERE player_id = ? ORDER BY id`).all(playerId).map(row => row.type_id),
+        payload.draw_equipment.map(draw => draw.equipment_id),
+    )
+    assert.equal(routeSql.statements.filter(sql => (
+        /^\s*INSERT\s+INTO\s+players_receive_history\b/i.test(sql)
+    )).length, 1)
 })
 
 test("expired ordinary banner is rejected before any persistent write", async () => {
@@ -994,6 +1162,217 @@ test("gacha source adapter writes capped overflow after external finalize", asyn
     })(), /late gacha adapter failure/)
     assert.equal(getPlayerMailsSync(playerId, 1, 100, true).length, 1)
     assert.equal(getPlayerItemSync(playerId, exBoostItemId), policy.maxCount(exBoostItemId))
+})
+
+function executeGachaGrantBatch(playerId, plan) {
+    const player = getPlayerSync(playerId)
+    return database.transaction(() => withDeferredInventoryBatchContextWithinTransactionSync({
+        playerId,
+        playerExistence: "caller-verified",
+    }, inventory => grantGachaRewardPlanInTransactionOwnerWithInventorySync(
+        playerId,
+        plan,
+        {
+            id: player.id,
+            freeMana: player.freeMana,
+            freeVmoney: player.freeVmoney,
+            expPool: player.expPool,
+        },
+        inventory,
+    )))()
+}
+
+function acquisitionSqlMetrics(statements) {
+    return {
+        characterReads: statements.filter(sql => (
+            /^\s*SELECT[\s\S]*FROM\s+players_characters\b/i.test(sql)
+            && /\bIN\s*\(/i.test(sql)
+        )).length,
+        bondReads: statements.filter(sql => (
+            /^\s*SELECT[\s\S]*FROM\s+players_characters_bond_tokens\b/i.test(sql)
+        )).length,
+        characterWrites: statements.filter(sql => (
+            /^\s*INSERT\s+INTO\s+players_characters\b/i.test(sql)
+        )).length,
+        equipmentReads: statements.filter(sql => (
+            /^\s*SELECT[\s\S]*FROM\s+players_equipment\b/i.test(sql)
+        )).length,
+        equipmentWrites: statements.filter(sql => (
+            /^\s*INSERT\s+INTO\s+players_equipment\b/i.test(sql)
+        )).length,
+    }
+}
+
+test("Gacha acquisition SQL statement counts stay constant from one to ten unique draws", async () => {
+    const characterIds = Object.keys(require("../assets/character.json"))
+        .map(Number)
+        .filter(id => id !== 1)
+        .slice(0, 10)
+    const equipmentIds = Object.keys(require("../assets/equipment_lookup.json"))
+        .map(Number)
+        .filter(id => id >= 3_000_000)
+        .slice(0, 10)
+    const characterMetrics = []
+    const equipmentMetrics = []
+    for (const count of [1, 10]) {
+        const characterPlayer = await createPlayer(`gacha-character-slope-${count}`)
+        const characterPlan = createRewardGrantExecutionPlan(characterIds.slice(0, count).map(id => ({
+            type: RewardType.CHARACTER,
+            id,
+        })))
+        characterMetrics.push(acquisitionSqlMetrics(
+            captureSql(() => executeGachaGrantBatch(characterPlayer.playerId, characterPlan)).statements,
+        ))
+
+        const equipmentPlayer = await createPlayer(`gacha-equipment-slope-${count}`)
+        const equipmentPlan = createRewardGrantExecutionPlan(equipmentIds.slice(0, count).map(id => ({
+            type: RewardType.EQUIPMENT,
+            id,
+            count: 1,
+        })))
+        equipmentMetrics.push(acquisitionSqlMetrics(
+            captureSql(() => executeGachaGrantBatch(equipmentPlayer.playerId, equipmentPlan)).statements,
+        ))
+    }
+    assert.deepEqual(characterMetrics, [
+        { characterReads: 1, bondReads: 0, characterWrites: 1, equipmentReads: 0, equipmentWrites: 0 },
+        { characterReads: 1, bondReads: 0, characterWrites: 1, equipmentReads: 0, equipmentWrites: 0 },
+    ])
+    assert.deepEqual(equipmentMetrics, [
+        { characterReads: 0, bondReads: 0, characterWrites: 0, equipmentReads: 1, equipmentWrites: 1 },
+        { characterReads: 0, bondReads: 0, characterWrites: 0, equipmentReads: 1, equipmentWrites: 1 },
+    ])
+})
+
+test("batched Character ownership records the hundred-character milestone once", async () => {
+    const { playerId } = await createPlayer("gacha-character-milestone")
+    const copyCharacter = database.prepare(`
+        INSERT INTO players_characters (
+            id, entry_count, evolution_level, over_limit_step, protection,
+            join_time, update_time, exp, stack, mana_board_index, player_id,
+            ex_boost_status_id, ex_boost_ability_id_list, illustration_settings
+        )
+        SELECT ?, entry_count, evolution_level, over_limit_step, protection,
+            join_time, update_time, exp, stack, mana_board_index, player_id,
+            ex_boost_status_id, ex_boost_ability_id_list, illustration_settings
+        FROM players_characters WHERE player_id = ? AND id = 1
+    `)
+    for (let index = 0; index < 98; index += 1) {
+        copyCharacter.run(900000 + index, playerId)
+    }
+    executeGachaGrantBatch(playerId, createRewardGrantExecutionPlan([{
+        type: RewardType.CHARACTER,
+        id: 251001,
+    }]))
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count FROM players_characters
+        WHERE player_id = ?`).get(playerId).count, 100)
+    assert.equal(database.prepare(`SELECT COUNT(*) AS count
+        FROM players_player_history_milestones
+        WHERE player_id = ? AND aggregation_target = 7 AND slot = 0`).get(playerId).count, 1)
+})
+
+test("Character acquisition batches repeated new ownership into final-state SQL", async () => {
+    const { playerId } = await createPlayer("gacha-character-batch")
+    const characterId = 251001
+    const plan = createRewardGrantExecutionPlan(Array.from({ length: 10 }, () => ({
+        type: RewardType.CHARACTER,
+        id: characterId,
+    })))
+    const measured = captureSql(() => executeGachaGrantBatch(playerId, plan))
+    assert.deepEqual(measured.result.entries.map(entry => ({
+        isNew: entry.outcome.isNew,
+        stack: entry.outcome.after.stack,
+    })), [
+        { isNew: true, stack: undefined },
+        ...Array.from({ length: 9 }, (_, index) => ({ isNew: false, stack: index + 1 })),
+    ])
+    assert.equal(getPlayerCharacterSync(playerId, characterId).stack, 9)
+    assert.equal(measured.statements.filter(sql => (
+        /^\s*SELECT[\s\S]*FROM\s+players_characters\b/i.test(sql)
+        && /\bIN\s*\(/i.test(sql)
+    )).length, 1)
+    assert.equal(measured.statements.filter(sql => (
+        /^\s*SELECT[\s\S]*FROM\s+players_characters_bond_tokens\b/i.test(sql)
+    )).length, 0)
+    assert.equal(measured.statements.filter(sql => (
+        /^\s*INSERT\s+INTO\s+players_characters\b/i.test(sql)
+    )).length, 1)
+    assert.equal(measured.statements.filter(sql => (
+        /^\s*INSERT\s+INTO\s+players_characters_bond_tokens\b/i.test(sql)
+    )).length, 1)
+    database.prepare(`UPDATE players_characters
+        SET exp = 123, evolution_level = 2, protection = 1, mana_board_index = 2
+        WHERE player_id = ? AND id = ?`).run(playerId, characterId)
+    executeGachaGrantBatch(playerId, createRewardGrantExecutionPlan([{
+        type: RewardType.CHARACTER,
+        id: characterId,
+    }]))
+    const preserved = getPlayerCharacterSync(playerId, characterId)
+    assert.equal(preserved.stack, 10)
+    assert.equal(preserved.exp, 123)
+    assert.equal(preserved.evolutionLevel, 2)
+    assert.equal(preserved.protection, true)
+    assert.equal(preserved.manaBoardIndex, 2)
+})
+
+test("batched duplicate compensation preserves per-entry capacity and overflow order", async () => {
+    const { playerId } = await createPlayer("gacha-character-batch-overflow")
+    const characterId = 1
+    const itemId = 14002
+    const maxCount = createRewardGrantItemOverflowPolicy(playerId).maxCount(itemId)
+    setInventoryFixtureItemExactSync(playerId, itemId, maxCount - 5)
+    const plan = createRewardGrantExecutionPlan(Array.from({ length: 10 }, () => ({
+        type: RewardType.CHARACTER,
+        id: characterId,
+    })))
+    const result = executeGachaGrantBatch(playerId, plan)
+    assert.deepEqual(
+        result.entries.map(entry => entry.outcome.compensationItem.acceptedAmount),
+        [1, 1, 1, 1, 1, 0, 0, 0, 0, 0],
+    )
+    assert.deepEqual(
+        result.entries.map(entry => entry.outcome.compensationItem.overflowAmount),
+        [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+    )
+    assert.equal(getPlayerItemSync(playerId, itemId), maxCount)
+    assert.equal(getPlayerCharacterSync(playerId, characterId).stack, 10)
+})
+
+test("Equipment acquisition batches repeated draws without overwriting non-stack state", async () => {
+    const { playerId } = await createPlayer("gacha-equipment-batch")
+    const equipmentId = 5020008
+    const plan = createRewardGrantExecutionPlan(Array.from({ length: 10 }, () => ({
+        type: RewardType.EQUIPMENT,
+        id: equipmentId,
+        count: 1,
+    })))
+    const measured = captureSql(() => executeGachaGrantBatch(playerId, plan))
+    assert.deepEqual(
+        measured.result.entries.map(entry => entry.outcome.after.stack),
+        Array.from({ length: 10 }, (_, index) => index),
+    )
+    assert.equal(getPlayerEquipmentSync(playerId, equipmentId).stack, 9)
+    assert.equal(measured.statements.filter(sql => (
+        /^\s*SELECT[\s\S]*FROM\s+players_equipment\b/i.test(sql)
+    )).length, 1)
+    assert.equal(measured.statements.filter(sql => (
+        /^\s*INSERT\s+INTO\s+players_equipment\b/i.test(sql)
+    )).length, 1)
+
+    database.prepare(`UPDATE players_equipment
+        SET level = 7, enhancement_level = 3, protection = 1
+        WHERE player_id = ? AND id = ?`).run(playerId, equipmentId)
+    executeGachaGrantBatch(playerId, createRewardGrantExecutionPlan([{
+        type: RewardType.EQUIPMENT,
+        id: equipmentId,
+        count: 1,
+    }]))
+    assert.deepEqual(getPlayerEquipmentSync(playerId, equipmentId), {
+        level: 7,
+        enhancementLevel: 3,
+        protection: true,
+        stack: 10,
+    })
 })
 
 test("character owner plan preserves per-draw movie order duplicate deltas and merged state", async () => {

@@ -36,6 +36,7 @@ import {
     replaceProjectedCharacterGrowthSaveTables,
 } from "../../lib/character-growth/save/project-growth-state"
 import { assertValidCharacterGrowthSaveState } from "../../lib/character-growth/save/validate-growth-state"
+import { assertValidGachaSaveState } from "../../lib/gacha-owner/save-validation"
 
 const DOMAIN_NAMES: readonly PlayerSaveDomainName[] = ["core", "missions", "events", "economy", "mailbox"]
 const EXCLUDED_DOMAINS = ["account", "session", "serverConfig", "activeQuest"] as const
@@ -63,6 +64,8 @@ const LEGACY_V1_UNMANAGED_TABLES = new Set([
     "players_score_attack_battle_history",
     "players_practice_battle_history",
     "players_shop_purchases",
+    "players_gacha_details",
+    "players_stars_gacha_campaigns",
     "players_shop_purchase_counters",
     "players_shop_campaign_lineups",
     "players_receive_history",
@@ -211,6 +214,11 @@ export function exportPlayerSaveV2Sync(
     for (const table of CHARACTER_GROWTH_SAVE_TABLE_NAMES) {
         domains.core.tables[table] = growthProjection[table].map(row => ({ ...row }))
     }
+    assertValidGachaSaveState(new Map([
+        ["players_gacha_info", domains.economy.tables.players_gacha_info],
+        ["players_gacha_details", domains.economy.tables.players_gacha_details],
+        ["players_stars_gacha_campaigns", domains.economy.tables.players_stars_gacha_campaigns],
+    ]))
 
     return {
         schema: PLAYER_SAVE_SCHEMA,
@@ -372,6 +380,10 @@ function projectAndValidateGrowthTables(tables: Map<string, PlayerSaveRow[]>): v
     replaceProjectedCharacterGrowthSaveTables(tables, projection)
 }
 
+function validateGachaTables(tables: Map<string, PlayerSaveRow[]>): void {
+    assertValidGachaSaveState(tables)
+}
+
 function getInsertionOrder(
     metadata: ReadonlyMap<string, PlayerSaveTableMetadata>,
 ): PlayerSaveTableDefinition[] {
@@ -460,6 +472,7 @@ function applyV2SnapshotSync(
     const schemaMetadata = assertRegistryMatchesDatabase(database)
     const tables = flattenAndValidateV2Snapshot(snapshot, database, schemaMetadata)
     projectAndValidateGrowthTables(tables)
+    validateGachaTables(tables)
     const target = database.prepare("SELECT account_id FROM players WHERE id = ?").get(targetPlayerId)
     if (target === undefined) throw new Error(`Target player ${targetPlayerId} was not found`)
     const insertionOrder = getInsertionOrder(schemaMetadata)
@@ -507,6 +520,7 @@ export function validatePlayerSaveSnapshotSync(
         const schemaMetadata = assertRegistryMatchesDatabase(database)
         const tables = flattenAndValidateV2Snapshot(parsed.snapshot, database, schemaMetadata)
         projectAndValidateGrowthTables(tables)
+        validateGachaTables(tables)
     }
     return parsed
 }
@@ -532,6 +546,18 @@ function restoreLegacyV1SaveSync(
         definition.name,
         selectPlayerRows(database, definition, targetPlayerId),
     ]))
+    const preservedGachaIds = new Set([
+        ...(preserved.get("players_gacha_details") ?? []),
+        ...(preserved.get("players_stars_gacha_campaigns") ?? []),
+    ].map(row => requireSafePositiveInteger(row.gacha_id, "preserved Gacha id")))
+    const preservedGachaParents = preservedGachaIds.size === 0
+        ? []
+        : database.prepare(`
+            SELECT gacha_id, is_daily_first, is_account_first, gacha_exchange_point
+            FROM players_gacha_info
+            WHERE player_id = ? AND gacha_id IN (${[...preservedGachaIds].map(() => "?").join(", ")})
+            ORDER BY gacha_id
+        `).all(targetPlayerId, ...preservedGachaIds) as PlayerSaveRow[]
     const legacyData = reviveMergedPlayerDates(parsed.snapshot.data as any)
     legacyData.player.id = targetPlayerId
     legacyData.player.timeOffset = null
@@ -544,6 +570,21 @@ function restoreLegacyV1SaveSync(
         database.pragma("defer_foreign_keys = ON")
         replacePlayerDataSync(legacyData)
         clearGiftRedemptionsForExternalRestoreSync(targetPlayerId, database)
+        const insertMissingGachaParent = database.prepare(`
+            INSERT INTO players_gacha_info (
+                gacha_id, is_daily_first, is_account_first, gacha_exchange_point, player_id
+            ) VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(gacha_id, player_id) DO NOTHING
+        `)
+        for (const row of preservedGachaParents) {
+            insertMissingGachaParent.run(
+                row.gacha_id,
+                row.is_daily_first,
+                row.is_account_first,
+                row.gacha_exchange_point,
+                targetPlayerId,
+            )
+        }
         for (const definition of [...definitions].reverse()) {
             database.prepare(
                 `DELETE FROM ${quotePlayerSaveIdentifier(definition.name)} WHERE player_id = ?`,

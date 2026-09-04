@@ -44,6 +44,13 @@ export function projectGachaExecResponse(input: {
                     campaign_id: campaign.campaignId,
                     count: campaign.count,
                 })),
+                ...(result.starsCampaignList.length === 0 ? {} : {
+                    stars_gacha_campaign_list: result.starsCampaignList.map(campaign => ({
+                        campaign_id: campaign.campaignId,
+                        free_one_times: campaign.freeOneTimes,
+                        free_ten_times: campaign.freeTenTimes,
+                    })),
+                }),
             }
             : {
                 ...common,

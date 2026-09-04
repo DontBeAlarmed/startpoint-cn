@@ -57,6 +57,7 @@ function characterSuccess() {
         mailArrived: false,
         ticketItemBalances: {},
         campaignList: [{ gachaId: 1638, campaignId: 77, count: 0 }],
+        starsCampaignList: [{ campaignId: 1, freeOneTimes: 2, freeTenTimes: 3 }],
         draw: [{ character_id: 111001, movie_id: "normal", seed: 101, entry_count: 1 }],
         characters: [{ character_id: 111001, stack: 0 }],
         rewardItems: {},
@@ -127,6 +128,11 @@ test("response projector is database-free and keeps Character/Equipment shapes e
         gacha_id: 1638,
         campaign_id: 77,
         count: 0,
+    }])
+    assert.deepEqual(characterResponse.stars_gacha_campaign_list, [{
+        campaign_id: 1,
+        free_one_times: 2,
+        free_ten_times: 3,
     }])
     assert.equal("draw_equipment" in characterResponse, false)
     assert.equal("equipment_list" in characterResponse, false)

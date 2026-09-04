@@ -18,7 +18,15 @@ const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "player-save-v2-
 const previousDataDirectory = process.env.DATA_DIR
 process.env.DATA_DIR = databaseDirectory
 const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
-    .installBundledGameplaySnapshot()
+    .installBundledGameplaySnapshot({
+        additionalTableNames: [
+            "gacha.json",
+            "gacha_pool.json",
+            "gacha_campaign_definitions.json",
+            "stars_gacha_campaign.json",
+            "gacha_exchange_rate.json",
+        ],
+    })
 
 const data = require("../src/data")
 const { getDb } = require("../src/data/db")
@@ -150,6 +158,16 @@ function seedEveryRegisteredPlayerTable(database, playerId) {
         } else if (definition.name === "players_character_awake_unlocks") {
             row.board_index = 1
             row.awake_level = 1
+        } else if (definition.name === "players_stars_gacha_campaigns") {
+            database.prepare(`INSERT OR IGNORE INTO players_gacha_info
+                (gacha_id, is_daily_first, is_account_first, gacha_exchange_point, player_id)
+                VALUES (80000, 1, 1, 0, ?)`).run(playerId)
+            row.campaign_id = 1
+            row.gacha_id = 80000
+            row.period_start_time = 1693526400
+            row.period_end_time = 1694304000
+            row.free_one_times = 1
+            row.free_ten_times = 2
         }
 
         const rowColumns = Object.keys(row)
@@ -506,8 +524,72 @@ test("v2 validation rejects future schemas and missing tables that existed in th
     const snapshot = exportPlayerSaveV2Sync(playerId)
 
     const future = cloneJson(snapshot)
-    future.producer.dbSchemaVersion = 25
+    future.producer.dbSchemaVersion = 26
     assert.throws(() => restorePlayerSaveV2Sync(future, playerId), /newer.*schema|future.*schema/i)
+
+    const starsState = (gachaId = 80000) => ({
+        player_id: snapshot.playerId,
+        campaign_id: 1,
+        gacha_id: gachaId,
+        period_start_time: 1693526400,
+        period_end_time: 1694304000,
+        free_one_times: 0,
+        free_ten_times: 0,
+    })
+    const addGachaParent = (target, gachaId) => {
+        target.domains.economy.tables.players_gacha_info.push({
+            gacha_id: gachaId,
+            is_daily_first: 1,
+            is_account_first: 1,
+            gacha_exchange_point: 0,
+            player_id: snapshot.playerId,
+        })
+    }
+
+    const starsOverLimit = cloneJson(snapshot)
+    addGachaParent(starsOverLimit, 80000)
+    starsOverLimit.domains.economy.tables.players_stars_gacha_campaigns.push({
+        ...starsState(),
+        free_ten_times: 999,
+    })
+    assert.throws(
+        () => validatePlayerSaveSnapshotSync(starsOverLimit),
+        /Stars campaign 1 state exceeds/i,
+    )
+
+    const starsMismatch = cloneJson(snapshot)
+    addGachaParent(starsMismatch, 80001)
+    starsMismatch.domains.economy.tables.players_stars_gacha_campaigns.push(starsState(80001))
+    assert.throws(
+        () => validatePlayerSaveSnapshotSync(starsMismatch),
+        /does not match Gacha 80001/i,
+    )
+
+    const starsPeriodOverflow = cloneJson(snapshot)
+    addGachaParent(starsPeriodOverflow, 80000)
+    starsPeriodOverflow.domains.economy.tables.players_stars_gacha_campaigns.push({
+        ...starsState(),
+        period_end_time: 1999999999,
+    })
+    assert.throws(
+        () => validatePlayerSaveSnapshotSync(starsPeriodOverflow),
+        /state exceeds/i,
+    )
+
+    const nonComebackDetail = cloneJson(snapshot)
+    addGachaParent(nonComebackDetail, 1638)
+    nonComebackDetail.domains.economy.tables.players_gacha_details.push({
+        player_id: snapshot.playerId,
+        gacha_id: 1638,
+        daily_one_count: null,
+        daily_ten_count: null,
+        comeback_period_start_time: 1723593600,
+        comeback_period_end_time: 1723680000,
+    })
+    assert.throws(
+        () => validatePlayerSaveSnapshotSync(nonComebackDetail),
+        /invalid Comeback period/i,
+    )
 
     const missingCurrent = cloneJson(snapshot)
     delete missingCurrent.domains.economy.tables.players_shop_purchases
@@ -750,6 +832,17 @@ test("legacy v1 restore updates legacy fields without deleting newer domains", (
     dataV1.player.name = "legacy-name-restored"
     dataV1.boxGachaList = {}
     dataV1.itemList = { 30005: 0, 70014: 12 }
+    db.prepare(`INSERT INTO players_gacha_info
+        (gacha_id, is_daily_first, is_account_first, gacha_exchange_point, player_id)
+        VALUES (?, 1, 1, 0, ?), (?, 1, 1, 0, ?)`)
+        .run(700000, playerId, 80000, playerId)
+    db.prepare(`INSERT INTO players_gacha_details
+        (player_id, gacha_id, comeback_period_start_time, comeback_period_end_time)
+        VALUES (?, 700000, 1723593600, 1723680000)`).run(playerId)
+    db.prepare(`INSERT INTO players_stars_gacha_campaigns
+        (player_id, campaign_id, gacha_id, period_start_time, period_end_time,
+         free_one_times, free_ten_times)
+        VALUES (?, 1, 80000, 1693526400, 1694304000, 1, 2)`).run(playerId)
     const result = restorePlayerSaveSnapshotSync({
         schema: "starpoint-cn-save",
         version: 1,
@@ -769,6 +862,25 @@ test("legacy v1 restore updates legacy fields without deleting newer domains", (
     assert.equal(
         db.prepare("SELECT total_obtained FROM players_collected_items WHERE player_id = ? AND item_id = 30005").get(playerId).total_obtained,
         41,
+    )
+    assert.deepEqual(
+        db.prepare(`SELECT gacha_id FROM players_gacha_info
+            WHERE player_id = ? AND gacha_id IN (700000, 80000) ORDER BY gacha_id`).all(playerId),
+        [{ gacha_id: 80000 }, { gacha_id: 700000 }],
+    )
+    assert.deepEqual(
+        db.prepare(`SELECT gacha_id, comeback_period_start_time, comeback_period_end_time
+            FROM players_gacha_details WHERE player_id = ?`).get(playerId),
+        {
+            gacha_id: 700000,
+            comeback_period_start_time: 1723593600,
+            comeback_period_end_time: 1723680000,
+        },
+    )
+    assert.deepEqual(
+        db.prepare(`SELECT campaign_id, gacha_id, free_one_times, free_ten_times
+            FROM players_stars_gacha_campaigns WHERE player_id = ?`).get(playerId),
+        { campaign_id: 1, gacha_id: 80000, free_one_times: 1, free_ten_times: 2 },
     )
     assert.equal(db.prepare("SELECT subject FROM players_mails WHERE player_id = ?").get(playerId).subject, "preserve-v1-mail")
     assert.equal(db.prepare("SELECT lineup_id FROM players_shop_campaign_lineups WHERE player_id = ?").get(playerId).lineup_id, 1010)

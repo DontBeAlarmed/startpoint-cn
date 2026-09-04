@@ -153,18 +153,16 @@ function executeEntry(
                 kind: "equipment",
                 equipmentId: reward.id,
                 requestedAmount: reward.count,
-                after: givePlayerEquipmentSync(
-                    playerId,
-                    reward.id,
-                    reward.count,
-                ) as RewardGrantObjectSnapshot,
+                after: options.assetAcquisition?.grantEquipment(reward.id, reward.count)
+                    ?? givePlayerEquipmentSync(
+                        playerId,
+                        reward.id,
+                        reward.count,
+                    ) as RewardGrantObjectSnapshot,
             }
         case RewardType.CHARACTER: {
             const compensationItems: RewardGrantItemOutcome[] = []
-            const granted = givePlayerCharacterWithinTransactionSync(
-                playerId,
-                reward.id,
-                (_ownerId, itemId, amount) => {
+            const grantCompensation = (itemId: number, amount: number) => {
                     if (compensationItems.length > 0) {
                         throw new RewardGrantAssetExecutionError(
                             entryIndex,
@@ -181,8 +179,14 @@ function executeEntry(
                             pendingItemOverflows,
                         ),
                     )
-                },
-            )
+                }
+            const granted = options.assetAcquisition === undefined
+                ? givePlayerCharacterWithinTransactionSync(
+                    playerId,
+                    reward.id,
+                    (_ownerId, itemId, amount) => grantCompensation(itemId, amount),
+                )
+                : options.assetAcquisition.grantCharacter(reward.id, grantCompensation)
             if (granted === null) {
                 throw new RewardGrantAssetExecutionError(entryIndex, `unknown Character ${reward.id}`)
             }
@@ -242,6 +246,7 @@ export function prepareRewardGrantExecution(
         options,
         pendingItemOverflows,
     ))
+    options.assetAcquisition?.persistFinalStates()
     const resourceAfter = snapshotPlayerResourceGrantState(resources)
     const result = createRewardGrantExecutionResult(
         playerId,

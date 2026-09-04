@@ -74,6 +74,8 @@ export const PLAYER_SAVE_TABLES: readonly PlayerSaveTableDefinition[] = [
 
     table("players_gacha_info", "economy"),
     table("players_gacha_campaigns", "economy"),
+    table("players_gacha_details", "economy", 25),
+    table("players_stars_gacha_campaigns", "economy", 25),
     table("players_periodic_reward_points", "economy"),
     table("players_shop_purchases", "economy", 3),
     table("players_shop_purchase_counters", "economy", 11),

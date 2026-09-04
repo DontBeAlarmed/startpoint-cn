@@ -8,6 +8,10 @@ const { selectTestGroups } = require("./select-tests.cjs")
 
 test("maps representative source files to focused groups", () => {
     assert.deepEqual(
+        selectTestGroups(["src/data/domains/gacha-state.ts"]),
+        ["full", "integration:database", "integration:rules", "quick:gacha"],
+    )
+    assert.deepEqual(
         selectTestGroups(["src/lib/quest/finish/session-validator.ts"]),
         ["integration:quest", "quick:quest"],
     )
@@ -133,6 +137,14 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(
         selectTestGroups(["src/lib/gacha-owner/execute.ts"]),
         ["integration:rules", "quick:gacha"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/data/domains/reward-acquisition.ts"]),
+        ["full", "integration:database", "integration:rules", "quick:gacha"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/gacha-owner/save-validation.ts"]),
+        ["integration:database", "integration:rules", "quick:gacha"],
     )
     for (const file of [
         "src/content/converters/gacha.ts",
@@ -1735,6 +1747,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/news_storage.test.cjs",
         "tools/schema23_news_migration.test.cjs",
         "tools/schema24_gift_migration.test.cjs",
+        "tools/schema25_gacha_state_migration.test.cjs",
         "tools/test-workflow/database-isolation.test.cjs",
         "tools/test-workflow/database-lifecycle.test.cjs",
         "tools/test-workflow/runtime-data-paths.test.cjs",

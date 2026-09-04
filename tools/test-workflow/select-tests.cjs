@@ -19,6 +19,18 @@ const SOURCE_RULES = [
         groups: ["integration:database"],
     },
     {
+        pattern: /^(?:src\/data\/domains\/gacha-state\.ts|tools\/schema25_gacha_state_migration\.test\.cjs)$/,
+        groups: ["integration:database", "integration:rules", "quick:gacha"],
+    },
+    {
+        pattern: /^src\/data\/domains\/reward-acquisition\.ts$/,
+        groups: ["integration:database", "integration:rules", "quick:gacha"],
+    },
+    {
+        pattern: /^src\/lib\/gacha-owner\/save-validation\.ts$/,
+        groups: ["integration:database"],
+    },
+    {
         pattern: /^tools\/character_growth_(?:lavu_orderings|gate_acceptance)\.test\.cjs$/,
         groups: ["quick:character-growth"],
     },

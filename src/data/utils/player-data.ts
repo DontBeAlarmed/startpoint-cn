@@ -9,6 +9,10 @@ import { getPlayerDailyChallengePointListSync, getPlayerSync, updatePlayerSync }
 import { getPlayerDrawnQuestsSync, getPlayerQuestProgressSync } from "../domains/quest"
 import { getPlayerEquipmentListSync } from "../domains/equipment"
 import { getPlayerGachaCampaignListSync, getPlayerGachaInfoListSync } from "../domains/gacha"
+import {
+    getPlayerGachaDetailListSync,
+    getPlayerStarsGachaCampaignListSync,
+} from "../domains/gacha-state"
 import { getPlayerItemsSync } from "../domains/item"
 import { getPlayerMailCountSync } from "../domains/mail"
 import { getPlayerMultiSpecialExchangeCampaignsSync, getPlayerPeriodicRewardPointsSync, getPlayerStartDashExchangeCampaignsSync } from "../domains/campaign"
@@ -101,6 +105,8 @@ export function getClientSerializedData(
         questProgress: getPlayerQuestProgressSync(playerId),
         gachaInfoList: getPlayerGachaInfoListSync(playerId),
         gachaCampaignList: getPlayerGachaCampaignListSync(playerId),
+        gachaDetailList: getPlayerGachaDetailListSync(playerId),
+        starsGachaCampaignList: getPlayerStarsGachaCampaignListSync(playerId),
         drawnQuestList: getPlayerDrawnQuestsSync(playerId),
         periodicRewardPointList: getPlayerPeriodicRewardPointsSync(playerId),
         allActiveMissionList: filterToActiveMissions(
@@ -152,6 +158,8 @@ export function getMergedPlayerDataSync(
         questProgress: getPlayerQuestProgressSync(playerId),
         gachaInfoList: getPlayerGachaInfoListSync(playerId),
         gachaCampaignList: getPlayerGachaCampaignListSync(playerId),
+        gachaDetailList: getPlayerGachaDetailListSync(playerId),
+        starsGachaCampaignList: getPlayerStarsGachaCampaignListSync(playerId),
         drawnQuestList: getPlayerDrawnQuestsSync(playerId),
         periodicRewardPointList: getPlayerPeriodicRewardPointsSync(playerId),
         allActiveMissionList: getPlayerActiveMissionsSync(playerId),

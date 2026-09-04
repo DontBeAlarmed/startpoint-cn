@@ -813,6 +813,50 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
 
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_gacha_details (
+        player_id INTEGER NOT NULL,
+        gacha_id INTEGER NOT NULL,
+        daily_one_count INTEGER DEFAULT NULL,
+        daily_ten_count INTEGER DEFAULT NULL,
+        comeback_period_start_time INTEGER DEFAULT NULL,
+        comeback_period_end_time INTEGER DEFAULT NULL,
+        PRIMARY KEY (player_id, gacha_id),
+        FOREIGN KEY (gacha_id, player_id)
+            REFERENCES players_gacha_info (gacha_id, player_id) ON DELETE CASCADE,
+        CHECK (daily_one_count IS NULL OR daily_one_count >= 0),
+        CHECK (daily_ten_count IS NULL OR daily_ten_count >= 0),
+        CHECK (
+            (comeback_period_start_time IS NULL AND comeback_period_end_time IS NULL)
+            OR (
+                comeback_period_start_time IS NOT NULL
+                AND comeback_period_end_time IS NOT NULL
+                AND comeback_period_start_time <= comeback_period_end_time
+            )
+        )
+    )`).run();
+
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_stars_gacha_campaigns (
+        player_id INTEGER NOT NULL,
+        campaign_id INTEGER NOT NULL,
+        gacha_id INTEGER NOT NULL,
+        period_start_time INTEGER NOT NULL,
+        period_end_time INTEGER NOT NULL,
+        free_one_times INTEGER NOT NULL DEFAULT 0,
+        free_ten_times INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (player_id, campaign_id),
+        UNIQUE (player_id, gacha_id),
+        FOREIGN KEY (gacha_id, player_id)
+            REFERENCES players_gacha_info (gacha_id, player_id) ON DELETE CASCADE,
+        CHECK (period_start_time <= period_end_time),
+        CHECK (free_one_times >= 0),
+        CHECK (free_ten_times >= 0)
+    )`).run();
+
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_players_gacha_info_player_gacha
+        ON players_gacha_info (player_id, gacha_id)`).run();
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_players_gacha_campaigns_player_gacha_campaign
+        ON players_gacha_campaigns (player_id, gacha_id, campaign_id)`).run();
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_drawn_quests (
         category_id INTEGER NOT NULL,
         quest_id INTEGER NOT NULL,

@@ -10,10 +10,11 @@ import {
     incrementActiveMissionGachaCampaignCountSync,
     incrementActiveMissionGachaCharacterCountSync,
 } from "../../data/domains/active_mission_counters"
-import { insertReceiveHistorySync, MailType } from "../../data/domains/mail"
+import { insertReceiveHistoryBatchSync, MailType } from "../../data/domains/mail"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import type { PlayerGachaCampaign } from "../../data/types"
 import { getDb } from "../../data/db"
+import { updatePlayerStarsGachaCampaignCountsSync } from "../../data/domains/gacha-state"
 import { deepFreeze } from "../../content/deep-freeze"
 import {
     drawGachaBannerWithMetadata,
@@ -40,6 +41,7 @@ import type {
     GachaExecProtocolRejected,
     GachaPostCommitEffect,
 } from "./model"
+import { getPlayerGachaExecutionStateSync } from "./player-period"
 
 function rejected(message: string): GachaExecRejected {
     return { ok: false, kind: "badRequest", message }
@@ -80,6 +82,24 @@ export function executeGachaDrawSync(command: GachaExecCommand): GachaExecResult
             }, inventory => {
                 const banner = catalog.banners[String(command.gachaId)]
                 if (banner === undefined) return rejected("Gacha does not exist.")
+                let playerGachaData = getPlayerGachaInfoSync(command.playerId, command.gachaId)
+                const playerExecutionState = getPlayerGachaExecutionStateSync(
+                    command.playerId,
+                    banner,
+                )
+                if (playerExecutionState.starsCampaign !== undefined) {
+                    const starsDefinition = catalog.starsCampaigns[
+                        String(playerExecutionState.starsCampaign.campaignId)
+                    ]
+                    if (starsDefinition === undefined
+                        || starsDefinition.gachaId !== command.gachaId
+                        || playerExecutionState.starsCampaign.freeOneTimes
+                            > starsDefinition.maximumFreeGachaTimes
+                        || playerExecutionState.starsCampaign.freeTenTimes
+                            > starsDefinition.maximumFreeGachaTimes) {
+                        return rejected("Stars Gacha state is invalid.")
+                    }
+                }
                 const ticket = getGachaTicketCost(
                     command.execType,
                     command.numberOfExec,
@@ -94,13 +114,13 @@ export function executeGachaDrawSync(command: GachaExecCommand): GachaExecResult
                     execType: command.execType,
                     numberOfExec: command.numberOfExec,
                     nowMs: command.nowMs,
+                    playerEffectivePeriod: playerExecutionState.effectivePeriod,
                     hasApplicableTicket,
                 })
                 if (prepared.kind !== "ordinary") {
                     return rejected("Crazy Gacha requires the candidate lifecycle.")
                 }
 
-                let playerGachaData = getPlayerGachaInfoSync(command.playerId, command.gachaId)
                 const insertPlayerGachaData = playerGachaData === null
                 playerGachaData = playerGachaData ?? {
                     gachaId: command.gachaId,
@@ -143,6 +163,30 @@ export function executeGachaDrawSync(command: GachaExecCommand): GachaExecResult
                 if (!planResult.ok) return rejected(planResult.message)
 
                 const plan = planResult.plan
+                const starsCampaignList = []
+                if (plan.campaign !== null && playerExecutionState.starsCampaign !== undefined) {
+                    const stars = playerExecutionState.starsCampaign
+                    const definition = catalog.starsCampaigns[String(stars.campaignId)]
+                    if (definition === undefined || definition.gachaId !== command.gachaId) {
+                        return rejected("Stars Gacha state is invalid.")
+                    }
+                    const isTen = command.execType === GACHA_EXEC_TYPES.CAMPAIGN_MULTI
+                    const used = isTen ? stars.freeTenTimes : stars.freeOneTimes
+                    if (used >= definition.maximumFreeGachaTimes) {
+                        return rejected("Stars Gacha free draw limit reached.")
+                    }
+                    const after = {
+                        campaignId: stars.campaignId,
+                        freeOneTimes: stars.freeOneTimes + (isTen ? 0 : 1),
+                        freeTenTimes: stars.freeTenTimes + (isTen ? 1 : 0),
+                    }
+                    updatePlayerStarsGachaCampaignCountsSync({
+                        playerId: command.playerId,
+                        gachaId: command.gachaId,
+                        ...after,
+                    })
+                    starsCampaignList.push(after)
+                }
                 const drawMetadata = drawGachaBannerWithMetadata(prepared.banner, plan.pullCount)
                 const drawResult = drawMetadata.map(draw => draw.id)
                 const characterMoviePlan = prepared.banner.kind === "character"
@@ -227,13 +271,14 @@ export function executeGachaDrawSync(command: GachaExecCommand): GachaExecResult
                 const historyType = prepared.banner.kind === "character"
                     ? MailType.CHARACTER
                     : MailType.EQUIPMENT
-                for (const itemId of drawResult) {
-                    insertReceiveHistorySync(command.playerId, {
+                insertReceiveHistoryBatchSync(
+                    command.playerId,
+                    drawResult.map(itemId => ({
                         type: historyType,
                         type_id: itemId,
                         number: 1,
-                    })
-                }
+                    })),
+                )
 
                 const nextGachaData = {
                     gachaId: command.gachaId,
@@ -271,6 +316,7 @@ export function executeGachaDrawSync(command: GachaExecCommand): GachaExecResult
                     mailArrived,
                     ticketItemBalances,
                     campaignList,
+                    starsCampaignList,
                     rewardItems: reward.items,
                     ...(reward.playerAfter === undefined ? {} : {
                         playerAfter: reward.playerAfter,

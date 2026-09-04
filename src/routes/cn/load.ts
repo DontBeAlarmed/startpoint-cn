@@ -129,7 +129,7 @@ function wrapOptionFields(
     d.tower_dungeon_list = [];
     d.special_exchange_campaign_list = [];
     d.win_lottery_active_mission_list = [];
-    d.stars_gacha_campaign_list = [];
+    d.stars_gacha_campaign_list ??= [];
     // Build favorite_party_group_list from user_party_group_list
     // Required for HomeScene kind=1 (profile_favorite) to work without F1010
     // fromPartyInfo expects party_name/party_edited (not name/edited like fromPartyInfoLite)

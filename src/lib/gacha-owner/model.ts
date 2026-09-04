@@ -33,6 +33,12 @@ export interface GachaCampaignAfter {
     readonly count: number
 }
 
+export interface GachaStarsCampaignAfter {
+    readonly campaignId: number
+    readonly freeOneTimes: number
+    readonly freeTenTimes: number
+}
+
 interface GachaExecSuccessBase {
     readonly ok: true
     readonly playerId: number
@@ -45,6 +51,7 @@ interface GachaExecSuccessBase {
     readonly mailArrived: boolean
     readonly ticketItemBalances: Readonly<Record<number, number>>
     readonly campaignList: readonly GachaCampaignAfter[]
+    readonly starsCampaignList: readonly GachaStarsCampaignAfter[]
     readonly rewardItems: Readonly<Record<number, number>>
     readonly playerAfter?: Readonly<{
         readonly freeMana: number

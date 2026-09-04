@@ -108,6 +108,7 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/lib/character-growth/commands/over-limit.ts",
         "src/lib/character-growth/commands/stack-to-exp.ts",
         "src/lib/event-trade-expiry-settlement.ts",
+        "src/lib/gacha-owner/execute.ts",
         "src/lib/gacha-reward-grant.ts",
         "src/lib/item-overflow/disposition.ts",
         "src/lib/item-sell.ts",
@@ -124,7 +125,6 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/routes/api/equipment.ts",
         "src/routes/api/exBoost.ts",
         "src/routes/api/exchange.ts",
-        "src/routes/api/gacha.ts",
         "src/routes/api/questUnlock.ts",
         "src/routes/api/sell.ts",
     ]
@@ -172,15 +172,15 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
     assert.doesNotMatch(shopPurchase, /\b(?:getItem|setItem)\s*:/)
     assert.match(shopPurchase, /withDeferredInventoryBatchContextWithinTransactionSync\(/)
     assert.match(shopPurchase, /grantShopRewardsTypedInTransactionOwnerWithInventorySync\([\s\S]*inventory/)
-    const gachaRoute = fs.readFileSync(
-        path.join(projectRoot, "src/routes/api/gacha.ts"),
+    const gachaOwner = fs.readFileSync(
+        path.join(projectRoot, "src/lib/gacha-owner/execute.ts"),
         "utf8",
     )
-    assert.match(gachaRoute, /withDeferredInventoryBatchContextWithinTransactionSync\(/)
-    assert.match(gachaRoute, /getTicketCount:\s*itemId\s*=>\s*inventory\.read\(itemId\)\.afterAmount/)
-    assert.match(gachaRoute, /inventory\.deduct\([\s\S]*execPlan\.ticket\.useTicketCount/)
+    assert.match(gachaOwner, /withDeferredInventoryBatchContextWithinTransactionSync\(/)
+    assert.match(gachaOwner, /getTicketCount:\s*itemId\s*=>\s*inventory\.read\(itemId\)\.afterAmount/)
+    assert.match(gachaOwner, /inventory\.deduct\([\s\S]*plan\.ticket\.useTicketCount/)
     assert.match(
-        gachaRoute,
+        gachaOwner,
         /grantGachaRewardPlanInTransactionOwnerWithInventorySync\([\s\S]*id:\s*player\.id[\s\S]*inventory/,
     )
     const gachaRewardGrant = fs.readFileSync(

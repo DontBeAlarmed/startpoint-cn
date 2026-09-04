@@ -395,6 +395,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/news_storage.test.cjs",
             "tools/schema23_news_migration.test.cjs",
             "tools/schema24_gift_migration.test.cjs",
+            "tools/schema25_gacha_state_migration.test.cjs",
             "tools/test-workflow/database-isolation.test.cjs",
             "tools/test-workflow/database-lifecycle.test.cjs",
             "tools/test-workflow/runtime-data-paths.test.cjs",

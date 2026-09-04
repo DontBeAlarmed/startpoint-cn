@@ -468,6 +468,8 @@ export function deserializePlayerData(
             questProgress: questProgress,
             gachaInfoList: gachaInfoList,
             gachaCampaignList: gachaCampaignList,
+            gachaDetailList: [],
+            starsGachaCampaignList: [],
             drawnQuestList: drawnQuestList,
             periodicRewardPointList: periodicRewardPointList,
             allActiveMissionList: allActiveMissionList,

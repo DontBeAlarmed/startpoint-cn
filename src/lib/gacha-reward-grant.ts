@@ -25,6 +25,7 @@ import { getDefaultGachaSeedQuarantine } from "./gacha-seed-quarantine"
 import { formatGachaCharacterDrawsSummary } from "./hot-path-log-formatters"
 import { sampledLog } from "./sampled-log"
 import { createRewardGrantItemOverflowPolicy } from "./reward-grant-item-overflow"
+import { prepareGachaAcquisitionBatchSync } from "./gacha-owner/acquisition-batch"
 
 export interface PlannedCharacterGachaMovie {
     characterId: number
@@ -142,6 +143,8 @@ export function grantGachaRewardPlanInTransactionOwnerWithInventorySync(
     knownPlayerBefore: GachaRewardKnownPlayerState,
     inventory: InventoryBatchContext,
 ): RewardGrantExecutionResult {
+    const acquisition = prepareGachaAcquisitionBatchSync(playerId, plan)
+    inventory.readMany(acquisition.compensationItemIds)
     return withRewardGrantExecutionPlanAsTransactionOwnerWithInventorySync(
         playerId,
         plan,
@@ -157,7 +160,10 @@ export function grantGachaRewardPlanInTransactionOwnerWithInventorySync(
             execution.finalize()
             return result
         },
-        { itemOverflow: createRewardGrantItemOverflowPolicy(playerId) },
+        {
+            itemOverflow: createRewardGrantItemOverflowPolicy(playerId),
+            assetAcquisition: acquisition.assetAcquisition,
+        },
     )
 }
 
