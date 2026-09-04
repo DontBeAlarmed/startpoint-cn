@@ -65,7 +65,7 @@ function characterListEntry(
     viewerId: number,
     after: CharacterGrowthProjectionState,
     character: PlayerCharacterProjectionData,
-    options: { readonly includeViewer?: boolean, readonly includeStack?: boolean, readonly includeOverLimit?: boolean } = {},
+    options: { readonly includeViewer?: boolean, readonly includeStack?: boolean, readonly includeOverLimit?: boolean, readonly includeBondTokens?: boolean } = {},
 ): Record<string, unknown> {
     return projectCharacterGrowthIncrement(
         { after, changedNodeIds: [] },
@@ -75,6 +75,7 @@ function characterListEntry(
                 ...EXP_CHARACTER_GROWTH_FIELDS,
                 ...(options.includeOverLimit === true ? ["over_limit_step" as const] : []),
                 ...(options.includeStack === true ? ["stack" as const] : []),
+                ...(options.includeBondTokens === true ? ["bond_token_list" as const] : []),
             ],
             ...(options.includeViewer === true ? { viewerId } : {}),
         },
@@ -206,7 +207,10 @@ const routes = async (fastify: FastifyInstance) => {
                 data_headers: generateDataHeaders({ viewer_id: viewerId }),
                 data: {
                     add_exp_list: result.addExpList,
-                    character_list: [characterListEntry(viewerId, result.after, character)],
+                    character_list: [characterListEntry(viewerId, {
+                        ...result.after,
+                        bondTokens: result.bondTokens,
+                    }, character, { includeBondTokens: true })],
                     user_info: {
                         exp_pool: result.expPool,
                         exp_pooled_time: expPoolRealDateToClientTimestamp(player.expPooledTime),

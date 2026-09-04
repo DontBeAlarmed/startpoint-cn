@@ -86,7 +86,7 @@ const AUTHORITATIVE_WRITE_SETS = Object.freeze({
     "character/learn_mana_node": Object.freeze([
         "updatePlayerSync", "incrementActiveMissionUsedManaCountSync",
         "withInventoryBatchContextWithinTransactionSync", "insertPlayerCharacterManaNodesSync",
-        "updateBondTokenForCompletedBoardFromGrowthState", "finalizeLearnManaAwakePublicationWrites",
+        "convergeBondTokenForLearnedBoardWithinTransaction", "finalizeLearnManaAwakePublicationWrites",
     ]),
     "exchange/star_crumb": Object.freeze(["executeStarCrumbExchangeSync"]),
     "gacha/exchange_character": Object.freeze(["executeGachaExchangeSync"]),
@@ -145,7 +145,7 @@ const LEARN_MANA_SYNC_AUTHORITATIVE_CALLBACKS = Object.freeze({
     withInventoryBatchContextWithinTransactionSync: Object.freeze([
         "updatePlayerSync",
         "incrementActiveMissionUsedManaCountSync",
-        "updateBondTokenForCompletedBoardFromGrowthState",
+        "convergeBondTokenForLearnedBoardWithinTransaction",
     ]),
 })
 const FINAL_WRITE_HELPERS = Object.freeze({

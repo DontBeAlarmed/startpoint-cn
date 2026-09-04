@@ -25,7 +25,7 @@ const {
 const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getDb } = require("../src/data/db")
 const { receiveBondToken } = require("../src/lib/character-growth/commands/receive-bond-token")
-const { updateBondTokenForCompletedBoard } = require("../src/lib/character-helpers")
+const { convergeBondTokenForLearnedBoardWithinTransaction } = require("../src/lib/character-growth/bond-token-qualification")
 const { createCharacterGrowthRequestContext } = require("../src/lib/character-growth/request-context")
 
 initializeDatabase()
@@ -178,7 +178,13 @@ test("completed-board helper rejects a missing token row instead of manufacturin
     const character = getPlayerCharacterSync(playerId, 1)
     const beforeBond = getPlayerSync(playerId).bondToken
     assert.throws(
-        () => updateBondTokenForCompletedBoard(playerId, 1, character, 1, true),
+        () => convergeBondTokenForLearnedBoardWithinTransaction(playerId, 1, new Map(), {
+            boardIndex: 1,
+            rarity: character.rarity ?? 3,
+            exp: character.exp,
+            requiredNodeIds: [],
+            learnedNodeIds: new Set(),
+        }),
         error => error.code === "INVALID_GROWTH_STATE",
     )
     assert.equal(getPlayerSync(playerId).bondToken, beforeBond)

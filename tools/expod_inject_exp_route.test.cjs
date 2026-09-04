@@ -147,6 +147,7 @@ stubModule("../src/lib/character-growth/commands/inject-exp", {
         return {
             addExpList: [{ character_id: characterId, add_exp: addExp }],
             expPool,
+            bondTokens: new Map([[1, 0]]),
             after: {
                 playerId,
                 characterId,
@@ -199,6 +200,10 @@ async function main() {
         assert.equal(state().expPool, 1000)
         assert.equal(state().characterExp, 1000)
         assert.equal(state().counters.totalInjectedExpCount, 1)
+        assert.deepEqual(
+            unpack(success.rawPayload).data.character_list[0].bond_token_list,
+            [{ mana_board_index: 1, status: 0 }],
+        )
 
         const beforeFailure = state()
         failExpWrite = true

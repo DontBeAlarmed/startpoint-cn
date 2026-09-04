@@ -120,6 +120,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/character_growth_load_projector.test.cjs",
             "tools/character_growth_client_merge.test.cjs",
             "tools/character_growth_bond_command.test.cjs",
+            "tools/character_growth_bond_qualification.test.cjs",
             "tools/character_growth_open_board_command.test.cjs",
             "tools/character_growth_node_commands.test.cjs",
             "tools/character_growth_awake_node_commands.test.cjs",

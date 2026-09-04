@@ -10,9 +10,7 @@ import { recordSecondManaBoardCompletionMilestoneSync } from "../../../lib/playe
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
 import { isCharacterSecondManaBoardAvailable } from "../../mana-board-availability"
 import { withInventoryBatchContextWithinTransactionSync } from "../../inventory"
-import {
-    updateBondTokenForCompletedBoardFromGrowthState,
-} from "../../character-helpers"
+import { convergeBondTokenForLearnedBoardWithinTransaction } from "../bond-token-qualification"
 import { buildCharacterEvolutionResponse } from "../../character-evolution"
 import { createAwakeRequestContext } from "../../mission/awake-request-context"
 import { publishAwakeUnlockCharacterListWithStateWithinTransaction } from "../facts/awake-unlock-facts"
@@ -153,12 +151,17 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
             const nextNodes = applyManaNodePlan(beforeNormalManaNodes, plan)
             const isBoardComplete = [...Object.keys(content.nodes).map(Number)]
                 .every(nodeId => nextNodes.has(nodeId))
-            const bond = updateBondTokenForCompletedBoardFromGrowthState(
+            const bond = convergeBondTokenForLearnedBoardWithinTransaction(
                 command.playerId,
                 command.characterId,
                 beforeBondTokens,
-                boardId,
-                isBoardComplete,
+                {
+                    boardIndex: boardId,
+                    rarity: character.rarity,
+                    exp: character.exp,
+                    requiredNodeIds: [...Object.keys(content.nodes).map(Number)],
+                    learnedNodeIds: new Set(nextNodes.keys()),
+                },
             )
             const boardOneContent = mutationContent(command.characterId, 1)
             const plannedEvolutionLevel = Math.max(

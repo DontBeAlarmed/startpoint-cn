@@ -7,11 +7,7 @@ import { getPlayerCharacterSync } from "../data/domains/character"
 import { getSession } from "../data/domains/session"
 import { resolvePlayerIdSync } from "../data/activeAccount"
 import { getPlayerItemSync } from "../data/domains/item"
-import { updatePlayerCharacterBondTokenSync } from "../data/domains/character"
 import { generateDataHeaders } from "../utils"
-import { getBondTokenStatus, projectSortedBondTokens } from "./character-growth/invariants"
-import type { BondTokenStatus } from "./character-growth/model"
-import { growthError } from "./character-growth/errors"
 import {
     characterGrowthProjectionStateFromPlayerCharacter,
     projectCharacterGrowthEntry,
@@ -193,65 +189,6 @@ export function validateManaBoardAwakeRequest(
         return "Mana node is outside the awake board."
     }
     return null
-}
-
-// ─── Bond token ───
-
-export interface BondTokenResult {
-    bondTokenList: Object[]
-    bondTokenGranted: boolean
-}
-
-/**
- * Checks board completion and updates the independently earned bond token.
- */
-export function updateBondTokenForCompletedBoard(
-    playerId: number,
-    characterId: number,
-    characterData: PlayerCharacter,
-    boardIndex: number,
-    isBoardComplete: boolean
-): BondTokenResult {
-    const tokenMap = new Map<number, BondTokenStatus>(characterData.bondTokenList.map(entry => [
-        entry.manaBoardIndex,
-        entry.status as BondTokenStatus,
-    ]))
-    return updateBondTokenForCompletedBoardFromGrowthState(
-        playerId,
-        characterId,
-        tokenMap,
-        boardIndex,
-        isBoardComplete,
-    )
-}
-
-export function updateBondTokenForCompletedBoardFromGrowthState(
-    playerId: number,
-    characterId: number,
-    tokenMap: ReadonlyMap<number, BondTokenStatus>,
-    boardIndex: number,
-    isBoardComplete: boolean,
-): BondTokenResult {
-    const currentStatus = getBondTokenStatus(tokenMap, boardIndex)
-    if (currentStatus === null) {
-        throw growthError(
-            "INVALID_GROWTH_STATE",
-            `completed mana board ${boardIndex} is missing its bond token row.`,
-        )
-    }
-    const bondTokenGranted = currentStatus === 0
-        && isBoardComplete
-
-    if (bondTokenGranted) {
-        updatePlayerCharacterBondTokenSync(playerId, characterId, { manaBoardIndex: boardIndex, status: 1 })
-    }
-
-    const nextTokenMap = new Map(tokenMap)
-    if (bondTokenGranted) nextTokenMap.set(boardIndex, 1)
-    return {
-        bondTokenGranted,
-        bondTokenList: projectSortedBondTokens(nextTokenMap),
-    }
 }
 
 /** Sends a standard-format mana-related response. */
