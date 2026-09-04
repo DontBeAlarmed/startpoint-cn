@@ -11,6 +11,20 @@ const gameTime = require("../src/runtime/time/game-time")
 const originalOffset = utils.getTimeOffset()
 const realDate = new Date("2026-08-20T00:00:00.000Z")
 const offsetMs = -24 * 60 * 60 * 1000
+const projectRoot = path.resolve(__dirname, "..")
+const candidateWorkspace = path.resolve(projectRoot, "..")
+const gitMetadataPath = path.join(projectRoot, ".git")
+const linkedGitDirectory = fs.statSync(gitMetadataPath).isFile()
+    ? path.resolve(
+        projectRoot,
+        fs.readFileSync(gitMetadataPath, "utf8").trim().replace(/^gitdir:\s*/, ""),
+    )
+    : null
+const workspaceRoot = fs.existsSync(path.join(candidateWorkspace, "wf-2.1.125-cn-decompiled"))
+    ? candidateWorkspace
+    : linkedGitDirectory === null
+        ? candidateWorkspace
+        : path.dirname(path.resolve(linkedGitDirectory, "../../.."))
 
 try {
     utils.setServerTimeOffset(offsetMs)
@@ -45,8 +59,8 @@ try {
 
     const clientSource = fs.readFileSync(
         path.join(
-            __dirname,
-            "../../wf-2.1.125-cn-decompiled/scripts/scripts/pinball/common/data/player/PlayerLogic.as",
+            workspaceRoot,
+            "wf-2.1.125-cn-decompiled/scripts/scripts/pinball/common/data/player/PlayerLogic.as",
         ),
         "utf8",
     )

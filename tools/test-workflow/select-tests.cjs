@@ -391,12 +391,16 @@ const SOURCE_RULES = [
         groups: ["quick:content", "quick:gacha"],
     },
     {
-        pattern: /^(?:src\/lib\/gacha-owner\/.*\.ts|tools\/gacha_(?:execution_owner|crazy_conversion)\.test\.cjs)$/,
+        pattern: /^(?:src\/lib\/gacha-owner\/.*\.ts|src\/routes\/api\/gacha\/crazy-routes\.ts|tools\/gacha_(?:execution_owner|crazy_conversion)\.test\.cjs)$/,
         groups: ["integration:rules", "quick:gacha"],
     },
     {
         pattern: /^(?:src\/lib\/star-crumb-exchange\/.*\.ts|src\/routes\/api\/exchange\.ts)$/,
         groups: ["integration:rules", "quick:content"],
+    },
+    {
+        pattern: /^(?:assets\/bond_token_exchange\.json|src\/data\/domains\/bondTokenExchange\.ts|src\/lib\/bond-token-exchange\/.*\.ts)$/,
+        groups: ["integration:database", "integration:rules", "quick:content"],
     },
     {
         pattern: /^src\/lib\/gacha-owner\/post-commit\.ts$/,
@@ -710,11 +714,11 @@ const SOURCE_RULES = [
     { pattern: /^src\/multi\//, groups: ["quick:protocol", "integration:multi-hub"] },
     { pattern: /^src\/multi\/tcp\/server\.ts$/, groups: ["integration:runtime"] },
     {
-        pattern: /^src\/data\/(?!player-save\/|defaultSave\.ts$|domains\/(?:gift|item-maintenance|news)\.ts$|schema\/server-(?:gifts|news)\.ts$)/,
+        pattern: /^src\/data\/(?!player-save\/|defaultSave\.ts$|domains\/(?:bondTokenExchange|gift|item-maintenance|news)\.ts$|schema\/server-(?:gifts|news)\.ts$)/,
         groups: ["integration:database", "full"],
     },
     {
-        pattern: /^src\/routes\/(?!api\/(?:exchange|gift|news|singleBattleQuest)\.ts$|web_api\/)/,
+        pattern: /^src\/routes\/(?!api\/(?:exchange|gift|news|singleBattleQuest)\.ts$|api\/gacha\/crazy-routes\.ts$|web_api\/)/,
         groups: ["full"],
     },
 ]

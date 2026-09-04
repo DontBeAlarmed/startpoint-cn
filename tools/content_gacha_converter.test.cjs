@@ -294,6 +294,30 @@ test("gacha converter preserves the official crazy ten-ticket field", async () =
     assert.equal(output["gacha.json"]["10"].crazyTenTicketItemId, 999012)
 })
 
+test("gacha converter accepts an official zero-weight rarity tier without weakening prize pools", async () => {
+    const fixture = createFixture()
+    fixture.nested.set("master/gacha_odds/fixture_rarity.orderedmap", [{
+        key: "fixture_rarity",
+        rows: [row("1", ["5", "5"]), row("2", ["4", "95"]), row("3", ["3", "0"])],
+    }])
+    const output = await convertGachas(fixture.reader)
+    assert.deepEqual(output["gacha.json"]["10"].rankRates.normal, [50, 950, 0])
+
+    const zeroCharacterPrize = createFixture()
+    zeroCharacterPrize.nested.set("master/gacha_odds/character_3.orderedmap", [{
+        key: "character_3",
+        rows: [row("1", ["1003", "3", "0", "false", "false", "false", "false"])],
+    }])
+    await assert.rejects(convertGachas(zeroCharacterPrize.reader), /weight must be positive/)
+
+    const zeroEquipmentPrize = createFixture()
+    zeroEquipmentPrize.nested.set("master/gacha_odds/equipment_3.orderedmap", [{
+        key: "equipment_3",
+        rows: [row("1", ["3003", "3", "0", "false", "false", "false"])],
+    }])
+    await assert.rejects(convertGachas(zeroEquipmentPrize.reader), /weight must be positive/)
+})
+
 test("gacha converter fails clearly when a referenced non-empty odds source is missing", async () => {
     assert.equal(typeof convertGachas, "function", "gacha converter should export convertGachas")
     const fixture = createFixture()

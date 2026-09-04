@@ -92,9 +92,8 @@ const routes = async (fastify: FastifyInstance) => {
             message: "Invalid viewer id.",
         });
 
-        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!;
-        const player = playerId !== null ? getPlayerSync(playerId) : null;
-        if (player === null) return reply.status(500).send({
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId);
+        if (playerId === null) return reply.status(500).send({
             error: "Internal Server Error",
             message: "No players bound to account.",
         });
@@ -134,9 +133,8 @@ const routes = async (fastify: FastifyInstance) => {
             message: "Invalid viewer id.",
         });
 
-        const playerId = resolvePlayerIdSync(viewerIdSession.accountId)!;
-        const player = playerId !== null ? getPlayerSync(playerId) : null;
-        if (player === null) return reply.status(500).send({
+        const playerId = resolvePlayerIdSync(viewerIdSession.accountId);
+        if (playerId === null) return reply.status(500).send({
             error: "Internal Server Error",
             message: "No players bound to account.",
         });

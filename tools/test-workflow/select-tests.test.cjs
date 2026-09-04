@@ -544,6 +544,24 @@ test("maps Star Crumb Exchange to its content and transaction leaves without ful
     }
 })
 
+test("maps Bond Token Exchange and Crazy routes to focused leaves", () => {
+    for (const file of [
+        "assets/bond_token_exchange.json",
+        "src/data/domains/bondTokenExchange.ts",
+        "src/lib/bond-token-exchange/catalog.ts",
+        "src/lib/bond-token-exchange/owner.ts",
+    ]) {
+        assert.deepEqual(
+            selectTestGroups([file]),
+            ["integration:database", "integration:rules", "quick:content"],
+        )
+    }
+    assert.deepEqual(
+        selectTestGroups(["src/routes/api/gacha/crazy-routes.ts"]),
+        ["integration:rules", "quick:gacha"],
+    )
+})
+
 test("keeps unknown content files on the full suite", () => {
     assert.deepEqual(selectTestGroups(["src/content/repository.ts"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/content/build/manifest.ts"]), ["full"])

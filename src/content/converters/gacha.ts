@@ -127,9 +127,9 @@ function parsePositiveInteger(value: string, fieldName: string, source: string):
     return parsed
 }
 
-// Official odds tables legitimately carry weight 0 (a tier or entry that can
-// never drop, e.g. rare_rarity pools without rarity-2 drops), so weights are
-// only required to be non-negative; permille math already maps 0 to 0‰.
+// Official rarity tables legitimately carry weight 0 for a tier that can never
+// drop (for example rare_rarity without rarity-2 drops). Prize-entry weights
+// remain strictly positive because the runtime weighted-pool catalog requires it.
 function parseNonNegativeWeight(value: string, source: string): number {
     const parsed = parseStrictInteger(value, "weight", source)
     if (parsed < 0) invalidGacha(`weight must be non-negative in ${source}: ${value}`)
@@ -165,7 +165,7 @@ function parseCharacterOdds(
         return {
             characterId: parsePositiveInteger(fields[0], "characterId", source),
             rarity: parsePositiveInteger(fields[1], "rarity", source),
-            weight: parseNonNegativeWeight(fields[2], source),
+            weight: parsePositiveInteger(fields[2], "weight", source),
             oddsUp: parseStrictBoolean(fields[3], "oddsUp", source),
             isLimited: parseStrictBoolean(fields[4], "isLimited", source),
             isExchangeable: parseStrictBoolean(fields[5], "isExchangeable", source),
@@ -185,7 +185,7 @@ function parseEquipmentOdds(
         return {
             equipmentId: parsePositiveInteger(fields[0], "equipmentId", source),
             rarity: parsePositiveInteger(fields[1], "rarity", source),
-            weight: parseNonNegativeWeight(fields[2], source),
+            weight: parsePositiveInteger(fields[2], "weight", source),
             oddsUp: parseStrictBoolean(fields[3], "oddsUp", source),
             isLimited: parseStrictBoolean(fields[4], "isLimited", source),
             isExchangeable: parseStrictBoolean(fields[5], "isExchangeable", source),

@@ -377,11 +377,17 @@ test("bond token exchange commits equipment grant, count and absolute response",
     const { playerId, viewerId } = await createPlayer("bond-token-success")
     updatePlayerSync({ id: playerId, bondToken: 100 })
 
-    const response = await app.inject({
+    const measured = await captureSqlAsync(() => app.inject({
         method: "POST",
         url: "/exchange/bond_token",
         payload: { viewer_id: viewerId, equipment_id: 5010005, api_count: 1 },
-    })
+    }))
+    const response = measured.result
+    assert.equal(measured.statements.length, 11)
+    assert.equal(countSql(measured.statements, /FROM players\s+WHERE id =/), 1)
+    assert.equal(countSql(measured.statements, /FROM players_bond_token_exchanges/), 1)
+    assert.equal(countSql(measured.statements, /^COMMIT$/), 1)
+    assert.equal(countSql(measured.statements, /^ROLLBACK$/), 0)
 
     assert.equal(response.statusCode, 200, response.body)
     const payload = unpack(Buffer.from(response.body, "base64"))
@@ -398,6 +404,11 @@ test("bond token exchange commits equipment grant, count and absolute response",
     assert.equal(payload.data.over_max, null)
     assert.equal(getPlayerSync(playerId).bondToken, 50)
     assert.equal(playerOwnsEquipmentSync(playerId, 5010005), true)
+    assert.equal(
+        getPlayerItemSync(playerId, 5010005),
+        null,
+        "Bond Token exchange follows the client Dummy path and does not also grant an ability-soul Item",
+    )
     assert.equal(getPlayerBondTokenExchangeCountSync(playerId, 5010005), 1)
 
     const listAfter = unpack(Buffer.from((await app.inject({
@@ -461,11 +472,17 @@ test("bond token exchange rolls charge, count and equipment back together", asyn
     `)
     t.after(() => database.exec("DROP TRIGGER IF EXISTS reject_bond_token_equipment"))
 
-    const response = await app.inject({
+    const measured = await captureSqlAsync(() => app.inject({
         method: "POST",
         url: "/exchange/bond_token",
         payload: { viewer_id: viewerId, equipment_id: 5010005, api_count: 1 },
-    })
+    }))
+    const response = measured.result
+    assert.equal(measured.statements.length, 10)
+    assert.equal(countSql(measured.statements, /FROM players\s+WHERE id =/), 1)
+    assert.equal(countSql(measured.statements, /FROM players_bond_token_exchanges/), 1)
+    assert.equal(countSql(measured.statements, /^COMMIT$/), 0)
+    assert.equal(countSql(measured.statements, /^ROLLBACK$/), 1)
 
     assert.equal(response.statusCode, 500)
     assert.equal(getPlayerSync(playerId).bondToken, 100)
@@ -483,7 +500,10 @@ test("bond token catalog is immutable per repository with typed cost and stock",
         listBondTokenExchangeProducts,
     } = require("../src/lib/bond-token-exchange")
     // WeakMap 缓存：同 repository 只构建一次，不随请求重复读取 Content 表
-    assert.equal(getBondTokenExchangeCatalog() === getBondTokenExchangeCatalog(), true)
+    const catalog = getBondTokenExchangeCatalog()
+    assert.equal(catalog === getBondTokenExchangeCatalog(), true)
+    assert.equal(Object.isFrozen(catalog), true)
+    assert.deepEqual(Object.keys(catalog), ["resolve", "list"])
     const resolution = resolveBondTokenExchangeProduct(5010005, Date.UTC(2026, 8, 4))
     assert.deepEqual(
         [resolution.ok, resolution.product.equipmentId, resolution.product.cost, resolution.product.stock],
@@ -500,6 +520,46 @@ test("bond token catalog is immutable per repository with typed cost and stock",
     assert.equal(resolveBondTokenExchangeProduct(5010005, endMs + 1).ok, false)
     const listed = listBondTokenExchangeProducts(Date.UTC(2026, 8, 4))
     assert.deepEqual(listed.map(product => product.equipmentId), [5010005, 5030005])
+
+    let tableReads = 0
+    const repository = {
+        table(name) {
+            assert.equal(name, "bond_token_exchange.json")
+            tableReads += 1
+            return { "5010005": [["50", "1", "2019-01-01 05:00:00", "2200-02-05 14:59:59"]] }
+        },
+    }
+    const cached = getBondTokenExchangeCatalog(repository)
+    assert.equal(cached, getBondTokenExchangeCatalog(repository))
+    assert.equal(tableReads, 1)
+    assert.equal(cached.resolve(5010005, Date.UTC(2026, 8, 4)).ok, true)
+
+    const reversedPeriodRepository = {
+        table() {
+            return { "5010005": [["50", "1", "2200-02-05 14:59:59", "2019-01-01 05:00:00"]] }
+        },
+    }
+    assert.throws(
+        () => getBondTokenExchangeCatalog(reversedPeriodRepository),
+        /period is reversed/,
+    )
+})
+
+test("bond token corrupted negative exchange count fails closed", async () => {
+    const { playerId, viewerId } = await createPlayer("bond-token-corrupt-count")
+    database.prepare(`INSERT INTO players_bond_token_exchanges (
+        player_id, equipment_id, exchange_count
+    ) VALUES (?, 5010005, -1)`).run(playerId)
+    assert.throws(
+        () => getPlayerBondTokenExchangeCountSync(playerId, 5010005),
+        /count is invalid/,
+    )
+    const response = await app.inject({
+        method: "POST",
+        url: "/exchange/get_bond_token_exchange_list",
+        payload: { viewer_id: viewerId, api_count: 1 },
+    })
+    assert.equal(response.statusCode, 500)
 })
 
 test("bulk stack conversion commits the complete planned result", async () => {

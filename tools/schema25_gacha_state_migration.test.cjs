@@ -24,7 +24,7 @@ test.after(() => {
     else process.env.DATA_DIR = previousDataDirectory
 })
 
-test("literal schema 24 migrates through 25 to 26 without rewriting existing Gacha state", () => {
+test("literal schema 24 migrates through 25 and 26 to 27 without rewriting existing Gacha state", () => {
     const fresh = data.initializeDatabase()
     const account = insertAccountSync({
         appId: "wf_cn",
@@ -46,6 +46,7 @@ test("literal schema 24 migrates through 25 to 26 without rewriting existing Gac
     const schema24 = new Sqlite(databasePath)
     schema24.pragma("foreign_keys = OFF")
     schema24.exec(`
+        DROP TABLE players_bond_token_exchanges;
         DROP TABLE players_gacha_conversions;
         DROP TABLE players_gacha_crazy_results;
         DROP TABLE players_stars_gacha_campaigns;
@@ -83,6 +84,11 @@ test("literal schema 24 migrates through 25 to 26 without rewriting existing Gac
             AND name IN ('players_gacha_crazy_results', 'players_gacha_conversions')
             ORDER BY name`).all().map(row => row.name),
         ["players_gacha_conversions", "players_gacha_crazy_results"],
+    )
+    assert.deepEqual(
+        migrated.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'
+            AND name = 'players_bond_token_exchanges'`).get(),
+        { name: "players_bond_token_exchanges" },
     )
     assert.deepEqual(migrated.prepare(`SELECT gacha_id, is_daily_first,
         is_account_first, gacha_exchange_point, player_id
@@ -143,4 +149,12 @@ test("literal schema 24 migrates through 25 to 26 without rewriting existing Gac
     migrated.prepare("DELETE FROM players_gacha_info WHERE player_id = ? AND gacha_id = 100").run(playerId)
     assert.equal(migrated.prepare("SELECT COUNT(*) AS count FROM players_gacha_crazy_results").get().count, 0)
     assert.equal(migrated.prepare("SELECT COUNT(*) AS count FROM players_gacha_conversions").get().count, 0)
+    migrated.prepare(`INSERT INTO players_bond_token_exchanges (
+        player_id, equipment_id, exchange_count
+    ) VALUES (?, 5010005, 1)`).run(playerId)
+    migrated.prepare("DELETE FROM players WHERE id = ?").run(playerId)
+    assert.equal(
+        migrated.prepare("SELECT COUNT(*) AS count FROM players_bond_token_exchanges").get().count,
+        0,
+    )
 })

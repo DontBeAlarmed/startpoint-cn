@@ -117,3 +117,11 @@ test("Star Crumb catalog owns its runtime snapshot tables without a bundled bypa
     }
     assert.doesNotMatch(source, /assets\/star_crumb_exchange|getRuntimeContentTableSync/)
 })
+
+test("Bond Token catalog owns its runtime snapshot table without a bundled bypass", () => {
+    const relativePath = "src/lib/bond-token-exchange/catalog.ts"
+    const source = fs.readFileSync(path.join(projectRoot, relativePath), "utf8")
+    assert.match(source, /getContentSnapshot\(\)\.repository/)
+    assert.match(source, /repository\.table[\s\S]*?"bond_token_exchange\.json"/)
+    assert.doesNotMatch(source, /assets\/bond_token_exchange|getRuntimeContentTableSync/)
+})
