@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Card, Descriptions, Table, Button, Space, InputNumber, Popconfirm, message, Tag, Tabs, Spin, Typography, Switch, Input, Upload } from "antd"
+import { Card, Col, Descriptions, Row, Table, Button, Space, InputNumber, Popconfirm, message, Tag, Tabs, Spin, Typography, Switch, Input, Upload } from "antd"
 import { SaveOutlined, DeleteOutlined, PlusOutlined, DownloadOutlined, UploadOutlined, UndoOutlined, SearchOutlined } from "@ant-design/icons"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
@@ -191,30 +191,33 @@ export default function PlayerDetail() {
 
     const { player, characters, items, equipment, questProgress, drawnQuests } = data
 
-    // 内联可编辑数字字段（复用于资源/账号字段）
+    // 内联可编辑数字字段（复用于资源/账号字段），渲染为响应式网格中的带标签输入单元
     const numField = (key: string, label: string, opts: { min?: number; allowNull?: boolean } = {}) => {
         const has = key in editValues
         const current = (player as any)[key]
         const shown = has ? editValues[key] : current
         const changed = has && editValues[key] !== current
         return (
-            <Descriptions.Item key={key} label={label}>
-                <Space.Compact style={{ width: "100%" }}>
-                    <InputNumber
-                        style={{ width: "100%" }}
-                        size="small"
-                        value={shown}
-                        min={opts.min}
-                        onChange={v => setEditValues(prev => ({ ...prev, [key]: v ?? (opts.allowNull ? null : (opts.min ?? 0)) }))}
-                    />
-                    {changed && (
-                        <Button size="small" type="primary" icon={<SaveOutlined />}
-                            loading={editField.isPending}
-                            onClick={() => editField.mutate({ field: key, value: editValues[key] })}
+            <Col key={key} xs={24} sm={12} md={8} lg={6}>
+                <div className="admin-edit-grid-cell">
+                    <span className="admin-edit-grid-label">{label}</span>
+                    <Space.Compact style={{ width: "100%" }}>
+                        <InputNumber
+                            style={{ width: "100%" }}
+                            size="small"
+                            value={shown}
+                            min={opts.min}
+                            onChange={v => setEditValues(prev => ({ ...prev, [key]: v ?? (opts.allowNull ? null : (opts.min ?? 0)) }))}
                         />
-                    )}
-                </Space.Compact>
-            </Descriptions.Item>
+                        {changed && (
+                            <Button size="small" type="primary" icon={<SaveOutlined />}
+                                loading={editField.isPending}
+                                onClick={() => editField.mutate({ field: key, value: editValues[key] })}
+                            />
+                        )}
+                    </Space.Compact>
+                </div>
+            </Col>
         )
     }
 
@@ -404,6 +407,30 @@ export default function PlayerDetail() {
             actions={<Button onClick={() => navigate("/accounts")}>返回账号 / 存档</Button>}
         >
         <Space direction="vertical" size="large" className="admin-stack">
+            <div className="admin-action-row">
+                <Text type="secondary">工具操作</Text>
+                <Popconfirm title="清除全部 EX Boost？" onConfirm={() => clearExBoost.mutate()} okText="确认" cancelText="取消">
+                    <Button size="small" danger loading={clearExBoost.isPending}>清除 EX Boost</Button>
+                </Popconfirm>
+                <Popconfirm title="重置编队到默认？" onConfirm={() => resetParties.mutate()} okText="确认" cancelText="取消">
+                    <Button size="small" danger icon={<UndoOutlined />}>重置编队</Button>
+                </Popconfirm>
+                <Popconfirm title="清空邮箱？" onConfirm={() => clearMail.mutate()} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
+                    <Button size="small" danger>清空邮箱</Button>
+                </Popconfirm>
+                <Popconfirm title="重置每日挑战点？" onConfirm={() => resetChallenge.mutate()} okText="确认" cancelText="取消">
+                    <Button size="small" danger icon={<UndoOutlined />}>重置每日挑战</Button>
+                </Popconfirm>
+                <Popconfirm title="清除接收历史（一次性道具的领取记录）？" onConfirm={() => clearReceiveHistory.mutate()} okText="确认" cancelText="取消">
+                    <Button size="small" danger loading={clearReceiveHistory.isPending}>清除接收历史</Button>
+                </Popconfirm>
+                <Button size="small" icon={<DownloadOutlined />} href={`/api/player/save?id=${pid}`} target="_blank">导出存档</Button>
+                <Upload accept=".json,application/json" showUploadList={false} maxCount={1}
+                    beforeUpload={file => { importSave.mutate(file); return false }}>
+                    <Button size="small" icon={<UploadOutlined />} danger loading={importSave.isPending}>导入存档(覆盖)</Button>
+                </Upload>
+            </div>
+
             <Card title="存档标识">
                     <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 3 }} className="admin-detail-descriptions">
                         <Descriptions.Item label="存档名">{player.name}</Descriptions.Item>
@@ -412,51 +439,27 @@ export default function PlayerDetail() {
                     </Descriptions>
             </Card>
 
-            <div className="admin-card-grid">
-                    <Card title="资源编辑" size="small">
-                        <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} className="admin-detail-descriptions">
-                            {resourceFields.map(f => numField(f.key, f.label, { min: 0 }))}
-                        </Descriptions>
-                    </Card>
+            <Card title="资源编辑" size="small">
+                <Row gutter={[12, 12]}>
+                    {resourceFields.map(f => numField(f.key, f.label, { min: 0 }))}
+                </Row>
+            </Card>
 
-                    <Card title="账号设置" size="small">
-                        <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} className="admin-detail-descriptions">
-                            <Descriptions.Item key="enableAuto3x" label="3x加速">
-                                <Switch checked={player.enableAuto3x} loading={editField.isPending}
-                                    onChange={v => editField.mutate({ field: "enableAuto3x", value: v })} />
-                            </Descriptions.Item>
-                            {numField("degreeId", "等级(称号ID)", { min: 0 })}
-                            {numField("leaderCharacterId", "队长角色ID", { min: 0 })}
-                            {numField("birth", "生日(birth)", { min: 0 })}
-                            {numField("tutorialStep", "教程步骤(空=null)", { min: 0, allowNull: true })}
-                        </Descriptions>
-                    </Card>
-
-                    <Card title="工具操作" size="small">
-                        <div className="admin-action-row">
-                            <Popconfirm title="清除全部 EX Boost？" onConfirm={() => clearExBoost.mutate()} okText="确认" cancelText="取消">
-                                <Button size="small" danger loading={clearExBoost.isPending}>清除 EX Boost</Button>
-                            </Popconfirm>
-                            <Popconfirm title="重置编队到默认？" onConfirm={() => resetParties.mutate()} okText="确认" cancelText="取消">
-                                <Button size="small" danger icon={<UndoOutlined />}>重置编队</Button>
-                            </Popconfirm>
-                            <Popconfirm title="清空邮箱？" onConfirm={() => clearMail.mutate()} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
-                                <Button size="small" danger>清空邮箱</Button>
-                            </Popconfirm>
-                            <Popconfirm title="重置每日挑战点？" onConfirm={() => resetChallenge.mutate()} okText="确认" cancelText="取消">
-                                <Button size="small" danger icon={<UndoOutlined />}>重置每日挑战</Button>
-                            </Popconfirm>
-                            <Popconfirm title="清除接收历史（一次性道具的领取记录）？" onConfirm={() => clearReceiveHistory.mutate()} okText="确认" cancelText="取消">
-                                <Button size="small" danger loading={clearReceiveHistory.isPending}>清除接收历史</Button>
-                            </Popconfirm>
-                            <Button size="small" icon={<DownloadOutlined />} href={`/api/player/save?id=${pid}`} target="_blank">导出存档</Button>
-                            <Upload accept=".json,application/json" showUploadList={false} maxCount={1}
-                                beforeUpload={file => { importSave.mutate(file); return false }}>
-                                <Button size="small" icon={<UploadOutlined />} danger loading={importSave.isPending}>导入存档(覆盖)</Button>
-                            </Upload>
+            <Card title="账号设置" size="small">
+                <Row gutter={[12, 12]}>
+                    <Col key="enableAuto3x" xs={24} sm={12} md={8} lg={6}>
+                        <div className="admin-edit-grid-cell">
+                            <span className="admin-edit-grid-label">3x加速</span>
+                            <Switch checked={player.enableAuto3x} loading={editField.isPending}
+                                onChange={v => editField.mutate({ field: "enableAuto3x", value: v })} />
                         </div>
-                    </Card>
-            </div>
+                    </Col>
+                    {numField("degreeId", "等级(称号ID)", { min: 0 })}
+                    {numField("leaderCharacterId", "队长角色ID", { min: 0 })}
+                    {numField("birth", "生日(birth)", { min: 0 })}
+                    {numField("tutorialStep", "教程步骤(空=null)", { min: 0, allowNull: true })}
+                </Row>
+            </Card>
 
             <Card className="admin-table-card">
                 <Tabs items={tabItems} />

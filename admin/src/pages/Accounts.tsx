@@ -1,6 +1,6 @@
 import { useState } from "react"
-import { Card, Table, Button, Space, Popconfirm, Input, message, Tag, Grid, Typography } from "antd"
-import { PlusOutlined, CopyOutlined, DeleteOutlined, SwapOutlined, EditOutlined, LeftOutlined } from "@ant-design/icons"
+import { Card, Table, Button, Space, Popconfirm, Input, message, Tag, Grid, Tooltip, Typography } from "antd"
+import { PlusOutlined, CopyOutlined, DeleteOutlined, SwapOutlined, EditOutlined, LeftOutlined, InfoCircleOutlined } from "@ant-design/icons"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import { apiGet, apiPost } from "../api/client"
@@ -91,7 +91,17 @@ export default function Accounts() {
     })
 
     const accountColumns = [
-        { title: "ID", dataIndex: "id", width: 64 },
+        {
+            title: (
+                <Space size={4}>
+                    ID
+                    <Tooltip title="账号 ID:账号表主键,一个账号可包含多个存档">
+                        <InfoCircleOutlined style={{ color: "var(--ink-soft)" }} />
+                    </Tooltip>
+                </Space>
+            ),
+            dataIndex: "id", width: 64,
+        },
         { title: "存档数", dataIndex: "saveCount", width: 80, responsive: ["sm"] as any },
         {
             title: "默认存档", width: 180, responsive: ["md"] as any,
@@ -107,7 +117,15 @@ export default function Accounts() {
             },
         },
         {
-            title: "绑定设备", width: 230,
+            title: (
+                <Space size={4}>
+                    绑定设备
+                    <Tooltip title="设备绑定:登录设备与账号的自动绑定关系;显示设备识别名,点击铅笔图标可修改设备备注名">
+                        <InfoCircleOutlined style={{ color: "var(--ink-soft)" }} />
+                    </Tooltip>
+                </Space>
+            ),
+            width: 230,
             render: (_: unknown, row: AccountRow) => row.devices.length === 0 ? <Tag>无</Tag> : (
                 <Space direction="vertical" size={4}>
                     {row.devices.map(device => renameDeviceId === device.deviceId ? (

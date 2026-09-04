@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react"
+import { Fragment, useMemo, useRef, useState } from "react"
 import { Alert, Button, Card, Divider, Empty, Input, Space, Table, Tag, Typography, message } from "antd"
 import { ReloadOutlined, UndoOutlined } from "@ant-design/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -109,6 +109,31 @@ function normalizeSearch(value: string): string {
 
 function renderGachaPeriod(gacha: Pick<ClairvoyanceGacha, "startDate" | "endDate">): string {
     return `${gacha.startDate} - ${gacha.endDate}`
+}
+
+// CDN 卡池日期是 +08:00 的裸字符串，currentTime 是 UTC ISO —— 解析口径与服务端 parseCdnDate 保持一致
+function parseCdnInstant(value: string): number {
+    return new Date(`${value.replace(" ", "T")}+08:00`).getTime()
+}
+
+type GachaLiveState = "live" | "ended" | "upcoming"
+
+function gachaLiveState(gacha: Pick<ClairvoyanceGacha, "startDate" | "endDate">, nowIso: string): GachaLiveState {
+    const now = Date.parse(nowIso)
+    const start = parseCdnInstant(gacha.startDate)
+    const end = parseCdnInstant(gacha.endDate)
+    if (!Number.isFinite(now) || !Number.isFinite(start) || !Number.isFinite(end)) return "upcoming"
+    if (now < start) return "upcoming"
+    if (now > end) return "ended"
+    return "live"
+}
+
+function renderGachaStatusBadge(gacha: Pick<ClairvoyanceGacha, "startDate" | "endDate">, nowIso: string | undefined) {
+    if (!nowIso) return null
+    const state = gachaLiveState(gacha, nowIso)
+    if (state === "live") return <span className="admin-badge-ok">上线中</span>
+    if (state === "ended") return <span className="admin-badge-warn">已结束</span>
+    return <span className="admin-badge-info">未开始</span>
 }
 
 function renderRateUpCharacters(characters: ClairvoyanceCharacter[]) {
@@ -434,7 +459,10 @@ export default function TimeControl() {
                                     <Space direction="vertical" className="admin-stack">
                                         {gachaTimeline.current.map(gacha => (
                                             <div key={gacha.id} className="admin-clairvoyance-panel">
-                                                <Typography.Text strong>{gacha.name} #{gacha.id}</Typography.Text>
+                                                <Space wrap size={8} align="center">
+                                                    <Typography.Text strong>{gacha.name} #{gacha.id}</Typography.Text>
+                                                    {renderGachaStatusBadge(gacha, gachaTimeline?.currentTime)}
+                                                </Space>
                                                 <Typography.Text type="secondary">{renderGachaPeriod(gacha)}</Typography.Text>
                                                 {renderRateUpCharacters(gacha.rateUpCharacters)}
                                             </div>
@@ -465,9 +493,12 @@ export default function TimeControl() {
                                                         {row.title && <Typography.Text type="secondary">{row.title}</Typography.Text>}
                                                         <Space wrap size={[4, 4]}>
                                                             {row.gachas.map(gacha => (
-                                                                <Tag key={gacha.id}>
-                                                                    #{gacha.id} {gacha.name} / {renderGachaPeriod(gacha)}
-                                                                </Tag>
+                                                                <Fragment key={gacha.id}>
+                                                                    <Tag>
+                                                                        #{gacha.id} {gacha.name} / {renderGachaPeriod(gacha)}
+                                                                    </Tag>
+                                                                    {renderGachaStatusBadge(gacha, gachaTimeline?.currentTime)}
+                                                                </Fragment>
                                                             ))}
                                                         </Space>
                                                     </div>
@@ -493,7 +524,16 @@ export default function TimeControl() {
                                     pagination={{ pageSize: 8, showSizeChanger: false }}
                                     columns={[
                                         { title: "卡池", dataIndex: "name", render: (name: string, row) => `${name} #${row.id}` },
-                                        { title: "上线 / 下线", render: (_: unknown, row) => renderGachaPeriod(row), width: 300 },
+                                        {
+                                            title: "上线 / 下线",
+                                            render: (_: unknown, row) => (
+                                                <Space wrap size={6} align="center">
+                                                    {renderGachaPeriod(row)}
+                                                    {renderGachaStatusBadge(row, gachaTimeline?.currentTime)}
+                                                </Space>
+                                            ),
+                                            width: 360,
+                                        },
                                         { title: "UP 角色", render: (_: unknown, row) => renderRateUpCharacters(row.rateUpCharacters) },
                                     ]}
                                 />

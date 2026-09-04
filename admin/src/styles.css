@@ -855,6 +855,21 @@ html[data-theme="dark"] {
   color: var(--ink-soft);
 }
 
+/* player detail: labeled input grid cells for the resource/account editors */
+.admin-edit-grid-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-edit-grid-label {
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 /* mail: send form reads as three bordered sections (收件人 / 附件 / 正文) */
 .admin-form-section {
   padding: 14px 14px 6px;
