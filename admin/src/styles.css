@@ -714,18 +714,6 @@ body {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .admin-dash-kv {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .admin-dash-cols {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .admin-dash-cols > .admin-dash-section {
-    grid-area: auto;
-  }
-
   .admin-toolbar {
     align-items: stretch;
   }
@@ -873,21 +861,28 @@ html[data-theme="dark"] {
   letter-spacing: 0.04em;
 }
 
-/* dashboard: wide cards split their sections into two quiet columns (no inner boxes) */
+/* dashboard: wide cards split their sections into two quiet columns (no inner boxes).
+   Mobile-first: single column in DOM order; two columns + explicit placement from 768px up. */
 .admin-dash-cols {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 32px;
+  grid-template-columns: minmax(0, 1fr);
   row-gap: 20px;
   min-width: 0;
 }
 
-/* explicit placement: left column 版本 → 来源与存储, right column 覆盖范围 → 内容摘要 → Snapshot 中已声明补丁 */
-.admin-dash-cols > .admin-dash-section:nth-child(1) { grid-area: 1 / 1; }
-.admin-dash-cols > .admin-dash-section:nth-child(2) { grid-area: 2 / 1; }
-.admin-dash-cols > .admin-dash-section:nth-child(3) { grid-area: 1 / 2; }
-.admin-dash-cols > .admin-dash-section:nth-child(4) { grid-area: 2 / 2; }
-.admin-dash-cols > .admin-dash-section:nth-child(5) { grid-area: 3 / 2; }
+@media (min-width: 768px) {
+  .admin-dash-cols {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 32px;
+  }
+
+  /* explicit placement: left column 版本 → 来源与存储, right column 覆盖范围 → 内容摘要 → Snapshot 中已声明补丁 */
+  .admin-dash-cols > .admin-dash-section:nth-child(1) { grid-area: 1 / 1; }
+  .admin-dash-cols > .admin-dash-section:nth-child(2) { grid-area: 2 / 1; }
+  .admin-dash-cols > .admin-dash-section:nth-child(3) { grid-area: 1 / 2; }
+  .admin-dash-cols > .admin-dash-section:nth-child(4) { grid-area: 2 / 2; }
+  .admin-dash-cols > .admin-dash-section:nth-child(5) { grid-area: 3 / 2; }
+}
 
 .admin-dash-section-body {
   display: flex;
@@ -896,12 +891,19 @@ html[data-theme="dark"] {
   min-width: 0;
 }
 
-/* dashboard: compact 2-column key-value grid for facts that are not statistics */
+/* dashboard: compact key-value grid for facts that are not statistics.
+   Mobile-first: single-column stack; two columns from 768px up. */
 .admin-dash-kv {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px 18px;
   min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .admin-dash-kv {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .admin-dash-kv-item {
