@@ -362,7 +362,7 @@ export default function Dashboard() {
                             ) : statusError || !status ? (
                                 <Alert type="error" showIcon message="CDN 信息加载失败" />
                             ) : (
-                                <div className="admin-dash-sections">
+                                <div className="admin-dash-cols">
                                     <div className="admin-dash-section">
                                         <div className="admin-dash-section-title">版本</div>
                                         <div className="admin-dash-section-body">

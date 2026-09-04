@@ -718,6 +718,14 @@ body {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .admin-dash-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-dash-cols > .admin-dash-section {
+    grid-area: auto;
+  }
+
   .admin-toolbar {
     align-items: stretch;
   }
@@ -844,20 +852,17 @@ html[data-theme="dark"] {
 .admin-badge-info { color: var(--water); border: 1.5px solid var(--water); background: var(--info-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; }
 .admin-badge-warn { color: var(--thunder); border: 1.5px solid var(--thunder); background: var(--warn-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; }
 
-/* dashboard: every card interior reads as the same 「标题行 + 内容区」 section pattern */
+/* dashboard: every card interior reads as the same flat 「标题行 + 内容区」 section pattern —
+   the card border is the only strong separator, sections rely on whitespace alone */
 .admin-dash-sections {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 20px;
   min-width: 0;
 }
 
 .admin-dash-section {
   min-width: 0;
-  padding: 12px 14px 14px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--stat-bg);
 }
 
 .admin-dash-section-title {
@@ -865,7 +870,24 @@ html[data-theme="dark"] {
   color: var(--ink-soft);
   font-size: 12px;
   font-weight: 800;
+  letter-spacing: 0.04em;
 }
+
+/* dashboard: wide cards split their sections into two quiet columns (no inner boxes) */
+.admin-dash-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 32px;
+  row-gap: 20px;
+  min-width: 0;
+}
+
+/* explicit placement: left column 版本 → 来源与存储, right column 覆盖范围 → 内容摘要 → Snapshot 中已声明补丁 */
+.admin-dash-cols > .admin-dash-section:nth-child(1) { grid-area: 1 / 1; }
+.admin-dash-cols > .admin-dash-section:nth-child(2) { grid-area: 2 / 1; }
+.admin-dash-cols > .admin-dash-section:nth-child(3) { grid-area: 1 / 2; }
+.admin-dash-cols > .admin-dash-section:nth-child(4) { grid-area: 2 / 2; }
+.admin-dash-cols > .admin-dash-section:nth-child(5) { grid-area: 3 / 2; }
 
 .admin-dash-section-body {
   display: flex;
