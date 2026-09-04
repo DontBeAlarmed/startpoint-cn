@@ -799,3 +799,25 @@ body {
     margin-inline-start: 0;
   }
 }
+
+.admin-theme-toggle {
+  padding: 4px 11px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-theme-toggle:hover,
+.admin-theme-toggle:focus-visible {
+  color: var(--ink);
+  border-color: var(--star-deep);
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
