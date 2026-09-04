@@ -299,7 +299,8 @@ export function deserializePlayerData(
                 gachaId: gachaId,
                 isDailyFirst: isDailyFirst,
                 isAccountFirst: isAccountFirst,
-                gachaExchangePoint: gachaInfo['gacha_exchange_point']
+                gachaExchangePoint: gachaInfo['gacha_exchange_point'],
+                crazyDrawCount: gachaInfo['crazy_draw_count'],
             }
         })
 

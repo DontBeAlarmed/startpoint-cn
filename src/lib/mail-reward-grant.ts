@@ -252,6 +252,7 @@ function settleDedicatedMailBalance(
     mails: readonly RawPlayerMail[],
     player: Player,
 ): { balance: DedicatedMailBalance, update: Partial<DedicatedMailBalance> } {
+    const config = getRuntimeContentTableSync<ConfigValues>("config.json", bundledConfig)
     const balance: DedicatedMailBalance = {
         vmoney: player.vmoney,
         starCrumb: player.starCrumb,
@@ -284,6 +285,11 @@ function settleDedicatedMailBalance(
                 break
         }
         if (field === null) continue
+        if (field === "starCrumb" && balance.starCrumb + mail.number > config.max_star_crumb) {
+            throw new MailRewardCapacityError(
+                "Mail Star Crumb cannot fit in the player's Star Crumb capacity.",
+            )
+        }
         addDedicatedReward(balance, field, mail.number)
         update[field] = balance[field]
     }

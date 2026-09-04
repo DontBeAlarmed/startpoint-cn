@@ -45,6 +45,7 @@ const PLANNED_CANDIDATE_SOURCES = Object.freeze({
     "exchange/star_crumb": "exchange-reward-characters",
     "gacha/exchange_character": "exchanged-character",
     "gacha/exec": "drawn-characters",
+    "gacha/crazy_select": "selected-crazy-characters",
     "item/sell": "mana-item-fact",
     "mail/receive": "mail-reward-characters",
     "mail/receive_all": "mail-reward-characters",
@@ -90,6 +91,7 @@ const AUTHORITATIVE_WRITE_SETS = Object.freeze({
     "exchange/star_crumb": Object.freeze(["transaction"]),
     "gacha/exchange_character": Object.freeze(["executeGachaExchangeSync"]),
     "gacha/exec": Object.freeze(["executeGachaDrawSync"]),
+    "gacha/crazy_select": Object.freeze(["selectCrazyGachaCandidateSync"]),
     "item/sell": Object.freeze(["sellItemSync"]),
     "mail/receive": Object.freeze([
         "settleMailRewardsInTransactionOwnerSync", "finalizeMailReceiveAwakePublicationWrites",
@@ -219,6 +221,9 @@ const ROUTE_OWNERS = Object.freeze({
         "/exchange_character": "gacha/exchange_character",
         "/exec": "gacha/exec",
     },
+    "src/routes/api/gacha/crazy-routes.ts": {
+        "/crazy_gacha_select": "gacha/crazy_select",
+    },
     "src/routes/api/item.ts": { "/sell": "item/sell" },
     "src/routes/api/mail.ts": {
         "/receive": "mail/receive",
@@ -311,6 +316,7 @@ const EXPECTED_MATRIX = Object.freeze([
     matrixRow({ relativeFile: "src/routes/api/character/bond.ts", owner: "character/receive_bond_token", boundary: "best-effort-in-tx", actualCharacterSeed: "[body.character_id]", finalAuthoritativeWrite: "receiveBondToken", runtimeEvidenceKey: "bond-success" }),
     matrixRow({ relativeFile: "src/routes/api/exchange.ts", owner: "exchange/star_crumb", boundary: "best-effort-post-commit", actualCharacterSeed: "kind === 0 ? [targetId] : []", finalAuthoritativeWrite: "transaction", runtimeEvidenceKey: "exchange-star-crumb" }),
     matrixRow({ relativeFile: "src/routes/api/gacha.ts", owner: "gacha/exec", boundary: "best-effort-post-commit", actualCharacterSeed: "[...characterIds]", finalAuthoritativeWrite: "executeGachaDrawSync", runtimeEvidenceKey: "gacha-exec" }),
+    matrixRow({ relativeFile: "src/routes/api/gacha/crazy-routes.ts", owner: "gacha/crazy_select", boundary: "best-effort-post-commit", actualCharacterSeed: "[...characterIds]", finalAuthoritativeWrite: "selectCrazyGachaCandidateSync", runtimeEvidenceKey: "gacha-crazy-select" }),
     matrixRow({ relativeFile: "src/routes/api/gacha/exchange-routes.ts", owner: "gacha/exchange_character", boundary: "best-effort-post-commit", actualCharacterSeed: "[...characterIds]", finalAuthoritativeWrite: "executeGachaExchangeSync", runtimeEvidenceKey: "gacha-exchange-character" }),
     matrixRow({ relativeFile: "src/routes/api/item.ts", owner: "item/sell", boundary: "best-effort-post-commit", actualCharacterSeed: "[]", actualFactSeeds: "player", finalAuthoritativeWrite: "sellItemSync", runtimeEvidenceKey: "mana-item-sell", changesGlobalFacts: true }),
     matrixRow({ relativeFile: "src/routes/api/mail.ts", owner: "mail/receive", boundary: "best-effort-in-tx", actualCharacterSeed: "[]", actualFactSeeds: "mail", finalAuthoritativeWrite: "finalizeMailReceiveAwakePublicationWrites", runtimeEvidenceKey: "mail-receive", changesGlobalFacts: true }),
@@ -2110,12 +2116,12 @@ function collectProductionCalls() {
 }
 
 function assertEvidenceContract(matrix) {
-    assert.equal(matrix.length, 21, "Awake owner matrix must contain exactly 21 rows")
-    assert.equal(new Set(matrix.map(entry => entry.owner)).size, 21, "Awake owners must be unique")
+    assert.equal(matrix.length, 22, "Awake owner matrix must contain exactly 22 rows")
+    assert.equal(new Set(matrix.map(entry => entry.owner)).size, 22, "Awake owners must be unique")
     assert.deepEqual(
         Object.fromEntries(["strict-in-tx", "best-effort-in-tx", "best-effort-post-commit"]
             .map(boundary => [boundary, matrix.filter(entry => entry.boundary === boundary).length])),
-        { "strict-in-tx": 1, "best-effort-in-tx": 9, "best-effort-post-commit": 11 },
+        { "strict-in-tx": 1, "best-effort-in-tx": 9, "best-effort-post-commit": 12 },
     )
     for (const entry of matrix) {
         assert.equal(Array.isArray(entry.authoritativeWriteSet), true, `${entry.owner} lacks a write set`)
@@ -2192,9 +2198,9 @@ function assertEvidenceContract(matrix) {
     assert.deepEqual(registeredOwners, matrix.map(entry => entry.owner).sort())
 }
 
-test("Awake reconcile production call expressions match the fixed 21-entry evidence matrix", () => {
+test("Awake reconcile production call expressions match the fixed 22-entry evidence matrix", () => {
     const calls = collectProductionCalls()
-    assert.equal(calls.length, 21)
+    assert.equal(calls.length, 22)
     const comparedFields = [
         "relativeFile", "callee", "owner", "boundary", "candidateSource",
         "plannedCandidateSource", "actualCharacterSeed", "actualFactSeeds",
@@ -2206,7 +2212,7 @@ test("Awake reconcile production call expressions match the fixed 21-entry evide
         calls.map(call => Object.fromEntries(comparedFields.map(field => [field, call[field]]))),
         EXPECTED_MATRIX.map(entry => Object.fromEntries(comparedFields.map(field => [field, entry[field]]))),
     )
-    assert.equal(new Set(calls.map(call => `${call.relativeFile}:${call.position}`)).size, 21)
+    assert.equal(new Set(calls.map(call => `${call.relativeFile}:${call.position}`)).size, 22)
     assertEvidenceContract(EXPECTED_MATRIX)
 })
 
@@ -2226,7 +2232,7 @@ test("production owner call inventories freeze every reviewed symbol, count, and
 })
 
 test("Awake reconcile audit matrix freezes owner, policy, and planned candidate source", () => {
-    assert.equal(EXPECTED_MATRIX.length, 21)
+    assert.equal(EXPECTED_MATRIX.length, 22)
     assert.deepEqual(
         Object.fromEntries(["strict-in-tx", "best-effort-in-tx", "best-effort-post-commit"]
             .map(boundary => [
@@ -2236,10 +2242,10 @@ test("Awake reconcile audit matrix freezes owner, policy, and planned candidate 
         {
             "strict-in-tx": 1,
             "best-effort-in-tx": 9,
-            "best-effort-post-commit": 11,
+            "best-effort-post-commit": 12,
         },
     )
-    assert.equal(new Set(EXPECTED_MATRIX.map(entry => entry.ownerLabel)).size, 21)
+    assert.equal(new Set(EXPECTED_MATRIX.map(entry => entry.ownerLabel)).size, 22)
     const single = EXPECTED_MATRIX.find(entry => entry.owner === "single/finish")
     assert.equal(single.plannedCandidateSource, "battle-party+invalidated-facts")
     assert.equal(single.directMissionSeed, "preparedGrowthPublication.publication.directMissionIds")
@@ -2263,14 +2269,14 @@ test("Awake reconcile audit matrix freezes owner, policy, and planned candidate 
     }
 })
 
-test("35.5D audit rows carry the complete fixed 21-owner evidence contract", () => {
+test("35.5D audit rows carry the complete fixed 22-owner evidence contract", () => {
     const missing = EXPECTED_MATRIX.flatMap((entry, index) => (
         REQUIRED_OWNER_EVIDENCE_FIELDS
             .filter(field => !Object.hasOwn(entry, field))
             .map(field => `${index}:${entry.ownerLabel}:${field}`)
     ))
     assert.deepEqual(missing, [], `matrix evidence fields are missing: ${missing.join(", ")}`)
-    assert.equal(EXPECTED_MATRIX.length, 21)
+    assert.equal(EXPECTED_MATRIX.length, 22)
     assert.equal(EXPECTED_MATRIX.some(entry => entry.owner === "pass_card/receive_all"), true)
     assert.equal(EXPECTED_MATRIX.some(entry => entry.owner === "raid_event/summary"), true)
 })

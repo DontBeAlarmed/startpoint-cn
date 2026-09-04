@@ -1,8 +1,10 @@
 import bundledGachas from "../../../assets/gacha.json"
+import bundledGachaPools from "../../../assets/gacha_pool.json"
 import bundledStarsCampaigns from "../../../assets/stars_gacha_campaign.json"
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 import type {
     GachaRuntimeBanners,
+    GachaPools,
     StarsGachaCampaignDefinition,
 } from "../types"
 import { parseGachaJstTimestamp } from "../gacha-catalog"
@@ -31,6 +33,20 @@ export function assertValidGachaSaveState(tables: ReadonlyMap<
     string,
     readonly SaveRow[]
 >): void {
+    const parentRows = tables.get("players_gacha_info") ?? []
+    const parentIds = new Set(parentRows.map(row => (
+        safeInteger(row.gacha_id, "players_gacha_info.gacha_id", 1)
+    )))
+    for (const row of parentRows) {
+        if (row.crazy_draw_count !== null && row.crazy_draw_count !== undefined) {
+            safeInteger(row.crazy_draw_count, "players_gacha_info.crazy_draw_count")
+        }
+    }
+    const hasContentBoundGachaState = (tables.get("players_gacha_details")?.length ?? 0) > 0
+        || (tables.get("players_stars_gacha_campaigns")?.length ?? 0) > 0
+        || (tables.get("players_gacha_crazy_results")?.length ?? 0) > 0
+        || (tables.get("players_gacha_conversions")?.length ?? 0) > 0
+    if (!hasContentBoundGachaState) return
     const gachas = getRuntimeContentTableSync(
         "gacha.json",
         bundledGachas as GachaRuntimeBanners,
@@ -39,9 +55,10 @@ export function assertValidGachaSaveState(tables: ReadonlyMap<
         "stars_gacha_campaign.json",
         bundledStarsCampaigns as Readonly<Record<string, StarsGachaCampaignDefinition>>,
     )
-    const parentIds = new Set((tables.get("players_gacha_info") ?? []).map(row => (
-        safeInteger(row.gacha_id, "players_gacha_info.gacha_id", 1)
-    )))
+    const gachaPools = getRuntimeContentTableSync(
+        "gacha_pool.json",
+        bundledGachaPools as GachaPools,
+    )
 
     for (const row of tables.get("players_gacha_details") ?? []) {
         const gachaId = safeInteger(row.gacha_id, "players_gacha_details.gacha_id", 1)
@@ -98,5 +115,83 @@ export function assertValidGachaSaveState(tables: ReadonlyMap<
             || freeTenTimes > campaign.maximumFreeGachaTimes) {
             throw new Error(`Stars campaign ${campaignId} state exceeds its Content limits`)
         }
+    }
+
+    const crazyPositions = new Map<string, Set<number>>()
+    const crazyCandidateIds = new Map<number, ReadonlySet<number>>()
+    for (const row of tables.get("players_gacha_crazy_results") ?? []) {
+        const gachaId = safeInteger(row.gacha_id, "players_gacha_crazy_results.gacha_id", 1)
+        const slot = safeInteger(row.slot_index, "players_gacha_crazy_results.slot_index")
+        const position = safeInteger(row.position, "players_gacha_crazy_results.position")
+        const characterId = safeInteger(
+            row.character_id,
+            "players_gacha_crazy_results.character_id",
+            1,
+        )
+        const banner = gachas[String(gachaId)]
+        if (!parentIds.has(gachaId)
+            || banner?.kind !== "character"
+            || banner.page.kind !== 5
+            || slot > 2
+            || position > 9) {
+            throw new Error(`Crazy Gacha result ${gachaId}/${slot}/${position} is invalid`)
+        }
+        let candidateIds = crazyCandidateIds.get(gachaId)
+        if (candidateIds === undefined) {
+            candidateIds = new Set(Object.values(banner.poolOddsIds).flatMap(oddsId => (
+                (gachaPools[oddsId] ?? []).map(item => item.id)
+            )))
+            crazyCandidateIds.set(gachaId, candidateIds)
+        }
+        if (!candidateIds.has(characterId)) {
+            throw new Error(`Crazy Gacha result ${gachaId} contains Character ${characterId} outside its pools`)
+        }
+        const key = `${gachaId}:${slot}`
+        const positions = crazyPositions.get(key) ?? new Set<number>()
+        if (positions.has(position)) throw new Error(`Crazy Gacha result ${key} repeats a position`)
+        positions.add(position)
+        crazyPositions.set(key, positions)
+        if (slot === 0) {
+            if (typeof row.movie_id !== "string" || row.movie_id.length === 0) {
+                throw new Error(`Crazy Gacha result ${key} has no movie`)
+            }
+            safeInteger(row.seed, "players_gacha_crazy_results.seed")
+            safeInteger(row.entry_count, "players_gacha_crazy_results.entry_count", 1)
+            if ((row.ex_boost_item_id === null) !== (row.ex_boost_item_count === null)) {
+                throw new Error(`Crazy Gacha result ${key} has partial EX Boost metadata`)
+            }
+            if (row.ex_boost_item_id !== null) {
+                safeInteger(
+                    row.ex_boost_item_id,
+                    "players_gacha_crazy_results.ex_boost_item_id",
+                    1,
+                )
+                safeInteger(
+                    row.ex_boost_item_count,
+                    "players_gacha_crazy_results.ex_boost_item_count",
+                )
+            }
+        } else if (row.movie_id !== null || row.seed !== null || row.entry_count !== null
+            || row.ex_boost_item_id !== null || row.ex_boost_item_count !== null) {
+            throw new Error(`Crazy Gacha saved result ${key} contains display metadata`)
+        }
+    }
+    for (const [key, positions] of crazyPositions) {
+        if (positions.size !== 10 || [...positions].some(position => position < 0 || position > 9)) {
+            throw new Error(`Crazy Gacha result ${key} is incomplete`)
+        }
+    }
+
+    for (const row of tables.get("players_gacha_conversions") ?? []) {
+        const gachaId = safeInteger(row.gacha_id, "players_gacha_conversions.gacha_id", 1)
+        // conversion 是 lifecycle 终态记录：banner 可能已从当前内容快照移除
+        // （转换触发本身允许 banner 缺失），只要求 players_gacha_info 父行存在。
+        if (!parentIds.has(gachaId)) {
+            throw new Error(`Gacha conversion ${gachaId} has no valid parent`)
+        }
+        safeInteger(row.pending_point, "players_gacha_conversions.pending_point", 1)
+        safeInteger(row.converted_at, "players_gacha_conversions.converted_at")
+        const shown = safeInteger(row.shown, "players_gacha_conversions.shown")
+        if (shown > 1) throw new Error(`Gacha conversion ${gachaId} shown state is invalid`)
     }
 }

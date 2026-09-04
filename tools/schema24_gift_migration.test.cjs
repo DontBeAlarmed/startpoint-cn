@@ -46,7 +46,7 @@ test("migrates literal schema 23 to 24 and creates the public gift tables", () =
     fs.writeFileSync(path.join(process.env.DATA_DIR, "wdfp_data.version"), "23")
 
     const from23 = data.initializeDatabase()
-    assert.equal(from23.pragma("user_version", { simple: true }), 25)
+    assert.equal(from23.pragma("user_version", { simple: true }), 26)
     assert.deepEqual(giftTables(from23), [
         "players_gift_redemptions",
         "server_gift_codes",

@@ -83,6 +83,11 @@ const OWNER_CONTRACTS = Object.freeze({
         boundary: "best-effort-post-commit",
         observation: wrapperObservation([], [121087]),
     }),
+    "gacha-crazy-select": Object.freeze({
+        owner: "gacha/crazy_select",
+        boundary: "best-effort-post-commit",
+        observation: wrapperObservation([111001], [111001]),
+    }),
     "mana-item-sell": Object.freeze({
         owner: "item/sell",
         boundary: "best-effort-post-commit",
@@ -492,6 +497,35 @@ function createAwakeOwnerFocusedScenarios(runtime) {
             response: routeResult,
             state: value => commonState(runtime, value.playerId, {
                 gacha: runtime.gachaDomain.getPlayerGachaInfoSync(value.playerId, 1638),
+            }),
+        }),
+        scenario("gacha-crazy-select", {
+            async prepare() {
+                const player = await fixture.createPlayer("owner-focused-gacha-crazy-select")
+                runtime.gachaDomain.insertPlayerGachaInfoSync(player.playerId, {
+                    gachaId: 100, isAccountFirst: true, isDailyFirst: true,
+                    gachaExchangePoint: 0, crazyDrawCount: 1,
+                })
+                const insert = runtime.getDb().prepare(`
+                    INSERT INTO players_gacha_crazy_results (
+                        player_id, gacha_id, slot_index, position, character_id,
+                        movie_id, seed, entry_count
+                    ) VALUES (?, 100, 0, ?, 111001, 'normal', ?, 1)
+                `)
+                for (let position = 0; position < 10; position += 1) {
+                    insert.run(player.playerId, position, 10000001 + position)
+                }
+                return player
+            },
+            request: value => ({
+                viewer_id: value.viewerId, gacha_id: 100, index: 0,
+            }),
+            execute: value => post("/gacha", "crazy_gacha_select", {
+                viewer_id: value.viewerId, gacha_id: 100, index: 0,
+            }),
+            response: routeResult,
+            state: value => commonState(runtime, value.playerId, {
+                gacha: runtime.gachaDomain.getPlayerGachaInfoSync(value.playerId, 100),
             }),
         }),
         scenario("mana-item-sell", {

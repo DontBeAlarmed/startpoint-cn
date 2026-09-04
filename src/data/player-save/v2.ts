@@ -66,6 +66,8 @@ const LEGACY_V1_UNMANAGED_TABLES = new Set([
     "players_shop_purchases",
     "players_gacha_details",
     "players_stars_gacha_campaigns",
+    "players_gacha_crazy_results",
+    "players_gacha_conversions",
     "players_shop_purchase_counters",
     "players_shop_campaign_lineups",
     "players_receive_history",
@@ -218,6 +220,8 @@ export function exportPlayerSaveV2Sync(
         ["players_gacha_info", domains.economy.tables.players_gacha_info],
         ["players_gacha_details", domains.economy.tables.players_gacha_details],
         ["players_stars_gacha_campaigns", domains.economy.tables.players_stars_gacha_campaigns],
+        ["players_gacha_crazy_results", domains.economy.tables.players_gacha_crazy_results],
+        ["players_gacha_conversions", domains.economy.tables.players_gacha_conversions],
     ]))
 
     return {
@@ -549,11 +553,14 @@ function restoreLegacyV1SaveSync(
     const preservedGachaIds = new Set([
         ...(preserved.get("players_gacha_details") ?? []),
         ...(preserved.get("players_stars_gacha_campaigns") ?? []),
+        ...(preserved.get("players_gacha_crazy_results") ?? []),
+        ...(preserved.get("players_gacha_conversions") ?? []),
     ].map(row => requireSafePositiveInteger(row.gacha_id, "preserved Gacha id")))
     const preservedGachaParents = preservedGachaIds.size === 0
         ? []
         : database.prepare(`
-            SELECT gacha_id, is_daily_first, is_account_first, gacha_exchange_point
+            SELECT gacha_id, is_daily_first, is_account_first, gacha_exchange_point,
+                crazy_draw_count
             FROM players_gacha_info
             WHERE player_id = ? AND gacha_id IN (${[...preservedGachaIds].map(() => "?").join(", ")})
             ORDER BY gacha_id
@@ -572,8 +579,9 @@ function restoreLegacyV1SaveSync(
         clearGiftRedemptionsForExternalRestoreSync(targetPlayerId, database)
         const insertMissingGachaParent = database.prepare(`
             INSERT INTO players_gacha_info (
-                gacha_id, is_daily_first, is_account_first, gacha_exchange_point, player_id
-            ) VALUES (?, ?, ?, ?, ?)
+                gacha_id, is_daily_first, is_account_first, gacha_exchange_point,
+                crazy_draw_count, player_id
+            ) VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(gacha_id, player_id) DO NOTHING
         `)
         for (const row of preservedGachaParents) {
@@ -582,6 +590,7 @@ function restoreLegacyV1SaveSync(
                 row.is_daily_first,
                 row.is_account_first,
                 row.gacha_exchange_point,
+                row.crazy_draw_count,
                 targetPlayerId,
             )
         }

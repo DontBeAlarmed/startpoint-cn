@@ -15,7 +15,7 @@ export class MailOverflowValidationError extends Error {
 
 export interface OverflowMailResult {
     readonly mailId: number
-    readonly type: MailType.ITEM | MailType.FREE_MANA
+    readonly type: MailType.ITEM | MailType.FREE_MANA | MailType.STAR_CRUMB
     readonly typeId: number | null
     readonly number: number
     readonly createTime: string
@@ -56,7 +56,7 @@ function requireDate(value: Date): Date {
 
 function insertOverflowMail(
     playerId: number,
-    type: MailType.ITEM | MailType.FREE_MANA,
+    type: MailType.ITEM | MailType.FREE_MANA | MailType.STAR_CRUMB,
     typeId: number | null,
     number: number,
     now: Date,
@@ -71,7 +71,7 @@ function insertOverflowMail(
         }
         positiveInteger(typeId, "typeId")
     } else if (typeId !== null) {
-        throw new MailOverflowValidationError("Mana overflow mail must not have typeId")
+        throw new MailOverflowValidationError("Currency overflow mail must not have typeId")
     }
 
     const createTime = clientSerializeDate(normalizedNow)
@@ -102,7 +102,7 @@ function insertOverflowMail(
 
 function insertOverflowMails(
     playerId: number,
-    type: MailType.ITEM | MailType.FREE_MANA,
+    type: MailType.ITEM | MailType.FREE_MANA | MailType.STAR_CRUMB,
     typeId: number | null,
     amount: number,
     maxAttachmentNumber: number,
@@ -135,6 +135,14 @@ export function insertManaOverflowMailWithinTransactionSync(
     now: Date = getVirtualNow(),
 ): OverflowMailResult {
     return insertOverflowMail(playerId, MailType.FREE_MANA, null, number, now)
+}
+
+export function insertStarCrumbOverflowMailWithinTransactionSync(
+    playerId: number,
+    number: number,
+    now: Date = getVirtualNow(),
+): OverflowMailResult {
+    return insertOverflowMail(playerId, MailType.STAR_CRUMB, null, number, now)
 }
 
 export function insertItemOverflowMailsWithinTransactionSync(

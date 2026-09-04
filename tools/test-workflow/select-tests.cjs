@@ -19,7 +19,7 @@ const SOURCE_RULES = [
         groups: ["integration:database"],
     },
     {
-        pattern: /^(?:src\/data\/domains\/gacha-state\.ts|tools\/schema25_gacha_state_migration\.test\.cjs)$/,
+        pattern: /^(?:src\/data\/domains\/gacha(?:-lifecycle)?-state\.ts|tools\/schema25_gacha_state_migration\.test\.cjs)$/,
         groups: ["integration:database", "integration:rules", "quick:gacha"],
     },
     {
@@ -387,7 +387,7 @@ const SOURCE_RULES = [
         groups: ["quick:content", "quick:gacha"],
     },
     {
-        pattern: /^(?:src\/lib\/gacha-owner\/.*\.ts|tools\/gacha_execution_owner\.test\.cjs)$/,
+        pattern: /^(?:src\/lib\/gacha-owner\/.*\.ts|tools\/gacha_(?:execution_owner|crazy_conversion)\.test\.cjs)$/,
         groups: ["integration:rules", "quick:gacha"],
     },
     {

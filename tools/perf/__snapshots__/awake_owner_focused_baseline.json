@@ -96,6 +96,22 @@
         "factSeeds": []
       }
     },
+    "gacha-crazy-select": {
+      "boundary": "best-effort-post-commit",
+      "owners": [
+        "gacha/crazy_select"
+      ],
+      "scenarios": [
+        "gacha-crazy-select"
+      ],
+      "seedContract": {
+        "characterSeeds": [
+          111001
+        ],
+        "directMissionSeeds": [],
+        "factSeeds": []
+      }
+    },
     "gacha-exchange-character": {
       "boundary": "best-effort-post-commit",
       "owners": [
@@ -423,6 +439,18 @@
       ],
       "seedContract": {
         "characterSeeds": [],
+        "directMissionSeeds": [],
+        "factSeeds": []
+      }
+    },
+    "gacha-crazy-select": {
+      "scenarios": [
+        "gacha-crazy-select"
+      ],
+      "seedContract": {
+        "characterSeeds": [
+          111001
+        ],
         "directMissionSeeds": [],
         "factSeeds": []
       }
@@ -2544,6 +2572,7 @@
           }
         ],
         "gacha": {
+          "crazyDrawCount": null,
           "gachaExchangePoint": 250,
           "gachaId": 1638,
           "isAccountFirst": false,
@@ -2579,6 +2608,7 @@
           }
         ],
         "gacha": {
+          "crazyDrawCount": null,
           "gachaExchangePoint": 0,
           "gachaId": 1638,
           "isAccountFirst": false,
@@ -2624,7 +2654,7 @@
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 12,
+      "sqlReads": 11,
       "sqlWrites": 5,
       "sqlByTable": {
         "players": {
@@ -2656,11 +2686,6 @@
           "reads": 1,
           "statements": 2,
           "writes": 1
-        },
-        "players_items": {
-          "reads": 1,
-          "statements": 1,
-          "writes": 0
         },
         "players_mails": {
           "reads": 1,
@@ -2746,6 +2771,7 @@
           }
         ],
         "gacha": {
+          "crazyDrawCount": null,
           "gachaExchangePoint": 1,
           "gachaId": 1638,
           "isAccountFirst": true,
@@ -2849,6 +2875,211 @@
         }
       }
     },
+    "gacha-crazy-select": {
+      "owner": "gacha/crazy_select",
+      "boundary": "best-effort-post-commit",
+      "runtimeEvidenceKey": "gacha-crazy-select",
+      "request": {
+        "gacha_id": 100,
+        "index": 0,
+        "viewer_id": 880000010
+      },
+      "response": {
+        "characterList": [
+          {
+            "characterId": 111001
+          }
+        ],
+        "statusCode": 200
+      },
+      "behaviorSha256": "a8461cb9cd3504b3b5022c0e18fdc63fba9f4c3cd567c92ac2d5a66a2eb65e2d",
+      "dbBefore": {
+        "category9": [],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          }
+        ],
+        "gacha": {
+          "crazyDrawCount": 1,
+          "gachaExchangePoint": 0,
+          "gachaId": 100,
+          "isAccountFirst": true,
+          "isDailyFirst": true
+        },
+        "items": [],
+        "player": {
+          "bondToken": 10,
+          "expPool": 0,
+          "freeMana": 2000,
+          "freeVmoney": 100,
+          "starCrumb": 2,
+          "totalManaObtained": 0,
+          "tutorialStep": 0,
+          "vmoney": 100
+        },
+        "unlocks": []
+      },
+      "dbAfter": {
+        "category9": [],
+        "characters": [
+          {
+            "characterId": 1,
+            "evolutionLevel": 0,
+            "exp": 10,
+            "stack": 0
+          },
+          {
+            "characterId": 111001,
+            "evolutionLevel": 0,
+            "exp": 0,
+            "stack": 9
+          }
+        ],
+        "gacha": {
+          "crazyDrawCount": 1,
+          "gachaExchangePoint": 0,
+          "gachaId": 100,
+          "isAccountFirst": true,
+          "isDailyFirst": true
+        },
+        "items": [
+          [
+            14003,
+            9
+          ]
+        ],
+        "player": {
+          "bondToken": 10,
+          "expPool": 0,
+          "freeMana": 2000,
+          "freeVmoney": 100,
+          "starCrumb": 2,
+          "totalManaObtained": 0,
+          "tutorialStep": 0,
+          "vmoney": 100
+        },
+        "unlocks": []
+      },
+      "characterSeeds": [
+        111001
+      ],
+      "factSeeds": [],
+      "directMissionSeeds": [],
+      "publicationObservation": {
+        "kind": "publish-wrapper",
+        "explicitCharacterSeeds": [
+          111001
+        ],
+        "characterListSeeds": [
+          111001
+        ],
+        "contextCandidateCharacterSeeds": [],
+        "characterSeeds": [
+          111001
+        ],
+        "factSeeds": [],
+        "directMissionSeeds": []
+      },
+      "loaderCalls": [
+        "player",
+        "questProgress:3",
+        "characterClearCounters",
+        "categoryMissionProgress:9:1110011,1110012,1110013",
+        "characters"
+      ],
+      "missionComputes": 0,
+      "snapshotSource": "none",
+      "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
+      "freshPostWriteEvaluationRequired": true,
+      "sqlReads": 17,
+      "sqlWrites": 7,
+      "sqlByTable": {
+        "players": {
+          "reads": 3,
+          "statements": 3,
+          "writes": 0
+        },
+        "players_category_mission_stages": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_category_missions": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_character_awake_unlocks": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_character_quest_clears": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_characters": {
+          "reads": 3,
+          "statements": 4,
+          "writes": 1
+        },
+        "players_characters_bond_tokens": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_characters_mana_nodes": {
+          "reads": 2,
+          "statements": 2,
+          "writes": 0
+        },
+        "players_collected_items": {
+          "reads": 0,
+          "statements": 1,
+          "writes": 1
+        },
+        "players_gacha_crazy_results": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_items": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_mails": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_player_history_milestones": {
+          "reads": 0,
+          "statements": 1,
+          "writes": 1
+        },
+        "players_quest_progress": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_receive_history": {
+          "reads": 0,
+          "statements": 1,
+          "writes": 1
+        },
+        "sessions": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        }
+      }
+    },
     "mana-item-sell": {
       "owner": "item/sell",
       "boundary": "best-effort-post-commit",
@@ -2857,7 +3088,7 @@
         "api_count": 1,
         "item_id": 1,
         "sell_number": 1,
-        "viewer_id": 880000010
+        "viewer_id": 880000011
       },
       "response": {
         "characterList": [
@@ -2870,7 +3101,7 @@
         ],
         "statusCode": 200
       },
-      "behaviorSha256": "421007e93cea30d35847020a9fdc88eeea24205d3e0a2305a121ff0a7ee8ce0f",
+      "behaviorSha256": "0ac08bc21ae96bef649fa0dfad31584376b8c58c778cfafc1261c32b06581b41",
       "dbBefore": {
         "category9": [
           [
@@ -3059,7 +3290,7 @@
       "runtimeEvidenceKey": "mail-receive",
       "request": {
         "mail_id": 1,
-        "viewer_id": 880000011
+        "viewer_id": 880000012
       },
       "response": {
         "characterList": [
@@ -3072,7 +3303,7 @@
         ],
         "statusCode": 200
       },
-      "behaviorSha256": "f9039cacbabb1b8bb297074e95da68eb4f9c89789a8214274436ee91cdbb798e",
+      "behaviorSha256": "d3315e5267b2b98bc3494e0caf309d5b8a7340d42a5c6e15d096c69d5436db42",
       "dbBefore": {
         "category9": [
           [
@@ -3260,7 +3491,7 @@
         "mail_ids": [
           2
         ],
-        "viewer_id": 880000012
+        "viewer_id": 880000013
       },
       "response": {
         "characterList": [
@@ -3273,7 +3504,7 @@
         ],
         "statusCode": 200
       },
-      "behaviorSha256": "256c8e805b5b853861b3bc576e84b94c05183859fd82faec8bc8da33ef3831c5",
+      "behaviorSha256": "1aa53de5218c0b3988867b26333a053aedc21e797e395f0526e30c650192417e",
       "dbBefore": {
         "category9": [
           [
@@ -3465,13 +3696,13 @@
             "progress_value": 1
           }
         ],
-        "viewer_id": 880000013
+        "viewer_id": 880000014
       },
       "response": {
         "characterList": [],
         "statusCode": 200
       },
-      "behaviorSha256": "7c98fbb2e2d8cdd5f220ca5eb134dfd70e4e39bc56ddc519659d942f3489ae70",
+      "behaviorSha256": "f61b074be0a9173da9573c1c676883d6ffa4cb701f822160b059580a0f40420a",
       "dbBefore": {
         "category9": [],
         "characters": [
@@ -3629,7 +3860,7 @@
           124
         ],
         "reward2_receive": [],
-        "viewer_id": 880000014
+        "viewer_id": 880000015
       },
       "response": {
         "characterList": [
@@ -3642,7 +3873,7 @@
         ],
         "statusCode": 200
       },
-      "behaviorSha256": "917a7053e39a9a0cca59867b27ae477c7988fdd8a744af55db49aeb5a5bdec43",
+      "behaviorSha256": "3abbbe9469624fc5ee585466b962b65b9d8136ed5bbfe6dd182a5831a06dae53",
       "dbBefore": {
         "category9": [
           [
@@ -3835,7 +4066,7 @@
       "request": {
         "api_count": 1,
         "event_id": 4,
-        "viewer_id": 880000015
+        "viewer_id": 880000016
       },
       "response": {
         "characterList": [
@@ -3848,7 +4079,7 @@
         ],
         "statusCode": 200
       },
-      "behaviorSha256": "bb29fea25806060983d0b5c19b14d573ba499ecc72d1e103f12ed499b89f4c31",
+      "behaviorSha256": "38384904186a3548dc4d84f68b7996a09e8987278ab9029d4c4b82129375933d",
       "dbBefore": {
         "category9": [
           [
@@ -4071,7 +4302,7 @@
         "number": 1,
         "shop_item_id": 880001,
         "shop_type": 8,
-        "viewer_id": 880000016
+        "viewer_id": 880000017
       },
       "response": {
         "characterList": [
@@ -4081,7 +4312,7 @@
         ],
         "statusCode": 200
       },
-      "behaviorSha256": "1e30d3369fa798ff8e647db18ceaa24894bf4201c587392af936904110a77ba2",
+      "behaviorSha256": "ac2c9a70efe93e7ead73f3b1902ecac65b21f5dfe67ff99f51a76ee12328486c",
       "dbBefore": {
         "category9": [],
         "characters": [
@@ -4273,7 +4504,7 @@
           "880002": 1
         },
         "shop_type": 4,
-        "viewer_id": 880000017
+        "viewer_id": 880000018
       },
       "response": {
         "characterList": [
@@ -4286,7 +4517,7 @@
         ],
         "statusCode": 200
       },
-      "behaviorSha256": "6b0128d0ff08b6d2cb6b1514e923ec6378aa7648581d54817e75d9f31ede3562",
+      "behaviorSha256": "8c5124752f250796b00e75cff9363e25bf5f74871dea37d2bc6547e3714fb22d",
       "dbBefore": {
         "category9": [],
         "characters": [
@@ -4508,7 +4739,7 @@
         "category": 3,
         "party_id": 1,
         "quest_id": 26300203,
-        "viewer_id": 880000018
+        "viewer_id": 880000019
       },
       "response": {
         "characterList": [
@@ -4521,7 +4752,7 @@
         ],
         "statusCode": 200
       },
-      "behaviorSha256": "cc85014459ff3c521d9a2647a8cd559521acd8f86c22fa2d296293e7cad18008",
+      "behaviorSha256": "8a51c79f4814bec5f5fa340a739c464ca5a26d912abff37bbd994be296a457ec",
       "dbBefore": {
         "category9": [
           [
@@ -4735,7 +4966,7 @@
         "skip": false,
         "statistics": {},
         "step": 14,
-        "viewer_id": 880000019
+        "viewer_id": 880000020
       },
       "response": {
         "characterList": [
@@ -4745,7 +4976,7 @@
         ],
         "statusCode": 200
       },
-      "behaviorSha256": "9fec23e559a091ecb2da5e5ea15ee1429313905e9d47dc53594e363c9660fd2b",
+      "behaviorSha256": "6bd1bf075905b487e631a4aac838cf0629c75960e77d762c599491f6689927ed",
       "dbBefore": {
         "category9": [],
         "characters": [
@@ -4895,7 +5126,7 @@
         "skip": false,
         "statistics": {},
         "step": 15,
-        "viewer_id": 880000020
+        "viewer_id": 880000021
       },
       "response": {
         "characterList": [
@@ -4905,7 +5136,7 @@
         ],
         "statusCode": 200
       },
-      "behaviorSha256": "da1ee40f2cf17fc6e506a8b8b3dbbe580b854442bd02171df7ff4aa9b6a1003d",
+      "behaviorSha256": "5dacf01ec2792225daf72c75ffdce0e3359936eb1b234b56556678a9aeb21368",
       "dbBefore": {
         "category9": [],
         "characters": [

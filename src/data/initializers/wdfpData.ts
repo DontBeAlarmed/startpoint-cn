@@ -799,10 +799,13 @@ export default function init(
         is_daily_first INTEGER NOT NULL,
         is_account_first INTEGER NOT NULL,
         gacha_exchange_point INTEGER,
+        crazy_draw_count INTEGER DEFAULT NULL,
         player_id INTEGER NOT NULL,
         PRIMARY KEY (gacha_id, player_id),
+        CHECK (crazy_draw_count IS NULL OR crazy_draw_count >= 0),
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run();
+    ensureSchemaColumn(database, "players_gacha_info.crazy_draw_count")
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_gacha_campaigns (
         gacha_id INTEGER NOT NULL,
@@ -856,6 +859,54 @@ export default function init(
         ON players_gacha_info (player_id, gacha_id)`).run();
     database.prepare(`CREATE INDEX IF NOT EXISTS idx_players_gacha_campaigns_player_gacha_campaign
         ON players_gacha_campaigns (player_id, gacha_id, campaign_id)`).run();
+
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_gacha_crazy_results (
+        player_id INTEGER NOT NULL,
+        gacha_id INTEGER NOT NULL,
+        slot_index INTEGER NOT NULL,
+        position INTEGER NOT NULL,
+        character_id INTEGER NOT NULL,
+        movie_id TEXT DEFAULT NULL,
+        seed INTEGER DEFAULT NULL,
+        entry_count INTEGER DEFAULT NULL,
+        ex_boost_item_id INTEGER DEFAULT NULL,
+        ex_boost_item_count INTEGER DEFAULT NULL,
+        PRIMARY KEY (player_id, gacha_id, slot_index, position),
+        FOREIGN KEY (gacha_id, player_id)
+            REFERENCES players_gacha_info (gacha_id, player_id) ON DELETE CASCADE,
+        CHECK (slot_index BETWEEN 0 AND 2),
+        CHECK (position BETWEEN 0 AND 9),
+        CHECK (character_id > 0),
+        CHECK (entry_count IS NULL OR entry_count > 0),
+        CHECK (
+            (ex_boost_item_id IS NULL AND ex_boost_item_count IS NULL)
+            OR (ex_boost_item_id > 0 AND ex_boost_item_count >= 0)
+        ),
+        CHECK (
+            (slot_index = 0 AND movie_id IS NOT NULL AND seed IS NOT NULL AND entry_count IS NOT NULL)
+            OR (
+                slot_index <> 0 AND movie_id IS NULL AND seed IS NULL
+                AND entry_count IS NULL AND ex_boost_item_id IS NULL
+                AND ex_boost_item_count IS NULL
+            )
+        )
+    )`).run();
+    database.prepare(`CREATE INDEX IF NOT EXISTS idx_players_gacha_crazy_results_player_gacha
+        ON players_gacha_crazy_results (player_id, gacha_id, slot_index, position)`).run();
+
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_gacha_conversions (
+        player_id INTEGER NOT NULL,
+        gacha_id INTEGER NOT NULL,
+        pending_point INTEGER NOT NULL,
+        converted_at INTEGER NOT NULL,
+        shown INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (player_id, gacha_id),
+        FOREIGN KEY (gacha_id, player_id)
+            REFERENCES players_gacha_info (gacha_id, player_id) ON DELETE CASCADE,
+        CHECK (pending_point > 0),
+        CHECK (converted_at >= 0),
+        CHECK (shown IN (0, 1))
+    )`).run();
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_drawn_quests (
         category_id INTEGER NOT NULL,

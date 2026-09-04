@@ -3,13 +3,17 @@ import { resolvePlayerIdSync } from "../../data/activeAccount"
 import { getSession } from "../../data/domains/session"
 import {
     executeGachaDrawSync,
+    executeCrazyGachaCandidateSync,
+    projectCrazyGachaCandidateResponse,
     projectGachaExecResponse,
     runGachaPostCommitEffects,
 } from "../../lib/gacha-owner"
 import { getVirtualNow } from "../../runtime/time/game-time"
 import { generateDataHeaders } from "../../utils"
 import { registerGachaExchangeRoutes } from "./gacha/exchange-routes"
+import { registerCrazyGachaRoutes } from "./gacha/crazy-routes"
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication"
+import { GACHA_EXEC_TYPES } from "../../lib/gacha-rules"
 
 interface ExecBody {
     readonly viewer_id: number
@@ -49,14 +53,40 @@ async function handleExec(request: FastifyRequest, reply: FastifyReply) {
         })
     }
 
-    const result = executeGachaDrawSync({
+    const command = {
         playerId,
         gachaId,
         paymentType,
         execType,
         numberOfExec,
         nowMs: getVirtualNow().getTime(),
-    })
+    }
+    if (execType === GACHA_EXEC_TYPES.CRAZY_MULTI_TICKET) {
+        const result = executeCrazyGachaCandidateSync(command)
+        if (!result.ok) {
+            if (result.kind === "protocolResultCode") {
+                reply.header("content-type", "application/x-msgpack")
+                return reply.status(200).send({
+                    data_headers: generateDataHeaders({
+                        viewer_id: viewerId,
+                        result_code: result.resultCode,
+                    }),
+                    data: {},
+                })
+            }
+            return reply.status(400).send({ error: "Bad Request", message: result.message })
+        }
+        runGachaPostCommitEffects(result, {
+            publishGrowth: () => [],
+        })
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send(projectCrazyGachaCandidateResponse({
+            dataHeaders: generateDataHeaders({ viewer_id: viewerId }),
+            result,
+        }))
+    }
+
+    const result = executeGachaDrawSync(command)
     if (!result.ok) {
         if (result.kind === "protocolResultCode") {
             reply.header("content-type", "application/x-msgpack")
@@ -91,5 +121,6 @@ async function handleExec(request: FastifyRequest, reply: FastifyReply) {
 
 export default async function gachaRoutes(fastify: FastifyInstance): Promise<void> {
     registerGachaExchangeRoutes(fastify)
+    registerCrazyGachaRoutes(fastify)
     fastify.post("/exec", handleExec)
 }

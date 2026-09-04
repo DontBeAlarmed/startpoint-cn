@@ -295,6 +295,10 @@ export function serializePlayerData(
                 "is_daily_first": gachaInfo.isDailyFirst,
                 "is_account_first": gachaInfo.isAccountFirst,
                 "gacha_exchange_point": gachaInfo.gachaExchangePoint,
+                ...(gachaInfo.crazyDrawCount === null
+                    || gachaInfo.crazyDrawCount === undefined
+                    ? {}
+                    : { "crazy_draw_count": gachaInfo.crazyDrawCount }),
                 ...(detail?.dailyOneCount === null || detail?.dailyOneCount === undefined
                     ? {} : { "daily_one_count": detail.dailyOneCount }),
                 ...(detail?.dailyTenCount === null || detail?.dailyTenCount === undefined

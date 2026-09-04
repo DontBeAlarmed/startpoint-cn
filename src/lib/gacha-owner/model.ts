@@ -25,7 +25,7 @@ export type GachaPostCommitEffect =
         readonly playerId: number
         readonly characterIds: readonly number[]
         readonly characters: readonly Readonly<Record<string, unknown>>[]
-        readonly source: "gacha/exec" | "gacha/exchange_character"
+        readonly source: "gacha/exec" | "gacha/exchange_character" | "gacha/crazy_select"
     }
 
 export interface GachaCampaignAfter {
@@ -128,3 +128,49 @@ export type GachaExchangeResult = GachaExchangeSuccess | GachaExecRejected | Gac
 export interface GachaPostCommitResult {
     readonly characterList: readonly Record<string, unknown>[]
 }
+
+export interface CrazyGachaCandidateSuccess {
+    readonly ok: true
+    readonly kind: "crazyCandidate"
+    readonly playerId: number
+    readonly gachaId: number
+    readonly draw: readonly GachaCharacterDraw[]
+    readonly crazyDrawCount: number
+    readonly exchangePoint: number
+    readonly isDailyFirst: boolean
+    readonly isAccountFirst: boolean
+    readonly ticketItemBalances: Readonly<Record<number, number>>
+    readonly slots: Readonly<Record<number, readonly number[]>>
+    readonly postCommitEffects: readonly GachaPostCommitEffect[]
+}
+
+export interface CrazyGachaSaveSuccess {
+    readonly ok: true
+    readonly kind: "crazySave"
+    readonly gachaId: number
+    readonly slots: Readonly<Record<number, readonly number[]>>
+}
+
+export interface CrazyGachaSelectSuccess {
+    readonly ok: true
+    readonly kind: "crazySelect"
+    readonly playerId: number
+    readonly gachaId: number
+    readonly characters: readonly Readonly<Record<string, unknown>>[]
+    readonly rewardItems: Readonly<Record<number, number>>
+    readonly playerAfter?: Readonly<{
+        readonly freeMana: number
+        readonly freeVmoney: number
+        readonly expPool: number
+    }>
+    readonly itemOverflowDispositions: readonly PlannedItemOverflowDisposition[]
+    readonly mailArrived: boolean
+    readonly postCommitEffects: readonly GachaPostCommitEffect[]
+}
+
+export type CrazyGachaCandidateResult = CrazyGachaCandidateSuccess
+    | GachaExecRejected | GachaExecProtocolRejected
+export type CrazyGachaSaveResult = CrazyGachaSaveSuccess
+    | GachaExecRejected | GachaExecProtocolRejected
+export type CrazyGachaSelectResult = CrazyGachaSelectSuccess
+    | GachaExecRejected | GachaExecProtocolRejected

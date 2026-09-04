@@ -58,6 +58,11 @@ import { isGiftCodeEnabledSync } from "../../lib/gift-code/capability";
 import type { ConfigValues } from "../../lib/types/config";
 import { projectItemOverflowCommonResponse } from "../../lib/item-overflow";
 import { collectRewardGrantItemOverflowDispositions } from "../../lib/reward-grant";
+import {
+    projectCrazyGachaLoadStateSync,
+    projectPendingGachaConversionsSync,
+    settleExpiredGachaPointsOnLoadSync,
+} from "../../lib/gacha-owner";
 
 interface CnLoadBody {
     device_id: number;
@@ -122,8 +127,8 @@ function wrapOptionFields(
     d.premium_bonus_mailed_item_list = [];
     d.ex_boost_draw_result = null;
     d.pass_force_reward = false;
-    d.crazy_gacha_result_list = [];
-    d.last_crazy_gacha_draw_result = [];
+    d.crazy_gacha_result_list ??= {};
+    d.last_crazy_gacha_draw_result ??= [];
     d.fund_receive_list = [];
     d.login_info = {};
     d.tower_dungeon_list = [];
@@ -304,6 +309,21 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             player = refreshedPlayer;
         }
 
+        const gachaPointConversion = settleExpiredGachaPointsOnLoadSync({
+            playerId,
+            nowMs: now.getTime(),
+            maxStarCrumb: contentSnapshot.repository.table<ConfigValues>(
+                "config.json",
+            ).max_star_crumb,
+        });
+        if (gachaPointConversion.status === "converted") {
+            const refreshedPlayer = getPlayerSync(playerId);
+            if (refreshedPlayer === null) {
+                return reply.status(500).send({ error: "Internal Server Error", message: "No player data." });
+            }
+            player = refreshedPlayer;
+        }
+
         // 若自定义时间与 lastLogin 不同步，强制对齐（防止客户端弹"日期变了"）
         if (now.toDateString() !== player.lastLoginTime.toDateString()) {
             updatePlayerSync({ id: player.id, lastLoginTime: now });
@@ -398,6 +418,10 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                 host: options.httpDisplayHost ?? "127.0.0.1",
                 port: options.httpPort ?? DEFAULT_SERVER_PORTS.http,
             });
+            const crazyGacha = projectCrazyGachaLoadStateSync(playerId);
+            clientData.crazy_gacha_result_list = crazyGacha.crazyGachaResultList;
+            clientData.last_crazy_gacha_draw_result = crazyGacha.lastCrazyGachaDrawResult;
+            clientData.converted_gacha_list = projectPendingGachaConversionsSync(playerId);
             clientData.favorite_party_group_list = getFavoritePartyGroupListSync(
                 playerId,
                 player.leaderCharacterId,

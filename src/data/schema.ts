@@ -16,6 +16,11 @@ const schemaColumns = {
         column: "tutorial_gacha_character_id",
         definition: "INTEGER DEFAULT NULL",
     },
+    "players_gacha_info.crazy_draw_count": {
+        table: "players_gacha_info",
+        column: "crazy_draw_count",
+        definition: "INTEGER DEFAULT NULL",
+    },
     "players.total_stamina_used": {
         table: "players",
         column: "total_stamina_used",

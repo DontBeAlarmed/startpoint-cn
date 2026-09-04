@@ -1,7 +1,13 @@
 import { getDefaultGachaSeedQuarantine } from "../gacha-seed-quarantine"
 import { formatGachaCharacterDrawsSummary } from "../hot-path-log-formatters"
 import { sampledLog } from "../sampled-log"
-import type { GachaExchangeSuccess, GachaExecSuccess, GachaPostCommitResult } from "./model"
+import type {
+    CrazyGachaCandidateSuccess,
+    CrazyGachaSelectSuccess,
+    GachaExchangeSuccess,
+    GachaExecSuccess,
+    GachaPostCommitResult,
+} from "./model"
 
 export interface GachaPostCommitDependencies {
     readonly markSeed?: (movieId: string, seed: number, rarity: number) => void
@@ -13,7 +19,7 @@ export interface GachaPostCommitDependencies {
         playerId: number,
         characterIds: readonly number[],
         characters: readonly Record<string, unknown>[],
-        source: "gacha/exec" | "gacha/exchange_character",
+        source: "gacha/exec" | "gacha/exchange_character" | "gacha/crazy_select",
     ) => readonly Record<string, unknown>[]
 }
 
@@ -28,10 +34,13 @@ const defaultSampledCharacterLog = (effect: Extract<
 }
 
 export function runGachaPostCommitEffects(
-    result: GachaExecSuccess | GachaExchangeSuccess,
+    result: GachaExecSuccess | GachaExchangeSuccess
+        | CrazyGachaCandidateSuccess | CrazyGachaSelectSuccess,
     dependencies: GachaPostCommitDependencies,
 ): GachaPostCommitResult {
-    let characterList = result.kind === "character" ? result.characters : []
+    let characterList = result.kind === "character" || result.kind === "crazySelect"
+        ? result.characters
+        : []
     for (const effect of result.postCommitEffects) {
         try {
             if (effect.kind === "seedMark") {

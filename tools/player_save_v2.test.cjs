@@ -168,6 +168,33 @@ function seedEveryRegisteredPlayerTable(database, playerId) {
             row.period_end_time = 1694304000
             row.free_one_times = 1
             row.free_ten_times = 2
+        } else if (definition.name === "players_gacha_crazy_results") {
+            database.prepare(`INSERT OR IGNORE INTO players_gacha_info
+                (gacha_id, is_daily_first, is_account_first, gacha_exchange_point,
+                    crazy_draw_count, player_id)
+                VALUES (100, 1, 1, 0, 1, ?)`).run(playerId)
+            const gachas = require("../assets/gacha.json")
+            const pools = require("../assets/gacha_pool.json")
+            const characterIds = Object.values(gachas["100"].poolOddsIds)
+                .flatMap(oddsId => pools[oddsId].map(item => item.id))
+            const insert = database.prepare(`INSERT INTO players_gacha_crazy_results (
+                player_id, gacha_id, slot_index, position, character_id,
+                movie_id, seed, entry_count
+            ) VALUES (?, 100, 0, ?, ?, 'normal', ?, 1)`)
+            for (let position = 0; position < 10; position += 1) {
+                insert.run(playerId, position, characterIds[position], 10000001 + position)
+            }
+            fixtureNumber += 1
+            continue
+        } else if (definition.name === "players_gacha_conversions") {
+            database.prepare(`INSERT OR IGNORE INTO players_gacha_info
+                (gacha_id, is_daily_first, is_account_first, gacha_exchange_point,
+                    crazy_draw_count, player_id)
+                VALUES (100, 1, 1, 0, 1, ?)`).run(playerId)
+            row.gacha_id = 100
+            row.pending_point = 1
+            row.converted_at = 1700000000
+            row.shown = 0
         }
 
         const rowColumns = Object.keys(row)
@@ -524,7 +551,7 @@ test("v2 validation rejects future schemas and missing tables that existed in th
     const snapshot = exportPlayerSaveV2Sync(playerId)
 
     const future = cloneJson(snapshot)
-    future.producer.dbSchemaVersion = 26
+    future.producer.dbSchemaVersion = 27
     assert.throws(() => restorePlayerSaveV2Sync(future, playerId), /newer.*schema|future.*schema/i)
 
     const starsState = (gachaId = 80000) => ({
@@ -589,6 +616,38 @@ test("v2 validation rejects future schemas and missing tables that existed in th
     assert.throws(
         () => validatePlayerSaveSnapshotSync(nonComebackDetail),
         /invalid Comeback period/i,
+    )
+
+    const incompleteCrazy = cloneJson(snapshot)
+    addGachaParent(incompleteCrazy, 100)
+    incompleteCrazy.domains.economy.tables.players_gacha_crazy_results.push({
+        player_id: snapshot.playerId,
+        gacha_id: 100,
+        slot_index: 0,
+        position: 0,
+        character_id: 111001,
+        movie_id: "normal",
+        seed: 10000001,
+        entry_count: 1,
+        ex_boost_item_id: null,
+        ex_boost_item_count: null,
+    })
+    assert.throws(
+        () => validatePlayerSaveSnapshotSync(incompleteCrazy),
+        /Crazy Gacha result 100:0 is incomplete/i,
+    )
+
+    const orphanConversion = cloneJson(snapshot)
+    orphanConversion.domains.economy.tables.players_gacha_conversions.push({
+        player_id: snapshot.playerId,
+        gacha_id: 29,
+        pending_point: 3,
+        converted_at: 1700000000,
+        shown: 0,
+    })
+    assert.throws(
+        () => validatePlayerSaveSnapshotSync(orphanConversion),
+        /Gacha conversion 29 has no valid parent/i,
     )
 
     const missingCurrent = cloneJson(snapshot)
