@@ -2,6 +2,8 @@
 
 本页展示当前 Category Mission 结算主链，以及普通单人战斗从入场到结算的事务生命周期。
 
+D25 在本页所述 Single 生命周期之下增加了无副作用的 Battle Settlement values/progress plans；它们同时由 Multi adapter 使用，但不拥有本页的 active identity、外层事务、continue/abort 或响应。完整边界见 [Battle Settlement 有限核](./battle-settlement-core-gate.md)。
+
 ## 单人复活当前边界
 
 `/single_battle_quest/play_continue` 的 CN 1.8.1 请求复活次数来自

@@ -37,6 +37,7 @@
 | D22 | Bond Token Exchange 独立用例（已实现，实机统一延期） | [领域边界蓝图](./domain-boundary-blueprint.md) | typed 产品/成本/库存/周期 catalog、list runtime（exchange_count）、唯一事务 owner 与 per-player 兑换计数 |
 | D23 | Character Growth Writer Convergence（已实现，实机统一延期） | [角色成长状态 Gate](./character-growth-state-gate.md) | 信赖之证资格按客户端规则统一派生（板1=非突破上限+全节点、板2=全节点）、节点/EXP/注入 writer 同事务收敛、metadata/EX Boost/repair/admin 经 aggregate command 或声明 adapter、DEBT-T01/T02 关闭 |
 | D24 | Mission Owner 收口（已实现） | [任务引擎架构](../systems/mission-engine-architecture.md) | snapshot-scoped Catalog、Session-only computer、来源事实 typed read port、receipt/RewardGrant 协调、Quest 计数回归所属 writer、DEBT-T03/T04 关闭 |
+| D25 | Battle Settlement 有限核（已实现，等待 D25 closure） | [Battle Settlement Core Gate](./battle-settlement-core-gate.md) | immutable values/progress plans；Single/Multi 外层事务与 lifecycle/transport 保持独立；DEBT-T05/T08 收敛 |
 
 ## 阅读顺序
 

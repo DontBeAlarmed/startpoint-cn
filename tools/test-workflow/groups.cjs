@@ -584,6 +584,7 @@ const TEST_GROUPS = Object.freeze({
         tests: [
             "tools/auto_start_stamina_stop.test.cjs",
             "tools/battle_quest_progress_plan.test.cjs",
+            "tools/battle_settlement_boundary.test.cjs",
             "tools/battle_settlement_values.test.cjs",
             "tools/battle_entry_inventory_route.test.cjs",
             "tools/perf/single_battle_settlement_admission.test.cjs",
@@ -598,7 +599,6 @@ const TEST_GROUPS = Object.freeze({
             "tools/single_finish_authority_transaction.test.cjs",
             "tools/single_finish_final_projection.test.cjs",
             "tools/single_finish_awake_reward_owner.test.cjs",
-            "tools/single_finish_orchestrator_architecture.test.cjs",
             "tools/single_finish_response_projector.test.cjs",
             "tools/single_finish_request_validation.test.cjs",
             "tools/story_quest_finish.test.cjs",

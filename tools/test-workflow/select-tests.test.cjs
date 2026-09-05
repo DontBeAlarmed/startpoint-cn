@@ -775,7 +775,7 @@ test("maps single finish settlement implementation and regression precisely", ()
         ["integration:mission", "integration:reward-grant"],
     )
     assert.deepEqual(
-        selectTestGroups(["tools/single_finish_orchestrator_architecture.test.cjs"]),
+        selectTestGroups(["tools/battle_settlement_boundary.test.cjs"]),
         ["integration:quest"],
     )
     assert.deepEqual(
@@ -2012,6 +2012,7 @@ test("splits isolated integration tests into focused domains", () => {
     assert.deepEqual(TEST_GROUPS["integration:quest"].tests, [
         "tools/auto_start_stamina_stop.test.cjs",
         "tools/battle_quest_progress_plan.test.cjs",
+        "tools/battle_settlement_boundary.test.cjs",
         "tools/battle_settlement_values.test.cjs",
         "tools/battle_entry_inventory_route.test.cjs",
         "tools/perf/single_battle_settlement_admission.test.cjs",
@@ -2026,7 +2027,6 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/single_finish_authority_transaction.test.cjs",
         "tools/single_finish_final_projection.test.cjs",
         "tools/single_finish_awake_reward_owner.test.cjs",
-        "tools/single_finish_orchestrator_architecture.test.cjs",
         "tools/single_finish_response_projector.test.cjs",
         "tools/single_finish_request_validation.test.cjs",
         "tools/story_quest_finish.test.cjs",
