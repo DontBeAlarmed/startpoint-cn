@@ -2,6 +2,10 @@ import { getDb } from "../db";
 import { PlayerQuestProgress, PlayerDrawnQuest, RawPlayerQuestProgress, RawPlayerDrawnQuest } from "../types";
 import { deserializeBoolean, serializeBoolean } from "../utils/primitives";
 
+export type PlayerQuestProgressWrite = Omit<PlayerQuestProgress, "leaderCharacterId"> & {
+    readonly leaderCharacterId?: number | null
+}
+
 /**
  * Converts a RawPlayerQuestProgress object into a PlayerQuestProgress object.
  * 
@@ -208,7 +212,7 @@ export function getPlayerQuestLocalRankPercentageSync(
 export function insertPlayerQuestProgressSync(
     playerId: number,
     section: number | string,
-    data: PlayerQuestProgress
+    data: PlayerQuestProgressWrite
 ) {
     getDb().prepare(`
     INSERT INTO players_quest_progress (section, quest_id, finished, unlocked, high_score, clear_rank, best_elapsed_time_ms, leader_character_id, host_finished, player_id)
@@ -259,7 +263,7 @@ export function insertPlayerQuestProgressListSync(
 export function updatePlayerQuestProgressSync(
     playerId: number,
     section: number | string,
-    data: Partial<PlayerQuestProgress> & Pick<PlayerQuestProgress, 'questId'>
+    data: Partial<PlayerQuestProgressWrite> & Pick<PlayerQuestProgressWrite, 'questId'>
 ) {
     const fieldMap: Record<string, string> = {
         'finished': 'finished',

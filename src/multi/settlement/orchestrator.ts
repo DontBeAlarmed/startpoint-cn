@@ -1,6 +1,6 @@
 import bundledAdditionalRewardRules from "../../../assets/additional_reward_rules.json"
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
-import { getPlayerSingleQuestProgressSync, incrementPlayerQuestMultiClearSync, insertPlayerQuestProgressSync, updatePlayerQuestProgressSync } from "../../data/domains/quest"
+import { getPlayerSingleQuestProgressSync, incrementPlayerQuestMultiClearSync } from "../../data/domains/quest"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings"
 import { settleAdditionalRewardsSync, type AdditionalRewardTable } from "../../lib/additional-reward"
@@ -36,19 +36,12 @@ import { settleActivityPeriodicRewardsSync } from "../../lib/quest/finish/period
 import type { FinishContext } from "../../lib/quest/finish/types"
 import { resolveHostFinished } from "../../lib/quest/host-finish"
 import { validateMultiFinishRequest, type ValidatedMultiFinish } from "../../lib/quest/multi-battle-validation"
-import {
-    calculateCharacterBattleExp,
-    calculateFixedQuestMana,
-    calculateFixedQuestPoolExp,
-    getRewardCampaignRates,
-} from "../../lib/reward-campaign"
 import { getCommonScoreRewardCount } from "../../lib/score-reward-lottery"
-import { addStaminaWithOverflowCap, getMaxStamina, getRankDegree } from "../../lib/stamina"
+import { addStaminaWithOverflowCap, getMaxStamina } from "../../lib/stamina"
 import { PlayerNotFoundError } from "../../lib/quest/start-entry"
 import { QuestCategory, type BattleQuest } from "../../lib/types"
 import { formatHardMultiMissionDiagnostic } from "../../lib/mission/client-check-diagnostics"
 import { sampledLog } from "../../lib/sampled-log"
-import { getServerTime } from "../../utils"
 import { getRealNow } from "../../runtime/time/game-time"
 import {
     recordCompletedMainChapterMilestoneSync,
@@ -62,6 +55,8 @@ import {
     settleRescueFragmentReward,
 } from "../rescue-fragment-reward"
 import { withEntryItemInventoryWithinTransactionSync } from "../../lib/quest/entry-item-inventory"
+import { createMultiSettlementValuePlan } from "./value-plan"
+import { writeMultiQuestProgressWithinTransactionSync } from "./quest-progress-write"
 
 export interface MultiplayerSettlementPreparationInput {
     readonly body: MultiFinishBody
@@ -227,12 +222,7 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             { boostPoint: player.boostPoint, bossBoostPoint: player.bossBoostPoint },
         )
         if (!freshValidation.ok) throw new ActiveQuestSettlementConflictError()
-        const beforeRankPoint = player.rankPoint
-        const newRankPoint = beforeRankPoint + questData.rankPointReward
-        const newBoostPoint = player.boostPoint - (activeQuest.useBoostPoint ? 1 : 0)
-        const newBossBoostPoint = player.bossBoostPoint - (activeQuest.useBossBoostPoint ? 1 : 0)
         const questProgress = getPlayerSingleQuestProgressSync(input.playerId, questCategory, questId)
-        const questProgressExists = questProgress !== null
         const questPreviouslyCompleted = questProgress?.finished === true
         const hostFinished = resolveHostFinished({
             previouslyHostFinished: questProgress?.hostFinished ?? false,
@@ -244,12 +234,6 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             clearRank,
             questProgress,
         })
-        const oldRkDegree = getRankDegree(beforeRankPoint)
-        const newDegreeId = getRankDegree(newRankPoint)
-        if (getRankDegree(player.rankPoint) < 100 && newDegreeId >= 100) {
-            recordRank100MilestoneSync(input.playerId, newRankPoint)
-        }
-        const didLevelUp = newDegreeId > oldRkDegree
         const entryResourceResult = questAccomplished
             ? commitEntryResources({
                 playerId: input.playerId,
@@ -297,38 +281,41 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             isMulti: true,
             isMultiHost: isRoomHost,
         }
-        const settlementTime = new Date(getServerTime() * 1000)
-        const rewardCampaignRates = getRewardCampaignRates(questCategory, questId, settlementTime)
-        const fixedManaReward = calculateFixedQuestMana(
-            questData.manaReward,
-            rewardCampaignRates,
-            useBoostPoint,
-        )
-        const fixedPoolExpReward = calculateFixedQuestPoolExp(
-            questData.poolExpReward,
-            rewardCampaignRates,
-            useBoostPoint,
-        )
-        const characterBattleExp = calculateCharacterBattleExp(
-            questData.characterExpReward || 0,
-            rewardCampaignRates,
-        )
         const fieldMana = freshValidation.addMana
-        const newMana = player.freeMana + fixedManaReward + fieldMana
-        const manaObtained = fixedManaReward + fieldMana
+        const { settlementTime, valuePlan } = createMultiSettlementValuePlan({
+            player,
+            activeQuest,
+            quest: questData,
+            questCategory,
+            questId,
+            fieldMana,
+            maxComboCount: Number((freshValidation.statistics as any).max_combo_count ?? 0),
+        })
+        const {
+            beforeRankPoint,
+            newRankPoint,
+            oldDegreeId,
+            newDegreeId,
+            didLevelUp,
+            fixedManaReward,
+            fixedPoolExpReward,
+            characterBattleExp,
+            manaObtained,
+            playerValues,
+            rewardCampaignRates,
+        } = valuePlan
+        const {
+            freeMana: newMana,
+            boostPoint: newBoostPoint,
+            bossBoostPoint: newBossBoostPoint,
+        } = playerValues
+        if (oldDegreeId < 100 && newDegreeId >= 100) {
+            recordRank100MilestoneSync(input.playerId, newRankPoint)
+        }
         finishCtx.manaObtained = manaObtained
         updatePlayerSync({
             id: input.playerId,
-            freeMana: newMana,
-            expPool: player.expPool + fixedPoolExpReward,
-            rankPoint: newRankPoint,
-            boostPoint: newBoostPoint,
-            bossBoostPoint: newBossBoostPoint,
-            totalManaObtained: (player.totalManaObtained ?? 0) + manaObtained,
-            maxComboAchieved: Math.max(
-                player.maxComboAchieved ?? 0,
-                (freshValidation.statistics as any).max_combo_count ?? 0,
-            ),
+            ...playerValues,
             ...(didLevelUp
                 ? {
                     stamina: addStaminaWithOverflowCap(player.stamina, getMaxStamina(newDegreeId)),
@@ -343,37 +330,19 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             ? rewardGranter.grantReward((questData as any).sPlusReward)
             : null
 
-        if (questAccomplished) {
-            if (questProgressExists) {
-                const updateData: any = {
-                    questId,
-                    finished: true,
-                    bestElapsedTimeMs: questProgress.bestElapsedTimeMs == null
-                        ? clearTime
-                        : Math.min(clearTime, questProgress.bestElapsedTimeMs),
-                    highScore: questProgress.highScore === undefined
-                        ? freshValidation.score
-                        : Math.max(freshValidation.score, questProgress.highScore),
-                    leaderCharacterId: leaderId ?? null,
-                    hostFinished,
-                }
-                if (clearRank !== null) {
-                    updateData.clearRank = questProgress.clearRank === undefined
-                        ? clearRank
-                        : Math.max(clearRank, questProgress.clearRank)
-                }
-                updatePlayerQuestProgressSync(input.playerId, questCategory, updateData)
-            } else {
-                insertPlayerQuestProgressSync(input.playerId, questCategory, {
-                    questId,
-                    finished: true,
-                    bestElapsedTimeMs: clearTime,
-                    highScore: freshValidation.score,
-                    clearRank: clearRank ?? 5,
-                    leaderCharacterId: leaderId ?? null,
-                    hostFinished,
-                })
-            }
+        const questProgressWritten = writeMultiQuestProgressWithinTransactionSync({
+            playerId: input.playerId,
+            questCategory,
+            questAccomplished,
+            questId,
+            clearTime,
+            score: freshValidation.score,
+            clearRank,
+            leaderCharacterId: leaderId ?? null,
+            hostFinished,
+            existing: questProgress,
+        })
+        if (questProgressWritten) {
             if (questCategory === QuestCategory.MAIN) {
                 recordCompletedMainChapterMilestoneSync(input.playerId, questId)
             }

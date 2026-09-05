@@ -720,7 +720,7 @@ const SOURCE_RULES = [
     },
     { pattern: /^tools\/perf\/hub_baseline(?:_helpers)?\.cjs$/, groups: ["integration:multi-hub"] },
     {
-        pattern: /^src\/multi\/settlement\/(?:orchestrator|response)\.ts$/,
+        pattern: /^src\/multi\/settlement\/(?:orchestrator|quest-progress-write|response|value-plan)\.ts$/,
         groups: ["integration:mission", "integration:party"],
     },
     {

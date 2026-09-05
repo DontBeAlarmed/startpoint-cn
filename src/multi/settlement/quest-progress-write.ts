@@ -2,13 +2,13 @@ import {
     insertPlayerQuestProgressSync,
     updatePlayerQuestProgressSync,
     type PlayerQuestProgressWrite,
-} from "../../../data/domains/quest"
+} from "../../data/domains/quest"
 import {
     createBattleQuestProgressPlan,
     type BattleQuestProgressPlanInput,
-} from "./battle-quest-progress-plan"
+} from "../../lib/quest/finish/battle-quest-progress-plan"
 
-export interface SingleQuestProgressWriteInput extends Omit<
+export interface MultiQuestProgressWriteInput extends Omit<
     BattleQuestProgressPlanInput,
     "missingLeader"
 > {
@@ -16,16 +16,13 @@ export interface SingleQuestProgressWriteInput extends Omit<
     readonly questCategory: number
 }
 
-/** Executes a shared progress plan inside the Single adapter's existing transaction. */
-export function writeSingleQuestProgressWithinTransactionSync(
-    input: SingleQuestProgressWriteInput,
+/** Executes a shared progress plan inside the Multi adapter's existing transaction. */
+export function writeMultiQuestProgressWithinTransactionSync(
+    input: MultiQuestProgressWriteInput,
 ): boolean {
-    const plan = createBattleQuestProgressPlan({ ...input, missingLeader: "preserve" })
+    const plan = createBattleQuestProgressPlan({ ...input, missingLeader: "clear" })
     if (plan.kind === "none") return false
-    const values: PlayerQuestProgressWrite = {
-        ...plan.values,
-        leaderCharacterId: plan.values.leaderCharacterId ?? undefined,
-    }
+    const values: PlayerQuestProgressWrite = plan.values
     if (plan.kind === "update") {
         updatePlayerQuestProgressSync(input.playerId, input.questCategory, values)
     } else {

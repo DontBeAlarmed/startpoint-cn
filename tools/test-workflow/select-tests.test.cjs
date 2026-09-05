@@ -492,6 +492,14 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["src/multi/settlement/orchestrator.ts"]),
         ["integration:mission", "integration:multi-hub", "integration:party", "quick:protocol"],
     )
+    for (const file of [
+        "src/multi/settlement/quest-progress-write.ts",
+        "src/multi/settlement/value-plan.ts",
+    ]) assert.deepEqual(
+        selectTestGroups([file]),
+        ["integration:mission", "integration:multi-hub", "integration:party", "quick:protocol"],
+        file,
+    )
     assert.deepEqual(
         selectTestGroups(["src/data/domains/mission.ts"]),
         ["full", "integration:database", "integration:mission"],
