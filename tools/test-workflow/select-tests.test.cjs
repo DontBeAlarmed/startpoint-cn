@@ -6,6 +6,23 @@ const test = require("node:test")
 const { AGGREGATE_GROUPS, TEST_GROUPS } = require("./groups.cjs")
 const { selectTestGroups } = require("./select-tests.cjs")
 
+test("maps the D27 runtime index seam and fixtures to quick content", () => {
+    for (const file of [
+        "src/content/runtime/table-access.ts",
+        "tools/content_runtime_index_contract.test.cjs",
+        "tools/content_runtime_index_boundary.test.cjs",
+        "tools/helpers/content-snapshot-fixture.cjs",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["quick:content"], file)
+    }
+    assert.ok(TEST_GROUPS["quick:content"].tests.includes(
+        "tools/content_runtime_index_contract.test.cjs",
+    ))
+    assert.ok(TEST_GROUPS["quick:content"].tests.includes(
+        "tools/content_runtime_index_boundary.test.cjs",
+    ))
+})
+
 test("maps representative source files to focused groups", () => {
     assert.deepEqual(
         selectTestGroups(["src/data/domains/gacha-state.ts"]),

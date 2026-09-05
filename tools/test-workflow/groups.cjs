@@ -237,6 +237,8 @@ const TEST_GROUPS = Object.freeze({
             "tools/reward_campaign_runtime.test.cjs",
             "tools/content_reward_repository.test.cjs",
             "tools/content_runtime_table.test.cjs",
+            "tools/content_runtime_index_contract.test.cjs",
+            "tools/content_runtime_index_boundary.test.cjs",
             "tools/content_runtime_authority.test.cjs",
             "tools/content_runtime_endpoint_tables.test.cjs",
             "tools/content_runtime_direct_tables.test.cjs",

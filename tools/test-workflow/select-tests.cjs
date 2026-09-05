@@ -181,6 +181,10 @@ const SOURCE_RULES = [
         groups: ["quick:content"],
     },
     {
+        pattern: /^(?:src\/content\/runtime\/table-access\.ts|tools\/(?:content_runtime_index_(?:contract|boundary)\.test\.cjs|helpers\/content-snapshot-fixture\.cjs))$/,
+        groups: ["quick:content"],
+    },
+    {
         pattern: /^src\/lib\/character-content\.ts$/,
         groups: ["quick:content", "admin", "integration:quest"],
     },
