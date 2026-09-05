@@ -3,6 +3,7 @@
 require("ts-node/register/transpile-only")
 
 const crypto = require("node:crypto")
+const fs = require("node:fs")
 const path = require("node:path")
 const Fastify = require("fastify")
 const { pack, unpack } = require("msgpackr")
@@ -51,11 +52,11 @@ function getRuntimeDependencies(runtimeRoot = projectRoot) {
         "src/lib/mission/patterns",
         "src/lib/mission/stages",
     ]) {
-        try {
-            Object.assign(missionCompat, fromRuntime(modulePath))
-        } catch {
-            // module retired on this runtime root
-        }
+        const absolutePath = path.join(resolvedRoot, modulePath)
+        const exists = [".ts", ".js", ".cjs"].some(extension =>
+            fs.existsSync(`${absolutePath}${extension}`),
+        )
+        if (exists) Object.assign(missionCompat, fromRuntime(modulePath))
     }
     const missionCatalog = missionCompat
     if (typeof missionCompat.isMissionEnabledAt !== "function" && typeof missionCompat.getMissionCatalog === "function") {

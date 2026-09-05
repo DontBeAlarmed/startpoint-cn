@@ -67,6 +67,10 @@ test("maps representative source files to focused groups", () => {
         ["integration:mission"],
     )
     assert.deepEqual(
+        selectTestGroups(["src/lib/mission/event-coverage-report.ts"]),
+        ["integration:mission"],
+    )
+    assert.deepEqual(
         selectTestGroups(["src/lib/mission/coverage-audit.ts"]),
         ["integration:mission"],
     )
@@ -1686,10 +1690,6 @@ test("routes active mission focused metrics, baseline, and production boundaries
         "integration:database",
         "integration:mission",
     ])
-    assert.deepEqual(
-        selectTestGroups(["tools/helpers/active-mission-legacy-evaluator.cjs"]),
-        ["integration:mission"],
-    )
 })
 
 test("keeps external data concerns out of self-contained runtime tests", () => {

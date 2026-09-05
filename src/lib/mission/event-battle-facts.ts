@@ -7,7 +7,6 @@ import {
 import type { FinishContext } from "../quest/finish/types"
 import { getExactEventSingleClearRules } from "./event-single-clear-rules"
 import ruleAsset from "../../../assets/mission_event_battle_rules.json"
-import eventQuestMap from "../../../assets/mission_event_quest_map.json"
 import eventMissionRewards from "../../../assets/mission_event_reward.json"
 import { completePlayerEventMissionFactSync } from "../../data/domains/event_mission_entry_facts"
 import { getQuestContentTableSync } from "../assets"
@@ -854,47 +853,4 @@ export function recordEventMissionBattleFacts(
     matchedMissionIds.push(...recordExactResistanceDebuffRules(ctx, evaluationTime))
     matchedMissionIds.push(...recordExactHardMultiConditionRules(ctx, evaluationTime))
     return matchedMissionIds
-}
-
-type EventCountMode = "single" | "multi" | "finish"
-
-interface EventQuestMapping {
-    questIds: number[]
-    categories: number[]
-    countMode: EventCountMode
-}
-
-export interface EventMissionCoverageReport {
-    total: number
-    mapped: number
-    exactMultiRules: number
-    exactMultiRulesByRole: Record<"any" | "host" | "guest", number>
-    unsupported: number
-    activeUnsupported: number
-    countModes: Record<EventCountMode, number>
-    unsupportedPatterns: string[]
-}
-
-export function getEventMissionCoverageReport(at: Date): EventMissionCoverageReport {
-    const definitions = getMissionCatalog().getDefinitions(3)
-    const mappings = eventQuestMap as Record<string, EventQuestMapping>
-    const exactCoverage = getExactEventBattleRuleCoverage()
-    const unsupportedDefinitions = definitions.filter(definition => mappings[definition.pattern] === undefined)
-    const countModes: Record<EventCountMode, number> = { single: 0, multi: 0, finish: 0 }
-    for (const definition of definitions) {
-        const mapping = mappings[definition.pattern]
-        if (mapping) countModes[mapping.countMode]++
-    }
-    return {
-        total: definitions.length,
-        mapped: definitions.length - unsupportedDefinitions.length,
-        exactMultiRules: exactCoverage.exactMultiRules,
-        exactMultiRulesByRole: exactCoverage.roles,
-        unsupported: unsupportedDefinitions.length,
-        activeUnsupported: unsupportedDefinitions.filter(definition =>
-            isMissionMasterDefinitionEnabledAt(definition, at)
-        ).length,
-        countModes,
-        unsupportedPatterns: unsupportedDefinitions.map(definition => definition.pattern),
-    }
 }

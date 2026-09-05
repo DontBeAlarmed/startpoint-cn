@@ -63,10 +63,6 @@ const SOURCE_RULES = [
         groups: ["quick:character"],
     },
     {
-        pattern: /^tools\/(?:active_mission_evaluator_equivalence\.test|helpers\/active-mission-legacy-evaluator)\.cjs$/,
-        groups: ["integration:mission"],
-    },
-    {
         pattern: /^tools\/helpers\/mission-degree-session-fixture\.cjs$/,
         groups: ["integration:mission"],
     },
@@ -562,7 +558,7 @@ const SOURCE_RULES = [
         groups: ["integration:rules"],
     },
     {
-        pattern: /^src\/lib\/mission\/(?:battle-facts|event-battle-facts|event-entry-facts|coverage-audit|computer-degree|degree-battle-facts|degree-candidates|degree-context-requirements|degree-operation-facts)\.ts$/,
+        pattern: /^src\/lib\/mission\/(?:battle-facts|event-battle-facts|event-coverage-report|event-entry-facts|coverage-audit|computer-degree|degree-battle-facts|degree-candidates|degree-context-requirements|degree-operation-facts)\.ts$/,
         groups: ["integration:mission"],
     },
     {

@@ -4,7 +4,7 @@ const assert = require("node:assert/strict")
 
 const {
     getEventMissionCoverageReport,
-} = require("../src/lib/mission/event-battle-facts")
+} = require("../src/lib/mission/event-coverage-report")
 const {
     buildEventSafeQuestProgress,
     EventSafeComputer,
