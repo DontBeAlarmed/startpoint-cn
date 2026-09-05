@@ -39,6 +39,7 @@
 | D24 | Mission Owner 收口（已实现） | [任务引擎架构](../systems/mission-engine-architecture.md) | snapshot-scoped Catalog、Session-only computer、来源事实 typed read port、receipt/RewardGrant 协调、Quest 计数回归所属 writer、DEBT-T03/T04 关闭 |
 | D25 | Battle Settlement 有限核（已实现） | [Battle Settlement Core Gate](./battle-settlement-core-gate.md) | immutable values/progress plans；Single/Multi 外层事务与 lifecycle/transport 保持独立；DEBT-T05/T08 收敛 |
 | D26 | Event Lifecycle 有限核（已完成） | [Event Lifecycle Core Gate](./event-lifecycle-core-gate.md) | typed descriptor/window/linkage、单 built-in hook、独立 Rush/Raid/Carnival/ScoreAttack handlers、Rush AutoRetry 与 official-only 边界 |
+| D27 | Content Runtime Index（设计通过，实施中） | [Content Runtime Index Gate](./content-runtime-index-gate.md) | 复用 immutable raw index、领域 typed adapters、identity/fail-closed/DEBT-T09 边界 |
 
 ## 阅读顺序
 
@@ -50,7 +51,7 @@
 
 D12、D13 与 D14 已完成服务端实现和自动化 Gate，等待客户端实机验收。三份 Gate 文档保留设计依据，同时作为相应已落地边界的架构与验证证据；它们不取代上述当前架构总览的阅读顺序。
 
-D15 已完成领域边界识别、决策和后续实施路线。D16、D17、D18、D18b 的服务端实现、Gate A broad closure、D18b scoped final review 和服务重启均已完成；D19–D22 与大 Gate B 已收口；D23 Character writer、D24 Mission owner、D25 Battle Settlement 与 D26 Event Lifecycle 有限核均已完成，大 Gate C 已收口；D27–D28 尚未实施。客户端实测统一延期到 D28 后。
+D15 已完成领域边界识别、决策和后续实施路线。D16、D17、D18、D18b 的服务端实现、Gate A broad closure、D18b scoped final review 和服务重启均已完成；D19–D22 与大 Gate B 已收口；D23 Character writer、D24 Mission owner、D25 Battle Settlement 与 D26 Event Lifecycle 有限核均已完成，大 Gate C 已收口；D27 设计已通过并正在实施，D28 尚未实施。客户端实测统一延期到 D28 后。
 
 ## 统一图例
 
@@ -66,7 +67,7 @@ D15 已完成领域边界识别、决策和后续实施路线。D16、D17、D18�
 - 本目录已收录的 D1-D11b 全部描述当前实现，图节标题统一带“当前”。
 - D12、D13 与 D14 描述已落地、待客户端实机验收的 Gate 架构；其中的实施状态和证据路径可以用于解释当前实现，仍需与功能支持矩阵区分自动验证和人工验收。
 - D15 描述经审查确认、但尚未实施的目标领域边界；其图和表不能替代 D1-D11b 的当前架构事实。
-- D16、D18、D18b、D19–D22 已实现资产与购买/抽卡/兑换 owners；D23 已收口 Character writer，D24 已收口 Mission owner，D25 已完成有限 Battle Settlement core，D26 Event Lifecycle 有限核与 Gate C closure 已完成。不得据此宣称体验兼容已经被官服后端证实；D27–D28 仍未实施。
+- D16、D18、D18b、D19–D22 已实现资产与购买/抽卡/兑换 owners；D23 已收口 Character writer，D24 已收口 Mission owner，D25 已完成有限 Battle Settlement core，D26 Event Lifecycle 有限核与 Gate C closure 已完成。不得据此宣称体验兼容已经被官服后端证实；D27 设计已通过并正在实施，D28 尚未实施。
 - 当前图不混入未来组件、迁移步骤或完成度信息；功能状态仍由 `docs/status/` 维护。
 - 目标架构必须使用独立图和独立证据，不得用虚线叠加到当前图。
 
