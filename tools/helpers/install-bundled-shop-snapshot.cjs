@@ -22,6 +22,10 @@ const tableNames = [
     "special_pack_shop.json",
     "mana_shop.json",
     "shop_cost_item_schedule.json",
+    "item_data.json",
+    "item_ids.json",
+    "item_lookup.json",
+    "item_sale.json",
 ]
 
 function installBundledShopSnapshot({ additionalTableNames = [] } = {}) {

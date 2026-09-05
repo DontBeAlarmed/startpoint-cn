@@ -1,0 +1,61 @@
+import { deepFreeze } from "../content/deep-freeze"
+import {
+    getContentSnapshot,
+    type ReadonlyContentRepository,
+} from "../content/runtime/content-snapshot"
+import type { EquipmentCraftEntry, EquipmentDissolveEntry } from "./types"
+
+export interface EquipmentLookupEntry {
+    readonly name: string
+    readonly rarity: string
+    readonly category: string
+}
+
+export interface EquipmentContentCatalog {
+    readonly craftByRarity: Readonly<Record<string, EquipmentCraftEntry>>
+    readonly dissolveById: Readonly<Record<string, EquipmentDissolveEntry>>
+    readonly ids: readonly number[]
+    readonly lookup: Readonly<Record<string, EquipmentLookupEntry>>
+}
+
+const catalogs = new WeakMap<ReadonlyContentRepository, EquipmentContentCatalog>()
+
+export function buildEquipmentContentCatalog(
+    repository: ReadonlyContentRepository,
+): EquipmentContentCatalog {
+    return deepFreeze({
+        craftByRarity: repository.table("equipment_craft.json"),
+        dissolveById: repository.table("equipment_dissolve.json"),
+        ids: repository.table("equipment_ids.json"),
+        lookup: repository.table("equipment_lookup.json"),
+    })
+}
+
+export function getEquipmentContentCatalog(
+    repository: ReadonlyContentRepository = getContentSnapshot().repository,
+): EquipmentContentCatalog {
+    const cached = catalogs.get(repository)
+    if (cached !== undefined) return cached
+    const catalog = buildEquipmentContentCatalog(repository)
+    catalogs.set(repository, catalog)
+    return catalog
+}
+
+export function getEquipmentDissolveSync(
+    id: number | string,
+): EquipmentDissolveEntry | null {
+    return getEquipmentContentCatalog().dissolveById[String(id)] ?? null
+}
+
+export function getEquipmentIdsSync(): readonly number[] {
+    return getEquipmentContentCatalog().ids
+}
+
+export function getEquipmentLookupSync(): Readonly<Record<string, EquipmentLookupEntry>> {
+    return getEquipmentContentCatalog().lookup
+}
+
+export function getEquipmentCraftSync(rarity: number): EquipmentCraftEntry | null {
+    const normalizedRarity = Math.max(1, Math.min(5, rarity))
+    return getEquipmentContentCatalog().craftByRarity[String(normalizedRarity)] ?? null
+}

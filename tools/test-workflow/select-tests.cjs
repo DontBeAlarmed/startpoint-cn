@@ -185,6 +185,10 @@ const SOURCE_RULES = [
         groups: ["quick:content"],
     },
     {
+        pattern: /^(?:src\/lib\/(?:item-content|equipment-content)\.ts|tools\/item_equipment_content\.test\.cjs)$/,
+        groups: ["admin", "integration:quest", "integration:rules", "quick:content"],
+    },
+    {
         pattern: /^src\/lib\/character-content\.ts$/,
         groups: ["quick:content", "admin", "integration:quest"],
     },

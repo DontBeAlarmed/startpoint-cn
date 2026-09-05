@@ -3,7 +3,8 @@ import { getAllAccountsSync, getAccountPlayersSync, getAccountSync } from "../..
 import { insertMailSync } from "../../data/domains/mail"
 import { getPlayerSync } from "../../data/domains/player"
 import { wantsJson } from "./http"
-import { getEquipmentIdsSync, getItemIdsSync } from "../../lib/assets"
+import { getEquipmentIdsSync } from "../../lib/equipment-content"
+import { getItemIdsSync } from "../../lib/item-content"
 import { isValidCharacterId } from "./validation"
 import {
     ADMIN_MAIL_MAX_INT,

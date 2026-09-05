@@ -123,7 +123,9 @@ test("gameplay readers use the active Content snapshot instead of static bundled
     t.after(restore)
 
     const carnival = require("../src/lib/carnival-rewards")
+    const equipmentContent = require("../src/lib/equipment-content")
     const equipmentMovie = require("../src/lib/gacha-equipment-movie")
+    const itemContent = require("../src/lib/item-content")
     const assets = require("../src/lib/assets")
     const raid = require("../src/lib/raid-event-master")
 
@@ -143,29 +145,29 @@ test("gameplay readers use the active Content snapshot instead of static bundled
     assert.deepEqual(assets.getExBoostItemSync(99001), { tier: 3, count: 2, element: 4 })
     assert.equal(assets.getExBoostItemSync(10001), null)
     assert.deepEqual(assets.getExStatusPoolSync(2), [992])
-    assert.deepEqual(assets.getEquipmentCraftSync(5), {
+    assert.deepEqual(equipmentContent.getEquipmentCraftSync(5), {
         dissolve_craft: 91,
         awakening_craft: 92,
         dissolve_star: 93,
     })
-    assert.deepEqual(assets.getEquipmentDissolveSync(9950001), {
+    assert.deepEqual(equipmentContent.getEquipmentDissolveSync(9950001), {
         ability_soul_id: 9950002,
         obtain_source: 0,
         generate_ability_soul: true,
         max_level: 5,
     })
-    assert.deepEqual(assets.getItemEffectSync(990100), { effectKind: 3, effectValue: 75 })
-    assert.deepEqual(assets.getItemSaleSync(990100), {
+    assert.deepEqual(itemContent.getItemEffectSync(990100), { effectKind: 3, effectValue: 75 })
+    assert.deepEqual(itemContent.getItemSaleSync(990100), {
         category: 9,
         sale_price: 77,
         sellable: true,
     })
-    assert.deepEqual(assets.getEquipmentIdsSync(), [9950001])
-    assert.deepEqual(assets.getEquipmentLookupSync(), {
+    assert.deepEqual(equipmentContent.getEquipmentIdsSync(), [9950001])
+    assert.deepEqual(equipmentContent.getEquipmentLookupSync(), {
         "9950001": { name: "快照装备", rarity: "5", category: "未分类" },
     })
-    assert.deepEqual(assets.getItemIdsSync(), [990100])
-    assert.deepEqual(assets.getItemLookupSync(), { "990100": "快照体力药" })
+    assert.deepEqual(itemContent.getItemIdsSync(), [990100])
+    assert.deepEqual(itemContent.getItemLookupSync(), { "990100": "快照体力药" })
     assert.deepEqual(assets.getCharacterManaNodesSync(99101, 1), {
         "9910101": {
             items: { "1": 3 },

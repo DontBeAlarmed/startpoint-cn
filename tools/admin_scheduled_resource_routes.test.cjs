@@ -5,12 +5,19 @@ const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
+
+require("ts-node/register/transpile-only")
+
+const {
+    installBundledGameplaySnapshot,
+} = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+
+const restoreContentSnapshot = installBundledGameplaySnapshot()
+test.after(restoreContentSnapshot)
 const Fastify = require("fastify")
 
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "admin-scheduled-resource-"))
 process.env.DATA_DIR = databaseDirectory
-
-require("ts-node/register/transpile-only")
 
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")

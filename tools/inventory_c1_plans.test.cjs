@@ -20,6 +20,9 @@ const {
     installBundledGameplaySnapshot,
 } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 
+const restoreDefaultSnapshot = installBundledGameplaySnapshot()
+test.after(restoreDefaultSnapshot)
+
 const CN_CONTENT_MAX_EPOCH_MS = Date.UTC(9999, 11, 31, 23, 59, 59)
     - 8 * 60 * 60 * 1000
 
@@ -53,7 +56,7 @@ function assertDeepFrozen(value, seen = new Set()) {
     for (const key of Reflect.ownKeys(value)) assertDeepFrozen(value[key], seen)
 }
 
-test("typed Item policy uses the deeply frozen bundled fallback before runtime initialization", () => {
+test("typed Item policy uses the deeply frozen initialized runtime snapshot", () => {
     const loaded = getItemInventoryPolicyCatalog()
     assert.ok(Object.keys(loaded.byItemId).length > 1_000)
     assert.ok(loaded.eventTradeItemIds.length > 0)

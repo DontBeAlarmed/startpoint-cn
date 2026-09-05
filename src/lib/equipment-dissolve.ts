@@ -1,4 +1,4 @@
-import { getEquipmentDissolveSync, getEquipmentCraftSync } from "./assets";
+import { getEquipmentDissolveSync, getEquipmentCraftSync } from "./equipment-content";
 
 export interface DissolveRewards {
     craftPoints: number;

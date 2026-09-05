@@ -1,4 +1,4 @@
-import { getEquipmentDissolveSync } from "../assets"
+import { getEquipmentDissolveSync } from "../equipment-content"
 import { getPlayerEquipmentListSync, updatePlayerEquipmentSync } from "../../data/domains/equipment"
 import { SaveValidator } from "./types"
 

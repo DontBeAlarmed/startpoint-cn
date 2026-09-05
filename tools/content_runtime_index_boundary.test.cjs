@@ -9,7 +9,9 @@ const projectRoot = path.resolve(__dirname, "..")
 const sourceRoot = path.join(projectRoot, "src")
 
 // D27 C2-C5 may add only reviewed raw-to-typed adapter builders here.
-const strictAccessorImporters = new Set([])
+const strictAccessorImporters = new Set([
+    "src/lib/inventory/item-inventory-policy.ts",
+])
 
 function sourceFiles(directory) {
     return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {

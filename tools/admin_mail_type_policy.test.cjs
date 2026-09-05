@@ -9,6 +9,12 @@ const test = require("node:test")
 
 require("ts-node/register/transpile-only")
 
+const {
+    installBundledGameplaySnapshot,
+} = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+const restoreContentSnapshot = installBundledGameplaySnapshot()
+test.after(restoreContentSnapshot)
+
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "admin-mail-type-policy-"))
 const previousDataDirectory = process.env.DATA_DIR
 process.env.DATA_DIR = databaseDirectory

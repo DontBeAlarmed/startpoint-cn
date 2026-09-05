@@ -1,6 +1,6 @@
 import { getPlayerSync, updatePlayerSync } from "../data/domains/player"
 import { getDb } from "../data/db"
-import { getItemEffectSync, ItemEffectEntry } from "./assets"
+import { getItemEffectSync, type ItemEffectEntry } from "./item-content"
 import {
     type InventoryItemResult,
     withInventoryBatchContextWithinTransactionSync,

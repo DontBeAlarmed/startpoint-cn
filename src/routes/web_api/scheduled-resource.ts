@@ -13,7 +13,7 @@ import {
     type ScheduledResourceRuleInput,
 } from "../../data/domains/scheduled-resource"
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
-import { getItemLookupSync } from "../../lib/assets"
+import { getItemLookupSync } from "../../lib/item-content"
 import type { ConfigValues } from "../../lib/types/config"
 import { validateScheduledResourceRuleInput } from "../../lib/scheduled-resource-rules"
 

@@ -1,6 +1,5 @@
-import bundledItemInventoryPolicy from "../../../assets/item_inventory_policy.json"
 import { deepFreeze } from "../../content/deep-freeze"
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
+import { getStrictRuntimeContentTableSync } from "../../content/runtime/table-access"
 
 export type ItemEffectKindCode =
     | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
@@ -165,10 +164,7 @@ export function parseItemInventoryPolicyCatalog(raw: unknown): ItemInventoryPoli
 }
 
 export function getItemInventoryPolicyCatalog(): ItemInventoryPolicyCatalog {
-    const raw = getRuntimeContentTableSync<unknown>(
-        "item_inventory_policy.json",
-        bundledItemInventoryPolicy,
-    )
+    const raw = getStrictRuntimeContentTableSync<unknown>("item_inventory_policy.json")
     return parseItemInventoryPolicyCatalog(raw)
 }
 

@@ -9,15 +9,7 @@ import manaNodes from "../../assets/mana_node.json";
 import manaNodeAwake from "../../assets/mana_node_awake.json";
 import manaBoard from "../../assets/mana_board.json";
 import configData from "../../assets/config.json"
-import equipmentDissolveData from "../../assets/equipment_dissolve.json"
-import equipmentIdsData from "../../assets/equipment_ids.json"
-import equipmentLookupData from "../../assets/equipment_lookup.json"
-import itemSaleData from "../../assets/item_sale.json"
-import itemData from "../../assets/item_data.json"
-import itemIdsData from "../../assets/item_ids.json"
-import itemLookupData from "../../assets/item_lookup.json"
-import equipmentCraftData from "../../assets/equipment_craft.json"
-import { AssetCharacter, BattleQuest, BoxGacha, ClearRewards, ConfigValues, EquipmentCraftEntry, EquipmentDissolveEntry, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, Gacha, ItemSaleEntry, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawBoxGachas, RawBoxRewards, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, ShopSelectItemCampaigns, StoryQuest } from "./types";
+import { AssetCharacter, BattleQuest, BoxGacha, ClearRewards, ConfigValues, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, Gacha, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawBoxGachas, RawBoxRewards, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, ShopSelectItemCampaigns, StoryQuest } from "./types";
 import { getLegacyGachas } from "./gacha-legacy-content";
 import { getRushCompatibilityEvent } from "./shop/rush-compatibility"
 import { RawBoxGachaSettings } from "./types/box-gacha";
@@ -828,105 +820,20 @@ export function getStaminaRecoverySeconds(): number {
     return v
 }
 
-// ─── Equipment dissolve data ────────────────────────────────────────────
-
-/**
- * Gets equipment dissolve properties from CDN data.
- * Returns null if equipment not found in the dataset.
- */
-export function getEquipmentDissolveSync(id: number | string): EquipmentDissolveEntry | null {
-    const table = getRuntimeContentTableSync(
-        "equipment_dissolve.json",
-        equipmentDissolveData as Record<string, EquipmentDissolveEntry>,
-    )
-    const entry = table[String(id)]
-    return entry ?? null
-}
-
-export function getEquipmentIdsSync(): readonly number[] {
-    return getRuntimeContentTableSync(
-        "equipment_ids.json",
-        equipmentIdsData as number[],
-    )
-}
-
-export interface EquipmentLookupEntry {
-    readonly name: string
-    readonly rarity: string
-    readonly category: string
-}
-
-export function getEquipmentLookupSync(): Readonly<Record<string, EquipmentLookupEntry>> {
-    return getRuntimeContentTableSync(
-        "equipment_lookup.json",
-        equipmentLookupData as Record<string, EquipmentLookupEntry>,
-    )
-}
-
-export interface StaminaItemEffectEntry {
-    readonly effectKind: 2 | 3
-    readonly effectValue: number
-}
-
-export interface CultivatePackEffectEntry {
-    readonly effectKind: 22
-    readonly effectValue: 0
-    readonly selectRewards: readonly {
-        readonly itemId: number
-        readonly amount: number
-    }[]
-}
-
-export type ItemEffectEntry = StaminaItemEffectEntry | CultivatePackEffectEntry
-
-export function getItemEffectSync(id: number | string): ItemEffectEntry | null {
-    const table = getRuntimeContentTableSync(
-        "item_data.json",
-        itemData as Record<string, ItemEffectEntry>,
-    )
-    return table[String(id)] ?? null
-}
-
-export function getItemIdsSync(): readonly number[] {
-    return getRuntimeContentTableSync(
-        "item_ids.json",
-        itemIdsData as number[],
-    )
-}
-
-export function getItemLookupSync(): Readonly<Record<string, string>> {
-    return getRuntimeContentTableSync(
-        "item_lookup.json",
-        itemLookupData as Record<string, string>,
-    )
-}
-
-// ─── Item sale data ──────────────────────────────────────────────────────
-
-/**
- * Gets item sale properties (price, sellable, category) from CDN data.
- * Returns null if item not found in the dataset.
- */
-export function getItemSaleSync(id: number | string): ItemSaleEntry | null {
-    const table = getRuntimeContentTableSync(
-        "item_sale.json",
-        itemSaleData as Record<string, ItemSaleEntry>,
-    )
-    const entry = table[String(id)]
-    return entry ?? null
-}
-
-// ─── Equipment craft / dissolve cost data ────────────────────────────────
-
-/**
- * Gets equipment craft-point costs and dissolve rates by rarity (1-5).
- * Returns null if rarity is invalid.
- */
-export function getEquipmentCraftSync(rarity: number): EquipmentCraftEntry | null {
-    const table = getRuntimeContentTableSync(
-        "equipment_craft.json",
-        equipmentCraftData as Record<string, EquipmentCraftEntry>,
-    )
-    const entry = table[String(Math.max(1, Math.min(5, rarity)))]
-    return entry ?? null
-}
+// D27 migration re-exports. Production consumers move to the domain modules.
+export {
+    getEquipmentCraftSync,
+    getEquipmentDissolveSync,
+    getEquipmentIdsSync,
+    getEquipmentLookupSync,
+    type EquipmentLookupEntry,
+} from "./equipment-content"
+export {
+    getItemEffectSync,
+    getItemIdsSync,
+    getItemLookupSync,
+    getItemSaleSync,
+    type CultivatePackEffectEntry,
+    type ItemEffectEntry,
+    type StaminaItemEffectEntry,
+} from "./item-content"

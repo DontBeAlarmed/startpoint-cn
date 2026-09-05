@@ -77,7 +77,10 @@ test("shop runtime facades read all twelve product tables from one initialized s
         "mana_shop.json": Object.freeze({ "109": item }),
         "shop_cost_item_schedule.json": Object.freeze({}),
         "cdn_general_shop_whitelist.json": Object.freeze([101]),
+        "item_data.json": Object.freeze({}),
+        "item_ids.json": Object.freeze([70001]),
         "item_lookup.json": Object.freeze({ "70001": "活动代币" }),
+        "item_sale.json": Object.freeze({}),
     })
     const repository = Object.freeze({
         info: () => Object.freeze({

@@ -23,6 +23,18 @@ test("maps the D27 runtime index seam and fixtures to quick content", () => {
     ))
 })
 
+test("maps D27 Item and Equipment typed content to affected focused groups", () => {
+    const expected = ["admin", "integration:quest", "integration:rules", "quick:content"]
+    for (const file of [
+        "src/lib/item-content.ts",
+        "src/lib/equipment-content.ts",
+    ]) assert.deepEqual(selectTestGroups([file]), expected, file)
+    assert.deepEqual(
+        selectTestGroups(["tools/item_equipment_content.test.cjs"]),
+        ["quick:content"],
+    )
+})
+
 test("maps representative source files to focused groups", () => {
     assert.deepEqual(
         selectTestGroups(["src/data/domains/gacha-state.ts"]),

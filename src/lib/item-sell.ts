@@ -1,4 +1,4 @@
-import { getItemSaleSync } from "./assets";
+import { getItemSaleSync } from "./item-content";
 import { countAbilitySoulUsedInPartiesSync } from "../data/domains/party"
 import { getPlayerSync, updatePlayerSync } from "../data/domains/player"
 import { getConfigSync } from "./assets";

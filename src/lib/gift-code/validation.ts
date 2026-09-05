@@ -1,7 +1,8 @@
 import bundledCharacterData from "../../../assets/character.json"
 import bundledItemMaxCounts from "../../../assets/item_max_count.json"
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
-import { getEquipmentIdsSync, getItemIdsSync } from "../assets"
+import { getEquipmentIdsSync } from "../equipment-content"
+import { getItemIdsSync } from "../item-content"
 import { RewardType } from "../types/rewards"
 import type { GiftDraft, GiftProtocolType, GiftReward } from "./types"
 

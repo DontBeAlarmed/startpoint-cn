@@ -1,6 +1,6 @@
 import { getContentSnapshot } from "../content/runtime/content-snapshot"
 import { getServerDate } from "../utils"
-import { getItemLookupSync } from "./assets"
+import { getItemLookupSync } from "./item-content"
 import type { EventShopItems } from "./types"
 
 interface GenerationWindow {

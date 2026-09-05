@@ -1,7 +1,8 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import bundledQuestLookup from "../../../assets/quest_lookup.json";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
-import { getEquipmentLookupSync, getItemLookupSync } from "../../lib/assets";
+import { getEquipmentLookupSync } from "../../lib/equipment-content";
+import { getItemLookupSync } from "../../lib/item-content";
 import { getCharacterLookup } from "../../lib/character-content";
 import bundledItemMaxCounts from "../../../assets/item_max_count.json";
 
