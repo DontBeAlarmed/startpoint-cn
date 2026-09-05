@@ -130,7 +130,7 @@ export default function GiftEditor({ gift, open, onClose, onSaved }: GiftEditorP
             okButtonProps={{ disabled: isActive }}
             onCancel={onClose}
             onOk={() => form.submit()}
-            width={880}
+            width="min(92vw, 880px)"
             destroyOnClose
         >
             <Form form={form} layout="vertical" disabled={isActive} onFinish={values => save.mutate(values)}>

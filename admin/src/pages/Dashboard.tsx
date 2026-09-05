@@ -222,7 +222,7 @@ export default function Dashboard() {
                 </div>
 
                 <Row gutter={[16, 16]}>
-                    <Col span={12}>
+                    <Col xs={24} md={12}>
                         <Card title="服务端状态" style={{ height: "100%" }}>
                             {statusLoading && !status ? (
                                 <Alert type="info" showIcon message="正在加载服务端状态" />
@@ -250,7 +250,7 @@ export default function Dashboard() {
                             )}
                         </Card>
                     </Col>
-                    <Col span={12}>
+                    <Col xs={24} md={12}>
                         <Card title="多人联机状态" style={{ height: "100%" }}>
                             {statusLoading && !status ? (
                                 <Alert type="info" showIcon message="正在加载多人联机状态" />
@@ -449,7 +449,7 @@ export default function Dashboard() {
                 </Row>
 
                 <Row gutter={[16, 16]}>
-                    <Col span={12}>
+                    <Col xs={24} md={12}>
                         <Card title="账号 / 存档概况" style={{ height: "100%" }}>
                             <div className="admin-dash-section-body">
                                 {accountsError ? (
@@ -473,7 +473,7 @@ export default function Dashboard() {
                             </div>
                         </Card>
                     </Col>
-                    <Col span={12}>
+                    <Col xs={24} md={12}>
                         <Card title="默认存档" style={{ height: "100%" }}>
                             <div className="admin-dash-section-body">
                                 <Typography.Text type="secondary">

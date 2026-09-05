@@ -295,6 +295,7 @@ export default function Accounts() {
                         dataSource={savePlayers}
                         pagination={false}
                         size="small"
+                        scroll={{ x: 690 }}
                         locale={{ emptyText: "暂无存档" }}
                         onRow={row => ({
                             className: "admin-clickable-table-row",
@@ -311,6 +312,7 @@ export default function Accounts() {
                         loading={isLoading}
                         pagination={false}
                         size="small"
+                        scroll={{ x: 804 }}
                     />
                 </Card>
             )}

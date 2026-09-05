@@ -391,14 +391,14 @@ export default function Mail() {
                     locale={{ emptyText: "暂无记录" }}
                     scroll={{ x: "max-content" }}
                     columns={[
-                        { title: "时间", dataIndex: "time", width: 160 },
+                        { title: "时间", dataIndex: "time", width: 160, responsive: ["sm"] as any },
                         { title: "对象", dataIndex: "target" },
                         {
                             title: "附件", key: "attach",
                             render: (_: unknown, r) => `${TYPE_LABEL[r.type] ?? r.type}${r.typeId ? ` #${r.typeId}` : ""} × ${r.number}`,
                         },
-                        { title: "发送数", dataIndex: "sent", width: 80, render: (n: number) => <span className="admin-badge-info">{n}</span> },
-                        { title: "有效期", dataIndex: "expirationDays", width: 90, render: (n: number) => String(n ?? 31) + " 天" },
+                        { title: "发送数", dataIndex: "sent", width: 80, responsive: ["sm"] as any, render: (n: number) => <span className="admin-badge-info">{n}</span> },
+                        { title: "有效期", dataIndex: "expirationDays", width: 90, responsive: ["sm"] as any, render: (n: number) => String(n ?? 31) + " 天" },
                     ]}
                 />
             </Card>
@@ -407,6 +407,7 @@ export default function Mail() {
             <Modal
                 open={!!confirm}
                 title="确认群发"
+                width="min(92vw, 560px)"
                 onOk={() => confirm && send.mutate(confirm.values)}
                 onCancel={() => setConfirm(null)}
                 okText="确认发送"

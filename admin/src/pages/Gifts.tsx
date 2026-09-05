@@ -134,6 +134,7 @@ export default function Gifts() {
                                 title: "状态",
                                 dataIndex: "status",
                                 width: 90,
+                                responsive: ["sm"] as any,
                                 render: (_, row) => (
                                     <span className={row.status === "active" ? "admin-badge-ok" : "admin-badge-warn"}>
                                         {row.status === "active" ? "启用" : "停止"}
@@ -144,17 +145,19 @@ export default function Gifts() {
                                 title: "奖励",
                                 dataIndex: "rewards",
                                 width: 280,
+                                responsive: ["sm"] as any,
                                 render: (_, row) => (
                                     <span className="gift-reward-summary">{rewardSummary(row)}</span>
                                 ),
                             },
-                            { title: "奖励版本", dataIndex: "rewardRevision", width: 100 },
-                            { title: "版本", dataIndex: "revision", width: 80 },
-                            { title: "已领取", dataIndex: "redemptionCount", width: 90 },
+                            { title: "奖励版本", dataIndex: "rewardRevision", width: 100, responsive: ["sm"] as any },
+                            { title: "版本", dataIndex: "revision", width: 80, responsive: ["sm"] as any },
+                            { title: "已领取", dataIndex: "redemptionCount", width: 90, responsive: ["sm"] as any },
                             {
                                 title: "更新时间",
                                 dataIndex: "updatedAt",
                                 width: 190,
+                                responsive: ["sm"] as any,
                                 render: value => new Date(value).toLocaleString("zh-CN"),
                             },
                             {

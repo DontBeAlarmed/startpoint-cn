@@ -59,15 +59,16 @@ export default function GiftRedemptions({ gift, onClose }: GiftRedemptionsProps)
                     }}
                     columns={[
                         { title: "Player ID", dataIndex: "playerId", width: 110 },
-                        { title: "Account ID", dataIndex: "accountId", width: 120 },
+                        { title: "Account ID", dataIndex: "accountId", width: 120, responsive: ["sm"] as any },
                         { title: "玩家名", dataIndex: "playerName", width: 180 },
                         {
                             title: "领取时间",
                             dataIndex: "redeemedAt",
                             width: 190,
+                            responsive: ["sm"] as any,
                             render: value => new Date(value).toLocaleString("zh-CN"),
                         },
-                        { title: "奖励版本", dataIndex: "rewardRevision", width: 100 },
+                        { title: "奖励版本", dataIndex: "rewardRevision", width: 100, responsive: ["sm"] as any },
                         {
                             title: "奖励快照",
                             dataIndex: "rewardSnapshot",
@@ -81,12 +82,14 @@ export default function GiftRedemptions({ gift, onClose }: GiftRedemptionsProps)
                             title: "继承",
                             dataIndex: "inherited",
                             width: 90,
+                            responsive: ["sm"] as any,
                             render: (value: boolean) => (value ? "是" : "否"),
                         },
                         {
                             title: "来源 Player",
                             dataIndex: "sourcePlayerId",
                             width: 130,
+                            responsive: ["sm"] as any,
                             render: (value: number | null) => (value === null ? "-" : `#${value}`),
                         },
                     ]}

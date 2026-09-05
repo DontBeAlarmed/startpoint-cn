@@ -533,6 +533,7 @@ export default function TimeControl() {
                                                 </Space>
                                             ),
                                             width: 360,
+                                            responsive: ["sm"] as any,
                                         },
                                         { title: "UP 角色", render: (_: unknown, row) => renderRateUpCharacters(row.rateUpCharacters) },
                                     ]}

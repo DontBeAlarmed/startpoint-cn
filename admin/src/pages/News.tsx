@@ -128,6 +128,7 @@ export default function News() {
                                 title: "分类",
                                 dataIndex: "category",
                                 width: 100,
+                                responsive: ["sm"] as any,
                                 render: (category: AdminNewsRow["category"]) => (
                                     <Tag>{CATEGORY_LABELS[category]}</Tag>
                                 ),
@@ -136,10 +137,11 @@ export default function News() {
                                 title: "发布时间",
                                 dataIndex: "publishedAtReal",
                                 width: 190,
+                                responsive: ["sm"] as any,
                                 render: value => new Date(value).toLocaleString("zh-CN"),
                             },
-                            { title: "标签", dataIndex: "label", width: 80, align: "right" },
-                            { title: "缩略图", dataIndex: "thumbnail", width: 90, align: "right" },
+                            { title: "标签", dataIndex: "label", width: 80, align: "right", responsive: ["sm"] as any },
+                            { title: "缩略图", dataIndex: "thumbnail", width: 90, align: "right", responsive: ["sm"] as any },
                             {
                                 title: "状态",
                                 width: 110,

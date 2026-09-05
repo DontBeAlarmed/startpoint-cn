@@ -90,7 +90,7 @@ export default function NewsEditor({ news, open, onClose, onSaved }: NewsEditorP
                 }
                 save.mutate()
             }}
-            width={860}
+            width="min(92vw, 860px)"
             destroyOnClose
         >
             <Form layout="vertical" preserve={false}>

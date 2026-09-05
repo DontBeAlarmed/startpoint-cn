@@ -714,6 +714,10 @@ body {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .multi-compatibility-value {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
   .admin-toolbar {
     align-items: stretch;
   }
