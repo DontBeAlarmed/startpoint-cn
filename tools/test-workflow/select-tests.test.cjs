@@ -807,6 +807,13 @@ test("maps the shared battle settlement value plan to both adapters", () => {
     ]) assert.deepEqual(selectTestGroups([file]), ["integration:quest"], file)
 })
 
+test("maps the finite Event descriptor to the Event focused group", () => {
+    for (const file of [
+        "src/lib/quest/finish/event-settlement-descriptor.ts",
+        "tools/event_settlement_descriptor.test.cjs",
+    ]) assert.deepEqual(selectTestGroups([file]), ["integration:event"], file)
+})
+
 test("maps single continue lifecycle implementation and regression precisely", () => {
     assert.deepEqual(
         selectTestGroups(["src/lib/quest/single-continue-lifecycle.ts"]),
@@ -1845,6 +1852,7 @@ test("splits isolated integration tests into focused domains", () => {
     assert.deepEqual(TEST_GROUPS["integration:event"].tests, [
         "tools/box_gacha_exec_transaction.test.cjs",
         "tools/carnival_rewards.test.cjs",
+        "tools/event_settlement_descriptor.test.cjs",
         "tools/event_route_reachability.test.cjs",
         "tools/how_to_get_route.test.cjs",
         "tools/practice_battle_history.test.cjs",

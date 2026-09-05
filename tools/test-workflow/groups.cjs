@@ -413,6 +413,7 @@ const TEST_GROUPS = Object.freeze({
         tests: [
             "tools/box_gacha_exec_transaction.test.cjs",
             "tools/carnival_rewards.test.cjs",
+            "tools/event_settlement_descriptor.test.cjs",
             "tools/event_route_reachability.test.cjs",
             "tools/how_to_get_route.test.cjs",
             "tools/practice_battle_history.test.cjs",

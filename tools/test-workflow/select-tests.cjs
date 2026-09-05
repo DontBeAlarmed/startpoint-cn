@@ -286,6 +286,10 @@ const SOURCE_RULES = [
         groups: ["integration:mission", "integration:party", "quick:quest"],
     },
     {
+        pattern: /^(?:src\/lib\/quest\/finish\/event-settlement-descriptor\.ts|tools\/event_settlement_descriptor\.test\.cjs)$/,
+        groups: ["integration:event"],
+    },
+    {
         pattern: /^src\/lib\/quest\/finish\/single-response-projector\.ts$/,
         groups: [
             "integration:compiled",
