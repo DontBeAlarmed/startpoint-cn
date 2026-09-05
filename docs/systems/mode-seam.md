@@ -108,7 +108,7 @@ Mod 扩展它,`host.table` 也读不到未注册的表。模块的开关与配�
 | 挂点 | 时机 | 能力 |
 |---|---|---|
 | `dispatchModeQuestStart` | `/single_battle_quest/start` 校验完关卡存在性后 | 抛错可拒绝进本，错误信息回传客户端 |
-| `dispatchModeRushFinish` | `handleRushEventFinish` 之后 | 收到与基座同一份依赖注入参数对象，因此复用同一批领域原语；返回的奖励条目追加进 `rush_battle_reward_list` |
+| `dispatchModeRushFinish` | `single-event-settlement` 的 built-in Rush hook 之后 | 收到与基座同一份原始 questData/依赖注入参数对象，因此复用同一批领域原语；返回的奖励条目追加进 `rush_battle_reward_list`；它不改变 built-in descriptor |
 | `dispatchModeRushParties` | 已用队伍序列化返回前 | 可原地改写记录。客户端的角色锁完全由这些列表推导，模块可据此释放锁而保持条目数（客户端 `getRushBattleRound()` = 列表长度 + 1） |
 
 ## 激活语义（建议）

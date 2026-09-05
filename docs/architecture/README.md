@@ -38,6 +38,7 @@
 | D23 | Character Growth Writer Convergence（已实现，实机统一延期） | [角色成长状态 Gate](./character-growth-state-gate.md) | 信赖之证资格按客户端规则统一派生（板1=非突破上限+全节点、板2=全节点）、节点/EXP/注入 writer 同事务收敛、metadata/EX Boost/repair/admin 经 aggregate command 或声明 adapter、DEBT-T01/T02 关闭 |
 | D24 | Mission Owner 收口（已实现） | [任务引擎架构](../systems/mission-engine-architecture.md) | snapshot-scoped Catalog、Session-only computer、来源事实 typed read port、receipt/RewardGrant 协调、Quest 计数回归所属 writer、DEBT-T03/T04 关闭 |
 | D25 | Battle Settlement 有限核（已实现） | [Battle Settlement Core Gate](./battle-settlement-core-gate.md) | immutable values/progress plans；Single/Multi 外层事务与 lifecycle/transport 保持独立；DEBT-T05/T08 收敛 |
+| D26 | Event Lifecycle 有限核（已实现，等待 Gate C closure） | [Event Lifecycle Core Gate](./event-lifecycle-core-gate.md) | typed descriptor/window/linkage、单 built-in hook、独立 Rush/Raid/Carnival/ScoreAttack handlers 与 official-only 边界 |
 
 ## 阅读顺序
 
