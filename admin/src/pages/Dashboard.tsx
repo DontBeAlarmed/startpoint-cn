@@ -164,7 +164,7 @@ export default function Dashboard() {
     const qc = useQueryClient()
     const navigate = useNavigate()
 
-    const { data: accounts = [], isLoading: accountsLoading, isError: accountsError, isFetching: accountsFetching } = useQuery({
+    const { data: accounts = [], isError: accountsError, isFetching: accountsFetching } = useQuery({
         queryKey: ["accounts"],
         queryFn: () => apiGet<AccountRow[]>("/api/server/accounts"),
     })
@@ -221,6 +221,39 @@ export default function Dashboard() {
                     <Typography.Text type="secondary">此管理后台随服务端一同构建，用于统一查看运行状态并执行日常管理操作。</Typography.Text>
                 </div>
 
+                {(status || !accountsError) && (
+                    <div className="admin-stat-band">
+                        {status && (
+                            <>
+                                <div className="admin-stat-band-item">
+                                    <span className="admin-stat-band-label">运行时间</span>
+                                    <span className="admin-stat-band-value">{formatDuration(status.server.uptimeSeconds)}</span>
+                                </div>
+                                <div className="admin-stat-band-item">
+                                    <span className="admin-stat-band-label">RSS 内存</span>
+                                    <span className="admin-stat-band-value">{formatBytes(status.server.memory.rss)}</span>
+                                </div>
+                                <div className="admin-stat-band-item">
+                                    <span className="admin-stat-band-label">活跃房间</span>
+                                    <span className="admin-stat-band-value">{status.multiplayer.activeRooms ?? "未知"}</span>
+                                </div>
+                            </>
+                        )}
+                        {!accountsError && (
+                            <>
+                                <div className="admin-stat-band-item">
+                                    <span className="admin-stat-band-label">账号总数</span>
+                                    <span className="admin-stat-band-value">{accountCount}</span>
+                                </div>
+                                <div className="admin-stat-band-item">
+                                    <span className="admin-stat-band-label">存档总数</span>
+                                    <span className="admin-stat-band-value">{saveCount}</span>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
+
                 <Row gutter={[16, 16]}>
                     <Col xs={24} md={12}>
                         <Card title="服务端状态" style={{ height: "100%" }}>
@@ -231,19 +264,12 @@ export default function Dashboard() {
                             ) : (
                                 <div className="admin-dash-sections">
                                     <div className="admin-dash-section">
-                                        <div className="admin-dash-section-title">运行指标</div>
-                                        <div className="admin-metric-row">
-                                            <Statistic className="admin-stat-tick" title="运行时间" value={formatDuration(status.server.uptimeSeconds)} />
-                                            <Statistic className="admin-stat-tick" title="RSS 内存" value={formatBytes(status.server.memory.rss)} />
-                                            <Statistic className="admin-stat-tick" title="PID" value={status.server.pid} />
-                                        </div>
-                                    </div>
-                                    <div className="admin-dash-section">
                                         <div className="admin-dash-section-title">运行环境</div>
                                         <div className="admin-dash-kv">
                                             <DashKvItem label="Node">{status.server.nodeVersion}</DashKvItem>
                                             <DashKvItem label="平台">{status.server.platform}</DashKvItem>
                                             <DashKvItem label="监听">{status.server.listenHost}:{status.server.listenPort}</DashKvItem>
+                                            <DashKvItem label="PID">{status.server.pid}</DashKvItem>
                                         </div>
                                     </div>
                                 </div>
@@ -271,7 +297,6 @@ export default function Dashboard() {
                                                 </span>
                                             </Space>
                                             <div className="admin-metric-row">
-                                                <Statistic className="admin-stat-tick" title="活跃房间" value={status.multiplayer.activeRooms ?? "未知"} />
                                                 <Statistic className="admin-stat-tick" title="进行中事实" value={status.multiplayer.battleFacts?.active ?? "未知"} />
                                                 <Statistic className="admin-stat-tick" title="已结束事实" value={status.multiplayer.battleFacts?.finalized ?? "未知"} />
                                             </div>
@@ -459,12 +484,7 @@ export default function Dashboard() {
                                         message="概览数据加载失败"
                                         description="接口 /api/server/accounts 不可用。"
                                     />
-                                ) : (
-                                    <div className="admin-metric-row">
-                                        <Statistic className="admin-stat-tick" title="账号总数" value={accountCount} loading={accountsLoading} />
-                                        <Statistic className="admin-stat-tick" title="存档总数" value={saveCount} loading={accountsLoading} />
-                                    </div>
-                                )}
+                                ) : null}
                                 <Space wrap>
                                     <Button icon={<TeamOutlined />} onClick={() => navigate("/accounts")}>账号 / 存档</Button>
                                     <Button icon={<MailOutlined />} onClick={() => navigate("/mail")}>邮件</Button>

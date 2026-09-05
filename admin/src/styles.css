@@ -839,6 +839,38 @@ html[data-theme="dark"] {
 .admin-badge-info { color: var(--water); border: 1.5px solid var(--water); background: var(--info-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; }
 .admin-badge-warn { color: var(--thunder); border: 1.5px solid var(--thunder); background: var(--warn-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; }
 
+/* dashboard: flat stat band under the page note — five key numbers live on one
+   whitespace-separated strip, no boxes (same flat language as .admin-page-note) */
+.admin-stat-band {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 40px;
+  align-items: baseline;
+}
+
+.admin-stat-band-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  min-width: 0;
+}
+
+.admin-stat-band-label {
+  flex: 0 0 auto;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-stat-band-value {
+  color: var(--ink);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+
 /* dashboard: every card interior reads as the same flat 「标题行 + 内容区」 section pattern —
    the card border is the only strong separator, sections rely on whitespace alone */
 .admin-dash-sections {
