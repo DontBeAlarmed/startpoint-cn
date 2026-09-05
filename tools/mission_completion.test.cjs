@@ -49,6 +49,14 @@ require("../src/data").initializeDatabase()
 db = require("../src/data/db").getDb()
 
 assert.equal(getComputer(10).name, "Regular")
+for (const category of [0, 11, Number.NaN]) {
+    assert.throws(
+        () => getComputer(category),
+        error => error instanceof TypeError
+            && /No mission computer registered/.test(error.message),
+        `unsupported category ${String(category)} must fail closed`,
+    )
+}
 assert.deepEqual(getCompletedStageNumbers(1, 1, 0), [])
 assert.deepEqual(getCompletedStageNumbers(1, 1, 10), [1])
 assert.equal(typeof isMissionProgressComplete, "function")

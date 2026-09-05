@@ -1557,6 +1557,20 @@ test("registers mission catalog and fact store regressions in the mission leaf g
     assert.deepEqual(selectTestGroups(["tools/mission_fact_key.test.cjs"]), ["integration:mission"])
     assert.ok(TEST_GROUPS["integration:mission"].tests.includes("tools/mission_fact_key.test.cjs"))
     for (const file of [
+        "src/lib/mission/registry.ts",
+        "src/lib/mission/rewards.ts",
+        "src/lib/mission/computer-awake.ts",
+        "src/lib/mission/computer-event-safe.ts",
+        "src/lib/mission/client-progress.ts",
+        "src/lib/mission/daily-battle-facts.ts",
+        "src/lib/mission/pass-battle-facts.ts",
+        "src/lib/mission/event-single-clear-rules.ts",
+        "src/lib/mission/login-fact-settlement.ts",
+        "src/lib/mission/story-fact-settlement.ts",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["integration:mission"], file)
+    }
+    for (const file of [
         "tools/mission_collected_items_batch.test.cjs",
         "tools/mission_collect_session_invariant.test.cjs",
         "tools/mission_collect_session_scope.test.cjs",
