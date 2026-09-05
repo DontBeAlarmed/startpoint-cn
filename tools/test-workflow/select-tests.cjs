@@ -262,6 +262,14 @@ const SOURCE_RULES = [
         groups: ["integration:mission", "integration:quest", "quick:quest"],
     },
     {
+        pattern: /^src\/lib\/quest\/finish\/battle-settlement-values\.ts$/,
+        groups: ["integration:party", "integration:quest", "quick:quest"],
+    },
+    {
+        pattern: /^tools\/battle_settlement_values\.test\.cjs$/,
+        groups: ["integration:quest"],
+    },
+    {
         pattern: /^src\/lib\/quest\/finish\/single-settlement-(?:response-state|writes)\.ts$/,
         groups: [
             "integration:compiled",

@@ -784,6 +784,17 @@ test("maps single finish settlement implementation and regression precisely", ()
     )
 })
 
+test("maps the shared battle settlement value plan to both adapters", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest/finish/battle-settlement-values.ts"]),
+        ["integration:party", "integration:quest", "quick:quest"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/battle_settlement_values.test.cjs"]),
+        ["integration:quest"],
+    )
+})
+
 test("maps single continue lifecycle implementation and regression precisely", () => {
     assert.deepEqual(
         selectTestGroups(["src/lib/quest/single-continue-lifecycle.ts"]),
@@ -1988,6 +1999,7 @@ test("splits isolated integration tests into focused domains", () => {
     ])
     assert.deepEqual(TEST_GROUPS["integration:quest"].tests, [
         "tools/auto_start_stamina_stop.test.cjs",
+        "tools/battle_settlement_values.test.cjs",
         "tools/battle_entry_inventory_route.test.cjs",
         "tools/perf/single_battle_settlement_admission.test.cjs",
         "tools/perf/single_battle_settlement_baseline.test.cjs",
