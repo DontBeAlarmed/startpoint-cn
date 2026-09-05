@@ -43,6 +43,10 @@ const SOURCE_RULES = [
         groups: ["quick:character-growth"],
     },
     {
+        pattern: /^src\/lib\/character-growth\/bond-token-qualification\.ts$/,
+        groups: ["integration:mission", "quick:character-growth"],
+    },
+    {
         pattern: /^(?:src\/lib\/character-growth\/save\/.*\.ts|tools\/character_growth_save_validation\.test\.cjs)$/,
         groups: ["integration:database"],
     },

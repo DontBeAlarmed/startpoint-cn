@@ -30,7 +30,10 @@ const { characterExpCaps } = require("../src/lib/character-growth/exp-caps")
 const { mutationContent } = require("../src/lib/character-growth/node-command-support")
 const { grantCharacterExp } = require("../src/lib/character-growth/commands/grant-character-exp")
 const { executeInjectCharacterExp } = require("../src/lib/character-growth/commands/inject-exp")
-const { convergeBondTokenForLearnedBoardWithinTransaction } = require("../src/lib/character-growth/bond-token-qualification")
+const {
+    convergeBondTokenForExpWithinTransaction,
+    convergeBondTokenForLearnedBoardWithinTransaction,
+} = require("../src/lib/character-growth/bond-token-qualification")
 
 initializeDatabase()
 const db = getDb()
@@ -174,13 +177,50 @@ test("expod inject_exp below the base cap leaves bond tokens untouched", () => {
     )
 })
 
+test("EXP convergence below the base cap does not load board Content or nodes", () => {
+    const playerId = createPlayer()
+    let loads = 0
+    const result = db.transaction(() => convergeBondTokenForExpWithinTransaction(
+        playerId,
+        PROTAGONIST_ID,
+        new Map([[1, 0], [2, 0]]),
+        {
+            rarity: PROTAGONIST_RARITY,
+            beforeExp: 0,
+            exp: BASE_EXP_CAP - 1,
+            loadBoardFacts: () => {
+                loads += 1
+                throw new Error("below-cap convergence loaded board facts")
+            },
+        },
+    ))()
+    assert.equal(result.granted, false)
+    assert.equal(loads, 0)
+})
+
 test("learn-path derivation grants board 1 only when the base cap is also reached", () => {
     const playerId = createPlayer()
     const nodeIds = [...Object.keys(mutationContent(PROTAGONIST_ID, 1).nodes)].map(Number)
     const learned = new Set(nodeIds)
     const tokens = new Map([[1, 0], [2, 0]])
 
-    const belowCap = convergeBondTokenForLearnedBoardWithinTransaction(
+    assert.throws(
+        () => convergeBondTokenForLearnedBoardWithinTransaction(
+            playerId,
+            PROTAGONIST_ID,
+            tokens,
+            {
+                boardIndex: 1,
+                rarity: PROTAGONIST_RARITY,
+                exp: BASE_EXP_CAP,
+                requiredNodeIds: nodeIds,
+                learnedNodeIds: learned,
+            },
+        ),
+        /transaction/i,
+    )
+
+    const belowCap = db.transaction(() => convergeBondTokenForLearnedBoardWithinTransaction(
         playerId, PROTAGONIST_ID, tokens,
         {
             boardIndex: 1,
@@ -189,11 +229,11 @@ test("learn-path derivation grants board 1 only when the base cap is also reache
             requiredNodeIds: nodeIds,
             learnedNodeIds: learned,
         },
-    )
+    ))()
     assert.equal(belowCap.bondTokenGranted, false)
     assert.equal(boardOneStatus(playerId), 0)
 
-    const atCap = convergeBondTokenForLearnedBoardWithinTransaction(
+    const atCap = db.transaction(() => convergeBondTokenForLearnedBoardWithinTransaction(
         playerId, PROTAGONIST_ID, tokens,
         {
             boardIndex: 1,
@@ -202,7 +242,7 @@ test("learn-path derivation grants board 1 only when the base cap is also reache
             requiredNodeIds: nodeIds,
             learnedNodeIds: learned,
         },
-    )
+    ))()
     assert.equal(atCap.bondTokenGranted, true)
     assert.equal(boardOneStatus(playerId), 1)
 })
@@ -234,4 +274,31 @@ test("missing board-1 row granted only on a fresh cap crossing", () => {
     grantCharacterExp({ playerId, characterIds: [PROTAGONIST_ID], amount: 100 })
 
     assert.equal(boardOneStatus(playerId), 1)
+})
+
+test("bond token write failure rolls the EXP crossing back atomically", t => {
+    const playerId = createPlayer()
+    learnAllBoardOneNodes(playerId)
+    const beforeExp = BASE_EXP_CAP - 100
+    updatePlayerCharacterSync(playerId, PROTAGONIST_ID, { exp: beforeExp })
+    db.exec(`
+        CREATE TRIGGER reject_bond_qualification_update
+        BEFORE UPDATE OF status ON players_characters_bond_tokens
+        WHEN OLD.player_id = ${playerId}
+          AND OLD.character_id = ${PROTAGONIST_ID}
+          AND OLD.mana_board_index = 1
+        BEGIN SELECT RAISE(ABORT, 'forced bond qualification failure'); END;
+    `)
+    t.after(() => db.exec("DROP TRIGGER IF EXISTS reject_bond_qualification_update"))
+
+    assert.throws(
+        () => grantCharacterExp({
+            playerId,
+            characterIds: [PROTAGONIST_ID],
+            amount: 100,
+        }),
+        /forced bond qualification failure/,
+    )
+    assert.equal(getPlayerCharacterSync(playerId, PROTAGONIST_ID).exp, beforeExp)
+    assert.equal(boardOneStatus(playerId), 0)
 })

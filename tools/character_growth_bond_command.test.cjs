@@ -178,13 +178,18 @@ test("completed-board helper rejects a missing token row instead of manufacturin
     const character = getPlayerCharacterSync(playerId, 1)
     const beforeBond = getPlayerSync(playerId).bondToken
     assert.throws(
-        () => convergeBondTokenForLearnedBoardWithinTransaction(playerId, 1, new Map(), {
-            boardIndex: 1,
-            rarity: character.rarity ?? 3,
-            exp: character.exp,
-            requiredNodeIds: [],
-            learnedNodeIds: new Set(),
-        }),
+        () => db.transaction(() => convergeBondTokenForLearnedBoardWithinTransaction(
+            playerId,
+            1,
+            new Map(),
+            {
+                boardIndex: 1,
+                rarity: character.rarity ?? 3,
+                exp: character.exp,
+                requiredNodeIds: [],
+                learnedNodeIds: new Set(),
+            },
+        ))(),
         error => error.code === "INVALID_GROWTH_STATE",
     )
     assert.equal(getPlayerSync(playerId).bondToken, beforeBond)

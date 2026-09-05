@@ -9,6 +9,7 @@ import {
     getBondTokenStatus,
 } from "./invariants"
 import type { BondTokenStatus } from "./model"
+import { assertInsideTransaction } from "./mutation-support"
 
 /**
  * Bond token qualification derivation.
@@ -76,6 +77,7 @@ export function convergeBondTokenForLearnedBoardWithinTransaction(
     tokens: ReadonlyMap<number, BondTokenStatus>,
     facts: BondTokenBoardQualificationFacts,
 ): StrictBondTokenConvergenceResult {
+    assertInsideTransaction()
     const currentStatus = getBondTokenStatus(tokens, facts.boardIndex)
     if (currentStatus === null) {
         throw growthError(
@@ -116,6 +118,7 @@ export function convergeBondTokenForExpWithinTransaction(
         readonly loadBoardFacts: () => BondTokenExpBoardFacts
     },
 ): BondTokenConvergence {
+    assertInsideTransaction()
     const currentStatus = getBondTokenStatus(tokens, 1)
     const sticky: BondTokenConvergence = {
         boardIndex: 1,
