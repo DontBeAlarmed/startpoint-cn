@@ -1550,14 +1550,10 @@ test("registers every test in exactly one leaf group and full covers runtime reg
 test("registers mission catalog and fact store regressions in the mission leaf group", () => {
     assert.deepEqual(selectTestGroups(["tools/mission_catalog.test.cjs"]), ["integration:mission"])
     assert.ok(TEST_GROUPS["integration:mission"].tests.includes("tools/mission_catalog.test.cjs"))
-    assert.deepEqual(selectTestGroups(["tools/mission_catalog_wrappers.test.cjs"]), ["integration:mission"])
-    assert.ok(TEST_GROUPS["integration:mission"].tests.includes("tools/mission_catalog_wrappers.test.cjs"))
     assert.deepEqual(selectTestGroups(["tools/mission_fact_key.test.cjs"]), ["integration:mission"])
     assert.ok(TEST_GROUPS["integration:mission"].tests.includes("tools/mission_fact_key.test.cjs"))
     for (const file of [
         "tools/mission_collected_items_batch.test.cjs",
-        "tools/mission_collect_legacy_context.test.cjs",
-        "tools/mission_collect_session_equivalence.test.cjs",
         "tools/mission_collect_session_invariant.test.cjs",
         "tools/mission_collect_session_scope.test.cjs",
         "tools/mission_collect_session_settlement.test.cjs",
@@ -1566,8 +1562,6 @@ test("registers mission catalog and fact store regressions in the mission leaf g
         "tools/mission_evaluation_quest_scoped.test.cjs",
         "tools/mission_evaluation_session.test.cjs",
         "tools/mission_master_value.test.cjs",
-        "tools/mission_periodic_session_migration.test.cjs",
-        "tools/mission_regular_session_equivalence.test.cjs",
         "tools/mission_regular_session_scope.test.cjs",
         "tools/mission_regular_session_settlement.test.cjs",
         "tools/mission_regular_state_derivation.test.cjs",
@@ -1692,15 +1686,10 @@ test("routes active mission focused metrics, baseline, and production boundaries
         "integration:database",
         "integration:mission",
     ])
-    for (const file of [
-        "tools/active_mission_evaluator_equivalence.test.cjs",
-        "tools/helpers/active-mission-legacy-evaluator.cjs",
-    ]) {
-        assert.deepEqual(selectTestGroups([file]), ["integration:mission"], file)
-        assert.ok(TEST_GROUPS["integration:mission"].tests.includes(
-            "tools/active_mission_evaluator_equivalence.test.cjs",
-        ))
-    }
+    assert.deepEqual(
+        selectTestGroups(["tools/helpers/active-mission-legacy-evaluator.cjs"]),
+        ["integration:mission"],
+    )
 })
 
 test("keeps external data concerns out of self-contained runtime tests", () => {
@@ -1902,8 +1891,6 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_event_session_semantics.test.cjs",
         "tools/mission_event_session_settlement.test.cjs",
         "tools/mission_collected_items_batch.test.cjs",
-        "tools/mission_collect_legacy_context.test.cjs",
-        "tools/mission_collect_session_equivalence.test.cjs",
         "tools/mission_collect_session_invariant.test.cjs",
         "tools/mission_collect_session_scope.test.cjs",
         "tools/mission_collect_session_settlement.test.cjs",
@@ -1918,7 +1905,6 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_active_content.test.cjs",
         "tools/mission_active_core.test.cjs",
         "tools/active_mission_plan.test.cjs",
-        "tools/active_mission_evaluator_equivalence.test.cjs",
         "tools/active_mission_counter_storage.test.cjs",
         "tools/active_mission_fact_session.test.cjs",
         "tools/active_mission_fixed_point.test.cjs",
@@ -1936,19 +1922,15 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/active_mission_receive_route.test.cjs",
         "tools/contents_guide_start_route.test.cjs",
         "tools/mission_catalog.test.cjs",
-        "tools/mission_catalog_wrappers.test.cjs",
-        "tools/mission_master_data.test.cjs",
         "tools/mission_pass.test.cjs",
         "tools/mission_pass_battle_facts.test.cjs",
         "tools/mission_pass_content.test.cjs",
         "tools/mission_pass_route.test.cjs",
         "tools/mission_pass_settlement.test.cjs",
         "tools/pass_card_point_change.test.cjs",
-        "tools/mission_periodic_session_migration.test.cjs",
         "tools/mission_progress_route.test.cjs",
         "tools/mission_regular_chapter_regressions.test.cjs",
         "tools/mission_regular_facts.test.cjs",
-        "tools/mission_regular_session_equivalence.test.cjs",
         "tools/mission_regular_session_scope.test.cjs",
         "tools/mission_regular_session_settlement.test.cjs",
         "tools/mission_regular_state_derivation.test.cjs",

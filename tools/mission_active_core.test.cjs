@@ -22,7 +22,10 @@ const {
     getActiveMissionEventMasterDefinitions,
     getActiveMissionMasterDefinitions,
 } = require("../src/lib/mission/active-master-data")
-const { getMissionRewardStageDefinition } = require("../src/lib/mission/rewards")
+const {
+    getActiveMissionPlan,
+    getActiveMissionPlanRewardStages,
+} = require("../src/lib/mission/active-plan")
 const { validateMissionRewardClaims } = require("../src/lib/mission/claims")
 const { filterToActiveMissions } = require("../src/lib/mission/filter")
 
@@ -65,7 +68,8 @@ assert.deepEqual(
     [99],
 )
 assert.equal(
-    getMissionRewardStageDefinition(99001, 1, repository)?.targetProgress,
+    getActiveMissionPlanRewardStages(getActiveMissionPlan(repository), 99001)
+        .find(stage => stage.stage === 1)?.targetProgress,
     99,
     "显式 repository 必须覆盖 bundled Active Mission 奖励表",
 )

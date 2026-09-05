@@ -1,6 +1,5 @@
 import { incrementPlayerCategoryMissionSync } from "../../data/domains/mission"
-import { getMissionMasterDefinition } from "./master-data"
-
+import { getMissionCatalog } from "./mission-catalog"
 export type DegreeOperationKind = "treasure_mana" | "equipment_upgrade"
 
 export interface AbilitySoulLoadout {
@@ -28,7 +27,7 @@ const REGULAR_RULES: Readonly<Record<DegreeOperationKind, {
 const ABILITY_SOUL_DEGREE_MISSION_IDS = [8000, 8010, 8020] as const
 
 function isAbilitySoulDefinitionSupported(missionId: number): boolean {
-    return getMissionMasterDefinition(5, missionId)?.pattern
+    return getMissionCatalog().getDefinition(5, missionId)?.pattern
         === `degree_abilitiesoul_use_${missionId === 8000 ? 1 : missionId === 8010 ? 2 : 3}`
 }
 
@@ -66,7 +65,7 @@ export function recordAbilitySoulEquipFactsSync(
 }
 
 function recordAbilitySoulEquipAmountSync(playerId: number, amount: number): void {
-    if (getMissionMasterDefinition(1, 65)?.pattern === "total_ability_soul_use_count") {
+    if (getMissionCatalog().getDefinition(1, 65)?.pattern === "total_ability_soul_use_count") {
         incrementPlayerCategoryMissionSync(playerId, 1, 65, amount)
     }
     for (const missionId of ABILITY_SOUL_DEGREE_MISSION_IDS) {
@@ -80,7 +79,7 @@ export function getAbilitySoulEquipMissionIds(): {
     readonly regular: readonly number[]
     readonly degree: readonly number[]
 } {
-    const regularMissionIds = getMissionMasterDefinition(1, 65)?.pattern
+    const regularMissionIds = getMissionCatalog().getDefinition(1, 65)?.pattern
         === "total_ability_soul_use_count" ? [65] : []
     const degreeMissionIds = ABILITY_SOUL_DEGREE_MISSION_IDS.filter(
         isAbilitySoulDefinitionSupported,
@@ -93,7 +92,7 @@ export function getAbilitySoulEquipMissionIds(): {
 
 function validMissionIds(kind: DegreeOperationKind): readonly number[] {
     return RULES[kind].filter(missionId => (
-        Number(getMissionMasterDefinition(5, missionId)?.row[3]) === EXPECTED_TYPE[kind]
+        Number(getMissionCatalog().getDefinition(5, missionId)?.row[3]) === EXPECTED_TYPE[kind]
     ))
 }
 
@@ -121,7 +120,7 @@ export function recordMissionOperationFactsSync(
         incrementPlayerCategoryMissionSync(playerId, 5, missionId, amount)
     }
     const regularRule = REGULAR_RULES[kind]
-    if (getMissionMasterDefinition(1, regularRule.missionId)?.pattern === regularRule.pattern) {
+    if (getMissionCatalog().getDefinition(1, regularRule.missionId)?.pattern === regularRule.pattern) {
         incrementPlayerCategoryMissionSync(playerId, 1, regularRule.missionId, amount)
     }
 }
@@ -130,7 +129,7 @@ export function getMissionOperationMissionIds(
     kind: DegreeOperationKind,
 ): { readonly regular: readonly number[], readonly degree: readonly number[] } {
     const regularRule = REGULAR_RULES[kind]
-    const regularMissionIds = getMissionMasterDefinition(1, regularRule.missionId)?.pattern
+    const regularMissionIds = getMissionCatalog().getDefinition(1, regularRule.missionId)?.pattern
         === regularRule.pattern
         ? [regularRule.missionId]
         : []

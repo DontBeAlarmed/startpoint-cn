@@ -9,7 +9,7 @@ const bundledEvents = require("../assets/mission_active_event.json")
 const bundledRewards = require("../assets/mission_active_reward.json")
 const { getActiveMissionPlan } = require("../src/lib/mission/active-plan")
 const { parseActiveMissionEventDefinition } = require("../src/lib/mission/active-plan")
-const { getActiveMissionRewards } = require("../src/lib/mission/rewards")
+const { getActiveMissionPlanRewardStages } = require("../src/lib/mission/active-plan")
 
 function clone(value) {
     return JSON.parse(JSON.stringify(value))
@@ -53,13 +53,13 @@ for (const stringId of ["", "(None)"]) {
     assert.equal(parseActiveMissionEventDefinition(1, row).stringId, stringId)
 }
 
-const copiedRewards = getActiveMissionRewards(11010, 1, repositoryA)
-assert.equal(copiedRewards[0].amount, 5)
-copiedRewards[0].amount = 999999
-copiedRewards[0].itemId = 999999
-assert.deepEqual(getActiveMissionRewards(11010, 1, repositoryA), [
-    { kind: 1, amount: 5, itemId: 101 },
-])
+assert.deepEqual(
+    getActiveMissionPlanRewardStages(getActiveMissionPlan(repositoryA), 11010)
+        .find(stage => stage.stage === 1)?.rewards,
+    [
+        { kind: 1, amount: 5, itemId: 101 },
+    ],
+)
 
 const duplicateMissionTables = {
     "mission_active.json": {

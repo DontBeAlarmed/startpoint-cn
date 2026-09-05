@@ -423,14 +423,6 @@ stubModule("../src/lib/mission", {
     reconcileActiveMissionFacts: () => [],
     reconcileAwakeUnlockCharacterList: (_playerId, list) => list,
     settleAwakeMissionCandidatesWithEvaluation: () => null,
-    settleAwakeBattleMissions: () => ({
-        missionInfo: [],
-        itemList: {},
-        characterList: [],
-        equipmentList: [],
-        degreeIds: [],
-        passCardPoints: {},
-    }),
     settleMissionCategories: () => ({
         missionInfo: [],
         itemList: {},

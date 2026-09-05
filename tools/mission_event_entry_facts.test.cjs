@@ -39,8 +39,9 @@ const {
     recordRaidSummaryMissionFactSync,
     validateEventEntryRule,
 } = require("../src/lib/mission/event-entry-facts")
-const masterData = require("../src/lib/mission/master-data")
-const { getMissionMasterDefinition } = masterData
+const missionCatalog = require("../src/lib/mission/mission-catalog")
+const { getMissionCatalog } = missionCatalog
+const getMissionMasterDefinition = (category, missionId) => getMissionCatalog().getDefinition(category, missionId)
 const {
     productionContentSnapshotProvider,
 } = require("../src/content/runtime/content-snapshot")
@@ -391,8 +392,8 @@ test("Raid SET edit facts fail closed for ordinary edits, illegal input, closed 
         null,
     ), false, "非 Date 的运行时输入必须 fail closed 而不是抛错")
 
-    const originalEnabledAt = masterData.isMissionDefinitionEnabledAt
-    masterData.isMissionDefinitionEnabledAt = definition => (
+    const originalEnabledAt = missionCatalog.isMissionMasterDefinitionEnabledAt
+    missionCatalog.isMissionMasterDefinitionEnabledAt = definition => (
         [400054, 400055, 400056, 400072, 400073, 400074].includes(definition.missionId)
     )
     try {
@@ -403,7 +404,7 @@ test("Raid SET edit facts fail closed for ordinary edits, illegal input, closed 
             new Date("2024-05-23T04:00:00.000Z"),
         ), false, "多个活动族同时开放时必须拒绝猜测")
     } finally {
-        masterData.isMissionDefinitionEnabledAt = originalEnabledAt
+        missionCatalog.isMissionMasterDefinitionEnabledAt = originalEnabledAt
     }
 
     const previousSnapshot = productionContentSnapshotProvider.snapshot

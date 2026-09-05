@@ -265,3 +265,58 @@ export function getMissionCatalogCraftPointItemId(catalog: MissionCatalog): numb
         ? itemId
         : DEFAULT_CRAFT_POINT_ITEM_ID
 }
+
+/** Client-visible standard mission categories (Awake is 9). */
+export const MISSION_CATEGORIES: readonly number[] = Object.freeze([
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+])
+
+export function getCurrentStage(
+    category: number,
+    missionId: number,
+    progress: number,
+    repository?: ReadonlyContentRepository,
+): number {
+    const stages = getMissionCatalog(repository).getRewardStages(category, missionId)
+    if (stages.length === 0) return 1
+    let current = stages[stages.length - 1].stage
+    for (const stage of stages) {
+        if (progress < stage.targetProgress) {
+            current = stage.stage
+            break
+        }
+    }
+    return current
+}
+
+export function getCompletedStageNumbers(
+    category: number,
+    missionId: number,
+    progress: number,
+    repository?: ReadonlyContentRepository,
+): number[] {
+    return getMissionCatalog(repository)
+        .getRewardStages(category, missionId)
+        .filter(stage => progress >= stage.targetProgress)
+        .map(stage => stage.stage)
+}
+
+export function isMissionProgressComplete(
+    category: number,
+    missionId: number,
+    progress: number,
+    repository?: ReadonlyContentRepository,
+): boolean {
+    const stages = getMissionCatalog(repository).getRewardStages(category, missionId)
+    return stages.length > 0 && stages.every(stage => progress >= stage.targetProgress)
+}
+
+export function getMissionStageIds(
+    category: number,
+    missionId: number,
+    repository?: ReadonlyContentRepository,
+): number[] {
+    return getMissionCatalog(repository)
+        .getRewardStages(category, missionId)
+        .map(stage => stage.stage)
+}

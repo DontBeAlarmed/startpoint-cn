@@ -6,14 +6,11 @@ import {
 import { getPlayerSync } from "../../data/domains/player"
 import type { Player, PlayerActiveMission } from "../../data/types"
 import { MissionEvaluationSession } from "./evaluation-session"
-import { getMissionCatalog } from "./mission-catalog"
+import { getMissionCatalog, isMissionProgressComplete } from "./mission-catalog"
 import { createProductionMissionFactLoaderRegistry } from "./production-fact-loaders"
 import type { ProductionMissionFactSeeds } from "./production-fact-loaders"
 import { getMissionFactRequirementRegistry } from "./requirements/registry"
 import { getComputer } from "./registry"
-import { getMissionPattern } from "./patterns"
-import { isMissionProgressComplete } from "./stages"
-import { getMissionMasterDefinition } from "./master-data"
 import type { FactKey } from "./facts/fact-key"
 import type { CategoryContext } from "./types"
 import type {
@@ -23,8 +20,6 @@ import type {
     MissionSettlementPlayerSnapshot,
     PreparedMissionSettlement,
 } from "./settlement"
-
-const SESSION_CATEGORIES: ReadonlySet<number> = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
 
 interface MutableEvaluatedMission {
     category: number
@@ -47,11 +42,11 @@ function applyDailyCompletionProgress(missions: MutableEvaluatedMission[]): void
     const dailyMissions = missions.filter(mission => mission.category === 2)
     if (dailyMissions.length === 0) return
     const completedCoreCount = dailyMissions.filter(mission => (
-        isDailyCoreMission(getMissionPattern(2, mission.missionId))
+        isDailyCoreMission((getMissionCatalog().getDefinition(2, mission.missionId)?.pattern ?? ""))
         && isMissionProgressComplete(2, mission.missionId, mission.finalProgress)
     )).length
     for (const mission of dailyMissions) {
-        if (!getMissionPattern(2, mission.missionId).startsWith("daily_quest_all_clear")) continue
+        if (!(getMissionCatalog().getDefinition(2, mission.missionId)?.pattern ?? "").startsWith("daily_quest_all_clear")) continue
         mission.finalProgress = Math.max(mission.dbProgress, completedCoreCount)
     }
 }
@@ -87,7 +82,7 @@ function groupPassMissionIds(
     if (category !== 7 && category !== 8) return [missionIds]
     const groups = new Map<string, number[]>()
     for (const missionId of missionIds) {
-        const eventId = getMissionMasterDefinition(category, missionId)?.eventId
+        const eventId = getMissionCatalog().getDefinition(category, missionId)?.eventId
         const key = eventId === undefined ? "unknown" : String(eventId)
         const group = groups.get(key) ?? []
         group.push(missionId)
@@ -188,15 +183,7 @@ export function evaluateMissionCandidates(
             throw new Error(`Mission category ${scope.category} was not prefetched`)
         }
         for (const groupedMissionIds of groupPassMissionIds(scope.category, missionIds)) {
-            const context = SESSION_CATEGORIES.has(scope.category)
-                && computer.buildContextFromSession !== undefined
-                ? computer.buildContextFromSession(session, scope.category, groupedMissionIds)
-                : computer.buildContext(
-                    prepared.playerId,
-                    scope.category,
-                    new Date(prepared.evaluationTime),
-                    groupedMissionIds,
-                )
+            const context = computer.buildContextFromSession(session, scope.category, groupedMissionIds)
             for (const missionId of groupedMissionIds) {
                 const key = `${scope.category}:${missionId}`
                 if (evaluatedKeys.has(key)) continue

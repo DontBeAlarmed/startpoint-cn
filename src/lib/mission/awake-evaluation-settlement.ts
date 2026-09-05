@@ -7,10 +7,10 @@ import type { AwakeMissionInfo, AwakeMissionSettlementResult } from "./awake-set
 import { MissionRewardGranter } from "./grants"
 import { getAwakeMissionRewardStageDefinition } from "./rewards"
 import { getCharacterIdFromMission } from "./character-queries"
-import { getCompletedStageNumbers } from "./stages"
 import { getFactKeyId, normalizeFactKey, type FactKey } from "./facts/fact-key"
 import type { MissionEvaluationResult, MissionSettlementObserver } from "./settlement"
 import type { MissionSettlementRewardDependencies } from "./settlement-write"
+import { getCompletedStageNumbers } from "./mission-catalog"
 
 export interface AwakeMissionEvaluationSettlement {
     readonly settlement: AwakeMissionSettlementResult

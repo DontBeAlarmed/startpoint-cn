@@ -30,9 +30,7 @@ const {
 const {
     recordActiveMissionQuestChallengeFactSync,
 } = require("../src/lib/mission/active-entry-facts")
-const {
-    computeActiveMissionFactProgress,
-} = require("../src/lib/mission/active-reconciliation")
+const { computeActiveMissionFactProgress } = require("./helpers/active-mission-fact-progress.cjs")
 
 initializeDatabase()
 db = getDb()

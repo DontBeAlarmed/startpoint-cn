@@ -15,10 +15,21 @@ productionContentSnapshotProvider.snapshot = null
 const activeMasterData = require("../src/lib/mission/active-master-data")
 const awakeRuleCatalog = require("../src/lib/mission/awake-rule-catalog")
 const characterQueries = require("../src/lib/mission/character-queries")
-const masterData = require("../src/lib/mission/master-data")
-const patterns = require("../src/lib/mission/patterns")
+const { getMissionCatalog, getMissionStageIds } = require("../src/lib/mission/mission-catalog")
 const rewards = require("../src/lib/mission/rewards")
-const stages = require("../src/lib/mission/stages")
+const {
+    getActiveMissionPlan,
+    getActiveMissionPlanRewardStages,
+} = require("../src/lib/mission/active-plan")
+
+function activePlanRewardStage(missionId, stage, repository) {
+    return getActiveMissionPlanRewardStages(getActiveMissionPlan(repository), missionId)
+        .find(definition => definition.stage === stage)
+}
+
+function catalogRewards(category, missionId, stage, repository) {
+    return getMissionCatalog(repository).getRewardStage(category, missionId, stage)?.rewards ?? []
+}
 
 const bundledAwakeDefinitions = require("../assets/mission_char_awake.json")
 
@@ -214,16 +225,16 @@ test("mission tables imported before snapshot follow the current complete runtim
         [first.ids.questId],
     )
     assert.equal(
-        masterData.getMissionMasterDefinition(1, first.ids.missionId).pattern,
+        getMissionCatalog().getDefinition(1, first.ids.missionId).pattern,
         "runtime-1",
     )
-    assert.equal(patterns.getMissionPattern(1, first.ids.missionId), "runtime-1")
-    assert.deepEqual(patterns.getMissionsByPattern("runtime-1"), [{
+    assert.equal(getMissionCatalog().getDefinition(1, first.ids.missionId)?.pattern ?? "", "runtime-1")
+    assert.deepEqual(getMissionCatalog().getDefinitionsByPattern("runtime-1").map(d => ({ missionId: d.missionId, category: d.category })), [{
         missionId: first.ids.missionId,
         category: 1,
     }])
     assert.equal(
-        patterns.getMissionDefinition(1, first.ids.missionId)[24],
+        getMissionCatalog().getDefinition(1, first.ids.missionId)?.row[24],
         "marker-1",
     )
     assert.equal(
@@ -231,14 +242,14 @@ test("mission tables imported before snapshot follow the current complete runtim
         1,
     )
     assert.equal(
-        rewards.getMissionRewardStageDefinition(first.ids.missionId, 1).targetProgress,
+        activePlanRewardStage(first.ids.missionId, 1).targetProgress,
         1,
     )
     assert.equal(
         rewards.getAwakeMissionRewardStageDefinition(first.ids.awakeMissionId, 1).targetProgress,
         1,
     )
-    assert.deepEqual(stages.getMissionIdsByCategory(1), [first.ids.missionId])
+    assert.deepEqual(getMissionCatalog().getMissionIds(1), [first.ids.missionId])
     assert.equal(awakeRuleCatalog.getAwakeMissionDefinitionRow(1110012)[1], String(first.ids.characterId))
     assert.equal(
         awakeRuleCatalog.getAwakeGenericCharacterClearRules()
@@ -265,36 +276,36 @@ test("mission tables imported before snapshot follow the current complete runtim
         characterQueries.getCharacterStoryQuestIds(second.ids.characterId),
         [second.ids.questId],
     )
-    assert.equal(masterData.getMissionMasterDefinition(1, first.ids.missionId), undefined)
-    assert.equal(patterns.getMissionPattern(1, first.ids.missionId), "")
-    assert.deepEqual(patterns.getMissionsByPattern("runtime-1"), [])
-    assert.equal(patterns.getMissionDefinition(1, first.ids.missionId), undefined)
+    assert.equal(getMissionCatalog().getDefinition(1, first.ids.missionId), undefined)
+    assert.equal(getMissionCatalog().getDefinition(1, first.ids.missionId)?.pattern ?? "", "")
+    assert.deepEqual(getMissionCatalog().getDefinitionsByPattern("runtime-1"), [])
+    assert.equal(getMissionCatalog().getDefinition(1, first.ids.missionId), undefined)
     assert.equal(
-        masterData.getMissionMasterDefinition(1, second.ids.missionId).row[24],
+        getMissionCatalog().getDefinition(1, second.ids.missionId).row[24],
         "marker-2",
     )
-    assert.equal(patterns.getMissionPattern(1, second.ids.missionId), "runtime-2")
-    assert.deepEqual(patterns.getMissionsByPattern("runtime-2"), [{
+    assert.equal(getMissionCatalog().getDefinition(1, second.ids.missionId)?.pattern ?? "", "runtime-2")
+    assert.deepEqual(getMissionCatalog().getDefinitionsByPattern("runtime-2").map(d => ({ missionId: d.missionId, category: d.category })), [{
         missionId: second.ids.missionId,
         category: 1,
     }])
     assert.equal(
-        patterns.getMissionDefinition(1, second.ids.missionId)[24],
+        getMissionCatalog().getDefinition(1, second.ids.missionId)?.row[24],
         "marker-2",
     )
     assert.equal(
-        rewards.getRegularMissionRewards(second.ids.missionId, 1)[0].itemId,
+        catalogRewards(1, second.ids.missionId, 1)[0].itemId,
         second.ids.itemId,
     )
     assert.equal(
-        rewards.getActiveMissionRewards(second.ids.missionId, 1)[0].itemId,
+        activePlanRewardStage(second.ids.missionId, 1).rewards[0].itemId,
         second.ids.itemId,
     )
     assert.equal(
-        rewards.getAwakeMissionRewards(second.ids.awakeMissionId, 1)[0].itemId,
+        catalogRewards(9, second.ids.awakeMissionId, 1)[0].itemId,
         second.ids.itemId,
     )
-    assert.deepEqual(stages.getMissionStageIds(1, second.ids.missionId), [1])
+    assert.deepEqual(getMissionStageIds(1, second.ids.missionId), [1])
     assert.equal(awakeRuleCatalog.getAwakeMissionDefinitionRow(1110012)[1], String(second.ids.characterId))
     assert.equal(
         awakeRuleCatalog.getAwakeGenericCharacterClearRules()
@@ -329,19 +340,19 @@ test("explicit repositories take priority over the installed runtime release", (
         [explicit.ids.questId],
     )
     assert.equal(
-        masterData.getMissionMasterDefinition(1, explicit.ids.missionId, explicitRepository).pattern,
+        getMissionCatalog(explicitRepository).getDefinition(1, explicit.ids.missionId).pattern,
         "runtime-4",
     )
     assert.equal(
-        patterns.getMissionPattern(1, explicit.ids.missionId, explicitRepository),
+        getMissionCatalog(explicitRepository).getDefinition(1, explicit.ids.missionId)?.pattern ?? "",
         "runtime-4",
     )
     assert.equal(
-        rewards.getRegularMissionRewards(explicit.ids.missionId, 1, explicitRepository)[0].itemId,
+        catalogRewards(1, explicit.ids.missionId, 1, explicitRepository)[0].itemId,
         explicit.ids.itemId,
     )
     assert.deepEqual(
-        stages.getMissionStageIds(1, explicit.ids.missionId, explicitRepository),
+        getMissionStageIds(1, explicit.ids.missionId, explicitRepository),
         [1],
     )
     assert.equal(
@@ -374,15 +385,15 @@ test("initialized runtime table failures never fall back to bundled mission data
         /broken mission release/,
     )
     assert.throws(
-        () => masterData.getMissionMasterDefinitions(1),
+        () => getMissionCatalog().getDefinitions(1),
         /broken mission release/,
     )
     assert.throws(
-        () => rewards.getRegularMissionRewards(1, 1),
+        () => getMissionCatalog().getRewardStage(1, 1, 1),
         /broken mission release/,
     )
     assert.throws(
-        () => stages.getMissionIdsByCategory(1),
+        () => getMissionCatalog().getMissionIds(1),
         /broken mission release/,
     )
     assert.throws(

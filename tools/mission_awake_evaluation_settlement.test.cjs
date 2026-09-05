@@ -31,12 +31,35 @@ const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getDb } = require("../src/data/db")
 const { getCharacterDataSync, getCharacterManaNodesSync } = require("../src/lib/assets")
 const { characterExpCaps } = require("../src/lib/character")
-const { AwakeComputer } = require("../src/lib/mission/computer-awake")
 const { MissionEvaluationSession } = require("../src/lib/mission/evaluation-session")
 const {
-    settleAwakeBattleMissions,
+    getAwakeBattleMissionIds,
+    settleAwakeMissionCandidates,
     settleAwakeMissionCandidatesWithEvaluation,
 } = require("../src/lib/mission/awake-settlement")
+
+function emptyAwakeSettlement() {
+    return {
+        missionInfo: [],
+        itemList: {},
+        characterList: [],
+        equipmentList: [],
+        degreeIds: [],
+        passCardPoints: {},
+    }
+}
+
+// Battle-finish composition retired from production (single/multi finish call
+// the pieces directly); tests keep the same wrapper semantics locally.
+function settleAwakeBattleMissions(params) {
+    if (!params.questAccomplished) return emptyAwakeSettlement()
+    const missionIds = getAwakeBattleMissionIds(
+        params.characterIds,
+        params.directlyChangedMissionIds,
+    )
+    if (missionIds.length === 0) return emptyAwakeSettlement()
+    return settleAwakeMissionCandidates(params.playerId, missionIds, params.evaluationTime)
+}
 const {
     publishCharacterGrowthOwnerStateBestEffort,
 } = require("../src/lib/character-growth/owner-publication")
@@ -91,20 +114,13 @@ function expectedRewardBalances(before) {
 test("battle seam evaluates immutable Session results and leaves Growth publication to the owner", () => {
     const playerId = createEligiblePlayer("awake-seam")
     const before = itemAmounts(playerId)
-    const originalLegacyBuilder = AwakeComputer.buildContext
-    AwakeComputer.buildContext = () => { throw new Error("awake settlement must not use legacy context") }
-    let settlement
-    try {
-        settlement = settleAwakeBattleMissions({
-            playerId,
-            questAccomplished: true,
-            characterIds: [341005],
-            directlyChangedMissionIds: [],
-            evaluationTime,
-        })
-    } finally {
-        AwakeComputer.buildContext = originalLegacyBuilder
-    }
+    const settlement = settleAwakeBattleMissions({
+        playerId,
+        questAccomplished: true,
+        characterIds: [341005],
+        directlyChangedMissionIds: [],
+        evaluationTime,
+    })
 
     assert.deepEqual(settlement.missionInfo, awakeMissionIds.map(missionId => ({
         mission_category_id: 9,

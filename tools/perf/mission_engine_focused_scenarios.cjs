@@ -190,11 +190,8 @@ function summarizeStoredMissionProgress(runtime, playerId, missionRefs) {
     return createMissionProgressSummary(rows)
 }
 
-function executeDegreeFocused(runtime, playerId, fixedTime, useRoutingFallback) {
-    const computer = runtime.getComputer(5)
-    const sessionBuilder = computer.buildContextFromSession
-    if (useRoutingFallback) computer.buildContextFromSession = undefined
-    try {
+function executeDegreeFocused(runtime, playerId, fixedTime) {
+    {
         const result = runtime.settleMissionCategories(playerId, [{
             category: 5,
             missionIds: DEGREE_FOCUSED_MISSION_IDS,
@@ -205,8 +202,6 @@ function executeDegreeFocused(runtime, playerId, fixedTime, useRoutingFallback) 
             missionRewards: result.missionInfo.map(info => info.mission_reward_id),
             degreeIds: [...result.degreeIds].sort((left, right) => left - right),
         }
-    } finally {
-        computer.buildContextFromSession = sessionBuilder
     }
 }
 
@@ -227,11 +222,8 @@ function executeDegreeBehaviorCharacterization(runtime, playerId, fixedTime) {
     }
 }
 
-function executeEventFocused(runtime, playerId, fixedTime, useRoutingFallback) {
-    const computer = runtime.getComputer(3)
-    const sessionBuilder = computer.buildContextFromSession
-    if (useRoutingFallback) computer.buildContextFromSession = undefined
-    try {
+function executeEventFocused(runtime, playerId, fixedTime) {
+    {
         const result = runtime.settleMissionCategories(playerId, [{
             category: 3,
             missionIds: [EVENT_FOCUSED_MISSION_ID],
@@ -242,8 +234,6 @@ function executeEventFocused(runtime, playerId, fixedTime, useRoutingFallback) {
             response: completeSettlementResponse(result),
             persisted: getPersistedEvent(runtime, playerId),
         }
-    } finally {
-        computer.buildContextFromSession = sessionBuilder
     }
 }
 
@@ -331,23 +321,12 @@ function summarizeBattleFinish(runtime, outcome, playerId) {
 function createFocusedScenarios(runtime) {
     return [
         {
-            name: "degree-routing-fallback",
-            prepare: () => createPlayer(runtime),
-            execute: (playerId, fixedTime) => executeDegreeFocused(
-                runtime,
-                playerId,
-                fixedTime,
-                true,
-            ),
-        },
-        {
             name: "degree-focused",
             prepare: () => createPlayer(runtime),
             execute: (playerId, fixedTime) => executeDegreeFocused(
                 runtime,
                 playerId,
                 fixedTime,
-                false,
             ),
         },
         {
@@ -361,17 +340,6 @@ function createFocusedScenarios(runtime) {
                 runtime,
                 playerId,
                 fixedTime,
-            ),
-        },
-        {
-            name: "event-routing-fallback",
-            serverTime: EVENT_REWARD_TIME,
-            prepare: () => prepareEventPlayer(runtime),
-            execute: (playerId, fixedTime) => executeEventFocused(
-                runtime,
-                playerId,
-                fixedTime,
-                true,
             ),
         },
         {

@@ -1,7 +1,7 @@
 require("ts-node/register/transpile-only")
 
 const assert = require("node:assert/strict")
-const { computeActiveMissionFactProgress } = require("../src/lib/mission/active-reconciliation")
+const { computeActiveMissionFactProgress } = require("./helpers/active-mission-fact-progress.cjs")
 
 const row = ({ battleKind = 3, rangeKind, first, second, third } = {}) => {
     const values = []

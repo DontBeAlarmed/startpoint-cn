@@ -1,7 +1,6 @@
 import { incrementPlayerCategoryMissionSync } from "../../data/domains/mission"
 import type { FinishContext } from "../quest/finish/types"
-import { getMissionMasterDefinitions, isMissionDefinitionEnabledAt } from "./master-data"
-
+import { getMissionCatalog, isMissionMasterDefinitionEnabledAt } from "./mission-catalog"
 const QUEST_CATEGORY_BY_RANGE_KIND: Readonly<Record<number, number>> = Object.freeze({
     2: 2,
     5: 7,
@@ -65,9 +64,9 @@ export function recordPassMissionBattleFacts(
     const matchedMissionIds: number[] = []
     const sendEmotionCount = getSendEmotionCount(context)
     if (sendEmotionCount !== null && sendEmotionCount > 0) {
-        for (const definition of getMissionMasterDefinitions(7)) {
+        for (const definition of getMissionCatalog().getDefinitions(7)) {
             if (definition.patternType !== 85
-                || !isMissionDefinitionEnabledAt(definition, evaluationTime)) continue
+                || !isMissionMasterDefinitionEnabledAt(definition, evaluationTime)) continue
             incrementPlayerCategoryMissionSync(
                 context.playerId,
                 7,
@@ -79,7 +78,7 @@ export function recordPassMissionBattleFacts(
     }
     if (!context.questAccomplished) return matchedMissionIds
 
-    for (const definition of getMissionMasterDefinitions(8)) {
+    for (const definition of getMissionCatalog().getDefinitions(8)) {
         const patternType = definition.patternType
         if (patternType !== 16 && patternType !== 23) continue
         if (patternType === 16 && context.isMulti !== true) continue
@@ -89,7 +88,7 @@ export function recordPassMissionBattleFacts(
                 && !(battleKind === 2 && context.isMulti === true)
                 && !(battleKind === 1 && context.isMulti !== true)) continue
         }
-        if (!isMissionDefinitionEnabledAt(definition, evaluationTime)
+        if (!isMissionMasterDefinitionEnabledAt(definition, evaluationTime)
             || !matchesQuestRange(definition.row, context.questCategory, context.questId)) continue
         incrementPlayerCategoryMissionSync(context.playerId, 8, definition.missionId, 1)
         matchedMissionIds.push(definition.missionId)

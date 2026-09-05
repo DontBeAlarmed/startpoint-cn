@@ -1,11 +1,10 @@
 import { getQuestContentTableSync } from "../assets"
-import { getMissionMasterDefinitions } from "./master-data"
-
+import { MissionMasterDefinition, getMissionCatalog } from "./mission-catalog"
 export interface ExactEventSingleClearRule {
     readonly missionId: number
     readonly categories: readonly number[]
     readonly questIds: "all" | readonly number[]
-    readonly definition: ReturnType<typeof getMissionMasterDefinitions>[number]
+    readonly definition: MissionMasterDefinition
 }
 
 const EXACT_SINGLE_CLEAR_MISSION_IDS = new Set([
@@ -27,7 +26,7 @@ function buildExactEventSingleClearRules(): readonly ExactEventSingleClearRule[]
     const challengeDungeonQuests = getQuestContentTableSync(
         "challenge_dungeon_event_quest.json",
     )
-    for (const definition of getMissionMasterDefinitions(3)) {
+    for (const definition of getMissionCatalog().getDefinitions(3)) {
         if (!EXACT_SINGLE_CLEAR_MISSION_IDS.has(definition.missionId)
             || Number(definition.row[2]) !== 14
             || definition.row[11] !== "(None)") continue

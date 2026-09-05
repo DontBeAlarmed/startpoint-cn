@@ -575,12 +575,14 @@ test("a failed context reconcile still consumes its write lifecycle", () => {
     assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).size, 0)
 })
 
-test("legacy resolver compatibility does not rely on an evaluate-shaped context check", () => {
+test("raw resolver inputs are rejected; AwakeRequestContext is the only awake request shape", () => {
     const playerId = createPlayer("legacy-resolver")
     makeBaseReady(playerId, CHARACTER_A)
     const resolver = missionApi().createCharacterAwakeEligibilityResolver(playerId, evaluationTime)
-    const reconciled = missionApi().reconcileAwakeUnlocks(playerId, [CHARACTER_A], resolver)
-    assert.deepEqual(reconciled.all, new Map([[String(CHARACTER_A), { 1: 1 }]]))
+    assert.throws(
+        () => missionApi().reconcileAwakeUnlocks(playerId, [CHARACTER_A], resolver),
+        /factory|context.*invalid/i,
+    )
 
     const resolverWithEvaluate = {
         characters: resolver.characters,
@@ -594,8 +596,26 @@ test("legacy resolver compatibility does not rely on an evaluate-shaped context 
             throw new Error("legacy resolver evaluate method must not be called")
         },
     }
-    const summary = missionApi().computeAwakeSummary(playerId, resolverWithEvaluate)
+    assert.throws(
+        () => missionApi().computeAwakeSummary(playerId, resolverWithEvaluate),
+        /factory|context.*invalid/i,
+    )
+
+    const summaryContext = requestContextModule().createAwakeRequestContext({
+        playerId,
+        evaluationTime,
+        candidateCharacterIds: [CHARACTER_A],
+    })
+    const summary = missionApi().computeAwakeSummary(playerId, summaryContext)
     assert.equal(summary.activeMissionList.length, 4)
+
+    const reconcileContext = requestContextModule().createAwakeRequestContext({
+        playerId,
+        evaluationTime,
+        candidateCharacterIds: [CHARACTER_A],
+    })
+    const reconciled = missionApi().reconcileAwakeUnlocks(playerId, [CHARACTER_A], reconcileContext)
+    assert.deepEqual(reconciled.all, new Map([[String(CHARACTER_A), { 1: 1 }]]))
 })
 
 test("Awake requirement collection fails closed for facts its context does not consume", () => {

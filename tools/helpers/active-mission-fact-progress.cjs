@@ -1,10 +1,13 @@
-import {
+// Test-only raw-row Active Mission fact progress.
+// Moved from src/lib/mission/active-fact-legacy-adapter.ts (D24 C2): production
+// reconciliation evaluates planned definitions via active-fact-session; the raw
+// master-row shape remains useful for pattern-level behavior assertions.
+const {
     evaluateStaticActiveMissionFact,
-    type ActiveMissionFactState,
-} from "./active-fact-evaluator"
-import { matchesRawActiveMissionQuestRange } from "./active-quest-range"
+} = require("../../src/lib/mission/active-fact-evaluator")
+const { matchesRawActiveMissionQuestRange } = require("../../src/lib/mission/active-quest-range")
 
-function parseInteger(value: unknown, field: string): number {
+function parseInteger(value, field) {
     const parsed = Number(value)
     if (!Number.isSafeInteger(parsed) || parsed < 0) {
         throw new TypeError(`Invalid Active Mission ${field}.`)
@@ -12,7 +15,7 @@ function parseInteger(value: unknown, field: string): number {
     return parsed
 }
 
-function countRawBattleClearFacts(row: readonly unknown[], state: ActiveMissionFactState): number {
+function countRawBattleClearFacts(row, state) {
     const battleKind = parseInteger(row[32], "battle kind")
     if (![1, 2, 3].includes(battleKind)) {
         throw new TypeError(`Unsupported Active Mission battle kind ${battleKind}.`)
@@ -27,7 +30,7 @@ function countRawBattleClearFacts(row: readonly unknown[], state: ActiveMissionF
     return count
 }
 
-function countRawSsRankFacts(row: readonly unknown[], state: ActiveMissionFactState): number | null {
+function countRawSsRankFacts(row, state) {
     const battleKind = parseInteger(row[32], "battle kind")
     if (![1, 2, 3].includes(battleKind)) {
         throw new TypeError(`Unsupported Active Mission battle kind ${battleKind}.`)
@@ -39,7 +42,7 @@ function countRawSsRankFacts(row: readonly unknown[], state: ActiveMissionFactSt
     return state.battleCounters.rankSsCount
 }
 
-function computeRawChapterCompleteFact(row: readonly unknown[], state: ActiveMissionFactState): number | null {
+function computeRawChapterCompleteFact(row, state) {
     const rangeKind = parseInteger(row[34], "quest range kind")
     const category = rangeKind === 0 ? 1 : rangeKind === 1 ? 4 : null
     if (category === null) return null
@@ -58,7 +61,7 @@ function computeRawChapterCompleteFact(row: readonly unknown[], state: ActiveMis
     return targetQuestIds.every(questId => clearRankByQuestId.get(questId) === 5) ? 1 : 0
 }
 
-function computeRawSpecificPartyFact(row: readonly unknown[], state: ActiveMissionFactState): number | null {
+function computeRawSpecificPartyFact(row, state) {
     const characterId = parseInteger(row[46], "specific leader character id")
     const battleKind = parseInteger(row[32], "battle kind")
     if (![1, 2, 3].includes(battleKind)) {
@@ -79,13 +82,8 @@ function computeRawSpecificPartyFact(row: readonly unknown[], state: ActiveMissi
     )).length
 }
 
-/** Compatibility API for raw master rows; it intentionally does not use planned parsing. */
-export function computeActiveMissionFactProgress(
-    pattern: number,
-    row: readonly unknown[],
-    state: ActiveMissionFactState,
-    missionId?: number,
-): number | null {
+/** Raw master-row fact progress; intentionally does not use planned parsing. */
+function computeActiveMissionFactProgress(pattern, row, state, missionId) {
     if (pattern === 23) return countRawBattleClearFacts(row, state)
     if (pattern === 26) return countRawSsRankFacts(row, state)
     if (pattern === 66) return computeRawChapterCompleteFact(row, state)
@@ -93,3 +91,5 @@ export function computeActiveMissionFactProgress(
     if (pattern === 70) return computeRawSpecificPartyFact(row, state)
     return evaluateStaticActiveMissionFact({ missionId, pattern, row, questRange: null }, state)
 }
+
+module.exports = { computeActiveMissionFactProgress }

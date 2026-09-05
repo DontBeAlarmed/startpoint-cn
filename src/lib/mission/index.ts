@@ -34,23 +34,19 @@ export { getComputer } from "./registry"
 
 // Snapshot-scoped standard mission catalog
 export type { MissionCatalog, MissionCatalogReward, MissionCatalogStage, MissionMasterDefinition } from "./mission-catalog"
-export { getMissionCatalog } from "./mission-catalog"
+export { getMissionCatalog, isMissionCatalogCategory, MISSION_CATEGORIES } from "./mission-catalog"
 
-// Stages
-export { getMissionIdsByCategory, getCurrentStage, getCompletedStageNumbers, getMissionStageIds, isMissionProgressComplete } from "./stages"
+// Stage derivations over the mission catalog
+export { getCurrentStage, getCompletedStageNumbers, getMissionStageIds, isMissionProgressComplete } from "./mission-catalog"
 
 // Rewards
 export type { ActiveMissionReward, AwakeMissionRewardStageDefinition, AwakeMissionSpecialReward, MissionRewardStageDefinition } from "./rewards"
-export { getActiveMissionRewards, getAwakeMissionRewards, getAwakeMissionRewardStageDefinition, getCollectMissionRewards, getDailyMissionRewards, getDegreeMissionRewards, getEventMissionRewards, getMissionRewardStageDefinition, getRegularMissionRewards, getWeeklyMissionRewards } from "./rewards"
+export { getAwakeMissionRewardStageDefinition } from "./rewards"
 export type { MissionSettlementInfo, MissionSettlementResult, MissionSettlementScope } from "./settlement"
 export { settleMissionCategories, settleMissionCategoriesWithEvaluation } from "./settlement"
 export type { MissionSettlementEvaluation } from "./settlement"
 export { evaluateMissionProgressStageB, getMissionProgressStageBRefs } from "./progress-stage-b"
 export { mergeMissionSettlementResponse } from "./response"
-
-// Patterns (for update_mission_progress)
-export type { PatternMatch } from "./patterns"
-export { getMissionsByPattern, getMissionDefinition, getMissionPattern, isComputablePattern, isMissionEnabledAt } from "./patterns"
 
 export type { MissionRewardClaimContext, MissionRewardClaimValidation, ValidatedMissionRewardClaim } from "./claims"
 export { validateMissionRewardClaims } from "./claims"
@@ -90,7 +86,7 @@ export { createAwakeRequestContext, isAwakeRequestContext } from "./awake-reques
 export type { AwakeMissionSeeds } from "./awake-request-context-scope"
 export { collectAwakeMissionIdsFromSeeds } from "./awake-request-context-scope"
 export type { AwakeBattleMissionSettlementParams, AwakeMissionComputedProgress, AwakeMissionInfo, AwakeMissionSettlementEvaluation, AwakeMissionSettlementResult } from "./awake-settlement"
-export { getAwakeBattleMissionIds, settleAwakeBattleMissions, settleAwakeMissionCandidates, settleAwakeMissionCandidatesWithEvaluation, settleAwakeMissionRewards } from "./awake-settlement"
+export { getAwakeBattleMissionIds, settleAwakeMissionCandidates, settleAwakeMissionCandidatesWithEvaluation } from "./awake-settlement"
 export type { AwakeUnlockProgress, AwakeUnlockReconciliationResult } from "./awake-unlock"
 export { reconcileAwakeUnlocks, reconcileAwakeUnlocksFromProgress } from "./awake-unlock"
 export type { CharacterAwakeBaseReadiness, CharacterAwakeEligibilityResolver, CharacterAwakeEligibilitySnapshot } from "./awake-eligibility"

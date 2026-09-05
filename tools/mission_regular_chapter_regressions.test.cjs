@@ -50,6 +50,7 @@ const exQuests = require("../assets/ex_quest.json")
 const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
+const { buildMissionComputerContext } = require("./helpers/mission-session-context.cjs")
 const {
     getPlayerEquipmentListSync,
 } = require("../src/data/domains/equipment")
@@ -60,8 +61,8 @@ const {
     insertPlayerQuestProgressListSync,
 } = require("../src/data/domains/quest")
 const {
-    getMissionMasterDefinitions,
-} = require("../src/lib/mission/master-data")
+    getMissionCatalog,
+} = require("../src/lib/mission/mission-catalog")
 const {
     getRegularQuestFactSection,
     isRegularQuestMissionSupported,
@@ -131,11 +132,10 @@ const exQuestsByChapter = getQuestsByChapter(exQuests)
 assertChapterSectionsAreNonEmpty()
 
 function isMissionEnabledAt(missionId) {
-    const { isMissionEnabledAt: enabledAt } = require("../src/lib/mission/patterns")
-    return enabledAt(1, missionId, evaluationTime)
+    return getMissionCatalog().isEnabledAt(1, missionId, evaluationTime)
 }
 
-const definitions = getMissionMasterDefinitions(1)
+const definitions = getMissionCatalog().getDefinitions(1)
     .filter(definition => Number(definition.row[2]) === 22)
     .filter(definition => isMissionEnabledAt(definition.missionId))
 
@@ -180,7 +180,7 @@ insertQuestProgress(
 )
 
 const regularComputer = getComputer(1)
-const partialContext = regularComputer.buildContext(playerId, 1)
+const partialContext = buildMissionComputerContext(playerId, 1)
 const progressByMissionId = new Map(definitions.map(definition => [
     definition.missionId,
     regularComputer.compute(definition.missionId, partialContext, 0),
@@ -195,7 +195,7 @@ for (const definition of definitions) {
 }
 
 insertQuestProgress(playerId, 1, mainGaps)
-const mainCompleteContext = regularComputer.buildContext(playerId, 1)
+const mainCompleteContext = buildMissionComputerContext(playerId, 1)
 for (const definition of definitions) {
     const expected = Number(definition.row[7]) === 0 ? 1 : 0
     assert.equal(
@@ -206,7 +206,7 @@ for (const definition of definitions) {
 }
 
 insertQuestProgress(playerId, 4, exGaps)
-const completeContext = regularComputer.buildContext(playerId, 1)
+const completeContext = buildMissionComputerContext(playerId, 1)
 for (const definition of definitions) {
     assert.equal(
         regularComputer.compute(definition.missionId, completeContext, 0),

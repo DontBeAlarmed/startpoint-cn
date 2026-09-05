@@ -21,7 +21,6 @@ import { getActiveMissionPlan } from "./active-plan"
 export {
     estimateActiveMissionCharacterLevel,
 } from "./active-fact-evaluator"
-export { computeActiveMissionFactProgress } from "./active-fact-legacy-adapter"
 export type {
     ActiveMissionFactCharacter,
     ActiveMissionFactQuestProgress,

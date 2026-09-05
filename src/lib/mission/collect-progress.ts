@@ -1,13 +1,10 @@
-import { getPlayerCollectedItemTotalsSync } from "../../data/domains/item"
-import { getPlayerSync } from "../../data/domains/player"
 import { buildCollectCategoryContextFromSession } from "./collect-session-context"
-import { getMissionMasterDefinition, getMissionMasterDefinitions } from "./master-data"
 import { parsePositiveSafeIntegerMasterValue } from "./master-value"
-import type { MissionMasterDefinition } from "./mission-catalog"
+import { MissionMasterDefinition, getMissionCatalog } from "./mission-catalog"
 import type { CategoryContext, MissionComputer } from "./types"
 
 export function getCollectMissionItemId(missionId: number): number | undefined {
-    const rawItemId = getMissionMasterDefinition(4, missionId)?.row[14]
+    const rawItemId = getMissionCatalog().getDefinition(4, missionId)?.row[14]
     return parsePositiveSafeIntegerMasterValue(rawItemId)
 }
 
@@ -15,8 +12,8 @@ function buildCollectMissionItemIds(
     missionIds: readonly number[] | undefined,
 ): ReadonlyMap<number, number> {
     const definitions = missionIds === undefined
-        ? getMissionMasterDefinitions(4)
-        : missionIds.map(missionId => getMissionMasterDefinition(4, missionId))
+        ? getMissionCatalog().getDefinitions(4)
+        : missionIds.map(missionId => getMissionCatalog().getDefinition(4, missionId))
             .filter((definition): definition is MissionMasterDefinition => definition !== undefined)
     const itemIds = new Map<number, number>()
     for (const definition of definitions) {
@@ -28,22 +25,6 @@ function buildCollectMissionItemIds(
 
 export const CollectComputer: MissionComputer = {
     name: "CollectItemEvent",
-
-    buildContext(playerId, category, _evaluationTime, missionIds): CategoryContext {
-        const player = getPlayerSync(playerId)
-        if (!player) throw new Error(`Player ${playerId} not found during collect mission evaluation.`)
-        return {
-            category,
-            playerId,
-            player,
-            questProgress: {},
-            totalQuestClears: 0,
-            totalStories: 0,
-            rankCounts: {},
-            collectedItemTotals: getPlayerCollectedItemTotalsSync(playerId),
-            collectMissionItemIds: buildCollectMissionItemIds(missionIds),
-        }
-    },
 
     buildContextFromSession(session, category, missionIds): CategoryContext {
         if (category !== 4) {

@@ -391,54 +391,6 @@ export function buildEventSafeQuestProgress(
 export const EventSafeComputer: MissionComputer = {
     name: "EventSafe",
 
-    buildContext(playerId: number, category: number, evaluationTime: Date): CategoryContext {
-        const player = getPlayerSync(playerId)
-        if (!player) throw new Error(`Player ${playerId} not found during event mission evaluation.`)
-        const rawProgress = getPlayerQuestProgressSync(playerId)
-        const catalog = getMissionCatalog()
-        const eventRules = getEventRuleCatalog(catalog)
-        const currentStateMissionIds = [...eventRules]
-            .filter(([, rule]) => rule.kind === "currentState")
-            .map(([missionId]) => missionId)
-        const includeCurrentState = getEnabledEventCurrentStateMissionIds(
-            catalog,
-            evaluationTime,
-        ).length > 0
-        return {
-            category,
-            playerId,
-            player,
-            questProgress: buildEventSafeQuestProgress(rawProgress),
-            totalQuestClears: 0,
-            totalStories: 0,
-            rankCounts: {},
-            eventRules,
-            collectedItemTotals: getPlayerCollectedItemTotalsSync(playerId),
-            eventMissionProgress: new Map(
-                Object.entries(getPlayerCategoryMissionsSync(playerId, 3))
-                    .map(([missionId, mission]) => [Number(missionId), mission.progress] as const),
-            ),
-            ...(includeCurrentState ? {
-                eventCurrentState: deriveEventCurrentState(
-                    {
-                        characters: getPlayerCharactersSync(playerId),
-                        characterManaNodes: getPlayerCharactersManaNodesSync(playerId),
-                        questProgress: buildEventSafeQuestProgress(rawProgress),
-                        equipment: getPlayerEquipmentListSync(playerId),
-                        items: getPlayerItemsSync(playerId),
-                        partyGroups: getPlayerPartyGroupListSync(playerId),
-                    },
-                    getEventCurrentStateStaticIndex(catalog),
-                    currentStateMissionIds,
-                    missionId => {
-                        const rule = eventRules.get(missionId)
-                        return rule?.kind === "currentState" ? rule.rule : undefined
-                    },
-                ),
-            } : {}),
-        }
-    },
-
     buildContextFromSession(session, category, missionIds): CategoryContext {
         const { buildEventCategoryContextFromSession } = require("./event-session-context") as
             typeof import("./event-session-context")

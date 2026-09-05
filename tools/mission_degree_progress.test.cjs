@@ -421,6 +421,7 @@ assert.equal(getDegreeBattleStatsSync(overflowPlayerId).feverCount, Number.MAX_S
 assert.equal(getDegreeBattleStatsSync(overflowPlayerId).healPartyCount, Number.MAX_SAFE_INTEGER)
 
 const equipmentDissolve = require("../assets/equipment_dissolve.json")
+const { buildMissionComputerContext } = require("./helpers/mission-session-context.cjs")
 const maxLevelEquipmentIds = Object.entries(equipmentDissolve)
     .filter(([, row]) => Number.isSafeInteger(row.max_level) && row.max_level > 0)
     .slice(-6)
@@ -446,7 +447,7 @@ assert.equal(
     JSON.stringify(episodeCountQueryPlan),
 )
 
-const context = DegreeComputer.buildContext(playerId, 5)
+const context = buildMissionComputerContext(playerId, 5, undefined, { computer: DegreeComputer })
 const catalog = getMissionCatalog()
 const degreeMissionIds = catalog.getMissionIds(5)
 const degreeSession = new MissionEvaluationSession({
@@ -512,7 +513,7 @@ assert.equal(DegreeComputer.compute(11020, context, 0), 0, "未完成指定 Boss
 assert.equal(DegreeComputer.compute(11080, context, 0), 0, "大蛇高级+不得完成超级难度称号")
 insertPlayerQuestProgressSync(playerId, 2, { questId: 1006003, finished: true })
 insertPlayerQuestProgressSync(playerId, 2, { questId: 1020003, finished: true })
-const exceptionalBossContext = DegreeComputer.buildContext(playerId, 5)
+const exceptionalBossContext = buildMissionComputerContext(playerId, 5, undefined, { computer: DegreeComputer })
 assert.equal(
     DegreeComputer.compute(11020, exceptionalBossContext, 0),
     1,
@@ -667,18 +668,18 @@ insertPlayerCharacterBondTokenSync(levelPlayerId, 111001, {
     manaBoardIndex: 2,
     status: 1,
 })
-const level80Context = DegreeComputer.buildContext(levelPlayerId, 5)
+const level80Context = buildMissionComputerContext(levelPlayerId, 5, undefined, { computer: DegreeComputer })
 assert.equal(DegreeComputer.compute(3000, level80Context, 7), 80, "角色等级称号应返回当前已证明的最高等级")
 assert.equal(DegreeComputer.compute(3010, level80Context, 0), 80, "五星角色达到官方 Lv80 EXP 阈值时应完成称号")
 assert.equal(DegreeComputer.compute(3020, level80Context, 7), 80, "Lv100 称号应显示当前已证明的最高等级")
 assert.equal(DegreeComputer.compute(111001, level80Context, 0), 0, "第二板信赖记录不得代替第一板信赖之证")
 
 updatePlayerCharacterBondTokenSync(levelPlayerId, 111001, { manaBoardIndex: 1, status: 1 })
-const bondedLevel80Context = DegreeComputer.buildContext(levelPlayerId, 5)
+const bondedLevel80Context = buildMissionComputerContext(levelPlayerId, 5, undefined, { computer: DegreeComputer })
 assert.equal(DegreeComputer.compute(111001, bondedLevel80Context, 0), 1, "仅取得一版信赖之证时一版称号应为 1/2")
 
 updatePlayerCharacterSync(levelPlayerId, 111001, { exp: 379988, overLimitStep: 4 })
-const level100Context = DegreeComputer.buildContext(levelPlayerId, 5)
+const level100Context = buildMissionComputerContext(levelPlayerId, 5, undefined, { computer: DegreeComputer })
 assert.equal(DegreeComputer.compute(3010, level100Context, 90), 100, "角色等级称号进度不得低于已证明等级")
 assert.equal(DegreeComputer.compute(3020, level100Context, 0), 100, "五星角色达到官方 Lv100 EXP 阈值时应完成称号")
 assert.equal(DegreeComputer.compute(111001, level100Context, 0), 2, "Lv100 且取得一版信赖之证时一版称号应为 2/2")

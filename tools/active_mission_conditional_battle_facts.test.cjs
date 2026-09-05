@@ -34,9 +34,7 @@ const {
 } = require("../src/lib/mission/active-conditional-battle-facts")
 const { getCharacterManaNodesSync } = require("../src/lib/assets")
 const { getActiveMissionMasterDefinition } = require("../src/lib/mission/active-master-data")
-const {
-    computeActiveMissionFactProgress,
-} = require("../src/lib/mission/active-reconciliation")
+const { computeActiveMissionFactProgress } = require("./helpers/active-mission-fact-progress.cjs")
 
 function definition(missionId, pattern, battleKind = 2) {
     const row = []

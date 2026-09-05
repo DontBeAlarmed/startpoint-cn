@@ -5,12 +5,7 @@ import {
     recordPlayerEventMissionLoginDaySync,
 } from "../../data/domains/event_mission_entry_facts"
 import { PartyCategory } from "../../data/types"
-import {
-    getMissionMasterDefinition,
-    isMissionDefinitionEnabledAt,
-    type MissionMasterDefinition,
-} from "./master-data"
-import type { MissionCatalogStage } from "./mission-catalog"
+import { MissionCatalogStage, MissionMasterDefinition, getMissionCatalog, isMissionMasterDefinitionEnabledAt } from "./mission-catalog"
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 
 export type EventEntryRuleProducer =
@@ -393,7 +388,7 @@ function getOpenRaidSetRuleFamily(
         const definitions = specs.map(getValidatedRule)
         if (definitions.some(definition => definition === undefined)
             || !definitions.every(definition => (
-                isMissionDefinitionEnabledAt(definition!, evaluationTime)
+                isMissionMasterDefinitionEnabledAt(definition!, evaluationTime)
             ))) return []
         return [specs]
     })
@@ -448,7 +443,7 @@ export function recordRaidSetEditMissionFactsSync(
 }
 
 function getValidatedRule(spec: EventEntryRuleSpec): MissionMasterDefinition | undefined {
-    const definition = getMissionMasterDefinition(3, spec.missionId)
+    const definition = getMissionCatalog().getDefinition(3, spec.missionId)
     const eventRewards = getRuntimeContentTableSync(
         "mission_event_reward.json",
         bundledEventRewards as Record<string, unknown>,
@@ -483,7 +478,7 @@ export function getEventLoginMissionId(evaluationTime: Date): number | null {
     const spec = EVENT_ENTRY_RULES.find(rule => rule.producer === "login")
     if (!spec) return null
     const definition = getValidatedRule(spec)
-    return definition && isMissionDefinitionEnabledAt(definition, evaluationTime)
+    return definition && isMissionMasterDefinitionEnabledAt(definition, evaluationTime)
         ? spec.missionId
         : null
 }
@@ -511,7 +506,7 @@ export function getOpenCharacterElectionVoteMissionId(
     ))
     if (specs.length !== 1) return null
     const definition = getValidatedRule(specs[0])
-    return definition && isMissionDefinitionEnabledAt(definition, evaluationTime)
+    return definition && isMissionMasterDefinitionEnabledAt(definition, evaluationTime)
         ? definition.missionId
         : null
 }
@@ -535,7 +530,7 @@ export function getRaidSummaryMissionId(
     const spec = getRaidSummaryRule(eventId)
     if (!spec) return null
     const definition = getValidatedRule(spec)
-    return definition && isMissionDefinitionEnabledAt(definition, evaluationTime)
+    return definition && isMissionMasterDefinitionEnabledAt(definition, evaluationTime)
         ? spec.missionId
         : null
 }

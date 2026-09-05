@@ -5,13 +5,9 @@ const fs = require("node:fs")
 const path = require("node:path")
 
 const {
-    getMissionMasterDefinition,
-    getMissionMasterDefinitions,
-    isMissionDefinitionEnabledAt,
-} = require("../src/lib/mission/master-data")
-const {
-    getMissionIdsByCategory,
-} = require("../src/lib/mission/stages")
+    getMissionCatalog,
+    isMissionMasterDefinitionEnabledAt,
+} = require("../src/lib/mission/mission-catalog")
 const {
     getCategoryMissionRewardStageDefinition,
 } = require("../src/lib/mission/rewards")
@@ -23,8 +19,13 @@ const missionTypesSource = fs.readFileSync(path.resolve(__dirname, "../src/lib/m
 const passComputerSource = fs.readFileSync(path.resolve(__dirname, "../src/lib/mission/pass.ts"), "utf8")
 assert.match(
     missionTypesSource,
-    /buildContext\s*\(\s*playerId\s*:\s*number\s*,\s*category\s*:\s*number\s*,\s*evaluationTime\s*:\s*Date(?:\s*,\s*missionIds\s*\?\s*:\s*readonly\s+number\[\])?\s*,?\s*\)\s*:\s*CategoryContext/,
-    "MissionComputer 必须要求调用方提供统一的评估时间",
+    /buildContextFromSession\s*\(\s*session\s*:\s*MissionEvaluationSession/,
+    "MissionComputer 必须只从声明的 Session 构建上下文",
+)
+assert.doesNotMatch(
+    missionTypesSource,
+    /\bbuildContext\s*\(/,
+    "MissionComputer 不得再保留 legacy buildContext 成员",
 )
 assert.doesNotMatch(
     passComputerSource,
@@ -32,30 +33,30 @@ assert.doesNotMatch(
     "PassComputer 不得回退到系统时间",
 )
 
-assert.equal(getMissionMasterDefinitions(6).length, 76)
-assert.equal(getMissionMasterDefinitions(7).length, 76)
-assert.equal(getMissionMasterDefinitions(8).length, 115)
+assert.equal(getMissionCatalog().getDefinitions(6).length, 76)
+assert.equal(getMissionCatalog().getDefinitions(7).length, 76)
+assert.equal(getMissionCatalog().getDefinitions(8).length, 115)
 
-const daily = getMissionMasterDefinition(6, 1)
+const daily = getMissionCatalog().getDefinition(6, 1)
 assert.equal(daily.eventId, 1)
 assert.equal(daily.pattern, "battle_pass_single_battle_daily_01")
 assert.equal(daily.patternType, 14)
 assert.equal(daily.enableStart, "2024-06-01 05:00:00")
 assert.equal(daily.enableEnd, "2024-07-01 04:59:59")
 
-const week = getMissionMasterDefinition(7, 1)
+const week = getMissionCatalog().getDefinition(7, 1)
 assert.equal(week.eventId, 1)
 assert.equal(week.pattern, "battle_pass_stamina_week_01")
 assert.equal(week.patternType, 39)
 
-const event = getMissionMasterDefinition(8, 1)
+const event = getMissionCatalog().getDefinition(8, 1)
 assert.equal(event.eventId, 1)
 assert.equal(event.pattern, "battle_pass_login_event_01")
 assert.equal(event.patternType, 0)
 
-assert.equal(getMissionIdsByCategory(6).length, 76)
-assert.equal(getMissionIdsByCategory(7).length, 76)
-assert.equal(getMissionIdsByCategory(8).length, 115)
+assert.equal(getMissionCatalog().getMissionIds(6).length, 76)
+assert.equal(getMissionCatalog().getMissionIds(7).length, 76)
+assert.equal(getMissionCatalog().getMissionIds(8).length, 115)
 
 assert.deepEqual(getCategoryMissionRewardStageDefinition(6, 1, 1), {
     missionRewardId: 1001,
@@ -84,16 +85,16 @@ for (const rewardId of Object.keys(passCardRewards).map(Number)) {
 }
 
 assert.equal(
-    isMissionDefinitionEnabledAt(daily, new Date("2024-05-31T20:59:59.999Z")),
+    isMissionMasterDefinitionEnabledAt(daily, new Date("2024-05-31T20:59:59.999Z")),
     false,
 )
 assert.equal(
-    isMissionDefinitionEnabledAt(daily, new Date("2024-05-31T21:00:00.000Z")),
+    isMissionMasterDefinitionEnabledAt(daily, new Date("2024-05-31T21:00:00.000Z")),
     true,
     "Pass 请求不携带 event_id，必须按主数据开放期选择当前活动",
 )
 assert.equal(
-    isMissionDefinitionEnabledAt(daily, new Date("2024-07-31T20:00:00.000Z")),
+    isMissionMasterDefinitionEnabledAt(daily, new Date("2024-07-31T20:00:00.000Z")),
     false,
 )
 

@@ -1,8 +1,5 @@
-import {
-    getMissionMasterDefinitions,
-    type MissionMasterDefinition,
-} from "./master-data"
 import { settleMissionCategories, type MissionSettlementResult } from "./settlement"
+import { MissionMasterDefinition, getMissionCatalog } from "./mission-catalog"
 
 const regularCandidateCache = new WeakMap<readonly MissionMasterDefinition[], readonly number[]>()
 const degreeCandidateCache = new WeakMap<readonly MissionMasterDefinition[], readonly number[]>()
@@ -24,7 +21,7 @@ function selectCached(
 
 function getRegularLoginMissionIds(): number[] {
     return [...selectCached(
-        getMissionMasterDefinitions(1),
+        getMissionCatalog().getDefinitions(1),
         regularCandidateCache,
         definition => definition.pattern === "total_login"
             || definition.pattern === "special_total_login_2anv",
@@ -33,7 +30,7 @@ function getRegularLoginMissionIds(): number[] {
 
 function getDegreeLoginMissionIds(): number[] {
     return [...selectCached(
-        getMissionMasterDefinitions(5),
+        getMissionCatalog().getDefinitions(5),
         degreeCandidateCache,
         definition => definition.pattern.startsWith("degree_login_count_"),
     )]
@@ -41,7 +38,7 @@ function getDegreeLoginMissionIds(): number[] {
 
 function getPassLoginMissionIds(): number[] {
     return [...selectCached(
-        getMissionMasterDefinitions(8),
+        getMissionCatalog().getDefinitions(8),
         passCandidateCache,
         definition => definition.patternType === 0,
     )]

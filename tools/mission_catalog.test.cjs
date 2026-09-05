@@ -12,8 +12,6 @@ const mission = require("../src/lib/mission")
 const {
     getMissionCatalog,
 } = require("../src/lib/mission/mission-catalog")
-const masterData = require("../src/lib/mission/master-data")
-const rewards = require("../src/lib/mission/rewards")
 
 const CATEGORY_LAYOUTS = Object.freeze({
     1: { definition: "mission_regular.json", reward: "mission_regular_reward.json", pattern: 0, start: 25, end: 26, progress: 1, rewardStart: 5 },
@@ -545,16 +543,6 @@ test("bundled catalog covers categories 1-10 with authoritative counts and sampl
         assert.deepEqual(
             expectedCounts.map((_, index) => catalog.getMissionIds(index + 1).length),
             expectedCounts,
-        )
-        assert.equal(catalog.getDefinition(1, 107).pattern, masterData.getMissionMasterDefinition(1, 107).pattern)
-        assert.equal(catalog.getDefinition(9, 11).row[1], masterData.getMissionMasterDefinition(9, 11).row[1])
-        assert.deepEqual(
-            catalog.getRewardStage(1, 107, 1).rewards,
-            rewards.getRegularMissionRewards(107, 1),
-        )
-        assert.deepEqual(
-            catalog.getRewardStage(9, 11, 1).rewards,
-            rewards.getAwakeMissionRewards(11, 1),
         )
         for (let category = 1; category <= 10; category++) {
             assert.ok(catalog.getDefinitions(category).length > 0, `category ${category}`)

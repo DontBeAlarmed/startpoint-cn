@@ -65,7 +65,7 @@ const {
     buildBattleMissionSettlementScopes,
     recordMissionBattleFacts,
 } = require("../src/lib/mission/battle-facts")
-const { getMissionMasterDefinitions } = require("../src/lib/mission/master-data")
+const { getMissionCatalog } = require("../src/lib/mission/mission-catalog")
 
 assert.equal(
     typeof buildBattleMissionSettlementScopes,
@@ -92,7 +92,7 @@ assert.equal(degreeScope.missionIds.includes(32000), true, "本场战力称号�
 assert.equal(degreeScope.missionIds.includes(35000), true, "本场最大伤害称号必须进入候选")
 assert.equal(degreeScope.missionIds.includes(39000), true, "本场复活棺柩称号必须进入候选")
 assert.equal(
-    degreeScope.missionIds.length < getMissionMasterDefinitions(5).length,
+    degreeScope.missionIds.length < getMissionCatalog().getDefinitions(5).length,
     true,
     "battle category 5 候选必须小于全量 1288",
 )

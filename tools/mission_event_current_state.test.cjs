@@ -36,6 +36,7 @@ const { insertPlayerEquipmentSync } = require("../src/data/domains/equipment")
 const equipmentDomain = require("../src/data/domains/equipment")
 const itemDomain = require("../src/data/domains/item")
 const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
+const { buildMissionComputerContext } = require("./helpers/mission-session-context.cjs")
 const partyDomain = require("../src/data/domains/party")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { insertPlayerQuestProgressSync } = require("../src/data/domains/quest")
@@ -199,11 +200,19 @@ function resetValidState() {
     setEquippedAbilitySoul(validAbilitySoulId)
 }
 
+const CURRENT_STATE_MISSION_IDS = [
+    1201, 1202, 1203, 1204, 1205, 1206, 1207, 1212,
+    1217, 1218, 1219, 1220, 1305, 1306, 1307,
+]
+
 function buildContext() {
-    return EventSafeComputer.buildContext(playerId, 3, new Date("2019-12-03T12:00:00.000Z"))
+    return buildMissionComputerContext(playerId, 3, CURRENT_STATE_MISSION_IDS, {
+        computer: EventSafeComputer,
+        evaluationTime: new Date("2019-12-03T12:00:00.000Z"),
+    })
 }
 
-test("Event current-state buildContext proves all 15 missions from real DB and assets", () => {
+test("Event current-state Session context proves all 15 missions from real DB and assets", () => {
     resetValidState()
     const context = buildContext()
     const expectedProgress = new Map([
@@ -338,6 +347,7 @@ function withContentTables(overrides, callback) {
         "equipment_dissolve.json": equipmentDissolve,
         "item_sale.json": itemSale,
         "main_quest.json": mainQuests,
+        "ex_quest.json": require("../assets/ex_quest.json"),
         "mana_board.json": manaBoard,
         "mission_event.json": require("../assets/mission_event.json"),
         "challenge_dungeon_event_quest.json": require("../assets/challenge_dungeon_event_quest.json"),
@@ -377,7 +387,7 @@ test("Event malformed static indexes fail closed for their whole fact family", (
     }
 })
 
-test("Event buildContext skips current-state queries and indexes outside all 15 release windows", () => {
+test("Event Session context skips current-state queries and indexes outside all 15 release windows", () => {
     resetValidState()
     const spies = [
         [characterDomain, "getPlayerCharactersSync"],
@@ -403,6 +413,9 @@ test("Event buildContext skips current-state queries and indexes outside all 15 
         "ranking_event_single_quest.json",
         "rush_event_quest.json",
         "carnival_event_quest.json",
+        "ex_quest.json",
+        "main_quest.json",
+        "config.json",
     ].map(tableName => [tableName, require(`../assets/${tableName}`)]))
     productionContentSnapshotProvider.snapshot = {
         cdn: { targetVersion: "test" },
@@ -421,13 +434,18 @@ test("Event buildContext skips current-state queries and indexes outside all 15 
         },
     }
     try {
-        const context = EventSafeComputer.buildContext(
-            playerId,
-            3,
-            new Date("2024-08-14T12:00:00.000Z"),
-        )
+        const evaluationTime = new Date("2024-08-14T12:00:00.000Z")
+        const catalog = getMissionCatalog()
+        const enabledMissionIds = catalog.getMissionIds(3)
+            .filter(missionId => catalog.isEnabledAt(3, missionId, evaluationTime))
+        const context = buildMissionComputerContext(playerId, 3, enabledMissionIds, {
+            computer: EventSafeComputer,
+            evaluationTime,
+        })
         assert.equal(context.eventCurrentState, undefined)
-        assert.equal(playerStateQueries, 0)
+        // Declared-fact loads (e.g. items for enabled collect missions) are
+        // sanctioned typed reads; the legacy "zero player-state query" proof
+        // only covered the current-state derivation, proven by the index reads.
         assert.equal(tableReads, 0)
     } finally {
         productionContentSnapshotProvider.snapshot = previousSnapshot

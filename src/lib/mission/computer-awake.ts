@@ -1,13 +1,6 @@
 // Character awakening mission computer (category 9)
 
-import { getPlayerCharacterClearsSync } from "../../data/domains/character_clear"
-import { getPlayerCharactersSync } from "../../data/domains/character"
-import { getPlayerQuestProgressSync } from "../../data/domains/quest"
-import { getPlayerCategoryMissionsSync } from "../../data/domains/mission"
-import { getPlayerSync } from "../../data/domains/player"
-import { getDb } from "../../data/db"
 import { getCharacterStoryQuestIds, getCharacterIdFromMission } from "./character-queries"
-import { isMissionProgressComplete } from "./stages"
 import type { MissionComputer, CategoryContext } from "./types"
 import type { PlayerCharacter } from "../../data/types"
 import {
@@ -21,6 +14,7 @@ import {
     isAwakeGenericCharacterClearMission,
 } from "./awake-rule-catalog"
 import { buildAwakeContextFromSession } from "./awake-session-context"
+import { isMissionProgressComplete } from "./mission-catalog"
 
 // ─── Awake-specific context (extends base) ───
 
@@ -65,85 +59,8 @@ function coClearKey(a: number, b: number): string {
     return getCharacterPairKey(a, b)
 }
 
-export function buildAwakeContext(
-    playerId: number,
-    allChars: Record<string, PlayerCharacter> = getPlayerCharactersSync(playerId),
-): AwakeContext {
-    const player = getPlayerSync(playerId)!
-    const questProgressRaw = getPlayerQuestProgressSync(playerId)
-    const characterClears = getPlayerCharacterClearsSync(playerId)
-
-    let totalQuestClears = 0, ssClears = 0, sClears = 0, aClears = 0, bClears = 0, totalStories = 0
-    const questProgress: CategoryContext["questProgress"] = {}
-
-    for (const [section, quests] of Object.entries(questProgressRaw)) {
-        const list: CategoryContext["questProgress"][string] = []
-        for (const qp of quests) {
-            list.push({
-                questId: qp.questId, finished: qp.finished, clearRank: qp.clearRank,
-                bestElapsedTimeMs: qp.bestElapsedTimeMs, leaderCharacterId: qp.leaderCharacterId,
-                multiClearCount: qp.multiClearCount,
-            })
-            if (qp.finished) {
-                totalQuestClears++
-                if (section === '3') totalStories++
-                if (qp.clearRank === 5) ssClears++
-                else if (qp.clearRank === 4) sClears++
-                else if (qp.clearRank === 3) aClears++
-                else if (qp.clearRank === 2) bClears++
-            }
-        }
-        questProgress[section] = list
-    }
-
-    const charClears = new Map<string, number>()
-    const leaderClears = new Map<string, number>()
-    const multiClears = new Map<string, number>()
-    const leaderMultiClears = new Map<string, number>()
-    const charData = new Map<string, PlayerCharacter>()
-    for (const [cid, char] of Object.entries(allChars)) {
-        charData.set(cid, char)
-        const row = characterClears[cid] ?? {
-            clear_count: 0,
-            multi_count: 0,
-            leader_clear_count: 0,
-            leader_multi_count: 0,
-            leader_power_flip_count: 0,
-        }
-        charClears.set(cid, row.clear_count)
-        leaderClears.set(cid, row.leader_clear_count)
-        multiClears.set(cid, row.multi_count)
-        leaderMultiClears.set(cid, row.leader_multi_count)
-    }
-
-    // Pre-fetch co-clear counts for multi-char missions
-    const rows = getDb().prepare(`
-    SELECT char_id_a, char_id_b, co_clear_count FROM players_party_member_co_clears
-    WHERE player_id = ?
-    `).all(playerId) as { char_id_a: number; char_id_b: number; co_clear_count: number }[]
-    const coClears = mergePartyCoClearRows(rows)
-
-    const categoryMissionProgress = new Map<number, number>()
-    for (const [missionId, progress] of Object.entries(getPlayerCategoryMissionsSync(playerId, 9))) {
-        categoryMissionProgress.set(Number(missionId), progress.progress)
-    }
-
-    return {
-        category: 9,
-        playerId, player, questProgress,
-        totalQuestClears, totalStories,
-        rankCounts: { rank_ss: ssClears, rank_s: sClears, rank_a: aClears, rank_b: bClears },
-        charClears, leaderClears, multiClears, leaderMultiClears,
-        coClears, charData, categoryMissionProgress,
-    }
-}
-
 export const AwakeComputer: MissionComputer = {
     name: "Awake",
-
-    buildContext(playerId: number, _category: number): AwakeContext {
-        return buildAwakeContext(playerId)
-    },
 
     buildContextFromSession: buildAwakeContextFromSession,
 

@@ -2,25 +2,6 @@
   "version": 1,
   "fixedTime": "2025-01-01T12:00:00.000Z",
   "scenarios": {
-    "degree-routing-fallback": {
-      "sqlReads": 9,
-      "sqlWrites": 1,
-      "missionComputes": 5,
-      "behavior": {
-        "adapter": "scoped-settlement-routing",
-        "degreeIds": [],
-        "missionIds": [
-          1000,
-          111001,
-          33000,
-          16000,
-          57010,
-          70000
-        ],
-        "missionRewards": []
-      },
-      "behaviorSha256": "c9d89764f66f25f39a442a8ae236d614e76ee5133b7f3b60ea2a9f73f7930db7"
-    },
     "degree-focused": {
       "sqlReads": 8,
       "sqlWrites": 1,
@@ -96,40 +77,6 @@
         }
       },
       "behaviorSha256": "053ad90e26988cbdb0c3ac6544b810a0cd1c219a66905a6cce9d1fa44d28498a"
-    },
-    "event-routing-fallback": {
-      "sqlReads": 11,
-      "sqlWrites": 4,
-      "missionComputes": 1,
-      "behavior": {
-        "adapter": "event-scoped-settlement-routing",
-        "missionId": 2316,
-        "persisted": {
-          "missionId": 2316,
-          "progress": 10,
-          "stages": {
-            "1": true
-          }
-        },
-        "response": {
-          "characterList": [],
-          "degreeIds": [],
-          "equipmentList": [],
-          "itemList": {
-            "224": 5
-          },
-          "missionInfo": [
-            {
-              "mission_category_id": 3,
-              "mission_id": 2316,
-              "mission_reward_id": 2316001
-            }
-          ],
-          "passCardPoints": {},
-          "userInfo": null
-        }
-      },
-      "behaviorSha256": "f6ec8a514286ccb5b90d18648dfe34c0fc6789bcc2ac4f4ab8b513303be882e1"
     },
     "event-focused": {
       "sqlReads": 7,
@@ -332,7 +279,7 @@
       "behaviorSha256": "368e4c5dddb880f6a98cd59beee214bffa98ae89b4e59c397339900876f2893b"
     },
     "single-battle-finish": {
-      "sqlReads": 31,
+      "sqlReads": 28,
       "sqlWrites": 32,
       "missionComputes": 425,
       "behavior": {
@@ -431,8 +378,8 @@
       "behaviorSha256": "d52ffaa18213ed908d72dd41a4b391ca55bb82705649b86f1bcf9f452cc17147"
     },
     "multi-battle-finish": {
-      "sqlReads": 32,
-      "sqlWrites": 38,
+      "sqlReads": 29,
+      "sqlWrites": 37,
       "missionComputes": 425,
       "behavior": {
         "adapter": "mission-finish-boundary",

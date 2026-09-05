@@ -32,9 +32,7 @@ const {
     collectActiveMissionSpecificBattleFacts,
     recordActiveMissionSpecificBattleFactsSync,
 } = require("../src/lib/mission/active-mission-specific-battle-facts")
-const {
-    computeActiveMissionFactProgress,
-} = require("../src/lib/mission/active-reconciliation")
+const { computeActiveMissionFactProgress } = require("./helpers/active-mission-fact-progress.cjs")
 
 function definition(missionId, characterElement, equipmentElement = "(None)", battleKind = 3) {
     const row = []

@@ -119,7 +119,6 @@ const {
     getAwakeBattleMissionIds,
     reconcileAwakeUnlocks,
     settleAwakeMissionCandidates,
-    settleAwakeMissionRewards,
 } = require("../src/lib/mission")
 const { insertAccountSync } = require("../src/data/domains/account")
 const {
@@ -132,12 +131,12 @@ const { getPlayerCharacterAwakeUnlocksSync } = characterAwakeDomain
 const { getPlayerItemSync } = require("../src/data/domains/item")
 const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
 const missionDomain = require("../src/data/domains/mission")
+const { updatePlayerCategoryMissionSync } = missionDomain
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getCharacterDataSync, getCharacterManaNodesSync } = require("../src/lib/assets")
 const { characterExpCaps } = require("../src/lib/character")
 const { getAwakeMissionRewardStageDefinition } = require("../src/lib/mission/rewards")
 const awakeRewardMaster = require("../assets/mission_char_awake_reward.json")
-const { AwakeComputer } = require("../src/lib/mission/computer-awake")
 
 require("../src/data").initializeDatabase()
 db = getDb()
@@ -177,9 +176,27 @@ function assertNoCharacterRewardConflictsWithSpecialUnlock() {
     assert.equal(specialRewardCount > 0, true)
 }
 
+function settleAwakeProgress(playerId, progressList) {
+    const progressByMissionId = new Map()
+    for (const entry of progressList) {
+        const current = progressByMissionId.get(entry.missionId)
+        if (current === undefined || entry.progress > current) {
+            progressByMissionId.set(entry.missionId, entry.progress)
+        }
+    }
+    for (const [missionId, progress] of progressByMissionId) {
+        updatePlayerCategoryMissionSync(playerId, 9, missionId, progress)
+    }
+    return settleAwakeMissionCandidates(
+        playerId,
+        [...progressByMissionId.keys()],
+        new Date("2025-01-01T12:00:00.000Z"),
+    )
+}
+
 function testDuplicateProgressUsesMaximum(playerId) {
     const itemAmountBefore = getPlayerItemSync(playerId, 13) ?? 0
-    const settlement = settleAwakeMissionRewards(playerId, [
+    const settlement = settleAwakeProgress(playerId, [
         { missionId: 3410051, progress: 1 },
         { missionId: 3410051, progress: 0 },
     ])
@@ -194,11 +211,11 @@ function testDuplicateProgressUsesMaximum(playerId) {
 }
 
 function testUnreceivedFinalStageRestoresMissingUnlock(playerId, progressList) {
-    settleAwakeMissionRewards(playerId, progressList.slice(0, 3))
+    settleAwakeProgress(playerId, progressList.slice(0, 3))
     assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has("341005"), false)
     const itemAmountBefore = getPlayerItemSync(playerId, 16) ?? 0
 
-    const settlement = settleAwakeMissionRewards(playerId, progressList)
+    const settlement = settleAwakeProgress(playerId, progressList)
     assert.deepEqual(settlement.missionInfo, [
         { mission_category_id: 9, mission_id: 3410054, mission_reward_id: 34100541 },
     ])
@@ -206,7 +223,7 @@ function testUnreceivedFinalStageRestoresMissingUnlock(playerId, progressList) {
     assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has("341005"), false)
     assert.equal(settlement.characterList.some(entry => entry.character_id === 341005), false)
 
-    const repeatedSettlement = settleAwakeMissionRewards(playerId, progressList)
+    const repeatedSettlement = settleAwakeProgress(playerId, progressList)
     assert.deepEqual(repeatedSettlement.missionInfo, [])
     assert.deepEqual(repeatedSettlement.itemList, {})
     assert.deepEqual(repeatedSettlement.characterList, [])
@@ -216,7 +233,7 @@ function testUnreceivedFinalStageRestoresMissingUnlock(playerId, progressList) {
 function testSpecialUnlockIsPublishedByGrowthOwner(playerId) {
     const missionId = 3410054
     const itemAmountBefore = getPlayerItemSync(playerId, 16) ?? 0
-    const settlement = settleAwakeMissionRewards(playerId, [{ missionId, progress: 3 }])
+    const settlement = settleAwakeProgress(playerId, [{ missionId, progress: 3 }])
 
     assert.equal(getPlayerItemSync(playerId, 16) ?? 0, itemAmountBefore + 1)
     assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has("341005"), false)
@@ -234,13 +251,7 @@ try {
         "main/Sub、直接变化任务及同角色 ALL_COMPLETE 必须稳定去重，未知或跨分类 ID 必须 fail closed",
     )
 
-    const originalBuildContext = AwakeComputer.buildContext
     const originalGetPlayerCategoryMissionsSync = missionDomain.getPlayerCategoryMissionsSync
-    let buildContextCalls = 0
-    AwakeComputer.buildContext = () => {
-        buildContextCalls++
-        throw new Error("empty candidates must not build awake context")
-    }
     missionDomain.getPlayerCategoryMissionsSync = () => {
         throw new Error("empty candidates must not read mission progress")
     }
@@ -256,9 +267,7 @@ try {
                 passCardPoints: {},
             },
         )
-        assert.equal(buildContextCalls, 0)
     } finally {
-        AwakeComputer.buildContext = originalBuildContext
         missionDomain.getPlayerCategoryMissionsSync = originalGetPlayerCategoryMissionsSync
     }
 
@@ -313,7 +322,7 @@ try {
         { missionId: 3410054, progress: 3 },
     ]
 
-    const firstSettlement = settleAwakeMissionRewards(playerId, progressList)
+    const firstSettlement = settleAwakeProgress(playerId, progressList)
     assert.deepEqual(firstSettlement.missionInfo, [
         { mission_category_id: 9, mission_id: 3410051, mission_reward_id: 34100511 },
         { mission_category_id: 9, mission_id: 3410052, mission_reward_id: 34100521 },
@@ -333,7 +342,7 @@ try {
     const settledSummary = computeAwakeSummary(playerId)
     assert.deepEqual(settledSummary.manaBoardAwakeMap.get("341005"), { 1: 1 })
 
-    const secondSettlement = settleAwakeMissionRewards(playerId, progressList)
+    const secondSettlement = settleAwakeProgress(playerId, progressList)
     assert.deepEqual(secondSettlement.missionInfo, [])
     assert.deepEqual(secondSettlement.itemList, {})
     assert.deepEqual(secondSettlement.characterList, [])

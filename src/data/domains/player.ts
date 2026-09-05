@@ -7,7 +7,7 @@ import { getAccountSync } from "./account";
 import { getPlayerQuestProgressSync } from "./quest";
 import { getBusinessDayKey, isNewDay, isNewWeek } from "../../lib/time-utils";
 import { buildPeriodicSnapshotData, getPassWeekSnapshotType, getSnapshot, initializePeriodicMissionSnapshots, takeSnapshot } from "../../lib/mission/snapshot";
-import { getMissionMasterDefinitions, isMissionDefinitionEnabledAt } from "../../lib/mission/master-data";
+
 import { ensurePlayerPassCardLoginProgressSync } from "./pass-card";
 import bundledDailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
@@ -82,9 +82,9 @@ function initializeCurrentPassWeekSnapshot(
     evaluationTime: Date,
     questClears: number,
 ): void {
-    const eventId = getMissionMasterDefinitions(7).find(definition =>
+    const eventId = getMissionCatalog().getDefinitions(7).find(definition =>
         definition.eventId !== undefined
-        && isMissionDefinitionEnabledAt(definition, evaluationTime)
+        && isMissionMasterDefinitionEnabledAt(definition, evaluationTime)
     )?.eventId
     if (eventId === undefined) return
     const snapshotType = getPassWeekSnapshotType(eventId)
@@ -102,11 +102,11 @@ function recordCurrentPassLogin(
     evaluationTime: Date,
 ): void {
     const eventIds = new Set(
-        getMissionMasterDefinitions(8)
+        getMissionCatalog().getDefinitions(8)
             .filter(definition =>
                 definition.patternType === 0
                 && definition.eventId !== undefined
-                && isMissionDefinitionEnabledAt(definition, evaluationTime)
+                && isMissionMasterDefinitionEnabledAt(definition, evaluationTime)
             )
             .map(definition => definition.eventId!),
     )
@@ -135,6 +135,7 @@ import { insertPlayerRushEventListSync, insertPlayerRushEventClearedFolderListSy
 import { deletePlayerCategoryMissionsSync, insertPlayerCategoryMissionListSync, insertPlayerClearedRegularMissionListSync, insertPlayerActiveMissionsSync } from "./mission";
 import { ensureActivityPeriodicRewardPointsSync, insertPlayerPeriodicRewardPointsListSync, insertPlayerStartDashExchangeCampaignsSync, insertPlayerMultiSpecialExchangeCampaignsSync, recoverActivityPeriodicRewardPointsSync } from "./campaign";
 import { insertCarnivalSaveStateSync } from "../../lib/carnival-save-state";
+import { getMissionCatalog, isMissionMasterDefinitionEnabledAt } from "../../lib/mission/mission-catalog"
 
 function assertValidExpPool(expPool: number, context: string): void {
     if (!Number.isSafeInteger(expPool) || expPool < 0) {
@@ -1314,9 +1315,9 @@ export function dailyResetPlayerDataSync(
             deletePlayerCategoryMissionsSync(playerId, 2)
             deletePlayerCategoryMissionsSync(playerId, 6)
 
-            const activePassWeekEventId = getMissionMasterDefinitions(7).find(definition =>
+            const activePassWeekEventId = getMissionCatalog().getDefinitions(7).find(definition =>
                 definition.eventId !== undefined
-                && isMissionDefinitionEnabledAt(definition, loginDate)
+                && isMissionMasterDefinitionEnabledAt(definition, loginDate)
             )?.eventId
             if (activePassWeekEventId !== undefined) {
                 const snapshotType = getPassWeekSnapshotType(activePassWeekEventId)

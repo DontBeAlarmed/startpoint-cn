@@ -5,7 +5,6 @@ import { RegularComputer } from "./computer-regular"
 import { DegreeComputer } from "./computer-degree"
 import { AwakeComputer } from "./computer-awake"
 import { CollectComputer } from "./collect-progress"
-import { FallbackComputer } from "./computer-fallback"
 import { PassComputer } from "./pass"
 import { EventSafeComputer } from "./computer-event-safe"
 
@@ -23,5 +22,9 @@ const REGISTRY: ComputerRegistry = new Map([
 ])
 
 export function getComputer(category: number): MissionComputer {
-    return REGISTRY.get(category) ?? FallbackComputer
+    const computer = REGISTRY.get(category)
+    if (computer === undefined) {
+        throw new TypeError(`No mission computer registered for category ${category}`)
+    }
+    return computer
 }

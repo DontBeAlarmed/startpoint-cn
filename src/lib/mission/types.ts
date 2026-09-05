@@ -93,17 +93,10 @@ export interface MissionComputer {
     readonly name: string
 
     /**
-     * Build pre-cached context for this category.
+     * Build pre-cached context for this category from a declared-fact Session.
      * All DB I/O happens here — compute() must be pure.
      */
-    buildContext(
-        playerId: number,
-        category: number,
-        evaluationTime: Date,
-        missionIds?: readonly number[],
-    ): CategoryContext
-
-    buildContextFromSession?(
+    buildContextFromSession(
         session: MissionEvaluationSession,
         category: number,
         missionIds: readonly number[],

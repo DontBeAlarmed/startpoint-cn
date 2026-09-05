@@ -1,8 +1,7 @@
 import { incrementPlayerCategoryMissionSync } from "../../data/domains/mission"
 import { getQuestContentTableSync } from "../assets"
 import type { FinishContext } from "../quest/finish/types"
-import { getMissionMasterDefinitions, isMissionDefinitionEnabledAt } from "./master-data"
-
+import { getMissionCatalog, isMissionMasterDefinitionEnabledAt } from "./mission-catalog"
 const ACTIVE_DAILY_BATTLE_MISSION_IDS = new Set([
     10075,
     800115,
@@ -88,9 +87,9 @@ export function recordDailyMissionBattleFacts(
     if (!context.questAccomplished) return []
 
     const matchedMissionIds: number[] = []
-    for (const definition of getMissionMasterDefinitions(2)) {
+    for (const definition of getMissionCatalog().getDefinitions(2)) {
         if (!ACTIVE_DAILY_BATTLE_MISSION_IDS.has(definition.missionId)
-            || !isMissionDefinitionEnabledAt(definition, evaluationTime)) continue
+            || !isMissionMasterDefinitionEnabledAt(definition, evaluationTime)) continue
 
         let matches = false
         if (definition.missionId === SCORE_ATTACK_DAILY_MISSION_ID) {

@@ -26,15 +26,24 @@ process.once("exit", cleanupDatabase)
 const {
     getComputer,
     getCompletedStageNumbers,
-    getActiveMissionRewards,
     getAwakeMissionRewardStageDefinition,
-    getDailyMissionRewards,
     isMissionProgressComplete,
-    getRegularMissionRewards,
-    getWeeklyMissionRewards,
-    isMissionEnabledAt,
     validateMissionRewardClaims,
 } = require("../src/lib/mission")
+const { getMissionCatalog } = require("../src/lib/mission/mission-catalog")
+const {
+    getActiveMissionPlan,
+    getActiveMissionPlanRewardStages,
+} = require("../src/lib/mission/active-plan")
+
+function catalogRewards(category, missionId, stage) {
+    return getMissionCatalog().getRewardStage(category, missionId, stage)?.rewards ?? []
+}
+
+function activePlanRewards(missionId, stage) {
+    return getActiveMissionPlanRewardStages(getActiveMissionPlan(), missionId)
+        .find(definition => definition.stage === stage)?.rewards ?? []
+}
 const { addMissionProgressDelta } = require("../src/lib/mission/progress")
 require("../src/data").initializeDatabase()
 db = require("../src/data/db").getDb()
@@ -55,19 +64,19 @@ assert.equal(awakeComputer.compute(3410054, { charClears: new Map([["341005", 3]
 assert.equal(awakeComputer.compute(3410054, { charClears: new Map([["341005", 5]]) }, 0), 3)
 
 assert.equal(
-    isMissionEnabledAt(2, 3, new Date("2019-11-28T03:59:59.999Z")),
+    getMissionCatalog().isEnabledAt(2, 3, new Date("2019-11-28T03:59:59.999Z")),
     false
 )
 assert.equal(
-    isMissionEnabledAt(2, 3, new Date("2019-11-28T04:00:00.000Z")),
+    getMissionCatalog().isEnabledAt(2, 3, new Date("2019-11-28T04:00:00.000Z")),
     true
 )
 assert.equal(
-    isMissionEnabledAt(4, 1500, new Date("2020-02-25T03:00:00.000Z"), 1),
+    getMissionCatalog().isEnabledAt(4, 1500, new Date("2020-02-25T03:00:00.000Z"), 1),
     true
 )
 assert.equal(
-    isMissionEnabledAt(4, 1500, new Date("2020-02-25T03:00:00.000Z"), 2),
+    getMissionCatalog().isEnabledAt(4, 1500, new Date("2020-02-25T03:00:00.000Z"), 2),
     false
 )
 
@@ -76,10 +85,10 @@ assert.equal(addMissionProgressDelta(4, 0), null)
 assert.equal(addMissionProgressDelta(4, -1), null)
 assert.equal(addMissionProgressDelta(4, 1.5), null)
 
-assert.deepEqual(getRegularMissionRewards(1, 1), [{ kind: 0, amount: 5 }])
-assert.deepEqual(getDailyMissionRewards(1, 1), [{ kind: 0, amount: 5 }])
-assert.deepEqual(getWeeklyMissionRewards(1, 1), [{ kind: 1, amount: 500, itemId: 70047 }])
-assert.deepEqual(getActiveMissionRewards(20001, 1), [
+assert.deepEqual(catalogRewards(1, 1, 1), [{ kind: 0, amount: 5 }])
+assert.deepEqual(catalogRewards(2, 1, 1), [{ kind: 0, amount: 5 }])
+assert.deepEqual(catalogRewards(10, 1, 1), [{ kind: 1, amount: 500, itemId: 70047 }])
+assert.deepEqual(activePlanRewards(20001, 1), [
     { kind: 4, amount: 1, characterId: 121033 },
     { kind: 4, amount: 1, characterId: 121007 },
     { kind: 2, amount: 5, equipmentId: 5080018 },

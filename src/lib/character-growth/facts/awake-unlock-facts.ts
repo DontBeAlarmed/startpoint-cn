@@ -6,7 +6,6 @@ import {
 import type { CharacterAwakeUnlockMap } from "../../../data/domains/character_awake"
 import { getCharacterIdFromMission } from "../../mission/character-queries"
 import { getAwakeMissionRewardStageDefinition } from "../../mission/rewards"
-import { getCompletedStageNumbers } from "../../mission/stages"
 import { createCharacterAwakeEligibilityResolver } from "../../mission/awake-eligibility"
 import type { CharacterAwakeEligibilityResolver } from "../../mission/awake-eligibility"
 import {
@@ -14,6 +13,7 @@ import {
     type AwakeRequestContext,
 } from "../../mission/awake-request-context"
 import { consumeAwakeRequestContextWrite } from "../../mission/awake-request-context-state"
+import { getCompletedStageNumbers } from "../../mission/mission-catalog"
 
 export interface AwakeUnlockProgress {
     missionId: number

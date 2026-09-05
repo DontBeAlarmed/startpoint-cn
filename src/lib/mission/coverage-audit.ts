@@ -3,9 +3,9 @@ import { getRegularComputedMissionIds } from "./computer-regular"
 import { getEventSafeMissionIds } from "./computer-event-safe"
 import { getExactEventBattleMissionIds } from "./event-battle-facts"
 import { getProducerBackedEventEntryMissionIds } from "./event-entry-facts"
-import { getMissionMasterDefinitions } from "./master-data"
 import { getAwakeMissionRuleFamilies } from "./awake-rule-catalog"
 import type { AwakeMissionRuleFamilyName } from "./awake-rule-catalog"
+import { MissionMasterDefinition, getMissionCatalog } from "./mission-catalog"
 
 export interface MissionCoverageEntry {
     readonly category: number
@@ -87,7 +87,7 @@ const REGULAR_FALLBACK_REASON_BY_MISSION_ID: ReadonlyMap<number, string> = new M
 
 function regularPartition(): MissionCoveragePartition {
     return createPartition(
-        [{ category: 1, definitions: getMissionMasterDefinitions(1) }],
+        [{ category: 1, definitions: getMissionCatalog().getDefinitions(1) }],
         missionKeys(1, getRegularComputedMissionIds()),
         (_category, definition) => REGULAR_FALLBACK_REASON_BY_MISSION_ID.get(definition.missionId)
             ?? "authoritative-regular-fact-unavailable",
@@ -95,9 +95,9 @@ function regularPartition(): MissionCoveragePartition {
 }
 
 function createPartition(
-    categoryDefinitions: readonly { readonly category: number; readonly definitions: ReturnType<typeof getMissionMasterDefinitions> }[],
+    categoryDefinitions: readonly { readonly category: number; readonly definitions: readonly MissionMasterDefinition[] }[],
     automatedKeys: ReadonlySet<string>,
-    reason: (category: number, definition: ReturnType<typeof getMissionMasterDefinitions>[number]) => string,
+    reason: (category: number, definition: MissionMasterDefinition) => string,
 ): MissionCoveragePartition {
     const automatedMissions: MissionCoverageEntry[] = []
     const fallbackMissions: MissionFallbackEntry[] = []
@@ -145,7 +145,7 @@ function eventPartition(): MissionCoveragePartition {
         ...getProducerBackedEventEntryMissionIds(),
     ])
     return createPartition(
-        [{ category: 3, definitions: getMissionMasterDefinitions(3) }],
+        [{ category: 3, definitions: getMissionCatalog().getDefinitions(3) }],
         missionKeys(3, [...ids]),
         (_category, definition) => eventFallbackReason(definition.row),
     )
@@ -153,7 +153,7 @@ function eventPartition(): MissionCoveragePartition {
 
 function degreePartition(): MissionCoveragePartition {
     return createPartition(
-        [{ category: 5, definitions: getMissionMasterDefinitions(5) }],
+        [{ category: 5, definitions: getMissionCatalog().getDefinitions(5) }],
         missionKeys(5, getDegreeComputedMissionIds()),
         (_category, definition) => degreeFallbackReason(definition.missionId),
     )
@@ -162,7 +162,7 @@ function degreePartition(): MissionCoveragePartition {
 function passPartition(): MissionCoveragePartition {
     const definitions = [6, 7, 8].map(category => ({
         category,
-        definitions: getMissionMasterDefinitions(category),
+        definitions: getMissionCatalog().getDefinitions(category),
     }))
     const automated = new Set<string>()
     for (const { category, definitions: entries } of definitions) {
@@ -184,7 +184,7 @@ function passPartition(): MissionCoveragePartition {
 }
 
 function awakeCoverage(): MissionCoverageAudit["awake"] {
-    const definitions = getMissionMasterDefinitions(9)
+    const definitions = getMissionCatalog().getDefinitions(9)
     const families = getAwakeMissionRuleFamilies().map(family => Object.freeze({
         family: family.family,
         status: family.status,

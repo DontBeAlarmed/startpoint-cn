@@ -42,8 +42,32 @@ function getRuntimeDependencies(runtimeRoot = projectRoot) {
     const characterLib = fromRuntime("src/lib/character")
     const awakeSettlement = fromRuntime("src/lib/mission/awake-settlement")
     const battleFacts = fromRuntime("src/lib/mission/battle-facts")
-    const patterns = fromRuntime("src/lib/mission/patterns")
-    const stages = fromRuntime("src/lib/mission/stages")
+    // Wrapper retirement (D24 C2) moved stage/pattern helpers into the
+    // catalog on current trees; archived BASE runtimes still ship the old
+    // wrapper modules. Merge whatever exists and adapt the legacy names.
+    const missionCompat = {}
+    for (const modulePath of [
+        "src/lib/mission/mission-catalog",
+        "src/lib/mission/patterns",
+        "src/lib/mission/stages",
+    ]) {
+        try {
+            Object.assign(missionCompat, fromRuntime(modulePath))
+        } catch {
+            // module retired on this runtime root
+        }
+    }
+    const missionCatalog = missionCompat
+    if (typeof missionCompat.isMissionEnabledAt !== "function" && typeof missionCompat.getMissionCatalog === "function") {
+        missionCompat.isMissionEnabledAt = (category, missionId, at, eventId) => (
+            missionCompat.getMissionCatalog().isEnabledAt(category, missionId, at, eventId)
+        )
+    }
+    if (typeof missionCompat.getMissionIdsByCategory !== "function" && typeof missionCompat.getMissionCatalog === "function") {
+        missionCompat.getMissionIdsByCategory = category => (
+            missionCompat.getMissionCatalog().getMissionIds(category)
+        )
+    }
     const { getComputer } = fromRuntime("src/lib/mission/registry")
     const { settleMissionCategories } = fromRuntime("src/lib/mission/settlement")
     const missionRoutes = fromRuntime("src/routes/api/mission").default
@@ -64,8 +88,10 @@ function getRuntimeDependencies(runtimeRoot = projectRoot) {
         ...characterLib,
         ...awakeSettlement,
         ...battleFacts,
-        ...patterns,
-        ...stages,
+        ...missionCatalog,
+        isMissionEnabledAt: (category, missionId, at, eventId) => (
+            missionCatalog.getMissionCatalog().isEnabledAt(category, missionId, at, eventId)
+        ),
         bondRoutes,
         getComputer,
         getTimeOffset,

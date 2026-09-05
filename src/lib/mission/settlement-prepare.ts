@@ -1,15 +1,12 @@
 import { ensurePlayerPassCardLoginProgressSync } from "../../data/domains/pass-card"
 import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
-import { getMissionMasterDefinition } from "./master-data"
-import { isMissionEnabledAt } from "./patterns"
 import {
     buildPeriodicSnapshotData,
     getPassWeekSnapshotType,
     getSnapshots,
     takeSnapshot,
 } from "./snapshot"
-import { getMissionIdsByCategory } from "./stages"
 import { getMissionCatalog } from "./mission-catalog"
 import type {
     MissionSettlementObserver,
@@ -55,7 +52,7 @@ function mergeSettlementScopes(
 function getRequestedMissionIds(scope: MissionSettlementScope): number[] {
     const categoryMissionIds = scope.category === 9
         ? getMissionCatalog().getMissionIds(9)
-        : getMissionIdsByCategory(scope.category)
+        : getMissionCatalog().getMissionIds(scope.category)
     if (scope.category === 2 || scope.missionIds === undefined) {
         return [...new Set(categoryMissionIds.filter(isSafeMissionId))]
     }
@@ -95,7 +92,7 @@ function eventIdsForCandidates(
     const eventIds = new Set<number>()
     for (const candidate of candidates) {
         if (candidate.category !== category) continue
-        const definition = getMissionMasterDefinition(candidate.category, candidate.missionId)
+        const definition = getMissionCatalog().getDefinition(candidate.category, candidate.missionId)
         if (!definition || !Number.isSafeInteger(definition.eventId) || definition.eventId! <= 0) continue
         if (category === 8 && definition.patternType !== 0) continue
         eventIds.add(definition.eventId!)
@@ -122,7 +119,7 @@ export function selectMissionSettlementCandidates(
     const scopes = mergeSettlementScopes(categories).map(scope => {
         const requestedMissionIds = getRequestedMissionIds(scope)
         const enabledMissionIds = requestedMissionIds.filter(missionId =>
-            isMissionEnabledAt(scope.category, missionId, fixedEvaluationTime, scope.eventId),
+            getMissionCatalog().isEnabledAt(scope.category, missionId, fixedEvaluationTime, scope.eventId),
         )
         observer?.onCategoryCandidates?.(scope.category, requestedMissionIds.length)
         return freezeScope(scope, requestedMissionIds.length, enabledMissionIds)

@@ -3,10 +3,6 @@
 import { getRankDegree } from "../stamina"
 import { buildDegreeCategoryContextFromSession } from "./degree-session-context"
 import type { DegreeMetric, DegreeRule } from "./degree-rule-catalog"
-import { MissionEvaluationSession } from "./evaluation-session"
-import { getMissionCatalog } from "./mission-catalog"
-import { createProductionMissionFactLoaderRegistry } from "./production-fact-loaders"
-import { getMissionFactRequirementRegistry } from "./requirements/registry"
 import type { CategoryContext, MissionComputer } from "./types"
 
 export {
@@ -95,31 +91,8 @@ export function computeDegreeProgress(
     }
 }
 
-function buildLegacyContext(
-    playerId: number,
-    category: number,
-    evaluationTime: Date,
-    missionIds?: readonly number[],
-): CategoryContext {
-    if (category !== 5) throw new Error("Degree context only supports category 5")
-    const catalog = getMissionCatalog()
-    const requestedIds = missionIds ?? catalog.getMissionIds(5)
-    const candidateIds = [...new Set(requestedIds)].filter(id => catalog.getDefinition(5, id))
-    const session = new MissionEvaluationSession({
-        playerId,
-        evaluationTime: evaluationTime instanceof Date ? evaluationTime : new Date(0),
-        catalog,
-        requirementRegistry: getMissionFactRequirementRegistry(catalog),
-        candidates: candidateIds.map(missionId => ({ category: 5, missionId })),
-        orchestratorFacts: [{ kind: "player" }],
-        loaders: createProductionMissionFactLoaderRegistry(),
-    })
-    return buildDegreeCategoryContextFromSession(session, 5, candidateIds)
-}
-
 export const DegreeComputer: MissionComputer = {
     name: "Degree",
-    buildContext: buildLegacyContext,
     buildContextFromSession: buildDegreeCategoryContextFromSession,
     compute(missionId, ctx, dbProgress) {
         return computeDegreeProgress(ctx.degreeRules?.get(missionId), ctx, dbProgress)

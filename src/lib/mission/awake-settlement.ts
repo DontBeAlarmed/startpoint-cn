@@ -1,17 +1,7 @@
-import {
-    getPlayerCategoryMissionsSync,
-    updatePlayerCategoryMissionStageSync,
-    updatePlayerCategoryMissionSync,
-} from "../../data/domains/mission"
-import { getPlayerSync } from "../../data/domains/player"
 import { getDb } from "../../data/db"
-import { MissionRewardGranter } from "./grants"
-import { getAwakeMissionRewardStageDefinition } from "./rewards"
-import { getCompletedStageNumbers } from "./stages"
-import { getCharacterIdFromMission } from "./character-queries"
 import { createCharacterAwakeEligibilityResolver } from "./awake-eligibility"
 import type { CharacterAwakeEligibilityResolver } from "./awake-eligibility"
-import { getMissionCatalog, type MissionCatalog } from "./mission-catalog"
+import { getMissionCatalog, MissionCatalog } from "./mission-catalog"
 import {
     prepareMissionSettlement,
     selectMissionSettlementCandidates,
@@ -149,88 +139,6 @@ export function settleAwakeMissionCandidatesWithEvaluation(
             resolver: effectiveResolver,
             settlement: settled.settlement,
             invalidatedFactKeys: settled.invalidatedFactKeys,
-        }
-    })()
-}
-
-export function settleAwakeBattleMissions(
-    params: AwakeBattleMissionSettlementParams,
-    dependencies: MissionSettlementRewardDependencies = {},
-): AwakeMissionSettlementResult {
-    if (!params.questAccomplished) return emptyAwakeMissionSettlement()
-    const missionIds = getAwakeBattleMissionIds(
-        params.characterIds,
-        params.directlyChangedMissionIds,
-    )
-    if (missionIds.length === 0) return emptyAwakeMissionSettlement()
-    return settleAwakeMissionCandidates(
-        params.playerId,
-        missionIds,
-        params.evaluationTime,
-        dependencies,
-    )
-}
-
-export function settleAwakeMissionRewards(
-    playerId: number,
-    progressList: AwakeMissionComputedProgress[],
-    resolver: CharacterAwakeEligibilityResolver = createCharacterAwakeEligibilityResolver(playerId),
-): AwakeMissionSettlementResult {
-    const progressByMissionId = new Map<number, number>()
-    for (const entry of progressList) {
-        const currentProgress = progressByMissionId.get(entry.missionId)
-        if (currentProgress === undefined || entry.progress > currentProgress) {
-            progressByMissionId.set(entry.missionId, entry.progress)
-        }
-    }
-    const aggregatedProgressList = [...progressByMissionId]
-        .map(([missionId, progress]) => ({ missionId, progress }))
-        .filter(({ missionId }) => resolver.isNewUnlockEligible(
-            Number(getCharacterIdFromMission(missionId)),
-            missionId,
-        ))
-
-    return getDb().transaction(() => {
-        const player = getPlayerSync(playerId)
-        if (!player) throw new Error(`Player ${playerId} not found during CharacterAwake settlement.`)
-        const persistedMissions = getPlayerCategoryMissionsSync(playerId, 9)
-        const granter = new MissionRewardGranter(playerId, player)
-        const missionInfo: AwakeMissionInfo[] = []
-        for (const entry of aggregatedProgressList) {
-            updatePlayerCategoryMissionSync(playerId, 9, entry.missionId, entry.progress)
-        }
-
-        for (const entry of aggregatedProgressList) {
-            const persistedStages = persistedMissions[String(entry.missionId)]?.stages
-            for (const stage of getCompletedStageNumbers(9, entry.missionId, entry.progress)) {
-                if (!Array.isArray(persistedStages) && persistedStages?.[String(stage)] === true) continue
-
-                const definition = getAwakeMissionRewardStageDefinition(entry.missionId, stage)
-                if (!definition) continue
-
-                updatePlayerCategoryMissionStageSync(playerId, 9, stage, entry.missionId, true)
-                granter.grant(definition.rewards)
-                missionInfo.push({
-                    mission_category_id: 9,
-                    mission_id: entry.missionId,
-                    mission_reward_id: definition.missionRewardId,
-                })
-
-            }
-        }
-
-        granter.persistPlayer()
-        return {
-            missionInfo,
-            itemList: granter.itemList,
-            characterList: granter.characterList as Record<string, unknown>[],
-            equipmentList: granter.equipmentList,
-            degreeIds: granter.degreeList,
-            passCardPoints: {},
-            ...(granter.itemOverflowDispositions.length > 0
-                ? { itemOverflowDispositions: granter.itemOverflowDispositions }
-                : {}),
-            ...(granter.hasPlayerChanges() ? { userInfo: granter.getUserInfo() } : {}),
         }
     })()
 }

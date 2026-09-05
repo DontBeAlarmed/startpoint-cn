@@ -562,7 +562,7 @@ const SOURCE_RULES = [
         groups: ["integration:rules"],
     },
     {
-        pattern: /^src\/lib\/mission\/(?:battle-facts|event-battle-facts|event-entry-facts|computer-event|coverage-audit|computer-degree|degree-battle-facts|degree-candidates|degree-context-requirements|degree-operation-facts)\.ts$/,
+        pattern: /^src\/lib\/mission\/(?:battle-facts|event-battle-facts|event-entry-facts|coverage-audit|computer-degree|degree-battle-facts|degree-candidates|degree-context-requirements|degree-operation-facts)\.ts$/,
         groups: ["integration:mission"],
     },
     {
@@ -571,6 +571,10 @@ const SOURCE_RULES = [
     },
     {
         pattern: /^tools\/helpers\/mission-evaluation-(?:rejected-(?:observer|promise)-worker|session-fixture)\.cjs$/,
+        groups: ["integration:mission"],
+    },
+    {
+        pattern: /^tools\/helpers\/(?:mission-session-context|active-mission-fact-progress)\.cjs$/,
         groups: ["integration:mission"],
     },
     {

@@ -33,7 +33,7 @@ const {
     getExactDegreeQuestClearMissionIds,
     recordDegreeMissionBattleFacts,
 } = require("../src/lib/mission/degree-battle-facts")
-const { getMissionMasterDefinitions } = require("../src/lib/mission/master-data")
+const { getMissionCatalog } = require("../src/lib/mission/mission-catalog")
 const { buildBattleMissionSettlementScopes } = require("../src/lib/mission/battle-facts")
 
 initializeDatabase()
@@ -48,7 +48,7 @@ const account = insertAccountSync({
 const playerId = insertDefaultPlayerSync(account.id).id
 
 const degreeScope = scopes => scopes.find(scope => typeof scope === "object" && scope.category === 5)
-const definitions = getMissionMasterDefinitions(5)
+const definitions = getMissionCatalog().getDefinitions(5)
 const missionIdsByConditionType = conditionType => definitions
     .filter(definition => Number(definition.row[3]) === conditionType)
     .map(definition => definition.missionId)

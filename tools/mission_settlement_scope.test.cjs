@@ -51,13 +51,13 @@ registry.getComputer = function instrumentedGetComputer(category) {
     const computer = realGetComputer(category)
     return {
         name: computer.name,
-        buildContext(...args) {
+        buildContextFromSession(session, category, missionIds) {
             calls.buildContext.push({
-                playerId: args[0],
-                category: args[1],
-                missionIds: args[3] === undefined ? undefined : [...args[3]],
+                playerId: session.playerId,
+                category,
+                missionIds: [...missionIds],
             })
-            return computer.buildContext(...args)
+            return computer.buildContextFromSession(session, category, missionIds)
         },
         compute(missionId, context, dbProgress) {
             calls.compute.push({
@@ -74,8 +74,7 @@ const { initializeDatabase } = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { recordMissionBattleResultSync } = require("../src/data/domains/mission_battle_facts")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
-const { isMissionEnabledAt } = require("../src/lib/mission/patterns")
-const { getMissionIdsByCategory } = require("../src/lib/mission/stages")
+const { getMissionCatalog } = require("../src/lib/mission/mission-catalog")
 
 initializeDatabase()
 db = realGetDb()
@@ -139,8 +138,8 @@ function settleWithCandidates(playerId, scopes, evaluationTime) {
 }
 
 const evaluationTime = new Date("2025-01-01T12:00:00.000Z")
-const categoryOneMissionIdSet = new Set(getMissionIdsByCategory(1))
-const foreignCategoryMissionId = getMissionIdsByCategory(2)
+const categoryOneMissionIdSet = new Set(getMissionCatalog().getMissionIds(1))
+const foreignCategoryMissionId = getMissionCatalog().getMissionIds(2)
     .find(missionId => !categoryOneMissionIdSet.has(missionId))
 assert.notEqual(
     foreignCategoryMissionId,
@@ -222,9 +221,9 @@ assert.deepEqual(union.candidates, [{ category: 1, count: 3 }])
 assert.deepEqual(calls.buildContext[0].missionIds, [1, 2])
 assert.deepEqual(calls.compute.map(call => call.missionId), [1, 2])
 
-const fullMissionIds = getMissionIdsByCategory(1)
+const fullMissionIds = getMissionCatalog().getMissionIds(1)
 const enabledFullMissionIds = fullMissionIds.filter(missionId =>
-    isMissionEnabledAt(1, missionId, evaluationTime),
+    getMissionCatalog().isEnabledAt(1, missionId, evaluationTime),
 )
 let fullSettlementResult
 for (const [label, scopes] of [
@@ -253,9 +252,9 @@ for (let index = 0; index < 3; index++) {
     recordMissionBattleResultSync(dailyPlayerId, { isMulti: false, accomplished: true })
 }
 recordMissionBattleResultSync(dailyPlayerId, { isMulti: true, accomplished: true })
-const dailyMissionIds = getMissionIdsByCategory(2)
+const dailyMissionIds = getMissionCatalog().getMissionIds(2)
 const enabledDailyMissionIds = dailyMissionIds.filter(missionId =>
-    isMissionEnabledAt(2, missionId, evaluationTime),
+    getMissionCatalog().isEnabledAt(2, missionId, evaluationTime),
 )
 const daily = settleWithCandidates(
     dailyPlayerId,

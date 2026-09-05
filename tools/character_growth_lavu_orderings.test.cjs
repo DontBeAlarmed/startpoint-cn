@@ -40,7 +40,7 @@ const {
 } = require("../src/lib/assets")
 const { characterExpCaps } = require("../src/lib/character")
 const { mutationContent } = require("../src/lib/character-growth/node-command-support")
-const { getCurrentStage } = require("../src/lib/mission/stages")
+const { getCurrentStage } = require("../src/lib/mission/mission-catalog")
 const { insertActiveQuest } = require("../src/lib/quest/active-quest-service")
 const { getTimeOffset, setServerTimeOffset } = require("../src/utils")
 

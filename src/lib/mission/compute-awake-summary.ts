@@ -1,22 +1,14 @@
 // Compute awake mission summary for /load response
 // Returns active_mission_list (Array format for data.active_mission_list)
 
-import { getPlayerCategoryMissionsSync } from "../../data/domains/mission"
 import { getPlayerCharacterAwakeUnlocksSync } from "../../data/domains/character_awake"
-import { getComputer } from "./registry"
-import { getMissionIdsByCategory, getMissionStageIds } from "./stages"
-import { getCharacterIdFromMission } from "./character-queries"
-import type { CategoryContext } from "./types"
-import { createCharacterAwakeEligibilityResolver } from "./awake-eligibility"
-import type { CharacterAwakeEligibilityResolver } from "./awake-eligibility"
-import { buildAwakeContext } from "./computer-awake"
 import {
     assertAwakeRequestContext,
     createAwakeRequestContext,
-    isAwakeRequestContext,
     readAwakeRequestContextCategoryMissions,
     type AwakeRequestContext,
 } from "./awake-request-context"
+import { getMissionStageIds } from "./mission-catalog"
 
 export interface AwakeMissionEntry {
     mission_id: number
@@ -31,71 +23,25 @@ export interface AwakeSummary {
 
 export function computeAwakeSummary(
     playerId: number,
-    resolverOrContext?: CharacterAwakeEligibilityResolver | AwakeRequestContext,
+    context?: AwakeRequestContext,
 ): AwakeSummary {
-    if (resolverOrContext === undefined || isAwakeRequestContext(resolverOrContext)) {
-        const context = resolverOrContext ?? createAwakeRequestContext({ playerId })
-        assertAwakeRequestContext(context, playerId)
-        const activeMissions = readAwakeRequestContextCategoryMissions(context)
-        const activeMissionList = context.evaluate().map(entry => {
-            const persistedStages = activeMissions[String(entry.missionId)]?.stages
-            return {
-                mission_id: entry.missionId,
-                progress_value: entry.progress,
-                stages: getMissionStageIds(9, entry.missionId).map(stage => ({
-                    stage,
-                    received: !Array.isArray(persistedStages)
-                        && persistedStages?.[String(stage)] === true,
-                })),
-            }
-        })
+    context ??= createAwakeRequestContext({ playerId })
+    assertAwakeRequestContext(context, playerId)
+    const activeMissions = readAwakeRequestContextCategoryMissions(context)
+    const activeMissionList = context.evaluate().map(entry => {
+        const persistedStages = activeMissions[String(entry.missionId)]?.stages
         return {
-            activeMissionList,
-            manaBoardAwakeMap: context.readUnlocks(),
+            mission_id: entry.missionId,
+            progress_value: entry.progress,
+            stages: getMissionStageIds(9, entry.missionId).map(stage => ({
+                stage,
+                received: !Array.isArray(persistedStages)
+                    && persistedStages?.[String(stage)] === true,
+            })),
         }
+    })
+    return {
+        activeMissionList,
+        manaBoardAwakeMap: context.readUnlocks(),
     }
-
-    const resolver = resolverOrContext
-    const activeMissions = getPlayerCategoryMissionsSync(playerId, 9)
-    const playerChars = resolver.characters
-    const awakeMissionIds = getMissionIdsByCategory(9)
-
-    const charMissionMap = new Map<string, number[]>()
-    for (const mid of awakeMissionIds) {
-        const charId = getCharacterIdFromMission(mid)
-        if (!charMissionMap.has(charId)) charMissionMap.set(charId, [])
-        charMissionMap.get(charId)!.push(mid)
-    }
-
-    const computer = getComputer(9)
-    const ctx = buildAwakeContext(playerId, playerChars) as CategoryContext
-
-    const activeMissionList: AwakeMissionEntry[] = []
-    const manaBoardAwakeMap = getPlayerCharacterAwakeUnlocksSync(playerId)
-
-    for (const [charKId, missionIds] of charMissionMap) {
-        if (!playerChars[charKId]) continue
-
-        for (const missionId of missionIds) {
-            if (!resolver.isNewUnlockEligible(Number(charKId), missionId)) continue
-
-            const dbProgress = activeMissions[String(missionId)]?.progress ?? 0
-            const progress = computer.compute(missionId, ctx, dbProgress)
-            const allStageIds = getMissionStageIds(9, missionId)
-            const persistedStages = activeMissions[String(missionId)]?.stages
-
-            const stages = allStageIds.map(sid => ({
-                stage: sid,
-                received: !Array.isArray(persistedStages) && persistedStages?.[String(sid)] === true,
-            }))
-
-            activeMissionList.push({
-                mission_id: missionId,
-                progress_value: progress,
-                stages,
-            })
-        }
-    }
-
-    return { activeMissionList, manaBoardAwakeMap }
 }

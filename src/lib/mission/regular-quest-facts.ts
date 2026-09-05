@@ -1,11 +1,8 @@
 import bundledExQuests from "../../../assets/ex_quest.json"
 import bundledMainQuests from "../../../assets/main_quest.json"
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
-import {
-    getMissionMasterDefinition,
-    type MissionMasterDefinition,
-} from "./master-data"
 import type { CategoryContext } from "./types"
+import { MissionMasterDefinition, getMissionCatalog } from "./mission-catalog"
 
 type RawQuestTable = Record<string, unknown>
 
@@ -76,7 +73,7 @@ function computeStoryQuestRange(
     missionId: number,
     ctx: CategoryContext,
 ): number | undefined {
-    const definition = getMissionMasterDefinition(1, missionId)
+    const definition = getMissionCatalog().getDefinition(1, missionId)
     const rule = definition ? getStoryQuestRule(definition) : null
     if (!rule) return undefined
     const finished = getFinishedQuestIds(ctx, rule.section)
@@ -87,7 +84,7 @@ function computePracticeQuestRange(
     missionId: number,
     ctx: CategoryContext,
 ): number | undefined {
-    const definition = getMissionMasterDefinition(1, missionId)
+    const definition = getMissionCatalog().getDefinition(1, missionId)
     const candidates = definition ? getPracticeQuestCandidates(definition) : null
     if (!candidates) return undefined
     const finished = getFinishedQuestIds(ctx, 15)
@@ -95,7 +92,7 @@ function computePracticeQuestRange(
 }
 
 export function isRegularQuestMissionSupported(missionId: number): boolean {
-    const definition = getMissionMasterDefinition(1, missionId)
+    const definition = getMissionCatalog().getDefinition(1, missionId)
     return definition !== undefined && getRegularQuestFactSection(definition) !== undefined
 }
 
