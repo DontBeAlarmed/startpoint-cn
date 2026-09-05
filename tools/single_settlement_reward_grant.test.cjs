@@ -469,7 +469,7 @@ test("single settlement migrates score while preserving multiplayer, Carnival an
     assert.match(responseState, /let playerState:\s*RewardGrantKnownPlayerState\s*=\s*\{\s*playerId:\s*player\.id,/)
     assert.match(responseState, /playerState = grant\.playerAfter/)
     assert.match(responseState, /grant\.assets\.items\.map/)
-    assert.match(writes, /responseState\.setPlayerState\(\{\s*playerId:\s*responseState\.playerState\.playerId,\s*freeMana:\s*newMana,/)
+    assert.match(writes, /responseState\.setPlayerState\(\{\s*playerId:\s*responseState\.playerState\.playerId,\s*freeMana:\s*playerValues\.freeMana,/)
     assert.match(writes, /selectScoreRewardGrantPlan\s*\(/)
     assert.match(writes, /grantSingleSettlementScoreRewardsWithinTransactionSync\s*\(/)
     assert.match(writes, /responseState\.observeGrant\(scoreRewardGrant\.grant\)/)

@@ -193,14 +193,21 @@ const singleGrowthPublicationSource = fs.readFileSync(
     path.join(__dirname, "../src/lib/quest/finish/single-growth-publication.ts"),
     "utf8",
 )
+const singleValuePlanSource = fs.readFileSync(
+    path.join(__dirname, "../src/lib/quest/finish/single-settlement-value-plan.ts"),
+    "utf8",
+)
 const singleTransactionStart = singleBattleSource.indexOf("export function executeSingleSettlementWrites(")
-const singleEvaluationTime = singleBattleSource.indexOf(
+const singleEvaluationTime = singleValuePlanSource.indexOf(
     "const settlementTime = new Date(getServerTime() * 1000)",
+)
+const singleValuePlanCall = singleBattleSource.indexOf(
+    "createSingleSettlementValuePlan({",
     singleTransactionStart,
 )
 const singleFactCall = singleBattleSource.indexOf(
     "recordMissionBattleFacts(finishCtx, settlementTime)",
-    singleEvaluationTime,
+    singleValuePlanCall,
 )
 const singleCharacterExp = singleBattleSource.indexOf(
     "givePlayerCharactersExpSync(",
@@ -246,8 +253,9 @@ const singleWritesBinding = singleOrchestratorSource.indexOf(
     "executeSingleSettlementWrites({",
     singleTransactionBinding,
 )
-assert.equal(singleEvaluationTime > singleTransactionStart, true, "单人 finish 必须在事务体内固定任务时间")
-assert.equal(singleFactCall > singleEvaluationTime, true, "单人任务事实必须使用事务时间")
+assert.equal(singleEvaluationTime >= 0, true, "单人 value adapter 必须固定任务时间")
+assert.equal(singleValuePlanCall > singleTransactionStart, true, "单人 finish 必须在事务体内创建 value plan")
+assert.equal(singleFactCall > singleValuePlanCall, true, "单人任务事实必须使用 value plan 的事务时间")
 assert.equal(singleCharacterExp > singleFactCall, true, "单人角色经验必须在任务事实后写入")
 assert.equal(singleGrowthPreparation > singleCharacterExp, true, "单人称号结算必须看到本场角色经验")
 assert.equal(singleMissionEvaluationCall >= 0, true, "单人成长发布适配器必须调用任务结算")
@@ -284,14 +292,21 @@ const multiResponseSource = fs.readFileSync(
     path.join(__dirname, "../src/multi/settlement/response.ts"),
     "utf8",
 )
+const multiValuePlanSource = fs.readFileSync(
+    path.join(__dirname, "../src/multi/settlement/value-plan.ts"),
+    "utf8",
+)
 const multiTransactionStart = multiBattleSource.indexOf("const executeFinishWrites =")
-const multiEvaluationTime = multiBattleSource.indexOf(
+const multiEvaluationTime = multiValuePlanSource.indexOf(
     "const settlementTime = new Date(getServerTime() * 1000)",
+)
+const multiValuePlanCall = multiBattleSource.indexOf(
+    "createMultiSettlementValuePlan({",
     multiTransactionStart,
 )
 const multiFactCall = multiBattleSource.indexOf(
     "recordMissionBattleFacts(finishCtx, settlementTime)",
-    multiEvaluationTime,
+    multiValuePlanCall,
 )
 const multiCharacterExp = multiBattleSource.indexOf(
     "givePlayerCharactersExpSync(",
@@ -316,8 +331,9 @@ const multiTransactionCall = multiBattleSource.indexOf("runMultiActiveQuestSettl
 const multiActiveDelete = multiBattleSource.indexOf("delete activeQuests[input.playerId]", multiTransactionCall)
 const multiCoordinatorFinalize = multiBattleSource.indexOf("context.coordinator.finalizeBattle({")
 assert.equal(multiTransactionStart >= 0, true, "多人 finish 必须定义同步结算事务体")
-assert.equal(multiEvaluationTime > multiTransactionStart, true, "多人 finish 必须在事务体内固定任务时间")
-assert.equal(multiFactCall > multiTransactionStart, true)
+assert.equal(multiEvaluationTime >= 0, true, "多人 value adapter 必须固定任务时间")
+assert.equal(multiValuePlanCall > multiTransactionStart, true, "多人 finish 必须在事务体内创建 value plan")
+assert.equal(multiFactCall > multiValuePlanCall, true, "多人任务事实必须使用 value plan 的事务时间")
 assert.equal(multiCharacterExp > multiFactCall, true, "多人角色经验必须在任务事实后写入")
 assert.equal(multiSettlementTime > multiCharacterExp, true, "多人称号结算必须看到本场角色经验")
 assert.equal(multiAwakeSettlement > multiFactCall, true, "多人 finish 必须把本场 facts 传入觉醒 seam")

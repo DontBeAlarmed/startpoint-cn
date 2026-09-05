@@ -43,4 +43,3 @@ RewardGrant、Mission、Character Growth、entry lifecycle、additional/score/pe
 - Multi transport tests 永不因 settlement 共享而删除。
 
 DEBT-T05 的 Single orchestrator 源码形状矩阵已由上述 typed API、依赖边界和生命周期测试替代。DEBT-T08 只收敛共同结算数值/进度 fixture；Single lifecycle 与 Multi transport/performance fixture 因职责不同而明确保留。
-

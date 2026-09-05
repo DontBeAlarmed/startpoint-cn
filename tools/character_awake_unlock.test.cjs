@@ -377,6 +377,7 @@ testAuthoritativeMutationRoutesPublishAwakeUnlocks()
 function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     const multiRouteSource = readProjectSource("src/multi/http/battle.ts")
     const multiSettlementSource = readProjectSource("src/multi/settlement/orchestrator.ts")
+    const multiProgressSource = readProjectSource("src/multi/settlement/quest-progress-write.ts")
     const multiResponseSource = readProjectSource("src/multi/settlement/response.ts")
     const activeMissionSource = readRouteSource("activeMission.ts")
     const boxGachaSource = readRouteSource("boxGacha.ts")
@@ -411,6 +412,9 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     for (const persistenceCall of [
         "insertPlayerQuestProgressSync",
         "updatePlayerQuestProgressSync",
+    ]) assert.equal(getLastCallPosition(multiProgressSource, persistenceCall) >= 0, true)
+    for (const persistenceCall of [
+        "writeMultiQuestProgressWithinTransactionSync",
         "updatePlayerSync",
         "grantScoreRewards",
         "recordMissionBattleFacts",
