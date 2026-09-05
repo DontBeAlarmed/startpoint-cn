@@ -31,7 +31,8 @@ export function setCharacterExBoostWithinTransactionSync(
     if (!Number.isSafeInteger(command.statusId) || command.statusId <= 0) {
         throw growthError("INVALID_REQUEST", "statusId must be a positive safe integer.")
     }
-    if (command.abilityIdList.some(id => !Number.isSafeInteger(id) || id <= 0)) {
+    if (!Array.isArray(command.abilityIdList)
+        || command.abilityIdList.some(id => !Number.isSafeInteger(id) || id <= 0)) {
         throw growthError("INVALID_REQUEST", "abilityIdList must contain positive safe integers.")
     }
     if (getPlayerCharacterSync(command.playerId, command.characterId) === null) {

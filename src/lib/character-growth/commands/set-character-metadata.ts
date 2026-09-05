@@ -27,7 +27,8 @@ function validateGrowthPlayerId(playerId: number): void {
 }
 
 function validateIllustrationSettings(settings: readonly number[]): void {
-    if (settings.length !== 6
+    if (!Array.isArray(settings)
+        || settings.length !== 6
         || settings.some(value => !Number.isSafeInteger(value) || value < 0)) {
         throw growthError("INVALID_REQUEST", "illustration settings must be six non-negative integers.")
     }
@@ -41,8 +42,14 @@ export function setCharacterProtection(
     command: SetCharacterProtectionCommand,
 ): readonly UpdatedCharacterRow[] {
     validateGrowthPlayerId(command.playerId)
+    if (!Array.isArray(command.characterIds)
+        || command.characterIds.some(characterId => (
+            !Number.isSafeInteger(characterId) || characterId <= 0
+        ))
+        || typeof command.protection !== "boolean") {
+        throw growthError("INVALID_REQUEST", "character protection command is invalid.")
+    }
     const characterIds = [...new Set(command.characterIds)]
-        .filter(characterId => Number.isSafeInteger(characterId) && characterId > 0)
     return getDb().transaction(() => {
         const updated: UpdatedCharacterRow[] = []
         for (const characterId of characterIds) {

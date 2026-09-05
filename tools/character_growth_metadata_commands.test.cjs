@@ -66,6 +66,18 @@ test("setCharacterProtection toggles owned ids and skips unknown ones", () => {
 
     setCharacterProtection({ playerId, characterIds: [PROTAGONIST_ID], protection: false })
     assert.equal(getPlayerCharacterSync(playerId, PROTAGONIST_ID).protection, false)
+
+    for (const invalid of [
+        { playerId, characterIds: [0], protection: true },
+        { playerId, characterIds: [PROTAGONIST_ID], protection: 1 },
+        { playerId, characterIds: null, protection: true },
+    ]) {
+        assert.throws(
+            () => setCharacterProtection(invalid),
+            error => error.code === "INVALID_REQUEST",
+        )
+    }
+    assert.equal(getPlayerCharacterSync(playerId, PROTAGONIST_ID).protection, false)
 })
 
 test("setCharacterIllustrationSettings persists the six-slot whitelist value", () => {
@@ -137,6 +149,15 @@ test("setCharacterExBoostWithinTransactionSync writes the pair and reports the u
             characterId: PROTAGONIST_ID,
             statusId: 0,
             abilityIdList: [101],
+        }))(),
+        error => error.code === "INVALID_REQUEST",
+    )
+    assert.throws(
+        () => getDb().transaction(() => setCharacterExBoostWithinTransactionSync({
+            playerId,
+            characterId: PROTAGONIST_ID,
+            statusId: 3,
+            abilityIdList: null,
         }))(),
         error => error.code === "INVALID_REQUEST",
     )

@@ -529,6 +529,16 @@ test("maps bond token qualification to Growth and Mission leaves", () => {
     )
 })
 
+test("maps Character metadata aggregate commands to the Growth leaf", () => {
+    for (const file of [
+        "src/lib/character-growth/commands/set-character-metadata.ts",
+        "src/lib/character-growth/commands/set-ex-boost.ts",
+        "tools/character_growth_metadata_commands.test.cjs",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["quick:character-growth"])
+    }
+})
+
 test("maps Star Crumb Exchange to its content and transaction leaves without full", () => {
     for (const file of [
         "src/lib/star-crumb-exchange/catalog.ts",
