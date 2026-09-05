@@ -262,11 +262,11 @@ const SOURCE_RULES = [
         groups: ["integration:mission", "integration:quest", "quick:quest"],
     },
     {
-        pattern: /^src\/lib\/quest\/finish\/battle-settlement-values\.ts$/,
+        pattern: /^src\/lib\/quest\/finish\/battle-(?:quest-progress-plan|settlement-values)\.ts$/,
         groups: ["integration:party", "integration:quest", "quick:quest"],
     },
     {
-        pattern: /^tools\/battle_settlement_values\.test\.cjs$/,
+        pattern: /^tools\/battle_(?:quest_progress_plan|settlement_values)\.test\.cjs$/,
         groups: ["integration:quest"],
     },
     {
