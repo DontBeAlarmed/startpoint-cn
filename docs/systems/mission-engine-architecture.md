@@ -59,7 +59,7 @@ Pass Category 7/8 的迁移保留了必要的前置写入：Category 7 在缺少
 
 第二阶段不能直接删除。任务奖励可能新增角色、装备或物品，当前行为会让相关进度在同一次任务页响应中立即更新，但不会在该请求内再次发奖。目标架构必须保留这一显示语义。
 
-此外，`patterns.ts` 当前在模块加载时建立普通对象索引。CN 启动顺序允许任务模块先于 Runtime Content snapshot 初始化，因此 bundled 表与 runtime 表不一致时，索引可能在进程启动后保持陈旧。
+D24 已删除旧 `patterns.ts` 索引外壳；definition、pattern、stage 与 Awake 角色索引统一由 snapshot-scoped `MissionCatalog` 持有。CN 启动阶段使用 bundled fallback，Runtime Content snapshot 就绪后按 repository identity 获得独立缓存，不会复用启动前索引。
 
 ## 设计边界
 
@@ -402,6 +402,12 @@ Settlement BASE fixture 与负载 reference 分别由固定无参数 generator
 - **Receipt 层 sanctioned 写**：`grants.ts` 中 kind 6（称号 `givePlayerDegreeSync` + players.degree_id 持久化）与 kind 7（Pass 点 `addPlayerPassCardPointWithChangeSync`）为收据层域函数写；kind 0-5 货币/资产一律经 RewardGrant typed plan（D17 合同），无旁路。
 - **Prepare 前置写**：`settlement-prepare` 的 pass 登录基线初始化（幂等）按 D15 蓝图保留。
 - **Quest 域计数归属**：multi-clear 计数自 D24 起由 multi settlement writer（`multi/settlement/orchestrator.ts`）在 quest 结算层调用，mission battle facts 只记录 mission 自有事实表。
+
+## D24 收口状态
+
+D24 已完成 Mission owner 收口。`master-data.ts`、`patterns.ts`、`stages.ts`、旧 Event/Fallback computer 与 Active raw-fact compatibility adapter 已退役；类别 1～10 的生产求值统一通过 `MissionEvaluationSession` 和必选的 `buildContextFromSession`，不再保留 legacy DB 直读 fallback。标准任务奖励继续由 category reward-stage definition 协调到 RewardGrant；Active plan 与 Awake 特殊奖励仍保持各自的权威来源。
+
+迁移期的 catalog wrapper、legacy/session equivalence 和 routing-fallback 场景已由 Catalog 合同、七类 actual family 行为测试、Awake 专项、事务回滚与结构性能基线替代。`mission_settlement_pipeline_interfaces.test.cjs` 只保留三段式 API 不从公共 barrel 暴露的运行时合同，不再冻结历史阶段名称、Task 编号或旧全量测试数量。DEBT-T03 与 DEBT-T04 均在 D24 关闭。
 
 ## 已知后续项
 

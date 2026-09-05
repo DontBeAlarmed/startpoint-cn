@@ -14,7 +14,7 @@
   体力和登录天数的当前基线。旧存档升级时以升级时状态创建基线，避免把历史累计量误算成本周期进度。
 - `get_mission_progress` 会检查任务开放时间、收集任务 `event_id`，并独立处理每个角色觉醒
   `character_id` 请求。
-- 主数据由 `master-data.ts` 按分类解释列位置：category 1、2、3、10 的 pattern 位于 `row[0]`，
+- 主数据由 snapshot-scoped `MissionCatalog` 按分类解释列位置：category 1、2、3、10 的 pattern 位于 `row[0]`，
   category 4 同时读取 `row[0]` 的 event ID 与 `row[2]` 的 pattern，category 5 使用 `row[1]`，
   category 6/7/8 使用 `row[0]` 的 Pass 活动 ID、`row[1]` 的 pattern 和 `row[3]` 的 pattern type，
   category 9 使用 `row[2]`。开放期统一按国服 UTC+8 解释，不再由各计算器分别猜测列号。
@@ -99,7 +99,7 @@
 - category 3 共 2512 条，旧 `mission_event_quest_map.json` 名义映射 2305 条，缺失 207 条；默认
   `2024-08-14 12:00 UTC` 时没有正在开放的缺失项。映射中 `single/multi/finish` 数量分别为 396/1679/230。
 - 旧 map 只展开关卡 ID，未完整保留活动期、难度、评级、房主/成员、救援来源、阶段和客户端战斗检查等维度；
-  1034 条已映射任务仍带有未应用的关卡或评级过滤。它只供 `computer-event.ts` 历史审计，不能作为自动事实或安全发奖依据。
+  1034 条已映射任务仍带有未应用的关卡或评级过滤。它只供 `event-coverage-report.ts` 离线历史审计，不能作为自动事实或安全发奖依据。
 - 230 条 `finish` 实为限时通关任务，审计计算器已按奖励表秒数和最佳毫秒记录修正，不再把一次普通通关判定为全部档位完成。
   该计算器只用于审计和后续规则迁移。
 - 旧 939 条宽松自动规则已全部移除，`mission_event_quest_map.json` 只保留历史审计用途。新的兼容行为不读取旧 map，

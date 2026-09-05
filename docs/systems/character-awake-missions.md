@@ -264,19 +264,17 @@ lib/mission/
 ├── index.ts           barrel export
 ├── types.ts           MissionComputer + CategoryContext 接口
 ├── registry.ts        分类→MissionComputer 分发表
-├── stages.ts          阶段阈值 (getCurrentStage, getCompletedStageNumbers)
+├── mission-catalog.ts snapshot-scoped definition/pattern/stage/Awake 索引与阶段派生
 ├── rewards.ts         奖励、奖励 ID 和 AwakeManaBoard 特殊奖励解析
 ├── awake-eligibility.ts  官方入口基础资格与新解锁统一门控
 ├── awake-settlement.ts  category 9 进入页面时的幂等奖励结算
-├── patterns.ts        pattern→mission 索引 (getMissionsByPattern)
 ├── character-queries.ts  角色→任务映射
 ├── computer-regular.ts   category 1/2 (pattern 分发)
 ├── computer-degree.ts    category 5 (等级任务)
-├── computer-awake.ts     category 9 (角色觉醒，预缓存 DB)
-└── computer-fallback.ts  默认回退 DB progress
+└── computer-awake.ts     category 9 (角色觉醒，Session facts)
 ```
 
-- `MissionComputer` 接口：`buildContext()` 一次预取 DB → `compute()` 纯计算
+- `MissionComputer` 接口：`buildContextFromSession()` 从声明式 facts 构造上下文 → `compute()` 纯计算
 - 新分类只需实现接口 + 注册到 `registry.ts` 一行
 - cat9 请求级预缓存：eligibility resolver 一次读取 `getPlayerCharactersSync` 与
   `getPlayerCharactersManaNodesSync`，角色通关事实由 `getPlayerCharacterClearsSync` 批量读取；单角色请求先缩小
