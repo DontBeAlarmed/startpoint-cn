@@ -812,6 +812,10 @@ test("maps the finite Event descriptor to the Event focused group", () => {
         "src/lib/quest/finish/event-settlement-descriptor.ts",
         "tools/event_settlement_descriptor.test.cjs",
     ]) assert.deepEqual(selectTestGroups([file]), ["integration:event"], file)
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest/finish/single-event-settlement.ts"]),
+        ["integration:event", "integration:quest", "integration:reward-grant", "quick:modes", "quick:quest"],
+    )
 })
 
 test("maps single continue lifecycle implementation and regression precisely", () => {

@@ -455,6 +455,7 @@ test("single settlement migrates score while preserving multiplayer, Carnival an
     const growthPublication = readSource("src/lib/quest/finish/single-growth-publication.ts")
     const missionPublication = readSource("src/lib/quest/finish/single-mission-publication.ts")
     const responseState = readSource("src/lib/quest/finish/single-settlement-response-state.ts")
+    const eventSettlement = readSource("src/lib/quest/finish/single-event-settlement.ts")
 
     assert.match(adapter, /createRewardGrantExecutionPlan\s*\(/)
     assert.match(adapter, /executeRewardGrantExecutionPlanAsTransactionOwnerSync\s*\(/)
@@ -476,7 +477,8 @@ test("single settlement migrates score while preserving multiplayer, Carnival an
     assert.match(writes, /responseState\.setExpPool\(rewardCharacterExpResult\.exp_pool\)/)
 
     assert.doesNotMatch(writes, /\bgivePlayerScoreRewardsSync\s*\(/)
-    assert.match(writes, /\bgrantCarnivalRewards\s*\(/)
+    assert.match(writes, /\bsettleSingleBuiltInEvent\s*\(/)
+    assert.match(eventSettlement, /\bgrantCarnivalRewards\s*\(/)
     assert.match(writes, /\bprepareSingleGrowthPublication\s*\(/)
     assert.match(growthPublication, /\bsettleSingleMissionEvaluations\s*\(/)
     assert.match(missionPublication, /\bsettleMissionCategoriesWithEvaluation\s*\(/)
