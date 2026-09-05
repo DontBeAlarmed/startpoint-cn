@@ -290,6 +290,10 @@ const SOURCE_RULES = [
         groups: ["integration:event"],
     },
     {
+        pattern: /^tools\/rush_auto_retry_characterization\.test\.cjs$/,
+        groups: ["integration:event"],
+    },
+    {
         pattern: /^src\/lib\/quest\/finish\/single-event-settlement\.ts$/,
         groups: ["integration:event", "integration:quest", "integration:reward-grant", "quick:modes", "quick:quest"],
     },
