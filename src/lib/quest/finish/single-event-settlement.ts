@@ -40,7 +40,10 @@ import type { ActiveQuest } from "../active-quest-service"
 import { buildScoreAttackBattleHistoryRecord } from "../score-attack-history"
 import type { ValidatedSingleFinishBody } from "../single-finish-validation"
 import type { EventSettlementDescriptor } from "./event-settlement-descriptor"
-import { dispatchBuiltInEventSettlement } from "./event-settlement-hook"
+import {
+    dispatchBuiltInEventSettlement,
+    getOperatorRushHookPhase,
+} from "./event-settlement-hook"
 import { handleCarnivalEventFinish } from "./carnival-handler"
 import { handleRaidEventFinish } from "./raid-handler"
 import { handleRushEventFinish } from "./rush-handler"
@@ -101,6 +104,10 @@ export function settleSingleBuiltInEvent(
         giveRewards: input.grantRewards,
         transaction: <T>(operation: () => T) => getDb().transaction(operation)(),
     }
+    const operatorHookPhase = getOperatorRushHookPhase(descriptor)
+    let modeRushExtension = operatorHookPhase === "beforeBuiltIn"
+        ? dispatchModeRushFinish(rushFinishParams, settlementModeHost)
+        : null
     const builtIn = dispatchBuiltInEventSettlement(descriptor, {
         rush: () => handleRushEventFinish(rushFinishParams),
         raid: current => handleRaidEventFinish({
@@ -147,7 +154,7 @@ export function settleSingleBuiltInEvent(
         scoreAttack: current => {
             insertPlayerScoreAttackBattleHistorySync(buildScoreAttackBattleHistoryRecord({
                 playerId,
-                eventId: current.eventId!,
+                eventId: current.eventId,
                 playId: input.activeQuest.playId,
                 categoryId: questCategory,
                 questId,
@@ -191,7 +198,9 @@ export function settleSingleBuiltInEvent(
     const raidEventData = builtIn.kind === "raid" ? builtIn.value : null
     const carnival = builtIn.kind === "carnival" ? builtIn.value : null
     const scoreAttack = builtIn.kind === "scoreAttack" ? builtIn.value : null
-    const modeRushExtension = dispatchModeRushFinish(rushFinishParams, settlementModeHost)
+    if (operatorHookPhase === "afterBuiltIn") {
+        modeRushExtension = dispatchModeRushFinish(rushFinishParams, settlementModeHost)
+    }
     if (modeRushExtension?.rush_battle_reward_list?.length && rush.rushEventData) {
         rush.rushEventData.rush_battle_reward_list.push(...modeRushExtension.rush_battle_reward_list)
     }

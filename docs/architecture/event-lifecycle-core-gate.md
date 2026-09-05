@@ -36,7 +36,7 @@ descriptor 不读 DB/Content/网络，不拥有玩家状态。window 不会在 f
 
 CN 客户端只有在有限 folder final 响应含非空 `rush_battle_reward_list` 时才打开 clear dialog 并触发下一 lap AutoRetry。当前首次 clear 满足，重复 clear 因一次性奖励返回空列表，不进入该路径。
 
-该结论只能证明当前响应和客户端跳转条件之间的差异，不能证明官服后端每 lap 的奖励频率。D26 不根据私有实现改写奖励经济，也不返回假奖励；`rush_auto_retry_characterization.test.cjs` 将它固定为待客户端专项验收的已知差异。
+该结论只能证明当前响应和客户端跳转条件之间的差异，不能证明官服后端每 lap 的奖励频率。D26 不根据私有实现改写奖励经济，也不返回假奖励；`rush_event_battle_flow.test.cjs` 以真实 Fastify + SQLite 两-lap 链将它固定为待客户端专项验收的已知差异。
 
 常驻官方末期 Rush `700011–700017` 的静态奖励/商店为空，当前已有 `eventId-10` 推测性体验回退。该行为不是 D26 shared core；用户确认未来开关默认开启，但必须由后台原子控制 folder reward、shop list 与 purchase period。开关化在边界重构后的独立策略任务执行。
 
@@ -48,4 +48,3 @@ CN 客户端只有在有限 folder final 响应含非空 `rush_battle_reward_lis
 - quick:modes 保留 loader、allowlist、lifecycle 与事务回滚；
 - Single settlement baseline 保持行为与 SQL 快照不变；
 - D26 closure 前不删除各模式状态/算法/transport tests。
-

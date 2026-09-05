@@ -79,14 +79,28 @@ test("resolves one immutable descriptor for each built-in Event mode", () => {
 })
 
 test("normal quests and incomplete Event linkage fail closed to none", () => {
-    assert.deepEqual(createEventSettlementDescriptor({
+    const cases = [{
         questCategory: QuestCategory.MAIN,
         questId: 1,
         quest: baseQuest,
-    }), { kind: "none" })
-    assert.deepEqual(createEventSettlementDescriptor({
+    }, {
         questCategory: QuestCategory.RUSH_EVENT,
         questId: 1,
         quest: baseQuest,
-    }), { kind: "none" })
+    }, {
+        questCategory: QuestCategory.RAID_EVENT,
+        questId: 1,
+        quest: { ...baseQuest, killCountWeight: 1 },
+    }, {
+        questCategory: QuestCategory.CARNIVAL_EVENT,
+        questId: 1,
+        quest: { ...baseQuest, eventId: 1, folderId: 1, difficultyScore: 1 },
+    }, {
+        questCategory: QuestCategory.SCORE_ATTACK_EVENT,
+        questId: 1,
+        quest: { ...baseQuest, eventId: 1 },
+    }]
+    for (const input of cases) {
+        assert.deepEqual(createEventSettlementDescriptor(input), { kind: "none" })
+    }
 })

@@ -21,6 +21,15 @@ export type BuiltInEventSettlementHookResult<Rush, Raid, Carnival, ScoreAttack> 
 
 const NO_BUILT_IN_EVENT = Object.freeze({ kind: "none" as const })
 
+export type OperatorRushHookPhase = "beforeBuiltIn" | "afterBuiltIn"
+
+/** Preserves the pre-D26 operator hook order for Rush and non-Rush finishes. */
+export function getOperatorRushHookPhase(
+    descriptor: EventSettlementDescriptor,
+): OperatorRushHookPhase {
+    return descriptor.kind === "rush" ? "afterBuiltIn" : "beforeBuiltIn"
+}
+
 /** Dispatches at most one built-in Event hook from one closed descriptor. */
 export function dispatchBuiltInEventSettlement<Rush, Raid, Carnival, ScoreAttack>(
     descriptor: EventSettlementDescriptor,

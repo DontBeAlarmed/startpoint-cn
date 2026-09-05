@@ -32,8 +32,8 @@ export type EventSettlementDescriptor =
     }>
     | Readonly<EventSettlementDescriptorBase & {
         kind: "scoreAttack"
-        eventId: number | undefined
-        scoreAttackQuestId: number | undefined
+        eventId: number
+        scoreAttackQuestId: number
     }>
 
 const NO_EVENT: EventSettlementDescriptor = Object.freeze({ kind: "none" })
@@ -89,6 +89,8 @@ export function createEventSettlementDescriptor(input: {
         })
     }
     if (input.questCategory === QuestCategory.SCORE_ATTACK_EVENT) {
+        if (input.quest.eventId === undefined
+            || input.quest.scoreAttackQuestId === undefined) return NO_EVENT
         return Object.freeze({
             ...base,
             kind: "scoreAttack" as const,

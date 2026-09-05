@@ -813,11 +813,10 @@ test("maps the finite Event descriptor to the Event focused group", () => {
         "src/lib/quest/finish/event-settlement-hook.ts",
         "tools/event_settlement_descriptor.test.cjs",
         "tools/event_settlement_hook.test.cjs",
-        "tools/rush_auto_retry_characterization.test.cjs",
     ]) assert.deepEqual(selectTestGroups([file]), ["integration:event"], file)
     assert.deepEqual(
         selectTestGroups(["src/lib/quest/finish/single-event-settlement.ts"]),
-        ["integration:event", "integration:quest", "integration:reward-grant", "quick:modes", "quick:quest"],
+        ["integration:compiled", "integration:event", "integration:quest", "integration:reward-grant", "quick:modes", "quick:quest"],
     )
 })
 
@@ -1871,7 +1870,6 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/raid_event_summary.test.cjs",
         "tools/raid_event_summary_route.test.cjs",
         "tools/ranking_event_route.test.cjs",
-        "tools/rush_auto_retry_characterization.test.cjs",
         "tools/rush_event_battle_flow.test.cjs",
         "tools/rush_event_shop_route.test.cjs",
         "tools/rush_event_reset_route.test.cjs",

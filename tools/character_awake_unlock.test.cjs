@@ -256,8 +256,9 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     const singleBattleCall = singleBattleSource.lastIndexOf("publishPreparedSingleGrowthPublication(")
     assert.equal(singleBattleCall > singleBattleSource.indexOf("recordMissionBattleFacts(finishCtx, settlementTime)"), true)
     assert.equal(singleBattleCall > singleBattleSource.indexOf("givePlayerCharactersExpSync("), true)
-    assert.equal(singleBattleCall > singleBattleSource.indexOf("handleRushEventFinish("), true)
-    assert.equal(singleBattleCall > singleBattleSource.indexOf("handleCarnivalEventFinish({"), true)
+    const singleEventSettlementCall = singleBattleSource.indexOf("settleSingleBuiltInEvent(")
+    assert.equal(singleEventSettlementCall >= 0, true)
+    assert.equal(singleBattleCall > singleEventSettlementCall, true)
     const singleBattlePublicationPreparation = singleBattleSource.lastIndexOf(
         "prepareSingleGrowthPublication({",
         singleBattleCall,

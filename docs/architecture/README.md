@@ -50,7 +50,7 @@
 
 D12、D13 与 D14 已完成服务端实现和自动化 Gate，等待客户端实机验收。三份 Gate 文档保留设计依据，同时作为相应已落地边界的架构与验证证据；它们不取代上述当前架构总览的阅读顺序。
 
-D15 已完成领域边界识别、决策和后续实施路线。D16、D17、D18、D18b 的服务端实现、Gate A broad closure、D18b scoped final review 和服务重启均已完成；D19、D20、D21 与 D22 的服务端实现与逐 checkpoint 审查已完成，大 Gate B 已收口；D23 Character writer、D24 Mission owner 与 D25 Battle Settlement 有限核均已完成；D26-D28 尚未实施。客户端实测统一延期到 D28 后。
+D15 已完成领域边界识别、决策和后续实施路线。D16、D17、D18、D18b 的服务端实现、Gate A broad closure、D18b scoped final review 和服务重启均已完成；D19–D22 与大 Gate B 已收口；D23 Character writer、D24 Mission owner 与 D25 Battle Settlement 有限核均已完成；D26 Event Lifecycle 有限核已实现，正在完成 Gate C closure；D27–D28 尚未实施。客户端实测统一延期到 D28 后。
 
 ## 统一图例
 
@@ -66,7 +66,7 @@ D15 已完成领域边界识别、决策和后续实施路线。D16、D17、D18�
 - 本目录已收录的 D1-D11b 全部描述当前实现，图节标题统一带“当前”。
 - D12、D13 与 D14 描述已落地、待客户端实机验收的 Gate 架构；其中的实施状态和证据路径可以用于解释当前实现，仍需与功能支持矩阵区分自动验证和人工验收。
 - D15 描述经审查确认、但尚未实施的目标领域边界；其图和表不能替代 D1-D11b 的当前架构事实。
-- D16、D18、D18b、D19、D20、D21 与 D22 已实现 typed Item policy、Inventory writer、Item cap、按 `sellable` 的 Sold/Mail disposition、Item expiry owner、`/load` EventTrade 到期转换、Mail claim、Shop/Gacha/Star Crumb/Bond Token owners；D23 已收口 Character writer，D24 已收口 Mission owner，D25 已完成有限 Battle Settlement core。不得据此宣称私服策略已经被官服后端证实；D26–D28 仍未实施。
+- D16、D18、D18b、D19–D22 已实现资产与购买/抽卡/兑换 owners；D23 已收口 Character writer，D24 已收口 Mission owner，D25 已完成有限 Battle Settlement core，D26 Event Lifecycle 有限核已实现并等待 Gate C closure。不得据此宣称私服策略已经被官服后端证实；D27–D28 仍未实施。
 - 当前图不混入未来组件、迁移步骤或完成度信息；功能状态仍由 `docs/status/` 维护。
 - 目标架构必须使用独立图和独立证据，不得用虚线叠加到当前图。
 

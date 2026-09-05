@@ -42,7 +42,7 @@
 
 CN 1.8.1 客户端在有限 Rush 文件夹最终回合后，只有收到非空 `rush_battle_reward_list` 才保存 clear reward、打开完成对话框，并在剩余自动战斗次数大于 0 时由 `AutoRetry` 重新调用 `select_folder` 和第一关 `battle/start`。当前服务端的首次通关响应满足该条件；已记录 folder 的重复通关返回空奖励，因此不会进入这条客户端 AutoRetry 路径。
 
-客户端源码只能证明当前响应与跳转条件不兼容，不能证明官服后端是否每 lap 重新发放 folder reward。私有部署线的每 lap 奖励和自制 `700099` 深渊模式均不作为官方语义证据；当前 official-only 主线不改变重复奖励经济，也不返回未实际发放的假奖励。该差异由 `rush_auto_retry_characterization.test.cjs` 固定，并延期到客户端专项验收；获得官方后端证据前不宣称自动多-lap 已支持。
+客户端源码只能证明当前响应与跳转条件不兼容，不能证明官服后端是否每 lap 重新发放 folder reward。私有部署线的每 lap 奖励和自制 `700099` 深渊模式均不作为官方语义证据；当前 official-only 主线不改变重复奖励经济，也不返回未实际发放的假奖励。该差异由 `rush_event_battle_flow.test.cjs` 的真实两-lap Fastify + SQLite 链固定，并延期到客户端专项验收；获得官方后端证据前不宣称自动多-lap 已支持。
 
 ## 商店协议
 
@@ -100,7 +100,7 @@ CN 1.8.1 客户端在有限 Rush 文件夹最终回合后，只有收到非空 `
 - `tools/rush_event_shop_route.test.cjs`：真实 Fastify 路由、常驻开放期列表和购买、全局时间过滤、`2053` 协议及 SQLite 回滚。
 - `tools/rush_event_reset_route.test.cjs`：普通/无限重置字段、跨活动目标、文件夹隔离和整组放弃回滚。
 - `tools/special_quest_flow.test.cjs`：文件夹首次通关发奖、重复通关不发奖，以及事务调用边界。
-- `tools/rush_auto_retry_characterization.test.cjs`：固定首次 clear 可进入客户端 AutoRetry、重复 clear 因空 reward 不会进入的当前差异；这是已知差异证据，不是通过声明。
+- `tools/rush_event_battle_flow.test.cjs`：真实执行两次 `select_folder → 两关 start/finish → summary`，固定首次 clear 可进入客户端 AutoRetry、重复 clear 因空 reward 不会进入的当前差异；这是已知差异证据，不是通过声明。
 
 ## 关卡掉落
 

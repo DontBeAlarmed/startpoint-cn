@@ -203,6 +203,11 @@ function assertPlayedQuestIds(map, expectedQuestIds) {
     )
 }
 
+function clientAutoRetryTransition(rushEvent, battleStartRemainingTimes) {
+    if (rushEvent.rush_battle_reward_list.length === 0) return "no-clear-dialog"
+    return battleStartRemainingTimes > 0 ? "auto-retry" : "complete"
+}
+
 async function assertFirstRoundProgress(folderId, firstQuestId) {
     const selected = await selectFolder(folderId)
     assert.equal(selected.statusCode, 200, selected.body)
@@ -233,12 +238,13 @@ async function assertTwoRoundFolder(folderId, questIds) {
     assert.equal(secondFinish.statusCode, 200, secondFinish.body)
     const finishRush = decodeResponse(secondFinish).data.rush_event
     assertPlayedQuestIds(finishRush.rush_battle_played_party_list, [])
-    assert.ok(finishRush.rush_battle_reward_list.length > 0)
 
     const settled = decodeResponse(await summary()).data
     assert.equal(settled.active_rush_battle_folder_id, null)
     assertPlayedQuestIds(settled.rush_battle_played_party_list, [])
     assert.ok(settled.cleared_folder_id_list.includes(folderId))
+    assertNoActiveQuest("folder final finish must clear active quest")
+    return finishRush
 }
 
 function invalidRushQuestTable() {
@@ -269,15 +275,31 @@ test("folder 最大 round 来自 eventId + folderId 的官方内容表", () => {
     )
 })
 
-test("中级首关 finish 与 summary 立即一致，第二关可使用 party2 并完成两关结算", async () => {
+test("中级两 lap 真实链固定首次 AutoRetry 与重复 clear 的已知断链", async () => {
     await fastify.register(rushEventRoutes, { prefix: "/api/index.php/event/rush" })
     await fastify.register(singleBattleRoutes, { prefix: "/api/index.php/single_battle_quest" })
     await fastify.ready()
-    await assertTwoRoundFolder(RushEventFolder.INTERMEDIATE, [700007001, 700007002])
+    const firstLap = await assertTwoRoundFolder(
+        RushEventFolder.INTERMEDIATE,
+        [700007001, 700007002],
+    )
+    assert.ok(firstLap.rush_battle_reward_list.length > 0)
+    assert.equal(clientAutoRetryTransition(firstLap, 2), "auto-retry")
+
+    const secondLap = await assertTwoRoundFolder(
+        RushEventFolder.INTERMEDIATE,
+        [700007001, 700007002],
+    )
+    assert.deepEqual(secondLap.rush_battle_reward_list, [])
+    assert.equal(clientAutoRetryTransition(secondLap, 1), "no-clear-dialog")
 })
 
 test("高级首关 finish 与 summary 立即一致，第二关可使用 party2 并完成两关结算", async () => {
-    await assertTwoRoundFolder(RushEventFolder.ADVANCED, [700007003, 700007004])
+    const finish = await assertTwoRoundFolder(
+        RushEventFolder.ADVANCED,
+        [700007003, 700007004],
+    )
+    assert.ok(finish.rush_battle_reward_list.length > 0)
 })
 
 test("三关 folder 在第二关后保留 active folder 与两关队伍，第三关才结算", async () => {
