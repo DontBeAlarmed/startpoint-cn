@@ -12,6 +12,14 @@ interface RushFolderBattleStartValidation {
     getQuest: (questId: number) => BattleQuest | null
 }
 
+interface RushFolderAutoRestartValidation {
+    quest: BattleQuest
+    rushEvent: PlayerRushEvent | null
+    playedParties: readonly PlayerRushEventPlayedParty[]
+    isAutoStartMode: boolean
+    clearedFolderIds: readonly number[]
+}
+
 function isPositiveSafeInteger(value: number | undefined): value is number {
     return Number.isSafeInteger(value) && value !== undefined && value > 0
 }
@@ -57,4 +65,24 @@ export function canStartRushEventFolderBattle({
     if (!completedRounds.every((completedRound, index) => completedRound === index + 1)) return false
 
     return round === folderParties.length + 1
+}
+
+export function canRestartClearedRushEventFolderForAutoStart({
+    quest,
+    rushEvent,
+    playedParties,
+    isAutoStartMode,
+    clearedFolderIds,
+}: RushFolderAutoRestartValidation): boolean {
+    const eventId = quest.rushEventId
+    const folderId = quest.rushEventFolderId
+    return isAutoStartMode === true
+        && isPositiveSafeInteger(eventId)
+        && isPositiveSafeInteger(folderId)
+        && quest.rushEventRound === 1
+        && rushEvent !== null
+        && rushEvent.eventId === eventId
+        && rushEvent.activeRushBattleFolderId === null
+        && !playedParties.some(party => party.battleType === RushEventBattleType.FOLDER)
+        && clearedFolderIds.includes(folderId)
 }

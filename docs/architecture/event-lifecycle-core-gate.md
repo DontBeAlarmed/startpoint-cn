@@ -32,11 +32,11 @@ descriptor 不读 DB/Content/网络，不拥有玩家状态。window 不会在 f
 
 `modes.d` 是显式安装、allowlist 和重启生效的运营扩展 seam，不是官方协议来源。`dispatchModeRushFinish` 继续收到原完整 questData，并与 built-in descriptor 分派分离；空 `modes.d` 是官方服务默认形态。私有 `700099` 深渊玩法及其掉落、商店、排行榜和 endless 兼容不进入当前代码或 D26 证据。
 
-## 已知 Rush AutoRetry 差异
+## Rush AutoRetry 闭环
 
-CN 客户端只有在有限 folder final 响应含非空 `rush_battle_reward_list` 时才打开 clear dialog 并触发下一 lap AutoRetry。当前首次 clear 满足，重复 clear 因一次性奖励返回空列表，不进入该路径。
+CN 客户端只有在有限 folder final 响应含非空 `rush_battle_reward_list` 时才打开 clear dialog 并触发下一 lap AutoRetry；`RushEventAutoStartQuestGroup.getSubsequentialLap()` 明确把文件夹全部关卡作为后续 lap，`BattleFinishDummyRemoteRushEventProcess` 则在每个 folder final 从文件夹主数据构造奖励列表，不检查首次通关。
 
-该结论只能证明当前响应和客户端跳转条件之间的差异，不能证明官服后端每 lap 的奖励频率。D26 不根据私有实现改写奖励经济，也不返回假奖励；`rush_event_battle_flow.test.cjs` 以真实 Fastify + SQLite 两-lap 链将它固定为待客户端专项验收的已知差异。
+本地实机进一步证明后续 lap 会在 active folder 已清空时直接请求第一关；旧服务端因此连续返回 H400。D26 仅对“已通关、严格布尔自动模式、第一关、无残留队伍”隐式恢复 active folder，并将恢复与 active quest 创建置于同一事务。每个完整 lap 实际发放并返回文件夹奖励，从而同时满足客户端显示与后续 AutoRetry，不伪造奖励。`700011–700017` 的奖励内容仍来自独立体验兼容层；私有 `700099` 不参与生命周期裁决。
 
 常驻官方末期 Rush `700011–700017` 的静态奖励/商店为空，当前已有 `eventId-10` 推测性体验回退。该行为不是 D26 shared core；用户确认未来开关默认开启，但必须由后台原子控制 folder reward、shop list 与 purchase period。开关化在边界重构后的独立策略任务执行。
 

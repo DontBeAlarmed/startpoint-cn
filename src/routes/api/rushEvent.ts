@@ -33,13 +33,21 @@ import {
 import { BattleQuest, QuestCategory } from "../../lib/types";
 import { generateDataHeaders, getServerDate, getServerTime } from "../../utils";
 import type { FinishBody } from "./singleBattleQuest";
-import { insertActiveQuest } from "../../lib/quest/active-quest-service";
+import {
+    insertActiveQuest,
+    persistActiveQuest,
+    publishActiveQuest,
+    type ActiveQuest,
+} from "../../lib/quest/active-quest-service";
 import { getPlayerRushEventEndlessBattleRankingSync, getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { ensureSpecialEventPartyGroupsSync, getGlobalPartyId } from "../../lib/special-event-parties";
 import { getDb } from "../../data/db";
-import { canStartRushEventFolderBattle } from "../../lib/rush-folder-progression";
+import {
+    canRestartClearedRushEventFolderForAutoStart,
+    canStartRushEventFolderBattle,
+} from "../../lib/rush-folder-progression";
 
 interface SummaryBody {
     event_id: number,
@@ -324,7 +332,8 @@ const routes = async (fastify: FastifyInstance) => {
         const partyId = body.party_id
         const questId = body.quest_id
         console.log(`[RUSH] battle/start: viewer=${viewerId} questId=${questId} partyId=${partyId} autoStart=${isAutoStartMode}`)
-        if (isNaN(viewerId) || isNaN(partyId) || isNaN(questId) || isAutoStartMode === undefined) return reply.status(400).send({
+        if (isNaN(viewerId) || isNaN(partyId) || isNaN(questId)
+            || typeof isAutoStartMode !== "boolean") return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
         })
@@ -362,22 +371,38 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "Quest doesn't exist."
         })
 
+        let restartsClearedFolderForAutoStart = false
         if (questData.rushEventRound !== 0) {
             const rushEventData = getPlayerRushEventSync(playerId, questData.rushEventId)
             const playedParties = getPlayerRushEventPlayedPartiesSync(playerId, questData.rushEventId)
-            if (!canStartRushEventFolderBattle({
+            const progression = {
                 quest: questData,
                 rushEvent: rushEventData,
                 playedParties,
-                getQuest: id => getQuestFromCategorySync(QuestCategory.RUSH_EVENT, id),
-            })) return reply.status(400).send({
+                getQuest: (id: number) => getQuestFromCategorySync(QuestCategory.RUSH_EVENT, id),
+            }
+            const continuesSelectedFolder = canStartRushEventFolderBattle(progression)
+            if (!continuesSelectedFolder) {
+                restartsClearedFolderForAutoStart = canRestartClearedRushEventFolderForAutoStart({
+                    quest: questData,
+                    rushEvent: rushEventData,
+                    playedParties,
+                    isAutoStartMode,
+                    clearedFolderIds: getPlayerRushEventClearedFoldersSync(
+                        playerId,
+                        questData.rushEventId,
+                    ),
+                })
+            }
+            if (!continuesSelectedFolder
+                && !restartsClearedFolderForAutoStart) return reply.status(400).send({
                 "error": "Bad Request",
                 "message": "Rush event folder progression is invalid."
             })
         }
 
         // insert active quest for '/single_battle_quest/finish' endpoint
-        insertActiveQuest(playerId, {
+        const activeQuest: ActiveQuest = {
             questId: questId,
             category: QuestCategory.RUSH_EVENT,
             useBoostPoint: false,
@@ -388,7 +413,20 @@ const routes = async (fastify: FastifyInstance) => {
             rescueFragmentEligible: false,
             playId: body.play_id,
             continueCount: 0
-        })
+        }
+        if (restartsClearedFolderForAutoStart) {
+            getDb().transaction(() => {
+                selectPlayerRushEventFolderSync(
+                    playerId,
+                    questData.rushEventId!,
+                    questData.rushEventFolderId!,
+                )
+                persistActiveQuest(playerId, activeQuest)
+            })()
+            publishActiveQuest(playerId, activeQuest)
+        } else {
+            insertActiveQuest(playerId, activeQuest)
+        }
 
         const headers = generateDataHeaders({
             viewer_id: viewerId

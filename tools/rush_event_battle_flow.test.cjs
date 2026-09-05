@@ -29,12 +29,14 @@ const { insertAccountSync } = require("../src/data/domains/account")
 const {
     deletePlayerRushEventPlayedPartyListSync,
     getDefaultPlayerRushEventSync,
+    insertPlayerRushEventClearedFolderSync,
     getPlayerRushEventPlayedPartiesSync,
     getPlayerRushEventSync,
     insertPlayerRushEventPlayedPartySync,
     insertPlayerRushEventSync,
     updatePlayerRushEventSync,
 } = require("../src/data/domains/rushEvent")
+const { getPlayerItemSync } = require("../src/data/domains/item")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { deletePlayerActiveQuestSync, getPlayerActiveQuestSync } = require("../src/data/domains/quest_active")
 const {
@@ -44,7 +46,10 @@ const {
 const { RushEventBattleType } = require("../src/data/types")
 const { QuestCategory, RushEventFolder } = require("../src/lib/types")
 const { encodeCnMsgpackPayload, registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
-const { getRushEventFolderMaxRoundSync } = require("../src/lib/assets")
+const {
+    getRushEventFolderClearRewards,
+    getRushEventFolderMaxRoundSync,
+} = require("../src/lib/assets")
 const { canStartRushEventFolderBattle } = require("../src/lib/rush-folder-progression.ts")
 const rushEventRoutes = require("../src/routes/api/rushEvent").default
 const singleBattleRoutes = require("../src/routes/api/singleBattleQuest").default
@@ -66,10 +71,12 @@ const account = insertAccountSync({
 const playerId = insertDefaultPlayerSync(account.id).id
 const viewerId = 800000511
 const eventId = 700007
+const compatibilityEventId = 700011
 
 db.prepare("INSERT INTO sessions (token, account_id, expires, type) VALUES (?, ?, ?, ?)")
     .run(String(viewerId), account.id, new Date("2099-12-31T23:59:59.000Z").toISOString(), 2)
 insertPlayerRushEventSync(playerId, getDefaultPlayerRushEventSync(eventId))
+insertPlayerRushEventSync(playerId, getDefaultPlayerRushEventSync(compatibilityEventId))
 
 function encodeRequest(body) {
     return pack(body).toString("base64")
@@ -92,23 +99,28 @@ async function post(url, body) {
     })
 }
 
-async function selectFolder(folderId) {
+async function selectFolder(folderId, targetEventId = eventId) {
     return post("/api/index.php/event/rush/select_folder", {
         viewer_id: viewerId,
         api_count: 1,
-        event_id: eventId,
+        event_id: targetEventId,
         folder_id: folderId,
     })
 }
 
-async function startBattle(questId, partyId) {
+async function startBattle(
+    questId,
+    partyId,
+    isAutoStartMode = false,
+    playId = `rush-${questId}-${partyId}-${randomUUID()}`,
+) {
     return post("/api/index.php/event/rush/battle/start", {
         viewer_id: viewerId,
         api_count: 1,
         quest_id: questId,
         party_id: partyId,
-        is_auto_start_mode: false,
-        play_id: `rush-${questId}-${partyId}-${randomUUID()}`,
+        is_auto_start_mode: isAutoStartMode,
+        play_id: playId,
     })
 }
 
@@ -203,6 +215,19 @@ function assertPlayedQuestIds(map, expectedQuestIds) {
     )
 }
 
+function getStoredItemAndMailTotal(itemId) {
+    const inventory = getPlayerItemSync(playerId, itemId) ?? 0
+    const mail = db.prepare(`
+        SELECT COALESCE(SUM(number), 0) AS amount
+        FROM players_mails
+        WHERE player_id = ?
+          AND receive_time = '0000-00-00 00:00:00'
+          AND type = 1
+          AND type_id = ?
+    `).get(playerId, itemId).amount
+    return inventory + mail
+}
+
 function clientAutoRetryTransition(rushEvent, battleStartRemainingTimes) {
     if (rushEvent.rush_battle_reward_list.length === 0) return "no-clear-dialog"
     return battleStartRemainingTimes > 0 ? "auto-retry" : "complete"
@@ -247,6 +272,28 @@ async function assertTwoRoundFolder(folderId, questIds) {
     return finishRush
 }
 
+async function assertAutoRestartedTwoRoundFolder(folderId, questIds) {
+    const firstStart = await startBattle(questIds[0], 1, true)
+    assert.equal(firstStart.statusCode, 200, firstStart.body)
+    assert.equal(getPlayerRushEventSync(playerId, eventId).activeRushBattleFolderId, folderId)
+
+    const firstFinish = await finishBattle(questIds[0])
+    assert.equal(firstFinish.statusCode, 200, firstFinish.body)
+    assertPlayedQuestIds(
+        decodeResponse(firstFinish).data.rush_event.rush_battle_played_party_list,
+        [questIds[0]],
+    )
+
+    const secondStart = await startBattle(questIds[1], 2, true)
+    assert.equal(secondStart.statusCode, 200, secondStart.body)
+    const secondFinish = await finishBattle(questIds[1])
+    assert.equal(secondFinish.statusCode, 200, secondFinish.body)
+    const finishRush = decodeResponse(secondFinish).data.rush_event
+    assertPlayedQuestIds(finishRush.rush_battle_played_party_list, [])
+    assertNoActiveQuest("auto-restarted folder final finish must clear active quest")
+    return finishRush
+}
+
 function invalidRushQuestTable() {
     const table = structuredClone(require("../assets/rush_event_quest.json"))
     table["700007002"].rushEventRound = "invalid"
@@ -275,7 +322,7 @@ test("folder 最大 round 来自 eventId + folderId 的官方内容表", () => {
     )
 })
 
-test("中级两 lap 真实链固定首次 AutoRetry 与重复 clear 的已知断链", async () => {
+test("中级两 lap 真实链允许客户端不重复 select_folder 直接开始后续 lap", async () => {
     await fastify.register(rushEventRoutes, { prefix: "/api/index.php/event/rush" })
     await fastify.register(singleBattleRoutes, { prefix: "/api/index.php/single_battle_quest" })
     await fastify.ready()
@@ -286,12 +333,70 @@ test("中级两 lap 真实链固定首次 AutoRetry 与重复 clear 的已知断
     assert.ok(firstLap.rush_battle_reward_list.length > 0)
     assert.equal(clientAutoRetryTransition(firstLap, 2), "auto-retry")
 
-    const secondLap = await assertTwoRoundFolder(
+    const secondLap = await assertAutoRestartedTwoRoundFolder(
         RushEventFolder.INTERMEDIATE,
         [700007001, 700007002],
     )
-    assert.deepEqual(secondLap.rush_battle_reward_list, [])
-    assert.equal(clientAutoRetryTransition(secondLap, 1), "no-clear-dialog")
+    assert.ok(secondLap.rush_battle_reward_list.length > 0)
+    assert.equal(clientAutoRetryTransition(secondLap, 1), "auto-retry")
+    assert.equal(clientAutoRetryTransition(secondLap, 0), "complete")
+})
+
+test("700011 高级两 lap 走真实兼容奖励并保持响应与库存一致", async () => {
+    const folderId = RushEventFolder.ADVANCED
+    const questIds = [700011003, 700011004]
+    const rewards = getRushEventFolderClearRewards(compatibilityEventId, folderId)
+    assert.ok(rewards?.length > 0)
+    const expectedResponseRewards = rewards.map(reward => ({
+        kind: 1,
+        kind_id: reward.id,
+        number: reward.count,
+    }))
+    const beforeTotals = Object.fromEntries(rewards.map(reward => [
+        reward.id,
+        getStoredItemAndMailTotal(reward.id),
+    ]))
+
+    const selected = await selectFolder(folderId, compatibilityEventId)
+    assert.equal(selected.statusCode, 200, selected.body)
+    const firstStart = await startBattle(questIds[0], 1, true)
+    assert.equal(firstStart.statusCode, 200, firstStart.body)
+    assert.equal((await finishBattle(questIds[0])).statusCode, 200)
+    const firstFinalStart = await startBattle(questIds[1], 2, true)
+    assert.equal(firstFinalStart.statusCode, 200, firstFinalStart.body)
+    const firstFinal = await finishBattle(questIds[1])
+    assert.equal(firstFinal.statusCode, 200, firstFinal.body)
+    assert.deepEqual(
+        decodeResponse(firstFinal).data.rush_event.rush_battle_reward_list,
+        expectedResponseRewards,
+    )
+
+    const secondLapPlayId = `rush-live-repro-${randomUUID()}`
+    const secondStart = await startBattle(questIds[0], 1, true, secondLapPlayId)
+    assert.equal(secondStart.statusCode, 200, secondStart.body)
+    assert.equal(
+        getPlayerRushEventSync(playerId, compatibilityEventId).activeRushBattleFolderId,
+        folderId,
+    )
+    assert.equal(getPlayerActiveQuestSync(playerId).playId, secondLapPlayId)
+    assert.equal(activeQuests[playerId].playId, secondLapPlayId)
+    assert.equal((await finishBattle(questIds[0])).statusCode, 200)
+    const secondFinalStart = await startBattle(questIds[1], 2, true)
+    assert.equal(secondFinalStart.statusCode, 200, secondFinalStart.body)
+    const secondFinal = await finishBattle(questIds[1])
+    assert.equal(secondFinal.statusCode, 200, secondFinal.body)
+    assert.deepEqual(
+        decodeResponse(secondFinal).data.rush_event.rush_battle_reward_list,
+        expectedResponseRewards,
+    )
+
+    for (const reward of rewards) {
+        assert.equal(
+            getStoredItemAndMailTotal(reward.id) - beforeTotals[reward.id],
+            reward.count * 2,
+            `item ${reward.id} 必须实际入库两次`,
+        )
+    }
 })
 
 test("高级首关 finish 与 summary 立即一致，第二关可使用 party2 并完成两关结算", async () => {
@@ -418,6 +523,66 @@ test("battle/start 对 folder 事件、active folder、历史列表与下一 rou
     await rejectWithoutActiveQuest(700007002, "folder quest round 必须等于已完成数加一")
 
     clearFolderState()
+})
+
+test("自动续战只可从已通关且状态干净的 folder 第一关重启", async () => {
+    const rejectAutoStart = async (questId, setup, label, autoStartValue = true) => {
+        clearFolderState()
+        db.prepare(`
+            DELETE FROM players_rush_events_cleared_folders
+            WHERE player_id = ? AND event_id = ?
+        `).run(playerId, eventId)
+        setup()
+        const response = await startBattle(questId, 1, autoStartValue)
+        try {
+            assert.equal(response.statusCode, 400, `${label}: ${response.body}`)
+            assertNoActiveQuest(label)
+        } finally {
+            clearFolderState()
+        }
+    }
+
+    await rejectAutoStart(700007001, () => {}, "未通关 folder 不得跳过 select_folder")
+    await rejectAutoStart(700007002, () => {
+        insertPlayerRushEventClearedFolderSync(playerId, eventId, RushEventFolder.INTERMEDIATE)
+    }, "后续 lap 必须从 folder 第一关开始")
+    await rejectAutoStart(700007001, () => {
+        insertPlayerRushEventClearedFolderSync(playerId, eventId, RushEventFolder.INTERMEDIATE)
+        insertFolderParty(700007003)
+    }, "残留 folder party 时不得隐式重启")
+    for (const invalidAutoStartValue of [1, "true", null]) {
+        await rejectAutoStart(700007001, () => {
+            insertPlayerRushEventClearedFolderSync(playerId, eventId, RushEventFolder.INTERMEDIATE)
+        }, `auto start 必须是 boolean：${String(invalidAutoStartValue)}`, invalidAutoStartValue)
+    }
+
+    clearFolderState()
+})
+
+test("自动续战恢复 folder 与创建 active quest 共同回滚", async () => {
+    clearFolderState()
+    insertPlayerRushEventClearedFolderSync(playerId, eventId, RushEventFolder.INTERMEDIATE)
+    db.exec(`
+        CREATE TRIGGER fail_rush_auto_restart_active_quest
+        BEFORE INSERT ON players_active_quests
+        BEGIN
+            SELECT RAISE(ABORT, 'injected rush auto restart rollback');
+        END;
+    `)
+    try {
+        const response = await startBattle(700007001, 1, true)
+        assert.equal(response.statusCode, 500, response.body)
+        assert.equal(getPlayerRushEventSync(playerId, eventId).activeRushBattleFolderId, null)
+        assertNoActiveQuest("自动续战 active quest 写入失败必须完整回滚")
+        assert.deepEqual(
+            getPlayerRushEventPlayedPartiesSync(playerId, eventId)
+                .filter(party => party.battleType === RushEventBattleType.FOLDER),
+            [],
+        )
+    } finally {
+        db.exec("DROP TRIGGER fail_rush_auto_restart_active_quest")
+        clearFolderState()
+    }
 })
 
 test("folder progression rejects a non-contiguous historical round", () => {

@@ -126,11 +126,9 @@ export function handleRushEventFinish(params: RushHandlerParams): {
         const isFolderFinal = rushEventRound >= folderMaxRound!
         if (isFolderFinal) {
             transaction(() => {
-                const isFirstClear = insertClearedFolder(playerId, rushEventId, rushEventFolderId)
+                insertClearedFolder(playerId, rushEventId, rushEventFolderId)
                 updateRushEvent(playerId, { eventId: rushEventId, activeRushBattleFolderId: null })
                 deletePartyList(playerId, rushEventId, rushEventBattleType)
-                if (!isFirstClear) return
-
                 rushBattleRewards = getFolderRewards(rushEventId, rushEventFolderId) ?? []
                 rushEventRewardsResult = giveRewards(playerId, rushBattleRewards)
             })

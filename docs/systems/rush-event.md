@@ -36,13 +36,15 @@
 非当前文件夹目标、未出战轮次和错误字段类型都会被拒绝且不修改存档。普通部分重置按主数据中的文件夹与轮次删除，
 不会因关卡 ID 较大而误删其他文件夹的残留记录；整组放弃时，清空文件夹选择和删除已用队伍共享同一 SQLite 事务。
 
-文件夹奖励按 `player_id + event_id + folder_id` 只结算一次。最终回合会在同一 SQLite 事务内首次写入通关记录、清理当前文件夹状态并发放完整奖励；重复通关只清理流程状态，不再次发奖。任一写入或发奖失败时整组操作回滚。
+`players_rush_events_cleared_folders` 只记录文件夹是否曾通关；它不是一次性奖励收据。每个完整 lap 的最终回合都会在同一 SQLite 事务内幂等写入通关标记、清理当前文件夹状态并实际发放/返回完整文件夹奖励。任一写入或发奖失败时整组操作回滚。
 
-### 自动续战的官方未知边界
+### 自动续战
 
-CN 1.8.1 客户端在有限 Rush 文件夹最终回合后，只有收到非空 `rush_battle_reward_list` 才保存 clear reward、打开完成对话框，并在剩余自动战斗次数大于 0 时由 `AutoRetry` 重新调用 `select_folder` 和第一关 `battle/start`。当前服务端的首次通关响应满足该条件；已记录 folder 的重复通关返回空奖励，因此不会进入这条客户端 AutoRetry 路径。
+CN 1.8.1 客户端的后续 lap 会重新枚举文件夹全部关卡，并可能在服务端已清空 active folder 后直接以 `is_auto_start_mode=true` 请求第一关。服务端仅在该文件夹已经通关、请求为第一关且没有残留 FOLDER 队伍时隐式恢复 active folder；普通手动请求、未通关文件夹、后续回合或残留状态仍必须拒绝。恢复 active folder 与创建 active quest 共用同一 SQLite 事务，避免部分写入。
 
-客户端源码只能证明当前响应与跳转条件不兼容，不能证明官服后端是否每 lap 重新发放 folder reward。私有部署线的每 lap 奖励和自制 `700099` 深渊模式均不作为官方语义证据；当前 official-only 主线不改变重复奖励经济，也不返回未实际发放的假奖励。该差异由 `rush_event_battle_flow.test.cjs` 的真实两-lap Fastify + SQLite 链固定，并延期到客户端专项验收；获得官方后端证据前不宣称自动多-lap 已支持。
+CN 客户端同时提供 `getSubsequentialLap()`（后续 lap 重新枚举文件夹全部关卡），并且只有最终回合响应含非空 `rush_battle_reward_list` 才会打开完成对话框、根据剩余次数触发 `AutoRetry`。更直接地，客户端 `BattleFinishDummyRemoteRushEventProcess` 在每次文件夹最终关都从 `RushEventQuestFolderLogic.getRewards()` 构造该列表，没有首次通关门槛。后续 lap 枚举、真实 finish 消费路径和 Dummy Remote 三方证据共同支持：服务端每个完整 lap 都实际发放并返回文件夹奖励，不能只返回用于驱动界面的假奖励。
+
+“每 lap 发奖”是 Rush 生命周期语义；`700011–700017` 具体使用哪组奖励是另一层策略。末期批次自身 CDN 奖励为空，当前 `eventId - 10` 内容来源仍是用户确认默认开启的体验兼容，而不是官服末期静态数据。以上生命周期裁决不依赖私有 `700099` 实现，也没有增加每一小关的普通掉落。
 
 ## 商店协议
 
@@ -99,8 +101,8 @@ CN 1.8.1 客户端在有限 Rush 文件夹最终回合后，只有收到非空 `
 - `tools/rush_event_shop.test.cjs`：主数据数量、兼容映射、空/非空精确数据覆盖、文件夹通关奖励（代币及配套素材）、UTC+8 边界与非法日期、数量校验、库存/余额和事务回滚。
 - `tools/rush_event_shop_route.test.cjs`：真实 Fastify 路由、常驻开放期列表和购买、全局时间过滤、`2053` 协议及 SQLite 回滚。
 - `tools/rush_event_reset_route.test.cjs`：普通/无限重置字段、跨活动目标、文件夹隔离和整组放弃回滚。
-- `tools/special_quest_flow.test.cjs`：文件夹首次通关发奖、重复通关不发奖，以及事务调用边界。
-- `tools/rush_event_battle_flow.test.cjs`：真实执行两次 `select_folder → 两关 start/finish → summary`，固定首次 clear 可进入客户端 AutoRetry、重复 clear 因空 reward 不会进入的当前差异；这是已知差异证据，不是通过声明。
+- `tools/special_quest_flow.test.cjs`：每个完整 lap 发奖、通关标记幂等和事务调用边界。
+- `tools/rush_event_battle_flow.test.cjs`：真实 Fastify + SQLite 两-lap 链；第二 lap 不重复 `select_folder`，验证隐式恢复、两关 start/finish、每 lap 非空奖励与 AutoRetry/完成分支。
 
 ## 关卡掉落
 

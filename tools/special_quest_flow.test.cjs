@@ -333,7 +333,7 @@ function testRaidWeightedBossProgress() {
     }), /invalid raid quest kill count weight/)
 }
 
-function testRushFolderRewardsAreGrantedOnlyOnFirstClear() {
+function testRushFolderRewardsAreGrantedForEveryCompletedLap() {
     let firstClear = true
     let grantCount = 0
     const calls = []
@@ -384,9 +384,11 @@ function testRushFolderRewardsAreGrantedOnlyOnFirstClear() {
 
     calls.length = 0
     const repeated = runFinish()
-    assert.equal(grantCount, 1, "重复通关已记录的文件夹不得再次发奖")
-    assert.deepEqual(repeated.rushEventData.rush_battle_reward_list, [])
-    assert.deepEqual(calls, ["begin", "insert", "update", "delete", "commit"])
+    assert.equal(grantCount, 2, "后续 lap 必须实际发放并返回文件夹奖励")
+    assert.deepEqual(repeated.rushEventData.rush_battle_reward_list, [
+        { kind: 1, kind_id: 2370001, number: 100 },
+    ])
+    assert.deepEqual(calls, ["begin", "insert", "update", "delete", "grant", "commit"])
 }
 
 testCarnivalScoreAndPreviousTotal()
@@ -399,5 +401,5 @@ testFailedSpecialQuestsDoNotProgress()
 testAdventHostFinishState()
 testRushEndlessProgressAndRaidResponse()
     testRaidWeightedBossProgress()
-testRushFolderRewardsAreGrantedOnlyOnFirstClear()
+testRushFolderRewardsAreGrantedForEveryCompletedLap()
 console.log("special quest flow tests passed")
