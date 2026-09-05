@@ -276,12 +276,16 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "utf8",
     )
     assert.match(singleSettlementWrites, /getPlayerItemSync/)
+    const singleEventSettlement = fs.readFileSync(
+        path.join(projectRoot, "src/lib/quest/finish/single-event-settlement.ts"),
+        "utf8",
+    )
     assert.match(
-        singleSettlementWrites,
-        /grantCarnivalRewards\([\s\S]*standardRewardGrant: standardRewardGrant\.forCarnival/,
+        singleEventSettlement,
+        /grantCarnivalRewards\([\s\S]*standardRewardGrant: input\.standardRewardGrant\.forCarnival/,
     )
     assert.doesNotMatch(
-        singleSettlementWrites,
+        singleEventSettlement,
         /grantCarnivalRewards\([\s\S]*giveItem:/,
     )
     const missionRewardGranter = fs.readFileSync(
