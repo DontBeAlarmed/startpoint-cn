@@ -161,7 +161,7 @@ export default function GameplaySettings() {
                         </Space>
                     </Card>
                     <Card
-                        title="本服玩家：房主允许自救"
+                        title="本服玩家：房主救援身份"
                         extra={(
                             <span className={settings.data?.multiRescueHostRewardsEnabled
                                 ? "admin-badge-ok"
@@ -176,7 +176,7 @@ export default function GameplaySettings() {
                                 <Switch
                                     checked={draftHostRescueEnabled ?? false}
                                     onChange={value => setDraftHostRescueEnabled(value)}
-                                    aria-label="本服玩家：房主允许自救"
+                                    aria-label="本服玩家：房主救援身份"
                                 />
                                 <Button
                                     type="primary"

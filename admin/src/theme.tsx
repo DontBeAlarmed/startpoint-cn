@@ -40,6 +40,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
                             colorBorderSecondary: "#30363D",  // 内部描边
                         } : {}),
                     },
+                    components: {
+                        // Tooltip 内部用全局 colorTextLightSolid（深色，服务黄色主按钮文字）渲染浮层文字，
+                        // 会变成深底深字。仅对 Tooltip 固定深色半透明底 + 浅色文字，两种主题下都可读。
+                        Tooltip: {
+                            colorBgSpotlight: "rgba(11, 15, 20, 0.96)",
+                            colorTextLightSolid: "#E6EDF3",
+                        },
+                    },
                 }}
             >
                 {children}

@@ -25,7 +25,7 @@ test("admin exposes validated gameplay settings through the server settings API"
     assert.match(page, /\{ multiRescueFragmentRewardsEnabled \}/)
     assert.match(page, /\{ multiRescueHostRewardsEnabled \}/)
     assert.match(page, /aria-label="本服玩家：所有多人房间救援资格"/)
-    assert.match(page, /aria-label="本服玩家：房主允许自救"/)
+    assert.match(page, /aria-label="本服玩家：房主救援身份"/)
     assert.match(page, /只影响本服所属真人玩家，不改变其他服务器、不发布铃铛/)
     assert.match(page, /当前还要求第一开关开启/)
     assert.doesNotMatch(page, /onClick=\{\(\) => draftRescueEnabled !== null && apiPatch/)
