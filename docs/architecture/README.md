@@ -37,7 +37,7 @@
 | D22 | Bond Token Exchange 独立用例（已实现，实机统一延期） | [领域边界蓝图](./domain-boundary-blueprint.md) | typed 产品/成本/库存/周期 catalog、list runtime（exchange_count）、唯一事务 owner 与 per-player 兑换计数 |
 | D23 | Character Growth Writer Convergence（已实现，实机统一延期） | [角色成长状态 Gate](./character-growth-state-gate.md) | 信赖之证资格按客户端规则统一派生（板1=非突破上限+全节点、板2=全节点）、节点/EXP/注入 writer 同事务收敛、metadata/EX Boost/repair/admin 经 aggregate command 或声明 adapter、DEBT-T01/T02 关闭 |
 | D24 | Mission Owner 收口（已实现） | [任务引擎架构](../systems/mission-engine-architecture.md) | snapshot-scoped Catalog、Session-only computer、来源事实 typed read port、receipt/RewardGrant 协调、Quest 计数回归所属 writer、DEBT-T03/T04 关闭 |
-| D25 | Battle Settlement 有限核（已实现，等待 D25 closure） | [Battle Settlement Core Gate](./battle-settlement-core-gate.md) | immutable values/progress plans；Single/Multi 外层事务与 lifecycle/transport 保持独立；DEBT-T05/T08 收敛 |
+| D25 | Battle Settlement 有限核（已实现） | [Battle Settlement Core Gate](./battle-settlement-core-gate.md) | immutable values/progress plans；Single/Multi 外层事务与 lifecycle/transport 保持独立；DEBT-T05/T08 收敛 |
 
 ## 阅读顺序
 
@@ -49,7 +49,7 @@
 
 D12、D13 与 D14 已完成服务端实现和自动化 Gate，等待客户端实机验收。三份 Gate 文档保留设计依据，同时作为相应已落地边界的架构与验证证据；它们不取代上述当前架构总览的阅读顺序。
 
-D15 已完成领域边界识别、决策和后续实施路线。D16、D17、D18、D18b 的服务端实现、Gate A broad closure、D18b scoped final review 和服务重启均已完成；D19、D20、D21 与 D22 的服务端实现与逐 checkpoint 审查已完成，大 Gate B 的 broad closure、整体终审与服务重启已在 D22 收口时执行；D23 的 Character writer 与 D24 的 Mission owner 已收口；D25 的 Battle Settlement 有限核与两侧 adapter 已实现，正在完成 closure；D26-D28 尚未实施。客户端实测统一延期到 D28 后。
+D15 已完成领域边界识别、决策和后续实施路线。D16、D17、D18、D18b 的服务端实现、Gate A broad closure、D18b scoped final review 和服务重启均已完成；D19、D20、D21 与 D22 的服务端实现与逐 checkpoint 审查已完成，大 Gate B 已收口；D23 Character writer、D24 Mission owner 与 D25 Battle Settlement 有限核均已完成；D26-D28 尚未实施。客户端实测统一延期到 D28 后。
 
 ## 统一图例
 
@@ -65,7 +65,7 @@ D15 已完成领域边界识别、决策和后续实施路线。D16、D17、D18�
 - 本目录已收录的 D1-D11b 全部描述当前实现，图节标题统一带“当前”。
 - D12、D13 与 D14 描述已落地、待客户端实机验收的 Gate 架构；其中的实施状态和证据路径可以用于解释当前实现，仍需与功能支持矩阵区分自动验证和人工验收。
 - D15 描述经审查确认、但尚未实施的目标领域边界；其图和表不能替代 D1-D11b 的当前架构事实。
-- D16、D18、D18b、D19、D20、D21 与 D22 已实现 typed Item policy、Inventory writer、Item cap、按 `sellable` 的 Sold/Mail disposition、Item expiry owner、`/load` EventTrade 到期转换、Mail claim、Shop/Gacha/Star Crumb/Bond Token owners；D23 已收口 Character writer，D24 已收口 Mission owner，D25 的有限 Battle Settlement core 已实现并等待 closure。不得据此宣称私服策略已经被官服后端证实；D26–D28 仍未实施。
+- D16、D18、D18b、D19、D20、D21 与 D22 已实现 typed Item policy、Inventory writer、Item cap、按 `sellable` 的 Sold/Mail disposition、Item expiry owner、`/load` EventTrade 到期转换、Mail claim、Shop/Gacha/Star Crumb/Bond Token owners；D23 已收口 Character writer，D24 已收口 Mission owner，D25 已完成有限 Battle Settlement core。不得据此宣称私服策略已经被官服后端证实；D26–D28 仍未实施。
 - 当前图不混入未来组件、迁移步骤或完成度信息；功能状态仍由 `docs/status/` 维护。
 - 目标架构必须使用独立图和独立证据，不得用虚线叠加到当前图。
 

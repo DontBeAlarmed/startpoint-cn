@@ -1,6 +1,6 @@
 # D25 Battle Settlement 有限核与 Single/Multi Adapter
 
-状态：有限 shared core、Single adapter、Multi adapter 与依赖边界已实现；D25 focused/performance 与 whole-range closure 在 C6 完成。客户端实机验收统一延期到 D28 后。
+状态：已实现并通过 focused/performance 与 whole-range 独立审查；客户端实机验收统一延期到 D28 后。
 
 ## 边界结论
 
