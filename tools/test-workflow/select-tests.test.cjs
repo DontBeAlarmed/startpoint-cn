@@ -810,7 +810,9 @@ test("maps the shared battle settlement value plan to both adapters", () => {
 test("maps the finite Event descriptor to the Event focused group", () => {
     for (const file of [
         "src/lib/quest/finish/event-settlement-descriptor.ts",
+        "src/lib/quest/finish/event-settlement-hook.ts",
         "tools/event_settlement_descriptor.test.cjs",
+        "tools/event_settlement_hook.test.cjs",
     ]) assert.deepEqual(selectTestGroups([file]), ["integration:event"], file)
     assert.deepEqual(
         selectTestGroups(["src/lib/quest/finish/single-event-settlement.ts"]),
@@ -1857,6 +1859,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/box_gacha_exec_transaction.test.cjs",
         "tools/carnival_rewards.test.cjs",
         "tools/event_settlement_descriptor.test.cjs",
+        "tools/event_settlement_hook.test.cjs",
         "tools/event_route_reachability.test.cjs",
         "tools/how_to_get_route.test.cjs",
         "tools/practice_battle_history.test.cjs",

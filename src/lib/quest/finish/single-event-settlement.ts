@@ -40,6 +40,7 @@ import type { ActiveQuest } from "../active-quest-service"
 import { buildScoreAttackBattleHistoryRecord } from "../score-attack-history"
 import type { ValidatedSingleFinishBody } from "../single-finish-validation"
 import type { EventSettlementDescriptor } from "./event-settlement-descriptor"
+import { dispatchBuiltInEventSettlement } from "./event-settlement-hook"
 import { handleCarnivalEventFinish } from "./carnival-handler"
 import { handleRaidEventFinish } from "./raid-handler"
 import { handleRushEventFinish } from "./rush-handler"
@@ -100,97 +101,100 @@ export function settleSingleBuiltInEvent(
         giveRewards: input.grantRewards,
         transaction: <T>(operation: () => T) => getDb().transaction(operation)(),
     }
-    const rush = descriptor.kind === "rush"
-        ? handleRushEventFinish(rushFinishParams)
+    const builtIn = dispatchBuiltInEventSettlement(descriptor, {
+        rush: () => handleRushEventFinish(rushFinishParams),
+        raid: current => handleRaidEventFinish({
+            questCategory,
+            questAccomplished,
+            activeEventId: current.eventId,
+            killCountWeight: current.killCountWeight,
+            party,
+            playerId,
+            questId,
+            getEvoLevelsFn: getCharactersEvolutionImgLevels,
+            insertPartyFn: insertPlayerRushEventPlayedPartySync,
+            getRequiredKillCountFn: getRaidEventRequiredKillCount,
+            getRaidBossStateFn: getRaidEventBossStateSync,
+            updateRaidBossStateFn: upsertRaidEventBossStateSync,
+            incrementQuestKillCountFn: incrementPlayerRaidEventQuestKillCountSync,
+        }),
+        carnival: current => handleCarnivalEventFinish({
+            questCategory,
+            questAccomplished,
+            questId,
+            questData: {
+                eventId: current.eventId,
+                folderId: current.folderId,
+                difficultyScore: current.difficultyScore,
+                timeLimitMs: current.timeLimitMs,
+            },
+            clearTime,
+            party,
+            playerId,
+            getRecordsFn: getPlayerCarnivalEventRecordsSync,
+            upsertFn: upsertPlayerCarnivalEventRecordSync,
+            getRewardDefinitionsFn: getCarnivalRewardDefinitions,
+            getClaimedRewardIdsFn: getPlayerClaimedCarnivalRewardIdsSync,
+            grantRewardsFn: (pid, definitions) => grantCarnivalRewards(pid, definitions, {
+                getPlayer: getPlayerSync,
+                giveDegree: givePlayerDegreeSync,
+                standardRewardGrant: input.standardRewardGrant.forCarnival,
+            }),
+            claimRewardIdsFn: insertPlayerClaimedCarnivalRewardIdsSync,
+            assertTargetPlayerFn: input.standardRewardGrant.assertTargetPlayer,
+            transactionFn: runCarnivalEventTransactionSync,
+        }),
+        scoreAttack: current => {
+            insertPlayerScoreAttackBattleHistorySync(buildScoreAttackBattleHistoryRecord({
+                playerId,
+                eventId: current.eventId!,
+                playId: input.activeQuest.playId,
+                categoryId: questCategory,
+                questId,
+                finishKind: 0,
+                createdAt: input.settlementTime,
+                elapsedTimeMs: clearTime,
+                score: body.score,
+                clearRank: input.clearRank,
+                party,
+                statistics: body.statistics,
+                equipmentList: getPlayerEquipmentListSync(playerId),
+            }))
+            return handleScoreAttackEventFinish({
+                playerId,
+                questId,
+                category: questCategory,
+                score: body.score,
+                elapsedTimeMs: clearTime,
+                isAccomplished: questAccomplished,
+                quest: {
+                    bRankScore: input.questData.bRankScore!,
+                    aRankScore: input.questData.aRankScore!,
+                    sRankScore: input.questData.sRankScore!,
+                    ssRankScore: input.questData.ssRankScore!,
+                },
+                tiers: [...input.scoreAttackBorderTiers],
+                party,
+            }, {
+                transaction: operation => operation(),
+                getProgress: getPlayerSingleQuestProgressSync,
+                grantRewards: input.grantRewards,
+                updateProgress: updatePlayerQuestProgressSync,
+                insertProgress: insertPlayerQuestProgressSync,
+                deleteActiveQuest: deletePlayerActiveQuestSync,
+            })
+        },
+    })
+    const rush = builtIn.kind === "rush"
+        ? builtIn.value
         : { rushEventData: null, rushEventRewardsResult: null }
+    const raidEventData = builtIn.kind === "raid" ? builtIn.value : null
+    const carnival = builtIn.kind === "carnival" ? builtIn.value : null
+    const scoreAttack = builtIn.kind === "scoreAttack" ? builtIn.value : null
     const modeRushExtension = dispatchModeRushFinish(rushFinishParams, settlementModeHost)
     if (modeRushExtension?.rush_battle_reward_list?.length && rush.rushEventData) {
         rush.rushEventData.rush_battle_reward_list.push(...modeRushExtension.rush_battle_reward_list)
     }
-
-    const raidEventData = descriptor.kind === "raid" ? handleRaidEventFinish({
-        questCategory,
-        questAccomplished,
-        activeEventId: descriptor.eventId,
-        killCountWeight: descriptor.killCountWeight,
-        party,
-        playerId,
-        questId,
-        getEvoLevelsFn: getCharactersEvolutionImgLevels,
-        insertPartyFn: insertPlayerRushEventPlayedPartySync,
-        getRequiredKillCountFn: getRaidEventRequiredKillCount,
-        getRaidBossStateFn: getRaidEventBossStateSync,
-        updateRaidBossStateFn: upsertRaidEventBossStateSync,
-        incrementQuestKillCountFn: incrementPlayerRaidEventQuestKillCountSync,
-    }) : null
-
-    const carnival = descriptor.kind === "carnival" ? handleCarnivalEventFinish({
-        questCategory,
-        questAccomplished,
-        questId,
-        questData: {
-            eventId: descriptor.eventId,
-            folderId: descriptor.folderId,
-            difficultyScore: descriptor.difficultyScore,
-            timeLimitMs: descriptor.timeLimitMs,
-        },
-        clearTime,
-        party,
-        playerId,
-        getRecordsFn: getPlayerCarnivalEventRecordsSync,
-        upsertFn: upsertPlayerCarnivalEventRecordSync,
-        getRewardDefinitionsFn: getCarnivalRewardDefinitions,
-        getClaimedRewardIdsFn: getPlayerClaimedCarnivalRewardIdsSync,
-        grantRewardsFn: (pid, definitions) => grantCarnivalRewards(pid, definitions, {
-            getPlayer: getPlayerSync,
-            giveDegree: givePlayerDegreeSync,
-            standardRewardGrant: input.standardRewardGrant.forCarnival,
-        }),
-        claimRewardIdsFn: insertPlayerClaimedCarnivalRewardIdsSync,
-        assertTargetPlayerFn: input.standardRewardGrant.assertTargetPlayer,
-        transactionFn: runCarnivalEventTransactionSync,
-    }) : null
-
-    if (descriptor.kind === "scoreAttack") {
-        insertPlayerScoreAttackBattleHistorySync(buildScoreAttackBattleHistoryRecord({
-            playerId,
-            eventId: descriptor.eventId!,
-            playId: input.activeQuest.playId,
-            categoryId: questCategory,
-            questId,
-            finishKind: 0,
-            createdAt: input.settlementTime,
-            elapsedTimeMs: clearTime,
-            score: body.score,
-            clearRank: input.clearRank,
-            party,
-            statistics: body.statistics,
-            equipmentList: getPlayerEquipmentListSync(playerId),
-        }))
-    }
-    const scoreAttack = descriptor.kind === "scoreAttack" ? handleScoreAttackEventFinish({
-        playerId,
-        questId,
-        category: questCategory,
-        score: body.score,
-        elapsedTimeMs: clearTime,
-        isAccomplished: questAccomplished,
-        quest: {
-            bRankScore: input.questData.bRankScore!,
-            aRankScore: input.questData.aRankScore!,
-            sRankScore: input.questData.sRankScore!,
-            ssRankScore: input.questData.ssRankScore!,
-        },
-        tiers: [...input.scoreAttackBorderTiers],
-        party,
-    }, {
-        transaction: operation => operation(),
-        getProgress: getPlayerSingleQuestProgressSync,
-        grantRewards: input.grantRewards,
-        updateProgress: updatePlayerQuestProgressSync,
-        insertProgress: insertPlayerQuestProgressSync,
-        deleteActiveQuest: deletePlayerActiveQuestSync,
-    }) : null
 
     return {
         rushEventData: rush.rushEventData,

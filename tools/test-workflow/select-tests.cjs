@@ -286,7 +286,7 @@ const SOURCE_RULES = [
         groups: ["integration:mission", "integration:party", "quick:quest"],
     },
     {
-        pattern: /^(?:src\/lib\/quest\/finish\/event-settlement-descriptor\.ts|tools\/event_settlement_descriptor\.test\.cjs)$/,
+        pattern: /^(?:src\/lib\/quest\/finish\/event-settlement-(?:descriptor|hook)\.ts|tools\/event_settlement_(?:descriptor|hook)\.test\.cjs)$/,
         groups: ["integration:event"],
     },
     {
