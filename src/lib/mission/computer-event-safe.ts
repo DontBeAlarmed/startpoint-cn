@@ -1,10 +1,4 @@
-import { getPlayerCollectedItemTotalsSync, getPlayerItemsSync } from "../../data/domains/item"
-import { getPlayerCategoryMissionsSync } from "../../data/domains/mission"
-import { getPlayerSync } from "../../data/domains/player"
-import { getPlayerQuestProgressSync } from "../../data/domains/quest"
-import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../../data/domains/character"
-import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
-import { getPlayerPartyGroupListSync } from "../../data/domains/party"
+import type { PlayerQuestProgress } from "../../data/types"
 import {
     ContentSnapshotError,
     getContentSnapshot,
@@ -60,18 +54,6 @@ export function getEventCurrentStateMissionIds(): readonly number[] {
         .filter(([, rule]) => rule.kind === "currentState")
         .map(([missionId]) => missionId)
         .sort((left, right) => left - right)
-}
-
-function getEnabledEventCurrentStateMissionIds(
-    catalog: MissionCatalog,
-    evaluationTime: Date,
-): readonly number[] {
-    if (!Number.isFinite(evaluationTime.getTime())) return []
-    return [...getEventRuleCatalog(catalog)]
-        .filter(([missionId, rule]) => (
-            rule.kind === "currentState" && catalog.isEnabledAt(3, missionId, evaluationTime)
-        ))
-        .map(([missionId]) => missionId)
 }
 
 function getOfficialManaNodeIds(
@@ -373,7 +355,7 @@ export function getEventItemMissionItemId(missionId: number): number | undefined
 }
 
 export function buildEventSafeQuestProgress(
-    rawProgress: ReturnType<typeof getPlayerQuestProgressSync>,
+    rawProgress: Readonly<Record<string, readonly PlayerQuestProgress[]>>,
 ): CategoryContext["questProgress"] {
     return Object.fromEntries(Object.entries(rawProgress).map(([category, progress]) => [
         category,

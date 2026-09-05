@@ -305,7 +305,6 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             rewardCampaignRates,
         } = valuePlan
         const {
-            freeMana: newMana,
             boostPoint: newBoostPoint,
             bossBoostPoint: newBossBoostPoint,
         } = playerValues

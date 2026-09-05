@@ -4,7 +4,7 @@ import {
     getPlayerCategoryMissionsSync,
 } from "../../data/domains/mission"
 import { getPlayerSync } from "../../data/domains/player"
-import type { Player, PlayerActiveMission } from "../../data/types"
+import type { Player } from "../../data/types"
 import { MissionEvaluationSession } from "./evaluation-session"
 import { getMissionCatalog, isMissionProgressComplete } from "./mission-catalog"
 import { createProductionMissionFactLoaderRegistry } from "./production-fact-loaders"
@@ -12,7 +12,6 @@ import type { ProductionMissionFactSeeds } from "./production-fact-loaders"
 import { getMissionFactRequirementRegistry } from "./requirements/registry"
 import { getComputer } from "./registry"
 import type { FactKey } from "./facts/fact-key"
-import type { CategoryContext } from "./types"
 import type {
     EvaluatedMissionResult,
     MissionEvaluationResult,

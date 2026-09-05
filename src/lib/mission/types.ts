@@ -1,6 +1,6 @@
 // Mission computer core types
 
-import type { Player, PlayerCharacter, RawPlayerQuestProgress } from "../../data/types"
+import type { Player } from "../../data/types"
 import type { SnapshotData } from "./snapshot"
 import type { MissionBattleCounters } from "../../data/domains/mission_battle_facts"
 import type { DegreeBattleStats } from "../../data/domains/degree_battle_stats"

@@ -1,7 +1,6 @@
 // Compute awake mission summary for /load response
 // Returns active_mission_list (Array format for data.active_mission_list)
 
-import { getPlayerCharacterAwakeUnlocksSync } from "../../data/domains/character_awake"
 import {
     assertAwakeRequestContext,
     createAwakeRequestContext,

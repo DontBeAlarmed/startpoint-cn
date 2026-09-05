@@ -1,6 +1,6 @@
 # D26 Event Lifecycle 有限核
 
-状态：typed descriptor、有限 built-in hook 与 Single Event adapter 已实现；等待 D26/Gate C final review、唯一 broad 和服务重启。当前服务端坚持 official-only；已登记的体验优化必须独立标识。
+状态：typed descriptor、有限 built-in hook、Single Event adapter、Rush AutoRetry 实机补丁、Gate C 唯一 broad 闭环与服务重启均已完成；客户端统一验收延期到 D28 后。当前服务端坚持 official-only；已登记的体验优化必须独立标识。
 
 ## 有限共享边界
 
@@ -48,3 +48,10 @@ CN 客户端只有在有限 folder final 响应含非空 `rush_battle_reward_lis
 - quick:modes 保留 loader、allowlist、lifecycle 与事务回滚；
 - Single settlement baseline 保持行为与 SQL 快照不变；
 - D26 closure 前不删除各模式状态/算法/transport tests。
+
+## Gate C 验证
+
+- 唯一 broad：`493 passed / 25 failed / 0 skipped`；25 项中 24 项为并发资源 timeout/工作树 Admin 依赖缺失，串行 leaf 全部通过；唯一真实断言失败是 D16 结构测试仍指向迁移前 Carnival 文件，更新后 direct `9/9`、`integration:database 33/33`。
+- Rush 实机补丁：精确 `700011003→700011004` 两 lap、兼容奖励真实入库、非布尔拒绝和组合事务回滚通过；`integration:event 22/22`。
+- typecheck、123 份文档、hygiene 与 diff check 通过；受支持启动入口构建成功，`healthz=ready`、schema 27。
+- broad 仅运行一次；失败后只运行对应 leaf 与受影响 focused group。
