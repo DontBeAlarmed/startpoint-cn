@@ -372,10 +372,11 @@ owner-focused 明确保留一个 single fresh reread 例外：`single-finish` �
 之后仍有 reward、Active Mission、response state 和 active quest 权威写入，因此必须在最后写入后
 重新进行有界求值，并固定恰好两次 Category 9 evaluation；它不复用旧 Session，也不构成跨请求
 缓存。其余 owner 在没有注入 owner snapshot 时按各自冻结 seed 加载有界 post-write scope。
-随后运行
-`node --test tools/awake_fact_scope.test.cjs tools/item_sell_awake_publication.test.cjs tools/awake_owner_fact_publication.test.cjs tools/awake_reconcile_callsite_matrix.test.cjs`，
+随后在 D14 当时运行包含 `tools/awake_reconcile_callsite_matrix.test.cjs` 的四文件命令，
 65/65 通过、0 失败、0 取消、0 跳过，退出码为 0，用时 17.81 秒，覆盖 global-fact、
-item sell publication、固定 21-owner/final-write 矩阵及 fail-closed 约束。
+item sell publication、固定 owner/final-write 矩阵及 fail-closed 约束。该迁移期矩阵已按
+DEBT-T01 于 D23 删除；现行最小边界验证命令为
+`node --test tools/character_growth_writer_boundary.test.cjs tools/awake_fact_scope.test.cjs tools/item_sell_awake_publication.test.cjs tools/awake_owner_fact_publication.test.cjs`。
 
 轻量回归使用
 `npm run benchmark:non-multi-mixed -- --output <WORKSPACE_ROOT>/docs/reports/task-35.4-repair/non-multi-mixed-smoke.json`，

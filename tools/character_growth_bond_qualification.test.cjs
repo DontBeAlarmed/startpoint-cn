@@ -264,7 +264,7 @@ test("board 2 completion grants its token without any level condition", () => {
 
     // Every board-2 node learned while the character is far below the base
     // cap — board 2 must still qualify (client rule: nodes only).
-    const granted = convergeBondTokenForLearnedBoardWithinTransaction(
+    const granted = db.transaction(() => convergeBondTokenForLearnedBoardWithinTransaction(
         playerId, PROTAGONIST_ID, new Map([[1, 1], [2, 0]]),
         {
             boardIndex: 2,
@@ -273,7 +273,7 @@ test("board 2 completion grants its token without any level condition", () => {
             requiredNodeIds: boardTwoNodeIds,
             learnedNodeIds: new Set(boardTwoNodeIds),
         },
-    )
+    ))()
     assert.equal(granted.bondTokenGranted, true)
     assert.equal(
         getPlayerCharacterSync(playerId, PROTAGONIST_ID).bondTokenList
@@ -283,7 +283,7 @@ test("board 2 completion grants its token without any level condition", () => {
 
     // An incomplete board 2 below any level must not grant, and must not
     // roll back the persisted grant from the call above.
-    const incomplete = convergeBondTokenForLearnedBoardWithinTransaction(
+    const incomplete = db.transaction(() => convergeBondTokenForLearnedBoardWithinTransaction(
         playerId, PROTAGONIST_ID, new Map([[1, 1], [2, 0]]),
         {
             boardIndex: 2,
@@ -292,7 +292,7 @@ test("board 2 completion grants its token without any level condition", () => {
             requiredNodeIds: boardTwoNodeIds,
             learnedNodeIds: new Set(boardTwoNodeIds.slice(1)),
         },
-    )
+    ))()
     assert.equal(incomplete.bondTokenGranted, false)
     assert.equal(
         getPlayerCharacterSync(playerId, PROTAGONIST_ID).bondTokenList
