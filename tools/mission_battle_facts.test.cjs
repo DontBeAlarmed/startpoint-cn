@@ -30,11 +30,6 @@ stubModule("../src/lib/quest/finish/party-co-clear-tracker", {
 stubModule("../src/lib/quest/finish/powerflip-tracker", {
     trackPowerflip: ctx => calls.push(["powerflip", ctx.questId]),
 })
-stubModule("../src/data/domains/quest", {
-    incrementPlayerQuestMultiClearSync: (playerId, category, questId) => {
-        calls.push(["multi", playerId, category, questId])
-    },
-})
 stubModule("../src/data/domains/mission_battle_facts", {
     recordMissionBattleResultSync: (playerId, result) => {
         calls.push(["result", playerId, result])

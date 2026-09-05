@@ -1202,6 +1202,13 @@ for (const [label, participant, isHost] of [
                 payload: startPayload(participant.viewerId, playId),
             })
             assert.equal(started.statusCode, 200, started.body)
+            home.db.prepare(`
+                INSERT INTO players_quest_progress (
+                    section, quest_id, finished, unlocked, multi_clear_count, player_id
+                ) VALUES (?, ?, 0, 1, 0, ?)
+                ON CONFLICT (section, quest_id, player_id)
+                DO UPDATE SET multi_clear_count = 0
+            `).run(productionQuest.category, productionQuest.questId, home.playerId)
             assert.deepEqual(
                 entryItemWriteAudit(home.db),
                 isHost ? [{ afterAmount: 0 }] : [],
@@ -1250,6 +1257,15 @@ for (const [label, participant, isHost] of [
                 getPlayerCollectedItemTotalSync(home.playerId, productionQuest.ticketId),
                 collectedBefore,
             )
+            assert.equal(home.db.prepare(`
+                SELECT multi_clear_count
+                FROM players_quest_progress
+                WHERE player_id = ? AND section = ? AND quest_id = ?
+            `).get(
+                home.playerId,
+                productionQuest.category,
+                productionQuest.questId,
+            ).multi_clear_count, 0, "failed Multi finish must not increment clear count")
             assert.equal(getPlayerActiveQuestSync(home.playerId), null)
         } finally {
             await closeProductionHome(home)
@@ -1480,6 +1496,7 @@ test("production /finish consumes one SQLite settlement after both requests pass
         const settledOnce = observableSettlementState(home.db, home.playerId)
         assert.equal(settledOnce.activeQuest.length, 0)
         assert.equal(settledOnce.questHistory.length, 1)
+        assert.equal(settledOnce.questHistory[0].multi_clear_count, 1)
         assert.equal(settledOnce.missionFacts[0].multi_clear_count, 1)
         assert.ok(settledOnce.inventory.length > 0, "真实奖励必须落入库存")
 
