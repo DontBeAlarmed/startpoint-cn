@@ -255,8 +255,8 @@ export default function Dashboard() {
                 )}
 
                 <Row gutter={[16, 16]}>
-                    <Col xs={24} md={12}>
-                        <Card title="服务端状态" style={{ height: "100%" }}>
+                    <Col xs={24} md={8}>
+                        <Card title="服务端状态" style={{ height: "100%" }} className="admin-dash-card">
                             {statusLoading && !status ? (
                                 <Alert type="info" showIcon message="正在加载服务端状态" />
                             ) : statusError || !status ? (
@@ -276,8 +276,8 @@ export default function Dashboard() {
                             )}
                         </Card>
                     </Col>
-                    <Col xs={24} md={12}>
-                        <Card title="多人联机状态" style={{ height: "100%" }}>
+                    <Col xs={24} md={16}>
+                        <Card title="多人联机状态" style={{ height: "100%" }} className="admin-dash-card">
                             {statusLoading && !status ? (
                                 <Alert type="info" showIcon message="正在加载多人联机状态" />
                             ) : statusError || !status ? (
@@ -320,7 +320,7 @@ export default function Dashboard() {
                                             <DashKvItem label="TCP 服务">
                                                 {status.multiplayer.tcp.available ? "可用" : "不可用"}
                                             </DashKvItem>
-                                            <DashKvItem label="TCP 地址">{status.multiplayer.tcp.endpoint ?? "-"}</DashKvItem>
+                                            <DashKvItem label="TCP 地址"><span className="admin-mono">{status.multiplayer.tcp.endpoint ?? "-"}</span></DashKvItem>
                                         </div>
                                     </div>
                                     {status.multiplayer.latestCompatibilityRejection ? (
@@ -381,7 +381,7 @@ export default function Dashboard() {
 
                 <Row gutter={[16, 16]}>
                     <Col span={24}>
-                        <Card title="CDN 基线 / 补丁 Overlay" style={{ height: "100%" }}>
+                        <Card title="CDN 基线 / 补丁 Overlay" style={{ height: "100%" }} className="admin-dash-card">
                             {statusLoading && !status ? (
                                 <Alert type="info" showIcon message="正在加载 CDN 状态" />
                             ) : statusError || !status ? (
@@ -406,7 +406,7 @@ export default function Dashboard() {
                                         <div className="admin-dash-section-title">来源与存储</div>
                                         <div className="admin-dash-kv">
                                             <DashKvItem label="资源模式">{status.cdn.storage.mode}</DashKvItem>
-                                            <DashKvItem label="CDN 地址">{status.cdn.baseUrl ?? "客户端自带"}</DashKvItem>
+                                            <DashKvItem label="CDN 地址"><span className="admin-mono">{status.cdn.baseUrl ?? "客户端自带"}</span></DashKvItem>
                                             <DashKvItem label="数据来源">{status.cdn.baseline.source}</DashKvItem>
                                             <DashKvItem label="完整包版本">{status.cdn.baseline.fullVersion}</DashKvItem>
                                             <DashKvItem label="Snapshot 声明归档">
@@ -450,16 +450,14 @@ export default function Dashboard() {
                                     </div>
                                     <div className="admin-dash-section">
                                         <div className="admin-dash-section-title">Snapshot 中已声明补丁</div>
-                                        <div className="admin-dash-section-body">
-                                            <Space wrap>
-                                                <span className={status.cdn.extension.runtimeEnabled ? "admin-badge-ok" : "admin-badge-info"}>
-                                                    {status.cdn.extension.runtimeEnabled ? "Snapshot 含 Overlay" : "无补丁"}
-                                                </span>
-                                                <Tag>归档 {status.cdn.extension.activePatchArchiveCount}</Tag>
-                                                {status.cdn.extension.versions.map(version => (
-                                                    <Tag key={version} color="blue">{version}</Tag>
-                                                ))}
-                                            </Space>
+                                        <div className="admin-page-note">
+                                            <span className={status.cdn.extension.runtimeEnabled ? "admin-badge-ok" : "admin-badge-info"}>
+                                                {status.cdn.extension.runtimeEnabled ? "Snapshot 含 Overlay" : "无补丁"}
+                                            </span>
+                                            <Tag>归档 {status.cdn.extension.activePatchArchiveCount}</Tag>
+                                            {status.cdn.extension.versions.map(version => (
+                                                <Tag key={version} color="blue">{version}</Tag>
+                                            ))}
                                             {!status.cdn.extension.runtimeEnabled && (
                                                 <Typography.Text type="secondary">
                                                     当前固定 Content Snapshot 未包含补丁。
@@ -475,63 +473,83 @@ export default function Dashboard() {
 
                 <Row gutter={[16, 16]}>
                     <Col xs={24} md={12}>
-                        <Card title="账号 / 存档概况" style={{ height: "100%" }}>
-                            <div className="admin-dash-section-body">
+                        <Card title="账号 / 存档概况" style={{ height: "100%" }} className="admin-dash-card">
+                            <div className="admin-dash-sections">
+                                <div className="admin-dash-section">
+                                    <div className="admin-dash-section-title">快捷入口</div>
+                                    <div className="admin-dash-section-body">
+                                        <Space wrap>
+                                            <Button icon={<TeamOutlined />} onClick={() => navigate("/accounts")}>账号 / 存档</Button>
+                                            <Button icon={<MailOutlined />} onClick={() => navigate("/mail")}>邮件</Button>
+                                            <Button icon={<ExperimentOutlined />} onClick={() => navigate("/seeds")}>动画种子</Button>
+                                        </Space>
+                                    </div>
+                                </div>
                                 {accountsError ? (
-                                    <Alert
-                                        type="error"
-                                        showIcon
-                                        message="概览数据加载失败"
-                                        description="接口 /api/server/accounts 不可用。"
-                                    />
+                                    <div className="admin-dash-section">
+                                        <div className="admin-dash-section-title">账号与存档</div>
+                                        <div className="admin-dash-section-body">
+                                            <Alert
+                                                type="error"
+                                                showIcon
+                                                message="概览数据加载失败"
+                                                description="接口 /api/server/accounts 不可用。"
+                                            />
+                                        </div>
+                                    </div>
                                 ) : null}
-                                <Space wrap>
-                                    <Button icon={<TeamOutlined />} onClick={() => navigate("/accounts")}>账号 / 存档</Button>
-                                    <Button icon={<MailOutlined />} onClick={() => navigate("/mail")}>邮件</Button>
-                                    <Button icon={<ExperimentOutlined />} onClick={() => navigate("/seeds")}>动画种子</Button>
-                                </Space>
                             </div>
                         </Card>
                     </Col>
                     <Col xs={24} md={12}>
-                        <Card title="默认存档" style={{ height: "100%" }}>
-                            <div className="admin-dash-section-body">
-                                <Typography.Text type="secondary">
-                                    上传玩家详情页「导出存档」得到的 JSON。之后任意账户「新建存档」时，将用它替换空存档。
-                                </Typography.Text>
-                                {defSave?.exists ? (
-                                    <Space wrap>
-                                        <span className="admin-badge-ok">已设置</span>
-                                        <Typography.Text>模板玩家：{defSave.playerName || "-"}</Typography.Text>
-                                        {defSave.exportedAt && (
-                                            <Typography.Text type="secondary">
-                                                导出于 {new Date(defSave.exportedAt).toLocaleString("zh-CN")}
-                                            </Typography.Text>
+                        <Card title="默认存档" style={{ height: "100%" }} className="admin-dash-card">
+                            <div className="admin-dash-sections">
+                                <div className="admin-dash-section">
+                                    <div className="admin-dash-section-title">默认存档说明</div>
+                                    <div className="admin-dash-section-body">
+                                        <Typography.Text type="secondary">
+                                            上传玩家详情页「导出存档」得到的 JSON。之后任意账户「新建存档」时，将用它替换空存档。
+                                        </Typography.Text>
+                                    </div>
+                                </div>
+                                <div className="admin-dash-section">
+                                    <div className="admin-dash-section-title">上传操作</div>
+                                    <div className="admin-dash-section-body">
+                                        {defSave?.exists ? (
+                                            <Space wrap>
+                                                <span className="admin-badge-ok">已设置</span>
+                                                <Typography.Text>模板玩家：{defSave.playerName || "-"}</Typography.Text>
+                                                {defSave.exportedAt && (
+                                                    <Typography.Text type="secondary">
+                                                        导出于 {new Date(defSave.exportedAt).toLocaleString("zh-CN")}
+                                                    </Typography.Text>
+                                                )}
+                                            </Space>
+                                        ) : (
+                                            <span className="admin-badge-info">未设置（新建存档为空档）</span>
                                         )}
-                                    </Space>
-                                ) : (
-                                    <span className="admin-badge-info">未设置（新建存档为空档）</span>
-                                )}
-                                <Space wrap>
-                                    <Upload
-                                        showUploadList={false}
-                                        accept=".json"
-                                        beforeUpload={(file) => { uploadDefault.mutate(file as File); return false }}
-                                    >
-                                        <Button icon={<UploadOutlined />} loading={uploadDefault.isPending}>
-                                            {defSave?.exists ? "替换默认存档" : "上传默认存档"}
-                                        </Button>
-                                    </Upload>
-                                    {defSave?.exists && (
-                                        <Popconfirm
-                                            title="清除默认存档？之后新建存档将为空档。"
-                                            onConfirm={() => clearDefault.mutate()}
-                                            okText="确认" cancelText="取消" okButtonProps={{ danger: true }}
-                                        >
-                                            <Button danger icon={<DeleteOutlined />} loading={clearDefault.isPending}>清除</Button>
-                                        </Popconfirm>
-                                    )}
-                                </Space>
+                                        <Space wrap>
+                                            <Upload
+                                                showUploadList={false}
+                                                accept=".json"
+                                                beforeUpload={(file) => { uploadDefault.mutate(file as File); return false }}
+                                            >
+                                                <Button icon={<UploadOutlined />} loading={uploadDefault.isPending}>
+                                                    {defSave?.exists ? "替换默认存档" : "上传默认存档"}
+                                                </Button>
+                                            </Upload>
+                                            {defSave?.exists && (
+                                                <Popconfirm
+                                                    title="清除默认存档？之后新建存档将为空档。"
+                                                    onConfirm={() => clearDefault.mutate()}
+                                                    okText="确认" cancelText="取消" okButtonProps={{ danger: true }}
+                                                >
+                                                    <Button danger icon={<DeleteOutlined />} loading={clearDefault.isPending}>清除</Button>
+                                                </Popconfirm>
+                                            )}
+                                        </Space>
+                                    </div>
+                                </div>
                             </div>
                         </Card>
                     </Col>
