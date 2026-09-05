@@ -186,6 +186,8 @@ test("single settlement keeps Growth preparation, response finalization, deletio
 test("single settlement writes derives duplicated values from authoritative inputs", () => {
     const orchestrator = readSource("src/lib/quest/finish/single-orchestrator.ts")
     const writes = readSource("src/lib/quest/finish/single-settlement-writes.ts")
+    const valueAdapter = readSource("src/lib/quest/finish/single-settlement-value-plan.ts")
+    const progressAdapter = readSource("src/lib/quest/finish/single-quest-progress-write.ts")
     const finishTypes = readSource("src/lib/quest/finish/types.ts")
     assert.ok(finishTypes.includes("export interface SingleSettlementWritesInput {"))
     const callInput = sourceBetween(
@@ -199,12 +201,6 @@ test("single settlement writes derives duplicated values from authoritative inpu
         "export interface SingleSettlementWritesInput {",
         "    dailyResetHour?: number\n}",
         "single settlement writes input interface",
-    )
-    const progressUpdate = sourceBetween(
-        writes,
-        "if (questAccomplished && !isScoreAttackEvent)",
-        "const oldRkDegree",
-        "single quest progress update",
     )
 
     for (const field of [
@@ -253,8 +249,10 @@ test("single settlement writes derives duplicated values from authoritative inpu
     assert.doesNotMatch(writes, /questProgressExists/)
     assert.doesNotMatch(writes, /const updateData:\s*any/)
     assert.doesNotMatch(writes, /questProgress!\./)
-    assert.match(
-        progressUpdate,
-        /const updateData:\s*Partial<PlayerQuestProgress>\s*&\s*Pick<PlayerQuestProgress,\s*["']questId["']>/,
-    )
+    assert.match(writes, /createSingleSettlementValuePlan\s*\(/)
+    assert.match(writes, /writeSingleQuestProgressWithinTransactionSync\s*\(/)
+    assert.match(valueAdapter, /createBattleSettlementValuePlan\s*\(/)
+    assert.match(progressAdapter, /createBattleQuestProgressPlan\s*\(/)
+    assert.doesNotMatch(valueAdapter, /getDb|\.transaction\s*\(/)
+    assert.doesNotMatch(progressAdapter, /\.transaction\s*\(/)
 })

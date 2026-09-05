@@ -12,13 +12,12 @@ import { insertPlayerPracticeBattleHistorySync } from "../../../data/domains/pra
 import { getPlayerCarnivalEventRecordsSync, getPlayerClaimedCarnivalRewardIdsSync, insertPlayerClaimedCarnivalRewardIdsSync, runCarnivalEventTransactionSync, upsertPlayerCarnivalEventRecordSync } from "../../../data/domains/carnivalEvent"
 import { givePlayerDegreeSync } from "../../../data/domains/degree"
 import { getDb } from "../../../data/db"
-import type { Player, PlayerQuestProgress } from "../../../data/types"
+import type { Player } from "../../../data/types"
 import { getRushEventFolderClearRewards } from "../../assets"
 import { getCharactersEvolutionImgLevels, givePlayerCharactersExpSync } from "../../character"
 import { getCommonScoreRewardCount } from "../../score-reward-lottery"
-import { calculateCharacterBattleExp, calculateFixedQuestMana, calculateFixedQuestPoolExp, getRewardCampaignRates } from "../../reward-campaign"
 import { QuestCategory } from "../../types"
-import { addStaminaWithOverflowCap, getRankDegree, getMaxStamina } from "../../stamina"
+import { addStaminaWithOverflowCap, getMaxStamina } from "../../stamina"
 import { getRuntimeContentTableSync } from "../../../content/runtime/table-access"
 import { settleAdditionalRewardsSync, type AdditionalRewardTable } from "../../additional-reward"
 import { getSerializedPlayerRushEventPlayedPartiesSync } from "../../rush"
@@ -30,7 +29,6 @@ import { buildPracticeBattleHistoryRecord } from "../practice-battle-history"
 import type { ActiveQuest } from "../active-quest-service"
 import { dispatchModeRushFinish } from "../../../modes/registry"
 import { createModeTransactionHost } from "../../../modes/loader"
-import { getServerTime } from "../../../utils"
 import { getRealNow } from "../../../runtime/time/game-time"
 import bundledAdditionalRewardRules from "../../../../assets/additional_reward_rules.json"
 import { handleCarnivalEventFinish } from "./carnival-handler"
@@ -48,6 +46,8 @@ import {
     publishPreparedSingleGrowthPublication,
 } from "./single-growth-publication"
 import { settleSingleEntryResources } from "./single-entry-resource-settlement"
+import { writeSingleQuestProgressWithinTransactionSync } from "./single-quest-progress-write"
+import { createSingleSettlementValuePlan } from "./single-settlement-value-plan"
 
 const settlementModeHost = createModeTransactionHost(message => console.log(message))
 export function executeSingleSettlementWrites(
@@ -69,18 +69,32 @@ export function executeSingleSettlementWrites(
             && Number.isSafeInteger(characterId)
             && characterId > 0) partyCharacterIds.push(characterId)
     }
-    const beforeRankPoint = settlementPlayer.rankPoint
-    const newRankPoint = beforeRankPoint + questData.rankPointReward
-    const newBoostPoint = settlementPlayer.boostPoint - (settlementActiveQuest.useBoostPoint ? 1 : 0)
-    const newBossBoostPoint = settlementPlayer.bossBoostPoint - (settlementActiveQuest.useBossBoostPoint ? 1 : 0)
-    const useBoostPoint = settlementActiveQuest.useBoostPoint || settlementActiveQuest.useBossBoostPoint
-    const settlementTime = new Date(getServerTime() * 1000)
-    const rewardCampaignRates = getRewardCampaignRates(questCategory, questId, settlementTime)
-    const fixedManaReward = calculateFixedQuestMana(questData.manaReward, rewardCampaignRates, useBoostPoint)
-    const fixedPoolExpReward = calculateFixedQuestPoolExp(questData.poolExpReward, rewardCampaignRates, useBoostPoint)
-    const addExpAmount = calculateCharacterBattleExp(questData.characterExpReward, rewardCampaignRates)
-    const newMana = settlementPlayer.freeMana + fixedManaReward + body.add_mana
-    const manaObtained = fixedManaReward + body.add_mana
+    const { settlementTime, valuePlan } = createSingleSettlementValuePlan({
+        player: settlementPlayer,
+        activeQuest: settlementActiveQuest,
+        quest: questData,
+        body,
+    })
+    const {
+        beforeRankPoint,
+        newRankPoint,
+        oldDegreeId,
+        newDegreeId,
+        didLevelUp,
+        fixedManaReward,
+        fixedPoolExpReward,
+        characterBattleExp,
+        manaObtained,
+        playerValues,
+        useBoostPoint,
+        rewardCampaignRates,
+    } = valuePlan
+    const {
+        freeMana: newMana,
+        expPool: newExpPool,
+        boostPoint: newBoostPoint,
+        bossBoostPoint: newBossBoostPoint,
+    } = playerValues
     finishCtx.manaObtained = manaObtained
     const entryResourceResult = settleSingleEntryResources({
         playerId,
@@ -99,33 +113,21 @@ export function executeSingleSettlementWrites(
         rewardGrantOptions,
     )
 
-    if (questAccomplished && !isScoreAttackEvent) {
-        if (questProgress !== null) {
-            const updateData: Partial<PlayerQuestProgress> & Pick<PlayerQuestProgress, "questId"> = {
-                questId,
-                finished: true,
-                bestElapsedTimeMs: questProgress.bestElapsedTimeMs === undefined || questProgress.bestElapsedTimeMs === null
-                    ? clearTime : Math.min(clearTime, questProgress.bestElapsedTimeMs),
-                highScore: questProgress.highScore === undefined ? body.score : Math.max(body.score, questProgress.highScore),
-                leaderCharacterId: leaderId ?? undefined,
-            }
-            if (clearRank !== null) {
-                updateData.clearRank = questProgress.clearRank === undefined
-                    ? clearRank : Math.max(clearRank, questProgress.clearRank)
-            }
-            updatePlayerQuestProgressSync(playerId, questCategory, updateData)
-        } else {
-            insertPlayerQuestProgressSync(playerId, questCategory, {
-                questId, finished: true, bestElapsedTimeMs: clearTime, highScore: body.score,
-                clearRank: clearRank ?? 5, leaderCharacterId: leaderId ?? undefined,
-            })
-        }
+    const questProgressWritten = writeSingleQuestProgressWithinTransactionSync({
+        playerId,
+        questCategory,
+        questAccomplished: questAccomplished && !isScoreAttackEvent,
+        questId,
+        clearTime,
+        score: body.score,
+        clearRank,
+        leaderCharacterId: leaderId ?? undefined,
+        existing: questProgress,
+    })
+    if (questProgressWritten) {
         if (questCategory === QuestCategory.MAIN) recordCompletedMainChapterMilestoneSync(playerId, questId)
     }
-    const oldRkDegree = getRankDegree(beforeRankPoint)
-    const newDegreeId = getRankDegree(newRankPoint)
-    const didLevelUp = newDegreeId > oldRkDegree
-    if (oldRkDegree < 100 && newDegreeId >= 100) recordRank100MilestoneSync(playerId, newRankPoint)
+    if (oldDegreeId < 100 && newDegreeId >= 100) recordRank100MilestoneSync(playerId, newRankPoint)
     const releasedEntryResources = entryResourceResult.kind === "released"
         ? entryResourceResult : null
     const staminaBeforeRankRefill = releasedEntryResources?.afterStamina ?? settlementPlayer.stamina
@@ -137,26 +139,20 @@ export function executeSingleSettlementWrites(
         : didLevelUp ? getRealNow() : settlementPlayer.staminaHealTime
     updatePlayerSync({
         id: playerId,
-        freeMana: newMana,
-        expPool: settlementPlayer.expPool + fixedPoolExpReward,
-        rankPoint: newRankPoint,
-        boostPoint: newBoostPoint,
-        bossBoostPoint: newBossBoostPoint,
-        totalManaObtained: (settlementPlayer.totalManaObtained ?? 0) + manaObtained,
-        maxComboAchieved: Math.max(settlementPlayer.maxComboAchieved ?? 0, body.statistics.max_combo_count ?? 0),
+        ...playerValues,
         ...(didLevelUp ? { stamina: afterStamina, staminaHealTime: afterStaminaHealTime } : {}),
     })
     responseState.setPlayerState({
         playerId: responseState.playerState.playerId,
-        freeMana: newMana,
+        freeMana: playerValues.freeMana,
         freeVmoney: responseState.playerState.freeVmoney,
-        expPool: settlementPlayer.expPool + fixedPoolExpReward,
+        expPool: newExpPool,
     })
     const clearReward = !isScoreAttackEvent && rewardEligibility.firstClear && questData.clearReward !== undefined
         ? grantDirectRewards(playerId, [questData.clearReward]) : null
     const sPlusClearReward = !isScoreAttackEvent && rewardEligibility.sPlus && questData.sPlusReward !== undefined
         ? grantDirectRewards(playerId, [questData.sPlusReward]) : null
-    if (didLevelUp) console.log(`[BATTLE-FINISH] player ${playerId} leveled up: ${oldRkDegree} -> ${newDegreeId}, stamina refilled`)
+    if (didLevelUp) console.log(`[BATTLE-FINISH] player ${playerId} leveled up: ${oldDegreeId} -> ${newDegreeId}, stamina refilled`)
 
     const dailyChallengePointList = entryResourceResult.kind === "committed"
         ? entryResourceResult.dailyChallengePointList : null
@@ -194,7 +190,7 @@ export function executeSingleSettlementWrites(
     const rewardCharacterExpResult = givePlayerCharactersExpSync(
         playerId,
         partyCharacterIds,
-        addExpAmount,
+        characterBattleExp,
         questData.fixedParty !== undefined,
         responseState.playerState.expPool,
         settlementTime,

@@ -270,7 +270,7 @@ const SOURCE_RULES = [
         groups: ["integration:quest"],
     },
     {
-        pattern: /^src\/lib\/quest\/finish\/single-settlement-(?:response-state|writes)\.ts$/,
+        pattern: /^src\/lib\/quest\/finish\/(?:single-quest-progress-write|single-settlement-(?:response-state|value-plan|writes))\.ts$/,
         groups: [
             "integration:compiled",
             "integration:event",
