@@ -65,6 +65,13 @@ const TABLE = Object.freeze({
         keywordIds: Object.freeze([1000001, 1000010]),
     }),
 })
+const CATALOG = require("../src/lib/character-election").buildCharacterElectionCatalog({
+    info: () => ({ source: "test" }),
+    table: tableName => {
+        if (tableName !== "character_election.json") throw new Error(`unexpected table ${tableName}`)
+        return TABLE
+    },
+})
 
 function decode(response) {
     return unpack(Buffer.from(response.body, "base64"))
@@ -77,7 +84,7 @@ async function main() {
     const app = Fastify()
     registerCnMsgpackOnSend(app)
     await app.register(characterElectionRoutes, {
-        getTable: () => TABLE,
+        getCatalog: () => CATALOG,
         now: () => now,
     })
     await app.ready()

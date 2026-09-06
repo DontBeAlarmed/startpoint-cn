@@ -12,6 +12,9 @@ const fs = require("node:fs")
 const os = require("node:os")
 const test = require("node:test")
 
+const restoreContentSnapshot = require("../helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+test.after(restoreContentSnapshot)
 const {
     FIXED_TIME,
     createSqlCounter,

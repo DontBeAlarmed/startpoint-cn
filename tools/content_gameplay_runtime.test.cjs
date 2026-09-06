@@ -141,6 +141,7 @@ test("gameplay readers use the active Content snapshot instead of static bundled
     const boxGachaContent = require("../src/lib/box-gacha-content")
     const equipmentContent = require("../src/lib/equipment-content")
     const equipmentMovie = require("../src/lib/gacha-equipment-movie")
+    const exBoostContent = require("../src/lib/ex-boost-content")
     const itemContent = require("../src/lib/item-content")
     const assets = require("../src/lib/assets")
     const raid = require("../src/lib/raid-event-master")
@@ -158,9 +159,10 @@ test("gameplay readers use the active Content snapshot instead of static bundled
         0.5,
     )
     assert.equal(equipmentMovie.getEquipmentGachaMovieProbabilitySync("1"), null)
-    assert.deepEqual(assets.getExBoostItemSync(99001), { tier: 3, count: 2, element: 4 })
-    assert.equal(assets.getExBoostItemSync(10001), null)
-    assert.deepEqual(assets.getExStatusPoolSync(2), [992])
+    const exCatalog = exBoostContent.getExBoostContentCatalog()
+    assert.deepEqual(exCatalog.resolveMaterial(99001), { tier: 3, count: 2, element: 4 })
+    assert.equal(exCatalog.resolveMaterial(10001), null)
+    assert.deepEqual(exCatalog.resolveStatusPool(2), [992])
     assert.deepEqual(equipmentContent.getEquipmentCraftSync(5), {
         dissolve_craft: 91,
         awakening_craft: 92,

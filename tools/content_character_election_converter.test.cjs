@@ -7,7 +7,7 @@ const {
     convertCharacterElections,
 } = require("../src/content/converters/character-election")
 const {
-    getValidatedCharacterElectionRule,
+    buildCharacterElectionCatalog,
 } = require("../src/lib/character-election")
 
 function csvRow(overrides = {}) {
@@ -141,10 +141,17 @@ test("character election runtime rejects years outside the CN master parser rang
             keywordIds: [1000001],
         },
     }
-    assert.notEqual(getValidatedCharacterElectionRule(table, 1), null)
+    const repository = electionTable => ({
+        info: () => ({ source: "test" }),
+        table: tableName => {
+            if (tableName !== "character_election.json") throw new Error(tableName)
+            return electionTable
+        },
+    })
+    assert.notEqual(buildCharacterElectionCatalog(repository(table)).resolve(1), null)
     for (const year of ["1969", "2201"]) {
-        assert.equal(getValidatedCharacterElectionRule({
+        assert.throws(() => buildCharacterElectionCatalog(repository({
             "1": { ...table["1"], startTime: `${year}-05-02 12:00:00` },
-        }, 1), null)
+        })))
     }
 })

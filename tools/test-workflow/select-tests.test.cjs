@@ -101,6 +101,35 @@ test("maps D27 Gacha and Box Gacha typed content to independent focused groups",
     )
 })
 
+test("maps D27 Exchange, EX Boost and Election Content boundaries", () => {
+    for (const file of [
+        "assets/star_crumb_exchange.json",
+        "assets/star_crumb_exchange_cost.json",
+        "src/lib/star-crumb-exchange/catalog.ts",
+    ]) assert.deepEqual(selectTestGroups([file]), ["integration:rules", "quick:content"], file)
+    for (const file of [
+        "assets/bond_token_exchange.json",
+        "src/lib/bond-token-exchange/catalog.ts",
+    ]) assert.deepEqual(
+        selectTestGroups([file]),
+        ["integration:database", "integration:rules", "quick:content"],
+        file,
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/ex-boost-content.ts"]),
+        ["integration:database", "quick:character", "quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/character-election.ts"]),
+        ["integration:mission", "quick:content"],
+    )
+    for (const file of [
+        "tools/ex_boost_content.test.cjs",
+        "tools/character_election_content.test.cjs",
+        "tools/exchange_content_boundary.test.cjs",
+    ]) assert.deepEqual(selectTestGroups([file]), ["quick:content"], file)
+})
+
 test("maps representative source files to focused groups", () => {
     assert.deepEqual(
         selectTestGroups(["src/data/domains/gacha-state.ts"]),

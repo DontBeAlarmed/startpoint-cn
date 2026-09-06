@@ -2,6 +2,8 @@ import type {
     ReadonlyCharacterElectionRule,
     ReadonlyCharacterElectionTable,
 } from "../content/converters/character-election"
+import { deepFreeze } from "../content/deep-freeze"
+import { getContentSnapshot, type ReadonlyContentRepository } from "../content/runtime/content-snapshot"
 
 const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/
 const MASTER_TIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/
@@ -30,14 +32,25 @@ function isPositiveSafeInteger(value: unknown): value is number {
     return typeof value === "number" && Number.isSafeInteger(value) && value > 0
 }
 
-export interface ValidatedCharacterElectionRule extends ReadonlyCharacterElectionRule {
+interface ValidatedCharacterElectionRule extends ReadonlyCharacterElectionRule {
     readonly electionId: number
     readonly startAt: number
     readonly endAt: number
     readonly keywordIdSet: ReadonlySet<number>
 }
 
-export function getValidatedCharacterElectionRule(
+export interface CharacterElectionDescriptor extends ReadonlyCharacterElectionRule {
+    readonly electionId: number
+    readonly startAt: number
+    readonly endAt: number
+}
+
+export interface CharacterElectionCatalog {
+    readonly resolve: (electionId: number) => CharacterElectionDescriptor | null
+    readonly acceptsKeyword: (electionId: number, keywordId: number) => boolean
+}
+
+function validateCharacterElectionRule(
     table: ReadonlyCharacterElectionTable,
     electionId: number,
 ): ValidatedCharacterElectionRule | null {
@@ -65,9 +78,59 @@ export function getValidatedCharacterElectionRule(
 }
 
 export function isCharacterElectionOpenAt(
-    rule: ValidatedCharacterElectionRule,
+    rule: Pick<CharacterElectionDescriptor, "startAt" | "endAt">,
     evaluationTime: Date,
 ): boolean {
     const time = evaluationTime.getTime()
     return Number.isFinite(time) && time >= rule.startAt && time <= rule.endAt
+}
+
+export function buildCharacterElectionCatalog(
+    repository: ReadonlyContentRepository,
+): CharacterElectionCatalog {
+    const table = repository.table<ReadonlyCharacterElectionTable>("character_election.json")
+    if (!table || typeof table !== "object" || Array.isArray(table)) {
+        throw new TypeError("Invalid Character Election table.")
+    }
+    const descriptors = new Map<number, CharacterElectionDescriptor>()
+    const keywordSets = new Map<number, ReadonlySet<number>>()
+    for (const electionIdText of Object.keys(table)) {
+        if (!POSITIVE_INTEGER_PATTERN.test(electionIdText)) {
+            throw new TypeError(`Invalid Character Election id: ${electionIdText}`)
+        }
+        const electionId = Number(electionIdText)
+        const validated = validateCharacterElectionRule(table, electionId)
+        if (validated === null || String(electionId) !== electionIdText) {
+            throw new TypeError(`Invalid Character Election ${electionIdText}.`)
+        }
+        const descriptor = deepFreeze({
+            electionId,
+            stringId: validated.stringId,
+            startTime: validated.startTime,
+            endTime: validated.endTime,
+            startAt: validated.startAt,
+            endAt: validated.endAt,
+            keywordIds: [...validated.keywordIds],
+        })
+        descriptors.set(electionId, descriptor)
+        keywordSets.set(electionId, new Set(validated.keywordIds))
+    }
+    return Object.freeze({
+        resolve: (electionId: number) => descriptors.get(electionId) ?? null,
+        acceptsKeyword: (electionId: number, keywordId: number) => (
+            keywordSets.get(electionId)?.has(keywordId) ?? false
+        ),
+    })
+}
+
+const catalogs = new WeakMap<ReadonlyContentRepository, CharacterElectionCatalog>()
+
+export function getCharacterElectionCatalog(
+    repository: ReadonlyContentRepository = getContentSnapshot().repository,
+): CharacterElectionCatalog {
+    const cached = catalogs.get(repository)
+    if (cached !== undefined) return cached
+    const catalog = buildCharacterElectionCatalog(repository)
+    catalogs.set(repository, catalog)
+    return catalog
 }

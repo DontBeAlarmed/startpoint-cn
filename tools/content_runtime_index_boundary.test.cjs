@@ -150,3 +150,46 @@ test("Gacha and Box Gacha raw tables stay inside their independent typed builder
     )
     assert.doesNotMatch(boxCatalog, ordinaryPattern)
 })
+
+test("Exchange, EX Boost and Character Election keep finite independent Content roots", () => {
+    const expectedByPattern = [
+        [/(?:star_crumb_exchange|star_crumb_exchange_cost)\.json/, [
+            "src/content/sync/table-registry.ts",
+            "src/lib/star-crumb-exchange/catalog.ts",
+        ]],
+        [/bond_token_exchange\.json/, [
+            "src/content/sync/table-registry.ts",
+            "src/lib/bond-token-exchange/catalog.ts",
+        ]],
+        [/(?:ex_ability|ex_boost|ex_status)\.json/, [
+            "src/content/converters/gameplay.ts",
+            "src/content/sync/table-registry.ts",
+            "src/lib/ex-boost-content.ts",
+        ]],
+        [/character_election\.json/, [
+            "src/content/converters/character-election.ts",
+            "src/content/sync/table-registry.ts",
+            "src/lib/character-election.ts",
+        ]],
+    ]
+    for (const [pattern, expected] of expectedByPattern) {
+        const actual = sourceFiles(sourceRoot).flatMap(filePath => (
+            pattern.test(fs.readFileSync(filePath, "utf8"))
+                ? [path.relative(projectRoot, filePath).split(path.sep).join("/")]
+                : []
+        )).sort()
+        assert.deepEqual(actual, expected)
+    }
+    const assets = fs.readFileSync(path.join(projectRoot, "src/lib/assets.ts"), "utf8")
+    assert.doesNotMatch(assets, /getExAbilityPoolsSync|getExStatusPoolSync|getExBoostItemSync/)
+    const exRoute = fs.readFileSync(path.join(projectRoot, "src/routes/api/exBoost.ts"), "utf8")
+    assert.doesNotMatch(exRoute, /getRuntimeContentTableSync|ex_(?:ability|boost|status)\.json/)
+    const electionRoute = fs.readFileSync(
+        path.join(projectRoot, "src/routes/api/characterElection.ts"),
+        "utf8",
+    )
+    assert.doesNotMatch(
+        electionRoute,
+        /getContentSnapshot|ReadonlyCharacterElectionTable|character_election\.json|getTable/,
+    )
+})

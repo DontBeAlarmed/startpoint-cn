@@ -1,11 +1,8 @@
-import exAbility from "../../assets/ex_ability.json";
-import exBoost from "../../assets/ex_boost.json";
-import exStatus from "../../assets/ex_status.json";
 import practiceQuests from "../../assets/practice_quest.json";
 import manaNodes from "../../assets/mana_node.json";
 import manaNodeAwake from "../../assets/mana_node_awake.json";
 import manaBoard from "../../assets/mana_board.json";
-import { AssetCharacter, BattleQuest, ClearRewards, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, StoryQuest } from "./types";
+import { AssetCharacter, BattleQuest, ClearRewards, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, StoryQuest } from "./types";
 import { getRushCompatibilityEvent } from "./shop/rush-compatibility"
 import {
     ContentSnapshotError,
@@ -574,48 +571,6 @@ export function getManaNodeAwakeCost(
     }
 
     return { manaAmount, items }
-}
-
-/**
- * Gets the ExAbilities record.
- * 
- * @returns 
- */
-export function getExAbilityPoolsSync(): ExAbilities {
-    return exAbility as ExAbilities;
-}
-
-/**
- * Gets an ex status pool.
- * 
- * @param tier The tier of the pool to get.
- * @returns A list of numbers with the StatusIDs corresponding to the requested pool.
- */
-export function getExStatusPoolSync(
-    tier: string | number
-): number[] | null {
-    const pool = getRuntimeContentTableSync(
-        "ex_status.json",
-        exStatus as ExStatus,
-    )[String(tier)]
-    return pool === undefined ? null : pool
-}
-
-/**
- * Gets an ex boost item.
- * 
- * @param itemId The ID of the item.
- * @returns The ExBoostItem that was found, or null.
- */
-export function getExBoostItemSync(
-    itemId: string | number
-): ExBoostItem | null {
-    const item = getRuntimeContentTableSync(
-        "ex_boost.json",
-        exBoost as ExBoostItems,
-    )[String(itemId)]
-
-    return item === undefined ? null : item
 }
 
 /**

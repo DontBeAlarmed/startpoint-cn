@@ -17,7 +17,6 @@ productionContentSnapshotProvider.snapshot = null
 
 // These imports intentionally happen before any ContentSnapshot is installed.
 const { getActiveCampaignRate } = require("../src/lib/stamina-campaign")
-const { getRuntimeExAbilityPools } = require("../src/routes/api/exBoost")
 const { isValidCharacterId } = require("../src/routes/web_api/validation")
 const mailRoutes = require("../src/routes/web_api/mail").default
 
@@ -36,10 +35,6 @@ function staminaRow(rate, questId) {
     ]]
 }
 
-function exAbilityRow(name) {
-    return [[name]]
-}
-
 function snapshot(targetVersion, tables) {
     return Object.freeze({
         cdn: Object.freeze({ targetVersion }),
@@ -52,12 +47,6 @@ function snapshot(targetVersion, tables) {
             },
         }),
     })
-}
-
-function abilityIds(pools) {
-    return [...Object.values(pools.A), ...Object.values(pools.B)]
-        .flat()
-        .sort((left, right) => left - right)
 }
 
 async function captureMailSendHandler() {
@@ -93,18 +82,12 @@ test("runtime endpoint tables follow the installed ContentSnapshot release", asy
         productionContentSnapshotProvider.snapshot = previousSnapshot
     })
 
-    const bundledPools = getRuntimeExAbilityPools()
     assert.equal(typeof getActiveCampaignRate(1, 1, new Date("2024-06-01T00:00:00Z")), "number")
-    assert.ok(abilityIds(bundledPools).length > 0)
     assert.equal(isValidCharacterId(1), true)
 
     const releaseA = Object.freeze({
         "stamina_campaign.json": Object.freeze({
             release_a: staminaRow(0.5, 77),
-        }),
-        "ex_ability.json": Object.freeze({
-            101: exAbilityRow("atk_self_r5"),
-            102: exAbilityRow("heal_self_r4"),
         }),
         "character.json": Object.freeze({
             201: Object.freeze({ name: "release-a" }),
@@ -114,10 +97,6 @@ test("runtime endpoint tables follow the installed ContentSnapshot release", asy
         "stamina_campaign.json": Object.freeze({
             release_b: staminaRow(0.25, 77),
         }),
-        "ex_ability.json": Object.freeze({
-            301: exAbilityRow("atk_party_r4"),
-            302: exAbilityRow("heal_party_r5"),
-        }),
         "character.json": Object.freeze({
             401: Object.freeze({ name: "release-b" }),
         }),
@@ -125,13 +104,11 @@ test("runtime endpoint tables follow the installed ContentSnapshot release", asy
 
     productionContentSnapshotProvider.snapshot = snapshot("release-a", releaseA)
     assert.equal(getActiveCampaignRate(1, 77, new Date("2024-06-01T00:00:00Z")), 0.5)
-    assert.deepEqual(abilityIds(getRuntimeExAbilityPools()), [101, 102])
     assert.equal(isValidCharacterId(201), true)
     assert.equal(isValidCharacterId(401), false)
 
     productionContentSnapshotProvider.snapshot = snapshot("release-b", releaseB)
     assert.equal(getActiveCampaignRate(1, 77, new Date("2024-06-01T00:00:00Z")), 0.25)
-    assert.deepEqual(abilityIds(getRuntimeExAbilityPools()), [301, 302])
     assert.equal(isValidCharacterId(201), false)
     assert.equal(isValidCharacterId(401), true)
 
@@ -147,10 +124,6 @@ test("runtime endpoint tables follow the installed ContentSnapshot release", asy
     assert.throws(
         () => getActiveCampaignRate(1, 77, new Date("2024-06-01T00:00:00Z")),
         /missing release table: stamina_campaign\.json/,
-    )
-    assert.throws(
-        () => getRuntimeExAbilityPools(),
-        /missing release table: ex_ability\.json/,
     )
     assert.throws(
         () => isValidCharacterId(1),

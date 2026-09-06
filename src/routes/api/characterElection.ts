@@ -1,7 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 
-import type { ReadonlyCharacterElectionTable } from "../../content/converters/character-election"
-import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { resolvePlayerIdSync } from "../../data/activeAccount"
 import { getDb } from "../../data/db"
 import {
@@ -11,8 +9,9 @@ import {
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import {
-    getValidatedCharacterElectionRule,
+    getCharacterElectionCatalog,
     isCharacterElectionOpenAt,
+    type CharacterElectionCatalog,
 } from "../../lib/character-election"
 import { getOpenCharacterElectionVoteMissionId } from "../../lib/mission/event-entry-facts"
 import { settleMissionCategories } from "../../lib/mission/settlement"
@@ -26,7 +25,7 @@ interface ElectionBody {
 }
 
 export interface CharacterElectionRoutesOptions {
-    readonly getTable?: () => ReadonlyCharacterElectionTable
+    readonly getCatalog?: () => CharacterElectionCatalog
     readonly now?: () => Date
 }
 
@@ -76,11 +75,7 @@ export default async function characterElectionRoutes(
     fastify: FastifyInstance,
     options: CharacterElectionRoutesOptions = {},
 ): Promise<void> {
-    const getTable = options.getTable ?? (() => (
-        getContentSnapshot().repository.table<ReadonlyCharacterElectionTable>(
-            "character_election.json",
-        )
-    ))
+    const getCatalog = options.getCatalog ?? getCharacterElectionCatalog
     const now = options.now ?? (() => new Date(getServerTime() * 1000))
 
     fastify.post("/get_vote_status", async (
@@ -93,7 +88,7 @@ export default async function characterElectionRoutes(
         if (!isPositiveSafeInteger(body.election_id)) {
             return sendBadRequest(reply, "Invalid election id.")
         }
-        const rule = getValidatedCharacterElectionRule(getTable(), body.election_id)
+        const rule = getCatalog().resolve(body.election_id)
         if (!rule) return sendBadRequest(reply, "Unknown character election.")
         const evaluationTime = now()
         if (!isCharacterElectionOpenAt(rule, evaluationTime)) {
@@ -118,13 +113,14 @@ export default async function characterElectionRoutes(
             || !isPositiveSafeInteger(body.keyword_id)) {
             return sendBadRequest(reply, "Invalid character election vote.")
         }
-        const rule = getValidatedCharacterElectionRule(getTable(), body.election_id)
+        const catalog = getCatalog()
+        const rule = catalog.resolve(body.election_id)
         if (!rule) return sendBadRequest(reply, "Unknown character election.")
         const evaluationTime = now()
         if (!isCharacterElectionOpenAt(rule, evaluationTime)) {
             return sendMsgpack(reply, context.viewerId, 11003, {})
         }
-        if (!rule.keywordIdSet.has(body.keyword_id)) {
+        if (!catalog.acceptsKeyword(body.election_id, body.keyword_id)) {
             return sendBadRequest(reply, "Invalid character election keyword.")
         }
         const missionId = getOpenCharacterElectionVoteMissionId(

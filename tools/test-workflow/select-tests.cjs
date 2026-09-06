@@ -446,7 +446,7 @@ const SOURCE_RULES = [
         groups: ["integration:rules", "quick:gacha"],
     },
     {
-        pattern: /^(?:src\/lib\/star-crumb-exchange\/.*\.ts|src\/routes\/api\/exchange\.ts)$/,
+        pattern: /^(?:assets\/star_crumb_exchange(?:_cost)?\.json|src\/lib\/star-crumb-exchange\/.*\.ts|src\/routes\/api\/exchange\.ts)$/,
         groups: ["integration:rules", "quick:content"],
     },
     {
@@ -607,6 +607,18 @@ const SOURCE_RULES = [
     {
         pattern: /^(?:src\/routes\/api\/(?:character|exBoost)\.ts|src\/data\/domains\/ex_boost\.ts)$/,
         groups: ["quick:character", "integration:database"],
+    },
+    {
+        pattern: /^(?:assets\/ex_(?:ability|boost|status)\.json|src\/lib\/ex-boost-content\.ts)$/,
+        groups: ["integration:database", "quick:character", "quick:content"],
+    },
+    {
+        pattern: /^(?:assets\/character_election\.json|src\/lib\/character-election\.ts|src\/routes\/api\/characterElection\.ts|src\/data\/domains\/character_election\.ts)$/,
+        groups: ["integration:mission", "quick:content"],
+    },
+    {
+        pattern: /^tools\/(?:ex_boost_content|character_election_content|exchange_content_boundary)\.test\.cjs$/,
+        groups: ["quick:content"],
     },
     {
         pattern: /^(?:src\/routes\/api\/(?:equipment|item|sell)\.ts|src\/lib\/item-sell\.ts)$/,
