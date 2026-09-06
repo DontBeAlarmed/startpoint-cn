@@ -9,9 +9,7 @@ const test = require("node:test")
 require("ts-node/register/transpile-only")
 
 const { ContentRepository } = require("../src/content/runtime/content-repository")
-const {
-    productionContentSnapshotProvider,
-} = require("../src/content/runtime/content-snapshot")
+const { installFrozenTestContentSnapshot } = require("./helpers/content-snapshot-fixture.cjs")
 const { getCharacterFacts } = require("../src/lib/character-content")
 const { getGachaCatalog } = require("../src/lib/gacha-catalog")
 const { getLegacyGachas } = require("../src/lib/gacha-legacy-content")
@@ -19,7 +17,6 @@ const { getLegacyGachas } = require("../src/lib/gacha-legacy-content")
 const projectRoot = path.resolve(__dirname, "..")
 
 test("character facade and Gacha typed catalog read one initialized ContentRepository", () => {
-    const previousSnapshot = productionContentSnapshotProvider.snapshot
     const character = Object.freeze({ name: "", rarity: 5, element: 1, skill_count: 6 })
     const gacha = Object.freeze({
         kind: "character",
@@ -48,39 +45,27 @@ test("character facade and Gacha typed catalog read one initialized ContentRepos
         fixture_3: Object.freeze([{ id: 990004, rank: 3, odds: 1, isExchangeable: false }]),
     })
     const requestedTables = []
-    const tables = Object.freeze({
-        "character.json": Object.freeze({
-            "990001": character,
-            "990003": Object.freeze({ ...character, rarity: 4 }),
-            "990004": Object.freeze({ ...character, rarity: 3 }),
-        }),
-        "gacha.json": Object.freeze({ "990002": gacha }),
-        "gacha_pool.json": pools,
-        "gacha_campaign_definitions.json": Object.freeze({}),
-        "stars_gacha_campaign.json": Object.freeze({}),
-        "gacha_exchange_rate.json": Object.freeze({
-            character: Object.freeze({ 3: 250, 4: 250, 5: 250 }),
-            equipment: Object.freeze({ 3: 250, 4: 250, 5: 250 }),
-        }),
-        "equipment_lookup.json": Object.freeze({}),
-        "item_lookup.json": Object.freeze({}),
-        "equipment_gacha_movie_probability.json": Object.freeze({}),
-    })
-    productionContentSnapshotProvider.snapshot = Object.freeze({
-        cdn: Object.freeze({ targetVersion: "test-release" }),
-        repository: Object.freeze({
-            info: () => Object.freeze({
-                source: "release",
-                assetVersion: "test-release",
-                generatorVersion: 1,
-                releaseDigest: null,
+    const install = installFrozenTestContentSnapshot({
+        targetVersion: "test-release",
+        onTableRead: tableName => requestedTables.push(tableName),
+        tables: {
+            "character.json": Object.freeze({
+                "990001": character,
+                "990003": Object.freeze({ ...character, rarity: 4 }),
+                "990004": Object.freeze({ ...character, rarity: 3 }),
             }),
-            table: tableName => {
-                requestedTables.push(tableName)
-                if (!(tableName in tables)) throw new Error(`unexpected table ${tableName}`)
-                return tables[tableName]
-            },
-        }),
+            "gacha.json": Object.freeze({ "990002": gacha }),
+            "gacha_pool.json": pools,
+            "gacha_campaign_definitions.json": Object.freeze({}),
+            "stars_gacha_campaign.json": Object.freeze({}),
+            "gacha_exchange_rate.json": Object.freeze({
+                character: Object.freeze({ 3: 250, 4: 250, 5: 250 }),
+                equipment: Object.freeze({ 3: 250, 4: 250, 5: 250 }),
+            }),
+            "equipment_lookup.json": Object.freeze({}),
+            "item_lookup.json": Object.freeze({}),
+            "equipment_gacha_movie_probability.json": Object.freeze({}),
+        },
     })
 
     try {
@@ -89,9 +74,9 @@ test("character facade and Gacha typed catalog read one initialized ContentRepos
             element: character.element,
             skillCount: character.skill_count,
         })
-        const catalog = getGachaCatalog(productionContentSnapshotProvider.snapshot.repository)
+        const catalog = getGachaCatalog(install.snapshot.repository)
         const projectedGacha = getLegacyGachas(
-            productionContentSnapshotProvider.snapshot.repository,
+            install.snapshot.repository,
         )["990002"]
         assert.equal(projectedGacha.type, 0)
         assert.equal(projectedGacha.singleCost, 150)
@@ -109,7 +94,7 @@ test("character facade and Gacha typed catalog read one initialized ContentRepos
             "gacha_exchange_rate.json",
         ])
     } finally {
-        productionContentSnapshotProvider.snapshot = previousSnapshot
+        install.restore()
     }
 })
 
