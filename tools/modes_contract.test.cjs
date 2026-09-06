@@ -58,16 +58,15 @@ async function load(dir, log) {
     return loadModes({ projectRoot: dir, env: { MODES_DIR: dir }, log })
 }
 
-function hostStub(tables = {}) {
+function hostStub() {
     const logs = []
     return {
         logs,
         host: {
             apiVersion: API,
-            table: name => {
-                if (name in tables) return tables[name]
-                throw new Error(`content table is not registered: ${name}`)
-            },
+            content: Object.freeze({
+                getCharacterElement: () => null,
+            }),
             log: message => logs.push(message),
             server: {},
         },
@@ -145,12 +144,25 @@ test("a duplicate mode name is refused and leaves the first registration intact"
     assert.match(logs.join("\n"), /second\.mjs.*already registered/s)
 })
 
-test("host.table serves base-registered tables and refuses anything else", () => {
-    const { host } = hostStub({ "character.json": { ok: true } })
-    assert.deepEqual(host.table("character.json"), { ok: true })
-    // Mode-private tables are not hosted here; a mode's own switches belong
-    // in its manifest or its own files.
-    assert.throws(() => host.table("mode_private.json"), /not registered/)
+test("v2 hosts expose named content queries only; the v1 arbitrary table read is gone", () => {
+    const restoreSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+        .installBundledGameplaySnapshot()
+    try {
+        const { createModeHost } = require("../src/modes/loader")
+        const host = createModeHost(() => {})
+        assert.equal(host.apiVersion, 2)
+        assert.equal(host.table, undefined, "v1 arbitrary base-registry table read must not exist")
+        // The named query is backed by the typed character facts adapter.
+        const bundledCharacters = require("../assets/character.json")
+        const sampleId = Number(Object.keys(bundledCharacters)[0])
+        assert.equal(
+            host.content.getCharacterElement(sampleId),
+            bundledCharacters[String(sampleId)].element,
+        )
+        assert.equal(host.content.getCharacterElement(999_999_999), null)
+    } finally {
+        restoreSnapshot()
+    }
 })
 
 test("quest start is a veto chain: first throw wins and later modules are skipped", async () => {

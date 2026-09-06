@@ -65,14 +65,14 @@ test("loader loads allowlisted modules and registers handlers", async t => {
         capability: "fixture@1",
         sha256: crypto.createHash("sha256").update(MODULE_SOURCE).digest("hex"),
     }])
-    const extension = dispatchModeRushFinish({}, { table: () => ({}), log: () => {} })
+    const extension = dispatchModeRushFinish({}, { content: {}, log: () => {} })
     assert.deepEqual(extension, {
         rush_battle_reward_list: [{ kind: 1, kind_id: 5, number: 2 }],
     })
     assert.throws(
         () => dispatchModeQuestStart(
             { playerId: 1, questId: 999, questCategory: 18 },
-            { table: () => ({}), log: () => {} },
+            { content: {}, log: () => {} },
         ),
         /blocked by fixture/,
     )
@@ -96,7 +96,7 @@ test("loader skips unregistered and hash-mismatched modules", async t => {
     assert.deepEqual(listLoadedModeIdentities(), [])
     assert.ok(logs.some(line => line.includes("SKIP unlisted.mjs")))
     assert.ok(logs.some(line => line.includes("SKIP tampered.mjs")))
-    assert.equal(dispatchModeRushFinish({}, { table: () => ({}), log: () => {} }), null)
+    assert.equal(dispatchModeRushFinish({}, { content: {}, log: () => {} }), null)
 })
 
 test("MODES_ENABLED=0 disables loading; missing dir is a silent no-op", async t => {

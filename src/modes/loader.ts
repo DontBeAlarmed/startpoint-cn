@@ -16,7 +16,6 @@ import { promises as fs } from "node:fs"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
 
-import { getContentSnapshot } from "../content/runtime/content-snapshot"
 import { getCharacterFacts } from "../lib/character-content"
 import { grantCharacterExpWithinTransactionSync } from "../lib/character-growth/commands/grant-character-exp"
 import { updatePlayerEquipmentSync } from "../data/domains/equipment"
@@ -45,11 +44,14 @@ export interface LoadModesOptions {
 export function createModeHost(log: (message: string) => void): ModeHost {
     return Object.freeze({
         apiVersion: MODE_API_VERSION,
-        // Base-registered tables only; unknown names throw. Mode-private
-        // configuration does not live in the content registry.
-        table: <T>(tableName: string): T => (
-            getContentSnapshot().repository.table<T>(tableName)
-        ),
+        // Mode API v2: fixed named read-only queries. The v1 arbitrary
+        // `table<T>(name)` base-registry read is intentionally gone.
+        content: Object.freeze({
+            getCharacterElement: (characterId: number) => {
+                const element = getCharacterFacts().get(characterId)?.element ?? null
+                return Number.isInteger(element) ? element : null
+            },
+        }),
         log,
     })
 }
@@ -65,10 +67,6 @@ export function createModeTransactionHost(
     return Object.freeze({
         ...createModeHost(log),
         server: Object.freeze({
-            getCharacterElement: (characterId: number) => {
-                const element = getCharacterFacts().get(characterId)?.element ?? null
-                return Number.isInteger(element) ? element : null
-            },
             updatePlayerEquipment: (
                 playerId: number, equipmentId: number, patch: { level: number },
             ) => { updatePlayerEquipmentSync(playerId, equipmentId, patch) },

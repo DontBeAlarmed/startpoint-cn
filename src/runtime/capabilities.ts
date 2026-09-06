@@ -21,7 +21,7 @@ const MODE_SERVER_CAPABILITIES = Object.freeze([
     "mode.hook.quest-start@1",
     "mode.hook.rush-finish@1",
     "mode.hook.rush-parties-serialized@1",
-    "mode.host.base-table@1",
+    "mode.host.content-query@1",
     "mode.host.transaction-server@1",
 ] as const)
 
@@ -59,7 +59,8 @@ export interface RuntimeCapabilitiesBody {
         readonly patchVersions: readonly string[]
     }
     readonly modes: {
-        readonly api: 1
+        /** Mirrors MODE_API_VERSION; bumped with the mode contract. */
+        readonly api: number
         readonly serverCapabilities: readonly string[]
         readonly loaded: readonly {
             readonly name: string

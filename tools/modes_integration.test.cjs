@@ -202,7 +202,7 @@ test("a settlement module throwing rolls back writes made in the same transactio
             db.prepare("UPDATE players SET name = ? WHERE id = ?").run("written-by-base", playerId)
             registry.dispatchModeRushFinish({}, {
                 apiVersion: registry.MODE_API_VERSION,
-                table: () => { throw new Error("unused") },
+                content: { getCharacterElement: () => { throw new Error("unused") } },
                 log: () => {},
                 server: {},
             })

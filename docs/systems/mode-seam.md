@@ -29,9 +29,15 @@
 
 ## 契约版本
 
-`MODE_API_VERSION`(当前 `1`)。模块必须**静态导出** `modeManifest`,装载器在
+`MODE_API_VERSION`(当前 `2`)。模块必须**静态导出** `modeManifest`,装载器在
 **把 host 交给模块之前**就读它校验版本——不兼容的模块因此永远没有机会调用 host。
 `host.apiVersion` 让模块自己也能分支。
+
+**v2 是 breaking change**(D27):v1 的 `host.table<T>(name)` 任意基座注册表读取被
+删除。只读内容访问收敛为 `host.content` 上的**固定命名查询**(当前仅
+`getCharacterElement`,由 Character typed facts 支持);不存在仍能读任意注册表的
+v1 shim,v1 manifest 在取得 host 前即被拒绝并记录不兼容。读取原语在 `host.content`
+(两种 host 都有),写入原语仍在事务 host 的 `host.server`。
 
 ## 模块契约
 
@@ -40,7 +46,7 @@
 ```js
 // 静态导出:装载器先读它做版本门禁,再决定是否执行 register
 export const modeManifest = {
-    apiVersion: 1,
+    apiVersion: 2,
     name: "example",
     capability: "example-settlement@1",
 }
@@ -58,23 +64,23 @@ export function register(host) {
 
 | host | 交给谁 | 内容 |
 |---|---|---|
-| `ModeHost`(只读) | 不在事务里的挂点 | `apiVersion` / `table` / `log` |
+| `ModeHost`(只读) | 不在事务里的挂点 | `apiVersion` / `content`(命名只读查询) / `log` |
 | `ModeTransactionHost` | 在显式事务里的挂点 | 以上 + `server` 写入原语 |
 
 不在事务里的挂点**拿不到任何写入原语**,因此无法修改玩家存档——这是类型层面的
 保证,不是约定。
 
-- `host.table(name)` —— 只读**基座已注册**的运行表;其他名字一律抛错。
-  **模块私有的配置/开关不放在这里**,见下节;
+- `host.content.getCharacterElement(id)` —— v2 命名只读查询,由 Character typed
+  facts 支持;真实 hook 需要新的只读事实时在此**按名扩展**,不回到任意表读取;
 - `host.log(message)`、`host.apiVersion`;
-- `host.server`(仅事务 host)—— 精选的服务端原语（角色元素查询、装备写入、
-  角色经验授予）,模块不直接 import 服务端内部实现。写入经由它发出,
+- `host.server`(仅事务 host)—— 精选的服务端写入原语（装备写入、角色经验授予）,
+  模块不直接 import 服务端内部实现。写入经由它发出,
   自动参与调用方的事务,因而随之回滚。
 
 ## 模块自己的配置放哪
 
 **不放在内容注册表里。** 基座的 Content Registry 是基座的,装载缝不会为某个具体
-Mod 扩展它,`host.table` 也读不到未注册的表。模块的开关与配置有两个去处:
+Mod 扩展它,v2 的 `host.content` 也没有任意表读取。模块的开关与配置有两个去处:
 
 1. 写进 `modeManifest`(简单开关、版本、能力声明);
 2. 放在模块自带的文件里,由模块自己经 `import.meta.url` 定位读取。
@@ -113,9 +119,11 @@ Mod 扩展它,`host.table` 也读不到未注册的表。模块的开关与配�
 
 ## 激活语义（建议）
 
-模块自身应当由**内容**键控：处理器第一步读取自己的激活表，表缺失或未启用时
-直接返回。这样"安装了模块但没有对应内容"与"完全没装模块"表现一致，
-运营者可以先装模块再按需下发内容。
+模块自身的激活开关属于模块自己：写进 `modeManifest` 或模块自带文件,处理器第一步
+读取,未启用时直接返回。v2 起 `host.content` 不提供任意表读取,基座注册表不再承担
+模块激活配置;需要按内容键控的玩法应在 manifest/自带文件中声明其激活条件,
+或由基座按名扩展 `host.content` 命名查询。这样"安装了模块但未启用"与"完全没装模块"
+表现一致,运营者可以先装模块再按需启用。
 
 ## 测试
 
@@ -123,8 +131,8 @@ Mod 扩展它,`host.table` 也读不到未注册的表。模块的开关与配�
   `MODES_ENABLED=0`、目录缺失静默无操作、重复/非法注册被拒;
 - `tools/modes_contract.test.cjs` —— 版本不符在 `register()` 执行前即拒装、缺 manifest
   拒装、被授权模块加载失败不影响其他模块、码点序分派、重名拒绝、
-  `table` 只服务基座已注册表、进本否决链短路、结算传播、队伍改写 fail-soft、
-  无模块时全部 no-op;
+  v2 host 只暴露命名 content 查询且 v1 `table` 表面不存在、进本否决链短路、
+  结算传播、队伍改写 fail-soft、无模块时全部 no-op;
 - `tools/modes_lifecycle.test.cjs` —— **生产启动顺序**:经
   `createContentLifecycleDependencies()`(cn-server 展开进协调器依赖的同一个组合)
   驱动真实 coordinator,snapshot/多人运行时/HTTP listen 用 spy 不占端口,断言顺序为
