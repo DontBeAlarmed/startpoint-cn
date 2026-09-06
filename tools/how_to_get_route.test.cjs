@@ -24,7 +24,6 @@ const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
-const { productionContentSnapshotProvider } = require("../src/content/runtime/content-snapshot")
 
 initializeDatabase()
 const db = getDb()
@@ -177,17 +176,9 @@ const snapshotTables = {
     },
 }
 
-const previousSnapshot = productionContentSnapshotProvider.snapshot
-productionContentSnapshotProvider.snapshot = {
-    cdn: { targetVersion: "1.4.54" },
-    repository: {
-        info: () => ({ source: "test", assetVersion: "1.4.54", generatorVersion: 1, releaseDigest: null }),
-        table(tableName) {
-            if (!(tableName in snapshotTables)) throw new Error(`unexpected test table ${tableName}`)
-            return snapshotTables[tableName]
-        },
-    },
-}
+const restoreContentFixture = require("./helpers/content-snapshot-fixture.cjs")
+    .installFrozenTestContentSnapshot({ targetVersion: "1.4.54", tables: snapshotTables })
+    .restore
 
 function decode(response) {
     assert.equal(response.headers["content-type"], "application/x-msgpack")
@@ -220,7 +211,7 @@ async function createApp() {
 }
 
 test.after(async () => {
-    productionContentSnapshotProvider.snapshot = previousSnapshot
+    restoreContentFixture()
     if (db.open) db.close()
     fs.rmSync(dataDirectory, { recursive: true, force: true })
     if (previousDataDirectory === undefined) delete process.env.DATA_DIR

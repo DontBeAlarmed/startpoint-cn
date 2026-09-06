@@ -14,30 +14,16 @@ const previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR
 process.env.DATA_DIR = databaseDirectory
 delete process.env.WDFP_DATABASE_DIR
 
-const projectRoot = path.resolve(__dirname, "..")
-const { BUNDLED_CDN_CATALOG_VERSION } = require("../src/content/constants")
-const {
-    productionContentSnapshotProvider,
-} = require("../src/content/runtime/content-snapshot")
-const previousSnapshot = productionContentSnapshotProvider.snapshot
-const tableCache = new Map()
-productionContentSnapshotProvider.snapshot = {
-    cdn: { targetVersion: BUNDLED_CDN_CATALOG_VERSION },
-    repository: {
-        info: () => ({
-            source: "bundled",
-            assetVersion: BUNDLED_CDN_CATALOG_VERSION,
-            generatorVersion: 1,
-            releaseDigest: null,
-        }),
-        table(tableName) {
-            if (!tableCache.has(tableName)) {
-                tableCache.set(tableName, require(path.join(projectRoot, "assets", tableName)))
-            }
-            return tableCache.get(tableName)
-        },
-    },
-}
+const restoreBundledSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot({
+        additionalTableNames: [
+            "gacha.json",
+            "gacha_pool.json",
+            "gacha_campaign_definitions.json",
+            "stars_gacha_campaign.json",
+            "gacha_exchange_rate.json",
+        ],
+    })
 
 const { closeDatabase, initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
@@ -387,7 +373,7 @@ main().then(
     },
 ).finally(() => {
     if (db.open) closeDatabase()
-    productionContentSnapshotProvider.snapshot = previousSnapshot
+    restoreBundledSnapshot()
     fs.rmSync(databaseDirectory, { recursive: true, force: true })
     if (previousDataDirectory === undefined) delete process.env.DATA_DIR
     else process.env.DATA_DIR = previousDataDirectory

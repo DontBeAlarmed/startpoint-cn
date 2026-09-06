@@ -12,9 +12,7 @@ const {
     getMissionCatalog,
     getMissionFactRequirementRegistry,
 } = require("../src/lib/mission")
-const {
-    productionContentSnapshotProvider,
-} = require("../src/content/runtime/content-snapshot")
+const { installFrozenTestContentSnapshot } = require("./helpers/content-snapshot-fixture.cjs")
 const { EventSafeComputer } = require("../src/lib/mission/computer-event-safe")
 const {
     getBundledStandardMissionTables,
@@ -187,23 +185,20 @@ test("Event compute stays bound to the Session Catalog after the global snapshot
         loaders: createLoaders(),
     })
     const context = EventSafeComputer.buildContextFromSession(session, 3, [2316])
-    const previousSnapshot = productionContentSnapshotProvider.snapshot
-    productionContentSnapshotProvider.snapshot = {
-        cdn: { targetVersion: "event-compute-must-not-read-global" },
-        repository: {
-            info: () => ({ source: "test" }),
-            table(tableName) {
-                throw new Error(`unexpected global Event compute table read: ${tableName}`)
-            },
+    const install = installFrozenTestContentSnapshot({
+        targetVersion: "event-compute-must-not-read-global",
+        tables: {},
+        onTableRead: tableName => {
+            throw new Error(`unexpected global Event compute table read: ${tableName}`)
         },
-    }
+    })
     try {
         assert.equal(EventSafeComputer.compute(2316, {
             ...context,
             collectedItemTotals: { 80111: 12 },
         }, 3), 12)
     } finally {
-        productionContentSnapshotProvider.snapshot = previousSnapshot
+        install.restore()
     }
 })
 

@@ -95,26 +95,13 @@ const tables = {
     },
 }
 
-const { productionContentSnapshotProvider } = require("../src/content/runtime/content-snapshot")
-const previousSnapshot = productionContentSnapshotProvider.snapshot
-productionContentSnapshotProvider.snapshot = {
-    cdn: { targetVersion: "contents-guide-test" },
-    repository: {
-        info: () => ({
-            source: "release",
-            assetVersion: "contents-guide-test",
-            generatorVersion: 1,
-            releaseDigest: "sha256:contents-guide-test",
-        }),
-        table: tableName => {
-            if (!(tableName in tables)) throw new Error(`unexpected table ${tableName}`)
-            return tables[tableName]
-        },
-    },
-}
-restoreSnapshot = () => {
-    productionContentSnapshotProvider.snapshot = previousSnapshot
-}
+const {
+    installFrozenTestContentSnapshot,
+} = require("./helpers/content-snapshot-fixture.cjs")
+restoreSnapshot = installFrozenTestContentSnapshot({
+    targetVersion: "contents-guide-test",
+    tables,
+}).restore
 
 const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")

@@ -29,30 +29,72 @@ function cleanup() {
 }
 process.once("exit", cleanup)
 
-const { productionContentSnapshotProvider } = require("../src/content/runtime/content-snapshot")
-const previousSnapshot = productionContentSnapshotProvider.snapshot
 let failReconciliation = false
-productionContentSnapshotProvider.snapshot = {
-    cdn: { targetVersion: "mission-event-login-test" },
-    repository: {
-        info: () => ({ source: "release", assetVersion: "test", generatorVersion: 1, releaseDigest: "sha256:test" }),
-        table: tableName => {
+restoreSnapshot = require("./helpers/content-snapshot-fixture.cjs")
+    .installFrozenTestContentSnapshot({
+        targetVersion: "mission-event-login-test",
+        onTableRead: () => {
             if (failReconciliation) throw new Error("forced load reconciliation failure")
-            if (tableName === "mission_event.json") return require("../assets/mission_event.json")
-            if (tableName === "mission_event_reward.json") return require("../assets/mission_event_reward.json")
-            if (tableName === "character.json") return require("../assets/character.json")
-            if (tableName === "item_inventory_policy.json") return require("../assets/item_inventory_policy.json")
-            if (tableName === "mana_node.json") return require("../assets/mana_node.json")
-            if (tableName === "mana_board.json") return require("../assets/mana_board.json")
-            if (tableName === "mana_node_awake.json") return require("../assets/mana_node_awake.json")
-            if (tableName === "character_level.json") return require("../assets/character_level.json")
-            if (tableName === "level_required_mana_node.json") return require("../assets/level_required_mana_node.json")
-            if (tableName === "config.json") return require("../assets/config.json")
-            return {}
         },
-    },
-}
-restoreSnapshot = () => { productionContentSnapshotProvider.snapshot = previousSnapshot }
+        tables: {
+            "mission_event.json": require("../assets/mission_event.json"),
+            "mission_event_reward.json": require("../assets/mission_event_reward.json"),
+            "character.json": require("../assets/character.json"),
+            "item_inventory_policy.json": require("../assets/item_inventory_policy.json"),
+            "mana_node.json": require("../assets/mana_node.json"),
+            "mana_board.json": require("../assets/mana_board.json"),
+            "mana_node_awake.json": require("../assets/mana_node_awake.json"),
+            "character_level.json": require("../assets/character_level.json"),
+            "level_required_mana_node.json": require("../assets/level_required_mana_node.json"),
+            "config.json": require("../assets/config.json"),
+            // C5-Admin moved the login bonus catalog to a strict typed read;
+            // the previous stub never served it (bundled fallback existed).
+            "login_bonus.json": require("../assets/login_bonus.json"),
+            // The previous inline stub answered every unlisted table with an
+            // empty object; keep that exact behavior for tolerant readers.
+            "daily_challenge_point_lookup.json": {},
+            "event_challenge_point_map.json": {},
+            "quest_entry_costs.json": {},
+            "quest_unlock_costs.json": {},
+            "hard_multi_event.json": {},
+            "hard_multi_event_quest.json": {},
+            "periodic_reward.json": {},
+            "periodic_reward_point.json": {},
+            "mission_regular.json": {},
+            "mission_daily.json": {},
+            "mission_weekly_def.json": {},
+            "mission_collect_item.json": {},
+            "mission_degree.json": {},
+            "mission_char_awake.json": {},
+            "mission_pass_daily.json": {},
+            "mission_pass_weekly.json": {},
+            "mission_pass_event.json": {},
+            "mission_regular_reward.json": {},
+            "mission_daily_reward.json": {},
+            "mission_collect_item_reward.json": {},
+            "mission_weekly_reward.json": {},
+            "mission_degree_reward.json": {},
+            "mission_pass_week.json": {},
+            "mission_pass_week_reward.json": {},
+            "mission_char_awake_reward.json": {},
+            "main_quest.json": {},
+            "ex_quest.json": {},
+            "character_quest_lookup.json": {},
+            "equipment_dissolve.json": {},
+            "equipment_lookup.json": {},
+            "boss_coin_shop.json": {},
+            "treasure_shop.json": {},
+            "challenge_dungeon_event_quest.json": {},
+            "mana_board2_open_condition.json": {},
+            "item_sale.json": {},
+            "mission_pass_daily_reward.json": {},
+            "mission_pass_weekly_reward.json": {},
+            "mission_pass_event_reward.json": {},
+            "mission_active.json": {},
+            "mission_active_event.json": {},
+            "mission_active_reward.json": {},
+        },
+    }).restore
 
 const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
