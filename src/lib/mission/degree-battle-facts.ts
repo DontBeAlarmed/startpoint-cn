@@ -1,5 +1,5 @@
 import { incrementPlayerCategoryMissionSync } from "../../data/domains/mission"
-import { getQuestContentTableSync } from "../assets"
+import { getQuestContentTableSync } from "../quest-content"
 import { getMissionCatalog, isMissionMasterDefinitionEnabledAt, MissionMasterDefinition } from "./mission-catalog"
 interface DegreeBattleFactContext {
     readonly playerId: number

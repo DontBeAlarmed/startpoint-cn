@@ -401,7 +401,9 @@ stubModule("../src/data/domains/carnivalEvent", {
 })
 stubModule("../src/data/domains/degree", { givePlayerDegreeSync: () => false })
 stubModule("../src/data/activeAccount", { resolvePlayerIdSync: () => 17 })
-stubModule("../src/lib/assets", {
+// Quest lookups moved to quest-content; assets only re-exports them.
+stubModule("../src/lib/quest-content", {
+    ...require("../src/lib/quest-content"),
     getQuestFromCategorySync: () => scoreQuest,
 })
 // Rush/event reward lookups moved to rush-event-content; stubs target the

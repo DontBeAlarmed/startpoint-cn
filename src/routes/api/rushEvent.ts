@@ -23,7 +23,7 @@ import { getDefaultPlayerPartyGroupsSync } from "../../data/domains/player"
 import { getPlayerCharacterSync } from "../../data/domains/character"
 import { ensurePlayerPartyGroupListSync, getPlayerPartyGroupListSync } from "../../data/domains/party"
 import { getSession } from "../../data/domains/session"
-import { getQuestFromCategorySync } from "../../lib/assets";
+import { getQuestFromCategorySync } from "../../lib/quest-content";
 import {
     getRushEventFolderMaxRoundSync,
     getRushEventQuestConfigurationErrorResponse,

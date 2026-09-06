@@ -1,4 +1,4 @@
-import { getQuestContentTableSync } from "../assets"
+import { getQuestContentTableSync } from "../quest-content"
 import { MissionMasterDefinition, getMissionCatalog } from "./mission-catalog"
 export interface ExactEventSingleClearRule {
     readonly missionId: number

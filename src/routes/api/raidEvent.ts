@@ -10,7 +10,7 @@ import { PartyCategory } from "../../data/types";
 import { clientSerializeDate } from "../../data/utils";
 import { getSerializedPlayerRushEventPlayedPartiesSync, getPlayerRushEventEndlessBattleRankingSync } from "../../lib/rush";
 import { insertActiveQuest } from "../../lib/quest/active-quest-service";
-import { getQuestFromCategorySync } from "../../lib/assets";
+import { getQuestFromCategorySync } from "../../lib/quest-content";
 import { BattleQuest, QuestCategory } from "../../lib/types";
 import { ensureSpecialEventPartyGroupsSync, resolvePartyGroupColorId } from "../../lib/special-event-parties";
 import {

@@ -1,6 +1,6 @@
 import type { IncomingHttpHeaders } from "node:http"
 
-import { getQuestFromCategorySync } from "../../lib/assets"
+import { getQuestFromCategorySync } from "../../lib/quest-content"
 import { getServerTime } from "../../utils"
 import { getRealNowMs } from "../../runtime/time/game-time"
 import type { MultiPlayerContext } from "../player-context"

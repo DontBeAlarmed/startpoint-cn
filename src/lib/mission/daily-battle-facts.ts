@@ -1,5 +1,5 @@
 import { incrementPlayerCategoryMissionSync } from "../../data/domains/mission"
-import { getQuestContentTableSync } from "../assets"
+import { getQuestContentTableSync } from "../quest-content"
 import type { FinishContext } from "../quest/finish/types"
 import { getMissionCatalog, isMissionMasterDefinitionEnabledAt } from "./mission-catalog"
 const ACTIVE_DAILY_BATTLE_MISSION_IDS = new Set([

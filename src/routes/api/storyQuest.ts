@@ -5,7 +5,7 @@ import { getPlayerSingleQuestProgressSync, insertPlayerQuestProgressSync, update
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { getQuestFromCategorySync } from "../../lib/assets";
+import { getQuestFromCategorySync } from "../../lib/quest-content";
 import { givePlayerCharacterSync } from "../../lib/character";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { grantStoryRewardWithinTransactionSync } from "../../lib/story-reward-grant"

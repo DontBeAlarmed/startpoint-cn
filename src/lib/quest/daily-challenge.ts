@@ -25,6 +25,12 @@ export function getDailyChallengePointDefinitions(): readonly DailyChallengePoin
     return definitions
 }
 
+export function getEventChallengePointMap(): Record<string, number> {
+    return getContentSnapshot().repository.table<Record<string, number>>(
+        "event_challenge_point_map.json",
+    )
+}
+
 export function getDailyChallengePointDefinition(
     challengePointId: number,
 ): DailyChallengePointDefinition | undefined {

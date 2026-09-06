@@ -2,7 +2,7 @@ import type { PlayerQuestProgress } from "../../../data/types"
 import {
     getQuestConfigurationErrorResponse,
     getQuestFromCategorySync,
-} from "../../assets"
+} from "../../quest-content"
 import {
     getRushEventFolderMaxRoundSync,
     getRushEventQuestConfigurationErrorResponse,

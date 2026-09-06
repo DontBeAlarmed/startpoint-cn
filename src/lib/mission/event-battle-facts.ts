@@ -9,7 +9,7 @@ import { getExactEventSingleClearRules } from "./event-single-clear-rules"
 import ruleAsset from "../../../assets/mission_event_battle_rules.json"
 import eventMissionRewards from "../../../assets/mission_event_reward.json"
 import { completePlayerEventMissionFactSync } from "../../data/domains/event_mission_entry_facts"
-import { getQuestContentTableSync } from "../assets"
+import { getQuestContentTableSync } from "../quest-content"
 import { getMissionCatalog, isMissionMasterDefinitionEnabledAt, MissionMasterDefinition } from "./mission-catalog"
 
 type MultiRole = "any" | "host" | "guest"

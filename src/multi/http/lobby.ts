@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify"
 import { GetRoomsBody, CreateRoomBody, SearchRoomBody, SelectRoomBody } from "../types"
-import { getQuestFromCategorySync } from "../../lib/assets"
+import { getQuestFromCategorySync } from "../../lib/quest-content"
 import { generateDataHeaders } from "../../utils"
 import { serializeRoomStatusConnection } from "../room/serializer"
 import { isValidMultiViewerId, type MultiHttpContext } from "./context"

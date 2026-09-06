@@ -7,11 +7,10 @@ const test = require("node:test")
 const ts = require("typescript")
 
 const projectRoot = path.resolve(__dirname, "..")
-const expectedAccess = Object.freeze({
-    "src/multi/player-context.ts": Object.freeze({
-        "cdndata/player_rank.json": "bundledPlayerRankTable",
-    }),
-})
+// All former low-risk facade consumers have migrated to strict typed reads;
+// the remaining bundled-fallback readers are tracked by
+// content_runtime_authority.test.cjs boundary candidates.
+const expectedAccess = Object.freeze({})
 
 function isFunctionLike(node) {
     return ts.isFunctionDeclaration(node)

@@ -17,14 +17,13 @@ import {
     getPlayerSync,
     updatePlayerSync,
 } from "../../data/domains/player";
-import { getQuestConfigurationErrorResponse, getQuestFromCategorySync } from "../../lib/assets";
+import { getQuestConfigurationErrorResponse, getQuestFromCategorySync } from "../../lib/quest-content";
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings";
 import { computeRealTimeStamina } from "../../lib/stamina";
 import { getStaminaCost } from "../../lib/stamina-cost";
 import { BattleQuest } from "../../lib/types";
 import { getDb } from "../../data/db";
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
-import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json";
+import { getQuestEntryCostByKey } from "../../lib/quest-entry-content";
 import {
     ActiveQuestAlreadyExistsError,
     buildStartEntryItemList,
@@ -32,7 +31,6 @@ import {
     InsufficientStaminaError,
     PlayerNotFoundError,
     runStartEntryTransaction,
-    type StartEntryCost,
 } from "../../lib/quest/start-entry";
 import {
     validateMultiStartRequest,
@@ -191,10 +189,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
         ) === identityKey;
         const questKey = `${category}_${quest_id}`;
         const entryCost = isRoomHost
-            ? getRuntimeContentTableSync(
-                "quest_entry_costs.json",
-                bundledQuestEntryCosts as Record<string, StartEntryCost>,
-            )[questKey]
+            ? getQuestEntryCostByKey(questKey)
             : undefined;
         const staminaCost = isRoomHost ? getStaminaCost(questKey).cost : 0;
         const coordinatorOrigin = await context.resolveCoordinatorOrigin({

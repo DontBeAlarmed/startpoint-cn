@@ -5,7 +5,7 @@ import { getAdditionalRewardTable, settleAdditionalRewardsSync } from "../../lib
 import {
     getQuestConfigurationErrorResponse,
     getQuestFromCategorySync,
-} from "../../lib/assets"
+} from "../../lib/quest-content"
 import { getMultiRewardPolicySync } from "../../lib/config-content"
 import { givePlayerCharactersExpSync } from "../../lib/character"
 import { buildBattleMissionSettlementScopes, recordMissionBattleFacts } from "../../lib/mission/battle-facts"

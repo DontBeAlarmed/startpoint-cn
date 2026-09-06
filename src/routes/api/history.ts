@@ -4,7 +4,7 @@ import { getPlayerScoreAttackBattleHistorySync } from "../../data/domains/score-
 import { getPlayerPracticeBattleHistorySync } from "../../data/domains/practice-battle-history"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { getQuestContentTableSync } from "../../lib/assets";
+import { getQuestContentTableSync } from "../../lib/quest-content";
 import { generateDataHeaders } from "../../utils";
 
 const routes = async (fastify: FastifyInstance) => {

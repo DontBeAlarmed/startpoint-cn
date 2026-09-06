@@ -5,7 +5,9 @@ import { getPlayerMailCountSync } from "../../data/domains/mail"
 import {
     getQuestConfigurationErrorResponse,
     getQuestFromCategorySync,
-} from "../../lib/assets"
+} from "../../lib/quest-content"
+import { getQuestEntryCostByKey } from "../../lib/quest-entry-content"
+import { getEventChallengePointMap } from "../../lib/quest/daily-challenge"
 import { getSingleContinuePolicySync } from "../../lib/config-content"
 import type { BattleQuest } from "../../lib/types"
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils"
@@ -21,9 +23,6 @@ import {
 import { settleSingleBattleQuest } from "../../lib/quest/finish/single-orchestrator"
 import { buildSingleFinishResponse } from "../../lib/quest/finish/single-response-projector"
 import type { SingleFinishResponseHeaders } from "../../lib/quest/finish/single-response-projector"
-import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json"
-import bundledEventChallengePointMap from "../../../assets/event_challenge_point_map.json"
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 import {
     mergeMissionSettlementResponse,
     settleMissionCategories,
@@ -37,7 +36,6 @@ import {
     InsufficientStaminaError,
     PlayerNotFoundError,
     runStartEntryTransaction,
-    StartEntryCost,
 } from "../../lib/quest/start-entry"
 import {
     ActiveQuest,
@@ -124,10 +122,7 @@ function summarizeItemList(itemList: Record<string, number>): string {
 
 const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteOptions = {}) => {
     const dailyResetHour = options.dailyResetHour ?? 5
-    const challengePointMap = getRuntimeContentTableSync(
-        "event_challenge_point_map.json",
-        bundledEventChallengePointMap as Record<string, number>,
-    )
+    const challengePointMap = getEventChallengePointMap()
 
     fastify.post("/finish", async (request: FastifyRequest, reply: FastifyReply) => {
         const validationResult = validateSingleFinishRequest(request.body)
@@ -281,10 +276,7 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
 
         // Validate and persist all quest-start state atomically.
         const questKey = `${category}_${questId}`
-        const entryCost = getRuntimeContentTableSync(
-            "quest_entry_costs.json",
-            bundledQuestEntryCosts as Record<string, StartEntryCost>,
-        )[questKey]
+        const entryCost = getQuestEntryCostByKey(questKey)
         const staminaInfo = getStaminaCost(questKey)
         console.log(`[BATTLE] start entry: questId=${questId} questKey=${questKey} entryCost=${JSON.stringify(entryCost)} discountRate=${staminaInfo.rate} baseStamina=${staminaInfo.baseCost}→${staminaInfo.cost}`)
         const staminaCost = staminaInfo.cost
