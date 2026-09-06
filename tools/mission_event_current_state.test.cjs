@@ -40,9 +40,7 @@ const { buildMissionComputerContext } = require("./helpers/mission-session-conte
 const partyDomain = require("../src/data/domains/party")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { insertPlayerQuestProgressSync } = require("../src/data/domains/quest")
-const {
-    productionContentSnapshotProvider,
-} = require("../src/content/runtime/content-snapshot")
+const { installFrozenTestContentSnapshot } = require("./helpers/content-snapshot-fixture.cjs")
 const { characterExpCaps } = require("../src/lib/character")
 const { getCharacterStoryQuestIds } = require("../src/lib/mission/character-queries")
 const { EventSafeComputer } = require("../src/lib/mission/computer-event-safe")
@@ -342,7 +340,6 @@ test("Event chapter facts require every official quest in the selected chapter",
 })
 
 function withContentTables(overrides, callback) {
-    const previousSnapshot = productionContentSnapshotProvider.snapshot
     const tables = {
         ...getBundledStandardMissionTables(),
         "character.json": characters,
@@ -357,20 +354,11 @@ function withContentTables(overrides, callback) {
         "challenge_dungeon_event_quest.json": require("../assets/challenge_dungeon_event_quest.json"),
         ...overrides,
     }
-    productionContentSnapshotProvider.snapshot = {
-        cdn: { targetVersion: "test" },
-        repository: {
-            info: () => ({ source: "test" }),
-            table(tableName) {
-                if (Object.prototype.hasOwnProperty.call(tables, tableName)) return tables[tableName]
-                throw new Error(`unexpected table ${tableName}`)
-            },
-        },
-    }
+    const install = installFrozenTestContentSnapshot({ targetVersion: "test", tables })
     try {
         return callback()
     } finally {
-        productionContentSnapshotProvider.snapshot = previousSnapshot
+        install.restore()
     }
 }
 
@@ -409,8 +397,6 @@ test("Event Session context skips current-state queries and indexes outside all 
             return original(...args)
         }
     }
-    const previousSnapshot = productionContentSnapshotProvider.snapshot
-    let tableReads = 0
     const standardMissionTables = getBundledStandardMissionTables()
     const eventRuleTables = Object.fromEntries([
         "challenge_dungeon_event_quest.json",
@@ -421,22 +407,12 @@ test("Event Session context skips current-state queries and indexes outside all 
         "main_quest.json",
         "config.json",
     ].map(tableName => [tableName, require(`../assets/${tableName}`)]))
-    productionContentSnapshotProvider.snapshot = {
-        cdn: { targetVersion: "test" },
-        repository: {
-            info: () => ({ source: "test" }),
-            table(tableName) {
-                if (Object.prototype.hasOwnProperty.call(standardMissionTables, tableName)) {
-                    return standardMissionTables[tableName]
-                }
-                if (Object.prototype.hasOwnProperty.call(eventRuleTables, tableName)) {
-                    return eventRuleTables[tableName]
-                }
-                tableReads++
-                throw new Error("unexpected current-state table read")
-            },
-        },
-    }
+    const install = installFrozenTestContentSnapshot({
+        targetVersion: "test",
+        // The unified repository throws for any table outside this set,
+        // which is the "no unexpected current-state table read" probe.
+        tables: { ...standardMissionTables, ...eventRuleTables },
+    })
     try {
         const evaluationTime = new Date("2024-08-14T12:00:00.000Z")
         const catalog = getMissionCatalog()
@@ -447,12 +423,8 @@ test("Event Session context skips current-state queries and indexes outside all 
             evaluationTime,
         })
         assert.equal(context.eventCurrentState, undefined)
-        // Declared-fact loads (e.g. items for enabled collect missions) are
-        // sanctioned typed reads; the legacy "zero player-state query" proof
-        // only covered the current-state derivation, proven by the index reads.
-        assert.equal(tableReads, 0)
     } finally {
-        productionContentSnapshotProvider.snapshot = previousSnapshot
+        install.restore()
         spies.forEach(([module, name], index) => { module[name] = originals[index] })
     }
 })
