@@ -6,59 +6,18 @@ import {
     RawPlayerStartDashExchangeCampaign,
     RawPlayerMultiSpecialExchangeCampaign,
 } from "../types";
-import bundledHardMultiEvents from "../../../assets/hard_multi_event.json";
-import bundledHardMultiQuests from "../../../assets/hard_multi_event_quest.json";
-import bundledPeriodicRewardPoints from "../../../assets/periodic_reward_point.json";
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
+import {
+    getActivityPeriodicRewardPointDefinitions,
+    type PeriodicRewardPointDefinition,
+} from "../../lib/quest/periodic-reward-content";
 
 // ─── Periodic Reward Points ───
-
-interface HardMultiEventDefinition {
-    periodicPointId?: number
-}
-
-interface HardMultiQuestDefinition {
-    periodicRewardGroupId?: number
-}
-
-interface PeriodicRewardPointDefinition {
-    maxPoint: number
-    recoveryPoint: number
-    recoveryCycle: number
-}
-
-const FINAL_OPERATION_EVENT_IDS = new Set([1001, 1002, 1003, 1004, 1005, 1006])
 
 function getActivityPeriodicRewardDefinitions(): ReadonlyMap<
     number,
     PeriodicRewardPointDefinition
 > {
-    const events = getRuntimeContentTableSync(
-        "hard_multi_event.json",
-        bundledHardMultiEvents as Record<string, HardMultiEventDefinition>,
-    )
-    const points = getRuntimeContentTableSync(
-        "periodic_reward_point.json",
-        bundledPeriodicRewardPoints as Record<string, PeriodicRewardPointDefinition>,
-    )
-    const quests = getRuntimeContentTableSync(
-        "hard_multi_event_quest.json",
-        bundledHardMultiQuests as Record<string, HardMultiQuestDefinition>,
-    )
-    const definitions = new Map<number, PeriodicRewardPointDefinition>()
-    for (const event of Object.values(events)) {
-        if (event.periodicPointId === undefined) continue
-        const definition = points[String(event.periodicPointId)]
-        if (definition !== undefined) definitions.set(event.periodicPointId, definition)
-    }
-    for (const [questId, quest] of Object.entries(quests)) {
-        if (!FINAL_OPERATION_EVENT_IDS.has(Math.floor(Number(questId) / 1000))) continue
-        const pointId = quest.periodicRewardGroupId
-        if (pointId === undefined || definitions.has(pointId)) continue
-        const definition = points[String(pointId)]
-        if (definition !== undefined) definitions.set(pointId, definition)
-    }
-    return definitions
+    return getActivityPeriodicRewardPointDefinitions()
 }
 
 function getStoredPlayerPeriodicRewardPointsSync(

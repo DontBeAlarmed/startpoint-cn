@@ -1,7 +1,3 @@
-import bundledHardMultiEvents from "../../../../assets/hard_multi_event.json"
-import bundledHardMultiQuests from "../../../../assets/hard_multi_event_quest.json"
-import bundledPeriodicRewards from "../../../../assets/periodic_reward.json"
-import { getRuntimeContentTableSync } from "../../../content/runtime/table-access"
 import { consumePeriodicRewardPointSync } from "../../../data/domains/campaign"
 import { getPlayerPeriodicRewardPointsSync } from "../../../data/domains/campaign"
 import { getDb } from "../../../data/db"
@@ -12,22 +8,12 @@ import {
     settleDirectItemOverflowsWithinTransactionSync,
     type PlannedItemOverflowDisposition,
 } from "../../item-overflow"
-
-interface HardMultiEventDefinition {
-    periodicPointId?: number
-}
-
-interface HardMultiQuestDefinition {
-    periodicRewardGroupId?: number
-    periodicRewardSlots?: number
-}
-
-interface PeriodicRewardDefinition {
-    kind: number
-    itemId: number
-    count: number
-    probability: number
-}
+import {
+    getHardMultiQuestPeriodicDefinition,
+    getPeriodicRewardGroup,
+    resolveActivityPeriodicRewardPointId,
+    type PeriodicRewardDefinition,
+} from "../periodic-reward-content"
 
 export interface PeriodicRewardDrop {
     readonly group_id: number
@@ -52,8 +38,6 @@ export interface ActivityPeriodicRewardSettlementInput {
     readonly random?: () => number
 }
 
-const FINAL_OPERATION_EVENT_IDS = new Set([1001, 1002, 1003, 1004, 1005, 1006])
-
 function emptySettlement(): ActivityPeriodicRewardSettlement {
     return {
         dropPeriodicRewardIds: [],
@@ -63,13 +47,7 @@ function emptySettlement(): ActivityPeriodicRewardSettlement {
 }
 
 function resolvePointId(eventId: number, groupId: number): number | null {
-    const events = getRuntimeContentTableSync(
-        "hard_multi_event.json",
-        bundledHardMultiEvents as Record<string, HardMultiEventDefinition>,
-    )
-    const configured = events[String(eventId)]?.periodicPointId
-    if (configured !== undefined) return configured
-    return FINAL_OPERATION_EVENT_IDS.has(eventId) ? groupId : null
+    return resolveActivityPeriodicRewardPointId(eventId, groupId)
 }
 
 function selectReward(
@@ -107,13 +85,9 @@ export function settleActivityPeriodicRewardsSync(
         return emptySettlement()
     }
 
-    const quests = getRuntimeContentTableSync(
-        "hard_multi_event_quest.json",
-        bundledHardMultiQuests as Record<string, HardMultiQuestDefinition>,
-    )
-    const quest = quests[String(input.questId)]
+    const quest = getHardMultiQuestPeriodicDefinition(input.questId)
     const groupId = quest?.periodicRewardGroupId
-    if (groupId === undefined || (quest.periodicRewardSlots ?? 0) <= 0) return emptySettlement()
+    if (quest === undefined || groupId === undefined || (quest.periodicRewardSlots ?? 0) <= 0) return emptySettlement()
 
     const eventId = Math.floor(input.questId / 1000)
     const pointId = resolvePointId(eventId, groupId)
@@ -122,11 +96,7 @@ export function settleActivityPeriodicRewardsSync(
         .find(entry => entry.id === pointId)?.point ?? 0
     if (availablePoint <= 0) return emptySettlement()
 
-    const rewardsByGroup = getRuntimeContentTableSync(
-        "periodic_reward.json",
-        bundledPeriodicRewards as Record<string, Record<string, PeriodicRewardDefinition>>,
-    )
-    const selected = selectReward(rewardsByGroup[String(groupId)] ?? {}, input.random ?? Math.random)
+    const selected = selectReward(getPeriodicRewardGroup(groupId) ?? {}, input.random ?? Math.random)
     if (selected === null) return emptySettlement()
 
     const [index, reward] = selected

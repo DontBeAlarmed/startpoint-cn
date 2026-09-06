@@ -2,10 +2,12 @@ import type { PlayerQuestProgress } from "../../../data/types"
 import {
     getQuestConfigurationErrorResponse,
     getQuestFromCategorySync,
+} from "../../assets"
+import {
     getRushEventFolderMaxRoundSync,
     getRushEventQuestConfigurationErrorResponse,
     getScoreAttackBorderRewards,
-} from "../../assets"
+} from "../../rush-event-content"
 import { QuestCategory, type BattleQuest } from "../../types"
 import { activeQuests, type ActiveQuest } from "../active-quest-service"
 import {

@@ -30,7 +30,7 @@ import { insertPlayerScoreAttackBattleHistorySync } from "../../../data/domains/
 import { getDb } from "../../../data/db"
 import { createModeTransactionHost } from "../../../modes/loader"
 import { dispatchModeRushFinish } from "../../../modes/registry"
-import { getRushEventFolderClearRewards } from "../../assets"
+import { getRushEventFolderClearRewards } from "../../rush-event-content"
 import { getCarnivalRewardDefinitions, grantCarnivalRewards } from "../../carnival-rewards"
 import { getCharactersEvolutionImgLevels } from "../../character"
 import { getRaidEventRequiredKillCount } from "../../raid-event-master"

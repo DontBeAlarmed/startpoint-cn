@@ -1,5 +1,10 @@
 require("ts-node/register/transpile-only")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot({ additionalTableNames: ["raid_event_overall_reward.json"] })
+process.once("exit", () => { restoreContentSnapshot() })
+
+
 const assert = require("node:assert/strict")
 const {
     getRaidEventOverallRewardDefinitions,

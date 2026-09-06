@@ -403,6 +403,11 @@ stubModule("../src/data/domains/degree", { givePlayerDegreeSync: () => false })
 stubModule("../src/data/activeAccount", { resolvePlayerIdSync: () => 17 })
 stubModule("../src/lib/assets", {
     getQuestFromCategorySync: () => scoreQuest,
+})
+// Rush/event reward lookups moved to rush-event-content; stubs target the
+// owning module because assets only re-exports them as getter bindings.
+stubModule("../src/lib/rush-event-content", {
+    ...require("../src/lib/rush-event-content"),
     getRushEventFolderClearRewards: () => [],
     getScoreAttackBorderRewards: () => require("../assets/score_attack_border_reward.json"),
 })

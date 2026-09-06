@@ -1,8 +1,4 @@
-import raidOverallRewardAsset from "../../../../assets/raid_event_overall_reward.json"
-import {
-    ContentSnapshotError,
-    getContentSnapshot,
-} from "../../../content/runtime/content-snapshot"
+import { getContentSnapshot } from "../../../content/runtime/content-snapshot"
 import { RewardType } from "../../types"
 import type { CurrencyReward, EquipmentItemReward } from "../../types"
 
@@ -115,15 +111,9 @@ function parseRow(id: number, row: readonly unknown[]): RaidOverallRewardDefinit
 type RawRaidOverallRewardTable = Record<string, readonly (readonly unknown[])[]>
 
 function getRewardTable(): RawRaidOverallRewardTable {
-    try {
-        return getContentSnapshot().repository.table<RawRaidOverallRewardTable>(
-            "raid_event_overall_reward.json",
-        )
-    } catch (error) {
-        if (!(error instanceof ContentSnapshotError)
-            || error.code !== "CONTENT_SNAPSHOT_NOT_INITIALIZED") throw error
-        return raidOverallRewardAsset as RawRaidOverallRewardTable
-    }
+    return getContentSnapshot().repository.table<RawRaidOverallRewardTable>(
+        "raid_event_overall_reward.json",
+    )
 }
 
 export function parseRaidEventOverallRewardDefinitions(
