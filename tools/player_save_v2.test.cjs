@@ -56,7 +56,8 @@ const playerRoutes = require("../src/routes/web_api/player").default
 const serverRoutes = require("../src/routes/web_api/server").default
 const { activeQuests } = require("../src/lib/quest/active-quest-service")
 const { ADMIN_UPLOAD_FILE_SIZE_LIMIT } = require("../src/routes/web_api")
-const { getCharacterManaNodesSync } = require("../src/lib/assets")
+const { getCharacterGrowthContent } = require("../src/lib/character-growth-content")
+const getCharacterManaNodesSync = (characterId, level) => getCharacterGrowthContent().getManaBoardNodes(characterId, level)
 const {
     PlayerSaveDownloadTooLargeError,
     serializePlayerSaveDownload,

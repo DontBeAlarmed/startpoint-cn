@@ -146,7 +146,11 @@ async function createAwakeOwnerFactPublicationFixture(options = {}) {
         const raidEventDomain = require("../../src/data/domains/raidEvent")
         const { insertSessionWithToken } = require("../../src/data/domains/session")
         const { SessionType } = require("../../src/data/types")
-        const characterAssets = require("../../src/lib/assets")
+        const characterAssets = {
+            getCharacterDataSync: characterId => require("../../src/lib/character-content").getCharacterFacts().get(characterId),
+            getCharacterManaNodesSync: (characterId, level) => require("../../src/lib/character-growth-content").getCharacterGrowthContent().getManaBoardNodes(characterId, level),
+            getQuestFromCategorySync: (category, questId) => require("../../src/lib/assets").getQuestFromCategorySync(category, questId),
+        }
         const { characterExpCaps } = require("../../src/lib/character")
         const { createAwakeRequestContext } = require("../../src/lib/mission/awake-request-context")
         const {

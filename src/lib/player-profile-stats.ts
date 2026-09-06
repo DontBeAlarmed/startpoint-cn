@@ -1,10 +1,6 @@
-import bundledCharacters from "../../assets/character.json"
-import bundledDegreeRewards from "../../assets/mission_degree_reward.json"
-import bundledManaBoards from "../../assets/mana_board.json"
-
-import { getRuntimeContentTableSync } from "../content/runtime/table-access"
-
-type Table = Record<string, unknown>
+import { getCharacterFacts } from "./character-content"
+import { getCharacterGrowthContent } from "./character-growth-content"
+import { getMissionCatalog } from "./mission/mission-catalog"
 
 export interface PlayerProfileStats {
     readonly maxOpenedManaBoardSecondCount: number
@@ -16,23 +12,10 @@ export interface PlayerProfileStats {
 export function getPlayerProfileStatsSync(
     playerCharacters: Readonly<Record<string, { readonly manaBoardIndex: number }>>,
 ): PlayerProfileStats {
-    const characters = getRuntimeContentTableSync(
-        "character.json",
-        bundledCharacters as Table,
-    ) as Table
-    const manaBoards = getRuntimeContentTableSync(
-        "mana_board.json",
-        bundledManaBoards as Table,
-    ) as Record<string, Record<string, unknown>>
-    const degreeRewards = getRuntimeContentTableSync(
-        "mission_degree_reward.json",
-        bundledDegreeRewards as Table,
-    ) as Table
     return Object.freeze({
-        maxOpenedManaBoardSecondCount: Object.values(manaBoards)
-            .filter(board => board?.["2"] !== undefined).length,
-        maxOwnedCharacterCount: Object.keys(characters).length,
-        maxOwnedDegreeCount: Object.keys(degreeRewards).length,
+        maxOpenedManaBoardSecondCount: getCharacterGrowthContent().getSecondBoardCharacterCount(),
+        maxOwnedCharacterCount: getCharacterFacts().getCharacterCount(),
+        maxOwnedDegreeCount: getMissionCatalog().getMissionIds(5).length,
         openedManaBoardSecondCount: Object.values(playerCharacters)
             .filter(character => character.manaBoardIndex >= 2).length,
     })

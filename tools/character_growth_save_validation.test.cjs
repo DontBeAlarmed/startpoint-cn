@@ -35,7 +35,8 @@ const {
 const {
     validateCharacterGrowthSaveState,
 } = require("../src/lib/character-growth/save/validate-growth-state")
-const { getCharacterManaNodesSync } = require("../src/lib/assets")
+const { getCharacterGrowthContent } = require("../src/lib/character-growth-content")
+const getCharacterManaNodesSync = (characterId, level) => getCharacterGrowthContent().getManaBoardNodes(characterId, level)
 
 let db
 const sqlStatements = []

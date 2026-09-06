@@ -13,7 +13,10 @@ const { getPlayerItemsSync } = require("../../src/data/domains/item")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../../src/data/domains/player")
 const { getPlayerSingleQuestProgressSync } = require("../../src/data/domains/quest")
 const { getPlayerActiveQuestSync } = require("../../src/data/domains/quest_active")
-const characterAssets = require("../../src/lib/assets")
+const characterAssets = {
+    getCharacterDataSync: characterId => require("../../src/lib/character-content").getCharacterFacts().get(characterId),
+    getCharacterManaNodesSync: (characterId, level) => require("../../src/lib/character-growth-content").getCharacterGrowthContent().getManaBoardNodes(characterId, level),
+}
 const { characterExpCaps } = require("../../src/lib/character")
 const { activeQuests } = require("../../src/lib/quest/active-quest-service")
 const { getRankDegree } = require("../../src/lib/stamina")

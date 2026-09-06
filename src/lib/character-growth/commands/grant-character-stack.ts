@@ -1,7 +1,7 @@
 import { getDb } from "../../../data/db"
 import { getPlayerCharacterSync } from "../../../data/domains/character"
 import type { PlayerCharacter } from "../../../data/types"
-import { getCharacterDataSync } from "../../assets"
+import { getCharacterFacts } from "../../character-content"
 import { withInventoryBatchContextWithinTransactionSync } from "../../inventory"
 import type { Element, GivePlayerCharacterResult } from "../../types"
 import { createRewardGrantItemOverflowPolicy } from "../../reward-grant-item-overflow"
@@ -47,7 +47,7 @@ export function grantCharacterStackWithinTransactionSync(
     validateGrowthCommandIds(command.playerId, command.characterId)
     const character = knownCharacter ?? getPlayerCharacterSync(command.playerId, command.characterId)
     if (character === null) return null
-    const asset = getCharacterDataSync(command.characterId)
+    const asset = getCharacterFacts().get(command.characterId)
     if (asset === null) return null
     const itemId = getCharacterStackCompensationItemId(asset.rarity, asset.element as Element)
     const stack = addSafeInteger(character.stack, 1, "character.stack")

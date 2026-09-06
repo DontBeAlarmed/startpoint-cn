@@ -32,7 +32,8 @@ const {
     insertPlayerClaimedCarnivalRewardIdsSync,
     upsertPlayerCarnivalEventRecordSync,
 } = require("../src/data/domains/carnivalEvent")
-const { getCharacterDataSync } = require("../src/lib/assets")
+const { getCharacterFacts } = require("../src/lib/character-content")
+const getCharacterDataSync = characterId => getCharacterFacts().get(characterId)
 const { givePlayerCharacterSync } = require("../src/lib/character")
 const { MissionRewardGranter } = require("../src/lib/mission/grants")
 const { grantCarnivalRewards } = require("../src/lib/carnival-rewards")

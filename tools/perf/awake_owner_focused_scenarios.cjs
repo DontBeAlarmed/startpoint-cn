@@ -406,11 +406,11 @@ function createAwakeOwnerFocusedScenarios(runtime) {
                 const player = await fixture.createPlayer("owner-focused-mana")
                 const characterId = 341005
                 runtime.characterDomain.insertDefaultPlayerCharacterSync(player.playerId, characterId)
-                const character = runtime.assets.getCharacterDataSync(characterId)
+                const character = runtime.assets.getCharacterFacts().get(characterId)
                 runtime.characterDomain.updatePlayerCharacterSync(player.playerId, characterId, {
                     exp: runtime.characterExpCaps[character.rarity][0],
                 })
-                const nodes = Object.keys(runtime.assets.getCharacterManaNodesSync(characterId, 1))
+                const nodes = Object.keys(runtime.assets.getCharacterGrowthContent().getManaBoardNodes(characterId, 1))
                     .map(Number).sort((a, b) => a - b)
                 const finalNodeId = nodes.at(-1)
                 runtime.characterDomain.insertPlayerCharacterManaNodesSync(
@@ -421,7 +421,7 @@ function createAwakeOwnerFocusedScenarios(runtime) {
                         player.playerId, 9, missionId, progress,
                     )
                 }
-                const node = runtime.assets.getCharacterManaNodesSync(characterId, 1)[finalNodeId]
+                const node = runtime.assets.getCharacterGrowthContent().getManaBoardNodes(characterId, 1)[finalNodeId]
                 runtime.playerDomain.updatePlayerSync({
                     id: player.playerId, freeMana: node.manaCost, paidMana: 0,
                 })

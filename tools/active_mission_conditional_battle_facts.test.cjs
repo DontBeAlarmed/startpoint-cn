@@ -21,6 +21,9 @@ function cleanup() {
 process.once("exit", cleanup)
 
 const { initializeDatabase } = require("../src/data")
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
@@ -32,7 +35,8 @@ const {
     collectActiveMissionConditionalBattleFacts,
     hasCompletedSecondManaBoardAbilities,
 } = require("../src/lib/mission/active-conditional-battle-facts")
-const { getCharacterManaNodesSync } = require("../src/lib/assets")
+const { getCharacterGrowthContent } = require("../src/lib/character-growth-content")
+const getCharacterManaNodesSync = (characterId, level) => getCharacterGrowthContent().getManaBoardNodes(characterId, level)
 const { getActiveMissionMasterDefinition } = require("../src/lib/mission/active-master-data")
 const { computeActiveMissionFactProgress } = require("./helpers/active-mission-fact-progress.cjs")
 

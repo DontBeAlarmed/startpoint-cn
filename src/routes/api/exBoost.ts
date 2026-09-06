@@ -6,7 +6,7 @@ import { getPlayerCharacterSync, playerOwnsCharacterSync } from "../../data/doma
 import { getPlayerItemSync } from "../../data/domains/item"
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
-import { getCharacterDataSync } from "../../lib/assets"
+import { getCharacterFacts } from "../../lib/character-content"
 import { getExBoostContentCatalog, type ExBoostAbilityDrawPools } from "../../lib/ex-boost-content"
 import { generateDataHeaders } from "../../utils"
 import { randomInt } from "crypto"
@@ -178,7 +178,7 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
         "error": "Bad Request", "message": "Player does not own character."
     })
 
-    const characterAssetData = getCharacterDataSync(characterId)
+    const characterAssetData = getCharacterFacts().get(characterId)
     if (!characterAssetData) return reply.status(500).send({
         "error": "Internal Server Error", "message": "Character does not have data."
     })

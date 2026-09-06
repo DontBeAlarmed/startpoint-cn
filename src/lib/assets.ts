@@ -1,8 +1,5 @@
 import practiceQuests from "../../assets/practice_quest.json";
-import manaNodes from "../../assets/mana_node.json";
-import manaNodeAwake from "../../assets/mana_node_awake.json";
-import manaBoard from "../../assets/mana_board.json";
-import { AssetCharacter, BattleQuest, ClearRewards, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, StoryQuest } from "./types";
+import { BattleQuest, ClearRewards, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, StoryQuest } from "./types";
 import { getRushCompatibilityEvent } from "./shop/rush-compatibility"
 import {
     ContentSnapshotError,
@@ -10,7 +7,6 @@ import {
 } from "../content/runtime/content-snapshot";
 import type { ScoreAttackBorderTier } from "./quest/finish/score-attack-handler";
 import type { QuestTableName } from "../content/converters/quest";
-import { getRuntimeContentTableSync } from "../content/runtime/table-access";
 
 export class QuestConfigurationError extends Error {
     constructor(
@@ -383,197 +379,6 @@ export function getQuestFromCategorySync(
 }
 
 /**
- * Gets a character's asset data from their id.
- * 
- * @param characterId The ID of the character.
- * @returns The character's asset data, or null if it wasn't found.
- */
-export function getCharacterDataSync(
-    characterId: string | number
-): AssetCharacter | null {
-    const characters = getContentSnapshot().repository.table<RawAssetCharacters>("character.json")
-    const character = (characters as RawAssetCharacters)[String(characterId)]
-
-    if (!character) return null;
-
-    return character
-}
-
-/**
- * Gets all mana node data for a character on a specific level.
- * 
- * @param characterId The ID of the character.
- * @param level The mana node level.
- * @returns A record containing ManaNode objects or null.
- */
-export function getCharacterManaNodesSync(
-    characterId: string | number,
-    level: string | number,
-): Record<string, ManaNode> | null{
-    const characterManaNodes = getRuntimeContentTableSync(
-        "mana_node.json",
-        manaNodes as ManaNodes,
-    )[String(characterId)]
-    if (!characterManaNodes) return null;
-
-    return characterManaNodes[String(level)] || null
-}
-
-/**
- * Gets the number of mana boards a character has in CDN data.
- */
-export function getCharacterManaBoardCountSync(
-    characterId: string | number
-): number {
-    const characterManaNodes = getRuntimeContentTableSync(
-        "mana_node.json",
-        manaNodes as ManaNodes,
-    )[String(characterId)]
-    if (!characterManaNodes) return 0
-    return Object.keys(characterManaNodes).length
-}
-
-/**
- * Gets the data for a character mana node.
- * 
- * @param characterId The ID of the character.
- * @param level The mana node level to get the node from.
- * @param manaNodeId The ID of the mana node.
- * @returns A ManaNode object or null.
- */
-export function getCharacterManaNodeSync(
-    characterId: string | number,
-    level: string | number,
-    manaNodeId: string | number
-): ManaNode | null {
-    const nodes = getCharacterManaNodesSync(characterId, level);
-    if (!nodes) return null;
-
-    return nodes[String(manaNodeId)] || null
-}
-
-/**
- * Gets the slot (1-4) for a character's mana node from its field6 value.
- * Returns 0 if the node is not found.
- * field6=1/2/3 → ability slot 1/2/3; field6="" → skill slot 4.
- */
-function getManaNodeSlot(
-    characterId: string | number,
-    manaNodeId: string | number
-): number {
-    const charData = getRuntimeContentTableSync(
-        "mana_node.json",
-        manaNodes as ManaNodes,
-    )[String(characterId)]
-    if (!charData) return 0
-    for (const level of Object.keys(charData)) {
-        const node = charData[level]?.[String(manaNodeId)]
-        if (node) {
-            const f6 = node.field6
-            if (f6 === '1') return 1
-            if (f6 === '2') return 2
-            if (f6 === '3') return 3
-            return 4  // empty → action skill slot
-        }
-    }
-    return 0
-}
-
-/**
- * Gets the pedestal_size (0 or 2) for a character's mana node.
- * Returns -1 if not found.
- */
-function getManaNodePedestalSize(
-    characterId: string | number,
-    manaNodeId: string | number
-): number {
-    const charBoard = getRuntimeContentTableSync(
-        "mana_board.json",
-        manaBoard as Record<string, any>,
-    )[String(characterId)]
-    if (!charBoard) return -1
-    for (const level of Object.keys(charBoard)) {
-        const nodes = charBoard[level]
-        for (const nodeIndex of Object.keys(nodes)) {
-            const row = nodes[nodeIndex][0]
-            if (String(row[0]) === String(manaNodeId)) {
-                return parseInt(row[4]) || 0
-            }
-        }
-    }
-    return -1
-}
-
-export interface ManaNodeAwakeCost {
-    manaAmount: number
-    items: Record<string, number>
-}
-
-function parseCanonicalNonNegativeInteger(value: unknown): number | null {
-    if (typeof value !== "string" || !/^\d+$/.test(value)) return null
-    const parsed = Number(value)
-    return Number.isSafeInteger(parsed) ? parsed : null
-}
-
-function parseCanonicalPositiveInteger(value: unknown): number | null {
-    if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) return null
-    const parsed = Number(value)
-    return Number.isSafeInteger(parsed) ? parsed : null
-}
-
-/**
- * Gets the awake cost for awakening a mana node.
- * CDN lookup: mana_node_awake[rarity][slot][pedestal_size]
- */
-export function getManaNodeAwakeCost(
-    characterId: string | number,
-    manaNodeId: string | number,
-    rarity: number
-): ManaNodeAwakeCost | null {
-    const slot = getManaNodeSlot(characterId, manaNodeId)
-    if (slot === 0) return null
-
-    const pedestalSize = getManaNodePedestalSize(characterId, manaNodeId)
-    if (pedestalSize < 0) return null
-
-    const rarityData = getRuntimeContentTableSync(
-        "mana_node_awake.json",
-        manaNodeAwake as Record<string, any>,
-    )[String(rarity)]
-    if (!rarityData) return null
-
-    const slotData = rarityData[String(slot)]
-    if (!slotData) return null
-
-    const targetRows = slotData[String(pedestalSize)]
-    if (!targetRows || !targetRows[0]) return null
-
-    const row = targetRows[0]
-    if (!Array.isArray(row) || row.length < 3) return null
-    // row[0]: "item_id_1,item_id_2,..." (IDs)
-    // row[1]: "count_1,count_2,..." (counts)
-    // row[2]: mana amount
-    if (typeof row[0] !== "string" || typeof row[1] !== "string") return null
-    const idStrings = row[0].split(',')
-    const countStrings = row[1].split(',')
-    if (idStrings.length === 0 || idStrings.length !== countStrings.length) return null
-    const manaAmount = parseCanonicalNonNegativeInteger(row[2])
-    if (manaAmount === null) return null
-
-    const items: Record<string, number> = {}
-    for (let i = 0; i < idStrings.length; i++) {
-        const id = parseCanonicalPositiveInteger(idStrings[i])
-        const count = parseCanonicalPositiveInteger(countStrings[i])
-        if (id === null || count === null) return null
-        const nextAmount = (items[String(id)] || 0) + count
-        if (!Number.isSafeInteger(nextAmount)) return null
-        items[String(id)] = nextAmount
-    }
-
-    return { manaAmount, items }
-}
-
-/**
  * Gets the rewards that should be given when clearing a given folder.
  * 
  * @param rushEventId The ID of the rush event.
@@ -621,21 +426,3 @@ export function getRushEventRankingRewards(): RushEventRankingRewards {
         "rush_event_ranking_reward.json",
     )
 }
-
-// D27 migration re-exports. Production consumers move to the domain modules.
-export {
-    getEquipmentCraftSync,
-    getEquipmentDissolveSync,
-    getEquipmentIdsSync,
-    getEquipmentLookupSync,
-    type EquipmentLookupEntry,
-} from "./equipment-content"
-export {
-    getItemEffectSync,
-    getItemIdsSync,
-    getItemLookupSync,
-    getItemSaleSync,
-    type CultivatePackEffectEntry,
-    type ItemEffectEntry,
-    type StaminaItemEffectEntry,
-} from "./item-content"

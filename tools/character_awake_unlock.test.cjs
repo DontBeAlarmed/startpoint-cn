@@ -751,7 +751,10 @@ const {
     updatePlayerCharacterSync,
 } = require("../src/data/domains/character")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
-const { getCharacterDataSync, getCharacterManaNodesSync } = require("../src/lib/assets")
+const { getCharacterFacts } = require("../src/lib/character-content")
+const { getCharacterGrowthContent } = require("../src/lib/character-growth-content")
+const getCharacterDataSync = characterId => getCharacterFacts().get(characterId)
+const getCharacterManaNodesSync = (characterId, level) => getCharacterGrowthContent().getManaBoardNodes(characterId, level)
 const { characterExpCaps, givePlayerCharacterSync } = require("../src/lib/character")
 const {
     createAwakeRequestContext,

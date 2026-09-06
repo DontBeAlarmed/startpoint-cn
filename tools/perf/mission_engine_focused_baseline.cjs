@@ -50,7 +50,8 @@ function getRuntimeDependencies() {
     const item = require("../../src/data/domains/item")
     const mission = require("../../src/data/domains/mission")
     const player = require("../../src/data/domains/player")
-    const assets = require("../../src/lib/assets")
+    const characterContent = require("../../src/lib/character-content")
+    const characterGrowthContent = require("../../src/lib/character-growth-content")
     const characterLib = require("../../src/lib/character")
     const awakeSettlement = require("../../src/lib/mission/awake-settlement")
     const battleFacts = require("../../src/lib/mission/battle-facts")
@@ -72,8 +73,9 @@ function getRuntimeDependencies() {
         ...item,
         ...mission,
         ...player,
-        ...assets,
-        ...characterLib,
+        ...characterContent,
+        ...characterGrowthContent,
+            ...characterLib,
         ...awakeSettlement,
         ...battleFacts,
         ...missionCatalog,

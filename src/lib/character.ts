@@ -1,7 +1,7 @@
 import { getDb } from "../data/db";
 import { getPlayerCharacterSync, insertPlayerCharacterSync } from "../data/domains/character"
 import type { PlayerCharacter } from "../data/types"
-import { getCharacterDataSync } from "./assets";
+import { getCharacterFacts } from "./character-content";
 import { getRealNow } from "../runtime/time/game-time";
 import { GivePlayerCharacterResult } from "./types";
 import { recordHundredCharactersMilestoneSync } from "./player-history-milestones";
@@ -33,7 +33,7 @@ function givePlayerCharacterInCurrentScopeSync(
 ): GivePlayerCharacterResult | null {
 
     // get the character's asset data
-    const assetData = getCharacterDataSync(characterId)
+    const assetData = getCharacterFacts().get(characterId)
     if (assetData === null) return null;
 
     // get the current character data
@@ -49,7 +49,7 @@ function givePlayerCharacterInCurrentScopeSync(
 
         // add the second bond token list item
         // if the character has more than 1 mana board
-        if (assetData.skill_count > 3) {
+        if (assetData.skillCount > 3) {
             bondTokenList.push({
                 manaBoardIndex: 2,
                 status: 0

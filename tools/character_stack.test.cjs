@@ -7,7 +7,7 @@ const bundledCharacters = require("../assets/character.json")
 const {
     productionContentSnapshotProvider,
 } = require("../src/content/runtime/content-snapshot")
-const { getCharacterDataSync } = require("../src/lib/assets")
+const { getCharacterFacts } = require("../src/lib/character-content")
 
 assert.equal(validateCharacterStackConversion(2, 1, false), null)
 assert.equal(validateCharacterStackConversion(2, 2, false), null)
@@ -17,14 +17,8 @@ assert.equal(validateCharacterStackConversion(2, 0, false), "Invalid conversion 
 assert.equal(validateCharacterStackConversion(2, -1, false), "Invalid conversion count.")
 assert.equal(validateCharacterStackConversion(2, 1.5, false), "Invalid conversion count.")
 
-test("getCharacterDataSync 从当前 Snapshot Repository 读取角色元数据", t => {
+test("CharacterFacts 从当前 Snapshot Repository 读取角色元数据", t => {
     const previousSnapshot = productionContentSnapshotProvider.snapshot
-    const releaseCharacter = Object.freeze({
-        name: "release-character",
-        rarity: 5,
-        element: 4,
-        skill_count: 6,
-    })
     const requestedTables = []
     productionContentSnapshotProvider.snapshot = Object.freeze({
         cdn: Object.freeze({ targetVersion: "test-release" }),
@@ -37,15 +31,28 @@ test("getCharacterDataSync 从当前 Snapshot Repository 读取角色元数据",
             }),
             table: (tableName) => {
                 requestedTables.push(tableName)
-                assert.equal(tableName, "character.json")
-                return Object.freeze({ "111129": releaseCharacter })
+                if (tableName === "character.json") {
+                    return Object.freeze({
+                        "111129": Object.freeze({
+                            name: "release-character",
+                            rarity: 5,
+                            element: 4,
+                            skill_count: 6,
+                        }),
+                    })
+                }
+                throw new Error(`unexpected table ${tableName}`)
             },
         }),
     })
     t.after(() => { productionContentSnapshotProvider.snapshot = previousSnapshot })
 
     assert.equal(bundledCharacters["111129"].skill_count, 3)
-    assert.strictEqual(getCharacterDataSync(111129), releaseCharacter)
+    assert.deepEqual(getCharacterFacts().get(111129), {
+        rarity: 5,
+        element: 4,
+        skillCount: 6,
+    })
     assert.deepEqual(requestedTables, ["character.json"])
-    assert.equal(getCharacterDataSync(99999999), null)
+    assert.equal(getCharacterFacts().get(99999999), null)
 })

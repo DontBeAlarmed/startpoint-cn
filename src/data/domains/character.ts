@@ -1,7 +1,7 @@
 import { getDb } from "../db";
 import { PlayerCharacter, PlayerCharacterBondToken, PlayerCharacterExBoost, PlayerCharacterProjectionData, RawPlayerCharacter, RawPlayerCharacterBondToken, RawPlayerCharacterManaNode } from "../types";
 import { deserializeNumberList, serializeBoolean, serializeNumberList } from "../utils/primitives";
-import { getCharacterDataSync } from "../../lib/assets";
+import { getCharacterFacts } from "../../lib/character-content";
 import { getRealNow } from "../../runtime/time/game-time";
 import { growthError } from "../../lib/character-growth/errors";
 
@@ -514,8 +514,8 @@ export function insertDefaultPlayerCharacterSync(
         }
     ]
 
-    const assetData = getCharacterDataSync(characterId)
-    if (assetData && assetData.skill_count > 3) {
+    const assetData = getCharacterFacts().get(characterId)
+    if (assetData && assetData.skillCount > 3) {
         bondTokenList.push({
             manaBoardIndex: 2,
             status: 0

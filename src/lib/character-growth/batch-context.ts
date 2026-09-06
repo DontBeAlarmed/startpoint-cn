@@ -1,4 +1,4 @@
-import { getCharacterDataSync } from "../assets"
+import { getCharacterFacts } from "../character-content"
 import { getCharacterGrowthContentFactsSync } from "./content-facts"
 import { growthError } from "./errors"
 import { validateAwakeLevel, validateBondTokenStatus, validateBoardIndex } from "./invariants"
@@ -40,7 +40,7 @@ function positiveId(value: number, field: string): number {
 }
 
 function defaultRarityLoader(characterId: number): number | null {
-    return getCharacterDataSync(characterId)?.rarity ?? null
+    return getCharacterFacts().get(characterId)?.rarity ?? null
 }
 
 function buildCore(

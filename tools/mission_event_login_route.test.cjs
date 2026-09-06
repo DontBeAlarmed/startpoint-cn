@@ -43,6 +43,10 @@ productionContentSnapshotProvider.snapshot = {
             if (tableName === "character.json") return require("../assets/character.json")
             if (tableName === "item_inventory_policy.json") return require("../assets/item_inventory_policy.json")
             if (tableName === "mana_node.json") return require("../assets/mana_node.json")
+            if (tableName === "mana_board.json") return require("../assets/mana_board.json")
+            if (tableName === "mana_node_awake.json") return require("../assets/mana_node_awake.json")
+            if (tableName === "character_level.json") return require("../assets/character_level.json")
+            if (tableName === "level_required_mana_node.json") return require("../assets/level_required_mana_node.json")
             if (tableName === "config.json") return require("../assets/config.json")
             return {}
         },

@@ -94,7 +94,9 @@ stubModule("../src/data/domains/item", {
     getPlayerItemsSync: () => ({}),
 })
 stubModule("../src/routes/api/character", { characterMaxOverLimits: () => 0 })
-stubModule("../src/lib/assets", { getCharacterDataSync: () => null })
+stubModule("../src/lib/character-content", {
+    getCharacterFacts: () => ({ exists: () => false, get: () => null }),
+})
 stubModule("../src/data/utils", { clientSerializeDate: value => value })
 stubModule("../src/lib/character-stack", { validateCharacterStackConversion: () => null })
 stubModule("../src/utils", {

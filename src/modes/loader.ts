@@ -17,7 +17,7 @@ import path from "node:path"
 import { pathToFileURL } from "node:url"
 
 import { getContentSnapshot } from "../content/runtime/content-snapshot"
-import { getCharacterDataSync } from "../lib/assets"
+import { getCharacterFacts } from "../lib/character-content"
 import { grantCharacterExpWithinTransactionSync } from "../lib/character-growth/commands/grant-character-exp"
 import { updatePlayerEquipmentSync } from "../data/domains/equipment"
 import {
@@ -66,7 +66,7 @@ export function createModeTransactionHost(
         ...createModeHost(log),
         server: Object.freeze({
             getCharacterElement: (characterId: number) => {
-                const element = Number(getCharacterDataSync(characterId)?.element)
+                const element = getCharacterFacts().get(characterId)?.element ?? null
                 return Number.isInteger(element) ? element : null
             },
             updatePlayerEquipment: (

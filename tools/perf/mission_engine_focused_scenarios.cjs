@@ -35,14 +35,14 @@ function createPlayer(runtime) {
 
 function prepareAwakeCharacter(runtime, playerId) {
     runtime.insertDefaultPlayerCharacterSync(playerId, AWAKE_CHARACTER_ID)
-    const rarity = runtime.getCharacterDataSync(AWAKE_CHARACTER_ID).rarity
+    const rarity = runtime.getCharacterFacts().get(AWAKE_CHARACTER_ID).rarity
     runtime.updatePlayerCharacterSync(playerId, AWAKE_CHARACTER_ID, {
         exp: runtime.characterExpCaps[rarity][0],
     })
     runtime.insertPlayerCharacterManaNodesSync(
         playerId,
         AWAKE_CHARACTER_ID,
-        Object.keys(runtime.getCharacterManaNodesSync(AWAKE_CHARACTER_ID, 1)).map(Number),
+        Object.keys(runtime.getCharacterGrowthContent().getManaBoardNodes(AWAKE_CHARACTER_ID, 1)).map(Number),
     )
 }
 

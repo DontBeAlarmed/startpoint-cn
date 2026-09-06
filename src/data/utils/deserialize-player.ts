@@ -1,5 +1,5 @@
 import { deserializeClientDate } from "./date"
-import { getCharacterDataSync } from "../../lib/assets"
+import { getCharacterFacts } from "../../lib/character-content"
 import { getDateFromServerTime, getServerTime, getServerDate, realDateFromServerTime, realToVirtual } from "../../utils"
 import { ClientPlayerData, DailyChallengePointListEntry, MergedPlayerData, PartyCategory, Player, PlayerBoxGacha, PlayerCharacter, PlayerCharacterBondToken, PlayerDrawnQuest, PlayerEquipment, PlayerGachaCampaign, PlayerGachaInfo, PlayerMultiSpecialExchangeCampaign, PlayerParty, PlayerPartyGroup, PlayerQuestProgress, PlayerRushEvent, PlayerRushEventPlayedParty, PlayerStartDashExchangeCampaign, RushEventBattleType, UserBoxGacha, UserCharacter, UserCharacterBondTokenStatus, UserEquipment, UserGachaCampaign, UserPartyGroup, UserPartyGroupTeam, UserQuestProgress, UserRushEvent, UserRushEventPlayedParty, UserRushEventPlayedPartyList, UserTutorial } from "../types"
 import { deserializePlayerRushEventPlayedParty, deserializeRushEvent, getPlayerRushEventListClearedFoldersSync, getPlayerRushEventListPlayedPartiesSync, getPlayerRushEventListSync, serializePlayerRushEventPlayedParty } from "../domains/rushEvent"
@@ -116,8 +116,7 @@ export function deserializePlayerData(
             const kIdKey = String(kId);
             
             // get asset data (uses business code to look up)
-            const assetData = getCharacterDataSync(characterId)
-            if (assetData === null) throw new Error(`Character with id "${characterId}" does not exist.`);
+            if (!getCharacterFacts().exists(characterId)) throw new Error(`Character with id "${characterId}" does not exist.`);
 
             const entryCount = character['entry_count']
             const evolutionLevel = character['evolution_level']

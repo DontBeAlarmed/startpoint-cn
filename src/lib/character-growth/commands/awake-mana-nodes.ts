@@ -7,7 +7,7 @@ import {
 import type { PlayerCharacter } from "../../../data/types"
 import { incrementActiveMissionUsedManaCountSync } from "../../../data/domains/active_mission_counters"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
-import { getManaNodeAwakeCost } from "../../assets"
+import { getCharacterGrowthContent } from "../../character-growth-content"
 import { buildCharacterEvolutionResponse } from "../../character-evolution"
 import { withInventoryBatchContextWithinTransactionSync } from "../../inventory"
 import type { BondTokenStatus, CharacterGrowthCoreFact } from "../model"
@@ -101,7 +101,7 @@ export function executeAwakeManaNodes(command: AwakeManaNodesCommand): AwakeMana
         const awakeCosts: Record<string, { manaCost: number; items: Record<string, number> }> = {}
         for (const nodeId of requestedNodeIds) {
             if ((boardLevels.get(nodeId) ?? 0) >= command.targetAwakeLevel) continue
-            const cost = getManaNodeAwakeCost(command.characterId, nodeId, character.rarity)
+            const cost = getCharacterGrowthContent().getManaNodeAwakeCost(command.characterId, nodeId, character.rarity)
             if (cost === null) {
                 throw growthError("AWAKE_COST_MISSING", `awake cost for node ${nodeId} is unavailable.`)
             }

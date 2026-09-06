@@ -423,7 +423,8 @@ test("Crazy select recalculates duplicate compensation from selection-time state
             join_time, update_time, exp, stack, mana_board_index, player_id
         ) VALUES (?, 1, 0, 0, 0, '2024-01-01T00:00:00.000Z', '2024-01-01T00:00:00.000Z', 0, 0, 1, ?)
     `).run(fresh.characterId, playerId)
-    const { getCharacterDataSync } = require("../src/lib/assets")
+    const { getCharacterFacts } = require("../src/lib/character-content")
+const getCharacterDataSync = characterId => getCharacterFacts().get(characterId)
     const { getCharacterStackCompensationItemId } = require("../src/lib/character-growth/commands/grant-character-stack")
     const compensationItemId = getCharacterStackCompensationItemId(
         getCharacterDataSync(fresh.characterId).rarity,

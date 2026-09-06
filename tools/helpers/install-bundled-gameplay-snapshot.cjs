@@ -135,11 +135,19 @@ function installBundledGameplaySnapshot({
     additionalTableNames = [],
 } = {}) {
     const previousSnapshot = productionContentSnapshotProvider.snapshot
+    const bundledCharacterTable = require(path.join(projectRoot, "assets", CHARACTER_TABLE_NAME))
+    const bundledCharacterContentTable = require(
+        path.join(projectRoot, "assets", CHARACTER_CONTENT_TABLE_NAME)
+    )
     const characterTable = deepFreeze(structuredClone(
-        require(path.join(projectRoot, "assets", CHARACTER_TABLE_NAME))
+        Object.prototype.hasOwnProperty.call(tableOverrides, CHARACTER_TABLE_NAME)
+            ? tableOverrides[CHARACTER_TABLE_NAME]
+            : bundledCharacterTable
     ))
     const characterContentTable = deepFreeze(structuredClone(
-        require(path.join(projectRoot, "assets", CHARACTER_CONTENT_TABLE_NAME))
+        Object.prototype.hasOwnProperty.call(tableOverrides, CHARACTER_CONTENT_TABLE_NAME)
+            ? tableOverrides[CHARACTER_CONTENT_TABLE_NAME]
+            : bundledCharacterContentTable
     ))
     const gameplayTables = Object.fromEntries(
         [...REWARD_TABLE_NAMES, ...QUEST_TABLE_NAMES, ...GAMEPLAY_DYNAMIC_TABLE_NAMES, ...additionalTableNames]

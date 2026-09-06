@@ -26,7 +26,8 @@ const {
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { getDb } = require("../src/data/db")
 const { characterExpCaps } = require("../src/lib/character")
-const { getCharacterManaNodesSync } = require("../src/lib/assets")
+const { getCharacterGrowthContent } = require("../src/lib/character-growth-content")
+const getCharacterManaNodesSync = (characterId, level) => getCharacterGrowthContent().getManaBoardNodes(characterId, level)
 const { openManaBoard } = require("../src/lib/character-growth/commands/open-mana-board")
 const { getCharacterGrowthContentFactsSync } = require("../src/lib/character-growth/content-facts")
 const manaRoutes = require("../src/routes/api/character/mana").default
@@ -309,17 +310,21 @@ test("openManaBoard rejects incomplete, downgrade, and jump requests at the comm
 })
 
 test("content loader rejects a missing board node table instead of exposing an empty board", () => {
-    const assets = require("../src/lib/assets")
-    const originalGetNodes = assets.getCharacterManaNodesSync
-    assets.getCharacterManaNodesSync = (characterId, boardIndex) => (
-        boardIndex === 1 ? null : originalGetNodes(characterId, boardIndex)
-    )
+    // Simulate board-one content being absent via a snapshot override.
+    const manaNodeTable = structuredClone(require("../assets/mana_node.json"))
+    const characterOneNodes = { ...manaNodeTable["1"] }
+    delete characterOneNodes["1"]
+    manaNodeTable["1"] = characterOneNodes
+    const playerId = createReadyPlayer()
+    const restoreMissingBoard = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+        .installBundledGameplaySnapshot({
+            tableOverrides: { "mana_node.json": manaNodeTable },
+        })
     try {
         assert.throws(
             () => getCharacterGrowthContentFactsSync(1),
             error => error.code === "CONTENT_INVALID",
         )
-        const playerId = createReadyPlayer()
         assert.throws(
             () => openManaBoard({
                 playerId,
@@ -331,7 +336,7 @@ test("content loader rejects a missing board node table instead of exposing an e
         )
         assert.equal(getPlayerCharacterSync(playerId, 1).manaBoardIndex, 1)
     } finally {
-        assets.getCharacterManaNodesSync = originalGetNodes
+        restoreMissingBoard()
     }
 })
 

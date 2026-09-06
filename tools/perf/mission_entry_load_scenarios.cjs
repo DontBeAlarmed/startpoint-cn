@@ -69,6 +69,32 @@ function getRuntimeDependencies(runtimeRoot = projectRoot) {
             missionCompat.getMissionCatalog().getMissionIds(category)
         )
     }
+    // C3-Growth moved the character/growth readers out of assets on current
+    // trees; archived BASE runtimes still ship them under the legacy names.
+    // Merge the typed modules when present and adapt the legacy readers.
+    const characterGrowthCompat = {}
+    for (const modulePath of [
+        "src/lib/character-content",
+        "src/lib/character-growth-content",
+    ]) {
+        const absolutePath = path.join(resolvedRoot, modulePath)
+        const exists = [".ts", ".js", ".cjs"].some(extension =>
+            fs.existsSync(`${absolutePath}${extension}`),
+        )
+        if (exists) Object.assign(characterGrowthCompat, fromRuntime(modulePath))
+    }
+    if (typeof characterGrowthCompat.getCharacterFacts !== "function") {
+        characterGrowthCompat.getCharacterFacts = () => ({
+            get: characterId => assets.getCharacterDataSync(characterId),
+        })
+    }
+    if (typeof characterGrowthCompat.getCharacterGrowthContent !== "function") {
+        characterGrowthCompat.getCharacterGrowthContent = () => ({
+            getManaBoardNodes: (characterId, level) => (
+                assets.getCharacterManaNodesSync(characterId, level)
+            ),
+        })
+    }
     const { getComputer } = fromRuntime("src/lib/mission/registry")
     const { settleMissionCategories } = fromRuntime("src/lib/mission/settlement")
     const missionRoutes = fromRuntime("src/routes/api/mission").default
@@ -87,6 +113,7 @@ function getRuntimeDependencies(runtimeRoot = projectRoot) {
         ...player,
         ...assets,
         ...characterLib,
+        ...characterGrowthCompat,
         ...awakeSettlement,
         ...battleFacts,
         ...missionCatalog,

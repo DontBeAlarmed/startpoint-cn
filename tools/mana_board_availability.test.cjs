@@ -7,8 +7,10 @@ const assert = require("node:assert/strict")
 const {
     getVisibleManaBoardIndex,
     isSecondManaBoardAvailable,
-    parseManaBoard2OpenConditionTable,
 } = require("../src/lib/mana-board-availability")
+const {
+    parseManaBoard2OpenConditionTable,
+} = require("../src/lib/character-growth-content")
 
 const sample = {
     111105: [["2024-09-05 12:00:00", "2199-12-31 23:59:59"]],

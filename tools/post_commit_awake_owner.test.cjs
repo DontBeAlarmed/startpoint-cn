@@ -35,7 +35,10 @@ const {
     getPlayerCharacterAwakeUnlocksSync,
 } = require("../src/data/domains/character_awake")
 const { givePlayerCharacterSync } = require("../src/lib/character")
-const { getCharacterDataSync, getCharacterManaNodesSync } = require("../src/lib/assets")
+const { getCharacterFacts } = require("../src/lib/character-content")
+const { getCharacterGrowthContent } = require("../src/lib/character-growth-content")
+const getCharacterDataSync = characterId => getCharacterFacts().get(characterId)
+const getCharacterManaNodesSync = (characterId, level) => getCharacterGrowthContent().getManaBoardNodes(characterId, level)
 const { characterExpCaps } = require("../src/lib/character")
 const { publishAwakeCharacterListBestEffort } = require("../src/lib/mission/awake-best-effort-context")
 

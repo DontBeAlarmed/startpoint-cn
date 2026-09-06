@@ -1,6 +1,4 @@
-import { getContentSnapshot } from "../../content/runtime/content-snapshot"
-import { parseCharacterLevelTable, getCharacterLevelByExperience } from "../../content/character-mana-admission"
-import { buildCharacterManaMutationContent } from "../character-mana-mutation-content"
+import { getCharacterGrowthContent } from "../character-growth-content"
 import { ManaNodeMutationValidationError } from "../character-mana-mutation-types"
 import type { CharacterManaMutationContent } from "../character-mana-mutation-types"
 import { growthError, CharacterGrowthError } from "./errors"
@@ -31,13 +29,9 @@ export function validateEvaluationTime(value: unknown): asserts value is Date {
 }
 
 export function mutationContent(characterId: number, boardId: number): CharacterManaMutationContent {
-    const repository = getContentSnapshot().repository
+    const content = getCharacterGrowthContent()
     try {
-        return buildCharacterManaMutationContent(characterId, boardId, {
-            manaNodes: repository.table("mana_node.json"),
-            manaBoard: repository.table("mana_board.json"),
-            levelRequirements: repository.table("level_required_mana_node.json"),
-        })
+        return content.buildManaMutationContent(characterId, boardId)
     } catch (error) {
         return growthMutationError(error)
     }
@@ -48,13 +42,9 @@ export function characterLevelFromContent(
     characterRarity: number,
     experience: number,
 ): number {
-    const repository = getContentSnapshot().repository
+    const content = getCharacterGrowthContent()
     try {
-        return getCharacterLevelByExperience(
-            parseCharacterLevelTable(repository.table("character_level.json")),
-            characterRarity,
-            experience,
-        )
+        return content.getLevelByExperience(characterRarity, experience)
     } catch (error) {
         throw growthError(
             "CONTENT_INVALID",

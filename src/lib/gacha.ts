@@ -5,7 +5,7 @@
 import { randomInt } from "crypto";
 import { getDefaultGachaSeedCatalog, reserveUniquePlaceholderSeed } from "./gacha-seed-catalog";
 import { PlayerBoxGachaDrawnReward } from "../data/types";
-import { getCharacterDataSync } from "./assets";
+import { getCharacterFacts } from "./character-content";
 import { BoxGachaBox, BoxGachaDrawResult, BoxGachaIdReward, BoxGachaRewardTier, BoxGachaRewardType, CharacterGacha, CharacterGachaRuntimeBanner, Gacha, GachaDrawResult, GachaMovieType, GachaRuntimeBanner, GachaType, RewardPlayerGachaDrawResult } from "./types";
 import { drawGachaWithMetadataSync } from "./gacha-draw";
 import type { GachaDrawMetadata } from "./gacha-draw";
@@ -56,7 +56,7 @@ export function planCharacterGachaMovies(
 ): PlannedCharacterGachaMovie[] {
     const usedSeeds = new Set<number>()
     return characterIds.map(characterId => {
-        const rarity = getCharacterDataSync(characterId)?.rarity || 3
+        const rarity = getCharacterFacts().get(characterId)?.rarity || 3
         const rarityIndex = 5 - rarity
         const movieType = randomPoolItem(1, 101, rankMovieRates[rarityIndex])
             ?? GachaMovieType.NORMAL

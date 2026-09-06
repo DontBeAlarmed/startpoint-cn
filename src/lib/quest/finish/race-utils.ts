@@ -1,9 +1,8 @@
-import { getContentSnapshot } from "../../../content/runtime/content-snapshot"
-import { getCharacterRacesFromRepository } from "../../character-content"
+import { getCharacterFacts } from "../../character-content"
 
 /** Returns the races for a character by ID (numeric or string) */
 export function getCharacterRaces(charId: number | string): string[] {
-    return getCharacterRacesFromRepository(getContentSnapshot().repository, charId)
+    return getCharacterFacts().races(charId)
 }
 
 /** Build a sorted unique race key (e.g., "Dragon+Human") */

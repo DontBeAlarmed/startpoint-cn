@@ -12,9 +12,7 @@ const { ContentRepository } = require("../src/content/runtime/content-repository
 const {
     productionContentSnapshotProvider,
 } = require("../src/content/runtime/content-snapshot")
-const {
-    getCharacterDataSync,
-} = require("../src/lib/assets")
+const { getCharacterFacts } = require("../src/lib/character-content")
 const { getGachaCatalog } = require("../src/lib/gacha-catalog")
 const { getLegacyGachas } = require("../src/lib/gacha-legacy-content")
 
@@ -86,7 +84,11 @@ test("character facade and Gacha typed catalog read one initialized ContentRepos
     })
 
     try {
-        assert.strictEqual(getCharacterDataSync(990001), character)
+        assert.deepEqual(getCharacterFacts().get(990001), {
+            rarity: character.rarity,
+            element: character.element,
+            skillCount: character.skill_count,
+        })
         const catalog = getGachaCatalog(productionContentSnapshotProvider.snapshot.repository)
         const projectedGacha = getLegacyGachas(
             productionContentSnapshotProvider.snapshot.repository,
@@ -143,7 +145,7 @@ test("Gacha HTTP routes delegate Content ownership to the Gacha catalog", () => 
     const exchangeOwner = fs.readFileSync(path.join(projectRoot, "src/lib/gacha-owner/exchange.ts"), "utf8")
 
     assert.match(characterRoute, /givePlayerCharacterSync.*from "\.\.\/\.\.\/lib\/character"/)
-    assert.match(characterOwner, /getCharacterDataSync.*from "\.\/assets"/)
+    assert.match(characterOwner, /getCharacterFacts.*from "\.\/character-content"/)
     assert.match(gachaRoute, /executeGachaDrawSync[\s\S]*from "\.\.\/\.\.\/lib\/gacha-owner"/)
     assert.match(gachaOwner, /getGachaCatalog/)
     assert.doesNotMatch(gachaOwner, /getGachaCampaignIdSync|getGachaSync/)

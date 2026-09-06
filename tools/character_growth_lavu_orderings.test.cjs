@@ -33,11 +33,11 @@ const {
 const { insertPlayerQuestProgressSync } = require("../src/data/domains/quest")
 const { getPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { getClientSerializedData } = require("../src/data/utils/player-data")
-const {
-    getCharacterDataSync,
-    getCharacterManaNodesSync,
-    getManaNodeAwakeCost,
-} = require("../src/lib/assets")
+const { getCharacterFacts } = require("../src/lib/character-content")
+const { getCharacterGrowthContent } = require("../src/lib/character-growth-content")
+const getCharacterDataSync = characterId => getCharacterFacts().get(characterId)
+const getCharacterManaNodesSync = (characterId, level) => getCharacterGrowthContent().getManaBoardNodes(characterId, level)
+const getManaNodeAwakeCost = (characterId, nodeId, rarity) => getCharacterGrowthContent().getManaNodeAwakeCost(characterId, nodeId, rarity)
 const { characterExpCaps } = require("../src/lib/character")
 const { mutationContent } = require("../src/lib/character-growth/node-command-support")
 const { getCurrentStage } = require("../src/lib/mission/mission-catalog")

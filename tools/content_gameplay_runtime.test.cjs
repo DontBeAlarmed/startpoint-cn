@@ -143,7 +143,7 @@ test("gameplay readers use the active Content snapshot instead of static bundled
     const equipmentMovie = require("../src/lib/gacha-equipment-movie")
     const exBoostContent = require("../src/lib/ex-boost-content")
     const itemContent = require("../src/lib/item-content")
-    const assets = require("../src/lib/assets")
+    const growthContent = require("../src/lib/character-growth-content")
     const raid = require("../src/lib/raid-event-master")
 
     assert.deepEqual(carnival.getCarnivalRewardDefinitions(77), [{
@@ -186,7 +186,7 @@ test("gameplay readers use the active Content snapshot instead of static bundled
     })
     assert.deepEqual(itemContent.getItemIdsSync(), [990100])
     assert.deepEqual(itemContent.getItemLookupSync(), { "990100": "快照体力药" })
-    assert.deepEqual(assets.getCharacterManaNodesSync(99101, 1), {
+    assert.deepEqual(growthContent.getCharacterGrowthContent().getManaBoardNodes(99101, 1), {
         "9910101": {
             items: { "1": 3 },
             manaCost: 60,
@@ -195,9 +195,9 @@ test("gameplay readers use the active Content snapshot instead of static bundled
             field6: "1",
         },
     })
-    assert.equal(assets.getCharacterManaBoardCountSync(99101), 1)
-    assert.equal(assets.getCharacterManaNodesSync(1, 1), null)
-    assert.deepEqual(assets.getManaNodeAwakeCost(99101, 9910101, 5), {
+    assert.equal(growthContent.getCharacterGrowthContent().getManaBoardCount(99101), 1)
+    assert.equal(growthContent.getCharacterGrowthContent().getManaBoardNodes(1, 1), null)
+    assert.deepEqual(growthContent.getCharacterGrowthContent().getManaNodeAwakeCost(99101, 9910101, 5), {
         items: { "1": 3 },
         manaAmount: 100,
     })

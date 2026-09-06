@@ -16,7 +16,7 @@ import { getRealNow } from "../../runtime/time/game-time"
 import { createCharacterGrowthBatchContext } from "../../lib/character-growth/batch-context"
 import { projectCharacterGrowthLoad } from "../../lib/character-growth/load-projector"
 import type { BondTokenStatus, CharacterGrowthStoredCore } from "../../lib/character-growth/model"
-import { getCharacterDataSync } from "../../lib/assets"
+import { getCharacterFacts } from "../../lib/character-content"
 
 export interface SerializePlayerDataOptions {
     viewerId?: number
@@ -130,7 +130,7 @@ function projectSerializedCharacterGrowth(toSerialize: MergedPlayerData) {
             characterId,
             getCharacterVisibleManaBoardIndex(character.manaBoardIndex, characterId),
         )
-        rarityByCharacter.set(characterId, getCharacterDataSync(characterId)?.rarity ?? null)
+        rarityByCharacter.set(characterId, getCharacterFacts().get(characterId)?.rarity ?? null)
     }
 
     const batch = createCharacterGrowthBatchContext({

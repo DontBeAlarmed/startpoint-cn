@@ -5,7 +5,8 @@ import {
 } from "../../data/domains/character"
 import type { PlayerCharacter } from "../../data/types"
 import { getServerDate } from "../../utils"
-import { getCharacterDataSync, getCharacterManaNodesSync } from "../assets"
+import { getCharacterFacts } from "../character-content"
+import { getCharacterGrowthContent } from "../character-growth-content"
 import { characterExpCaps } from "../character"
 import { getCharacterIdFromMission } from "./character-queries"
 import { getMissionCatalog } from "./mission-catalog"
@@ -85,8 +86,8 @@ export function createCharacterAwakeEligibilityResolverFromSnapshot(
         const cached = readinessCache.get(characterId)
         if (cached !== undefined) return cached
 
-        const asset = getCharacterDataSync(characterId)
-        const boardOne = getCharacterManaNodesSync(characterId, 1)
+        const asset = getCharacterFacts().get(characterId)
+        const boardOne = getCharacterGrowthContent().getManaBoardNodes(characterId, 1)
         const boardOneNodeIds = boardOne ? Object.keys(boardOne) : []
         let readiness: CharacterAwakeBaseReadiness
 

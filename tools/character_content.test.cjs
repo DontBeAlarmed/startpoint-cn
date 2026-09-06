@@ -83,6 +83,7 @@ test("character races use current repository rows and normalize comma-separated 
     productionContentSnapshotProvider.snapshot = Object.freeze({
         cdn: Object.freeze({ targetVersion: "test-release" }),
         repository: repository({
+            "character.json": {},
             "cdndata/character.json": {
                 "100001": contentRow(raceFields),
                 "100002": "malformed-row",

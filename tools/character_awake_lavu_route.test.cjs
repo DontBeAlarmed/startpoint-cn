@@ -58,7 +58,8 @@ const {
 } = require("../src/data/domains/character")
 const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
-const characterAssets = require("../src/lib/assets")
+const characterContent = require("../src/lib/character-content")
+const characterGrowthContent = require("../src/lib/character-growth-content")
 const { characterExpCaps } = require("../src/lib/character")
 const { insertActiveQuest } = require("../src/lib/quest/active-quest-service")
 const missionRoutes = require("../src/routes/api/mission").default
@@ -88,12 +89,12 @@ for (const characterId of [LAVU_ID, BARETTA_ID, RAMS_ID]) {
     insertDefaultPlayerCharacterSync(playerId, characterId)
 }
 for (const characterId of [LAVU_ID, RAMS_ID]) {
-    const rarity = characterAssets.getCharacterDataSync(characterId).rarity
+    const rarity = characterContent.getCharacterFacts().get(characterId).rarity
     updatePlayerCharacterSync(playerId, characterId, { exp: characterExpCaps[rarity][0] })
     insertPlayerCharacterManaNodesSync(
         playerId,
         characterId,
-        Object.keys(characterAssets.getCharacterManaNodesSync(characterId, 1)).map(Number),
+        Object.keys(characterGrowthContent.getCharacterGrowthContent().getManaBoardNodes(characterId, 1)).map(Number),
     )
 }
 

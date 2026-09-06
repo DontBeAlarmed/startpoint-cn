@@ -1,7 +1,8 @@
 import { getDb } from "../../data/db"
 import { raisePlayerCharacterEvolutionLevelSync } from "../../data/domains/character"
 import type { PlayerCharacter } from "../../data/types"
-import { getCharacterDataSync, getCharacterManaNodesSync } from "../assets"
+import { getCharacterFacts } from "../character-content"
+import { getCharacterGrowthContent } from "../character-growth-content"
 import { InvalidManaNodeSemanticsError } from "../../content/mana-node-semantics"
 import { buildCharacterEvolutionNodes, computeCharacterEvolutionLevel } from "../character-evolution"
 import type { ManaNode } from "../types"
@@ -52,8 +53,8 @@ function deriveEvolutionLevel(
     characterId: number,
     snapshot: AwakeEvolutionRepairSnapshot,
 ): number | null {
-    if (getCharacterDataSync(characterId) === null) return null
-    const boardNodes = getCharacterManaNodesSync(characterId, 1)
+    if (!getCharacterFacts().exists(characterId)) return null
+    const boardNodes = getCharacterGrowthContent().getManaBoardNodes(characterId, 1)
     if (!boardNodes || Object.keys(boardNodes).length === 0) return null
 
     const learnedNodeIds = parseNodeIds(snapshot.manaNodes[String(characterId)] ?? [])

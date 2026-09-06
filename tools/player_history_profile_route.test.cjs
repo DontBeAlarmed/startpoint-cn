@@ -35,6 +35,15 @@ initializeDatabase({
         verbose: sql => sqlStatements.push(sql),
     }),
 })
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot({
+        additionalTableNames: [
+            "player_history.json",
+            "player_history_card_background.json",
+            "player_history_topic.json",
+        ],
+    })
+test.after(() => { restoreContentSnapshot() })
 setServerTime(new Date("2025-07-25T00:00:00.000Z"))
 const db = getDb()
 const account = insertAccountSync({

@@ -47,8 +47,10 @@ const { getPlayerCharacterAwakeUnlocksSync } = require("../src/data/domains/char
 const { getPlayerItemSync } = require("../src/data/domains/item")
 const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
-const characterAssets = require("../src/lib/assets")
-const { getCharacterDataSync, getCharacterManaNodesSync } = characterAssets
+const characterContent = require("../src/lib/character-content")
+const characterGrowthContent = require("../src/lib/character-growth-content")
+const getCharacterDataSync = characterId => characterContent.getCharacterFacts().get(characterId)
+const getCharacterManaNodesSync = (characterId, level) => characterGrowthContent.getCharacterGrowthContent().getManaBoardNodes(characterId, level)
 const { characterExpCaps } = require("../src/lib/character")
 const computerAwakeModule = require("../src/lib/mission/computer-awake")
 const { AwakeComputer } = computerAwakeModule
@@ -323,7 +325,7 @@ async function main() {
         assert.deepEqual(getPlayerCategoryMissionsSync(playerId, 9), expectedAwakeMissionProgress)
 
         const originalPrepare = db.prepare.bind(db)
-        const originalGetCharacterDataSync = characterAssets.getCharacterDataSync
+        const originalGetCharacterFacts = characterContent.getCharacterFacts
         const originalLegacyAwakeContext = computerAwakeModule.buildAwakeContext
         const originalSessionAwakeContext = AwakeComputer.buildContextFromSession
         const evaluatedCharacterIds = new Set()
@@ -366,9 +368,15 @@ async function main() {
             }
             return originalPrepare(sql)
         }
-        characterAssets.getCharacterDataSync = candidateCharacterId => {
-            evaluatedCharacterIds.add(Number(candidateCharacterId))
-            return originalGetCharacterDataSync(candidateCharacterId)
+        characterContent.getCharacterFacts = (...args) => {
+            const facts = originalGetCharacterFacts(...args)
+            return {
+                ...facts,
+                get: candidateCharacterId => {
+                    evaluatedCharacterIds.add(Number(candidateCharacterId))
+                    return facts.get(candidateCharacterId)
+                },
+            }
         }
         computerAwakeModule.buildAwakeContext = () => {
             throw new Error("Category 9 get_progress must not use legacy context")
@@ -383,7 +391,7 @@ async function main() {
             first = await requestAwakePage(fastify)
         } finally {
             db.prepare = originalPrepare
-            characterAssets.getCharacterDataSync = originalGetCharacterDataSync
+            characterContent.getCharacterFacts = originalGetCharacterFacts
             computerAwakeModule.buildAwakeContext = originalLegacyAwakeContext
             AwakeComputer.buildContextFromSession = originalSessionAwakeContext
         }

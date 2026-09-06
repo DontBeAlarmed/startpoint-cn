@@ -11,7 +11,7 @@ import { getPlayerPartyGroupListSync } from "../../data/domains/party"
 import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { getPlayerShopPurchasesMapSync } from "../../data/domains/shopPurchase"
-import { getCharacterManaNodesSync } from "../assets"
+import { getCharacterGrowthContent } from "../character-growth-content"
 import { ShopType } from "../types"
 import { getCharacterStoryQuestIds } from "./character-queries"
 import type {
@@ -218,7 +218,7 @@ export function createProductionActiveMissionFactDomains(
                 const boards: Record<string, number[]> = {}
                 const slots: Record<string, number> = {}
                 for (let level = 1; level <= 2; level++) {
-                    const board = getCharacterManaNodesSync(characterId, level)
+                    const board = getCharacterGrowthContent().getManaBoardNodes(characterId, level)
                     if (!board) continue
                     boards[String(level)] = Object.keys(board).map(Number)
                     for (const [nodeId, node] of Object.entries(board)) {

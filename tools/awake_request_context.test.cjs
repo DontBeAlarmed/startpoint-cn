@@ -33,7 +33,8 @@ const {
 } = require("../src/data/domains/mission")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getDb } = require("../src/data/db")
-const characterAssets = require("../src/lib/assets")
+const characterContent = require("../src/lib/character-content")
+const characterGrowthContent = require("../src/lib/character-growth-content")
 const { characterExpCaps } = require("../src/lib/character")
 
 initializeDatabase()
@@ -76,7 +77,7 @@ function createPlayer(label, characterIds = [CHARACTER_A]) {
 }
 
 function makeBaseReady(playerId, characterId) {
-    const asset = characterAssets.getCharacterDataSync(characterId)
+    const asset = characterContent.getCharacterFacts().get(characterId)
     characterDomain.updatePlayerCharacterSync(
         playerId,
         characterId,
@@ -85,7 +86,7 @@ function makeBaseReady(playerId, characterId) {
     characterDomain.insertPlayerCharacterManaNodesSync(
         playerId,
         characterId,
-        Object.keys(characterAssets.getCharacterManaNodesSync(characterId, 1)).map(Number),
+        Object.keys(characterGrowthContent.getCharacterGrowthContent().getManaBoardNodes(characterId, 1)).map(Number),
     )
 }
 
@@ -197,7 +198,7 @@ test("context freezes identity, time, and candidate scope without refresh or glo
 
 test("a context created before an authoritative write stays stale and a fresh context sees it", () => {
     const playerId = createPlayer("write-order")
-    const asset = characterAssets.getCharacterDataSync(CHARACTER_A)
+    const asset = characterContent.getCharacterFacts().get(CHARACTER_A)
     characterDomain.updatePlayerCharacterSync(
         playerId,
         CHARACTER_A,
@@ -211,7 +212,7 @@ test("a context created before an authoritative write stays stale and a fresh co
     characterDomain.insertPlayerCharacterManaNodesSync(
         playerId,
         CHARACTER_A,
-        Object.keys(characterAssets.getCharacterManaNodesSync(CHARACTER_A, 1)).map(Number),
+        Object.keys(characterGrowthContent.getCharacterGrowthContent().getManaBoardNodes(CHARACTER_A, 1)).map(Number),
     )
 
     assert.deepEqual(stale.evaluate(), [])
@@ -287,7 +288,7 @@ test("identity mismatch and incomplete forged context fail closed", () => {
 
 test("candidate zero preserves permanent unlocks while one and many stay scoped", () => {
     const playerId = createPlayer("candidate-cardinality", [CHARACTER_A, CHARACTER_B])
-    const characterAAsset = characterAssets.getCharacterDataSync(CHARACTER_A)
+    const characterAAsset = characterContent.getCharacterFacts().get(CHARACTER_A)
     characterDomain.updatePlayerCharacterSync(
         playerId,
         CHARACTER_A,
@@ -396,35 +397,35 @@ test("resolver facts, time, and character master readiness stay frozen", () => {
         evaluationTime,
         candidateCharacterIds: [CHARACTER_A],
     })
-    const originalGetCharacterDataSync = characterAssets.getCharacterDataSync
-    const originalGetCharacterManaNodesSync = characterAssets.getCharacterManaNodesSync
-    characterAssets.getCharacterDataSync = characterId => (
-        Number(characterId) === CHARACTER_A ? null : originalGetCharacterDataSync(characterId)
-    )
-    characterAssets.getCharacterManaNodesSync = (characterId, boardIndex) => (
-        Number(characterId) === CHARACTER_A
-            ? null
-            : originalGetCharacterManaNodesSync(characterId, boardIndex)
-    )
+    let unknownContext
+    // Simulate the character disappearing from Content by installing a
+    // snapshot whose character/mana tables omit CHARACTER_A. The stale
+    // context keeps the facts captured at creation; a fresh context filters
+    // the unknown character out.
+    const withoutKey = (table, key) => {
+        const clone = structuredClone(table)
+        delete clone[String(key)]
+        return clone
+    }
+    const bundledCharacterTable = require("../assets/character.json")
+    const bundledCharacterContentTable = require("../assets/cdndata/character.json")
+    const bundledManaNodeTable = require("../assets/mana_node.json")
+    const restoreMissingCharacter = installBundledGameplaySnapshot({
+        tableOverrides: {
+            "character.json": withoutKey(bundledCharacterTable, CHARACTER_A),
+            "cdndata/character.json": withoutKey(bundledCharacterContentTable, CHARACTER_A),
+            "mana_node.json": withoutKey(bundledManaNodeTable, CHARACTER_A),
+        },
+    })
     try {
         assert.equal(context.evaluate().length, 4)
-    } finally {
-        characterAssets.getCharacterDataSync = originalGetCharacterDataSync
-        characterAssets.getCharacterManaNodesSync = originalGetCharacterManaNodesSync
-    }
-
-    characterAssets.getCharacterDataSync = characterId => (
-        Number(characterId) === CHARACTER_A ? null : originalGetCharacterDataSync(characterId)
-    )
-    let unknownContext
-    try {
         unknownContext = requestContextModule().createAwakeRequestContext({
             playerId,
             evaluationTime,
             candidateCharacterIds: [CHARACTER_A],
         })
     } finally {
-        characterAssets.getCharacterDataSync = originalGetCharacterDataSync
+        restoreMissingCharacter()
     }
     assert.deepEqual(unknownContext.evaluate(), [])
 })

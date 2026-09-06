@@ -16,7 +16,7 @@ import {
 import { insertReceiveHistoryBatchSync, MailType } from "../../data/domains/mail"
 import { getPlayerSync } from "../../data/domains/player"
 import { getCharacterAcquisitionStatesSync } from "../../data/domains/reward-acquisition"
-import { getCharacterDataSync } from "../assets"
+import { getCharacterFacts } from "../character-content"
 import { getCrazyGachaPolicySync } from "../config-content"
 import { getCharacterStackCompensationItemId } from "../character-growth/commands/grant-character-stack"
 import {
@@ -173,7 +173,7 @@ export function executeCrazyGachaCandidateSync(
                     const movie = movies[index]
                     const duplicate = seen.has(characterId)
                     seen.add(characterId)
-                    const asset = duplicate ? getCharacterDataSync(characterId) : null
+                    const asset = duplicate ? getCharacterFacts().get(characterId) : null
                     const itemId = asset === null ? undefined : getCharacterStackCompensationItemId(
                         asset.rarity,
                         asset.element as Element,

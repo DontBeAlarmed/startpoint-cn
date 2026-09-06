@@ -7,7 +7,7 @@ import {
 } from "../../data/domains/reward-acquisition"
 import type { PlayerCharacter, PlayerEquipment } from "../../data/types"
 import { getRealNow } from "../../runtime/time/game-time"
-import { getCharacterDataSync } from "../assets"
+import { getCharacterFacts } from "../character-content"
 import { clientSerializeEquipment } from "../equipment"
 import {
     getCharacterStackCompensationItemId,
@@ -42,7 +42,7 @@ export interface PreparedGachaAcquisitionBatch {
 }
 
 function newCharacter(characterId: number, evaluationTime: Date): PlayerCharacter | null {
-    const asset = getCharacterDataSync(characterId)
+    const asset = getCharacterFacts().get(characterId)
     if (asset === null) return null
     return {
         entryCount: 1,
@@ -54,7 +54,7 @@ function newCharacter(characterId: number, evaluationTime: Date): PlayerCharacte
         exp: 0,
         stack: 0,
         manaBoardIndex: 1,
-        bondTokenList: asset.skill_count > 3
+        bondTokenList: asset.skillCount > 3
             ? [
                 { manaBoardIndex: 1, status: 0 },
                 { manaBoardIndex: 2, status: 0 },
@@ -124,7 +124,7 @@ export function prepareGachaAcquisitionBatchSync(
     for (const characterId of characterIds) {
         const key = String(characterId)
         if (initiallyAvailableCharacters.has(key)) {
-            const asset = getCharacterDataSync(characterId)
+            const asset = getCharacterFacts().get(characterId)
             if (asset !== null) {
                 const itemId = getCharacterStackCompensationItemId(
                     asset.rarity,
@@ -150,7 +150,7 @@ export function prepareGachaAcquisitionBatchSync(
                     character: newCharacterProjection(characterId, character),
                 }
             }
-            const asset = getCharacterDataSync(characterId)
+            const asset = getCharacterFacts().get(characterId)
             if (asset === null) return null
             const itemId = getCharacterStackCompensationItemId(
                 asset.rarity,
