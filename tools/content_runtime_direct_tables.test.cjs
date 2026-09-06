@@ -8,9 +8,6 @@ const ts = require("typescript")
 
 const projectRoot = path.resolve(__dirname, "..")
 const expectedAccess = Object.freeze({
-    "src/lib/quest/score-reward-selection.ts": Object.freeze({
-        "reward_element_map.json": "bundledRewardElementMap",
-    }),
     "src/multi/player-context.ts": Object.freeze({
         "cdndata/player_rank.json": "bundledPlayerRankTable",
     }),

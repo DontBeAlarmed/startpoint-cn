@@ -1,9 +1,7 @@
-import bundledAdditionalRewardRules from "../../../assets/additional_reward_rules.json"
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 import { getPlayerSingleQuestProgressSync, incrementPlayerQuestMultiClearSync } from "../../data/domains/quest"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings"
-import { settleAdditionalRewardsSync, type AdditionalRewardTable } from "../../lib/additional-reward"
+import { getAdditionalRewardTable, settleAdditionalRewardsSync } from "../../lib/additional-reward"
 import {
     getQuestConfigurationErrorResponse,
     getQuestFromCategorySync,
@@ -365,10 +363,7 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
         const serverDropMultiplier = getServerGameplaySettingsSync().dropMultiplier
         const additionalRewardSettlement = questAccomplished
             ? settleAdditionalRewardsSync(
-                getRuntimeContentTableSync(
-                    "additional_reward_rules.json",
-                    bundledAdditionalRewardRules as AdditionalRewardTable,
-                ),
+                getAdditionalRewardTable(),
                 {
                     questCategory,
                     questId,

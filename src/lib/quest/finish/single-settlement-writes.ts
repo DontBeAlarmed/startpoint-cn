@@ -11,13 +11,11 @@ import { givePlayerCharactersExpSync } from "../../character"
 import { getCommonScoreRewardCount } from "../../score-reward-lottery"
 import { QuestCategory } from "../../types"
 import { addStaminaWithOverflowCap, getMaxStamina } from "../../stamina"
-import { getRuntimeContentTableSync } from "../../../content/runtime/table-access"
-import { settleAdditionalRewardsSync, type AdditionalRewardTable } from "../../additional-reward"
+import { getAdditionalRewardTable, settleAdditionalRewardsSync } from "../../additional-reward"
 import { recordMissionBattleFacts } from "../../mission/battle-facts"
 import { buildPracticeBattleHistoryRecord } from "../practice-battle-history"
 import type { ActiveQuest } from "../active-quest-service"
 import { getRealNow } from "../../../runtime/time/game-time"
-import bundledAdditionalRewardRules from "../../../../assets/additional_reward_rules.json"
 import type { FinishContext, SingleSettlementWritesInput } from "./types"
 import { selectScoreRewardGrantPlan } from "../score-reward-selection"
 import { grantSingleSettlementScoreRewardsWithinTransactionSync } from "./single-settlement-reward-grant"
@@ -154,10 +152,7 @@ export function executeSingleSettlementWrites(
     const scoreRewardsResult = scoreRewardGrant.result
     const additionalRewardSettlement = questAccomplished
         ? settleAdditionalRewardsSync(
-            getRuntimeContentTableSync(
-                "additional_reward_rules.json",
-                bundledAdditionalRewardRules as AdditionalRewardTable,
-            ),
+            getAdditionalRewardTable(),
             {
                 questCategory, questId, enemyLevel: questData.enemyLevel,
                 nowMs: settlementTime.getTime(), isMulti: false,

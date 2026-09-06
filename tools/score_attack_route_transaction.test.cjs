@@ -177,6 +177,22 @@ const activeQuests = {
 const runtimeContentTables = {
     "config.json": require("../assets/config.json"),
     "item_inventory_policy.json": require("../assets/item_inventory_policy.json"),
+    "reward_element_map.json": require("../assets/reward_element_map.json"),
+    "additional_reward_rules.json": {
+        groups: {
+            9001: [{ index: 1, groupStringId: "test", type: 0, id: 40502, number: 2, weight: 1 }],
+        },
+        collectItemRules: [{
+            eventId: 1,
+            startAtMs: 0,
+            endAtMs: 4_102_444_800_000,
+            prerequisite: null,
+            categories: [27],
+            keyQueries: [null, null],
+            thresholds: [{ enemyLevelMin: 60, groupId: 9001 }],
+        }],
+        bossPickupRules: [],
+    },
 }
 
 stubModule("../src/data/db", { getDb: () => db })
@@ -196,22 +212,8 @@ stubModule("../src/content/runtime/table-access", {
         throw new Error(`unexpected strict runtime table ${tableName}`)
     },
     getRuntimeContentTableSync(tableName, fallback) {
-        if (tableName !== "additional_reward_rules.json") return fallback
-        return {
-            groups: {
-                9001: [{ index: 1, groupStringId: "test", type: 0, id: 40502, number: 2, weight: 1 }],
-            },
-            collectItemRules: [{
-                eventId: 1,
-                startAtMs: 0,
-                endAtMs: 4_102_444_800_000,
-                prerequisite: null,
-                categories: [27],
-                keyQueries: [null, null],
-                thresholds: [{ enemyLevelMin: 60, groupId: 9001 }],
-            }],
-            bossPickupRules: [],
-        }
+        if (tableName in runtimeContentTables) return runtimeContentTables[tableName]
+        return fallback
     },
 })
 stubModule("../src/data/domains/quest_active", {

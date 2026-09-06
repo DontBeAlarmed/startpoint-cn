@@ -1,6 +1,18 @@
 import { calculateScoreRewardAmount, type RewardCampaignRates } from "./reward-campaign"
+import { getContentSnapshot } from "../content/runtime/content-snapshot"
 import type { DropScoreRewardId, PlayerRewardResult, Reward } from "./types"
 import { RewardType } from "./types"
+
+/**
+ * Shared read-only additional reward rules query. Single and multi
+ * settlements consume the same table; their transaction lifecycles stay
+ * independent.
+ */
+export function getAdditionalRewardTable(): AdditionalRewardTable {
+    return getContentSnapshot().repository.table<AdditionalRewardTable>(
+        "additional_reward_rules.json",
+    )
+}
 
 export interface AdditionalRewardCandidate {
     readonly index: number

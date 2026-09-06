@@ -1,5 +1,10 @@
 require("ts-node/register/transpile-only")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
+
+
 const path = require("node:path")
 const { loadServerReleaseContract } = require("../tools/server-bundle/release-contract.cjs")
 const currentDataSchema = loadServerReleaseContract(path.resolve(__dirname, "..")).currentDataSchema

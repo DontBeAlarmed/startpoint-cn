@@ -1,8 +1,7 @@
-import bundledRewardElementMap from "../../../assets/reward_element_map.json"
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
+import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings"
 import { getDateFromServerTime, getServerTime } from "../../utils"
-import { getRareScoreRewardGroup } from "../assets"
+import { getRareScoreRewardGroup } from "../quest-content"
 import { resolveEventCurrencyId } from "../event-currency"
 import { createRewardGrantExecutionPlan } from "../reward-grant"
 import type { RewardCampaignRates } from "../reward-campaign"
@@ -32,9 +31,8 @@ function resolveContextualItemId(
     questElement?: number,
 ): number {
     const enemyElement = ELEMENT_TO_ENEMY_MAP[questElement ?? 0] ?? 3
-    const map = getRuntimeContentTableSync(
+    const map = getContentSnapshot().repository.table<Record<string, Record<string, Record<string, string[][]>>>>(
         "reward_element_map.json",
-        bundledRewardElementMap as Record<string, Record<string, Record<string, string[][]>>>,
     )
     const mapKind = kind === "element" ? "1" : "2"
     return Number(map[mapKind][String(rarity)][String(enemyElement)][0][0])

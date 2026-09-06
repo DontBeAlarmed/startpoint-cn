@@ -1,6 +1,5 @@
 import { RewardType } from "./types"
-import bundledRewardCampaigns from "../../assets/reward_campaign.json"
-import { getRuntimeContentTableSync } from "../content/runtime/table-access"
+import { getContentSnapshot } from "../content/runtime/content-snapshot"
 
 export interface RewardCampaignEntry {
     readonly id: number
@@ -79,9 +78,8 @@ export function getRewardCampaignRates(
     questId: number,
     now: Date,
 ): RewardCampaignRates {
-    const campaigns = getRuntimeContentTableSync(
+    const campaigns = getContentSnapshot().repository.table<RewardCampaignTable>(
         "reward_campaign.json",
-        bundledRewardCampaigns as RewardCampaignTable,
     )
     return resolveRewardCampaignRates(campaigns, category, questId, now)
 }

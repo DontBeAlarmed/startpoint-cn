@@ -8,6 +8,11 @@ const { unpack } = require("msgpackr")
 
 require("ts-node/register/transpile-only")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
+
+
 const dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "how-to-get-route-"))
 const previousDataDirectory = process.env.DATA_DIR
 const previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR

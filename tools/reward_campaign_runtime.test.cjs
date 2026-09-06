@@ -2,24 +2,33 @@ const assert = require("node:assert/strict")
 
 require("ts-node/register/transpile-only")
 
-const tableAccessPath = require.resolve("../src/content/runtime/table-access")
+const contentSnapshotPath = require.resolve("../src/content/runtime/content-snapshot")
 let requestedTable = null
-require.cache[tableAccessPath] = {
-    id: tableAccessPath,
-    filename: tableAccessPath,
+require.cache[contentSnapshotPath] = {
+    id: contentSnapshotPath,
+    filename: contentSnapshotPath,
     loaded: true,
     exports: {
-        getRuntimeContentTableSync(tableName, fallback) {
-            requestedTable = { tableName, fallback }
+        getContentSnapshot() {
             return {
-                1: {
-                    id: 1,
-                    startAtMs: Date.parse("2024-07-01T00:00:00Z"),
-                    endAtMs: Date.parse("2024-07-31T23:59:59Z"),
-                    rewardKind: 0,
-                    rate: 2,
-                    categories: [13],
-                    keyQueries: [[1], [2]],
+                repository: {
+                    table(tableName) {
+                        requestedTable = { tableName }
+                        if (tableName !== "reward_campaign.json") {
+                            throw new Error(`unexpected runtime table ${tableName}`)
+                        }
+                        return {
+                            1: {
+                                id: 1,
+                                startAtMs: Date.parse("2024-07-01T00:00:00Z"),
+                                endAtMs: Date.parse("2024-07-31T23:59:59Z"),
+                                rewardKind: 0,
+                                rate: 2,
+                                categories: [13],
+                                keyQueries: [[1], [2]],
+                            },
+                        }
+                    },
                 },
             }
         },
@@ -33,6 +42,5 @@ assert.deepEqual(
     { item: 2, exp: 1, mana: 1 },
 )
 assert.equal(requestedTable.tableName, "reward_campaign.json")
-assert.equal(typeof requestedTable.fallback, "object")
 
 console.log("reward campaign runtime tests passed")
