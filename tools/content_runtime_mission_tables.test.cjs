@@ -331,7 +331,7 @@ test("explicit repositories take priority over the installed runtime release", (
     installRelease(runtime, "runtime")
 
     assert.deepEqual(
-        activeMasterData.getActiveMissionMasterDefinitions(explicitRepository)
+        activeMasterData.getActiveMissionMasterDefinitions(getActiveMissionPlan(explicitRepository))
             .map(entry => entry.missionId),
         [explicit.ids.missionId],
     )

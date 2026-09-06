@@ -57,6 +57,10 @@ for (const category of [0, 11, Number.NaN]) {
         `unsupported category ${String(category)} must fail closed`,
     )
 }
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
+
 assert.deepEqual(getCompletedStageNumbers(1, 1, 0), [])
 assert.deepEqual(getCompletedStageNumbers(1, 1, 10), [1])
 assert.equal(typeof isMissionProgressComplete, "function")

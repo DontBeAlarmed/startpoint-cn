@@ -5,6 +5,9 @@ const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
 const { getActiveMissionPlan } = require("../src/lib/mission/active-plan")
 const {
     ACTIVE_MISSION_FACT_KINDS,
@@ -138,7 +141,6 @@ test("runner loads candidate facts only after availability", () => {
 
     runActiveMissionReconciliation({
         playerId: 1,
-        repository: {},
         now: Date.parse("2024-08-14T12:00:00.000Z"),
         plan,
         session,
@@ -223,7 +225,6 @@ test("stage-only settlement does not dirty target dependency", () => {
     const writes = []
     const result = runActiveMissionReconciliation({
         playerId: 1,
-        repository: {},
         now: Date.parse("2024-08-14T12:00:00.000Z"),
         plan,
         session,
@@ -274,7 +275,6 @@ test("settlement errors escape the runner", () => {
 
     assert.throws(() => runActiveMissionReconciliation({
         playerId: 1,
-        repository: {},
         now: Date.parse("2024-08-14T12:00:00.000Z"),
         plan,
         session,

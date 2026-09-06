@@ -5,6 +5,10 @@ const { pack, unpack } = require("msgpackr")
 
 require("ts-node/register/transpile-only")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
+
 function stubModule(relativePath, exports) {
     const modulePath = require.resolve(relativePath)
     require.cache[modulePath] = {

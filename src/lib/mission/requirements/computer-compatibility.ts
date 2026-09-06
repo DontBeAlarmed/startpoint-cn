@@ -1,13 +1,10 @@
 import { getMissionCatalog, type MissionMasterDefinition } from "../mission-catalog"
-import { bundledMissionContentRepository } from "../mission-catalog-source"
-
-const computerCatalog = getMissionCatalog(bundledMissionContentRepository)
 
 /** Compatibility guard until MissionComputer lookups are migrated to an injected Catalog. */
 export function matchesCurrentMissionComputerDefinition(
     definition: MissionMasterDefinition,
 ): boolean {
-    const current = computerCatalog.getDefinition(definition.category, definition.missionId)
+    const current = getMissionCatalog().getDefinition(definition.category, definition.missionId)
     return current !== undefined
         && current.pattern === definition.pattern
         && current.eventId === definition.eventId

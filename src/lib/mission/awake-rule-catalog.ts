@@ -1,6 +1,5 @@
-import bundledCharAwakeDefs from "../../../assets/mission_char_awake.json"
 import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
+import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 
 export type AwakeMissionRuleFamilyName =
     | "all-complete"
@@ -49,12 +48,8 @@ const GENERIC_CHARACTER_CLEAR_MISSION_IDS = Object.freeze([
 ])
 
 function getDefinitions(repository?: ReadonlyContentRepository): AwakeDefinitionMap {
-    return repository
-        ? repository.table<AwakeDefinitionMap>("mission_char_awake.json")
-        : getRuntimeContentTableSync(
-            "mission_char_awake.json",
-            bundledCharAwakeDefs as AwakeDefinitionMap,
-        )
+    return (repository ?? getContentSnapshot().repository)
+        .table<AwakeDefinitionMap>("mission_char_awake.json")
 }
 
 function getMissionIdsByPattern(

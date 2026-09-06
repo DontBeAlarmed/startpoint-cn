@@ -1,13 +1,9 @@
 import {
-    ContentSnapshotError,
     getContentSnapshot,
     type ReadonlyContentRepository,
 } from "../../content/runtime/content-snapshot"
 import { getEquipmentCurrencyPolicySync } from "../config-content"
-import {
-    bundledMissionContentRepository,
-    parseMissionCatalogSource,
-} from "./mission-catalog-source"
+import { parseMissionCatalogSource } from "./mission-catalog-source"
 
 export interface MissionMasterDefinition {
     readonly category: number
@@ -221,20 +217,8 @@ class SnapshotMissionCatalog implements MissionCatalog {
 const catalogByRepository = new WeakMap<ReadonlyContentRepository, MissionCatalog>()
 const repositoryByCatalog = new WeakMap<MissionCatalog, ReadonlyContentRepository>()
 
-function currentRepository(): ReadonlyContentRepository {
-    try {
-        return getContentSnapshot().repository
-    } catch (error) {
-        if (error instanceof ContentSnapshotError
-            && error.code === "CONTENT_SNAPSHOT_NOT_INITIALIZED") {
-            return bundledMissionContentRepository
-        }
-        throw error
-    }
-}
-
 export function getMissionCatalog(repository?: ReadonlyContentRepository): MissionCatalog {
-    const selectedRepository = repository ?? currentRepository()
+    const selectedRepository = repository ?? getContentSnapshot().repository
     const cached = catalogByRepository.get(selectedRepository)
     if (cached) return cached
     const catalog = Object.freeze(new SnapshotMissionCatalog(selectedRepository))

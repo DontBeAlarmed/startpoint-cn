@@ -2,6 +2,10 @@
 
 require("ts-node/register/transpile-only")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
+
 const assert = require("node:assert/strict")
 const test = require("node:test")
 const bundledExQuests = require("../assets/ex_quest.json")

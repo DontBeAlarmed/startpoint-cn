@@ -12,6 +12,10 @@ process.env.DATA_DIR = databaseDirectory
 
 require("ts-node/register/transpile-only")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
+
 const data = require("../src/data")
 const { insertAccountSync, getAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")

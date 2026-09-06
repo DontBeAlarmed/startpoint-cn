@@ -33,6 +33,10 @@ assert.doesNotMatch(
     "PassComputer 不得回退到系统时间",
 )
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
+
 assert.equal(getMissionCatalog().getDefinitions(6).length, 76)
 assert.equal(getMissionCatalog().getDefinitions(7).length, 76)
 assert.equal(getMissionCatalog().getDefinitions(8).length, 115)

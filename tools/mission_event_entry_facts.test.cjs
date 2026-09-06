@@ -51,6 +51,9 @@ const {
 const { PartyCategory } = require("../src/data/types")
 const eventRewards = require("../assets/mission_event_reward.json")
 
+const restoreBundledSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreBundledSnapshot() })
 initializeDatabase()
 db = getDb()
 const account = insertAccountSync({

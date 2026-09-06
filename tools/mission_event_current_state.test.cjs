@@ -55,6 +55,9 @@ const {
 const {
     getBundledStandardMissionTables,
 } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
 
 const characters = require("../assets/character.json")
 const characterQuests = require("../assets/character_quest_lookup.json")

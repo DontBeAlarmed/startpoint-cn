@@ -13,7 +13,6 @@ import {
 } from "../../lib/mission/index";
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { MissionRewardGranter } from "../../lib/mission/grants";
-import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time";
 import { projectItemOverflowCommonResponse } from "../../lib/item-overflow";
 
@@ -52,7 +51,6 @@ const routes = async (fastify: FastifyInstance) => {
                 getPlayerActiveMissionsSync(playerId),
                 requestList,
                 {
-                    repository: getContentSnapshot().repository,
                     now: evaluationTime,
                     questProgress: getPlayerQuestProgressSync(playerId),
                 },

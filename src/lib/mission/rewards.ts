@@ -1,4 +1,3 @@
-import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
 import type { ActiveMissionReward } from "./active-plan"
 import {
     getMissionCatalog,
@@ -47,9 +46,8 @@ function cloneRewards(stage: MissionCatalogStage | undefined): ActiveMissionRewa
 export function getAwakeMissionRewardStageDefinition(
     missionId: number,
     stage: number,
-    repository?: ReadonlyContentRepository,
 ): AwakeMissionRewardStageDefinition | null {
-    const definition = getMissionCatalog(repository).getRewardStage(9, missionId, stage)
+    const definition = getMissionCatalog().getRewardStage(9, missionId, stage)
     if (!definition) return null
     return {
         missionRewardId: definition.missionRewardId,
@@ -70,10 +68,9 @@ export function getCategoryMissionRewardStageDefinition(
     category: number,
     missionId: number,
     stage: number,
-    repository?: ReadonlyContentRepository,
 ): CategoryMissionRewardStageDefinition | null {
     if (!CATEGORY_REWARD_IDS.has(category)) return null
-    const definition = getMissionCatalog(repository).getRewardStage(category, missionId, stage)
+    const definition = getMissionCatalog().getRewardStage(category, missionId, stage)
     if (!definition) return null
     return {
         missionRewardId: definition.missionRewardId,

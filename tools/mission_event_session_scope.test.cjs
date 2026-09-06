@@ -19,6 +19,9 @@ const { EventSafeComputer } = require("../src/lib/mission/computer-event-safe")
 const {
     getBundledStandardMissionTables,
 } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
 
 const catalog = getMissionCatalog()
 const registry = getMissionFactRequirementRegistry(catalog)

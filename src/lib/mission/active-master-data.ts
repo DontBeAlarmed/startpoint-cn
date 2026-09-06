@@ -1,9 +1,9 @@
-import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
 import {
     getActiveMissionPlan,
     getActiveMissionPlanEventRow,
     getActiveMissionPlanEventRows,
     getActiveMissionPlanMissionRows,
+    type ActiveMissionPlan,
 } from "./active-plan"
 
 export interface ActiveMissionMasterDefinition {
@@ -17,45 +17,44 @@ export interface ActiveMissionEventMasterDefinition {
 }
 
 function projectMissionDefinitions(
-    repository?: ReadonlyContentRepository,
+    plan: ActiveMissionPlan,
 ): readonly ActiveMissionMasterDefinition[] {
-    return getActiveMissionPlanMissionRows(getActiveMissionPlan(repository))
+    return getActiveMissionPlanMissionRows(plan)
 }
 
 function projectEventDefinitions(
-    repository?: ReadonlyContentRepository,
+    plan: ActiveMissionPlan,
 ): readonly ActiveMissionEventMasterDefinition[] {
-    const plan = getActiveMissionPlan(repository)
     return getActiveMissionPlanEventRows(plan)
 }
 
 export function getActiveMissionMasterDefinitions(
-    repository?: ReadonlyContentRepository,
+    plan?: ActiveMissionPlan,
 ): readonly ActiveMissionMasterDefinition[] {
-    return projectMissionDefinitions(repository)
+    return projectMissionDefinitions(plan ?? getActiveMissionPlan())
 }
 
 export function getActiveMissionMasterDefinition(
     missionId: number,
-    repository?: ReadonlyContentRepository,
+    plan?: ActiveMissionPlan,
 ): ActiveMissionMasterDefinition | undefined {
-    const definition = getActiveMissionPlan(repository).getMission(missionId)
+    const definition = (plan ?? getActiveMissionPlan()).getMission(missionId)
     return definition ? { missionId: definition.missionId, row: definition.row } : undefined
 }
 
 export function getActiveMissionEventMasterDefinitions(
-    repository?: ReadonlyContentRepository,
+    plan?: ActiveMissionPlan,
 ): readonly ActiveMissionEventMasterDefinition[] {
     // Event rows are kept as a compatibility surface; the parsed event is the plan authority.
-    return projectEventDefinitions(repository)
+    return projectEventDefinitions(plan ?? getActiveMissionPlan())
 }
 
 export function getActiveMissionEventMasterDefinition(
     eventId: number,
-    repository?: ReadonlyContentRepository,
+    plan?: ActiveMissionPlan,
 ): ActiveMissionEventMasterDefinition | undefined {
-    const plan = getActiveMissionPlan(repository)
-    if (!plan.getEvent(eventId)) return undefined
-    const row = getActiveMissionPlanEventRow(plan, eventId)
+    const resolvedPlan = plan ?? getActiveMissionPlan()
+    if (!resolvedPlan.getEvent(eventId)) return undefined
+    const row = getActiveMissionPlanEventRow(resolvedPlan, eventId)
     return row ? { eventId, row } : undefined
 }

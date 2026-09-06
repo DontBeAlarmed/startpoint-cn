@@ -357,7 +357,14 @@ export function loadExactEventBattleRules(assetValue: unknown): readonly ExactMu
     return Object.freeze(rules)
 }
 
-const exactMultiRules = loadExactEventBattleRules(ruleAsset)
+let exactMultiRulesCache: readonly ExactMultiRule[] | null = null
+
+function getExactMultiRules(): readonly ExactMultiRule[] {
+    if (exactMultiRulesCache === null) {
+        exactMultiRulesCache = loadExactEventBattleRules(ruleAsset)
+    }
+    return exactMultiRulesCache
+}
 
 function getClearRuleSources(): Record<string, {
     readonly category: number
@@ -472,7 +479,14 @@ function buildExactStatisticsRules(): readonly ExactStatisticsRule[] {
     return Object.freeze(rules)
 }
 
-const exactStatisticsRules = buildExactStatisticsRules()
+let exactStatisticsRulesCache: readonly ExactStatisticsRule[] | null = null
+
+function getExactStatisticsRules(): readonly ExactStatisticsRule[] {
+    if (exactStatisticsRulesCache === null) {
+        exactStatisticsRulesCache = buildExactStatisticsRules()
+    }
+    return exactStatisticsRulesCache
+}
 
 const EXACT_RESISTANCE_DEBUFF_RULES: Readonly<Record<number, {
     readonly eventId: number
@@ -585,7 +599,14 @@ function buildExactHardMultiConditionRules(): readonly ExactHardMultiConditionRu
     return Object.freeze(rules)
 }
 
-const exactHardMultiConditionRules = buildExactHardMultiConditionRules()
+let exactHardMultiConditionRulesCache: readonly ExactHardMultiConditionRule[] | null = null
+
+function getExactHardMultiConditionRules(): readonly ExactHardMultiConditionRule[] {
+    if (exactHardMultiConditionRulesCache === null) {
+        exactHardMultiConditionRulesCache = buildExactHardMultiConditionRules()
+    }
+    return exactHardMultiConditionRulesCache
+}
 
 function matchesRole(role: MultiRole, isMultiHost: boolean | undefined): boolean {
     if (role === "any") return true
@@ -599,13 +620,13 @@ export function getExactEventBattleRuleCoverage() {
     const exactPhaseRules = buildExactPhaseRules()
     const exactEventSingleClearRules = getExactEventSingleClearRules()
     const exactResistanceDebuffRules = buildExactResistanceDebuffRules()
-    const roles = exactMultiRules.reduce((counts, rule) => {
+    const roles = getExactMultiRules().reduce((counts, rule) => {
         counts[rule.role]++
         return counts
     }, { any: 0, host: 0, guest: 0 })
     return {
         totalEventMissions: getMissionCatalog().getDefinitions(3).length,
-        exactMultiRules: exactMultiRules.length,
+        exactMultiRules: getExactMultiRules().length,
         roles,
         exactClearRules: exactClearRules.length,
         clearRulesByCategory: exactClearRules.reduce((counts, rule) => {
@@ -614,12 +635,12 @@ export function getExactEventBattleRuleCoverage() {
         }, {} as Record<number, number>),
         exactPhaseRules: exactPhaseRules.length,
         exactSingleClearRules: exactEventSingleClearRules.length,
-        exactStatisticsRules: exactStatisticsRules.length,
-        exactStatisticsRuleMissionIds: exactStatisticsRules.map(rule => rule.missionId),
+        exactStatisticsRules: getExactStatisticsRules().length,
+        exactStatisticsRuleMissionIds: getExactStatisticsRules().map(rule => rule.missionId),
         exactResistanceDebuffRules: exactResistanceDebuffRules.length,
         exactResistanceDebuffRuleMissionIds: exactResistanceDebuffRules.map(rule => rule.missionId),
-        exactHardMultiConditionRules: exactHardMultiConditionRules.length,
-        exactHardMultiConditionRuleMissionIds: exactHardMultiConditionRules.map(rule => rule.missionId),
+        exactHardMultiConditionRules: getExactHardMultiConditionRules().length,
+        exactHardMultiConditionRuleMissionIds: getExactHardMultiConditionRules().map(rule => rule.missionId),
     }
 }
 
@@ -629,12 +650,12 @@ export function getExactEventBattleMissionIds(): readonly number[] {
     const exactEventSingleClearRules = getExactEventSingleClearRules()
     const exactResistanceDebuffRules = buildExactResistanceDebuffRules()
     return Object.freeze([...new Set([
-        ...exactMultiRules.map(rule => rule.missionId),
+        ...getExactMultiRules().map(rule => rule.missionId),
         ...exactClearRules.map(rule => rule.missionId),
         ...exactPhaseRules.map(rule => rule.missionId),
-        ...exactStatisticsRules.map(rule => rule.missionId),
+        ...getExactStatisticsRules().map(rule => rule.missionId),
         ...exactResistanceDebuffRules.map(rule => rule.missionId),
-        ...exactHardMultiConditionRules.map(rule => rule.missionId),
+        ...getExactHardMultiConditionRules().map(rule => rule.missionId),
         ...exactEventSingleClearRules.map(rule => rule.missionId),
     ])].sort((left, right) => left - right))
 }
@@ -716,7 +737,7 @@ function recordExactHardMultiConditionRules(
         || !isSafeNonNegativeInteger(ctx.clearTime)
         || ctx.clearTime <= 0) return []
     const matchedMissionIds: number[] = []
-    for (const rule of exactHardMultiConditionRules) {
+    for (const rule of getExactHardMultiConditionRules()) {
         if (rule.questId !== ctx.questId
             || !isMissionMasterDefinitionEnabledAt(rule.definition, evaluationTime)
             || (rule.maxClearTimeMs !== null && ctx.clearTime > rule.maxClearTimeMs)
@@ -775,7 +796,7 @@ function recordExactStatisticsRules(
 ): number[] {
     const matchedMissionIds: number[] = []
     const type28Rules: ExactStatisticsRule[] = []
-    for (const rule of exactStatisticsRules) {
+    for (const rule of getExactStatisticsRules()) {
         if (rule.battleKind !== 3
             || (ctx.isMulti !== true && ctx.isMulti !== false && ctx.isMulti !== undefined)
             || !isMissionMasterDefinitionEnabledAt(rule.definition, evaluationTime)) continue
@@ -811,7 +832,7 @@ export function recordEventMissionBattleFacts(
     const exactPhaseRules = buildExactPhaseRules()
     const matchedMissionIds: number[] = []
     if (ctx.isMulti === true) {
-        for (const rule of exactMultiRules) {
+        for (const rule of getExactMultiRules()) {
             if (!matchesRole(rule.role, ctx.isMultiHost)) continue
             if (rule.categories !== "all" && !rule.categories.has(ctx.questCategory)) continue
             if (rule.questIds !== "all" && !rule.questIds.has(ctx.questId)) continue

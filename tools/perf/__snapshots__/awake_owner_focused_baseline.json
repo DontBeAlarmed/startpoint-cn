@@ -889,7 +889,7 @@
         "categoryMissionProgress:9:11,12,13,2630021,2630022,2630023",
         "characters"
       ],
-      "missionComputes": 342,
+      "missionComputes": 343,
       "snapshotSource": "none",
       "rereadReason": "earlier awake settlement precedes later authoritative reward, active-mission, response-state and active-quest writes",
       "freshPostWriteEvaluationRequired": true,
@@ -1212,7 +1212,7 @@
         "categoryMissionProgress:9:11,12,13,2630021,2630022,2630023",
         "characters"
       ],
-      "missionComputes": 342,
+      "missionComputes": 343,
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
@@ -1474,7 +1474,7 @@
         "categoryMissionProgress:9:2630021,2630022,2630023",
         "characters"
       ],
-      "missionComputes": 7,
+      "missionComputes": 8,
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
@@ -2083,7 +2083,7 @@
         "categoryMissionProgress:9:2630021,2630022,2630023",
         "characters"
       ],
-      "missionComputes": 7,
+      "missionComputes": 8,
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
@@ -2507,12 +2507,12 @@
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 7,
+      "sqlReads": 6,
       "sqlWrites": 3,
       "sqlByTable": {
         "players": {
-          "reads": 3,
-          "statements": 4,
+          "reads": 2,
+          "statements": 3,
           "writes": 1
         },
         "players_character_awake_unlocks": {
@@ -3220,7 +3220,7 @@
         "categoryMissionProgress:9:2630021,2630022,2630023",
         "characters"
       ],
-      "missionComputes": 7,
+      "missionComputes": 8,
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
@@ -3419,7 +3419,7 @@
         "categoryMissionProgress:9:2630021,2630022,2630023",
         "characters"
       ],
-      "missionComputes": 7,
+      "missionComputes": 8,
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
@@ -3620,7 +3620,7 @@
         "categoryMissionProgress:9:2630021,2630022,2630023",
         "characters"
       ],
-      "missionComputes": 7,
+      "missionComputes": 8,
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
@@ -3990,7 +3990,7 @@
         "categoryMissionProgress:9:2630021,2630022,2630023",
         "characters"
       ],
-      "missionComputes": 7,
+      "missionComputes": 8,
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
@@ -4195,7 +4195,7 @@
         "categoryMissionProgress:9:2630021,2630022,2630023",
         "characters"
       ],
-      "missionComputes": 7,
+      "missionComputes": 8,
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
@@ -4867,7 +4867,7 @@
         "partyCoClearCounters",
         "categoryMissionProgress:9:11,12,13,1110011,1110012,1110013,1210011,1210012,1210013,1310051,1310052,1310053,1410031,1410032,1410033,1510061,1510062,1510063,1610021,1610022,1610023,2110011,2110012,2110013,2210041,2210042,2210043,2310011,2310012,2310013,2410631,2410632,2410633,2510031,2510032,2510033,2510041,2510042,2510043,2610071,2610072,2610073,2630021,2630022,2630023,3210131,3210132,3210133,3310031,3310032,3310033,3410011,3410012,3410013"
       ],
-      "missionComputes": 10,
+      "missionComputes": 11,
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,

@@ -53,7 +53,6 @@ test("Degree compute keeps using rules bound into an already-built context", () 
 })
 
 test("Degree Session follows the supplied Catalog mission pattern instead of global Content", () => {
-    productionContentSnapshotProvider.snapshot = null
     const catalog = customDegreeCatalog(definitions => {
         definitions[1000][0][1] = "degree_companion_add_custom"
     })

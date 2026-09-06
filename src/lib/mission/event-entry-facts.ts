@@ -1,4 +1,3 @@
-import bundledEventRewards from "../../../assets/mission_event_reward.json"
 import { getDb } from "../../data/db"
 import {
     completePlayerEventMissionFactSync,
@@ -6,7 +5,6 @@ import {
 } from "../../data/domains/event_mission_entry_facts"
 import { PartyCategory } from "../../data/types"
 import { MissionCatalogStage, MissionMasterDefinition, getMissionCatalog, isMissionMasterDefinitionEnabledAt } from "./mission-catalog"
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 
 export type EventEntryRuleProducer =
     | "login"
@@ -443,13 +441,11 @@ export function recordRaidSetEditMissionFactsSync(
 }
 
 function getValidatedRule(spec: EventEntryRuleSpec): MissionMasterDefinition | undefined {
-    const definition = getMissionCatalog().getDefinition(3, spec.missionId)
-    const eventRewards = getRuntimeContentTableSync(
-        "mission_event_reward.json",
-        bundledEventRewards as Record<string, unknown>,
-    )
-    const rewards = eventRewards[String(spec.missionId)]
-    return validateEventEntryRule(definition, rewards, spec) ? definition : undefined
+    const catalog = getMissionCatalog()
+    const definition = catalog.getDefinition(3, spec.missionId)
+    if (!definition) return undefined
+    const stages = catalog.getRewardStages(3, spec.missionId)
+    return validateEventEntryCatalogRule(definition, stages) ? definition : undefined
 }
 
 export function getAuthoritativeEventEntryMissionIds(): readonly number[] {

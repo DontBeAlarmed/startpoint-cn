@@ -16,6 +16,13 @@ const {
     EMPTY_DEGREE_BATTLE_STATS,
 } = require("../../src/lib/mission/degree-state-derivation")
 
+// Baseline global snapshot so strict runtime defaults (requirement registry's
+// "current computer definition" comparisons) match the bundled data the
+// degree tests assert against; installGlobalRepository() overrides it.
+const restoreContentSnapshot = require("./install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
+
 function clone(value) {
     return JSON.parse(JSON.stringify(value))
 }

@@ -34,6 +34,7 @@ export type { ActiveMissionEventEligibilityContext }
 
 export interface ReconcileActiveMissionFactsInput {
     readonly playerId: number
+    /** Fact-domain source only; plan reads go through the typed ActiveMissionPlan. */
     readonly repository: ReadonlyContentRepository
     readonly now: number | Date
     readonly observer?: ActiveMissionFactObserver
@@ -61,7 +62,10 @@ export function reconcileActiveMissionFactsWithResult(
             domains: createProductionActiveMissionFactDomains(input.repository, player),
         })
         const result = runActiveMissionReconciliation({
-            ...input,
+            playerId: input.playerId,
+            now: input.now,
+            observer: input.observer,
+            isEventEligible: input.isEventEligible,
             plan,
             session,
             updateMission: (missionId, progress) => {

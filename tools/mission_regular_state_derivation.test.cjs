@@ -5,6 +5,10 @@ require("ts-node/register/transpile-only")
 const assert = require("node:assert/strict")
 const test = require("node:test")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
+
 const {
     getMissionCatalog,
     getMissionCatalogContentTable,

@@ -24,7 +24,6 @@ import { reconcileAwakeEvolutionLevelsSync } from "../../lib/mission/awake-evolu
 import { computeManaBoardAwakeFromNodes, mergeManaBoardAwakeMaps } from "../../lib/character-helpers"
 import { getDb } from "../db"
 import { getCarnivalSaveStateSync } from "../../lib/carnival-save-state"
-import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { getPlayerCharacterAwakeUnlockRecordSync } from "../domains/character_awake"
 import { reconcileInterruptedStartTutorialSync } from "../../lib/start-tutorial-state"
 import { projectMergedCharacterGrowthState } from "../../lib/character-growth/save/project-growth-state"
@@ -113,7 +112,6 @@ export function getClientSerializedData(
             options.activeMissionsOverride
                 ? restoreActiveMissionPayloadShape(options.activeMissionsOverride)
                 : getPlayerActiveMissionsSync(playerId),
-            getContentSnapshot().repository,
         ),
         boxGachaList: getPlayerBoxGachasSync(playerId),
         purchasedTimesList: {},

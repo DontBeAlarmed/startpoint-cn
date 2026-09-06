@@ -2,8 +2,8 @@ import {
     getAwakeMissionRuleFamilies,
     type AwakeMissionRuleFamily,
 } from "../awake-rule-catalog"
+import { getContentSnapshot } from "../../../content/runtime/content-snapshot"
 import type { MissionCatalog, MissionMasterDefinition } from "../mission-catalog"
-import { bundledMissionContentRepository } from "../mission-catalog-source"
 import { matchesCurrentMissionComputerDefinition } from "./computer-compatibility"
 import type { MissionFactRequirementDraft } from "./types"
 
@@ -13,7 +13,7 @@ function getFamilyView(catalog: MissionCatalog): ReadonlyMap<number, AwakeMissio
     const cached = familyViewByCatalog.get(catalog)
     if (cached) return cached
     const familyByMissionId = new Map<number, AwakeMissionRuleFamily>()
-    for (const family of getAwakeMissionRuleFamilies(bundledMissionContentRepository)) {
+    for (const family of getAwakeMissionRuleFamilies(getContentSnapshot().repository)) {
         for (const missionId of family.missionIds) {
             const definition = catalog.getDefinition(9, missionId)
             if (definition && matchesCurrentMissionComputerDefinition(definition)) {
