@@ -92,3 +92,61 @@ test("Shop business consumers use the typed Shop catalog", () => {
         /event_item_shop_id_map\.json|boss_coin_shop_item_category_map\.json/,
     )
 })
+
+test("Gacha and Box Gacha raw tables stay inside their independent typed builders", () => {
+    const ordinaryPattern = /(?:^|[^A-Za-z0-9_])(?:gacha|gacha_pool|gacha_campaign_definitions|stars_gacha_campaign|gacha_exchange_rate|equipment_gacha_movie_probability)\.json/
+    const ordinaryReferences = sourceFiles(sourceRoot).flatMap(filePath => {
+        const source = fs.readFileSync(filePath, "utf8")
+        return ordinaryPattern.test(source)
+            ? [path.relative(projectRoot, filePath).split(path.sep).join("/")]
+            : []
+    }).sort()
+    assert.deepEqual(ordinaryReferences, [
+        "src/content/converters/gacha.ts",
+        "src/content/converters/gameplay.ts",
+        "src/content/sync/table-registry.ts",
+        "src/lib/gacha-catalog/catalog.ts",
+        "src/lib/types/gacha.ts",
+    ])
+
+    const boxPattern = /(?:box_gacha|box_reward|box_gacha_box_settings)\.json/
+    const boxReferences = sourceFiles(sourceRoot).flatMap(filePath => {
+        const source = fs.readFileSync(filePath, "utf8")
+        return boxPattern.test(source)
+            ? [path.relative(projectRoot, filePath).split(path.sep).join("/")]
+            : []
+    }).sort()
+    assert.deepEqual(boxReferences, [
+        "src/content/converters/box-gacha.ts",
+        "src/content/sync/table-registry.ts",
+        "src/lib/box-gacha-content.ts",
+    ])
+
+    const targetedConsumers = [
+        "src/lib/gacha-equipment-movie.ts",
+        "src/lib/gacha-legacy-content.ts",
+        "src/lib/gacha-owner/save-validation.ts",
+        "src/lib/how-to-get.ts",
+        "src/routes/api/boxGacha.ts",
+        "src/routes/api/tutorial.ts",
+        "src/lib/assets.ts",
+    ]
+    for (const relative of targetedConsumers) {
+        const source = fs.readFileSync(path.join(projectRoot, relative), "utf8")
+        assert.doesNotMatch(
+            source,
+            /getGachaSync|getBoxGachaSync|getRuntimeContentTableSync\(\s*["'](?:gacha|gacha_pool|stars_gacha_campaign|equipment_gacha_movie_probability|box_gacha|box_reward|box_gacha_box_settings)\.json/,
+            relative,
+        )
+    }
+    const ordinaryCatalog = fs.readFileSync(
+        path.join(projectRoot, "src/lib/gacha-catalog/catalog.ts"),
+        "utf8",
+    )
+    assert.doesNotMatch(ordinaryCatalog, boxPattern)
+    const boxCatalog = fs.readFileSync(
+        path.join(projectRoot, "src/lib/box-gacha-content.ts"),
+        "utf8",
+    )
+    assert.doesNotMatch(boxCatalog, ordinaryPattern)
+})

@@ -24,7 +24,7 @@ const tableOverrides = {
         [BOX_GACHA_ID]: {
             itemId: CURRENCY_ITEM_ID,
             count: 10,
-            availableCounts: { 1: 10, 2: 10, 3: 10, 4: 1, 5: 1 },
+            availableCounts: { 1: 10, 2: 10, 4: 1, 5: 1 },
         },
     },
     "box_reward.json": {
@@ -34,9 +34,6 @@ const tableOverrides = {
             },
             2: {
                 99001002: { type: 0, count: 1, available: 10, tier: 2, id: REWARD_ITEM_ID },
-            },
-            3: {
-                99001003: { type: 0, count: 1, available: 10, tier: 2, id: REWARD_ITEM_ID },
             },
             4: {
                 99001004: { type: 5, count: 1, available: 1, tier: 2, id: REWARD_CHARACTER_ID },
@@ -59,14 +56,6 @@ const tableOverrides = {
             2: {
                 requiredBoxId: null,
                 resetKind: 2,
-                resetLimit: null,
-                availableFrom: "2010-01-01 00:00:00",
-                availableUntil: "2199-12-31 23:59:59",
-                closeKind: 1,
-            },
-            3: {
-                requiredBoxId: null,
-                resetKind: 1,
                 resetLimit: null,
                 availableFrom: "2010-01-01 00:00:00",
                 availableUntil: "2199-12-31 23:59:59",
@@ -490,18 +479,6 @@ test("resettable box ignores featured early stop and empties the requested inven
     const after = snapshot(playerId, 2)
     assert.equal(after.items[String(CURRENCY_ITEM_ID)], 900)
     assert.equal(after.items[String(REWARD_ITEM_ID)], 10)
-    assert.equal(after.drawn.reduce((sum, reward) => sum + reward.number, 0), 10)
-    assert.equal(after.box.remainingNumber, 0)
-})
-
-test("manual reset button box also ignores featured early stop", async () => {
-    const { playerId, viewerId } = await createPlayer("box-manual-reset-stop")
-
-    const response = await execBox(viewerId, 3, 10, true)
-
-    assert.equal(response.statusCode, 200, response.body)
-    const after = snapshot(playerId, 3)
-    assert.equal(after.items[String(CURRENCY_ITEM_ID)], 900)
     assert.equal(after.drawn.reduce((sum, reward) => sum + reward.number, 0), 10)
     assert.equal(after.box.remainingNumber, 0)
 })

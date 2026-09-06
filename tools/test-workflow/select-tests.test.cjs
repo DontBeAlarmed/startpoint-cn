@@ -74,6 +74,33 @@ test("maps D27 Shop typed content to the affected focused groups", () => {
     )
 })
 
+test("maps D27 Gacha and Box Gacha typed content to independent focused groups", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/lib/gacha-catalog/catalog.ts"]),
+        ["quick:content", "quick:gacha"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/gacha-owner/save-validation.ts"]),
+        ["integration:database", "integration:rules", "quick:gacha"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/gacha_save_validation.test.cjs"]),
+        ["integration:database"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/box-gacha-content.ts"]),
+        ["integration:event", "quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/box_gacha_content.test.cjs"]),
+        ["quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/routes/api/tutorial.ts"]),
+        ["full", "integration:quest", "integration:reward-grant", "quick:gacha"],
+    )
+})
+
 test("maps representative source files to focused groups", () => {
     assert.deepEqual(
         selectTestGroups(["src/data/domains/gacha-state.ts"]),
@@ -1908,6 +1935,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_category_batch_read.test.cjs",
         "tools/player_history_profile_route.test.cjs",
         "tools/player_save_v2.test.cjs",
+        "tools/gacha_save_validation.test.cjs",
         "tools/character_growth_save_validation.test.cjs",
         "tools/receive_history_retention.test.cjs",
         "tools/scheduled_resource_storage.test.cjs",

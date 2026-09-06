@@ -14,12 +14,13 @@ const {
 } = require("../src/content/runtime/content-snapshot")
 const {
     getCharacterDataSync,
-    getGachaSync,
 } = require("../src/lib/assets")
+const { getGachaCatalog } = require("../src/lib/gacha-catalog")
+const { getLegacyGachas } = require("../src/lib/gacha-legacy-content")
 
 const projectRoot = path.resolve(__dirname, "..")
 
-test("character and gacha API asset facades read one initialized ContentRepository", () => {
+test("character facade and Gacha typed catalog read one initialized ContentRepository", () => {
     const previousSnapshot = productionContentSnapshotProvider.snapshot
     const character = Object.freeze({ name: "", rarity: 5, element: 1, skill_count: 6 })
     const gacha = Object.freeze({
@@ -44,15 +45,28 @@ test("character and gacha API asset facades read one initialized ContentReposito
         canBeStartDashExchange: false,
     })
     const pools = Object.freeze({
-        fixture_5: Object.freeze([]),
-        fixture_4: Object.freeze([]),
-        fixture_3: Object.freeze([]),
+        fixture_5: Object.freeze([{ id: 990001, rank: 5, odds: 1, isExchangeable: false }]),
+        fixture_4: Object.freeze([{ id: 990003, rank: 4, odds: 1, isExchangeable: false }]),
+        fixture_3: Object.freeze([{ id: 990004, rank: 3, odds: 1, isExchangeable: false }]),
     })
     const requestedTables = []
     const tables = Object.freeze({
-        "character.json": Object.freeze({ "990001": character }),
+        "character.json": Object.freeze({
+            "990001": character,
+            "990003": Object.freeze({ ...character, rarity: 4 }),
+            "990004": Object.freeze({ ...character, rarity: 3 }),
+        }),
         "gacha.json": Object.freeze({ "990002": gacha }),
         "gacha_pool.json": pools,
+        "gacha_campaign_definitions.json": Object.freeze({}),
+        "stars_gacha_campaign.json": Object.freeze({}),
+        "gacha_exchange_rate.json": Object.freeze({
+            character: Object.freeze({ 3: 250, 4: 250, 5: 250 }),
+            equipment: Object.freeze({ 3: 250, 4: 250, 5: 250 }),
+        }),
+        "equipment_lookup.json": Object.freeze({}),
+        "item_lookup.json": Object.freeze({}),
+        "equipment_gacha_movie_probability.json": Object.freeze({}),
     })
     productionContentSnapshotProvider.snapshot = Object.freeze({
         cdn: Object.freeze({ targetVersion: "test-release" }),
@@ -73,14 +87,24 @@ test("character and gacha API asset facades read one initialized ContentReposito
 
     try {
         assert.strictEqual(getCharacterDataSync(990001), character)
-        const projectedGacha = getGachaSync(990002)
+        const catalog = getGachaCatalog(productionContentSnapshotProvider.snapshot.repository)
+        const projectedGacha = getLegacyGachas(
+            productionContentSnapshotProvider.snapshot.repository,
+        )["990002"]
         assert.equal(projectedGacha.type, 0)
         assert.equal(projectedGacha.singleCost, 150)
-        assert.strictEqual(projectedGacha.pool["1"], pools.fixture_5)
+        assert.strictEqual(projectedGacha.pool["1"], catalog.pools.fixture_5.items)
         assert.deepEqual(requestedTables, [
             "character.json",
-            "gacha.json",
+            "character.json",
+            "equipment_lookup.json",
+            "item_lookup.json",
+            "equipment_gacha_movie_probability.json",
             "gacha_pool.json",
+            "gacha.json",
+            "gacha_campaign_definitions.json",
+            "stars_gacha_campaign.json",
+            "gacha_exchange_rate.json",
         ])
     } finally {
         productionContentSnapshotProvider.snapshot = previousSnapshot

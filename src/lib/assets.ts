@@ -1,6 +1,3 @@
-import boxGacha from "../../assets/box_gacha.json";
-import boxGachaBoxSettings from "../../assets/box_gacha_box_settings.json";
-import boxReward from "../../assets/box_reward.json";
 import exAbility from "../../assets/ex_ability.json";
 import exBoost from "../../assets/ex_boost.json";
 import exStatus from "../../assets/ex_status.json";
@@ -8,10 +5,8 @@ import practiceQuests from "../../assets/practice_quest.json";
 import manaNodes from "../../assets/mana_node.json";
 import manaNodeAwake from "../../assets/mana_node_awake.json";
 import manaBoard from "../../assets/mana_board.json";
-import { AssetCharacter, BattleQuest, BoxGacha, ClearRewards, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, Gacha, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawBoxGachas, RawBoxRewards, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, StoryQuest } from "./types";
-import { getLegacyGachas } from "./gacha-legacy-content";
+import { AssetCharacter, BattleQuest, ClearRewards, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, StoryQuest } from "./types";
 import { getRushCompatibilityEvent } from "./shop/rush-compatibility"
-import { RawBoxGachaSettings } from "./types/box-gacha";
 import {
     ContentSnapshotError,
     getContentSnapshot,
@@ -621,61 +616,6 @@ export function getExBoostItemSync(
     )[String(itemId)]
 
     return item === undefined ? null : item
-}
-
-/**
- * Gets the data for a box gacha from the assets folder.
- * 
- * @param id The ID of the box gacha.
- * @returns A BoxGacha object or null, if it didn't exist.
- */
-export function getBoxGachaSync(
-    id: string | number
-): BoxGacha | null {
-
-    const idString = String(id)
-    // get redeem item data
-    const redeemItemData = getRuntimeContentTableSync(
-        "box_gacha.json",
-        boxGacha as RawBoxGachas,
-    )[idString]
-    if (redeemItemData === undefined) return null;
-
-    // get boxes
-    const boxes = getRuntimeContentTableSync(
-        "box_reward.json",
-        boxReward as RawBoxRewards,
-    )[idString]
-    if (boxes === undefined) return null;
-
-    const boxSettings = getRuntimeContentTableSync(
-        "box_gacha_box_settings.json",
-        boxGachaBoxSettings as RawBoxGachaSettings,
-    )[idString]
-    if (boxSettings === undefined) return null;
-
-    // build box gacha
-    return {
-        redeemItemId: redeemItemData.itemId,
-        redeemItemCount: redeemItemData.count,
-        boxes: boxes,
-        availableCounts: redeemItemData.availableCounts,
-        boxSettings
-    }
-}
-
-/**
- * Gets the data for a gacha.
- * 
- * @param id The ID of the gacha.
- * @returns The gacha's data, or null.
- */
-export function getGachaSync(
-    id: string | number
-): Gacha | null {
-    const data = getLegacyGachas(getContentSnapshot().repository)[String(id)];
-    
-    return data ?? null
 }
 
 /**

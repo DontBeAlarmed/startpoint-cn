@@ -16,7 +16,7 @@ import { createRewardGrantItemOverflowPolicy } from "../../lib/reward-grant-item
 import { projectItemOverflowCommonResponse } from "../../lib/item-overflow"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { getGachaSync } from "../../lib/assets";
+import { getGachaCatalog } from "../../lib/gacha-catalog";
 import { rewardPlayerGachaDrawResultSync } from "../../lib/gacha";
 import { givePlayerCharacterSync } from "../../lib/character";
 import { randomInt } from "crypto";
@@ -231,7 +231,12 @@ const routes = async (fastify: FastifyInstance) => {
             && !isNaN(body.gacha_id)
             ? body.gacha_id
             : null
-        const gachaData = gachaId === null ? null : getGachaSync(gachaId)
+        const gachaData = gachaId === null
+            ? null
+            : getGachaCatalog().banners[String(gachaId)]?.definition ?? null
+        const tutorialGachaCost = gachaData?.page.kind === 0 || gachaData?.page.kind === 8
+            ? gachaData.page.singleCost
+            : null
 
         let deferredCharacterSampledLog: (() => void) | undefined
         const result = getDb().transaction(() => {
@@ -266,7 +271,8 @@ const routes = async (fastify: FastifyInstance) => {
                 return { ok: true, data: receipt.responseData } as const
             }
 
-            if (effectiveNextStep === TUTORIAL_GACHA_EFFECTIVE_STEP && gachaData === null) {
+            if (effectiveNextStep === TUTORIAL_GACHA_EFFECTIVE_STEP
+                && (gachaData === null || tutorialGachaCost === null)) {
                 return {
                     ok: false,
                     message: gachaId === null
@@ -349,7 +355,7 @@ const routes = async (fastify: FastifyInstance) => {
                     number: 1,
                 })
 
-                const newFreeVmoney = currentPlayer.freeVmoney - gachaData!.singleCost
+                const newFreeVmoney = currentPlayer.freeVmoney - tutorialGachaCost!
                 updatePlayerSync({
                     id: playerId,
                     tutorialStep: storedNextStep,

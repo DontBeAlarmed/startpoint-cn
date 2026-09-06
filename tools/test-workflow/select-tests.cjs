@@ -35,6 +35,10 @@ const SOURCE_RULES = [
         groups: ["integration:database"],
     },
     {
+        pattern: /^tools\/gacha_save_validation\.test\.cjs$/,
+        groups: ["integration:database"],
+    },
+    {
         pattern: /^tools\/character_growth_(?:lavu_orderings|gate_acceptance)\.test\.cjs$/,
         groups: ["quick:character-growth"],
     },
@@ -428,6 +432,14 @@ const SOURCE_RULES = [
     {
         pattern: /^(?:src\/lib\/gacha-catalog\/.*\.ts|tools\/gacha_catalog\.test\.cjs)$/,
         groups: ["quick:content", "quick:gacha"],
+    },
+    {
+        pattern: /^src\/lib\/box-gacha-content\.ts$/,
+        groups: ["integration:event", "quick:content"],
+    },
+    {
+        pattern: /^tools\/box_gacha_content\.test\.cjs$/,
+        groups: ["quick:content"],
     },
     {
         pattern: /^(?:src\/lib\/gacha-owner\/.*\.ts|src\/routes\/api\/gacha\/crazy-routes\.ts|tools\/gacha_(?:execution_owner|crazy_conversion)\.test\.cjs)$/,

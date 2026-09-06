@@ -1875,7 +1875,7 @@ test("equipment owner plan preserves draw order metadata effects and last equipm
         const knownPlayerBefore = rewardGrantPlayerSnapshot(playerId)
         result = database.transaction(() => rewardPlayerGachaDrawResultSync(
             playerId,
-            { type: GachaType.WEAPON },
+            { type: GachaType.WEAPON, equipmentMovieProbabilityId: "1" },
             drawResult,
             metadata,
             undefined,
@@ -1935,7 +1935,7 @@ test("owner path rejects metadata and returned typed reward mismatches with no c
     assert.throws(
         database.transaction(() => rewardPlayerGachaDrawResultSync(
             metadataMismatchPlayer.playerId,
-            { type: GachaType.WEAPON },
+            { type: GachaType.WEAPON, equipmentMovieProbabilityId: "1" },
             [5040016, 5020008],
             [{ id: 5040016, rank: 4, isGuarantee: false }],
             undefined,
@@ -1955,7 +1955,7 @@ test("owner path rejects metadata and returned typed reward mismatches with no c
     assert.throws(
         database.transaction(() => rewardPlayerGachaDrawResultSync(
             resultMismatchPlayer.playerId,
-            { type: GachaType.WEAPON },
+            { type: GachaType.WEAPON, equipmentMovieProbabilityId: "1" },
             [5040016, 5020008],
             [
                 { id: 5040016, rank: 4, isGuarantee: false },

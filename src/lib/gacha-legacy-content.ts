@@ -1,10 +1,10 @@
 import type { ReadonlyContentRepository } from "../content/runtime/content-snapshot"
+import { getGachaCatalog } from "./gacha-catalog"
+import type { GachaBanner, GachaCatalog } from "./gacha-catalog"
 import type {
     CharacterGacha,
     Gacha,
-    GachaPools,
     GachaRuntimeBanner,
-    GachaRuntimeBanners,
     Gachas,
 } from "./types/gacha"
 import { GachaType } from "./types/gacha"
@@ -39,14 +39,12 @@ function legacyCosts(page: GachaRuntimeBanner["page"]): Pick<
 }
 
 function projectLegacyGacha(
-    banner: GachaRuntimeBanner,
-    pools: GachaPools,
+    catalogBanner: GachaBanner,
 ): Gacha {
-    const pool = Object.fromEntries(Object.entries(banner.poolOddsIds).map(([rank, oddsId]) => {
-        const items = pools[oddsId]
-        if (items === undefined) throw new TypeError(`Gacha references missing pool ${oddsId}.`)
-        return [rank, items]
-    }))
+    const banner: GachaRuntimeBanner = catalogBanner.definition
+    const pool = Object.fromEntries(Object.entries(catalogBanner.poolsByRank).map(
+        ([rank, weightedPool]) => [rank, weightedPool.items],
+    ))
     const common = {
         name: banner.name,
         paymentType: 0,
@@ -96,18 +94,17 @@ function projectLegacyGacha(
     return character
 }
 
-const legacyByRepository = new WeakMap<ReadonlyContentRepository, Gachas>()
+const legacyByCatalog = new WeakMap<GachaCatalog, Gachas>()
 
 /** Temporary compatibility view for pre-D20 callers. It never copies prize arrays. */
 export function getLegacyGachas(repository: ReadonlyContentRepository): Gachas {
-    const cached = legacyByRepository.get(repository)
+    const catalog = getGachaCatalog(repository)
+    const cached = legacyByCatalog.get(catalog)
     if (cached !== undefined) return cached
-    const banners = repository.table<GachaRuntimeBanners>("gacha.json")
-    const pools = repository.table<GachaPools>("gacha_pool.json")
-    const projected = Object.fromEntries(Object.entries(banners).map(([id, banner]) => [
+    const projected = Object.fromEntries(Object.entries(catalog.banners).map(([id, banner]) => [
         id,
-        projectLegacyGacha(banner, pools),
+        projectLegacyGacha(banner),
     ]))
-    legacyByRepository.set(repository, projected)
+    legacyByCatalog.set(catalog, projected)
     return projected
 }

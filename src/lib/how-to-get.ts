@@ -1,21 +1,18 @@
-import { getContentSnapshot } from "../content/runtime/content-snapshot"
 import { getPlayerShopCampaignLineupsSync } from "../data/domains/shop-campaign-lineup"
 import { getPlayerEquipmentsByIdsSync } from "../data/domains/equipment"
 import { getPlayerShopPurchaseCountsByTypeBulkSync } from "../data/domains/shopPurchase"
 import {
-    getBoxGachaSync,
-} from "./assets"
+    findAvailableBoxGachaIdsForReward,
+    getBoxGachaContentCatalog,
+} from "./box-gacha-content"
 import { getShopCatalog, type ShopCatalog } from "./shop"
 import { buildShopSalesListSync } from "./shop-sales-list"
-import { validateBoxGachaPeriod } from "./box-gacha-reset"
 import {
     isShopItemVisibleForCampaign,
     requireAvailableShopCampaign,
 } from "./shop-select-campaign"
 import {
-    BoxGachaIdReward,
     BoxGachaRewardType,
-    RawBoxRewards,
     ShopItem,
     ShopItemRewardType,
     ShopItems,
@@ -106,27 +103,12 @@ function getMatchingBoxGachaIds(target: HowToGetTarget, nowMs: number): number[]
     const expectedType = target.kind === "item"
         ? BoxGachaRewardType.ITEM
         : BoxGachaRewardType.EQUIPMENT
-    const rewards = getContentSnapshot().repository.table<RawBoxRewards>("box_reward.json")
-    const result = new Set<number>()
-    for (const [boxGachaId, boxes] of Object.entries(rewards)) {
-        const boxGacha = getBoxGachaSync(boxGachaId)
-        if (boxGacha === null) continue
-        const matches = Object.entries(boxes).some(([boxId, box]) => {
-            const settings = boxGacha.boxSettings[Number(boxId)]
-            if (settings === undefined) return false
-            try {
-                validateBoxGachaPeriod(settings, nowMs)
-            } catch {
-                return false
-            }
-            return Object.values(box).some(reward => (
-                reward.type === expectedType
-                && (reward as BoxGachaIdReward).id === target.id
-            ))
-        })
-        if (matches) result.add(Number(boxGachaId))
-    }
-    return [...result].sort((a, b) => a - b)
+    return [...findAvailableBoxGachaIdsForReward(
+        getBoxGachaContentCatalog(),
+        expectedType,
+        target.id,
+        nowMs,
+    )]
 }
 
 export function getHowToGetListSync(

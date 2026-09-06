@@ -7,7 +7,8 @@ export enum BoxGachaRewardType {
     EMPTY,
     MANA,
     EXP,
-    CHARACTER
+    CHARACTER,
+    DEGREE,
 }
 
 

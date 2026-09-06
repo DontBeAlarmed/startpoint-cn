@@ -1,13 +1,8 @@
-import bundledGachas from "../../../assets/gacha.json"
-import bundledGachaPools from "../../../assets/gacha_pool.json"
-import bundledStarsCampaigns from "../../../assets/stars_gacha_campaign.json"
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
-import type {
-    GachaRuntimeBanners,
-    GachaPools,
-    StarsGachaCampaignDefinition,
-} from "../types"
-import { parseGachaJstTimestamp } from "../gacha-catalog"
+import {
+    getGachaCatalog,
+    parseGachaJstTimestamp,
+    type GachaCatalog,
+} from "../gacha-catalog"
 
 type SaveRow = Readonly<Record<string, unknown>>
 
@@ -32,7 +27,7 @@ function unixMilliseconds(value: unknown, field: string): number {
 export function assertValidGachaSaveState(tables: ReadonlyMap<
     string,
     readonly SaveRow[]
->): void {
+>, suppliedCatalog?: GachaCatalog): void {
     const parentRows = tables.get("players_gacha_info") ?? []
     const parentIds = new Set(parentRows.map(row => (
         safeInteger(row.gacha_id, "players_gacha_info.gacha_id", 1)
@@ -42,23 +37,17 @@ export function assertValidGachaSaveState(tables: ReadonlyMap<
             safeInteger(row.crazy_draw_count, "players_gacha_info.crazy_draw_count")
         }
     }
-    const hasContentBoundGachaState = (tables.get("players_gacha_details")?.length ?? 0) > 0
+    const hasContentBoundGachaState = (tables.get("players_gacha_details") ?? []).some(row => (
+        (row.comeback_period_start_time !== null
+            && row.comeback_period_start_time !== undefined)
+        || (row.comeback_period_end_time !== null
+            && row.comeback_period_end_time !== undefined)
+    ))
         || (tables.get("players_stars_gacha_campaigns")?.length ?? 0) > 0
         || (tables.get("players_gacha_crazy_results")?.length ?? 0) > 0
-        || (tables.get("players_gacha_conversions")?.length ?? 0) > 0
-    if (!hasContentBoundGachaState) return
-    const gachas = getRuntimeContentTableSync(
-        "gacha.json",
-        bundledGachas as GachaRuntimeBanners,
-    )
-    const starsCampaigns = getRuntimeContentTableSync(
-        "stars_gacha_campaign.json",
-        bundledStarsCampaigns as Readonly<Record<string, StarsGachaCampaignDefinition>>,
-    )
-    const gachaPools = getRuntimeContentTableSync(
-        "gacha_pool.json",
-        bundledGachaPools as GachaPools,
-    )
+    const catalog = hasContentBoundGachaState
+        ? suppliedCatalog ?? getGachaCatalog()
+        : null
 
     for (const row of tables.get("players_gacha_details") ?? []) {
         const gachaId = safeInteger(row.gacha_id, "players_gacha_details.gacha_id", 1)
@@ -73,7 +62,8 @@ export function assertValidGachaSaveState(tables: ReadonlyMap<
         if (start !== null) {
             const startMs = unixMilliseconds(start, "players_gacha_details.comeback_period_start_time")
             const endMs = unixMilliseconds(end, "players_gacha_details.comeback_period_end_time")
-            if (startMs > endMs || gachas[String(gachaId)]?.isComeback !== true) {
+            if (startMs > endMs
+                || catalog?.banners[String(gachaId)]?.definition.isComeback !== true) {
                 throw new Error(`Gacha detail ${gachaId} has an invalid Comeback period`)
             }
         }
@@ -87,9 +77,10 @@ export function assertValidGachaSaveState(tables: ReadonlyMap<
         )
         const gachaId = safeInteger(row.gacha_id, "players_stars_gacha_campaigns.gacha_id", 1)
         if (!parentIds.has(gachaId)) throw new Error(`Stars Gacha ${gachaId} has no parent info`)
-        const campaign = starsCampaigns[String(campaignId)]
-        const banner = gachas[String(gachaId)]
-        if (campaign === undefined || campaign.gachaId !== gachaId || banner?.isStarsGacha !== true) {
+        const campaign = catalog?.starsCampaigns[String(campaignId)]
+        const banner = catalog?.banners[String(gachaId)]
+        if (campaign === undefined || campaign.gachaId !== gachaId
+            || banner?.definition.isStarsGacha !== true) {
             throw new Error(`Stars campaign ${campaignId} does not match Gacha ${gachaId}`)
         }
         const startMs = unixMilliseconds(
@@ -128,19 +119,18 @@ export function assertValidGachaSaveState(tables: ReadonlyMap<
             "players_gacha_crazy_results.character_id",
             1,
         )
-        const banner = gachas[String(gachaId)]
+        const banner = catalog?.banners[String(gachaId)]
         if (!parentIds.has(gachaId)
             || banner?.kind !== "character"
-            || banner.page.kind !== 5
+            || banner.definition.page.kind !== 5
             || slot > 2
             || position > 9) {
             throw new Error(`Crazy Gacha result ${gachaId}/${slot}/${position} is invalid`)
         }
         let candidateIds = crazyCandidateIds.get(gachaId)
         if (candidateIds === undefined) {
-            candidateIds = new Set(Object.values(banner.poolOddsIds).flatMap(oddsId => (
-                (gachaPools[oddsId] ?? []).map(item => item.id)
-            )))
+            candidateIds = new Set(Object.values(banner.poolsByRank)
+                .flatMap(pool => pool.items.map(item => item.id)))
             crazyCandidateIds.set(gachaId, candidateIds)
         }
         if (!candidateIds.has(characterId)) {

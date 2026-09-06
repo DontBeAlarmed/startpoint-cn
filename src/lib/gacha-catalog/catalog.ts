@@ -9,6 +9,7 @@ import type {
     StarsGachaCampaignDefinition,
 } from "../types/gacha"
 import type { GachaBanner, GachaCatalog, GachaWeightedPool } from "./model"
+import type { EquipmentGachaMovieProbability } from "../gacha-equipment-movie"
 import { isGachaPeriodAvailable, parseGachaJstTimestamp } from "./period"
 
 function positiveInteger(value: unknown, subject: string): number {
@@ -112,6 +113,37 @@ function validateRankRates(gachaId: number, banner: GachaRuntimeBanner): void {
     }
 }
 
+const EQUIPMENT_MOVIE_PROBABILITY_FIELDS = [
+    "probabilityEruption",
+    "probabilityTreasureUp3To5",
+    "probabilityTreasureUp4To5",
+    "probabilityTreasureUp3To4",
+    "guaranteeProbabilityTreasureUp3To5",
+    "guaranteeProbabilityTreasureUp4To5",
+    "guaranteeProbabilityTreasureUp3To4",
+] as const
+
+function buildEquipmentMovieProfiles(
+    raw: Readonly<Record<string, EquipmentGachaMovieProbability>>,
+): Readonly<Record<string, EquipmentGachaMovieProbability>> {
+    const profiles: Record<string, EquipmentGachaMovieProbability> = {}
+    for (const [idText, profile] of Object.entries(raw)) {
+        positiveInteger(Number(idText), "Equipment movie profile id")
+        if (!profile || typeof profile !== "object" || Array.isArray(profile)
+            || typeof profile.stringId !== "string" || profile.stringId.length === 0
+            || EQUIPMENT_MOVIE_PROBABILITY_FIELDS.some(field => (
+                typeof profile[field] !== "number"
+                || !Number.isFinite(profile[field])
+                || profile[field] < 0
+                || profile[field] > 1
+            ))) {
+            throw new TypeError(`Equipment movie profile ${idText} is invalid.`)
+        }
+        profiles[idText] = profile
+    }
+    return profiles
+}
+
 export function buildGachaCatalog(repository: ReadonlyContentRepository): GachaCatalog {
     const characters = repository.table<Readonly<Record<string, { readonly rarity?: unknown }>>>(
         "character.json",
@@ -120,8 +152,10 @@ export function buildGachaCatalog(repository: ReadonlyContentRepository): GachaC
         "equipment_lookup.json",
     )
     const itemLookup = repository.table<Readonly<Record<string, unknown>>>("item_lookup.json")
-    const equipmentMovieProfiles = repository.table<Readonly<Record<string, unknown>>>(
-        "equipment_gacha_movie_probability.json",
+    const equipmentMovieProfiles = buildEquipmentMovieProfiles(
+        repository.table<Readonly<Record<string, EquipmentGachaMovieProbability>>>(
+            "equipment_gacha_movie_probability.json",
+        ),
     )
     const rawPools = repository.table<GachaPools>("gacha_pool.json")
     const pools = Object.fromEntries(Object.entries(rawPools).map(([id, items]) => [
@@ -279,6 +313,7 @@ export function buildGachaCatalog(repository: ReadonlyContentRepository): GachaC
         starsCampaigns,
         exchangeRates,
         exchangeableByGachaAndItem: exchangeable,
+        equipmentMovieProfiles,
     })
 }
 

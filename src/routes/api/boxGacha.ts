@@ -10,7 +10,7 @@ import { playerOwnsEquipmentSync, updatePlayerEquipmentSync } from "../../data/d
 import { updatePlayerPartyGroupSync } from "../../data/domains/party"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { getBoxGachaSync } from "../../lib/assets";
+import { getBoxGachaContent, getBoxGachaContentCatalog } from "../../lib/box-gacha-content";
 import { parseBoxGachaResetRequest, sendBoxGachaResultCode } from "../../lib/box-gacha-protocol";
 import { BoxGachaInvalidPeriodError, BoxGachaResetError, resetBoxGachaSync, validateBoxGachaPeriod } from "../../lib/box-gacha-reset";
 import { grantBoxGachaDrawInTransactionOwnerWithInventorySync } from "../../lib/box-gacha-reward-grant";
@@ -113,7 +113,7 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "No players bound to account."
         })
 
-        const boxGachaData = getBoxGachaSync(boxGachaId)
+        const boxGachaData = getBoxGachaContent(getBoxGachaContentCatalog(), boxGachaId)
         const settings = boxGachaData?.boxSettings[boxId]
         const availableCount = boxGachaData?.availableCounts[boxId]
         if (
@@ -190,7 +190,7 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get box asset data.
-        const boxGachaData = getBoxGachaSync(boxGachaId)
+        const boxGachaData = getBoxGachaContent(getBoxGachaContentCatalog(), boxGachaId)
         if (boxGachaData === null) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid box gacha id."
@@ -281,7 +281,7 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get box gacha data
-        const boxGachaData = getBoxGachaSync(boxGachaId)
+        const boxGachaData = getBoxGachaContent(getBoxGachaContentCatalog(), boxGachaId)
         if (boxGachaData === null) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid box gacha id."
@@ -523,7 +523,7 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get box gacha data
-        const boxGachaData = getBoxGachaSync(boxGachaId)
+        const boxGachaData = getBoxGachaContent(getBoxGachaContentCatalog(), boxGachaId)
         if (boxGachaData === null) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid box gacha id."

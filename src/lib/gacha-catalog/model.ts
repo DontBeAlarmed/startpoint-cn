@@ -6,6 +6,7 @@ import type {
     EquipmentGachaRuntimeBanner,
     StarsGachaCampaignDefinition,
 } from "../types/gacha"
+import type { EquipmentGachaMovieProbability } from "../gacha-equipment-movie"
 
 export interface GachaPeriod {
     readonly availableFrom: string
@@ -47,4 +48,5 @@ export interface GachaCatalog {
     readonly starsCampaigns: Readonly<Record<string, Readonly<StarsGachaCampaignDefinition>>>
     readonly exchangeRates: Readonly<GachaExchangeRates>
     readonly exchangeableByGachaAndItem: Readonly<Record<string, Readonly<GachaPoolItem>>>
+    readonly equipmentMovieProfiles: Readonly<Record<string, Readonly<EquipmentGachaMovieProbability>>>
 }

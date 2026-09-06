@@ -182,8 +182,8 @@ test("bundled Gacha byte-integrity and compact source projection stay closed", (
     const legacy = getLegacyGachas(repo)
     assert.strictEqual(
         legacy["1638"].pool["1"],
-        pools[banners["1638"].poolOddsIds["1"]],
-        "legacy compatibility must share prize arrays",
+        getGachaCatalog(repo).pools[banners["1638"].poolOddsIds["1"]].items,
+        "legacy compatibility must share the validated Catalog prize array",
     )
     assert.deepEqual(
         Object.entries(repo.tables["equipment_lookup.json"])
@@ -379,4 +379,8 @@ test("catalog rejects reachable semantic corruption at the content boundary", ()
     const badTicketExpiry = repository()
     badTicketExpiry.tables["gacha.json"]["25009"].ticketExpiryTime = "not-a-time"
     assert.throws(() => buildGachaCatalog(badTicketExpiry), /invalid Gacha period/i)
+
+    const badMovieProfile = repository()
+    badMovieProfile.tables["equipment_gacha_movie_probability.json"]["1"].probabilityEruption = 2
+    assert.throws(() => buildGachaCatalog(badMovieProfile), /movie profile/i)
 })

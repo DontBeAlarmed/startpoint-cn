@@ -11,6 +11,13 @@ const {
 
 test("gameplay readers use the active Content snapshot instead of static bundled tables", t => {
     const restore = installBundledGameplaySnapshot({
+        additionalTableNames: [
+            "gacha.json",
+            "gacha_pool.json",
+            "gacha_campaign_definitions.json",
+            "stars_gacha_campaign.json",
+            "gacha_exchange_rate.json",
+        ],
         tableOverrides: {
             "box_gacha.json": {
                 "77": { itemId: 70077, count: 10, availableCounts: { "1": 2 } },
@@ -44,7 +51,7 @@ test("gameplay readers use the active Content snapshot instead of static bundled
                 },
             },
             "equipment_gacha_movie_probability.json": {
-                "fixture": {
+                "77": {
                     stringId: "fixture",
                     probabilityEruption: 0.5,
                     probabilityTreasureUp3To5: 0,
@@ -54,6 +61,14 @@ test("gameplay readers use the active Content snapshot instead of static bundled
                     guaranteeProbabilityTreasureUp4To5: 0,
                     guaranteeProbabilityTreasureUp3To4: 0,
                 },
+            },
+            "gacha.json": {},
+            "gacha_pool.json": {},
+            "gacha_campaign_definitions.json": {},
+            "stars_gacha_campaign.json": {},
+            "gacha_exchange_rate.json": {
+                character: { "3": 250, "4": 250, "5": 250 },
+                equipment: { "3": 250, "4": 250, "5": 250 },
             },
             "ex_boost.json": {
                 "99001": { tier: 3, count: 2, element: 4 },
@@ -123,6 +138,7 @@ test("gameplay readers use the active Content snapshot instead of static bundled
     t.after(restore)
 
     const carnival = require("../src/lib/carnival-rewards")
+    const boxGachaContent = require("../src/lib/box-gacha-content")
     const equipmentContent = require("../src/lib/equipment-content")
     const equipmentMovie = require("../src/lib/gacha-equipment-movie")
     const itemContent = require("../src/lib/item-content")
@@ -138,7 +154,7 @@ test("gameplay readers use the active Content snapshot instead of static bundled
     }])
     assert.equal(carnival.getCarnivalRewardDefinitions(1).length, 0)
     assert.equal(
-        equipmentMovie.getEquipmentGachaMovieProbabilitySync("fixture").probabilityEruption,
+        equipmentMovie.getEquipmentGachaMovieProbabilitySync("77").probabilityEruption,
         0.5,
     )
     assert.equal(equipmentMovie.getEquipmentGachaMovieProbabilitySync("1"), null)
@@ -183,7 +199,10 @@ test("gameplay readers use the active Content snapshot instead of static bundled
         items: { "1": 3 },
         manaAmount: 100,
     })
-    assert.deepEqual(assets.getBoxGachaSync(77), {
+    assert.deepEqual(boxGachaContent.getBoxGachaContent(
+        boxGachaContent.getBoxGachaContentCatalog(),
+        77,
+    ), {
         redeemItemId: 70077,
         redeemItemCount: 10,
         boxes: {
@@ -203,6 +222,9 @@ test("gameplay readers use the active Content snapshot instead of static bundled
             },
         },
     })
-    assert.equal(assets.getBoxGachaSync(1), null)
+    assert.equal(boxGachaContent.getBoxGachaContent(
+        boxGachaContent.getBoxGachaContentCatalog(),
+        1,
+    ), null)
     assert.equal(raid.getRaidEventRequiredKillCount(77), 321)
 })

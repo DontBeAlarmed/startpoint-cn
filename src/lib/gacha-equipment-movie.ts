@@ -1,5 +1,4 @@
-import equipmentGachaMovieProbability from "../../assets/equipment_gacha_movie_probability.json"
-import { getRuntimeContentTableSync } from "../content/runtime/table-access"
+import { getGachaCatalog } from "./gacha-catalog"
 
 export interface EquipmentMovieDrawInput {
     id: number
@@ -39,11 +38,7 @@ export function getEquipmentGachaMovieProbabilitySync(
 ): EquipmentGachaMovieProbability | null {
     if (id === undefined) return null
 
-    const table = getRuntimeContentTableSync(
-        "equipment_gacha_movie_probability.json",
-        equipmentGachaMovieProbability as Record<string, EquipmentGachaMovieProbability>,
-    )
-    return table[String(id)] ?? null
+    return getGachaCatalog().equipmentMovieProfiles[String(id)] ?? null
 }
 
 // The client renders this value as a grade-up path ending at the drawn rarity.
@@ -125,15 +120,7 @@ export function computeEquipmentGachaMovieEffectsForGacha(
     roll: Roll = Math.random
 ): EquipmentGachaMovieEffects {
     const probability = getEquipmentGachaMovieProbabilitySync(gacha.equipmentMovieProbabilityId)
-    if (!probability) {
-        return {
-            isErupt: false,
-            draws: drawInputs.map((draw) => ({
-                equipmentId: draw.id,
-                treasureUpType: 0,
-            })),
-        }
-    }
+    if (!probability) throw new TypeError("Equipment Gacha movie profile does not exist.")
 
     return computeEquipmentGachaMovieEffects(drawInputs, probability, roll)
 }

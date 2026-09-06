@@ -191,24 +191,43 @@ assert.deepEqual(settings["28"]["5"], {
 assert.equal(settings["28"]["4"].resetKind, 0);
 
 require("ts-node/register/transpile-only");
-const { getBoxGachaSync } = require("../src/lib/assets.ts");
+const {
+    BoxGachaContentError,
+    buildBoxGachaContentCatalog,
+    getBoxGachaContent,
+} = require("../src/lib/box-gacha-content.ts");
+const boxDefinitions = JSON.parse(fs.readFileSync(
+    path.resolve(projectRoot, "assets/box_gacha.json"),
+    "utf8",
+));
+const boxRewards = JSON.parse(fs.readFileSync(
+    path.resolve(projectRoot, "assets/box_reward.json"),
+    "utf8",
+));
+function boxRepository(boxSettings) {
+    return {
+        info: () => ({ source: "test" }),
+        table(tableName) {
+            if (tableName === "box_gacha.json") return boxDefinitions;
+            if (tableName === "box_reward.json") return boxRewards;
+            if (tableName === "box_gacha_box_settings.json") return boxSettings;
+            throw new Error(`unexpected Box Gacha table ${tableName}`);
+        },
+    };
+}
+const boxCatalog = buildBoxGachaContentCatalog(boxRepository(settings));
 assert.deepEqual(
-    getBoxGachaSync(28)?.boxSettings,
+    getBoxGachaContent(boxCatalog, 28)?.boxSettings,
     settings["28"],
-    "asset loader must expose box settings for the selected gacha",
+    "typed Box Gacha catalog must expose settings for the selected gacha",
 );
 
-const settings28 = settings["28"];
-try {
-    delete settings["28"];
-    assert.equal(
-        getBoxGachaSync(28),
-        null,
-        "asset loader must return null when box settings are missing",
-    );
-} finally {
-    settings["28"] = settings28;
-}
+const incompleteSettings = structuredClone(settings);
+delete incompleteSettings["28"];
+assert.throws(
+    () => buildBoxGachaContentCatalog(boxRepository(incompleteSettings)),
+    BoxGachaContentError,
+);
 
 const missingFeatures = [];
 let resetModule;
