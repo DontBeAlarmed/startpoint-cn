@@ -293,12 +293,15 @@ recordActiveMissionSpecificBattleFactsSync({
     questProgress: null,
 })
 assert.equal(getActiveMissionBattleFactsSync(playerId)["20017"], 1)
+// The recorder also counts the loadout mission 20011 once for party character
+// 1 matching its target element under the installed runtime snapshot.
+assert.equal(getActiveMissionBattleFactsSync(playerId)["20011"], 1)
 
 incrementActiveMissionBattleFactSync(playerId, 20011)
 incrementActiveMissionBattleFactSync(playerId, 20011)
 incrementActiveMissionBattleFactSync(playerId, 20012)
 assert.deepEqual(getActiveMissionBattleFactsSync(playerId), {
-    "20011": 2,
+    "20011": 3,
     "20012": 1,
     "20017": 1,
 })
@@ -373,7 +376,7 @@ const state = {
     totalInjectedExpCount: 0,
     totalGachaCampaignCount: 0,
 }
-assert.equal(computeActiveMissionFactProgress(89, definitions[0].row, state, 20011), 2)
+assert.equal(computeActiveMissionFactProgress(89, definitions[0].row, state, 20011), 3)
 assert.equal(computeActiveMissionFactProgress(89, definitions[1].row, state, 20012), 1)
 assert.equal(computeActiveMissionFactProgress(89, definitions[2].row, state, 20013), 0)
 assert.equal(computeActiveMissionFactProgress(91, skillStartDefinitions[0].row, state, 20017), 1)

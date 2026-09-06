@@ -128,15 +128,7 @@ function buildCharacterState(
 ): ConditionalBattleCharacterState | null {
     const growth = context.characterGrowthFacts[String(characterId)]
     if (!growth) return null
-    let rarity = getCharacterFacts().get(characterId)?.rarity
-    if (context.repository) {
-        try {
-            rarity = context.repository.table<Record<string, { readonly rarity?: number }>>("character.json")
-                [String(characterId)]?.rarity ?? rarity
-        } catch {
-            // Bundled character data remains the compatibility fallback.
-        }
-    }
+    const rarity = getCharacterFacts().get(characterId)?.rarity
     const secondBoard = getCharacterGrowthContent().getManaBoardNodes(characterId, 2) ?? {}
     return {
         level: estimateActiveMissionCharacterLevel({
@@ -154,16 +146,9 @@ function buildCharacterState(
 }
 
 function createRecorderContext(context: FinishContext): ActiveBattleFactContext {
-    let repository
-    try {
-        repository = getContentSnapshot().repository
-    } catch {
-        repository = undefined
-    }
     return createActiveBattleFactContext(
         context,
-        getActiveMissionPlan(repository),
-        repository,
+        getActiveMissionPlan(),
     )
 }
 

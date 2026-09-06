@@ -168,14 +168,12 @@ for (const profile of profiles) {
     const repository = getContentSnapshot().repository
     const reconcileSql = measure(() => reconcileActiveMissionFacts({
         playerId,
-        repository,
         now: Date.parse("2024-08-14T12:00:00.000Z"),
     }))
     const finishContext = createFinishContext(playerId, ownedCharacterIds)
     const activeContext = createActiveBattleFactContext(
         finishContext,
         getActiveMissionPlan(repository),
-        repository,
     )
     assert.deepEqual(
         activeContext.targetCharacterIds,
@@ -242,9 +240,7 @@ try {
     const context = createActiveBattleFactContext(
         createFinishContext(playerId, ownedCharacterIds),
         getActiveMissionPlan(originalRepository),
-        originalRepository,
     )
-    assert.equal(context.repository, originalRepository)
 } finally {
     productionContentSnapshotProvider.snapshot = originalSnapshot
 }

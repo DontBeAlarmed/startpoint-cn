@@ -1,6 +1,5 @@
-import bundledCharacters from "../../../assets/character.json"
-import bundledManaBoard from "../../../assets/mana_board.json"
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
+import { getContentSnapshot } from "../../content/runtime/content-snapshot"
+import { getCharacterFacts } from "../character-content"
 import {
     getPlayerCharactersManaNodesSync,
     getPlayerCharactersSync,
@@ -47,6 +46,16 @@ function reachesCharacterLevel80(rarity: number, experience: number): boolean {
         && thresholdIndex >= 0
         && thresholdIndex < thresholds.length
         && experience >= thresholds[thresholdIndex]
+}
+
+function characterFactsTable(characterIds: readonly string[]): RawCharacterTable {
+    const facts = getCharacterFacts()
+    const table: Record<string, { rarity: number }> = {}
+    for (const id of characterIds) {
+        const entry = facts.get(id)
+        if (entry !== null) table[id] = { rarity: entry.rarity }
+    }
+    return table
 }
 
 function getSecondBoardNodeIds(
@@ -116,8 +125,9 @@ export function deriveRegularStateFacts(sources: RegularStateFactSources): Regul
 
 export function getRegularStateFactsSync(playerId: number): RegularStateFacts {
     const craftPointItemId = getEquipmentCurrencyPolicySync().craftPointItemId
+    const characters = getPlayerCharactersSync(playerId)
     return deriveRegularStateFacts({
-        characters: getPlayerCharactersSync(playerId),
+        characters,
         characterManaNodes: getPlayerCharactersManaNodesSync(playerId),
         equipment: getPlayerEquipmentListSync(playerId),
         collectedItemTotals: {
@@ -126,14 +136,8 @@ export function getRegularStateFactsSync(playerId: number): RegularStateFacts {
                 craftPointItemId,
             ),
         },
-        characterTable: getRuntimeContentTableSync<RawCharacterTable>(
-            "character.json",
-            bundledCharacters as RawCharacterTable,
-        ),
-        manaBoardTable: getRuntimeContentTableSync<RawManaBoard>(
-            "mana_board.json",
-            bundledManaBoard as RawManaBoard,
-        ),
+        characterTable: characterFactsTable(Object.keys(characters)),
+        manaBoardTable: getContentSnapshot().repository.table<RawManaBoard>("mana_board.json"),
         craftPointItemId,
     })
 }

@@ -337,12 +337,22 @@ test("fixed point caches static facts and only recomputes dirty dependencies", (
             },
         }
         const repository = createRepository()
-        const result = reconcileActiveMissionFactsWithResult({
-            playerId,
+        const { productionContentSnapshotProvider } = require("../src/content/runtime/content-snapshot")
+        const previousSnapshot = productionContentSnapshotProvider.snapshot
+        productionContentSnapshotProvider.snapshot = {
+            cdn: { targetVersion: "fixed-point-test" },
             repository,
-            now: Date.parse("2024-08-14T12:00:00.000Z"),
-            observer,
-        })
+        }
+        let result
+        try {
+            result = reconcileActiveMissionFactsWithResult({
+                playerId,
+                now: Date.parse("2024-08-14T12:00:00.000Z"),
+                observer,
+            })
+        } finally {
+            productionContentSnapshotProvider.snapshot = previousSnapshot
+        }
 
         assert.equal(metrics.staticComputes[90001], 1)
         assert.equal(metrics.staticComputes[90004], 1)

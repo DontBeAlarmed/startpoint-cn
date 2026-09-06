@@ -16,6 +16,9 @@ const mission = require("../src/lib/mission")
 const {
     getMissionCatalog,
 } = require("../src/lib/mission/mission-catalog")
+const {
+    bundledMissionContentRepository,
+} = require("../src/lib/mission/mission-catalog-source")
 
 const CATEGORY_LAYOUTS = Object.freeze({
     1: { definition: "mission_regular.json", reward: "mission_regular_reward.json", pattern: 0, start: 25, end: 26, progress: 1, rewardStart: 5 },
@@ -515,11 +518,11 @@ test("deep-freezes every public cached value", () => {
     assert.equal(catalog.getDefinition(9, 11).row[1], "123")
 })
 
-test("switches from the bundled pre-init catalog to runtime repository identity", () => {
+test("pre-init catalog access fails closed and follows the installed runtime repository", () => {
     const previousSnapshot = productionContentSnapshotProvider.snapshot
     try {
         productionContentSnapshotProvider.snapshot = null
-        const bundledCatalog = getMissionCatalog()
+        assert.throws(() => getMissionCatalog(), /CONTENT_SNAPSHOT_NOT_INITIALIZED/)
         const tables = emptyTables()
         addMission(tables, 1, "999", { 1: [rewardRow(1, 999001, 1)] })
         const runtimeRepository = repository(tables, "runtime")
@@ -530,7 +533,6 @@ test("switches from the bundled pre-init catalog to runtime repository identity"
         }
 
         const runtimeCatalog = getMissionCatalog()
-        assert.notEqual(runtimeCatalog, bundledCatalog)
         assert.equal(runtimeCatalog, getMissionCatalog(runtimeRepository))
         assert.deepEqual(runtimeCatalog.getMissionIds(1), [999])
     } finally {
@@ -539,10 +541,8 @@ test("switches from the bundled pre-init catalog to runtime repository identity"
 })
 
 test("bundled catalog covers categories 1-10 with authoritative counts and samples", () => {
-    const previousSnapshot = productionContentSnapshotProvider.snapshot
-    try {
-        productionContentSnapshotProvider.snapshot = null
-        const catalog = getMissionCatalog()
+    const catalog = getMissionCatalog(bundledMissionContentRepository)
+    {
         const expectedCounts = [120, 656, 2512, 997, 1288, 76, 76, 115, 144, 2]
         assert.deepEqual(
             expectedCounts.map((_, index) => catalog.getMissionIds(index + 1).length),
@@ -551,7 +551,5 @@ test("bundled catalog covers categories 1-10 with authoritative counts and sampl
         for (let category = 1; category <= 10; category++) {
             assert.ok(catalog.getDefinitions(category).length > 0, `category ${category}`)
         }
-    } finally {
-        productionContentSnapshotProvider.snapshot = previousSnapshot
     }
 })

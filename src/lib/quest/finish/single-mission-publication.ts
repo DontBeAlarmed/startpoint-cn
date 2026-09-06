@@ -1,4 +1,3 @@
-import { getContentSnapshot } from "../../../content/runtime/content-snapshot"
 import {
     getAwakeBattleMissionIds,
     reconcileActiveMissionFacts,
@@ -57,7 +56,6 @@ export function settleSingleMissionEvaluations(input: {
         },
         activeMissionList: reconcileActiveMissionFacts({
             playerId: input.playerId,
-            repository: getContentSnapshot().repository,
             now: input.evaluationTime,
         }),
         invalidatedFactKeys: [

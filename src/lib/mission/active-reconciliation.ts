@@ -1,4 +1,3 @@
-import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
 import { getDb } from "../../data/db"
 import {
     getPlayerActiveMissionsSync,
@@ -34,8 +33,6 @@ export type { ActiveMissionEventEligibilityContext }
 
 export interface ReconcileActiveMissionFactsInput {
     readonly playerId: number
-    /** Fact-domain source only; plan reads go through the typed ActiveMissionPlan. */
-    readonly repository: ReadonlyContentRepository
     readonly now: number | Date
     readonly observer?: ActiveMissionFactObserver
     readonly isEventEligible?: (context: ActiveMissionEventEligibilityContext) => boolean
@@ -54,12 +51,12 @@ export function reconcileActiveMissionFactsWithResult(
         if (!player) {
             throw new Error(`Player ${input.playerId} does not exist.`)
         }
-        const plan = getActiveMissionPlan(input.repository)
+        const plan = getActiveMissionPlan()
         const session = createActiveMissionFactSession({
             playerId: input.playerId,
             plan,
             observer: input.observer,
-            domains: createProductionActiveMissionFactDomains(input.repository, player),
+            domains: createProductionActiveMissionFactDomains(player),
         })
         const result = runActiveMissionReconciliation({
             playerId: input.playerId,

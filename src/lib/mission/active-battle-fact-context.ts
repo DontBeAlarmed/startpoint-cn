@@ -1,4 +1,3 @@
-import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
 import {
     getPlayerCharacterGrowthFactsByIdsSync,
     getPlayerCharacterManaNodesByIdsSync,
@@ -11,7 +10,6 @@ const CONDITIONAL_BATTLE_PATTERNS = new Set([71, 72, 73])
 
 export interface ActiveBattleFactContext {
     readonly plan: ActiveMissionPlan
-    readonly repository?: ReadonlyContentRepository
     readonly partyCharacterIds: readonly number[]
     readonly unisonCharacterIds: readonly number[]
     readonly allPartyCharacterIds: readonly number[]
@@ -34,7 +32,6 @@ function collectCharacterIds(
 export function createActiveBattleFactContext(
     context: FinishContext,
     plan: ActiveMissionPlan,
-    repository: ReadonlyContentRepository | undefined,
 ): ActiveBattleFactContext {
     const partyCharacterIds = collectCharacterIds(context.party.characters)
     const unisonCharacterIds = collectCharacterIds(context.party.unison_characters)
@@ -53,7 +50,6 @@ export function createActiveBattleFactContext(
     )))].sort((left, right) => left - right)
     return {
         plan,
-        repository,
         partyCharacterIds,
         unisonCharacterIds,
         allPartyCharacterIds,

@@ -1,5 +1,4 @@
 import { recordMissionBattleResultSync } from "../../data/domains/mission_battle_facts"
-import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { trackCharacterClears } from "../quest/finish/character-clear-tracker"
 import { trackLeaderPowerflip } from "../quest/finish/leader-powerflip-tracker"
 import { trackPartyCoClears } from "../quest/finish/party-co-clear-tracker"
@@ -128,16 +127,9 @@ export function recordMissionBattleFacts(
         isMulti: ctx.isMulti,
         isMvp: ctx.statistics.is_mvp === true,
     }, evaluationTime)
-    let repository
-    try {
-        repository = getContentSnapshot().repository
-    } catch {
-        repository = undefined
-    }
     const activeBattleFactContext = createActiveBattleFactContext(
         ctx,
-        getActiveMissionPlan(repository),
-        repository,
+        getActiveMissionPlan(),
     )
     recordActiveMissionSpecificBattleFactsSync(ctx, activeBattleFactContext)
     recordActiveMissionConditionalBattleFactsSync(ctx, activeBattleFactContext)

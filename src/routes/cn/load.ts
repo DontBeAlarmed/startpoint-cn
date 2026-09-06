@@ -395,7 +395,6 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
 
         const activeMissionReconciliation = reconcileActiveMissionFactsWithResult({
             playerId,
-            repository: contentSnapshot.repository,
             now: getServerTime() * 1000,
         });
 

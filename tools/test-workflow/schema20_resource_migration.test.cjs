@@ -7,7 +7,7 @@ const Sqlite = require("better-sqlite3")
 
 require("ts-node/register/transpile-only")
 
-const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+const restoreContentSnapshot = require("../helpers/install-bundled-gameplay-snapshot.cjs")
     .installBundledGameplaySnapshot()
 process.once("exit", () => { restoreContentSnapshot() })
 

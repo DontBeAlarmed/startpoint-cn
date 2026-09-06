@@ -11,7 +11,7 @@ process.env.DATA_DIR = path.join(importSandbox, "data")
 process.on("exit", () => fs.rmSync(importSandbox, { recursive: true, force: true }))
 require("ts-node/register/transpile-only")
 
-const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+const restoreContentSnapshot = require("../helpers/install-bundled-gameplay-snapshot.cjs")
     .installBundledGameplaySnapshot()
 process.once("exit", () => { restoreContentSnapshot() })
 

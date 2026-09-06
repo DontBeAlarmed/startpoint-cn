@@ -328,7 +328,7 @@ async function main() {
     `)
 
     observedActiveMissionPlans.length = 0
-    const first = reconcileActiveMissionFacts({ playerId, repository, now: serverNow })
+    const first = reconcileActiveMissionFacts({ playerId, now: serverNow })
     assert.equal(
         observedActiveMissionPlans.length,
         1,
@@ -372,7 +372,7 @@ async function main() {
 
     updatePlayerSync({ id: playerId, totalLoginDays: 1, totalStaminaUsed: 5 })
     assert.deepEqual(
-        reconcileActiveMissionFacts({ playerId, repository, now: serverNow }),
+        reconcileActiveMissionFacts({ playerId, now: serverNow }),
         [],
         "绝对事实降低与重复 reconcile 都不得产生增量或回退",
     )
@@ -390,7 +390,7 @@ async function main() {
         END
     `)
     assert.throws(
-        () => reconcileActiveMissionFacts({ playerId, repository, now: serverNow }),
+        () => reconcileActiveMissionFacts({ playerId, now: serverNow }),
         /forced active reconciliation failure/,
     )
     assert.equal(getPlayerActiveMissionsSync(playerId)[90004].progress, 3, "数据库异常必须回滚较早写入")

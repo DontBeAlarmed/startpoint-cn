@@ -17,7 +17,6 @@ import { settleCharacterStoryFactMissions } from "../../lib/mission/story-fact-s
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { getQuestJoinCharacterIds } from "../../lib/story-join-character";
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 import { QuestCategory } from "../../lib/types";
 import { recordCompletedMainChapterMilestoneSync } from "../../lib/player-history-milestones";
 import { projectItemOverflowCommonResponse } from "../../lib/item-overflow";
@@ -109,7 +108,6 @@ function processStoryQuestFinish(
         ]
         const activeMissionList = reconcileActiveMissionFacts({
             playerId,
-            repository: getContentSnapshot().repository,
             now: evaluationTime.getTime(),
         })
         const characterList = publishCharacterGrowthOwnerStateBestEffort(

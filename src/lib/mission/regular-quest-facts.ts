@@ -1,6 +1,4 @@
-import bundledExQuests from "../../../assets/ex_quest.json"
-import bundledMainQuests from "../../../assets/main_quest.json"
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
+import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import type { CategoryContext } from "./types"
 import { MissionMasterDefinition, getMissionCatalog } from "./mission-catalog"
 
@@ -49,9 +47,9 @@ function getStoryQuestRule(definition: MissionMasterDefinition): {
     const quests = parseIntegerList(definition.row[10])
     if (worlds === null && chapters === null && quests === null) return null
 
-    const table = rangeKind === 0
-        ? getRuntimeContentTableSync<RawQuestTable>("main_quest.json", bundledMainQuests)
-        : getRuntimeContentTableSync<RawQuestTable>("ex_quest.json", bundledExQuests)
+    const table = getContentSnapshot().repository.table<RawQuestTable>(
+        rangeKind === 0 ? "main_quest.json" : "ex_quest.json",
+    )
     const candidates = Object.keys(table)
         .map(Number)
         .filter(questId => Number.isSafeInteger(questId)

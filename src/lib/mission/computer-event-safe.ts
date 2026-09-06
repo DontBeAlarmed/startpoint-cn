@@ -1,17 +1,10 @@
 import type { PlayerQuestProgress } from "../../data/types"
 import {
-    ContentSnapshotError,
     getContentSnapshot,
 } from "../../content/runtime/content-snapshot"
 import { buildCharacterStoryQuestIndex } from "./character-queries"
 import { characterExpCaps } from "../character"
 import { readonlyMap, readonlySet } from "./degree-immutable"
-import bundledCharacters from "../../../assets/character.json"
-import bundledCharacterQuests from "../../../assets/character_quest_lookup.json"
-import bundledEquipmentDissolve from "../../../assets/equipment_dissolve.json"
-import bundledItemSale from "../../../assets/item_sale.json"
-import bundledMainQuests from "../../../assets/main_quest.json"
-import bundledManaBoard from "../../../assets/mana_board.json"
 import {
     getMissionCatalog,
     getMissionCatalogContentTable,
@@ -36,7 +29,6 @@ type RawManaBoardTable = Record<string, Record<string, Record<string, readonly u
 
 const staticIndexByRepository = new WeakMap<object, EventCurrentStateStaticIndex>()
 const staticIndexByCatalog = new WeakMap<MissionCatalog, EventCurrentStateStaticIndex>()
-let bundledStaticIndex: EventCurrentStateStaticIndex | undefined
 
 function unavailableStaticIndex(): EventCurrentStateStaticIndex {
     return Object.freeze({
@@ -225,23 +217,8 @@ export function getEventCurrentStateStaticIndex(
         const built = buildStaticIndex(<T>(tableName: string) => repository.table<T>(tableName))
         staticIndexByRepository.set(repository, built)
         return built
-    } catch (error) {
-        if (!(error instanceof ContentSnapshotError)
-            || error.code !== "CONTENT_SNAPSHOT_NOT_INITIALIZED") {
-            return unavailableStaticIndex()
-        }
-        if (!bundledStaticIndex) {
-            const tables: Readonly<Record<string, unknown>> = {
-                "character.json": bundledCharacters,
-                "character_quest_lookup.json": bundledCharacterQuests,
-                "equipment_dissolve.json": bundledEquipmentDissolve,
-                "item_sale.json": bundledItemSale,
-                "main_quest.json": bundledMainQuests,
-                "mana_board.json": bundledManaBoard,
-            }
-            bundledStaticIndex = buildStaticIndex(<T>(tableName: string) => tables[tableName] as T)
-        }
-        return bundledStaticIndex
+    } catch {
+        return unavailableStaticIndex()
     }
 }
 

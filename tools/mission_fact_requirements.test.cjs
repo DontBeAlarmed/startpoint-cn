@@ -499,11 +499,10 @@ test("caches by MissionCatalog identity without leaking global Degree definition
     )
 })
 
-test("isolates Event and Awake provider views from current snapshot build order", () => {
+test("requirement registries follow their own catalog content regardless of build order", () => {
     const previousSnapshot = productionContentSnapshotProvider.snapshot
     try {
-        productionContentSnapshotProvider.snapshot = null
-        const bundledCatalog = getMissionCatalog()
+        const bundledCatalog = getMissionCatalog(bundledMissionContentRepository)
         const bundledRegistry = getMissionFactRequirementRegistry(bundledCatalog)
         assert.equal(bundledRegistry.getRequirement(3, 1200).mode, "persisted")
         assert.equal(bundledRegistry.getRequirement(9, 1110013).mode, "persisted")
@@ -535,16 +534,21 @@ test("isolates Event and Awake provider views from current snapshot build order"
             repository: runtimeRepository,
         }
 
+        // The runtime catalog is the current authority: its own drifted
+        // definitions stay self-consistent instead of being rejected against
+        // the bundled baseline.
         const runtimeCatalog = getMissionCatalog(runtimeRepository)
         const runtimeRegistry = getMissionFactRequirementRegistry(runtimeCatalog)
-        assertUnsupported(runtimeRegistry.getRequirement(3, 1200), /producer|schema|contract/i)
-        assertUnsupported(runtimeRegistry.getRequirement(9, 1110013), /awake|schema|family/i)
+        assert.equal(runtimeRegistry.getRequirement(3, 1200).mode, "persisted")
+        assert.equal(runtimeRegistry.getRequirement(9, 1110013).mode, "persisted")
 
+        // A registry built afterwards over bundled content compares against
+        // the drifted current catalog, so those definitions no longer match.
         const sameBundledContent = getMissionFactRequirementRegistry(
             forwardingCatalog(bundledCatalog),
         )
-        assert.equal(sameBundledContent.getRequirement(3, 1200).mode, "persisted")
-        assert.equal(sameBundledContent.getRequirement(9, 1110013).mode, "persisted")
+        assertUnsupported(sameBundledContent.getRequirement(3, 1200), /producer|schema|contract|pattern/i)
+        assertUnsupported(sameBundledContent.getRequirement(9, 1110013), /awake|schema|family|pattern/i)
     } finally {
         productionContentSnapshotProvider.snapshot = previousSnapshot
     }
