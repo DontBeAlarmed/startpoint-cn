@@ -1,8 +1,4 @@
-import bundledPlayerHistories from "../../assets/player_history.json"
-import bundledPlayerHistoryBackgrounds from "../../assets/player_history_card_background.json"
-import bundledPlayerHistoryTopics from "../../assets/player_history_topic.json"
-
-import { getRuntimeContentTableSync } from "../content/runtime/table-access"
+import { getContentSnapshot } from "../content/runtime/content-snapshot"
 
 type RawFlatTable = Record<string, unknown>
 type RawNestedTable = Record<string, unknown>
@@ -167,18 +163,14 @@ function parseTopics(table: RawNestedTable, historyId: number): readonly PlayerH
 
 export function loadPlayerHistoryCatalog(nowMs: number): PlayerHistoryCatalog {
     if (!Number.isFinite(nowMs)) malformed("current server time")
-    const histories = getRuntimeContentTableSync(
-        "player_history.json",
-        bundledPlayerHistories as RawFlatTable,
-    )
+    const repository = getContentSnapshot().repository
+    const histories = repository.table<RawFlatTable>("player_history.json")
     const historyId = parseCurrentHistoryId(histories, nowMs)
-    const backgrounds = parseBackgrounds(getRuntimeContentTableSync(
+    const backgrounds = parseBackgrounds(repository.table<RawFlatTable>(
         "player_history_card_background.json",
-        bundledPlayerHistoryBackgrounds as RawFlatTable,
     ))
-    const topics = parseTopics(getRuntimeContentTableSync(
+    const topics = parseTopics(repository.table<RawNestedTable>(
         "player_history_topic.json",
-        bundledPlayerHistoryTopics as RawNestedTable,
     ), historyId)
     return Object.freeze({
         playerHistoryId: historyId,

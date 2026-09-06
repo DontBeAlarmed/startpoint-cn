@@ -21,6 +21,13 @@ export function getQuestContentTableSync(tableName: QuestTableName): RawQuests {
     return getContentSnapshot().repository.table<RawQuests>(tableName)
 }
 
+/** Main quest ids belonging to one progression chapter (id / 1_000_000). */
+export function getMainQuestIdsForChapter(chapter: number): readonly number[] {
+    return Object.keys(getQuestContentTableSync("main_quest.json"))
+        .map(Number)
+        .filter(id => Math.floor(id / 1_000_000) === chapter)
+}
+
 export function getQuestConfigurationErrorResponse(error: unknown): Record<string, unknown> | null {
     if (!(error instanceof QuestConfigurationError)) return null
     return {
