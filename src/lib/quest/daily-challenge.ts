@@ -1,4 +1,35 @@
 import { QuestCategory } from "../types"
+import { getContentSnapshot, type ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
+
+export interface DailyChallengePointDefinition {
+    readonly id: number
+    readonly maxPoint: number
+    readonly isRecovery: boolean
+}
+
+type DailyChallengePointLookupTable = Record<string, { maxPoint: number, isRecovery: boolean, name: string }>
+
+const definitionsByRepository = new WeakMap<ReadonlyContentRepository, readonly DailyChallengePointDefinition[]>()
+
+export function getDailyChallengePointDefinitions(): readonly DailyChallengePointDefinition[] {
+    const repository = getContentSnapshot().repository
+    const cached = definitionsByRepository.get(repository)
+    if (cached) return cached
+    const lookup = repository.table<DailyChallengePointLookupTable>("daily_challenge_point_lookup.json")
+    const definitions = Object.freeze(Object.entries(lookup).map(([idStr, data]) => ({
+        id: Number(idStr),
+        maxPoint: data.maxPoint,
+        isRecovery: data.isRecovery,
+    })))
+    definitionsByRepository.set(repository, definitions)
+    return definitions
+}
+
+export function getDailyChallengePointDefinition(
+    challengePointId: number,
+): DailyChallengePointDefinition | undefined {
+    return getDailyChallengePointDefinitions().find(definition => definition.id === challengePointId)
+}
 
 export class DailyChallengePointExhaustedError extends Error {
     constructor(public readonly challengePointId: number) {

@@ -1,5 +1,4 @@
-import bundledCampaignData from "../../assets/stamina_campaign.json";
-import { getRuntimeContentTableSync } from "../content/runtime/table-access";
+import { getContentSnapshot, type ReadonlyContentRepository } from "../content/runtime/content-snapshot";
 import { QuestCategory } from "./types";
 
 interface StaminaCampaign {
@@ -32,17 +31,14 @@ function buildCampaigns(campaignData: CampaignTable): readonly StaminaCampaign[]
     return Object.freeze(campaigns)
 }
 
-const campaignsByTable = new WeakMap<CampaignTable, readonly StaminaCampaign[]>()
+const campaignsByRepository = new WeakMap<ReadonlyContentRepository, readonly StaminaCampaign[]>()
 
 function getCampaigns(): readonly StaminaCampaign[] {
-    const table = getRuntimeContentTableSync(
-        "stamina_campaign.json",
-        bundledCampaignData as CampaignTable,
-    )
-    const cached = campaignsByTable.get(table)
+    const repository = getContentSnapshot().repository
+    const cached = campaignsByRepository.get(repository)
     if (cached) return cached
-    const campaigns = buildCampaigns(table)
-    campaignsByTable.set(table, campaigns)
+    const campaigns = buildCampaigns(repository.table<CampaignTable>("stamina_campaign.json"))
+    campaignsByRepository.set(repository, campaigns)
     return campaigns
 }
 

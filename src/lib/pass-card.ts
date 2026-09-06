@@ -1,6 +1,4 @@
-import bundledPassCardEvents from "../../assets/pass_card_event.json"
-import bundledPassCardRewards from "../../assets/pass_card_reward.json"
-import { getRuntimeContentTableSync } from "../content/runtime/table-access"
+import { getContentSnapshot } from "../content/runtime/content-snapshot"
 import type { ActiveMissionReward } from "./mission/rewards"
 
 export interface PassCardEventDefinition {
@@ -60,9 +58,8 @@ function parseReward(row: readonly unknown[], kindIndex: number): ActiveMissionR
 }
 
 export function getPassCardEventDefinition(eventId: number): PassCardEventDefinition | undefined {
-    const passCardEvents = getRuntimeContentTableSync(
+    const passCardEvents = getContentSnapshot().repository.table<Record<string, unknown>>(
         "pass_card_event.json",
-        bundledPassCardEvents as Record<string, unknown>,
     )
     const row = firstRow(passCardEvents[String(eventId)])
     const thresholdPoint = row ? integer(row[4]) : undefined
@@ -77,9 +74,8 @@ export function getPassCardEventDefinition(eventId: number): PassCardEventDefini
 }
 
 export function getActivePassCardEventDefinitionAt(at: Date): PassCardEventDefinition | undefined {
-    const passCardEvents = getRuntimeContentTableSync(
+    const passCardEvents = getContentSnapshot().repository.table<Record<string, unknown>>(
         "pass_card_event.json",
-        bundledPassCardEvents as Record<string, unknown>,
     )
     return Object.keys(passCardEvents)
         .map(eventId => integer(eventId))
@@ -97,9 +93,8 @@ export function isPassCardEventActiveAt(event: PassCardEventDefinition, at: Date
 }
 
 export function getPassCardRewardDefinition(rewardId: number): PassCardRewardDefinition | undefined {
-    const passCardRewards = getRuntimeContentTableSync(
+    const passCardRewards = getContentSnapshot().repository.table<Record<string, unknown>>(
         "pass_card_reward.json",
-        bundledPassCardRewards as Record<string, unknown>,
     )
     const row = firstRow(passCardRewards[String(rewardId)])
     if (!row) return undefined

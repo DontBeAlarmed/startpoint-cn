@@ -3,10 +3,9 @@ import { getPlayerQuestProgressSync, insertPlayerQuestProgressSync, updatePlayer
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { getQuestFromCategorySync } from "../../lib/assets";
+import { getQuestFromCategorySync } from "../../lib/quest-content";
+import { getQuestUnlockCost } from "../../lib/quest-entry-content";
 import { generateDataHeaders } from "../../utils";
-import bundledQuestUnlockCosts from "../../../assets/quest_unlock_costs.json";
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
 import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
@@ -70,10 +69,7 @@ const routes = async (fastify: FastifyInstance) => {
             })
         }
 
-        const unlockCost = getRuntimeContentTableSync(
-            "quest_unlock_costs.json",
-            bundledQuestUnlockCosts as Record<string, { itemIds: number[], itemCounts: number[] }>,
-        )[String(questId)]
+        const unlockCost = getQuestUnlockCost(questId)
         if (!unlockCost || unlockCost.itemIds.length === 0) {
             return reply.status(400).send({
                 "error": "Bad Request",

@@ -8,10 +8,6 @@ const ts = require("typescript")
 
 const projectRoot = path.resolve(__dirname, "..")
 const expectedAccess = Object.freeze({
-    "src/lib/pass-card.ts": Object.freeze({
-        "pass_card_event.json": "bundledPassCardEvents",
-        "pass_card_reward.json": "bundledPassCardRewards",
-    }),
     "src/lib/quest/score-reward-selection.ts": Object.freeze({
         "reward_element_map.json": "bundledRewardElementMap",
     }),

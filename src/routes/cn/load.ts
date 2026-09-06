@@ -16,14 +16,13 @@ import { getRoom } from "../../multi/room/manager";
 import { runPermanentValidators } from "../../lib/validate";
 import { restoreActiveQuestFromStorage } from "../../lib/quest/entry-lifecycle";
 import { ActiveQuest, publishActiveQuest, runAbortActiveQuestTransaction } from "../../lib/quest/active-quest-service";
-import type { StartEntryCost } from "../../lib/quest/start-entry";
+import { getQuestEntryCost } from "../../lib/quest-entry-content";
 import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 import {
     parseAssetProviderConfig,
     resolveAssetLoadState,
     type AssetProviderConfig,
 } from "../../content/cdn/asset-mode";
-import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json";
 import bundledLoginBonuses from "../../../assets/login_bonus.json";
 import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 import { reconcileActiveMissionFactsWithResult } from "../../lib/mission/active-reconciliation";
@@ -381,12 +380,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             }
             if (activeQuest) {
                 activeQuest = restoreActiveQuestFromStorage(playerId, activeQuest, {
-                    getEntryCost: (category, questId) => (
-                        getRuntimeContentTableSync(
-                            "quest_entry_costs.json",
-                            bundledQuestEntryCosts as Record<string, StartEntryCost>,
-                        )
-                    )[`${category}_${questId}`],
+                    getEntryCost: (category, questId) => getQuestEntryCost(category, questId),
                     persistEntryItemCount: updatePlayerActiveQuestEntryItemCountSync,
                     publishActiveQuest,
                 });

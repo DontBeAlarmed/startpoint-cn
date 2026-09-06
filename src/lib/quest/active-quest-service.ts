@@ -6,14 +6,12 @@ import {
     updatePlayerActiveQuestContinueCountSync,
 } from "../../data/domains/quest_active"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
-import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json"
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
+import { getQuestEntryCost } from "../quest-entry-content"
 import { getRealNow } from "../../runtime/time/game-time"
 import {
     computeEntryLifecycleStamina,
     runAbortEntryTransaction,
 } from "./entry-lifecycle"
-import type { StartEntryCost } from "./start-entry"
 import type { MultiCoordinatorOrigin } from "../../multi/coordinator/contracts"
 import { withEntryItemInventoryWithinTransactionSync } from "./entry-item-inventory"
 
@@ -194,12 +192,7 @@ export function runAbortActiveQuestTransaction(
         withEntryItemInventory: withEntryItemInventoryWithinTransactionSync,
         deleteActiveQuest: deletePlayerActiveQuestSync,
         clearActiveQuest: clearPublishedActiveQuest,
-        getEntryCost: (category, questId) => (
-            getRuntimeContentTableSync(
-                "quest_entry_costs.json",
-                bundledQuestEntryCosts as Record<string, StartEntryCost>,
-            )
-        )[`${category}_${questId}`],
+        getEntryCost: (category, questId) => getQuestEntryCost(category, questId),
     })
 }
 

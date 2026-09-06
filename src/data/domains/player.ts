@@ -9,27 +9,16 @@ import { getBusinessDayKey, isNewDay, isNewWeek } from "../../lib/time-utils";
 import { buildPeriodicSnapshotData, getPassWeekSnapshotType, getSnapshot, initializePeriodicMissionSnapshots, takeSnapshot } from "../../lib/mission/snapshot";
 
 import { ensurePlayerPassCardLoginProgressSync } from "./pass-card";
-import bundledDailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
+import { getDailyChallengePointDefinition, getDailyChallengePointDefinitions } from "../../lib/quest/daily-challenge";
 import { getRealNow } from "../../runtime/time/game-time";
 import { calculatePooledExpAtRealTime } from "../../lib/exp-pool-time";
 
-type DailyChallengePointLookup = Record<string, { maxPoint: number, isRecovery: boolean, name: string }>
-
 function getDailyChallengePointDefaults(): DailyChallengePointListEntry[] {
-    const lookup = getRuntimeContentTableSync(
-        "daily_challenge_point_lookup.json",
-        bundledDailyChallengePointLookup as DailyChallengePointLookup,
-    )
-    const entries: DailyChallengePointListEntry[] = []
-    for (const [idStr, data] of Object.entries(lookup)) {
-        entries.push({
-            id: Number(idStr),
-            point: data.maxPoint,
-            campaignList: []
-        })
-    }
-    return entries
+    return getDailyChallengePointDefinitions().map(definition => ({
+        id: definition.id,
+        point: definition.maxPoint,
+        campaignList: []
+    }))
 }
 
 /** Refresh only recoverable challenge points against the real-time business day. */
@@ -59,12 +48,8 @@ export function refreshPlayerDailyChallengePointsForRealDaySync(
     }
     if (previousBusinessDay >= businessDay) return false
 
-    const lookup = getRuntimeContentTableSync(
-        "daily_challenge_point_lookup.json",
-        bundledDailyChallengePointLookup as DailyChallengePointLookup,
-    )
     for (const entry of entries) {
-        const definition = lookup[String(entry.id)]
+        const definition = getDailyChallengePointDefinition(entry.id)
         if (!definition?.isRecovery) continue
         const point = definition.maxPoint + entry.campaignList.reduce(
             (total, campaign) => total + campaign.additionalPoint,

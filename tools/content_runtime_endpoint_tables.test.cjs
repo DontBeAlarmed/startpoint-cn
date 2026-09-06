@@ -82,7 +82,12 @@ test("runtime endpoint tables follow the installed ContentSnapshot release", asy
         productionContentSnapshotProvider.snapshot = previousSnapshot
     })
 
-    assert.equal(typeof getActiveCampaignRate(1, 1, new Date("2024-06-01T00:00:00Z")), "number")
+    // Strict runtime contract: campaign reads before snapshot installation fail
+    // closed instead of falling back to the bundled table.
+    assert.throws(
+        () => getActiveCampaignRate(1, 1, new Date("2024-06-01T00:00:00Z")),
+        /CONTENT_SNAPSHOT_NOT_INITIALIZED/,
+    )
     assert.equal(isValidCharacterId(1), true)
 
     const releaseA = Object.freeze({
