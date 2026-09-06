@@ -14,7 +14,8 @@ import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { getConfigSync, getShopSelectItemCampaignsSync } from "../../lib/assets";
+import { getShopSelectItemCampaignsSync } from "../../lib/assets";
+import { getStaminaPolicySync } from "../../lib/config-content"
 import { ShopType } from "../../lib/types";
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
 import { computeRealTimeStamina } from "../../lib/stamina";
@@ -162,10 +163,10 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
             "error": "Internal Server Error", "message": "Player not found."
         })
 
-        const config = getConfigSync()
-        const recoveryCost = config.stamina_recovery_virtual_money
-        const recoveryValue = config.stamina_recovery_value
-        const maxOverflow = config.max_stamina_overflow
+        const staminaPolicy = getStaminaPolicySync()
+        const recoveryCost = staminaPolicy.recoveryVmoneyCost
+        const recoveryValue = staminaPolicy.recoveryValue
+        const maxOverflow = staminaPolicy.maxOverflow
 
         const currentStamina = computeRealTimeStamina(player)
 

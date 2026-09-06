@@ -8,7 +8,7 @@ import {
 import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
 import { getPlayerCollectedItemTotalSync } from "../../data/domains/item"
 import type { PlayerCharacter, PlayerEquipment } from "../../data/types"
-import { getConfigSync } from "../assets"
+import { getEquipmentCurrencyPolicySync } from "../config-content"
 import { characterExpCaps } from "../character"
 
 type RawCharacterTable = Record<string, { readonly rarity?: unknown }>
@@ -115,7 +115,7 @@ export function deriveRegularStateFacts(sources: RegularStateFactSources): Regul
 }
 
 export function getRegularStateFactsSync(playerId: number): RegularStateFacts {
-    const craftPointItemId = getConfigSync().craft_point_item_id || 100000
+    const craftPointItemId = getEquipmentCurrencyPolicySync().craftPointItemId
     return deriveRegularStateFacts({
         characters: getPlayerCharactersSync(playerId),
         characterManaNodes: getPlayerCharactersManaNodesSync(playerId),

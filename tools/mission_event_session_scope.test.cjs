@@ -49,6 +49,7 @@ function catalogWithEventDefinitions(eventDefinitions) {
         "ranking_event_single_quest.json": require("../assets/ranking_event_single_quest.json"),
         "rush_event_quest.json": require("../assets/rush_event_quest.json"),
         "carnival_event_quest.json": require("../assets/carnival_event_quest.json"),
+        "config.json": require("../assets/config.json"),
     }
     return getMissionCatalog({
         info: () => ({ source: "test" }),

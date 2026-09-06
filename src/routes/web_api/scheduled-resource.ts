@@ -1,7 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 
-import bundledConfig from "../../../assets/config.json"
-import bundledItemMaxCounts from "../../../assets/item_max_count.json"
 import { getPlayerSync } from "../../data/domains/player"
 import {
     deleteScheduledResourceRuleSync,
@@ -12,9 +10,12 @@ import {
     type ScheduledResourceRule,
     type ScheduledResourceRuleInput,
 } from "../../data/domains/scheduled-resource"
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
+import { getCurrencyCapacityPolicySync } from "../../lib/config-content"
+import {
+    findItemInventoryPolicy,
+    getItemInventoryPolicyCatalog,
+} from "../../lib/inventory/item-inventory-policy"
 import { getItemLookupSync } from "../../lib/item-content"
-import type { ConfigValues } from "../../lib/types/config"
 import { validateScheduledResourceRuleInput } from "../../lib/scheduled-resource-rules"
 
 interface RuleParams {
@@ -65,15 +66,12 @@ function parseRuleId(raw: string): number | null {
 }
 
 function getAuthority() {
+    const itemCatalog = getItemInventoryPolicyCatalog()
     return {
-        itemMaxCounts: getRuntimeContentTableSync<Readonly<Record<string, number>>>(
-            "item_max_count.json",
-            bundledItemMaxCounts,
+        itemMaxCount: (itemId: number) => (
+            findItemInventoryPolicy(itemCatalog, itemId)?.maxCount ?? null
         ),
-        maxFreeVmoney: getRuntimeContentTableSync<ConfigValues>(
-            "config.json",
-            bundledConfig,
-        ).max_virtual_money,
+        maxFreeVmoney: getCurrencyCapacityPolicySync().maxVmoney,
         playerExists: (playerId: number) => getPlayerSync(playerId) !== null,
     }
 }
@@ -95,7 +93,7 @@ function createRuleProjector() {
                 : itemLookup[String(rule.rewardId)] ?? `道具 #${rule.rewardId}`,
             officialMaxCount: rule.rewardType === "free_vmoney"
                 ? authority.maxFreeVmoney
-                : authority.itemMaxCounts[String(rule.rewardId)],
+                : authority.itemMaxCount(rule.rewardId as number),
         })
 }
 

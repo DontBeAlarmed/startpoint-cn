@@ -349,6 +349,7 @@ function withContentTables(overrides, callback) {
         "main_quest.json": mainQuests,
         "ex_quest.json": require("../assets/ex_quest.json"),
         "mana_board.json": manaBoard,
+        "config.json": require("../assets/config.json"),
         "mission_event.json": require("../assets/mission_event.json"),
         "challenge_dungeon_event_quest.json": require("../assets/challenge_dungeon_event_quest.json"),
         ...overrides,

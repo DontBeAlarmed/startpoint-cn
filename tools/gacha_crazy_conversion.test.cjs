@@ -554,8 +554,8 @@ test("Crazy save and select fail closed on repeats, empty slots, wrong gacha and
 
 test("Crazy draw limit comes from config gacha_crazy_ten_max_count", async () => {
     const { playerId, viewerId } = await createPlayer("crazy-draw-limit")
-    const { getConfigSync } = require("../src/lib/assets")
-    const maxCount = getConfigSync().gacha_crazy_ten_max_count
+    const { getCrazyGachaPolicySync } = require("../src/lib/config-content")
+    const maxCount = getCrazyGachaPolicySync().tenDrawMaxCount
     assert.equal(Number.isSafeInteger(maxCount) && maxCount > 0, true)
 
     grantInventoryFixtureItemSync(playerId, CRAZY_TICKET_ID, 2)

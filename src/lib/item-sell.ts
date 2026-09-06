@@ -1,7 +1,7 @@
 import { getItemSaleSync } from "./item-content";
+import { getCurrencyCapacityPolicySync } from "./config-content"
 import { countAbilitySoulUsedInPartiesSync } from "../data/domains/party"
 import { getPlayerSync, updatePlayerSync } from "../data/domains/player"
-import { getConfigSync } from "./assets";
 import { getDb } from "../data/db";
 import { withInventoryBatchContextWithinTransactionSync } from "./inventory"
 
@@ -68,8 +68,7 @@ export function sellItemSync(
 
             // Check mana limit
             const manaGained = saleData.sale_price * sellNumber
-            const config = getConfigSync()
-            const maxMana = config.max_mana ?? 99999999
+            const maxMana = getCurrencyCapacityPolicySync().maxMana
             if (player.freeMana + manaGained > maxMana) {
                 return { ok: false, errorCode: 2102, error: "Mana would exceed maximum." }
             }

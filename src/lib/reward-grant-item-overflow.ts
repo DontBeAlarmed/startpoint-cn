@@ -6,9 +6,7 @@ import {
 import { getVirtualNow } from "../runtime/time/game-time"
 import type { RewardGrantItemOverflowPolicy } from "./reward-grant"
 import { getPlayerSync } from "../data/domains/player"
-import bundledConfig from "../../assets/config.json"
-import { getRuntimeContentTableSync } from "../content/runtime/table-access"
-import type { ConfigValues } from "./types/config"
+import { getCurrencyCapacityPolicySync } from "./config-content"
 import {
     planItemOverflowDisposition,
     type PlannedItemOverflowDisposition,
@@ -20,10 +18,7 @@ export function createRewardGrantItemOverflowPolicy(
     knownPaidMana?: number,
 ): RewardGrantItemOverflowPolicy {
     const catalog = getItemInventoryPolicyCatalog()
-    const maxMana = getRuntimeContentTableSync<ConfigValues>(
-        "config.json",
-        bundledConfig,
-    ).max_mana
+    const maxMana = getCurrencyCapacityPolicySync().maxMana
     let paidMana: number | null = knownPaidMana ?? null
     const policyFor = (itemId: number) => {
         const policy = findItemInventoryPolicy(catalog, itemId)

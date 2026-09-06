@@ -11,6 +11,8 @@ process.env.DATA_DIR = databaseDirectory
 
 require("ts-node/register/transpile-only")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
 const data = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
@@ -30,6 +32,7 @@ try {
 }
 
 const itemMaxCounts = { "1": 99, "2": 9999, "3": 9999 }
+const itemMaxCount = itemId => itemMaxCounts[String(itemId)] ?? null
 const maxFreeVmoney = 999999
 
 function createPlayer(label) {
@@ -65,7 +68,7 @@ function settle(playerId, realNow) {
         player: getPlayerSync(playerId),
         realNow,
         dailyResetHour: 5,
-        itemMaxCounts,
+        itemMaxCount,
         maxFreeVmoney,
     })
 }
@@ -80,6 +83,7 @@ test.beforeEach(() => {
 })
 
 test.after(() => {
+    restoreContentSnapshot()
     data.closeDatabase()
     fs.rmSync(databaseDirectory, { recursive: true, force: true })
 })

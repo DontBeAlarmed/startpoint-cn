@@ -63,11 +63,10 @@ test("Mission Catalog keeps its private readonly Content table source", () => {
     )
 })
 
-test("Regular craft-point requirement selects its Catalog config item with the legacy default", () => {
+test("Regular craft-point requirement selects its Catalog config item and zero sentinel default", () => {
     for (const [config, expectedItemId] of [
-        [{ craft_point_item_id: 777777 }, 777777],
-        [{}, 100000],
-        [{ craft_point_item_id: "invalid" }, 100000],
+        [{ craft_point_item_id: 777777, star_grain_item_id: 990008 }, 777777],
+        [{ craft_point_item_id: 0, star_grain_item_id: 990008 }, 100000],
     ]) {
         const catalog = getMissionCatalog(repositoryWithTables({ "config.json": config }))
         const requirement = getMissionFactRequirementRegistry(catalog).getRequirement(1, 66)
@@ -75,6 +74,14 @@ test("Regular craft-point requirement selects its Catalog config item with the l
             `collectedItems:${expectedItemId}`,
         ])
     }
+
+    const malformed = getMissionCatalog(repositoryWithTables({
+        "config.json": { craft_point_item_id: "invalid", star_grain_item_id: 990008 },
+    }))
+    assert.throws(
+        () => getMissionFactRequirementRegistry(malformed).getRequirement(1, 66),
+        /craft_point_item_id/,
+    )
 })
 
 test("pure Regular state derivation preserves character, board, equipment and collected rules", () => {

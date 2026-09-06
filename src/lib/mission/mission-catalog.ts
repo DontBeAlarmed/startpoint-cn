@@ -3,6 +3,7 @@ import {
     getContentSnapshot,
     type ReadonlyContentRepository,
 } from "../../content/runtime/content-snapshot"
+import { getEquipmentCurrencyPolicySync } from "../config-content"
 import {
     bundledMissionContentRepository,
     parseMissionCatalogSource,
@@ -254,16 +255,9 @@ export function getMissionCatalogContentTable<T>(
 export const DEFAULT_CRAFT_POINT_ITEM_ID = 100000
 
 export function getMissionCatalogCraftPointItemId(catalog: MissionCatalog): number {
-    let config: Record<string, unknown>
-    try {
-        config = getMissionCatalogContentTable(catalog, "config.json")
-    } catch {
-        return DEFAULT_CRAFT_POINT_ITEM_ID
-    }
-    const itemId = Number(config.craft_point_item_id)
-    return Number.isSafeInteger(itemId) && itemId > 0
-        ? itemId
-        : DEFAULT_CRAFT_POINT_ITEM_ID
+    const repository = repositoryByCatalog.get(catalog)
+    if (repository === undefined) return DEFAULT_CRAFT_POINT_ITEM_ID
+    return getEquipmentCurrencyPolicySync(repository).craftPointItemId
 }
 
 /** Client-visible standard mission categories (Awake is 9). */

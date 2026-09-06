@@ -5,9 +5,7 @@ import {
 } from "../data/domains/mail"
 import { updatePlayerSync } from "../data/domains/player"
 import type { Player } from "../data/types"
-import bundledConfig from "../../assets/config.json"
-import { getRuntimeContentTableSync } from "../content/runtime/table-access"
-import type { ConfigValues } from "./types/config"
+import { getCurrencyCapacityPolicySync } from "./config-content"
 import {
     findItemInventoryPolicy,
     getItemInventoryPolicyCatalog,
@@ -252,7 +250,7 @@ function settleDedicatedMailBalance(
     mails: readonly RawPlayerMail[],
     player: Player,
 ): { balance: DedicatedMailBalance, update: Partial<DedicatedMailBalance> } {
-    const config = getRuntimeContentTableSync<ConfigValues>("config.json", bundledConfig)
+    const currencyPolicy = getCurrencyCapacityPolicySync()
     const balance: DedicatedMailBalance = {
         vmoney: player.vmoney,
         starCrumb: player.starCrumb,
@@ -285,7 +283,8 @@ function settleDedicatedMailBalance(
                 break
         }
         if (field === null) continue
-        if (field === "starCrumb" && balance.starCrumb + mail.number > config.max_star_crumb) {
+        if (field === "starCrumb"
+            && balance.starCrumb + mail.number > currencyPolicy.maxStarCrumb) {
             throw new MailRewardCapacityError(
                 "Mail Star Crumb cannot fit in the player's Star Crumb capacity.",
             )
@@ -356,10 +355,7 @@ export function settleMailRewardsInTransactionOwnerSync(
     const manaCapacity = planManaCapacity({
         freeMana: knownPlayerBefore.freeMana,
         paidMana: knownPlayerBefore.paidMana,
-        maxMana: getRuntimeContentTableSync<ConfigValues>(
-            "config.json",
-            bundledConfig,
-        ).max_mana,
+        maxMana: getCurrencyCapacityPolicySync().maxMana,
         requestedMana: manaRequested,
     })
     if (manaCapacity.overflowMana > 0) {

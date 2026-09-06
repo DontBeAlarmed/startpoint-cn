@@ -6,7 +6,7 @@ import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { getConfigSync } from "../../lib/assets";
+import { getCurrencyCapacityPolicySync } from "../../lib/config-content"
 import { setPlayerPassCardPurchasedSync } from "../../data/domains/pass-card";
 import { getActivePassCardEventDefinitionAt } from "../../lib/pass-card";
 import paymentProducts from "../../../assets/payment_products.json";
@@ -172,8 +172,7 @@ const routes = async (fastify: FastifyInstance) => {
             console.warn(`[PAYMENT-FINISH] product ${productId} has zero vmoney`)
         }
 
-        const config = getConfigSync()
-        const maxVmoney = config.max_virtual_money
+        const maxVmoney = getCurrencyCapacityPolicySync().maxVmoney
         const afterPaid = Math.min(player.vmoney + paidVmoney, maxVmoney)
         const afterFree = Math.min(player.freeVmoney + freeVmoney, maxVmoney)
 

@@ -3,10 +3,10 @@ import { getPlayerActiveQuestSync } from "../../data/domains/quest_active"
 import { getPlayerDailyChallengePointListSync, getPlayerSync, refreshPlayerDailyChallengePointsForRealDaySync, updatePlayerSync } from "../../data/domains/player"
 import { getPlayerMailCountSync } from "../../data/domains/mail"
 import {
-    getConfigSync,
     getQuestConfigurationErrorResponse,
     getQuestFromCategorySync,
 } from "../../lib/assets"
+import { getSingleContinuePolicySync } from "../../lib/config-content"
 import type { BattleQuest } from "../../lib/types"
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils"
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time"
@@ -429,10 +429,15 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
         const expectedContinueCount = parseSingleContinueExpectedCount(body.statistics)
         if (expectedContinueCount === null) return sendBadRequest("Invalid request body.")
 
-        const continueVmoneyCost = (
-            options.getContinueVmoneyCost
-                ?? (() => getConfigSync().continue_virtual_money)
-        )()
+        let continueVmoneyCost: number
+        try {
+            continueVmoneyCost = (
+                options.getContinueVmoneyCost
+                    ?? (() => getSingleContinuePolicySync().vmoneyCost)
+            )()
+        } catch {
+            continueVmoneyCost = Number.NaN
+        }
         if (!Number.isSafeInteger(continueVmoneyCost) || continueVmoneyCost <= 0) {
             request.log.error(
                 { code: "SINGLE_CONTINUE_CONFIG_INVALID" },

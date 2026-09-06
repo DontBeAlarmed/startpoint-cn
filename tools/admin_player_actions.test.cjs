@@ -9,6 +9,8 @@ const Sqlite = require("better-sqlite3")
 
 require("ts-node/register/transpile-only")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "admin-player-actions-"))
 process.env.DATA_DIR = databaseDirectory
 
@@ -71,6 +73,7 @@ test.before(() => {
 })
 
 test.after(() => {
+    restoreContentSnapshot()
     data.closeDatabase()
     fs.rmSync(databaseDirectory, { recursive: true, force: true })
 })

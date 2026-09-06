@@ -130,6 +130,8 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/routes/api/exBoost.ts",
         "src/routes/api/questUnlock.ts",
         "src/routes/api/sell.ts",
+        "src/routes/cn/load.ts",
+        "src/routes/web_api/scheduled-resource.ts",
     ]
     assert.deepEqual(importedOutsideInventory.sort(), reviewedMigrations)
     for (const relativePath of reviewedMigrations) {

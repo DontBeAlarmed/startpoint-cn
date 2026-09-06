@@ -55,7 +55,11 @@ import { getGameTimeContext } from "../../runtime/time/game-time";
 import { settleScheduledResourcesSync } from "../../lib/scheduled-resource-settlement";
 import { settleEventTradeExpiryOnLoadSync } from "../../lib/event-trade-expiry-settlement";
 import { isGiftCodeEnabledSync } from "../../lib/gift-code/capability";
-import type { ConfigValues } from "../../lib/types/config";
+import { getCurrencyCapacityPolicySync } from "../../lib/config-content";
+import {
+    findItemInventoryPolicy,
+    getItemInventoryPolicyCatalog,
+} from "../../lib/inventory/item-inventory-policy";
 import { projectItemOverflowCommonResponse } from "../../lib/item-overflow";
 import { collectRewardGrantItemOverflowDispositions } from "../../lib/reward-grant";
 import {
@@ -274,16 +278,16 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
         }
 
         const contentSnapshot = getContentSnapshot();
+        const currencyPolicy = getCurrencyCapacityPolicySync(contentSnapshot.repository);
+        const itemPolicyCatalog = getItemInventoryPolicyCatalog();
         const scheduledResourceSettlement = settleScheduledResourcesSync({
             player,
             realNow: gameTime.realNow,
             dailyResetHour: options.dailyResetHour ?? 5,
-            itemMaxCounts: contentSnapshot.repository.table<Readonly<Record<string, number>>>(
-                "item_max_count.json",
+            itemMaxCount: itemId => (
+                findItemInventoryPolicy(itemPolicyCatalog, itemId)?.maxCount ?? null
             ),
-            maxFreeVmoney: contentSnapshot.repository.table<ConfigValues>(
-                "config.json",
-            ).max_virtual_money,
+            maxFreeVmoney: currencyPolicy.maxVmoney,
         })
         if (scheduledResourceSettlement.status === "granted") {
             const refreshedPlayer = getPlayerSync(playerId);
@@ -297,9 +301,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             playerId,
             player,
             nowMs: now.getTime(),
-            maxMana: contentSnapshot.repository.table<ConfigValues>(
-                "config.json",
-            ).max_mana,
+            maxMana: currencyPolicy.maxMana,
         });
         if (eventTradeExpirySettlement.status === "converted") {
             const refreshedPlayer = getPlayerSync(playerId);
@@ -312,9 +314,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
         const gachaPointConversion = settleExpiredGachaPointsOnLoadSync({
             playerId,
             nowMs: now.getTime(),
-            maxStarCrumb: contentSnapshot.repository.table<ConfigValues>(
-                "config.json",
-            ).max_star_crumb,
+            maxStarCrumb: currencyPolicy.maxStarCrumb,
         });
         if (gachaPointConversion.status === "converted") {
             const refreshedPlayer = getPlayerSync(playerId);

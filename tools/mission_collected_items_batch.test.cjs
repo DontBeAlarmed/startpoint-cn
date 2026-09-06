@@ -9,6 +9,8 @@ const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "mission-collected-batch-db-"))
 const previousDataDirectory = process.env.DATA_DIR
 const previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR
@@ -25,6 +27,7 @@ initializeDatabase()
 const db = getDb()
 
 test.after(() => {
+    restoreContentSnapshot()
     if (db.open) db.close()
     fs.rmSync(databaseDirectory, { recursive: true, force: true })
     if (previousDataDirectory === undefined) delete process.env.DATA_DIR

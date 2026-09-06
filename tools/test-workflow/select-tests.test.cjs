@@ -35,6 +35,23 @@ test("maps D27 Item and Equipment typed content to affected focused groups", () 
     )
 })
 
+test("maps D27 narrow Config policies to every affected focused group", () => {
+    const expected = [
+        "admin",
+        "integration:database",
+        "integration:mission",
+        "integration:party",
+        "integration:quest",
+        "integration:reward-grant",
+        "integration:rules",
+        "quick:content",
+        "quick:gacha",
+        "quick:quest",
+    ]
+    assert.deepEqual(selectTestGroups(["src/lib/config-content.ts"]), expected)
+    assert.deepEqual(selectTestGroups(["tools/config_content.test.cjs"]), ["quick:content"])
+})
+
 test("maps representative source files to focused groups", () => {
     assert.deepEqual(
         selectTestGroups(["src/data/domains/gacha-state.ts"]),

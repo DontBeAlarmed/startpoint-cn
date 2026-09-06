@@ -36,3 +36,21 @@ test("production source cannot import the test-only snapshot fixture", () => {
     )).map(filePath => path.relative(projectRoot, filePath).split(path.sep).join("/"))
     assert.deepEqual(violations, [])
 })
+
+test("raw Config access stays inside the typed Config adapter", () => {
+    const readers = sourceFiles(sourceRoot).flatMap(filePath => {
+        const source = fs.readFileSync(filePath, "utf8")
+        const readsConfig = /repository\.table(?:<[^>]+>)?\(\s*["']config\.json["']/.test(source)
+            || /getRuntimeContentTableSync(?:<[^>]+>)?\(\s*["']config\.json["']/.test(source)
+        return readsConfig
+            ? [path.relative(projectRoot, filePath).split(path.sep).join("/")]
+            : []
+    }).sort()
+    assert.deepEqual(readers, ["src/lib/config-content.ts"])
+
+    const legacyUsers = sourceFiles(sourceRoot).flatMap(filePath => {
+        const relative = path.relative(projectRoot, filePath).split(path.sep).join("/")
+        return fs.readFileSync(filePath, "utf8").includes("getConfigSync") ? [relative] : []
+    })
+    assert.deepEqual(legacyUsers, [])
+})

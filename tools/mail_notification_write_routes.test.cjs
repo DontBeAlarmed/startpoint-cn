@@ -40,10 +40,17 @@ stubModule("../src/data/domains/equipment", {
     },
 })
 stubModule("../src/lib/assets", {
-    getConfigSync: () => ({ max_stamina_overflow: 999, craft_point_item_id: 100000 }),
+})
+stubModule("../src/lib/config-content", {
+    getEquipmentCurrencyPolicySync: () => ({ craftPointItemId: 100000, starGrainItemId: 990008 }),
+    getStaminaPolicySync: () => ({ maxOverflow: 999 }),
+})
+stubModule("../src/lib/item-content", {
     getItemEffectSync: itemId => itemId === 100
         ? { effectKind: 2, effectValue: 1 }
         : null,
+})
+stubModule("../src/lib/equipment-content", {
     getEquipmentCraftSync: () => null,
     getEquipmentDissolveSync: () => null,
 })

@@ -231,6 +231,46 @@ test("play_continue returns a bounded MsgPack failure for invalid continue confi
     assert.deepEqual(snapshotState(playerId), before)
 })
 
+test("play_continue bounds a malformed typed Config failure before lifecycle writes", async t => {
+    const restoreMalformedSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+        .installBundledGameplaySnapshot({
+            tableOverrides: {
+                "config.json": {
+                    ...require("../assets/config.json"),
+                    continue_virtual_money: "invalid",
+                },
+            },
+        })
+    t.after(restoreMalformedSnapshot)
+    const typedPolicyApp = Fastify({ logger: false })
+    registerCnMsgpackOnSend(typedPolicyApp)
+    await typedPolicyApp.register(singleBattleRoutes, {
+        prefix: "/single_battle_quest",
+    })
+    await typedPolicyApp.ready()
+    t.after(() => typedPolicyApp.close())
+
+    const { playerId, viewerId } = await createPlayer("continue-malformed-typed-config")
+    updatePlayerSync({ id: playerId, freeVmoney: 100, vmoney: 100 })
+    const activeQuest = createActiveQuest("continue-malformed-typed-config-play")
+    persistActiveQuest(playerId, activeQuest)
+    publishActiveQuest(playerId, activeQuest)
+    t.after(() => delete activeQuests[playerId])
+    const before = snapshotState(playerId)
+
+    const response = await typedPolicyApp.inject({
+        method: "POST",
+        url: "/single_battle_quest/play_continue",
+        payload: createPayload(viewerId, activeQuest),
+    })
+
+    assertMsgpackStatus(response, 500, {
+        error: "Internal Server Error",
+        message: "Continue configuration is invalid.",
+    })
+    assert.deepEqual(snapshotState(playerId), before)
+})
+
 test("play_continue encodes invalid viewer failures as MsgPack", async () => {
     const activeQuest = createActiveQuest("continue-invalid-viewer")
     const response = await app.inject({

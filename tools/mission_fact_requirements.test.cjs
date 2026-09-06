@@ -286,6 +286,7 @@ test("selects Degree craft points from the supplied Catalog config without all-i
     const bundledRegistry = getMissionFactRequirementRegistry(getMissionCatalog())
     const customRegistry = getMissionFactRequirementRegistry(catalogWithConfig({
         craft_point_item_id: 777777,
+        star_grain_item_id: 990008,
     }))
 
     for (const missionId of [41000, 41010, 41020]) {

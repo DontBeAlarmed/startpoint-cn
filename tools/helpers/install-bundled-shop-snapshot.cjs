@@ -22,6 +22,7 @@ const tableNames = [
     "special_pack_shop.json",
     "mana_shop.json",
     "shop_cost_item_schedule.json",
+    "config.json",
     "item_data.json",
     "item_ids.json",
     "item_lookup.json",

@@ -36,7 +36,7 @@ test("Degree Session derives selectors and state from every supplied custom Cata
     const catalog = getMissionCatalog(repositoryWith({
         "mission_degree.json": definitions,
         "mission_degree_reward.json": rewards,
-        "config.json": { craft_point_item_id: 78888 },
+        "config.json": { craft_point_item_id: 78888, star_grain_item_id: 990008 },
         "character.json": { 999001: { rarity: 5 } },
         "mana_board.json": { 999001: { 2: { a: [[101]], b: [[102]] } } },
         "main_quest.json": { 9000001: {} },

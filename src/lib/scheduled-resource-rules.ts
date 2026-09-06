@@ -1,7 +1,7 @@
 import type { ScheduledResourceRuleInput } from "../data/domains/scheduled-resource"
 
 export interface ScheduledResourceRuleAuthority {
-    readonly itemMaxCounts: Readonly<Record<string, number>>
+    readonly itemMaxCount: (itemId: number) => number | null
     readonly maxFreeVmoney: number
     readonly playerExists: (playerId: number) => boolean
 }
@@ -58,7 +58,7 @@ export function validateScheduledResourceRuleInput(
 
     if (input.rewardType === "item") {
         if (!isPositiveSafeInteger(input.rewardId)) return invalid("道具 ID 无效")
-        const officialMax = authority.itemMaxCounts[String(input.rewardId)]
+        const officialMax = authority.itemMaxCount(input.rewardId)
         if (!isPositiveSafeInteger(officialMax)) return invalid(`道具 ID ${input.rewardId} 不存在`)
         if (input.inventoryCap > officialMax) {
             return invalid(`持有上限不能超过道具官方上限 ${officialMax}`)

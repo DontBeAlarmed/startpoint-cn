@@ -13,7 +13,7 @@ import { getPlayerSync } from "../../data/domains/player";
 import { getSession } from "../../data/domains/session";
 import { generateDataHeaders, getServerDate } from "../../utils";
 import { clientSerializeEquipment, buildFullEquipmentList, serializeFullEquipmentList } from "../../lib/equipment";
-import { getConfigSync } from "../../lib/assets";
+import { getEquipmentCurrencyPolicySync } from "../../lib/config-content"
 import { getEquipmentDissolveSync, getEquipmentCraftSync } from "../../lib/equipment-content";
 import { AccountId, PlayerId } from "../../lib/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -52,7 +52,7 @@ interface BulkUpgradeBody {
     equipment_ids: number[]
 }
 
-const wrightpieceItemId = () => getConfigSync().craft_point_item_id || 100000
+const wrightpieceItemId = () => getEquipmentCurrencyPolicySync().craftPointItemId
 
 // wrightpiece cost for each rank of weapon (awakening) — from CDN
 const getUpgradeCost = (rarity: number): number => getEquipmentCraftSync(rarity)?.awakening_craft ?? 25

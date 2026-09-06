@@ -9,6 +9,9 @@ const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+test.after(restoreContentSnapshot)
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "mission-regular-session-settlement-"))
 const previousDataDirectory = process.env.DATA_DIR
 const previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR

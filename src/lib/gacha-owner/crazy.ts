@@ -16,7 +16,8 @@ import {
 import { insertReceiveHistoryBatchSync, MailType } from "../../data/domains/mail"
 import { getPlayerSync } from "../../data/domains/player"
 import { getCharacterAcquisitionStatesSync } from "../../data/domains/reward-acquisition"
-import { getConfigSync, getCharacterDataSync } from "../assets"
+import { getCharacterDataSync } from "../assets"
+import { getCrazyGachaPolicySync } from "../config-content"
 import { getCharacterStackCompensationItemId } from "../character-growth/commands/grant-character-stack"
 import {
     drawGachaBannerWithMetadata,
@@ -149,7 +150,7 @@ export function executeCrazyGachaCandidateSync(
                 }
                 const info = getPlayerGachaInfoSync(command.playerId, command.gachaId)
                 const crazyDrawCount = (info?.crazyDrawCount ?? 0) + 1
-                if (crazyDrawCount > getConfigSync().gacha_crazy_ten_max_count) {
+                if (crazyDrawCount > getCrazyGachaPolicySync().tenDrawMaxCount) {
                     return badRequest("Crazy Gacha draw limit reached.")
                 }
                 if (inventory.read(prepared.ticket.itemId).afterAmount

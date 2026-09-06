@@ -2,7 +2,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { getConfigSync } from "../../lib/assets";
+import { getStaminaPolicySync } from "../../lib/config-content"
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
 import { getRealNow } from "../../runtime/time/game-time";
 import { sellItemSync } from "../../lib/item-sell";
@@ -39,7 +39,7 @@ const routes = async (fastify: FastifyInstance) => {
                 settleItemUseInCallerTransactionSync(
                     playerId,
                     body,
-                    getConfigSync().max_stamina_overflow,
+                    getStaminaPolicySync().maxOverflow,
                 )
             ))()
         } catch (error) {

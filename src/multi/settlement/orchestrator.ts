@@ -5,10 +5,10 @@ import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings"
 import { settleAdditionalRewardsSync, type AdditionalRewardTable } from "../../lib/additional-reward"
 import {
-    getConfigSync,
     getQuestConfigurationErrorResponse,
     getQuestFromCategorySync,
 } from "../../lib/assets"
+import { getMultiRewardPolicySync } from "../../lib/config-content"
 import { givePlayerCharactersExpSync } from "../../lib/character"
 import { buildBattleMissionSettlementScopes, recordMissionBattleFacts } from "../../lib/mission/battle-facts"
 import {
@@ -356,7 +356,7 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
                 commonRewardCount: getCommonScoreRewardCount(
                     questData,
                     clearRank,
-                    getConfigSync().common_reward_multiplier_by_multi_play_mode,
+                    getMultiRewardPolicySync().commonRewardMultiplier,
                 ) ?? undefined,
                 rewardCampaignRates,
                 rewardDate: settlementTime,

@@ -12,7 +12,7 @@ import { clientSerializeEquipment, buildFullEquipmentList } from "../../lib/equi
 import { calculateDissolveRewards } from "../../lib/equipment-dissolve";
 import { asAccountId, asPlayerId, AccountId, PlayerId } from "../../lib/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { getConfigSync } from "../../lib/assets";
+import { getEquipmentCurrencyPolicySync } from "../../lib/config-content"
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
 import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
@@ -43,8 +43,8 @@ interface BulkSellStackBody {
     equipment_ids: number[]
 }
 
-const wrightpieceItemId = () => getConfigSync().craft_point_item_id || 100000
-const starGrainItemId = () => getConfigSync().star_grain_item_id || 990008
+const wrightpieceItemId = () => getEquipmentCurrencyPolicySync().craftPointItemId
+const starGrainItemId = () => getEquipmentCurrencyPolicySync().starGrainItemId
 
 function grantDissolveRewardsWithinTransactionSync(
     playerId: number,
