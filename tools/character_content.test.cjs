@@ -74,21 +74,17 @@ test("character lookup is built entirely from one repository snapshot", () => {
 })
 
 test("character races use current repository rows and normalize comma-separated values", () => {
-    const {
-        productionContentSnapshotProvider,
-    } = require("../src/content/runtime/content-snapshot")
-    const previousSnapshot = productionContentSnapshotProvider.snapshot
+    const { installFrozenTestContentSnapshot } = require("./helpers/content-snapshot-fixture.cjs")
     const raceFields = []
     raceFields[4] = " Human, Beast, ,Mystery  "
-    productionContentSnapshotProvider.snapshot = Object.freeze({
-        cdn: Object.freeze({ targetVersion: "test-release" }),
-        repository: repository({
+    const { restore } = installFrozenTestContentSnapshot({
+        tables: {
             "character.json": {},
             "cdndata/character.json": {
                 "100001": contentRow(raceFields),
                 "100002": "malformed-row",
             },
-        }),
+        },
     })
 
     try {
@@ -97,7 +93,7 @@ test("character races use current repository rows and normalize comma-separated 
         assert.deepEqual(getCharacterRaces("100002"), [])
         assert.deepEqual(getCharacterRaces(999999), [])
     } finally {
-        productionContentSnapshotProvider.snapshot = previousSnapshot
+        restore()
     }
 })
 

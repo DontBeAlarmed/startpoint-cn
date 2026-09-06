@@ -8,6 +8,7 @@ const test = require("node:test")
 const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
     .installBundledGameplaySnapshot()
 process.once("exit", () => { restoreContentSnapshot() })
+const { installFrozenTestContentSnapshot } = require("./helpers/content-snapshot-fixture.cjs")
 const { getActiveMissionPlan } = require("../src/lib/mission/active-plan")
 const {
     ACTIVE_MISSION_FACT_KINDS,
@@ -55,7 +56,7 @@ function rewardRow(targetProgress) {
     return row
 }
 
-function createRepository() {
+function createMissionTables() {
     const targetIds = "90001,90002,90003,90004,90005,90006"
     const tables = {
         "mission_active.json": {
@@ -80,13 +81,7 @@ function createRepository() {
         "main_quest.json": {},
         "ex_quest.json": {},
     }
-    return {
-        info: () => ({ source: "release", assetVersion: "fixed-point-test", contentVersion: 1 }),
-        table: tableName => {
-            if (!(tableName in tables)) throw new Error(`unexpected table ${tableName}`)
-            return tables[tableName]
-        },
-    }
+    return tables
 }
 
 function subsetPlan(sourcePlan, definitions) {
@@ -336,13 +331,10 @@ test("fixed point caches static facts and only recomputes dirty dependencies", (
                 metrics.dependencyComputes[missionId] = (metrics.dependencyComputes[missionId] ?? 0) + 1
             },
         }
-        const repository = createRepository()
-        const { productionContentSnapshotProvider } = require("../src/content/runtime/content-snapshot")
-        const previousSnapshot = productionContentSnapshotProvider.snapshot
-        productionContentSnapshotProvider.snapshot = {
-            cdn: { targetVersion: "fixed-point-test" },
-            repository,
-        }
+        const { restore: restoreRuntimeTables } = installFrozenTestContentSnapshot({
+            targetVersion: "fixed-point-test",
+            tables: createMissionTables(),
+        })
         let result
         try {
             result = reconcileActiveMissionFactsWithResult({
@@ -351,7 +343,7 @@ test("fixed point caches static facts and only recomputes dirty dependencies", (
                 observer,
             })
         } finally {
-            productionContentSnapshotProvider.snapshot = previousSnapshot
+            restoreRuntimeTables()
         }
 
         assert.equal(metrics.staticComputes[90001], 1)

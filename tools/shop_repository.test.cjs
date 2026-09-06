@@ -9,9 +9,7 @@ const test = require("node:test")
 require("ts-node/register/transpile-only")
 
 const { ContentRepository } = require("../src/content/runtime/content-repository")
-const {
-    productionContentSnapshotProvider,
-} = require("../src/content/runtime/content-snapshot")
+const { installFrozenTestContentSnapshot } = require("./helpers/content-snapshot-fixture.cjs")
 const { getShopCatalog } = require("../src/lib/shop")
 const { resolveEventCurrencyId } = require("../src/lib/event-currency")
 const { ShopType } = require("../src/lib/types")
@@ -32,7 +30,6 @@ const SHOP_TABLES = Object.freeze([
     "shop_cost_item_schedule.json",
 ])
 test("shop typed catalog reads its runtime tables from one initialized snapshot", () => {
-    const previousSnapshot = productionContentSnapshotProvider.snapshot
     const requested = []
     const item = Object.freeze({
         costs: Object.freeze([{ id: 800, amount: 1 }]),
@@ -45,54 +42,42 @@ test("shop typed catalog reads its runtime tables from one initialized snapshot"
         ...item,
         costs: Object.freeze([{ id: 70001, amount: 1 }]),
     })
-    const tables = Object.freeze({
-        "general_shop.json": Object.freeze({ "101": item }),
-        "event_item_shop.json": Object.freeze({
-            "11": Object.freeze({ "700001": Object.freeze({ "102": eventItem }) }),
+    const { snapshot, restore } = installFrozenTestContentSnapshot({
+        targetVersion: "test-shop-release",
+        onTableRead: tableName => { requested.push(tableName) },
+        tables: Object.freeze({
+            "general_shop.json": Object.freeze({ "101": item }),
+            "event_item_shop.json": Object.freeze({
+                "11": Object.freeze({ "700001": Object.freeze({ "102": eventItem }) }),
+            }),
+            "event_item_shop_id_map.json": Object.freeze({
+                "102": Object.freeze({ eventType: 11, eventId: 700001 }),
+            }),
+            "boss_coin_shop.json": Object.freeze({
+                "5": Object.freeze({ "103": item }),
+            }),
+            "boss_coin_shop_item_category_map.json": Object.freeze({ "103": 5 }),
+            "shop_item_campaign.json": Object.freeze({ "4": Object.freeze({}), "7": Object.freeze({}) }),
+            "shop_select_item_campaign.json": Object.freeze({ "4": Object.freeze({}), "7": Object.freeze({}) }),
+            "star_grain_shop.json": Object.freeze({ "104": item }),
+            "treasure_shop.json": Object.freeze({ "105": item }),
+            "equipment_enhancement_shop.json": Object.freeze({ "106": item }),
+            "special_pack_shop.json": Object.freeze({
+                "107": Object.freeze({ ...item, purchaseKind: "purchase", specialExchangeCampaignId: 0 }),
+                "108": Object.freeze({ ...item, purchaseKind: "specialExchangeLink", specialExchangeCampaignId: 11 }),
+            }),
+            "mana_shop.json": Object.freeze({ "109": item }),
+            "shop_cost_item_schedule.json": Object.freeze({}),
+            "cdn_general_shop_whitelist.json": Object.freeze([101]),
+            "item_data.json": Object.freeze({}),
+            "item_ids.json": Object.freeze([70001]),
+            "item_lookup.json": Object.freeze({ "70001": "活动代币" }),
+            "item_sale.json": Object.freeze({}),
         }),
-        "event_item_shop_id_map.json": Object.freeze({
-            "102": Object.freeze({ eventType: 11, eventId: 700001 }),
-        }),
-        "boss_coin_shop.json": Object.freeze({
-            "5": Object.freeze({ "103": item }),
-        }),
-        "boss_coin_shop_item_category_map.json": Object.freeze({ "103": 5 }),
-        "shop_item_campaign.json": Object.freeze({ "4": Object.freeze({}), "7": Object.freeze({}) }),
-        "shop_select_item_campaign.json": Object.freeze({ "4": Object.freeze({}), "7": Object.freeze({}) }),
-        "star_grain_shop.json": Object.freeze({ "104": item }),
-        "treasure_shop.json": Object.freeze({ "105": item }),
-        "equipment_enhancement_shop.json": Object.freeze({ "106": item }),
-        "special_pack_shop.json": Object.freeze({
-            "107": Object.freeze({ ...item, purchaseKind: "purchase", specialExchangeCampaignId: 0 }),
-            "108": Object.freeze({ ...item, purchaseKind: "specialExchangeLink", specialExchangeCampaignId: 11 }),
-        }),
-        "mana_shop.json": Object.freeze({ "109": item }),
-        "shop_cost_item_schedule.json": Object.freeze({}),
-        "cdn_general_shop_whitelist.json": Object.freeze([101]),
-        "item_data.json": Object.freeze({}),
-        "item_ids.json": Object.freeze([70001]),
-        "item_lookup.json": Object.freeze({ "70001": "活动代币" }),
-        "item_sale.json": Object.freeze({}),
-    })
-    const repository = Object.freeze({
-        info: () => Object.freeze({
-            source: "release",
-            assetVersion: "test-shop-release",
-            generatorVersion: 1,
-            releaseDigest: null,
-        }),
-        table: tableName => {
-            requested.push(tableName)
-            if (!(tableName in tables)) throw new Error(`unexpected table ${tableName}`)
-            return tables[tableName]
-        },
-    })
-    productionContentSnapshotProvider.snapshot = Object.freeze({
-        cdn: Object.freeze({ targetVersion: "test-shop-release" }),
-        repository,
     })
 
     try {
+        const repository = snapshot.repository
         const catalog = getShopCatalog(repository)
         assert.equal(catalog.entries[`${ShopType.GENERAL}:101`].listed, true)
         assert.equal(catalog.entries[`${ShopType.STAR_GRAIN}:104`].kind, "purchase")
@@ -112,9 +97,9 @@ test("shop typed catalog reads its runtime tables from one initialized snapshot"
         assert.equal(requested.includes("cdn_general_shop_whitelist.json"), true)
         assert.equal(requested.includes("item_lookup.json"), true)
         assert.equal(requested.length >= 12, true)
-        assert.strictEqual(productionContentSnapshotProvider.snapshot.repository, repository)
+        assert.strictEqual(getShopCatalog(), catalog, "no-argument catalog reads the installed snapshot repository")
     } finally {
-        productionContentSnapshotProvider.snapshot = previousSnapshot
+        restore()
     }
 })
 

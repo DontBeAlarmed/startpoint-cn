@@ -201,28 +201,14 @@ const tables = {
     },
 }
 
-const repository = {
-    info: () => ({
-        source: "release",
-        assetVersion: "active-reconcile-test",
-        generatorVersion: 1,
-        releaseDigest: "sha256:active-reconcile-test",
-    }),
-    table: tableName => {
-        if (!(tableName in tables)) throw new Error(`unexpected table ${tableName}`)
-        return tables[tableName]
-    },
-}
-
-const { productionContentSnapshotProvider } = require("../src/content/runtime/content-snapshot")
-const previousSnapshot = productionContentSnapshotProvider.snapshot
-productionContentSnapshotProvider.snapshot = {
-    cdn: { targetVersion: "active-reconcile-test" },
-    repository,
-}
-restoreSnapshot = () => {
-    productionContentSnapshotProvider.snapshot = previousSnapshot
-}
+const {
+    installFrozenTestContentSnapshot,
+} = require("./helpers/content-snapshot-fixture.cjs")
+const installedContentSnapshot = installFrozenTestContentSnapshot({
+    targetVersion: "active-reconcile-test",
+    tables,
+})
+restoreSnapshot = installedContentSnapshot.restore
 
 const {
     getActiveMissionPlan: originalGetActiveMissionPlan,

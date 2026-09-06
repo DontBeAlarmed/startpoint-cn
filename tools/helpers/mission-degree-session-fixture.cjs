@@ -53,6 +53,18 @@ function installGlobalRepository(repository) {
     }
 }
 
+function captureGlobalSnapshot() {
+    return productionContentSnapshotProvider.snapshot
+}
+
+function restoreGlobalSnapshot(snapshot) {
+    productionContentSnapshotProvider.snapshot = snapshot
+}
+
+function clearGlobalSnapshot() {
+    productionContentSnapshotProvider.snapshot = null
+}
+
 function player(rankPoint = 0) {
     return {
         id: 99,
@@ -144,7 +156,9 @@ module.exports = {
     assertLoaderKeys,
     buildDegreeRuleCatalog,
     bundledMissionContentRepository,
+    captureGlobalSnapshot,
     character,
+    clearGlobalSnapshot,
     clone,
     computeDegreeProgress,
     createSession,
@@ -154,6 +168,6 @@ module.exports = {
     getMissionFactRequirementRegistry,
     installGlobalRepository,
     player,
-    productionContentSnapshotProvider,
     repositoryWith,
+    restoreGlobalSnapshot,
 }

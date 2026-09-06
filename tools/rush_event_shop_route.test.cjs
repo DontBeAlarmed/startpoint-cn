@@ -8,10 +8,10 @@ const { pack, unpack } = require("msgpackr")
 require("ts-node/register/transpile-only")
 
 const { after } = require("node:test")
-const { installBundledShopSnapshot } = require("./helpers/install-bundled-shop-snapshot.cjs")
 const {
-    productionContentSnapshotProvider,
-} = require("../src/content/runtime/content-snapshot")
+    installBundledShopSnapshot,
+    installRefreshedShopRepositoryIdentity,
+} = require("./helpers/install-bundled-shop-snapshot.cjs")
 const restoreBundledShopSnapshot = installBundledShopSnapshot()
 after(restoreBundledShopSnapshot)
 
@@ -578,14 +578,7 @@ async function main() {
             product.availableFrom = "2019-01-01 00:00:00"
             product.availableUntil = "2020-01-01 00:00:00"
         }
-        const periodSnapshot = productionContentSnapshotProvider.snapshot
-        productionContentSnapshotProvider.snapshot = {
-            ...periodSnapshot,
-            repository: {
-                info: () => periodSnapshot.repository.info(),
-                table: tableName => periodSnapshot.repository.table(tableName),
-            },
-        }
+        const restorePeriodIdentity = installRefreshedShopRepositoryIdentity()
         try {
             const beforePeriods = snapshot()
             for (const [shopType, shopItemId] of periodProducts) {
@@ -599,7 +592,7 @@ async function main() {
                 assert.deepEqual(snapshot(), beforePeriods)
             }
         } finally {
-            productionContentSnapshotProvider.snapshot = periodSnapshot
+            restorePeriodIdentity()
             periodProducts.forEach(([, , product], index) => {
                 product.availableFrom = originalPeriods[index].availableFrom
                 product.availableUntil = originalPeriods[index].availableUntil
@@ -620,14 +613,7 @@ async function main() {
 
         const scheduleRows = shopCostScheduleAsset.equipment_awaking_crystal_piece
         shopCostScheduleAsset.equipment_awaking_crystal_piece = scheduleRows.filter(row => row.month !== 8)
-        const scheduleSnapshot = productionContentSnapshotProvider.snapshot
-        productionContentSnapshotProvider.snapshot = {
-            ...scheduleSnapshot,
-            repository: {
-                info: () => scheduleSnapshot.repository.info(),
-                table: tableName => scheduleSnapshot.repository.table(tableName),
-            },
-        }
+        const restoreScheduleIdentity = installRefreshedShopRepositoryIdentity()
         try {
             setItem(17, 40122, 75)
             setItem(17, 40052, 75)
@@ -640,7 +626,7 @@ async function main() {
             assert.equal(missingSchedule.statusCode, 500)
             assert.deepEqual(snapshot(), beforeMissingSchedule)
         } finally {
-            productionContentSnapshotProvider.snapshot = scheduleSnapshot
+            restoreScheduleIdentity()
             shopCostScheduleAsset.equipment_awaking_crystal_piece = scheduleRows
         }
         globalNowSeconds = Date.parse("2022-12-23T12:00:00+08:00") / 1000
@@ -735,14 +721,7 @@ async function main() {
         eventItemShopAsset["11"]["700011"] = {
             "999999": eventItemShopAsset["11"]["700001"]["700000"],
         }
-        const previousTargetSnapshot = productionContentSnapshotProvider.snapshot
-        productionContentSnapshotProvider.snapshot = {
-            ...previousTargetSnapshot,
-            repository: {
-                info: () => previousTargetSnapshot.repository.info(),
-                table: tableName => previousTargetSnapshot.repository.table(tableName),
-            },
-        }
+        const restoreExactShopIdentity = installRefreshedShopRepositoryIdentity()
         try {
             const beforeExactShopPurchase = snapshot()
             const oldItemPurchase = await fastify.inject({
@@ -758,7 +737,7 @@ async function main() {
             )
             assert.deepEqual(snapshot(), beforeExactShopPurchase)
         } finally {
-            productionContentSnapshotProvider.snapshot = previousTargetSnapshot
+            restoreExactShopIdentity()
             delete eventItemShopAsset["11"]["700011"]
         }
 
@@ -964,14 +943,7 @@ async function main() {
 
         const enhancementItem = equipmentEnhancementShopAsset["2001"]
         enhancementItem.userCost = { type: 1, amount: 30 }
-        const previousEquipmentSnapshot = productionContentSnapshotProvider.snapshot
-        productionContentSnapshotProvider.snapshot = {
-            ...previousEquipmentSnapshot,
-            repository: {
-                info: () => previousEquipmentSnapshot.repository.info(),
-                table: tableName => previousEquipmentSnapshot.repository.table(tableName),
-            },
-        }
+        const restoreEnhancementIdentity = installRefreshedShopRepositoryIdentity()
         const grantsBeforeEnhancement = shopRewardGrantCalls
         globalNowSeconds = Date.parse("2024-10-12T12:00:00+08:00") / 1000
         db.prepare("UPDATE player_state SET free_mana = 10, paid_mana = 100 WHERE id = 17").run()
@@ -998,7 +970,7 @@ async function main() {
                 "追忆强化必须通过空 RewardGrant 计划统一 flush shared Inventory",
             )
         } finally {
-            productionContentSnapshotProvider.snapshot = previousEquipmentSnapshot
+            restoreEnhancementIdentity()
             delete enhancementItem.userCost
         }
         globalNowSeconds = Date.parse("2023-12-01T00:00:00+08:00") / 1000

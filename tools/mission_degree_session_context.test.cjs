@@ -9,6 +9,8 @@ const {
     allFacts,
     assertLoaderKeys,
     bundledMissionContentRepository,
+    captureGlobalSnapshot,
+    clearGlobalSnapshot,
     computeDegreeProgress,
     createSession,
     customDegreeCatalog,
@@ -16,12 +18,12 @@ const {
     getMissionFactRequirementRegistry,
     installGlobalRepository,
     player,
-    productionContentSnapshotProvider,
     repositoryWith,
+    restoreGlobalSnapshot,
 } = require("./helpers/mission-degree-session-fixture.cjs")
 
-const previousSnapshot = productionContentSnapshotProvider.snapshot
-test.after(() => { productionContentSnapshotProvider.snapshot = previousSnapshot })
+const previousSnapshot = captureGlobalSnapshot()
+test.after(() => { restoreGlobalSnapshot(previousSnapshot) })
 
 test("Degree exposes a Category 5 Session context builder", () => {
     assert.equal(typeof DegreeComputer.buildContextFromSession, "function")
@@ -29,7 +31,7 @@ test("Degree exposes a Category 5 Session context builder", () => {
 })
 
 test("Degree compute keeps using rules bound into an already-built context", () => {
-    productionContentSnapshotProvider.snapshot = null
+    clearGlobalSnapshot()
     const context = {
         category: 5,
         playerId: 99,

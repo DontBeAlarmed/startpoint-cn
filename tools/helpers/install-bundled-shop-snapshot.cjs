@@ -58,4 +58,27 @@ function installBundledShopSnapshot({ additionalTableNames = [] } = {}) {
     }
 }
 
-module.exports = { installBundledShopSnapshot }
+// Reinstalls the currently installed snapshot with a fresh repository identity
+// that delegates to the same repository. Shop tests mutate the required asset
+// objects in place; per-repository catalog caches only rebuild for a new
+// repository identity, so an identity refresh makes those mutations visible
+// without going through the provider singleton directly.
+function installRefreshedShopRepositoryIdentity() {
+    const previousSnapshot = productionContentSnapshotProvider.snapshot
+    const repository = previousSnapshot.repository
+    productionContentSnapshotProvider.snapshot = {
+        ...previousSnapshot,
+        repository: {
+            info: () => repository.info(),
+            table: tableName => repository.table(tableName),
+        },
+    }
+    let restored = false
+    return () => {
+        if (restored) return
+        restored = true
+        productionContentSnapshotProvider.snapshot = previousSnapshot
+    }
+}
+
+module.exports = { installBundledShopSnapshot, installRefreshedShopRepositoryIdentity }

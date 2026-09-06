@@ -70,7 +70,6 @@ db = require("../src/data/db").getDb()
 
 const {
     getContentSnapshot,
-    productionContentSnapshotProvider,
 } = require("../src/content/runtime/content-snapshot")
 const {
     getPlayerCharacterGrowthFactsByIdsSync,
@@ -222,16 +221,14 @@ assert.equal(
     "failed battle must not load Active Mission character mana nodes",
 )
 
-const originalSnapshot = productionContentSnapshotProvider.snapshot
-const originalRepository = originalSnapshot.repository
-const alternateRepository = {
-    info: () => originalRepository.info(),
-    table: tableName => originalRepository.table(tableName),
-}
-productionContentSnapshotProvider.snapshot = {
-    ...originalSnapshot,
-    repository: alternateRepository,
-}
+// The fact context must stay correct when the installed runtime repository
+// identity differs from the repository the plan was built from: reinstall an
+// equivalent bundled snapshot (fresh repository identity) and keep the plan on
+// the original repository object.
+const originalRepository = getContentSnapshot().repository
+const restoreAlternateRuntime = installBundledGameplaySnapshot({
+    tableOverrides: buildMissionOverrides(),
+})
 try {
     const playerId = db.prepare("SELECT id FROM players ORDER BY id LIMIT 1").get().id
     const ownedCharacterIds = db.prepare(`
@@ -242,7 +239,7 @@ try {
         getActiveMissionPlan(originalRepository),
     )
 } finally {
-    productionContentSnapshotProvider.snapshot = originalSnapshot
+    restoreAlternateRuntime()
 }
 
 const validationPlayerId = db.prepare("SELECT id FROM players ORDER BY id LIMIT 1 OFFSET 1").get().id

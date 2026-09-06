@@ -13,14 +13,14 @@ const bundledMovieProbability = require("../assets/equipment_gacha_movie_probabi
 const bundledExchangeRates = require("../assets/gacha_exchange_rate.json")
 
 const {
-    productionContentSnapshotProvider,
-} = require("../src/content/runtime/content-snapshot")
+    installFrozenTestContentSnapshot,
+} = require("../tools/helpers/content-snapshot-fixture.cjs")
 
 const {
     buildShortUpCharacterGachaTimeline,
 } = require("../src/lib/admin-clairvoyance")
 
-function repository(
+function tables(
     characterMeta,
     characterText,
     gachas = bundledGachas,
@@ -30,34 +30,25 @@ function repository(
     // gacha catalog validates every remaining auxiliary table strictly.
     { campaignTables = true } = {},
 ) {
-    return Object.freeze({
-        info: () => Object.freeze({
-            source: "release",
-            assetVersion: "test-release",
-            generatorVersion: 1,
-            releaseDigest: null,
-        }),
-        table: (tableName) => {
-            if (tableName === "gacha.json") return gachas
-            if (tableName === "gacha_pool.json") return gachaPools
-            if (tableName === "character.json") return characterMeta
-            if (tableName === "cdndata/character_text.json") return characterText
-            if (tableName === "gacha_campaign_definitions.json") {
-                return campaignTables ? bundledCampaigns : {}
-            }
-            if (tableName === "stars_gacha_campaign.json") {
-                return campaignTables ? bundledStarsCampaigns : {}
-            }
-            if (tableName === "gacha_exchange_rate.json") return bundledExchangeRates
-            if (tableName === "equipment_lookup.json") return bundledEquipmentLookup
-            if (tableName === "item_lookup.json") return bundledItemLookup
-            if (tableName === "equipment_gacha_movie_probability.json") return bundledMovieProbability
-            throw new Error(`unexpected content table: ${tableName}`)
-        },
-    })
+    return {
+        "gacha.json": gachas,
+        "gacha_pool.json": gachaPools,
+        "character.json": characterMeta,
+        "cdndata/character_text.json": characterText,
+        "gacha_campaign_definitions.json": campaignTables ? bundledCampaigns : {},
+        "stars_gacha_campaign.json": campaignTables ? bundledStarsCampaigns : {},
+        "gacha_exchange_rate.json": bundledExchangeRates,
+        "equipment_lookup.json": bundledEquipmentLookup,
+        "item_lookup.json": bundledItemLookup,
+        "equipment_gacha_movie_probability.json": bundledMovieProbability,
+    }
 }
 
-const previousSnapshot = productionContentSnapshotProvider.snapshot
+const restoreBundledBaseline = installFrozenTestContentSnapshot({
+    targetVersion: "1.4.54",
+    tables: tables(bundledCharacters, bundledCharacterText),
+}).restore
+
 const targetGachaItems = Object.values(bundledGachas["900002"].poolOddsIds)
     .flatMap(oddsId => bundledGachaPools[oddsId])
     .filter(item => item.id === 121069)
@@ -66,10 +57,6 @@ const originalRarities = targetGachaItems.map(item => ({
     hasRarity: Object.hasOwn(item, "rarity"),
     rarity: item.rarity,
 }))
-productionContentSnapshotProvider.snapshot = Object.freeze({
-    cdn: Object.freeze({ targetVersion: "1.4.54" }),
-    repository: repository(bundledCharacters, bundledCharacterText),
-})
 
 try {
     const timeline = buildShortUpCharacterGachaTimeline(new Date("2021-10-18T14:00:00.000Z"))
@@ -118,9 +105,9 @@ try {
             structuredClone(bundledGachaPools[oddsId]),
         ]),
     )
-    productionContentSnapshotProvider.snapshot = Object.freeze({
-        cdn: Object.freeze({ targetVersion: "test-release" }),
-        repository: repository(
+    const { restore: restoreInjected } = installFrozenTestContentSnapshot({
+        targetVersion: "test-release",
+        tables: tables(
             injectedCharacters,
             injectedText,
             Object.freeze({ "900002": Object.freeze(injectedGacha) }),
@@ -154,9 +141,9 @@ try {
                 : item),
         ]),
     )
-    productionContentSnapshotProvider.snapshot = Object.freeze({
-        cdn: Object.freeze({ targetVersion: "test-release-without-gacha-rarity" }),
-        repository: repository(
+    const { restore: restoreWithoutRarity } = installFrozenTestContentSnapshot({
+        targetVersion: "test-release-without-gacha-rarity",
+        tables: tables(
             injectedCharacters,
             injectedText,
             Object.freeze({ "900002": Object.freeze(injectedGacha) }),
@@ -183,31 +170,16 @@ try {
     assert.strictEqual(releaseCharacter.element, injectedCharacter.element)
 
     let tableReads = 0
-    const cachedRepository = Object.freeze({
-        info: () => Object.freeze({
-            source: "release",
-            assetVersion: "cache-test",
-            generatorVersion: 1,
-            releaseDigest: null,
-        }),
-        table: (tableName) => {
-            tableReads++
-            if (tableName === "gacha.json") return Object.freeze({ "900002": Object.freeze(injectedGacha) })
-            if (tableName === "gacha_pool.json") return Object.freeze(injectedGachaPools)
-            if (tableName === "character.json") return injectedCharacters
-            if (tableName === "cdndata/character_text.json") return injectedText
-            if (tableName === "gacha_campaign_definitions.json") return {}
-            if (tableName === "stars_gacha_campaign.json") return {}
-            if (tableName === "gacha_exchange_rate.json") return bundledExchangeRates
-            if (tableName === "equipment_lookup.json") return bundledEquipmentLookup
-            if (tableName === "item_lookup.json") return bundledItemLookup
-            if (tableName === "equipment_gacha_movie_probability.json") return bundledMovieProbability
-            throw new Error(`unexpected content table: ${tableName}`)
-        },
-    })
-    productionContentSnapshotProvider.snapshot = Object.freeze({
-        cdn: Object.freeze({ targetVersion: "cache-test" }),
-        repository: cachedRepository,
+    const { restore: restoreCacheProbe } = installFrozenTestContentSnapshot({
+        targetVersion: "cache-test",
+        onTableRead: () => { tableReads++ },
+        tables: tables(
+            injectedCharacters,
+            injectedText,
+            Object.freeze({ "900002": Object.freeze(injectedGacha) }),
+            Object.freeze(injectedGachaPools),
+            { campaignTables: false },
+        ),
     })
 
     const cachedFirst = buildShortUpCharacterGachaTimeline(new Date("2021-10-18T14:00:00.000Z"))
@@ -221,7 +193,7 @@ try {
         if (hasRarity) item.rarity = rarity
         else delete item.rarity
     }
-    productionContentSnapshotProvider.snapshot = previousSnapshot
+    restoreBundledBaseline()
 }
 
 console.log("admin-clairvoyance tests passed")

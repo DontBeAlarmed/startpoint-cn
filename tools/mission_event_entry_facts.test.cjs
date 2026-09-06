@@ -42,9 +42,7 @@ const {
 const missionCatalog = require("../src/lib/mission/mission-catalog")
 const { getMissionCatalog } = missionCatalog
 const getMissionMasterDefinition = (category, missionId) => getMissionCatalog().getDefinition(category, missionId)
-const {
-    productionContentSnapshotProvider,
-} = require("../src/content/runtime/content-snapshot")
+const { installFrozenTestContentSnapshot } = require("./helpers/content-snapshot-fixture.cjs")
 const {
     getBundledStandardMissionTables,
 } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
@@ -410,19 +408,15 @@ test("Raid SET edit facts fail closed for ordinary edits, illegal input, closed 
         missionCatalog.isMissionMasterDefinitionEnabledAt = originalEnabledAt
     }
 
-    const previousSnapshot = productionContentSnapshotProvider.snapshot
     const driftEventDefinitions = structuredClone(require("../assets/mission_event.json"))
     driftEventDefinitions["400054"][0][2] = "81"
     const driftTables = getBundledStandardMissionTables({
         "mission_event.json": driftEventDefinitions,
     })
-    productionContentSnapshotProvider.snapshot = {
-        cdn: { targetVersion: "event-entry-master-drift" },
-        repository: {
-            info: () => ({ source: "test" }),
-            table: tableName => driftTables[tableName],
-        },
-    }
+    const { restore: restoreDriftSnapshot } = installFrozenTestContentSnapshot({
+        targetVersion: "event-entry-master-drift",
+        tables: driftTables,
+    })
     try {
         assert.equal(recordRaidSetEditMissionFactsSync(
             noFactPlayerId,
@@ -431,7 +425,7 @@ test("Raid SET edit facts fail closed for ordinary edits, illegal input, closed 
             new Date("2024-05-23T04:00:00.000Z"),
         ), false, "任一族内主数据不符时不得写入部分事实")
     } finally {
-        productionContentSnapshotProvider.snapshot = previousSnapshot
+        restoreDriftSnapshot()
     }
     assert.deepEqual(getPlayerCategoryMissionsSync(noFactPlayerId, 3), {})
 })

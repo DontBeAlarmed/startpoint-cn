@@ -21,8 +21,9 @@ database.getDb = () => {
 
 const mission = require("../src/lib/mission")
 const {
-    productionContentSnapshotProvider,
-} = require("../src/content/runtime/content-snapshot")
+    getBundledStandardMissionTables,
+} = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+const { installFrozenTestContentSnapshot } = require("./helpers/content-snapshot-fixture.cjs")
 const {
     bundledMissionContentRepository,
 } = require("../src/lib/mission/mission-catalog-source")
@@ -500,27 +501,36 @@ test("caches by MissionCatalog identity without leaking global Degree definition
 })
 
 test("requirement registries follow their own catalog content regardless of build order", () => {
-    const previousSnapshot = productionContentSnapshotProvider.snapshot
-    try {
-        const bundledCatalog = getMissionCatalog(bundledMissionContentRepository)
-        const bundledRegistry = getMissionFactRequirementRegistry(bundledCatalog)
-        assert.equal(bundledRegistry.getRequirement(3, 1200).mode, "persisted")
-        assert.equal(bundledRegistry.getRequirement(9, 1110013).mode, "persisted")
+    const bundledCatalog = getMissionCatalog(bundledMissionContentRepository)
+    const bundledRegistry = getMissionFactRequirementRegistry(bundledCatalog)
+    assert.equal(bundledRegistry.getRequirement(3, 1200).mode, "persisted")
+    assert.equal(bundledRegistry.getRequirement(9, 1110013).mode, "persisted")
 
-        const eventDefinitions = bundledMissionContentRepository.table("mission_event.json")
-        const awakeDefinitions = bundledMissionContentRepository.table("mission_char_awake.json")
-        const runtimeTables = {
-            "mission_event.json": {
-                ...eventDefinitions,
-                1200: [[...eventDefinitions["1200"][0]]],
-            },
-            "mission_char_awake.json": {
-                ...awakeDefinitions,
-                1110013: [[...awakeDefinitions["1110013"][0]]],
-            },
-        }
-        runtimeTables["mission_event.json"][1200][0][2] = "999"
-        runtimeTables["mission_char_awake.json"][1110013][0][4] = "999"
+    const eventDefinitions = bundledMissionContentRepository.table("mission_event.json")
+    const awakeDefinitions = bundledMissionContentRepository.table("mission_char_awake.json")
+    const runtimeTables = {
+        "mission_event.json": {
+            ...eventDefinitions,
+            1200: [[...eventDefinitions["1200"][0]]],
+        },
+        "mission_char_awake.json": {
+            ...awakeDefinitions,
+            1110013: [[...awakeDefinitions["1110013"][0]]],
+        },
+    }
+    runtimeTables["mission_event.json"][1200][0][2] = "999"
+    runtimeTables["mission_char_awake.json"][1110013][0][4] = "999"
+    const { restore: restoreRuntimeSnapshot } = installFrozenTestContentSnapshot({
+        tables: {
+            ...getBundledStandardMissionTables(runtimeTables),
+            "main_quest.json": bundledMainQuests,
+            "ex_quest.json": bundledExQuests,
+        },
+    })
+    try {
+        // The runtime catalog is the current authority: its own drifted
+        // definitions stay self-consistent instead of being rejected against
+        // the bundled baseline.
         const runtimeRepository = {
             info: () => ({ source: "mission-requirement-runtime" }),
             table(tableName) {
@@ -528,15 +538,6 @@ test("requirement registries follow their own catalog content regardless of buil
                     ?? bundledRuntimeTable(tableName)
             },
         }
-        productionContentSnapshotProvider.snapshot = {
-            cdn: {},
-            archiveSources: { schemaVersion: 1, archives: [] },
-            repository: runtimeRepository,
-        }
-
-        // The runtime catalog is the current authority: its own drifted
-        // definitions stay self-consistent instead of being rejected against
-        // the bundled baseline.
         const runtimeCatalog = getMissionCatalog(runtimeRepository)
         const runtimeRegistry = getMissionFactRequirementRegistry(runtimeCatalog)
         assert.equal(runtimeRegistry.getRequirement(3, 1200).mode, "persisted")
@@ -550,7 +551,7 @@ test("requirement registries follow their own catalog content regardless of buil
         assertUnsupported(sameBundledContent.getRequirement(3, 1200), /producer|schema|contract|pattern/i)
         assertUnsupported(sameBundledContent.getRequirement(9, 1110013), /awake|schema|family|pattern/i)
     } finally {
-        productionContentSnapshotProvider.snapshot = previousSnapshot
+        restoreRuntimeSnapshot()
     }
 })
 
@@ -580,7 +581,6 @@ test("uses the supplied Catalog reward stage for authoritative Degree levels", (
 })
 
 test("keeps explicit bundled Degree rewards isolated from the runtime snapshot", () => {
-    const previousSnapshot = productionContentSnapshotProvider.snapshot
     const registryModulePath = require.resolve("../src/lib/mission/requirements/registry")
     try {
         const bundledRewards = bundledMissionContentRepository.table("mission_degree_reward.json")
@@ -592,32 +592,31 @@ test("keeps explicit bundled Degree rewards isolated from the runtime snapshot",
             },
         }
         runtimeRewards[3010][1][0][1] = "81"
-        const runtimeRepository = {
-            info: () => ({ source: "mission-requirement-runtime-degree" }),
-            table(tableName) {
-                return tableName === "mission_degree_reward.json"
-                    ? runtimeRewards
-                    : bundledRuntimeTable(tableName)
+        const { restore: restoreRuntimeSnapshot } = installFrozenTestContentSnapshot({
+            tables: {
+                ...getBundledStandardMissionTables({
+                    "mission_degree_reward.json": runtimeRewards,
+                }),
+                "main_quest.json": bundledMainQuests,
+                "ex_quest.json": bundledExQuests,
             },
-        }
-        productionContentSnapshotProvider.snapshot = {
-            cdn: {},
-            archiveSources: { schemaVersion: 1, archives: [] },
-            repository: runtimeRepository,
-        }
+        })
 
-        delete require.cache[registryModulePath]
-        const isolatedRegistryModule = require(registryModulePath)
-        const bundledCatalog = getMissionCatalog(bundledMissionContentRepository)
-        assert.equal(bundledCatalog.getRewardStage(5, 3010, 1).targetProgress, 80)
+        try {
+            delete require.cache[registryModulePath]
+            const isolatedRegistryModule = require(registryModulePath)
+            const bundledCatalog = getMissionCatalog(bundledMissionContentRepository)
+            assert.equal(bundledCatalog.getRewardStage(5, 3010, 1).targetProgress, 80)
 
-        const requirement = isolatedRegistryModule
-            .getMissionFactRequirementRegistry(bundledCatalog)
-            .getRequirement(5, 3010)
-        assert.equal(requirement.mode, "computed")
-        assert.deepEqual(factIds(requirement), ["characters"])
+            const requirement = isolatedRegistryModule
+                .getMissionFactRequirementRegistry(bundledCatalog)
+                .getRequirement(5, 3010)
+            assert.equal(requirement.mode, "computed")
+            assert.deepEqual(factIds(requirement), ["characters"])
+        } finally {
+            restoreRuntimeSnapshot()
+        }
     } finally {
-        productionContentSnapshotProvider.snapshot = previousSnapshot
         delete require.cache[registryModulePath]
         require(registryModulePath)
     }
