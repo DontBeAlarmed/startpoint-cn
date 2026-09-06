@@ -174,14 +174,27 @@ const activeQuests = {
     },
 }
 
+const runtimeContentTables = {
+    "config.json": require("../assets/config.json"),
+    "item_inventory_policy.json": require("../assets/item_inventory_policy.json"),
+}
+
 stubModule("../src/data/db", { getDb: () => db })
 stubModule("../src/data/domains/server-settings", {
     getServerGameplaySettingsSync: () => ({ dropMultiplier: 3 }),
 })
 stubModule("../src/content/runtime/content-snapshot", {
-    getContentSnapshot: () => ({ repository: {} }),
+    getContentSnapshot: () => ({
+        repository: {
+            table: tableName => runtimeContentTables[tableName],
+        },
+    }),
 })
 stubModule("../src/content/runtime/table-access", {
+    getStrictRuntimeContentTableSync(tableName) {
+        if (tableName in runtimeContentTables) return runtimeContentTables[tableName]
+        throw new Error(`unexpected strict runtime table ${tableName}`)
+    },
     getRuntimeContentTableSync(tableName, fallback) {
         if (tableName !== "additional_reward_rules.json") return fallback
         return {

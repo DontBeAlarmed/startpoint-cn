@@ -12,9 +12,6 @@ const { ContentRepository } = require("../src/content/runtime/content-repository
 const {
     productionContentSnapshotProvider,
 } = require("../src/content/runtime/content-snapshot")
-const {
-    getShopSelectItemCampaignsSync,
-} = require("../src/lib/assets")
 const { getShopCatalog } = require("../src/lib/shop")
 const { resolveEventCurrencyId } = require("../src/lib/event-currency")
 const { ShopType } = require("../src/lib/types")
@@ -34,12 +31,7 @@ const SHOP_TABLES = Object.freeze([
     "mana_shop.json",
     "shop_cost_item_schedule.json",
 ])
-const SHOP_RUNTIME_TABLES = Object.freeze([
-    ...SHOP_TABLES.filter(tableName => tableName !== "shop_cost_item_schedule.json"),
-    "item_lookup.json",
-])
-
-test("shop runtime facades read all twelve product tables from one initialized snapshot", () => {
+test("shop typed catalog reads its runtime tables from one initialized snapshot", () => {
     const previousSnapshot = productionContentSnapshotProvider.snapshot
     const requested = []
     const item = Object.freeze({
@@ -115,7 +107,7 @@ test("shop runtime facades read all twelve product tables from one initialized s
             availableFrom: "2025-06-26 12:00:00",
             availableUntil: "2025-08-14 23:59:59",
         })
-        assert.deepEqual(getShopSelectItemCampaignsSync(), { "4": {}, "7": {} })
+        assert.deepEqual(catalog.campaignsByKey, {})
         assert.equal(resolveEventCurrencyId(70001, new Date("2024-01-02T00:00:00Z")), 70001)
         assert.equal(requested.includes("cdn_general_shop_whitelist.json"), true)
         assert.equal(requested.includes("item_lookup.json"), true)

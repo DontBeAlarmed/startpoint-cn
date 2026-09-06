@@ -7,6 +7,10 @@ const path = require("node:path")
 const Fastify = require("fastify")
 const { pack, unpack } = require("msgpackr")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot({
+        additionalTableNames: ["raid_event_overall_reward.json"],
+    })
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "raid-event-summary-route-db-"))
 const previousDataDirectory = process.env.DATA_DIR
 process.env.DATA_DIR = databaseDirectory
@@ -130,6 +134,7 @@ main().then(
         process.exitCode = 1
     },
 ).finally(() => {
+    restoreContentSnapshot()
     closeDatabase()
     fs.rmSync(databaseDirectory, { recursive: true, force: true })
     if (previousDataDirectory === undefined) delete process.env.DATA_DIR

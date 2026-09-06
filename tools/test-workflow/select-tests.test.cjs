@@ -52,6 +52,28 @@ test("maps D27 narrow Config policies to every affected focused group", () => {
     assert.deepEqual(selectTestGroups(["tools/config_content.test.cjs"]), ["quick:content"])
 })
 
+test("maps D27 Shop typed content to the affected focused groups", () => {
+    for (const file of ["src/lib/shop/catalog.ts", "src/lib/shop/model.ts"]) {
+        assert.deepEqual(
+            selectTestGroups([file]),
+            ["integration:event", "integration:rules", "quick:content"],
+            file,
+        )
+    }
+    assert.deepEqual(
+        selectTestGroups(["src/lib/event-currency.ts"]),
+        ["integration:rules"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/shop-select-campaign.ts"]),
+        ["integration:event", "integration:rules"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/how-to-get.ts"]),
+        ["integration:event"],
+    )
+})
+
 test("maps representative source files to focused groups", () => {
     assert.deepEqual(
         selectTestGroups(["src/data/domains/gacha-state.ts"]),

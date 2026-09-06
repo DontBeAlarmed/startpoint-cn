@@ -55,6 +55,19 @@ export interface ShopNavigationProduct extends ShopCatalogEntryBase {
 
 export type ShopCatalogEntry = ShopPurchaseProduct | ShopNavigationProduct
 
+export interface ShopCampaignDescriptor {
+    readonly shopType: ShopType.EVENT_ITEM | ShopType.BOSS_COIN
+    readonly campaignId: number
+    readonly availableFromMs: number
+    readonly availableUntilMs: number
+    readonly lineupIds: readonly number[]
+}
+
+export interface ShopEventCurrencyWindow {
+    readonly fromMs: number
+    readonly untilMs: number
+}
+
 export interface ShopCatalog {
     readonly entries: Readonly<Record<string, ShopCatalogEntry>>
     readonly productIdsByType: Readonly<Record<string, readonly number[]>>
@@ -63,6 +76,8 @@ export interface ShopCatalog {
     readonly equipmentGroupProductIds: Readonly<Record<string, readonly number[]>>
     readonly rewardProductKeys: Readonly<Record<string, readonly string[]>>
     readonly scheduleRowsByMonth: Readonly<Record<string, readonly Readonly<ShopCostItemScheduleRow>[]>>
+    readonly campaignsByKey: Readonly<Record<string, ShopCampaignDescriptor>>
+    readonly eventCurrencyWindowsByItemId: Readonly<Record<string, readonly ShopEventCurrencyWindow[]>>
 }
 
 export interface EffectiveShopOffer extends Omit<ShopPurchaseProduct, "item"> {

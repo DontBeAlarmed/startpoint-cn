@@ -5,7 +5,7 @@ import { getPlayerShopPurchaseCountsByTypeBulkSync } from "../data/domains/shopP
 import {
     getBoxGachaSync,
 } from "./assets"
-import { getShopCatalog } from "./shop"
+import { getShopCatalog, type ShopCatalog } from "./shop"
 import { buildShopSalesListSync } from "./shop-sales-list"
 import { validateBoxGachaPeriod } from "./box-gacha-reset"
 import {
@@ -19,7 +19,6 @@ import {
     ShopItem,
     ShopItemRewardType,
     ShopItems,
-    ShopSelectItemCampaigns,
     ShopType,
 } from "./types"
 
@@ -40,8 +39,8 @@ interface SalesListItemIdentity {
 
 function getRelevantShopItemsFromCatalog(
     target: HowToGetTarget,
+    catalog: ShopCatalog,
 ): { readonly itemsByType: Record<number, ShopItems>, readonly matchingKeys: Set<string> } {
-    const catalog = getShopCatalog()
     const expectedType = target.kind === "item"
         ? ShopItemRewardType.ITEM
         : ShopItemRewardType.EQUIPMENT
@@ -82,7 +81,7 @@ function isUnselectedLineupItemAvailable(
     item: Pick<ShopItem, "campaignId" | "lineupId">,
     shopType: number,
     selections: Readonly<Record<string, number>>,
-    campaigns: Readonly<ShopSelectItemCampaigns>,
+    catalog: Pick<ShopCatalog, "campaignsByKey">,
     nowMs: number,
 ): boolean {
     if (!Number.isSafeInteger(item.campaignId) || item.campaignId! <= 0
@@ -91,7 +90,7 @@ function isUnselectedLineupItemAvailable(
     if (selectedLineupId !== undefined) return false
     try {
         const campaign = requireAvailableShopCampaign(
-            campaigns,
+            catalog,
             shopType,
             item.campaignId!,
             null,
@@ -137,11 +136,9 @@ export function getHowToGetListSync(
     purchasePeriodNowMs = nowMs,
     resetHour = 5,
 ): HowToGetList {
-    const relevant = getRelevantShopItemsFromCatalog(target)
+    const catalog = getShopCatalog()
+    const relevant = getRelevantShopItemsFromCatalog(target, catalog)
     const campaignLineups = getPlayerShopCampaignLineupsSync(playerId)
-    const campaigns = getContentSnapshot().repository.table<ShopSelectItemCampaigns>(
-        "shop_select_item_campaign.json",
-    )
     const equipmentIds = Object.values(relevant.itemsByType[ShopType.TREASURE_EQUIPMENT] ?? {})
         .map(item => item.equipmentId)
         .filter((equipmentId): equipmentId is number => equipmentId !== undefined)
@@ -172,7 +169,7 @@ export function getHowToGetListSync(
             item,
             shopType,
             campaignLineups,
-            campaigns,
+            catalog,
             nowMs,
         ),
     }, dependencies).salesList

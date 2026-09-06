@@ -90,6 +90,7 @@ function fixtureTables() {
             "11": {
                 "700001": {
                     "310001": item({
+                        costs: [{ id: 70001, amount: 1 }],
                         availableUntil: "2024-12-31 23:59:59",
                         rewards: [{ type: 0, id: 777, count: 2 }],
                     }),
@@ -139,6 +140,7 @@ function bundledRepository() {
     const assetsRoot = path.resolve(__dirname, "../assets")
     const tableNames = [
         "shop_item_campaign.json",
+        "shop_select_item_campaign.json",
         "cdn_general_shop_whitelist.json",
         "shop_cost_item_schedule.json",
         "treasure_shop.json",
@@ -200,6 +202,17 @@ test("Shop catalog exposes typed scopes, stable indexes and compatibility window
         `${ShopType.GENERAL}:999999`,
         `${ShopType.EVENT_ITEM}:310001`,
     ])
+    assert.deepEqual(catalog.campaignsByKey["4:10"], {
+        shopType: ShopType.EVENT_ITEM,
+        campaignId: 10,
+        availableFromMs: shop.parseShopCnTimestamp("2024-01-01 00:00:00"),
+        availableUntilMs: shop.parseShopCnTimestamp("2025-01-01 00:00:00"),
+        lineupIds: [1010],
+    })
+    assert.deepEqual(catalog.eventCurrencyWindowsByItemId["70001"], [{
+        fromMs: shop.parseShopCnTimestamp("2024-01-01 00:00:00"),
+        untilMs: shop.parseShopCnTimestamp("2024-12-31 23:59:59"),
+    }], "Rush compatibility must not become an official Event Currency window")
     assert.equal(Object.isFrozen(catalog), true)
     assert.equal(Object.isFrozen(catalog.entries), true)
     assert.equal(Object.isFrozen(catalog.entries[`${ShopType.EVENT_ITEM}:310001`]), true)
@@ -359,6 +372,20 @@ test("catalog rejects invalid navigation product invariants", () => {
     assert.throws(() => buildShopCatalog(repository(missingCampaign)), /Invalid special exchange link/)
 })
 
+test("catalog rejects malformed or dangling Campaign definitions", () => {
+    const malformedPeriod = fixtureTables()
+    malformedPeriod["shop_select_item_campaign.json"]["4"]["10"].availableFrom = "invalid"
+    assert.throws(() => buildShopCatalog(repository(malformedPeriod)), /Invalid shop period/)
+
+    const missingCampaign = fixtureTables()
+    delete missingCampaign["shop_select_item_campaign.json"]["4"]["10"]
+    assert.throws(() => buildShopCatalog(repository(missingCampaign)), /campaign does not exist/)
+
+    const missingLineup = fixtureTables()
+    missingLineup["shop_select_item_campaign.json"]["4"]["10"].lineupIds = [9999]
+    assert.throws(() => buildShopCatalog(repository(missingLineup)), /lineup does not exist/)
+})
+
 test("runtime repository whitelist is the only General listing authority", () => {
     const tables = fixtureTables()
     tables["cdn_general_shop_whitelist.json"] = [999999]
@@ -398,6 +425,8 @@ test("bundled shop content builds one complete immutable catalog", () => {
     assert.equal(Object.keys(catalog.equipmentGroupProductIds).length, 29)
     assert.equal(Object.keys(catalog.rewardProductKeys).length, 812)
     assert.equal(Object.keys(catalog.scheduleRowsByMonth).length, 12)
+    assert.equal(Object.keys(catalog.campaignsByKey).length, 6)
+    assert.equal(Object.keys(catalog.eventCurrencyWindowsByItemId).length > 0, true)
     assert.equal(catalog.eventProductIds["11:700011"].length, 33)
     assert.equal(Object.isFrozen(catalog.scheduleRowsByMonth), true)
 
@@ -439,5 +468,5 @@ test("bundled shop content builds one complete immutable catalog", () => {
     const lookupDurationMs = performance.now() - lookupStartedAt
     assert.ok(buildDurationMs < 2_000, `catalog build took ${buildDurationMs.toFixed(1)}ms`)
     assert.ok(lookupDurationMs < 500, `100k catalog lookups took ${lookupDurationMs.toFixed(1)}ms`)
-    assert.equal(source.calls.length, 11)
+    assert.equal(source.calls.length, 12)
 })

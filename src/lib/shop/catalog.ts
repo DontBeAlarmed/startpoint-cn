@@ -10,16 +10,20 @@ import type {
     ShopItem,
     ShopItemCampaignMap,
     ShopItems,
+    ShopSelectItemCampaigns,
 } from "../types/shop"
 import { ShopType } from "../types/shop"
 import type {
     ShopCatalog,
     ShopCatalogEntry,
+    ShopCampaignDescriptor,
     ShopCatalogScope,
+    ShopEventCurrencyWindow,
     ShopNavigationProduct,
     ShopPurchaseProduct,
 } from "./model"
 import { shopCatalogKey } from "./model"
+import { parseShopCnTimestamp } from "./period"
 import {
     addRushCompatibilityPeriod,
     RUSH_COMPATIBILITY_EVENTS,
@@ -42,6 +46,8 @@ interface MutableCatalog {
     equipmentGroupProductIds: Record<string, number[]>
     rewardProductKeys: Record<string, string[]>
     scheduleRowsByMonth: Record<string, ShopCostItemScheduleRows[string]>
+    campaignsByKey: Record<string, ShopCampaignDescriptor>
+    eventCurrencyWindowsByItemId: Record<string, ShopEventCurrencyWindow[]>
 }
 
 function append(index: Record<string, number[]>, key: string, value: number): void {
@@ -57,6 +63,86 @@ function cloneItem(item: ShopItem): ShopItem {
         specifiedMonths: item.specifiedMonths === undefined
             ? undefined
             : [...item.specifiedMonths],
+    }
+}
+
+function buildCampaignIndex(
+    campaigns: ShopSelectItemCampaigns,
+): MutableCatalog["campaignsByKey"] {
+    if (!campaigns || typeof campaigns !== "object" || Array.isArray(campaigns)) {
+        throw new TypeError("Invalid shop campaign table.")
+    }
+    const result: MutableCatalog["campaignsByKey"] = {}
+    for (const [shopTypeText, definitions] of Object.entries(campaigns)) {
+        const shopType = Number(shopTypeText)
+        if ((shopType !== ShopType.EVENT_ITEM && shopType !== ShopType.BOSS_COIN)
+            || !definitions || typeof definitions !== "object" || Array.isArray(definitions)) {
+            throw new TypeError(`Invalid shop campaign type: ${shopTypeText}`)
+        }
+        for (const [campaignIdText, definition] of Object.entries(definitions)) {
+            const campaignId = Number(campaignIdText)
+            if (!Number.isSafeInteger(campaignId) || campaignId <= 0
+                || !definition || typeof definition !== "object" || Array.isArray(definition)
+                || !Array.isArray(definition.lineupIds)) {
+                throw new TypeError(`Invalid shop campaign: ${shopTypeText}:${campaignIdText}`)
+            }
+            const lineupIds = definition.lineupIds.map(lineupId => {
+                if (!Number.isSafeInteger(lineupId) || lineupId <= 0) {
+                    throw new TypeError(`Invalid shop campaign lineup: ${shopTypeText}:${campaignIdText}`)
+                }
+                return lineupId
+            })
+            if (new Set(lineupIds).size !== lineupIds.length) {
+                throw new TypeError(`Duplicate shop campaign lineup: ${shopTypeText}:${campaignIdText}`)
+            }
+            const availableFromMs = parseShopCnTimestamp(definition.availableFrom)
+            const availableUntilMs = parseShopCnTimestamp(definition.availableUntil)
+            if (availableUntilMs < availableFromMs) {
+                throw new TypeError(`Invalid shop campaign period: ${shopTypeText}:${campaignIdText}`)
+            }
+            result[`${shopType}:${campaignId}`] = {
+                shopType,
+                campaignId,
+                availableFromMs,
+                availableUntilMs,
+                lineupIds,
+            }
+        }
+    }
+    return result
+}
+
+function appendEventCurrencyWindows(catalog: MutableCatalog, item: ShopItem): void {
+    const fromMs = parseShopCnTimestamp(item.availableFrom)
+    const untilMs = item.availableUntil === null
+        ? Infinity
+        : parseShopCnTimestamp(item.availableUntil)
+    if (untilMs < fromMs) throw new TypeError("Invalid Event Shop item period.")
+    for (const cost of item.costs) {
+        if (!Number.isSafeInteger(cost.id) || cost.id <= 0) {
+            throw new TypeError("Invalid Event Shop currency item id.")
+        }
+        ;(catalog.eventCurrencyWindowsByItemId[String(cost.id)] ??= []).push({ fromMs, untilMs })
+    }
+}
+
+function validateCampaignScope(
+    catalog: MutableCatalog,
+    shopType: ShopType,
+    shopItemId: number,
+    scope: ShopCatalogScope,
+): void {
+    if (scope.kind !== "event" && scope.kind !== "bossCoin") return
+    if (scope.lineupId !== undefined && scope.campaignId === undefined) {
+        throw new TypeError(`Shop lineup has no campaign: ${shopType}:${shopItemId}`)
+    }
+    if (scope.campaignId === undefined) return
+    const campaign = catalog.campaignsByKey[`${shopType}:${scope.campaignId}`]
+    if (campaign === undefined) {
+        throw new TypeError(`Shop campaign does not exist: ${shopType}:${shopItemId}`)
+    }
+    if (scope.lineupId !== undefined && !campaign.lineupIds.includes(scope.lineupId)) {
+        throw new TypeError(`Shop campaign lineup does not exist: ${shopType}:${shopItemId}`)
     }
 }
 
@@ -134,6 +220,7 @@ function addEntry(
         throw new TypeError(`Invalid shop purchase kind: ${key}`)
     }
     const scoped = campaignScope(scope, item, reference)
+    validateCampaignScope(catalog, shopType, shopItemId, scoped.scope)
     const entry: ShopPurchaseProduct = {
         kind: "purchase",
         shopType,
@@ -185,6 +272,9 @@ function buildScheduleIndex(
 
 export function buildShopCatalog(repository: ReadonlyContentRepository): ShopCatalog {
     const campaignMap = repository.table<ShopItemCampaignMap>("shop_item_campaign.json")
+    const campaignsByKey = buildCampaignIndex(
+        repository.table<ShopSelectItemCampaigns>("shop_select_item_campaign.json"),
+    )
     const generalWhitelist = new Set(
         repository.table<readonly number[]>("cdn_general_shop_whitelist.json"),
     )
@@ -195,6 +285,8 @@ export function buildShopCatalog(repository: ReadonlyContentRepository): ShopCat
         bossProductIds: {},
         equipmentGroupProductIds: {},
         rewardProductKeys: {},
+        campaignsByKey,
+        eventCurrencyWindowsByItemId: {},
         scheduleRowsByMonth: buildScheduleIndex(
             repository.table<ShopCostItemScheduleRows>("shop_cost_item_schedule.json"),
         ),
@@ -235,6 +327,7 @@ export function buildShopCatalog(repository: ReadonlyContentRepository): ShopCat
             const eventId = Number(eventIdText)
             const compatibility = rushCompatibilityForSource(eventShops, eventType, eventId)
             for (const [itemId, item] of Object.entries(items)) {
+                appendEventCurrencyWindows(catalog, item)
                 const effectiveItem = compatibility === null
                     ? item
                     : addRushCompatibilityPeriod(item, compatibility)

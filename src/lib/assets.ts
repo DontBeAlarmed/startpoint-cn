@@ -8,7 +8,7 @@ import practiceQuests from "../../assets/practice_quest.json";
 import manaNodes from "../../assets/mana_node.json";
 import manaNodeAwake from "../../assets/mana_node_awake.json";
 import manaBoard from "../../assets/mana_board.json";
-import { AssetCharacter, BattleQuest, BoxGacha, ClearRewards, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, Gacha, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawBoxGachas, RawBoxRewards, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, ShopSelectItemCampaigns, StoryQuest } from "./types";
+import { AssetCharacter, BattleQuest, BoxGacha, ClearRewards, ExAbilities, ExBoostItem, ExBoostItems, ExStatus, Gacha, ManaNode, ManaNodes, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawAssetCharacters, RawBoxGachas, RawBoxRewards, RawQuests, Reward, RushEventFolders, ScoreReward, ScoreRewardGroups, StoryQuest } from "./types";
 import { getLegacyGachas } from "./gacha-legacy-content";
 import { getRushCompatibilityEvent } from "./shop/rush-compatibility"
 import { RawBoxGachaSettings } from "./types/box-gacha";
@@ -677,17 +677,6 @@ export function getGachaSync(
     
     return data ?? null
 }
-
-// shop functions
-
-function getShopContentTable<T>(tableName: string): T {
-    return getContentSnapshot().repository.table<T>(tableName)
-}
-
-export function getShopSelectItemCampaignsSync(): ShopSelectItemCampaigns {
-    return getShopContentTable<ShopSelectItemCampaigns>("shop_select_item_campaign.json")
-}
-
 
 /**
  * Gets the rewards that should be given when clearing a given folder.

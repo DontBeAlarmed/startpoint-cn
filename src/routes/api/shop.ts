@@ -14,7 +14,6 @@ import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { getShopSelectItemCampaignsSync } from "../../lib/assets";
 import { getStaminaPolicySync } from "../../lib/config-content"
 import { ShopType } from "../../lib/types";
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
@@ -251,7 +250,7 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
         })
         try {
             requireAvailableShopCampaign(
-                getShopSelectItemCampaignsSync(),
+                getShopCatalog(),
                 shopType,
                 campaignId!,
                 null,
@@ -311,7 +310,7 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
         })
         try {
             requireAvailableShopCampaign(
-                getShopSelectItemCampaignsSync(),
+                getShopCatalog(),
                 shopType,
                 campaignId!,
                 lineupId!,

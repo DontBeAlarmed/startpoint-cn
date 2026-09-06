@@ -504,6 +504,7 @@ test("every bundled Character product has an authoritative finite limit", () => 
     const assetsRoot = path.resolve(__dirname, "../assets")
     const tableNames = [
         "shop_item_campaign.json",
+        "shop_select_item_campaign.json",
         "cdn_general_shop_whitelist.json",
         "shop_cost_item_schedule.json",
         "treasure_shop.json",

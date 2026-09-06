@@ -570,8 +570,14 @@ async function main() {
             [9, 100000, starGrainShopAsset["100000"]],
             [10, 2001, equipmentEnhancementShopAsset["2001"]],
         ]
-        const originalPeriods = periodProducts.map(([, , product]) => product.availableUntil)
-        for (const [, , product] of periodProducts) product.availableUntil = "2020-01-01 00:00:00"
+        const originalPeriods = periodProducts.map(([, , product]) => ({
+            availableFrom: product.availableFrom,
+            availableUntil: product.availableUntil,
+        }))
+        for (const [, , product] of periodProducts) {
+            product.availableFrom = "2019-01-01 00:00:00"
+            product.availableUntil = "2020-01-01 00:00:00"
+        }
         const periodSnapshot = productionContentSnapshotProvider.snapshot
         productionContentSnapshotProvider.snapshot = {
             ...periodSnapshot,
@@ -595,7 +601,8 @@ async function main() {
         } finally {
             productionContentSnapshotProvider.snapshot = periodSnapshot
             periodProducts.forEach(([, , product], index) => {
-                product.availableUntil = originalPeriods[index]
+                product.availableFrom = originalPeriods[index].availableFrom
+                product.availableUntil = originalPeriods[index].availableUntil
             })
         }
 

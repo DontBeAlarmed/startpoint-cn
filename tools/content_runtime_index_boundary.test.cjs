@@ -54,3 +54,41 @@ test("raw Config access stays inside the typed Config adapter", () => {
     })
     assert.deepEqual(legacyUsers, [])
 })
+
+test("Shop business consumers use the typed Shop catalog", () => {
+    const targetedConsumers = [
+        "src/lib/event-currency.ts",
+        "src/lib/how-to-get.ts",
+        "src/routes/api/shop.ts",
+        "src/lib/assets.ts",
+    ]
+    for (const relative of targetedConsumers) {
+        const source = fs.readFileSync(path.join(projectRoot, relative), "utf8")
+        assert.doesNotMatch(source, /getShopSelectItemCampaignsSync|getShopContentTable/, relative)
+        assert.doesNotMatch(source, /shop_select_item_campaign\.json/, relative)
+        if (relative === "src/lib/event-currency.ts") {
+            assert.doesNotMatch(source, /getContentSnapshot|event_item_shop\.json/, relative)
+        }
+    }
+
+    const rawReferences = sourceFiles(sourceRoot).flatMap(filePath => {
+        const source = fs.readFileSync(filePath, "utf8")
+        return /(?:event_item_shop|shop_select_item_campaign)\.json/.test(source)
+            ? [path.relative(projectRoot, filePath).split(path.sep).join("/")]
+            : []
+    }).sort()
+    assert.deepEqual(rawReferences, [
+        "src/content/converters/shop.ts",
+        "src/content/sync/table-registry.ts",
+        "src/lib/shop/catalog.ts",
+    ])
+
+    const catalogSource = fs.readFileSync(
+        path.join(projectRoot, "src/lib/shop/catalog.ts"),
+        "utf8",
+    )
+    assert.doesNotMatch(
+        catalogSource,
+        /event_item_shop_id_map\.json|boss_coin_shop_item_category_map\.json/,
+    )
+})

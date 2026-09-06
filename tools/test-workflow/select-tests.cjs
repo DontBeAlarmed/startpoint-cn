@@ -522,6 +522,18 @@ const SOURCE_RULES = [
         groups: ["quick:content"],
     },
     {
+        pattern: /^src\/lib\/shop\/(?:catalog|model)\.ts$/,
+        groups: ["integration:event", "integration:rules"],
+    },
+    {
+        pattern: /^src\/lib\/event-currency\.ts$/,
+        groups: ["integration:rules"],
+    },
+    {
+        pattern: /^src\/lib\/shop-select-campaign\.ts$/,
+        groups: ["integration:event", "integration:rules"],
+    },
+    {
         pattern: /^(?:src\/lib\/item-overflow\/direct-settlement\.ts|tools\/item_overflow_direct_settlement\.test\.cjs)$/,
         groups: ["integration:database", "integration:rules"],
     },

@@ -59,30 +59,31 @@ assert.equal(selectPlayerShopCampaignLineupSync(playerId, 4, 10, 1020), "conflic
 assert.equal(getPlayerShopCampaignLineupSync(playerId, 4, 10), 1010)
 assert.deepEqual(getPlayerShopCampaignLineupsSync(playerId), { "4:10": 1010 })
 
-const campaigns = {
-    "4": {
-        "10": {
-            availableFrom: "2023-01-01 12:00:00",
-            availableUntil: "2023-01-02 11:59:59",
+const catalog = {
+    campaignsByKey: {
+        "4:10": {
+            shopType: 4,
+            campaignId: 10,
+            availableFromMs: Date.parse("2023-01-01T12:00:00+08:00"),
+            availableUntilMs: Date.parse("2023-01-02T11:59:59+08:00"),
             lineupIds: [1010, 1020],
         },
     },
-    "7": {},
 }
 const periodStart = Date.parse("2023-01-01T12:00:00+08:00")
 const periodEnd = Date.parse("2023-01-02T11:59:59+08:00")
-assert.equal(requireAvailableShopCampaign(campaigns, 4, 10, 1010, periodStart).lineupIds[0], 1010)
-assert.doesNotThrow(() => requireAvailableShopCampaign(campaigns, 4, 10, 1020, periodEnd))
+assert.equal(requireAvailableShopCampaign(catalog, 4, 10, 1010, periodStart).lineupIds[0], 1010)
+assert.doesNotThrow(() => requireAvailableShopCampaign(catalog, 4, 10, 1020, periodEnd))
 assert.throws(
-    () => requireAvailableShopCampaign(campaigns, 4, 10, 9999, periodStart),
+    () => requireAvailableShopCampaign(catalog, 4, 10, 9999, periodStart),
     ShopCampaignValidationError,
 )
 assert.throws(
-    () => requireAvailableShopCampaign(campaigns, 4, 10, null, periodEnd + 1),
+    () => requireAvailableShopCampaign(catalog, 4, 10, null, periodEnd + 1),
     ShopCampaignPeriodError,
 )
 assert.throws(
-    () => requireAvailableShopCampaign(campaigns, 7, 10, null, periodStart),
+    () => requireAvailableShopCampaign(catalog, 7, 10, null, periodStart),
     ShopCampaignValidationError,
 )
 
