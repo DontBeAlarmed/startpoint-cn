@@ -24,8 +24,25 @@ import {
 } from "./reward-grant"
 import { createRewardGrantItemOverflowPolicy } from "./reward-grant-item-overflow"
 import { RewardType } from "./types/rewards"
+import {
+    getContentSnapshot,
+    type ReadonlyContentRepository,
+} from "../content/runtime/content-snapshot"
 
 export { getPlayerNormalLoginBonusProgressSync } from "../data/domains/login-bonus"
+
+const loginBonusCatalogByRepository = new WeakMap<ReadonlyContentRepository, LoginBonusCatalog>()
+
+/** Strict login bonus catalog read for the Load compatibility flow. */
+export function getLoginBonusCatalog(
+    repository: ReadonlyContentRepository = getContentSnapshot().repository,
+): LoginBonusCatalog {
+    const cached = loginBonusCatalogByRepository.get(repository)
+    if (cached !== undefined) return cached
+    const catalog = repository.table<LoginBonusCatalog>("login_bonus.json")
+    loginBonusCatalogByRepository.set(repository, catalog)
+    return catalog
+}
 
 export interface LoginBonusStatus {
     readonly groupId: string

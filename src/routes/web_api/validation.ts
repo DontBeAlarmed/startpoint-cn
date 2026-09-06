@@ -1,18 +1,11 @@
 // 写入端点结构安全校验（防坏档）：只挡会真正坏档/崩溃的输入，不卡游戏平衡。
-import bundledCharacterData from "../../../assets/character.json"
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
+import { getCharacterFacts } from "../../lib/character-content"
 import { getItemIdsSync } from "../../lib/item-content"
 
 export const MAX_INT = 2147483647 // 2^31 - 1，客户端 int 上限（≥2^31 解码成 null = 坏档）
 
-type CharacterTable = Record<string, unknown>
-
 export function isValidCharacterId(characterId: number): boolean {
-    const table = getRuntimeContentTableSync(
-        "character.json",
-        bundledCharacterData as CharacterTable,
-    )
-    return Object.prototype.hasOwnProperty.call(table, String(characterId))
+    return getCharacterFacts().exists(characterId)
 }
 
 export function isValidItemId(itemId: number): boolean {

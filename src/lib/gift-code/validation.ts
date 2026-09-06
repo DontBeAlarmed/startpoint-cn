@@ -1,8 +1,10 @@
-import bundledCharacterData from "../../../assets/character.json"
-import bundledItemMaxCounts from "../../../assets/item_max_count.json"
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
+import { getCharacterFacts } from "../character-content"
 import { getEquipmentIdsSync } from "../equipment-content"
 import { getItemIdsSync } from "../item-content"
+import {
+    findItemInventoryPolicy,
+    getItemInventoryPolicyCatalog,
+} from "../inventory/item-inventory-policy"
 import { RewardType } from "../types/rewards"
 import type { GiftDraft, GiftProtocolType, GiftReward } from "./types"
 
@@ -53,11 +55,7 @@ export function validateGiftCode(code: string): void {
 }
 
 function isValidCharacterId(characterId: number): boolean {
-    const table = getRuntimeContentTableSync(
-        "character.json",
-        bundledCharacterData as Record<string, unknown>,
-    )
-    return Object.prototype.hasOwnProperty.call(table, String(characterId))
+    return getCharacterFacts().exists(characterId)
 }
 
 function isGiftProtocolType(value: unknown): value is GiftProtocolType {
@@ -123,11 +121,14 @@ function validateReward(reward: GiftReward, position: number): void {
         return
     }
     if (reward.type === 1) {
-        const maxCounts = getRuntimeContentTableSync(
-            "item_max_count.json",
-            bundledItemMaxCounts as Record<string, number>,
-        )
-        const maxCount = maxCounts[String(reward.typeId)]
+        const { typeId } = reward
+        if (typeof typeId !== "number") {
+            throw new GiftRewardValidationError()
+        }
+        const maxCount = findItemInventoryPolicy(
+            getItemInventoryPolicyCatalog(),
+            typeId,
+        )?.maxCount
         if (typeof maxCount !== "number"
             || !Number.isSafeInteger(maxCount)
             || maxCount <= 0

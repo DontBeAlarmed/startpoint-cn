@@ -1,8 +1,9 @@
 // Character → quest mapping helpers
 
-import bundledCharacterQuests from "../../../assets/character_quest_lookup.json"
-import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
+import {
+    getContentSnapshot,
+    type ReadonlyContentRepository,
+} from "../../content/runtime/content-snapshot"
 
 type RawCharacterQuestTable = Record<string, unknown>
 
@@ -43,12 +44,8 @@ const characterStoryQuestIndexByTable = new WeakMap<
 function getCharacterQuestTable(
     repository?: ReadonlyContentRepository,
 ): RawCharacterQuestTable {
-    return repository
-        ? repository.table<RawCharacterQuestTable>("character_quest_lookup.json")
-        : getRuntimeContentTableSync(
-            "character_quest_lookup.json",
-            bundledCharacterQuests as RawCharacterQuestTable,
-        )
+    const resolved = repository ?? getContentSnapshot().repository
+    return resolved.table<RawCharacterQuestTable>("character_quest_lookup.json")
 }
 
 function getCharacterStoryQuestIndex(

@@ -23,8 +23,6 @@ import {
     resolveAssetLoadState,
     type AssetProviderConfig,
 } from "../../content/cdn/asset-mode";
-import bundledLoginBonuses from "../../../assets/login_bonus.json";
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 import { reconcileActiveMissionFactsWithResult } from "../../lib/mission/active-reconciliation";
 import {
     getEventLoginMissionId,
@@ -46,10 +44,10 @@ import type {
     MultiSettlementIdentity,
 } from "../../multi/settlement/verifier";
 import {
+    getLoginBonusCatalog,
     settleLoginBonusesSync,
     type LoginBonusSettlement,
 } from "../../lib/login-bonus";
-import type { LoginBonusCatalog } from "../../content/converters/login-bonus";
 import { getGameTimeContext } from "../../runtime/time/game-time";
 import { settleScheduledResourcesSync } from "../../lib/scheduled-resource-settlement";
 import { settleEventTradeExpiryOnLoadSync } from "../../lib/event-trade-expiry-settlement";
@@ -261,10 +259,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             virtualNowMs: now.getTime(),
             realNowMs: gameTime.realNowMs,
             dailyResetHour: options.dailyResetHour ?? 5,
-            catalog: getRuntimeContentTableSync(
-                "login_bonus.json",
-                bundledLoginBonuses as LoginBonusCatalog,
-            ),
+            catalog: getLoginBonusCatalog(),
             previousLastLoginMs,
             isBeginner,
         });

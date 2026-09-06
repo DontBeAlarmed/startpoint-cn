@@ -88,7 +88,10 @@ test("runtime endpoint tables follow the installed ContentSnapshot release", asy
         () => getActiveCampaignRate(1, 1, new Date("2024-06-01T00:00:00Z")),
         /CONTENT_SNAPSHOT_NOT_INITIALIZED/,
     )
-    assert.equal(isValidCharacterId(1), true)
+    assert.throws(
+        () => isValidCharacterId(1),
+        /CONTENT_SNAPSHOT_NOT_INITIALIZED/,
+    )
 
     const releaseA = Object.freeze({
         "stamina_campaign.json": Object.freeze({

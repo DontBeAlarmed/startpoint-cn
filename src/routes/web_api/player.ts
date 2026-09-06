@@ -15,8 +15,10 @@ import { getPlayerQuestProgressSync, getPlayerDrawnQuestsSync } from "../../data
 import { insertPlayerPartyGroupListSync } from "../../data/domains/party"
 import { PartyCategory } from "../../data/types";
 import { getRealNow } from "../../runtime/time/game-time";
-import bundledDailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
+import {
+    getDailyChallengePointDefinition,
+    getDailyChallengePointDefinitions,
+} from "../../lib/quest/daily-challenge";
 import {
     exportPlayerSaveV2Sync,
     restorePlayerSaveSnapshotSync,
@@ -400,22 +402,18 @@ const routes = async (fastify: FastifyInstance) => {
         if (isNaN(playerId)) return reply.status(400).send({ error: "Invalid params" })
         try {
             const entries = getPlayerDailyChallengePointListSync(playerId)
-            const lookup = getRuntimeContentTableSync(
-                "daily_challenge_point_lookup.json",
-                bundledDailyChallengePointLookup as Record<string, { maxPoint: number }>,
-            )
             if (entries.length === 0) {
-                // No entries yet — create all 282 from CDN
-                const defaults = Object.entries(lookup).map(([idStr, data]) => ({
-                    id: Number(idStr),
-                    point: data.maxPoint,
+                // No entries yet — create all from the typed daily challenge definitions
+                const defaults = getDailyChallengePointDefinitions().map(definition => ({
+                    id: definition.id,
+                    point: definition.maxPoint,
                     campaignList: [] as any[]
                 }))
                 insertPlayerDailyChallengePointListSync(playerId, defaults)
                 return reply.status(200).send({ ok: true, count: defaults.length, created: true })
             }
             for (const entry of entries) {
-                const maxPoint = lookup[String(entry.id)]?.maxPoint ?? entry.point
+                const maxPoint = getDailyChallengePointDefinition(entry.id)?.maxPoint ?? entry.point
                 updatePlayerDailyChallengePointSync(playerId, entry.id, maxPoint)
             }
             return reply.status(200).send({ ok: true, count: entries.length })

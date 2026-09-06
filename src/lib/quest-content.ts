@@ -21,6 +21,13 @@ export function getQuestContentTableSync(tableName: QuestTableName): RawQuests {
     return getContentSnapshot().repository.table<RawQuests>(tableName)
 }
 
+/** Derived admin quest lookup ("category_questId" → display name). */
+export function getQuestLookup(): Readonly<Record<string, string>> {
+    return getContentSnapshot().repository.table<Readonly<Record<string, string>>>(
+        "quest_lookup.json",
+    )
+}
+
 /** Main quest ids belonging to one progression chapter (id / 1_000_000). */
 export function getMainQuestIdsForChapter(chapter: number): readonly number[] {
     return Object.keys(getQuestContentTableSync("main_quest.json"))

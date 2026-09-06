@@ -113,6 +113,7 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/lib/gacha-owner/exchange.ts",
         "src/lib/gacha-owner/execute.ts",
         "src/lib/gacha-reward-grant.ts",
+        "src/lib/gift-code/validation.ts",
         "src/lib/item-overflow/disposition.ts",
         "src/lib/item-sell.ts",
         "src/lib/item-use-settlement.ts",
@@ -131,6 +132,8 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/routes/api/questUnlock.ts",
         "src/routes/api/sell.ts",
         "src/routes/cn/load.ts",
+        "src/routes/web_api/lookup.ts",
+        "src/routes/web_api/mail.ts",
         "src/routes/web_api/scheduled-resource.ts",
     ]
     assert.deepEqual(importedOutsideInventory.sort(), reviewedMigrations)

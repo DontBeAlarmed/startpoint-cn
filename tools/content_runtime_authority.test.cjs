@@ -23,19 +23,11 @@ const bundledStartupExceptions = new Map([
     ])],
 ])
 
-// This is the audit baseline produced by the architecture review. Existing
-// asset adapters outside this set already route through lib/assets.ts; these
-// are the remaining production modules that still need an explicit boundary.
+// This is the audit baseline produced by the architecture review. The C2–C5
+// waves migrated every other former candidate to strict typed adapters; the
+// only remaining production module importing a bundled CDN table is the
+// database updater below (covered by its startup exception).
 const runtimeBoundaryCandidates = new Set([
-    "src/lib/mission/active-master-data.ts",
-    "src/lib/mission/awake-rule-catalog.ts",
-    "src/lib/mission/character-queries.ts",
-    "src/lib/mission/event-entry-facts.ts",
-    "src/lib/mission/rewards.ts",
-    "src/routes/api/exBoost.ts",
-    "src/routes/api/exchange.ts",
-    "src/routes/web_api/mail.ts",
-    "src/routes/web_api/validation.ts",
     "src/data/updaters/wdfpData.ts",
 ])
 

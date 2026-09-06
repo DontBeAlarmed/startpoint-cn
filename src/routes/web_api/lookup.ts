@@ -1,10 +1,16 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import bundledQuestLookup from "../../../assets/quest_lookup.json";
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
+import { getQuestLookup } from "../../lib/quest-content";
 import { getEquipmentLookupSync } from "../../lib/equipment-content";
 import { getItemLookupSync } from "../../lib/item-content";
 import { getCharacterLookup } from "../../lib/character-content";
-import bundledItemMaxCounts from "../../../assets/item_max_count.json";
+import { getItemInventoryPolicyCatalog } from "../../lib/inventory/item-inventory-policy";
+
+function getItemMaxCountLookup(): Readonly<Record<string, number>> {
+    const { byItemId } = getItemInventoryPolicyCatalog()
+    return Object.fromEntries(
+        Object.entries(byItemId).map(([itemId, policy]) => [itemId, policy.maxCount]),
+    )
+}
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.get("/characters", async (_request: FastifyRequest, reply: FastifyReply) => {
@@ -16,10 +22,7 @@ const routes = async (fastify: FastifyInstance) => {
     })
 
     fastify.get("/item-max-counts", async (_request: FastifyRequest, reply: FastifyReply) => {
-        return reply.send(getRuntimeContentTableSync(
-            "item_max_count.json",
-            bundledItemMaxCounts,
-        ))
+        return reply.send(getItemMaxCountLookup())
     })
 
     fastify.get("/equipment", async (_request: FastifyRequest, reply: FastifyReply) => {
@@ -27,10 +30,7 @@ const routes = async (fastify: FastifyInstance) => {
     })
 
     fastify.get("/quests", async (_request: FastifyRequest, reply: FastifyReply) => {
-        return reply.send(getRuntimeContentTableSync(
-            "quest_lookup.json",
-            bundledQuestLookup,
-        ))
+        return reply.send(getQuestLookup())
     })
 }
 

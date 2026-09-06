@@ -160,3 +160,52 @@ export function getCharacterRacesFromRepository(
 ): string[] {
     return getCharacterFacts(repository).races(characterId)
 }
+
+export interface CharacterTextEntry {
+    readonly name: string
+    readonly title: string
+}
+
+/**
+ * Limited character display-text facts (name/title from the CDN text table).
+ * Same raw-table root as CharacterFacts; carries no player state.
+ */
+export interface CharacterTextFacts {
+    getNameTitle(characterId: number | string): CharacterTextEntry
+}
+
+type CharacterTextTable = Record<string, readonly (readonly string[])[]>
+
+function buildCharacterTextFacts(
+    repository: ReadonlyContentRepository,
+): CharacterTextFacts {
+    let textTable: CharacterTextTable | null = null
+    const readTextTable = (): CharacterTextTable => {
+        if (textTable === null) {
+            textTable = repository.table<CharacterTextTable>("cdndata/character_text.json")
+        }
+        return textTable
+    }
+    const facts: CharacterTextFacts = {
+        getNameTitle: characterId => {
+            const fields = readTextTable()[String(characterId)]?.[0]
+            return Object.freeze({
+                name: fields?.[0] || `#${characterId}`,
+                title: fields?.[3] || "",
+            })
+        },
+    }
+    return Object.freeze(facts)
+}
+
+const textFactsByRepository = new WeakMap<ReadonlyContentRepository, CharacterTextFacts>()
+
+export function getCharacterTextFacts(
+    repository: ReadonlyContentRepository = getContentSnapshot().repository,
+): CharacterTextFacts {
+    const cached = textFactsByRepository.get(repository)
+    if (cached !== undefined) return cached
+    const facts = buildCharacterTextFacts(repository)
+    textFactsByRepository.set(repository, facts)
+    return facts
+}
