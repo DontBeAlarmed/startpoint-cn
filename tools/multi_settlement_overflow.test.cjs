@@ -23,7 +23,7 @@ const { getPlayerItemSync } = require("../src/data/domains/item")
 const { getPlayerMailsSync, MailType } = require("../src/data/domains/mail")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { getPlayerActiveQuestSync } = require("../src/data/domains/quest_active")
-const { getQuestFromCategorySync } = require("../src/lib/assets")
+const { getQuestFromCategorySync } = require("../src/lib/quest-content")
 const {
     activeQuests,
     insertActiveQuest,

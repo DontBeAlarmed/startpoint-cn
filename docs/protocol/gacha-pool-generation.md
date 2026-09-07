@@ -12,7 +12,7 @@
   -> src/content/converters/gacha.ts
   -> Content Release 对象
   -> ContentRepository snapshot
-  -> src/lib/assets.ts
+  -> src/lib/gacha-catalog/catalog.ts（GachaCatalog）
   -> /gacha/*
 ```
 

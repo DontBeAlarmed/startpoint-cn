@@ -39,7 +39,7 @@
 | D24 | Mission Owner 收口（已实现） | [任务引擎架构](../systems/mission-engine-architecture.md) | snapshot-scoped Catalog、Session-only computer、来源事实 typed read port、receipt/RewardGrant 协调、Quest 计数回归所属 writer、DEBT-T03/T04 关闭 |
 | D25 | Battle Settlement 有限核（已实现） | [Battle Settlement Core Gate](./battle-settlement-core-gate.md) | immutable values/progress plans；Single/Multi 外层事务与 lifecycle/transport 保持独立；DEBT-T05/T08 收敛 |
 | D26 | Event Lifecycle 有限核（已完成） | [Event Lifecycle Core Gate](./event-lifecycle-core-gate.md) | typed descriptor/window/linkage、单 built-in hook、独立 Rush/Raid/Carnival/ScoreAttack handlers、Rush AutoRetry 与 official-only 边界 |
-| D27 | Content Runtime Index（设计通过，实施中） | [Content Runtime Index Gate](./content-runtime-index-gate.md) | 复用 immutable raw index、领域 typed adapters、identity/fail-closed/DEBT-T09 边界 |
+| D27 | Content Runtime Index（实施完成，待 D27 whole-range review） | [Content Runtime Index Gate](./content-runtime-index-gate.md) | 复用 immutable raw index、领域 typed adapters、identity/fail-closed/DEBT-T09 边界（已关闭；`assets.ts` 跨域 facade 与迁移 fallback 已删除） |
 
 ## 阅读顺序
 
@@ -51,7 +51,7 @@
 
 D12、D13 与 D14 已完成服务端实现和自动化 Gate，等待客户端实机验收。三份 Gate 文档保留设计依据，同时作为相应已落地边界的架构与验证证据；它们不取代上述当前架构总览的阅读顺序。
 
-D15 已完成领域边界识别、决策和后续实施路线。D16、D17、D18、D18b 的服务端实现、Gate A broad closure、D18b scoped final review 和服务重启均已完成；D19–D22 与大 Gate B 已收口；D23 Character writer、D24 Mission owner、D25 Battle Settlement 与 D26 Event Lifecycle 有限核均已完成，大 Gate C 已收口；D27 设计已通过并正在实施，D28 尚未实施。客户端实测统一延期到 D28 后。
+D15 已完成领域边界识别、决策和后续实施路线。D16、D17、D18、D18b 的服务端实现、Gate A broad closure、D18b scoped final review 和服务重启均已完成；D19–D22 与大 Gate B 已收口；D23 Character writer、D24 Mission owner、D25 Battle Settlement 与 D26 Event Lifecycle 有限核均已完成，大 Gate C 已收口；D27 实施（C1–C6）已完成、DEBT-T09 已关闭，待 D27 whole-range review，D28 尚未实施。客户端实测统一延期到 D28 后。
 
 ## 统一图例
 

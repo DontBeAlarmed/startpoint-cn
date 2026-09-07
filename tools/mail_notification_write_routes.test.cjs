@@ -39,8 +39,6 @@ stubModule("../src/data/domains/equipment", {
         if (equipmentId === 500001) equipmentProtected = patch.protection
     },
 })
-stubModule("../src/lib/assets", {
-})
 stubModule("../src/lib/config-content", {
     getEquipmentCurrencyPolicySync: () => ({ craftPointItemId: 100000, starGrainItemId: 990008 }),
     getStaminaPolicySync: () => ({ maxOverflow: 999 }),

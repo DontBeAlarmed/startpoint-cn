@@ -32,7 +32,6 @@ const unusedRouteDependencies = [
     "../src/data/domains/rushEvent",
     "../src/data/domains/session",
     "../src/data/types",
-    "../src/lib/assets",
     "../src/lib/carnival-rewards",
     "../src/lib/character",
     "../src/lib/equipment",

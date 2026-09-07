@@ -1,6 +1,6 @@
 # D27 Content Runtime Index 与 Typed Adapters
 
-状态：设计已通过独立审查，正在进入 C1 实现。D27 是 Gate D 的第一个 checkpoint；D28 完成前不宣称边界重构主线结束。
+状态：实施完成（C1–C6）。DEBT-T09 已按退出条件关闭，`assets.ts` 跨域 facade 与 `getRuntimeContentTableSync(table,bundled)` 迁移 facade 均已删除；待 D27 whole-range review。D27 是 Gate D 的第一个 checkpoint；D28 完成前不宣称边界重构主线结束。
 
 ## 目标
 
@@ -41,15 +41,15 @@ raw table index 只供 Content 基础设施和声明的 adapter builder 使用�
 
 ## 初始化与失败语义
 
-正式启动必须先完成 Content 初始化，再开放 HTTP、Multi 与 Modes。production strict accessor 在未初始化时抛 `CONTENT_SNAPSHOT_NOT_INITIALIZED`，不接收 bundled fallback。旧 generic fallback 只作为 D27 同一 Gate 内的迁移 facade；每个领域子波次迁走对应 consumer，Gate 退出前删除生产签名。初始化后的缺表、损坏表或关系不完整必须由对应 typed adapter fail closed；不得退回旧 bundled 内容继续发奖、购买、抽卡或推进任务。
+正式启动必须先完成 Content 初始化，再开放 HTTP、Multi 与 Modes。production strict accessor（`getStrictRuntimeContentTableSync`）在未初始化时抛 `CONTENT_SNAPSHOT_NOT_INITIALIZED`，不接收 bundled fallback。D27 期间曾以 `getRuntimeContentTableSync(table,bundled)` 作为同 Gate 内的迁移 facade，各领域子波次迁走 consumer 后已在 C6 删除该生产签名。初始化后的缺表、损坏表或关系不完整必须由对应 typed adapter fail closed；不得退回旧 bundled 内容继续发奖、购买、抽卡或推进任务。
 
-测试中的 bundled 数据必须通过显式 test repository/provider 或 typed adapter 注入。生产 singleton 替换只在仍保护 snapshot 生命周期本身的低层测试中保留，不能成为普通业务测试默认做法。
+测试中的 bundled 数据必须通过显式 test repository/provider 或 typed adapter 注入。生产 singleton 替换只在仍保护 snapshot 生命周期本身的低层测试中保留（由 `content_runtime_test_fixture_authority` guard 按职责 allowlist 管理），不能成为普通业务测试默认做法。
 
 ## 跨域 facade 与 Mode API
 
-`src/lib/assets.ts` 当前同时承载 Quest、Reward、Character/Growth、Gacha、Shop、Config、Item、Equipment 与 Event 读取。D27 按领域子波次迁移其全部实际生产 export；迁移期可以短暂 re-export，但 Gate 退出时不能保留同等能力的跨域生产 facade，也不能换名复制成 `ContentService`。
+`src/lib/assets.ts` 曾同时承载 Quest、Reward、Character/Growth、Gacha、Shop、Config、Item、Equipment 与 Event 读取。D27 按领域子波次迁移其全部实际生产 export 后，C6 删除了该 barrel；没有保留同等能力的跨域生产 facade，也没有换名复制成 `ContentService`。
 
-`ModeHost.table<T>(string)` 是 Mode API v1 的公开契约，不能在版本号不变时删除。D27 将其作为 breaking change：Mode API v2 只暴露实际 hook 所需有限命名查询；v1 manifest 在模块取得 host 前 fail closed 并记录不兼容，不提供仍可读任意注册表的 v1 shim。
+`ModeHost.table<T>(string)` 是 Mode API v1 的公开契约，不能在版本号不变时删除。D27 将其作为 breaking change：Mode API v2（`MODE_API_VERSION=2`）只暴露实际 hook 所需有限命名查询（`host.content`）；v1 manifest 在模块取得 host 前 fail closed 并记录不兼容，不提供仍可读任意注册表的 v1 shim。
 
 Admin lookup/validation、Save/restore integrity、Load compatibility/maintenance 与 CDN/Multi transport metadata 分别保留自己的权限、外层事务、错误和 session 语义。它们可以复用领域纯查询或 parser，但不合并为玩家业务 owner。
 
@@ -62,16 +62,16 @@ Admin lookup/validation、Save/restore integrity、Load compatibility/maintenanc
 - 合并 Shop、Gacha、Mission、Growth、Quest/Event 的业务生命周期；
 - 为 schema-only、无 actual consumer 的客户端不可达分类补造 E2E。
 
-## DEBT-T09
+## DEBT-T09（已关闭）
 
-重复 snapshot 初始化 fixture 和 source-shape 白名单只能在替代边界成立后删除。退出时至少满足：
+重复 snapshot 初始化 fixture 和 source-shape 白名单只能在替代边界成立后删除。退出条件与关闭证据：
 
-1. raw index contract、identity、release pinning 与 corruption fail-closed 有行为测试；
-2. D16–D26 actual consumer 都有领域 typed adapter 代表；
-3. 业务层 raw reader 由最小依赖方向 guard 管理；
-4. 被删除的 fixture 已由独立 provider/typed adapter 测试替代；
-5. actual enum、Missing-runtime、CDN transport、Multi transport/session 测试完整保留；
-6. focused regression 与性能 admission 通过。
+1. raw index contract、identity、release pinning 与 corruption fail-closed 有行为测试——`content_runtime_index_contract`（strict pre-init/错误传播/幂等 restore）、`content_snapshot_configuration`、`content_runtime_mission_tables`（broken release 不回退）、`content_runtime_endpoint_tables`（损坏 fail-closed）；
+2. D16–D26 actual consumer 都有领域 typed adapter 代表——C2–C4 各子波次全部提交（见仓库外 consumer ledger 实施状态）；
+3. 业务层 raw reader 由最小依赖方向 guard 管理——`content_runtime_boundary`（strict accessor builder allowlist）、`content_runtime_authority`、`content_runtime_direct_tables`、`content_runtime_test_fixture_authority`（业务测试 fixture 统一安装 guard）；
+4. 被删除的 fixture 已由独立 provider/typed adapter 测试替代——`content_runtime_table.test.cjs` 随迁移 facade 删除，其快照优先/pre-init/错误传播覆盖由改写后的 `content_runtime_index_contract` 承担；重复 snapshot 安装由统一 helper（`content-snapshot-fixture`/bundled snapshot helpers）替代，业务测试直接赋值清零；
+5. actual enum、Missing-runtime、CDN transport、Multi transport/session 测试完整保留（D27 各波次未触碰）；
+6. focused regression 与性能 admission 通过（C6 全量受影响组与 perf admission 绿，日志见仓库外进度材料）；
 7. 仓库外 consumer ledger 无未分类/未处置调用点，Actual Missing-runtime closure 表中的应实现项都有真实生产 consumer。
 
 ## 性能准入

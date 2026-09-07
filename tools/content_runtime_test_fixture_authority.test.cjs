@@ -20,8 +20,6 @@ const projectRoot = path.resolve(__dirname, "..")
 const LOW_LEVEL_PROVIDER = new Set([
     "tools/content_snapshot_configuration.test.cjs",
     "tools/content_runtime_index_contract.test.cjs",
-    // Migration-facade lifecycle; deleted together with the facade in C6.
-    "tools/content_runtime_table.test.cjs",
     "tools/cdn_catalog_provider.test.cjs",
     // Verifies pre-init provider semantics for a business module (null
     // snapshot: no read for non-Content-bound state, strict error otherwise).

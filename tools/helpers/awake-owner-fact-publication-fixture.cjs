@@ -149,7 +149,7 @@ async function createAwakeOwnerFactPublicationFixture(options = {}) {
         const characterAssets = {
             getCharacterDataSync: characterId => require("../../src/lib/character-content").getCharacterFacts().get(characterId),
             getCharacterManaNodesSync: (characterId, level) => require("../../src/lib/character-growth-content").getCharacterGrowthContent().getManaBoardNodes(characterId, level),
-            getQuestFromCategorySync: (category, questId) => require("../../src/lib/assets").getQuestFromCategorySync(category, questId),
+            getQuestFromCategorySync: (category, questId) => require("../../src/lib/quest-content").getQuestFromCategorySync(category, questId),
         }
         const { characterExpCaps } = require("../../src/lib/character")
         const { createAwakeRequestContext } = require("../../src/lib/mission/awake-request-context")

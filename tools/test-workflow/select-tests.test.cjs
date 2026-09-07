@@ -309,7 +309,6 @@ test("maps representative source files to focused groups", () => {
     )
     for (const sharedFile of [
         "src/content/sync/table-registry.ts",
-        "src/lib/assets.ts",
         "src/lib/types/index.ts",
     ]) {
         assert.deepEqual(selectTestGroups([sharedFile]), ["full"], sharedFile)

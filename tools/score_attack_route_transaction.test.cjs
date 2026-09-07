@@ -211,10 +211,6 @@ stubModule("../src/content/runtime/table-access", {
         if (tableName in runtimeContentTables) return runtimeContentTables[tableName]
         throw new Error(`unexpected strict runtime table ${tableName}`)
     },
-    getRuntimeContentTableSync(tableName, fallback) {
-        if (tableName in runtimeContentTables) return runtimeContentTables[tableName]
-        return fallback
-    },
 })
 stubModule("../src/data/domains/quest_active", {
     getPlayerActiveQuestSync(playerId) {

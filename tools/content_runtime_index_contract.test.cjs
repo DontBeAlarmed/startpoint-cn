@@ -9,10 +9,7 @@ const {
     ContentSnapshotError,
     productionContentSnapshotProvider,
 } = require("../src/content/runtime/content-snapshot")
-const {
-    getRuntimeContentTableSync,
-    getStrictRuntimeContentTableSync,
-} = require("../src/content/runtime/table-access")
+const { getStrictRuntimeContentTableSync } = require("../src/content/runtime/table-access")
 const {
     createFrozenTestContentRepository,
     installFrozenTestContentSnapshot,
@@ -63,7 +60,7 @@ test("frozen test repository provides stable identity and explicit missing-table
     assert.notStrictEqual(other.table("config.json"), first)
 })
 
-test("strict access reads the installed frozen snapshot while migration fallback stays bounded", () => {
+test("strict access reads the installed frozen snapshot and restore is idempotent", () => {
     const previous = productionContentSnapshotProvider.snapshot
     const sentinel = Object.freeze({ marker: "sentinel" })
     productionContentSnapshotProvider.snapshot = sentinel
@@ -77,12 +74,8 @@ test("strict access reads the installed frozen snapshot while migration fallback
         const strict = getStrictRuntimeContentTableSync("config.json")
         assert.deepEqual(strict, { nested: { max_mana: 123 } })
         assert.strictEqual(getStrictRuntimeContentTableSync("config.json"), strict)
-        assert.strictEqual(
-            getRuntimeContentTableSync("config.json", { max_mana: 1 }),
-            strict,
-        )
         assert.throws(
-            () => getRuntimeContentTableSync("missing.json", { fallback: true }),
+            () => getStrictRuntimeContentTableSync("missing.json"),
             /missing test content table/,
         )
         installed.restore()
@@ -94,7 +87,7 @@ test("strict access reads the installed frozen snapshot while migration fallback
     }
 })
 
-test("migration fallback does not swallow a repository error with the provider code", () => {
+test("strict access propagates repository errors instead of swallowing them", () => {
     const previous = productionContentSnapshotProvider.snapshot
     const repositoryError = new ContentSnapshotError(
         "CONTENT_SNAPSHOT_NOT_INITIALIZED",
@@ -110,7 +103,7 @@ test("migration fallback does not swallow a repository error with the provider c
     }
     try {
         assert.throws(
-            () => getRuntimeContentTableSync("config.json", { fallback: true }),
+            () => getStrictRuntimeContentTableSync("config.json"),
             error => error === repositoryError,
         )
     } finally {

@@ -49,7 +49,7 @@ const { encodeCnMsgpackPayload, registerCnMsgpackOnSend } = require("../src/rout
 const {
     getRushEventFolderClearRewards,
     getRushEventFolderMaxRoundSync,
-} = require("../src/lib/assets")
+} = require("../src/lib/rush-event-content")
 const { canStartRushEventFolderBattle } = require("../src/lib/rush-folder-progression.ts")
 const rushEventRoutes = require("../src/routes/api/rushEvent").default
 const singleBattleRoutes = require("../src/routes/api/singleBattleQuest").default

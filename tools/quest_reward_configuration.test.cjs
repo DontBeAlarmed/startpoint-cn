@@ -4,7 +4,7 @@ const assert = require("node:assert/strict")
 const {
     getQuestFromCategorySync,
     QuestConfigurationError,
-} = require("../src/lib/assets")
+} = require("../src/lib/quest-content")
 const { QuestCategory } = require("../src/lib/types")
 const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 const hardMultiQuests = require("../assets/hard_multi_event_quest.json")

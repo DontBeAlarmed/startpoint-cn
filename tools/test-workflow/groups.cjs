@@ -242,7 +242,6 @@ const TEST_GROUPS = Object.freeze({
             "tools/content_reward_converter.test.cjs",
             "tools/reward_campaign_runtime.test.cjs",
             "tools/content_reward_repository.test.cjs",
-            "tools/content_runtime_table.test.cjs",
             "tools/content_runtime_index_contract.test.cjs",
             "tools/content_runtime_test_fixture_authority.test.cjs",
             "tools/content_runtime_index_boundary.test.cjs",

@@ -8,7 +8,8 @@ const test = require("node:test")
 require("ts-node/register/transpile-only")
 
 const { installFrozenTestContentSnapshot } = require("./helpers/content-snapshot-fixture.cjs")
-const assets = require("../src/lib/assets")
+const questContent = require("../src/lib/quest-content")
+const rushEventContent = require("../src/lib/rush-event-content")
 
 test("reward readers use the active Content snapshot instead of static bundled tables", t => {
     const install = installFrozenTestContentSnapshot({
@@ -26,16 +27,16 @@ test("reward readers use the active Content snapshot instead of static bundled t
     })
     t.after(install.restore)
 
-    assert.deepEqual(assets.getClearRewardSync(99001), { type: 3, count: 7 })
-    assert.deepEqual(assets.getScoreRewardGroup(99002), [{ type: 0, reward_type: 4, count: 8 }])
-    assert.deepEqual(assets.getRareScoreRewardGroup(99003), [{ type: 0, id: 42, count: 9 }])
-    assert.deepEqual(assets.getRushEventFolderClearRewards(99004, 2), [{ type: 3, count: 10 }])
+    assert.deepEqual(questContent.getClearRewardSync(99001), { type: 3, count: 7 })
+    assert.deepEqual(questContent.getScoreRewardGroup(99002), [{ type: 0, reward_type: 4, count: 8 }])
+    assert.deepEqual(questContent.getRareScoreRewardGroup(99003), [{ type: 0, id: 42, count: 9 }])
+    assert.deepEqual(rushEventContent.getRushEventFolderClearRewards(99004, 2), [{ type: 3, count: 10 }])
     assert.deepEqual(
-        assets.getScoreAttackBorderRewards()["99005_3"],
+        rushEventContent.getScoreAttackBorderRewards()["99005_3"],
         [{ id: 11, score: 12 }],
     )
     assert.deepEqual(
-        assets.getRushEventRankingRewards()[99006],
+        rushEventContent.getRushEventRankingRewards()[99006],
         { 1: [{ fromRank: 1, toRank: 3, kind: 7, kindId: 64, number: 2 }] },
     )
 

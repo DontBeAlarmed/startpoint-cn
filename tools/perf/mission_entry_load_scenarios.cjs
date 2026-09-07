@@ -39,7 +39,14 @@ function getRuntimeDependencies(runtimeRoot = projectRoot) {
     const character = fromRuntime("src/data/domains/character")
     const mission = fromRuntime("src/data/domains/mission")
     const player = fromRuntime("src/data/domains/player")
-    const assets = fromRuntime("src/lib/assets")
+    // D27 C6 deleted the assets barrel on current trees; archived BASE
+    // runtimes still ship it and the legacy growth readers in
+    // characterGrowthCompat below fall back to those names.
+    const assetsPath = path.join(resolvedRoot, "src/lib/assets")
+    const assetsExists = [".ts", ".js", ".cjs"].some(extension =>
+        fs.existsSync(`${assetsPath}${extension}`),
+    )
+    const assets = assetsExists ? fromRuntime("src/lib/assets") : null
     const characterLib = fromRuntime("src/lib/character")
     const awakeSettlement = fromRuntime("src/lib/mission/awake-settlement")
     const battleFacts = fromRuntime("src/lib/mission/battle-facts")

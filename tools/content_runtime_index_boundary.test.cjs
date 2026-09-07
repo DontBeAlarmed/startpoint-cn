@@ -60,7 +60,6 @@ test("Shop business consumers use the typed Shop catalog", () => {
         "src/lib/event-currency.ts",
         "src/lib/how-to-get.ts",
         "src/routes/api/shop.ts",
-        "src/lib/assets.ts",
     ]
     for (const relative of targetedConsumers) {
         const source = fs.readFileSync(path.join(projectRoot, relative), "utf8")
@@ -129,7 +128,6 @@ test("Gacha and Box Gacha raw tables stay inside their independent typed builder
         "src/lib/how-to-get.ts",
         "src/routes/api/boxGacha.ts",
         "src/routes/api/tutorial.ts",
-        "src/lib/assets.ts",
     ]
     for (const relative of targetedConsumers) {
         const source = fs.readFileSync(path.join(projectRoot, relative), "utf8")
@@ -180,8 +178,6 @@ test("Exchange, EX Boost and Character Election keep finite independent Content 
         )).sort()
         assert.deepEqual(actual, expected)
     }
-    const assets = fs.readFileSync(path.join(projectRoot, "src/lib/assets.ts"), "utf8")
-    assert.doesNotMatch(assets, /getExAbilityPoolsSync|getExStatusPoolSync|getExBoostItemSync/)
     const exRoute = fs.readFileSync(path.join(projectRoot, "src/routes/api/exBoost.ts"), "utf8")
     assert.doesNotMatch(exRoute, /getRuntimeContentTableSync|ex_(?:ability|boost|status)\.json/)
     const electionRoute = fs.readFileSync(

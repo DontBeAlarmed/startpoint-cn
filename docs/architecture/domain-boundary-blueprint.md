@@ -188,7 +188,7 @@ D15 明确拒绝：
 
 ```text
 D15_MAP_STATUS: COMPLETE
-BOUNDARY_MAINLINE_STATUS: IN_PROGRESS (D16-D26 and Gate C complete; D27 implementation; D28 pending)
+BOUNDARY_MAINLINE_STATUS: IN_PROGRESS (D16-D26 and Gate C complete; D27 implementation complete with DEBT-T09 closed, awaiting D27 whole-range review; D28 pending)
 ```
 
 D15 完成表示：CDN 分类、客户端可达性、服务端 owner/write/transaction、19 项边界决策、测试债务、私服策略和后续依赖路线已经闭环。它不表示本文目标架构已实现。
