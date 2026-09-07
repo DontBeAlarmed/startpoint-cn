@@ -1,4 +1,3 @@
-import practiceQuests from "../../assets/practice_quest.json";
 import { BattleQuest, ClearRewards, QuestCategory, RareScoreReward, RareScoreRewardGroups, RawQuests, Reward, ScoreReward, ScoreRewardGroups } from "./types";
 import {
     getContentSnapshot,
@@ -19,6 +18,10 @@ export class QuestConfigurationError extends Error {
 
 export function getQuestContentTableSync(tableName: QuestTableName): RawQuests {
     return getContentSnapshot().repository.table<RawQuests>(tableName)
+}
+
+function getPracticeQuestContentTableSync(): RawQuests {
+    return getContentSnapshot().repository.table<RawQuests>("practice_quest.json")
 }
 
 /** Derived admin quest lookup ("category_questId" → display name). */
@@ -201,7 +204,7 @@ export function getExQuestSync(
 export function getPracticeQuestSync(
     questId: string | number
 ): BattleQuest | null {
-    return getQuestSync((practiceQuests as RawQuests), questId, QuestCategory.PRACTICE)
+    return getQuestSync(getPracticeQuestContentTableSync(), questId, QuestCategory.PRACTICE)
 }
 
 /**
@@ -312,7 +315,7 @@ export function getQuestFromCategorySync(
         case QuestCategory.DAILY_EXP_MANA_EVENT:
             return getQuestSync(getQuestContentTableSync("daily_exp_mana_event_quest.json"), questId, category)
         case QuestCategory.PRACTICE:
-            return getQuestSync((practiceQuests as RawQuests), questId, category)
+            return getQuestSync(getPracticeQuestContentTableSync(), questId, category)
         case QuestCategory.DAILY_WEEK_EVENT:
             return getQuestSync(getQuestContentTableSync("daily_week_event_quest.json"), questId, category)
         case QuestCategory.TOWER_DUNGEON_EVENT:

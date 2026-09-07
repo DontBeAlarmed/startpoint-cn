@@ -1,5 +1,5 @@
-import eventQuestMap from "../../../assets/mission_event_quest_map.json"
 import { getExactEventBattleRuleCoverage } from "./event-battle-facts"
+import { getEventQuestMapping } from "./event-content"
 import {
     getMissionCatalog,
     isMissionMasterDefinitionEnabledAt,
@@ -26,13 +26,15 @@ export interface EventMissionCoverageReport {
 
 /** Offline coverage report; runtime settlement does not consume the legacy quest map. */
 export function getEventMissionCoverageReport(at: Date): EventMissionCoverageReport {
-    const definitions = getMissionCatalog().getDefinitions(3)
-    const mappings = eventQuestMap as Readonly<Record<string, EventQuestMapping>>
+    const catalog = getMissionCatalog()
+    const definitions = catalog.getDefinitions(3)
     const exactCoverage = getExactEventBattleRuleCoverage()
-    const unsupportedDefinitions = definitions.filter(definition => mappings[definition.pattern] === undefined)
+    const unsupportedDefinitions = definitions.filter(definition => (
+        getEventQuestMapping(catalog, definition.pattern) === undefined
+    ))
     const countModes: Record<EventCountMode, number> = { single: 0, multi: 0, finish: 0 }
     for (const definition of definitions) {
-        const mapping = mappings[definition.pattern]
+        const mapping = getEventQuestMapping(catalog, definition.pattern) as EventQuestMapping | undefined
         if (mapping) countModes[mapping.countMode]++
     }
     return Object.freeze({

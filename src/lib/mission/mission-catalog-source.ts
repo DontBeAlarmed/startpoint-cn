@@ -1,41 +1,3 @@
-import bundledRegularDefinitions from "../../../assets/mission_regular.json"
-import bundledDailyDefinitions from "../../../assets/mission_daily.json"
-import bundledEventDefinitions from "../../../assets/mission_event.json"
-import bundledCollectDefinitions from "../../../assets/mission_collect_item.json"
-import bundledDegreeDefinitions from "../../../assets/mission_degree.json"
-import bundledPassDailyDefinitions from "../../../assets/mission_pass_daily.json"
-import bundledPassWeekDefinitions from "../../../assets/mission_pass_week.json"
-import bundledPassEventDefinitions from "../../../assets/mission_pass_event.json"
-import bundledAwakeDefinitions from "../../../assets/mission_char_awake.json"
-import bundledWeeklyDefinitions from "../../../assets/mission_weekly_def.json"
-import bundledRegularRewards from "../../../assets/mission_regular_reward.json"
-import bundledDailyRewards from "../../../assets/mission_daily_reward.json"
-import bundledEventRewards from "../../../assets/mission_event_reward.json"
-import bundledCollectRewards from "../../../assets/mission_collect_item_reward.json"
-import bundledDegreeRewards from "../../../assets/mission_degree_reward.json"
-import bundledPassDailyRewards from "../../../assets/mission_pass_daily_reward.json"
-import bundledPassWeekRewards from "../../../assets/mission_pass_week_reward.json"
-import bundledPassEventRewards from "../../../assets/mission_pass_event_reward.json"
-import bundledAwakeRewards from "../../../assets/mission_char_awake_reward.json"
-import bundledWeeklyRewards from "../../../assets/mission_weekly_reward.json"
-import bundledCharacters from "../../../assets/character.json"
-import bundledCharacterQuests from "../../../assets/character_quest_lookup.json"
-import bundledManaBoard from "../../../assets/mana_board.json"
-import bundledConfig from "../../../assets/config.json"
-import bundledMainQuests from "../../../assets/main_quest.json"
-import bundledExQuests from "../../../assets/ex_quest.json"
-import bundledTreasureShop from "../../../assets/treasure_shop.json"
-import bundledBossBattleQuests from "../../../assets/boss_battle_quest.json"
-import bundledExpertSingleEventQuests from "../../../assets/expert_single_event_quest.json"
-import bundledWorldStoryEventQuests from "../../../assets/world_story_event_quest.json"
-import bundledAdventEventQuests from "../../../assets/advent_event_quest.json"
-import bundledCarnivalEventQuests from "../../../assets/carnival_event_quest.json"
-import bundledHardMultiEventQuests from "../../../assets/hard_multi_event_quest.json"
-import bundledChallengeDungeonEventQuests from "../../../assets/challenge_dungeon_event_quest.json"
-import bundledRankingEventSingleQuests from "../../../assets/ranking_event_single_quest.json"
-import bundledRushEventQuests from "../../../assets/rush_event_quest.json"
-import bundledEquipmentDissolve from "../../../assets/equipment_dissolve.json"
-import bundledItemSale from "../../../assets/item_sale.json"
 import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
 import type {
     MissionCatalogReward,
@@ -66,6 +28,24 @@ export interface MissionCatalogSourceEntry {
     readonly awakeCharacterId?: number
 }
 
+const BUNDLED_TABLE_NAMES = new Set([
+    "mission_regular.json", "mission_daily.json", "mission_event.json",
+    "mission_collect_item.json", "mission_degree.json", "mission_pass_daily.json",
+    "mission_pass_week.json", "mission_pass_event.json", "mission_char_awake.json",
+    "mission_weekly_def.json", "mission_regular_reward.json", "mission_daily_reward.json",
+    "mission_event_reward.json", "mission_collect_item_reward.json",
+    "mission_degree_reward.json", "mission_pass_daily_reward.json",
+    "mission_pass_week_reward.json", "mission_pass_event_reward.json",
+    "mission_char_awake_reward.json", "mission_weekly_reward.json", "character.json",
+    "character_quest_lookup.json", "mana_board.json", "config.json", "main_quest.json",
+    "ex_quest.json", "treasure_shop.json", "boss_battle_quest.json",
+    "expert_single_event_quest.json", "world_story_event_quest.json",
+    "world_story_event_boss_battle_quest.json", "advent_event_quest.json",
+    "carnival_event_quest.json", "hard_multi_event_quest.json",
+    "challenge_dungeon_event_quest.json", "ranking_event_single_quest.json",
+    "rush_event_quest.json", "equipment_dissolve.json", "item_sale.json",
+])
+
 const CATEGORY_SOURCES: readonly CategorySource[] = Object.freeze([
     { category: 1, definitionTable: "mission_regular.json", rewardTable: "mission_regular_reward.json", patternIndex: 0, startIndex: 25, endIndex: 26, targetProgressIndex: 1, firstRewardKindIndex: 5 },
     { category: 2, definitionTable: "mission_daily.json", rewardTable: "mission_daily_reward.json", patternIndex: 0, startIndex: 25, endIndex: 26, targetProgressIndex: 1, firstRewardKindIndex: 5 },
@@ -79,47 +59,6 @@ const CATEGORY_SOURCES: readonly CategorySource[] = Object.freeze([
     { category: 10, definitionTable: "mission_weekly_def.json", rewardTable: "mission_weekly_reward.json", patternIndex: 0, startIndex: 25, endIndex: 26, targetProgressIndex: 1, firstRewardKindIndex: 5 },
 ])
 
-const BUNDLED_TABLES: Readonly<Record<string, unknown>> = Object.freeze({
-    "mission_regular.json": bundledRegularDefinitions,
-    "mission_daily.json": bundledDailyDefinitions,
-    "mission_event.json": bundledEventDefinitions,
-    "mission_collect_item.json": bundledCollectDefinitions,
-    "mission_degree.json": bundledDegreeDefinitions,
-    "mission_pass_daily.json": bundledPassDailyDefinitions,
-    "mission_pass_week.json": bundledPassWeekDefinitions,
-    "mission_pass_event.json": bundledPassEventDefinitions,
-    "mission_char_awake.json": bundledAwakeDefinitions,
-    "mission_weekly_def.json": bundledWeeklyDefinitions,
-    "mission_regular_reward.json": bundledRegularRewards,
-    "mission_daily_reward.json": bundledDailyRewards,
-    "mission_event_reward.json": bundledEventRewards,
-    "mission_collect_item_reward.json": bundledCollectRewards,
-    "mission_degree_reward.json": bundledDegreeRewards,
-    "mission_pass_daily_reward.json": bundledPassDailyRewards,
-    "mission_pass_week_reward.json": bundledPassWeekRewards,
-    "mission_pass_event_reward.json": bundledPassEventRewards,
-    "mission_char_awake_reward.json": bundledAwakeRewards,
-    "mission_weekly_reward.json": bundledWeeklyRewards,
-    "character.json": bundledCharacters,
-    "character_quest_lookup.json": bundledCharacterQuests,
-    "mana_board.json": bundledManaBoard,
-    "config.json": bundledConfig,
-    "main_quest.json": bundledMainQuests,
-    "ex_quest.json": bundledExQuests,
-    "treasure_shop.json": bundledTreasureShop,
-    "boss_battle_quest.json": bundledBossBattleQuests,
-    "expert_single_event_quest.json": bundledExpertSingleEventQuests,
-    "world_story_event_quest.json": bundledWorldStoryEventQuests,
-    "advent_event_quest.json": bundledAdventEventQuests,
-    "carnival_event_quest.json": bundledCarnivalEventQuests,
-    "hard_multi_event_quest.json": bundledHardMultiEventQuests,
-    "challenge_dungeon_event_quest.json": bundledChallengeDungeonEventQuests,
-    "ranking_event_single_quest.json": bundledRankingEventSingleQuests,
-    "rush_event_quest.json": bundledRushEventQuests,
-    "equipment_dissolve.json": bundledEquipmentDissolve,
-    "item_sale.json": bundledItemSale,
-})
-
 const bundledInfo = Object.freeze({
     source: "bundled" as const,
     assetVersion: "mission-catalog",
@@ -132,10 +71,10 @@ const bundledInfo = Object.freeze({
 export const bundledMissionContentRepository: ReadonlyContentRepository = Object.freeze({
     info: () => bundledInfo,
     table<T>(tableName: string): T {
-        if (!Object.prototype.hasOwnProperty.call(BUNDLED_TABLES, tableName)) {
+        if (!BUNDLED_TABLE_NAMES.has(tableName)) {
             throw new Error(`unsupported bundled mission table: ${tableName}`)
         }
-        return BUNDLED_TABLES[tableName] as T
+        return require(`../../../assets/${tableName}`) as T
     },
 })
 

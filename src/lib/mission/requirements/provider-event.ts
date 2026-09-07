@@ -1,5 +1,5 @@
-import eventQuestMap from "../../../../assets/mission_event_quest_map.json"
 import type { MissionCatalog, MissionMasterDefinition } from "../mission-catalog"
+import { getEventQuestMapping } from "../event-content"
 import type { FactKey } from "../facts/fact-key"
 import type { MissionFactRequirementDraft, MissionRef } from "./types"
 import {
@@ -50,8 +50,8 @@ function currentStateFacts(missionId: number): readonly FactKey[] {
     return [{ kind: "characters" }]
 }
 
-function questFacts(definition: MissionMasterDefinition): readonly FactKey[] {
-    const mapping = (eventQuestMap as Readonly<Record<string, QuestMapEntry>>)[definition.pattern]
+function questFacts(catalog: MissionCatalog, definition: MissionMasterDefinition): readonly FactKey[] {
+    const mapping = getEventQuestMapping(catalog, definition.pattern) as QuestMapEntry | undefined
     const sections = mapping?.categories?.filter(category => (
         Number.isSafeInteger(category) && category > 0
     ))
@@ -82,7 +82,7 @@ interface EventDependencyFacts {
     readonly missionIds: readonly number[]
 }
 
-function directComputedFacts(definition: MissionMasterDefinition): readonly FactKey[] {
+function directComputedFacts(catalog: MissionCatalog, definition: MissionMasterDefinition): readonly FactKey[] {
     const { missionId } = definition
     if (isEventCurrentStateMission(missionId)) return currentStateFacts(missionId)
     if (Number(definition.row[2]) === 37) {
@@ -91,7 +91,7 @@ function directComputedFacts(definition: MissionMasterDefinition): readonly Fact
             ? [{ kind: "collectedItems", itemIds: [itemId] }]
             : []
     }
-    return questFacts(definition)
+    return questFacts(catalog, definition)
 }
 
 function collectDependencyFacts(
@@ -111,7 +111,7 @@ function collectDependencyFacts(
         missionIds.add(dependency.missionId)
         const childDependencies = parseMissionDependencies(child)
         if (childDependencies.length === 0) {
-            facts.push(...directComputedFacts(child))
+        facts.push(...directComputedFacts(catalog, child))
             continue
         }
         visiting.add(dependency.missionId)
@@ -133,7 +133,7 @@ export function getEventRequirement(
     if (view.safeMissionIds.has(missionId)) {
         const missionDependencies = parseMissionDependencies(definition)
         if (missionDependencies.length === 0) {
-            const facts = directComputedFacts(definition)
+            const facts = directComputedFacts(catalog, definition)
             return facts.length > 0
                 ? { mode: "computed", facts }
                 : {

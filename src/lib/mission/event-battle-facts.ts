@@ -6,11 +6,15 @@ import {
 } from "../../data/domains/mission"
 import type { FinishContext } from "../quest/finish/types"
 import { getExactEventSingleClearRules } from "./event-single-clear-rules"
-import ruleAsset from "../../../assets/mission_event_battle_rules.json"
-import eventMissionRewards from "../../../assets/mission_event_reward.json"
 import { completePlayerEventMissionFactSync } from "../../data/domains/event_mission_entry_facts"
-import { getQuestContentTableSync } from "../quest-content"
-import { getMissionCatalog, isMissionMasterDefinitionEnabledAt, MissionMasterDefinition } from "./mission-catalog"
+import { getEventBattleRuleAsset, getEventMissionRewardTable } from "./event-content"
+import {
+    getMissionCatalog,
+    getMissionCatalogContentTable,
+    isMissionMasterDefinitionEnabledAt,
+    type MissionCatalog,
+    type MissionMasterDefinition,
+} from "./mission-catalog"
 
 type MultiRole = "any" | "host" | "guest"
 type QuestRange = "All" | "BossBattle" | "AdventEvent" | "WorldStoryEventBossBattle"
@@ -77,6 +81,10 @@ interface ExactHardMultiConditionRule {
     readonly condition: ExactHardMultiCondition
     readonly maxClearTimeMs: number | null
     readonly definition: MissionMasterDefinition
+}
+
+function getQuestContentTable(catalog: MissionCatalog, tableName: string): Record<string, unknown> {
+    return getMissionCatalogContentTable<Record<string, unknown>>(catalog, tableName)
 }
 
 const TOP_LEVEL_FIELDS = new Set(["schemaVersion", "rules"])
@@ -245,17 +253,18 @@ function trackedQuestIds(table: Record<string, unknown>): readonly number[] | nu
     return (ids as number[]).sort((left, right) => left - right)
 }
 
-function getTrackedQuestIds(): Record<Exclude<QuestRange, "All">, readonly number[] | null> {
+function getTrackedQuestIds(catalog: MissionCatalog): Record<Exclude<QuestRange, "All">, readonly number[] | null> {
     return {
-        BossBattle: trackedQuestIds(getQuestContentTableSync("boss_battle_quest.json")),
-        AdventEvent: trackedQuestIds(getQuestContentTableSync("advent_event_quest.json")),
+        BossBattle: trackedQuestIds(getQuestContentTable(catalog, "boss_battle_quest.json")),
+        AdventEvent: trackedQuestIds(getQuestContentTable(catalog, "advent_event_quest.json")),
         WorldStoryEventBossBattle: trackedQuestIds(
-            getQuestContentTableSync("world_story_event_boss_battle_quest.json"),
+            getQuestContentTable(catalog, "world_story_event_boss_battle_quest.json"),
         ),
     }
 }
 
 function hasMatchingRangeData(
+    catalog: MissionCatalog,
     selector: ExactSelector,
     categories: unknown,
     questIds: unknown,
@@ -274,7 +283,7 @@ function hasMatchingRangeData(
         || categories.length !== 1
         || categories[0] !== categoryByRange[selector.range]) return false
 
-    const sourceQuestIds = getTrackedQuestIds()[selector.range]
+    const sourceQuestIds = getTrackedQuestIds(catalog)[selector.range]
     if (sourceQuestIds === null || sourceQuestIds.length === 0) return false
     if (compatibility === TYPE16_EMPTY_SELECTOR_COMPATIBILITY
         && selector.range === "BossBattle"
@@ -298,7 +307,10 @@ function hasMatchingRole(patternType: number, role: unknown): role is MultiRole 
         || patternType === 18 && role === "guest"
 }
 
-export function loadExactEventBattleRules(assetValue: unknown): readonly ExactMultiRule[] {
+export function loadExactEventBattleRules(
+    assetValue: unknown,
+    catalog: MissionCatalog = getMissionCatalog(),
+): readonly ExactMultiRule[] {
     if (!isPlainRecord(assetValue)
         || !hasOnlyFields(assetValue, TOP_LEVEL_FIELDS)
         || assetValue.schemaVersion !== 1
@@ -315,7 +327,7 @@ export function loadExactEventBattleRules(assetValue: unknown): readonly ExactMu
     }
 
     const definitions = new Map(
-        getMissionCatalog().getDefinitions(3).map(definition => [definition.missionId, definition]),
+        catalog.getDefinitions(3).map(definition => [definition.missionId, definition]),
     )
     const rules: ExactMultiRule[] = []
 
@@ -333,6 +345,7 @@ export function loadExactEventBattleRules(assetValue: unknown): readonly ExactMu
             || raw.rank !== null
             || !isKnownSelector(raw.selector)) continue
         if (!hasMatchingRangeData(
+            catalog,
             raw.selector,
             raw.categories,
             raw.questIds,
@@ -357,25 +370,26 @@ export function loadExactEventBattleRules(assetValue: unknown): readonly ExactMu
     return Object.freeze(rules)
 }
 
-let exactMultiRulesCache: readonly ExactMultiRule[] | null = null
+const exactMultiRulesCache = new WeakMap<MissionCatalog, readonly ExactMultiRule[]>()
 
-function getExactMultiRules(): readonly ExactMultiRule[] {
-    if (exactMultiRulesCache === null) {
-        exactMultiRulesCache = loadExactEventBattleRules(ruleAsset)
-    }
-    return exactMultiRulesCache
+function getExactMultiRules(catalog: MissionCatalog): readonly ExactMultiRule[] {
+    const cached = exactMultiRulesCache.get(catalog)
+    if (cached !== undefined) return cached
+    const rules = loadExactEventBattleRules(getEventBattleRuleAsset(catalog), catalog)
+    exactMultiRulesCache.set(catalog, rules)
+    return rules
 }
 
-function getClearRuleSources(): Record<string, {
+function getClearRuleSources(catalog: MissionCatalog): Record<string, {
     readonly category: number
     readonly quests: Record<string, unknown>
 }> {
     return {
-        "5": { category: 7, quests: getQuestContentTableSync("advent_event_quest.json") },
-        "6": { category: 10, quests: getQuestContentTableSync("story_event_single_quest.json") },
-        "7": { category: 13, quests: getQuestContentTableSync("challenge_dungeon_event_quest.json") },
-        "16": { category: 23, quests: getQuestContentTableSync("raid_event_quest.json") },
-        "17": { category: 24, quests: getQuestContentTableSync("rush_event_quest.json") },
+        "5": { category: 7, quests: getQuestContentTable(catalog, "advent_event_quest.json") },
+        "6": { category: 10, quests: getQuestContentTable(catalog, "story_event_single_quest.json") },
+        "7": { category: 13, quests: getQuestContentTable(catalog, "challenge_dungeon_event_quest.json") },
+        "16": { category: 23, quests: getQuestContentTable(catalog, "raid_event_quest.json") },
+        "17": { category: 24, quests: getQuestContentTable(catalog, "rush_event_quest.json") },
     }
 }
 
@@ -389,10 +403,10 @@ function parseExactQuestSuffixes(value: unknown): number[] | null {
     )) ? values : null
 }
 
-function buildExactClearRules(): readonly ExactClearRule[] {
+function buildExactClearRules(catalog: MissionCatalog): readonly ExactClearRule[] {
     const rules: ExactClearRule[] = []
-    const sources = getClearRuleSources()
-    for (const definition of getMissionCatalog().getDefinitions(3)) {
+    const sources = getClearRuleSources(catalog)
+    for (const definition of catalog.getDefinitions(3)) {
         if (Number(definition.row[2]) !== 23 || definition.row[11] !== "(None)") continue
         const battleKind = Number(definition.row[5])
         if (battleKind !== 1 && battleKind !== 3) continue
@@ -414,12 +428,12 @@ function buildExactClearRules(): readonly ExactClearRule[] {
     return Object.freeze(rules)
 }
 
-function buildExactPhaseRules(): readonly ExactPhaseRule[] {
+function buildExactPhaseRules(catalog: MissionCatalog): readonly ExactPhaseRule[] {
     const rules: ExactPhaseRule[] = []
-    const rankingEventSingleQuests = getQuestContentTableSync(
+    const rankingEventSingleQuests = getQuestContentTable(catalog,
         "ranking_event_single_quest.json",
     )
-    for (const definition of getMissionCatalog().getDefinitions(3)) {
+    for (const definition of catalog.getDefinitions(3)) {
         const patternType = Number(definition.row[2])
         if (patternType < 49 || patternType > 52 || Number(definition.row[7]) !== 8) continue
         const eventId = Number(definition.row[8])
@@ -455,11 +469,11 @@ const EVENT_STATISTICS_RULES: Readonly<Record<number, {
     1223: { patternType: 28, statisticsCode: 2 },
 }
 
-function buildExactStatisticsRules(): readonly ExactStatisticsRule[] {
+function buildExactStatisticsRules(catalog: MissionCatalog): readonly ExactStatisticsRule[] {
     const rules: ExactStatisticsRule[] = []
     for (const missionId of EXACT_EVENT_STATISTICS_MISSION_IDS) {
         const expected = EVENT_STATISTICS_RULES[missionId]
-        const definition = getMissionCatalog().getDefinition(3, missionId)
+        const definition = catalog.getDefinition(3, missionId)
         if (!expected || !definition
             || definition.missionId !== missionId
             || Number(definition.row[2]) !== expected.patternType
@@ -479,13 +493,14 @@ function buildExactStatisticsRules(): readonly ExactStatisticsRule[] {
     return Object.freeze(rules)
 }
 
-let exactStatisticsRulesCache: readonly ExactStatisticsRule[] | null = null
+const exactStatisticsRulesCache = new WeakMap<MissionCatalog, readonly ExactStatisticsRule[]>()
 
-function getExactStatisticsRules(): readonly ExactStatisticsRule[] {
-    if (exactStatisticsRulesCache === null) {
-        exactStatisticsRulesCache = buildExactStatisticsRules()
-    }
-    return exactStatisticsRulesCache
+function getExactStatisticsRules(catalog: MissionCatalog): readonly ExactStatisticsRule[] {
+    const cached = exactStatisticsRulesCache.get(catalog)
+    if (cached !== undefined) return cached
+    const rules = buildExactStatisticsRules(catalog)
+    exactStatisticsRulesCache.set(catalog, rules)
+    return rules
 }
 
 const EXACT_RESISTANCE_DEBUFF_RULES: Readonly<Record<number, {
@@ -514,14 +529,14 @@ export function hasSingleEventMissionTarget(value: unknown): boolean {
         && rows[0][1] === "1"
 }
 
-function buildExactResistanceDebuffRules(): readonly ExactResistanceDebuffRule[] {
-    const hardMultiEventQuests = getQuestContentTableSync("hard_multi_event_quest.json")
+function buildExactResistanceDebuffRules(catalog: MissionCatalog): readonly ExactResistanceDebuffRule[] {
+    const hardMultiEventQuests = getQuestContentTable(catalog, "hard_multi_event_quest.json")
     const sourceQuestIds = trackedQuestIds(hardMultiEventQuests)
     if (sourceQuestIds === null) return Object.freeze([])
     const rules: ExactResistanceDebuffRule[] = []
     for (const [missionIdToken, expected] of Object.entries(EXACT_RESISTANCE_DEBUFF_RULES)) {
         const missionId = Number(missionIdToken)
-        const definition = getMissionCatalog().getDefinition(3, missionId)
+        const definition = catalog.getDefinition(3, missionId)
         if (!definition
             || definition.pattern !== expected.pattern
             || Number(definition.row[2]) !== 86
@@ -531,7 +546,7 @@ function buildExactResistanceDebuffRules(): readonly ExactResistanceDebuffRule[]
             || definition.row[10] !== ""
             || definition.row[11] !== "(None)"
             || !hasSingleEventMissionTarget(
-                (eventMissionRewards as Record<string, unknown>)[missionIdToken],
+                getEventMissionRewardTable(catalog)[missionIdToken],
             )) continue
         if (!sourceQuestIds.includes(expected.questId)
             || Math.trunc(expected.questId / 1_000) !== expected.eventId) continue
@@ -564,14 +579,14 @@ const EXACT_HARD_MULTI_CONDITION_RULES: Readonly<Record<number, {
     900814: { eventId: 1006, clientCheckKey: "hard_multi_steam_robot_dark", condition: "leader-attack-down", maxClearTimeMs: null },
 })
 
-function buildExactHardMultiConditionRules(): readonly ExactHardMultiConditionRule[] {
-    const hardMultiEventQuests = getQuestContentTableSync("hard_multi_event_quest.json")
+function buildExactHardMultiConditionRules(catalog: MissionCatalog): readonly ExactHardMultiConditionRule[] {
+    const hardMultiEventQuests = getQuestContentTable(catalog, "hard_multi_event_quest.json")
     const sourceQuestIds = trackedQuestIds(hardMultiEventQuests)
     if (sourceQuestIds === null) return Object.freeze([])
     const rules: ExactHardMultiConditionRule[] = []
     for (const [missionIdToken, expected] of Object.entries(EXACT_HARD_MULTI_CONDITION_RULES)) {
         const missionId = Number(missionIdToken)
-        const definition = getMissionCatalog().getDefinition(3, missionId)
+        const definition = catalog.getDefinition(3, missionId)
         const questId = expected.eventId * 1_000 + 1
         if (!definition
             || Number(definition.row[2]) !== 87
@@ -582,7 +597,7 @@ function buildExactHardMultiConditionRules(): readonly ExactHardMultiConditionRu
             || definition.row[11] !== "(None)"
             || definition.row[6] !== expected.clientCheckKey
             || !hasSingleEventMissionTarget(
-                (eventMissionRewards as Record<string, unknown>)[missionIdToken],
+                getEventMissionRewardTable(catalog)[missionIdToken],
             )
             || !sourceQuestIds.includes(questId)
             || Math.trunc(questId / 1_000) !== expected.eventId) continue
@@ -599,13 +614,14 @@ function buildExactHardMultiConditionRules(): readonly ExactHardMultiConditionRu
     return Object.freeze(rules)
 }
 
-let exactHardMultiConditionRulesCache: readonly ExactHardMultiConditionRule[] | null = null
+const exactHardMultiConditionRulesCache = new WeakMap<MissionCatalog, readonly ExactHardMultiConditionRule[]>()
 
-function getExactHardMultiConditionRules(): readonly ExactHardMultiConditionRule[] {
-    if (exactHardMultiConditionRulesCache === null) {
-        exactHardMultiConditionRulesCache = buildExactHardMultiConditionRules()
-    }
-    return exactHardMultiConditionRulesCache
+function getExactHardMultiConditionRules(catalog: MissionCatalog): readonly ExactHardMultiConditionRule[] {
+    const cached = exactHardMultiConditionRulesCache.get(catalog)
+    if (cached !== undefined) return cached
+    const rules = buildExactHardMultiConditionRules(catalog)
+    exactHardMultiConditionRulesCache.set(catalog, rules)
+    return rules
 }
 
 function matchesRole(role: MultiRole, isMultiHost: boolean | undefined): boolean {
@@ -616,17 +632,18 @@ function matchesRole(role: MultiRole, isMultiHost: boolean | undefined): boolean
 }
 
 export function getExactEventBattleRuleCoverage() {
-    const exactClearRules = buildExactClearRules()
-    const exactPhaseRules = buildExactPhaseRules()
+    const catalog = getMissionCatalog()
+    const exactClearRules = buildExactClearRules(catalog)
+    const exactPhaseRules = buildExactPhaseRules(catalog)
     const exactEventSingleClearRules = getExactEventSingleClearRules()
-    const exactResistanceDebuffRules = buildExactResistanceDebuffRules()
-    const roles = getExactMultiRules().reduce((counts, rule) => {
+    const exactResistanceDebuffRules = buildExactResistanceDebuffRules(catalog)
+    const roles = getExactMultiRules(catalog).reduce((counts, rule) => {
         counts[rule.role]++
         return counts
     }, { any: 0, host: 0, guest: 0 })
     return {
-        totalEventMissions: getMissionCatalog().getDefinitions(3).length,
-        exactMultiRules: getExactMultiRules().length,
+        totalEventMissions: catalog.getDefinitions(3).length,
+        exactMultiRules: getExactMultiRules(catalog).length,
         roles,
         exactClearRules: exactClearRules.length,
         clearRulesByCategory: exactClearRules.reduce((counts, rule) => {
@@ -635,27 +652,28 @@ export function getExactEventBattleRuleCoverage() {
         }, {} as Record<number, number>),
         exactPhaseRules: exactPhaseRules.length,
         exactSingleClearRules: exactEventSingleClearRules.length,
-        exactStatisticsRules: getExactStatisticsRules().length,
-        exactStatisticsRuleMissionIds: getExactStatisticsRules().map(rule => rule.missionId),
+        exactStatisticsRules: getExactStatisticsRules(catalog).length,
+        exactStatisticsRuleMissionIds: getExactStatisticsRules(catalog).map(rule => rule.missionId),
         exactResistanceDebuffRules: exactResistanceDebuffRules.length,
         exactResistanceDebuffRuleMissionIds: exactResistanceDebuffRules.map(rule => rule.missionId),
-        exactHardMultiConditionRules: getExactHardMultiConditionRules().length,
-        exactHardMultiConditionRuleMissionIds: getExactHardMultiConditionRules().map(rule => rule.missionId),
+        exactHardMultiConditionRules: getExactHardMultiConditionRules(catalog).length,
+        exactHardMultiConditionRuleMissionIds: getExactHardMultiConditionRules(catalog).map(rule => rule.missionId),
     }
 }
 
 export function getExactEventBattleMissionIds(): readonly number[] {
-    const exactClearRules = buildExactClearRules()
-    const exactPhaseRules = buildExactPhaseRules()
+    const catalog = getMissionCatalog()
+    const exactClearRules = buildExactClearRules(catalog)
+    const exactPhaseRules = buildExactPhaseRules(catalog)
     const exactEventSingleClearRules = getExactEventSingleClearRules()
-    const exactResistanceDebuffRules = buildExactResistanceDebuffRules()
+    const exactResistanceDebuffRules = buildExactResistanceDebuffRules(catalog)
     return Object.freeze([...new Set([
-        ...getExactMultiRules().map(rule => rule.missionId),
+        ...getExactMultiRules(catalog).map(rule => rule.missionId),
         ...exactClearRules.map(rule => rule.missionId),
         ...exactPhaseRules.map(rule => rule.missionId),
-        ...getExactStatisticsRules().map(rule => rule.missionId),
+        ...getExactStatisticsRules(catalog).map(rule => rule.missionId),
         ...exactResistanceDebuffRules.map(rule => rule.missionId),
-        ...getExactHardMultiConditionRules().map(rule => rule.missionId),
+        ...getExactHardMultiConditionRules(catalog).map(rule => rule.missionId),
         ...exactEventSingleClearRules.map(rule => rule.missionId),
     ])].sort((left, right) => left - right))
 }
@@ -679,6 +697,7 @@ function hasNoReceivedResistanceDebuff(ctx: FinishContext): boolean {
 function recordExactResistanceDebuffRules(
     ctx: FinishContext,
     evaluationTime: Date,
+    catalog: MissionCatalog,
 ): number[] {
     if (ctx.questAccomplished !== true
         || ctx.isMulti !== true
@@ -687,7 +706,7 @@ function recordExactResistanceDebuffRules(
         || ctx.clearTime <= 0
         || !hasNoReceivedResistanceDebuff(ctx)) return []
     const matchedMissionIds: number[] = []
-    for (const rule of buildExactResistanceDebuffRules()) {
+    for (const rule of buildExactResistanceDebuffRules(catalog)) {
         if (rule.battleKind !== 2
             || rule.category !== ctx.questCategory
             || !rule.questIds.has(ctx.questId)
@@ -729,6 +748,7 @@ function matchesHardMultiCondition(ctx: FinishContext, condition: ExactHardMulti
 function recordExactHardMultiConditionRules(
     ctx: FinishContext,
     evaluationTime: Date,
+    catalog: MissionCatalog,
 ): number[] {
     if (ctx.questAccomplished !== true
         || ctx.isMulti !== true
@@ -737,7 +757,7 @@ function recordExactHardMultiConditionRules(
         || !isSafeNonNegativeInteger(ctx.clearTime)
         || ctx.clearTime <= 0) return []
     const matchedMissionIds: number[] = []
-    for (const rule of getExactHardMultiConditionRules()) {
+    for (const rule of getExactHardMultiConditionRules(catalog)) {
         if (rule.questId !== ctx.questId
             || !isMissionMasterDefinitionEnabledAt(rule.definition, evaluationTime)
             || (rule.maxClearTimeMs !== null && ctx.clearTime > rule.maxClearTimeMs)
@@ -793,10 +813,11 @@ function recordExactStatisticsRule(
 function recordExactStatisticsRules(
     ctx: FinishContext,
     evaluationTime: Date,
+    catalog: MissionCatalog,
 ): number[] {
     const matchedMissionIds: number[] = []
     const type28Rules: ExactStatisticsRule[] = []
-    for (const rule of getExactStatisticsRules()) {
+    for (const rule of getExactStatisticsRules(catalog)) {
         if (rule.battleKind !== 3
             || (ctx.isMulti !== true && ctx.isMulti !== false && ctx.isMulti !== undefined)
             || !isMissionMasterDefinitionEnabledAt(rule.definition, evaluationTime)) continue
@@ -827,12 +848,13 @@ export function recordEventMissionBattleFacts(
 ): number[] {
     if (!ctx.questAccomplished) return []
 
-    const exactClearRules = buildExactClearRules()
+    const catalog = getMissionCatalog()
+    const exactClearRules = buildExactClearRules(catalog)
     const exactEventSingleClearRules = getExactEventSingleClearRules()
-    const exactPhaseRules = buildExactPhaseRules()
+    const exactPhaseRules = buildExactPhaseRules(catalog)
     const matchedMissionIds: number[] = []
     if (ctx.isMulti === true) {
-        for (const rule of getExactMultiRules()) {
+        for (const rule of getExactMultiRules(catalog)) {
             if (!matchesRole(rule.role, ctx.isMultiHost)) continue
             if (rule.categories !== "all" && !rule.categories.has(ctx.questCategory)) continue
             if (rule.questIds !== "all" && !rule.questIds.has(ctx.questId)) continue
@@ -870,8 +892,8 @@ export function recordEventMissionBattleFacts(
             matchedMissionIds.push(rule.missionId)
         }
     }
-    matchedMissionIds.push(...recordExactStatisticsRules(ctx, evaluationTime))
-    matchedMissionIds.push(...recordExactResistanceDebuffRules(ctx, evaluationTime))
-    matchedMissionIds.push(...recordExactHardMultiConditionRules(ctx, evaluationTime))
+    matchedMissionIds.push(...recordExactStatisticsRules(ctx, evaluationTime, catalog))
+    matchedMissionIds.push(...recordExactResistanceDebuffRules(ctx, evaluationTime, catalog))
+    matchedMissionIds.push(...recordExactHardMultiConditionRules(ctx, evaluationTime, catalog))
     return matchedMissionIds
 }

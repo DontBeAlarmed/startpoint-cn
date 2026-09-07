@@ -71,6 +71,9 @@ const QUEST_TABLE_NAMES = [
     "quest_unlock_costs.json",
 ]
 const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
+    "cdndata/player_rank_full.json",
+    "mission_event_battle_rules.json",
+    "mission_event_quest_map.json",
     "additional_reward_rules.json",
     "bond_token_exchange.json",
     "box_gacha.json",

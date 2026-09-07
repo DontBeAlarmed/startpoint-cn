@@ -5,7 +5,7 @@ import { getSession } from "../../data/domains/session"
 import { generateDataHeaders } from "../../utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getMailArrivedSync } from "../../lib/mail-notification";
-import encyclopedia from "../../../assets/encyclopedia.json";
+import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 
 interface IndexBody {
     api_count: number,
@@ -77,7 +77,9 @@ const routes = async (fastify: FastifyInstance) => {
                 viewer_id: viewerId
             }),
             "data": {
-                "encyclopedia_list": encyclopedia,
+                "encyclopedia_list": getContentSnapshot().repository.table<Record<string, object>>(
+                    "encyclopedia.json",
+                ),
                 "mail_arrived": getMailArrivedSync(playerId)
             }
         })

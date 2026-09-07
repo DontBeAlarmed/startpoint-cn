@@ -11,9 +11,9 @@ const projectRoot = path.resolve(__dirname, "..")
 const sourceRoot = path.join(projectRoot, "src")
 const { TABLE_SOURCES } = require("../src/content/sync/table-registry")
 
-const cdnTables = new Set(
+const runtimeTables = new Set(
     TABLE_SOURCES
-        .filter(definition => definition.scope === "cdn")
+        .filter(definition => definition.scope !== "server")
         .map(definition => definition.tableName),
 )
 
@@ -21,14 +21,6 @@ const bundledStartupExceptions = new Map([
     ["src/data/updaters/wdfpData.ts", new Map([
         ["mission_char_awake_reward.json", "数据库初始化早于 ContentSnapshot，历史 schema 默认值必须使用 bundled 表"],
     ])],
-])
-
-// This is the audit baseline produced by the architecture review. The C2–C5
-// waves migrated every other former candidate to strict typed adapters; the
-// only remaining production module importing a bundled CDN table is the
-// database updater below (covered by its startup exception).
-const runtimeBoundaryCandidates = new Set([
-    "src/data/updaters/wdfpData.ts",
 ])
 
 function listSources(directory) {
@@ -43,12 +35,12 @@ function importedCdnFallbacks(source) {
     for (const match of source.matchAll(
         /import\s+([A-Za-z_$][\w$]*)\s+from\s+["'](?:\.\.\/)+assets\/([^"']+)["']/g,
     )) {
-        if (cdnTables.has(match[2])) fallbacks.set(match[2], match[1])
+        if (runtimeTables.has(match[2])) fallbacks.set(match[2], match[1])
     }
     for (const match of source.matchAll(
         /const\s+([A-Za-z_$][\w$]*)\s*=\s*require\(["'](?:\.\.\/)+assets\/([^"']+)["']\)/g,
     )) {
-        if (cdnTables.has(match[2])) fallbacks.set(match[2], match[1])
+        if (runtimeTables.has(match[2])) fallbacks.set(match[2], match[1])
     }
     return fallbacks
 }
@@ -81,7 +73,6 @@ test("production modules route CDN-scoped bundled fallbacks through ContentSnaps
         const tables = [...fallbacks.keys()]
         if (tables.length === 0) continue
         const relativeFile = path.relative(projectRoot, filePath).replaceAll(path.sep, "/")
-        if (!runtimeBoundaryCandidates.has(relativeFile)) continue
         const exceptions = bundledStartupExceptions.get(relativeFile) ?? new Map()
         for (const table of tables) {
             if (exceptions.has(table)) continue

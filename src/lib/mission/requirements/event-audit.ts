@@ -1,11 +1,10 @@
-import eventBattleRules from "../../../../assets/mission_event_battle_rules.json"
-import eventQuestMap from "../../../../assets/mission_event_quest_map.json"
 import { validateEventEntryCatalogRule } from "../event-entry-facts"
+import { getEventBattleRuleAsset, getEventQuestMapping } from "../event-content"
 import {
     getEventCurrentStateRule,
     isEventCurrentStateMissionId,
 } from "../event-current-state-rules"
-import type { MissionCatalog, MissionMasterDefinition } from "../mission-catalog"
+import { getMissionCatalog, type MissionCatalog, type MissionMasterDefinition } from "../mission-catalog"
 import { matchesCurrentMissionComputerDefinition } from "./computer-compatibility"
 
 const HISTORICAL_SINGLE_CLEAR_MISSION_IDS = new Set([
@@ -42,8 +41,8 @@ function hasSingleTarget(catalog: MissionCatalog, missionId: number): boolean {
     return stages.length === 1 && stages[0].stage === 1 && stages[0].targetProgress === 1
 }
 
-function hasValidQuestMapping(definition: MissionMasterDefinition): boolean {
-    const mapping = (eventQuestMap as Readonly<Record<string, EventQuestMapping>>)[definition.pattern]
+function hasValidQuestMapping(catalog: MissionCatalog, definition: MissionMasterDefinition): boolean {
+    const mapping = getEventQuestMapping(catalog, definition.pattern) as EventQuestMapping | undefined
     return mapping?.countMode === "single"
         && Array.isArray(mapping.categories)
         && mapping.categories.length > 0
@@ -89,7 +88,7 @@ function isSafeDefinition(
     if (patternType !== 13) return false
 
     const dependencies = parsePositiveIntegerList(row[17])
-    if (!dependencies) return hasValidQuestMapping(definition)
+    if (!dependencies) return hasValidQuestMapping(catalog, definition)
     if (visiting.has(missionId)) return false
     visiting.add(missionId)
     try {
@@ -102,8 +101,15 @@ function isSafeDefinition(
     }
 }
 
-function isGeneratedMultiRule(definition: MissionMasterDefinition): boolean {
-    const rule = eventBattleRules.rules.find(entry => entry.missionId === definition.missionId)
+function isGeneratedMultiRule(catalog: MissionCatalog, definition: MissionMasterDefinition): boolean {
+    const asset = getEventBattleRuleAsset(catalog)
+    if (!asset || typeof asset !== "object" || Array.isArray(asset)) return false
+    const rawRules = (asset as { rules?: unknown }).rules
+    if (!Array.isArray(rawRules)) return false
+    const rule = rawRules.find(entry => (
+        entry !== null && typeof entry === "object" && !Array.isArray(entry)
+        && (entry as { missionId?: unknown }).missionId === definition.missionId
+    )) as { patternType?: unknown; role?: unknown } | undefined
     if (!rule) return false
     return Number(definition.row[2]) === rule.patternType
         && definition.row[11] === "(None)"
@@ -135,9 +141,10 @@ function isExactPhaseRule(definition: MissionMasterDefinition): boolean {
 
 export function isExactEventBattleProducerDefinition(
     definition: MissionMasterDefinition,
+    catalog?: MissionCatalog,
 ): boolean {
     if (!matchesCurrentMissionComputerDefinition(definition)) return false
-    return isGeneratedMultiRule(definition)
+    return isGeneratedMultiRule(catalog ?? getMissionCatalog(), definition)
         || isExactClearRule(definition)
         || isExactPhaseRule(definition)
         || EXACT_STATISTICS_MISSION_IDS.has(definition.missionId)
@@ -159,7 +166,7 @@ export function buildEventRequirementView(catalog: MissionCatalog): EventRequire
             safeMissionIds.add(definition.missionId)
             continue
         }
-        if (isExactEventBattleProducerDefinition(definition)
+        if (isExactEventBattleProducerDefinition(definition, catalog)
             || validateEventEntryCatalogRule(
                 definition,
                 catalog.getRewardStages(3, definition.missionId),

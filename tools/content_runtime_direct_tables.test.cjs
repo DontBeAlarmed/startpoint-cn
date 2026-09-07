@@ -1,94 +1,44 @@
 "use strict"
 
+require("ts-node/register/transpile-only")
+
 const assert = require("node:assert/strict")
 const fs = require("node:fs")
 const path = require("node:path")
 const test = require("node:test")
-const ts = require("typescript")
 
 const projectRoot = path.resolve(__dirname, "..")
-// All former low-risk facade consumers have migrated to strict typed reads;
-// the remaining bundled-fallback readers are tracked by
-// content_runtime_authority.test.cjs boundary candidates.
-const expectedAccess = Object.freeze({})
+const sourceRoot = path.join(projectRoot, "src")
+const { TABLE_SOURCES } = require("../src/content/sync/table-registry")
+const runtimeTables = new Set(
+    TABLE_SOURCES
+        .filter(definition => definition.scope !== "server")
+        .map(definition => definition.tableName),
+)
 
-function isFunctionLike(node) {
-    return ts.isFunctionDeclaration(node)
-        || ts.isFunctionExpression(node)
-        || ts.isArrowFunction(node)
-        || ts.isMethodDeclaration(node)
-        || ts.isGetAccessorDeclaration(node)
-        || ts.isSetAccessorDeclaration(node)
-        || ts.isConstructorDeclaration(node)
+function listSources(directory) {
+    return fs.readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+        const entryPath = path.join(directory, entry.name)
+        return entry.isDirectory() ? listSources(entryPath) : [entryPath]
+    }).filter(filePath => filePath.endsWith(".ts"))
 }
 
-function hasAncestor(node, predicate) {
-    for (let current = node.parent; current; current = current.parent) {
-        if (predicate(current)) return true
-    }
-    return false
-}
-
-function runtimeTableCallFor(node, tableName) {
-    return ts.isCallExpression(node)
-        && ts.isIdentifier(node.expression)
-        && node.expression.text === "getRuntimeContentTableSync"
-        && ts.isStringLiteral(node.arguments[0])
-        && node.arguments[0].text === tableName
-}
-
-test("low-risk direct CDN table consumers read whole runtime tables per call", () => {
-    for (const [relativePath, tables] of Object.entries(expectedAccess)) {
-        const source = fs.readFileSync(path.join(projectRoot, relativePath), "utf8")
-        const sourceFile = ts.createSourceFile(
-            relativePath,
-            source,
-            ts.ScriptTarget.Latest,
-            true,
-            ts.ScriptKind.TS,
-        )
-
-        for (const [tableName, fallbackName] of Object.entries(tables)) {
-            const calls = []
-            const fallbackReferences = []
-
-            function visit(node) {
-                if (runtimeTableCallFor(node, tableName)) calls.push(node)
-                if (ts.isIdentifier(node) && node.text === fallbackName) {
-                    fallbackReferences.push(node)
-                }
-                ts.forEachChild(node, visit)
-            }
-            visit(sourceFile)
-
-            assert.ok(calls.length > 0, `${relativePath} must access ${tableName} through the runtime snapshot`)
-            for (const call of calls) {
-                assert.ok(
-                    hasAncestor(call, isFunctionLike),
-                    `${relativePath} must resolve ${tableName} at function/request time`,
-                )
-                assert.ok(
-                    call.arguments[1]
-                        && call.arguments[1].getText(sourceFile).includes(fallbackName),
-                    `${relativePath} must pass the whole bundled ${tableName} table as initialization fallback`,
-                )
-            }
-
-            for (const reference of fallbackReferences) {
-                const inImport = hasAncestor(reference, ts.isImportDeclaration)
-                const inFallbackArgument = calls.some(call => {
-                    const fallback = call.arguments[1]
-                    return fallback
-                        && reference.pos >= fallback.pos
-                        && reference.end <= fallback.end
-                })
-                assert.ok(
-                    inImport || inFallbackArgument,
-                    `${relativePath} must not read ${tableName} directly or fall back by key`,
-                )
+test("production code has no unapproved static runtime table imports", () => {
+    const violations = []
+    for (const filePath of listSources(sourceRoot)) {
+        const source = fs.readFileSync(filePath, "utf8")
+        const relativePath = path.relative(projectRoot, filePath).replaceAll(path.sep, "/")
+        for (const match of source.matchAll(
+            /import\s+[^;\n]+\s+from\s+["'](?:\.\.\/)+assets\/([^"']+)["']/g,
+        )) {
+            if (runtimeTables.has(match[1])
+                && !(relativePath === "src/data/updaters/wdfpData.ts"
+                    && match[1] === "mission_char_awake_reward.json")) {
+                violations.push(`${relativePath} -> ${match[1]}`)
             }
         }
     }
+    assert.deepEqual(violations, [])
 })
 
 test("Star Crumb catalog owns its runtime snapshot tables without a bundled bypass", () => {
