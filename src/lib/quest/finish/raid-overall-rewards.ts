@@ -48,11 +48,18 @@ export function toPlayerReward(grant: RaidOverallRewardGrant): EquipmentItemRewa
     }
 }
 
-function parsePositiveInteger(value: unknown): number | undefined {
+function parseOptionalPositiveInteger(value: unknown, label: string): number | undefined {
     if (value === undefined || value === null || value === "" || value === "(None)") return undefined
-    if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) return undefined
+    if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) {
+        throw new Error(`invalid ${label}`)
+    }
     const parsed = Number(value)
-    return Number.isSafeInteger(parsed) ? parsed : undefined
+    if (!Number.isSafeInteger(parsed)) throw new Error(`invalid ${label}`)
+    return parsed
+}
+
+function parsePositiveInteger(value: unknown): number | undefined {
+    return parseOptionalPositiveInteger(value, "positive integer")
 }
 
 function isEmptyMasterValue(value: unknown): boolean {
@@ -86,8 +93,12 @@ function parseReward(
         if (itemId === undefined) throw new Error(`invalid raid reward item id at column ${offset + 1}`)
         return { kind: "item", itemId, amount }
     }
-    if (kind === 2) return { kind: "stone", amount }
-    if (kind === 3) return { kind: "mana", amount }
+    if (kind === 2 || kind === 3) {
+        if (!isEmptyMasterValue(rawId)) {
+            throw new Error(`invalid raid reward currency id at column ${offset + 1}`)
+        }
+        return { kind: kind === 2 ? "stone" : "mana", amount }
+    }
     throw new Error(`unsupported reward kind ${kind} at column ${offset}`)
 }
 
@@ -108,7 +119,7 @@ function parseRow(id: number, row: readonly unknown[]): RaidOverallRewardDefinit
     if (requirementKind !== "1") {
         throw new Error(`unsupported raid reward requirement ${String(requirementKind)}`)
     }
-    const start = parsePositiveInteger(row[3])
+    const start = parseOptionalPositiveInteger(row[3], "raid reward start")
     const interval = parsePositiveInteger(row[4])
     if (interval === undefined) throw new Error(`invalid raid reward interval for ${id}`)
     return {

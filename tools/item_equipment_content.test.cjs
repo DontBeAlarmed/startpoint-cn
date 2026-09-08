@@ -7,6 +7,7 @@ require("ts-node/register/transpile-only")
 
 const {
     getEquipmentContentCatalog,
+    getEquipmentRaritySync,
 } = require("../src/lib/equipment-content")
 const {
     getItemContentCatalog,
@@ -150,4 +151,25 @@ test("Equipment rarity follows the ID prefix only for equipment namespaces", () 
         })),
         /rarity must match its id prefix/i,
     )
+})
+
+test("Equipment rarity policy resolves both equipment and sub-million namespaces", () => {
+    const specialNamespace = repository(1, {
+        "equipment_craft.json": {
+            "5": { dissolve_craft: 1, awakening_craft: 1, dissolve_star: 1 },
+        },
+        "equipment_ids.json": [100001],
+        "equipment_dissolve.json": {
+            "100001": {
+                ability_soul_id: 1,
+                obtain_source: 0,
+                generate_ability_soul: false,
+                max_level: 1,
+            },
+        },
+        "equipment_lookup.json": {
+            "100001": { name: "主线宝珠", rarity: "5", category: "主线宝珠" },
+        },
+    })
+    assert.equal(getEquipmentRaritySync(100001, specialNamespace), 5)
 })

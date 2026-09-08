@@ -55,6 +55,16 @@ export function getEquipmentLookupSync(): Readonly<Record<string, EquipmentLooku
     return getEquipmentContentCatalog().lookup
 }
 
+export function getEquipmentRaritySync(
+    id: number | string,
+    repository?: ReadonlyContentRepository,
+): number | null {
+    const lookup = getEquipmentContentCatalog(repository ?? getContentSnapshot().repository)
+        .lookup[String(id)]
+    if (lookup === undefined) return null
+    return Number(lookup.rarity)
+}
+
 export function getEquipmentCraftSync(rarity: number): EquipmentCraftEntry | null {
     const normalizedRarity = Math.max(1, Math.min(5, rarity))
     return getEquipmentContentCatalog().craftByRarity[String(normalizedRarity)] ?? null

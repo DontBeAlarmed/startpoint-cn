@@ -267,6 +267,33 @@ test("Raid/Event reward catalog rejects malformed rows and dangling event relati
         })),
         /invalid raid event 1 required kill count/i,
     )
+
+    for (const invalidStart of [true, [], " 1", "1e2", "01"]) {
+        const row = raidRow()
+        row[2] = "1"
+        row[3] = invalidStart
+        row[4] = "1"
+        assert.throws(
+            () => getRaidEventRewardCatalog(repository({
+                "raid_event_overall_reward.json": { "1": [row] },
+            })),
+            /invalid raid reward start/i,
+            `invalid start ${JSON.stringify(invalidStart)} must fail closed`,
+        )
+    }
+
+    for (const invalidCurrencyId of [true, [], " 1", "1e2", "01", 1]) {
+        const row = raidRow()
+        row[7] = "2"
+        row[8] = invalidCurrencyId
+        assert.throws(
+            () => getRaidEventRewardCatalog(repository({
+                "raid_event_overall_reward.json": { "1": [row] },
+            })),
+            /invalid raid reward currency id/i,
+            `currency raw id ${JSON.stringify(invalidCurrencyId)} must fail closed`,
+        )
+    }
 })
 
 test("battle settlement validates reward Content before write transactions", () => {
@@ -288,4 +315,10 @@ test("battle settlement validates reward Content before write transactions", () 
     }
     assert.ok(multi.indexOf("runMultiActiveQuestSettlementTransaction(")
         > multi.indexOf("getPeriodicRewardCatalog()"))
+
+    const raid = fs.readFileSync(
+        path.resolve(__dirname, "../src/routes/api/raidEvent.ts"),
+        "utf8",
+    )
+    assert.ok(raid.indexOf("getRaidEventRewardCatalog()") < raid.indexOf("insertPlayerRushEventSync("))
 })

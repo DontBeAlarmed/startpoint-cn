@@ -14,7 +14,11 @@ import { getSession } from "../../data/domains/session";
 import { generateDataHeaders, getServerDate } from "../../utils";
 import { clientSerializeEquipment, buildFullEquipmentList, serializeFullEquipmentList } from "../../lib/equipment";
 import { getEquipmentCurrencyPolicySync } from "../../lib/config-content"
-import { getEquipmentDissolveSync, getEquipmentCraftSync } from "../../lib/equipment-content";
+import {
+    getEquipmentDissolveSync,
+    getEquipmentCraftSync,
+    getEquipmentRaritySync,
+} from "../../lib/equipment-content";
 import { AccountId, PlayerId } from "../../lib/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDb } from "../../data/db";
@@ -96,7 +100,8 @@ const routes = async (fastify: FastifyInstance) => {
         const newStack = useStack ? equipment.stack - upgradeCount : equipment.stack
         if (newStack < 0) return reply.status(400).send({ "error": "Bad Request", "message": "Not enough stack." })
 
-        const equipmentRarity = Math.floor(equipmentId / 1000000)  // 1-indexed
+        const equipmentRarity = getEquipmentRaritySync(equipmentId)
+        if (equipmentRarity === null) throw new Error(`Missing equipment rarity definition ${equipmentId}`)
         if (!useStack && (itemId === undefined || !canUseEquipmentAwakeningCrystal(itemId, equipmentRarity))) {
             return reply.status(400).send({ "error": "Bad Request", "message": "Invalid awakening material for equipment rarity." })
         }
@@ -249,7 +254,8 @@ const routes = async (fastify: FastifyInstance) => {
             const upgradeCount = Math.min(maxLvl - equipment.level, equipment.stack)
             if (upgradeCount <= 0) continue
 
-            const rarity = Math.floor(equipmentId / 1000000)  // 1-indexed
+            const rarity = getEquipmentRaritySync(equipmentId)
+            if (rarity === null) throw new Error(`Missing equipment rarity definition ${equipmentId}`)
             totalCraftPointCost += getUpgradeCost(rarity) * upgradeCount
             upgrades.push({
                 equipmentId,

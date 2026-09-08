@@ -11,6 +11,7 @@ const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snaps
     .installBundledGameplaySnapshot({
         additionalTableNames: ["raid_event_overall_reward.json"],
     })
+const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "raid-event-summary-route-db-"))
 const previousDataDirectory = process.env.DATA_DIR
 process.env.DATA_DIR = databaseDirectory
@@ -122,6 +123,35 @@ async function main() {
             0,
             "无效主数据必须在写入领奖游标前拒绝",
         )
+
+        const malformedRewards = structuredClone(require("../assets/raid_event_overall_reward.json"))
+        malformedRewards["1"][0][2] = "1"
+        malformedRewards["1"][0][3] = true
+        malformedRewards["1"][0][4] = "1"
+        const restoreMalformedContent = installBundledGameplaySnapshot({
+            additionalTableNames: ["raid_event_overall_reward.json"],
+            tableOverrides: { "raid_event_overall_reward.json": malformedRewards },
+        })
+        try {
+            const rushStateBefore = getDb().prepare(
+                "SELECT COUNT(*) AS count FROM players_rush_events WHERE player_id = ? AND event_id = 4",
+            ).get(playerId).count
+            const malformedResponse = await fastify.inject({
+                method: "POST",
+                url: "/summary",
+                payload: { viewer_id: 123, event_id: 4, api_count: 5 },
+            })
+            assert.equal(malformedResponse.statusCode, 500)
+            assert.equal(
+                getDb().prepare(
+                    "SELECT COUNT(*) AS count FROM players_rush_events WHERE player_id = ? AND event_id = 4",
+                ).get(playerId).count,
+                rushStateBefore,
+                "malformed reward catalog must not create default Rush state",
+            )
+        } finally {
+            restoreMalformedContent()
+        }
     } finally {
         await fastify.close()
     }

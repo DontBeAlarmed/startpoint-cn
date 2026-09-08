@@ -48,11 +48,32 @@ test("maps D27 Item and Equipment typed content to affected focused groups", () 
     for (const file of [
         "src/lib/item-content.ts",
         "src/lib/equipment-content.ts",
+        "src/lib/equipment-dissolve.ts",
     ]) assert.deepEqual(selectTestGroups([file]), expected, file)
+    for (const file of [
+        "src/routes/api/equipment.ts",
+        "src/routes/api/sell.ts",
+    ]) assert.deepEqual(
+        selectTestGroups([file]),
+        ["admin", "full", "integration:quest", "integration:rules", "quick:content"],
+        file,
+    )
     assert.deepEqual(
         selectTestGroups(["tools/item_equipment_content.test.cjs"]),
         ["quick:content"],
     )
+})
+
+test("maps D27 Raid reward parsing and route transaction boundaries to focused groups", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest/finish/raid-overall-rewards.ts"]),
+        ["integration:event", "integration:mission", "quick:content", "quick:quest"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest/periodic-reward-content.ts"]),
+        ["integration:event", "integration:mission", "quick:content", "quick:quest"],
+    )
+    assert.deepEqual(selectTestGroups(["tools/equipment_dissolve.test.cjs"]), ["integration:rules"])
 })
 
 test("maps D27 narrow Config policies to every affected focused group", () => {

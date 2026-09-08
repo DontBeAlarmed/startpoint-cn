@@ -193,6 +193,18 @@ const SOURCE_RULES = [
         groups: ["admin", "integration:quest", "integration:rules", "quick:content"],
     },
     {
+        pattern: /^(?:src\/lib\/equipment-dissolve\.ts|src\/routes\/api\/(?:equipment|sell)\.ts|tools\/equipment_dissolve\.test\.cjs)$/,
+        groups: ["admin", "integration:quest", "integration:rules", "quick:content"],
+    },
+    {
+        pattern: /^src\/lib\/quest\/finish\/raid-overall-rewards\.ts$/,
+        groups: ["integration:event", "integration:mission", "quick:content", "quick:quest"],
+    },
+    {
+        pattern: /^src\/lib\/quest\/periodic-reward-content\.ts$/,
+        groups: ["integration:event", "integration:mission", "quick:content", "quick:quest"],
+    },
+    {
         pattern: /^(?:src\/lib\/config-content\.ts|tools\/config_content\.test\.cjs)$/,
         groups: [
             "admin",

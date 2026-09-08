@@ -1,4 +1,8 @@
-import { getEquipmentDissolveSync, getEquipmentCraftSync } from "./equipment-content";
+import {
+    getEquipmentDissolveSync,
+    getEquipmentCraftSync,
+    getEquipmentRaritySync,
+} from "./equipment-content";
 
 export interface DissolveRewards {
     craftPoints: number;
@@ -24,11 +28,12 @@ export function calculateDissolveRewards(
     equipmentId: number,
     count: number
 ): DissolveRewards {
-    const rarity = Math.floor(equipmentId / 1000000);  // 1-indexed, matches CDN keys
-    const craftEntry = getEquipmentCraftSync(rarity);
     const cdn = getEquipmentDissolveSync(equipmentId);
-    if (craftEntry === null) throw new Error(`Missing equipment craft definition for rarity ${rarity}`)
     if (cdn === null) throw new Error(`Missing equipment definition ${equipmentId}`)
+    const rarity = getEquipmentRaritySync(equipmentId)
+    if (rarity === null) throw new Error(`Missing equipment rarity definition ${equipmentId}`)
+    const craftEntry = getEquipmentCraftSync(rarity);
+    if (craftEntry === null) throw new Error(`Missing equipment craft definition for rarity ${rarity}`)
     const craftPoints = craftEntry.dissolve_craft * count;
 
     // Star grains: only if obtain_source == 0

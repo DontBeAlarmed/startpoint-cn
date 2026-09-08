@@ -14,6 +14,16 @@ test.after(restoreContentSnapshot)
 
 const { calculateDissolveRewards } = require("../src/lib/equipment-dissolve")
 
+assert.deepEqual(
+    calculateDissolveRewards(100001, 1),
+    {
+        craftPoints: 5,
+        starGrains: 0,
+        abilitySouls: { 100001: 1 },
+    },
+    "sub-million orb IDs use equipment_lookup.rarity instead of an ID prefix",
+)
+
 const equipmentId = 5020043
 
 assert.deepEqual(

@@ -23,6 +23,7 @@ import { getDb } from "../../data/db";
 import { grantRaidEventRewardsWithinTransactionSync } from "../../lib/raid-event-reward-grant"
 import { projectItemOverflowCommonResponse } from "../../lib/item-overflow"
 import {
+    getRaidEventRewardCatalog,
     getRaidEventOverallRewardDefinitions,
     toRaidEventRewardResponse,
 } from "../../lib/quest/finish/raid-overall-rewards";
@@ -84,6 +85,9 @@ const routes = async (fastify: FastifyInstance) => {
         if (requiredKillCount === undefined) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid raid event id."
         })
+        // Validate the complete reward/event catalog before creating default
+        // rush state or entering any settlement write transaction.
+        getRaidEventRewardCatalog()
         const rewardDefinitions = getRaidEventOverallRewardDefinitions(eventId)
         const evaluationTime = getServerDate()
 
