@@ -1,6 +1,10 @@
-import { getContentSnapshot } from "../../content/runtime/content-snapshot"
-import type { CategoryContext } from "./types"
-import { MissionMasterDefinition, getMissionCatalog } from "./mission-catalog"
+import type { CategoryContext, RegularQuestRule } from "./types"
+import {
+    type MissionCatalog,
+    type MissionMasterDefinition,
+    getMissionCatalog,
+    getMissionCatalogContentTable,
+} from "./mission-catalog"
 
 type RawQuestTable = Record<string, unknown>
 
@@ -36,10 +40,10 @@ function matchesSelector(
         && (quests === null || quests.includes(quest))
 }
 
-function getStoryQuestRule(definition: MissionMasterDefinition): {
-    readonly section: number
-    readonly candidates: readonly number[]
-} | null {
+function getStoryQuestRule(
+    definition: MissionMasterDefinition,
+    catalog: MissionCatalog,
+): RegularQuestRule | null {
     const rangeKind = Number(definition.row[7])
     if (rangeKind !== 0 && rangeKind !== 1) return null
     const worlds = parseIntegerList(definition.row[8])
@@ -47,7 +51,8 @@ function getStoryQuestRule(definition: MissionMasterDefinition): {
     const quests = parseIntegerList(definition.row[10])
     if (worlds === null && chapters === null && quests === null) return null
 
-    const table = getContentSnapshot().repository.table<RawQuestTable>(
+    const table = getMissionCatalogContentTable<RawQuestTable>(
+        catalog,
         rangeKind === 0 ? "main_quest.json" : "ex_quest.json",
     )
     const candidates = Object.keys(table)
@@ -67,45 +72,56 @@ function getPracticeQuestCandidates(
     return candidates && candidates.length > 0 ? candidates : null
 }
 
-function computeStoryQuestRange(
-    missionId: number,
-    ctx: CategoryContext,
-): number | undefined {
-    const definition = getMissionCatalog().getDefinition(1, missionId)
-    const rule = definition ? getStoryQuestRule(definition) : null
-    if (!rule) return undefined
-    const finished = getFinishedQuestIds(ctx, rule.section)
-    return rule.candidates.every(questId => finished.has(questId)) ? 1 : 0
+export function getRegularQuestRule(
+    definition: MissionMasterDefinition,
+    catalog: MissionCatalog,
+): RegularQuestRule | undefined {
+    return getRegularQuestRules(catalog).get(definition.missionId)
 }
 
-function computePracticeQuestRange(
-    missionId: number,
-    ctx: CategoryContext,
-): number | undefined {
-    const definition = getMissionCatalog().getDefinition(1, missionId)
-    const candidates = definition ? getPracticeQuestCandidates(definition) : null
-    if (!candidates) return undefined
-    const finished = getFinishedQuestIds(ctx, 15)
-    return candidates.some(questId => finished.has(questId)) ? 1 : 0
+const regularQuestRulesByCatalog = new WeakMap<MissionCatalog, ReadonlyMap<number, RegularQuestRule>>()
+
+function getRegularQuestRules(catalog: MissionCatalog): ReadonlyMap<number, RegularQuestRule> {
+    const cached = regularQuestRulesByCatalog.get(catalog)
+    if (cached) return cached
+    const rules = new Map<number, RegularQuestRule>()
+    for (const definition of catalog.getDefinitions(1)) {
+        const storyRule = getStoryQuestRule(definition, catalog)
+        const practiceCandidates = storyRule ? null : getPracticeQuestCandidates(definition)
+        const rule = storyRule
+            ?? (practiceCandidates ? { section: 15, candidates: practiceCandidates } : undefined)
+        if (rule) rules.set(definition.missionId, Object.freeze({
+            section: rule.section,
+            candidates: Object.freeze([...rule.candidates]),
+        }))
+    }
+    regularQuestRulesByCatalog.set(catalog, rules)
+    return rules
 }
 
-export function isRegularQuestMissionSupported(missionId: number): boolean {
-    const definition = getMissionCatalog().getDefinition(1, missionId)
-    return definition !== undefined && getRegularQuestFactSection(definition) !== undefined
+export function isRegularQuestMissionSupported(
+    missionId: number,
+    catalog: MissionCatalog = getMissionCatalog(),
+): boolean {
+    const definition = catalog.getDefinition(1, missionId)
+    return definition !== undefined && getRegularQuestRule(definition, catalog) !== undefined
 }
 
 export function getRegularQuestFactSection(
     definition: MissionMasterDefinition,
+    catalog: MissionCatalog = getMissionCatalog(),
 ): number | undefined {
-    const storyRule = getStoryQuestRule(definition)
-    if (storyRule) return storyRule.section
-    return getPracticeQuestCandidates(definition) ? 15 : undefined
+    return getRegularQuestRule(definition, catalog)?.section
 }
 
 export function computeRegularQuestProgress(
     missionId: number,
     ctx: CategoryContext,
 ): number | undefined {
-    return computeStoryQuestRange(missionId, ctx)
-        ?? computePracticeQuestRange(missionId, ctx)
+    const rule = ctx.regularQuestRules?.get(missionId)
+    if (!rule) return undefined
+    const finished = getFinishedQuestIds(ctx, rule.section)
+    return rule.section === 15
+        ? (rule.candidates.some(questId => finished.has(questId)) ? 1 : 0)
+        : (rule.candidates.every(questId => finished.has(questId)) ? 1 : 0)
 }

@@ -37,8 +37,12 @@ restoreSnapshot = require("./helpers/content-snapshot-fixture.cjs")
             if (failReconciliation) throw new Error("forced load reconciliation failure")
         },
         tables: {
+            "cdndata/player_rank_full.json": require("../assets/cdndata/player_rank_full.json"),
             "mission_event.json": require("../assets/mission_event.json"),
             "mission_event_reward.json": require("../assets/mission_event_reward.json"),
+            "mission_event_battle_rules.json": require("../assets/mission_event_battle_rules.json"),
+            "mission_event_quest_map.json": require("../assets/mission_event_quest_map.json"),
+            "practice_quest.json": require("../assets/practice_quest.json"),
             "character.json": require("../assets/character.json"),
             "item_inventory_policy.json": require("../assets/item_inventory_policy.json"),
             "mana_node.json": require("../assets/mana_node.json"),
@@ -85,6 +89,9 @@ restoreSnapshot = require("./helpers/content-snapshot-fixture.cjs")
             "boss_coin_shop.json": {},
             "treasure_shop.json": {},
             "challenge_dungeon_event_quest.json": {},
+            "ranking_event_single_quest.json": {},
+            "rush_event_quest.json": {},
+            "carnival_event_quest.json": {},
             "mana_board2_open_condition.json": {},
             "item_sale.json": {},
             "mission_pass_daily_reward.json": {},

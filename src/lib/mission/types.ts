@@ -9,6 +9,11 @@ import type { MissionEvaluationSession } from "./evaluation-session"
 import type { DegreeRule } from "./degree-rule-catalog"
 import type { EventRule } from "./event-rule-catalog"
 
+export interface RegularQuestRule {
+    readonly section: number
+    readonly candidates: readonly number[]
+}
+
 export interface PlayerQuestProgressEntry {
     questId: number
     finished: boolean
@@ -27,6 +32,12 @@ export interface CategoryContext {
     totalQuestClears: number
     totalStories: number
     rankCounts: Record<string, number>
+    /** Rank projected from the same Content snapshot as this evaluation Session. */
+    playerRankDegree?: number
+    /** Regular quest selectors projected from the Session Catalog. */
+    regularQuestRules?: ReadonlyMap<number, RegularQuestRule>
+    /** Mission patterns projected from the Session Catalog for pure computers. */
+    missionPatterns?: ReadonlyMap<number, string>
     collectedItemTotals?: Record<string, number>
     collectMissionItemIds?: ReadonlyMap<number, number>
     regularStats?: {

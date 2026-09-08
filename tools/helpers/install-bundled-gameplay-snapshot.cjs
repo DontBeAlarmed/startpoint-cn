@@ -74,6 +74,7 @@ const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
     "cdndata/player_rank_full.json",
     "mission_event_battle_rules.json",
     "mission_event_quest_map.json",
+    "practice_quest.json",
     "additional_reward_rules.json",
     "bond_token_exchange.json",
     "box_gacha.json",

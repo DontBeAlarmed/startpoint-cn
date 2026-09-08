@@ -31,7 +31,7 @@ const { MissionEvaluationSession } = require("../src/lib/mission/evaluation-sess
 const missionCatalogModule = require("../src/lib/mission/mission-catalog")
 const {
     bundledMissionContentRepository,
-} = require("../src/lib/mission/mission-catalog-source")
+} = require("./helpers/mission-catalog-bundled.cjs")
 const { settleMissionCategories } = require("../src/lib/mission/settlement")
 const buildMissionCatalog = missionCatalogModule.getMissionCatalog
 

@@ -110,8 +110,11 @@ const bundledQuestTables = Object.fromEntries(QUEST_TABLE_NAMES.map(tableName =>
 ]))
 
 const tables = {
+    "cdndata/player_rank_full.json": require("../assets/cdndata/player_rank_full.json"),
     ...getBundledStandardMissionTables(),
     ...bundledQuestTables,
+    "mission_event_battle_rules.json": require("../assets/mission_event_battle_rules.json"),
+    "mission_event_quest_map.json": require("../assets/mission_event_quest_map.json"),
     "daily_challenge_point_lookup.json": require("../assets/daily_challenge_point_lookup.json"),
     "hard_multi_event.json": {},
     "hard_multi_event_quest.json": {},

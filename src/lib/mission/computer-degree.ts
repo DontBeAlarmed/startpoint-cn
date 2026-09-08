@@ -1,6 +1,5 @@
 // Degree mission computer (category 5)
 
-import { getRankDegree } from "../stamina"
 import { buildDegreeCategoryContextFromSession } from "./degree-session-context"
 import type { DegreeMetric, DegreeRule } from "./degree-rule-catalog"
 import type { CategoryContext, MissionComputer } from "./types"
@@ -51,7 +50,7 @@ export function computeDegreeProgress(
     dbProgress: number,
 ): number {
     if (!rule || rule.kind === "persisted" || rule.kind === "unsupported") return dbProgress
-    if (rule.kind === "playerRank") return getRankDegree(ctx.player.rankPoint)
+    if (rule.kind === "playerRank") return ctx.playerRankDegree ?? dbProgress
     const stats = ctx.degreeStats
     if (!stats) return dbProgress
     switch (rule.kind) {

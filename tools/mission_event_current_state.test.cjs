@@ -351,7 +351,12 @@ function withContentTables(overrides, callback) {
         "mana_board.json": manaBoard,
         "config.json": require("../assets/config.json"),
         "mission_event.json": require("../assets/mission_event.json"),
+        "mission_event_battle_rules.json": require("../assets/mission_event_battle_rules.json"),
+        "mission_event_quest_map.json": require("../assets/mission_event_quest_map.json"),
         "challenge_dungeon_event_quest.json": require("../assets/challenge_dungeon_event_quest.json"),
+        "ranking_event_single_quest.json": require("../assets/ranking_event_single_quest.json"),
+        "rush_event_quest.json": require("../assets/rush_event_quest.json"),
+        "carnival_event_quest.json": require("../assets/carnival_event_quest.json"),
         ...overrides,
     }
     const install = installFrozenTestContentSnapshot({ targetVersion: "test", tables })
@@ -406,6 +411,8 @@ test("Event Session context skips current-state queries and indexes outside all 
         "ex_quest.json",
         "main_quest.json",
         "config.json",
+        "mission_event_battle_rules.json",
+        "mission_event_quest_map.json",
     ].map(tableName => [tableName, require(`../assets/${tableName}`)]))
     const install = installFrozenTestContentSnapshot({
         targetVersion: "test",

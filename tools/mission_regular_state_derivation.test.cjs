@@ -15,7 +15,7 @@ const {
 } = require("../src/lib/mission/mission-catalog")
 const {
     bundledMissionContentRepository,
-} = require("../src/lib/mission/mission-catalog-source")
+} = require("./helpers/mission-catalog-bundled.cjs")
 const {
     deriveRegularStateFacts,
 } = require("../src/lib/mission/regular-state-facts")

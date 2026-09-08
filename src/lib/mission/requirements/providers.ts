@@ -9,7 +9,6 @@ import { parsePositiveSafeIntegerMasterValue } from "../master-value"
 import { getAwakeRequirement } from "./provider-awake"
 import { getDegreeRequirement } from "./provider-degree"
 import { getEventRequirement } from "./provider-event"
-import { matchesCurrentMissionComputerDefinition } from "./computer-compatibility"
 import type { MissionFactRequirementDraft, MissionRef } from "./types"
 
 const REGULAR_PERSISTED_PATTERNS = new Set([
@@ -88,13 +87,11 @@ function getRegularRequirement(
     if (facts) return { mode: "computed", facts }
     if (REGULAR_PERSISTED_PATTERNS.has(definition.pattern)) return { mode: "persisted" }
 
-    if (matchesCurrentMissionComputerDefinition(definition)) {
-        const questSection = getRegularQuestFactSection(definition)
-        if (questSection !== undefined) {
-            return {
-                mode: "computed",
-                facts: [{ kind: "questProgress", sections: [questSection] }],
-            }
+    const questSection = getRegularQuestFactSection(definition, catalog)
+    if (questSection !== undefined) {
+        return {
+            mode: "computed",
+            facts: [{ kind: "questProgress", sections: [questSection] }],
         }
     }
     return {

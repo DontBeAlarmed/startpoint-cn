@@ -35,6 +35,13 @@ export interface AwakeGenericCharacterClearRule {
 
 type AwakeDefinitionMap = Record<string, readonly (readonly string[])[]>
 
+function asAwakeDefinitionMap(value: unknown): AwakeDefinitionMap {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) {
+        throw new TypeError("Character Awake mission table must be an object.")
+    }
+    return value as AwakeDefinitionMap
+}
+
 const GENERIC_CHARACTER_CLEAR_MISSION_IDS = Object.freeze([
     1110012, 1110031, 1110032, 1110033, 1210051, 1210052, 1210053,
     1310041, 1310042, 1310043, 1410011, 1410012, 1410013,
@@ -182,6 +189,13 @@ function validateResolvedFamilySchemas(definitions: AwakeDefinitionMap): void {
     assertDefinitionFields(definitions, 1610023, { 4: "23", 7: "3", 23: "161002" })
     assertDefinitionFields(definitions, 2630022, { 4: "2" })
 
+    for (const [missionId, patternType] of [
+        [1110013, "93"], [1310052, "23"], [2110013, "23"], [2310013, "15"],
+        [2510032, "23"], [2510033, "15"], [2630023, "23"],
+    ] as const) {
+        assertDefinitionFields(definitions, missionId, { 4: patternType })
+    }
+
     for (const [missionId, characterId] of [
         [1410033, 141003],
         [2210043, 221004],
@@ -261,13 +275,16 @@ function buildCatalog(definitions: AwakeDefinitionMap): AwakeRuleCatalog {
     })
 }
 
-function getCatalog(repository?: ReadonlyContentRepository): AwakeRuleCatalog {
-    const definitions = getDefinitions(repository)
+function getCatalogFromDefinitions(definitions: AwakeDefinitionMap): AwakeRuleCatalog {
     const cached = catalogByDefinitions.get(definitions)
     if (cached) return cached
     const catalog = buildCatalog(definitions)
     catalogByDefinitions.set(definitions, catalog)
     return catalog
+}
+
+function getCatalog(repository?: ReadonlyContentRepository): AwakeRuleCatalog {
+    return getCatalogFromDefinitions(getDefinitions(repository))
 }
 
 export function getAwakeMissionDefinitionRow(
@@ -294,6 +311,12 @@ export function getAwakeMissionRuleFamilies(
     repository?: ReadonlyContentRepository,
 ): readonly AwakeMissionRuleFamily[] {
     return getCatalog(repository).missionRuleFamilies
+}
+
+export function getAwakeMissionRuleFamiliesFromTable(
+    table: unknown,
+): readonly AwakeMissionRuleFamily[] {
+    return getCatalogFromDefinitions(asAwakeDefinitionMap(table)).missionRuleFamilies
 }
 
 export function getAwakeFailClosedMissionIds(

@@ -50,6 +50,10 @@ function catalogWithEventDefinitions(eventDefinitions) {
         "ranking_event_single_quest.json": require("../assets/ranking_event_single_quest.json"),
         "rush_event_quest.json": require("../assets/rush_event_quest.json"),
         "carnival_event_quest.json": require("../assets/carnival_event_quest.json"),
+        "main_quest.json": require("../assets/main_quest.json"),
+        "ex_quest.json": require("../assets/ex_quest.json"),
+        "mission_event_battle_rules.json": require("../assets/mission_event_battle_rules.json"),
+        "mission_event_quest_map.json": require("../assets/mission_event_quest_map.json"),
         "config.json": require("../assets/config.json"),
     }
     return getMissionCatalog({

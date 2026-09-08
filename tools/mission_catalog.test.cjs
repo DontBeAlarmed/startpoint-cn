@@ -18,7 +18,7 @@ const {
 } = require("../src/lib/mission/mission-catalog")
 const {
     bundledMissionContentRepository,
-} = require("../src/lib/mission/mission-catalog-source")
+} = require("./helpers/mission-catalog-bundled.cjs")
 
 const CATEGORY_LAYOUTS = Object.freeze({
     1: { definition: "mission_regular.json", reward: "mission_regular_reward.json", pattern: 0, start: 25, end: 26, progress: 1, rewardStart: 5 },

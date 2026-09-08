@@ -64,6 +64,7 @@ function rewardRow() {
 }
 
 const tables = {
+    "cdndata/player_rank_full.json": require("../assets/cdndata/player_rank_full.json"),
     ...require("./helpers/install-bundled-gameplay-snapshot.cjs")
         .getBundledStandardMissionTables(),
     "daily_challenge_point_lookup.json": require("../assets/daily_challenge_point_lookup.json"),

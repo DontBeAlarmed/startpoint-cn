@@ -40,6 +40,7 @@ test("Degree compute keeps using rules bound into an already-built context", () 
         totalQuestClears: 0,
         totalStories: 0,
         rankCounts: {},
+        playerRankDegree: 250,
         degreeRules: new Map([[1000, {
             missionId: 1000,
             kind: "playerRank",

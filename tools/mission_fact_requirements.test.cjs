@@ -24,9 +24,10 @@ const {
     getBundledStandardMissionTables,
 } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 const { installFrozenTestContentSnapshot } = require("./helpers/content-snapshot-fixture.cjs")
+const { getContentSnapshot } = require("../src/content/runtime/content-snapshot")
 const {
     bundledMissionContentRepository,
-} = require("../src/lib/mission/mission-catalog-source")
+} = require("./helpers/mission-catalog-bundled.cjs")
 const { getMissionCatalog } = require("../src/lib/mission/mission-catalog")
 const { getRegularComputedMissionIds } = require("../src/lib/mission/computer-regular")
 const { getEventSafeMissionIds } = require("../src/lib/mission/computer-event-safe")
@@ -64,43 +65,62 @@ function catalogWithConfig(config) {
     }))
 }
 
+const CATEGORY_TABLES = Object.freeze({
+    1: ["mission_regular.json", "mission_regular_reward.json", 1],
+    2: ["mission_daily.json", "mission_daily_reward.json", 1],
+    3: ["mission_event.json", "mission_event_reward.json", 1],
+    4: ["mission_collect_item.json", "mission_collect_item_reward.json", 2],
+    5: ["mission_degree.json", "mission_degree_reward.json", 1],
+    6: ["mission_pass_daily.json", "mission_pass_daily_reward.json", 1],
+    7: ["mission_pass_week.json", "mission_pass_week_reward.json", 1],
+    8: ["mission_pass_event.json", "mission_pass_event_reward.json", 1],
+    9: ["mission_char_awake.json", "mission_char_awake_reward.json", 5],
+    10: ["mission_weekly_def.json", "mission_weekly_reward.json", 1],
+})
+
 function forwardingCatalog(source, overrides = new Map(), options = {}) {
     const removedDefinitions = options.removedDefinitions ?? new Set()
     const removedRewardStages = options.removedRewardStages ?? new Set()
     const rewardStageOverrides = options.rewardStageOverrides ?? new Map()
-    return Object.freeze({
-        getDefinitions(category) {
-            return source.getDefinitions(category)
-                .filter(definition => !removedDefinitions.has(`${category}:${definition.missionId}`))
-                .map(definition => (
-                    overrides.get(`${category}:${definition.missionId}`) ?? definition
-                ))
+    const sourceRepository = options.sourceRepository ?? getContentSnapshot().repository
+    const tableOverrides = new Map()
+
+    function mutableTable(tableName) {
+        if (!tableOverrides.has(tableName)) {
+            tableOverrides.set(tableName, structuredClone(sourceRepository.table(tableName)))
+        }
+        return tableOverrides.get(tableName)
+    }
+
+    for (const [key, definition] of overrides) {
+        const [categoryText, missionIdText] = key.split(":")
+        const [definitionTable] = CATEGORY_TABLES[Number(categoryText)]
+        mutableTable(definitionTable)[missionIdText] = [[...definition.row]]
+    }
+    for (const key of removedDefinitions) {
+        const [categoryText, missionIdText] = key.split(":")
+        const [definitionTable] = CATEGORY_TABLES[Number(categoryText)]
+        delete mutableTable(definitionTable)[missionIdText]
+    }
+    for (const key of removedRewardStages) {
+        const [categoryText, missionIdText, stageText] = key.split(":")
+        const [, rewardTable] = CATEGORY_TABLES[Number(categoryText)]
+        const missionRewards = mutableTable(rewardTable)[missionIdText]
+        if (missionRewards) delete missionRewards[stageText]
+    }
+    for (const [key, stage] of rewardStageOverrides) {
+        const [categoryText, missionIdText, stageText] = key.split(":")
+        const [, rewardTable, targetProgressIndex] = CATEGORY_TABLES[Number(categoryText)]
+        const row = mutableTable(rewardTable)[missionIdText]?.[stageText]?.[0]
+        if (row) row[targetProgressIndex] = String(stage.targetProgress)
+    }
+
+    return getMissionCatalog(Object.freeze({
+        info: sourceRepository.info,
+        table(tableName) {
+            return tableOverrides.get(tableName) ?? sourceRepository.table(tableName)
         },
-        getDefinition(category, missionId) {
-            if (removedDefinitions.has(`${category}:${missionId}`)) return undefined
-            return overrides.get(`${category}:${missionId}`)
-                ?? source.getDefinition(category, missionId)
-        },
-        getMissionIds: source.getMissionIds.bind(source),
-        getDefinitionsByPattern: source.getDefinitionsByPattern.bind(source),
-        getRewardStages(category, missionId) {
-            return source.getRewardStages(category, missionId)
-                .filter(stage => !removedRewardStages.has(
-                    `${category}:${missionId}:${stage.stage}`,
-                ))
-                .map(stage => (
-                    rewardStageOverrides.get(`${category}:${missionId}:${stage.stage}`) ?? stage
-                ))
-        },
-        getRewardStage(category, missionId, stage) {
-            const key = `${category}:${missionId}:${stage}`
-            return removedRewardStages.has(key)
-                ? undefined
-                : rewardStageOverrides.get(key) ?? source.getRewardStage(category, missionId, stage)
-        },
-        isEnabledAt: source.isEnabledAt.bind(source),
-        getAwakeMissionIdsByCharacter: source.getAwakeMissionIdsByCharacter.bind(source),
-    })
+    }))
 }
 
 function withDefinitionField(source, rowIndex, value, pattern = source.pattern) {
@@ -176,10 +196,10 @@ test("covers every authoritative Regular computed mission with exact fact domain
         catalog,
         new Map([["1:42", changedDefinition]]),
     )
-    assertUnsupported(
-        getMissionFactRequirementRegistry(changedCatalog).getRequirement(1, 42),
-        /authoritative|computer|definition|mapping/i,
-    )
+    const changedRequirement = getMissionFactRequirementRegistry(changedCatalog)
+        .getRequirement(1, 42)
+    assert.equal(changedRequirement.mode, "computed")
+    assert.deepEqual(factIds(changedRequirement), ["questProgress:1"])
 })
 
 test("maps every Degree fact family to the authoritative FactKey domain", () => {
@@ -368,9 +388,9 @@ test("matches Event safe coverage and validates current-state reward stages", ()
         new Map([["3:1201", changedDefinition]]),
     )
 
-    assertUnsupported(
+    assert.equal(
         getMissionFactRequirementRegistry(withoutReward).getRequirement(3, 1201),
-        /authoritative|mapping|reward|target/i,
+        undefined,
     )
     assertUnsupported(
         getMissionFactRequirementRegistry(wrongTarget).getRequirement(3, 1201),
@@ -441,11 +461,10 @@ test("separates recomputable, atomic, and fail-closed Awake families", () => {
         pattern: "custom-unknown-awake-family",
         row: Object.freeze(source.row.map((value, index) => index === 4 ? "999" : value)),
     })
-    const customRegistry = getMissionFactRequirementRegistry(forwardingCatalog(
+    assert.throws(() => getMissionFactRequirementRegistry(forwardingCatalog(
         catalog,
         new Map([["9:1110013", customDefinition]]),
-    ))
-    assert.equal(customRegistry.getRequirement(9, 1110013).mode, "unsupported")
+    )), /awake|field|schema/i)
 })
 
 test("normalizes and merges facts, indexes them in stable order, and freezes public results", () => {
@@ -539,17 +558,20 @@ test("requirement registries follow their own catalog content regardless of buil
             },
         }
         const runtimeCatalog = getMissionCatalog(runtimeRepository)
-        const runtimeRegistry = getMissionFactRequirementRegistry(runtimeCatalog)
-        assert.equal(runtimeRegistry.getRequirement(3, 1200).mode, "persisted")
-        assert.equal(runtimeRegistry.getRequirement(9, 1110013).mode, "persisted")
-
-        // A registry built afterwards over bundled content compares against
-        // the drifted current catalog, so those definitions no longer match.
-        const sameBundledContent = getMissionFactRequirementRegistry(
-            forwardingCatalog(bundledCatalog),
+        assert.throws(
+            () => getMissionFactRequirementRegistry(runtimeCatalog),
+            /awake|field|schema/i,
         )
-        assertUnsupported(sameBundledContent.getRequirement(3, 1200), /producer|schema|contract|pattern/i)
-        assertUnsupported(sameBundledContent.getRequirement(9, 1110013), /awake|schema|family|pattern/i)
+
+        // A registry built afterwards over bundled content remains bound to
+        // its own repository identity instead of the drifted global snapshot.
+        const sameBundledContent = getMissionFactRequirementRegistry(
+            forwardingCatalog(bundledCatalog, new Map(), {
+                sourceRepository: bundledMissionContentRepository,
+            }),
+        )
+        assert.equal(sameBundledContent.getRequirement(3, 1200).mode, "persisted")
+        assert.equal(sameBundledContent.getRequirement(9, 1110013).mode, "persisted")
     } finally {
         restoreRuntimeSnapshot()
     }
@@ -570,9 +592,9 @@ test("uses the supplied Catalog reward stage for authoritative Degree levels", (
 
     assert.equal(getMissionFactRequirementRegistry(catalog)
         .getRequirement(5, 3010).mode, "computed")
-    assertUnsupported(
+    assert.equal(
         getMissionFactRequirementRegistry(withoutReward).getRequirement(5, 3010),
-        /reward|authoritative/i,
+        undefined,
     )
     assertUnsupported(
         getMissionFactRequirementRegistry(wrongTarget).getRequirement(5, 3010),
@@ -638,9 +660,9 @@ test("fails aggregate missions closed when any declared dependency is absent", (
         getMissionFactRequirementRegistry(missingDaily).getRequirement(2, 5),
         /dependency/i,
     )
-    assertUnsupported(
-        getMissionFactRequirementRegistry(missingAwake).getRequirement(9, 14),
-        /dependency/i,
+    assert.throws(
+        () => getMissionFactRequirementRegistry(missingAwake),
+        /awake|partition|master data/i,
     )
     assertUnsupported(
         getMissionFactRequirementRegistry(missingEvent).getRequirement(3, 1454),

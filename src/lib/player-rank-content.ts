@@ -17,6 +17,8 @@ export interface PlayerRankContent {
     readonly getRankDegree: (rankPoint: number) => number
 }
 
+const playerRankContentByTable = new WeakMap<object, PlayerRankContent>()
+
 function parseEntry(degreeText: string, value: unknown[][]): PlayerRankEntry {
     const row = value[0]
     if (!Array.isArray(row)) throw new TypeError(`invalid player rank row: ${degreeText}`)
@@ -31,13 +33,14 @@ function parseEntry(degreeText: string, value: unknown[][]): PlayerRankEntry {
     return { stamina, threshold, healRate }
 }
 
-function buildPlayerRankContent(repository: ReadonlyContentRepository): PlayerRankContent {
-    const table = repository.table<PlayerRankTable>("cdndata/player_rank_full.json")
+export function parsePlayerRankContent(table: unknown): PlayerRankContent {
     if (!table || typeof table !== "object" || Array.isArray(table)) {
         throw new TypeError("invalid player rank table")
     }
+    const cached = playerRankContentByTable.get(table)
+    if (cached !== undefined) return cached
     const entries = new Map<number, PlayerRankEntry>()
-    for (const [degreeText, value] of Object.entries(table)) {
+    for (const [degreeText, value] of Object.entries(table as PlayerRankTable)) {
         const degree = Number(degreeText)
         if (!Number.isSafeInteger(degree) || degree < 0 || entries.has(degree)) {
             throw new TypeError(`invalid player rank degree: ${degreeText}`)
@@ -48,7 +51,7 @@ function buildPlayerRankContent(repository: ReadonlyContentRepository): PlayerRa
         throw new TypeError("player rank table is missing required boundary ranks")
     }
     const sortedDegrees = [...entries.keys()].sort((left, right) => left - right)
-    return Object.freeze({
+    const content = Object.freeze({
         getMaxStamina: (degreeId: number): number => {
             const entry = degreeId <= 0
                 ? entries.get(1)
@@ -67,6 +70,8 @@ function buildPlayerRankContent(repository: ReadonlyContentRepository): PlayerRa
             return result
         },
     })
+    playerRankContentByTable.set(table, content)
+    return content
 }
 
 const playerRankContentByRepository = new WeakMap<ReadonlyContentRepository, PlayerRankContent>()
@@ -76,7 +81,9 @@ export function getPlayerRankContent(
 ): PlayerRankContent {
     const cached = playerRankContentByRepository.get(repository)
     if (cached !== undefined) return cached
-    const content = buildPlayerRankContent(repository)
+    const content = parsePlayerRankContent(
+        repository.table<PlayerRankTable>("cdndata/player_rank_full.json"),
+    )
     playerRankContentByRepository.set(repository, content)
     return content
 }

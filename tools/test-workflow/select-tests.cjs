@@ -585,6 +585,14 @@ const SOURCE_RULES = [
         groups: ["integration:quest", "quick:quest"],
     },
     {
+        pattern: /^src\/lib\/(?:quest-content|player-rank-content|stamina)\.ts$/,
+        groups: ["integration:mission", "integration:party", "integration:quest", "quick:content"],
+    },
+    {
+        pattern: /^src\/lib\/rescue-fragment-content\.ts$/,
+        groups: ["integration:party", "quick:content"],
+    },
+    {
         pattern: /^src\/lib\/mission\/awake-unlock\.ts$/,
         groups: ["integration:mission", "integration:mission-compiled"],
     },
@@ -641,7 +649,7 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^(?:src\/lib\/mission\/(?:awake-eligibility|awake-evaluation-settlement|awake-request-context(?:-scope|-state)?|awake-reward-facts|awake-settlement|awake-unlock|awake-unlock-response|compute-awake-summary|evaluation-session|fact-loaders|index|mission-catalog|mission-catalog-source|production-fact-loaders)\.ts|src\/data\/domains\/(?:character_clear|party_co_clear)\.ts|tools\/mission_awake_reward_owner\.test\.cjs)$/,
+        pattern: /^(?:src\/lib\/mission\/(?:awake-eligibility|awake-evaluation-settlement|awake-request-context(?:-scope|-state)?|awake-reward-facts|awake-settlement|awake-unlock|awake-unlock-response|compute-awake-summary|evaluation-session|event-content|fact-loaders|index|mission-catalog|mission-catalog-source|production-fact-loaders)\.ts|src\/data\/domains\/(?:character_clear|party_co_clear)\.ts|tools\/mission_awake_reward_owner\.test\.cjs)$/,
         groups: ["integration:mission"],
     },
     {
@@ -651,6 +659,10 @@ const SOURCE_RULES = [
     {
         pattern: /^tools\/helpers\/(?:mission-session-context|active-mission-fact-progress)\.cjs$/,
         groups: ["integration:mission"],
+    },
+    {
+        pattern: /^tools\/(?:event_content_boundary|mission_catalog_startup_boundary|quest_practice_content_boundary|stamina_content_boundary)\.test\.cjs$/,
+        groups: ["quick:content"],
     },
     {
         pattern: /^tools\/helpers\/awake-owner-fact-publication-fixture\.cjs$/,

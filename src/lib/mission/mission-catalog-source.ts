@@ -28,24 +28,6 @@ export interface MissionCatalogSourceEntry {
     readonly awakeCharacterId?: number
 }
 
-const BUNDLED_TABLE_NAMES = new Set([
-    "mission_regular.json", "mission_daily.json", "mission_event.json",
-    "mission_collect_item.json", "mission_degree.json", "mission_pass_daily.json",
-    "mission_pass_week.json", "mission_pass_event.json", "mission_char_awake.json",
-    "mission_weekly_def.json", "mission_regular_reward.json", "mission_daily_reward.json",
-    "mission_event_reward.json", "mission_collect_item_reward.json",
-    "mission_degree_reward.json", "mission_pass_daily_reward.json",
-    "mission_pass_week_reward.json", "mission_pass_event_reward.json",
-    "mission_char_awake_reward.json", "mission_weekly_reward.json", "character.json",
-    "character_quest_lookup.json", "mana_board.json", "config.json", "main_quest.json",
-    "ex_quest.json", "treasure_shop.json", "boss_battle_quest.json",
-    "expert_single_event_quest.json", "world_story_event_quest.json",
-    "world_story_event_boss_battle_quest.json", "advent_event_quest.json",
-    "carnival_event_quest.json", "hard_multi_event_quest.json",
-    "challenge_dungeon_event_quest.json", "ranking_event_single_quest.json",
-    "rush_event_quest.json", "equipment_dissolve.json", "item_sale.json",
-])
-
 const CATEGORY_SOURCES: readonly CategorySource[] = Object.freeze([
     { category: 1, definitionTable: "mission_regular.json", rewardTable: "mission_regular_reward.json", patternIndex: 0, startIndex: 25, endIndex: 26, targetProgressIndex: 1, firstRewardKindIndex: 5 },
     { category: 2, definitionTable: "mission_daily.json", rewardTable: "mission_daily_reward.json", patternIndex: 0, startIndex: 25, endIndex: 26, targetProgressIndex: 1, firstRewardKindIndex: 5 },
@@ -58,25 +40,6 @@ const CATEGORY_SOURCES: readonly CategorySource[] = Object.freeze([
     { category: 9, definitionTable: "mission_char_awake.json", rewardTable: "mission_char_awake_reward.json", patternIndex: 2, startIndex: 27, endIndex: 28, targetProgressIndex: 5, firstRewardKindIndex: 9, awake: true },
     { category: 10, definitionTable: "mission_weekly_def.json", rewardTable: "mission_weekly_reward.json", patternIndex: 0, startIndex: 25, endIndex: 26, targetProgressIndex: 1, firstRewardKindIndex: 5 },
 ])
-
-const bundledInfo = Object.freeze({
-    source: "bundled" as const,
-    assetVersion: "mission-catalog",
-    generatorVersion: 0,
-    releaseDigest: null,
-    contentDigest: "sha256:mission-catalog" as const,
-    multiBattleContentDigest: "sha256:mission-catalog" as const,
-})
-
-export const bundledMissionContentRepository: ReadonlyContentRepository = Object.freeze({
-    info: () => bundledInfo,
-    table<T>(tableName: string): T {
-        if (!BUNDLED_TABLE_NAMES.has(tableName)) {
-            throw new Error(`unsupported bundled mission table: ${tableName}`)
-        }
-        return require(`../../../assets/${tableName}`) as T
-    },
-})
 
 function asTable(value: unknown): RawTable | undefined {
     return value !== null && typeof value === "object" && !Array.isArray(value)

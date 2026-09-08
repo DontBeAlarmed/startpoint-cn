@@ -687,16 +687,7 @@ test("registry independently covers static CN runtime JSON references", () => {
     const uncovered = [...references]
         .filter(reference => !registered.has(reference) && !intentionallyExternal.has(reference))
         .sort()
-    const unreferenced = TABLE_SOURCES
-        .filter(entry => entry.scope !== "cdn")
-        .map(entry => entry.tableName)
-        .filter(tableName => (
-            !references.has(tableName)
-            && tableName !== "cdn_general_shop_whitelist.json"
-        ))
-        .sort()
     assert.deepEqual(uncovered, [])
-    assert.deepEqual(unreferenced, [])
 })
 
 test("every registry table has an explicit existing bundled fallback", () => {

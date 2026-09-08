@@ -1,4 +1,3 @@
-import { getRankDegree } from "../stamina"
 import {
     computeRegularQuestProgress,
     isRegularQuestMissionSupported,
@@ -27,10 +26,10 @@ const LIFETIME_PATTERNS = new Set([
     "total_ability_soul_use_count", "get_mvp",
 ])
 
-export function getRegularComputedMissionIds(): readonly number[] {
-    return Object.freeze(getMissionCatalog().getDefinitions(1)
+export function getRegularComputedMissionIds(catalog = getMissionCatalog()): readonly number[] {
+    return Object.freeze(catalog.getDefinitions(1)
         .filter(definition => LIFETIME_PATTERNS.has(definition.pattern)
-            || isRegularQuestMissionSupported(definition.missionId))
+            || isRegularQuestMissionSupported(definition.missionId, catalog))
         .map(definition => definition.missionId)
         .sort((left, right) => left - right))
 }
@@ -45,7 +44,7 @@ function computeLifetime(pattern: string, ctx: CategoryContext, dbProgress: numb
     if (pattern === "use_dash") return Math.max(dbProgress, ctx.player.totalDashes ?? 0)
     if (pattern === "single_battle_play") return Math.max(dbProgress, counters.singleClearCount)
     if (pattern === "use_power_flip") return Math.max(dbProgress, ctx.player.totalPowerflips ?? 0)
-    if (pattern === "user_rank") return Math.max(dbProgress, getRankDegree(ctx.player.rankPoint))
+    if (pattern === "user_rank") return Math.max(dbProgress, ctx.playerRankDegree ?? dbProgress)
     if (pattern === "total_login" || pattern === "special_total_login_2anv") {
         return Math.max(dbProgress, ctx.player.totalLoginDays ?? 0)
     }
@@ -53,7 +52,7 @@ function computeLifetime(pattern: string, ctx: CategoryContext, dbProgress: numb
     if (pattern === "multi_play_host") return Math.max(dbProgress, counters.multiHostClearCount)
     if (pattern === "multi_play_guest") return Math.max(dbProgress, counters.multiGuestClearCount)
     if (pattern === "use_skill") return Math.max(dbProgress, counters.skillUseCount)
-    if (pattern === "character_level") return Math.max(dbProgress, getRankDegree(ctx.player.rankPoint))
+    if (pattern === "character_level") return Math.max(dbProgress, ctx.playerRankDegree ?? dbProgress)
     if (pattern === "clear_episode") return Math.max(dbProgress, ctx.totalStories)
     if (pattern === "weak_point_attack") return Math.max(dbProgress, battleStats.weakPointAttackCount)
     if (pattern === "max_skill_chain") return Math.max(dbProgress, battleStats.skillChainMax)
@@ -136,7 +135,7 @@ export const RegularComputer: MissionComputer = {
     },
 
     compute(missionId: number, ctx: CategoryContext, dbProgress: number): number {
-        const pattern = (getMissionCatalog().getDefinition(ctx.category, missionId)?.pattern ?? "")
+        const pattern = ctx.missionPatterns?.get(missionId) ?? ""
         if (ctx.category === 1) {
             const questProgress = computeRegularQuestProgress(missionId, ctx)
             if (questProgress !== undefined) return Math.max(dbProgress, questProgress)

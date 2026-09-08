@@ -24,6 +24,7 @@ const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.c
 const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getDb } = require("../src/data/db")
+const { getContentSnapshot } = require("../src/content/runtime/content-snapshot")
 const catalogModule = require("../src/lib/mission/mission-catalog")
 const { MissionEvaluationSession } = require("../src/lib/mission/evaluation-session")
 const { CollectComputer } = require("../src/lib/mission/collect-progress")
@@ -119,28 +120,19 @@ test("malformed Catalog selector cannot load collected facts, write progress, or
     })
     const playerId = insertDefaultPlayerSync(account.id).id
     grantInventoryFixtureItemSync(playerId, 1, 100)
-    const baseCatalog = catalogModule.getMissionCatalog()
-    const baseDefinition = baseCatalog.getDefinition(4, 1500)
-    const malformedDefinition = Object.freeze({
-        ...baseDefinition,
-        row: Object.freeze(baseDefinition.row.map((value, index) => index === 14 ? true : value)),
-    })
-    const customCatalog = new Proxy(baseCatalog, {
-        get(target, property) {
-            if (property === "getDefinitions") {
-                return category => category === 4
-                    ? target.getDefinitions(4).map(definition =>
-                        definition.missionId === 1500 ? malformedDefinition : definition)
-                    : target.getDefinitions(category)
-            }
-            if (property === "getDefinition") {
-                return (category, missionId) => category === 4 && missionId === 1500
-                    ? malformedDefinition
-                    : target.getDefinition(category, missionId)
-            }
-            const value = Reflect.get(target, property, target)
-            return typeof value === "function" ? value.bind(target) : value
-        },
+    const baseRepository = getContentSnapshot().repository
+    const baseCollectDefinitions = baseRepository.table("mission_collect_item.json")
+    const collectDefinitions = {
+        ...baseCollectDefinitions,
+        1500: baseCollectDefinitions[1500].map((row, rowIndex) => rowIndex === 0
+            ? row.map((value, index) => index === 14 ? true : value)
+            : row),
+    }
+    const customCatalog = catalogModule.getMissionCatalog({
+        info: () => baseRepository.info(),
+        table: tableName => tableName === "mission_collect_item.json"
+            ? collectDefinitions
+            : baseRepository.table(tableName),
     })
     const originalGetMissionCatalog = catalogModule.getMissionCatalog
     const loads = []

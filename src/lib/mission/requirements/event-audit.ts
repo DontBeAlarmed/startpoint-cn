@@ -4,8 +4,7 @@ import {
     getEventCurrentStateRule,
     isEventCurrentStateMissionId,
 } from "../event-current-state-rules"
-import { getMissionCatalog, type MissionCatalog, type MissionMasterDefinition } from "../mission-catalog"
-import { matchesCurrentMissionComputerDefinition } from "./computer-compatibility"
+import type { MissionCatalog, MissionMasterDefinition } from "../mission-catalog"
 
 const HISTORICAL_SINGLE_CLEAR_MISSION_IDS = new Set([
     1213, 1214, 1215, 1221, 1222, 1300, 1303, 1304,
@@ -57,7 +56,6 @@ function isSafeDefinition(
     catalog: MissionCatalog,
     visiting: Set<number>,
 ): boolean {
-    if (!matchesCurrentMissionComputerDefinition(definition)) return false
     const { missionId, row, pattern } = definition
     if (getEventCurrentStateRule(
         definition,
@@ -141,10 +139,9 @@ function isExactPhaseRule(definition: MissionMasterDefinition): boolean {
 
 export function isExactEventBattleProducerDefinition(
     definition: MissionMasterDefinition,
-    catalog?: MissionCatalog,
+    catalog: MissionCatalog,
 ): boolean {
-    if (!matchesCurrentMissionComputerDefinition(definition)) return false
-    return isGeneratedMultiRule(catalog ?? getMissionCatalog(), definition)
+    return isGeneratedMultiRule(catalog, definition)
         || isExactClearRule(definition)
         || isExactPhaseRule(definition)
         || EXACT_STATISTICS_MISSION_IDS.has(definition.missionId)

@@ -9,6 +9,8 @@ import {
 import { deriveRegularStateFacts } from "./regular-state-facts"
 import type { MissionEvaluationSession } from "./evaluation-session"
 import type { CategoryContext, PlayerQuestProgressEntry } from "./types"
+import { parsePlayerRankContent } from "../player-rank-content"
+import { getRegularQuestRule } from "./regular-quest-facts"
 
 const EMPTY_DEGREE_BATTLE_STATS: DegreeBattleStats = Object.freeze({
     feverCount: 0,
@@ -109,14 +111,36 @@ export function buildRegularCategoryContextFromSession(
             : DEFAULT_CRAFT_POINT_ITEM_ID,
     })
 
+    const player = session.getFact({ kind: "player" })
+    const regularQuestRules = new Map(missionIds.flatMap(missionId => {
+        const definition = session.catalog.getDefinition(1, missionId)
+        if (!definition) return []
+        const rule = getRegularQuestRule(definition, session.catalog)
+        return rule ? [[missionId, rule] as const] : []
+    }))
+    const missionPatterns = new Map(missionIds.flatMap(missionId => {
+        const pattern = session.catalog.getDefinition(1, missionId)?.pattern
+        return pattern === undefined ? [] : [[missionId, pattern] as const]
+    }))
+    const needsPlayerRank = [...missionPatterns.values()].some(pattern =>
+        pattern === "user_rank" || pattern === "character_level")
+    const playerRankDegree = needsPlayerRank
+        ? parsePlayerRankContent(
+            getMissionCatalogContentTable(session.catalog, "cdndata/player_rank_full.json"),
+        ).getRankDegree(player.rankPoint)
+        : undefined
+
     return {
         category: 1,
         playerId: session.playerId,
-        player: session.getFact({ kind: "player" }),
+        player,
         questProgress: questSummary.questProgress,
         totalQuestClears: questSummary.totalQuestClears,
         totalStories: questSummary.totalStories,
         rankCounts: questSummary.rankCounts,
+        ...(playerRankDegree === undefined ? {} : { playerRankDegree }),
+        regularQuestRules,
+        missionPatterns,
         regularStats: {
             exRankSsCount: questSummary.exRankSsCount,
             degreeBattleStats: degreeKey

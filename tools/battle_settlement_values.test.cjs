@@ -5,6 +5,10 @@ require("ts-node/register/transpile-only")
 const assert = require("node:assert/strict")
 const test = require("node:test")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+test.after(restoreContentSnapshot)
+
 const {
     createBattleSettlementValuePlan,
 } = require("../src/lib/quest/finish/battle-settlement-values")
