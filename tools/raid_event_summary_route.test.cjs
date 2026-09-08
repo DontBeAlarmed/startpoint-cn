@@ -149,6 +149,33 @@ async function main() {
                 rushStateBefore,
                 "malformed reward catalog must not create default Rush state",
             )
+
+            const freshAccount = insertAccountSync({
+                appId: "wf_cn",
+                idpAlias: "",
+                idpCode: "test",
+                idpId: "raid-event-summary-route-fresh",
+                status: "normal",
+            })
+            const freshPlayerId = insertDefaultPlayerSync(freshAccount.id).id
+            getDb().prepare("INSERT INTO sessions (token, account_id, expires, type) VALUES (?, ?, ?, ?)")
+                .run("456", freshAccount.id, "2999-01-01T00:00:00.000Z", 2)
+            const freshRushStateBefore = getDb().prepare(
+                "SELECT COUNT(*) AS count FROM players_rush_events WHERE player_id = ? AND event_id = 4",
+            ).get(freshPlayerId).count
+            const freshMalformedResponse = await fastify.inject({
+                method: "POST",
+                url: "/summary",
+                payload: { viewer_id: 456, event_id: 4, api_count: 6 },
+            })
+            assert.equal(freshMalformedResponse.statusCode, 500)
+            assert.equal(
+                getDb().prepare(
+                    "SELECT COUNT(*) AS count FROM players_rush_events WHERE player_id = ? AND event_id = 4",
+                ).get(freshPlayerId).count,
+                freshRushStateBefore,
+                "a fresh player must not receive default Rush state before malformed catalog rejection",
+            )
         } finally {
             restoreMalformedContent()
         }

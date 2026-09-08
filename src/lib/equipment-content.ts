@@ -5,6 +5,9 @@ import {
 import { validateEquipmentContentTables } from "../content/validation/item-equipment-output"
 import type { EquipmentCraftEntry, EquipmentDissolveEntry } from "./types"
 
+const MIN_EQUIPMENT_RARITY = 1
+const MAX_EQUIPMENT_RARITY = 5
+
 export interface EquipmentLookupEntry {
     readonly name: string
     readonly rarity: string
@@ -66,6 +69,10 @@ export function getEquipmentRaritySync(
 }
 
 export function getEquipmentCraftSync(rarity: number): EquipmentCraftEntry | null {
-    const normalizedRarity = Math.max(1, Math.min(5, rarity))
-    return getEquipmentContentCatalog().craftByRarity[String(normalizedRarity)] ?? null
+    if (!Number.isInteger(rarity)
+        || rarity < MIN_EQUIPMENT_RARITY
+        || rarity > MAX_EQUIPMENT_RARITY) {
+        return null
+    }
+    return getEquipmentContentCatalog().craftByRarity[String(rarity)] ?? null
 }

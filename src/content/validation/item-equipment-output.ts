@@ -11,6 +11,9 @@ import {
     requireRecord,
 } from "./runtime-table"
 
+const MIN_EQUIPMENT_RARITY = 1
+const MAX_EQUIPMENT_RARITY = 5
+
 export interface ValidatedItemContentTables {
     readonly effects: Readonly<Record<string, unknown>>
     readonly ids: readonly number[]
@@ -142,6 +145,12 @@ export function validateEquipmentContentTables(input: {
             tableName,
             "equipment_craft rarity",
         )
+        if (rarity < MIN_EQUIPMENT_RARITY || rarity > MAX_EQUIPMENT_RARITY) {
+            invalidRuntimeTable(
+                tableName,
+                `equipment_craft rarity must be from ${MIN_EQUIPMENT_RARITY} through ${MAX_EQUIPMENT_RARITY}`,
+            )
+        }
         craftRarities.add(rarity)
         const row = requireRecord(raw, tableName, `equipment_craft[${rarityText}]`)
         for (const field of ["dissolve_craft", "awakening_craft", "dissolve_star"] as const) {
@@ -193,6 +202,12 @@ export function validateEquipmentContentTables(input: {
             tableName,
             `equipment_lookup[${idText}].rarity`,
         )
+        if (rarity < MIN_EQUIPMENT_RARITY || rarity > MAX_EQUIPMENT_RARITY) {
+            invalidRuntimeTable(
+                tableName,
+                `equipment rarity must be from ${MIN_EQUIPMENT_RARITY} through ${MAX_EQUIPMENT_RARITY}`,
+            )
+        }
         if (!craftRarities.has(rarity)) {
             invalidRuntimeTable(tableName, `equipment ${idText} references missing craft rarity ${rarity}`)
         }

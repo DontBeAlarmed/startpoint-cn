@@ -7,6 +7,7 @@ require("ts-node/register/transpile-only")
 
 const {
     getEquipmentContentCatalog,
+    getEquipmentCraftSync,
     getEquipmentRaritySync,
 } = require("../src/lib/equipment-content")
 const {
@@ -172,4 +173,32 @@ test("Equipment rarity policy resolves both equipment and sub-million namespaces
         },
     })
     assert.equal(getEquipmentRaritySync(100001, specialNamespace), 5)
+})
+
+test("Equipment rarity rejects unsupported domains and craft lookup fails closed", () => {
+    const unsupportedRarity = repository(1, {
+        "equipment_craft.json": {
+            "1": { dissolve_craft: 1, awakening_craft: 1, dissolve_star: 1 },
+            "5": { dissolve_craft: 5, awakening_craft: 5, dissolve_star: 5 },
+            "6": { dissolve_craft: 6, awakening_craft: 6, dissolve_star: 6 },
+        },
+        "equipment_ids.json": [6000001],
+        "equipment_dissolve.json": {
+            "6000001": {
+                ability_soul_id: 1,
+                obtain_source: 0,
+                generate_ability_soul: false,
+                max_level: 1,
+            },
+        },
+        "equipment_lookup.json": {
+            "6000001": { name: "越界装备", rarity: "6", category: "测试" },
+        },
+    })
+
+    assert.throws(
+        () => getEquipmentContentCatalog(unsupportedRarity),
+        /rarity must be from 1 through 5/i,
+    )
+    assert.equal(getEquipmentCraftSync(6), null)
 })
