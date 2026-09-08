@@ -1,5 +1,7 @@
 import { RewardType } from "./types"
 import { getContentSnapshot } from "../content/runtime/content-snapshot"
+import type { ReadonlyContentRepository } from "../content/runtime/content-snapshot"
+import { validateRewardCampaignTable } from "../content/converters/reward-campaign"
 
 export interface RewardCampaignEntry {
     readonly id: number
@@ -23,6 +25,19 @@ export interface RewardCampaignRates {
 }
 
 const DEFAULT_RATES: RewardCampaignRates = Object.freeze({ item: 1, exp: 1, mana: 1 })
+const campaignTables = new WeakMap<ReadonlyContentRepository, RewardCampaignTable>()
+
+export function getRewardCampaignTable(
+    repository: ReadonlyContentRepository = getContentSnapshot().repository,
+): RewardCampaignTable {
+    const cached = campaignTables.get(repository)
+    if (cached !== undefined) return cached
+    const table = validateRewardCampaignTable(
+        repository.table("reward_campaign.json"),
+    ) as RewardCampaignTable
+    campaignTables.set(repository, table)
+    return table
+}
 
 function questKeyParts(category: number, questId: number): number[] {
     if (category === 1 || category === 2 || category === 4) {
@@ -78,10 +93,7 @@ export function getRewardCampaignRates(
     questId: number,
     now: Date,
 ): RewardCampaignRates {
-    const campaigns = getContentSnapshot().repository.table<RewardCampaignTable>(
-        "reward_campaign.json",
-    )
-    return resolveRewardCampaignRates(campaigns, category, questId, now)
+    return resolveRewardCampaignRates(getRewardCampaignTable(), category, questId, now)
 }
 
 function eligibleRate(rewardType: RewardType, rates: RewardCampaignRates): number | null {

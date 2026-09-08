@@ -75,6 +75,14 @@ export function parsePlayerRankContent(table: unknown): PlayerRankContent {
 }
 
 const playerRankContentByRepository = new WeakMap<ReadonlyContentRepository, PlayerRankContent>()
+const multiRankLevelsByTable = new WeakMap<object, readonly Readonly<{
+    rank: number
+    threshold: number
+}>[]>()
+const multiRankLevelsByRepository = new WeakMap<
+    ReadonlyContentRepository,
+    readonly Readonly<{ rank: number; threshold: number }>[]
+>()
 
 export function getPlayerRankContent(
     repository: ReadonlyContentRepository = getContentSnapshot().repository,
@@ -88,14 +96,65 @@ export function getPlayerRankContent(
     return content
 }
 
-export function getPlayerRankLevel(rankPoint: number): number {
-    const playerRankTable = getContentSnapshot().repository.table<PlayerRankTable>(
-        "cdndata/player_rank.json",
+export function parseMultiPlayerRankLevels(table: unknown): readonly Readonly<{
+    rank: number
+    threshold: number
+}>[] {
+    if (!table || typeof table !== "object" || Array.isArray(table)) {
+        throw new TypeError("invalid multi player rank table")
+    }
+    const cached = multiRankLevelsByTable.get(table)
+    if (cached !== undefined) return cached
+    const levels = Object.entries(table as PlayerRankTable).map(([rankText, rows]) => {
+        if (!/^[1-9]\d*$/.test(rankText) || !Number.isSafeInteger(Number(rankText))) {
+            throw new TypeError(`invalid multi player rank: ${rankText}`)
+        }
+        if (!Array.isArray(rows) || rows.length !== 1
+            || !Array.isArray(rows[0]) || rows[0].length !== 3) {
+            throw new TypeError(`invalid multi player rank row: ${rankText}`)
+        }
+        const threshold = Number(rows[0][1])
+        if (!Number.isSafeInteger(threshold) || threshold < 0) {
+            throw new TypeError(`invalid multi player rank threshold: ${rankText}`)
+        }
+        return Object.freeze({ rank: Number(rankText), threshold })
+    }).sort((left, right) => left.rank - right.rank)
+    if (levels.length === 0) throw new TypeError("multi player rank table must not be empty")
+    let previousThreshold = -1
+    for (const level of levels) {
+        if (level.threshold <= previousThreshold) {
+            throw new TypeError("multi player rank thresholds must be strictly increasing")
+        }
+        previousThreshold = level.threshold
+    }
+    const frozen = Object.freeze(levels)
+    multiRankLevelsByTable.set(table, frozen)
+    return frozen
+}
+
+export function getMultiPlayerRankLevels(
+    repository: ReadonlyContentRepository = getContentSnapshot().repository,
+): readonly Readonly<{ rank: number; threshold: number }>[] {
+    const cached = multiRankLevelsByRepository.get(repository)
+    if (cached !== undefined) return cached
+    const levels = parseMultiPlayerRankLevels(
+        repository.table<PlayerRankTable>("cdndata/player_rank.json"),
     )
+    multiRankLevelsByRepository.set(repository, levels)
+    return levels
+}
+
+export function getPlayerRankLevel(
+    rankPoint: number,
+    repository: ReadonlyContentRepository = getContentSnapshot().repository,
+): number {
+    if (!Number.isSafeInteger(rankPoint) || rankPoint < 0) {
+        throw new TypeError("rankPoint must be a non-negative safe integer")
+    }
     let level = 1
-    for (const [rank, data] of Object.entries(playerRankTable)) {
-        const threshold = Number(data?.[0]?.[1])
-        if (Number.isFinite(threshold) && rankPoint >= threshold) level = Number(rank)
+    for (const entry of getMultiPlayerRankLevels(repository)) {
+        if (rankPoint >= entry.threshold) level = entry.rank
+        else break
     }
     return level
 }

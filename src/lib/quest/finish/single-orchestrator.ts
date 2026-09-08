@@ -32,6 +32,8 @@ import {
     type SingleSettlementWritesResult,
 } from "./single-settlement-writes"
 import { recordScoreRewardSettlement } from "../score-reward-settlement"
+import { getAdditionalRewardTable } from "../../additional-reward"
+import { getRewardCampaignTable } from "../../reward-campaign"
 
 export interface SingleFinishFailure {
     ok: false
@@ -146,6 +148,9 @@ export function settleSingleBattleQuest({
         questProgress: PlayerQuestProgress | null
     }
     try {
+        // Validate the complete reward Content closure before opening the write transaction.
+        getRewardCampaignTable()
+        getAdditionalRewardTable()
         transactionResult = runSingleFinishSettlementTransaction({
             playerId,
             memoryQuest: memoryActiveQuest,

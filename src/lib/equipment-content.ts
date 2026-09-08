@@ -1,8 +1,8 @@
-import { deepFreeze } from "../content/deep-freeze"
 import {
     getContentSnapshot,
     type ReadonlyContentRepository,
 } from "../content/runtime/content-snapshot"
+import { validateEquipmentContentTables } from "../content/validation/item-equipment-output"
 import type { EquipmentCraftEntry, EquipmentDissolveEntry } from "./types"
 
 export interface EquipmentLookupEntry {
@@ -23,12 +23,12 @@ const catalogs = new WeakMap<ReadonlyContentRepository, EquipmentContentCatalog>
 export function buildEquipmentContentCatalog(
     repository: ReadonlyContentRepository,
 ): EquipmentContentCatalog {
-    return deepFreeze({
+    return validateEquipmentContentTables({
         craftByRarity: repository.table("equipment_craft.json"),
         dissolveById: repository.table("equipment_dissolve.json"),
         ids: repository.table("equipment_ids.json"),
         lookup: repository.table("equipment_lookup.json"),
-    })
+    }) as EquipmentContentCatalog
 }
 
 export function getEquipmentContentCatalog(

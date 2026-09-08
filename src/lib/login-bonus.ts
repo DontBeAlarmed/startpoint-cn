@@ -9,6 +9,7 @@ import {
 import {
     selectActiveLoginBonusGroups,
     selectActiveNormalLoginBonusGroup,
+    validateLoginBonusCatalog,
     type LoginBonusCatalog,
     type LoginBonusEntry,
     type LoginBonusGroup,
@@ -39,7 +40,7 @@ export function getLoginBonusCatalog(
 ): LoginBonusCatalog {
     const cached = loginBonusCatalogByRepository.get(repository)
     if (cached !== undefined) return cached
-    const catalog = repository.table<LoginBonusCatalog>("login_bonus.json")
+    const catalog = validateLoginBonusCatalog(repository.table("login_bonus.json"))
     loginBonusCatalogByRepository.set(repository, catalog)
     return catalog
 }

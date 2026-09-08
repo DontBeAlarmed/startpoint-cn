@@ -9,6 +9,17 @@ const {
     installBundledGameplaySnapshot,
 } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 
+function raidOverallRewardRow(eventId) {
+    const row = Array(37).fill("")
+    row[0] = String(eventId)
+    row[2] = "0"
+    row[3] = "1"
+    row[7] = "0"
+    row[8] = "40001"
+    row[9] = "1"
+    return row
+}
+
 test("gameplay readers use the active Content snapshot instead of static bundled tables", t => {
     const restore = installBundledGameplaySnapshot({
         additionalTableNames: [
@@ -132,6 +143,9 @@ test("gameplay readers use the active Content snapshot instead of static bundled
             },
             "raid_event.json": {
                 "77": { requiredKillCount: 321 },
+            },
+            "raid_event_overall_reward.json": {
+                "77": [raidOverallRewardRow(77)],
             },
         },
     })

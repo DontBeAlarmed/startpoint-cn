@@ -1,5 +1,5 @@
 import { incrementPlayerCategoryMissionSync } from "../../data/domains/mission"
-import { getQuestContentTableSync } from "../quest-content"
+import { getScoreAttackEventIdForQuest, hasAdventEventQuest } from "../quest-content"
 import type { FinishContext } from "../quest/finish/types"
 import { getMissionCatalog, isMissionMasterDefinitionEnabledAt } from "./mission-catalog"
 const ACTIVE_DAILY_BATTLE_MISSION_IDS = new Set([
@@ -28,8 +28,7 @@ function matchesAdventEvent(
     questCategory: number,
     questId: number,
 ): boolean {
-    const adventQuestIds = Object.keys(getQuestContentTableSync("advent_event_quest.json"))
-    if (questCategory !== 7 || !adventQuestIds.includes(String(questId))) return false
+    if (questCategory !== 7 || !hasAdventEventQuest(questId)) return false
     const eventSelector = Number(row[8])
     return Number.isSafeInteger(eventSelector)
         && eventSelector > 0
@@ -62,12 +61,9 @@ function matchesScoreAttackDailyMission(
         || context.questCategory !== 27) return false
 
     const eventId = Number(row[8])
-    const quest = (getQuestContentTableSync(
-        "score_attack_event_quest.json",
-    ) as Record<string, { eventId?: number }>)[String(context.questId)]
     return Number.isSafeInteger(eventId)
         && eventId > 0
-        && quest?.eventId === eventId
+        && getScoreAttackEventIdForQuest(context.questId) === eventId
 }
 
 function matchesAnyBattleDailyMission(

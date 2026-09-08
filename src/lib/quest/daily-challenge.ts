@@ -1,5 +1,6 @@
 import { QuestCategory } from "../types"
 import { getContentSnapshot, type ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
+import { validateDailyChallengeContent } from "../../content/validation/quest-derived-output"
 
 export interface DailyChallengePointDefinition {
     readonly id: number
@@ -9,26 +10,32 @@ export interface DailyChallengePointDefinition {
 
 type DailyChallengePointLookupTable = Record<string, { maxPoint: number, isRecovery: boolean, name: string }>
 
-const definitionsByRepository = new WeakMap<ReadonlyContentRepository, readonly DailyChallengePointDefinition[]>()
-
-export function getDailyChallengePointDefinitions(): readonly DailyChallengePointDefinition[] {
-    const repository = getContentSnapshot().repository
-    const cached = definitionsByRepository.get(repository)
-    if (cached) return cached
-    const lookup = repository.table<DailyChallengePointLookupTable>("daily_challenge_point_lookup.json")
-    const definitions = Object.freeze(Object.entries(lookup).map(([idStr, data]) => ({
-        id: Number(idStr),
-        maxPoint: data.maxPoint,
-        isRecovery: data.isRecovery,
-    })))
-    definitionsByRepository.set(repository, definitions)
-    return definitions
+interface DailyChallengeCatalog {
+    readonly definitions: readonly DailyChallengePointDefinition[]
+    readonly eventPointMap: Readonly<Record<string, number>>
 }
 
-export function getEventChallengePointMap(): Record<string, number> {
-    return getContentSnapshot().repository.table<Record<string, number>>(
-        "event_challenge_point_map.json",
-    )
+const catalogs = new WeakMap<ReadonlyContentRepository, DailyChallengeCatalog>()
+
+export function getDailyChallengeCatalog(
+    repository: ReadonlyContentRepository = getContentSnapshot().repository,
+): DailyChallengeCatalog {
+    const cached = catalogs.get(repository)
+    if (cached !== undefined) return cached
+    const catalog = validateDailyChallengeContent({
+        lookup: repository.table("daily_challenge_point_lookup.json"),
+        eventPointMap: repository.table("event_challenge_point_map.json"),
+    }) as DailyChallengeCatalog
+    catalogs.set(repository, catalog)
+    return catalog
+}
+
+export function getDailyChallengePointDefinitions(): readonly DailyChallengePointDefinition[] {
+    return getDailyChallengeCatalog().definitions
+}
+
+export function getEventChallengePointMap(): Readonly<Record<string, number>> {
+    return getDailyChallengeCatalog().eventPointMap
 }
 
 export function getDailyChallengePointDefinition(

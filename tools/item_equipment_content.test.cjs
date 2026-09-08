@@ -15,7 +15,7 @@ const {
     createFrozenTestContentRepository,
 } = require("./helpers/content-snapshot-fixture.cjs")
 
-function repository(marker) {
+function repository(marker, tableOverrides = {}) {
     return createFrozenTestContentRepository({
         assetVersion: "same-version",
         tables: {
@@ -38,6 +38,7 @@ function repository(marker) {
             "equipment_lookup.json": {
                 "1000001": { name: `equipment-${marker}`, rarity: "1", category: "test" },
             },
+            ...tableOverrides,
         },
     })
 }
@@ -66,4 +67,87 @@ test("typed catalog construction fails closed when a required table is missing",
     const missing = createFrozenTestContentRepository({ tables: { "item_data.json": {} } })
     assert.throws(() => getItemContentCatalog(missing), /missing test content table/)
     assert.throws(() => getEquipmentContentCatalog(missing), /missing test content table/)
+})
+
+test("Item catalog rejects malformed roots, negative economics and relationship drift", () => {
+    assert.throws(
+        () => getItemContentCatalog(repository(1, { "item_sale.json": [] })),
+        /invalid item catalog content.*item_sale.*object/i,
+    )
+    assert.throws(
+        () => getItemContentCatalog(repository(1, {
+            "item_sale.json": { "1": { category: 1, sale_price: -100, sellable: true } },
+        })),
+        /sale_price.*non-negative/i,
+    )
+    assert.throws(
+        () => getItemContentCatalog(repository(1, { "item_lookup.json": {} })),
+        /item_lookup ids must exactly match/i,
+    )
+})
+
+test("Equipment catalog rejects malformed levels and missing craft relationships", () => {
+    assert.throws(
+        () => getEquipmentContentCatalog(repository(1, {
+            "equipment_dissolve.json": {
+                "1000001": {
+                    ability_soul_id: 1,
+                    obtain_source: 0,
+                    generate_ability_soul: true,
+                    max_level: "bad",
+                },
+            },
+        })),
+        /max_level.*positive safe integer/i,
+    )
+    assert.throws(
+        () => getEquipmentContentCatalog(repository(1, { "equipment_craft.json": {} })),
+        /equipment_craft must not be empty|missing craft rarity/i,
+    )
+    assert.throws(
+        () => getEquipmentContentCatalog(repository(1, { "equipment_dissolve.json": {} })),
+        /equipment_dissolve ids must exactly match/i,
+    )
+})
+
+test("Equipment rarity follows the ID prefix only for equipment namespaces", () => {
+    const specialNamespace = repository(1, {
+        "equipment_craft.json": {
+            "5": { dissolve_craft: 1, awakening_craft: 1, dissolve_star: 1 },
+        },
+        "equipment_ids.json": [100001],
+        "equipment_dissolve.json": {
+            "100001": {
+                ability_soul_id: 1,
+                obtain_source: 0,
+                generate_ability_soul: false,
+                max_level: 1,
+            },
+        },
+        "equipment_lookup.json": {
+            "100001": { name: "主线宝珠", rarity: "5", category: "主线宝珠" },
+        },
+    })
+    assert.doesNotThrow(() => getEquipmentContentCatalog(specialNamespace))
+
+    assert.throws(
+        () => getEquipmentContentCatalog(repository(1, {
+            "equipment_craft.json": {
+                "5": { dissolve_craft: 1, awakening_craft: 1, dissolve_star: 1 },
+            },
+            "equipment_lookup.json": {
+                "1000001": { name: "装备", rarity: "5", category: "剑" },
+            },
+            "equipment_ids.json": [1000001],
+            "equipment_dissolve.json": {
+                "1000001": {
+                    ability_soul_id: 1,
+                    obtain_source: 0,
+                    generate_ability_soul: false,
+                    max_level: 1,
+                },
+            },
+        })),
+        /rarity must match its id prefix/i,
+    )
 })

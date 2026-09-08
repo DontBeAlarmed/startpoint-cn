@@ -7,6 +7,7 @@ require("ts-node/register/transpile-only")
 
 const clearRewards = require("../assets/clear_reward.json")
 const itemInventoryPolicy = require("../assets/item_inventory_policy.json")
+const rewardCampaign = require("../assets/reward_campaign.json")
 const mainQuests = require("../assets/main_quest.json")
 const rushEventQuestFolders = require("../assets/rush_event_quest_folder.json")
 const {
@@ -18,6 +19,7 @@ const { getMaxStamina, getRankDegree } = require("../src/lib/stamina")
 const { getServerTime, realToVirtual } = require("../src/utils")
 const {
     MAIN_QUEST_ID,
+    noIncidentalAdditionalRewards,
     withSingleBattleHarness,
 } = require("./perf/single_battle_settlement_harness.cjs")
 
@@ -74,11 +76,7 @@ function rewardOverrides(clearReward, sPlusReward) {
         },
         "score_reward.json": {},
         "item_inventory_policy.json": itemPolicy,
-        "additional_reward_rules.json": {
-            groups: {},
-            collectItemRules: [],
-            bossPickupRules: [],
-        },
+        "additional_reward_rules.json": noIncidentalAdditionalRewards(),
         ...EMPTY_MISSION_OVERRIDES,
     }
 }
@@ -178,11 +176,7 @@ test("single finish sends unsellable Item overflow to Mail and publishes Mail To
 function noIncidentalRewardOverrides() {
     return {
         "score_reward.json": {},
-        "additional_reward_rules.json": {
-            groups: {},
-            collectItemRules: [],
-            bossPickupRules: [],
-        },
+        "additional_reward_rules.json": noIncidentalAdditionalRewards(),
         ...EMPTY_MISSION_OVERRIDES,
     }
 }
@@ -212,6 +206,32 @@ async function finishFirstClear(harness, playId, options) {
     assert.equal(response.statusCode, 200, JSON.stringify(response))
     return response.data
 }
+
+test("single finish rejects malformed Reward Campaign before any database write", async () => {
+    const malformedCampaign = structuredClone(rewardCampaign)
+    const campaignId = Object.keys(malformedCampaign)[0]
+    malformedCampaign[campaignId].rewardKind = 99
+    await withSingleBattleHarness("malformed-reward-campaign-no-write", async harness => {
+        const playId = "malformed-reward-campaign-no-write"
+        harness.insertActiveQuest(harness.createActiveQuest({ playId }))
+        const before = harness.snapshotState()
+        const response = await harness.post(
+            "finish",
+            harness.finishPayload({ characterId: 1, playId }),
+        )
+
+        assert.equal(response.statusCode, 500, JSON.stringify(response))
+        assert.deepEqual(harness.snapshotState(), before)
+    }, {
+        tableOverrides: {
+            ...rewardOverrides(
+                { name: "clear item", type: RewardType.ITEM, id: 920264, count: 1 },
+                { name: "S+ mana", type: RewardType.MANA, count: 1 },
+            ),
+            "reward_campaign.json": malformedCampaign,
+        },
+    })
+})
 
 test("single finish returns clear and S+ item rewards at their persisted absolute inventory", async () => {
     const clearItemId = 920261

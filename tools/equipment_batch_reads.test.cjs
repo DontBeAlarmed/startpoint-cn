@@ -17,7 +17,41 @@ const previousDataDirectory = process.env.DATA_DIR
 process.env.DATA_DIR = databaseDirectory
 
 const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
-    .installBundledGameplaySnapshot()
+    .installBundledGameplaySnapshot({
+        tableOverrides: {
+            "equipment_craft.json": {
+                "1": { dissolve_craft: 1, awakening_craft: 5, dissolve_star: 0 },
+                "2": { dissolve_craft: 2, awakening_craft: 10, dissolve_star: 0 },
+                "3": { dissolve_craft: 3, awakening_craft: 15, dissolve_star: 1 },
+            },
+            "equipment_dissolve.json": {
+                "1111001": {
+                    ability_soul_id: 1111001,
+                    obtain_source: 0,
+                    generate_ability_soul: false,
+                    max_level: 5,
+                },
+                "2222001": {
+                    ability_soul_id: 2222001,
+                    obtain_source: 0,
+                    generate_ability_soul: false,
+                    max_level: 5,
+                },
+                "3333001": {
+                    ability_soul_id: 3333001,
+                    obtain_source: 0,
+                    generate_ability_soul: true,
+                    max_level: 5,
+                },
+            },
+            "equipment_ids.json": [1111001, 2222001, 3333001],
+            "equipment_lookup.json": {
+                "1111001": { name: "测试装备A", rarity: "1", category: "未分类" },
+                "2222001": { name: "测试装备B", rarity: "2", category: "未分类" },
+                "3333001": { name: "无关测试装备", rarity: "3", category: "未分类" },
+            },
+        },
+    })
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const {

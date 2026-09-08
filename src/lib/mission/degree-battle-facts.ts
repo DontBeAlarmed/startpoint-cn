@@ -1,5 +1,8 @@
 import { incrementPlayerCategoryMissionSync } from "../../data/domains/mission"
-import { getQuestContentTableSync } from "../quest-content"
+import {
+    getAdventEventQuestIdsForEvent,
+    getBossBattleQuestIdsForFamilyStage,
+} from "../quest-content"
 import { getMissionCatalog, isMissionMasterDefinitionEnabledAt, MissionMasterDefinition } from "./mission-catalog"
 interface DegreeBattleFactContext {
     readonly playerId: number
@@ -33,8 +36,6 @@ export function getDegreeMvpMissionIds(): readonly number[] {
 
 function buildExactDegreeQuestClearRules(): readonly ExactDegreeQuestClearRule[] {
     const rules: ExactDegreeQuestClearRule[] = []
-    const bossBattleQuests = getQuestContentTableSync("boss_battle_quest.json")
-    const adventEventQuests = getQuestContentTableSync("advent_event_quest.json")
     for (const definition of getMissionCatalog().getDefinitions(5)) {
         if (Number(definition.row[3]) !== 23
             || definition.row[11] !== ""
@@ -46,10 +47,7 @@ function buildExactDegreeQuestClearRules(): readonly ExactDegreeQuestClearRule[]
             const stageGroup = Number(definition.row[10])
             if (!Number.isSafeInteger(family) || family <= 0
                 || !Number.isSafeInteger(stageGroup) || stageGroup <= 0) continue
-            const questIds = Object.keys(bossBattleQuests).map(Number).filter(questId => (
-                Math.floor(questId / 1_000_000) === family
-                && Math.floor(questId / 1_000) % 1_000 === stageGroup
-            ))
+            const questIds = getBossBattleQuestIdsForFamilyStage(family, stageGroup)
             if (questIds.length === 0) continue
             rules.push({
                 missionId: definition.missionId,
@@ -63,8 +61,7 @@ function buildExactDegreeQuestClearRules(): readonly ExactDegreeQuestClearRule[]
         if (rangeKind !== 5 || definition.row[10] !== "") continue
         const eventId = Number(definition.row[9])
         if (!Number.isSafeInteger(eventId) || eventId <= 0) continue
-        const questIds = Object.keys(adventEventQuests).map(Number)
-            .filter(questId => Math.floor(questId / 1_000) === eventId)
+        const questIds = getAdventEventQuestIdsForEvent(eventId)
         if (questIds.length === 0) continue
         rules.push({
             missionId: definition.missionId,

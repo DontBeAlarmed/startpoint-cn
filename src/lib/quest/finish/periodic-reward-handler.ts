@@ -96,11 +96,13 @@ export function settleActivityPeriodicRewardsSync(
         .find(entry => entry.id === pointId)?.point ?? 0
     if (availablePoint <= 0) return emptySettlement()
 
-    const selected = selectReward(getPeriodicRewardGroup(groupId) ?? {}, input.random ?? Math.random)
+    const rewards = getPeriodicRewardGroup(groupId)
+    if (rewards === undefined) throw new Error(`Missing periodic reward group ${groupId}`)
+    const selected = selectReward(rewards, input.random ?? Math.random)
     if (selected === null) return emptySettlement()
 
     const [index, reward] = selected
-    if (reward.kind !== 0) return emptySettlement()
+    if (reward.kind !== 0) throw new Error(`Unsupported periodic reward kind ${reward.kind}`)
     const remainingPoint = consumePeriodicRewardPointSync(input.playerId, pointId)
     if (remainingPoint === null) return emptySettlement()
     return withInventoryBatchContextWithinTransactionSync({

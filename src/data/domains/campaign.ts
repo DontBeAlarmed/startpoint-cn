@@ -8,17 +8,9 @@ import {
 } from "../types";
 import {
     getActivityPeriodicRewardPointDefinitions,
-    type PeriodicRewardPointDefinition,
 } from "../../lib/quest/periodic-reward-content";
 
 // ─── Periodic Reward Points ───
-
-function getActivityPeriodicRewardDefinitions(): ReadonlyMap<
-    number,
-    PeriodicRewardPointDefinition
-> {
-    return getActivityPeriodicRewardPointDefinitions()
-}
 
 function getStoredPlayerPeriodicRewardPointsSync(
     playerId: number,
@@ -39,14 +31,16 @@ export function ensureActivityPeriodicRewardPointsSync(playerId: number): void {
     INSERT OR IGNORE INTO players_periodic_reward_points (id, point, player_id)
     VALUES (?, ?, ?)
     `)
-    for (const [id, definition] of getActivityPeriodicRewardDefinitions()) {
+    for (const { id, definition } of getActivityPeriodicRewardPointDefinitions()) {
         if (existingIds.has(id)) continue
         insert.run(id, definition.recoveryPoint, playerId)
     }
 }
 
 export function recoverActivityPeriodicRewardPointsSync(playerId: number): void {
-    const definitions = getActivityPeriodicRewardDefinitions()
+    const definitions = new Map(getActivityPeriodicRewardPointDefinitions().map(
+        ({ id, definition }) => [id, definition] as const,
+    ))
     const existing = getStoredPlayerPeriodicRewardPointsSync(playerId)
     ensureActivityPeriodicRewardPointsSync(playerId)
     const update = getDb().prepare(`

@@ -1,6 +1,10 @@
 import { deepFreeze } from "../deep-freeze"
 import type { OrderedMapTextRow } from "../sync/ordered-map"
 import { parseCsvLine } from "./csv"
+import {
+    validateEquipmentContentTables,
+    validateItemContentTables,
+} from "../validation/item-equipment-output"
 
 const EQUIPMENT_PATH = "master/item/equipment.orderedmap"
 const EQUIPMENT_CRAFT_PATH = "master/item/equipment_craft_point_exchange.orderedmap"
@@ -405,8 +409,21 @@ export async function convertItemEquipmentTables(
     ])
     const equipment = convertEquipment(equipmentRows, compatibility)
     const items = convertItems(itemRows, convertItemBonusSelect(itemBonusSelectRows))
+    const equipmentCraft = convertEquipmentCraft(craftRows, dissolveRateRows)
+    validateItemContentTables({
+        effects: items.data,
+        ids: items.ids,
+        lookup: items.lookup,
+        sale: items.sale,
+    })
+    validateEquipmentContentTables({
+        craftByRarity: equipmentCraft,
+        dissolveById: equipment.dissolve,
+        ids: equipment.ids,
+        lookup: equipment.lookup,
+    })
     return deepFreeze({
-        "equipment_craft.json": convertEquipmentCraft(craftRows, dissolveRateRows),
+        "equipment_craft.json": equipmentCraft,
         "equipment_dissolve.json": equipment.dissolve,
         "equipment_ids.json": equipment.ids,
         "equipment_lookup.json": equipment.lookup,

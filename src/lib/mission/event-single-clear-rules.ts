@@ -1,4 +1,4 @@
-import { getQuestContentTableSync } from "../quest-content"
+import { hasChallengeDungeonQuest } from "../quest-content"
 import { MissionMasterDefinition, getMissionCatalog } from "./mission-catalog"
 export interface ExactEventSingleClearRule {
     readonly missionId: number
@@ -23,9 +23,6 @@ function parsePositiveIntegerList(value: unknown): number[] | null {
 
 function buildExactEventSingleClearRules(): readonly ExactEventSingleClearRule[] {
     const rules: ExactEventSingleClearRule[] = []
-    const challengeDungeonQuests = getQuestContentTableSync(
-        "challenge_dungeon_event_quest.json",
-    )
     for (const definition of getMissionCatalog().getDefinitions(3)) {
         if (!EXACT_SINGLE_CLEAR_MISSION_IDS.has(definition.missionId)
             || Number(definition.row[2]) !== 14
@@ -49,9 +46,7 @@ function buildExactEventSingleClearRules(): readonly ExactEventSingleClearRule[]
         const suffixes = parsePositiveIntegerList(definition.row[10])
         if (!Number.isSafeInteger(eventId) || eventId <= 0 || suffixes === null) continue
         const questIds = suffixes.map(suffix => eventId * 1000 + suffix)
-        if (questIds.some(questId => (
-            challengeDungeonQuests as Record<string, unknown>
-        )[String(questId)] === undefined)) continue
+        if (questIds.some(questId => !hasChallengeDungeonQuest(questId))) continue
         rules.push({
             missionId: definition.missionId,
             categories: [13],

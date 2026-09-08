@@ -55,7 +55,11 @@ interface BulkUpgradeBody {
 const wrightpieceItemId = () => getEquipmentCurrencyPolicySync().craftPointItemId
 
 // wrightpiece cost for each rank of weapon (awakening) — from CDN
-const getUpgradeCost = (rarity: number): number => getEquipmentCraftSync(rarity)?.awakening_craft ?? 25
+const getUpgradeCost = (rarity: number): number => {
+    const craft = getEquipmentCraftSync(rarity)
+    if (craft === null) throw new Error(`Missing equipment craft definition for rarity ${rarity}`)
+    return craft.awakening_craft
+}
 
 const routes = async (fastify: FastifyInstance) => {
 
@@ -84,7 +88,8 @@ const routes = async (fastify: FastifyInstance) => {
         if (!equipment) return reply.status(400).send({ "error": "Bad Request", "message": "Player does not own equipment." })
 
         const cdnInfo = getEquipmentDissolveSync(equipmentId)
-        const maxLevel = cdnInfo?.max_level ?? 5
+        if (cdnInfo === null) throw new Error(`Missing equipment definition ${equipmentId}`)
+        const maxLevel = cdnInfo.max_level
         const newLevel = equipment.level + upgradeCount
         if (newLevel > maxLevel) return reply.status(400).send({ "error": "Bad Request", "message": "Reached max awakening level." })
 
@@ -239,7 +244,8 @@ const routes = async (fastify: FastifyInstance) => {
             if (!equipment) continue
 
             const dissolveInfo = getEquipmentDissolveSync(equipmentId)
-            const maxLvl = dissolveInfo?.max_level ?? 5
+            if (dissolveInfo === null) throw new Error(`Missing equipment definition ${equipmentId}`)
+            const maxLvl = dissolveInfo.max_level
             const upgradeCount = Math.min(maxLvl - equipment.level, equipment.stack)
             if (upgradeCount <= 0) continue
 
@@ -250,7 +256,7 @@ const routes = async (fastify: FastifyInstance) => {
                 upgradeCount,
                 newLevel: equipment.level + upgradeCount,
                 newStack: equipment.stack - upgradeCount,
-                abilitySoulId: dissolveInfo?.generate_ability_soul
+                abilitySoulId: dissolveInfo.generate_ability_soul
                     ? dissolveInfo.ability_soul_id
                     : null,
             })

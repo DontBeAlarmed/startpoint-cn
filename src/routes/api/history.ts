@@ -4,7 +4,7 @@ import { getPlayerScoreAttackBattleHistorySync } from "../../data/domains/score-
 import { getPlayerPracticeBattleHistorySync } from "../../data/domains/practice-battle-history"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { getQuestContentTableSync } from "../../lib/quest-content";
+import { hasScoreAttackEvent } from "../../lib/quest-content";
 import { generateDataHeaders } from "../../utils";
 
 const routes = async (fastify: FastifyInstance) => {
@@ -86,8 +86,7 @@ const routes = async (fastify: FastifyInstance) => {
         if (playerId === null) return reply.status(400).send({
             error: "Bad Request", message: "No player bound to account."
         })
-        const eventExists = Object.values(getQuestContentTableSync("score_attack_event_quest.json"))
-            .some(quest => quest.eventId === eventId)
+        const eventExists = hasScoreAttackEvent(eventId)
         if (!eventExists) return reply.status(400).send({
             error: "Bad Request", message: "Score attack event doesn't exist."
         })

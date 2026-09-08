@@ -107,7 +107,7 @@ test("reward campaign converter rejects malformed recurrence and rates", async (
             0: 0, 1: "2024-07-11 12:00:00", 2: "2024-08-01 23:59:59",
             5: 0, 6: 0.5, 7: 0, 8: "(None)", 9: "(None)", 10: "(None)",
         })] }),
-        /rate.*at least 1/i,
+        /rate.*1 through 2/i,
     )
 })
 

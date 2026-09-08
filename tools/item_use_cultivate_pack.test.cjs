@@ -17,6 +17,9 @@ const previousDataDirectory = process.env.DATA_DIR
 process.env.DATA_DIR = databaseDirectory
 
 const bundledItemData = require("../assets/item_data.json")
+const bundledItemIds = require("../assets/item_ids.json")
+const bundledItemLookup = require("../assets/item_lookup.json")
+const bundledItemSale = require("../assets/item_sale.json")
 const bundledItemPolicy = structuredClone(require("../assets/item_inventory_policy.json"))
 for (const itemId of [4, 990003, 990004]) {
     bundledItemPolicy.byItemId[itemId] = {
@@ -28,21 +31,25 @@ const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snaps
     .installBundledGameplaySnapshot({
         tableOverrides: {
             "item_inventory_policy.json": bundledItemPolicy,
+            "item_ids.json": [...bundledItemIds, 990004, 990100],
+            "item_lookup.json": {
+                ...bundledItemLookup,
+                990004: "测试用自返还养成素材宝箱",
+                990100: "测试用体力比例回复道具",
+            },
+            "item_sale.json": {
+                ...bundledItemSale,
+                990004: { category: 0, sale_price: 0, sellable: false },
+                990100: { category: 0, sale_price: 0, sellable: false },
+            },
             "item_data.json": {
                 ...bundledItemData,
-                990001: { effectKind: 22, effectValue: 0, selectRewards: [] },
-                990002: { effectKind: 99, effectValue: 0 },
                 990100: { effectKind: 3, effectValue: 50 },
-                990003: {
-                    effectKind: 22,
-                    effectValue: 0,
-                    selectRewards: [{ itemId: 4, amount: 1 }],
-                },
                 990004: {
                     effectKind: 22,
                     effectValue: 0,
-                    selectRewards: Array.from({ length: 6 }, () => ({
-                        itemId: 990004,
+                    selectRewards: [990004, 4, 8, 12, 16, 45].map(itemId => ({
+                        itemId,
                         amount: 1,
                     })),
                 },
@@ -289,9 +296,6 @@ test("invalid cultivate pack requests reject without writes", async () => {
         ["non integer index", [{ id: 999102, number: 1, selectIndex: 1.5 }]],
         ["missing index", [{ id: 999102, number: 1 }]],
         ["missing effect", [{ id: 123456789, number: 1, selectIndex: 1 }]],
-        ["missing candidates", [{ id: 990001, number: 1, selectIndex: 1 }]],
-        ["unsupported effect", [{ id: 990002, number: 1, selectIndex: 1 }]],
-        ["short candidates", [{ id: 990003, number: 1, selectIndex: 2 }]],
         ["invalid id", [{ id: 0, number: 1, selectIndex: 1 }]],
         ["invalid number", [{ id: 999102, number: 0, selectIndex: 1 }]],
         ["non integer number", [{ id: 999102, number: 1.5, selectIndex: 1 }]],

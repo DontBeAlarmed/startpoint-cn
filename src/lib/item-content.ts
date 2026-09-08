@@ -1,8 +1,8 @@
-import { deepFreeze } from "../content/deep-freeze"
 import {
     getContentSnapshot,
     type ReadonlyContentRepository,
 } from "../content/runtime/content-snapshot"
+import { validateItemContentTables } from "../content/validation/item-equipment-output"
 import type { ItemSaleEntry } from "./types"
 
 export interface StaminaItemEffectEntry {
@@ -33,12 +33,12 @@ const catalogs = new WeakMap<ReadonlyContentRepository, ItemContentCatalog>()
 export function buildItemContentCatalog(
     repository: ReadonlyContentRepository,
 ): ItemContentCatalog {
-    return deepFreeze({
+    return validateItemContentTables({
         effects: repository.table("item_data.json"),
         ids: repository.table("item_ids.json"),
         lookup: repository.table("item_lookup.json"),
         sale: repository.table("item_sale.json"),
-    })
+    }) as ItemContentCatalog
 }
 
 export function getItemContentCatalog(

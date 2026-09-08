@@ -72,6 +72,7 @@ const QUEST_TABLE_NAMES = [
 ]
 const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
     "cdndata/player_rank_full.json",
+    "cdndata/player_rank.json",
     "mission_event_battle_rules.json",
     "mission_event_quest_map.json",
     "practice_quest.json",
@@ -92,6 +93,7 @@ const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
     "equipment_dissolve.json",
     "equipment_ids.json",
     "equipment_lookup.json",
+    "encyclopedia.json",
     "item_data.json",
     "item_ids.json",
     "item_inventory_policy.json",
@@ -114,6 +116,7 @@ const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
     "periodic_reward.json",
     "periodic_reward_point.json",
     "raid_event.json",
+    "raid_event_overall_reward.json",
     "reward_campaign.json",
     "stamina_campaign.json",
     "star_crumb_exchange.json",

@@ -1,5 +1,7 @@
 import { calculateScoreRewardAmount, type RewardCampaignRates } from "./reward-campaign"
 import { getContentSnapshot } from "../content/runtime/content-snapshot"
+import type { ReadonlyContentRepository } from "../content/runtime/content-snapshot"
+import { validateAdditionalRewardTable } from "../content/validation/additional-reward-output"
 import type { DropScoreRewardId, PlayerRewardResult, Reward } from "./types"
 import { RewardType } from "./types"
 
@@ -8,10 +10,18 @@ import { RewardType } from "./types"
  * settlements consume the same table; their transaction lifecycles stay
  * independent.
  */
-export function getAdditionalRewardTable(): AdditionalRewardTable {
-    return getContentSnapshot().repository.table<AdditionalRewardTable>(
-        "additional_reward_rules.json",
-    )
+const tables = new WeakMap<ReadonlyContentRepository, AdditionalRewardTable>()
+
+export function getAdditionalRewardTable(
+    repository: ReadonlyContentRepository = getContentSnapshot().repository,
+): AdditionalRewardTable {
+    const cached = tables.get(repository)
+    if (cached !== undefined) return cached
+    const table = validateAdditionalRewardTable(
+        repository.table("additional_reward_rules.json"),
+    ) as unknown as AdditionalRewardTable
+    tables.set(repository, table)
+    return table
 }
 
 export interface AdditionalRewardCandidate {

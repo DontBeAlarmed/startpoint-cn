@@ -49,6 +49,122 @@ export interface LoginBonusConversionOutput {
     readonly "login_bonus.json": LoginBonusCatalog
 }
 
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
+function requireFiniteTimestamp(value: unknown, subject: string): number {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+        invalidLoginBonus(`${subject} must be finite`)
+    }
+    return value
+}
+
+function requireNullableTimestamp(value: unknown, subject: string): number | null {
+    return value === null ? null : requireFiniteTimestamp(value, subject)
+}
+
+/** Validates the generated wire catalog before converters or runtime readers expose it. */
+export function validateLoginBonusCatalog(raw: unknown): LoginBonusCatalog {
+    if (!isRecord(raw)) invalidLoginBonus("catalog root must be an object")
+    const catalog = raw as Readonly<Record<string, unknown>>
+    const groupIds = Object.keys(catalog)
+    if (groupIds.length === 0) invalidLoginBonus("no login bonus groups were found")
+    for (const groupId of groupIds) {
+        if (groupId.length === 0) invalidLoginBonus("group id must not be empty")
+        const rawGroup = catalog[groupId]
+        if (!isRecord(rawGroup)) invalidLoginBonus(`${groupId} must be an object`)
+        const group = rawGroup as Readonly<Record<string, unknown>>
+        if (!LOGIN_BONUS_GROUP_TYPES.includes(group.groupType as LoginBonusGroupType)) {
+            invalidLoginBonus(`${groupId}.groupType is invalid: ${String(group.groupType)}`)
+        }
+        const availableFromMs = requireFiniteTimestamp(
+            group.availableFromMs,
+            `${groupId}.availableFromMs`,
+        )
+        const availableUntilMs = requireNullableTimestamp(
+            group.availableUntilMs,
+            `${groupId}.availableUntilMs`,
+        )
+        if (availableUntilMs !== null && availableUntilMs < availableFromMs) {
+            invalidLoginBonus(`${groupId} availability period is inverted`)
+        }
+        const conditionFrom = requireNullableTimestamp(
+            group.conditionPeriodFromMs,
+            `${groupId}.conditionPeriodFromMs`,
+        )
+        const conditionUntil = requireNullableTimestamp(
+            group.conditionPeriodUntilMs,
+            `${groupId}.conditionPeriodUntilMs`,
+        )
+        if ((conditionFrom === null) !== (conditionUntil === null)
+            || (conditionFrom !== null && conditionUntil !== null && conditionUntil < conditionFrom)) {
+            invalidLoginBonus(`${groupId} comeback condition period is invalid`)
+        }
+        if (group.comebackInactivityDays !== null
+            && (!Number.isSafeInteger(group.comebackInactivityDays)
+                || (group.comebackInactivityDays as number) <= 0)) {
+            invalidLoginBonus(`${groupId}.comebackInactivityDays must be null or positive`)
+        }
+        if (group.linkedComebackGroupId !== null
+            && (typeof group.linkedComebackGroupId !== "string"
+                || group.linkedComebackGroupId.length === 0)) {
+            invalidLoginBonus(`${groupId}.linkedComebackGroupId must be null or non-empty`)
+        }
+        if (group.includeBeginner !== null && typeof group.includeBeginner !== "boolean") {
+            invalidLoginBonus(`${groupId}.includeBeginner must be null or boolean`)
+        }
+        if (!Array.isArray(group.entries) || group.entries.length === 0) {
+            invalidLoginBonus(`${groupId}.entries must be a non-empty array`)
+        }
+        group.entries.forEach((rawEntry, offset) => {
+            if (!isRecord(rawEntry)) invalidLoginBonus(`${groupId}.entries[${offset}] is invalid`)
+            const entry = rawEntry as Readonly<Record<string, unknown>>
+            if (entry.index !== offset + 1) {
+                invalidLoginBonus(`${groupId} indices must start at 1 and be contiguous`)
+            }
+            if (!Array.isArray(entry.rewards) || entry.rewards.length === 0) {
+                invalidLoginBonus(`${groupId}[${offset + 1}] has no rewards`)
+            }
+            entry.rewards.forEach((rawReward, rewardOffset) => {
+                if (!isRecord(rawReward)) {
+                    invalidLoginBonus(`${groupId}[${offset + 1}].reward[${rewardOffset}] is invalid`)
+                }
+                const reward = rawReward as Readonly<Record<string, unknown>>
+                if (!Number.isSafeInteger(reward.kind)
+                    || (reward.kind as number) < 0
+                    || (reward.kind as number) > 4) {
+                    invalidLoginBonus(`${groupId}[${offset + 1}].reward[${rewardOffset}].kind is invalid`)
+                }
+                if (!Number.isSafeInteger(reward.count) || (reward.count as number) <= 0) {
+                    invalidLoginBonus(`${groupId}[${offset + 1}].reward[${rewardOffset}].count must be positive`)
+                }
+                const kind = reward.kind as number
+                if ((kind === 1 || kind === 2)
+                    && (!Number.isSafeInteger(reward.id) || (reward.id as number) <= 0)) {
+                    invalidLoginBonus(`${groupId}[${offset + 1}].reward[${rewardOffset}].id must be positive`)
+                }
+                if (kind === 2 && reward.count !== 1) {
+                    invalidLoginBonus(`${groupId}[${offset + 1}].character count must be exactly 1`)
+                }
+            })
+        })
+    }
+    for (const [groupId, rawGroup] of Object.entries(catalog)) {
+        const group = rawGroup as Readonly<Record<string, unknown>>
+        const linked = group.linkedComebackGroupId
+        if (linked === null) continue
+        if (linked === groupId) continue
+        const linkedGroup = catalog[linked as string]
+        if (!isRecord(linkedGroup)
+            || !["Comeback", "ComebackCn", "ComebackJp"]
+                .includes(String(linkedGroup.groupType))) {
+            invalidLoginBonus(`${groupId} references an invalid comeback group: ${String(linked)}`)
+        }
+    }
+    return deepFreeze(catalog) as LoginBonusCatalog
+}
+
 function invalidLoginBonus(reason: string): never {
     throw new Error(`invalid login bonus content: ${reason}`)
 }
@@ -260,8 +376,7 @@ export function convertLoginBonusTree(tree: CsvOrderedMapTree): LoginBonusCatalo
         if (groupId.length === 0) invalidLoginBonus("group id must not be empty")
         output[groupId] = convertGroup(groupId, requireGroupTree(groupId, tree[groupId]))
     }
-    if (Object.keys(output).length === 0) invalidLoginBonus("no login bonus groups were found")
-    return deepFreeze(output)
+    return validateLoginBonusCatalog(output)
 }
 
 export async function convertLoginBonuses(

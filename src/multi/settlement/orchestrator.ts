@@ -31,6 +31,8 @@ import {
 } from "../../lib/quest/entry-lifecycle"
 import { resolveQuestRewardEligibility } from "../../lib/quest/first-clear-reward"
 import { settleActivityPeriodicRewardsSync } from "../../lib/quest/finish/periodic-reward-handler"
+import { getPeriodicRewardCatalog } from "../../lib/quest/periodic-reward-content"
+import { getRewardCampaignTable } from "../../lib/reward-campaign"
 import type { FinishContext } from "../../lib/quest/finish/types"
 import { resolveHostFinished } from "../../lib/quest/host-finish"
 import { validateMultiFinishRequest, type ValidatedMultiFinish } from "../../lib/quest/multi-battle-validation"
@@ -193,6 +195,10 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
 
     const useBoostPoint = activeQuest.useBoostPoint || activeQuest.useBossBoostPoint
     const questAccomplished = body.is_accomplished
+    // Validate the complete reward Content closure before opening the write transaction.
+    getRewardCampaignTable()
+    getAdditionalRewardTable()
+    getPeriodicRewardCatalog()
     const leaderId = (finishValidation.statistics as any).party?.characters?.[0]?.id
     const bodyPartyStatistics = (finishValidation.statistics as any).party
         || { characters: [], unison_characters: [] }

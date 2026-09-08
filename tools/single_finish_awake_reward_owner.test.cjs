@@ -15,6 +15,7 @@ const {
 } = require("./helpers/awake-reward-owner-fixture.cjs")
 const {
     MAIN_QUEST_ID,
+    noIncidentalAdditionalRewards,
     withSingleBattleHarness,
 } = require("./perf/single_battle_settlement_harness.cjs")
 
@@ -67,11 +68,7 @@ function tableOverrides() {
         },
         "score_reward.json": {},
         "item_inventory_policy.json": itemPolicy,
-        "additional_reward_rules.json": {
-            groups: {},
-            collectItemRules: [],
-            bossPickupRules: [],
-        },
+        "additional_reward_rules.json": noIncidentalAdditionalRewards(),
         "mission_char_awake_reward.json": awakeRewardTable({ multipleStages: true }),
     }
 }

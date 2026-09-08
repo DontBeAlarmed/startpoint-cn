@@ -54,16 +54,15 @@ restoreSnapshot = require("./helpers/content-snapshot-fixture.cjs")
             // C5-Admin moved the login bonus catalog to a strict typed read;
             // the previous stub never served it (bundled fallback existed).
             "login_bonus.json": require("../assets/login_bonus.json"),
-            // The previous inline stub answered every unlisted table with an
-            // empty object; keep that exact behavior for tolerant readers.
-            "daily_challenge_point_lookup.json": {},
-            "event_challenge_point_map.json": {},
-            "quest_entry_costs.json": {},
-            "quest_unlock_costs.json": {},
-            "hard_multi_event.json": {},
-            "hard_multi_event_quest.json": {},
-            "periodic_reward.json": {},
-            "periodic_reward_point.json": {},
+            // Player creation now consumes these strict runtime catalogs.
+            "daily_challenge_point_lookup.json": require("../assets/daily_challenge_point_lookup.json"),
+            "event_challenge_point_map.json": require("../assets/event_challenge_point_map.json"),
+            "quest_entry_costs.json": require("../assets/quest_entry_costs.json"),
+            "quest_unlock_costs.json": require("../assets/quest_unlock_costs.json"),
+            "hard_multi_event.json": require("../assets/hard_multi_event.json"),
+            "hard_multi_event_quest.json": require("../assets/hard_multi_event_quest.json"),
+            "periodic_reward.json": require("../assets/periodic_reward.json"),
+            "periodic_reward_point.json": require("../assets/periodic_reward_point.json"),
             "mission_regular.json": {},
             "mission_daily.json": {},
             "mission_weekly_def.json": {},

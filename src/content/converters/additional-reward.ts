@@ -1,6 +1,8 @@
 import { deepFreeze } from "../deep-freeze"
+import { QUEST_CATEGORIES_BY_RANGE_KIND } from "../quest-range-shape"
 import type { NestedOrderedMapTextRows, OrderedMapTextRow } from "../sync/ordered-map"
 import { parseCsvLine } from "./csv"
+import { validateAdditionalRewardTable } from "../validation/additional-reward-output"
 
 export const ADDITIONAL_REWARD_PATHS = Object.freeze({
     groups: "master/reward/event/additional_reward.orderedmap",
@@ -14,11 +16,6 @@ export const ADDITIONAL_REWARD_PATHS = Object.freeze({
     bossPickupSchedules:
         "master/quest/boss_battle/boss_battle_multi_pickup_event_schedule.orderedmap",
 })
-
-const CATEGORY_BY_RANGE_KIND: readonly (readonly number[])[] = [
-    [1], [4], [2], [6], [14], [7], [10], [13], [11], [18], [19], [15],
-    [6, 14, 13, 20], [20], [21], [22], [23], [24], [25], [26], [27],
-]
 
 const CATEGORY_BY_REFERENCE_KIND: readonly number[] = [
     1, 4, 2, 6, 11, 10, 7, 13, 14, 18, 19, 20, 21, 22, 3, 23, 24, 25, 26, 27,
@@ -102,7 +99,7 @@ function parseQuestRange(fields: readonly string[], subject: string): {
     readonly keyQueries: readonly (readonly number[] | null)[]
 } {
     const kind = parseInteger(fields[1], `${subject}.kind`)
-    const categories = CATEGORY_BY_RANGE_KIND[kind]
+    const categories = QUEST_CATEGORIES_BY_RANGE_KIND[kind]
     if (categories === undefined) invalidAdditionalReward(`${subject}.kind is unsupported: ${kind}`)
     if (kind <= 2) {
         return {
@@ -325,6 +322,10 @@ export async function convertAdditionalRewards(
     }
 
     return deepFreeze({
-        "additional_reward_rules.json": { groups, collectItemRules, bossPickupRules },
+        "additional_reward_rules.json": validateAdditionalRewardTable({
+            groups,
+            collectItemRules,
+            bossPickupRules,
+        }),
     })
 }

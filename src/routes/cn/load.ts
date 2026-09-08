@@ -49,6 +49,7 @@ import {
     type LoginBonusSettlement,
 } from "../../lib/login-bonus";
 import { getGameTimeContext } from "../../runtime/time/game-time";
+import { getDailyChallengeCatalog } from "../../lib/quest/daily-challenge";
 import { settleScheduledResourcesSync } from "../../lib/scheduled-resource-settlement";
 import { settleEventTradeExpiryOnLoadSync } from "../../lib/event-trade-expiry-settlement";
 import { isGiftCodeEnabledSync } from "../../lib/gift-code/capability";
@@ -229,6 +230,9 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
         if (player === null) {
             return reply.status(500).send({ error: "Internal Server Error", message: "No player data." });
         }
+        // Damaged login/daily catalogs must fail before daily reset or validator writes.
+        const loginBonusCatalog = getLoginBonusCatalog()
+        getDailyChallengeCatalog()
 
         const gameTime = getGameTimeContext();
         const now = gameTime.virtualNow;
@@ -259,7 +263,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             virtualNowMs: now.getTime(),
             realNowMs: gameTime.realNowMs,
             dailyResetHour: options.dailyResetHour ?? 5,
-            catalog: getLoginBonusCatalog(),
+            catalog: loginBonusCatalog,
             previousLastLoginMs,
             isBeginner,
         });

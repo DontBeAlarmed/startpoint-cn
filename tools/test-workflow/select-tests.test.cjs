@@ -23,6 +23,26 @@ test("maps the D27 runtime index seam and fixtures to quick content", () => {
     ))
 })
 
+test("maps D27 strict Quest, Daily, Awake and Encyclopedia boundaries to focused groups", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest-entry-content.ts"]),
+        ["integration:party", "integration:quest", "integration:rules", "quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest/daily-challenge.ts"]),
+        ["admin", "integration:database", "integration:quest", "quick:content", "quick:quest"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/mission/awake-rule-catalog.ts"]),
+        ["integration:mission"],
+    )
+    for (const file of [
+        "src/lib/encyclopedia-content.ts",
+        "src/routes/api/encyclopedia.ts",
+        "tools/encyclopedia_content.test.cjs",
+    ]) assert.deepEqual(selectTestGroups([file]), ["quick:content"], file)
+})
+
 test("maps D27 Item and Equipment typed content to affected focused groups", () => {
     const expected = ["admin", "integration:quest", "integration:rules", "quick:content"]
     for (const file of [

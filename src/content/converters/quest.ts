@@ -1,5 +1,10 @@
 import { deepFreeze } from "../deep-freeze"
 import {
+    validateDailyChallengeContent,
+    validateQuestEntryCostTable,
+    validateQuestUnlockCostTable,
+} from "../validation/quest-derived-output"
+import {
     convertOrderedMapJson,
     type CsvOrderedMapTree,
 } from "./ordered-map-json"
@@ -803,7 +808,7 @@ export function buildQuestEntryCosts(
             output[key] = { itemId, itemCount, stamina }
         }
     }
-    return deepFreeze(output)
+    return validateQuestEntryCostTable(output)
 }
 
 export function buildQuestUnlockCosts(
@@ -843,7 +848,7 @@ export function buildQuestUnlockCosts(
             output[questId] = { itemIds, itemCounts }
         }
     }
-    return deepFreeze(output)
+    return validateQuestUnlockCostTable(output)
 }
 
 export function buildQuestLookup(
@@ -965,16 +970,22 @@ export async function convertQuests(
         reader.readDynamic(QUEST_AUXILIARY_SOURCES.soloTimeAttackEvent),
         reader.readDynamic(QUEST_AUXILIARY_SOURCES.practiceQuest),
     ])
+    const dailyChallengePointLookup = buildDailyChallengePointLookup(
+        convertOrderedMapJson(dailyChallengePoint, 1),
+    )
+    const eventChallengePointMap = buildEventChallengePointMap(
+        convertOrderedMapJson(expertSingleEvent, 1),
+        convertOrderedMapJson(soloTimeAttackEvent, 1),
+        questTrees["story_event_single_quest.json"],
+    )
+    validateDailyChallengeContent({
+        lookup: dailyChallengePointLookup,
+        eventPointMap: eventChallengePointMap,
+    })
     return deepFreeze({
         ...questTables,
-        "daily_challenge_point_lookup.json": buildDailyChallengePointLookup(
-            convertOrderedMapJson(dailyChallengePoint, 1),
-        ),
-        "event_challenge_point_map.json": buildEventChallengePointMap(
-            convertOrderedMapJson(expertSingleEvent, 1),
-            convertOrderedMapJson(soloTimeAttackEvent, 1),
-            questTrees["story_event_single_quest.json"],
-        ),
+        "daily_challenge_point_lookup.json": dailyChallengePointLookup,
+        "event_challenge_point_map.json": eventChallengePointMap,
         "quest_entry_costs.json": buildQuestEntryCosts(questTrees),
         "quest_lookup.json": buildQuestLookup(
             questTables,

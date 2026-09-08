@@ -1,4 +1,11 @@
-import { getContentSnapshot } from "../content/runtime/content-snapshot"
+import {
+    getContentSnapshot,
+    type ReadonlyContentRepository,
+} from "../content/runtime/content-snapshot"
+import {
+    validateQuestEntryCostTable,
+    validateQuestUnlockCostTable,
+} from "../content/validation/quest-derived-output"
 
 export interface QuestEntryCost {
     readonly itemId: number
@@ -14,12 +21,24 @@ export interface QuestUnlockCost {
 type EntryCostTable = Record<string, QuestEntryCost>
 type UnlockCostTable = Record<string, QuestUnlockCost>
 
-function getEntryCostTable(): EntryCostTable {
-    return getContentSnapshot().repository.table<EntryCostTable>("quest_entry_costs.json")
+interface QuestEntryContentCatalog {
+    readonly entries: Readonly<EntryCostTable>
+    readonly unlocks: Readonly<UnlockCostTable>
 }
 
-function getUnlockCostTable(): UnlockCostTable {
-    return getContentSnapshot().repository.table<UnlockCostTable>("quest_unlock_costs.json")
+const catalogs = new WeakMap<ReadonlyContentRepository, QuestEntryContentCatalog>()
+
+export function getQuestEntryContentCatalog(
+    repository: ReadonlyContentRepository = getContentSnapshot().repository,
+): QuestEntryContentCatalog {
+    const cached = catalogs.get(repository)
+    if (cached !== undefined) return cached
+    const catalog = Object.freeze({
+        entries: validateQuestEntryCostTable(repository.table("quest_entry_costs.json")),
+        unlocks: validateQuestUnlockCostTable(repository.table("quest_unlock_costs.json")),
+    }) as QuestEntryContentCatalog
+    catalogs.set(repository, catalog)
+    return catalog
 }
 
 /**
@@ -31,17 +50,17 @@ export function getQuestEntryCost(
     category: number,
     questId: number,
 ): QuestEntryCost | undefined {
-    return getEntryCostTable()[`${category}_${questId}`]
+    return getQuestEntryContentCatalog().entries[`${category}_${questId}`]
 }
 
 export function getQuestEntryCostByKey(
     questKey: string,
 ): QuestEntryCost | undefined {
-    return getEntryCostTable()[questKey]
+    return getQuestEntryContentCatalog().entries[questKey]
 }
 
 export function getQuestUnlockCost(
     questId: number,
 ): QuestUnlockCost | undefined {
-    return getUnlockCostTable()[String(questId)]
+    return getQuestEntryContentCatalog().unlocks[String(questId)]
 }

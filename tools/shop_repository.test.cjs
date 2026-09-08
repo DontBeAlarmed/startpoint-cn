@@ -72,7 +72,9 @@ test("shop typed catalog reads its runtime tables from one initialized snapshot"
             "item_data.json": Object.freeze({}),
             "item_ids.json": Object.freeze([70001]),
             "item_lookup.json": Object.freeze({ "70001": "活动代币" }),
-            "item_sale.json": Object.freeze({}),
+            "item_sale.json": Object.freeze({
+                "70001": Object.freeze({ category: 3, sale_price: 1, sellable: true }),
+            }),
         }),
     })
 

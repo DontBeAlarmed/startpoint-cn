@@ -4,6 +4,8 @@ require("ts-node/register/transpile-only")
 
 const assert = require("node:assert/strict")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
 const { buildFinishFollowInfo } = require("../src/lib/quest/finish/follow-info")
 
 async function main() {
@@ -33,8 +35,12 @@ async function main() {
 }
 
 main().then(
-    () => console.log("multi finish follow info tests passed"),
+    () => {
+        restoreContentSnapshot()
+        console.log("multi finish follow info tests passed")
+    },
     error => {
+        restoreContentSnapshot()
         console.error(error)
         process.exitCode = 1
     },

@@ -1,7 +1,7 @@
 import { Reward, RushEventFolders } from "./types"
 import { getRushCompatibilityEvent } from "./shop/rush-compatibility"
 import { getContentSnapshot } from "../content/runtime/content-snapshot"
-import { getQuestContentTableSync } from "./quest-content"
+import { getRushEventQuestRounds } from "./quest-content"
 import type { ScoreAttackBorderTier } from "./quest/finish/score-attack-handler"
 
 export class RushEventQuestConfigurationError extends Error {
@@ -33,15 +33,13 @@ export function getRushEventFolderMaxRoundSync(
         throw new RushEventQuestConfigurationError(eventId, folderId)
     }
 
-    const matchingQuests = Object.values(getQuestContentTableSync("rush_event_quest.json"))
-        .filter(quest => quest.rushEventId === eventId && quest.rushEventFolderId === folderId)
-    if (matchingQuests.length === 0) {
+    const rounds = getRushEventQuestRounds(eventId!, folderId!)
+    if (rounds.length === 0) {
         throw new RushEventQuestConfigurationError(eventId, folderId)
     }
 
     let maxRound = 0
-    for (const quest of matchingQuests) {
-        const round = quest.rushEventRound
+    for (const round of rounds) {
         if (!Number.isSafeInteger(round) || round! <= 0) {
             throw new RushEventQuestConfigurationError(eventId, folderId)
         }

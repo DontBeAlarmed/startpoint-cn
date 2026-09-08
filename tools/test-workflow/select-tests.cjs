@@ -589,6 +589,26 @@ const SOURCE_RULES = [
         groups: ["integration:mission", "integration:party", "integration:quest", "quick:content"],
     },
     {
+        pattern: /^src\/lib\/quest-entry-content\.ts$/,
+        groups: ["integration:party", "integration:quest", "integration:rules", "quick:content"],
+    },
+    {
+        pattern: /^src\/lib\/quest\/daily-challenge\.ts$/,
+        groups: ["admin", "integration:database", "integration:quest", "quick:content", "quick:quest"],
+    },
+    {
+        pattern: /^src\/lib\/mission\/awake-rule-catalog\.ts$/,
+        groups: ["integration:mission"],
+    },
+    {
+        pattern: /^(?:src\/lib\/encyclopedia-content\.ts|src\/routes\/api\/encyclopedia\.ts|tools\/encyclopedia_content\.test\.cjs)$/,
+        groups: ["quick:content"],
+    },
+    {
+        pattern: /^src\/content\/validation\/(?:runtime-table|item-equipment-output|quest-derived-output|additional-reward-output|periodic-reward-output)\.ts$/,
+        groups: ["quick:content"],
+    },
+    {
         pattern: /^src\/lib\/rescue-fragment-content\.ts$/,
         groups: ["integration:party", "quick:content"],
     },
@@ -813,7 +833,7 @@ const SOURCE_RULES = [
         groups: ["integration:database", "full"],
     },
     {
-        pattern: /^src\/routes\/(?!api\/(?:exchange|gift|news|singleBattleQuest)\.ts$|api\/gacha\/crazy-routes\.ts$|web_api\/)/,
+        pattern: /^src\/routes\/(?!api\/(?:encyclopedia|exchange|gift|news|singleBattleQuest)\.ts$|api\/gacha\/crazy-routes\.ts$|web_api\/)/,
         groups: ["full"],
     },
 ]

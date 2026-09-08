@@ -1,13 +1,14 @@
 import { deepFreeze } from "../deep-freeze"
+import {
+    hasValidQuestRangeShape,
+    QUEST_CATEGORIES_BY_RANGE_KIND,
+} from "../quest-range-shape"
 import type { OrderedMapTextRow } from "../sync/ordered-map"
 import { parseCsvLine } from "./csv"
 
 export const REWARD_CAMPAIGN_PATH = "master/campaign/reward_campaign.orderedmap"
-
-const CATEGORY_BY_QUEST_KIND: readonly (readonly number[])[] = [
-    [1], [4], [2], [6], [14], [7], [10], [13], [11], [18], [19], [15],
-    [6, 14, 13, 20], [20], [21], [22], [23], [24], [25], [26], [27],
-]
+// CN 1.8.1's final catalog contains only 1x–2x campaign rates.
+const MAX_REWARD_CAMPAIGN_RATE = 2
 
 export interface RewardCampaignSourceReader {
     read(logicalPath: string): Promise<readonly OrderedMapTextRow[]>
@@ -15,6 +16,76 @@ export interface RewardCampaignSourceReader {
 
 export interface RewardCampaignConversionOutput {
     readonly "reward_campaign.json": Readonly<Record<string, unknown>>
+}
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
+/** Validates the converted runtime shape so release readers share converter invariants. */
+export function validateRewardCampaignTable(
+    raw: unknown,
+): Readonly<Record<string, unknown>> {
+    if (!isRecord(raw)) invalidCampaign("catalog root must be an object")
+    const table = raw as Readonly<Record<string, unknown>>
+    if (Object.keys(table).length === 0) invalidCampaign("catalog must not be empty")
+    for (const [idText, rawEntry] of Object.entries(table)) {
+        if (!/^[1-9]\d*$/.test(idText)
+            || !Number.isSafeInteger(Number(idText))) {
+            invalidCampaign(`campaign key must be a canonical positive integer: ${idText}`)
+        }
+        if (!isRecord(rawEntry)) invalidCampaign(`campaign ${idText} must be an object`)
+        const entry = rawEntry as Readonly<Record<string, unknown>>
+        if (entry.id !== Number(idText)) invalidCampaign(`campaign ${idText} id does not match key`)
+        if (entry.repeatKind !== "once" && entry.repeatKind !== "weekly") {
+            invalidCampaign(`campaign ${idText} repeatKind is invalid`)
+        }
+        if (typeof entry.startAtMs !== "number" || !Number.isFinite(entry.startAtMs)
+            || typeof entry.endAtMs !== "number" || !Number.isFinite(entry.endAtMs)
+            || entry.endAtMs < entry.startAtMs) {
+            invalidCampaign(`campaign ${idText} period is invalid`)
+        }
+        if (!Number.isSafeInteger(entry.rewardKind)
+            || (entry.rewardKind as number) < 0
+            || (entry.rewardKind as number) > 2) {
+            invalidCampaign(`campaign ${idText} rewardKind is invalid`)
+        }
+        if (typeof entry.rate !== "number" || !Number.isFinite(entry.rate)
+            || entry.rate < 1 || entry.rate > MAX_REWARD_CAMPAIGN_RATE) {
+            invalidCampaign(`campaign ${idText} rate must be from 1 through ${MAX_REWARD_CAMPAIGN_RATE}`)
+        }
+        if (!Array.isArray(entry.categories) || entry.categories.length === 0
+            || entry.categories.some(category => !Number.isSafeInteger(category) || category <= 0)) {
+            invalidCampaign(`campaign ${idText} categories are invalid`)
+        }
+        if (!Array.isArray(entry.keyQueries)
+            || entry.keyQueries.some(query => query !== null && (
+                !Array.isArray(query)
+                || query.some(value => !Number.isSafeInteger(value) || value <= 0)
+                || new Set(query).size !== query.length
+            ))) {
+            invalidCampaign(`campaign ${idText} keyQueries are invalid`)
+        }
+        if (!hasValidQuestRangeShape(
+            entry.categories as readonly number[],
+            (entry.keyQueries as readonly unknown[]).length,
+        )) {
+            invalidCampaign(`campaign ${idText} quest range shape is invalid`)
+        }
+        if (entry.repeatKind === "weekly") {
+            if (!Number.isSafeInteger(entry.dayOfWeek)
+                || (entry.dayOfWeek as number) < 0
+                || (entry.dayOfWeek as number) > 6
+                || !Number.isSafeInteger(entry.resetTimeMs)
+                || (entry.resetTimeMs as number) < 0
+                || (entry.resetTimeMs as number) >= 24 * 60 * 60 * 1000) {
+                invalidCampaign(`campaign ${idText} weekly schedule is invalid`)
+            }
+        } else if (entry.dayOfWeek !== undefined || entry.resetTimeMs !== undefined) {
+            invalidCampaign(`campaign ${idText} once schedule has weekly fields`)
+        }
+    }
+    return deepFreeze(table)
 }
 
 function invalidCampaign(reason: string): never {
@@ -82,7 +153,7 @@ function questRange(fields: readonly string[], questKind: number): {
     categories: readonly number[]
     keyQueries: readonly (readonly number[] | null)[]
 } {
-    const categories = CATEGORY_BY_QUEST_KIND[questKind]
+    const categories = QUEST_CATEGORIES_BY_RANGE_KIND[questKind]
     if (categories === undefined) invalidCampaign(`quest kind is unsupported: ${questKind}`)
     if (questKind <= 2) {
         return {
@@ -135,7 +206,9 @@ export async function convertRewardCampaigns(
         const rewardKind = parseInteger(fields[5], `reward_campaign[${row.key}].rewardKind`)
         if (rewardKind < 0 || rewardKind > 2) invalidCampaign(`reward kind is unsupported: ${rewardKind}`)
         const rate = Number(fields[6])
-        if (!Number.isFinite(rate) || rate < 1) invalidCampaign("campaign rate must be at least 1")
+        if (!Number.isFinite(rate) || rate < 1 || rate > MAX_REWARD_CAMPAIGN_RATE) {
+            invalidCampaign(`campaign rate must be from 1 through ${MAX_REWARD_CAMPAIGN_RATE}`)
+        }
         const questKind = parseInteger(fields[7], `reward_campaign[${row.key}].questKind`)
         const range = questRange(fields, questKind)
         const repeat = repeatKind === 0
@@ -167,5 +240,5 @@ export async function convertRewardCampaigns(
             ...range,
         }
     }
-    return deepFreeze({ "reward_campaign.json": output })
+    return deepFreeze({ "reward_campaign.json": validateRewardCampaignTable(output) })
 }

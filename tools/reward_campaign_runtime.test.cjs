@@ -20,6 +20,7 @@ require.cache[contentSnapshotPath] = {
                         return {
                             1: {
                                 id: 1,
+                                repeatKind: "once",
                                 startAtMs: Date.parse("2024-07-01T00:00:00Z"),
                                 endAtMs: Date.parse("2024-07-31T23:59:59Z"),
                                 rewardKind: 0,
