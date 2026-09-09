@@ -78,6 +78,30 @@ assert.equal(
     "empty mission rewards must not shadow the serialized load equipment list",
 )
 
+const responseWithoutCommonKeys = { event_status: 1 }
+mergeMissionSettlementResponse(responseWithoutCommonKeys, {
+    missionInfo: [{ mission_category_id: 9, mission_id: 40, mission_reward_id: 4001 }],
+    userInfo: { free_mana: 2 },
+    itemList: { 5: 6 },
+    characterList: [{ character_id: 12, stack: 1 }],
+    equipmentList: [{ equipment_id: 22, level: 1, protection: false, enhancement_level: 0, stack: 0 }],
+    degreeIds: [41],
+}, 99)
+assert.deepEqual(responseWithoutCommonKeys, {
+    event_status: 1,
+    mission_info: [{ mission_category_id: 9, mission_id: 40, mission_reward_id: 4001 }],
+    user_info: { free_mana: 2 },
+    item_list: { 5: 6 },
+    character_list: [{ character_id: 12, stack: 1 }],
+    equipment_list: [{ equipment_id: 22, level: 1, protection: false, enhancement_level: 0, stack: 0 }],
+    degree_list: [{ viewer_id: 99, degree_id: 41 }],
+})
+assert.equal(
+    Object.hasOwn(responseWithoutCommonKeys, "mail_arrived"),
+    false,
+    "facade must not fabricate common keys the endpoint never published",
+)
+
 const responseSource = fs.readFileSync(
     path.join(__dirname, "../src/lib/mission/response.ts"),
     "utf8",
