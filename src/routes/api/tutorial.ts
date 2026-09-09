@@ -13,7 +13,9 @@ import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
 import { executeRewardGrantExecutionPlanAsTransactionOwnerSync } from "../../lib/reward-grant"
 import { createRewardGrantItemOverflowPolicy } from "../../lib/reward-grant-item-overflow"
-import { projectItemOverflowCommonResponse } from "../../lib/item-overflow"
+import { projectCharacterPatch } from "../../lib/common-response/entities"
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow/common-response"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders, getServerTime } from "../../utils";
 import { getGachaCatalog } from "../../lib/gacha-catalog";
@@ -94,9 +96,18 @@ function buildTutorialGachaReplayData(
     const character = getPlayerCharacterSync(playerId, characterId)
     return {
         "step": effectiveNextStep,
-        "user_info": {
-            "free_vmoney": player.freeVmoney,
-        },
+        ...mergeCommonResponseFragments([{
+            "user_info": {
+                "free_vmoney": player.freeVmoney,
+            },
+            "character_list": character === null
+                ? []
+                : [projectCharacterPatch(
+                    serializeTutorialReplayCharacter(viewerId, characterId, character),
+                )],
+            "item_list": {},
+            "mail_arrived": getMailArrivedSync(playerId),
+        }]),
         "gacha": {
             "draw": [{
                 "character_id": characterId,
@@ -110,12 +121,7 @@ function buildTutorialGachaReplayData(
                 "is_daily_first": false,
             }],
         },
-        "character_list": character === null
-            ? []
-            : [serializeTutorialReplayCharacter(viewerId, characterId, character)],
-        "item_list": {},
         "encyclopedia_info": [],
-        "mail_arrived": getMailArrivedSync(playerId),
         "start_time": getServerTime(),
     }
 }
@@ -130,19 +136,23 @@ function buildTutorialPresentReplayData(
 
     return {
         "step": effectiveNextStep,
-        "user_info": {
-            "free_vmoney": player.freeVmoney,
-        },
-        "character_list": character === null
-            ? []
-            : [serializeTutorialReplayCharacter(0, freeTutorialCharacterId, character)],
-        "item_list": {},
+        ...mergeCommonResponseFragments([{
+            "user_info": {
+                "free_vmoney": player.freeVmoney,
+            },
+            "character_list": character === null
+                ? []
+                : [projectCharacterPatch(
+                    serializeTutorialReplayCharacter(0, freeTutorialCharacterId, character),
+                )],
+            "item_list": {},
+            "mail_arrived": getMailArrivedSync(playerId),
+        }]),
         "encyclopedia_info": {
             [`1${freeTutorialCharacterId}01`]: {
                 "read": false,
             },
         },
-        "mail_arrived": getMailArrivedSync(playerId),
         "start_time": getServerTime(),
     }
 }

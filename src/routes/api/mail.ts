@@ -13,9 +13,13 @@ import {
     UnsupportedMailAttachmentError,
 } from "../../lib/mail-reward-grant";
 import {
-    projectItemOverflowCommonResponse,
-    type PlannedItemOverflowDisposition,
-} from "../../lib/item-overflow";
+    projectCharacterPatch,
+    projectEquipmentEntity,
+} from "../../lib/common-response/entities";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
+import type { CommonResponseFragment } from "../../lib/common-response/model";
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow/common-response";
+import type { PlannedItemOverflowDisposition } from "../../lib/item-overflow/disposition";
 
 interface IndexBody {
     api_count: number
@@ -208,22 +212,35 @@ const routes = async (fastify: FastifyInstance) => {
         const { equipmentList, itemList, userInfo, reconciledCharacterList } = settlement
 
         const totalCount = getPlayerMailCountSync(playerId)
-
+        const overMax = projectItemOverflowCommonResponse(
+            settlement.itemOverflowDispositions ?? [],
+        )
+        const fragment: CommonResponseFragment = {
+            mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
+            ...(overMax.length > 0 ? { over_max: overMax } : {}),
+            ...(reconciledCharacterList.length > 0
+                ? {
+                    character_list: reconciledCharacterList.map(
+                        character => projectCharacterPatch(character),
+                    ),
+                }
+                : {}),
+            ...(equipmentList.length > 0
+                ? {
+                    equipment_list: equipmentList.map(
+                        equipment => projectEquipmentEntity(equipment),
+                    ),
+                }
+                : {}),
+            ...(Object.keys(itemList).length > 0 ? { item_list: itemList } : {}),
+            ...(Object.keys(userInfo).length > 0 ? { user_info: userInfo } : {}),
+        }
         const responseData: Record<string, any> = {
             auto_sale_expired_mail: settlement.autoSaleExpiredMailCount > 0,
             dispose_expired_mail: false,
             total_count: totalCount,
-            mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
+            ...mergeCommonResponseFragments([fragment]),
         }
-        const overMax = projectItemOverflowCommonResponse(
-            settlement.itemOverflowDispositions ?? [],
-        )
-        if (overMax.length > 0) responseData.over_max = overMax
-
-        if (reconciledCharacterList.length > 0) responseData.character_list = reconciledCharacterList
-        if (equipmentList.length > 0) responseData.equipment_list = equipmentList
-        if (Object.keys(itemList).length > 0) responseData.item_list = itemList
-        if (Object.keys(userInfo).length > 0) responseData.user_info = userInfo
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -386,6 +403,27 @@ const routes = async (fastify: FastifyInstance) => {
             itemOverflowDispositions,
         } = settlement
 
+        const overMax = projectItemOverflowCommonResponse(itemOverflowDispositions)
+        const receiveAllFragment: CommonResponseFragment = {
+            mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
+            ...(reconciledCharacterList.length > 0
+                ? {
+                    character_list: reconciledCharacterList.map(
+                        character => projectCharacterPatch(character),
+                    ),
+                }
+                : {}),
+            ...(equipmentList.length > 0
+                ? {
+                    equipment_list: equipmentList.map(
+                        equipment => projectEquipmentEntity(equipment),
+                    ),
+                }
+                : {}),
+            ...(Object.keys(itemList).length > 0 ? { item_list: itemList } : {}),
+            ...(Object.keys(userInfo).length > 0 ? { user_info: userInfo } : {}),
+            ...(overMax.length > 0 ? { over_max: overMax } : {}),
+        }
         const responseData: Record<string, any> = {
             already_mail_count: alreadyCount,
             auto_sale_expired_mail_count: autoSaleExpiredMailCount,
@@ -396,15 +434,8 @@ const routes = async (fastify: FastifyInstance) => {
             max_overed_mail_count: blockedCount,
             outdated_mail_count: outdatedCount,
             total_count: getPlayerMailCountSync(playerId),
-            mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
+            ...mergeCommonResponseFragments([receiveAllFragment]),
         }
-
-        if (reconciledCharacterList.length > 0) responseData.character_list = reconciledCharacterList
-        if (equipmentList.length > 0) responseData.equipment_list = equipmentList
-        if (Object.keys(itemList).length > 0) responseData.item_list = itemList
-        if (Object.keys(userInfo).length > 0) responseData.user_info = userInfo
-        const overMax = projectItemOverflowCommonResponse(itemOverflowDispositions)
-        if (overMax.length > 0) responseData.over_max = overMax
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
