@@ -1,4 +1,7 @@
-import { projectItemOverflowCommonResponse } from "../item-overflow"
+import { projectCharacterPatch } from "../common-response/entities"
+import { mergeCommonResponseFragments } from "../common-response/merge"
+import type { CommonResponseFragment } from "../common-response/model"
+import { projectItemOverflowCommonResponse } from "../item-overflow/common-response"
 import type {
     CrazyGachaCandidateSuccess,
     CrazyGachaSaveSuccess,
@@ -17,11 +20,14 @@ export function projectCrazyGachaCandidateResponse(input: {
     readonly dataHeaders: Readonly<Record<string, unknown>>
     readonly result: CrazyGachaCandidateSuccess
 }): Record<string, unknown> {
+    const common = mergeCommonResponseFragments([{
+        item_list: input.result.ticketItemBalances,
+    }])
     return {
         data_headers: input.dataHeaders,
         data: {
+            ...common,
             draw: input.result.draw,
-            item_list: input.result.ticketItemBalances,
             gacha_info_list: [{
                 gacha_id: input.result.gachaId,
                 is_account_first: input.result.isAccountFirst,
@@ -50,18 +56,25 @@ export function projectCrazyGachaSelectResponse(input: {
     readonly postCommit: GachaPostCommitResult
 }): Record<string, unknown> {
     const overMax = projectItemOverflowCommonResponse(input.result.itemOverflowDispositions)
+    const fragment: CommonResponseFragment = {
+        character_list: input.postCommit.characterList.map(
+            character => projectCharacterPatch(character),
+        ),
+        item_list: input.result.rewardItems,
+        ...(input.result.playerAfter === undefined ? {} : {
+            user_info: {
+                free_mana: input.result.playerAfter.freeMana,
+                free_vmoney: input.result.playerAfter.freeVmoney,
+            },
+        }),
+        mail_arrived: input.result.mailArrived,
+        ...(overMax.length === 0 ? {} : { over_max: overMax }),
+    }
     return {
         data_headers: input.dataHeaders,
         data: {
-            character_list: input.postCommit.characterList,
-            item_list: input.result.rewardItems,
-            ...(input.result.playerAfter === undefined ? {} : { user_info: {
-                free_mana: input.result.playerAfter.freeMana,
-                free_vmoney: input.result.playerAfter.freeVmoney,
-            } }),
+            ...mergeCommonResponseFragments([fragment]),
             crazy_gacha_result_list: {},
-            mail_arrived: input.result.mailArrived,
-            ...(overMax.length === 0 ? {} : { over_max: overMax }),
         },
     }
 }
