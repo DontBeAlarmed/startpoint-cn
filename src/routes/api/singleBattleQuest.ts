@@ -28,6 +28,7 @@ import {
     settleMissionCategories,
 } from "../../lib/mission"
 import type { MissionSettlementResult } from "../../lib/mission"
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
 import { getDb } from "../../data/db"
 import {
     ActiveQuestAlreadyExistsError,
@@ -217,13 +218,15 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
         return reply.status(200).send({
             "data_headers": headers,
             "data": {
-                "user_info": {},
+                ...mergeCommonResponseFragments([{
+                    "user_info": {},
+                    "item_list": abortResult.itemList,
+                }]),
                 "category_id": resolvedIdentity.category,
                 "is_multi": "single",
                 "start_time": headers['servertime'],
                 "quest_name": "",
-                "item_list": abortResult.itemList
-            }
+            },
         })
     })
 
@@ -377,12 +380,14 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
 
         reply.header("content-type", "application/x-msgpack")
         const responseData: Record<string, any> = {
-                "user_info": {
-                    "last_main_quest_id": body.quest_id,
-                    "stamina": startResult.afterStamina,
-                    "stamina_heal_time": realToVirtual(startTime)
-                },
-                "item_list": buildStartEntryItemList(startResult),
+                ...mergeCommonResponseFragments([{
+                    "user_info": {
+                        "last_main_quest_id": body.quest_id,
+                        "stamina": startResult.afterStamina,
+                        "stamina_heal_time": realToVirtual(startTime)
+                    },
+                    "item_list": buildStartEntryItemList(startResult),
+                }]),
                 "category_id": body.category,
                 "is_multi": "single",
                 "start_time": dataHeaders['servertime'],

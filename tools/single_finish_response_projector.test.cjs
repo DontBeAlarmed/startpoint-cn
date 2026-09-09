@@ -1,6 +1,8 @@
 "use strict"
 
 const assert = require("node:assert/strict")
+const fs = require("node:fs")
+const path = require("node:path")
 const test = require("node:test")
 
 require("ts-node/register/transpile-only")
@@ -33,7 +35,13 @@ function rewardResult({ mana, vmoney, pool, characterId, equipmentId, itemId }) 
         user_info: { free_mana: mana, free_vmoney: vmoney, exp_pool: pool },
         character_list: [{ character_id: characterId }],
         joined_character_id_list: [characterId],
-        equipment_list: [{ equipment_id: equipmentId }],
+        equipment_list: [{
+            equipment_id: equipmentId,
+            protection: false,
+            level: 1,
+            enhancement_level: 0,
+            stack: 0,
+        }],
         items: { [itemId]: 1 },
     }
 }
@@ -70,7 +78,13 @@ test("projects the complete single finish success envelope without mutating its 
         carnivalRewardResult: {
             user_info: { free_mana: 5, free_vmoney: 5, exp_pool: 40 },
             item_list: { 306: 1 },
-            equipment_list: [{ equipment_id: 206 }],
+            equipment_list: [{
+                equipment_id: 206,
+                protection: false,
+                level: 1,
+                enhancement_level: 0,
+                stack: 0,
+            }],
             new_degree_ids: [66],
         },
         scoreAttackFinishResult: {
@@ -81,7 +95,7 @@ test("projects the complete single finish success envelope without mutating its 
             mana: 4, vmoney: 4, pool: 30, characterId: 104, equipmentId: 204, itemId: 304,
         }),
         itemList: { 301: 9, 501: 22 },
-        characterList: [{ character_id: 101, level: 9, mana_board_awake: { level: 1 } }],
+        characterList: [{ character_id: 101, mana_board_awake: { level: 1 } }],
         clearReward: rewardResult({
             mana: 1, vmoney: 1, pool: 10, characterId: 101, equipmentId: 201, itemId: 301,
         }),
@@ -91,7 +105,7 @@ test("projects the complete single finish success envelope without mutating its 
         missionSettlement: missionSettlement({
             missionId: 9001,
             itemCount: 11,
-            character: { character_id: 101, level: 10, mana_board_awake: { unlocked: true } },
+            character: { character_id: 101, stack: 3, mana_board_awake: { unlocked: true } },
             equipment: { equipment_id: 203, enhancement_level: 1 },
             degreeId: 71,
             freeMana: 111,
@@ -154,7 +168,7 @@ test("projects the complete single finish success envelope without mutating its 
             add_exp_list: { 101: 55 },
             character_list: [{
                 character_id: 101,
-                level: 10,
+                stack: 3,
                 mana_board_awake: { level: 2, unlocked: true },
             }],
             bond_token_status_list: { 101: { before: [], after: [] } },
@@ -174,12 +188,48 @@ test("projects the complete single finish success envelope without mutating its 
             drop_additional_reward_ids: [{ kind: 2, id: 701 }],
             drop_periodic_reward_ids: [],
             equipment_list: [
-                { equipment_id: 203, enhancement_level: 2 },
-                { equipment_id: 201 },
-                { equipment_id: 202 },
-                { equipment_id: 205 },
-                { equipment_id: 204 },
-                { equipment_id: 206 },
+                {
+                    equipment_id: 203,
+                    protection: false,
+                    level: 1,
+                    enhancement_level: 2,
+                    stack: 0,
+                },
+                {
+                    equipment_id: 201,
+                    protection: false,
+                    level: 1,
+                    enhancement_level: 0,
+                    stack: 0,
+                },
+                {
+                    equipment_id: 202,
+                    protection: false,
+                    level: 1,
+                    enhancement_level: 0,
+                    stack: 0,
+                },
+                {
+                    equipment_id: 205,
+                    protection: false,
+                    level: 1,
+                    enhancement_level: 0,
+                    stack: 0,
+                },
+                {
+                    equipment_id: 204,
+                    protection: false,
+                    level: 1,
+                    enhancement_level: 0,
+                    stack: 0,
+                },
+                {
+                    equipment_id: 206,
+                    protection: false,
+                    level: 1,
+                    enhancement_level: 0,
+                    stack: 0,
+                },
             ],
             category_id: 14,
             start_time: 1700000000,
@@ -205,4 +255,107 @@ test("projects the complete single finish success envelope without mutating its 
         },
     })
     assert.deepEqual(input, originalInput)
+})
+
+test("single finish projection applies the entity whitelist and canonical identity", () => {
+    const base = {
+        ok: true,
+        body: { viewer_id: 2468, category: 14, add_mana: 0 },
+        dailyChallengePointList: null,
+        scoreRewardsResult: {
+            user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
+            character_list: [],
+            joined_character_id_list: [],
+            equipment_list: [{
+                equipment_id: 203,
+                protection: false,
+                level: 1,
+                enhancement_level: 0,
+                stack: 0,
+            }],
+            items: {},
+            drop_score_reward_ids: [],
+            drop_rare_reward_ids: [],
+        },
+        additionalRewardSettlement: { dropAdditionalRewardIds: [], rewardResult: null },
+        rewardCharacterExpResult: {
+            exp_pool: 0,
+            add_exp_list: {},
+            character_list: [],
+            bond_token_status_list: {},
+        },
+        rushEventData: null,
+        rushEventRewardsResult: null,
+        raidEventData: null,
+        carnivalEventData: null,
+        carnivalRewardResult: null,
+        scoreAttackFinishResult: null,
+        scoreAttackRewardResult: null,
+        itemList: {},
+        characterList: [{ character_id: 101, stack: 2, junk_field: "leak" }],
+        clearReward: null,
+        sPlusClearReward: null,
+        missionSettlement: null,
+        awakeMissionSettlement: null,
+        activeMissionList: [],
+        fixedManaReward: 0,
+        fixedPoolExpReward: 0,
+        beforeRankPoint: 0,
+        clearRank: 4,
+        questProgress: null,
+    }
+    const player = {
+        freeMana: 1,
+        expPool: 2,
+        expPooledTime: 3,
+        freeVmoney: 4,
+        rankPoint: 5,
+        degreeId: 6,
+        stamina: 7,
+        staminaHealTime: 8,
+        boostPoint: 9,
+        bossBoostPoint: 10,
+    }
+    const response = projector.buildSingleFinishResponse({
+        result: base,
+        dataHeaders: { viewer_id: 2468, servertime: 1700000000 },
+        player,
+        mailArrived: false,
+    })
+    assert.deepEqual(response.data.character_list, [{ character_id: 101, stack: 2 }])
+    assert.throws(() => projector.buildSingleFinishResponse({
+        result: { ...base, characterList: [{ character_id: 0 }] },
+        dataHeaders: { viewer_id: 2468, servertime: 1700000000 },
+        player,
+        mailArrived: false,
+    }), TypeError)
+    assert.throws(() => projector.buildSingleFinishResponse({
+        result: {
+            ...base,
+            scoreRewardsResult: {
+                ...base.scoreRewardsResult,
+                equipment_list: [{ equipment_id: 203, stack: 0 }],
+            },
+            characterList: [],
+        },
+        dataHeaders: { viewer_id: 2468, servertime: 1700000000 },
+        player,
+        mailArrived: false,
+    }), TypeError)
+})
+
+test("single finish projector is dependency-free from DB, Content, and routes", () => {
+    const source = fs.readFileSync(
+        path.join(__dirname, "../src/lib/quest/finish/single-response-projector.ts"),
+        "utf8",
+    )
+    assert.doesNotMatch(
+        source,
+        /(?:from\s+["'][^"']*(?:\/data|\/content|\/routes)|require\([^)]*(?:\/data|\/content|\/routes))/i,
+    )
+    const loaded = Object.keys(require.cache)
+    assert.equal(
+        loaded.some(file => /\/src\/(data|content|routes)\//.test(file)),
+        false,
+    )
 })

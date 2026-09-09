@@ -1,6 +1,15 @@
-import { mergeMissionSettlementResponse } from "../../mission/response"
+import {
+    composeMissionSettlementResponse,
+    projectMissionSettlementFragment,
+} from "../../mission/response-fragment"
+import {
+    projectCharacterPatch,
+    projectEquipmentEntity,
+} from "../../common-response/entities"
+import { mergeCommonResponseFragments } from "../../common-response/merge"
+import type { CommonResponseFragment } from "../../common-response/model"
 import type { SingleFinishSuccess } from "./single-orchestrator"
-import { projectItemOverflowCommonResponse } from "../../item-overflow"
+import { projectItemOverflowCommonResponse } from "../../item-overflow/common-response"
 
 export interface SingleFinishResponseFinalPlayerProjection {
     readonly freeMana: number
@@ -49,7 +58,7 @@ type ScoreAttackEventData = NonNullable<
 export interface SingleFinishResponseData {
     user_info: SingleFinishResponseUserInfo
     add_exp_list: SingleFinishSuccess["rewardCharacterExpResult"]["add_exp_list"]
-    character_list: unknown[]
+    character_list: readonly unknown[]
     bond_token_status_list: SingleFinishSuccess["rewardCharacterExpResult"]["bond_token_status_list"]
     rewards: SingleFinishResponseRewards
     old_high_score: number
@@ -60,7 +69,7 @@ export interface SingleFinishResponseData {
     drop_rare_reward_ids: SingleFinishSuccess["scoreRewardsResult"]["drop_rare_reward_ids"]
     drop_additional_reward_ids: SingleFinishSuccess["additionalRewardSettlement"]["dropAdditionalRewardIds"]
     drop_periodic_reward_ids: unknown[]
-    equipment_list: unknown[]
+    equipment_list: readonly unknown[]
     category_id: number
     start_time: number
     is_multi: "single"
@@ -73,7 +82,7 @@ export interface SingleFinishResponseData {
     user_daily_challenge_point_list: unknown[]
     presigned_quest_category: unknown[]
     active_mission_list: SingleFinishSuccess["activeMissionList"]
-    mission_info: unknown[]
+    mission_info: readonly unknown[]
     degree_list: Array<{ viewer_id: number; degree_id: number }>
     mail_arrived: boolean
     over_max?: ReturnType<typeof projectItemOverflowCommonResponse>
@@ -125,8 +134,9 @@ export function buildSingleFinishResponse({
     } = result
     const scoreAttackEventData = scoreAttackFinishResult?.scoreAttackEvent ?? null
     const viewerId = body.viewer_id
+    const overMax = projectItemOverflowCommonResponse(result.itemOverflowDispositions ?? [])
 
-    const responseData: SingleFinishResponseData = {
+    const commonFragment: CommonResponseFragment = {
         "user_info": {
             "free_mana": player.freeMana,
             "exp_pool": player.expPool,
@@ -139,8 +149,34 @@ export function buildSingleFinishResponse({
             "boost_point": player.boostPoint,
             "boss_boost_point": player.bossBoostPoint,
         },
+        "character_list": characterList.map(
+            character => projectCharacterPatch(character),
+        ),
+        "equipment_list": [
+            ...scoreRewardsResult.equipment_list,
+            ...(clearReward?.equipment_list || []),
+            ...(sPlusClearReward?.equipment_list || []),
+            ...(rushEventRewardsResult?.equipment_list || []),
+            ...(scoreAttackRewardResult?.equipment_list ?? []),
+            ...(carnivalRewardResult?.equipment_list ?? []),
+        ].map(equipment => projectEquipmentEntity(equipment)),
+        "item_list": itemList,
+        "mission_info": [],
+        "mail_arrived": mailArrived,
+        ...(overMax.length > 0 ? { "over_max": overMax } : {}),
+    }
+
+    const common = mergeCommonResponseFragments([commonFragment])
+
+    const responseData: SingleFinishResponseData = {
+        "user_info": common.user_info as SingleFinishResponseUserInfo,
+        "character_list": common.character_list ?? [],
+        "equipment_list": common.equipment_list ?? [],
+        "item_list": common.item_list as SingleFinishSuccess["itemList"],
+        "mission_info": common.mission_info ?? [],
+        ...(Array.isArray(common.over_max) ? { "over_max": common.over_max } : {}),
+        "mail_arrived": mailArrived,
         "add_exp_list": rewardCharacterExpResult.add_exp_list,
-        "character_list": [...characterList],
         "bond_token_status_list": rewardCharacterExpResult.bond_token_status_list,
         "rewards": {
             "overflow_pool_exp": 0,
@@ -162,19 +198,10 @@ export function buildSingleFinishResponse({
         "drop_rare_reward_ids": scoreRewardsResult.drop_rare_reward_ids,
         "drop_additional_reward_ids": additionalRewardSettlement.dropAdditionalRewardIds,
         "drop_periodic_reward_ids": [],
-        "equipment_list": [
-            ...scoreRewardsResult.equipment_list,
-            ...(clearReward?.equipment_list || []),
-            ...(sPlusClearReward?.equipment_list || []),
-            ...(rushEventRewardsResult?.equipment_list || []),
-            ...(scoreAttackRewardResult?.equipment_list ?? []),
-            ...(carnivalRewardResult?.equipment_list ?? []),
-        ],
         "category_id": body.category,
         "start_time": dataHeaders.servertime,
         "is_multi": "single",
         "quest_name": "",
-        "item_list": itemList,
         "raid_event": raidEventData,
         "rush_event": rushEventData,
         "carnival_event": carnivalEventData,
@@ -182,29 +209,31 @@ export function buildSingleFinishResponse({
         "user_daily_challenge_point_list": dailyChallengePointList ?? [],
         "presigned_quest_category": [],
         "active_mission_list": activeMissionList,
-        "mission_info": [],
         "degree_list": [],
-        "mail_arrived": mailArrived,
     }
-    const overMax = projectItemOverflowCommonResponse(result.itemOverflowDispositions ?? [])
-    if (overMax.length > 0) responseData.over_max = overMax
-    // The legacy mission adapter mutates a dynamic response shape. Keep that
-    // conversion local so the projector's public input and output remain strict.
-    const missionResponseTarget = responseData as unknown as Parameters<
-        typeof mergeMissionSettlementResponse
-    >[0]
-    mergeMissionSettlementResponse(missionResponseTarget, {
-        ...missionSettlement,
-        itemList: {},
-        userInfo: undefined,
-        itemOverflowDispositions: [],
-    }, viewerId)
-    mergeMissionSettlementResponse(missionResponseTarget, {
-        ...awakeMissionSettlement,
-        itemList: {},
-        userInfo: undefined,
-        itemOverflowDispositions: [],
-    }, viewerId)
+    // The Mission composition adapter mutates a dynamic response shape. Keep
+    // that conversion local so the projector's public output stays strict.
+    const missionResponseTarget = responseData as unknown as Record<string, unknown>
+    composeMissionSettlementResponse(
+        missionResponseTarget,
+        projectMissionSettlementFragment({
+            ...missionSettlement,
+            itemList: {},
+            userInfo: undefined,
+            itemOverflowDispositions: [],
+        }),
+        viewerId,
+    )
+    composeMissionSettlementResponse(
+        missionResponseTarget,
+        projectMissionSettlementFragment({
+            ...awakeMissionSettlement,
+            itemList: {},
+            userInfo: undefined,
+            itemOverflowDispositions: [],
+        }),
+        viewerId,
+    )
 
     return {
         "data_headers": dataHeaders,
