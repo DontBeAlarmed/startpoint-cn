@@ -11,8 +11,8 @@ const data = {
     user_info: { free_mana: 10, rank_point: 20 },
     item_list: { 1: 5, 2: 7 },
     character_list: [
-        { character_id: 10, level: 2, mana_board_awake: { 1: 1 } },
-        { character_id: 11, level: 1 },
+        { character_id: 10, evolution_level: 2, mana_board_awake: { 1: 1 } },
+        { character_id: 11, evolution_level: 1 },
     ],
     equipment_list: [
         { equipment_id: 20, level: 1 },
@@ -26,8 +26,8 @@ mergeMissionSettlementResponse(data, {
     userInfo: { free_mana: 50, free_vmoney: 60 },
     itemList: { 1: 8, 3: 9 },
     characterList: [
-        { character_id: 10, level: 3, mana_board_awake: { 2: 1 } },
-        { character_id: 12, level: 1 },
+        { character_id: 10, evolution_level: 3, mana_board_awake: { 2: 1 } },
+        { character_id: 12, evolution_level: 1 },
     ],
     equipmentList: [
         { equipment_id: 20, level: 2 },
@@ -40,9 +40,9 @@ assert.deepEqual(data.mission_info.map(entry => entry.mission_id), [100, 6])
 assert.deepEqual(data.user_info, { free_mana: 50, rank_point: 20, free_vmoney: 60 })
 assert.deepEqual(data.item_list, { 1: 8, 2: 7, 3: 9 })
 assert.deepEqual(data.character_list, [
-    { character_id: 10, level: 3, mana_board_awake: { 1: 1, 2: 1 } },
-    { character_id: 11, level: 1 },
-    { character_id: 12, level: 1 },
+    { character_id: 10, evolution_level: 3, mana_board_awake: { 1: 1, 2: 1 } },
+    { character_id: 11, evolution_level: 1 },
+    { character_id: 12, evolution_level: 1 },
 ])
 assert.deepEqual(data.equipment_list, [
     { equipment_id: 20, level: 2 },
@@ -76,6 +76,21 @@ assert.equal(
     Object.hasOwn(loadDataWithoutIncrementalLists, "equipment_list"),
     false,
     "empty mission rewards must not shadow the serialized load equipment list",
+)
+
+const responseSource = fs.readFileSync(
+    path.join(__dirname, "../src/lib/mission/response.ts"),
+    "utf8",
+)
+assert.doesNotMatch(
+    responseSource,
+    /from\s+["'][^"']*(?:\/data|\/content|\/routes|mail|growth)/i,
+    "compatibility facade must remain a pure projection path",
+)
+assert.equal(
+    Object.keys(require.cache).some(file => /\/src\/(data|content|routes)\//.test(file)),
+    false,
+    "compatibility facade must not load database, content, or route owners",
 )
 
 const activeMissionSource = fs.readFileSync(

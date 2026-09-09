@@ -31,7 +31,10 @@ import {
 import { settleLoginFactMissions } from "../../lib/mission/login-fact-settlement";
 import { setCnMsgpackPendingEncoder } from "./msgpack";
 import { settleMissionCategories } from "../../lib/mission/settlement";
-import { mergeMissionSettlementResponse } from "../../lib/mission/response";
+import {
+    composeMissionSettlementResponse,
+    projectMissionSettlementFragment,
+} from "../../lib/mission/response-fragment";
 import { getFavoritePartyGroupListSync } from "../../lib/profileFavorite";
 import {
     isValidBattleSessionId,
@@ -473,9 +476,9 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
         setCnMsgpackPendingEncoder(reply, (payload, encoder) => (
             getDb().transaction(() => {
                 const loginMissionSettlement = settleLoginFactMissions(playerId, now)
-                mergeMissionSettlementResponse(
+                composeMissionSettlementResponse(
                     (payload as { data: Record<string, unknown> }).data,
-                    loginMissionSettlement,
+                    projectMissionSettlementFragment(loginMissionSettlement),
                     accountId,
                 )
                 const eventLoginMissionId = getEventLoginMissionId(now)
@@ -485,9 +488,9 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                         category: 3,
                         missionIds: [eventLoginMissionId],
                     }], now)
-                    mergeMissionSettlementResponse(
+                    composeMissionSettlementResponse(
                         (payload as { data: Record<string, unknown> }).data,
-                        eventLoginSettlement,
+                        projectMissionSettlementFragment(eventLoginSettlement),
                         accountId,
                     )
                 }
