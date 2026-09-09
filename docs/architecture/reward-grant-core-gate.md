@@ -401,7 +401,7 @@ D17 起点没有 RewardGrant 专属快照；现有 Mission、Awake、Single/Mult
 
 D17 建立独立 core admission：空 plan、单/重复/distinct Item、单 Character、同 Character 首获后连续重复、已拥有 Character 多次补偿、同 Equipment 多 entry、direct Item 与 Character compensation 命中同 Item、多资产、standalone/within/transaction-owner；计真实 SQL execution、事务/savepoint、executor 激活、typed result schema/hash 和结果大小。真实来源继续使用现有 focused/performance baseline，不能用 core 微测替代来源事务。
 
-跨域客户端 DTO 重复属于 DEBT-T07，必须留到 D28；D17 不以删除响应 fixture 为退出条件。
+跨域客户端 DTO 重复属于 DEBT-T07，必须留到 D28；D17 不以删除响应 fixture 为退出条件。（D28 已按此裁决以公共字段 characterization + 域内最小 adapter case 关闭 DEBT-T07，见 [Common Response Projector Gate](./common-response-projector-gate.md)。）
 
 ## 15. 实施顺序与退出
 
