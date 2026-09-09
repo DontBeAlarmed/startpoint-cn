@@ -14,6 +14,12 @@ import {
     characterGrowthProjectionStateFromPlayerCharacter,
     projectCharacterGrowthEntry,
 } from "./character-growth/response-projector"
+import {
+    computeManaBoardAwakeFromNodes,
+    mergeManaBoardAwakeMaps,
+} from "./character-mana-board-maps"
+
+export { computeManaBoardAwakeFromNodes, mergeManaBoardAwakeMaps }
 
 // ─── Response types ───
 
@@ -116,26 +122,6 @@ export function computeItemDeductions(
     return result
 }
 
-/** Merges mission-unlocked and persisted mana-board awake levels. */
-export function mergeManaBoardAwakeMaps(
-    ...maps: Map<string, Record<number, number>>[]
-): Map<string, Record<number, number>> {
-    const merged = new Map<string, Record<number, number>>()
-
-    for (const map of maps) {
-        for (const [characterId, boardLevels] of map) {
-            const current = merged.get(characterId) ?? {}
-            for (const [boardIndex, awakeLevel] of Object.entries(boardLevels)) {
-                const index = Number(boardIndex)
-                current[index] = Math.max(current[index] ?? 0, awakeLevel)
-            }
-            merged.set(characterId, current)
-        }
-    }
-
-    return merged
-}
-
 /** Builds the minimal common-response entries needed to refresh Awake unlocks. */
 export function buildManaBoardAwakeCharacterList(
     characters: Record<string, PlayerCharacter>,
@@ -230,23 +216,4 @@ export function sendCharacterResponse(
             ...endpointLocal,
         },
     })
-}
-
-// ─── Mana board awake level computation ───
-
-/** Computes persisted mana-board awake levels from node state. */
-export function computeManaBoardAwakeFromNodes(
-    characterManaNodeAwakeLevels: Record<string, Record<number, number>>
-): Map<string, Record<number, number>> {
-    const result = new Map<string, Record<number, number>>()
-    for (const [charId, nodeLevels] of Object.entries(characterManaNodeAwakeLevels)) {
-        let maxLevel = 0
-        for (const awakeLevel of Object.values(nodeLevels)) {
-            if (awakeLevel > maxLevel) maxLevel = awakeLevel
-        }
-        if (maxLevel > 0) {
-            result.set(charId, { 1: maxLevel })
-        }
-    }
-    return result
 }
