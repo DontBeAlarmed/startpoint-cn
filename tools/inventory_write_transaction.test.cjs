@@ -220,6 +220,19 @@ test("equipment upgrade atomically deducts the client-selected crystal and craft
         protection: false,
         stack: 0,
     })
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
+    assert.ok(Array.isArray(payload.data.equipment_list))
+    assert.ok(payload.data.equipment_list.every(entry => (
+        typeof entry.equipment_id === "number"
+        && typeof entry.protection === "boolean"
+        && typeof entry.level === "number"
+        && typeof entry.enhancement_level === "number"
+        && typeof entry.stack === "number"
+    )))
+    assert.ok(Array.isArray(payload.data.mission_info))
+    assert.ok(Array.isArray(payload.data.degree_list))
+    assert.equal("character_list" in payload.data, false)
+    assert.equal(typeof payload.data.mail_arrived, "boolean")
 })
 
 test("bulk_upgrade rolls equipment rewards and mission facts back on a late mission failure", async t => {

@@ -26,6 +26,9 @@ import { canUseEquipmentAwakeningCrystal } from "../../lib/equipment-upgrade";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { settleMissionOperationFactsSync } from "../../lib/mission/operation-fact-settlement";
 import { mergeMissionSettlementResponse } from "../../lib/mission";
+import { projectEquipmentEntity } from "../../lib/common-response/entities";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
+import type { CommonResponseFragment } from "../../lib/common-response/model";
 import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
 import { createRewardGrantItemOverflowPolicy } from "../../lib/reward-grant-item-overflow";
 import {
@@ -189,17 +192,22 @@ const routes = async (fastify: FastifyInstance) => {
         console.log(`[UPGRADE] account=${accountId} player=${playerId}: eid=${equipmentId} rarity=${equipmentRarity} level ${equipment.level-upgradeCount}->${equipment.level} stack ${equipment.stack+upgradeCount}->${equipment.stack} craft -${upgradeCost*upgradeCount}`)
 
         reply.header("content-type", "application/x-msgpack")
-        const responseData: Record<string, unknown> = {
-            equipment_list: returnEquipmentList,
+        const overMax = projectItemOverflowCommonResponse(operationResult.itemOverflowDispositions)
+        const fragment: CommonResponseFragment = {
+            equipment_list: returnEquipmentList.map(
+                equipment => projectEquipmentEntity(equipment),
+            ),
             item_list: returnItemList,
             mission_info: [],
-            degree_list: [],
             mail_arrived: getMailArrivedSync(playerId),
+            ...(overMax.length > 0 ? { over_max: overMax } : {}),
+            ...(operationResult.itemOverflowDispositions.some(entry => entry.kind === "sold")
+                ? { user_info: { free_mana: operationResult.overflowFreeManaAfter } }
+                : {}),
         }
-        const overMax = projectItemOverflowCommonResponse(operationResult.itemOverflowDispositions)
-        if (overMax.length > 0) responseData.over_max = overMax
-        if (operationResult.itemOverflowDispositions.some(entry => entry.kind === "sold")) {
-            responseData.user_info = { free_mana: operationResult.overflowFreeManaAfter }
+        const responseData: Record<string, unknown> = {
+            ...mergeCommonResponseFragments([fragment]),
+            degree_list: [],
         }
         if (operationResult.missionSettlement) {
             mergeMissionSettlementResponse(responseData, operationResult.missionSettlement, viewerId)
@@ -272,7 +280,11 @@ const routes = async (fastify: FastifyInstance) => {
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-                "data": { "equipment_list": [], "item_list": {}, "mail_arrived": getMailArrivedSync(playerId) }
+                "data": mergeCommonResponseFragments([{
+                    equipment_list: [],
+                    item_list: {},
+                    mail_arrived: getMailArrivedSync(playerId),
+                }]),
             })
         }
 
@@ -347,24 +359,29 @@ const routes = async (fastify: FastifyInstance) => {
         const returnEquipmentList = serializeFullEquipmentList(operationResult.equipmentSnapshot)
 
         reply.header("content-type", "application/x-msgpack")
-        const responseData: Record<string, unknown> = {
-            equipment_list: returnEquipmentList,
+        const overMax = projectItemOverflowCommonResponse(operationResult.itemOverflowDispositions)
+        const bulkFragment: CommonResponseFragment = {
+            equipment_list: returnEquipmentList.map(
+                equipment => projectEquipmentEntity(equipment),
+            ),
             item_list: returnItemList,
             mission_info: [],
-            degree_list: [],
             mail_arrived: getMailArrivedSync(playerId),
+            ...(overMax.length > 0 ? { over_max: overMax } : {}),
+            ...(operationResult.itemOverflowDispositions.some(entry => entry.kind === "sold")
+                ? { user_info: { free_mana: operationResult.overflowFreeManaAfter } }
+                : {}),
         }
-        const overMax = projectItemOverflowCommonResponse(operationResult.itemOverflowDispositions)
-        if (overMax.length > 0) responseData.over_max = overMax
-        if (operationResult.itemOverflowDispositions.some(entry => entry.kind === "sold")) {
-            responseData.user_info = { free_mana: operationResult.overflowFreeManaAfter }
+        const bulkResponseData: Record<string, unknown> = {
+            ...mergeCommonResponseFragments([bulkFragment]),
+            degree_list: [],
         }
         if (operationResult.missionSettlement) {
-            mergeMissionSettlementResponse(responseData, operationResult.missionSettlement, viewerId)
+            mergeMissionSettlementResponse(bulkResponseData, operationResult.missionSettlement, viewerId)
         }
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": responseData,
+            "data": bulkResponseData,
         })
     })
 
@@ -396,10 +413,12 @@ const routes = async (fastify: FastifyInstance) => {
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {
-                "equipment_list": buildFullEquipmentList(playerId),
-                "mail_arrived": getMailArrivedSync(playerId),
-            }
+            "data": mergeCommonResponseFragments([{
+                equipment_list: buildFullEquipmentList(playerId).map(
+                    equipment => projectEquipmentEntity(equipment),
+                ),
+                mail_arrived: getMailArrivedSync(playerId),
+            }]),
         })
     })
 }

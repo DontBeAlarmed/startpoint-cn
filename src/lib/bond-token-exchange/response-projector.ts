@@ -1,3 +1,6 @@
+import { projectEquipmentEntity } from "../common-response/entities"
+import { mergeCommonResponseFragments } from "../common-response/merge"
+import type { CommonResponseFragment } from "../common-response/model"
 import type { BondTokenExchangeListEntry, BondTokenExchangeSuccess } from "./owner"
 
 export interface BondTokenExchangeResponseInput {
@@ -9,19 +12,24 @@ export interface BondTokenExchangeResponseInput {
 export function projectBondTokenExchangeResponse(
     input: BondTokenExchangeResponseInput,
 ): Record<string, unknown> {
+    const fragment: CommonResponseFragment = {
+        user_info: {
+            bond_token: input.result.bondTokenAfter,
+        },
+        character_list: null,
+        item_list: null,
+        equipment_list: input.result.equipment.map(
+            equipment => projectEquipmentEntity(equipment),
+        ),
+        mission_info: null,
+        over_max: null,
+        mail_arrived: input.mailArrived,
+    }
     return {
         data_headers: input.dataHeaders,
         data: {
-            user_info: {
-                bond_token: input.result.bondTokenAfter,
-            },
-            character_list: null,
-            item_list: null,
-            equipment_list: input.result.equipment,
+            ...mergeCommonResponseFragments([fragment]),
             active_mission_list: null,
-            mission_info: null,
-            over_max: null,
-            mail_arrived: input.mailArrived,
             config: null,
             user_daily_challenge_point_list: null,
             encyclopedia_info: null,
