@@ -14,12 +14,8 @@ import {
     characterGrowthProjectionStateFromPlayerCharacter,
     projectCharacterGrowthEntry,
 } from "./character-growth/response-projector"
-import {
-    computeManaBoardAwakeFromNodes,
-    mergeManaBoardAwakeMaps,
-} from "./character-mana-board-maps"
 
-export { computeManaBoardAwakeFromNodes, mergeManaBoardAwakeMaps }
+export { computeManaBoardAwakeFromNodes, mergeManaBoardAwakeMaps } from "./character-mana-board-maps"
 
 // ─── Response types ───
 

@@ -39,7 +39,6 @@ flowchart LR
     ADAPTERS -->|"CommonResponseFragment"| CORE
     CORE -->|"公共字段"| ROUTES
     ADAPTERS -->|"endpoint-local 字段"| ROUTES
-    KEEP -.->|"仅复用明确 serializer"| CLIENT
 ```
 
 已迁移入口（公共字段经 fragment 组合）：Shop、普通/Crazy/Exchange Gacha、Star Crumb、Bond Token、Mail、Gift、Item、Equipment、Sell、PassCard、ActiveMission、Tutorial、Single finish/abort/start、Multi finish/start、party、Story、Raid、Rush、Box Gacha、Mission claim/Awake、Growth（character/bond/mana/mana-awake/expod）、EX Boost、Profile、Quest Unlock、encyclopedia（仅 `mail_arrived`）、`/load` login/event-login Mission 组合。
