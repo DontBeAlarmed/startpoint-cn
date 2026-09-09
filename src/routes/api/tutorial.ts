@@ -399,14 +399,25 @@ const routes = async (fastify: FastifyInstance) => {
                     })()
                     : existingCharacterList
 
+                const overMax = rewardResult.itemOverflowDispositions === undefined
+                    ? undefined
+                    : projectItemOverflowCommonResponse(rewardResult.itemOverflowDispositions)
                 const data = {
                     "step": effectiveNextStep,
-                    "user_info": {
-                        "free_vmoney": newFreeVmoney,
-                        ...(rewardResult.playerAfter === undefined
+                    ...mergeCommonResponseFragments([{
+                        "user_info": {
+                            "free_vmoney": newFreeVmoney,
+                            ...(rewardResult.playerAfter === undefined
+                                ? {}
+                                : { "free_mana": rewardResult.playerAfter.freeMana }),
+                        },
+                        "character_list": characterList.map(entry => projectCharacterPatch(entry)),
+                        "item_list": rewardResult.items,
+                        "mail_arrived": getMailArrivedSync(playerId),
+                        ...(overMax === undefined || overMax.length === 0
                             ? {}
-                            : { "free_mana": rewardResult.playerAfter.freeMana }),
-                    },
+                            : { "over_max": overMax }),
+                    }]),
                     "gacha": {
                         "draw": rewardResult.draw,
                         "gacha_info_list": [
@@ -417,19 +428,8 @@ const routes = async (fastify: FastifyInstance) => {
                             }
                         ],
                     },
-                    "character_list": characterList,
-                    "item_list": rewardResult.items,
                     "encyclopedia_info": [],
-                    "mail_arrived": getMailArrivedSync(playerId),
                     "start_time": getServerTime(),
-                    ...(rewardResult.itemOverflowDispositions === undefined
-                        ? {}
-                        : (() => {
-                            const overMax = projectItemOverflowCommonResponse(
-                                rewardResult.itemOverflowDispositions,
-                            )
-                            return overMax.length > 0 ? { "over_max": overMax } : {}
-                        })()),
                 }
                 upsertTutorialStepReceiptSync(playerId, {
                     completedStep,
@@ -495,17 +495,19 @@ const routes = async (fastify: FastifyInstance) => {
 
                 const data = {
                     "step": effectiveNextStep,
-                    "user_info": {
-                        "free_vmoney": newVMoney
-                    },
-                    "character_list": characterList,
-                    "item_list": itemList,
+                    ...mergeCommonResponseFragments([{
+                        "user_info": {
+                            "free_vmoney": newVMoney,
+                        },
+                        "character_list": characterList.map(entry => projectCharacterPatch(entry)),
+                        "item_list": itemList,
+                        "mail_arrived": true,
+                    }]),
                     "encyclopedia_info": {
                         [`1${freeTutorialCharacterId}01`]: {
                             "read": false
                         }
                     },
-                    "mail_arrived": true,
                     "start_time": getServerTime()
                 }
                 upsertTutorialStepReceiptSync(playerId, {
