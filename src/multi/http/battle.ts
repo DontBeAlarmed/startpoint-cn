@@ -45,6 +45,9 @@ import {
     runMultiplayerSettlementOrchestration,
 } from "../settlement/orchestrator";
 import { projectMultiplayerFinishResponse } from "../settlement/response";
+import { buildFinishFollowInfo } from "../../lib/quest/finish/follow-info";
+import { getPlayerMailCountSync } from "../../data/domains/mail";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
 import { resolveLocalRescueFragmentEligibility } from "../rescue-fragment-reward";
 import { withEntryItemInventoryWithinTransactionSync } from "../../lib/quest/entry-item-inventory";
 
@@ -258,11 +261,13 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             "data": {
                 "is_multi": "multi",
                 "play_id": play_id,
-                "user_info": {
-                    "stamina": startResult.afterStamina,
-                    "stamina_heal_time": realToVirtual(startTime),
-                },
-                "item_list": buildStartEntryItemList(startResult),
+                ...mergeCommonResponseFragments([{
+                    "user_info": {
+                        "stamina": startResult.afterStamina,
+                        "stamina_heal_time": realToVirtual(startTime),
+                    },
+                    "item_list": buildStartEntryItemList(startResult),
+                }]),
             }
         });
     });
@@ -313,6 +318,12 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             playerId,
             settlement: settlementResult,
             viewerId,
+            mailArrived: getPlayerMailCountSync(playerId, true) > 0,
+            followInfo: await buildFinishFollowInfo(
+                viewerId,
+                ((body as any).mate_player_result || []) as Array<{ viewer_id?: number }>,
+                preparation.value.activeQuest.matePlayerIds || [],
+            ),
         });
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send(response);

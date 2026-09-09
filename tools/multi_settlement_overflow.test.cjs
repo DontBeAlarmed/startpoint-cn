@@ -194,9 +194,13 @@ test("Multi base Mana and sellable clear overflow share one authoritative Player
         playerId: fixture.playerId,
         settlement,
         viewerId: fixture.body.viewer_id,
+        mailArrived: false,
+        followInfo: [],
     })
     assert.equal(response.data.user_info.free_mana, MAX_MANA)
     assert.equal(response.data.item_list[ITEM_ID], ITEM_MAX)
+    assert.equal(response.data.mail_arrived, false)
+    assert.deepEqual(response.data.follow_info, [])
     assert.deepEqual(response.data.over_max, [{
         process_type: 2,
         amount_sold: ITEM_SALE_PRICE,

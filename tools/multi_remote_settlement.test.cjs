@@ -1949,5 +1949,7 @@ test("multi finish delegates preparation, settlement writes, and response projec
     assert.match(orchestratorSource, /runMultiActiveQuestSettlementTransaction\(/)
     assert.match(orchestratorSource, /const player = getPlayerSync\(input\.playerId\)/)
     assert.match(responseSource, /export async function projectMultiplayerFinishResponse/)
-    assert.match(responseSource, /mergeMissionSettlementResponse\(/)
+    assert.match(responseSource, /composeMissionSettlementResponse\(/)
+    assert.doesNotMatch(responseSource, /getPlayerMailCountSync/)
+    assert.doesNotMatch(responseSource, /buildFinishFollowInfo/)
 })

@@ -20,6 +20,7 @@ import { validatePartyLoadouts } from "../../lib/party-loadout-validation";
 import { settleAbilitySoulEquipFactsSync } from "../../lib/mission/operation-fact-settlement";
 import { settleMissionCategories, type MissionSettlementResult } from "../../lib/mission/settlement";
 import { mergeMissionSettlementResponse } from "../../lib/mission/response";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
 
 interface PartyInfoListItem {
     party_edited: boolean
@@ -621,7 +622,9 @@ const routes = async (fastify: FastifyInstance) => {
 
         reply.header("content-type", "application/x-msgpack")
         const responseData: Record<string, unknown> = {
-            "mail_arrived": getMailArrivedSync(playerId)
+            ...mergeCommonResponseFragments([{
+                "mail_arrived": getMailArrivedSync(playerId)
+            }]),
         }
         for (const settlement of missionSettlements) {
             mergeMissionSettlementResponse(responseData, settlement, viewerId)
