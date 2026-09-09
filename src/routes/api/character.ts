@@ -19,6 +19,8 @@ import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { canClaimTownStoryCharacter } from "../../lib/story-join-character";
 import { getRealNow } from "../../runtime/time/game-time";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
+import { projectCharacterPatch } from "../../lib/common-response/entities";
 import {
     FULL_CHARACTER_GROWTH_FIELDS,
     OVER_LIMIT_CHARACTER_GROWTH_FIELDS,
@@ -193,17 +195,19 @@ const routes = async (fastify: FastifyInstance) => {
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 data_headers: generateDataHeaders({ viewer_id: viewerId }),
-                data: {
+                data: mergeCommonResponseFragments([{
                     character_list: [...projectCharacterGrowthIncrement({
                         after: result.after,
                         changedNodeIds: [],
                     }, {
                         character,
                         fields: OVER_LIMIT_CHARACTER_GROWTH_FIELDS,
-                    }).character_list],
-                    item_list: result.itemId === undefined ? {} : { [result.itemId]: result.itemCount },
+                    }).character_list].map(entry => projectCharacterPatch(entry)),
+                    item_list: (result.itemId === undefined
+                        ? {}
+                        : { [result.itemId]: result.itemCount }) as Record<string, number>,
                     mail_arrived: getMailArrivedSync(playerId),
-                },
+                }]),
             })
         } catch (error) {
             return growthFailure(reply, error)
@@ -242,10 +246,10 @@ const routes = async (fastify: FastifyInstance) => {
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 data_headers: generateDataHeaders({ viewer_id: viewerId }),
-                data: {
-                    character_list: characterList,
+                data: mergeCommonResponseFragments([{
+                    character_list: characterList.map(entry => projectCharacterPatch(entry)),
                     mail_arrived: getMailArrivedSync(playerId),
-                },
+                }]),
             })
         } catch (error) {
             return growthFailure(reply, error)

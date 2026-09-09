@@ -8,6 +8,8 @@ import { getSession } from "../data/domains/session"
 import { resolvePlayerIdSync } from "../data/activeAccount"
 import { getPlayerItemSync } from "../data/domains/item"
 import { generateDataHeaders } from "../utils"
+import { projectCharacterPatch, projectEquipmentPatch } from "./common-response/entities"
+import { mergeCommonResponseFragments } from "./common-response/merge"
 import {
     characterGrowthProjectionStateFromPlayerCharacter,
     projectCharacterGrowthEntry,
@@ -197,10 +199,36 @@ export function sendCharacterResponse(
     viewerId: number,
     data: CharacterResponseData
 ) {
+    const {
+        user_info,
+        character_list,
+        item_list,
+        mail_arrived,
+        mission_info,
+        equipment_list,
+        ...endpointLocal
+    } = data
+    const common = mergeCommonResponseFragments([{
+        user_info,
+        character_list: character_list.map(character => projectCharacterPatch(character)),
+        item_list,
+        mail_arrived,
+        ...(mission_info === undefined ? {} : { mission_info }),
+        ...(equipment_list === undefined
+            ? {}
+            : {
+                equipment_list: equipment_list.map(
+                    equipment => projectEquipmentPatch(equipment),
+                ),
+            }),
+    }])
     reply.header("content-type", "application/x-msgpack")
     return reply.status(200).send({
         "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-        "data": data,
+        "data": {
+            ...common,
+            ...endpointLocal,
+        },
     })
 }
 

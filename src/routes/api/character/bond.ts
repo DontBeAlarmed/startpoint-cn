@@ -8,7 +8,10 @@ import {
     sendCharacterResponse,
     validateSessionAndPlayer,
 } from "../../../lib/character-helpers"
-import { mergeMissionSettlementResponse } from "../../../lib/mission"
+import {
+    composeMissionSettlementResponse,
+    projectMissionSettlementFragment,
+} from "../../../lib/mission/response-fragment"
 import { receiveBondToken } from "../../../lib/character-growth/commands/receive-bond-token"
 import { openManaBoard } from "../../../lib/character-growth/commands/open-mana-board"
 import { getServerDate } from "../../../utils"
@@ -116,7 +119,11 @@ const routes = async (fastify: FastifyInstance) => {
                 degree_list: [],
             }
             if (result.missionSettlement !== null) {
-                mergeMissionSettlementResponse(responseData, result.missionSettlement, body.viewer_id)
+                composeMissionSettlementResponse(
+                    responseData,
+                    projectMissionSettlementFragment(result.missionSettlement),
+                    body.viewer_id,
+                )
             }
             return sendCharacterResponse(reply, body.viewer_id, responseData)
         } catch (error) {
