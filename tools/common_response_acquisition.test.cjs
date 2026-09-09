@@ -380,6 +380,52 @@ test("projects repeated Character outcomes with first creation fields and final 
     }])
 })
 
+test("merges split new Character required fields before validating the final snapshot", () => {
+    const characterId = 321008
+    const grant = createRewardGrantExecutionResult(
+        1,
+        createRewardGrantExecutionPlan([
+            { type: RewardType.CHARACTER, id: characterId },
+            { type: RewardType.CHARACTER, id: characterId },
+        ]),
+        [
+            {
+                kind: "character",
+                characterId,
+                isNew: true,
+                after: {
+                    character_id: characterId,
+                    entry_count: 1,
+                },
+                compensationItem: null,
+            },
+            {
+                kind: "character",
+                characterId,
+                isNew: false,
+                after: {
+                    character_id: characterId,
+                    bond_token_list: [{ mana_board_index: 1, status: 0 }],
+                    join_time: "2026-09-08 00:00:00",
+                    update_time: "2026-09-08 00:00:00",
+                    stack: 1,
+                },
+                compensationItem: null,
+            },
+        ],
+        { playerId: 1, freeMana: 0, freeVmoney: 0, expPool: 0 },
+    )
+
+    assert.deepEqual(projectRewardGrantAcquisitionFragment({ grant }).character_list, [{
+        character_id: characterId,
+        entry_count: 1,
+        bond_token_list: [{ mana_board_index: 1, status: 0 }],
+        join_time: "2026-09-08 00:00:00",
+        update_time: "2026-09-08 00:00:00",
+        stack: 1,
+    }])
+})
+
 test("projects repeated Equipment outcomes as one complete final entity", () => {
     const equipmentId = 20
     const grant = createRewardGrantExecutionResult(

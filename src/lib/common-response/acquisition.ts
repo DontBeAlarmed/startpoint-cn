@@ -86,9 +86,7 @@ export function projectRewardGrantAcquisitionFragment(
                 throw new TypeError("character_id must match Character owner identity")
             }
             characterFragments.push({
-                character_list: [outcome.isNew
-                    ? projectNewCharacterSnapshot(outcome.after)
-                    : projectCharacterPatch(outcome.after)],
+                character_list: [projectCharacterPatch(outcome.after)],
             })
         } else if (outcome.kind === "equipment") {
             if (outcome.after.equipment_id !== outcome.equipmentId) {
