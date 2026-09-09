@@ -27,7 +27,7 @@
 | D12 | 后台运营能力目标架构 | [后台运营能力 Gate](./admin-operations-gate.md) | 发布契约集中化、SQLite 公告、公共礼包码与邮件资源边界 |
 | D13 | 拉芙觉醒任务与单人复活目标架构 | [觉醒任务与复活 Gate](./character-awake-and-continue-gate.md) | 拉芙任务 exact quest 与单人星导石复活协议；玛纳板独立性延期 |
 | D14 | 统一角色成长状态服务（已落地，待实机验收） | [角色成长状态 Gate](./character-growth-state-gate.md) | Growth commands、事务、任务事实、投影、`/load`、存档与性能合同 |
-| D15 | 全项目领域边界蓝图（识别完成，实施主线进行中） | [领域边界蓝图](./domain-boundary-blueprint.md) | CDN/客户端/服务端三层边界；owner、有限 shared core、adapter、projector 与独立模块 |
+| D15 | 全项目领域边界蓝图（识别与实施主线均已收口） | [领域边界蓝图](./domain-boundary-blueprint.md) | CDN/客户端/服务端三层边界；owner、有限 shared core、adapter、projector 与独立模块 |
 | D16 | Item Inventory Owner（已落地，Gate A 自动验证已完成） | [Item Inventory Owner Gate](./item-inventory-owner-gate.md) | typed Item Content、唯一 Item writer、cap 纯计划与 EventTrade 到期策略 |
 | D17 | RewardGrant 正向协调核（已落地，Gate A 自动验证已完成） | [RewardGrant Core Gate](./reward-grant-core-gate.md) | 正向 Reward plan、资产 owner executors 与 Typed Grant Result；不成为 Economy bus |
 | D18b | Item Overflow Disposition 与 Toast（服务端 Gate 已完成，实机统一延期） | [Item Overflow Disposition Gate](./item-overflow-disposition-gate.md) | `sellable` 驱动 Sold/Mail、Mana 二次 overflow 与官方 `data.over_max` Toast |
@@ -39,8 +39,8 @@
 | D24 | Mission Owner 收口（已实现） | [任务引擎架构](../systems/mission-engine-architecture.md) | snapshot-scoped Catalog、Session-only computer、来源事实 typed read port、receipt/RewardGrant 协调、Quest 计数回归所属 writer、DEBT-T03/T04 关闭 |
 | D25 | Battle Settlement 有限核（已实现） | [Battle Settlement Core Gate](./battle-settlement-core-gate.md) | immutable values/progress plans；Single/Multi 外层事务与 lifecycle/transport 保持独立；DEBT-T05/T08 收敛 |
 | D26 | Event Lifecycle 有限核（已完成） | [Event Lifecycle Core Gate](./event-lifecycle-core-gate.md) | typed descriptor/window/linkage、单 built-in hook、独立 Rush/Raid/Carnival/ScoreAttack handlers、Rush AutoRetry 与 official-only 边界 |
-| D27 | Content Runtime Index（实施完成，待 D27 whole-range review） | [Content Runtime Index Gate](./content-runtime-index-gate.md) | 复用 immutable raw index、领域 typed adapters、identity/fail-closed/DEBT-T09 边界（已关闭；`assets.ts` 跨域 facade 与迁移 fallback 已删除） |
-| D28 | Common Response 字段级 Projector（C1–C6 已实施，待 C7 broad/final review） | [Common Response Projector Gate](./common-response-projector-gate.md) | 无状态纯 merge core（七字段合并代数）、owner→adapter→projector 方向守卫、DEBT-T07 关闭、Load/Save/Admin 保留边界；build 时间 admission residual 待决议 |
+| D27 | Content Runtime Index（实施与 whole-range review 已完成） | [Content Runtime Index Gate](./content-runtime-index-gate.md) | 复用 immutable raw index、领域 typed adapters、identity/fail-closed/DEBT-T09 边界（已关闭；`assets.ts` 跨域 facade 与迁移 fallback 已删除） |
+| D28 | Common Response 字段级 Projector（C1–C7 与 Gate D closure 已完成） | [Common Response Projector Gate](./common-response-projector-gate.md) | 无状态纯 merge core（七字段合并代数）、owner→adapter→projector 方向守卫、DEBT-T07 关闭、Load/Save/Admin 保留边界；微秒级 build 成本已接受并重定基线 |
 
 ## 阅读顺序
 
@@ -52,7 +52,7 @@
 
 D12、D13 与 D14 已完成服务端实现和自动化 Gate，等待客户端实机验收。三份 Gate 文档保留设计依据，同时作为相应已落地边界的架构与验证证据；它们不取代上述当前架构总览的阅读顺序。
 
-D15 已完成领域边界识别、决策和后续实施路线。D16、D17、D18、D18b 的服务端实现、Gate A broad closure、D18b scoped final review 和服务重启均已完成；D19–D22 与大 Gate B 已收口；D23 Character writer、D24 Mission owner、D25 Battle Settlement 与 D26 Event Lifecycle 有限核均已完成，大 Gate C 已收口；D27 实施（C1–C6）已完成、DEBT-T09 已关闭，待 D27 whole-range review；D28 C1–C6 已实施（DEBT-T07 关闭，build 时间 admission residual 待决议），待 Gate D 唯一 broad 与 whole-range final review。客户端实测统一延期到 D28 后。
+D15 已完成领域边界识别、决策和后续实施路线。D16、D17、D18、D18b 的服务端实现、Gate A broad closure、D18b scoped final review 和服务重启均已完成；D19–D22 与大 Gate B 已收口；D23 Character writer、D24 Mission owner、D25 Battle Settlement 与 D26 Event Lifecycle 有限核均已完成，大 Gate C 已收口；D27 实施与 whole-range review 已完成、DEBT-T09 已关闭；D28 C1–C7、唯一 broad、whole-range review、性能决议、服务构建启动与健康检查均已完成，Gate D 已 closure。客户端实测仍按 post-D28 清单执行。
 
 ## 统一图例
 
@@ -68,7 +68,7 @@ D15 已完成领域边界识别、决策和后续实施路线。D16、D17、D18�
 - 本目录已收录的 D1-D11b 全部描述当前实现，图节标题统一带“当前”。
 - D12、D13 与 D14 描述已落地、待客户端实机验收的 Gate 架构；其中的实施状态和证据路径可以用于解释当前实现，仍需与功能支持矩阵区分自动验证和人工验收。
 - D15 描述经审查确认、但尚未实施的目标领域边界；其图和表不能替代 D1-D11b 的当前架构事实。
-- D16、D18、D18b、D19–D22 已实现资产与购买/抽卡/兑换 owners；D23 已收口 Character writer，D24 已收口 Mission owner，D25 已完成有限 Battle Settlement core，D26 Event Lifecycle 有限核与 Gate C closure 已完成。不得据此宣称体验兼容已经被官服后端证实；D27 实施已完成待 whole-range review，D28 C1–C6 已实施、待 Gate D broad 与 final review，本文相应段落以 [Common Response Projector Gate](./common-response-projector-gate.md) 为准。
+- D16、D18、D18b、D19–D22 已实现资产与购买/抽卡/兑换 owners；D23 已收口 Character writer，D24 已收口 Mission owner，D25 已完成有限 Battle Settlement core，D26 Event Lifecycle 有限核与 Gate C closure 已完成。不得据此宣称体验兼容已经被官服后端证实；D27 whole-range 与 D28 Gate D closure 已完成，本文相应段落以 [Common Response Projector Gate](./common-response-projector-gate.md) 为准。
 - 当前图不混入未来组件、迁移步骤或完成度信息；功能状态仍由 `docs/status/` 维护。
 - 目标架构必须使用独立图和独立证据，不得用虚线叠加到当前图。
 

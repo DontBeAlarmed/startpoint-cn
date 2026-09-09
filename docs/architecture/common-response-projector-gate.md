@@ -1,6 +1,6 @@
 # D28 Common Response 字段级 Projector
 
-状态：C1–C6 已实施。C1–C5 各波次 scoped review 已批准；C6 完成 DEBT-T07 字段 characterization、依赖方向守卫、性能 admission 与本文档。DEBT-T07 已按退出条件关闭。payload build 时间 admission 存在 residual（见「性能准入」）。待 Gate D 唯一 broad、`5620e86a..HEAD` whole-range final review 与服务重启（C7）；此前不宣称 Gate D 收口。
+状态：C1–C7 与 Gate D closure 已完成。C1–C5 各波次 scoped review 已批准；C6 完成 DEBT-T07 字段 characterization、依赖方向守卫、性能 admission 与本文档；C7 完成唯一 broad、`5620e86a..6829b67b` whole-range review、服务构建启动与健康检查。DEBT-T07 已按退出条件关闭。payload build 时间相对阈值未通过，但绝对成本约 10–27µs/build，已接受并重定基线；未追加 D28 内性能专项。
 
 ## 目标
 
@@ -80,7 +80,7 @@ flowchart LR
 ## 性能准入
 
 - **硬门禁（全部通过）**：Pure Common merge 与 acquisition projector 的 instrumented DB probe 精确为 0；五个代表 endpoint（Shop /buy、Gacha /exec、Single /finish、Multi /finish、Equipment /bulk_upgrade）与 `/load` 代表路径的精确 Select/Write/Transaction 与 D28_BASE 逐项一致（23/14/5/4、24/13/7/4、56/33/15/8、88/55/25/8、25/12/9/4、135/78/35/22/0）；MsgPack 字节逐项一致（45/546/750/710）。
-- **residual**：payload build 时间相对 D28_BASE 的 20% 容差未通过——同负载对照下代码归因回归 +226%~356%（mission/gacha/shop 三 fixture，绝对量级 10~27µs/build），归因于类型化实体校验与输入/输出隔离（B0-14 clone 不变量）的固有成本。查询计数零容忍不受影响。处置（接受并重定基线，或授权专项优化）记录在仓库外 D28 C6-4 报告，待 Gate D 审查决议。
+- **已接受的性能 exception**：payload build 时间相对 D28_BASE 的 20% 容差未通过——同负载对照下代码归因回归 +226%~356%（mission/gacha/shop 三 fixture，绝对量级 10~27µs/build），归因于类型化实体校验与输入/输出隔离（B0-14 clone 不变量）的固有成本。查询计数零容忍不受影响。Gate D 已接受该微秒级绝对成本并重定 D28 基线，不在 D28 追加 fragment 单遍优化或另开 post-D28 性能专项。
 
 ## 明确排除
 

@@ -1,6 +1,6 @@
 # D27 Content Runtime Index 与 Typed Adapters
 
-状态：实施完成（C1–C6）。DEBT-T09 已按退出条件关闭，`assets.ts` 跨域 facade 与 `getRuntimeContentTableSync(table,bundled)` 迁移 facade 均已删除；待 D27 whole-range review。D27 是 Gate D 的第一个 checkpoint；D28 完成前不宣称边界重构主线结束。
+状态：实施与 whole-range review 完成（C1–C6）。DEBT-T09 已按退出条件关闭，`assets.ts` 跨域 facade 与 `getRuntimeContentTableSync(table,bundled)` 迁移 facade 均已删除；D27 作为 Gate D 的第一个 checkpoint 已完成，Gate D 随 D28 C7 closure 收口。
 
 ## 目标
 

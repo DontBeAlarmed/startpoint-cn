@@ -1,6 +1,6 @@
 # D15 全项目领域边界蓝图
 
-状态：D15 边界识别、决策和后续实施路线已经完成并通过独立审查；D16–D22 与大 Gate A/B 已完成，D23 Character Growth、D24 Mission Owner、D25 Battle Settlement 与 D26 Event Lifecycle 有限核均已完成，大 Gate C 已收口。D27 实施已完成、待 whole-range review；D28 Common Response Projector C1–C6 已实施（见 [Common Response Projector Gate](./common-response-projector-gate.md)），待 Gate D broad 与 final review，因此本文不能用来宣称边界重构主线已经收口。D16–D26 已落地边界以对应 Gate 文档、本文状态行和代码为准。
+状态：D15 边界识别、决策和后续实施路线已经完成并通过独立审查；D16–D22 与大 Gate A/B 已完成，D23 Character Growth、D24 Mission Owner、D25 Battle Settlement 与 D26 Event Lifecycle 有限核均已完成，大 Gate C 已收口。D27 whole-range review 与 D28 Common Response Projector C1–C7、Gate D closure 均已完成（见 [Common Response Projector Gate](./common-response-projector-gate.md)）。D16–D28 已落地边界以对应 Gate 文档、本文状态行和代码为准。
 
 ## 1. 目标与证据纪律
 
@@ -188,7 +188,7 @@ D15 明确拒绝：
 
 ```text
 D15_MAP_STATUS: COMPLETE
-BOUNDARY_MAINLINE_STATUS: IN_PROGRESS (D16-D26 and Gate C complete; D27 implementation complete with DEBT-T09 closed, awaiting D27 whole-range review; D28 C1-C6 implemented with DEBT-T07 closed, awaiting Gate D broad and final review)
+BOUNDARY_MAINLINE_STATUS: COMPLETE (D16-D28 and Gate A-D closure complete; DEBT-T09 and DEBT-T07 closed; D28 performance exception accepted and rebaselined)
 ```
 
 D15 完成表示：CDN 分类、客户端可达性、服务端 owner/write/transaction、19 项边界决策、测试债务、私服策略和后续依赖路线已经闭环。它不表示本文目标架构已实现。
