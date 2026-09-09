@@ -622,7 +622,9 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
     assert.equal(tutorialStep15ExistingList[0].includes("character !== null"), true)
     assert.equal(tutorialStep15ExistingList[0].includes('typeof character === "object"'), true)
     assert.equal(tutorialStep15ExistingList[0].includes("!Array.isArray(character)"), true)
-    assert.deepEqual(findPropertyAssignmentValues(tutorialStep15Block, "character_list"), ["characterList"])
+    assert.deepEqual(findPropertyAssignmentValues(tutorialStep15Block, "character_list"), [
+        "characterList.map(entry => projectCharacterPatch(entry))",
+    ])
 
     const tutorialStep16Call = getOnlyCall(tutorialStep16Block, "reconcileAwakeUnlockCharacterList")
     assert.deepEqual(tutorialStep16Call.arguments, [
@@ -647,7 +649,9 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
     assert.equal(tutorialStep16ItemList[0].startsWith("giveResult?.item"), true)
     assert.equal(tutorialStep16ItemList[0].includes("[giveResult.item.id]"), true)
     assert.equal(tutorialStep16ItemList[0].includes("giveResult.item.count"), true)
-    assert.deepEqual(findPropertyAssignmentValues(tutorialStep16Block, "character_list"), ["characterList"])
+    assert.deepEqual(findPropertyAssignmentValues(tutorialStep16Block, "character_list"), [
+        "characterList.map(entry => projectCharacterPatch(entry))",
+    ])
     assert.deepEqual(findPropertyAssignmentValues(tutorialStep16Block, "item_list"), ["itemList"])
 
     for (const source of [gachaSource, exchangeSource, characterSource, tutorialSource]) {
