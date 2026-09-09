@@ -6,6 +6,12 @@ import type {
     EquipmentFragment,
     ItemListFragment,
 } from "./model"
+import {
+    cloneCharacterFragment,
+    cloneEquipmentFragment,
+    isCommonResponseRecord,
+    requirePositiveFragmentId,
+} from "./clone"
 
 function mergeRecord(
     current: CommonResponseRecord | null | undefined,
@@ -18,27 +24,6 @@ function mergeRecord(
     return merged
 }
 
-function requirePositiveId(value: unknown, field: string): number {
-    if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
-        throw new TypeError(`${field} must be a positive safe integer`)
-    }
-    return value
-}
-
-function cloneCharacter(fragment: CharacterFragment): CharacterFragment {
-    requirePositiveId(fragment.character_id, "character_id")
-    const cloned = mergeRecord(undefined, fragment) as Record<string, unknown>
-    if (Array.isArray(fragment.bond_token_list)) {
-        cloned.bond_token_list = fragment.bond_token_list.map(entry => (
-            isRecord(entry) ? { ...entry } : entry
-        ))
-    }
-    if (fragment.mana_board_awake !== undefined) {
-        cloned.mana_board_awake = { ...fragment.mana_board_awake }
-    }
-    return cloned as CharacterFragment
-}
-
 function mergeCharacterList(
     current: readonly CharacterFragment[] | null | undefined,
     next: readonly CharacterFragment[],
@@ -47,8 +32,8 @@ function mergeCharacterList(
     const merged = (current ?? []) as CharacterFragment[]
 
     for (const rawFragment of next) {
-        const fragment = cloneCharacter(rawFragment)
-        const id = requirePositiveId(fragment.character_id, "character_id")
+        const fragment = cloneCharacterFragment(rawFragment)
+        const id = requirePositiveFragmentId(fragment.character_id, "character_id")
         const existingIndex = indexById.get(id)
         if (existingIndex === undefined) {
             indexById.set(id, merged.length)
@@ -73,11 +58,6 @@ function mergeCharacterList(
     return merged
 }
 
-function cloneEquipment(fragment: EquipmentFragment): EquipmentFragment {
-    requirePositiveId(fragment.equipment_id, "equipment_id")
-    return mergeRecord(undefined, fragment) as EquipmentFragment
-}
-
 function mergeEquipmentList(
     current: readonly EquipmentFragment[] | null | undefined,
     next: readonly EquipmentFragment[],
@@ -86,8 +66,8 @@ function mergeEquipmentList(
     const merged = (current ?? []) as EquipmentFragment[]
 
     for (const rawFragment of next) {
-        const fragment = cloneEquipment(rawFragment)
-        const id = requirePositiveId(fragment.equipment_id, "equipment_id")
+        const fragment = cloneEquipmentFragment(rawFragment)
+        const id = requirePositiveFragmentId(fragment.equipment_id, "equipment_id")
         const existingIndex = indexById.get(id)
         if (existingIndex === undefined) {
             indexById.set(id, merged.length)
@@ -99,17 +79,13 @@ function mergeEquipmentList(
     return merged
 }
 
-function isRecord(value: unknown): value is CommonResponseRecord {
-    return value !== null && typeof value === "object" && !Array.isArray(value)
-}
-
 function isLegacyEmptyItemList(value: ItemListFragment): value is readonly never[] {
     return Array.isArray(value)
 }
 
 function cloneOverflowEntry(entry: CommonResponseRecord): CommonResponseRecord {
     const cloned = mergeRecord(undefined, entry) as Record<string, unknown>
-    if (isRecord(entry.item)) cloned.item = { ...entry.item }
+    if (isCommonResponseRecord(entry.item)) cloned.item = { ...entry.item }
     return cloned
 }
 
