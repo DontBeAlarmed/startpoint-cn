@@ -5,6 +5,7 @@ import { getSession } from "../../data/domains/session"
 import { generateDataHeaders } from "../../utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getMailArrivedSync } from "../../lib/mail-notification";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
 import { getEncyclopediaContent } from "../../lib/encyclopedia-content"
 
 interface IndexBody {
@@ -78,7 +79,9 @@ const routes = async (fastify: FastifyInstance) => {
             }),
             "data": {
                 "encyclopedia_list": getEncyclopediaContent(),
-                "mail_arrived": getMailArrivedSync(playerId)
+                ...mergeCommonResponseFragments([{
+                    "mail_arrived": getMailArrivedSync(playerId)
+                }]),
             }
         })
     })
