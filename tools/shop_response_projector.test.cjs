@@ -3,6 +3,8 @@
 require("ts-node/register/transpile-only")
 
 const assert = require("node:assert/strict")
+const fs = require("node:fs")
+const path = require("node:path")
 const test = require("node:test")
 
 const { projectShopPurchaseResponse } = require("../src/lib/shop/response-projector")
@@ -84,4 +86,52 @@ test("merges overflow and complete Mission delta after Shop absolute facts", () 
     assert.deepEqual(data.character_list, [{ character_id: 1, stack: 2 }])
     assert.deepEqual(data.degree_list, [{ viewer_id: 99, degree_id: 45000 }])
     assert.equal(data.over_max.length, 1)
+})
+
+test("projects entity snapshots through the common entity field whitelist", () => {
+    const data = projectShopPurchaseResponse(result({
+        characters: [{
+            characterId: 7,
+            joined: false,
+            after: { character_id: 7, stack: 2, secret_field: "leak" },
+        }],
+        equipmentRewards: [{
+            equipmentId: 8,
+            requestedAmount: 1,
+            after: { equipment_id: 8, stack: 1, junk: true },
+        }],
+        equipmentEnhancements: [],
+    }), 99)
+    assert.deepEqual(data.character_list, [{ character_id: 7, stack: 2 }])
+    assert.deepEqual(data.equipment_list, [{ equipment_id: 8, stack: 1 }])
+})
+
+test("rejects non-canonical entity identity in owner snapshots", () => {
+    assert.throws(() => projectShopPurchaseResponse(result({
+        characters: [{ characterId: 1, joined: true, after: { character_id: 0 } }],
+    }), 99), TypeError)
+    assert.throws(() => projectShopPurchaseResponse(result({
+        equipmentRewards: [{
+            equipmentId: 8,
+            requestedAmount: 1,
+            after: { equipment_id: -1 },
+        }],
+        equipmentEnhancements: [],
+    }), 99), TypeError)
+})
+
+test("shop response projection is dependency-free from DB, Content, and routes", () => {
+    const source = fs.readFileSync(
+        path.join(__dirname, "../src/lib/shop/response-projector.ts"),
+        "utf8",
+    )
+    assert.doesNotMatch(
+        source,
+        /(?:from\s+["'][^"']*(?:\/data|\/content|\/routes)|require\([^)]*(?:\/data|\/content|\/routes))/i,
+    )
+    const loaded = Object.keys(require.cache)
+    assert.equal(
+        loaded.some(file => /\/src\/(data|content|routes)\//.test(file)),
+        false,
+    )
 })

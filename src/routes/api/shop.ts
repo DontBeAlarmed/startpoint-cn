@@ -31,6 +31,7 @@ import { planFreeFirstDeduction } from "../../lib/economy/free-first-deduction"
 import { registerShopPurchaseRoutes } from "./shop/purchase-routes"
 import { getShopCatalog } from "../../lib/shop"
 import { selectShopSalesCatalogItems } from "../../lib/shop/sales-catalog"
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
 
 interface GetSalesListBody {
     equipment_enhancement_shop_category_ids: number[],
@@ -211,15 +212,15 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {
-                "user_info": {
+            "data": mergeCommonResponseFragments([{
+                user_info: {
                     "stamina": afterStamina,
                     "stamina_heal_time": realToVirtual(recoveryTime),
                     "vmoney": deduction.paidBalance,
                     "free_vmoney": deduction.freeBalance,
                 },
-                "mail_arrived": getMailArrivedSync(playerId)
-            }
+                mail_arrived: getMailArrivedSync(playerId),
+            }]),
         })
     })
 

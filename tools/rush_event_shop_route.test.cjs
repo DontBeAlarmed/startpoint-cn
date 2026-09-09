@@ -253,6 +253,8 @@ stubModule("../src/data/domains/equipment", {
         return row === undefined ? null : {
             level: row.level,
             enhancementLevel: row.enhancement_level,
+            protection: false,
+            stack: 0,
         }
     },
     playerOwnsEquipmentSync(playerId, equipmentId) {
