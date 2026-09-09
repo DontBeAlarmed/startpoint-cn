@@ -325,10 +325,10 @@ const multiAwakeSettlement = multiBattleSource.indexOf(
     multiSettlementTime,
 )
 const multiGeneralMerge = multiResponseSource.indexOf(
-    "mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)",
+    "composeMissionSettlementResponse(\n        responseData,\n        projectMissionSettlementFragment(missionSettlement),\n        viewerId,\n    )",
 )
 const multiAwakeMerge = multiResponseSource.indexOf(
-    "mergeMissionSettlementResponse(responseData, awakeMissionSettlement, viewerId)",
+    "composeMissionSettlementResponse(\n        responseData,\n        projectMissionSettlementFragment(awakeMissionSettlement),\n        viewerId,\n    )",
     multiGeneralMerge,
 )
 const multiTransactionCall = multiBattleSource.indexOf("runMultiActiveQuestSettlementTransaction(")
@@ -342,7 +342,7 @@ assert.equal(multiCharacterExp > multiFactCall, true, "多人角色经验必须�
 assert.equal(multiSettlementTime > multiCharacterExp, true, "多人称号结算必须看到本场角色经验")
 assert.equal(multiAwakeSettlement > multiFactCall, true, "多人 finish 必须把本场 facts 传入觉醒 seam")
 assert.equal(multiAwakeSettlement > multiSettlementTime, true, "多人觉醒 seam 必须位于通用结算之后")
-assert.equal(multiGeneralMerge >= 0 && multiAwakeMerge > multiGeneralMerge, true, "多人响应必须先合并通用结算再合并觉醒结算")
+assert.equal(multiGeneralMerge >= 0 && multiAwakeMerge > multiGeneralMerge, true, "多人响应必须先组合通用结算再组合觉醒结算")
 assert.match(
     multiBattleSource,
     /const existingCharacterList = \[[\s\S]*?awakeMissionSettlement\.characterList[\s\S]*?publishCharacterGrowthOwnerStateBestEffort\(\s*input\.playerId,\s*candidateCharacterIds,\s*\[existingCharacterList\],/,

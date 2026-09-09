@@ -242,7 +242,7 @@ test("all non-multi entries use isolated real CN HTTP journeys", async () => {
         responseViewerMatchesAccount: true,
         assetUpdate: false,
         availableAssetVersion: "1.4.54",
-        characterCount: 1,
+        characterCount: 0,
         equipmentCount: 0,
         itemCount: 4,
         unfinishedQuestCount: 0,

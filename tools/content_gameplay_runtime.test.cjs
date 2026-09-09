@@ -93,16 +93,16 @@ test("gameplay readers use the active Content snapshot instead of static bundled
                 "5": { dissolve_craft: 91, awakening_craft: 92, dissolve_star: 93 },
             },
             "equipment_dissolve.json": {
-                "9950001": {
-                    ability_soul_id: 9950002,
+                "5950001": {
+                    ability_soul_id: 5950002,
                     obtain_source: 0,
                     generate_ability_soul: true,
                     max_level: 5,
                 },
             },
-            "equipment_ids.json": [9950001],
+            "equipment_ids.json": [5950001],
             "equipment_lookup.json": {
-                "9950001": { name: "快照装备", rarity: "5", category: "未分类" },
+                "5950001": { name: "快照装备", rarity: "5", category: "未分类" },
             },
             "item_data.json": {
                 "990100": { effectKind: 3, effectValue: 75 },
@@ -182,8 +182,8 @@ test("gameplay readers use the active Content snapshot instead of static bundled
         awakening_craft: 92,
         dissolve_star: 93,
     })
-    assert.deepEqual(equipmentContent.getEquipmentDissolveSync(9950001), {
-        ability_soul_id: 9950002,
+    assert.deepEqual(equipmentContent.getEquipmentDissolveSync(5950001), {
+        ability_soul_id: 5950002,
         obtain_source: 0,
         generate_ability_soul: true,
         max_level: 5,
@@ -194,9 +194,9 @@ test("gameplay readers use the active Content snapshot instead of static bundled
         sale_price: 77,
         sellable: true,
     })
-    assert.deepEqual(equipmentContent.getEquipmentIdsSync(), [9950001])
+    assert.deepEqual(equipmentContent.getEquipmentIdsSync(), [5950001])
     assert.deepEqual(equipmentContent.getEquipmentLookupSync(), {
-        "9950001": { name: "快照装备", rarity: "5", category: "未分类" },
+        "5950001": { name: "快照装备", rarity: "5", category: "未分类" },
     })
     assert.deepEqual(itemContent.getItemIdsSync(), [990100])
     assert.deepEqual(itemContent.getItemLookupSync(), { "990100": "快照体力药" })

@@ -1091,6 +1091,7 @@ test("maps the public reward grant layer and its regressions to one focused leaf
         "tools/reward_grant_architecture.test.cjs",
         "tools/score_reward_selection_core.test.cjs",
         "tools/score_reward_selection.test.cjs",
+        "tools/common_response_acquisition.test.cjs",
         "tools/single_settlement_reward_grant.test.cjs",
         "tools/task23c_reward_grants.test.cjs",
         "tools/mail_reward_grant.test.cjs",
@@ -1969,6 +1970,7 @@ test("keeps isolated test groups parallel while infrastructure groups stay seria
         assert.equal(TEST_GROUPS[group].execution, "parallel")
     }
     assert.equal(TEST_GROUPS["quick:runtime"].timeoutMs, 60_000)
+    assert.equal(TEST_GROUPS["quick:gacha"].timeoutMs, 60_000)
     assert.equal(TEST_GROUPS["integration:compiled"].execution, "parallel")
     assert.equal(TEST_GROUPS["integration:runtime"].execution, "serial")
     assert.equal(TEST_GROUPS["integration:mission-compiled"].execution, "parallel")
@@ -2073,6 +2075,8 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_progress_stage_b.test.cjs",
         "tools/mission_progress_stage_b_route.test.cjs",
         "tools/mission_progress_stage_b_integration.test.cjs",
+        "tools/mission_degree_response_composition.test.cjs",
+        "tools/mission_response_fragment.test.cjs",
         "tools/mission_reward_invalidation.test.cjs",
         "tools/mission_reward_invalidation_integration.test.cjs",
         "tools/mission_collect_progress.test.cjs",
@@ -2217,6 +2221,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/multi_settlement_overflow.test.cjs",
         "tools/perf/multi_settlement_baseline.test.cjs",
         "tools/perf/multi_snapshot_baseline.test.cjs",
+        "tools/multi_response_projection.test.cjs",
         "tools/rescue_fragment_reward.test.cjs",
         "tools/special_quest_party.test.cjs",
     ])
@@ -2235,6 +2240,10 @@ test("quick workflow includes documentation and package script contracts", () =>
         "tools/test-workflow/select-tests.test.cjs",
         "tools/test-workflow/run.test.cjs",
         "tools/test-workflow/verify-cn-build.test.cjs",
+        "tools/c5_common_projection_route.test.cjs",
+        "tools/common_response_entities.test.cjs",
+        "tools/common_response_projector.test.cjs",
+        "tools/debt_t07_field_characterization.test.cjs",
         "tools/perf/http_metrics.test.cjs",
         "tools/perf/http_baseline.test.cjs",
         "tools/perf/tcp_baseline.test.cjs",
@@ -2277,6 +2286,7 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/shop_purchase_plan.test.cjs",
         "tools/shop_purchase_owner.test.cjs",
         "tools/shop_response_projector.test.cjs",
+        "tools/exchange_response_projection.test.cjs",
         "tools/mail_notification.test.cjs",
         "tools/mail_notification_write_routes.test.cjs",
         "tools/mail_reward_fixture.test.cjs",
