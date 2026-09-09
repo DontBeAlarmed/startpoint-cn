@@ -44,6 +44,7 @@ import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { ensureSpecialEventPartyGroupsSync, getGlobalPartyId } from "../../lib/special-event-parties";
 import { getDb } from "../../data/db";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
 import {
     canRestartClearedRushEventFolderForAutoStart,
     canStartRushEventFolderBattle,
@@ -436,9 +437,11 @@ const routes = async (fastify: FastifyInstance) => {
         return reply.status(200).send({
             "data_headers": headers,
             "data": {
-                "user_info": {
-                    "last_main_quest_id": body.quest_id
-                },
+                ...mergeCommonResponseFragments([{
+                    "user_info": {
+                        "last_main_quest_id": body.quest_id
+                    },
+                }]),
                 "is_multi": "single",
                 "start_time": headers['servertime'],
                 "quest_name": ""

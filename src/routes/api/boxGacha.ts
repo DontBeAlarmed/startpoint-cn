@@ -21,7 +21,12 @@ import { BoxGachaBoxes, PlayerRewardResult } from "../../lib/types";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time";
 import type { FactKey } from "../../lib/mission/facts/fact-key"
-import { projectItemOverflowCommonResponse } from "../../lib/item-overflow"
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow/common-response"
+import {
+    projectCharacterPatch,
+    projectEquipmentEntity,
+} from "../../lib/common-response/entities";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
 
 interface GetBoxListBody {
     box_gacha_id: number
@@ -471,11 +476,25 @@ const routes = async (fastify: FastifyInstance) => {
                 viewer_id: viewerId
             }),
             "data": {
-                "user_info": {
-                    "free_mana": settlement.player.freeMana + (settlement.rewardResult?.user_info.free_mana ?? 0),
-                    "exp_pool": settlement.player.expPool + (settlement.rewardResult?.user_info.exp_pool ?? 0),
-                    "exp_pooled_time": expPoolRealDateToClientTimestamp(settlement.player.expPooledTime),
-                },
+                ...mergeCommonResponseFragments([{
+                    "user_info": {
+                        "free_mana": settlement.player.freeMana + (settlement.rewardResult?.user_info.free_mana ?? 0),
+                        "exp_pool": settlement.player.expPool + (settlement.rewardResult?.user_info.exp_pool ?? 0),
+                        "exp_pooled_time": expPoolRealDateToClientTimestamp(settlement.player.expPooledTime),
+                    },
+                    "character_list": characterList.map(
+                        character => projectCharacterPatch(character),
+                    ),
+                    "equipment_list": (settlement.rewardResult?.equipment_list ?? []).map(
+                        equipment => projectEquipmentEntity(equipment),
+                    ),
+                    "item_list": {
+                        [pullCurrencyId]: settlement.newPullCurrency,
+                        ...(settlement.rewardResult?.items ?? {})
+                    },
+                    "mail_arrived": getMailArrivedSync(playerId),
+                    ...(overMax.length > 0 ? { "over_max": overMax } : {})
+                }]),
                 "drawn_reward_list": settlement.drawnRewards.map(reward => {
                     return {
                         "reward_id": reward.id,
@@ -484,14 +503,6 @@ const routes = async (fastify: FastifyInstance) => {
                 }),
                 "all_box_info": allBoxInfo,
                 "joined_character_id_list": settlement.rewardResult?.joined_character_id_list ?? [],
-                "character_list": characterList,
-                "equipment_list": settlement.rewardResult?.equipment_list ?? [],
-                "item_list": {
-                    [pullCurrencyId]: settlement.newPullCurrency,
-                    ...(settlement.rewardResult?.items ?? {})
-                },
-                "mail_arrived": getMailArrivedSync(playerId),
-                ...(overMax.length > 0 ? { "over_max": overMax } : {})
             }
         })
     })

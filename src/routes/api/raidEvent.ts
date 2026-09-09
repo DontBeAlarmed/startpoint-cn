@@ -21,7 +21,12 @@ import {
 } from "../../data/domains/raidEvent";
 import { getDb } from "../../data/db";
 import { grantRaidEventRewardsWithinTransactionSync } from "../../lib/raid-event-reward-grant"
-import { projectItemOverflowCommonResponse } from "../../lib/item-overflow"
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow/common-response"
+import {
+    projectCharacterPatch,
+    projectEquipmentEntity,
+} from "../../lib/common-response/entities";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
 import {
     getRaidEventRewardCatalog,
     getRaidEventOverallRewardDefinitions,
@@ -167,6 +172,27 @@ const routes = async (fastify: FastifyInstance) => {
         ]))
 
         reply.header("content-type", "application/x-msgpack");
+        const overMax = projectItemOverflowCommonResponse(
+            rewardResult?.itemOverflowDispositions ?? [],
+        )
+        const commonFragment = {
+            ...(rewardResult == null ? {} : {
+                user_info: {
+                    free_mana: summary.player.freeMana,
+                    free_vmoney: summary.player.freeVmoney,
+                    exp_pool: summary.player.expPool,
+                },
+                character_list: (characterList ?? []).map(
+                    character => projectCharacterPatch(character),
+                ),
+                equipment_list: rewardResult.equipment_list.map(
+                    equipment => projectEquipmentEntity(equipment),
+                ),
+                item_list: rewardResult.items,
+            }),
+            mail_arrived: getMailArrivedSync(playerId),
+            ...(overMax.length > 0 ? { over_max: overMax } : {}),
+        }
         const responseData: Record<string, unknown> = {
                 "aggregated_time": clientSerializeDate(getServerDate()),
                 "auto_start_point": 0,
@@ -180,17 +206,9 @@ const routes = async (fastify: FastifyInstance) => {
                     "total_kill_count": summary.raidBossState.totalKillCount,
                 },
                 ...(rewardResult ? {
-                    "user_info": {
-                        "free_mana": summary.player.freeMana,
-                        "free_vmoney": summary.player.freeVmoney,
-                        "exp_pool": summary.player.expPool,
-                    },
-                    "character_list": characterList,
                     "joined_character_id_list": rewardResult.joined_character_id_list,
-                    "equipment_list": rewardResult.equipment_list,
-                    "item_list": rewardResult.items,
                 } : {}),
-                "mail_arrived": getMailArrivedSync(playerId),
+                ...mergeCommonResponseFragments([commonFragment]),
                 "endless_battle_next_round": rushEventData.endlessBattleNextRound,
                 "active_rush_battle_folder_id": rushEventData.activeRushBattleFolderId,
                 "endless_battle_played_max_round": rushEventData.endlessBattleNextRound,
@@ -199,10 +217,6 @@ const routes = async (fastify: FastifyInstance) => {
                 "rush_battle_played_party_list": serializedPlayedParties.folderParties,
                 "endless_battle_my_ranking": getPlayerRushEventEndlessBattleRankingSync(playerId, eventId, { rushEventData }),
         }
-        const overMax = projectItemOverflowCommonResponse(
-            rewardResult?.itemOverflowDispositions ?? [],
-        )
-        if (overMax.length > 0) responseData.over_max = overMax
         if (summary.missionSettlement) {
             mergeMissionSettlementResponse(responseData, summary.missionSettlement, viewerId)
         }
