@@ -7,7 +7,13 @@ import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
 import { getPlayerMailCountSync } from "../../data/domains/mail"
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { createCharacterAwakeEligibilityResolver, evaluateMissionProgressStageB, getCharacterIdFromMission, getCurrentStage, getMissionCatalog, mergeMissionSettlementResponse, settleAwakeMissionCandidatesWithEvaluation, settleMissionCategories, settleMissionCategoriesWithEvaluation } from "../../lib/mission/index";
+import { createCharacterAwakeEligibilityResolver, evaluateMissionProgressStageB, getCharacterIdFromMission, getCurrentStage, getMissionCatalog, settleAwakeMissionCandidatesWithEvaluation, settleMissionCategories, settleMissionCategoriesWithEvaluation } from "../../lib/mission/index";
+import {
+    composeMissionSettlementResponse,
+    projectMissionSettlementFragment,
+} from "../../lib/mission/response-fragment";
+import { projectCharacterPatch } from "../../lib/common-response/entities";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { resolveClientProgressTargets } from "../../lib/mission/client-progress";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -156,21 +162,27 @@ const routes = async (fastify: FastifyInstance) => {
 
             const responseData: Record<string, unknown> = {
                 mission_progress_list: missionProgressList,
-                mission_info: [],
-                item_list: {},
-                character_list: [],
-                equipment_list: [],
+                ...mergeCommonResponseFragments([{
+                    mission_info: [],
+                    item_list: {},
+                    character_list: [],
+                    equipment_list: [],
+                }]),
                 degree_list: [],
             }
             if (automaticSettlement) {
-                mergeMissionSettlementResponse(
+                composeMissionSettlementResponse(
                     responseData,
-                    automaticSettlement.settlement,
+                    projectMissionSettlementFragment(automaticSettlement.settlement),
                     viewerId,
                 )
             }
             if (awakeResult) {
-                mergeMissionSettlementResponse(responseData, awakeResult, viewerId)
+                composeMissionSettlementResponse(
+                    responseData,
+                    projectMissionSettlementFragment(awakeResult),
+                    viewerId,
+                )
             }
             responseData.mission_info = [
                 ...(awakeResult?.missionInfo ?? []),
@@ -277,15 +289,23 @@ const routes = async (fastify: FastifyInstance) => {
         console.log(`[MISSION] update_progress viewer=${viewerId} params=${missionParams.length} db_updates=${updatedCount}`)
 
         const responseData: Record<string, unknown> = {
-            mission_info: [],
+            ...mergeCommonResponseFragments([{
+                mission_info: [],
+                character_list: characterList.map(
+                    character => projectCharacterPatch(character),
+                ),
+                item_list: {},
+                equipment_list: [],
+                mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
+            }]),
             degree_list: [],
-            character_list: characterList,
-            item_list: {},
-            equipment_list: [],
-            mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
         }
         if (automaticSettlement) {
-            mergeMissionSettlementResponse(responseData, automaticSettlement, viewerId)
+            composeMissionSettlementResponse(
+                responseData,
+                projectMissionSettlementFragment(automaticSettlement),
+                viewerId,
+            )
         }
 
         reply.header("content-type", "application/x-msgpack")

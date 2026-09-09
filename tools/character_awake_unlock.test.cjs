@@ -275,7 +275,10 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     ]) {
         assert.equal(singleBattleMergeBlock.includes(existingSegment), true)
     }
-    assert.equal(singleBattleProjectorSource.includes('"character_list": [...characterList]'), true)
+    assert.equal(
+        singleBattleProjectorSource.includes('"character_list": characterList.map('),
+        true,
+    )
 
     const storyCall = storySource.lastIndexOf("reconcileAwakeUnlockCharacterList(")
     assert.equal(countOccurrences(storySource, "reconcileAwakeUnlockCharacterList("), 1)
@@ -427,7 +430,10 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
         multiSettlementSource.indexOf("runMultiActiveQuestSettlementTransaction(") > multiCall.position,
         true,
     )
-    assert.deepEqual(findPropertyAssignmentValues(multiResponseSource, "character_list"), ["characterList"])
+    assert.deepEqual(
+        findPropertyAssignmentValues(multiResponseSource, "character_list"),
+        ["characterList.map(\n            character => projectCharacterPatch(character),\n        )"],
+    )
     assert.match(multiFinishBlock, /runMultiplayerSettlementOrchestration\(/)
     assert.equal(findCalls(multiStartBlock, "reconcileAwakeUnlockCharacterList").length, 0)
     assert.equal(findCalls(multiAbortBlock, "reconcileAwakeUnlockCharacterList").length, 0)
@@ -453,7 +459,10 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     assert.deepEqual(activeMissionCall.enclosingTransactionCallbacks, ["getDb().transaction"])
     const activeMissionTransactionCall = getOnlyCall(activeReceiveBlock, "transaction")
     assert.equal(activeMissionTransactionCall.assignedVariable, "settlement")
-    assert.deepEqual(findPropertyAssignmentValues(activeReceiveBlock, "character_list"), ["settlement.characterList"])
+    assert.deepEqual(
+        findPropertyAssignmentValues(activeReceiveBlock, "character_list"),
+        ["settlement.characterList.map(\n                character => projectCharacterPatch(character),\n            )"],
+    )
 
     const boxCloseBlock = getRouteBlock(boxGachaSource, "/close", "/exec")
     const boxExecBlock = getRouteBlock(boxGachaSource, "/exec", "/get_box_list")
@@ -479,7 +488,10 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     }
     assert.deepEqual(boxGachaCall.conditionalConditions, [])
     assert.deepEqual(boxGachaCall.enclosingLoops, [])
-    assert.deepEqual(findPropertyAssignmentValues(boxExecBlock, "character_list"), ["characterList"])
+    assert.deepEqual(
+        findPropertyAssignmentValues(boxExecBlock, "character_list"),
+        ["characterList.map(\n                        character => projectCharacterPatch(character),\n                    )"],
+    )
     assert.equal(findCalls(boxCloseBlock, "reconcileAwakeUnlockCharacterList").length, 0)
     assert.equal(findCalls(boxReadOnlyBlock, "reconcileAwakeUnlockCharacterList").length, 0)
 
