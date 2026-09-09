@@ -6,6 +6,7 @@ import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getQuestFromCategorySync } from "../../lib/quest-content";
 import { getQuestUnlockCost } from "../../lib/quest-entry-content";
 import { generateDataHeaders } from "../../utils";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
 import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
@@ -133,10 +134,10 @@ const routes = async (fastify: FastifyInstance) => {
             "data_headers": generateDataHeaders({
                 viewer_id: viewerId
             }),
-            "data": {
+            "data": mergeCommonResponseFragments([{
                 "item_list": result.itemList,
-                "mail_arrived": getMailArrivedSync(playerId)
-            }
+                "mail_arrived": getMailArrivedSync(playerId),
+            }])
         })
     })
 }

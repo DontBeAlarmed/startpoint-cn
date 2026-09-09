@@ -9,6 +9,7 @@ import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 // removed getAccountPlayers "../../data/wdfpData";
 import { generateDataHeaders } from "../../utils";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
 import { getOwnedPlayerDegreeIdsSync } from "../../data/domains/degree";
 import {
     getPlayerProfileSettingsSync,
@@ -81,9 +82,11 @@ const routes = async (fastify: FastifyInstance) => {
                     owned_character_count: charCount,
                     owned_degree_count: degreeCount,
                 },
-                user_info: {
-                    degree_id: player.degreeId,
-                },
+                ...mergeCommonResponseFragments([{
+                    user_info: {
+                        degree_id: player.degreeId,
+                    },
+                }]),
                 profile_settings: serializeProfileSettings(profileSettings),
                 user_party_group_list: partyGroupList,
             }
@@ -187,7 +190,7 @@ const routes = async (fastify: FastifyInstance) => {
         return reply.status(200).send({
             data_headers: generateDataHeaders({ viewer_id: viewerId }),
             data: {
-                user_info: { degree_id: Number(degreeId) }
+                ...mergeCommonResponseFragments([{ user_info: { degree_id: Number(degreeId) } }])
             }
         })
     })

@@ -13,7 +13,9 @@ import { randomInt } from "crypto"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { characterMaxOverLimits } from "./character"
 import { setCharacterExBoostWithinTransactionSync } from "../../lib/character-growth/commands/set-ex-boost"
-import { getMailArrivedSync } from "../../lib/mail-notification";
+import { getMailArrivedSync } from "../../lib/mail-notification"
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
+import { projectCharacterPatch } from "../../lib/common-response/entities";
 import { getDb } from "../../data/db";
 import {
     deletePendingExBoostDrawSync,
@@ -208,8 +210,10 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
                     status_id: pendingDraw.statusId,
                     ability_id_list: pendingDraw.abilityIdList,
                 },
-                item_list: { [String(costItemId)]: currentCostItemAmount },
-                mail_arrived: getMailArrivedSync(playerId),
+                ...mergeCommonResponseFragments([{
+                    item_list: { [String(costItemId)]: currentCostItemAmount },
+                    mail_arrived: getMailArrivedSync(playerId),
+                }]),
             },
         })
     }
@@ -220,14 +224,16 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
         return reply.status(200).send({
             data_headers: generateDataHeaders({ viewer_id: viewerId }),
             data: {
-                character_list: [projectExBoostCharacter(
-                    viewerId,
-                    characterId,
-                    characterData,
-                    characterData.exBoost,
-                )],
-                item_list: { [String(costItemId)]: currentCostItemAmount },
-                mail_arrived: getMailArrivedSync(playerId),
+                ...mergeCommonResponseFragments([{
+                    character_list: [projectCharacterPatch(projectExBoostCharacter(
+                        viewerId,
+                        characterId,
+                        characterData,
+                        characterData.exBoost,
+                    ))],
+                    item_list: { [String(costItemId)]: currentCostItemAmount },
+                    mail_arrived: getMailArrivedSync(playerId),
+                }]),
             },
         })
     }
@@ -287,15 +293,17 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
         return reply.status(200).send({
             data_headers: headers,
             data: {
-                character_list: [projectExBoostCharacter(
-                    viewerId,
-                    characterId,
-                    characterData,
-                    drawResult,
-                    updateTime,
-                )],
-                item_list: { [String(costItemId)]: settled.afterAmount },
-                mail_arrived: getMailArrivedSync(playerId),
+                ...mergeCommonResponseFragments([{
+                    character_list: [projectCharacterPatch(projectExBoostCharacter(
+                        viewerId,
+                        characterId,
+                        characterData,
+                        drawResult,
+                        updateTime,
+                    ))],
+                    item_list: { [String(costItemId)]: settled.afterAmount },
+                    mail_arrived: getMailArrivedSync(playerId),
+                }]),
             },
         })
     } else {
@@ -315,8 +323,10 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
             data: {
                 character_id: characterId,
                 draw_result: { status_id: drawResult.statusId, ability_id_list: drawResult.abilityIdList },
-                item_list: { [String(costItemId)]: settledCostItemAmount },
-                mail_arrived: getMailArrivedSync(playerId),
+                ...mergeCommonResponseFragments([{
+                    item_list: { [String(costItemId)]: settledCostItemAmount },
+                    mail_arrived: getMailArrivedSync(playerId),
+                }]),
             },
         })
     }
@@ -366,14 +376,16 @@ const routes = async (fastify: FastifyInstance) => {
         return reply.status(200).send({
             data_headers: headers,
             data: {
-                character_list: [projectExBoostCharacter(
-                    viewerId,
-                    characterId,
-                    characterData,
-                    drawResult,
-                    updateTime,
-                )],
-                mail_arrived: getMailArrivedSync(playerId),
+                ...mergeCommonResponseFragments([{
+                    character_list: [projectCharacterPatch(projectExBoostCharacter(
+                        viewerId,
+                        characterId,
+                        characterData,
+                        drawResult,
+                        updateTime,
+                    ))],
+                    mail_arrived: getMailArrivedSync(playerId),
+                }]),
             },
         })
     })
