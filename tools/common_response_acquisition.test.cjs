@@ -226,7 +226,38 @@ test("rejects an Equipment snapshot whose canonical ID differs from its owner en
 
 test("does not share mutable containers between the owner result and the fragment", () => {
     const grant = {
-        entries: [],
+        entries: [
+            {
+                index: 0,
+                outcome: {
+                    kind: "character",
+                    characterId: 7,
+                    isNew: false,
+                    after: {
+                        character_id: 7,
+                        exp: 2,
+                        bond_token_list: [{ mana_board_index: 1, status: 0 }],
+                        mana_board_awake: { 1: 1 },
+                    },
+                    compensationItem: null,
+                },
+            },
+            {
+                index: 1,
+                outcome: {
+                    kind: "equipment",
+                    equipmentId: 20,
+                    requestedAmount: 1,
+                    after: {
+                        equipment_id: 20,
+                        protection: false,
+                        level: 1,
+                        enhancement_level: 0,
+                        stack: 3,
+                    },
+                },
+            },
+        ],
         assets: {
             items: [{
                 itemId: 101,
@@ -238,10 +269,10 @@ test("does not share mutable containers between the owner result and the fragmen
             }],
             characters: [{
                 characterId: 7,
-                joined: true,
+                joined: false,
                 after: {
                     character_id: 7,
-                    level: 2,
+                    exp: 2,
                     bond_token_list: [{ mana_board_index: 1, status: 0 }],
                     mana_board_awake: { 1: 1 },
                 },
@@ -249,7 +280,13 @@ test("does not share mutable containers between the owner result and the fragmen
             equipment: [{
                 equipmentId: 20,
                 requestedAmount: 1,
-                after: { equipment_id: 20, stack: 3 },
+                after: {
+                    equipment_id: 20,
+                    protection: false,
+                    level: 1,
+                    enhancement_level: 0,
+                    stack: 3,
+                },
             }],
             currencies: [],
         },
@@ -258,7 +295,7 @@ test("does not share mutable containers between the owner result and the fragmen
     const fragment = projectRewardGrantAcquisitionFragment({ grant })
 
     grant.assets.items[0].afterAmount = 99
-    grant.assets.characters[0].after.level = 99
+    grant.assets.characters[0].after.exp = 99
     grant.assets.characters[0].after.bond_token_list[0].status = 99
     grant.assets.characters[0].after.mana_board_awake[1] = 99
     grant.assets.equipment[0].after.stack = 99
@@ -269,11 +306,17 @@ test("does not share mutable containers between the owner result and the fragmen
         item_list: { 101: 5 },
         character_list: [{
             character_id: 7,
-            level: 2,
+            exp: 2,
             bond_token_list: [{ mana_board_index: 1, status: 0 }],
             mana_board_awake: { 1: 1 },
         }],
-        equipment_list: [{ equipment_id: 20, stack: 3 }],
+        equipment_list: [{
+            equipment_id: 20,
+            protection: false,
+            level: 1,
+            enhancement_level: 0,
+            stack: 3,
+        }],
     })
 })
 
@@ -292,4 +335,102 @@ test("composes with the C1 merge algebra as absolute last-writer patches", () =>
         character_list: [characterSnapshot],
         equipment_list: [equipmentSnapshot],
     })
+})
+
+test("projects repeated Character outcomes with first creation fields and final stack", () => {
+    const characterId = 321007
+    const grant = createRewardGrantExecutionResult(
+        1,
+        createRewardGrantExecutionPlan([
+            { type: RewardType.CHARACTER, id: characterId },
+            { type: RewardType.CHARACTER, id: characterId },
+        ]),
+        [
+            {
+                kind: "character",
+                characterId,
+                isNew: true,
+                after: {
+                    character_id: characterId,
+                    entry_count: 1,
+                    bond_token_list: [{ mana_board_index: 1, status: 0 }],
+                    join_time: "2026-09-08 00:00:00",
+                    update_time: "2026-09-08 00:00:00",
+                },
+                compensationItem: null,
+            },
+            {
+                kind: "character",
+                characterId,
+                isNew: false,
+                after: { character_id: characterId, stack: 1 },
+                compensationItem: null,
+            },
+        ],
+        { playerId: 1, freeMana: 0, freeVmoney: 0, expPool: 0 },
+    )
+
+    assert.deepEqual(projectRewardGrantAcquisitionFragment({ grant }).character_list, [{
+        character_id: characterId,
+        entry_count: 1,
+        bond_token_list: [{ mana_board_index: 1, status: 0 }],
+        join_time: "2026-09-08 00:00:00",
+        update_time: "2026-09-08 00:00:00",
+        stack: 1,
+    }])
+})
+
+test("projects repeated Equipment outcomes as one complete final entity", () => {
+    const equipmentId = 20
+    const grant = createRewardGrantExecutionResult(
+        1,
+        createRewardGrantExecutionPlan([
+            { type: RewardType.EQUIPMENT, id: equipmentId, count: 1 },
+            { type: RewardType.EQUIPMENT, id: equipmentId, count: 1 },
+        ]),
+        [
+            {
+                kind: "equipment",
+                equipmentId,
+                requestedAmount: 1,
+                after: { equipment_id: equipmentId, protection: false, level: 1 },
+            },
+            {
+                kind: "equipment",
+                equipmentId,
+                requestedAmount: 1,
+                after: { equipment_id: equipmentId, enhancement_level: 0, stack: 1 },
+            },
+        ],
+        { playerId: 1, freeMana: 0, freeVmoney: 0, expPool: 0 },
+    )
+
+    assert.deepEqual(projectRewardGrantAcquisitionFragment({ grant }).equipment_list, [{
+        equipment_id: equipmentId,
+        protection: false,
+        level: 1,
+        enhancement_level: 0,
+        stack: 1,
+    }])
+})
+
+test("rejects an acquisition whose final Equipment entity remains partial", () => {
+    const grant = createRewardGrantExecutionResult(
+        1,
+        createRewardGrantExecutionPlan([
+            { type: RewardType.EQUIPMENT, id: 20, count: 1 },
+        ]),
+        [{
+            kind: "equipment",
+            equipmentId: 20,
+            requestedAmount: 1,
+            after: { equipment_id: 20, stack: 1 },
+        }],
+        { playerId: 1, freeMana: 0, freeVmoney: 0, expPool: 0 },
+    )
+
+    assert.throws(
+        () => projectRewardGrantAcquisitionFragment({ grant }),
+        /protection|level|enhancement_level/,
+    )
 })
