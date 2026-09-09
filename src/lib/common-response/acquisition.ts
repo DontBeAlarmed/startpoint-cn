@@ -1,6 +1,8 @@
-import type { PlannedItemOverflowDisposition } from "../item-overflow/disposition"
 import { projectItemOverflowCommonResponse } from "../item-overflow/common-response"
-import type { RewardGrantExecutionResult } from "../reward-grant"
+import {
+    collectRewardGrantItemOverflowDispositions,
+    type RewardGrantExecutionResult,
+} from "../reward-grant/projection"
 import { cloneCharacterFragment, cloneEquipmentFragment } from "./clone"
 import type {
     CharacterFragment,
@@ -44,7 +46,6 @@ export function projectAcquisitionCurrencyUserInfo(
 
 export interface RewardGrantAcquisitionFragmentInput {
     readonly grant: RewardGrantExecutionResult
-    readonly itemOverflowDispositions: readonly PlannedItemOverflowDisposition[]
 }
 
 export function projectRewardGrantAcquisitionFragment(
@@ -66,17 +67,30 @@ export function projectRewardGrantAcquisitionFragment(
     }
     if (Object.keys(itemList).length > 0) fragment.item_list = itemList
     if (input.grant.assets.characters.length > 0) {
-        fragment.character_list = input.grant.assets.characters.map(
-            entry => cloneCharacterFragment(entry.after as unknown as CharacterFragment),
-        )
+        fragment.character_list = input.grant.assets.characters.map(entry => {
+            if (entry.after.character_id !== entry.characterId) {
+                throw new TypeError("character_id must match Character owner identity")
+            }
+            return cloneCharacterFragment({
+                ...entry.after,
+                character_id: entry.characterId,
+            })
+        })
     }
     if (input.grant.assets.equipment.length > 0) {
-        fragment.equipment_list = input.grant.assets.equipment.map(
-            entry => cloneEquipmentFragment(entry.after as unknown as EquipmentFragment),
-        )
+        fragment.equipment_list = input.grant.assets.equipment.map(entry => {
+            if (entry.after.equipment_id !== entry.equipmentId) {
+                throw new TypeError("equipment_id must match Equipment owner identity")
+            }
+            return cloneEquipmentFragment({
+                ...entry.after,
+                equipment_id: entry.equipmentId,
+            })
+        })
     }
-    if (input.itemOverflowDispositions.length > 0) {
-        fragment.over_max = projectItemOverflowCommonResponse(input.itemOverflowDispositions)
+    const itemOverflowDispositions = collectRewardGrantItemOverflowDispositions(input.grant)
+    if (itemOverflowDispositions.length > 0) {
+        fragment.over_max = projectItemOverflowCommonResponse(itemOverflowDispositions)
     }
     return fragment
 }

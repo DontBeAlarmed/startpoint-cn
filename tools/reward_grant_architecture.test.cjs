@@ -13,6 +13,7 @@ const targetCoreFiles = [
     "execution-outcome.ts",
     "execution-plan.ts",
     "execution-result.ts",
+    "projection.ts",
     "snapshot.ts",
     "transaction-executor.ts",
 ]
@@ -75,6 +76,13 @@ test("public RewardGrant barrel exposes only the target typed contract", () => {
     assert.doesNotMatch(index, /\.\/executor|\.\/plan|\.\/types|owner-executor|entry-result/)
     assert.match(read("src/lib/reward-grant/execution-plan.ts"), /createRewardGrantExecutionPlan/)
     assert.match(read("src/lib/reward-grant/transaction-executor.ts"), /executeRewardGrantExecutionPlanSync/)
+})
+
+test("public RewardGrant projection entrypoint stays side-effect-free", () => {
+    const projection = read("src/lib/reward-grant/projection.ts")
+    assert.match(projection, /collectRewardGrantItemOverflowDispositions/)
+    assert.match(projection, /RewardGrantExecutionResult/)
+    assert.doesNotMatch(projection, /transaction-executor|data\/|routes\//)
 })
 
 test("production consumers use the public barrel and contain no legacy result fields", () => {

@@ -15,7 +15,6 @@ const {
 const {
     createRewardGrantExecutionPlan,
     createRewardGrantExecutionResult,
-    collectRewardGrantItemOverflowDispositions,
 } = require("../src/lib/reward-grant")
 const { RewardType } = require("../src/lib/types/rewards")
 
@@ -89,10 +88,7 @@ function fullGrantFixture() {
 
 test("projects a RewardGrant owner result into absolute Item/Currency/entity fragments", () => {
     const { grant, characterSnapshot, equipmentSnapshot } = fullGrantFixture()
-    const fragment = projectRewardGrantAcquisitionFragment({
-        grant,
-        itemOverflowDispositions: collectRewardGrantItemOverflowDispositions(grant),
-    })
+    const fragment = projectRewardGrantAcquisitionFragment({ grant })
 
     assert.deepEqual(fragment, {
         user_info: { free_mana: 3, free_vmoney: 1, exp_pool: 2 },
@@ -109,10 +105,7 @@ test("omits unpublished common fields for a grant without acquisitions", () => {
         [],
         { playerId: 1, freeMana: 0, freeVmoney: 0, expPool: 0 },
     )
-    const fragment = projectRewardGrantAcquisitionFragment({
-        grant,
-        itemOverflowDispositions: collectRewardGrantItemOverflowDispositions(grant),
-    })
+    const fragment = projectRewardGrantAcquisitionFragment({ grant })
 
     assert.deepEqual(fragment, {
         user_info: { free_mana: 0, free_vmoney: 0, exp_pool: 0 },
@@ -123,7 +116,7 @@ test("omits unpublished common fields for a grant without acquisitions", () => {
     assert.equal("over_max" in fragment, false)
 })
 
-test("reuses the unique overflow adapter for ordered Mail/Sold over_max entries", () => {
+test("derives ordered Mail/Sold over_max entries from the RewardGrant owner result", () => {
     const grant = createRewardGrantExecutionResult(
         1,
         createRewardGrantExecutionPlan([
@@ -172,10 +165,7 @@ test("reuses the unique overflow adapter for ordered Mail/Sold over_max entries"
         { playerId: 1, freeMana: 120, freeVmoney: 0, expPool: 0 },
     )
 
-    const fragment = projectRewardGrantAcquisitionFragment({
-        grant,
-        itemOverflowDispositions: collectRewardGrantItemOverflowDispositions(grant),
-    })
+    const fragment = projectRewardGrantAcquisitionFragment({ grant })
 
     assert.deepEqual(fragment.over_max, [
         { process_type: 1, item: { item_id: 30102, number: 15 } },
@@ -183,6 +173,55 @@ test("reuses the unique overflow adapter for ordered Mail/Sold over_max entries"
     ])
     assert.deepEqual(fragment.item_list, { 30102: 5, 1: 10 })
     assert.deepEqual(fragment.user_info, { free_mana: 120, free_vmoney: 0, exp_pool: 0 })
+})
+
+test("rejects a Character snapshot whose canonical ID differs from its owner entry", () => {
+    const grant = createRewardGrantExecutionResult(
+        1,
+        createRewardGrantExecutionPlan([
+            { type: RewardType.CHARACTER, id: 7 },
+        ]),
+        [{
+            kind: "character",
+            characterId: 7,
+            isNew: true,
+            after: { character_id: 8 },
+            compensationItem: null,
+        }],
+        { playerId: 1, freeMana: 0, freeVmoney: 0, expPool: 0 },
+    )
+
+    assert.throws(
+        () => projectRewardGrantAcquisitionFragment({ grant }),
+        /character_id must match Character owner identity/,
+    )
+})
+
+test("rejects an Equipment snapshot whose canonical ID differs from its owner entry", () => {
+    const grant = createRewardGrantExecutionResult(
+        1,
+        createRewardGrantExecutionPlan([
+            { type: RewardType.EQUIPMENT, id: 20, count: 1 },
+        ]),
+        [{
+            kind: "equipment",
+            equipmentId: 20,
+            requestedAmount: 1,
+            after: {
+                equipment_id: 21,
+                protection: false,
+                level: 1,
+                enhancement_level: 0,
+                stack: 0,
+            },
+        }],
+        { playerId: 1, freeMana: 0, freeVmoney: 0, expPool: 0 },
+    )
+
+    assert.throws(
+        () => projectRewardGrantAcquisitionFragment({ grant }),
+        /equipment_id must match Equipment owner identity/,
+    )
 })
 
 test("does not share mutable containers between the owner result and the fragment", () => {
@@ -216,10 +255,7 @@ test("does not share mutable containers between the owner result and the fragmen
         },
         playerAfter: { playerId: 1, freeMana: 4, freeVmoney: 6, expPool: 8 },
     }
-    const fragment = projectRewardGrantAcquisitionFragment({
-        grant,
-        itemOverflowDispositions: [],
-    })
+    const fragment = projectRewardGrantAcquisitionFragment({ grant })
 
     grant.assets.items[0].afterAmount = 99
     grant.assets.characters[0].after.level = 99
@@ -243,10 +279,7 @@ test("does not share mutable containers between the owner result and the fragmen
 
 test("composes with the C1 merge algebra as absolute last-writer patches", () => {
     const { grant, characterSnapshot, equipmentSnapshot } = fullGrantFixture()
-    const fragment = projectRewardGrantAcquisitionFragment({
-        grant,
-        itemOverflowDispositions: collectRewardGrantItemOverflowDispositions(grant),
-    })
+    const fragment = projectRewardGrantAcquisitionFragment({ grant })
 
     const merged = mergeCommonResponseFragments([
         fragment,
