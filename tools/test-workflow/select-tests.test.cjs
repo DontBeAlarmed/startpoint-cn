@@ -2040,6 +2040,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/rush_event_battle_flow.test.cjs",
         "tools/rush_event_shop_route.test.cjs",
         "tools/rush_event_reset_route.test.cjs",
+        "tools/rush_final_operation_override.test.cjs",
         "tools/shop_campaign_lineup.test.cjs",
         "tools/shop_sales_list_bulk_reads.test.cjs",
         "tools/score_attack_history.test.cjs",
