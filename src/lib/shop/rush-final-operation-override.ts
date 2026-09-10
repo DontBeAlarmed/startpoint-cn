@@ -9,7 +9,7 @@ import type { ShopCatalog } from "./model"
  * event shop rows. This module is the explicit private input that
  * re-exposes the `700001`-`700007` batch content for those events; it is
  * composed at query time and never written back into the official
- * Content Snapshot, `wf-assets-cn` or the CDN archives.
+ * Content Snapshot, the raw CN asset baseline or the CDN archives.
  */
 
 export interface RushFinalOperationOverrideEvent {
