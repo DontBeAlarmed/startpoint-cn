@@ -9,6 +9,7 @@ import {
     ShopOfferPeriodError,
 } from "../../../lib/shop"
 import { executeShopPurchaseSync } from "../../../lib/shop/owner"
+import { resolveRushFinalOperationOverrideForRuntime } from "../../../lib/rush-final-operation-policy"
 import {
     InvalidShopPurchaseCommandError,
     ShopPurchaseBalancePlanError,
@@ -126,6 +127,7 @@ export function registerShopPurchaseRoutes(
                 virtualNowMs: gameTime.virtualNowMs,
                 purchasePeriodNowMs: gameTime.realNowMs,
                 resetHour: dailyResetHour,
+                rushOverride: resolveRushFinalOperationOverrideForRuntime(),
             })
             const responseData = projectShopPurchaseResponse(result, body.viewer_id)
             responseData.character_list = publishCharacterGrowthOwnerStateBestEffort(
@@ -183,6 +185,7 @@ export function registerShopPurchaseRoutes(
                 virtualNowMs: gameTime.virtualNowMs,
                 purchasePeriodNowMs: gameTime.realNowMs,
                 resetHour: dailyResetHour,
+                rushOverride: resolveRushFinalOperationOverrideForRuntime(),
             })
             const responseData = projectShopPurchaseResponse(result, body.viewer_id)
             responseData.character_list = publishCharacterGrowthOwnerStateBestEffort(

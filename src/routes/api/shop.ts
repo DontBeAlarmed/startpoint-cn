@@ -31,6 +31,7 @@ import { planFreeFirstDeduction } from "../../lib/economy/free-first-deduction"
 import { registerShopPurchaseRoutes } from "./shop/purchase-routes"
 import { getShopCatalog } from "../../lib/shop"
 import { selectShopSalesCatalogItems } from "../../lib/shop/sales-catalog"
+import { resolveRushFinalOperationOverrideForRuntime } from "../../lib/rush-final-operation-policy"
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
 
 interface GetSalesListBody {
@@ -89,7 +90,7 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
                 eventIds: event.event_ids,
             })),
             bossCategoryIds: bossCoinShopCategoryIds,
-        })
+        }, resolveRushFinalOperationOverrideForRuntime())
 
         const gameTime = getGameTimeContext()
         const nowMs = gameTime.virtualNowMs

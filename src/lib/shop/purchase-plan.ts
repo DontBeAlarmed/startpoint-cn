@@ -8,6 +8,7 @@ import {
 } from "../types"
 import { resolveEffectiveShopOffer } from "./effective-offer"
 import type { EffectiveShopOffer, ShopCatalog } from "./model"
+import type { RushFinalOperationOverride } from "./rush-final-operation-override"
 import {
     createShopPurchaseCountQuery,
     getShopPurchasePeriodKeys,
@@ -46,6 +47,7 @@ export interface PrepareShopPurchaseInput {
     readonly virtualNowMs: number
     readonly purchasePeriodNowMs: number
     readonly resetHour?: number
+    readonly rushOverride?: RushFinalOperationOverride | null
 }
 
 export interface PreparedShopPurchaseEntry extends ShopPurchaseCommandEntry {
@@ -164,6 +166,7 @@ export function prepareShopPurchase(input: PrepareShopPurchaseInput): PreparedSh
             input.shopType,
             shopItemId,
             input.virtualNowMs,
+            input.rushOverride ?? null,
         )
         const keys = getShopPurchasePeriodKeys(
             input.purchasePeriodNowMs,

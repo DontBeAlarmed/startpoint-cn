@@ -13,6 +13,10 @@ const { installFrozenTestContentSnapshot } = require("./helpers/content-snapshot
 const { getShopCatalog } = require("../src/lib/shop")
 const { resolveEventCurrencyId } = require("../src/lib/event-currency")
 const { ShopType } = require("../src/lib/types")
+const {
+    resolveRushFinalOperationOverride,
+} = require("../src/lib/shop/rush-final-operation-override")
+const { resolveEffectiveShopOffer } = require("../src/lib/shop")
 
 const SHOP_TABLES = Object.freeze([
     "general_shop.json",
@@ -90,10 +94,21 @@ test("shop typed catalog reads its runtime tables from one initialized snapshot"
         assert.equal(catalog.entries[`${ShopType.MANA}:109`].kind, "purchase")
         assert.deepEqual(catalog.eventProductIds["11:700001"], [102])
         assert.deepEqual(catalog.bossProductIds["5"], [103])
-        assert.deepEqual(catalog.entries[`${ShopType.EVENT_ITEM}:102`].periods[1], {
-            availableFrom: "2025-06-26 12:00:00",
-            availableUntil: "2025-08-14 23:59:59",
-        })
+        assert.equal(
+            catalog.entries[`${ShopType.EVENT_ITEM}:102`].periods.length,
+            1,
+            "runtime catalog stays official-only; rush compatibility composes at query time",
+        )
+        assert.equal(
+            resolveEffectiveShopOffer(
+                catalog,
+                ShopType.EVENT_ITEM,
+                102,
+                Date.parse("2025-07-01T04:00:00Z"),
+                resolveRushFinalOperationOverride(true),
+            ).shopItemId,
+            102,
+        )
         assert.deepEqual(catalog.campaignsByKey, {})
         assert.equal(resolveEventCurrencyId(70001, new Date("2024-01-02T00:00:00Z")), 70001)
         assert.equal(requested.includes("cdn_general_shop_whitelist.json"), true)

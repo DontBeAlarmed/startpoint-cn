@@ -31,6 +31,7 @@ import { getDb } from "../../../data/db"
 import { createModeTransactionHost } from "../../../modes/loader"
 import { dispatchModeRushFinish } from "../../../modes/registry"
 import { getRushEventFolderClearRewards } from "../../rush-event-content"
+import { resolveRushFinalOperationOverrideForRuntime } from "../../rush-final-operation-policy"
 import { getCarnivalRewardDefinitions, grantCarnivalRewards } from "../../carnival-rewards"
 import { getCharactersEvolutionImgLevels } from "../../character"
 import { getRaidEventRequiredKillCount } from "../../raid-event-master"
@@ -83,6 +84,7 @@ export function settleSingleBuiltInEvent(
     const clearTime = body.elapsed_time_ms
     const party = body.statistics.party
 
+    const rushFolderRewardOverride = resolveRushFinalOperationOverrideForRuntime()
     const rushFinishParams = {
         questCategory,
         questAccomplished,
@@ -100,7 +102,8 @@ export function settleSingleBuiltInEvent(
         insertClearedFolder: insertPlayerRushEventClearedFolderSync,
         deletePartyList: deletePlayerRushEventPlayedPartyListSync,
         getSerializedParties: getSerializedPlayerRushEventPlayedPartiesSync,
-        getFolderRewards: getRushEventFolderClearRewards,
+        getFolderRewards: (eventId: number, folderId: number) =>
+            getRushEventFolderClearRewards(eventId, folderId, rushFolderRewardOverride),
         giveRewards: input.grantRewards,
         transaction: <T>(operation: () => T) => getDb().transaction(operation)(),
     }

@@ -24,10 +24,6 @@ import type {
 } from "./model"
 import { shopCatalogKey } from "./model"
 import { parseShopCnTimestamp } from "./period"
-import {
-    addRushCompatibilityPeriod,
-    RUSH_COMPATIBILITY_EVENTS,
-} from "./rush-compatibility"
 
 const GENERIC_TABLES: readonly (readonly [ShopType, string])[] = [
     [ShopType.TREASURE, "treasure_shop.json"],
@@ -239,22 +235,6 @@ function addEntry(
     }
 }
 
-function rushCompatibilityForSource(
-    eventShops: EventShopItems,
-    eventType: number,
-    eventId: number,
-) {
-    if (eventType !== 11) return null
-    for (const [targetEventId, compatibility] of Object.entries(RUSH_COMPATIBILITY_EVENTS)) {
-        if (compatibility.sourceEventId !== eventId) continue
-        const targetItems = eventShops["11"]?.[targetEventId]
-        return targetItems !== undefined && Object.keys(targetItems).length > 0
-            ? null
-            : compatibility
-    }
-    return null
-}
-
 function buildScheduleIndex(
     schedules: ShopCostItemScheduleRows,
 ): MutableCatalog["scheduleRowsByMonth"] {
@@ -325,17 +305,13 @@ export function buildShopCatalog(repository: ReadonlyContentRepository): ShopCat
         const eventType = Number(eventTypeText)
         for (const [eventIdText, items] of Object.entries(events)) {
             const eventId = Number(eventIdText)
-            const compatibility = rushCompatibilityForSource(eventShops, eventType, eventId)
             for (const [itemId, item] of Object.entries(items)) {
                 appendEventCurrencyWindows(catalog, item)
-                const effectiveItem = compatibility === null
-                    ? item
-                    : addRushCompatibilityPeriod(item, compatibility)
                 addEntry(
                     catalog,
                     ShopType.EVENT_ITEM,
                     itemId,
-                    effectiveItem,
+                    item,
                     { kind: "event", eventType, eventId },
                     true,
                     campaignMap[String(ShopType.EVENT_ITEM)]?.[itemId],
@@ -343,13 +319,6 @@ export function buildShopCatalog(repository: ReadonlyContentRepository): ShopCat
                 append(catalog.eventProductIds, `${eventType}:${eventId}`, Number(itemId))
             }
         }
-    }
-    for (const [targetEventId, compatibility] of Object.entries(RUSH_COMPATIBILITY_EVENTS)) {
-        const targetKey = `11:${targetEventId}`
-        if ((catalog.eventProductIds[targetKey]?.length ?? 0) > 0) continue
-        const sourceItems = eventShops["11"]?.[String(compatibility.sourceEventId)]
-        if (sourceItems === undefined || Object.keys(sourceItems).length === 0) continue
-        catalog.eventProductIds[targetKey] = Object.keys(sourceItems).map(Number)
     }
 
     const bossShops = repository.table<BossCoinShopItems>("boss_coin_shop.json")

@@ -3,6 +3,11 @@ import type { ShopItem } from "../types/shop"
 import type { EffectiveShopOffer, ShopCatalog } from "./model"
 import { shopCatalogKey } from "./model"
 import {
+    getRushFinalOperationOverrideForSourceEvent,
+    RUSH_EVENT_TYPE,
+    type RushFinalOperationOverride,
+} from "./rush-final-operation-override"
+import {
     getShopCnMonth,
     isShopPeriodAvailable,
 } from "./period"
@@ -18,13 +23,30 @@ export function resolveEffectiveShopOffer(
     shopType: number,
     shopItemId: number,
     nowMs: number,
+    rushOverride: RushFinalOperationOverride | null = null,
 ): EffectiveShopOffer {
     if (!Number.isFinite(nowMs)) throw new ShopOfferPeriodError("Invalid shop time.")
     const entry = catalog.entries[shopCatalogKey(shopType, shopItemId)]
     if (entry === undefined || entry.kind !== "purchase") {
         throw new ShopOfferNotPurchasableError("Shop offer is not purchasable.")
     }
-    if (!entry.periods.some(period => isShopPeriodAvailable(period, nowMs))) {
+    let periods = entry.periods
+    if (rushOverride !== null
+        && entry.scope.kind === "event"
+        && entry.scope.eventType === RUSH_EVENT_TYPE) {
+        const source = getRushFinalOperationOverrideForSourceEvent(
+            catalog,
+            rushOverride,
+            entry.scope.eventId,
+        )
+        if (source !== null) {
+            periods = [...periods, {
+                availableFrom: source.availableFrom,
+                availableUntil: source.availableUntil,
+            }]
+        }
+    }
+    if (!periods.some(period => isShopPeriodAvailable(period, nowMs))) {
         throw new ShopOfferPeriodError("Shop offer is outside its available period.")
     }
 

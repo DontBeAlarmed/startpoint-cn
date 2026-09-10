@@ -82,6 +82,15 @@ db.exec(`
         lineup_id INTEGER NOT NULL,
         PRIMARY KEY (player_id, shop_type, campaign_id)
     );
+    CREATE TABLE server_gameplay_settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        drop_multiplier INTEGER NOT NULL DEFAULT 1,
+        multi_rescue_fragment_rewards_enabled INTEGER NOT NULL DEFAULT 1,
+        multi_rescue_host_rewards_enabled INTEGER NOT NULL DEFAULT 1,
+        rush_700011_to_700017_compatibility_enabled INTEGER NOT NULL DEFAULT 1,
+        updated_at TEXT NOT NULL
+    );
+    INSERT INTO server_gameplay_settings (id, updated_at) VALUES (1, '2026-09-10T00:00:00.000Z');
     INSERT INTO player_state VALUES (17, 0, 0, 1000, 100, 20, 50);
     INSERT INTO item_state VALUES (17, 2370001, 1000);
     INSERT INTO item_state VALUES (17, 49100, 3);
@@ -494,6 +503,14 @@ function decode(response) {
     return unpack(response.rawPayload)
 }
 
+function setRushCompatibilityEnabled(enabled) {
+    db.prepare(`
+        UPDATE server_gameplay_settings
+        SET rush_700011_to_700017_compatibility_enabled = ?, updated_at = ?
+        WHERE id = 1
+    `).run(enabled ? 1 : 0, new Date().toISOString())
+}
+
 async function getRushSales(fastify, eventType, eventId) {
     const response = await fastify.inject({
         method: "POST",
@@ -765,6 +782,56 @@ async function main() {
         assert.equal((await getRushSales(fastify, 11, 700011)).length, 33)
         globalNowSeconds = Date.parse("2025-08-15T00:00:00+08:00") / 1000
         assert.equal((await getRushSales(fastify, 11, 700011)).length, 0)
+
+        setRushCompatibilityEnabled(false)
+        try {
+            globalNowSeconds = Date.parse("2025-07-12T12:00:00+08:00") / 1000
+            assert.equal(
+                (await getRushSales(fastify, 11, 700011)).length,
+                0,
+                "关闭策略后 700011 商店必须回到官方末期空列表",
+            )
+            assert.equal(
+                (await getRushSales(fastify, 11, 700017)).length,
+                0,
+                "关闭策略后 700017 商店必须回到官方末期空列表",
+            )
+            assert.equal(
+                (await getRushSales(fastify, 11, 700001)).length,
+                0,
+                "关闭策略后源活动列表不得携带常驻期兼容",
+            )
+            setItem(17, 2370001, 1000)
+            const beforeDisabledPurchase = snapshot()
+            const disabledPurchase = await fastify.inject({
+                method: "POST",
+                url: "/buy",
+                payload: { viewer_id: 123, shop_type: 4, shop_item_id: 700032, number: 1 },
+            })
+            assert.equal(disabledPurchase.statusCode, 200)
+            assert.equal(
+                decode(disabledPurchase).data_headers.result_code,
+                2053,
+                "关闭策略后常驻期直购必须按官方原始开放期拒绝（2053）",
+            )
+            assert.deepEqual(snapshot(), beforeDisabledPurchase)
+            const disabledBulk = await fastify.inject({
+                method: "POST",
+                url: "/bulk_buy",
+                payload: { viewer_id: 123, shop_type: 4, buy_item_list: { 700032: 1 } },
+            })
+            assert.equal(disabledBulk.statusCode, 200)
+            assert.equal(decode(disabledBulk).data_headers.result_code, 2053)
+        } finally {
+            setRushCompatibilityEnabled(true)
+        }
+
+        globalNowSeconds = Date.parse("2025-07-12T12:00:00+08:00") / 1000
+        assert.equal(
+            (await getRushSales(fastify, 11, 700011)).length,
+            33,
+            "重新开启策略后私服兼容立即恢复且无缓存残留",
+        )
 
         globalNowSeconds = Date.parse("2023-12-18T12:00:00+08:00") / 1000
         assert.equal(

@@ -1,5 +1,8 @@
 import { Reward, RushEventFolders } from "./types"
-import { getRushCompatibilityEvent } from "./shop/rush-compatibility"
+import {
+    getRushFinalOperationOverrideEvent,
+    type RushFinalOperationOverride,
+} from "./shop/rush-final-operation-override"
 import { getContentSnapshot } from "../content/runtime/content-snapshot"
 import { getRushEventQuestRounds } from "./quest-content"
 import type { ScoreAttackBorderTier } from "./quest/finish/score-attack-handler"
@@ -48,6 +51,56 @@ export function getRushEventFolderMaxRoundSync(
     return maxRound
 }
 
+export type RushFolderClearRewardProvenance = "OFFICIAL_CONTENT" | "PRIVATE_OVERRIDE"
+
+export interface RushFolderClearRewardResolution {
+    readonly rewards: readonly Reward[]
+    readonly provenance: RushFolderClearRewardProvenance
+}
+
+class RushEventFolderContentError extends Error {
+    constructor(eventId: number, folderId: number) {
+        super(`Rush event folder clear rewards are invalid: eventId=${eventId} folderId=${folderId}`)
+        this.name = "RushEventFolderContentError"
+    }
+}
+
+/**
+ * Resolves the folder clear rewards for a rush event from the official
+ * Content Snapshot first. Only when the official row is present but empty
+ * and the private final-operation override is enabled for this exact
+ * event does the resolution compose the source batch's rewards, marked
+ * with PRIVATE_OVERRIDE provenance. Malformed official rows throw instead
+ * of silently falling back to private content.
+ */
+export function resolveRushEventFolderClearRewards(
+    rushEventId: number,
+    folderId: number,
+    rushOverride: RushFinalOperationOverride | null = null,
+): RushFolderClearRewardResolution {
+    const rushEventQuestFolders = getContentSnapshot().repository.table<RushEventFolders>(
+        "rush_event_quest_folder.json",
+    )
+    const folders = rushEventQuestFolders[rushEventId]
+    const rewards = folders?.[folderId]
+    if (rewards !== undefined && !Array.isArray(rewards)) {
+        throw new RushEventFolderContentError(rushEventId, folderId)
+    }
+    if (Array.isArray(rewards) && rewards.length > 0) {
+        return { rewards, provenance: "OFFICIAL_CONTENT" }
+    }
+
+    const overrideEvent = getRushFinalOperationOverrideEvent(rushOverride, rushEventId)
+    if (overrideEvent === null) return { rewards: [], provenance: "OFFICIAL_CONTENT" }
+    const fallbackRewards = rushEventQuestFolders[overrideEvent.sourceEventId]?.[folderId]
+    if (fallbackRewards !== undefined && !Array.isArray(fallbackRewards)) {
+        throw new RushEventFolderContentError(overrideEvent.sourceEventId, folderId)
+    }
+    return Array.isArray(fallbackRewards) && fallbackRewards.length > 0
+        ? { rewards: fallbackRewards, provenance: "PRIVATE_OVERRIDE" }
+        : { rewards: [], provenance: "OFFICIAL_CONTENT" }
+}
+
 /**
  * Gets the rewards that should be given when clearing a given folder.
  *
@@ -57,19 +110,11 @@ export function getRushEventFolderMaxRoundSync(
  */
 export function getRushEventFolderClearRewards(
     rushEventId: number,
-    folderId: number
+    folderId: number,
+    rushOverride: RushFinalOperationOverride | null = null,
 ): Reward[] | null {
-    const rushEventQuestFolders = getContentSnapshot().repository.table<RushEventFolders>(
-        "rush_event_quest_folder.json",
-    )
-    const folders = rushEventQuestFolders[rushEventId]
-    const rewards = folders?.[folderId]
-    if (Array.isArray(rewards) && rewards.length > 0) return rewards
-
-    const compatibility = getRushCompatibilityEvent(rushEventId)
-    if (compatibility === null) return null
-    const fallbackRewards = rushEventQuestFolders[compatibility.sourceEventId]?.[folderId]
-    return Array.isArray(fallbackRewards) && fallbackRewards.length > 0 ? fallbackRewards : null
+    const resolution = resolveRushEventFolderClearRewards(rushEventId, folderId, rushOverride)
+    return resolution.rewards.length > 0 ? [...resolution.rewards] : null
 }
 
 export function getScoreAttackBorderRewards(): Record<string, ScoreAttackBorderTier[]> {

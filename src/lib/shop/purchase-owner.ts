@@ -18,6 +18,7 @@ import {
 } from "./equipment-enhancement-adapter"
 import { getShopCatalog } from "./catalog"
 import type { ShopCatalog } from "./model"
+import type { RushFinalOperationOverride } from "./rush-final-operation-override"
 import {
     applyPreparedShopPassCardEffectWithinTransactionSync,
     prepareShopPassCardEffect,
@@ -41,6 +42,7 @@ export interface ExecuteShopPurchaseInput {
     readonly purchasePeriodNowMs: number
     readonly resetHour?: number
     readonly catalog?: ShopCatalog
+    readonly rushOverride?: RushFinalOperationOverride | null
 }
 
 function authorizeCampaignLineups(
@@ -84,6 +86,7 @@ export function executeShopPurchaseSync(
         virtualNowMs: input.virtualNowMs,
         purchasePeriodNowMs: input.purchasePeriodNowMs,
         resetHour: input.resetHour,
+        rushOverride: input.rushOverride ?? null,
     })
     const virtualNow = new Date(input.virtualNowMs)
 

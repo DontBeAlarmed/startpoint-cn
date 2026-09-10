@@ -49,7 +49,9 @@ const { encodeCnMsgpackPayload, registerCnMsgpackOnSend } = require("../src/rout
 const {
     getRushEventFolderClearRewards,
     getRushEventFolderMaxRoundSync,
+    resolveRushEventFolderClearRewards,
 } = require("../src/lib/rush-event-content")
+const { resolveRushFinalOperationOverrideForRuntime } = require("../src/lib/rush-final-operation-policy")
 const { canStartRushEventFolderBattle } = require("../src/lib/rush-folder-progression.ts")
 const rushEventRoutes = require("../src/routes/api/rushEvent").default
 const singleBattleRoutes = require("../src/routes/api/singleBattleQuest").default
@@ -345,7 +347,13 @@ test("中级两 lap 真实链允许客户端不重复 select_folder 直接开始
 test("700011 高级两 lap 走真实兼容奖励并保持响应与库存一致", async () => {
     const folderId = RushEventFolder.ADVANCED
     const questIds = [700011003, 700011004]
-    const rewards = getRushEventFolderClearRewards(compatibilityEventId, folderId)
+    const resolution = resolveRushEventFolderClearRewards(
+        compatibilityEventId,
+        folderId,
+        resolveRushFinalOperationOverrideForRuntime(),
+    )
+    assert.equal(resolution.provenance, "PRIVATE_OVERRIDE")
+    const rewards = [...resolution.rewards]
     assert.ok(rewards?.length > 0)
     const expectedResponseRewards = rewards.map(reward => ({
         kind: 1,
@@ -642,6 +650,65 @@ test("single battle finish 在 folder round 内容非法时拒绝结算", async 
         assert.equal(response.statusCode, 500, response.body)
     } finally {
         restoreInvalidSnapshot()
+        clearFolderState()
+    }
+})
+
+test("关闭狂热激战常驻兼容开关后，700011 文件夹奖励回到官方末期空数据", async () => {
+    db.prepare(`
+        UPDATE server_gameplay_settings
+        SET rush_700011_to_700017_compatibility_enabled = 0
+        WHERE id = 1
+    `).run()
+    try {
+        const disabled = resolveRushEventFolderClearRewards(
+            compatibilityEventId,
+            RushEventFolder.ADVANCED,
+            resolveRushFinalOperationOverrideForRuntime(),
+        )
+        assert.equal(disabled.provenance, "OFFICIAL_CONTENT")
+        assert.deepEqual(disabled.rewards, [])
+
+        const folderId = RushEventFolder.ADVANCED
+        const questIds = [700011003, 700011004]
+        const beforeTotalsSnapshot = (() => {
+            const officialSource = resolveRushEventFolderClearRewards(
+                700001,
+                folderId,
+                resolveRushFinalOperationOverrideForRuntime(),
+            )
+            return Object.fromEntries(officialSource.rewards.map(reward => [
+                reward.id,
+                getStoredItemAndMailTotal(reward.id),
+            ]))
+        })()
+
+        const selected = await selectFolder(folderId, compatibilityEventId)
+        assert.equal(selected.statusCode, 200, selected.body)
+        assert.equal((await startBattle(questIds[0], 1, true)).statusCode, 200)
+        assert.equal((await finishBattle(questIds[0])).statusCode, 200)
+        assert.equal((await startBattle(questIds[1], 2, true)).statusCode, 200)
+        const final = await finishBattle(questIds[1])
+        assert.equal(final.statusCode, 200, final.body)
+        assert.deepEqual(
+            decodeResponse(final).data.rush_event.rush_battle_reward_list,
+            [],
+            "关闭策略后 folder 终局结算必须返回官方空奖励",
+        )
+
+        for (const [itemId, before] of Object.entries(beforeTotalsSnapshot)) {
+            assert.equal(
+                getStoredItemAndMailTotal(Number(itemId)),
+                before,
+                `关闭策略后不得发放源活动道具 ${itemId}`,
+            )
+        }
+    } finally {
+        db.prepare(`
+            UPDATE server_gameplay_settings
+            SET rush_700011_to_700017_compatibility_enabled = 1
+            WHERE id = 1
+        `).run()
         clearFolderState()
     }
 })
