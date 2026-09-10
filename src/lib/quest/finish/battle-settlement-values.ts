@@ -26,6 +26,7 @@ export interface BattleSettlementValueQuest {
 export interface BattleSettlementValuePlanInput {
     readonly player: BattleSettlementValuePlayer
     readonly quest: BattleSettlementValueQuest
+    readonly questAccomplished: boolean
     readonly useBoostPoint: boolean
     readonly useBossBoostPoint: boolean
     readonly fieldMana: number
@@ -62,29 +63,42 @@ export interface BattleSettlementValuePlan {
 /**
  * Computes the values shared by Single and Multi finish adapters.
  * The caller remains the lifecycle/transaction owner and supplies validated facts.
+ *
+ * A failed settlement keeps every success-only contribution at zero: fixed and
+ * field Mana, the fixed EXP pool, character battle EXP and rank points are not
+ * published, and the boost points are not consumed. Entry resources are handled
+ * by the caller's release path, not by this plan.
  */
 export function createBattleSettlementValuePlan(
     input: BattleSettlementValuePlanInput,
 ): BattleSettlementValuePlan {
     const useBoostPoint = input.useBoostPoint || input.useBossBoostPoint
     const rates = Object.freeze({ ...input.rewardCampaignRates })
-    const fixedManaReward = calculateFixedQuestMana(
-        input.quest.manaReward,
-        rates,
-        useBoostPoint,
-    )
-    const fixedPoolExpReward = calculateFixedQuestPoolExp(
-        input.quest.poolExpReward,
-        rates,
-        useBoostPoint,
-    )
-    const characterBattleExp = calculateCharacterBattleExp(
-        input.quest.characterExpReward,
-        rates,
-    )
-    const manaObtained = fixedManaReward + input.fieldMana
+    const fixedManaReward = input.questAccomplished
+        ? calculateFixedQuestMana(
+            input.quest.manaReward,
+            rates,
+            useBoostPoint,
+        )
+        : 0
+    const fixedPoolExpReward = input.questAccomplished
+        ? calculateFixedQuestPoolExp(
+            input.quest.poolExpReward,
+            rates,
+            useBoostPoint,
+        )
+        : 0
+    const characterBattleExp = input.questAccomplished
+        ? calculateCharacterBattleExp(
+            input.quest.characterExpReward,
+            rates,
+        )
+        : 0
+    const fieldMana = input.questAccomplished ? input.fieldMana : 0
+    const manaObtained = fixedManaReward + fieldMana
     const beforeRankPoint = input.player.rankPoint
-    const newRankPoint = beforeRankPoint + input.quest.rankPointReward
+    const newRankPoint = beforeRankPoint
+        + (input.questAccomplished ? input.quest.rankPointReward : 0)
     const oldDegreeId = getRankDegree(beforeRankPoint)
     const newDegreeId = getRankDegree(newRankPoint)
 
@@ -94,7 +108,7 @@ export function createBattleSettlementValuePlan(
         fixedManaReward,
         fixedPoolExpReward,
         characterBattleExp,
-        fieldMana: input.fieldMana,
+        fieldMana,
         manaObtained,
         beforeRankPoint,
         newRankPoint,
@@ -105,8 +119,10 @@ export function createBattleSettlementValuePlan(
             freeMana: input.player.freeMana + manaObtained,
             expPool: input.player.expPool + fixedPoolExpReward,
             rankPoint: newRankPoint,
-            boostPoint: input.player.boostPoint - (input.useBoostPoint ? 1 : 0),
-            bossBoostPoint: input.player.bossBoostPoint - (input.useBossBoostPoint ? 1 : 0),
+            boostPoint: input.player.boostPoint
+                - (input.questAccomplished && input.useBoostPoint ? 1 : 0),
+            bossBoostPoint: input.player.bossBoostPoint
+                - (input.questAccomplished && input.useBossBoostPoint ? 1 : 0),
             totalManaObtained: input.player.totalManaObtained + manaObtained,
             maxComboAchieved: Math.max(input.player.maxComboAchieved, input.maxComboCount),
         }),

@@ -57,6 +57,7 @@ export function executeSingleSettlementWrites(
         activeQuest: settlementActiveQuest,
         quest: questData,
         body,
+        questAccomplished,
     })
     const {
         beforeRankPoint,
@@ -66,6 +67,7 @@ export function executeSingleSettlementWrites(
         didLevelUp,
         fixedManaReward,
         fixedPoolExpReward,
+        fieldMana,
         characterBattleExp,
         manaObtained,
         playerValues,
@@ -149,12 +151,14 @@ export function executeSingleSettlementWrites(
         ? getServerGameplaySettingsSync()
         : null
     console.log(`[BATTLE] scoreReward groupId=${questData.scoreRewardGroupId} groupLen=${questData.scoreRewardGroup?.length ?? "null"} questId=${questId} category=${questCategory}`)
-    const scoreRewardSelection = selectScoreRewardGrantPlan(
-        questData.scoreRewardGroupId, questData.scoreRewardGroup, useBoostPoint, questData.element, {
-            commonRewardCount: getCommonScoreRewardCount(questData, clearRank) ?? undefined,
-            rewardCampaignRates, rewardDate: settlementTime,
-        },
-    )
+    const scoreRewardSelection = questAccomplished
+        ? selectScoreRewardGrantPlan(
+            questData.scoreRewardGroupId, questData.scoreRewardGroup, useBoostPoint, questData.element, {
+                commonRewardCount: getCommonScoreRewardCount(questData, clearRank) ?? undefined,
+                rewardCampaignRates, rewardDate: settlementTime,
+            },
+        )
+        : selectScoreRewardGrantPlan()
     const scoreRewardGrant = grantSingleSettlementScoreRewardsWithinTransactionSync(
         playerId, scoreRewardSelection, responseState.playerState, rewardGrantOptions,
     )
@@ -261,7 +265,7 @@ export function executeSingleSettlementWrites(
         raidEventData, carnivalEventData, carnivalRewardResult, scoreAttackFinishResult,
         scoreAttackRewardResult, itemList, characterList, clearReward, sPlusClearReward,
         missionSettlement, awakeMissionSettlement, activeMissionList, fixedManaReward,
-        fixedPoolExpReward, newMana, beforeRankPoint, newRankPoint, newBoostPoint,
+        fixedPoolExpReward, fieldMana, newMana, beforeRankPoint, newRankPoint, newBoostPoint,
         newBossBoostPoint, finalPlayerProjection,
         itemOverflowDispositions,
     }

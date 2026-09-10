@@ -1276,6 +1276,85 @@ for (const [label, participant, isHost] of [
     })
 }
 
+test("production failed /finish grants no success-only economy writes", async () => {
+    let home
+    try {
+        home = await openProductionHome(
+            "a1-failed-no-rewards",
+            host,
+            true,
+            { verify: async () => ({ ok: true, isHost: true }) },
+        )
+        const playId = "a1-failed-no-rewards"
+        const started = await home.app.inject({
+            method: "POST",
+            url: "/start",
+            payload: startPayload(host.viewerId, playId),
+        })
+        assert.equal(started.statusCode, 200, started.body)
+        const before = getPlayerSync(home.playerId)
+
+        const finished = await home.app.inject({
+            method: "POST",
+            url: "/finish",
+            payload: finishPayload(host.viewerId, playId, {
+                is_accomplished: false,
+                add_mana: 4_321,
+            }),
+        })
+        assert.equal(finished.statusCode, 200, finished.body)
+        const after = getPlayerSync(home.playerId)
+
+        // The host prepaid entry Item is still restored exactly once.
+        assert.equal(getPlayerItemSync(home.playerId, productionQuest.ticketId), 1)
+        // Hard-multi quest 2001 carries manaReward 2790, poolExpReward 2900 and
+        // rankPointReward 1590; a failed settlement grants none of them and the
+        // client add_mana contributes nothing.
+        assert.equal(after.freeMana, before.freeMana)
+        assert.equal(after.expPool, before.expPool)
+        assert.equal(after.rankPoint, before.rankPoint)
+        assert.equal(after.totalManaObtained ?? 0, before.totalManaObtained ?? 0)
+        assert.equal(getPlayerActiveQuestSync(home.playerId), null)
+    } finally {
+        await closeProductionHome(home)
+    }
+})
+
+test("production /finish rejects client add_mana above the client int32 field", async () => {
+    let home
+    try {
+        home = await openProductionHome(
+            "a1-add-mana-int32-bound",
+            host,
+            true,
+            { verify: async () => ({ ok: true, isHost: true }) },
+        )
+        const playId = "a1-add-mana-int32-bound"
+        const started = await home.app.inject({
+            method: "POST",
+            url: "/start",
+            payload: startPayload(host.viewerId, playId),
+        })
+        assert.equal(started.statusCode, 200, started.body)
+        const before = getPlayerSync(home.playerId)
+
+        const finished = await home.app.inject({
+            method: "POST",
+            url: "/finish",
+            payload: finishPayload(host.viewerId, playId, {
+                add_mana: 2_147_483_648,
+            }),
+        })
+        assert.equal(finished.statusCode, 400, finished.body)
+        const after = getPlayerSync(home.playerId)
+        assert.equal(after.freeMana, before.freeMana)
+        assert.equal(after.rankPoint, before.rankPoint)
+        assert.notEqual(getPlayerActiveQuestSync(home.playerId), null)
+    } finally {
+        await closeProductionHome(home)
+    }
+})
+
 test("production /finish settles through a real HubClient session rotation", async t => {
     const hub = createRotatingHub(t)
     const created = await hub.coordinator.createRoom({

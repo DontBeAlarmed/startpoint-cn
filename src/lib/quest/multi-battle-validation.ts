@@ -43,6 +43,12 @@ function isNonNegativeSafeInteger(value: unknown): value is number {
     return Number.isSafeInteger(value) && (value as number) >= 0
 }
 
+// The client serializes add_mana from BattleClearParameter.obtainedMana, an
+// int32 field, so anything above INT32_MAX cannot come from an official client.
+function isNonNegativeInt32(value: unknown): value is number {
+    return isNonNegativeSafeInteger(value) && (value as number) <= 2_147_483_647
+}
+
 export function validateMultiStartRequest(
     input: MultiStartValidationInput,
 ): MultiStartValidationResult {
@@ -86,7 +92,7 @@ export function validateMultiFinishRequest(
     const continueCount = body.continue_count
     const statistics = body.statistics ?? body.quest_statistics
     if (!isPositiveSafeInteger(elapsedTimeMs)
-        || !isNonNegativeSafeInteger(addMana)
+        || !isNonNegativeInt32(addMana)
         || typeof score !== "number"
         || !Number.isFinite(score)
         || score < 0

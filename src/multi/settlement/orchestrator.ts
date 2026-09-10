@@ -292,6 +292,7 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             quest: questData,
             questCategory,
             questId,
+            questAccomplished,
             fieldMana,
             maxComboCount: Number((freshValidation.statistics as any).max_combo_count ?? 0),
         })
@@ -351,21 +352,23 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             }
         }
 
-        const scoreRewardsResult = rewardGranter.grantScoreRewards(
-            questData.scoreRewardGroupId || 0,
-            questData.scoreRewardGroup,
-            useBoostPoint,
-            questData.element,
-            {
-                commonRewardCount: getCommonScoreRewardCount(
-                    questData,
-                    clearRank,
-                    getMultiRewardPolicySync().commonRewardMultiplier,
-                ) ?? undefined,
-                rewardCampaignRates,
-                rewardDate: settlementTime,
-            },
-        )
+        const scoreRewardsResult = questAccomplished
+            ? rewardGranter.grantScoreRewards(
+                questData.scoreRewardGroupId || 0,
+                questData.scoreRewardGroup,
+                useBoostPoint,
+                questData.element,
+                {
+                    commonRewardCount: getCommonScoreRewardCount(
+                        questData,
+                        clearRank,
+                        getMultiRewardPolicySync().commonRewardMultiplier,
+                    ) ?? undefined,
+                    rewardCampaignRates,
+                    rewardDate: settlementTime,
+                },
+            )
+            : rewardGranter.grantScoreRewards()
         const serverDropMultiplier = getServerGameplaySettingsSync().dropMultiplier
         const additionalRewardSettlement = questAccomplished
             ? settleAdditionalRewardsSync(
@@ -504,7 +507,7 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             sPlusClearReward,
             missionSettlement,
             awakeMissionSettlement,
-            fieldMana,
+            fieldMana: valuePlan.fieldMana,
             fixedManaReward,
             fixedPoolExpReward,
             beforeRankPoint,

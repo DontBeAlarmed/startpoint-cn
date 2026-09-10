@@ -14,6 +14,7 @@ export function createMultiSettlementValuePlan(input: {
     readonly quest: BattleQuest
     readonly questCategory: number
     readonly questId: number
+    readonly questAccomplished: boolean
     readonly fieldMana: number
     readonly maxComboCount: number
 }): { readonly settlementTime: Date; readonly valuePlan: BattleSettlementValuePlan } {
@@ -34,6 +35,7 @@ export function createMultiSettlementValuePlan(input: {
             maxComboAchieved: input.player.maxComboAchieved ?? 0,
         },
         quest: input.quest,
+        questAccomplished: input.questAccomplished,
         useBoostPoint: input.activeQuest.useBoostPoint,
         useBossBoostPoint: input.activeQuest.useBossBoostPoint,
         fieldMana: input.fieldMana,

@@ -14,6 +14,7 @@ export function createSingleSettlementValuePlan(input: {
     readonly activeQuest: ActiveQuest
     readonly quest: BattleQuest
     readonly body: ValidatedSingleFinishBody
+    readonly questAccomplished: boolean
 }): { readonly settlementTime: Date; readonly valuePlan: BattleSettlementValuePlan } {
     const settlementTime = new Date(getServerTime() * 1000)
     const rewardCampaignRates = getRewardCampaignRates(
@@ -32,6 +33,7 @@ export function createSingleSettlementValuePlan(input: {
             maxComboAchieved: input.player.maxComboAchieved ?? 0,
         },
         quest: input.quest,
+        questAccomplished: input.questAccomplished,
         useBoostPoint: input.activeQuest.useBoostPoint,
         useBossBoostPoint: input.activeQuest.useBossBoostPoint,
         fieldMana: input.body.add_mana,

@@ -128,6 +128,7 @@ export function buildSingleFinishResponse({
         activeMissionList,
         fixedManaReward,
         fixedPoolExpReward,
+        fieldMana,
         beforeRankPoint,
         clearRank,
         questProgress,
@@ -183,7 +184,7 @@ export function buildSingleFinishResponse({
             "converted_pool_exp": 0,
             "reward_pool_exp": fixedPoolExpReward,
             "reward_mana": fixedManaReward,
-            "field_mana": body.add_mana,
+            "field_mana": fieldMana,
         },
         "old_high_score": scoreAttackFinishResult?.oldHighScore ?? (questProgress === null ? 0 : questProgress.highScore || 0),
         "joined_character_id_list": [

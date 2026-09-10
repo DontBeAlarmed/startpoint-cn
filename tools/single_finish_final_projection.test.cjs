@@ -15,9 +15,9 @@ const {
     insertPlayerRushEventSync,
 } = require("../src/data/domains/rushEvent")
 const { QuestCategory, RewardType } = require("../src/lib/types")
-const { getMaxStamina, getRankDegree } = require("../src/lib/stamina")
 const { getServerTime, realToVirtual } = require("../src/utils")
 const {
+    AWAKE_CHARACTER_ID,
     MAIN_QUEST_ID,
     noIncidentalAdditionalRewards,
     withSingleBattleHarness,
@@ -336,7 +336,7 @@ test("single finish user_info is the final persisted player projection", async (
     })
 })
 
-test("single failed finish applies rank refill after releasing entry stamina", async () => {
+test("single failed finish releases entry stamina without rank refill", async () => {
     await withSingleBattleHarness("final-failed-rank-up-refill", async harness => {
         const playId = "task-26d2-failed-rank-up-refill"
         const rankPointBefore = 93
@@ -357,14 +357,87 @@ test("single failed finish applies rank refill after releasing entry stamina", a
 
         const persisted = harness.getPlayer()
         assert.ok(persisted)
-        const newDegreeId = getRankDegree(rankPointBefore + 3)
-        const releasedAfterStamina = currentStamina + 10
-        const expectedStamina = Math.min(
-            releasedAfterStamina + getMaxStamina(newDegreeId),
-            999,
+        // A failed finish keeps the rank point at its pre-battle value, so the
+        // rank-up stamina refill must not fire either.
+        assert.equal(persisted.rankPoint, rankPointBefore)
+        assert.equal(persisted.stamina, currentStamina + 10)
+        assert.equal(response.data.user_info.stamina, currentStamina + 10)
+    }, {
+        tableOverrides: noIncidentalRewardOverrides(),
+    })
+})
+
+test("single failed finish grants no success-only rewards or progression writes", async () => {
+    await withSingleBattleHarness("a1-failed-no-rewards", async harness => {
+        harness.makeAwakeEligible()
+        const playId = "task-a1-failed-no-rewards"
+        harness.updatePlayer({ rankPoint: 10 })
+        const activeQuest = harness.createActiveQuest({ playId })
+        activeQuest.staminaCost = 10
+        harness.insertActiveQuest(activeQuest)
+
+        const characterExpBefore = harness.db.prepare(`
+            SELECT exp FROM players_characters WHERE player_id = ? AND id = ?
+        `).get(harness.playerId, AWAKE_CHARACTER_ID)?.exp
+
+        const payload = harness.finishPayload({ playId, addMana: 5_000 })
+        payload.is_accomplished = false
+        const before = harness.snapshotState()
+        const response = await harness.post("finish", payload)
+        assert.equal(response.statusCode, 200, JSON.stringify(response))
+        const after = harness.snapshotState()
+
+        // Entry release stays: the prepaid stamina is refunded once.
+        assert.equal(after.player.stamina, before.player.stamina + 10)
+        // Fixed quest Mana, client add_mana, the fixed EXP pool, rank points and
+        // the lifetime Mana total must not move on a failed settlement.
+        assert.equal(after.player.freeMana, before.player.freeMana)
+        assert.equal(after.player.expPool, before.player.expPool)
+        assert.equal(after.player.rankPoint, before.player.rankPoint)
+        assert.equal(after.player.degreeId, before.player.degreeId)
+        assert.equal(after.player.totalManaObtained, before.player.totalManaObtained)
+        // Party characters keep their EXP and the response reports no gain.
+        assert.equal(
+            harness.db.prepare(`
+                SELECT exp FROM players_characters WHERE player_id = ? AND id = ?
+            `).get(harness.playerId, AWAKE_CHARACTER_ID)?.exp,
+            characterExpBefore,
         )
-        assert.equal(persisted.stamina, expectedStamina)
-        assert.equal(response.data.user_info.stamina, expectedStamina)
+        assert.ok(response.data.add_exp_list.every(entry => entry.add_exp === 0))
+        assert.equal(response.data.rewards.reward_mana, 0)
+        assert.equal(response.data.rewards.reward_pool_exp, 0)
+        assert.equal(response.data.rewards.field_mana, 0)
+        // Score rewards and the first-clear/S+ rewards stay ungranted.
+        assert.equal(after.items["910001"] ?? 0, before.items["910001"] ?? 0)
+        assert.deepEqual(response.data.drop_score_reward_ids, [])
+        assert.equal(after.questProgress, null)
+        // Mission/awake facts stay untouched by a failed settlement.
+        assert.deepEqual(after.missionProgress, before.missionProgress)
+        assert.deepEqual(after.missionStages, before.missionStages)
+        assert.deepEqual(after.awakeUnlocks, before.awakeUnlocks)
+        // The failed settlement still ends the active quest.
+        assert.equal(after.databaseActive, null)
+    }, {
+        tableOverrides: {
+            "additional_reward_rules.json": noIncidentalAdditionalRewards(),
+            ...EMPTY_MISSION_OVERRIDES,
+        },
+    })
+})
+
+test("single finish rejects client add_mana above the client int32 field", async () => {
+    await withSingleBattleHarness("a1-add-mana-int32-bound", async harness => {
+        const playId = "task-a1-add-mana-int32-bound"
+        harness.insertActiveQuest(harness.createActiveQuest({ playId }))
+        const before = harness.snapshotState()
+
+        const response = await harness.post("finish", harness.finishPayload({
+            playId,
+            addMana: 2_147_483_648,
+        }), { normalize: false })
+
+        assert.equal(response.statusCode, 400, JSON.stringify(response))
+        assert.deepEqual(harness.snapshotState(), before)
     }, {
         tableOverrides: noIncidentalRewardOverrides(),
     })
