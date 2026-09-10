@@ -10,6 +10,7 @@ interface GameplaySettings {
     dropMultiplier: number
     multiRescueFragmentRewardsEnabled: boolean
     multiRescueHostRewardsEnabled: boolean
+    rush700011To700017CompatibilityEnabled: boolean
     updatedAt: string
 }
 export default function GameplaySettings() {
@@ -17,6 +18,7 @@ export default function GameplaySettings() {
     const [draftMultiplier, setDraftMultiplier] = useState<number | null>(null)
     const [draftRescueEnabled, setDraftRescueEnabled] = useState<boolean | null>(null)
     const [draftHostRescueEnabled, setDraftHostRescueEnabled] = useState<boolean | null>(null)
+    const [draftRushCompatibilityEnabled, setDraftRushCompatibilityEnabled] = useState<boolean | null>(null)
     const settings = useQuery({
         queryKey: ["serverGameplaySettings"],
         queryFn: () => apiGet<GameplaySettings>("/api/server/settings/gameplay"),
@@ -57,11 +59,24 @@ export default function GameplaySettings() {
         },
         onError: (error: Error) => message.error(error.message),
     })
+    const saveRushCompatibilitySetting = useMutation({
+        mutationFn: (rush700011To700017CompatibilityEnabled: boolean) => apiPatch<GameplaySettings>(
+            "/api/server/settings/gameplay",
+            { rush700011To700017CompatibilityEnabled },
+        ),
+        onSuccess: value => {
+            queryClient.setQueryData(["serverGameplaySettings"], value)
+            setDraftRushCompatibilityEnabled(value.rush700011To700017CompatibilityEnabled)
+            message.success("游戏设置已保存")
+        },
+        onError: (error: Error) => message.error(error.message),
+    })
 
     useEffect(() => {
         if (settings.data) setDraftMultiplier(settings.data.dropMultiplier)
         if (settings.data) setDraftRescueEnabled(settings.data.multiRescueFragmentRewardsEnabled)
         if (settings.data) setDraftHostRescueEnabled(settings.data.multiRescueHostRewardsEnabled)
+        if (settings.data) setDraftRushCompatibilityEnabled(settings.data.rush700011To700017CompatibilityEnabled)
     }, [settings.data])
 
     const currentMultiplier = settings.data?.dropMultiplier
@@ -70,6 +85,8 @@ export default function GameplaySettings() {
         || draftRescueEnabled === settings.data?.multiRescueFragmentRewardsEnabled
     const hostRescueUnchanged = draftHostRescueEnabled === null
         || draftHostRescueEnabled === settings.data?.multiRescueHostRewardsEnabled
+    const rushCompatibilityUnchanged = draftRushCompatibilityEnabled === null
+        || draftRushCompatibilityEnabled === settings.data?.rush700011To700017CompatibilityEnabled
 
     return (
         <AdminPage
@@ -163,6 +180,29 @@ export default function GameplaySettings() {
                             type="info"
                             showIcon
                             message="开启后允许本服房主自救；当前还要求第一开关开启。"
+                        />
+                        <Space wrap align="center">
+                            <Typography.Text>狂热激战常驻批次（700011–700017）私服兼容</Typography.Text>
+                            <Switch
+                                checked={draftRushCompatibilityEnabled ?? false}
+                                onChange={value => setDraftRushCompatibilityEnabled(value)}
+                                aria-label="狂热激战常驻批次（700011–700017）私服兼容"
+                            />
+                            <Button
+                                type="primary"
+                                icon={<SaveOutlined />}
+                                disabled={rushCompatibilityUnchanged}
+                                loading={saveRushCompatibilitySetting.isPending}
+                                onClick={() => draftRushCompatibilityEnabled !== null
+                                    && saveRushCompatibilitySetting.mutate(draftRushCompatibilityEnabled)}
+                            >
+                                保存
+                            </Button>
+                        </Space>
+                        <Alert
+                            type="info"
+                            showIcon
+                            message="开启后 700011–700017 复用 700001–700007 的文件夹奖励、商店与购买期；关闭后完全回到官方末期空奖励、空商店行为。整体开关，无部分开启状态。"
                         />
                     </Space>
                 )}

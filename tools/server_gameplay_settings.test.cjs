@@ -216,6 +216,125 @@ test("migrates an existing gameplay settings row with host rewards enabled", t =
     assert.equal(getServerGameplaySettingsSync().multiRescueHostRewardsEnabled, true)
 })
 
+test("rush 700011-700017 compatibility setting defaults on, persists and updates atomically", async t => {
+    const domainPath = path.join(__dirname, "../src/data/domains/server-settings.ts")
+    const routePath = path.join(__dirname, "../src/routes/web_api/settings.ts")
+    const paths = temporaryPaths(t)
+    delete process.env.DROP_MULTIPLIER
+    data.initializeDatabase({ paths })
+    const {
+        getServerGameplaySettingsSync,
+        updateServerGameplaySettingsSync,
+    } = require(domainPath)
+
+    assert.equal(
+        getServerGameplaySettingsSync().rush700011To700017CompatibilityEnabled,
+        true,
+        "new rush compatibility setting must default to enabled",
+    )
+
+    const disabled = updateServerGameplaySettingsSync({
+        dropMultiplier: getServerGameplaySettingsSync().dropMultiplier,
+        rush700011To700017CompatibilityEnabled: false,
+    })
+    assert.equal(disabled.rush700011To700017CompatibilityEnabled, false)
+    assert.equal(disabled.multiRescueFragmentRewardsEnabled, true)
+    assert.match(disabled.updatedAt, /^\d{4}-\d{2}-\d{2}T/)
+
+    assert.throws(
+        () => updateServerGameplaySettingsSync({
+            dropMultiplier: 1,
+            rush700011To700017CompatibilityEnabled: "false",
+        }),
+        /rush 700011 to 700017 compatibility/i,
+    )
+    assert.equal(
+        getServerGameplaySettingsSync().rush700011To700017CompatibilityEnabled,
+        false,
+        "invalid update must not partially change the setting",
+    )
+
+    data.closeDatabase()
+    data.initializeDatabase({ paths })
+    assert.equal(
+        getServerGameplaySettingsSync().rush700011To700017CompatibilityEnabled,
+        false,
+        "rush compatibility setting must survive a server restart",
+    )
+
+    const settingsRoutes = require(routePath).default
+    const fastify = Fastify()
+    t.after(() => fastify.close())
+    await fastify.register(settingsRoutes, { prefix: "/api/server/settings" })
+
+    const loaded = await fastify.inject({
+        method: "GET",
+        url: "/api/server/settings/gameplay",
+    })
+    assert.equal(loaded.statusCode, 200)
+    assert.equal(loaded.json().rush700011To700017CompatibilityEnabled, false)
+
+    const saved = await fastify.inject({
+        method: "PATCH",
+        url: "/api/server/settings/gameplay",
+        payload: { rush700011To700017CompatibilityEnabled: true },
+    })
+    assert.equal(saved.statusCode, 200)
+    assert.equal(saved.json().rush700011To700017CompatibilityEnabled, true)
+    assert.equal(getServerGameplaySettingsSync().rush700011To700017CompatibilityEnabled, true)
+
+    for (const payload of [
+        { rush700011To700017CompatibilityEnabled: "true" },
+        { rush700011To700017CompatibilityEnabled: 1 },
+        { rush700011To700017CompatibilityEnabled: null },
+    ]) {
+        const rejected = await fastify.inject({
+            method: "PATCH",
+            url: "/api/server/settings/gameplay",
+            payload,
+            headers: { "content-type": "application/json" },
+        })
+        assert.equal(rejected.statusCode, 400, JSON.stringify(payload))
+    }
+    assert.equal(
+        getServerGameplaySettingsSync().rush700011To700017CompatibilityEnabled,
+        true,
+        "rejected admin updates must leave the setting unchanged",
+    )
+})
+
+test("migrated legacy gameplay settings rows default rush compatibility to enabled", t => {
+    const paths = temporaryPaths(t)
+    fs.mkdirSync(path.dirname(paths.databaseFile), { recursive: true })
+    const legacyDatabase = new Database(paths.databaseFile)
+    legacyDatabase.exec(`
+        CREATE TABLE server_gameplay_settings (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            drop_multiplier INTEGER NOT NULL CHECK (drop_multiplier BETWEEN 1 AND 10),
+            multi_rescue_fragment_rewards_enabled INTEGER NOT NULL DEFAULT 1,
+            updated_at TEXT NOT NULL
+        )
+    `)
+    legacyDatabase.prepare(`
+        INSERT INTO server_gameplay_settings (id, drop_multiplier, updated_at)
+        VALUES (1, 2, '2024-08-14T12:00:00.000Z')
+    `).run()
+    legacyDatabase.close()
+
+    data.initializeDatabase({ paths })
+
+    const migratedColumn = getDb().prepare(
+        "PRAGMA table_info(server_gameplay_settings)",
+    ).all().find(column => column.name === "rush_700011_to_700017_compatibility_enabled")
+    assert.equal(migratedColumn?.type, "INTEGER")
+    assert.equal(migratedColumn?.notnull, 1)
+    assert.equal(migratedColumn?.dflt_value, "1")
+    const { getServerGameplaySettingsSync } = require(
+        path.join(__dirname, "../src/data/domains/server-settings.ts"),
+    )
+    assert.equal(getServerGameplaySettingsSync().rush700011To700017CompatibilityEnabled, true)
+})
+
 test("quest score rewards use the persisted multiplier instead of DROP_MULTIPLIER", t => {
     const domainPath = path.join(__dirname, "../src/data/domains/server-settings.ts")
     assert.equal(fs.existsSync(domainPath), true, "server settings domain must exist")

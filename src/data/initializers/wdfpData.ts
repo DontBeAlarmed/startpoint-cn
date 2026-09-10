@@ -38,10 +38,12 @@ export default function init(
         drop_multiplier INTEGER NOT NULL CHECK (drop_multiplier BETWEEN 1 AND 10),
         multi_rescue_fragment_rewards_enabled INTEGER NOT NULL DEFAULT 1,
         multi_rescue_host_rewards_enabled INTEGER NOT NULL DEFAULT 1,
+        rush_700011_to_700017_compatibility_enabled INTEGER NOT NULL DEFAULT 1,
         updated_at TEXT NOT NULL
     )`).run()
     ensureSchemaColumn(database, "server_gameplay_settings.multi_rescue_fragment_rewards_enabled")
     ensureSchemaColumn(database, "server_gameplay_settings.multi_rescue_host_rewards_enabled")
+    ensureSchemaColumn(database, "server_gameplay_settings.rush_700011_to_700017_compatibility_enabled")
     const gameplaySettingsExist = database.prepare(
         "SELECT 1 FROM server_gameplay_settings WHERE id = 1",
     ).get() !== undefined
@@ -49,8 +51,9 @@ export default function init(
         database.prepare(`
             INSERT INTO server_gameplay_settings (
                 id, drop_multiplier, multi_rescue_fragment_rewards_enabled,
-                multi_rescue_host_rewards_enabled, updated_at
-            ) VALUES (1, ?, 1, 1, ?)
+                multi_rescue_host_rewards_enabled,
+                rush_700011_to_700017_compatibility_enabled, updated_at
+            ) VALUES (1, ?, 1, 1, 1, ?)
         `).run(getInitialDropMultiplier(), getRealNow().toISOString())
     }
 
