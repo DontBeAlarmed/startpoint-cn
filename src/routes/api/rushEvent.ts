@@ -34,11 +34,12 @@ import { BattleQuest, QuestCategory } from "../../lib/types";
 import { generateDataHeaders, getServerDate, getServerTime } from "../../utils";
 import type { FinishBody } from "./singleBattleQuest";
 import {
-    insertActiveQuest,
     persistActiveQuest,
     publishActiveQuest,
     type ActiveQuest,
 } from "../../lib/quest/active-quest-service";
+import { getPlayerActiveQuestSync } from "../../data/domains/quest_active";
+import { getRealNow } from "../../runtime/time/game-time";
 import { getPlayerRushEventEndlessBattleRankingSync, getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -49,6 +50,22 @@ import {
     canRestartClearedRushEventFolderForAutoStart,
     canStartRushEventFolderBattle,
 } from "../../lib/rush-folder-progression";
+import { getQuestEntryCostByKey } from "../../lib/quest-entry-content";
+import { getStaminaCost } from "../../lib/stamina-cost";
+import { computeRealTimeStamina } from "../../lib/stamina";
+import { withEntryItemInventoryWithinTransactionSync } from "../../lib/quest/entry-item-inventory";
+import { updatePlayerSync, getPlayerSync } from "../../data/domains/player";
+import {
+    ActiveQuestAlreadyExistsError,
+    InsufficientEntryItemError,
+    InsufficientStaminaError,
+    PlayerNotFoundError,
+    runStartEntryTransaction,
+} from "../../lib/quest/start-entry";
+import {
+    AUTO_START_STOP_RESULT_CODE,
+    shouldStopAutoStartForStamina,
+} from "../../lib/quest/auto-start-stop";
 
 interface SummaryBody {
     event_id: number,
@@ -415,18 +432,59 @@ const routes = async (fastify: FastifyInstance) => {
             playId: body.play_id,
             continueCount: 0
         }
-        if (restartsClearedFolderForAutoStart) {
-            getDb().transaction(() => {
-                selectPlayerRushEventFolderSync(
-                    playerId,
-                    questData.rushEventId!,
-                    questData.rushEventFolderId!,
-                )
-                persistActiveQuest(playerId, activeQuest)
-            })()
-            publishActiveQuest(playerId, activeQuest)
-        } else {
-            insertActiveQuest(playerId, activeQuest)
+        const questKey = `${QuestCategory.RUSH_EVENT}_${questId}`
+        const staminaInfo = getStaminaCost(questKey)
+        console.log(`[RUSH] start entry: questId=${questId} questKey=${questKey} discountRate=${staminaInfo.rate} baseStamina=${staminaInfo.baseCost}→${staminaInfo.cost}`)
+        try {
+            runStartEntryTransaction({
+                playerId,
+                entryCost: getQuestEntryCostByKey(questKey) ?? undefined,
+                staminaCost: staminaInfo.cost,
+                partyId,
+                updatePartySlot: questData.fixedParty === undefined,
+                activeQuest,
+                now: getRealNow(),
+            }, {
+                transaction: operation => getDb().transaction(operation)(),
+                getActiveQuest: getPlayerActiveQuestSync,
+                getPlayer: getPlayerSync,
+                computeStamina: computeRealTimeStamina,
+                withEntryItemInventory: withEntryItemInventoryWithinTransactionSync,
+                updatePlayer: updatePlayerSync,
+                persistActiveQuest,
+                beforePersist: () => {
+                    if (!restartsClearedFolderForAutoStart) return
+                    selectPlayerRushEventFolderSync(
+                        playerId,
+                        questData.rushEventId!,
+                        questData.rushEventFolderId!,
+                    )
+                },
+                publishActiveQuest,
+            })
+        } catch (error) {
+            if (error instanceof ActiveQuestAlreadyExistsError
+                || error instanceof InsufficientEntryItemError
+                || error instanceof InsufficientStaminaError
+                || error instanceof PlayerNotFoundError) {
+                console.warn(`[RUSH-START] player ${playerId}: ${error.message}`)
+                if (error instanceof InsufficientStaminaError
+                    && shouldStopAutoStartForStamina(isAutoStartMode, true)) {
+                    reply.header("content-type", "application/x-msgpack")
+                    return reply.status(200).send({
+                        "data_headers": generateDataHeaders({
+                            viewer_id: viewerId,
+                            result_code: AUTO_START_STOP_RESULT_CODE,
+                        }),
+                        "data": {},
+                    })
+                }
+                return reply.status(400).send({
+                    "error": "Bad Request",
+                    "message": error.message,
+                })
+            }
+            throw error
         }
 
         const headers = generateDataHeaders({
