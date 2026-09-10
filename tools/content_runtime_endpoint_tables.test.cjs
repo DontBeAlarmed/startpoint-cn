@@ -30,7 +30,9 @@ function staminaRow(rate, questId) {
         String(rate),
         "0",
         "(None)",
-        "",
+        // Empty selector lists match nothing under the official semantics, so
+        // the level stays unconstrained here; the quest level pins the target.
+        "(None)",
         String(questId),
     ]]
 }
