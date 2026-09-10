@@ -1,8 +1,8 @@
-import type { ShopItem } from "../types/shop"
-import type { ShopCatalog } from "./model"
+import { ShopType, type ShopItem } from "./types/shop"
+import { shopCatalogKey, type ShopCatalog } from "./shop/model"
 
 /**
- * Private-server content override for the CN final-operation Rush batch.
+ * Shared private-server content override for the CN final-operation Rush batch.
  *
  * Official master data ships `700011`-`700017` (internal names
  * `combat_diver_constant_1..7`) with empty folder clear rewards and no
@@ -81,6 +81,33 @@ export function getRushFinalOperationOverrideForSourceEvent(
         return targetProducts !== undefined && targetProducts.length > 0 ? null : event
     }
     return null
+}
+
+/**
+ * Returns whether a purchase can require the runtime compatibility setting.
+ *
+ * The catalog is the cheap, immutable boundary: ordinary shops, unrelated
+ * event shops and non-Rush event products must not read server settings just
+ * because the route accepts an event-shop request.
+ */
+export function isRushFinalOperationOverridePurchaseCandidate(
+    catalog: Pick<ShopCatalog, "entries" | "eventProductIds">,
+    shopType: number,
+    shopItemIds: readonly number[],
+): boolean {
+    if (shopType !== ShopType.EVENT_ITEM) return false
+    return shopItemIds.some(shopItemId => {
+        const entry = catalog.entries[shopCatalogKey(shopType, shopItemId)]
+        if (entry === undefined
+            || entry.kind !== "purchase"
+            || entry.scope.kind !== "event"
+            || entry.scope.eventType !== RUSH_EVENT_TYPE) return false
+        return getRushFinalOperationOverrideForSourceEvent(
+            catalog,
+            RUSH_FINAL_OPERATION_OVERRIDE,
+            entry.scope.eventId,
+        ) !== null
+    })
 }
 
 export function addRushFinalOperationCompatibilityPeriod(

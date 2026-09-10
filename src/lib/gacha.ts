@@ -184,6 +184,8 @@ export function drawBoxGachaSync(
                 drawnCharacters.set(characterId, (drawnCharacters.get(characterId) ?? 0) + reward.count)
                 break;
             }
+            default:
+                throw new Error(`Unsupported Box Gacha reward type: ${reward.type}`)
         }
         
         sessionDrawnRewards.set(rewardId, (sessionDrawnRewards.get(rewardId) ?? 0) + 1)

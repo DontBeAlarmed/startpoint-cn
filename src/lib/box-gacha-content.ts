@@ -150,7 +150,7 @@ export function buildBoxGachaContentCatalog(
                 if (!isRecord(reward)) {
                     throw new BoxGachaContentError(`Box Gacha ${gachaId}/${boxId} reward is invalid.`)
                 }
-                if (!Number.isSafeInteger(reward.type) || reward.type < 0 || reward.type > 6
+                if (!Number.isSafeInteger(reward.type) || reward.type < 0 || reward.type > 7
                     || !Number.isSafeInteger(reward.tier) || reward.tier < 0 || reward.tier > 2) {
                     throw new BoxGachaContentError(`Box Gacha ${gachaId}/${boxId} reward is invalid.`)
                 }
@@ -163,7 +163,7 @@ export function buildBoxGachaContentCatalog(
                 if (!Number.isSafeInteger(summedAvailable)) {
                     throw new BoxGachaContentError(`Box Gacha ${gachaId}/${boxId} count overflow.`)
                 }
-                if ([0, 1, 5, 6].includes(reward.type)) {
+                if ([0, 1, 6, 7].includes(reward.type)) {
                     const rewardWithId = reward as unknown as BoxGachaIdReward
                     positiveInteger(rewardWithId.id, `Box Gacha ${gachaId}/${boxId} reward item id`)
                     if (reward.type === 0 || reward.type === 1) {

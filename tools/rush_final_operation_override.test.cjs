@@ -16,10 +16,11 @@ const {
     addRushFinalOperationCompatibilityPeriod,
     getRushFinalOperationOverrideEvent,
     getRushFinalOperationOverrideForSourceEvent,
+    isRushFinalOperationOverridePurchaseCandidate,
     resolveRushFinalOperationOverride,
     resolveRushFinalOperationEventView,
     RUSH_EVENT_TYPE,
-} = require("../src/lib/shop/rush-final-operation-override")
+} = require("../src/lib/rush-final-operation-override")
 const { buildShopCatalog } = require("../src/lib/shop/catalog")
 const { selectShopSalesCatalogItems } = require("../src/lib/shop/sales-catalog")
 const { ShopType } = require("../src/lib/types")
@@ -69,7 +70,9 @@ test("override scope is limited to the explicit 700011-700017 target set", () =>
 })
 
 test("folder clear reward provenance distinguishes official content from the private override", () => {
-    const restore = installFolderSnapshot(folderTable())
+    const folders = folderTable()
+    folders[700017] = { 1: [] }
+    const restore = installFolderSnapshot(folders)
     try {
         assert.deepEqual(
             resolveRushEventFolderClearRewards(700001, 1, ENABLED),
@@ -134,6 +137,32 @@ test("malformed official folder rows throw instead of silently falling back to p
         )
     } finally {
         restore.restore()
+    }
+})
+
+test("missing official target event or folder throws instead of enabling private content", () => {
+    const missingEvent = folderTable()
+    delete missingEvent[700011]
+    const missingEventSnapshot = installFolderSnapshot(missingEvent)
+    try {
+        assert.throws(
+            () => resolveRushEventFolderClearRewards(700011, 1, ENABLED),
+            /Rush event folder clear rewards are invalid/,
+        )
+    } finally {
+        missingEventSnapshot.restore()
+    }
+
+    const missingFolder = folderTable()
+    delete missingFolder[700011][1]
+    const missingFolderSnapshot = installFolderSnapshot(missingFolder)
+    try {
+        assert.throws(
+            () => resolveRushEventFolderClearRewards(700011, 1, ENABLED),
+            /Rush event folder clear rewards are invalid/,
+        )
+    } finally {
+        missingFolderSnapshot.restore()
     }
 })
 
@@ -245,6 +274,67 @@ test("event view composition and item transforms stay out of the official catalo
     const view = resolveRushFinalOperationEventView(catalog, DISABLED, RUSH_EVENT_TYPE, 700011, [])
     assert.equal(view.itemTransform, null)
     assert.deepEqual(view.productIds, [])
+})
+
+test("purchase settings are only needed for mapped Rush source-event products", () => {
+    const shopItem = () => ({
+        costs: [],
+        rewards: [],
+        availableFrom: "2023-11-23 12:00:00",
+        availableUntil: "2023-12-18 11:59:59",
+        stock: 9,
+    })
+    const repository = {
+        info: () => ({ source: "bundled" }),
+        table(name) {
+            const tables = {
+                "shop_item_campaign.json": {},
+                "shop_select_item_campaign.json": {},
+                "cdn_general_shop_whitelist.json": [],
+                "shop_cost_item_schedule.json": {},
+                "treasure_shop.json": {},
+                "special_pack_shop.json": {},
+                "mana_shop.json": {},
+                "general_shop.json": {},
+                "star_grain_shop.json": {},
+                "equipment_enhancement_shop.json": {},
+                "event_item_shop.json": {
+                    [String(RUSH_EVENT_TYPE)]: {
+                        700001: { "310001": shopItem() },
+                        700099: { "310099": shopItem() },
+                    },
+                },
+                "boss_coin_shop.json": {},
+            }
+            return tables[name]
+        },
+    }
+    const catalog = buildShopCatalog(repository)
+
+    assert.equal(
+        isRushFinalOperationOverridePurchaseCandidate(
+            catalog,
+            ShopType.EVENT_ITEM,
+            [310001],
+        ),
+        true,
+    )
+    assert.equal(
+        isRushFinalOperationOverridePurchaseCandidate(
+            catalog,
+            ShopType.EVENT_ITEM,
+            [310099],
+        ),
+        false,
+    )
+    assert.equal(
+        isRushFinalOperationOverridePurchaseCandidate(
+            catalog,
+            ShopType.GENERAL,
+            [310001],
+        ),
+        false,
+    )
 })
 
 test("hard multi final-operation events and 700099 are structurally outside the override", () => {

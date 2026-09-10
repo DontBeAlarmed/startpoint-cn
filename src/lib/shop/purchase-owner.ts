@@ -18,7 +18,7 @@ import {
 } from "./equipment-enhancement-adapter"
 import { getShopCatalog } from "./catalog"
 import type { ShopCatalog } from "./model"
-import type { RushFinalOperationOverride } from "./rush-final-operation-override"
+import type { RushFinalOperationOverride } from "../rush-final-operation-override"
 import {
     applyPreparedShopPassCardEffectWithinTransactionSync,
     prepareShopPassCardEffect,

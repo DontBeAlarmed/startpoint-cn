@@ -24,6 +24,8 @@
 
 三张表由同一 Content Release 提供；snapshot 尚未初始化的低级测试才回退仓库内 bundled JSON。路由必须读取规则表，不能用“最后一个箱”或固定 `box_id` 推断是否允许重置。
 
+国服 1.8.1 客户端把 Box reward type 解释为：`0=Item`、`1=Equipment`、`2=Stone`、`3=Mana`、`4=PooledExp`、`5=PassCardPoint`、`6=Character`、`7=Degree`。服务端枚举和内容校验使用这套 CN 编号，不能沿用旧 EN 客户端中 `5=Character`、`6=Degree` 的定义。当前官方 snapshot 实际使用 `0/1/3/4/6`；其中 type 6 限定角色进入统一 RewardGrant 角色发放流程。客户端支持但当前 snapshot 未使用、服务端尚未实现发奖语义的类型会使整个抽取事务失败，不能只扣活动道具和奖池库存而静默吞掉奖励。
+
 ## 空箱重置
 
 `POST /reset` 请求包含 `viewer_id`、`box_gacha_id` 和 `box_id`。服务端通过 session 与 `resolvePlayerIdSync` 解析账号当前存档，并使用全局服务器时间检查开放期。

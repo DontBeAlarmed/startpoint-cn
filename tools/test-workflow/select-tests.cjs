@@ -518,6 +518,10 @@ const SOURCE_RULES = [
         groups: ["integration:event", "quick:content"],
     },
     {
+        pattern: /^src\/lib\/rush-final-operation-override\.ts$/,
+        groups: ["integration:event", "integration:rules", "quick:content"],
+    },
+    {
         pattern: /^src\/routes\/api\/shop\/purchase-routes\.ts$/,
         groups: ["integration:event", "integration:mission", "integration:rules"],
     },

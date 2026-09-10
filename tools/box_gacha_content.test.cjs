@@ -76,6 +76,19 @@ test("Box Gacha catalog validates relations, caches by repository and indexes re
     assert.deepEqual(findAvailableBoxGachaIdsForReward(catalog, 1, 90001, february), [])
 })
 
+test("Box Gacha catalog accepts the CN Degree reward type 7", () => {
+    const source = tables()
+    source["box_reward.json"][10][2][102] = {
+        type: 7,
+        id: 300001,
+        count: 1,
+        available: 1,
+        tier: 2,
+    }
+
+    assert.doesNotThrow(() => buildBoxGachaContentCatalog(repository(source)))
+})
+
 test("Box Gacha catalog rejects mismatched counts and missing prerequisite boxes", () => {
     const countMismatch = tables()
     countMismatch["box_gacha.json"][10].availableCounts[1] = 4

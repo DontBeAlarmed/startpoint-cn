@@ -3,7 +3,7 @@ import type { ShopCatalog } from "./model"
 import {
     resolveRushFinalOperationEventView,
     type RushFinalOperationOverride,
-} from "./rush-final-operation-override"
+} from "../rush-final-operation-override"
 
 export interface ShopSalesCatalogRequest {
     readonly shopTypes: readonly ShopType[]

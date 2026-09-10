@@ -8,7 +8,7 @@ import {
 } from "../types"
 import { resolveEffectiveShopOffer } from "./effective-offer"
 import type { EffectiveShopOffer, ShopCatalog } from "./model"
-import type { RushFinalOperationOverride } from "./rush-final-operation-override"
+import type { RushFinalOperationOverride } from "../rush-final-operation-override"
 import {
     createShopPurchaseCountQuery,
     getShopPurchasePeriodKeys,

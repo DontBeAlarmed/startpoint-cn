@@ -15,7 +15,7 @@ const { resolveEventCurrencyId } = require("../src/lib/event-currency")
 const { ShopType } = require("../src/lib/types")
 const {
     resolveRushFinalOperationOverride,
-} = require("../src/lib/shop/rush-final-operation-override")
+} = require("../src/lib/rush-final-operation-override")
 const { resolveEffectiveShopOffer } = require("../src/lib/shop")
 
 const SHOP_TABLES = Object.freeze([

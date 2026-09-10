@@ -6,7 +6,7 @@ import {
     getRushFinalOperationOverrideForSourceEvent,
     RUSH_EVENT_TYPE,
     type RushFinalOperationOverride,
-} from "./rush-final-operation-override"
+} from "../rush-final-operation-override"
 import {
     getShopCnMonth,
     isShopPeriodAvailable,

@@ -2,7 +2,7 @@ import { Reward, RushEventFolders } from "./types"
 import {
     getRushFinalOperationOverrideEvent,
     type RushFinalOperationOverride,
-} from "./shop/rush-final-operation-override"
+} from "./rush-final-operation-override"
 import { getContentSnapshot } from "../content/runtime/content-snapshot"
 import { getRushEventQuestRounds } from "./quest-content"
 import type { ScoreAttackBorderTier } from "./quest/finish/score-attack-handler"
@@ -82,11 +82,17 @@ export function resolveRushEventFolderClearRewards(
         "rush_event_quest_folder.json",
     )
     const folders = rushEventQuestFolders[rushEventId]
-    const rewards = folders?.[folderId]
-    if (rewards !== undefined && !Array.isArray(rewards)) {
+    if (folders === null
+        || typeof folders !== "object"
+        || Array.isArray(folders)
+        || !Object.prototype.hasOwnProperty.call(folders, folderId)) {
         throw new RushEventFolderContentError(rushEventId, folderId)
     }
-    if (Array.isArray(rewards) && rewards.length > 0) {
+    const rewards = folders[folderId]
+    if (!Array.isArray(rewards)) {
+        throw new RushEventFolderContentError(rushEventId, folderId)
+    }
+    if (rewards.length > 0) {
         return { rewards, provenance: "OFFICIAL_CONTENT" }
     }
 

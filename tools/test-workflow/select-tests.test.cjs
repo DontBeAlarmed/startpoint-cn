@@ -1306,6 +1306,13 @@ test("maps the single battle settlement baseline family to integration quest", (
     }
 })
 
+test("maps the shared Rush final-operation override to its three consumers", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/lib/rush-final-operation-override.ts"]),
+        ["integration:event", "integration:rules", "quick:content"],
+    )
+})
+
 test("upgrades package and unknown source changes to full", () => {
     assert.deepEqual(selectTestGroups(["package.json"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/unmapped/new-feature.ts"]), ["full"])

@@ -34,7 +34,7 @@ const { buildShopSalesListSync } = require("../src/lib/shop-sales-list")
 const {
     RUSH_FINAL_OPERATION_OVERRIDE,
     resolveRushFinalOperationOverride,
-} = require("../src/lib/shop/rush-final-operation-override")
+} = require("../src/lib/rush-final-operation-override")
 
 function item(overrides = {}) {
     return {

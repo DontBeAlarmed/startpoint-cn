@@ -7,9 +7,10 @@ import { getMailArrivedSync } from "../../../lib/mail-notification"
 import {
     ShopOfferNotPurchasableError,
     ShopOfferPeriodError,
+    getShopCatalog,
 } from "../../../lib/shop"
 import { executeShopPurchaseSync } from "../../../lib/shop/owner"
-import { resolveRushFinalOperationOverrideForRuntime } from "../../../lib/rush-final-operation-policy"
+import { resolveRushFinalOperationOverrideForPurchase } from "../../../lib/rush-final-operation-policy"
 import {
     InvalidShopPurchaseCommandError,
     ShopPurchaseBalancePlanError,
@@ -119,6 +120,7 @@ export function registerShopPurchaseRoutes(
         const playerId = await resolvePurchasePlayerId(body.viewer_id, reply)
         if (playerId === null) return
         const gameTime = getGameTimeContext()
+        const catalog = getShopCatalog()
         try {
             const result = executeShopPurchaseSync({
                 playerId,
@@ -127,7 +129,12 @@ export function registerShopPurchaseRoutes(
                 virtualNowMs: gameTime.virtualNowMs,
                 purchasePeriodNowMs: gameTime.realNowMs,
                 resetHour: dailyResetHour,
-                rushOverride: resolveRushFinalOperationOverrideForRuntime(),
+                catalog,
+                rushOverride: resolveRushFinalOperationOverrideForPurchase(
+                    catalog,
+                    body.shop_type,
+                    [body.shop_item_id],
+                ),
             })
             const responseData = projectShopPurchaseResponse(result, body.viewer_id)
             responseData.character_list = publishCharacterGrowthOwnerStateBestEffort(
@@ -177,6 +184,7 @@ export function registerShopPurchaseRoutes(
         const playerId = await resolvePurchasePlayerId(body.viewer_id, reply)
         if (playerId === null) return
         const gameTime = getGameTimeContext()
+        const catalog = getShopCatalog()
         try {
             const result = executeShopPurchaseSync({
                 playerId,
@@ -185,7 +193,12 @@ export function registerShopPurchaseRoutes(
                 virtualNowMs: gameTime.virtualNowMs,
                 purchasePeriodNowMs: gameTime.realNowMs,
                 resetHour: dailyResetHour,
-                rushOverride: resolveRushFinalOperationOverrideForRuntime(),
+                catalog,
+                rushOverride: resolveRushFinalOperationOverrideForPurchase(
+                    catalog,
+                    body.shop_type,
+                    entries.map(entry => entry.shopItemId),
+                ),
             })
             const responseData = projectShopPurchaseResponse(result, body.viewer_id)
             responseData.character_list = publishCharacterGrowthOwnerStateBestEffort(

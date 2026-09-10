@@ -24,7 +24,7 @@ const tableOverrides = {
         [BOX_GACHA_ID]: {
             itemId: CURRENCY_ITEM_ID,
             count: 10,
-            availableCounts: { 1: 10, 2: 10, 4: 1, 5: 1 },
+            availableCounts: { 1: 10, 2: 10, 4: 1, 5: 1, 6: 1 },
         },
     },
     "box_reward.json": {
@@ -36,10 +36,13 @@ const tableOverrides = {
                 99001002: { type: 0, count: 1, available: 10, tier: 2, id: REWARD_ITEM_ID },
             },
             4: {
-                99001004: { type: 5, count: 1, available: 1, tier: 2, id: REWARD_CHARACTER_ID },
+                99001004: { type: 6, count: 1, available: 1, tier: 2, id: REWARD_CHARACTER_ID },
             },
             5: {
                 99001005: { type: 0, count: 105, available: 1, tier: 2, id: 1 },
+            },
+            6: {
+                99001006: { type: 5, count: 1, available: 1, tier: 2 },
             },
         },
     },
@@ -70,6 +73,14 @@ const tableOverrides = {
                 closeKind: 1,
             },
             5: {
+                requiredBoxId: null,
+                resetKind: 0,
+                resetLimit: null,
+                availableFrom: "2010-01-01 00:00:00",
+                availableUntil: "2199-12-31 23:59:59",
+                closeKind: 1,
+            },
+            6: {
                 requiredBoxId: null,
                 resetKind: 0,
                 resetLimit: null,
@@ -468,6 +479,17 @@ test("box gacha keeps its legacy empty joined-character projection for a real ne
     assert.equal(payload.data.character_list.length, 1)
     assert.equal(payload.data.character_list[0].character_id, REWARD_CHARACTER_ID)
     assert.equal(payload.data.item_list[CURRENCY_ITEM_ID], 990)
+})
+
+test("box gacha rolls back unsupported CN reward types instead of silently consuming them", async () => {
+    const { playerId, viewerId } = await createPlayer("box-unsupported-pass-card-point")
+    const before = snapshot(playerId, 6)
+
+    const response = await execBox(viewerId, 6, 1, false)
+
+    assert.equal(response.statusCode, 500)
+    assert.match(response.body, /Unsupported Box Gacha reward type: 5/)
+    assert.deepEqual(snapshot(playerId, 6), before)
 })
 
 test("resettable box ignores featured early stop and empties the requested inventory", async () => {

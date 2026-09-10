@@ -2,13 +2,14 @@ import { PlayerBoxGachaDrawnReward } from "../../data/types"
 import { Reward } from "./rewards"
 
 export enum BoxGachaRewardType {
-    ITEM,
-    EQUIPMENT,
-    EMPTY,
-    MANA,
-    EXP,
-    CHARACTER,
-    DEGREE,
+    ITEM = 0,
+    EQUIPMENT = 1,
+    STONE = 2,
+    MANA = 3,
+    EXP = 4,
+    PASS_CARD_POINT = 5,
+    CHARACTER = 6,
+    DEGREE = 7,
 }
 
 

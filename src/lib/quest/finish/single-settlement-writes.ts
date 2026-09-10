@@ -31,6 +31,7 @@ import { writeSingleQuestProgressWithinTransactionSync } from "./single-quest-pr
 import { createSingleSettlementValuePlan } from "./single-settlement-value-plan"
 import { createEventSettlementDescriptor } from "./event-settlement-descriptor"
 import { settleSingleBuiltInEvent } from "./single-event-settlement"
+import { resolveRushFinalOperationOverrideForSettings } from "../../rush-final-operation-policy"
 
 export function executeSingleSettlementWrites(
     input: SingleSettlementWritesInput,
@@ -138,6 +139,15 @@ export function executeSingleSettlementWrites(
 
     const dailyChallengePointList = entryResourceResult.kind === "committed"
         ? entryResourceResult.dailyChallengePointList : null
+    const eventDescriptor = createEventSettlementDescriptor({
+        questCategory,
+        questId,
+        quest: questData,
+        activeEventId: settlementActiveQuest.eventId ?? undefined,
+    })
+    const gameplaySettings = questAccomplished || eventDescriptor.kind === "rush"
+        ? getServerGameplaySettingsSync()
+        : null
     console.log(`[BATTLE] scoreReward groupId=${questData.scoreRewardGroupId} groupLen=${questData.scoreRewardGroup?.length ?? "null"} questId=${questId} category=${questCategory}`)
     const scoreRewardSelection = selectScoreRewardGrantPlan(
         questData.scoreRewardGroupId, questData.scoreRewardGroup, useBoostPoint, questData.element, {
@@ -160,7 +170,7 @@ export function executeSingleSettlementWrites(
                     getPlayerSingleQuestProgressSync(playerId, category, requiredQuestId)?.finished === true
                 ),
                 rewardCampaignRates, boostPointUsed: useBoostPoint,
-                serverDropMultiplier: getServerGameplaySettingsSync().dropMultiplier,
+                serverDropMultiplier: gameplaySettings!.dropMultiplier,
             },
             { grantRewards: rewards => grantDirectRewards(playerId, rewards) },
         )
@@ -176,12 +186,6 @@ export function executeSingleSettlementWrites(
     )
     responseState.setExpPool(rewardCharacterExpResult.exp_pool)
 
-    const eventDescriptor = createEventSettlementDescriptor({
-        questCategory,
-        questId,
-        quest: questData,
-        activeEventId: settlementActiveQuest.eventId ?? undefined,
-    })
     const {
         rushEventData,
         rushEventRewardsResult,
@@ -200,6 +204,9 @@ export function executeSingleSettlementWrites(
         settlementTime,
         rushEventFolderMaxRound,
         scoreAttackBorderTiers,
+        rushFolderRewardOverride: eventDescriptor.kind === "rush"
+            ? resolveRushFinalOperationOverrideForSettings(gameplaySettings!)
+            : null,
         grantRewards: grantDirectRewards,
         standardRewardGrant,
     })
