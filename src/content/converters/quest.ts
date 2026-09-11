@@ -37,6 +37,8 @@ export const QUEST_AUXILIARY_SOURCES = Object.freeze({
     expertSingleEvent: "master/quest/event/expert_single_event.orderedmap",
     soloTimeAttackEvent: "master/quest/event/solo_time_attack_event.orderedmap",
     practiceQuest: "master/quest/practice/practice_quest.orderedmap",
+    mainStageNode: "master/quest/main_stage_node.orderedmap",
+    exStageNode: "master/quest/ex_stage_node.orderedmap",
 } as const)
 
 export type QuestTableName = keyof typeof QUEST_TABLE_SOURCES
@@ -45,6 +47,7 @@ export type QuestDerivedTableName =
     | "event_challenge_point_map.json"
     | "quest_entry_costs.json"
     | "quest_lookup.json"
+    | "quest_prerequisites.json"
     | "quest_unlock_costs.json"
 export type QuestConversionOutput = Readonly<Record<
     QuestTableName | QuestDerivedTableName,
@@ -851,6 +854,72 @@ export function buildQuestUnlockCosts(
     return validateQuestUnlockCostTable(output)
 }
 
+/**
+ * Official stage-node prerequisite chains (CN 1.8.1 MainStageNodeLogic /
+ * StageNodeBase.isViewable): a stage node is reachable once its need-node is
+ * cleared, and a node counts as cleared once every quest of that node is
+ * finished (getQuestIdsNeedToBeClearedToClear). Project that onto quests:
+ * quest_prerequisites[questId] = every quest id of its node's need-node.
+ */
+export function buildQuestPrerequisites(
+    questTrees: Readonly<Partial<Record<"main_quest.json" | "ex_quest.json", CsvOrderedMapTree>>>,
+    stageNodeTrees: Readonly<Partial<Record<"main_quest.json" | "ex_quest.json", CsvOrderedMapTree>>>,
+): Readonly<Record<string, unknown>> {
+    const output: Record<string, unknown> = {}
+    // chapter:node -> quest ids, per table; ex nodes may depend on main nodes.
+    const questsByNode = new Map<string, Map<string, number[]>>()
+    for (const tableName of ["main_quest.json", "ex_quest.json"] as const) {
+        const questTree = questTrees[tableName]
+        if (!questTree) continue
+        const tableNodes = new Map<string, number[]>()
+        for (const row of collectRows(tableName, questTree, 3)) {
+            const questId = parsePositiveIntegerRowField(tableName, row.fields[0], "quest id")
+            const nodeKey = `${row.path[0]}:${row.path[1]}`
+            const bucket = tableNodes.get(nodeKey) ?? []
+            bucket.push(questId)
+            tableNodes.set(nodeKey, bucket)
+        }
+        questsByNode.set(tableName, tableNodes)
+    }
+    const mainNodes = questsByNode.get("main_quest.json")!
+    for (const tableName of ["main_quest.json", "ex_quest.json"] as const) {
+        const questTree = questTrees[tableName]
+        const stageNodeTree = stageNodeTrees[tableName]
+        const tableNodes = questsByNode.get(tableName)
+        if (!questTree || !stageNodeTree || !tableNodes) continue
+        for (const row of collectRows(tableName, stageNodeTree, 2)) {
+            const [multipliedId, , needChapter, needNode] = row.fields
+            parsePositiveIntegerRowField(tableName, multipliedId, "multiplied id")
+            if (isMissing(needChapter) || needChapter === "(None)") continue
+            const needKey = `${needChapter}:${needNode}`
+            const prerequisiteQuestIds = tableNodes.get(needKey) ?? mainNodes.get(needKey)
+            if (prerequisiteQuestIds === undefined) {
+                invalidQuest(tableName, `need stage node ${needKey} has no quests`)
+            }
+            const nodeKey = `${row.path[0]}:${row.path[1]}`
+            for (const questId of tableNodes.get(nodeKey) ?? []) {
+                if (prerequisiteQuestIds.includes(questId)) {
+                    invalidQuest(tableName, `quest ${questId} depends on its own node`)
+                }
+                output[String(questId)] = Object.freeze([...prerequisiteQuestIds])
+            }
+        }
+    }
+    return deepFreeze(output)
+}
+
+function parsePositiveIntegerRowField(
+    tableName: QuestTableName,
+    value: string,
+    field: string,
+): number {
+    const parsed = Number(value)
+    if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+        invalidQuest(tableName, `${field} must be a positive integer`)
+    }
+    return parsed
+}
+
 export function buildQuestLookup(
     tables: Readonly<Partial<Record<QuestTableName, Readonly<Record<string, unknown>>>>>,
     practiceTree: CsvOrderedMapTree,
@@ -964,11 +1033,13 @@ export async function convertQuests(
     const questTrees = Object.fromEntries(convertedSources.map(
         ([tableName, tree]) => [tableName, tree],
     )) as Record<QuestTableName, CsvOrderedMapTree>
-    const [dailyChallengePoint, expertSingleEvent, soloTimeAttackEvent, practiceQuest] = await Promise.all([
+    const [dailyChallengePoint, expertSingleEvent, soloTimeAttackEvent, practiceQuest, mainStageNode, exStageNode] = await Promise.all([
         reader.readDynamic(QUEST_AUXILIARY_SOURCES.dailyChallengePoint),
         reader.readDynamic(QUEST_AUXILIARY_SOURCES.expertSingleEvent),
         reader.readDynamic(QUEST_AUXILIARY_SOURCES.soloTimeAttackEvent),
         reader.readDynamic(QUEST_AUXILIARY_SOURCES.practiceQuest),
+        reader.readDynamic(QUEST_AUXILIARY_SOURCES.mainStageNode),
+        reader.readDynamic(QUEST_AUXILIARY_SOURCES.exStageNode),
     ])
     const dailyChallengePointLookup = buildDailyChallengePointLookup(
         convertOrderedMapJson(dailyChallengePoint, 1),
@@ -993,5 +1064,15 @@ export async function convertQuests(
             compatibility.practiceQuests,
         ),
         "quest_unlock_costs.json": buildQuestUnlockCosts(questTrees),
+        "quest_prerequisites.json": buildQuestPrerequisites(
+            {
+                "main_quest.json": questTrees["main_quest.json"],
+                "ex_quest.json": questTrees["ex_quest.json"],
+            },
+            {
+                "main_quest.json": convertOrderedMapJson(mainStageNode, 2),
+                "ex_quest.json": convertOrderedMapJson(exStageNode, 2),
+            },
+        ),
     })
 }

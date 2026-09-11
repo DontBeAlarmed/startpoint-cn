@@ -684,6 +684,15 @@ const definitionInputs: TableSourceInput[] = [
         "quest_unlock_costs.json",
         Object.values(QUEST_TABLE_SOURCES).map(source => source.logicalPath),
     ),
+    questDerivedDefinition(
+        "quest_prerequisites.json",
+        [
+            QUEST_AUXILIARY_SOURCES.mainStageNode,
+            QUEST_AUXILIARY_SOURCES.exStageNode,
+            QUEST_TABLE_SOURCES["main_quest.json"].logicalPath,
+            QUEST_TABLE_SOURCES["ex_quest.json"].logicalPath,
+        ],
+    ),
     ...BUNDLED_TABLE_NAMES.map(bundledDefinition),
     ...SERVER_TABLE_NAMES.map(serverDefinition),
 ]

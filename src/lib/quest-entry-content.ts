@@ -4,6 +4,7 @@ import {
 } from "../content/runtime/content-snapshot"
 import {
     validateQuestEntryCostTable,
+    validateQuestPrerequisiteTable,
     validateQuestUnlockCostTable,
 } from "../content/validation/quest-derived-output"
 
@@ -24,6 +25,7 @@ type UnlockCostTable = Record<string, QuestUnlockCost>
 interface QuestEntryContentCatalog {
     readonly entries: Readonly<EntryCostTable>
     readonly unlocks: Readonly<UnlockCostTable>
+    readonly prerequisites: Readonly<Record<string, readonly number[]>>
 }
 
 const catalogs = new WeakMap<ReadonlyContentRepository, QuestEntryContentCatalog>()
@@ -36,6 +38,7 @@ export function getQuestEntryContentCatalog(
     const catalog = Object.freeze({
         entries: validateQuestEntryCostTable(repository.table("quest_entry_costs.json")),
         unlocks: validateQuestUnlockCostTable(repository.table("quest_unlock_costs.json")),
+        prerequisites: validateQuestPrerequisiteTable(repository.table("quest_prerequisites.json")),
     }) as QuestEntryContentCatalog
     catalogs.set(repository, catalog)
     return catalog
@@ -57,6 +60,16 @@ export function getQuestEntryCostByKey(
     questKey: string,
 ): QuestEntryCost | undefined {
     return getQuestEntryContentCatalog().entries[questKey]
+}
+
+/**
+ * Stage-node prerequisite quest ids for a main/ex quest; undefined means the
+ * quest's node has no need-node (always reachable).
+ */
+export function getQuestPrerequisites(
+    questId: number,
+): readonly number[] | undefined {
+    return getQuestEntryContentCatalog().prerequisites[String(questId)]
 }
 
 export function getQuestUnlockCost(

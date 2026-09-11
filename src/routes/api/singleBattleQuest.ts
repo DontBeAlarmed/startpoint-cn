@@ -18,6 +18,8 @@ import {
     isQuestOutOfPeriodAt,
     QUEST_OUT_OF_PERIOD_RESULT_CODE,
 } from "../../lib/quest/open-period"
+import { getQuestPrerequisites } from "../../lib/quest-entry-content"
+import { getPlayerSingleQuestProgressSync } from "../../data/domains/quest"
 import { getRealNow } from "../../runtime/time/game-time"
 import { dispatchModeQuestStart } from "../../modes/registry"
 import { createModeHost } from "../../modes/loader"
@@ -269,6 +271,20 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
                 "error": "Bad Request",
                 "message": "Quest doesn't exist."
             })
+        }
+
+        const prerequisites = getQuestPrerequisites(questId)
+        if (prerequisites !== undefined) {
+            const uncleared = prerequisites.filter(prerequisiteId => (
+                getPlayerSingleQuestProgressSync(playerId, category, prerequisiteId)?.finished !== true
+            ))
+            if (uncleared.length > 0) {
+                console.log(`[BATTLE] start locked: category=${category} questId=${questId} missing=${uncleared.join(",")}`)
+                return reply.status(400).send({
+                    "error": "Bad Request",
+                    "message": "Quest prerequisite is not cleared."
+                })
+            }
         }
 
         if (isQuestOutOfPeriodAt(questData, getServerTime() * 1000)) {

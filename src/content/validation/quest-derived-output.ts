@@ -141,3 +141,26 @@ export function validateDailyChallengeContent(input: {
         eventPointMap,
     }) as ValidatedDailyChallengeContent
 }
+
+export function validateQuestPrerequisiteTable(
+    raw: unknown,
+): Readonly<Record<string, readonly number[]>> {
+    const tableName = "quest_prerequisites.json"
+    const table = requireRecord(raw, tableName)
+    for (const [questId, value] of Object.entries(table)) {
+        requireCanonicalPositiveIntegerKey(questId, tableName, "quest id")
+        const row = requireArray(value, tableName, questId)
+        if (row.length === 0) invalidRuntimeTable(tableName, `${questId} prerequisites must not be empty`)
+        row.forEach((prerequisiteId, index) => {
+            requirePositiveSafeInteger(prerequisiteId, tableName, `${questId}[${index}]`)
+        })
+        const ids = row as unknown[]
+        if (new Set(ids).size !== ids.length) {
+            invalidRuntimeTable(tableName, `${questId} prerequisites must be unique`)
+        }
+        if (ids.includes(Number(questId))) {
+            invalidRuntimeTable(tableName, `${questId} must not depend on itself`)
+        }
+    }
+    return table as Readonly<Record<string, readonly number[]>>
+}
