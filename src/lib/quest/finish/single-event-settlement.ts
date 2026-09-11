@@ -121,6 +121,7 @@ export function settleSingleBuiltInEvent(
             party,
             playerId,
             questId,
+            questData: input.questData,
             getEvoLevelsFn: getCharactersEvolutionImgLevels,
             insertPartyFn: insertPlayerRushEventPlayedPartySync,
             getRequiredKillCountFn: getRaidEventRequiredKillCount,

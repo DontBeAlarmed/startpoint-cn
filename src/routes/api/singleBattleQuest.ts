@@ -14,6 +14,10 @@ import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils"
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time"
 import { computeRealTimeStamina } from "../../lib/stamina"
 import { getStaminaCost } from "../../lib/stamina-cost"
+import {
+    isQuestOutOfPeriodAt,
+    QUEST_OUT_OF_PERIOD_RESULT_CODE,
+} from "../../lib/quest/open-period"
 import { getRealNow } from "../../runtime/time/game-time"
 import { dispatchModeQuestStart } from "../../modes/registry"
 import { createModeHost } from "../../modes/loader"
@@ -264,6 +268,18 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
             return reply.status(400).send({
                 "error": "Bad Request",
                 "message": "Quest doesn't exist."
+            })
+        }
+
+        if (isQuestOutOfPeriodAt(questData, getServerTime() * 1000)) {
+            console.log(`[BATTLE] start out of period: category=${category} questId=${questId}`)
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(200).send({
+                "data_headers": generateDataHeaders({
+                    viewer_id: viewerId,
+                    result_code: QUEST_OUT_OF_PERIOD_RESULT_CODE,
+                }),
+                "data": {},
             })
         }
 

@@ -1,4 +1,6 @@
 import { RushEventBattleType } from "../../../data/types"
+import { isQuestOutOfPeriodAt } from "../open-period"
+import { getServerTime } from "../../../utils"
 import type { UserRushEventPlayedParty } from "../../../data/types"
 import type { PlayerRewardResult, EquipmentItemReward, RushEventFolder } from "../../types"
 import { QuestCategory } from "../../types"
@@ -23,6 +25,8 @@ interface RushHandlerParams {
         rushEventId?: number
         rushEventFolderId?: RushEventFolder
         rushEventRound?: number
+        availableFromMs?: number | null
+        availableUntilMs?: number | null
     }
     clearTime: number
     party: {
@@ -153,7 +157,7 @@ export function handleRushEventFinish(params: RushHandlerParams): {
         })),
         "rush_battle_played_party_list": serializedPlayedParties.folderParties,
         "endless_battle_played_party_list": serializedPlayedParties.endlessParties,
-        "is_out_of_period": false,
+        "is_out_of_period": isQuestOutOfPeriodAt(questData, getServerTime() * 1000),
         "endless_battle_next_round": isEndless ? newEndlessNextRound : null,
         "endless_battle_max_round": isEndless ? newEndlessMaxRound : null,
         "high_score": isEndless ? clearTime : null,

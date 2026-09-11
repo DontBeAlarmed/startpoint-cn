@@ -52,6 +52,10 @@ import {
 } from "../../lib/rush-folder-progression";
 import { getQuestEntryCostByKey } from "../../lib/quest-entry-content";
 import { getStaminaCost } from "../../lib/stamina-cost";
+import {
+    isQuestOutOfPeriodAt,
+    QUEST_OUT_OF_PERIOD_RESULT_CODE,
+} from "../../lib/quest/open-period";
 import { computeRealTimeStamina } from "../../lib/stamina";
 import { withEntryItemInventoryWithinTransactionSync } from "../../lib/quest/entry-item-inventory";
 import { updatePlayerSync, getPlayerSync } from "../../data/domains/player";
@@ -388,6 +392,18 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Bad Request",
             "message": "Quest doesn't exist."
         })
+
+        if (isQuestOutOfPeriodAt(questData, getServerTime() * 1000)) {
+            console.log(`[RUSH] battle/start out of period: questId=${questId}`)
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(200).send({
+                "data_headers": generateDataHeaders({
+                    viewer_id: viewerId,
+                    result_code: QUEST_OUT_OF_PERIOD_RESULT_CODE,
+                }),
+                "data": {},
+            })
+        }
 
         let restartsClearedFolderForAutoStart = false
         if (questData.rushEventRound !== 0) {

@@ -5,7 +5,11 @@ import { getPlayerCharactersSync } from "../../data/domains/character"
 import { ensurePlayerPartyGroupListSync, getPlayerPartyGroupListSync } from "../../data/domains/party"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { generateDataHeaders, getServerDate } from "../../utils";
+import { generateDataHeaders, getServerDate, getServerTime } from "../../utils";
+import {
+    isQuestOutOfPeriodAt,
+    QUEST_OUT_OF_PERIOD_RESULT_CODE,
+} from "../../lib/quest/open-period";
 import { PartyCategory } from "../../data/types";
 import { clientSerializeDate } from "../../data/utils";
 import { getSerializedPlayerRushEventPlayedPartiesSync, getPlayerRushEventEndlessBattleRankingSync } from "../../lib/rush";
@@ -375,6 +379,18 @@ const routes = async (fastify: FastifyInstance) => {
         if (questData === null || questData.eventId === undefined) return reply.status(400).send({
             "error": "Bad Request", "message": "Quest doesn't exist."
         })
+
+        if (isQuestOutOfPeriodAt(questData, getServerTime() * 1000)) {
+            console.log(`[RAID] battle/start out of period: questId=${body.quest_id}`)
+            reply.header("content-type", "application/x-msgpack");
+            return reply.status(200).send({
+                "data_headers": generateDataHeaders({
+                    viewer_id: viewerId,
+                    result_code: QUEST_OUT_OF_PERIOD_RESULT_CODE,
+                }),
+                "data": {}
+            });
+        }
 
         // Register active quest for /single_battle_quest/finish. The request has
         // no event_id, so derive it from the CN raid quest master data.
