@@ -371,7 +371,7 @@ test("expired EventTrade mail remains when its sale Mana cannot fit", async () =
     assert.equal(receiveHistoryCount(playerId), 0)
 })
 
-test("single receive rejects an expired limited mail without granting its attachment", async () => {
+test("single receive of an expired limited mail answers 2004 without granting its attachment", async () => {
     const { playerId, viewerId } = await createPlayer("expired-single")
     const itemId = 14002
     const before = getPlayerItemSync(playerId, itemId) ?? 0
@@ -383,7 +383,8 @@ test("single receive rejects an expired limited mail without granting its attach
         payload: { viewer_id: viewerId, mail_id: mailId },
     })
 
-    assert.equal(response.statusCode, 400, response.body)
+    assert.equal(response.statusCode, 200, response.body)
+    assert.equal(decode(response).data_headers.result_code, 2004)
     assert.equal(getPlayerItemSync(playerId, itemId) ?? 0, before)
     assert.equal(mailState(mailId), null)
     assert.equal(receiveHistoryCount(playerId), 0)
@@ -645,5 +646,36 @@ test("unsupported attachment in a mixed batch rolls every valid mail back", asyn
     assert.equal(getPlayerItemSync(playerId, itemId) ?? 0, before)
     assert.equal(mailState(itemMailId), "0000-00-00 00:00:00")
     assert.equal(mailState(unsupportedMailId), "0000-00-00 00:00:00")
+    assert.equal(receiveHistoryCount(playerId), 0)
+})
+
+test("single receive of a missing mail answers 2001 in the graceful channel", async () => {
+    const { playerId, viewerId } = await createPlayer("missing-mail-2001")
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/receive",
+        payload: { viewer_id: viewerId, mail_id: 999999999 },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    assert.equal(decode(response).data_headers.result_code, 2001)
+    assert.equal(receiveHistoryCount(playerId), 0)
+})
+
+test("single receive of an already-received mail answers 2002", async () => {
+    const { playerId, viewerId } = await createPlayer("already-received-2002")
+    const mailId = addMail(playerId, MailType.FREE_MANA, null, 4)
+    database.prepare("UPDATE players_mails SET receive_time = ? WHERE id = ?")
+        .run("2026-08-18 00:00:01", mailId)
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/receive",
+        payload: { viewer_id: viewerId, mail_id: mailId },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    assert.equal(decode(response).data_headers.result_code, 2002)
     assert.equal(receiveHistoryCount(playerId), 0)
 })

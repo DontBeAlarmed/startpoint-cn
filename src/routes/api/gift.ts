@@ -61,7 +61,7 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         reply.header("content-type", "application/x-msgpack")
-        const overflow = result.resultCode === 1 ? result.itemOverflow : undefined
+        const overflow = result.resultCode === 0 ? result.itemOverflow : undefined
         const overMax = overflow === undefined
             ? []
             : projectItemOverflowCommonResponse(overflow.dispositions)

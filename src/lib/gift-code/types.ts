@@ -36,7 +36,9 @@ export interface GiftDefinitionPage {
 
 export type GiftReceiveResult =
     | {
-        readonly resultCode: 1
+        // Body-level success code: 0 opens the client reward dialog; the
+        // header result_code stays 1 (Success) via generateDataHeaders.
+        readonly resultCode: 0
         readonly rewards: readonly GiftReward[]
         readonly itemOverflow?: Readonly<{
             dispositions: readonly import("../item-overflow").PlannedItemOverflowDisposition[]

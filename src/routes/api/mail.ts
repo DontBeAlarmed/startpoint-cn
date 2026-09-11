@@ -39,7 +39,11 @@ interface ReceiveAllBody {
     mail_ids: number[]
 }
 
-class MailNotAvailableError extends Error {}
+class MailNotAvailableError extends Error {
+    constructor(public readonly resultCode: 2001 | 2002 | 2004) {
+        super("Mail not available")
+    }
+}
 const MAX_RECEIVE_ALL_MAIL_IDS = 500
 
 function getMailAwakeInvalidatedFactKeys(
@@ -168,11 +172,17 @@ const routes = async (fastify: FastifyInstance) => {
         }
         try {
             const evaluationTime = getVirtualNow()
-            const mail = getPlayerMailSync(playerId, mailId, true)
-            if (!mail) throw new MailNotAvailableError()
+            // The client handles 2001/2002/2004 in MailReceiveRealRemote's
+            // graceful channel (ReceiveErrorNoPresent/AlreadyReceive/
+            // PeriodOutdated), so these stay HTTP 200 with a result code.
+            const mail = getPlayerMailSync(playerId, mailId)
+            if (!mail) throw new MailNotAvailableError(2001)
+            if (mail.receive_time !== "0000-00-00 00:00:00") {
+                throw new MailNotAvailableError(2002)
+            }
             if (isPlayerMailExpiredAt(mail, getVirtualNow())) {
                 deletePlayerMailsByIdsSync(playerId, [mail.id])
-                throw new MailNotAvailableError()
+                throw new MailNotAvailableError(2004)
             }
             settlement = getDb().transaction(() => {
                 const player = getPlayerSync(playerId)
@@ -197,10 +207,16 @@ const routes = async (fastify: FastifyInstance) => {
                 }
             })()
         } catch (error) {
-            if (error instanceof MailNotAvailableError) return reply.status(400).send({
-                error: "Bad Request",
-                message: "Mail not found or already received"
-            })
+            if (error instanceof MailNotAvailableError) {
+                reply.header("content-type", "application/x-msgpack")
+                return reply.status(200).send({
+                    data_headers: generateDataHeaders({
+                        viewer_id: viewerId,
+                        result_code: error.resultCode,
+                    }),
+                    data: {},
+                })
+            }
             if (error instanceof MailRewardCapacityError) return reply.status(400).send({
                 error: "Mail reward cannot fit",
                 message: error.message,

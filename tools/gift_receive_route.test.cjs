@@ -103,7 +103,7 @@ test("receives a Chinese code once and projects all six rewards in protocol orde
     const gift = createActiveGift("中文礼包码")
     const { playerId, viewerId } = await createPlayer("chinese")
     const response = await receive(viewerId, gift.code)
-    assert.equal(response.result_code, 1)
+    assert.equal(response.result_code, 0)
     assert.deepEqual(response.all_gift_info, [
         { type: 1, type_id: 1, number: 3 },
         { type: 4, type_id: null, number: 5000 },
@@ -130,7 +130,7 @@ test("sellable Item overflow publishes final inventory, Mana and Sold Toast", as
 
     const response = await receive(viewerId, activeGift.code)
 
-    assert.equal(response.result_code, 1)
+    assert.equal(response.result_code, 0)
     assert.equal(getPlayerItemSync(playerId, 1), 9999)
     assert.equal(getPlayerSync(playerId).freeMana, before.freeMana + 10)
     assert.deepEqual(response.item_list, { 1: 9999 })
@@ -248,7 +248,7 @@ test("stopped gifts return 6103 and redeemed gifts return 6104 for the same play
 
     const gift = createActiveGift("duplicate-route")
     const player = await createPlayer("duplicate")
-    assert.equal((await receive(player.viewerId, gift.code)).result_code, 1)
+    assert.equal((await receive(player.viewerId, gift.code)).result_code, 0)
     assert.equal((await receive(player.viewerId, gift.code)).result_code, 6104)
 })
 
@@ -256,6 +256,6 @@ test("different players redeem the same gift independently", async () => {
     const gift = createActiveGift("shared-route")
     const first = await createPlayer("shared-first")
     const second = await createPlayer("shared-second")
-    assert.equal((await receive(first.viewerId, gift.code)).result_code, 1)
-    assert.equal((await receive(second.viewerId, gift.code)).result_code, 1)
+    assert.equal((await receive(first.viewerId, gift.code)).result_code, 0)
+    assert.equal((await receive(second.viewerId, gift.code)).result_code, 0)
 })

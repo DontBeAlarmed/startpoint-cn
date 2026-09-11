@@ -152,7 +152,10 @@ export function receiveGiftCodeSync(playerId: number, rawKey: unknown): GiftRece
 
         const dispositions = collectRewardGrantItemOverflowDispositions(grant)
         return {
-            resultCode: 1,
+            // The gift body result_code is its own channel: 0 opens the client
+            // reward dialog (GiftRealRemote → OtherMenuScene), 6101-6106 are
+            // the readable gift errors; 1 would display as rc_gift_key_error.
+            resultCode: 0,
             rewards,
             ...(dispositions.length === 0
                 ? {}
