@@ -197,6 +197,8 @@ const TEST_GROUPS = Object.freeze({
             "tools/gift_capability.test.cjs",
             "tools/gift_code_lifecycle.test.cjs",
             "tools/gift_receive_route.test.cjs",
+            "tools/attention_config_route.test.cjs",
+            "tools/load_identity_boundary.test.cjs",
         ],
     },
     "quick:cdn": {
@@ -608,6 +610,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/mission_time_utils.test.cjs",
             "tools/pass_card_purchase_route.test.cjs",
             "tools/pass_card_route.test.cjs",
+            "tools/stamina_campaign_targeting.test.cjs",
         ],
     },
     "integration:quest": {
@@ -619,6 +622,10 @@ const TEST_GROUPS = Object.freeze({
             "tools/battle_settlement_boundary.test.cjs",
             "tools/battle_settlement_values.test.cjs",
             "tools/battle_entry_inventory_route.test.cjs",
+            "tools/open_period_boundaries.test.cjs",
+            "tools/quest_prerequisite_boundaries.test.cjs",
+            "tools/rush_battle_stamina.test.cjs",
+            "tools/party_heal_option_persistence.test.cjs",
             "tools/perf/single_battle_settlement_admission.test.cjs",
             "tools/perf/single_battle_settlement_baseline.test.cjs",
             "tools/quest_entry_lifecycle.test.cjs",
