@@ -220,10 +220,16 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
     fastify.post("/load", async (request: FastifyRequest, reply: FastifyReply) => {
         try {
         const body = request.body as CnLoadBody;
-        const viewerId = body.viewer_id || body.keychain || 1;
+        // The official client always sends viewer_id (keychain as its local
+        // fallback); the historical `|| 1` fallback served account 1's full
+        // save to any body that carried neither, so reject it instead.
+        const viewerId = body.viewer_id || body.keychain;
+        if (!Number.isSafeInteger(viewerId) || viewerId < 1) {
+            return reply.status(400).send({ error: "Bad Request", message: "Invalid viewer id." });
+        }
 
         const session = await getSession(String(viewerId));
-        const accountId = session ? session.accountId : (body.viewer_id || body.keychain || 1);
+        const accountId = session ? session.accountId : viewerId;
         const playerId = resolvePlayerIdSync(accountId);
         if (!playerId) {
             return reply.status(400).send({ error: "Bad Request", message: "No player found" });
