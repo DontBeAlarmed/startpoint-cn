@@ -72,6 +72,7 @@ const LEGACY_V1_UNMANAGED_TABLES = new Set([
     "players_shop_campaign_lineups",
     "players_receive_history",
     "players_mails",
+    "players_bond_token_exchanges",
 ])
 
 export {

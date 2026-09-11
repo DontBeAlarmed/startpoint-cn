@@ -1074,3 +1074,95 @@ test("admin export and clone routes use the complete v2 path", async t => {
         db.exec("DROP TABLE players_orphan")
     }
 })
+
+test("legacy v1 restore preserves rush, carnival, bond exchange, and campaign state", () => {
+    const account = createAccount("legacy-newer-domains")
+    const playerId = insertDefaultPlayerSync(account.id).id
+    db.prepare(`
+        INSERT INTO players_rush_events (
+            player_id, event_id, active_rush_battle_folder_id,
+            endless_battle_max_round, endless_battle_max_round_time
+        ) VALUES (?, 700007, 1, 3, 1000)
+    `).run(playerId)
+    db.prepare(`
+        INSERT INTO players_rush_events_cleared_folders (player_id, event_id, folder_id)
+        VALUES (?, 700007, 1)
+    `).run(playerId)
+    db.prepare(`
+        INSERT INTO players_rush_events_played_parties (
+            player_id, event_id, round, battle_type,
+            character_id_1, character_id_2, character_id_3,
+            unison_character_id_1, unison_character_id_2, unison_character_id_3,
+            equipment_id_1, equipment_id_2, equipment_id_3,
+            ability_soul_id_1, ability_soul_id_2, ability_soul_id_3,
+            evolution_img_level_1, evolution_img_level_2, evolution_img_level_3,
+            unison_evolution_img_level_1, unison_evolution_img_level_2, unison_evolution_img_level_3
+        ) VALUES (
+            ?, 700007, 1, 1,
+            1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+            0, NULL, NULL, NULL, NULL, NULL
+        )
+    `).run(playerId)
+    db.prepare(`
+        INSERT INTO players_carnival_event_records (
+            player_id, event_id, folder_id, best_score
+        ) VALUES (?, 1001, 1, 5000)
+    `).run(playerId)
+    db.prepare(`
+        INSERT INTO players_carnival_event_rewards (player_id, event_id, reward_id)
+        VALUES (?, 1001, 990026204)
+    `).run(playerId)
+    db.prepare(`
+        INSERT INTO players_bond_token_exchanges (player_id, equipment_id, exchange_count)
+        VALUES (?, 500001, 2)
+    `).run(playerId)
+    db.prepare(`
+        INSERT INTO daily_challenge_point_list_entries (id, point, player_id)
+        VALUES (9001, 3, ?)
+    `).run(playerId)
+    db.prepare(`
+        INSERT INTO daily_challenge_point_list_campaigns (
+            campaign_id, additional_point, list_entry_id, player_id
+        ) VALUES (11, 5, 9001, ?)
+    `).run(playerId)
+
+    const dataV1 = cloneJson(getMergedPlayerDataSync(playerId))
+    dataV1.player.name = "legacy-newer-domains-restored"
+    const result = restorePlayerSaveSnapshotSync({
+        schema: "starpoint-cn-save",
+        version: 1,
+        playerId,
+        data: dataV1,
+    }, playerId)
+    assert.deepEqual(result, { playerId, legacyPartial: true })
+
+    assert.equal(
+        db.prepare("SELECT endless_battle_max_round FROM players_rush_events WHERE player_id = ? AND event_id = 700007").get(playerId)?.endless_battle_max_round,
+        3,
+        "rush event progress must survive a v1 restore",
+    )
+    assert.equal(
+        db.prepare("SELECT folder_id FROM players_rush_events_cleared_folders WHERE player_id = ?").get(playerId)?.folder_id,
+        1,
+    )
+    assert.equal(
+        db.prepare("SELECT battle_type FROM players_rush_events_played_parties WHERE player_id = ?").get(playerId)?.battle_type,
+        1,
+    )
+    assert.equal(
+        db.prepare("SELECT best_score FROM players_carnival_event_records WHERE player_id = ?").get(playerId)?.best_score,
+        5000,
+    )
+    assert.equal(
+        db.prepare("SELECT reward_id FROM players_carnival_event_rewards WHERE player_id = ?").get(playerId)?.reward_id,
+        990026204,
+    )
+    assert.equal(
+        db.prepare("SELECT exchange_count FROM players_bond_token_exchanges WHERE player_id = ? AND equipment_id = 500001").get(playerId)?.exchange_count,
+        2,
+    )
+    assert.equal(
+        db.prepare("SELECT additional_point FROM daily_challenge_point_list_campaigns WHERE player_id = ?").get(playerId)?.additional_point,
+        5,
+    )
+})
