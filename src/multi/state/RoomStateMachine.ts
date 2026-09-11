@@ -15,6 +15,7 @@ export class RoomStateMachine {
             [RoomState.Ready, RoomState.Filled],
             [RoomState.Ready, RoomState.Disbanded],
             [RoomState.Filled, RoomState.Battle],
+            [RoomState.Ready, RoomState.Battle],
             [RoomState.Filled, RoomState.Ready],
             [RoomState.Filled, RoomState.Disbanded],
             [RoomState.Battle, RoomState.Ready],

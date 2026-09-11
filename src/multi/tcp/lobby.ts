@@ -318,6 +318,10 @@ async function handleEnterComs(
 ): Promise<void> {
     const room = getRoom(client.roomNumber)
     if (!room) return
+    if (room.raising_state === 4 && sessionManager.isRoomBattleOccupied(client.roomNumber)) {
+        console.log(`[LOBBY] EnterComs rejected: room=${client.roomNumber} battle in progress`)
+        return
+    }
     room.is_npc_mode = true
     const requestId = beginRecruitmentRequest(room)
 
@@ -425,9 +429,22 @@ async function handleEnterComs(
     }, npcRecruitmentTiming.joinDelayMs + npcRecruitmentTiming.readyDelayMs)
 }
 
+// A running battle locks the lobby: state mutations, party edits, ready flags,
+// and NPC recruitment are invalid while members hold the battle. Once the
+// battle scene is cleared the lock releases and the host may re-enter for the
+// rematch (Battle → Ready stays a legal machine transition).
+function roomBattleLocksLobbyMutations(roomNumber: string): boolean {
+    const room = getRoom(roomNumber)
+    return room?.raising_state === 4 && sessionManager.isRoomBattleOccupied(roomNumber)
+}
+
 function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): void {
     const ed = data[1]
     if (!ed?.party || !client.yourself) return
+    if (roomBattleLocksLobbyMutations(client.roomNumber)) {
+        console.log(`[LOBBY] enter rejected: room=${client.roomNumber} battle in progress`)
+        return
+    }
 
     const room = getRoom(client.roomNumber)
     const isHost = !!client.participant
@@ -560,6 +577,10 @@ function handleBye(_socket: net.Socket, client: SessionClient, _data: any[]): vo
 }
 
 function handleChangeParty(_socket: net.Socket, client: SessionClient, data: any[]): void {
+    if (roomBattleLocksLobbyMutations(client.roomNumber)) {
+        console.log(`[LOBBY] party change rejected: room=${client.roomNumber} battle in progress`)
+        return
+    }
     const pd = data[1]
     if (pd?.party && client.yourself) {
         if (client.snapshot) {
@@ -629,6 +650,10 @@ function handleChangeAutoStart(client: SessionClient, data: any[]): void {
 }
 
 function handleReady(_socket: net.Socket, client: SessionClient, data: any[]): void {
+    if (roomBattleLocksLobbyMutations(client.roomNumber)) {
+        console.log(`[LOBBY] ready change rejected: room=${client.roomNumber} battle in progress`)
+        return
+    }
     const readyState = Array.isArray(data[1]) ? data[1][0] : data[1]
     client.isReady = readyState === 1
 

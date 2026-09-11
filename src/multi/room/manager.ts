@@ -179,6 +179,7 @@ export function createRoom(
         npc_count: 0,
         npc_roster: [],
     };
+    sessionManager.initRoomState(roomNumber, RoomState.Filled)
     rooms.set(roomNumber, room);
     console.log(`[MULTI] room created: room=${roomNumber} category=${category} quest=${questId}`);
     return room;
@@ -260,9 +261,28 @@ export function removeRoomMember(roomNumber: string, participant: ParticipantIde
     return true;
 }
 
+// Wire raising_state numbers onto the RoomStateMachine lifecycle:
+// 2 (recruiting, room created with the host) → Filled, 1 (preparation after
+// host Enter) → Ready, 4 → Battle. StartBattle is legal from both Filled and
+// Ready; Battle → Ready stays legal for the post-battle rematch re-entry.
+const RAISING_STATE_TO_ROOM_STATE = new Map<number, RoomState>([
+    [2, RoomState.Filled],
+    [1, RoomState.Ready],
+    [4, RoomState.Battle],
+])
+
 export function updateRoomState(roomNumber: string, state: number): boolean {
     const room = rooms.get(roomNumber);
     if (!room) return false;
+    const machine = sessionManager.getRoomState(roomNumber)
+    const target = RAISING_STATE_TO_ROOM_STATE.get(state)
+    if (target !== undefined && machine.getState() !== target) {
+        const transition = machine.tryTransition(target)
+        if (!transition.allowed) {
+            console.warn(`[MULTI] room state transition rejected: ${roomNumber} ${transition.reason}`);
+            return false;
+        }
+    }
     console.log(`[MULTI] room state: ${roomNumber} → ${state}`);
     room.raising_state = state;
     return true;

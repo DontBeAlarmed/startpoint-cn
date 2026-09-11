@@ -4,6 +4,7 @@
 
 import * as net from "net"
 import { Result, ClientState, BattleState } from "../types"
+import { RoomState } from "../types"
 import { RoomStateMachine } from "./RoomStateMachine"
 import { ClientStateMachine } from "./ClientStateMachine"
 import {
@@ -729,6 +730,17 @@ export class SessionManager {
         return (this.battleExpectedCount.get(roomNumber) ?? -1) === 0
     }
 
+    /**
+     * True while a started battle still occupies the room: members hold battle
+     * sockets or handshakes are still pending. Lobby mutation gates consume
+     * this together with raising_state to distinguish a running battle from a
+     * finished one whose host may legally re-enter for the rematch.
+     */
+    isRoomBattleOccupied(roomNumber: string): boolean {
+        return (this.battleClients.get(roomNumber)?.size ?? 0) > 0
+            || (this.battleExpectedCount.get(roomNumber) ?? 0) > 0
+    }
+
     activateBattleScene(roomNumber: string): boolean {
         const generation = this.battleSceneGeneration.get(roomNumber) ?? -1
         if (generation < 0
@@ -982,6 +994,12 @@ export class SessionManager {
             this.roomStates.set(roomNumber, sm)
         }
         return sm
+    }
+
+    /** Seed a room's machine at its creation state; existing machines stay. */
+    initRoomState(roomNumber: string, initialState: RoomState): void {
+        if (this.roomStates.has(roomNumber)) return
+        this.roomStates.set(roomNumber, new RoomStateMachine(initialState))
     }
 
     removeRoomState(roomNumber: string): void {

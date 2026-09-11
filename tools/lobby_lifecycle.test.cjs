@@ -1491,3 +1491,45 @@ test("lobby Send relays as MeetingServer2Client.Messages to the targeted member"
     assert.deepEqual(guests[0].socket.writes.at(-1), [2, host.client.connectionId, payload])
     assert.equal(host.socket.writes.length, hostWritesBefore)
 })
+
+test("lobby mutations are gated while the room battle is occupied", async t => {
+    const { room, host, guests } = createLobbyRoom(t, 4701, [4702])
+    const guest = guests[0]
+    handleMessage(host.socket, [0, [0, { party: { marker: "pre" } }]])
+    handleMessage(guest.socket, [0, [0, { party: { marker: "guest" } }]])
+    assert.equal(room.raising_state, 1)
+    const hostMateBefore = host.client.mates.find(mate => mate.viewerId === 4701)
+
+    handleMessage(host.socket, [0, [6]])
+    assert.equal(room.raising_state, 4)
+
+    // Host re-Enter mid-battle must not reset the room to preparation.
+    handleMessage(host.socket, [0, [0, { party: { marker: "during-battle" } }]])
+    assert.equal(room.raising_state, 4, "battle state must survive a mid-battle host Enter")
+
+    // ChangeParty mid-battle must not mutate the party or the room party id.
+    const hostPartyIdBefore = room.host_party_id
+    const hostWritesBefore = host.socket.writes.length
+    handleMessage(host.socket, [0, [2, { party: { marker: "mid-battle-party" }, currentPartyId: 7 }]])
+    const hostMateAfterParty = host.client.mates.find(mate => mate.viewerId === 4701)
+    assert.deepEqual(hostMateAfterParty.party, hostMateBefore.party)
+    assert.equal(room.host_party_id, hostPartyIdBefore)
+
+    // Ready mid-battle must not flip the ready state.
+    handleMessage(guest.socket, [0, [3, [1]]])
+    const guestMate = guest.client.mates.find(mate => mate.viewerId === 4702)
+    assert.deepEqual(guestMate.state, [0])
+    assert.equal(guest.client.isReady, false)
+    assert.equal(host.socket.writes.length, hostWritesBefore)
+
+    // EnterComs mid-battle must not start NPC recruitment.
+    handleMessage(host.socket, [0, [10]])
+    await flushPromises()
+    assert.equal(room.is_npc_mode, false)
+
+    // After the battle ends (scene cleared), host re-Enter legally returns the
+    // room to preparation for the rematch.
+    sessionManager.clearBattleExpectedCount(room.room_number)
+    handleMessage(host.socket, [0, [0, { party: { marker: "rematch" } }]])
+    assert.equal(room.raising_state, 1)
+})
