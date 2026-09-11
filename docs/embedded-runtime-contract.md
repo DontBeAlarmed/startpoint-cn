@@ -127,7 +127,7 @@ Bundle 不包含：
 
 默认开发路径是项目根的 `.database`。嵌入模式必须显式传入由 Supervisor 管理的绝对 `DATA_DIR`。服务端在打开数据库前解析现有祖先的物理路径，拒绝 Data Volume 与 Server Bundle 或 local CDN 相等、互为祖先/后代；通过祖先符号链接指回这些只读输入也会被拒绝。替换 Server Bundle 不得覆盖 Data Volume。
 
-数据库 schema 由服务端代码拥有。当前 Bundle 接受 schema `0..24`，启动时由服务端事务化迁移到 `24`，并拒绝高于 `24` 的数据库。集中发布契约锚点以本文档末尾的 `release-contract` 块为准。Supervisor 只在停服后复制备份，不直接执行 SQL。
+数据库 schema 由服务端代码拥有。当前 Bundle 接受 schema `0..27`，启动时由服务端事务化迁移到 `27`，并拒绝高于 `27` 的数据库。集中发布契约锚点以本文档末尾的 `release-contract` 块为准。Supervisor 只在停服后复制备份，不直接执行 SQL。
 
 ### Asset Provider
 
@@ -160,7 +160,7 @@ manifest 核心字段如下：
     "node": ">=20.12.0",
     "dependencyLock": "sha256:<package-lock digest>",
     "minDataSchema": 0,
-    "targetDataSchema": 24
+    "targetDataSchema": 27
   },
   "admin": {
     "path": "web/dist",
@@ -258,10 +258,13 @@ Supervisor 和服务端的完整启动顺序：
 
 ## 健康接口
 
-`GET /healthz` 是普通 JSON，不经过管理后台 SPA fallback：
+`GET /healthz` 是普通 JSON，不经过管理后台 SPA fallback。`services.tcp` 表示 TCP
+Session 服务当前是否可用；它不是所有运行模式的共同 ready 前置：
 
-- `200`：HTTP、TCP、数据库和 Content snapshot 全部就绪；
-- `503`：仍在启动、正在停止或关键组件不可用。
+- `embedded`：`200` 要求 HTTP、TCP、数据库、Content snapshot 和管理后台全部就绪；
+- `host`/`client`：HTTP、数据库、Content snapshot 和管理后台就绪即可返回 `200`，TCP 或
+  Hub 不可用时通过 `multiplayer.state=degraded` 和 `services.tcp=false` 表示降级；
+- `503`：仍在启动、正在停止或上述该运行模式的关键组件不可用。
 
 最小响应：
 
@@ -279,7 +282,7 @@ Supervisor 和服务端的完整启动顺序：
   },
   "database": {
     "ready": true,
-    "schema": 12
+    "schema": 27
   },
   "services": {
     "http": true,
