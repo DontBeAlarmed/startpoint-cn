@@ -520,7 +520,7 @@ const { getCharacterGrowthContent } = require("../src/lib/character-growth-conte
 const getCharacterDataSync = characterId => getCharacterFacts().get(characterId)
 const getCharacterManaNodesSync = (characterId, level) => getCharacterGrowthContent().getManaBoardNodes(characterId, level)
 const { characterExpCaps } = require("../src/lib/character")
-const { computeRealTimeStamina } = require("../src/lib/stamina")
+const { computeRealTimeStamina, getRankDegree } = require("../src/lib/stamina")
 const { registerBattleRoutes } = require("../src/multi/http/battle")
 const cnLoadRoutes = require("../src/routes/cn/load").default
 
@@ -2031,4 +2031,39 @@ test("multi finish delegates preparation, settlement writes, and response projec
     assert.match(responseSource, /composeMissionSettlementResponse\(/)
     assert.doesNotMatch(responseSource, /getPlayerMailCountSync/)
     assert.doesNotMatch(responseSource, /buildFinishFollowInfo/)
+})
+
+test("production /finish projects the settled degree instead of a constant", async () => {
+    let home
+    try {
+        home = await openProductionHome(
+            "b2-degree-projection",
+            host,
+            true,
+            { verify: async () => ({ ok: true, isHost: true }) },
+        )
+        const playId = "b2-degree-projection"
+        updatePlayerSync({ id: home.playerId, rankPoint: 95 })
+        const started = await home.app.inject({
+            method: "POST",
+            url: "/start",
+            payload: startPayload(host.viewerId, playId),
+        })
+        assert.equal(started.statusCode, 200, started.body)
+
+        const finished = await home.app.inject({
+            method: "POST",
+            url: "/finish",
+            payload: finishPayload(host.viewerId, playId),
+        })
+        assert.equal(finished.statusCode, 200, finished.body)
+        const userInfo = JSON.parse(finished.body).data.user_info
+        // The settled rank must cross into a real degree and the response must
+        // project that degree instead of the constant 1.
+        assert.notEqual(userInfo.rank_point, 95)
+        assert.equal(userInfo.degree_id, getRankDegree(userInfo.rank_point))
+        assert.notEqual(userInfo.degree_id, 1)
+    } finally {
+        await closeProductionHome(home)
+    }
 })

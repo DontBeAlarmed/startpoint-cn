@@ -510,6 +510,7 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             fieldMana: valuePlan.fieldMana,
             fixedManaReward,
             fixedPoolExpReward,
+            degreeId: newDegreeId,
             beforeRankPoint,
             newRankPoint,
             newBoostPoint,

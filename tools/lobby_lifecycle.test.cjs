@@ -1467,3 +1467,27 @@ test("active com_id 2 selects the second configured NPC party", async t => {
     assert.ok(npc)
     assert.deepEqual(npc.party, { marker: "npc-party-1" })
 })
+
+test("lobby Broadcast relays as MeetingServer2Client.Messages with the sender id", async t => {
+    const { host, guests } = createLobbyRoom(t, 4601, [4602])
+    const payload = [[0, 3]]
+    const hostWritesBefore = host.socket.writes.length
+
+    handleMessage(host.socket, [1, payload])
+
+    // Receivers get Messages(2, senderConnectionId, payload); the sender renders
+    // its own emotion locally and must not receive its own relay.
+    assert.deepEqual(guests[0].socket.writes.at(-1), [2, host.client.connectionId, payload])
+    assert.equal(host.socket.writes.length, hostWritesBefore)
+})
+
+test("lobby Send relays as MeetingServer2Client.Messages to the targeted member", async t => {
+    const { host, guests } = createLobbyRoom(t, 4603, [4604])
+    const payload = [[0, 5]]
+    const hostWritesBefore = host.socket.writes.length
+
+    handleMessage(host.socket, [2, [guests[0].client.participant.viewerId], payload])
+
+    assert.deepEqual(guests[0].socket.writes.at(-1), [2, host.client.connectionId, payload])
+    assert.equal(host.socket.writes.length, hostWritesBefore)
+})

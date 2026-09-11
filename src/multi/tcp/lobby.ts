@@ -697,15 +697,21 @@ function handleNotify(socket: net.Socket, client: SessionClient, data: any[]): v
     }
 }
 
+// Client2Server.Broadcast(1, payload)/Send(2, targets, payload) must be relayed
+// as MeetingServer2Client.Messages(2, senderConnectionId, payload); echoing the
+// raw client frame would make receivers parse the payload as a single
+// MeetingServerMessage and lets any member inject arbitrary server messages.
+// The sender renders its own emotion locally, so relays exclude it.
 function handleBroadcast(_socket: net.Socket, client: SessionClient, data: any[]): void {
-    sessionManager.broadcastToRoom(client.roomNumber, data)
+    sessionManager.broadcastToRoom(client.roomNumber, [2, client.connectionId, data[1]], client)
 }
 
-function handleSend(_socket: net.Socket, _client: SessionClient, data: any[]): void {
-    const targetViewerId = data[1] as number
-    const roomNumber = _client.roomNumber
-    const target = sessionManager.getUniqueRoomClientByViewerId(targetViewerId, roomNumber)
-    if (target) sessionManager.sendJson(target.socket, data)
+function handleSend(_socket: net.Socket, client: SessionClient, data: any[]): void {
+    const targetViewerIds = Array.isArray(data[1]) ? data[1] : [data[1]]
+    for (const targetViewerId of targetViewerIds) {
+        const target = sessionManager.getUniqueRoomClientByViewerId(targetViewerId, client.roomNumber)
+        if (target) sessionManager.sendJson(target.socket, [2, client.connectionId, data[2]])
+    }
 }
 
 export function handleMessage(socket: net.Socket, data: unknown): void {

@@ -4,38 +4,121 @@
     "finish": {
       "activeQuestCleared": true,
       "observations": {
-        "eventLoopDelayMs": 353.107967,
-        "latencyMs": 352.87139900000057
+        "eventLoopDelayMs": 1257.242623,
+        "latencyMs": 1257.1109379999998
       },
-      "outputSignature": "sha256:6251057102cadbbc480793acf2f3a111f18d9844c9210191b3b71a013d0cce0e",
+      "outputSignature": "sha256:caa9a69355e64bdad536c707818f4bc4a48ce3feb63b2a655c197941eb2210d4",
       "sql": {
-        "selectStatements": 56,
-        "statements": 93,
-        "transactionStatements": 12,
+        "selectStatements": 52,
+        "statements": 85,
+        "transactionStatements": 8,
         "writeStatements": 25,
         "byTable": {
-          "players": { "reads": 11, "statements": 17, "writes": 6 },
-          "players_active_mission_battle_facts": { "reads": 0, "statements": 1, "writes": 1 },
-          "players_active_quests": { "reads": 1, "statements": 2, "writes": 1 },
-          "players_category_mission_stages": { "reads": 4, "statements": 5, "writes": 1 },
-          "players_category_missions": { "reads": 5, "statements": 8, "writes": 3 },
-          "players_character_awake_unlocks": { "reads": 2, "statements": 2, "writes": 0 },
-          "players_character_quest_clears": { "reads": 1, "statements": 3, "writes": 2 },
-          "players_characters": { "reads": 4, "statements": 5, "writes": 1 },
-          "players_characters_bond_tokens": { "reads": 4, "statements": 4, "writes": 0 },
-          "players_characters_mana_nodes": { "reads": 5, "statements": 5, "writes": 0 },
-          "players_collected_items": { "reads": 2, "statements": 3, "writes": 1 },
-          "players_degree_battle_stats": { "reads": 1, "statements": 2, "writes": 1 },
-          "players_equipment": { "reads": 1, "statements": 1, "writes": 0 },
-          "players_items": { "reads": 1, "statements": 2, "writes": 1 },
-          "players_mails": { "reads": 1, "statements": 1, "writes": 0 },
-          "players_mission_battle_counters": { "reads": 1, "statements": 2, "writes": 1 },
-          "players_party_member_co_clears": { "reads": 1, "statements": 1, "writes": 0 },
-          "players_party_race_clears": { "reads": 0, "statements": 1, "writes": 1 },
-          "players_pass_cards": { "reads": 1, "statements": 4, "writes": 3 },
-          "players_periodic_snapshots": { "reads": 4, "statements": 4, "writes": 0 },
-          "players_quest_progress": { "reads": 5, "statements": 7, "writes": 2 },
-          "server_gameplay_settings": { "reads": 2, "statements": 2, "writes": 0 }
+          "players": {
+            "reads": 11,
+            "statements": 17,
+            "writes": 6
+          },
+          "players_active_mission_battle_facts": {
+            "reads": 0,
+            "statements": 1,
+            "writes": 1
+          },
+          "players_active_quests": {
+            "reads": 1,
+            "statements": 2,
+            "writes": 1
+          },
+          "players_category_mission_stages": {
+            "reads": 3,
+            "statements": 4,
+            "writes": 1
+          },
+          "players_category_missions": {
+            "reads": 4,
+            "statements": 7,
+            "writes": 3
+          },
+          "players_character_awake_unlocks": {
+            "reads": 1,
+            "statements": 1,
+            "writes": 0
+          },
+          "players_character_quest_clears": {
+            "reads": 0,
+            "statements": 2,
+            "writes": 2
+          },
+          "players_characters": {
+            "reads": 4,
+            "statements": 5,
+            "writes": 1
+          },
+          "players_characters_bond_tokens": {
+            "reads": 4,
+            "statements": 4,
+            "writes": 0
+          },
+          "players_characters_mana_nodes": {
+            "reads": 5,
+            "statements": 5,
+            "writes": 0
+          },
+          "players_collected_items": {
+            "reads": 2,
+            "statements": 3,
+            "writes": 1
+          },
+          "players_degree_battle_stats": {
+            "reads": 1,
+            "statements": 2,
+            "writes": 1
+          },
+          "players_equipment": {
+            "reads": 1,
+            "statements": 1,
+            "writes": 0
+          },
+          "players_items": {
+            "reads": 1,
+            "statements": 2,
+            "writes": 1
+          },
+          "players_mails": {
+            "reads": 1,
+            "statements": 1,
+            "writes": 0
+          },
+          "players_mission_battle_counters": {
+            "reads": 1,
+            "statements": 2,
+            "writes": 1
+          },
+          "players_party_race_clears": {
+            "reads": 0,
+            "statements": 1,
+            "writes": 1
+          },
+          "players_pass_cards": {
+            "reads": 1,
+            "statements": 4,
+            "writes": 3
+          },
+          "players_periodic_snapshots": {
+            "reads": 4,
+            "statements": 4,
+            "writes": 0
+          },
+          "players_quest_progress": {
+            "reads": 5,
+            "statements": 7,
+            "writes": 2
+          },
+          "server_gameplay_settings": {
+            "reads": 2,
+            "statements": 2,
+            "writes": 0
+          }
         }
       },
       "statusCode": 200,
