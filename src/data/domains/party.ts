@@ -47,7 +47,8 @@ export function getPlayerPartyGroupListsSync(
     const rawParties = db.prepare(`
     SELECT slot, name, character_id_1, character_id_2, character_id_3, unison_character_1,
         unison_character_2, unison_character_3, equipment_1, equipment_2, equipment_3,
-        ability_soul_1, ability_soul_2, ability_soul_3, edited, group_id, category,
+        ability_soul_1, ability_soul_2, ability_soul_3, edited, allow_other_players_to_heal_me,
+        group_id, category,
         current_battle_power, before_battle_power
     FROM players_parties
     WHERE player_id = ? AND category IN (${placeholders})
@@ -69,7 +70,7 @@ export function getPlayerPartyGroupListsSync(
             abilitySoulIds: [rawParty.ability_soul_1, rawParty.ability_soul_2, rawParty.ability_soul_3],
             edited: deserializeBoolean(rawParty.edited),
             options: {
-                allowOtherPlayersToHealMe: true
+                allowOtherPlayersToHealMe: rawParty.allow_other_players_to_heal_me !== 0
             },
             category: rawParty.category,
             currentBattlePower: rawParty.current_battle_power ?? 0,
@@ -118,7 +119,8 @@ function insertPlayerPartySync(playerId: number, slot: number | string, groupId:
     db.prepare(`
     INSERT INTO players_parties (slot, name, character_id_1, character_id_2, character_id_3,
         unison_character_1, unison_character_2, unison_character_3, equipment_1, equipment_2,
-        equipment_3, ability_soul_1, ability_soul_2, ability_soul_3, edited, player_id, group_id, category,
+        equipment_3, ability_soul_1, ability_soul_2, ability_soul_3, edited,
+        allow_other_players_to_heal_me, player_id, group_id, category,
         current_battle_power, before_battle_power)
     VALUES (${PARTY_WRITE_VALUES})
     `).run(buildPartyWriteParameters(playerId, groupId, slot, party))
@@ -160,6 +162,7 @@ export function updatePlayerPartySync(playerId: number, slot: number, party: Pla
         unison_character_1 = ?, unison_character_2 = ?, unison_character_3 = ?,
         equipment_1 = ?, equipment_2 = ?, equipment_3 = ?,
         ability_soul_1 = ?, ability_soul_2 = ?, ability_soul_3 = ?, edited = ?,
+        allow_other_players_to_heal_me = ?,
         current_battle_power = ?, before_battle_power = ?
     WHERE slot = ? AND player_id = ? AND group_id = ? AND category = ?
     `).run(
@@ -169,6 +172,7 @@ export function updatePlayerPartySync(playerId: number, slot: number, party: Pla
         party.equipmentIds[0], party.equipmentIds[1], party.equipmentIds[2],
         party.abilitySoulIds[0], party.abilitySoulIds[1], party.abilitySoulIds[2],
         serializeBoolean(party.edited),
+        party.options.allowOtherPlayersToHealMe ? 1 : 0,
         party.currentBattlePower ?? 0, party.beforeBattlePower ?? 0,
         slot, playerId, groupId, party.category
     )

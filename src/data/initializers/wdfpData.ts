@@ -638,6 +638,7 @@ export default function init(
         ability_soul_2 INTEGER,
         ability_soul_3 INTEGER,
         edited INTEGER NOT NULL,
+        allow_other_players_to_heal_me INTEGER NOT NULL DEFAULT 1,
         current_battle_power INTEGER NOT NULL DEFAULT 0,
         before_battle_power INTEGER NOT NULL DEFAULT 0,
         player_id INTEGER NOT NULL,
@@ -651,6 +652,7 @@ export default function init(
     // migration: add current_battle_power and before_battle_power to existing tables
     ensureSchemaColumn(database, "players_parties.current_battle_power")
     ensureSchemaColumn(database, "players_parties.before_battle_power")
+    ensureSchemaColumn(database, "players_parties.allow_other_players_to_heal_me")
     pruneSpecialEventPartyGroupsSync(database)
 
     // database.prepare(`CREATE TABLE IF NOT EXISTS players_party_options (

@@ -180,6 +180,7 @@ export interface PlayerPartyOptions {
 export interface RawPlayerParty {
     slot: number
     name: string
+    allow_other_players_to_heal_me: number
     character_id_1: number
     character_id_2: number
     character_id_3: number

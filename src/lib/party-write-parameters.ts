@@ -22,6 +22,7 @@ export function buildPartyWriteParameters(
         ability_soul_2: party.abilitySoulIds[1] || null,
         ability_soul_3: party.abilitySoulIds[2] || null,
         edited: party.edited ? 1 : 0,
+        allow_other_players_to_heal_me: party.options.allowOtherPlayersToHealMe ? 1 : 0,
         player_id: playerId,
         group_id: Number(groupId),
         category: party.category,
@@ -35,6 +36,6 @@ export const PARTY_WRITE_VALUES = `
     @unison_character_1, @unison_character_2, @unison_character_3,
     @equipment_1, @equipment_2, @equipment_3,
     @ability_soul_1, @ability_soul_2, @ability_soul_3,
-    @edited, @player_id, @group_id, @category,
+    @edited, @allow_other_players_to_heal_me, @player_id, @group_id, @category,
     @current_battle_power, @before_battle_power
 `

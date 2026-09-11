@@ -146,6 +146,11 @@ const schemaColumns = {
         column: "illustration_settings",
         definition: "TEXT",
     },
+    "players_parties.allow_other_players_to_heal_me": {
+        table: "players_parties",
+        column: "allow_other_players_to_heal_me",
+        definition: "INTEGER NOT NULL DEFAULT 1",
+    },
     "players_parties.current_battle_power": {
         table: "players_parties",
         column: "current_battle_power",
