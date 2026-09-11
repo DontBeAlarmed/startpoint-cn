@@ -901,7 +901,15 @@ export function buildQuestPrerequisites(
                 if (prerequisiteQuestIds.includes(questId)) {
                     invalidQuest(tableName, `quest ${questId} depends on its own node`)
                 }
-                output[String(questId)] = Object.freeze([...prerequisiteQuestIds])
+                const category = QUEST_DERIVATION_LAYOUTS[tableName].category
+                const prerequisiteTableName = tableNodes.get(needKey) !== undefined
+                    ? tableName : "main_quest.json"
+                output[`${category}_${questId}`] = Object.freeze(
+                    prerequisiteQuestIds.map(prerequisiteId => Object.freeze({
+                        category: QUEST_DERIVATION_LAYOUTS[prerequisiteTableName].category,
+                        questId: prerequisiteId,
+                    })),
+                )
             }
         }
     }

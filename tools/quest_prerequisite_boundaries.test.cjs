@@ -59,7 +59,7 @@ async function createPlayer(label) {
     return { playerId, viewerId }
 }
 
-async function start(viewerId, questId) {
+async function start(viewerId, questId, category = 1) {
     const response = await app.inject({
         method: "POST",
         url: "/api/index.php/single_battle_quest/start",
@@ -68,7 +68,7 @@ async function start(viewerId, questId) {
             viewer_id: viewerId,
             api_count: 1,
             quest_id: questId,
-            category: 1,
+            category,
             party_id: 1,
             play_id: `prereq-${questId}-${randomUUID()}`,
             use_boost_point: false,
@@ -83,12 +83,16 @@ async function start(viewerId, questId) {
     return { statusCode: response.statusCode, headers: decoded.data_headers }
 }
 
-function insertMainQuestProgress(playerId, questId) {
+function insertQuestProgress(playerId, category, questId) {
     getDb().prepare(`
         INSERT INTO players_quest_progress (section, quest_id, finished, unlocked, player_id)
-        VALUES (1, ?, 1, 1, ?)
+        VALUES (?, ?, 1, 1, ?)
         ON CONFLICT (section, quest_id, player_id) DO UPDATE SET finished = 1
-    `).run(questId, playerId)
+    `).run(category, questId, playerId)
+}
+
+function insertMainQuestProgress(playerId, questId) {
+    insertQuestProgress(playerId, 1, questId)
 }
 
 before(async () => {
@@ -137,4 +141,20 @@ test("a chained main quest is locked until every need-node quest is cleared", as
     const unlocked = await start(viewerId, 1002001)
     assert.equal(unlocked.statusCode, 200, JSON.stringify(unlocked))
     assert.notEqual(getPlayerActiveQuestSync(playerId), null)
+})
+
+test("main and ex quests with the same id use category-specific prerequisites", async () => {
+    const main = await createPlayer("same-id-main")
+    for (const questId of [1008001, 1008002, 1008003, 1008004]) {
+        insertQuestProgress(main.playerId, 1, questId)
+    }
+    const mainResult = await start(main.viewerId, 2001001, 1)
+    assert.equal(mainResult.statusCode, 200, JSON.stringify(mainResult))
+
+    const ex = await createPlayer("same-id-ex")
+    for (const questId of [2009001, 2009002, 2009003]) {
+        insertQuestProgress(ex.playerId, 4, questId)
+    }
+    const exResult = await start(ex.viewerId, 2001001, 4)
+    assert.equal(exResult.statusCode, 200, JSON.stringify(exResult))
 })

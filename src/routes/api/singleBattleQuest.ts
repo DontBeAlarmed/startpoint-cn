@@ -273,13 +273,17 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
             })
         }
 
-        const prerequisites = getQuestPrerequisites(questId)
+        const prerequisites = getQuestPrerequisites(category, questId)
         if (prerequisites !== undefined) {
-            const uncleared = prerequisites.filter(prerequisiteId => (
-                getPlayerSingleQuestProgressSync(playerId, category, prerequisiteId)?.finished !== true
+            const uncleared = prerequisites.filter(prerequisite => (
+                getPlayerSingleQuestProgressSync(
+                    playerId,
+                    prerequisite.category,
+                    prerequisite.questId,
+                )?.finished !== true
             ))
             if (uncleared.length > 0) {
-                console.log(`[BATTLE] start locked: category=${category} questId=${questId} missing=${uncleared.join(",")}`)
+                console.log(`[BATTLE] start locked: category=${category} questId=${questId} missing=${uncleared.map(prerequisite => `${prerequisite.category}_${prerequisite.questId}`).join(",")}`)
                 return reply.status(400).send({
                     "error": "Bad Request",
                     "message": "Quest prerequisite is not cleared."

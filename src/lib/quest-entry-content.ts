@@ -25,7 +25,12 @@ type UnlockCostTable = Record<string, QuestUnlockCost>
 interface QuestEntryContentCatalog {
     readonly entries: Readonly<EntryCostTable>
     readonly unlocks: Readonly<UnlockCostTable>
-    readonly prerequisites: Readonly<Record<string, readonly number[]>>
+    readonly prerequisites: Readonly<Record<string, readonly QuestPrerequisite[]>>
+}
+
+export interface QuestPrerequisite {
+    readonly category: number
+    readonly questId: number
 }
 
 const catalogs = new WeakMap<ReadonlyContentRepository, QuestEntryContentCatalog>()
@@ -63,13 +68,15 @@ export function getQuestEntryCostByKey(
 }
 
 /**
- * Stage-node prerequisite quest ids for a main/ex quest; undefined means the
- * quest's node has no need-node (always reachable).
+ * Stage-node prerequisites for a main/ex quest; undefined means the quest's
+ * node has no need-node (always reachable). Each prerequisite retains its
+ * own category for cross-table EX -> Main dependencies.
  */
 export function getQuestPrerequisites(
+    category: number,
     questId: number,
-): readonly number[] | undefined {
-    return getQuestEntryContentCatalog().prerequisites[String(questId)]
+): readonly QuestPrerequisite[] | undefined {
+    return getQuestEntryContentCatalog().prerequisites[`${category}_${questId}`]
 }
 
 export function getQuestUnlockCost(

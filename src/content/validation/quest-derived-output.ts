@@ -144,23 +144,33 @@ export function validateDailyChallengeContent(input: {
 
 export function validateQuestPrerequisiteTable(
     raw: unknown,
-): Readonly<Record<string, readonly number[]>> {
+): Readonly<Record<string, readonly { readonly category: number, readonly questId: number }[]>> {
     const tableName = "quest_prerequisites.json"
     const table = requireRecord(raw, tableName)
-    for (const [questId, value] of Object.entries(table)) {
-        requireCanonicalPositiveIntegerKey(questId, tableName, "quest id")
-        const row = requireArray(value, tableName, questId)
-        if (row.length === 0) invalidRuntimeTable(tableName, `${questId} prerequisites must not be empty`)
-        row.forEach((prerequisiteId, index) => {
-            requirePositiveSafeInteger(prerequisiteId, tableName, `${questId}[${index}]`)
-        })
-        const ids = row as unknown[]
-        if (new Set(ids).size !== ids.length) {
-            invalidRuntimeTable(tableName, `${questId} prerequisites must be unique`)
+    for (const [questKey, value] of Object.entries(table)) {
+        const keyMatch = /^([1-9]\d*)_([1-9]\d*)$/.exec(questKey)
+        if (keyMatch === null
+            || !Number.isSafeInteger(Number(keyMatch[1]))
+            || !Number.isSafeInteger(Number(keyMatch[2]))) {
+            invalidRuntimeTable(tableName, `key must be canonical category_questId: ${questKey}`)
         }
-        if (ids.includes(Number(questId))) {
-            invalidRuntimeTable(tableName, `${questId} must not depend on itself`)
+        const row = requireArray(value, tableName, questKey)
+        if (row.length === 0) invalidRuntimeTable(tableName, `${questKey} prerequisites must not be empty`)
+        row.forEach((prerequisite, index) => {
+            const entry = requireRecord(prerequisite, tableName, `${questKey}[${index}]`)
+            requirePositiveSafeInteger(entry.category, tableName, `${questKey}[${index}].category`)
+            requirePositiveSafeInteger(entry.questId, tableName, `${questKey}[${index}].questId`)
+        })
+        const prerequisiteKeys = row.map(prerequisite => {
+            const entry = prerequisite as Record<string, unknown>
+            return `${entry.category}_${entry.questId}`
+        })
+        if (new Set(prerequisiteKeys).size !== prerequisiteKeys.length) {
+            invalidRuntimeTable(tableName, `${questKey} prerequisites must be unique`)
+        }
+        if (prerequisiteKeys.includes(`${keyMatch[1]}_${keyMatch[2]}`)) {
+            invalidRuntimeTable(tableName, `${questKey} must not depend on itself`)
         }
     }
-    return table as Readonly<Record<string, readonly number[]>>
+    return table as Readonly<Record<string, readonly { readonly category: number, readonly questId: number }[]>>
 }
