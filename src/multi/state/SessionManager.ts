@@ -459,6 +459,10 @@ export class SessionManager {
         return out
     }
 
+    hasBattleClients(roomNumber: string): boolean {
+        return (this.battleClients.get(roomNumber)?.size ?? 0) > 0
+    }
+
     hasRoomClients(roomNumber: string): boolean {
         const set = this.roomClients.get(roomNumber)
         return !!set && set.size > 0
@@ -873,10 +877,6 @@ export class SessionManager {
         ))) return false
         if (finalized.size === 0) this.finalizedBattleParticipantKeys.delete(roomNumber)
         return true
-    }
-
-    hasBattleClients(roomNumber: string): boolean {
-        return (this.battleClients.get(roomNumber)?.size ?? 0) > 0
     }
 
     clearSceneReady(roomNumber: string): void {

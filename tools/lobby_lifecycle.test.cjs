@@ -14,6 +14,8 @@ const {
     getRoom,
     isRoomMember,
     removeRoomMember,
+    startRoomCleanup,
+    stopRoomCleanup,
     updateRoomState,
 } = require("../src/multi/room/manager")
 let lobbyLifecycle = {}
@@ -1532,4 +1534,45 @@ test("lobby mutations are gated while the room battle is occupied", async t => {
     sessionManager.clearBattleExpectedCount(room.room_number)
     handleMessage(host.socket, [0, [0, { party: { marker: "rematch" } }]])
     assert.equal(room.raising_state, 1)
+})
+
+test("an abandoned battle room is recycled once every participant is gone", async t => {
+    const { room, host, guests } = createLobbyRoom(t, 4801, [4802])
+    const guest = guests[0]
+    handleMessage(host.socket, [0, [0, { party: {} }]])
+    handleMessage(guest.socket, [0, [0, { party: {} }]])
+    handleMessage(host.socket, [0, [6]])
+    assert.equal(room.raising_state, 4)
+    const battleSessionId = sessionManager.getActiveBattleSessionId(room.room_number)
+    assert.notEqual(battleSessionId, undefined)
+
+    let cleanup
+    startRoomCleanup({
+        createInterval(callback) {
+            cleanup = callback
+            return { unref() {} }
+        },
+        clearInterval() {},
+        abandonedBattleExpiryMs: 40,
+    })
+    t.after(() => stopRoomCleanup())
+
+    // Active lobby participants keep the battle room alive.
+    cleanup()
+    assert.equal(getRoom(room.room_number), room, "occupied battle room must survive the sweep")
+
+    // Everyone disappears without finish/abort: the room survives the grace,
+    // then the sweep recycles it together with its battle facts.
+    sessionManager.removeClient(host.client)
+    sessionManager.removeClient(guest.client)
+    cleanup()
+    assert.equal(getRoom(room.room_number), room, "battle room must survive inside the grace")
+    await new Promise(resolve => setTimeout(resolve, 60))
+
+    cleanup()
+    assert.equal(getRoom(room.room_number), undefined, "abandoned battle room must be recycled")
+    assert.equal(sessionManager.getActiveBattleSessionId(room.room_number), null)
+    // Idempotent: sweeping again after deletion is a no-op.
+    cleanup()
+    assert.equal(getRoom(room.room_number), undefined)
 })

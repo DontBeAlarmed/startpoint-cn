@@ -11,6 +11,11 @@ let roomSequence = 1;
 
 const DEFAULT_INCOMPLETE_EXPIRY_MS = 900_000; // 15min, mates < 3
 const DEFAULT_FULL_ROOM_EXPIRY_MS = 1_800_000; // 30min, mates >= 3
+// A battle room whose members all vanished without finish/abort keeps its
+// battle facts until this bounded grace passes; members that only lag behind
+// their HTTP finish stay covered by the same order of magnitude as the idle
+// policies above.
+const DEFAULT_ABANDONED_BATTLE_EXPIRY_MS = 900_000; // 15min
 const DEFAULT_CLEAN_INTERVAL_MS = 60_000;
 const REMAINING_NOTIFY_MS = 30000; // send RemainingTime float 30s before disband
 const ROOM_NUMBER_ALLOCATION_ATTEMPTS = 10;
@@ -27,6 +32,7 @@ export interface RoomCleanupOptions {
     reconnectGraceMs?: number;
     createInterval?: (callback: () => void, intervalMs: number) => RoomCleanupTimer;
     clearInterval?: (timer: RoomCleanupTimer) => void;
+    abandonedBattleExpiryMs?: number;
 }
 
 export interface RoomCleanupStatus {
@@ -42,6 +48,7 @@ let roomDisbandListener:
 interface RoomCleanupTiming {
     readonly incompleteExpiryMs: number;
     readonly fullExpiryMs: number;
+    readonly abandonedBattleExpiryMs: number;
 }
 
 function notifyRoomDisbanded(roomNumber: string, hostPlayerId: number): void {
@@ -53,8 +60,22 @@ function cleanExpiredRooms(timing: RoomCleanupTiming) {
     const timeOffset = now - getServerTime() * 1000;
     let cleaned = 0;
     for (const [roomNumber, room] of rooms) {
-        // Battle rooms — rely on removeClient auto-disband, no timer
-        if (room.raising_state === 4) continue;
+        if (room.raising_state === 4) {
+            // A battle room is only recycled once every participant is gone
+            // (no lobby socket, no battle socket) and the bounded grace has
+            // passed; disbandRoom releases the battle facts idempotently.
+            if (sessionManager.hasRoomClients(roomNumber)
+                || sessionManager.hasBattleClients(roomNumber)) {
+                room.battle_empty_since_ms = undefined;
+                continue;
+            }
+            room.battle_empty_since_ms ??= now;
+            if (now - room.battle_empty_since_ms > timing.abandonedBattleExpiryMs) {
+                console.log(`[MULTI] recycling abandoned battle room: ${roomNumber}`);
+                if (disbandRoom(roomNumber)) cleaned++;
+            }
+            continue;
+        }
 
         const idleAge = now - (room.host_entry_time * 1000 + timeOffset);
         const timeout = room.mates.length < 3
@@ -84,6 +105,8 @@ export function startRoomCleanup(options: RoomCleanupOptions = {}): void {
     const timing: RoomCleanupTiming = Object.freeze({
         incompleteExpiryMs: options.incompleteExpiryMs ?? DEFAULT_INCOMPLETE_EXPIRY_MS,
         fullExpiryMs: options.fullExpiryMs ?? DEFAULT_FULL_ROOM_EXPIRY_MS,
+        abandonedBattleExpiryMs: options.abandonedBattleExpiryMs
+            ?? DEFAULT_ABANDONED_BATTLE_EXPIRY_MS,
     });
     const timer = createInterval(
         () => cleanExpiredRooms(timing),
