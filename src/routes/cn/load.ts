@@ -140,25 +140,9 @@ function wrapOptionFields(
     d.special_exchange_campaign_list = [];
     d.win_lottery_active_mission_list = [];
     d.stars_gacha_campaign_list ??= [];
-    // Build favorite_party_group_list from user_party_group_list
-    // Required for HomeScene kind=1 (profile_favorite) to work without F1010
-    // fromPartyInfo expects party_name/party_edited (not name/edited like fromPartyInfoLite)
-    d.favorite_party_group_list = Object.entries(d.user_party_group_list || {}).map(([groupId, group]: [string, any]) => ({
-        party_group_id: Number(groupId),
-        party_group_color_id: group.color_id,
-        party_list: Object.entries(group.list || {}).map(([partyId, party]: [string, any]) => ({
-            party_id: Number(partyId),
-            party_name: party.name,
-            character_ids: party.character_ids,
-            unison_character_ids: party.unison_character_ids,
-            equipment_ids: party.equipment_ids,
-            ability_soul_ids: party.ability_soul_ids,
-            options: party.options,
-            party_edited: party.edited,
-            current_battle_power: party.current_battle_power,
-            before_battle_power: party.before_battle_power,
-        }))
-    }));
+    // favorite_party_group_list is assigned after wrapOptionFields from
+    // getFavoritePartyGroupListSync (profile favorite selection with leader
+    // context); building a placeholder here would only be overwritten.
 
     d.ranking_event_reward = [];
     d.party_list = [];

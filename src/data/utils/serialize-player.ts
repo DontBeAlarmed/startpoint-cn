@@ -106,11 +106,11 @@ function projectSerializedCharacterGrowth(toSerialize: MergedPlayerData) {
         ]))
 
         const nodeIds = toSerialize.characterManaNodeList[key] ?? []
-        if (new Set(nodeIds).size !== nodeIds.length) {
+        const nodeIdSet = new Set(nodeIds)
+        if (nodeIdSet.size !== nodeIds.length) {
             throw new Error(`characterManaNodeList contains duplicate nodes for character ${characterId}`)
         }
         const awakeLevels = toSerialize.characterManaNodeAwakeLevels?.[key] ?? {}
-        const nodeIdSet = new Set(nodeIds)
         for (const rawNodeId of Object.keys(awakeLevels)) {
             if (!nodeIdSet.has(Number(rawNodeId))) {
                 throw new Error(`characterManaNodeAwakeLevels contains unknown node ${characterId}/${rawNodeId}`)
