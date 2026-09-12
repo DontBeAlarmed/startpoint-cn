@@ -294,6 +294,18 @@ async function main() {
             ]),
         ), expectedAwakeItemAmounts)
 
+        db.exec(`
+            CREATE TRIGGER reject_awake_unlock_publication
+            BEFORE INSERT ON players_character_awake_unlocks
+            BEGIN SELECT RAISE(ABORT, 'forced unlock publication failure'); END;
+        `)
+        const unlockFault = await finishAwakeBattle(fastify)
+        db.exec("DROP TRIGGER reject_awake_unlock_publication")
+        assert.equal(unlockFault.statusCode, 500, "解锁发布失败必须回滚整个 finish 事务")
+        assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has("341005"), false)
+        assert.deepEqual(getPlayerCategoryMissionsSync(playerId, 9), {})
+        assert.deepEqual(getAwakeItemAmounts(), awakeItemAmountsBefore)
+
         const finish = await finishAwakeBattle(fastify)
         assert.equal(finish.statusCode, 200, finish.body)
         const finishData = decodeResponse(finish).data
@@ -303,26 +315,26 @@ async function main() {
         assert.deepEqual(
             finishCharacterList[0].mana_board_awake,
             { 1: 1 },
+            "完成最终条件的 finish 必须同请求发布三板解锁",
         )
         assert.deepEqual(
             finishData.mission_info.filter(entry => entry.mission_category_id === 9),
-            [
-                { mission_category_id: 9, mission_id: 3410051, mission_reward_id: 34100511 },
-                { mission_category_id: 9, mission_id: 3410052, mission_reward_id: 34100521 },
-                { mission_category_id: 9, mission_id: 3410053, mission_reward_id: 34100531 },
-                { mission_category_id: 9, mission_id: 3410054, mission_reward_id: 34100541 },
-            ],
+            [],
+            "finish 不得代领 category 9 普通觉醒奖励",
         )
-        assert.deepEqual(
-            Object.fromEntries(Object.keys(awakeRewardAmounts).map(itemId => [
-                itemId,
-                finishData.item_list[itemId],
-            ])),
-            expectedAwakeItemAmounts,
-        )
-        assert.deepEqual(getAwakeItemAmounts(), expectedAwakeItemAmounts)
+        assert.deepEqual(getAwakeItemAmounts(), awakeItemAmountsBefore, "finish 不得发放觉醒奖励物品")
         assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId).get("341005"), { 1: 1 })
-        assert.deepEqual(getPlayerCategoryMissionsSync(playerId, 9), expectedAwakeMissionProgress)
+        assert.deepEqual(
+            Object.fromEntries(Object.entries(getPlayerCategoryMissionsSync(playerId, 9))
+                .map(([missionId, mission]) => [missionId, mission.progress])),
+            {
+                3410051: 5,
+                3410052: 5,
+                3410053: 5,
+                3410054: 3,
+            },
+            "finish 必须写入觉醒进度",
+        )
 
         const originalPrepare = db.prepare.bind(db)
         const originalGetCharacterFacts = characterContent.getCharacterFacts
@@ -419,8 +431,23 @@ async function main() {
                 { mission_category: 9, mission_id: 3410054, progress_value: 3, stage: 1 },
             ],
         )
-        assert.deepEqual(firstData.mission_info, [])
-        assert.deepEqual(firstData.item_list, {})
+        assert.deepEqual(
+            firstData.mission_info,
+            [
+                { mission_category_id: 9, mission_id: 3410051, mission_reward_id: 34100511 },
+                { mission_category_id: 9, mission_id: 3410052, mission_reward_id: 34100521 },
+                { mission_category_id: 9, mission_id: 3410053, mission_reward_id: 34100531 },
+                { mission_category_id: 9, mission_id: 3410054, mission_reward_id: 34100541 },
+            ],
+            "觉醒任务第一页一次领取全部已完成未领奖励",
+        )
+        assert.deepEqual(
+            Object.fromEntries(Object.keys(awakeRewardAmounts).map(itemId => [
+                itemId,
+                firstData.item_list[itemId],
+            ])),
+            expectedAwakeItemAmounts,
+        )
         assert.deepEqual(firstData.character_list, [])
         assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId).get("341005"), { 1: 1 })
         assert.deepEqual(getPlayerCategoryMissionsSync(playerId, 9), expectedAwakeMissionProgress)

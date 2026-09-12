@@ -440,6 +440,9 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
                     missionBattleFacts.awakeMissionIds,
                 ),
                 settlementTime,
+                undefined,
+                {},
+                { claimStageRewards: false },
             )
             : null
         const awakeMissionSettlement = awakeMissionEvaluation?.settlement ?? {

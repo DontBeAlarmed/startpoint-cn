@@ -294,11 +294,13 @@ lib/mission/
   `AwakeManaBoard(character_id, board_index, awake_level)` 作为特殊奖励处理。
 - 奖励发放、阶段领取状态和玩家货币更新在同一个 SQLite 事务中提交；重复进入页面不会重复发奖。
 
-### 解锁与领奖时序（2026-07-17）✅
+### 解锁与领奖时序（2026-07-17，2026-09-12 收口）✅
 
 第二页解锁与第一页领奖使用独立的持久状态：前者保存在
 `players_character_awake_unlocks`，后者保存在
-`players_category_mission_stages.status`。
+`players_category_mission_stages.status`。2026-09-12 起单人/多人战斗 finish 与各成长
+入口一律只写进度并即时发布解锁，不代领普通觉醒奖励；category 9 第一页
+`get_mission_progress` 是普通觉醒奖励的唯一领取入口，领取后同事务发布缺失的解锁。
 
 - 任务未全部完成时，客户端进入第一页；`get_mission_progress` 自动结算当前已完成且未领取的奖励，
   第二页继续锁定。

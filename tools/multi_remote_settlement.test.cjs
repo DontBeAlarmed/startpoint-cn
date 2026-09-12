@@ -972,7 +972,7 @@ test("production /finish uses stored SQLite rescue eligibility despite memory an
     }
 })
 
-test("production multi /finish returns non-empty Awake progress rewards and unlock immediately", async () => {
+test("production multi /finish publishes the Awake unlock immediately without claiming page rewards", async () => {
     let home
     try {
         home = await openProductionHome(
@@ -1009,26 +1009,43 @@ test("production multi /finish returns non-empty Awake progress rewards and unlo
         })
         assert.equal(finished.statusCode, 200, finished.body)
         const response = JSON.parse(finished.body).data
-        assert.deepEqual(response.mission_info.filter(entry => entry.mission_category_id === 9), [
+        assert.deepEqual(
+            response.mission_info.filter(entry => entry.mission_category_id === 9),
+            [],
+            "multi finish must not claim category 9 page-owned rewards",
+        )
+        assert.deepEqual(Object.fromEntries([1, 2, 3, 4].map(itemId => [
+            itemId,
+            getPlayerItemSync(home.playerId, itemId) ?? 0,
+        ])), itemBefore, "multi finish must not grant Awake reward items")
+        assert.deepEqual(
+            response.character_list.find(entry => entry.character_id === 1)?.mana_board_awake,
+            { 1: 1 },
+            "multi finish must publish the three-board unlock in the same response",
+        )
+        assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(home.playerId).get("1"), { 1: 1 })
+
+        const { settleAwakeMissionCandidates } = require("../src/lib/mission/awake-settlement")
+        const page = settleAwakeMissionCandidates(
+            home.playerId,
+            [11, 12, 13, 14],
+            new Date("2025-01-01T12:00:00.000Z"),
+        )
+        assert.deepEqual(page.missionInfo, [
             { mission_category_id: 9, mission_id: 11, mission_reward_id: 111 },
             { mission_category_id: 9, mission_id: 12, mission_reward_id: 121 },
             { mission_category_id: 9, mission_id: 13, mission_reward_id: 131 },
             { mission_category_id: 9, mission_id: 14, mission_reward_id: 141 },
-        ])
+        ], "the category 9 page claim remains the only Awake reward owner")
         assert.deepEqual(Object.fromEntries([1, 2, 3, 4].map(itemId => [
             itemId,
-            response.item_list[itemId],
+            getPlayerItemSync(home.playerId, itemId) ?? 0,
         ])), {
             1: itemBefore[1] + 10,
             2: itemBefore[2] + 5,
             3: itemBefore[3] + 3,
             4: itemBefore[4] + 1,
         })
-        assert.deepEqual(
-            response.character_list.find(entry => entry.character_id === 1)?.mana_board_awake,
-            { 1: 1 },
-        )
-        assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(home.playerId).get("1"), { 1: 1 })
     } finally {
         await closeProductionHome(home)
     }

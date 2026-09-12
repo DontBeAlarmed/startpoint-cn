@@ -302,7 +302,9 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     )
 
     const missionUpdateBlock = missionSource.split('fastify.post("/update_mission_progress"')[1]
-    assert.equal(countOccurrences(missionSource, "reconcileAwakeUnlockCharacterList("), 1)
+    const missionGetBlock = missionSource.split('fastify.post("/get_mission_progress"')[1]
+        .split('fastify.post("/update_mission_progress"')[0]
+    assert.equal(countOccurrences(missionSource, "reconcileAwakeUnlockCharacterList("), 2)
     assert.equal(
         missionUpdateBlock.indexOf("reconcileAwakeUnlockCharacterList(")
             > missionUpdateBlock.indexOf("})()"),
@@ -312,6 +314,23 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     assert.equal(missionUpdateBlock.includes("givePlayerReward"), false)
     assert.equal(missionUpdateBlock.includes("incrementPlayerCategoryMissionStage"), false)
     assert.equal(missionUpdateBlock.includes("character_list: characterList"), true)
+    assert.equal(
+        missionGetBlock.includes("reconcileAwakeUnlockCharacterList("),
+        true,
+        "category 9 page must publish the unlock owner in the same request",
+    )
+    assert.equal(
+        missionGetBlock.indexOf("reconcileAwakeUnlockCharacterList(")
+            > missionGetBlock.indexOf("settleAwakeMissionCandidatesWithEvaluation("),
+        true,
+        "page publication runs after the page reward settlement",
+    )
+    assert.equal(
+        missionGetBlock.indexOf("reconcileAwakeUnlockCharacterList(")
+            < missionGetBlock.indexOf("})()"),
+        true,
+        "page publication stays inside the get_mission_progress transaction",
+    )
 
     const mailIndexBlock = mailSource.split('fastify.post("/index"')[1]
         .split('fastify.post("/receive"')[0]

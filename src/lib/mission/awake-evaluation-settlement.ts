@@ -17,6 +17,14 @@ export interface AwakeMissionEvaluationSettlement {
     readonly invalidatedFactKeys: readonly FactKey[]
 }
 
+export interface AwakeMissionSettlementOptions {
+    /**
+     * The category 9 page is the sole owner of normal Awake stage rewards.
+     * Battle paths pass false to record progress and eligibility only.
+     */
+    readonly claimStageRewards?: boolean
+}
+
 export function settleAwakeMissionEvaluation(
     evaluation: MissionEvaluationResult,
     resolver: CharacterAwakeEligibilityResolver,
@@ -30,7 +38,9 @@ export function settleAwakeMissionEvaluationWithInvalidations(
     resolver: CharacterAwakeEligibilityResolver,
     observer?: MissionSettlementObserver,
     dependencies: MissionSettlementRewardDependencies = {},
+    options: AwakeMissionSettlementOptions = {},
 ): AwakeMissionEvaluationSettlement {
+    const claimStageRewards = options.claimStageRewards !== false
     const missions = evaluation.missions.filter(mission => (
         mission.category === 9
         && resolver.isNewUnlockEligible(
@@ -54,10 +64,19 @@ export function settleAwakeMissionEvaluationWithInvalidations(
     }
 
     for (const mission of missions) {
+        const previouslyCompletedStages = new Set(
+            getCompletedStageNumbers(9, mission.missionId, mission.dbProgress),
+        )
         for (const stage of getCompletedStageNumbers(9, mission.missionId, mission.finalProgress)) {
-            if (mission.receivedStages.includes(stage)) continue
             const definition = getAwakeMissionRewardStageDefinition(mission.missionId, stage)
             if (!definition) continue
+            if (definition.specialReward && !previouslyCompletedStages.has(stage)) {
+                // Permanent CharacterAwake unlock eligibility follows progress,
+                // not the receipt; the unlock itself is published by Character
+                // Growth after the outer owner has finished all mission writes.
+                awakeEligibilityChanged = true
+            }
+            if (!claimStageRewards || mission.receivedStages.includes(stage)) continue
             updatePlayerCategoryMissionStageSync(
                 evaluation.playerId,
                 9,
@@ -73,11 +92,6 @@ export function settleAwakeMissionEvaluationWithInvalidations(
                 mission_id: mission.missionId,
                 mission_reward_id: definition.missionRewardId,
             })
-            if (!definition.specialReward) continue
-            // The mission engine records the reward receipt only. Permanent
-            // CharacterAwake state is published by Character Growth after the
-            // outer owner has finished producing all mission facts.
-            awakeEligibilityChanged = true
         }
     }
 

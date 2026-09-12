@@ -812,7 +812,7 @@
           "bondToken": 10,
           "expPool": 13,
           "freeMana": 2021,
-          "freeVmoney": 285,
+          "freeVmoney": 355,
           "starCrumb": 2,
           "totalManaObtained": 604820,
           "tutorialStep": 0,
@@ -1131,7 +1131,7 @@
           "bondToken": 10,
           "expPool": 90,
           "freeMana": 2021,
-          "freeVmoney": 445,
+          "freeVmoney": 515,
           "starCrumb": 2,
           "totalManaObtained": 604820,
           "tutorialStep": 0,
@@ -2359,7 +2359,7 @@
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
       "sqlReads": 24,
-      "sqlWrites": 9,
+      "sqlWrites": 6,
       "sqlByTable": {
         "players": {
           "reads": 5,
@@ -2408,8 +2408,8 @@
         },
         "players_items": {
           "reads": 1,
-          "statements": 5,
-          "writes": 4
+          "statements": 2,
+          "writes": 1
         },
         "players_mails": {
           "reads": 1,

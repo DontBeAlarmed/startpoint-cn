@@ -137,6 +137,10 @@ stubModule("../src/lib/mission/index", {
                 }],
                 observer: { candidateCount: 1, computeCount: 1, loaderCalls: [] },
             },
+            resolver: {
+                characters: new Map(),
+                isNewUnlockEligible: () => false,
+            },
             settlement: {
                 missionInfo: [{ mission_category_id: 9, mission_id: 901, mission_reward_id: 9011 }],
                 itemList: { [rewardItemId]: amount },

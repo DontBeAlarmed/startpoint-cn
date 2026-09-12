@@ -119,6 +119,24 @@ const routes = async (fastify: FastifyInstance) => {
             const awakeProgressByMission = new Map(
                 (awakeSettlement?.evaluation.missions ?? []).map(mission => [mission.missionId, mission]),
             )
+            const awakeGrowthCharacterList = awakeSettlement === null
+                ? []
+                : publishCharacterGrowthOwnerStateBestEffort(
+                    playerId,
+                    [],
+                    [awakeSettlement.settlement.characterList as Record<string, unknown>[]],
+                    {
+                        evaluatedAwakeUnlocks: {
+                            progressList: awakeSettlement.evaluation.missions.map(mission => ({
+                                missionId: mission.missionId,
+                                progress: mission.finalProgress,
+                            })),
+                            resolver: awakeSettlement.resolver,
+                        },
+                    },
+                    "mission/get_mission_progress",
+                    evaluationTime,
+                ).characterList
             const automaticMissionIdsByRequest = requestList.map(requestEntry => (
                 automaticSettlement?.prepared.scopes.find(scope => (
                     scope.category === requestEntry.category
@@ -178,9 +196,20 @@ const routes = async (fastify: FastifyInstance) => {
                 )
             }
             if (awakeResult) {
+                const awakeFragment = projectMissionSettlementFragment(awakeResult)
                 composeMissionSettlementResponse(
                     responseData,
-                    projectMissionSettlementFragment(awakeResult),
+                    awakeGrowthCharacterList.length > 0
+                        ? {
+                            ...awakeFragment,
+                            common: {
+                                ...awakeFragment.common,
+                                character_list: awakeGrowthCharacterList.map(
+                                    projectCharacterPatch,
+                                ),
+                            },
+                        }
+                        : awakeFragment,
                     viewerId,
                 )
             }

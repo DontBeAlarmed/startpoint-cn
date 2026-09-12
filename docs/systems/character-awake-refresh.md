@@ -24,10 +24,20 @@ CN 1.8.1 客户端在 `CharacterAwakeScene.preparation()` 中读取并缓存
 
 ## 服务端最终流程
 
-觉醒板解锁与任务奖励领取是两份独立的持久状态：
+觉醒板解锁与任务奖励领取是两份独立的持久状态，也是两个独立的时点：
 
 - `players_character_awake_unlocks` 保存第二页的持久解锁；
 - `players_category_mission_stages.status` 保存 category 9 各阶段是否已经领奖。
+
+即时解锁：任意使最终条件成立的权威写入（战斗 finish、成长命令、`/load` 校准、
+`update_mission_progress` 等）只更新 category 9 进度，并按进度在同一事务内幂等发布
+三板解锁；这些入口**不领取**普通觉醒奖励，也不返回对应的 `mission_info`。
+
+第一页领奖：`/mission/get_mission_progress`（category 9 + `character_id`）一次领取
+所有已完成且未领取的普通觉醒奖励；领取后仍在同一事务内调用 Character Growth
+owner 发布三板状态，并在同响应返回 `mana_board_awake` 与角色 patch——覆盖最终条件
+在「该角色不在当前队伍」下成立（如历史通关、累计玛纳跨阈值）的场景，第一页领取
+本身即可补发缺失的解锁。
 
 官方入口资格必须同时满足：category 9 对应活动开放、玩家持有角色、角色达到当前稀有度的基础等级上限、
 第一块玛纳板的全部节点已经学习；不要求第二块玛纳板。

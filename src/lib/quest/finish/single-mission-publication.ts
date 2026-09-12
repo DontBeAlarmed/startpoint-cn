@@ -41,6 +41,7 @@ export function settleSingleMissionEvaluations(input: {
             input.evaluationTime,
             undefined,
             input.rewardDependencies,
+            { claimStageRewards: false },
         )
         : null
     return {

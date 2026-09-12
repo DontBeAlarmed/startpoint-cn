@@ -35,6 +35,9 @@
   使用全部 zone 的 `encoffinment_count` 总和为 0。核心解锁与领奖流程已通过客户端，144 条条件尚未逐条验收。
 - category 1、2、6、7、8、10 的 `get_mission_progress` 会兼容补结算已完成但历史入口未发奖的阶段；携带角色 ID 的 category 9 请求仍是
   觉醒第一页的正式领奖入口。
+- 觉醒（category 9）奖励时点（2026-09-12 收口）：单人/多人战斗 finish、成长命令与 `/load` 只写进度并按进度即时发布三板解锁，
+  不领取普通觉醒奖励、不返回对应 `mission_info`；`get_mission_progress` category 9 一次领取全部已完成未领奖励，并在同事务发布
+  三板解锁与角色 patch。
 - ActiveMission 领奖会在原子发奖前校验任务存在、阶段定义、完成阈值、既有领奖状态与重复请求。
 - ActiveMission 奖励保留 kind 0（星导石），并把物品、装备、角色、玛纳、经验和称号写入正确的响应集合。
 - Active Mission 的 96 条任务定义、4 个事件定义和奖励表已从官方 1.4.54 资源纳入运行资产与 Content registry；

@@ -18,6 +18,9 @@ const {
     noIncidentalAdditionalRewards,
     withSingleBattleHarness,
 } = require("./perf/single_battle_settlement_harness.cjs")
+const {
+    settleAwakeMissionCandidates,
+} = require("../src/lib/mission/awake-settlement")
 
 const EMPTY_MISSION_OVERRIDES = Object.fromEntries([
     "mission_regular.json",
@@ -83,7 +86,7 @@ async function finishAwakeBattle(harness, playId, options) {
     }), options)
 }
 
-test("single finish returns final Awake item and currency state after multiple owner grants", async () => {
+test("single finish records Awake progress without claiming page-owned rewards", async () => {
     await withSingleBattleHarness("awake-owner-final", async harness => {
         const before = harness.getPlayer()
         const response = await finishAwakeBattle(
@@ -94,31 +97,51 @@ test("single finish returns final Awake item and currency state after multiple o
         const after = harness.getPlayer()
 
         assert.equal(response.statusCode, 200, JSON.stringify(response))
-        assert.equal(harness.getItem(AWAKE_ITEM_ID), 15)
-        assert.equal(response.data.item_list[AWAKE_ITEM_ID], 15)
-        assert.equal(after.freeMana, before.freeMana + 7)
-        assert.equal(after.freeVmoney, before.freeVmoney + 13)
-        assert.equal(after.expPool, before.expPool + 11)
-        assert.equal(response.data.user_info.free_mana, after.freeMana)
-        assert.equal(response.data.user_info.free_vmoney, after.freeVmoney)
-        assert.equal(response.data.user_info.exp_pool, after.expPool)
-        assert.deepEqual(response.data.mission_info.filter(entry => (
-            entry.mission_category_id === 9 && entry.mission_id === AWAKE_MISSION_ID
-        )), [
+        assert.equal(harness.getItem(AWAKE_ITEM_ID), 10, "finish 不得发放觉醒页面奖励物品")
+        assert.deepEqual(
+            response.data.mission_info.filter(entry => entry.mission_category_id === 9),
+            [],
+            "finish 响应不得携带 category 9 的 mission_info",
+        )
+        assert.equal(after.freeMana, before.freeMana, "finish 不得代领觉醒玛纳奖励")
+        assert.equal(after.freeVmoney, before.freeVmoney, "finish 不得代领觉醒星导石奖励")
+        assert.equal(after.expPool, before.expPool, "finish 不得代领觉醒经验奖励")
+
+        const pageSettlement = settleAwakeMissionCandidates(
+            harness.playerId,
+            [AWAKE_MISSION_ID],
+            new Date("2025-01-01T12:00:00.000Z"),
+        )
+        assert.deepEqual(pageSettlement.missionInfo, [
             { mission_category_id: 9, mission_id: AWAKE_MISSION_ID, mission_reward_id: 34100511 },
             { mission_category_id: 9, mission_id: AWAKE_MISSION_ID, mission_reward_id: 34100512 },
-        ])
+        ], "觉醒任务第一页领取是唯一奖励入口")
+        assert.equal(harness.getItem(AWAKE_ITEM_ID), 15)
+        const claimed = harness.getPlayer()
+        assert.equal(claimed.freeMana, before.freeMana + 7)
+        assert.equal(claimed.freeVmoney, before.freeVmoney + 13)
+        assert.equal(claimed.expPool, before.expPool + 11)
+
+        const repeated = settleAwakeMissionCandidates(
+            harness.playerId,
+            [AWAKE_MISSION_ID],
+            new Date("2025-01-01T12:00:00.000Z"),
+        )
+        assert.deepEqual(repeated.missionInfo, [], "重复领取不得重复发奖")
+        assert.deepEqual(repeated.itemList, {})
+        assert.equal(harness.getItem(AWAKE_ITEM_ID), 15)
+        assert.equal(harness.getPlayer().freeMana, before.freeMana + 7)
     }, { tableOverrides: tableOverrides() })
 })
 
 for (const fault of [
     {
-        label: "owner grant",
+        label: "awake progress write",
         trigger: `
-            CREATE TRIGGER reject_awake_owner_item
-            BEFORE UPDATE OF amount ON players_items
-            WHEN NEW.id = ${AWAKE_ITEM_ID}
-            BEGIN SELECT RAISE(ABORT, 'forced Awake owner grant failure'); END;
+            CREATE TRIGGER reject_awake_progress_write
+            BEFORE INSERT ON players_category_missions
+            WHEN NEW.category = 9
+            BEGIN SELECT RAISE(ABORT, 'forced Awake progress write failure'); END;
         `,
     },
     {

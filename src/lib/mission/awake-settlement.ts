@@ -9,6 +9,7 @@ import {
 import { evaluateMissionCandidates } from "./settlement-evaluate"
 import {
     settleAwakeMissionEvaluationWithInvalidations,
+    type AwakeMissionSettlementOptions,
 } from "./awake-evaluation-settlement"
 import type {
     MissionEvaluationResult,
@@ -109,6 +110,7 @@ export function settleAwakeMissionCandidatesWithEvaluation(
     evaluationTime: Date,
     resolver?: CharacterAwakeEligibilityResolver,
     dependencies: MissionSettlementRewardDependencies = {},
+    options?: AwakeMissionSettlementOptions,
 ): AwakeMissionSettlementEvaluation | null {
     if (missionIds.length === 0) return null
     const candidates = getAwakeBattleMissionIds([], missionIds)
@@ -132,6 +134,7 @@ export function settleAwakeMissionCandidatesWithEvaluation(
             effectiveResolver,
             undefined,
             dependencies,
+            options,
         )
         return {
             prepared,

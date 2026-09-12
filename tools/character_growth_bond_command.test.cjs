@@ -199,6 +199,45 @@ test("completed-board helper rejects a missing token row instead of manufacturin
     )
 })
 
+test("Awake bond-token mission requires both character tokens claimed, not player balance", () => {
+    const { AwakeComputer } = require("../src/lib/mission/computer-awake")
+    const missionId = 1410033
+    const contextFor = tokens => ({
+        category: 9,
+        charData: new Map([["141003", { bondTokenList: tokens }]]),
+    })
+
+    assert.equal(
+        AwakeComputer.compute(missionId, contextFor([
+            { manaBoardIndex: 1, status: 0 },
+            { manaBoardIndex: 2, status: 1 },
+        ]), 0),
+        0,
+        "0/1：第一张未领取不得完成",
+    )
+    assert.equal(
+        AwakeComputer.compute(missionId, contextFor([
+            { manaBoardIndex: 1, status: 2 },
+            { manaBoardIndex: 2, status: 1 },
+        ]), 0),
+        0,
+        "2/1：第二张仅可领取仍未完成，玩家余额不参与判定",
+    )
+    assert.equal(
+        AwakeComputer.compute(missionId, contextFor([
+            { manaBoardIndex: 1, status: 2 },
+            { manaBoardIndex: 2, status: 2 },
+        ]), 0),
+        1,
+        "2/2：两张均已领取才完成",
+    )
+    assert.equal(
+        AwakeComputer.compute(missionId, contextFor([]), 0),
+        0,
+        "空列表不得完成",
+    )
+})
+
 test.after(() => {
     if (db.open) db.close()
     restoreContentSnapshot()
