@@ -403,6 +403,33 @@ Settlement BASE fixture 与负载 reference 分别由固定无参数 generator
 - **Prepare 前置写**：`settlement-prepare` 的 pass 登录基线初始化（幂等）按 D15 蓝图保留。
 - **Quest 域计数归属**：multi-clear 计数自 D24 起由 multi settlement writer（`multi/settlement/orchestrator.ts`）在 quest 结算层调用，mission battle facts 只记录 mission 自有事实表。
 
+## H4 Active Mission 事实时点(2026-09-12 收口)
+
+Active Mission 的权威事实时点统一为 after-write 固定点:`publishActiveMissionOwnerStateWithinTransaction`
+(`src/lib/mission/active-publication-owner.ts`)要求调用方处于打开的业务事务中,在最后一个权威业务写之后执行,
+读取写后事实、一次收敛依赖链、返回 `activeMissionList` 增量;固定点或状态写失败与业务写同事务回滚,不做
+best-effort 吞错。owner 不拥有业务事务、不编码 HTTP 响应、不调用 Character Growth owner、不跨请求缓存。
+
+已接入入口(全部为「业务写之后、同事务、单次固定点、响应带增量」):
+
+| 入口 | 接线点 | source |
+|---|---|---|
+| 单人战斗 finish | `single-mission-publication.ts` | `single-finish` |
+| 多人战斗 finish | `multi/settlement/orchestrator.ts` | `multi-finish` |
+| 角色故事 finish | `routes/api/storyQuest.ts`(兼容 wrapper,等价 after-write) | — |
+| `/load` | `routes/cn/load.ts`(兼容 wrapper) | — |
+| 编队 /party/edit | `routes/api/party.ts` | `party/edit` |
+| 抽卡 exec | `gacha-owner/execute.ts` | `gacha/exec` |
+| 经验注入 | `character-growth/commands/inject-exp.ts` | `character-growth/inject-exp` |
+| 玛纳板学习/觉醒 | `learn-mana-nodes.ts` / `awake-mana-nodes.ts` | `character-growth/*` |
+| 装备觉醒/批量 | `routes/api/equipment.ts` | `equipment/*` |
+| 商店购买 | `shop/purchase-owner.ts` | `shop/purchase` |
+| 信赖之证领取 | `routes/api/character/bond.ts` | `character/receive_bond_token` |
+| 内容指南 start | `mission/contents-guide-start.ts` | `contents_guide/start`(含依赖固定点) |
+
+`active_mission_list` 是 `CommonResponseFragment` 的可选通用字段(追加语义合并);Active Mission 奖励仍由
+`/active_mission/receive` 手动领取,进度发布不自动发奖。pattern 57 显式声明 `questProgress` 事实。
+
 ## D24 收口状态
 
 D24 已完成 Mission owner 收口。`master-data.ts`、`patterns.ts`、`stages.ts`、旧 Event/Fallback computer 与 Active raw-fact compatibility adapter 已退役；类别 1～10 的生产求值统一通过 `MissionEvaluationSession` 和必选的 `buildContextFromSession`，不再保留 legacy DB 直读 fallback。标准任务奖励继续由 category reward-stage definition 协调到 RewardGrant；Active plan 与 Awake 特殊奖励仍保持各自的权威来源。

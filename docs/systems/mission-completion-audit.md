@@ -55,6 +55,11 @@
 - category 2 使用每日快照差值。默认服务器时间下当前开放 11 条每日任务，现已 `11/11` 自动计算：常驻
   `11/13/14/16/17` 共 5 条，活动每日共 6 条。常驻 all-clear `17` 只汇总单人通关、协力通关、冲刺和
   消耗体力四项，不包含活动任务。
+- 2026-09-12 起 daily all-clear 逐条按自身 CDN `row[17]` 依赖集计算（5→1,3,2,4；10→6,8,7,9；
+  15→11,13,12,14；17→11,13,16,14），不再使用全局硬编码核心 pattern 集；`timeOffset` 回放四代历史窗口
+  （UTC+8 05:00 代际切换）由 `tools/mission_daily_history_replay.test.cjs` 锁定。
+- `weekevent_battle_play(_2/_3)`（任务 2/7/12）由战斗 finish producer 驱动：CDN selector（type 14 +
+  QuestRange kind 12 → category 6/13/14/20）+ 单人成功结算，每场 +1，开放期按主数据 UTC+8。
 - 活动每日 `800115..800117` 使用 Advent selector `200015`，只接受 category 7 范围内匹配活动的协力成功；
   `800124..800126` 使用 BossBattle 全范围，只接受 category 2 的领主战协力成功。每条任务仍按自身开放期和
   奖励阈值独立增长。`mission_daily` 历史总表共有 656 条，本项目不宣称全部支持。

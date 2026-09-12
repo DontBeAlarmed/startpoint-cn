@@ -927,10 +927,6 @@ test("maps single finish settlement implementation and regression precisely", ()
         ["integration:quest"],
     )
     assert.deepEqual(
-        selectTestGroups(["src/lib/quest/finish/single-mission-settlement.ts"]),
-        ["integration:mission", "integration:quest", "integration:reward-grant", "quick:quest"],
-    )
-    assert.deepEqual(
         selectTestGroups(["src/lib/mission/settlement.ts"]),
         ["integration:mission", "integration:reward-grant"],
     )
@@ -2091,6 +2087,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission-client-check-diagnostics.test.cjs",
         "tools/mission_coverage_audit.test.cjs",
         "tools/mission_daily_battle_facts.test.cjs",
+        "tools/mission_daily_history_replay.test.cjs",
         "tools/mission_degree_candidates.test.cjs",
         "tools/mission_degree_battle_context.test.cjs",
         "tools/mission_degree_characterization.test.cjs",
@@ -2134,6 +2131,8 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_active_content.test.cjs",
         "tools/mission_active_core.test.cjs",
         "tools/active_mission_plan.test.cjs",
+        "tools/active_mission_owner_publication.test.cjs",
+        "tools/active_mission_operation_publication.test.cjs",
         "tools/active_mission_counter_storage.test.cjs",
         "tools/active_mission_fact_session.test.cjs",
         "tools/active_mission_fixed_point.test.cjs",
@@ -2235,6 +2234,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/perf/multi_settlement_baseline.test.cjs",
         "tools/perf/multi_snapshot_baseline.test.cjs",
         "tools/multi_response_projection.test.cjs",
+        "tools/multi_settlement_active_mission.test.cjs",
         "tools/rescue_fragment_reward.test.cjs",
         "tools/special_quest_party.test.cjs",
     ])

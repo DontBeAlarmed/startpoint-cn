@@ -6,6 +6,22 @@
 
 ## 状态:定稿(6 路子审计全部合入,关键发现均经主审二次核验;§十一 为按任务 ID 的人类审查表,中文描述逐字取自 CDN 表)
 
+### 2026-09-12 修复关闭表(Mission Semantic Closure + H4 Gate)
+
+| Finding | 状态 | 修复 |
+|---|---|---|
+| B-F1 mission 9 读玩家 rank | 已关闭 | `character_level` 改按持有角色最高等级(`RegularStateFacts.maxCharacterLevel`,degree 同款 proven 语义),requirement 声明 `characters` |
+| B-F2 daily all-clear 硬编码核心集 / weekevent 无 producer | 已关闭 | `daily-completion.ts` 严格解析每条 all-clear 自己的 `row[17]`;weekevent 2/7/12 接入战斗 producer(type 14 + range kind 12 + category 6/13/14/20 + 单人),四代 `timeOffset` 回放有测试锁定 |
+| AM-F1 多人 finish 不 reconcile、响应无增量 | 已关闭 | 多人 finish 在结算事务内调用 H4 owner 并投影 `active_mission_list` |
+| AM-F2 操作类计数不触发 reconcile | 已关闭 | 编队/抽卡/经验注入/玛纳板学习+觉醒/装备觉醒+批量/商店/信赖之证 8 入口在业务事务尾统一调用 H4 owner |
+| AM-F3 pattern 57 事实声明为空 | 已关闭 | `factKindsForPattern` 显式声明 `questProgress`(runner 预加载保留) |
+| AW-F1 觉醒奖励 finish 即发 | 已关闭 | 战斗 finish/成长入口只写进度+即时发布解锁;category 9 第一页 `get_mission_progress` 是唯一领取入口 |
+| AW-F2 页面路径不发布三板解锁 | 已关闭 | 第一页领取后同事务调用 Character Growth owner 发布解锁与角色 patch |
+| D-F06 contents_guide/start 不跑依赖固定点 | 已关闭 | start 后同事务运行固定点,一个请求返回全部依赖变化 |
+| C-F3 死代码 `settleSingleBattleMissionCategories` | 已删除 | `src/lib/quest/finish/single-mission-settlement.ts`(零调用方);`BATTLE_SETTLEMENT_CATEGORIES` 为测试 oracle 保留 |
+
+未实施项维持 §一/§九 原状:Pass type 85/16/23 活动匹配、Attention/救援/回归资格 fail-closed、表情失败计数、未知奖励 kind/年份守卫、`row[19]` 校验、PERF-07(DEFERRED,恢复条件见 `task-C7-perf07.md`)。
+
 ---
 
 ## 一、四类症状的根因结论(先给答案)
