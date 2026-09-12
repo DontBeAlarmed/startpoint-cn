@@ -61,6 +61,7 @@ interface GachaExecSuccessBase {
     }>
     readonly itemOverflowDispositions: readonly PlannedItemOverflowDisposition[]
     readonly postCommitEffects: readonly GachaPostCommitEffect[]
+    readonly activeMissionList: readonly unknown[]
 }
 
 export interface CharacterGachaExecSuccess extends GachaExecSuccessBase {

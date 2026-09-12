@@ -229,6 +229,7 @@ const routes = async (fastify: FastifyInstance) => {
                         mail_arrived: getMailArrivedSync(resolved.playerId),
                     }]),
                     add_exp_list: result.addExpList,
+                    active_mission_list: result.activeMissionList,
                 },
             })
         } catch (error) {

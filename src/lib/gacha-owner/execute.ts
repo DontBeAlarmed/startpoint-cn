@@ -10,6 +10,7 @@ import {
     incrementActiveMissionGachaCampaignCountSync,
     incrementActiveMissionGachaCharacterCountSync,
 } from "../../data/domains/active_mission_counters"
+import { publishActiveMissionOwnerStateWithinTransaction } from "../mission/active-publication-owner"
 import { insertReceiveHistoryBatchSync, MailType } from "../../data/domains/mail"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import type { PlayerGachaCampaign } from "../../data/types"
@@ -307,6 +308,11 @@ export function executeGachaDrawSync(command: GachaExecCommand): GachaExecResult
                 if (plan.campaign !== null) {
                     incrementActiveMissionGachaCampaignCountSync(command.playerId)
                 }
+                const activeMission = publishActiveMissionOwnerStateWithinTransaction({
+                    playerId: command.playerId,
+                    now: command.nowMs,
+                    source: "gacha/exec",
+                })
                 const mailArrived = getMailArrivedSync(command.playerId)
                 const successBase = {
                     ok: true as const,
@@ -327,6 +333,7 @@ export function executeGachaDrawSync(command: GachaExecCommand): GachaExecResult
                     }),
                     itemOverflowDispositions: reward.itemOverflowDispositions ?? [],
                     postCommitEffects,
+                    activeMissionList: activeMission.activeMissionList,
                 }
                 return prepared.banner.kind === "character"
                     ? deepFreeze({

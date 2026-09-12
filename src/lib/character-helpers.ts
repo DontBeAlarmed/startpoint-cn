@@ -27,6 +27,7 @@ export interface CharacterResponseData {
     evolution: Object
     mail_arrived: boolean
     mission_info?: Record<string, unknown>[]
+    active_mission_list?: readonly unknown[]
     equipment_list?: Record<string, unknown>[]
     degree_list?: Record<string, unknown>[]
 }

@@ -45,6 +45,12 @@ db.exec(`
 
 const players = new Map([[7, { id: 7, partySlot: 1 }]])
 let failPartyWrite = false
+stubModule("../src/lib/mission/active-publication-owner", {
+    publishActiveMissionOwnerStateWithinTransaction: () => ({
+        activeMissionList: [],
+        activeMissions: {},
+    }),
+})
 stubModule("../src/data/db", { getDb: () => db })
 stubModule("../src/data/domains/player", {
     getPlayerSync: playerId => players.get(playerId) ?? null,

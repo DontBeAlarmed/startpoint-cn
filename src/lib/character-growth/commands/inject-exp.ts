@@ -2,6 +2,7 @@ import { getDb } from "../../../data/db"
 import { getPlayerSync } from "../../../data/domains/player"
 import { updatePlayerCharacterSync } from "../../../data/domains/character"
 import { incrementActiveMissionInjectedExpCountSync } from "../../../data/domains/active_mission_counters"
+import { publishActiveMissionOwnerStateWithinTransaction } from "../../mission/active-publication-owner"
 import { createCharacterGrowthRequestContext } from "../request-context"
 import { convergeBondTokenForExpWithinTransaction } from "../bond-token-qualification"
 import type { BondTokenStatus } from "../model"
@@ -33,6 +34,7 @@ export interface InjectCharacterExpResult {
     readonly overflowExp: number
     readonly expPool: number
     readonly bondTokens: ReadonlyMap<number, BondTokenStatus>
+    readonly activeMissionList: readonly unknown[]
     readonly replayed: false
 }
 
@@ -84,6 +86,11 @@ export function executeInjectCharacterExp(command: InjectCharacterExpCommand): I
         const afterBondTokens = new Map(context.bondTokens())
         if (bondConvergence.granted) afterBondTokens.set(1, 1)
         incrementActiveMissionInjectedExpCountSync(command.playerId)
+        const activeMission = publishActiveMissionOwnerStateWithinTransaction({
+            playerId: command.playerId,
+            now: command.evaluationTime,
+            source: "character-growth/inject-exp",
+        })
         return {
             command: "inject_exp",
             before,
@@ -98,6 +105,7 @@ export function executeInjectCharacterExp(command: InjectCharacterExpCommand): I
             overflowExp: calculation.overflowExp,
             expPool: afterPool,
             bondTokens: afterBondTokens,
+            activeMissionList: activeMission.activeMissionList,
             replayed: false,
         } as InjectCharacterExpResult
     })()

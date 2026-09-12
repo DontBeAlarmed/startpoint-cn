@@ -1779,9 +1779,12 @@ test("character owner plan preserves per-draw movie order duplicate deltas and m
         measured.statements.filter(sql => /^\s*SELECT[\s\S]*\bFROM\s+players_items\b/i.test(sql)).length,
         2,
     )
+    // The in-transaction Active Mission owner publication keeps the deferred
+    // inventory context open across the reconcile, so the two compensation
+    // writes flush as one multi-row upsert. Final amounts stay locked above.
     assert.equal(
         measured.statements.filter(sql => /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql)).length,
-        2,
+        1,
     )
     assert.deepEqual(measured.result.characters.map(character => character.character_id), [
         existingCharacterId,

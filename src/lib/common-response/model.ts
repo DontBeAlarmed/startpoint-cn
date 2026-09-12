@@ -19,6 +19,7 @@ export interface CommonResponseFragment {
     readonly equipment_list?: readonly EquipmentFragment[] | null
     readonly mission_info?: readonly CommonResponseRecord[] | null
     readonly over_max?: readonly CommonResponseRecord[] | null
+    readonly active_mission_list?: readonly unknown[] | null
     readonly mail_arrived?: boolean | null
 }
 

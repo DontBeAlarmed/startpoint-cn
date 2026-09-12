@@ -16,6 +16,7 @@ import { receiveBondToken } from "../../../lib/character-growth/commands/receive
 import { openManaBoard } from "../../../lib/character-growth/commands/open-mana-board"
 import { getServerDate } from "../../../utils"
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../../lib/character-growth/owner-publication"
+import { publishActiveMissionOwnerStateWithinTransaction } from "../../../lib/mission/active-publication-owner"
 import { MANA_CHARACTER_GROWTH_FIELDS, projectCharacterGrowthIncrement } from "../../../lib/character-growth/response-projector"
 import { sendGrowthMutationError } from "./mana-mutation-http"
 
@@ -58,23 +59,31 @@ const routes = async (fastify: FastifyInstance) => {
                     character,
                     fields: MANA_CHARACTER_GROWTH_FIELDS,
                 }).character_list]
+                const characterList = result.replayed
+                    ? existingCharacterList
+                    : publishCharacterGrowthOwnerStateBestEffort(
+                        sess.playerId,
+                        [body.character_id],
+                        [existingCharacterList],
+                        {},
+                        "character/receive_bond_token",
+                        getServerDate(),
+                    ).characterList
+                const activeMission = publishActiveMissionOwnerStateWithinTransaction({
+                    playerId: sess.playerId,
+                    now: getServerDate(),
+                    source: "character/receive_bond_token",
+                })
                 return {
                     bondTokenAfter: result.playerBondTokenAfter,
-                    characterList: result.replayed
-                        ? existingCharacterList
-                        : publishCharacterGrowthOwnerStateBestEffort(
-                            sess.playerId,
-                            [body.character_id],
-                            [existingCharacterList],
-                            {},
-                            "character/receive_bond_token",
-                            getServerDate(),
-                        ).characterList,
+                    characterList,
+                    activeMissionList: activeMission.activeMissionList,
                 }
             })()
             return sendCharacterResponse(reply, body.viewer_id, {
                 user_info: { bond_token: settlement.bondTokenAfter },
                 character_list: settlement.characterList,
+                active_mission_list: settlement.activeMissionList,
                 user_character_mana_node_list: {},
                 item_list: {},
                 evolution: [],

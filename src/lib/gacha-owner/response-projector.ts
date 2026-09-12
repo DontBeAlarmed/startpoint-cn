@@ -29,6 +29,7 @@ export function projectGachaExecResponse(input: {
             ...result.rewardItems,
         },
         mail_arrived: result.mailArrived,
+        active_mission_list: result.activeMissionList,
         ...(result.kind === "character"
             ? {
                 character_list: input.postCommit.characterList.map(

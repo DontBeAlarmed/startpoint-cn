@@ -20,6 +20,7 @@ import { validatePartyLoadouts } from "../../lib/party-loadout-validation";
 import { settleAbilitySoulEquipFactsSync } from "../../lib/mission/operation-fact-settlement";
 import { settleMissionCategories, type MissionSettlementResult } from "../../lib/mission/settlement";
 import { mergeMissionSettlementResponse } from "../../lib/mission/response";
+import { publishActiveMissionOwnerStateWithinTransaction } from "../../lib/mission/active-publication-owner";
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
 
 interface PartyInfoListItem {
@@ -617,7 +618,12 @@ const routes = async (fastify: FastifyInstance) => {
                     }], evaluationTime))
                 }
             }
-            return settlements
+            const activeMission = publishActiveMissionOwnerStateWithinTransaction({
+                playerId,
+                now: evaluationTime,
+                source: "party/edit",
+            })
+            return { settlements, activeMissionList: activeMission.activeMissionList }
         })()
 
         reply.header("content-type", "application/x-msgpack")
@@ -626,9 +632,10 @@ const routes = async (fastify: FastifyInstance) => {
                 "mail_arrived": getMailArrivedSync(playerId)
             }]),
         }
-        for (const settlement of missionSettlements) {
+        for (const settlement of missionSettlements.settlements) {
             mergeMissionSettlementResponse(responseData, settlement, viewerId)
         }
+        responseData.active_mission_list = missionSettlements.activeMissionList
         return reply.status(200).send({
             "data_headers": generateDataHeaders({
                 viewer_id: viewerId

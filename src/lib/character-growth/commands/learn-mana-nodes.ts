@@ -6,6 +6,7 @@ import {
     updatePlayerCharacterSync,
 } from "../../../data/domains/character"
 import { incrementActiveMissionUsedManaCountSync } from "../../../data/domains/active_mission_counters"
+import { publishActiveMissionOwnerStateWithinTransaction } from "../../mission/active-publication-owner"
 import { recordSecondManaBoardCompletionMilestoneSync } from "../../../lib/player-history-milestones"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
 import { isCharacterSecondManaBoardAvailable } from "../../mana-board-availability"
@@ -54,6 +55,7 @@ export interface LearnManaNodesResult extends CharacterGrowthCommandResult {
     readonly responseNodeEntries: readonly { readonly multiplied_id: number; readonly awake_level: number }[]
     readonly evolution: Object
     readonly missionFacts: Readonly<{ readonly usedMana: number }>
+    readonly activeMissionList: readonly unknown[]
     readonly resourceState: Readonly<{
         mana: number
         freeMana: number
@@ -235,6 +237,11 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
             nextNodes,
             afterAwakeUnlocks,
         ) as LearnManaNodesResult["after"]
+        const activeMission = publishActiveMissionOwnerStateWithinTransaction({
+            playerId: command.playerId,
+            now: command.evaluationTime,
+            source: "character-growth/learn-mana-nodes",
+        })
         return {
             command: "learn_mana_nodes",
             before: observed(character, beforeBondTokens, beforeNormalManaNodes, beforeAwakeUnlocks),
@@ -248,6 +255,7 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
             },
             missionSettlement: null,
             missionFacts: { usedMana: resources.totalManaCost },
+            activeMissionList: activeMission.activeMissionList,
             replayed: false,
             bondTokenGranted: bond.bondTokenGranted,
             character: characterData,

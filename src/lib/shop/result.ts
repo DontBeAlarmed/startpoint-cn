@@ -38,6 +38,7 @@ export interface ShopPurchaseOwnerResult {
     readonly passCardEffects: readonly AppliedShopPassCardEffect[]
     readonly purchaseCounts: readonly ShopPurchaseCountAfter[]
     readonly rewardInvalidatedFactKeys: readonly FactKey[]
+    readonly activeMissionList: readonly unknown[]
     readonly missionSettlement: MissionSettlementResult | null
 }
 

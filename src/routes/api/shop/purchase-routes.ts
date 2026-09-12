@@ -145,6 +145,7 @@ export function registerShopPurchaseRoutes(
                 "shop/buy",
                 gameTime.virtualNow,
             ).characterList
+            responseData.active_mission_list = result.activeMissionList
             responseData.mail_arrived = getMailArrivedSync(result.playerId)
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
@@ -209,6 +210,7 @@ export function registerShopPurchaseRoutes(
                 "shop/bulk-buy",
                 gameTime.virtualNow,
             ).characterList
+            responseData.active_mission_list = result.activeMissionList
             responseData.mail_arrived = getMailArrivedSync(result.playerId)
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({

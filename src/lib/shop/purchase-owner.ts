@@ -4,6 +4,7 @@ import {
     getPlayerShopPurchaseCountsByTypeBulkSync,
 } from "../../data/domains/shopPurchase"
 import { incrementActiveMissionUsedManaCountSync } from "../../data/domains/active_mission_counters"
+import { publishActiveMissionOwnerStateWithinTransaction } from "../mission/active-publication-owner"
 import { getPlayerSync } from "../../data/domains/player"
 import { getDb } from "../../data/db"
 import { deepFreeze } from "../../content/deep-freeze"
@@ -199,6 +200,11 @@ export function executeShopPurchaseSync(
                 }
             }
             const missionUser = missionSettlement?.userInfo
+            const activeMission = publishActiveMissionOwnerStateWithinTransaction({
+                playerId: input.playerId,
+                now: virtualNow,
+                source: "shop/purchase",
+            })
             return deepFreeze({
                 playerId: input.playerId,
                 shopType: input.shopType,
@@ -232,6 +238,7 @@ export function executeShopPurchaseSync(
                 purchaseCounts,
                 rewardInvalidatedFactKeys: reward.invalidatedFactKeys,
                 missionSettlement,
+                activeMissionList: activeMission.activeMissionList,
             })
         })
     })()

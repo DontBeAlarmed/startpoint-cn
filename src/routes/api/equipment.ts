@@ -25,6 +25,7 @@ import { getDb } from "../../data/db";
 import { canUseEquipmentAwakeningCrystal } from "../../lib/equipment-upgrade";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { settleMissionOperationFactsSync } from "../../lib/mission/operation-fact-settlement";
+import { publishActiveMissionOwnerStateWithinTransaction } from "../../lib/mission/active-publication-owner";
 import { mergeMissionSettlementResponse } from "../../lib/mission";
 import { projectEquipmentEntity } from "../../lib/common-response/entities";
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
@@ -176,11 +177,17 @@ const routes = async (fastify: FastifyInstance) => {
                     returnItemList[dissolveInfo.ability_soul_id] = grant.afterAmount
                 })
             }
+            const activeMission = publishActiveMissionOwnerStateWithinTransaction({
+                playerId,
+                now: getServerDate(),
+                source: "equipment/awaken",
+            })
             return {
                 equipmentSnapshot,
                 missionSettlement,
                 itemOverflowDispositions,
                 overflowFreeManaAfter,
+                activeMissionList: activeMission.activeMissionList,
             }
         })()
 
@@ -212,6 +219,7 @@ const routes = async (fastify: FastifyInstance) => {
         if (operationResult.missionSettlement) {
             mergeMissionSettlementResponse(responseData, operationResult.missionSettlement, viewerId)
         }
+        responseData.active_mission_list = operationResult.activeMissionList
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": responseData,
@@ -345,11 +353,17 @@ const routes = async (fastify: FastifyInstance) => {
                     getServerDate(),
                     equipmentSnapshot,
                 )
+                const activeMission = publishActiveMissionOwnerStateWithinTransaction({
+                    playerId,
+                    now: getServerDate(),
+                    source: "equipment/bulk_upgrade",
+                })
                 return {
                     equipmentSnapshot,
                     missionSettlement,
                     itemOverflowDispositions: overflowSettlement.dispositions,
                     overflowFreeManaAfter: overflowSettlement.freeManaAfter,
+                    activeMissionList: activeMission.activeMissionList,
                 }
             })
         ))()
@@ -379,6 +393,7 @@ const routes = async (fastify: FastifyInstance) => {
         if (operationResult.missionSettlement) {
             mergeMissionSettlementResponse(bulkResponseData, operationResult.missionSettlement, viewerId)
         }
+        bulkResponseData.active_mission_list = operationResult.activeMissionList
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": bulkResponseData,

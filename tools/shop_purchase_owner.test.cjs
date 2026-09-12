@@ -673,9 +673,11 @@ test("500-entry owner admission keeps reads and transaction structure constant",
     assert.equal(getPlayerSync(playerId).freeMana, 1000)
     assert.equal(getPlayerItemSync(playerId, COST_ITEM_ID), 500)
     assert.equal(getPlayerItemSync(playerId, REWARD_ITEM_ID), 500)
+    // One read above is the owner's after-write player snapshot for the
+    // in-transaction Active Mission publication.
     assert.equal(measured.statements.filter(statement => (
         /FROM players\s+WHERE id =/i.test(statement)
-    )).length, 1)
+    )).length, 2)
     assert.equal(measured.statements.filter(statement => (
         /CROSS JOIN players_shop_purchase_counters/i.test(statement)
     )).length, 1)
