@@ -271,6 +271,163 @@ assert.deepEqual(
     "成功结算才接入活动每日事实，失败 finish 不得记录",
 )
 
+// ---------------------------------------------------------------------------
+// weekevent_battle_play* producers across the four daily generations
+// selector comes from the CDN row (type 14 + quest range kind 12), never
+// from mission-ID guessing; windows follow the master-data UTC+8 columns
+// ---------------------------------------------------------------------------
+
+function createWeekeventPlayer() {
+    const account = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId: `mission-daily-weekevent-${randomUUID()}`,
+        status: "normal",
+    })
+    const weekeventPlayerId = insertDefaultPlayerSync(account.id).id
+    return { weekeventPlayerId, weekeventPlayer: getPlayerSync(weekeventPlayerId) }
+}
+
+function weekeventContext(playerId, player, overrides = {}) {
+    return context({
+        playerId,
+        player,
+        questCategory: 13,
+        questId: 1020001,
+        isMulti: undefined,
+        isMultiHost: undefined,
+        ...overrides,
+    })
+}
+
+const WEEKEVENT_GENERATIONS = [
+    { missionId: 2, target: 1, sample: new Date("2020-01-15T04:00:00.000Z") },
+    { missionId: 7, target: 3, sample: new Date("2021-06-15T04:00:00.000Z") },
+    { missionId: 12, target: 1, sample: new Date("2023-12-15T04:00:00.000Z") },
+]
+for (const { missionId, target, sample } of WEEKEVENT_GENERATIONS) {
+    const { weekeventPlayerId, weekeventPlayer } = createWeekeventPlayer()
+    const playerProgress = () => (
+        getPlayerCategoryMissionsSync(weekeventPlayerId, 2)[missionId]?.progress ?? 0
+    )
+    assert.deepEqual(
+        recordDailyMissionBattleFacts(
+            weekeventContext(weekeventPlayerId, weekeventPlayer),
+            sample,
+        ),
+        [missionId],
+        `摇曳的迷宫成功单人结算必须推进本代 weekevent 任务 ${missionId}`,
+    )
+    assert.equal(playerProgress(), 1)
+    for (let success = 1; success < target; success++) {
+        recordDailyMissionBattleFacts(
+            weekeventContext(weekeventPlayerId, weekeventPlayer),
+            sample,
+        )
+    }
+    assert.equal(playerProgress(), target, `weekevent 任务 ${missionId} 累计到目标次数`)
+    assert.deepEqual(
+        settleMissionCategories(weekeventPlayerId, [2], sample)
+            .missionInfo.map(info => info.mission_id),
+        [missionId],
+        `weekevent 任务 ${missionId} 达到目标后必须正常结算奖励`,
+    )
+    recordDailyMissionBattleFacts(
+        weekeventContext(weekeventPlayerId, weekeventPlayer),
+        sample,
+    )
+    assert.equal(
+        playerProgress(),
+        target + 1,
+        `重复成功必须继续累计 weekevent 任务 ${missionId}`,
+    )
+    assert.deepEqual(
+        settleMissionCategories(weekeventPlayerId, [2], sample).missionInfo,
+        [],
+        `已领奖的 weekevent 任务 ${missionId} 不得重复发奖`,
+    )
+    for (const invalid of [
+        { questAccomplished: false },
+        { questCategory: 1 },
+        { questCategory: 2 },
+        { isMulti: true, isMultiHost: true },
+    ]) {
+        recordDailyMissionBattleFacts(
+            weekeventContext(weekeventPlayerId, weekeventPlayer, invalid),
+            sample,
+        )
+    }
+    assert.equal(
+        playerProgress(),
+        target + 1,
+        `失败、错误 category/quest 与协力结算不得增长 weekevent 任务 ${missionId}`,
+    )
+}
+
+const { weekeventPlayerId: seamPlayerId, weekeventPlayer: seamPlayer } = createWeekeventPlayer()
+const seamProgress = () => [2, 7].map(id => (
+    getPlayerCategoryMissionsSync(seamPlayerId, 2)[id]?.progress ?? 0
+))
+assert.deepEqual(
+    recordDailyMissionBattleFacts(
+        weekeventContext(seamPlayerId, seamPlayer),
+        new Date("2019-11-28T03:59:59.999Z"),
+    ),
+    [],
+    "第一代窗口前 1ms 不得记录 weekevent 事实",
+)
+assert.deepEqual(
+    recordDailyMissionBattleFacts(
+        weekeventContext(seamPlayerId, seamPlayer),
+        new Date("2019-11-28T04:00:00.000Z"),
+    ),
+    [2],
+    "第一代起点整秒必须开放 weekevent 任务 2",
+)
+assert.deepEqual(seamProgress(), [1, 0], "第一代窗口内只累计任务 2")
+assert.deepEqual(
+    recordDailyMissionBattleFacts(
+        weekeventContext(seamPlayerId, seamPlayer),
+        new Date("2020-02-21T20:59:59.000Z"),
+    ),
+    [2],
+    "第一代终点整秒（UTC+8 04:59:59）weekevent 任务 2 仍然开放",
+)
+assert.deepEqual(
+    recordDailyMissionBattleFacts(
+        weekeventContext(seamPlayerId, seamPlayer),
+        new Date("2020-02-21T20:59:59.001Z"),
+    ),
+    [],
+    "第一代终点后 1ms 不得再记录 weekevent 事实",
+)
+assert.deepEqual(
+    recordDailyMissionBattleFacts(
+        weekeventContext(seamPlayerId, seamPlayer),
+        new Date("2020-02-21T20:59:59.999Z"),
+    ),
+    [],
+    "UTC+8 05:00 前的代际间隙不得记录任何 weekevent 事实",
+)
+assert.deepEqual(
+    recordDailyMissionBattleFacts(
+        weekeventContext(seamPlayerId, seamPlayer),
+        new Date("2020-02-21T21:00:00.000Z"),
+    ),
+    [7],
+    "第二代起点（UTC+8 05:00 整）必须切换到 weekevent 任务 7",
+)
+assert.deepEqual(seamProgress(), [2, 1], "代际切换后旧代进度保留、新代独立累计")
+assert.deepEqual(
+    recordDailyMissionBattleFacts(
+        weekeventContext(seamPlayerId, seamPlayer),
+        activeTime,
+    ),
+    [],
+    "冻结时间 2024-08-14 下三代 weekevent 任务均已关窗，不得记录",
+)
+
 console.log("mission daily battle facts tests passed")
 cleanup()
 process.removeListener("exit", cleanup)

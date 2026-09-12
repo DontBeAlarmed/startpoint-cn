@@ -351,6 +351,26 @@ test("uses actual child missions for Daily and Awake aggregate dependencies", ()
     assert.deepEqual(factIds(registry.getRequirement(9, 14)), [
         "categoryMissionProgress:9:11,12,13",
     ])
+
+    for (const missionId of [2, 7, 12]) {
+        const requirement = registry.getRequirement(2, missionId)
+        assert.equal(
+            requirement.mode,
+            "persisted",
+            `weekevent daily mission ${missionId} must be producer-persisted`,
+        )
+    }
+    for (const [missionId, deps] of [
+        [10, [6, 7, 8, 9]],
+        [15, [11, 12, 13, 14]],
+        [17, [11, 13, 14, 16]],
+    ]) {
+        assert.deepEqual(
+            registry.getRequirement(2, missionId).missionDependencies?.map(ref => ref.missionId),
+            deps,
+            `daily all-clear ${missionId} must keep its own row[17] dependencies`,
+        )
+    }
 })
 
 test("separates Event producers from fail-closed selectors", () => {

@@ -13,6 +13,12 @@ const ACTIVE_DAILY_BATTLE_MISSION_IDS = new Set([
     800392,
 ])
 
+const WEEKEVENT_BATTLE_PATTERNS = new Set([
+    "weekevent_battle_play",
+    "weekevent_battle_play_2",
+    "weekevent_battle_play_3",
+])
+
 const ADVENT_EVENT_RANGE_KIND = 5
 const BOSS_BATTLE_RANGE_KIND = 2
 const SCORE_ATTACK_EVENT_RANGE_KIND = 20
@@ -22,6 +28,8 @@ const BATTLE_CLEAR_PATTERN_TYPE = 23
 const ANY_BATTLE_KIND = 3
 const SCORE_ATTACK_DAILY_MISSION_ID = 10075
 const ANY_BATTLE_DAILY_MISSION_ID = 800392
+const WEEKEVENT_QUEST_RANGE_KIND = 12
+const WEEKEVENT_QUEST_CATEGORIES: ReadonlySet<number> = new Set([6, 13, 14, 20])
 
 function matchesAdventEvent(
     row: readonly unknown[],
@@ -76,6 +84,16 @@ function matchesAnyBattleDailyMission(
         && (context.isMulti === true || context.isMulti === false || context.isMulti === undefined)
 }
 
+function matchesWeekeventDailyMission(
+    row: readonly unknown[],
+    context: FinishContext,
+): boolean {
+    return Number(row[2]) === SINGLE_BATTLE_CLEAR_PATTERN_TYPE
+        && Number(row[7]) === WEEKEVENT_QUEST_RANGE_KIND
+        && context.isMulti !== true
+        && WEEKEVENT_QUEST_CATEGORIES.has(context.questCategory)
+}
+
 export function recordDailyMissionBattleFacts(
     context: FinishContext,
     evaluationTime: Date,
@@ -84,7 +102,9 @@ export function recordDailyMissionBattleFacts(
 
     const matchedMissionIds: number[] = []
     for (const definition of getMissionCatalog().getDefinitions(2)) {
-        if (!ACTIVE_DAILY_BATTLE_MISSION_IDS.has(definition.missionId)
+        const isProducerMission = ACTIVE_DAILY_BATTLE_MISSION_IDS.has(definition.missionId)
+            || WEEKEVENT_BATTLE_PATTERNS.has(definition.pattern)
+        if (!isProducerMission
             || !isMissionMasterDefinitionEnabledAt(definition, evaluationTime)) continue
 
         let matches = false
@@ -92,6 +112,8 @@ export function recordDailyMissionBattleFacts(
             matches = matchesScoreAttackDailyMission(definition.row, context)
         } else if (definition.missionId === ANY_BATTLE_DAILY_MISSION_ID) {
             matches = matchesAnyBattleDailyMission(definition.row, context)
+        } else if (WEEKEVENT_BATTLE_PATTERNS.has(definition.pattern)) {
+            matches = matchesWeekeventDailyMission(definition.row, context)
         } else {
             matches = context.isMulti === true
                 && Number(definition.row[2]) === MULTI_BATTLE_CLEAR_PATTERN_TYPE

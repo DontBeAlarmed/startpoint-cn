@@ -6,7 +6,8 @@ import {
 import { getPlayerSync } from "../../data/domains/player"
 import type { Player } from "../../data/types"
 import { MissionEvaluationSession } from "./evaluation-session"
-import { getMissionCatalog, isMissionProgressComplete } from "./mission-catalog"
+import { applyDailyDependencyCompletion } from "./daily-completion"
+import { getMissionCatalog } from "./mission-catalog"
 import { createProductionMissionFactLoaderRegistry } from "./production-fact-loaders"
 import type { ProductionMissionFactSeeds } from "./production-fact-loaders"
 import { getMissionFactRequirementRegistry } from "./requirements/registry"
@@ -28,26 +29,6 @@ interface MutableEvaluatedMission {
     computedProgress: number
     finalProgress: number
     receivedStages: number[]
-}
-
-function isDailyCoreMission(pattern: string): boolean {
-    return /^single_battle_play(?:_[23])?$/.test(pattern)
-        || /^multi_battle_play(?:_[23])?$/.test(pattern)
-        || /^use_dash(?:_[23])?$/.test(pattern)
-        || pattern === "daily_quest_stamina_use_2024_02"
-}
-
-function applyDailyCompletionProgress(missions: MutableEvaluatedMission[]): void {
-    const dailyMissions = missions.filter(mission => mission.category === 2)
-    if (dailyMissions.length === 0) return
-    const completedCoreCount = dailyMissions.filter(mission => (
-        isDailyCoreMission((getMissionCatalog().getDefinition(2, mission.missionId)?.pattern ?? ""))
-        && isMissionProgressComplete(2, mission.missionId, mission.finalProgress)
-    )).length
-    for (const mission of dailyMissions) {
-        if (!(getMissionCatalog().getDefinition(2, mission.missionId)?.pattern ?? "").startsWith("daily_quest_all_clear")) continue
-        mission.finalProgress = Math.max(mission.dbProgress, completedCoreCount)
-    }
 }
 
 function snapshotPlayer(player: Player): MissionSettlementPlayerSnapshot {
@@ -208,7 +189,7 @@ export function evaluateMissionCandidates(
             }
         }
     }
-    applyDailyCompletionProgress(evaluated)
+    applyDailyDependencyCompletion(evaluated, catalog)
     const missions = Object.freeze(evaluated.map(freezeMission))
     return Object.freeze({
         playerId: prepared.playerId,

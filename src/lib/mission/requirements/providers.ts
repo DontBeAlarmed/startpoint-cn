@@ -1,4 +1,5 @@
 import type { FactKey } from "../facts/fact-key"
+import { getDailyCompletionDependencies } from "../daily-completion"
 import {
     getMissionCatalogCraftPointItemId,
     type MissionCatalog,
@@ -21,7 +22,7 @@ const REGULAR_PERSISTED_PATTERNS = new Set([
 ])
 
 const DAILY_BATTLE_PRODUCER_IDS = new Set([
-    10075, 800115, 800116, 800117, 800124, 800125, 800126, 800392,
+    2, 7, 12, 10075, 800115, 800116, 800117, 800124, 800125, 800126, 800392,
 ])
 
 const REGULAR_FACTS: Readonly<Record<string, readonly FactKey[]>> = Object.freeze({
@@ -62,14 +63,6 @@ const REGULAR_FACTS: Readonly<Record<string, readonly FactKey[]>> = Object.freez
     ],
 })
 
-function parsePositiveIntegerList(value: unknown): readonly number[] | null {
-    if (typeof value !== "string" || value === "" || value === "(None)") return null
-    const values = value.split(",").map(Number)
-    return values.length > 0 && values.every(value => Number.isSafeInteger(value) && value > 0)
-        ? values
-        : null
-}
-
 function getRegularRequirement(
     definition: MissionMasterDefinition,
     catalog: MissionCatalog,
@@ -101,8 +94,7 @@ function getRegularRequirement(
 }
 
 function dailyDependencies(definition: MissionMasterDefinition): readonly MissionRef[] {
-    if (Number(definition.row[2]) !== 13) return []
-    return (parsePositiveIntegerList(definition.row[17]) ?? [])
+    return getDailyCompletionDependencies(definition)
         .map(missionId => ({ category: 2, missionId }))
 }
 

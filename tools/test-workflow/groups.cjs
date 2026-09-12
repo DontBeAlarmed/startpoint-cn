@@ -501,6 +501,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/mission-client-check-diagnostics.test.cjs",
             "tools/mission_coverage_audit.test.cjs",
             "tools/mission_daily_battle_facts.test.cjs",
+            "tools/mission_daily_history_replay.test.cjs",
             "tools/mission_degree_candidates.test.cjs",
             "tools/mission_degree_battle_context.test.cjs",
             "tools/mission_degree_characterization.test.cjs",
