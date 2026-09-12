@@ -15,6 +15,7 @@ import {
     settleMissionCategoriesWithEvaluation,
 } from "../../lib/mission"
 import { collectAwakeCandidateCharacterIds } from "../../lib/mission/awake-candidate-character-ids"
+import { publishActiveMissionOwnerStateWithinTransaction } from "../../lib/mission/active-publication-owner"
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication"
 import type { FactKey } from "../../lib/mission/facts/fact-key"
 import {
@@ -498,8 +499,14 @@ export function runMultiplayerSettlementOrchestration(input: MultiplayerSettleme
             "multi-finish",
             settlementTime,
         ).characterList
+        const activeMission = publishActiveMissionOwnerStateWithinTransaction({
+            playerId: input.playerId,
+            now: settlementTime,
+            source: "multi-finish",
+        })
         return {
             characterList,
+            activeMissionList: activeMission.activeMissionList,
             clearReward,
             playerData,
             rewardCharacterExpResult,

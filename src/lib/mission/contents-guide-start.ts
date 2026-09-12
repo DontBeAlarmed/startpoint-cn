@@ -1,4 +1,5 @@
 import { getDb } from "../../data/db"
+import { publishActiveMissionOwnerStateWithinTransaction } from "./active-publication-owner"
 import {
     getPlayerActiveMissionsSync,
     updatePlayerActiveMissionStageSync,
@@ -31,7 +32,11 @@ export interface StartContentsGuideMissionInput {
 }
 
 export type StartContentsGuideMissionResult =
-    | { readonly ok: true, readonly delta: ActiveMissionProgressDelta | null }
+    | {
+        readonly ok: true
+        readonly delta: ActiveMissionProgressDelta | null
+        readonly deltas: readonly ActiveMissionProgressDelta[]
+    }
     | { readonly ok: false, readonly message: string }
 
 function normalizeActiveMissions(
@@ -97,12 +102,24 @@ export function startContentsGuideMission(
             1,
             { plan },
         )
-        if (settlement.delta === null) return { ok: true, delta: null }
-
-        updatePlayerActiveMissionSync(input.playerId, missionId, settlement.state.progress)
-        for (const stage of settlement.delta.stages) {
-            updatePlayerActiveMissionStageSync(input.playerId, stage.stage, missionId, false)
+        if (settlement.delta !== null) {
+            updatePlayerActiveMissionSync(input.playerId, missionId, settlement.state.progress)
+            for (const stage of settlement.delta.stages) {
+                updatePlayerActiveMissionStageSync(input.playerId, stage.stage, missionId, false)
+            }
         }
-        return { ok: true, delta: settlement.delta }
+        // Publish the dependency fixed point in the same transaction so one
+        // start request returns every unlocked mission's progress.
+        const publication = publishActiveMissionOwnerStateWithinTransaction({
+            playerId: input.playerId,
+            now: input.now,
+            source: "contents_guide/start",
+        })
+        const deltas = [...publication.activeMissionList]
+        const startDelta = settlement.delta
+        if (startDelta !== null && !deltas.some(delta => delta.mission_id === startDelta.mission_id)) {
+            deltas.unshift(startDelta)
+        }
+        return { ok: true, delta: settlement.delta, deltas }
     })()
 }

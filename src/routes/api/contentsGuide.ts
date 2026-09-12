@@ -58,7 +58,7 @@ const routes = async (
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
-                "active_mission_list": result.delta === null ? [] : [result.delta]
+                "active_mission_list": result.deltas
             }
         });
     });

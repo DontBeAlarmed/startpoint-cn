@@ -31,7 +31,11 @@ function cleanup() {
 
 process.once("exit", cleanup)
 
-function missionRow(eventId, stringId = "contents_guide_start") {
+function missionRow(
+    eventId,
+    stringId = "contents_guide_start",
+    windowEnd = "2024-08-14 20:30:00",
+) {
     const row = []
     row[0] = String(eventId)
     row[1] = "1"
@@ -40,12 +44,26 @@ function missionRow(eventId, stringId = "contents_guide_start") {
     row[56] = "(None)"
     row[58] = "(None)"
     row[60] = "2020-01-01 00:00:00"
-    row[61] = "2024-08-14 20:30:00"
+    row[61] = windowEnd
+    return row
+}
+
+function unsupportedRow(eventId) {
+    const row = missionRow(eventId)
+    row[29] = "999"
+    return row
+}
+
+function dependencyMissionRow(eventId, missionIds) {
+    const row = missionRow(eventId, `guide_dep_${eventId}`)
+    row[29] = "13"
+    row[55] = missionIds
     return row
 }
 
 function eventRow(kind, prerequisiteQuestId = 1008004) {
     const row = []
+    row[0] = "guide_event"
     row[2] = String(kind)
     row[3] = "1"
     row[14] = "2020-01-01 00:00:00"
@@ -63,10 +81,35 @@ function rewardRow() {
     return row
 }
 
+const {
+    QUEST_TABLE_NAMES,
+    getBundledStandardMissionTables,
+} = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+const bundledQuestTables = Object.fromEntries(QUEST_TABLE_NAMES.map(tableName => [
+    tableName,
+    require(`../assets/${tableName}`),
+]))
 const tables = {
     "cdndata/player_rank_full.json": require("../assets/cdndata/player_rank_full.json"),
-    ...require("./helpers/install-bundled-gameplay-snapshot.cjs")
-        .getBundledStandardMissionTables(),
+    ...getBundledStandardMissionTables(),
+    ...bundledQuestTables,
+    "mission_regular.json": require("../assets/mission_regular.json"),
+    "mission_daily.json": require("../assets/mission_daily.json"),
+    "mission_event.json": require("../assets/mission_event.json"),
+    "mission_collect_item.json": require("../assets/mission_collect_item.json"),
+    "mission_degree.json": require("../assets/mission_degree.json"),
+    "mission_char_awake.json": require("../assets/mission_char_awake.json"),
+    "mission_char_awake_reward.json": require("../assets/mission_char_awake_reward.json"),
+    "character.json": require("../assets/character.json"),
+    "config.json": require("../assets/config.json"),
+    "item_inventory_policy.json": require("../assets/item_inventory_policy.json"),
+    "item_max_count.json": require("../assets/item_max_count.json"),
+    "mana_node.json": require("../assets/mana_node.json"),
+    "mana_board.json": require("../assets/mana_board.json"),
+    "mana_node_awake.json": require("../assets/mana_node_awake.json"),
+    "character_level.json": require("../assets/character_level.json"),
+    "level_required_mana_node.json": require("../assets/level_required_mana_node.json"),
+    "mana_board2_open_condition.json": {},
     "daily_challenge_point_lookup.json": require("../assets/daily_challenge_point_lookup.json"),
     "event_challenge_point_map.json": require("../assets/event_challenge_point_map.json"),
     "hard_multi_event.json": require("../assets/hard_multi_event.json"),
@@ -78,16 +121,19 @@ const tables = {
     "mission_pass_event.json": require("../assets/mission_pass_event.json"),
     "mission_active.json": {
         77123: [missionRow(77)],
-        88123: [missionRow(88)],
-        89123: [missionRow(89)],
-        89124: [missionRow(89)],
-        90123: [missionRow(90)],
+        88123: [unsupportedRow(88)],
+        89123: [unsupportedRow(89)],
+        89124: [unsupportedRow(89)],
+        90123: [unsupportedRow(90)],
+        91123: [missionRow(91)],
+        91124: [dependencyMissionRow(91, "91123")],
     },
     "mission_active_event.json": {
         77: [eventRow(2)],
         88: [eventRow(1)],
         89: [eventRow(2)],
         90: [eventRow(2)],
+        91: [eventRow(2, 1008005)],
     },
     "mission_active_reward.json": {
         77123: { 1: [rewardRow()] },
@@ -95,6 +141,8 @@ const tables = {
         89123: { 1: [rewardRow()] },
         89124: { 1: [rewardRow()] },
         90123: { 1: [rewardRow()] },
+        91123: { 1: [rewardRow()] },
+        91124: { 1: [rewardRow()] },
     },
 }
 
@@ -258,6 +306,67 @@ async function main() {
         assert.equal(failedWrite.statusCode, 500, failedWrite.body)
         assert.equal(getPlayerActiveMissionsSync(playerId)[90123], undefined)
         db.exec("DROP TRIGGER fail_contents_guide_stage_insert")
+
+        insertPlayerQuestProgressSync(playerId, 1, {
+            questId: 1008005,
+            finished: true,
+            unlocked: true,
+        })
+        const withDependency = await request(91)
+        assert.equal(withDependency.statusCode, 200, withDependency.body)
+        assert.deepEqual(decodeResponse(withDependency).data.active_mission_list, [
+            { mission_id: 91123, progress_value: 1, stages: [{ stage: 1, received: false }] },
+            { mission_id: 91124, progress_value: 1, stages: [{ stage: 1, received: false }] },
+        ], "start 必须在同一请求内运行依赖固定点并返回全部变化项")
+        assert.deepEqual(getPlayerActiveMissionsSync(playerId)[91124], {
+            progress: 1,
+            stages: { 1: false },
+        })
+        const repeatedWithDependency = await request(91)
+        assert.deepEqual(
+            decodeResponse(repeatedWithDependency).data.active_mission_list,
+            [],
+            "重复 start 不得重复累计或重复返回依赖变化",
+        )
+
+        db.exec(`
+            CREATE TRIGGER fail_contents_guide_dependency_insert
+            BEFORE INSERT ON players_active_missions
+            WHEN NEW.mission_id = 91124
+            BEGIN SELECT RAISE(FAIL, 'forced dependency publication failure'); END;
+        `)
+        const noPlayerForDependency = insertAccountSync({
+            appId: "wf_cn",
+            idpAlias: "",
+            idpCode: "test",
+            idpId: `contents-guide-dep-${randomUUID()}`,
+            status: "normal",
+        })
+        const dependencyPlayerId = insertDefaultPlayerSync(noPlayerForDependency.id).id
+        insertPlayerQuestProgressSync(dependencyPlayerId, 1, {
+            questId: 1008004,
+            finished: true,
+            unlocked: true,
+        })
+        insertPlayerQuestProgressSync(dependencyPlayerId, 1, {
+            questId: 1008005,
+            finished: true,
+            unlocked: true,
+        })
+        const dependencyViewerId = viewerId + 2
+        db.prepare("INSERT INTO sessions (token, account_id, expires, type) VALUES (?, ?, ?, ?)")
+            .run(String(dependencyViewerId), noPlayerForDependency.id, new Date("2099-12-31T23:59:59.000Z").toISOString(), 2)
+        const dependencyFailed = await rawRequest({
+            viewer_id: dependencyViewerId,
+            api_count: 1,
+            event_id: 91,
+        })
+        assert.equal(dependencyFailed.statusCode, 500, dependencyFailed.body)
+        assert.equal(
+            getPlayerActiveMissionsSync(dependencyPlayerId)[91123], undefined,
+            "依赖固定点写失败必须回滚起始任务写入",
+        )
+        db.exec("DROP TRIGGER fail_contents_guide_dependency_insert")
     } finally {
         await fastify.close()
         cleanup()

@@ -109,6 +109,7 @@ export function mergeCommonResponseFragments(
         equipment_list?: readonly EquipmentFragment[] | null
         mission_info?: readonly CommonResponseRecord[] | null
         over_max?: readonly CommonResponseRecord[] | null
+        active_mission_list?: readonly unknown[] | null
         mail_arrived?: boolean | null
     } = {}
     const characterIndexById = new Map<number, number>()
@@ -176,6 +177,16 @@ export function mergeCommonResponseFragments(
                 )
             } else if (result.mission_info === undefined) {
                 result.mission_info = null
+            }
+        }
+        if (fragment.active_mission_list !== undefined) {
+            if (fragment.active_mission_list !== null) {
+                result.active_mission_list = [
+                    ...(result.active_mission_list ?? []),
+                    ...fragment.active_mission_list,
+                ]
+            } else if (result.active_mission_list === undefined) {
+                result.active_mission_list = null
             }
         }
         if (fragment.over_max !== undefined) {

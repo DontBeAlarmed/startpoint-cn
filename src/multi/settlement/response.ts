@@ -29,6 +29,7 @@ export async function projectMultiplayerFinishResponse(input: MultiplayerFinishR
     const { body, settlement, viewerId, mailArrived, followInfo } = input
     const {
         characterList,
+        activeMissionList,
         clearReward,
         playerData,
         rewardCharacterExpResult,
@@ -93,6 +94,7 @@ export async function projectMultiplayerFinishResponse(input: MultiplayerFinishR
             ...periodicRewardSettlement.items,
         },
         "mission_info": [],
+        "active_mission_list": activeMissionList,
         "mail_arrived": mailArrived,
         ...(overMax.length > 0 ? { "over_max": overMax } : {}),
     }
