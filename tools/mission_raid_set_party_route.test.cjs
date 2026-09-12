@@ -53,6 +53,12 @@ const players = new Map([[7, { id: 7, partySlot: 1 }]])
 let evaluationTime = new Date("2024-05-23T04:00:00.000Z")
 
 stubModule("../src/data/db", { getDb: () => db })
+stubModule("../src/lib/mission/active-publication-owner", {
+    publishActiveMissionOwnerStateWithinTransaction: () => ({
+        activeMissionList: [],
+        activeMissions: {},
+    }),
+})
 stubModule("../src/data/domains/player", {
     getPlayerSync: playerId => players.get(playerId) ?? null,
     updatePlayerSync(player) {

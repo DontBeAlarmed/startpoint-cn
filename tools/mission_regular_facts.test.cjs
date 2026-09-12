@@ -496,10 +496,13 @@ insertPlayerQuestProgressSync(playerId, 15, {
 
 const expandedRegularContext = buildMissionComputerContext(playerId, 1)
 assert.equal(regular.compute(8, expandedRegularContext, 0), 100, "技能成就应读取成功结算累计")
+// character_level follows the highest proven owned-character level; the
+// fixture characters are below the first rarity EXP threshold, so it stays 0
+// regardless of the player Rank (mission 22 keeps the Rank fact).
 assert.equal(
     regular.compute(9, expandedRegularContext, 0),
-    getRankDegree(10_000),
-    "character_level 是玩家等级成就，不读取角色经验",
+    0,
+    "character_level 按持有角色最高已证等级计算，不读取玩家 Rank",
 )
 assert.equal(regular.compute(10, expandedRegularContext, 0), 1, "第 1 章全部普通关卡完成后应达成")
 assert.equal(regular.compute(16, expandedRegularContext, 0), 1, "第 1 章全部高难关卡完成后应达成")

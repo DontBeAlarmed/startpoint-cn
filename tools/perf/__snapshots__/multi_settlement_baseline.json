@@ -4,25 +4,40 @@
     "finish": {
       "activeQuestCleared": true,
       "observations": {
-        "eventLoopDelayMs": 1257.242623,
-        "latencyMs": 1257.1109379999998
+        "eventLoopDelayMs": 1083.179007,
+        "latencyMs": 1083.871278999999
       },
-      "outputSignature": "sha256:caa9a69355e64bdad536c707818f4bc4a48ce3feb63b2a655c197941eb2210d4",
+      "outputSignature": "sha256:ddbb6e6d66b35f1031affed9a63505f49de31072b5bba50e9c183fb75111dba8",
       "sql": {
-        "selectStatements": 52,
-        "statements": 85,
+        "selectStatements": 61,
+        "statements": 94,
         "transactionStatements": 8,
         "writeStatements": 25,
         "byTable": {
           "players": {
-            "reads": 11,
-            "statements": 17,
+            "reads": 12,
+            "statements": 18,
             "writes": 6
           },
           "players_active_mission_battle_facts": {
             "reads": 0,
             "statements": 1,
             "writes": 1
+          },
+          "players_active_mission_counters": {
+            "reads": 1,
+            "statements": 1,
+            "writes": 0
+          },
+          "players_active_missions": {
+            "reads": 1,
+            "statements": 1,
+            "writes": 0
+          },
+          "players_active_missions_stages": {
+            "reads": 1,
+            "statements": 1,
+            "writes": 0
           },
           "players_active_quests": {
             "reads": 1,
@@ -50,18 +65,18 @@
             "writes": 2
           },
           "players_characters": {
-            "reads": 4,
-            "statements": 5,
+            "reads": 5,
+            "statements": 6,
             "writes": 1
           },
           "players_characters_bond_tokens": {
-            "reads": 4,
-            "statements": 4,
+            "reads": 5,
+            "statements": 5,
             "writes": 0
           },
           "players_characters_mana_nodes": {
-            "reads": 5,
-            "statements": 5,
+            "reads": 6,
+            "statements": 6,
             "writes": 0
           },
           "players_collected_items": {
@@ -75,8 +90,8 @@
             "writes": 1
           },
           "players_equipment": {
-            "reads": 1,
-            "statements": 1,
+            "reads": 2,
+            "statements": 2,
             "writes": 0
           },
           "players_items": {
@@ -110,8 +125,8 @@
             "writes": 0
           },
           "players_quest_progress": {
-            "reads": 5,
-            "statements": 7,
+            "reads": 6,
+            "statements": 8,
             "writes": 2
           },
           "server_gameplay_settings": {

@@ -346,6 +346,12 @@ stubModule("../src/data/domains/active_mission_counters", {
         `).run(playerId, amount)
     },
 })
+stubModule("../src/lib/mission/active-publication-owner", {
+    publishActiveMissionOwnerStateWithinTransaction: () => ({
+        activeMissionList: [],
+        activeMissions: {},
+    }),
+})
 stubModule("../src/lib/mission/operation-fact-settlement", {
     settleMissionOperationFactsSync: (...args) => {
         degreeOperationCalls.push(args)

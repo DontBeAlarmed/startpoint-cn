@@ -95,8 +95,10 @@ test("snapshot pins the completed mission engine structural performance values",
     }, {
         awakeCharacterPage: { sqlReads: 11, sqlWrites: 0, missionComputes: 7 },
         getProgressNoInvalidation: { sqlReads: 14, sqlWrites: 1, missionComputes: 110 },
-        singleBattleFinish: { sqlReads: 28, sqlWrites: 32, missionComputes: 425 },
-        multiBattleFinish: { sqlReads: 29, sqlWrites: 37, missionComputes: 425 },
+        // Battle finish no longer claims category 9 rewards (page-owned);
+        // 6 reward writes removed at both single and multi boundaries.
+        singleBattleFinish: { sqlReads: 28, sqlWrites: 26, missionComputes: 425 },
+        multiBattleFinish: { sqlReads: 29, sqlWrites: 31, missionComputes: 425 },
     })
 })
 

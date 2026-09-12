@@ -31,10 +31,17 @@ const FIXED_BASE_COMMIT = "f85a01c1eb730afa3ff9e6de00fd7b7a9d992c32"
 const FORMAL_CONCURRENCY_STEPS = Object.freeze([1, 10, 25, 50, 100])
 const FORMAL_PREPARED_STATES = 600
 const FORMAL_REQUESTS_PER_ENTRY = 150
+// 2026-09-12 Mission Semantic Closure + H4 Gate: finish entries no longer
+// claim category 9 rewards (page-owned timing) and publish Active Mission
+// deltas; get-progress adds the mission 9 character-level stages. Signatures
+// re-approved after behavior review in task-C7/C8.
 const APPROVED_BEHAVIOR_SIGNATURES = Object.freeze({
-    "get-progress": "e30a9d15a262f2a17ff9a5c9d61ccab0ac8b5f09640d8167088999e91548b7fa",
-    "single-finish": "d2d70f29389735e3136cbcb857748e01628a40df9cae57cdeac2c6ba07fb979d",
-    "multi-finish": "66acac4bc1fa05caee238fcfd461aa67e5462e36ca5e0434c821e47fea5728db",
+    "get-progress": "9067ee435ee158b93a69887fdcde713a633a67c0a4fbcb8fa4afa94553aa87dc",
+    "single-finish": "7a365ba7aaa022956cb63981d6ef26f60bb9e632fe0d8d3444ee63365c309901",
+    "multi-finish": "76a6641373be8957823506f4c9abaac4ab09fc197fe443d953c07b8ee978799d",
+    // receive_bond_token now publishes the Active Mission delta in the same
+    // transaction (H4 operation entry).
+    "character-bond": "24dda48edd019a0f7deebe2c68d7fd32aebcaf3e83c12b2abe0b5e09519d7de5",
 })
 const REFERENCE_PATH = path.join(
     __dirname,

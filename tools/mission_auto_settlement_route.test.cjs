@@ -282,8 +282,8 @@ async function main() {
             finishData.mission_info
                 .filter(entry => entry.mission_category_id === 9)
                 .map(entry => entry.mission_id),
-            [13, 14],
-            "本场觉醒任务与 ALL_COMPLETE 必须随同一次 finish 返回",
+            [],
+            "finish 只写觉醒进度；category 9 奖励由觉醒第一页统一领取",
         )
         assert.deepEqual(
             finishData.character_list.find(character => character.character_id === 1)
@@ -296,8 +296,8 @@ async function main() {
             1,
             "同一角色的经验与觉醒更新不得产生重复 character_list 条目",
         )
-        assert.equal(finishData.item_list[3], awakeItemsBeforeRollback[3] + 3)
-        assert.equal(finishData.item_list[4], awakeItemsBeforeRollback[4] + 1)
+        assert.equal(finishData.item_list[3] ?? awakeItemsBeforeRollback[3], awakeItemsBeforeRollback[3])
+        assert.equal(finishData.item_list[4] ?? awakeItemsBeforeRollback[4], awakeItemsBeforeRollback[4])
         assert.equal(
             finishData.mission_info.some(entry => (
                 entry.mission_category_id === 9

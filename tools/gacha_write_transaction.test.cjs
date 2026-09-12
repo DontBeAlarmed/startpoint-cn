@@ -1316,10 +1316,13 @@ test("ticket gacha rolls its ticket and rewards back on a late mission failure",
     assert.match(response.body, /forced ticket gacha mission counter failure/)
     assert.deepEqual(drawState(playerId, 1613), before)
     assert.equal(getPlayerCollectedItemTotalSync(playerId, 70030), collectedBefore)
+    // The in-transaction H4 owner keeps the deferred inventory context open,
+    // so the ticket deduction flushes merged with the compensation write as
+    // one multi-row upsert; match the ticket row anywhere in the VALUES list.
     assert.equal(
         routeSql.statements.filter(sql => (
             /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql)
-            && /VALUES\s*\(70030(?:\.0+)?,\s*0(?:\.0+)?,/i.test(sql)
+            && /\(\s*70030(?:\.0+)?\s*,\s*0(?:\.0+)?\s*,/i.test(sql)
         )).length,
         1,
         routeSql.statements.filter(sql => (

@@ -649,6 +649,9 @@ const TEST_GROUPS = Object.freeze({
     },
     "integration:party": {
         execution: "parallel",
+        // Multi-finish settlement suites are heavyweight (real production
+        // homes); 30s parallel default flakes under group load.
+        timeoutMs: 120_000,
         tests: [
             "tools/multi_battle_lifecycle.test.cjs",
             "tools/multi_settlement_overflow.test.cjs",

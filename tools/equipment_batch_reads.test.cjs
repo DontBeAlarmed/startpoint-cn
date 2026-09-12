@@ -142,7 +142,11 @@ function equipmentSelects(statements) {
     ))
 }
 
-function assertSingleBatchReadAndFullResponse(statements, uniqueIdCount) {
+function assertSingleBatchReadAndFullResponse(
+    statements,
+    uniqueIdCount,
+    { ownerEquipmentFactRead = false } = {},
+) {
     const selects = equipmentSelects(statements)
     const batchReads = selects.filter(statement => /\bid\s+IN\s*\(/i.test(statement))
     const singleReads = selects.filter(statement => /\bid\s*=\s*/i.test(statement))
@@ -150,7 +154,14 @@ function assertSingleBatchReadAndFullResponse(statements, uniqueIdCount) {
 
     assert.equal(batchReads.length, 1, selects.join("\n---\n"))
     assert.equal(singleReads.length, 0, selects.join("\n---\n"))
-    assert.equal(fullReads.length, 1, selects.join("\n---\n"))
+    // One full read projects the response inventory; upgrade routes add a
+    // second constant full read for the H4 owner's after-write equipment
+    // fact snapshot (sell routes produce no mission facts and read once).
+    assert.equal(
+        fullReads.length,
+        ownerEquipmentFactRead ? 2 : 1,
+        selects.join("\n---\n"),
+    )
 
     const inValues = batchReads[0].match(/\bid\s+IN\s*\(([^)]*)\)/i)?.[1]
     assert.ok(inValues, batchReads[0])
@@ -262,7 +273,7 @@ test("bulk_upgrade reads unique requested equipment once and returns the full in
     }))
 
     const responseData = decodeSuccess(response)
-    assertSingleBatchReadAndFullResponse(statements, 3)
+    assertSingleBatchReadAndFullResponse(statements, 3, { ownerEquipmentFactRead: true })
     assert.deepEqual(equipmentById(responseData, EQUIPMENT_A), {
         equipment_id: EQUIPMENT_A,
         protection: false,

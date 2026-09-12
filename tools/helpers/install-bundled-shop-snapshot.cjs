@@ -27,6 +27,11 @@ const tableNames = [
     "item_ids.json",
     "item_lookup.json",
     "item_sale.json",
+    // Shop purchases publish Active Mission progress in the same transaction,
+    // so the fixed point also reads the mission content tables.
+    "mission_active.json",
+    "mission_active_event.json",
+    "mission_active_reward.json",
 ]
 
 function installBundledShopSnapshot({ additionalTableNames = [] } = {}) {

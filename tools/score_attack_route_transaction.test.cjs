@@ -180,6 +180,9 @@ const runtimeContentTables = {
     "event_challenge_point_map.json": require("../assets/event_challenge_point_map.json"),
     "item_inventory_policy.json": require("../assets/item_inventory_policy.json"),
     "reward_element_map.json": require("../assets/reward_element_map.json"),
+    "mission_active.json": require("../assets/mission_active.json"),
+    "mission_active_event.json": require("../assets/mission_active_event.json"),
+    "mission_active_reward.json": require("../assets/mission_active_reward.json"),
     "additional_reward_rules.json": {
         groups: {
             9001: [{ index: 1, groupStringId: "test", type: 0, id: 40502, number: 2, weight: 1 }],
@@ -198,6 +201,13 @@ const runtimeContentTables = {
 }
 
 stubModule("../src/data/db", { getDb: () => db })
+stubModule("../src/lib/mission/active-publication-owner", {
+    publishActiveMissionOwnerStateWithinTransaction: () => ({
+        activeMissionList: [],
+        activeMissions: {},
+    }),
+})
+
 stubModule("../src/data/domains/server-settings", {
     getServerGameplaySettingsSync: () => ({ dropMultiplier: 3 }),
 })
