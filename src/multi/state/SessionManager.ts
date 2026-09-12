@@ -1023,10 +1023,14 @@ export class SessionManager {
             && excludeClient.roomNumber === roomNumber
             ? this.roomClientKey(roomNumber, excludeClient.participant)
             : undefined
+        let frame: string | undefined
         for (const addr of set) {
             if (excludeAddr !== undefined && addr === excludeAddr) continue
             const c = this.clients.get(addr)
-            if (c) this.sendJson(c.socket, data)
+            if (c) {
+                frame ??= JSON.stringify(data) + "\0"
+                this.sendFrame(c.socket, frame)
+            }
         }
     }
 
