@@ -3,8 +3,8 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
-    deletePlayerEquipmentSync, getPlayerEquipmentSync, getPlayerEquipmentsByIdsSync,
-    normalizeEquipmentBatchIds, updatePlayerEquipmentSync,
+    deletePlayerEquipmentsByIdsSync, deletePlayerEquipmentSync, getPlayerEquipmentSync, getPlayerEquipmentsByIdsSync,
+    normalizeEquipmentBatchIds, updatePlayerEquipmentStacksToZeroSync, updatePlayerEquipmentSync,
 } from "../../data/domains/equipment";
 import { getSession } from "../../data/domains/session";
 import { generateDataHeaders } from "../../utils";
@@ -178,8 +178,9 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         const rewardSettlement = getDb().transaction(() => {
-            for (const equipmentId of soldIds) {
-                deletePlayerEquipmentSync(playerId, equipmentId)
+            const deleted = deletePlayerEquipmentsByIdsSync(playerId, soldIds)
+            if (deleted !== soldIds.length) {
+                throw new Error(`sell_equipment expected to remove ${soldIds.length} equipment rows, removed ${deleted}`)
             }
             return grantDissolveRewardsWithinTransactionSync(
                 playerId,
@@ -341,8 +342,9 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         const rewardSettlement = getDb().transaction(() => {
-            for (const equipmentId of toSell) {
-                updatePlayerEquipmentSync(playerId, equipmentId, { stack: 0 })
+            const dissolved = updatePlayerEquipmentStacksToZeroSync(playerId, toSell)
+            if (dissolved !== toSell.length) {
+                throw new Error(`bulk sell expected to dissolve ${toSell.length} equipment rows, updated ${dissolved}`)
             }
             return grantDissolveRewardsWithinTransactionSync(
                 playerId,
