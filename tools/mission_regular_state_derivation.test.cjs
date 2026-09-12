@@ -120,6 +120,7 @@ test("pure Regular state derivation preserves character, board, equipment and co
     assert.deepEqual(facts, {
         characterCount: 2,
         level80CharacterCount: 1,
+        maxCharacterLevel: 100,
         manaBoardNodeCount: 3,
         overLimitCount: 3,
         bondTokenCount: 1,
@@ -132,10 +133,56 @@ test("pure Regular state derivation preserves character, board, equipment and co
     })
 })
 
+test("pure Regular state derivation proves max character level from owned characters", () => {
+    const caps = require("../src/lib/character-growth/exp-caps").characterExpCaps
+    assert.deepEqual(factsWithCharacters([{ rarity: 5, exp: Number.MAX_SAFE_INTEGER }]), {
+        maxCharacterLevel: 100,
+    })
+    // rarity 5 caps: [153988, 210488, 266988, 323488, 379988] on levels 80..100
+    assert.deepEqual(factsWithCharacters([{ rarity: 5, exp: caps[5][0] }]), {
+        maxCharacterLevel: 80,
+    })
+    assert.deepEqual(factsWithCharacters([{ rarity: 5, exp: caps[5][0] - 1 }]), {
+        maxCharacterLevel: 0,
+    })
+    // rarity 1 caps start at level 40: [11416, ...]
+    assert.deepEqual(factsWithCharacters([{ rarity: 1, exp: caps[1][0] }]), {
+        maxCharacterLevel: 40,
+    })
+    assert.deepEqual(factsWithCharacters([
+        { rarity: 5, exp: caps[5][0] },
+        { rarity: 1, exp: Number.MAX_SAFE_INTEGER },
+    ]), {
+        maxCharacterLevel: 100,
+    })
+    // unknown rarity content contributes no proven level
+    assert.deepEqual(factsWithCharacters([{ rarity: undefined, exp: Number.MAX_SAFE_INTEGER }]), {
+        maxCharacterLevel: 0,
+    })
+
+    function factsWithCharacters(entries) {
+        const characters = {}
+        const characterTable = {}
+        entries.forEach((entry, index) => {
+            const id = 100000 + index
+            characters[id] = character({ exp: entry.exp })
+            if (entry.rarity !== undefined) characterTable[id] = { rarity: entry.rarity }
+        })
+        const facts = deriveRegularStateFacts({
+            characters,
+            characterTable,
+            manaBoardTable: {},
+            craftPointItemId: 700001,
+        })
+        return { maxCharacterLevel: facts.maxCharacterLevel }
+    }
+})
+
 test("pure Regular state derivation uses safe zeroes for unloaded facts", () => {
     assert.deepEqual(deriveRegularStateFacts({ craftPointItemId: 700001 }), {
         characterCount: 0,
         level80CharacterCount: 0,
+        maxCharacterLevel: 0,
         manaBoardNodeCount: 0,
         overLimitCount: 0,
         bondTokenCount: 0,

@@ -98,3 +98,32 @@ test("Category 1 settlement uses Session context and stops reading it before com
     assert.equal(computeCalls > 0, true)
     assert.equal(readsAfterComputeStarted, 0)
 })
+
+test("mission 9 computes from owned character levels while mission 22 keeps player rank", () => {
+    function categoryContext({ playerRankDegree, maxCharacterLevel }) {
+        return {
+            category: 1,
+            missionPatterns: new Map([[9, "character_level"], [22, "user_rank"]]),
+            battleCounters: {},
+            player: {},
+            regularStats: {
+                degreeBattleStats: {},
+                state: { maxCharacterLevel },
+            },
+            ...(playerRankDegree === undefined ? {} : { playerRankDegree }),
+        }
+    }
+
+    // high player Rank, low best character level: mission 9 must not borrow Rank
+    const rankHigh = categoryContext({ playerRankDegree: 100, maxCharacterLevel: 60 })
+    assert.equal(RegularComputer.compute(9, rankHigh, 0), 60)
+    assert.equal(RegularComputer.compute(22, rankHigh, 0), 100)
+
+    // low player Rank, high best character level: mission 9 follows the character level
+    const levelHigh = categoryContext({ playerRankDegree: 10, maxCharacterLevel: 100 })
+    assert.equal(RegularComputer.compute(9, levelHigh, 0), 100)
+    assert.equal(RegularComputer.compute(22, levelHigh, 0), 10)
+
+    // proven level cannot lower persisted progress, same as every other pattern
+    assert.equal(RegularComputer.compute(9, rankHigh, 70), 70)
+})

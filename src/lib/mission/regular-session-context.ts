@@ -123,7 +123,7 @@ export function buildRegularCategoryContextFromSession(
         return pattern === undefined ? [] : [[missionId, pattern] as const]
     }))
     const needsPlayerRank = [...missionPatterns.values()].some(pattern =>
-        pattern === "user_rank" || pattern === "character_level")
+        pattern === "user_rank")
     const playerRankDegree = needsPlayerRank
         ? parsePlayerRankContent(
             getMissionCatalogContentTable(session.catalog, "cdndata/player_rank_full.json"),

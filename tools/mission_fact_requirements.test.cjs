@@ -183,6 +183,8 @@ test("covers every authoritative Regular computed mission with exact fact domain
 
     assert.deepEqual(unsupportedMissionIds, [])
     assert.deepEqual(factIds(registry.getRequirement(1, 5)), ["degreeBattleStats"])
+    assert.deepEqual(factIds(registry.getRequirement(1, 9)), ["characters"])
+    assert.deepEqual(factIds(registry.getRequirement(1, 22)), ["player"])
     for (const missionId of [...Array.from({ length: 14 }, (_, index) => index + 42), 93]) {
         const requirement = registry.getRequirement(1, missionId)
         assert.equal(requirement.mode, "computed", `Regular ${missionId}`)

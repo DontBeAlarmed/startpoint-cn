@@ -52,7 +52,7 @@ function computeLifetime(pattern: string, ctx: CategoryContext, dbProgress: numb
     if (pattern === "multi_play_host") return Math.max(dbProgress, counters.multiHostClearCount)
     if (pattern === "multi_play_guest") return Math.max(dbProgress, counters.multiGuestClearCount)
     if (pattern === "use_skill") return Math.max(dbProgress, counters.skillUseCount)
-    if (pattern === "character_level") return Math.max(dbProgress, ctx.playerRankDegree ?? dbProgress)
+    if (pattern === "character_level") return Math.max(dbProgress, state.maxCharacterLevel)
     if (pattern === "clear_episode") return Math.max(dbProgress, ctx.totalStories)
     if (pattern === "weak_point_attack") return Math.max(dbProgress, battleStats.weakPointAttackCount)
     if (pattern === "max_skill_chain") return Math.max(dbProgress, battleStats.skillChainMax)

@@ -31,7 +31,7 @@ const REGULAR_FACTS: Readonly<Record<string, readonly FactKey[]>> = Object.freez
     single_battle_play: [{ kind: "missionBattleCounters" }],
     use_power_flip: [{ kind: "player" }],
     use_skill: [{ kind: "missionBattleCounters" }],
-    character_level: [{ kind: "player" }],
+    character_level: [{ kind: "characters" }],
     user_rank: [{ kind: "player" }],
     clear_episode: [{ kind: "questProgress", sections: [3] }],
     total_login: [{ kind: "player" }],
