@@ -245,7 +245,10 @@ test("box gacha exec rolls flushed Inventory and rewards back on late drawn-hist
     const itemWrites = measured.statements.filter(sql => (
         /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql)
     ))
-    assert.equal(itemWrites.length, 2, itemWrites.join("\n---\n"))
+    // The Inventory flush batches both items into one multi-row upsert.
+    assert.equal(itemWrites.length, 1, itemWrites.join("\n---\n"))
+    assert.match(itemWrites[0], /\(10002(?:\.0+)?,/)
+    assert.match(itemWrites[0], /\(999001(?:\.0+)?,/)
     const historyWriteIndex = measured.statements.findIndex(sql => (
         /^\s*INSERT\s+INTO\s+players_box_gacha_drawn_rewards\b/i.test(sql)
     ))
@@ -442,15 +445,16 @@ test("featured early stop charges only the actual draw count", async () => {
         "Box reads pull currency once and direct reward Items in one stable batch",
     )
     const itemWrites = measured.statements.filter(sql => (
-        /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql)
-    ))
-    assert.equal(itemWrites.length, 2, itemWrites.join("\n---\n"))
+        /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql))
+    )
+    // One multi-row Inventory flush covers both items.
+    assert.equal(itemWrites.length, 1, itemWrites.join("\n---\n"))
     assert.equal(itemWrites.filter(sql => new RegExp(
-        `VALUES\\s*\\(${CURRENCY_ITEM_ID}(?:\\.0+)?,\\s*990(?:\\.0+)?,`,
+        `\\(${CURRENCY_ITEM_ID}(?:\\.0+)?,\\s*990(?:\\.0+)?,`,
         "i",
     ).test(sql)).length, 1)
     assert.equal(itemWrites.filter(sql => new RegExp(
-        `VALUES\\s*\\(${REWARD_ITEM_ID}(?:\\.0+)?,\\s*1(?:\\.0+)?,`,
+        `\\(${REWARD_ITEM_ID}(?:\\.0+)?,\\s*1(?:\\.0+)?,`,
         "i",
     ).test(sql)).length, 1)
     const collectedWrites = measured.statements.filter(sql => (

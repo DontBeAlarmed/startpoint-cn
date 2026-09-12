@@ -1154,9 +1154,9 @@
       },
       "behaviorSha256": "60166f8606770cc44b07e293a0365fd6269fef44ffd74c86912b1b4498ce0dbd",
       "sql": {
-        "statements": 117,
+        "statements": 111,
         "selectStatements": 59,
-        "writeStatements": 50,
+        "writeStatements": 44,
         "transactionStatements": 8,
         "byTable": {
           "players": {
@@ -1220,9 +1220,9 @@
             "writes": 0
           },
           "players_collected_items": {
-            "statements": 7,
+            "statements": 4,
             "reads": 1,
-            "writes": 6
+            "writes": 3
           },
           "players_degree_battle_stats": {
             "statements": 2,
@@ -1240,9 +1240,9 @@
             "writes": 0
           },
           "players_items": {
-            "statements": 9,
+            "statements": 6,
             "reads": 3,
-            "writes": 6
+            "writes": 3
           },
           "players_mails": {
             "statements": 1,
@@ -1430,9 +1430,9 @@
       },
       "behaviorSha256": "ece93a5759d57939832dd018021034f586638e6c14584eb71c241c6f4ff00a9e",
       "sql": {
-        "statements": 105,
+        "statements": 99,
         "selectStatements": 48,
-        "writeStatements": 49,
+        "writeStatements": 43,
         "transactionStatements": 8,
         "byTable": {
           "players": {
@@ -1491,9 +1491,9 @@
             "writes": 0
           },
           "players_collected_items": {
-            "statements": 7,
+            "statements": 4,
             "reads": 1,
-            "writes": 6
+            "writes": 3
           },
           "players_degree_battle_stats": {
             "statements": 2,
@@ -1511,9 +1511,9 @@
             "writes": 0
           },
           "players_items": {
-            "statements": 9,
+            "statements": 6,
             "reads": 3,
-            "writes": 6
+            "writes": 3
           },
           "players_mission_battle_counters": {
             "statements": 2,
