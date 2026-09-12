@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { MailType, RawPlayerMail, deleteExpiredPlayerMailsSync, deletePlayerMailsByIdsSync, getPlayerMailCountSync, getPlayerMailSync, getPlayerMailsByIdsSync, getPlayerMailsSync, isPlayerMailExpiredAt, receiveMailSync } from "../../data/domains/mail"
+import { MailType, RawPlayerMail, deleteExpiredPlayerMailsSync, deletePlayerMailsByIdsSync, getPlayerMailCountSync, getPlayerMailSync, getPlayerMailsByIdsSync, getPlayerMailsSync, isPlayerMailExpiredAt, markPlayerMailsReceivedSync, receiveMailSync } from "../../data/domains/mail"
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -77,21 +77,19 @@ function finalizeMailReceiveAwakePublicationWrites(
 function finalizeMailReceiveAllAwakePublicationWrites(
     playerId: number,
     validMailIds: readonly number[],
-    mailMap: ReadonlyMap<number, RawPlayerMail>,
 ): number[] {
-    const claimed: number[] = []
-    for (const mailId of validMailIds) {
-        if (receiveMailSync(playerId, mailId, mailMap.get(mailId)) !== null) {
-            claimed.push(mailId)
-            if (deletePlayerMailsByIdsSync(playerId, [mailId]) !== 1) {
-                throw new Error(`Mail ${mailId} could not be removed after receipt.`)
-            }
-        }
-    }
-    if (claimed.length !== validMailIds.length) {
+    if (validMailIds.length === 0) return []
+    // Only settled (claimed) ids reach here. Per-mail mark-then-delete collapses
+    // to mark-all-then-delete-all inside the same transaction; each mail is still
+    // marked received before it is removed.
+    const marked = markPlayerMailsReceivedSync(playerId, validMailIds)
+    if (marked !== validMailIds.length) {
         throw new Error("Mail state changed while mails were being received.")
     }
-    return claimed
+    if (deletePlayerMailsByIdsSync(playerId, validMailIds) !== validMailIds.length) {
+        throw new Error("Mail state changed while mails were being received.")
+    }
+    return [...validMailIds]
 }
 
 function formatMailResponse(mail: RawPlayerMail) {
@@ -362,7 +360,6 @@ const routes = async (fastify: FastifyInstance) => {
                 const finalized = finalizeMailReceiveAllAwakePublicationWrites(
                     playerId,
                     claimed,
-                    mailMap,
                 )
                 if (finalized.length !== claimed.length) {
                     throw new Error("Mail state changed while mails were being received.")

@@ -512,8 +512,8 @@ test("receive_all reads one owner reward snapshot plus one bounded Awake player 
     )
     assert.equal(
         measured.statements.filter(statement => /^\s*DELETE\s+FROM\s+players_mails\b/i.test(statement)).length,
-        3,
-        measured.statements.join("\n---\n"),
+        1,
+        "receive_all finalize deletes all claimed mails in one batched DELETE",
     )
 })
 

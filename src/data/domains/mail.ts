@@ -233,6 +233,25 @@ export function receiveAllMailsSync(
 }
 
 /**
+ * Batch-marks unreceived mails as received; returns the number of rows marked.
+ * Same per-row guard as receiveMailSync's UPDATE (owner + still unreceived).
+ */
+export function markPlayerMailsReceivedSync(
+    playerId: number,
+    mailIds: readonly number[],
+): number {
+    const ids = [...new Set(mailIds)]
+    if (ids.length === 0) return 0
+    const now = getRealNow().toISOString().replace('T', ' ').substring(0, 19)
+    const placeholders = ids.map(() => "?").join(", ")
+    return getDb().prepare(
+        `UPDATE players_mails
+        SET receive_time = ?
+        WHERE player_id = ? AND receive_time = '0000-00-00 00:00:00' AND id IN (${placeholders})`,
+    ).run(now, playerId, ...ids).changes
+}
+
+/**
  * Deletes all mail for a player (admin recovery: clear mailbox).
  * @returns number of mail rows deleted.
  */
