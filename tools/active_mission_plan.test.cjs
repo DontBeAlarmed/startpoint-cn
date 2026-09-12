@@ -204,7 +204,7 @@ const expectedFactKinds = new Map([
     [16, ["battleCounters"]], [17, ["battleCounters"]], [21, ["characters"]], [23, []],
     [26, ["battleCounters"]], [34, ["equipment"]], [35, ["party"]], [36, ["equipment"]],
     [39, ["player"]], [45, ["shopPurchases"]], [46, ["counters"]], [48, ["manaNodes"]],
-    [57, []], [58, ["counters"]], [59, ["counters"]], [60, ["counters"]],
+    [57, ["questProgress"]], [58, ["counters"]], [59, ["counters"]], [60, ["counters"]],
     [61, ["characters"]], [62, ["manaNodes"]], [63, ["counters"]], [64, ["shopPurchases"]],
     [65, ["counters"]], [66, []], [71, ["conditionalBattleFacts"]],
     [72, ["conditionalBattleFacts"]], [73, ["conditionalBattleFacts"]], [78, ["counters"]],

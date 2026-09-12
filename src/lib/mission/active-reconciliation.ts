@@ -48,42 +48,53 @@ export interface ActiveMissionReconciliationResult {
 export function reconcileActiveMissionFactsWithResult(
     input: ReconcileActiveMissionFactsInput,
 ): ActiveMissionReconciliationResult {
-    return getDb().transaction(() => {
-        const player = input.playerOverride ?? getPlayerSync(input.playerId)
-        if (!player) {
-            throw new Error(`Player ${input.playerId} does not exist.`)
-        }
-        const plan = getActiveMissionPlan()
-        const session = createActiveMissionFactSession({
-            playerId: input.playerId,
-            plan,
-            observer: input.observer,
-            domains: createProductionActiveMissionFactDomains(player),
-        })
-        const result = runActiveMissionReconciliation({
-            playerId: input.playerId,
-            now: input.now,
-            observer: input.observer,
-            isEventEligible: input.isEventEligible,
-            plan,
-            session,
-            updateMission: (missionId, progress) => {
-                updatePlayerActiveMissionSync(input.playerId, missionId, progress)
-            },
-            updateStage: (missionId, stage) => {
-                updatePlayerActiveMissionStageSync(
-                    input.playerId,
-                    stage,
-                    missionId,
-                    false,
-                )
-            },
-        })
-        return {
-            deltas: result.deltas,
-            activeMissions: result.activeMissions as ReturnType<typeof getPlayerActiveMissionsSync>,
-        }
-    })()
+    return getDb().transaction(() => (
+        reconcileActiveMissionFactsWithinTransaction(input)
+    ))()
+}
+
+/**
+ * In-transaction reconciliation core. The caller owns the transaction: this
+ * runs after the caller's authoritative writes and throws on failure so the
+ * business transaction rolls back together with the fixed point.
+ */
+export function reconcileActiveMissionFactsWithinTransaction(
+    input: ReconcileActiveMissionFactsInput,
+): ActiveMissionReconciliationResult {
+    const player = input.playerOverride ?? getPlayerSync(input.playerId)
+    if (!player) {
+        throw new Error(`Player ${input.playerId} does not exist.`)
+    }
+    const plan = getActiveMissionPlan()
+    const session = createActiveMissionFactSession({
+        playerId: input.playerId,
+        plan,
+        observer: input.observer,
+        domains: createProductionActiveMissionFactDomains(player),
+    })
+    const result = runActiveMissionReconciliation({
+        playerId: input.playerId,
+        now: input.now,
+        observer: input.observer,
+        isEventEligible: input.isEventEligible,
+        plan,
+        session,
+        updateMission: (missionId, progress) => {
+            updatePlayerActiveMissionSync(input.playerId, missionId, progress)
+        },
+        updateStage: (missionId, stage) => {
+            updatePlayerActiveMissionStageSync(
+                input.playerId,
+                stage,
+                missionId,
+                false,
+            )
+        },
+    })
+    return {
+        deltas: result.deltas,
+        activeMissions: result.activeMissions as ReturnType<typeof getPlayerActiveMissionsSync>,
+    }
 }
 
 export function reconcileActiveMissionFacts(

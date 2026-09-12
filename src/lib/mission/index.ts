@@ -75,6 +75,13 @@ export {
     reconcileActiveMissionFactsWithResult,
     resolveActiveMissionQuestIds,
 } from "./active-reconciliation"
+export {
+    publishActiveMissionOwnerStateWithinTransaction,
+} from "./active-publication-owner"
+export type {
+    ActiveMissionOwnerPublicationInput,
+    ActiveMissionOwnerPublicationResult,
+} from "./active-publication-owner"
 
 // Character queries
 export { getCharacterStoryQuestIds, getCharacterIdFromMission } from "./character-queries"

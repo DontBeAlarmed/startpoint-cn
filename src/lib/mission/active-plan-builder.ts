@@ -61,6 +61,9 @@ function factKindsForPattern(
         case 26:
             add("battleCounters")
             break
+        case 57:
+            add("questProgress")
+            break
         case 34:
         case 36:
             add("equipment")
