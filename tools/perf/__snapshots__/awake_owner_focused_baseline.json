@@ -1216,18 +1216,33 @@
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 49,
-      "sqlWrites": 28,
+      "sqlReads": 58,
+      "sqlWrites": 33,
       "sqlByTable": {
         "players": {
-          "reads": 9,
-          "statements": 15,
+          "reads": 10,
+          "statements": 16,
           "writes": 6
         },
         "players_active_mission_battle_facts": {
           "reads": 0,
           "statements": 1,
           "writes": 1
+        },
+        "players_active_mission_counters": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_active_missions": {
+          "reads": 1,
+          "statements": 4,
+          "writes": 3
+        },
+        "players_active_missions_stages": {
+          "reads": 1,
+          "statements": 3,
+          "writes": 2
         },
         "players_active_quests": {
           "reads": 1,
@@ -1255,18 +1270,18 @@
           "writes": 2
         },
         "players_characters": {
-          "reads": 4,
-          "statements": 5,
+          "reads": 5,
+          "statements": 6,
           "writes": 1
         },
         "players_characters_bond_tokens": {
-          "reads": 4,
-          "statements": 4,
+          "reads": 5,
+          "statements": 5,
           "writes": 0
         },
         "players_characters_mana_nodes": {
-          "reads": 5,
-          "statements": 5,
+          "reads": 6,
+          "statements": 6,
           "writes": 0
         },
         "players_collected_items": {
@@ -1285,8 +1300,8 @@
           "writes": 1
         },
         "players_equipment": {
-          "reads": 1,
-          "statements": 1,
+          "reads": 2,
+          "statements": 2,
           "writes": 0
         },
         "players_items": {
@@ -1315,8 +1330,8 @@
           "writes": 0
         },
         "players_quest_progress": {
-          "reads": 5,
-          "statements": 7,
+          "reads": 6,
+          "statements": 8,
           "writes": 2
         },
         "server_gameplay_settings": {
@@ -2087,13 +2102,28 @@
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 18,
-      "sqlWrites": 3,
+      "sqlReads": 27,
+      "sqlWrites": 8,
       "sqlByTable": {
         "players": {
-          "reads": 4,
-          "statements": 5,
+          "reads": 5,
+          "statements": 6,
           "writes": 1
+        },
+        "players_active_mission_counters": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_active_missions": {
+          "reads": 1,
+          "statements": 4,
+          "writes": 3
+        },
+        "players_active_missions_stages": {
+          "reads": 1,
+          "statements": 3,
+          "writes": 2
         },
         "players_category_mission_stages": {
           "reads": 1,
@@ -2111,18 +2141,23 @@
           "writes": 1
         },
         "players_characters": {
+          "reads": 4,
+          "statements": 4,
+          "writes": 0
+        },
+        "players_characters_bond_tokens": {
+          "reads": 4,
+          "statements": 5,
+          "writes": 1
+        },
+        "players_characters_mana_nodes": {
           "reads": 3,
           "statements": 3,
           "writes": 0
         },
-        "players_characters_bond_tokens": {
-          "reads": 3,
-          "statements": 4,
-          "writes": 1
-        },
-        "players_characters_mana_nodes": {
-          "reads": 2,
-          "statements": 2,
+        "players_equipment": {
+          "reads": 1,
+          "statements": 1,
           "writes": 0
         },
         "players_mails": {
@@ -2131,8 +2166,8 @@
           "writes": 0
         },
         "players_quest_progress": {
-          "reads": 1,
-          "statements": 1,
+          "reads": 2,
+          "statements": 2,
           "writes": 0
         },
         "sessions": {
@@ -2358,18 +2393,28 @@
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 24,
-      "sqlWrites": 6,
+      "sqlReads": 33,
+      "sqlWrites": 11,
       "sqlByTable": {
         "players": {
-          "reads": 5,
-          "statements": 6,
+          "reads": 6,
+          "statements": 7,
           "writes": 1
         },
         "players_active_mission_counters": {
-          "reads": 0,
-          "statements": 1,
+          "reads": 1,
+          "statements": 2,
           "writes": 1
+        },
+        "players_active_missions": {
+          "reads": 1,
+          "statements": 4,
+          "writes": 3
+        },
+        "players_active_missions_stages": {
+          "reads": 1,
+          "statements": 3,
+          "writes": 2
         },
         "players_category_mission_stages": {
           "reads": 1,
@@ -2392,19 +2437,24 @@
           "writes": 0
         },
         "players_characters": {
-          "reads": 4,
-          "statements": 5,
+          "reads": 5,
+          "statements": 6,
           "writes": 1
         },
         "players_characters_bond_tokens": {
+          "reads": 5,
+          "statements": 6,
+          "writes": 1
+        },
+        "players_characters_mana_nodes": {
           "reads": 4,
           "statements": 5,
           "writes": 1
         },
-        "players_characters_mana_nodes": {
-          "reads": 3,
-          "statements": 4,
-          "writes": 1
+        "players_equipment": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
         },
         "players_items": {
           "reads": 1,
@@ -2412,6 +2462,11 @@
           "writes": 1
         },
         "players_mails": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_quest_progress": {
           "reads": 1,
           "statements": 1,
           "writes": 0
@@ -2815,17 +2870,27 @@
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 11,
-      "sqlWrites": 7,
+      "sqlReads": 20,
+      "sqlWrites": 9,
       "sqlByTable": {
         "players": {
-          "reads": 2,
-          "statements": 3,
+          "reads": 3,
+          "statements": 4,
           "writes": 1
         },
         "players_active_mission_counters": {
-          "reads": 0,
-          "statements": 1,
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_active_missions": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_active_missions_stages": {
+          "reads": 1,
+          "statements": 2,
           "writes": 1
         },
         "players_character_awake_unlocks": {
@@ -2834,18 +2899,23 @@
           "writes": 0
         },
         "players_characters": {
-          "reads": 3,
-          "statements": 4,
+          "reads": 4,
+          "statements": 5,
           "writes": 1
         },
         "players_characters_bond_tokens": {
-          "reads": 1,
-          "statements": 2,
+          "reads": 2,
+          "statements": 3,
           "writes": 1
         },
         "players_characters_mana_nodes": {
-          "reads": 2,
-          "statements": 2,
+          "reads": 3,
+          "statements": 3,
+          "writes": 0
+        },
+        "players_equipment": {
+          "reads": 1,
+          "statements": 1,
           "writes": 0
         },
         "players_gacha_info": {
@@ -2862,6 +2932,11 @@
           "reads": 0,
           "statements": 1,
           "writes": 1
+        },
+        "players_quest_progress": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
         },
         "players_receive_history": {
           "reads": 0,
@@ -4419,8 +4494,8 @@
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 16,
-      "sqlWrites": 8,
+      "sqlReads": 25,
+      "sqlWrites": 10,
       "sqlByTable": {
         "json_each": {
           "reads": 2,
@@ -4428,8 +4503,23 @@
           "writes": 0
         },
         "players": {
-          "reads": 3,
-          "statements": 4,
+          "reads": 4,
+          "statements": 5,
+          "writes": 1
+        },
+        "players_active_mission_counters": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_active_missions": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_active_missions_stages": {
+          "reads": 1,
+          "statements": 2,
           "writes": 1
         },
         "players_category_mission_stages": {
@@ -4453,18 +4543,23 @@
           "writes": 0
         },
         "players_characters": {
-          "reads": 3,
-          "statements": 4,
+          "reads": 4,
+          "statements": 5,
           "writes": 1
         },
         "players_characters_bond_tokens": {
-          "reads": 1,
-          "statements": 3,
+          "reads": 2,
+          "statements": 4,
           "writes": 2
         },
         "players_characters_mana_nodes": {
-          "reads": 2,
-          "statements": 2,
+          "reads": 3,
+          "statements": 3,
+          "writes": 0
+        },
+        "players_equipment": {
+          "reads": 1,
+          "statements": 1,
           "writes": 0
         },
         "players_mails": {
@@ -4476,6 +4571,11 @@
           "reads": 0,
           "statements": 1,
           "writes": 1
+        },
+        "players_quest_progress": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
         },
         "players_shop_purchase_counters": {
           "reads": 1,
@@ -4655,8 +4755,8 @@
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 17,
-      "sqlWrites": 15,
+      "sqlReads": 26,
+      "sqlWrites": 17,
       "sqlByTable": {
         "json_each": {
           "reads": 2,
@@ -4664,8 +4764,23 @@
           "writes": 0
         },
         "players": {
-          "reads": 3,
-          "statements": 4,
+          "reads": 4,
+          "statements": 5,
+          "writes": 1
+        },
+        "players_active_mission_counters": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
+        },
+        "players_active_missions": {
+          "reads": 1,
+          "statements": 2,
+          "writes": 1
+        },
+        "players_active_missions_stages": {
+          "reads": 1,
+          "statements": 2,
           "writes": 1
         },
         "players_category_mission_stages": {
@@ -4689,18 +4804,23 @@
           "writes": 0
         },
         "players_characters": {
-          "reads": 5,
-          "statements": 7,
+          "reads": 6,
+          "statements": 8,
           "writes": 2
         },
         "players_characters_bond_tokens": {
-          "reads": 1,
-          "statements": 5,
+          "reads": 2,
+          "statements": 6,
           "writes": 4
         },
         "players_characters_mana_nodes": {
-          "reads": 2,
-          "statements": 2,
+          "reads": 3,
+          "statements": 3,
+          "writes": 0
+        },
+        "players_equipment": {
+          "reads": 1,
+          "statements": 1,
           "writes": 0
         },
         "players_mails": {
@@ -4712,6 +4832,11 @@
           "reads": 0,
           "statements": 2,
           "writes": 2
+        },
+        "players_quest_progress": {
+          "reads": 1,
+          "statements": 1,
+          "writes": 0
         },
         "players_shop_purchase_counters": {
           "reads": 1,

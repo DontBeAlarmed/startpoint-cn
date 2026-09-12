@@ -306,10 +306,6 @@
             }
           ],
           "items": {
-            "13": 10,
-            "14": 5,
-            "15": 3,
-            "16": 1,
             "910001": 2,
             "910002": 3
           },
@@ -352,7 +348,7 @@
             {
               "category": 1,
               "id": 9,
-              "progress": 1
+              "progress": 60
             },
             {
               "category": 1,
@@ -636,6 +632,42 @@
             },
             {
               "category": 1,
+              "mission_id": 9,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 9,
+              "stage": 2,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 9,
+              "stage": 3,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 9,
+              "stage": 4,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 9,
+              "stage": 5,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 9,
+              "stage": 6,
+              "status": 1
+            },
+            {
+              "category": 1,
               "mission_id": 34,
               "stage": 1,
               "status": 1
@@ -699,37 +731,13 @@
               "mission_id": 43,
               "stage": 1,
               "status": 1
-            },
-            {
-              "category": 9,
-              "mission_id": 3410051,
-              "stage": 1,
-              "status": 1
-            },
-            {
-              "category": 9,
-              "mission_id": 3410052,
-              "stage": 1,
-              "status": 1
-            },
-            {
-              "category": 9,
-              "mission_id": 3410053,
-              "stage": 1,
-              "status": 1
-            },
-            {
-              "category": 9,
-              "mission_id": 3410054,
-              "stage": 1,
-              "status": 1
             }
           ],
           "player": {
             "degreeId": 15020,
             "expPool": 26,
             "freeMana": 2031,
-            "freeVmoney": 300,
+            "freeVmoney": 360,
             "maxComboAchieved": 30,
             "partySlot": 1,
             "rankPoint": 3,
@@ -761,28 +769,7 @@
               "number": 3
             }
           ],
-          "awake": [
-            {
-              "mission_category_id": 9,
-              "mission_id": 3410051,
-              "mission_reward_id": 34100511
-            },
-            {
-              "mission_category_id": 9,
-              "mission_id": 3410052,
-              "mission_reward_id": 34100521
-            },
-            {
-              "mission_category_id": 9,
-              "mission_id": 3410053,
-              "mission_reward_id": 34100531
-            },
-            {
-              "mission_category_id": 9,
-              "mission_id": 3410054,
-              "mission_reward_id": 34100541
-            }
-          ],
+          "awake": [],
           "firstClear": [
             {
               "count": 15,
@@ -805,6 +792,36 @@
               "mission_category_id": 1,
               "mission_id": 1,
               "mission_reward_id": 1003
+            },
+            {
+              "mission_category_id": 1,
+              "mission_id": 9,
+              "mission_reward_id": 9001
+            },
+            {
+              "mission_category_id": 1,
+              "mission_id": 9,
+              "mission_reward_id": 9002
+            },
+            {
+              "mission_category_id": 1,
+              "mission_id": 9,
+              "mission_reward_id": 9003
+            },
+            {
+              "mission_category_id": 1,
+              "mission_id": 9,
+              "mission_reward_id": 9004
+            },
+            {
+              "mission_category_id": 1,
+              "mission_id": 9,
+              "mission_reward_id": 9005
+            },
+            {
+              "mission_category_id": 1,
+              "mission_id": 9,
+              "mission_reward_id": 9006
             },
             {
               "mission_category_id": 1,
@@ -874,7 +891,7 @@
             "currency": {
               "expPool": 26,
               "freeMana": 2031,
-              "freeVmoney": 300
+              "freeVmoney": 360
             },
             "rewards": {
               "converted_pool_exp": 0,
@@ -1012,10 +1029,6 @@
             "equipment_list": [],
             "is_multi": "single",
             "item_list": {
-              "13": 10,
-              "14": 5,
-              "15": 3,
-              "16": 1,
               "910001": 2,
               "910002": 3
             },
@@ -1036,6 +1049,36 @@
                 "mission_category_id": 1,
                 "mission_id": 1,
                 "mission_reward_id": 1003
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 9,
+                "mission_reward_id": 9001
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 9,
+                "mission_reward_id": 9002
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 9,
+                "mission_reward_id": 9003
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 9,
+                "mission_reward_id": 9004
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 9,
+                "mission_reward_id": 9005
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 9,
+                "mission_reward_id": 9006
               },
               {
                 "mission_category_id": 1,
@@ -1091,26 +1134,6 @@
                 "mission_category_id": 8,
                 "mission_id": 43,
                 "mission_reward_id": 43001
-              },
-              {
-                "mission_category_id": 9,
-                "mission_id": 3410051,
-                "mission_reward_id": 34100511
-              },
-              {
-                "mission_category_id": 9,
-                "mission_id": 3410052,
-                "mission_reward_id": 34100521
-              },
-              {
-                "mission_category_id": 9,
-                "mission_id": 3410053,
-                "mission_reward_id": 34100531
-              },
-              {
-                "mission_category_id": 9,
-                "mission_id": 3410054,
-                "mission_reward_id": 34100541
               }
             ],
             "old_high_score": 0,
@@ -1135,7 +1158,7 @@
               "exp_pool": 26,
               "exp_pooled_time": "fixture-pool-time",
               "free_mana": 2031,
-              "free_vmoney": 300,
+              "free_vmoney": 360,
               "rank_point": 3,
               "stamina": 100,
               "stamina_heal_time": "matches-database-virtual-time"
@@ -1152,12 +1175,12 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "60166f8606770cc44b07e293a0365fd6269fef44ffd74c86912b1b4498ce0dbd",
+      "behaviorSha256": "2d37010066ea4c126a531ad91fdd31c8ee748ce21a62e6a59d0474421abc866f",
       "sql": {
-        "statements": 111,
-        "selectStatements": 59,
-        "writeStatements": 44,
-        "transactionStatements": 8,
+        "statements": 102,
+        "selectStatements": 58,
+        "writeStatements": 38,
+        "transactionStatements": 6,
         "byTable": {
           "players": {
             "statements": 14,
@@ -1185,9 +1208,9 @@
             "writes": 1
           },
           "players_category_mission_stages": {
-            "statements": 8,
+            "statements": 4,
             "reads": 3,
-            "writes": 5
+            "writes": 1
           },
           "players_category_missions": {
             "statements": 9,
@@ -1220,9 +1243,9 @@
             "writes": 0
           },
           "players_collected_items": {
-            "statements": 4,
+            "statements": 3,
             "reads": 1,
-            "writes": 3
+            "writes": 2
           },
           "players_degree_battle_stats": {
             "statements": 2,
@@ -1240,9 +1263,9 @@
             "writes": 0
           },
           "players_items": {
-            "statements": 6,
-            "reads": 3,
-            "writes": 3
+            "statements": 4,
+            "reads": 2,
+            "writes": 2
           },
           "players_mails": {
             "statements": 1,
@@ -1430,10 +1453,10 @@
       },
       "behaviorSha256": "ece93a5759d57939832dd018021034f586638e6c14584eb71c241c6f4ff00a9e",
       "sql": {
-        "statements": 99,
-        "selectStatements": 48,
-        "writeStatements": 43,
-        "transactionStatements": 8,
+        "statements": 90,
+        "selectStatements": 47,
+        "writeStatements": 37,
+        "transactionStatements": 6,
         "byTable": {
           "players": {
             "statements": 13,
@@ -1461,9 +1484,9 @@
             "writes": 1
           },
           "players_category_mission_stages": {
-            "statements": 7,
+            "statements": 3,
             "reads": 2,
-            "writes": 5
+            "writes": 1
           },
           "players_category_missions": {
             "statements": 8,
@@ -1491,9 +1514,9 @@
             "writes": 0
           },
           "players_collected_items": {
-            "statements": 4,
+            "statements": 3,
             "reads": 1,
-            "writes": 3
+            "writes": 2
           },
           "players_degree_battle_stats": {
             "statements": 2,
@@ -1511,9 +1534,9 @@
             "writes": 0
           },
           "players_items": {
-            "statements": 6,
-            "reads": 3,
-            "writes": 3
+            "statements": 4,
+            "reads": 2,
+            "writes": 2
           },
           "players_mission_battle_counters": {
             "statements": 2,
@@ -1608,11 +1631,6 @@
               "category": 1,
               "id": 8,
               "progress": 5
-            },
-            {
-              "category": 1,
-              "id": 9,
-              "progress": 2
             },
             {
               "category": 1,
@@ -2135,12 +2153,12 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "7119d703719536544a456203d74027cf0c1ab32e82b4007ee55993d47c430a2e",
+      "behaviorSha256": "06c71db1402b897d3e241a6e51933f4b363cf3994f2d8e9f45de007037d3cc8a",
       "sql": {
-        "statements": 96,
+        "statements": 94,
         "selectStatements": 57,
         "writeStatements": 29,
-        "transactionStatements": 10,
+        "transactionStatements": 8,
         "byTable": {
           "players": {
             "statements": 13,
@@ -2312,10 +2330,6 @@
             "useBossBoostPoint": false
           },
           "items": {
-            "13": 10,
-            "14": 5,
-            "15": 3,
-            "16": 1,
             "910001": 2,
             "910002": 3
           },
@@ -2374,7 +2388,7 @@
             {
               "category": 1,
               "id": 9,
-              "progress": 1
+              "progress": 60
             },
             {
               "category": 1,
@@ -2658,6 +2672,42 @@
             },
             {
               "category": 1,
+              "mission_id": 9,
+              "stage": 1,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 9,
+              "stage": 2,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 9,
+              "stage": 3,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 9,
+              "stage": 4,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 9,
+              "stage": 5,
+              "status": 1
+            },
+            {
+              "category": 1,
+              "mission_id": 9,
+              "stage": 6,
+              "status": 1
+            },
+            {
+              "category": 1,
               "mission_id": 34,
               "stage": 1,
               "status": 1
@@ -2721,37 +2771,13 @@
               "mission_id": 43,
               "stage": 1,
               "status": 1
-            },
-            {
-              "category": 9,
-              "mission_id": 3410051,
-              "stage": 1,
-              "status": 1
-            },
-            {
-              "category": 9,
-              "mission_id": 3410052,
-              "stage": 1,
-              "status": 1
-            },
-            {
-              "category": 9,
-              "mission_id": 3410053,
-              "stage": 1,
-              "status": 1
-            },
-            {
-              "category": 9,
-              "mission_id": 3410054,
-              "stage": 1,
-              "status": 1
             }
           ],
           "player": {
             "degreeId": 15020,
             "expPool": 26,
             "freeMana": 2031,
-            "freeVmoney": 300,
+            "freeVmoney": 360,
             "maxComboAchieved": 30,
             "partySlot": 1,
             "rankPoint": 3,
@@ -2794,10 +2820,6 @@
               }
             ],
             "items": {
-              "13": 10,
-              "14": 5,
-              "15": 3,
-              "16": 1,
               "910001": 2,
               "910002": 3
             },
@@ -2840,7 +2862,7 @@
               {
                 "category": 1,
                 "id": 9,
-                "progress": 1
+                "progress": 60
               },
               {
                 "category": 1,
@@ -3124,6 +3146,42 @@
               },
               {
                 "category": 1,
+                "mission_id": 9,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 9,
+                "stage": 2,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 9,
+                "stage": 3,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 9,
+                "stage": 4,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 9,
+                "stage": 5,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 9,
+                "stage": 6,
+                "status": 1
+              },
+              {
+                "category": 1,
                 "mission_id": 34,
                 "stage": 1,
                 "status": 1
@@ -3187,37 +3245,13 @@
                 "mission_id": 43,
                 "stage": 1,
                 "status": 1
-              },
-              {
-                "category": 9,
-                "mission_id": 3410051,
-                "stage": 1,
-                "status": 1
-              },
-              {
-                "category": 9,
-                "mission_id": 3410052,
-                "stage": 1,
-                "status": 1
-              },
-              {
-                "category": 9,
-                "mission_id": 3410053,
-                "stage": 1,
-                "status": 1
-              },
-              {
-                "category": 9,
-                "mission_id": 3410054,
-                "stage": 1,
-                "status": 1
               }
             ],
             "player": {
               "degreeId": 15020,
               "expPool": 26,
               "freeMana": 2031,
-              "freeVmoney": 300,
+              "freeVmoney": 360,
               "maxComboAchieved": 30,
               "partySlot": 1,
               "rankPoint": 3,
@@ -3246,28 +3280,7 @@
                 "number": 3
               }
             ],
-            "awake": [
-              {
-                "mission_category_id": 9,
-                "mission_id": 3410051,
-                "mission_reward_id": 34100511
-              },
-              {
-                "mission_category_id": 9,
-                "mission_id": 3410052,
-                "mission_reward_id": 34100521
-              },
-              {
-                "mission_category_id": 9,
-                "mission_id": 3410053,
-                "mission_reward_id": 34100531
-              },
-              {
-                "mission_category_id": 9,
-                "mission_id": 3410054,
-                "mission_reward_id": 34100541
-              }
-            ],
+            "awake": [],
             "firstClear": [
               {
                 "count": 15,
@@ -3290,6 +3303,36 @@
                 "mission_category_id": 1,
                 "mission_id": 1,
                 "mission_reward_id": 1003
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 9,
+                "mission_reward_id": 9001
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 9,
+                "mission_reward_id": 9002
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 9,
+                "mission_reward_id": 9003
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 9,
+                "mission_reward_id": 9004
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 9,
+                "mission_reward_id": 9005
+              },
+              {
+                "mission_category_id": 1,
+                "mission_id": 9,
+                "mission_reward_id": 9006
               },
               {
                 "mission_category_id": 1,
@@ -3359,7 +3402,7 @@
               "currency": {
                 "expPool": 26,
                 "freeMana": 2031,
-                "freeVmoney": 300
+                "freeVmoney": 360
               },
               "rewards": {
                 "converted_pool_exp": 0,
@@ -3407,10 +3450,6 @@
               }
             ],
             "items": {
-              "13": 10,
-              "14": 5,
-              "15": 3,
-              "16": 1,
               "910001": 4,
               "910002": 6
             },
@@ -3453,7 +3492,7 @@
               {
                 "category": 1,
                 "id": 9,
-                "progress": 1
+                "progress": 60
               },
               {
                 "category": 1,
@@ -3754,6 +3793,42 @@
               },
               {
                 "category": 1,
+                "mission_id": 9,
+                "stage": 1,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 9,
+                "stage": 2,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 9,
+                "stage": 3,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 9,
+                "stage": 4,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 9,
+                "stage": 5,
+                "status": 1
+              },
+              {
+                "category": 1,
+                "mission_id": 9,
+                "stage": 6,
+                "status": 1
+              },
+              {
+                "category": 1,
                 "mission_id": 34,
                 "stage": 1,
                 "status": 1
@@ -3829,37 +3904,13 @@
                 "mission_id": 43,
                 "stage": 1,
                 "status": 1
-              },
-              {
-                "category": 9,
-                "mission_id": 3410051,
-                "stage": 1,
-                "status": 1
-              },
-              {
-                "category": 9,
-                "mission_id": 3410052,
-                "stage": 1,
-                "status": 1
-              },
-              {
-                "category": 9,
-                "mission_id": 3410053,
-                "stage": 1,
-                "status": 1
-              },
-              {
-                "category": 9,
-                "mission_id": 3410054,
-                "stage": 1,
-                "status": 1
               }
             ],
             "player": {
               "degreeId": 15020,
               "expPool": 52,
               "freeMana": 3562,
-              "freeVmoney": 310,
+              "freeVmoney": 370,
               "maxComboAchieved": 30,
               "partySlot": 1,
               "rankPoint": 6,
@@ -3927,7 +3978,7 @@
               "currency": {
                 "expPool": 52,
                 "freeMana": 3562,
-                "freeVmoney": 310
+                "freeVmoney": 370
               },
               "rewards": {
                 "converted_pool_exp": 0,
@@ -4065,7 +4116,7 @@
                 "exp_pool": 52,
                 "exp_pooled_time": "fixture-pool-time",
                 "free_mana": 3562,
-                "free_vmoney": 310,
+                "free_vmoney": 370,
                 "rank_point": 6,
                 "stamina": 100,
                 "stamina_heal_time": "matches-database-virtual-time"
@@ -4083,12 +4134,12 @@
           }
         }
       },
-      "behaviorSha256": "30d01dd204d200c66b0fb6f09522ed9605c571548e1c0437e27f14083ab42254",
+      "behaviorSha256": "6f4773883c19cfa0f6ca794bdd7e0ea8f4ca4545449e32b422fd698066be12ef",
       "sql": {
-        "statements": 90,
+        "statements": 88,
         "selectStatements": 57,
         "writeStatements": 25,
-        "transactionStatements": 8,
+        "transactionStatements": 6,
         "byTable": {
           "players": {
             "statements": 11,
@@ -4321,11 +4372,6 @@
           "missionProgress": [
             {
               "category": 1,
-              "id": 9,
-              "progress": 1
-            },
-            {
-              "category": 1,
               "id": 22,
               "progress": 1
             },
@@ -4419,7 +4465,7 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "751564e37beef18c55a2c4fb7f456dbd752e6fb0897f5879f4c63b5d6316931d",
+      "behaviorSha256": "780876a269295578a244231867470034253544eda341a2e25f90060a5d4b1438",
       "sql": {
         "statements": 25,
         "selectStatements": 18,
