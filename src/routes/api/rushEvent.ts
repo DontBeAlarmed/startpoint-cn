@@ -133,7 +133,6 @@ const routes = async (fastify: FastifyInstance) => {
 
         const viewerId = body.viewer_id
         const eventId = body.event_id
-        console.log(`[RUSH] summary: viewer=${viewerId} eventId=${eventId}`)
         if (isNaN(viewerId) || isNaN(eventId)) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
@@ -164,7 +163,6 @@ const routes = async (fastify: FastifyInstance) => {
 
         // get serialized parties
         const serializedPlayedParties = getSerializedPlayerRushEventPlayedPartiesSync(playerId, eventId)
-        console.log(`[RUSH] summary: folderParties=${Object.keys(serializedPlayedParties.folderParties ?? {}).length} endlessParties=${Object.keys(serializedPlayedParties.endlessParties ?? {}).length}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -193,7 +191,6 @@ const routes = async (fastify: FastifyInstance) => {
         const viewerId = body.viewer_id
         const eventId = body.event_id
         const folderId = body.folder_id
-        console.log(`[RUSH] select_folder: viewer=${viewerId} eventId=${eventId} folderId=${folderId}`)
         if (isNaN(viewerId) || isNaN(eventId) || isNaN(folderId)) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
@@ -353,7 +350,6 @@ const routes = async (fastify: FastifyInstance) => {
         const isAutoStartMode = body.is_auto_start_mode
         const partyId = body.party_id
         const questId = body.quest_id
-        console.log(`[RUSH] battle/start: viewer=${viewerId} questId=${questId} partyId=${partyId} autoStart=${isAutoStartMode}`)
         if (isNaN(viewerId) || isNaN(partyId) || isNaN(questId)
             || typeof isAutoStartMode !== "boolean") return reply.status(400).send({
             "error": "Bad Request",
@@ -450,7 +446,6 @@ const routes = async (fastify: FastifyInstance) => {
         }
         const questKey = `${QuestCategory.RUSH_EVENT}_${questId}`
         const staminaInfo = getStaminaCost(questKey)
-        console.log(`[RUSH] start entry: questId=${questId} questKey=${questKey} discountRate=${staminaInfo.rate} baseStamina=${staminaInfo.baseCost}→${staminaInfo.cost}`)
         try {
             runStartEntryTransaction({
                 playerId,
@@ -483,7 +478,7 @@ const routes = async (fastify: FastifyInstance) => {
                 || error instanceof InsufficientEntryItemError
                 || error instanceof InsufficientStaminaError
                 || error instanceof PlayerNotFoundError) {
-                console.warn(`[RUSH-START] player ${playerId}: ${error.message}`)
+                console.warn(`[RUSH-START] start rejected: ${error.message}`)
                 if (error instanceof InsufficientStaminaError
                     && shouldStopAutoStartForStamina(isAutoStartMode, true)) {
                     reply.header("content-type", "application/x-msgpack")
@@ -537,7 +532,6 @@ const routes = async (fastify: FastifyInstance) => {
         const questType: ResetQuestType = body.quest_type
         const resetTargetId: number | undefined = body.reset_target_id
         const isResetAfterTargetRound: boolean | undefined = body.is_reset_after_target_round
-        console.log(`[RUSH] reset: viewer=${viewerId} eventId=${eventId} questType=${questType} resetTargetId=${resetTargetId} isResetAfterTarget=${isResetAfterTargetRound}`)
         if (!Number.isSafeInteger(viewerId) || viewerId <= 0
             || !Number.isSafeInteger(eventId) || eventId <= 0
             || (questType !== ResetQuestType.FOLDER && questType !== ResetQuestType.ENDLESS)
@@ -657,7 +651,6 @@ const routes = async (fastify: FastifyInstance) => {
         const body = request.body as { event_id: number, viewer_id: number, api_count: number };
         const viewerId = body.viewer_id;
         const eventId = body.event_id;
-        console.log(`[RUSH] reward: viewer=${viewerId} eventId=${eventId}`)
         if (!viewerId || isNaN(viewerId) || isNaN(eventId)) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         });
@@ -690,8 +683,6 @@ const routes = async (fastify: FastifyInstance) => {
             }
         }
 
-        console.log(`[RUSH] reward: rank=${rankNumber} rewards=${rewardList.length}`)
-
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
@@ -714,7 +705,6 @@ const routes = async (fastify: FastifyInstance) => {
         const body = request.body as { event_id: number, viewer_id: number, api_count: number };
         const viewerId = body.viewer_id;
         const eventId = body.event_id;
-        console.log(`[RUSH] endless_battle: viewer=${viewerId} eventId=${eventId}`)
         if (!viewerId || isNaN(viewerId) || isNaN(eventId)) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         });
@@ -735,8 +725,6 @@ const routes = async (fastify: FastifyInstance) => {
             : { endlessParties: null, folderParties: null }
         const maxRound = rushEventData?.endlessBattleMaxRound ?? null
         const nextRound = rushEventData?.endlessBattleNextRound ?? 1
-
-        console.log(`[RUSH] endless_battle: maxRound=${maxRound} nextRound=${nextRound}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

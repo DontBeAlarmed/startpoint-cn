@@ -121,12 +121,6 @@ interface PlayContinueBody {
     statistics: QuestStatistics
 }
 
-function summarizeItemList(itemList: Record<string, number>): string {
-    const entries = Object.entries(itemList)
-    if (entries.length === 0) return "none"
-    return entries.map(([itemId, amount]) => `${itemId}:${amount}`).join(",")
-}
-
 const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteOptions = {}) => {
     const dailyResetHour = options.dailyResetHour ?? 5
     const challengePointMap = getEventChallengePointMap()
@@ -206,19 +200,6 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
             category,
         })
         const resolvedIdentity = abortResult.resolvedIdentity
-        const observedActiveQuest = abortResult.observedActiveQuest
-        console.log([
-            "[SINGLE_ABORT]",
-            `player=${playerId}`,
-            `viewer=${viewerId}`,
-            `missing_play=${playId === null}`,
-            `missing_quest=${questId === null}`,
-            `missing_category=${category === null}`,
-            `active=${observedActiveQuest ? `${observedActiveQuest.category}_${observedActiveQuest.questId}` : "none"}`,
-            `resolved=${resolvedIdentity.category}_${resolvedIdentity.questId}`,
-            `cancelled=${abortResult.cancelled}`,
-            `refund=${summarizeItemList(abortResult.itemList)}`,
-        ].join(" "))
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -317,7 +298,6 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
         const questKey = `${category}_${questId}`
         const entryCost = getQuestEntryCostByKey(questKey)
         const staminaInfo = getStaminaCost(questKey)
-        console.log(`[BATTLE] start entry: questId=${questId} questKey=${questKey} entryCost=${JSON.stringify(entryCost)} discountRate=${staminaInfo.rate} baseStamina=${staminaInfo.baseCost}→${staminaInfo.cost}`)
         const staminaCost = staminaInfo.cost
         const challengePointId = getDailyChallengePointId(
             category,
@@ -389,7 +369,7 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
                 || error instanceof PlayerNotFoundError
                 || error instanceof DailyChallengePointExhaustedError
                 || error instanceof DailyChallengePointUnavailableError) {
-                console.warn(`[BATTLE-START] player ${playerId}: ${error.message}`)
+                console.warn(`[BATTLE-START] start rejected: ${error.message}`)
                 if (error instanceof InsufficientStaminaError
                     && shouldStopAutoStartForStamina(isAutoStartMode, true)) {
                     reply.header("content-type", "application/x-msgpack")
@@ -408,7 +388,6 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
             }
             throw error
         }
-        console.log(`[BATTLE-START] stamina: ${startResult.beforeStamina} -> ${startResult.afterStamina} (cost: ${staminaCost}, rate: ${staminaInfo.rate})`)
 
         const dataHeaders = generateDataHeaders({
             viewer_id: viewerId

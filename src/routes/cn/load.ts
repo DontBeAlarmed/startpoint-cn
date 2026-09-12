@@ -410,7 +410,6 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             if (clientData === null) throw new Error("No player data.");
 
             const resVer = request.headers['res_ver'] as string | undefined;
-            console.log(`[CN-LOAD] res_ver=${resVer || '(not sent)'} account=${accountId} player=${playerId} party_slot=${clientData?.user_info?.party_slot}`);
             const snapshotTargetVersion = assetProvider.mode === "client-owned"
                 ? ""
                 : contentSnapshot.cdn.targetVersion;

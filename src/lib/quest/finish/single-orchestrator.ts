@@ -69,14 +69,12 @@ export function settleSingleBattleQuest({
     body: ValidatedSingleFinishBody
     dailyResetHour?: number
 }): SingleFinishResult {
-    console.log(`[FINISH] req: playerId=${playerId} questId=${body.quest_id} category=${body.category} activeExists=${memoryActiveQuest !== undefined} multi=${memoryActiveQuest?.isMulti ?? false}`)
     if (memoryActiveQuest === undefined) {
         return failure(400, "Bad Request", "No active quest to finish.")
     }
 
     const questCategory = memoryActiveQuest.category
     const questId = memoryActiveQuest.questId
-    console.log(`[FINISH] active: category=${questCategory} questId=${questId}`)
     let questData: BattleQuest | null
     try {
         questData = getQuestFromCategorySync(questCategory, questId)

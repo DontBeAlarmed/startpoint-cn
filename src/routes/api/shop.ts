@@ -81,8 +81,6 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
             "message": "No players bound to account."
         })
 
-        console.log(`[shop:req] viewer=${viewerId} types=${JSON.stringify(shopTypes)} bossCats=${JSON.stringify(bossCoinShopCategoryIds)} equipCats=${JSON.stringify(equipmentEnhancementCategoryIds)} events=${eventList.length} eventList=${JSON.stringify(eventList)}`)
-
         const toParseShopItems = selectShopSalesCatalogItems(getShopCatalog(), {
             shopTypes,
             eventList: eventList.map(event => ({
@@ -120,13 +118,6 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
         if (filteredGeneralCount > 0) {
             console.log(`[shop] Filtered ${filteredGeneralCount} general shop items not in CDN master data`)
         }
-
-        const salesByType: Record<number, number> = {}
-        for (const item of salesList) {
-            const t = (item as any).shop_type
-            salesByType[t] = (salesByType[t] || 0) + 1
-        }
-        console.log(`[shop:res] totalSales=${salesList.length} byType=${JSON.stringify(salesByType)} toParseItems=${JSON.stringify(Object.fromEntries(Object.entries(toParseShopItems).map(([k,v]) => [k, Object.keys(v).length])))}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -173,7 +164,6 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
 
         // Already at max
         if (currentStamina >= maxOverflow) {
-            console.log(`[RECOVER-STAMINA] player ${playerId} already at max (${currentStamina} >= ${maxOverflow})`)
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId, result_code: 2102 }),
@@ -187,7 +177,7 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
             recoveryCost,
         )
         if (deduction === null) {
-            console.warn(`[RECOVER-STAMINA] player ${playerId} insufficient vmoney: free=${player.freeVmoney} paid=${player.vmoney} cost=${recoveryCost}`)
+            console.warn(`[RECOVER-STAMINA] insufficient vmoney: free=${player.freeVmoney} paid=${player.vmoney} cost=${recoveryCost}`)
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId, result_code: 0 }),
@@ -207,8 +197,6 @@ const routes = async (fastify: FastifyInstance, options: ShopRoutesOptions = {})
             freeVmoney: deduction.freeBalance,
             vmoney: deduction.paidBalance,
         })
-
-        console.log(`[RECOVER-STAMINA] player ${playerId}: stamina ${currentStamina}->${afterStamina} (+${actualRecovery}), freeVmoney ${player.freeVmoney}->${deduction.freeBalance}, vmoney ${player.vmoney}->${deduction.paidBalance}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

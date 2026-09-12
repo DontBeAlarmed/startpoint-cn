@@ -137,7 +137,6 @@ export function executeSingleSettlementWrites(
         ? grantDirectRewards(playerId, [questData.clearReward]) : null
     const sPlusClearReward = !isScoreAttackEvent && rewardEligibility.sPlus && questData.sPlusReward !== undefined
         ? grantDirectRewards(playerId, [questData.sPlusReward]) : null
-    if (didLevelUp) console.log(`[BATTLE-FINISH] player ${playerId} leveled up: ${oldDegreeId} -> ${newDegreeId}, stamina refilled`)
 
     const dailyChallengePointList = entryResourceResult.kind === "committed"
         ? entryResourceResult.dailyChallengePointList : null
@@ -150,7 +149,6 @@ export function executeSingleSettlementWrites(
     const gameplaySettings = questAccomplished || eventDescriptor.kind === "rush"
         ? getServerGameplaySettingsSync()
         : null
-    console.log(`[BATTLE] scoreReward groupId=${questData.scoreRewardGroupId} groupLen=${questData.scoreRewardGroup?.length ?? "null"} questId=${questId} category=${questCategory}`)
     const scoreRewardSelection = questAccomplished
         ? selectScoreRewardGrantPlan(
             questData.scoreRewardGroupId, questData.scoreRewardGroup, useBoostPoint, questData.element, {

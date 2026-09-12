@@ -108,7 +108,6 @@ const routes = async (fastify: FastifyInstance) => {
         }
         const clearedFolderIdList = getPlayerRushEventClearedFoldersSync(playerId, eventId)
         const serializedPlayedParties = getSerializedPlayerRushEventPlayedPartiesSync(playerId, eventId)
-        console.log(`[RAID] summary: folderParties=${Object.keys(serializedPlayedParties.folderParties ?? {}).length} endlessParties=${Object.keys(serializedPlayedParties.endlessParties ?? {}).length}`)
 
         const summary = getDb().transaction(() => {
             let missionSettlement: MissionSettlementResult | null = null
@@ -336,12 +335,6 @@ const routes = async (fastify: FastifyInstance) => {
             "party_list": partyList
         }]
 
-        const partyDump = userPartyGroupList.map(g => ({
-            gid: g.party_group_id,
-            parties: g.party_list.map(p => ({ pid: p.party_id, chars: p.character_ids, unisons: p.unison_character_ids }))
-        }))
-        console.log(`[RAID] party: response=${JSON.stringify(partyDump)}`)
-
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
@@ -360,7 +353,6 @@ const routes = async (fastify: FastifyInstance) => {
             viewer_id: number, api_count: number
         };
         const viewerId = body.viewer_id;
-        console.log(`[RAID] battle/start body: questId=${body.quest_id} eventId=${body.event_id} partyGroup=${body.party_group_id}`)
         if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         });
