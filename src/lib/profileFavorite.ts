@@ -52,6 +52,7 @@ function firstParty(groups: Record<string, PlayerPartyGroup>): FavoritePartySele
 export function getFavoritePartySelectionSync(
     playerId: number,
     fallbackLeaderCharacterId: number,
+    normalGroupsOverride?: Record<string, PlayerPartyGroup>,
 ): FavoritePartySelection {
     const favorite = firstParty(getPlayerPartyGroupListSync(
         playerId,
@@ -59,7 +60,7 @@ export function getFavoritePartySelectionSync(
     ))
     if (favorite) return favorite
 
-    const normal = firstParty(getPlayerPartyGroupListSync(playerId, PartyCategory.NORMAL))
+    const normal = firstParty(normalGroupsOverride ?? getPlayerPartyGroupListSync(playerId, PartyCategory.NORMAL))
     if (normal) return normal
 
     return {
@@ -78,6 +79,7 @@ export function getFavoritePartySelectionSync(
 export function getFavoritePartyGroupListSync(
     playerId: number,
     fallbackLeaderCharacterId: number,
+    normalGroupsOverride?: Record<string, PlayerPartyGroup>,
 ): any[] {
     const favoriteGroups = getPlayerPartyGroupListSync(
         playerId,
@@ -115,7 +117,7 @@ export function getFavoritePartyGroupListSync(
 
     if (serialized.length > 0) return serialized
 
-    const fallback = getFavoritePartySelectionSync(playerId, fallbackLeaderCharacterId)
+    const fallback = getFavoritePartySelectionSync(playerId, fallbackLeaderCharacterId, normalGroupsOverride)
     return [{
         party_group_color_id: 15,
         party_group_id: 1,

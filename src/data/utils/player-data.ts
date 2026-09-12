@@ -32,6 +32,8 @@ export { getDefaultPlayerData } from "./default-player"
 export interface GetClientSerializedDataOptions extends SerializePlayerDataOptions {
     readonly activeMissionsOverride?: ReturnType<typeof getPlayerActiveMissionsSync>
     readonly playerOverride?: NonNullable<ReturnType<typeof getPlayerSync>>
+    /** Normal-category party groups when the caller already read them this request. */
+    readonly partyGroupListOverride?: ReturnType<typeof getPlayerPartyGroupListSync>
 }
 
 function restoreActiveMissionPayloadShape(
@@ -98,7 +100,7 @@ export function getClientSerializedData(
         characterManaNodeList: awakeEligibility.manaNodes,
         characterManaNodeAwakeLevels: nodeAwakeLevels,
         manaBoardAwakeMap,
-        partyGroupList: getPlayerPartyGroupListSync(playerId),
+        partyGroupList: options.partyGroupListOverride ?? getPlayerPartyGroupListSync(playerId),
         itemList: getPlayerItemsSync(playerId),
         equipmentList: getPlayerEquipmentListSync(playerId),
         questProgress: getPlayerQuestProgressSync(playerId),

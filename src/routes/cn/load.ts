@@ -9,6 +9,7 @@ import {
     updatePlayerActiveQuestEntryItemCountSync,
 } from "../../data/domains/quest_active"
 import { getSession } from "../../data/domains/session"
+import { getPlayerPartyGroupListSync } from "../../data/domains/party"
 import { getDb } from "../../data/db"
 import { getClientSerializedData } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -242,7 +243,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
         collectPlayerDataPooledExpSync(player);
 
         // Run save validators (permanent fixes: max_level, etc.)
-        const validatorFixes = runPermanentValidators(playerId);
+        const validatorFixes = runPermanentValidators(playerId, player);
         if (validatorFixes > 0) {
             const refreshedPlayer = getPlayerSync(playerId);
             if (refreshedPlayer === null) {
@@ -304,6 +305,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
 
         const gachaPointConversion = settleExpiredGachaPointsOnLoadSync({
             playerId,
+            player,
             nowMs: now.getTime(),
             maxStarCrumb: currencyPolicy.maxStarCrumb,
         });
@@ -381,8 +383,13 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
 
         const activeMissionReconciliation = reconcileActiveMissionFactsWithResult({
             playerId,
+            playerOverride: player,
             now: getServerTime() * 1000,
         });
+
+        // The response projects the same normal-category party groups twice
+        // (serialization + profile-favorite fallback); read them once here.
+        const normalPartyGroups = getPlayerPartyGroupListSync(playerId);
 
         const responsePayload = (() => {
             const clientData = getClientSerializedData(playerId, {
@@ -390,6 +397,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                 summonComSeconds: options.summonComSeconds,
                 activeMissionsOverride: activeMissionReconciliation.activeMissions,
                 playerOverride: player,
+                partyGroupListOverride: normalPartyGroups,
             }) as any;
             if (clientData === null) throw new Error("No player data.");
 
@@ -409,6 +417,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             clientData.favorite_party_group_list = getFavoritePartyGroupListSync(
                 playerId,
                 player.leaderCharacterId,
+                normalPartyGroups,
             );
             if (loginBonusSettlement.status === "none") {
                 clientData.bonus_index_list = [];

@@ -7,6 +7,7 @@ import {
 } from "../../data/domains/gacha-lifecycle-state"
 import { getPlayerGachaInfoListSync, updatePlayerGachaInfoSync } from "../../data/domains/gacha"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
+import type { Player } from "../../data/types"
 import { insertStarCrumbOverflowMailWithinTransactionSync } from "../mail-overflow"
 import { withDeferredInventoryBatchContextWithinTransactionSync } from "../inventory"
 import { getGachaCatalog } from "../gacha-catalog"
@@ -31,6 +32,8 @@ export function settleExpiredGachaPointsOnLoadSync(input: {
     readonly playerId: number
     readonly nowMs: number
     readonly maxStarCrumb: number
+    /** Current player row when the caller already holds it (same synchronous request). */
+    readonly player?: Player
 }): GachaPointConversionSettlement {
     if (!Number.isSafeInteger(input.playerId) || input.playerId <= 0
         || !Number.isSafeInteger(input.nowMs) || input.nowMs < 0
@@ -38,7 +41,7 @@ export function settleExpiredGachaPointsOnLoadSync(input: {
         throw new TypeError("Gacha conversion input is invalid")
     }
     return getDb().transaction(() => {
-        const player = getPlayerSync(input.playerId)
+        const player = input.player ?? getPlayerSync(input.playerId)
         if (player === null) throw new Error("Gacha conversion player disappeared")
         const infos = getPlayerGachaInfoListSync(input.playerId).filter(info => (
             Number.isSafeInteger(info.gachaExchangePoint) && (info.gachaExchangePoint ?? 0) > 0

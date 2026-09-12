@@ -36,6 +36,8 @@ export interface ReconcileActiveMissionFactsInput {
     readonly now: number | Date
     readonly observer?: ActiveMissionFactObserver
     readonly isEventEligible?: (context: ActiveMissionEventEligibilityContext) => boolean
+    /** Current player row when the caller already holds it (same synchronous request). */
+    readonly playerOverride?: NonNullable<ReturnType<typeof getPlayerSync>>
 }
 
 export interface ActiveMissionReconciliationResult {
@@ -47,7 +49,7 @@ export function reconcileActiveMissionFactsWithResult(
     input: ReconcileActiveMissionFactsInput,
 ): ActiveMissionReconciliationResult {
     return getDb().transaction(() => {
-        const player = getPlayerSync(input.playerId)
+        const player = input.playerOverride ?? getPlayerSync(input.playerId)
         if (!player) {
             throw new Error(`Player ${input.playerId} does not exist.`)
         }
