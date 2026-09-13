@@ -109,7 +109,13 @@ function getSourceAccountId(currentViewerId: string | null, deviceId: number): n
     `).get(deviceId) as { account_id: number } | undefined
     if (session && session.type !== SessionType.VIEWER) return null
     if (session && binding && session.accountId !== binding.account_id) return null
-    return session?.accountId ?? binding?.account_id ?? null
+    // The device binding is the only server-side anchor for "the account that
+    // lives on the requesting device": the official client derives viewer_id
+    // and device_id from the same local store, so a viewer session alone (e.g.
+    // a leaked viewer_id paired with an unbound device id) must never resolve
+    // to that account as a transfer source — an unbound device simply has no
+    // device-local source to abolish.
+    return binding?.account_id ?? null
 }
 
 function transferAccount(
