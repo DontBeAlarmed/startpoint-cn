@@ -881,16 +881,30 @@ export function buildQuestPrerequisites(
         }
         questsByNode.set(tableName, tableNodes)
     }
-    const mainNodes = questsByNode.get("main_quest.json")!
+    const mainNodes = questsByNode.get("main_quest.json")
+    if (mainNodes === undefined) {
+        invalidQuest("main_quest.json", "main quest tree is required to derive stage-node prerequisites")
+    }
     for (const tableName of ["main_quest.json", "ex_quest.json"] as const) {
         const questTree = questTrees[tableName]
         const stageNodeTree = stageNodeTrees[tableName]
         const tableNodes = questsByNode.get(tableName)
         if (!questTree || !stageNodeTree || !tableNodes) continue
         for (const row of collectRows(tableName, stageNodeTree, 2)) {
+            // Official rows carry 7 (main) or 9 (ex) columns; the four we read
+            // are multipliedId, name, needChapter, needNode. Short rows must be
+            // rejected, not silently treated as "no prerequisites".
+            requireColumns(tableName, row.fields, 4)
             const [multipliedId, , needChapter, needNode] = row.fields
             parsePositiveIntegerRowField(tableName, multipliedId, "multiplied id")
-            if (isMissing(needChapter) || needChapter === "(None)") continue
+            if (isMissing(needChapter)) {
+                if (!isMissing(needNode)) {
+                    invalidQuest(tableName, "need node must also be missing when need chapter is missing")
+                }
+                continue
+            }
+            parsePositiveIntegerRowField(tableName, needChapter, "need chapter")
+            parsePositiveIntegerRowField(tableName, needNode, "need node")
             const needKey = `${needChapter}:${needNode}`
             const prerequisiteQuestIds = tableNodes.get(needKey) ?? mainNodes.get(needKey)
             if (prerequisiteQuestIds === undefined) {
@@ -901,10 +915,13 @@ export function buildQuestPrerequisites(
                 if (prerequisiteQuestIds.includes(questId)) {
                     invalidQuest(tableName, `quest ${questId} depends on its own node`)
                 }
-                const category = QUEST_DERIVATION_LAYOUTS[tableName].category
+                const outputKey = `${QUEST_DERIVATION_LAYOUTS[tableName].category}_${questId}`
+                if (output[outputKey] !== undefined) {
+                    invalidQuest(tableName, `duplicate prerequisite quest: ${questId}`)
+                }
                 const prerequisiteTableName = tableNodes.get(needKey) !== undefined
                     ? tableName : "main_quest.json"
-                output[`${category}_${questId}`] = Object.freeze(
+                output[outputKey] = Object.freeze(
                     prerequisiteQuestIds.map(prerequisiteId => Object.freeze({
                         category: QUEST_DERIVATION_LAYOUTS[prerequisiteTableName].category,
                         questId: prerequisiteId,
@@ -921,11 +938,10 @@ function parsePositiveIntegerRowField(
     value: string,
     field: string,
 ): number {
-    const parsed = Number(value)
-    if (!Number.isSafeInteger(parsed) || parsed <= 0) {
-        invalidQuest(tableName, `${field} must be a positive integer`)
+    if (!/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value))) {
+        invalidQuest(tableName, `${field} must be a canonical positive integer: ${value}`)
     }
-    return parsed
+    return Number(value)
 }
 
 export function buildQuestLookup(

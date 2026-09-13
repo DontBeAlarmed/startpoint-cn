@@ -10,6 +10,7 @@ const {
     buildEventChallengePointMap,
     buildQuestEntryCosts,
     buildQuestLookup,
+    buildQuestPrerequisites,
     buildQuestUnlockCosts,
     convertQuestTree,
     QUEST_AUXILIARY_SOURCES,
@@ -544,6 +545,67 @@ test("quest derived tables use authoritative categories, costs and names", () =>
         "18_5001": "一次解锁",
         "26_3001": "歼灭者",
     })
+})
+
+test("quest prerequisites derive stage-node chains and reject malformed stage rows", () => {
+    const questTrees = {
+        "main_quest.json": { 1: { 1: { 1: [["1001001"]] }, 2: { 1: [["1002001"]] } } },
+        "ex_quest.json": { 1: { 2: { 1: [["41001001"]] } } },
+    }
+    const stageNodeTrees = {
+        "main_quest.json": {
+            1: {
+                1: [["1001", "第1关", "(None)", "", "0", "", ""]],
+                2: [["1002", "第2关", "1", "1", "0", "", ""]],
+            },
+        },
+        "ex_quest.json": { 1: { 2: [["1002", "EX第2关", "1", "1", "(None)", "", "0", "", ""]] } },
+    }
+    assert.deepEqual(buildQuestPrerequisites(questTrees, stageNodeTrees), {
+        "1_1002001": [{ category: 1, questId: 1001001 }],
+        "4_41001001": [{ category: 1, questId: 1001001 }],
+    })
+    assert.equal(Object.isFrozen(buildQuestPrerequisites(questTrees, stageNodeTrees)), true)
+
+    // Truncated stage rows must not silently become "no prerequisites".
+    assert.throws(() => buildQuestPrerequisites(questTrees, {
+        "main_quest.json": { 1: { 2: [["1002", "第2关"]] } },
+    }), /at least 4 columns/i)
+
+    // A missing need chapter must not be paired with a present need node.
+    assert.throws(() => buildQuestPrerequisites(questTrees, {
+        "main_quest.json": { 1: { 2: [["1002", "第2关", "(None)", "1"]] } },
+    }), /need node must also be missing/i)
+
+    // Non-canonical integers are rejected, not coerced by Number().
+    assert.throws(() => buildQuestPrerequisites(questTrees, {
+        "main_quest.json": { 1: { 2: [["1002.0", "第2关", "1", "1"]] } },
+    }), /multiplied id must be a canonical positive integer/i)
+    assert.throws(() => buildQuestPrerequisites(questTrees, {
+        "main_quest.json": { 1: { 2: [["1002", "第2关", "1", "1.0"]] } },
+    }), /need node must be a canonical positive integer/i)
+    assert.throws(() => buildQuestPrerequisites({
+        "main_quest.json": { 1: { 2: { 1: [[" 1002001"]] } } },
+    }, stageNodeTrees), /quest id must be a canonical positive integer/i)
+
+    // A quest mapped by two stage nodes is a duplicate, not an overwrite.
+    assert.throws(() => buildQuestPrerequisites({
+        "main_quest.json": { 1: { 1: { 1: [["1001001"]] }, 2: { 1: [["1002001"]] }, 3: { 1: [["1002001"]] } } },
+    }, {
+        "main_quest.json": {
+            1: {
+                2: [["1002", "第2关", "1", "1"]],
+                3: [["1003", "第3关", "1", "1"]],
+            },
+        },
+    }), /duplicate prerequisite quest/i)
+
+    // The ex fallback needs the main quest tree; deriving without it must fail.
+    assert.throws(() => buildQuestPrerequisites({
+        "ex_quest.json": questTrees["ex_quest.json"],
+    }, {
+        "ex_quest.json": stageNodeTrees["ex_quest.json"],
+    }), /main quest tree is required/i)
 })
 
 test("challenge point derivatives come from their authoritative master rows", () => {
