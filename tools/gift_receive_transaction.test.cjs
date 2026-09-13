@@ -106,7 +106,7 @@ test("redeems the exact active code atomically with a fixed-key snapshot and his
     const playerId = createPlayer("exact")
     const before = state(playerId)
     const result = receiveGiftCodeSync(playerId, gift.code)
-    assert.deepEqual(result, { resultCode: 0, rewards: expectedProjection })
+    assert.deepEqual(result, { resultCode: 1, rewards: expectedProjection })
 
     const saved = redemption(gift.id, playerId)
     assert.equal(saved.reward_revision, gift.rewardRevision)
@@ -132,8 +132,8 @@ test("exact lookups separate players and reject stopped definitions", () => {
     const shared = createActiveGift("transaction-shared")
     const first = createPlayer("shared-first")
     const second = createPlayer("shared-second")
-    assert.equal(receiveGiftCodeSync(first, shared.code).resultCode, 0)
-    assert.equal(receiveGiftCodeSync(second, shared.code).resultCode, 0)
+    assert.equal(receiveGiftCodeSync(first, shared.code).resultCode, 1)
+    assert.equal(receiveGiftCodeSync(second, shared.code).resultCode, 1)
 
     const stopped = createActiveGift("transaction-stopped")
     stopGiftSync(stopped.id, stopped.revision)
@@ -182,7 +182,7 @@ test("concurrent requests grant the shared reward exactly once", async t => {
         assert.equal(response.statusCode, 200, response.body)
         return unpack(Buffer.from(response.body, "base64")).data.result_code
     })
-    assert.deepEqual(resultCodes.sort(), [0, 6104])
+    assert.deepEqual(resultCodes.sort(), [1, 6104])
     assert.equal(getPlayerItemSync(playerId, 1), 3)
     assert.equal(redemption(gift.id, playerId).reward_snapshot.includes(`"number":3`), true)
 })
@@ -283,7 +283,7 @@ test("commit ordering deterministically selects stop-first rejection or receive-
 
     const receiveFirstGift = createActiveGift("receive-first")
     const receiveFirstPlayer = createPlayer("receive-first")
-    assert.equal(receiveGiftCodeSync(receiveFirstPlayer, receiveFirstGift.code).resultCode, 0)
+    assert.equal(receiveGiftCodeSync(receiveFirstPlayer, receiveFirstGift.code).resultCode, 1)
     const secondExternal = new Sqlite(liveDatabasePath)
     secondExternal.exec(`
         BEGIN IMMEDIATE;

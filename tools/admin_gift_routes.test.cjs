@@ -239,7 +239,7 @@ test("deletes stopped gifts with redemptions and allows the same code to be rede
     }))
     assert.equal(restarted.status, "active")
     paddedGift = restarted
-    assert.equal(receiveGiftCodeSync(playerOne.id, paddedGift.code).resultCode, 0)
+    assert.equal(receiveGiftCodeSync(playerOne.id, paddedGift.code).resultCode, 1)
     const withRedemption = json(await inject("GET", `/api/gifts/${paddedGift.id}`))
     assert.equal(withRedemption.redemptionCount, 1)
 
@@ -270,7 +270,7 @@ test("deletes stopped gifts with redemptions and allows the same code to be rede
     assert.equal(activatedResponse.statusCode, 200, activatedResponse.payload)
 
     const redeemedAgain = receiveGiftCodeSync(playerOne.id, paddedGift.code)
-    assert.equal(redeemedAgain.resultCode, 0)
+    assert.equal(redeemedAgain.resultCode, 1)
     assert.deepEqual(redeemedAgain.rewards, [{ ...itemReward }])
     assert.equal(json(await inject("GET", `/api/gifts/${recreated.id}`)).redemptionCount, 1)
 })
@@ -321,7 +321,7 @@ test("searches redemption records by name and exact numeric ids", async () => {
     const giftId = getDb().prepare(
         "SELECT id FROM server_gift_codes WHERE code = ?",
     ).get(paddedGift.code).id
-    assert.equal(receiveGiftCodeSync(playerTwo.id, paddedGift.code).resultCode, 0)
+    assert.equal(receiveGiftCodeSync(playerTwo.id, paddedGift.code).resultCode, 1)
     const url = (query) => `/api/gifts/${giftId}/redemptions?page=1&pageSize=50&q=${encodeURIComponent(query)}`
 
     const byPlayerId = json(await inject("GET", url(String(playerOne.id))))
@@ -445,7 +445,7 @@ test("isolates redemption pages and searches to the requested gift", async () =>
         { revision: secondCreated.revision },
     ))
     assert.equal(secondActivated.status, "active")
-    assert.equal(receiveGiftCodeSync(playerTwo.id, secondActivated.code).resultCode, 0)
+    assert.equal(receiveGiftCodeSync(playerTwo.id, secondActivated.code).resultCode, 1)
 
     const firstPage = json(await inject(
         "GET",
