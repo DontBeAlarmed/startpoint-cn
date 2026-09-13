@@ -32,6 +32,7 @@ function input(overrides = {}) {
         },
         useBoostPoint: false,
         useBossBoostPoint: false,
+        questAccomplished: true,
         fieldMana: 7,
         maxComboCount: 12,
         rewardCampaignRates: { item: 1, exp: 1.5, mana: 2 },
@@ -92,6 +93,26 @@ test("boost source affects fixed rewards and only consumes its own balance", () 
         [bossBoost.playerValues.boostPoint, bossBoost.playerValues.bossBoostPoint],
         [3, 1],
     )
+})
+
+test("a failed settlement keeps every success-only contribution at zero", () => {
+    const plan = createBattleSettlementValuePlan(input({ questAccomplished: false }))
+
+    assert.equal(plan.fixedManaReward, 0)
+    assert.equal(plan.fixedPoolExpReward, 0)
+    assert.equal(plan.characterBattleExp, 0)
+    assert.equal(plan.fieldMana, 0)
+    assert.equal(plan.manaObtained, 0)
+    assert.equal(plan.newRankPoint, plan.beforeRankPoint)
+    assert.deepEqual(plan.playerValues, {
+        freeMana: 2_000,
+        expPool: 100,
+        rankPoint: 0,
+        boostPoint: 3,
+        bossBoostPoint: 2,
+        totalManaObtained: 500,
+        maxComboAchieved: 20,
+    })
 })
 
 test("the shared plan and its nested values are immutable", () => {

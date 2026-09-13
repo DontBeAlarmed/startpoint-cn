@@ -16,7 +16,7 @@
           "1": {
             "candidates": 120,
             "computed": 107,
-            "progressChanged": 5,
+            "progressChanged": 4,
             "rewardStagesGranted": 0
           },
           "2": {
@@ -58,7 +58,7 @@
         },
         "candidates": 3557,
         "computed": 177,
-        "progressChanged": 7
+        "progressChanged": 6
       },
       "name": "new-account",
       "rewardStagesGranted": 1,
@@ -142,8 +142,8 @@
           "1": {
             "candidates": 120,
             "computed": 107,
-            "progressChanged": 18,
-            "rewardStagesGranted": 40
+            "progressChanged": 17,
+            "rewardStagesGranted": 38
           },
           "2": {
             "candidates": 656,
@@ -184,10 +184,10 @@
         },
         "candidates": 3557,
         "computed": 177,
-        "progressChanged": 28
+        "progressChanged": 27
       },
       "name": "normal-progress",
-      "rewardStagesGranted": 48,
+      "rewardStagesGranted": 46,
       "sql": {
         "byTable": {
           "players": {
@@ -222,8 +222,8 @@
           },
           "players_collected_items": {
             "reads": 1,
-            "statements": 4,
-            "writes": 3
+            "statements": 2,
+            "writes": 1
           },
           "players_degree_battle_stats": {
             "reads": 1,
@@ -237,8 +237,8 @@
           },
           "players_items": {
             "reads": 1,
-            "statements": 4,
-            "writes": 3
+            "statements": 2,
+            "writes": 1
           },
           "players_mission_battle_counters": {
             "reads": 1,
@@ -262,9 +262,9 @@
           }
         },
         "selectStatements": 20,
-        "statements": 36,
+        "statements": 32,
         "transactionStatements": 2,
-        "writeStatements": 14
+        "writeStatements": 10
       }
     },
     {
@@ -274,7 +274,7 @@
             "candidates": 120,
             "computed": 107,
             "progressChanged": 40,
-            "rewardStagesGranted": 133
+            "rewardStagesGranted": 139
           },
           "2": {
             "candidates": 656,
@@ -318,7 +318,7 @@
         "progressChanged": 55
       },
       "name": "high-completion-volume",
-      "rewardStagesGranted": 147,
+      "rewardStagesGranted": 153,
       "sql": {
         "byTable": {
           "players": {
@@ -353,8 +353,8 @@
           },
           "players_collected_items": {
             "reads": 1,
-            "statements": 4,
-            "writes": 3
+            "statements": 2,
+            "writes": 1
           },
           "players_degree_battle_stats": {
             "reads": 1,
@@ -368,8 +368,8 @@
           },
           "players_items": {
             "reads": 1,
-            "statements": 4,
-            "writes": 3
+            "statements": 2,
+            "writes": 1
           },
           "players_mission_battle_counters": {
             "reads": 1,
@@ -393,12 +393,12 @@
           }
         },
         "selectStatements": 25,
-        "statements": 47,
+        "statements": 43,
         "transactionStatements": 2,
-        "writeStatements": 20
+        "writeStatements": 16
       }
     }
   ],
   "version": 2,
-  "sha256": "8dc7a2aaf98d93b1e7285f4968bed570694ad3f39b0c5f3846c9e94fce77670d"
+  "sha256": "cd5d857fcf87d8e4a807de6218147b25cffcedb607e011cdd27cc48e305a3f7e"
 }

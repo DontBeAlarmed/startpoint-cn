@@ -614,6 +614,8 @@ test("challenge point derivatives come from their authoritative master rows", ()
         expertSingleEvent: "master/quest/event/expert_single_event.orderedmap",
         soloTimeAttackEvent: "master/quest/event/solo_time_attack_event.orderedmap",
         practiceQuest: "master/quest/practice/practice_quest.orderedmap",
+        mainStageNode: "master/quest/main_stage_node.orderedmap",
+        exStageNode: "master/quest/ex_stage_node.orderedmap",
     })
     assert.deepEqual(buildDailyChallengePointLookup({
         1: [["expert", "9999", "999", "true", "挑战次数"]],

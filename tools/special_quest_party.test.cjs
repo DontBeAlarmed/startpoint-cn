@@ -209,6 +209,7 @@ db.exec(`
         ability_soul_2 INTEGER,
         ability_soul_3 INTEGER,
         edited INTEGER NOT NULL,
+        allow_other_players_to_heal_me INTEGER NOT NULL DEFAULT 1,
         current_battle_power INTEGER NOT NULL DEFAULT 0,
         before_battle_power INTEGER NOT NULL DEFAULT 0,
         player_id INTEGER NOT NULL,

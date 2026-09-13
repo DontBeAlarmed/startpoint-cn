@@ -21,6 +21,9 @@ function repository(marker, overrides = {}) {
             "quest_unlock_costs.json": {
                 "1001": { itemIds: [60000], itemCounts: [marker] },
             },
+            // quest-entry-content fail-closed reads the derived prerequisite
+            // table alongside the cost tables; an empty one is valid.
+            "quest_prerequisites.json": {},
             "daily_challenge_point_lookup.json": {
                 "1": { maxPoint: marker, isRecovery: true, name: "challenge" },
             },
