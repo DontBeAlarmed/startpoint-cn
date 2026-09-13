@@ -4,7 +4,7 @@
  */
 import * as fs from "fs";
 import { setServerTimeOffset } from "../utils";
-import { prepareDataVolume } from "../runtime/data-paths";
+import { prepareDataVolume, resolveRuntimeDataPaths } from "../runtime/data-paths";
 import { getAccountPlayersSync } from "./domains/account";
 import { getRealNowMs } from "../runtime/time/game-time";
 
@@ -15,24 +15,67 @@ interface WebState {
     defaultPlayers: Record<number, number>;
 }
 
-function readState(): WebState {
-    const stateFile = prepareDataVolume().activeAccountFile;
-    try {
-        if (fs.existsSync(stateFile)) {
-            const raw = JSON.parse(fs.readFileSync(stateFile, "utf-8"));
-            return {
-                activePlayerId: raw.activePlayerId ?? null,
-                timeOffset: raw.timeOffset ?? null,
-                lastSetTime: raw.lastSetTime ?? null,
-                defaultPlayers: raw.defaultPlayers ?? {},
-            };
-        }
-    } catch { /* ignore corrupt file */ }
+function defaultState(): WebState {
     return { activePlayerId: null, timeOffset: null, lastSetTime: null, defaultPlayers: {} };
+}
+
+// resolvePlayerIdSync runs on every authenticated request, and each cold read
+// replays ~13 sync syscalls (directory preparation + existence probe + file
+// read + JSON.parse). Cache the parsed state per resolved state-file path and
+// revalidate with a single statSync: every in-process writer goes through
+// writeState (which drops the entry), and an external rewrite of the file
+// changes mtime/size, so the stat check keeps other processes honest. Paths
+// are the cache key, so switching DATA_DIR mid-process cannot cross-contaminate
+// volumes.
+interface CachedState {
+    readonly mtimeMs: number;
+    readonly size: number;
+    readonly state: WebState;
+}
+
+const stateCache = new Map<string, CachedState>();
+
+function parseStateFile(stateFile: string): WebState {
+    try {
+        const raw = JSON.parse(fs.readFileSync(stateFile, "utf-8"));
+        return {
+            activePlayerId: raw.activePlayerId ?? null,
+            timeOffset: raw.timeOffset ?? null,
+            lastSetTime: raw.lastSetTime ?? null,
+            defaultPlayers: raw.defaultPlayers ?? {},
+        };
+    } catch { /* ignore corrupt file */ }
+    return defaultState();
+}
+
+function readState(): WebState {
+    const stateFile = resolveRuntimeDataPaths().activeAccountFile;
+    try {
+        const stats = fs.statSync(stateFile);
+        const cached = stateCache.get(stateFile);
+        if (cached !== undefined
+            && cached.mtimeMs === stats.mtimeMs
+            && cached.size === stats.size) {
+            return cached.state;
+        }
+        const state = parseStateFile(stateFile);
+        stateCache.set(stateFile, { mtimeMs: stats.mtimeMs, size: stats.size, state });
+        return state;
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+            throw error;
+        }
+        // No state file yet: keep the historical side effect of creating the
+        // volume directories, then report the empty state.
+        stateCache.delete(stateFile);
+        prepareDataVolume();
+        return defaultState();
+    }
 }
 
 function writeState(state: WebState): void {
     const stateFile = prepareDataVolume().activeAccountFile;
+    stateCache.delete(stateFile);
     fs.writeFileSync(stateFile, JSON.stringify(state));
 }
 
