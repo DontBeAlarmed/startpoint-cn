@@ -115,3 +115,71 @@ test("load still resolves the keychain identity fallback", async () => {
     assert.notEqual(decoded.data, undefined)
     assert.ok(Object.keys(decoded.data).length > 0, "keychain load must return the player save")
 })
+
+test("load without a VIEWER session cannot read or settle an account by id", async () => {
+    const before = getDb().prepare(
+        "SELECT last_login_time FROM players WHERE id = ?",
+    ).get(playerId)
+    for (const body of [
+        // Small-integer enumeration: the account id must not be loadable as a
+        // viewer identity just because it parses as a number.
+        { viewer_id: account.id, device_id: 1, device_token: "test" },
+        { keychain: account.id, device_id: 1, device_token: "test" },
+        // An unknown viewer id without a session is not an account id either.
+        { viewer_id: 960000009, device_id: 1, device_token: "test" },
+        { keychain: 960000009, device_id: 1, device_token: "test" },
+    ]) {
+        const response = await app.inject({
+            method: "POST",
+            url: "/load",
+            headers: {
+                "content-type": "application/x-www-form-urlencoded",
+                res_ver: "1.4.54",
+            },
+            payload: encodeRequest(body),
+        })
+        assert.equal(
+            response.statusCode, 400,
+            `body ${JSON.stringify(body)}: ${String(response.body).slice(0, 160)}`,
+        )
+    }
+    const after = getDb().prepare(
+        "SELECT last_login_time FROM players WHERE id = ?",
+    ).get(playerId)
+    assert.deepEqual(after, before, "rejected loads must not trigger idempotent settlement")
+})
+
+test("load accepts the sessioned viewer id and rejects non-VIEWER sessions", async () => {
+    const sessioned = await app.inject({
+        method: "POST",
+        url: "/load",
+        headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            res_ver: "1.4.54",
+        },
+        payload: encodeRequest({
+            viewer_id: viewerId,
+            device_id: 1,
+            device_token: "test",
+        }),
+    })
+    assert.equal(sessioned.statusCode, 200, sessioned.body)
+    assert.ok(Object.keys(decodeResponse(sessioned).data).length > 0)
+
+    getDb().prepare("INSERT INTO sessions (token, account_id, expires, type) VALUES (?, ?, ?, ?)")
+        .run("960000010", account.id, new Date("2099-12-31T23:59:59.000Z").toISOString(), 3)
+    const nonViewer = await app.inject({
+        method: "POST",
+        url: "/load",
+        headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            res_ver: "1.4.54",
+        },
+        payload: encodeRequest({
+            viewer_id: 960000010,
+            device_id: 1,
+            device_token: "test",
+        }),
+    })
+    assert.equal(nonViewer.statusCode, 400, nonViewer.body)
+})

@@ -9,6 +9,7 @@ import {
     updatePlayerActiveQuestEntryItemCountSync,
 } from "../../data/domains/quest_active"
 import { getSession } from "../../data/domains/session"
+import { SessionType } from "../../data/types"
 import { getPlayerPartyGroupListSync } from "../../data/domains/party"
 import { getDb } from "../../data/db"
 import { getClientSerializedData } from "../../data/utils";
@@ -205,16 +206,24 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
     fastify.post("/load", async (request: FastifyRequest, reply: FastifyReply) => {
         try {
         const body = request.body as CnLoadBody;
-        // The official client always sends viewer_id (keychain as its local
-        // fallback); the historical `|| 1` fallback served account 1's full
-        // save to any body that carried neither, so reject it instead.
+        // The official client always calls /load with a viewer identity it
+        // obtained from /tool/signup (keychain is the same viewer id from the
+        // local store, and viewer sessions never expire). A viewer id without
+        // a VIEWER session is unknown to this server and must never be read
+        // as an account id: the historical fallbacks (`|| 1`, then
+        // `accountId = viewerId`) served account 1's — or any enumerable
+        // account's — full save and idempotent settlement to unauthenticated
+        // callers.
         const viewerId = body.viewer_id || body.keychain;
         if (!Number.isSafeInteger(viewerId) || viewerId < 1) {
             return reply.status(400).send({ error: "Bad Request", message: "Invalid viewer id." });
         }
 
         const session = await getSession(String(viewerId));
-        const accountId = session ? session.accountId : viewerId;
+        if (session === null || session.type !== SessionType.VIEWER) {
+            return reply.status(400).send({ error: "Bad Request", message: "Invalid viewer id." });
+        }
+        const accountId = session.accountId;
         const playerId = resolvePlayerIdSync(accountId);
         if (!playerId) {
             return reply.status(400).send({ error: "Bad Request", message: "No player found" });
