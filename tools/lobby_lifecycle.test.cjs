@@ -14,6 +14,7 @@ const {
     getRoom,
     isRoomMember,
     removeRoomMember,
+    setRoomDisbandListener,
     startRoomCleanup,
     stopRoomCleanup,
     updateRoomState,
@@ -35,6 +36,7 @@ const {
     resetNpcRecruitmentTiming,
 } = require("../src/multi/tcp/lobby")
 const { NpcMateProvider } = require("../src/multi/npc/controller")
+const { installDisbandLifecycleListener } = require("../src/multi/room/disband-listener")
 
 function deferred() {
     let resolve
@@ -387,6 +389,23 @@ test("a network-disconnected host is disbanded only after the reconnect grace", 
     assert.equal(handleSocketDisconnect(host.socket), true)
     assert.equal(getRoom(room.room_number), room)
     await new Promise(resolve => setTimeout(resolve, 40))
+    assert.equal(getRoom(room.room_number), undefined)
+})
+
+test("an expired host reconnect lease broadcasts dismissal only once", { concurrency: false }, async t => {
+    installDisbandLifecycleListener()
+    t.after(() => setRoomDisbandListener(null))
+    configureReconnectGraceMs(25)
+    const { room, host, guests } = createLobbyRoom(t, 507, [607])
+    const guest = guests[0]
+
+    assert.equal(handleSocketDisconnect(host.socket), true)
+    await new Promise(resolve => setTimeout(resolve, 40))
+
+    const dismissed = guest.socket.writes.filter(message => (
+        JSON.stringify(message) === JSON.stringify([1, [6, "multibattle_room_dismissed"]])
+    ))
+    assert.equal(dismissed.length, 1)
     assert.equal(getRoom(room.room_number), undefined)
 })
 

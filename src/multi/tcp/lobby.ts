@@ -97,7 +97,6 @@ function expireReconnectLease(key: string): void {
         lease.participant,
     )
     if (isHost) {
-        sessionManager.broadcastToRoom(lease.roomNumber, [1, [6, "multibattle_room_dismissed"]])
         disbandRoom(lease.roomNumber)
         return
     }

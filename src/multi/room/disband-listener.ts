@@ -4,16 +4,11 @@ import { setRoomDisbandListener } from "./manager"
 
 /**
  * Every disband path funnels through manager.disbandRoom, which invokes the
- * registered room disband listener. Interactive paths (HTTP disband, host
- * disconnect) already broadcast "multibattle_room_dismissed" before deleting
- * the room, but the cleaner paths (idle expiry, abandoned battle recycling)
- * and direct disbandRoom callers reach the choke point without any
- * client-facing teardown — clients only leave the room on the dismissed
- * message (MultiBattleRoomScene), so a silent delete leaves ghost sockets
- * bound to a recyclable room number. The listener therefore owns the
- * broadcast, the socket teardown and the abandoned active-quest release.
- * Duplicate broadcasts from interactive paths are inert: their recipients
- * are already closed or leaving.
+ * registered room disband listener. All callers rely on this choke point for
+ * the client dismissal, socket teardown and abandoned active-quest release —
+ * clients only leave the room on the dismissed message
+ * (MultiBattleRoomScene), so a silent delete leaves ghost sockets bound to a
+ * recyclable room number.
  */
 export function installDisbandLifecycleListener(): void {
     setRoomDisbandListener((roomNumber, hostPlayerId) => {
