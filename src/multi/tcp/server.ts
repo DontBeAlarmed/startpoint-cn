@@ -11,11 +11,11 @@ import {
 import { handleBattleMessage } from "./battle"
 import { sessionManager } from "../state/SessionManager"
 import {
-    setRoomDisbandListener,
     startRoomCleanup,
     stopRoomCleanup,
     type RoomCleanupOptions,
 } from "../room/manager"
+import { installDisbandLifecycleListener } from "../room/disband-listener"
 import { startLobbyLifecycle, stopLobbyLifecycle } from "./lobby-lifecycle"
 import {
     configureNpcRecruitmentTiming,
@@ -38,7 +38,6 @@ import {
     type MultiBattleTuning,
     type MultiTransportTuning,
 } from "../runtime/tuning"
-import { releaseAbandonedMultiActiveQuest } from "../../lib/quest/active-quest-service"
 import { DEFAULT_SERVER_PORTS } from "../../runtime/release-contract"
 
 export const SESSION_PORT = DEFAULT_SERVER_PORTS.tcp
@@ -717,13 +716,7 @@ export function startSessionServer(options: SessionServerOptions = {}): Promise<
         createdServer.listen(options.port ?? SESSION_PORT, options.host ?? SESSION_HOST, () => {
             if (activeContext !== context || phase !== "starting") return
             try {
-                setRoomDisbandListener((roomNumber, hostPlayerId) => {
-                    try {
-                        releaseAbandonedMultiActiveQuest(hostPlayerId, roomNumber)
-                    } catch (error) {
-                        console.error(`[MULTI] abandoned host release failed: code=${failureCode(error) ?? "UNKNOWN"}`)
-                    }
-                })
+                installDisbandLifecycleListener()
                 startRoomCleanup(options.roomCleanup)
                 configureReconnectGraceMs(options.roomCleanup?.reconnectGraceMs)
                 configureNpcRecruitmentTiming(options.npcRecruitment)
