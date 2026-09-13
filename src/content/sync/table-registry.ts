@@ -346,6 +346,7 @@ function questDerivedDefinition(
     tableName: QuestDerivedTableName,
     sourceOrderedMaps: readonly string[],
     bundledSources: readonly string[] = [],
+    converterVersion: number = 1,
 ): TableSourceInput {
     return {
         tableName,
@@ -353,8 +354,8 @@ function questDerivedDefinition(
         sourceOrderedMaps,
         bundledSources,
         converterId: "quest",
-        converterVersion: 1,
-        outputShapeVersion: 1,
+        converterVersion,
+        outputShapeVersion: converterVersion,
     }
 }
 
@@ -692,6 +693,12 @@ const definitionInputs: TableSourceInput[] = [
             QUEST_TABLE_SOURCES["main_quest.json"].logicalPath,
             QUEST_TABLE_SOURCES["ex_quest.json"].logicalPath,
         ],
+        // v2: ex rows re-derive need_main_stage_node against the main table
+        // only and start consuming the ex-internal need_stage_node pair, so
+        // releases derived by the v1 converter (both its number[] shape and
+        // its collision/ungated output) must be re-converted.
+        [],
+        2,
     ),
     ...BUNDLED_TABLE_NAMES.map(bundledDefinition),
     ...SERVER_TABLE_NAMES.map(serverDefinition),

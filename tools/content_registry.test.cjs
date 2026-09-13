@@ -590,6 +590,42 @@ test("registry derives authoritative quest tables from official OrderedMap sourc
     assert.equal(findTableSource("practice_quest.json").scope, "bundled")
 })
 
+test("quest prerequisites converter is versioned so v1 releases re-convert", () => {
+    const entry = findTableSource("quest_prerequisites.json")
+    assert.equal(entry.converterVersion, 2)
+    assert.equal(entry.outputShapeVersion, 2)
+
+    // The ex derivation semantics changed after v1 (need_main_stage_node now
+    // resolves against the main table only and the ex-internal need_stage_node
+    // pair is consumed), so a release persisted with the v1 converter must be
+    // reported as registry-stale and re-converted by content sync.
+    const { getReleaseTableRegistryError } = require("../src/content/sync/table-contract")
+    const staleManifest = createReleaseManifest({
+        schemaVersion: CONTENT_SCHEMA_VERSION,
+        assetVersion: "1.4.54",
+        runtimeSchemaVersion: CONTENT_RUNTIME_SCHEMA_VERSION,
+        generatorVersion: 3,
+        tables: Object.fromEntries(TABLE_SOURCES.map(definition => [
+            definition.tableName,
+            {
+                object: TEST_DIGEST,
+                scope: definition.scope,
+                converterId: definition.converterId,
+                converterVersion: definition.tableName === entry.tableName
+                    ? 1
+                    : definition.converterVersion,
+                sources: definition.manifestSources,
+            },
+        ])),
+        catalog: { object: TEST_DIGEST },
+        summary: { object: TEST_DIGEST },
+    })
+    assert.match(
+        String(getReleaseTableRegistryError(staleManifest)),
+        /quest_prerequisites\.json has mismatched converterVersion/,
+    )
+})
+
 test("registry derives activity hard multi periodic rewards from official OrderedMaps", () => {
     for (const [tableName, source] of Object.entries(EXPECTED_PERIODIC_REWARD_CDN_TABLES)) {
         const entry = findTableSource(tableName)

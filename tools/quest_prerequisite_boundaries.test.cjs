@@ -151,10 +151,38 @@ test("main and ex quests with the same id use category-specific prerequisites", 
     const mainResult = await start(main.viewerId, 2001001, 1)
     assert.equal(mainResult.statusCode, 200, JSON.stringify(mainResult))
 
+    // EX 2:1's need_main_stage_node is 2:9, which collides with EX's own 2:9
+    // node number. The prerequisite must resolve against the MAIN table
+    // (category 1, quests 2009001..2009007), so ex-category progress on the
+    // same numeric ids must not unlock it.
     const ex = await createPlayer("same-id-ex")
     for (const questId of [2009001, 2009002, 2009003]) {
         insertQuestProgress(ex.playerId, 4, questId)
     }
+    const lockedByCollision = await start(ex.viewerId, 2001001, 4)
+    assert.equal(lockedByCollision.statusCode, 400)
+    assert.equal(getPlayerActiveQuestSync(ex.playerId), null)
+
+    for (const questId of [2009001, 2009002, 2009003, 2009004, 2009005, 2009006, 2009007]) {
+        insertQuestProgress(ex.playerId, 1, questId)
+    }
     const exResult = await start(ex.viewerId, 2001001, 4)
     assert.equal(exResult.statusCode, 200, JSON.stringify(exResult))
+})
+
+test("ex internal chains gate ex quests on their predecessor node", async () => {
+    // EX 2:2 needs EX 2:1 (quests 2001001/2001002) cleared first.
+    const { playerId, viewerId } = await createPlayer("ex-chain")
+    const locked = await start(viewerId, 2002001, 4)
+    assert.equal(locked.statusCode, 400)
+    assert.equal(getPlayerActiveQuestSync(playerId), null)
+
+    insertQuestProgress(playerId, 4, 2001001)
+    const stillLocked = await start(viewerId, 2002001, 4)
+    assert.equal(stillLocked.statusCode, 400, "partial node clear must stay locked")
+
+    insertQuestProgress(playerId, 4, 2001002)
+    const unlocked = await start(viewerId, 2002001, 4)
+    assert.equal(unlocked.statusCode, 200, JSON.stringify(unlocked))
+    assert.notEqual(getPlayerActiveQuestSync(playerId), null)
 })

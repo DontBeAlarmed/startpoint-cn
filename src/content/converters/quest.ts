@@ -856,10 +856,13 @@ export function buildQuestUnlockCosts(
 
 /**
  * Official stage-node prerequisite chains (CN 1.8.1 MainStageNodeLogic /
- * StageNodeBase.isViewable): a stage node is reachable once its need-node is
- * cleared, and a node counts as cleared once every quest of that node is
- * finished (getQuestIdsNeedToBeClearedToClear). Project that onto quests:
- * quest_prerequisites[questId] = every quest id of its node's need-node.
+ * ExStageNodeLogic / StageNodeBase.isViewable): a stage node is reachable once
+ * its need-nodes are cleared, and a node counts as cleared once every quest of
+ * that node is finished (getQuestIdsNeedToBeClearedToClear). Main nodes carry a
+ * single same-table need_stage_node pair; ex nodes carry need_main_stage_node
+ * (always resolved against the main table) plus an ex-internal need_stage_node
+ * pair, both of which must be cleared. Project that onto quests:
+ * quest_prerequisites[questId] = the union of the need-nodes' quest ids.
  */
 export function buildQuestPrerequisites(
     questTrees: Readonly<Partial<Record<"main_quest.json" | "ex_quest.json", CsvOrderedMapTree>>>,
@@ -890,43 +893,74 @@ export function buildQuestPrerequisites(
         const stageNodeTree = stageNodeTrees[tableName]
         const tableNodes = questsByNode.get(tableName)
         if (!questTree || !stageNodeTree || !tableNodes) continue
+        const isEx = tableName === "ex_quest.json"
         for (const row of collectRows(tableName, stageNodeTree, 2)) {
-            // Official rows carry 7 (main) or 9 (ex) columns; the four we read
-            // are multipliedId, name, needChapter, needNode. Short rows must be
-            // rejected, not silently treated as "no prerequisites".
-            requireColumns(tableName, row.fields, 4)
-            const [multipliedId, , needChapter, needNode] = row.fields
+            // Official rows carry 7 (main) or 9 (ex) columns. The pairs we read
+            // are multipliedId/name plus, for main rows, the same-table
+            // need_stage_node pair (MainStageNodeValues cols 3-4); ex rows
+            // carry need_main_stage_node at cols 3-4 and their internal
+            // need_stage_node pair at cols 5-6 (ExStageNodeValues). Short rows
+            // must be rejected, not silently treated as "no prerequisites".
+            requireColumns(tableName, row.fields, isEx ? 6 : 4)
+            const [multipliedId, , firstNeedChapter, firstNeedNode, secondNeedChapter, secondNeedNode] = row.fields
             parsePositiveIntegerRowField(tableName, multipliedId, "multiplied id")
-            if (isMissing(needChapter)) {
-                if (!isMissing(needNode)) {
-                    invalidQuest(tableName, "need node must also be missing when need chapter is missing")
+            // ExStageNodeLogic.isViewable resolves need_main_stage_node through
+            // MainStageNodeLogic unconditionally (the main table), then applies
+            // the ex-internal need_stage_node chain against the ex table.
+            const needPairs = isEx
+                ? [
+                    {
+                        chapter: firstNeedChapter, node: firstNeedNode,
+                        nodes: mainNodes, prerequisiteTableName: "main_quest.json" as const,
+                    },
+                    {
+                        chapter: secondNeedChapter, node: secondNeedNode,
+                        nodes: tableNodes, prerequisiteTableName: "ex_quest.json" as const,
+                    },
+                ]
+                : [
+                    {
+                        chapter: firstNeedChapter, node: firstNeedNode,
+                        nodes: mainNodes, prerequisiteTableName: "main_quest.json" as const,
+                    },
+                ]
+            const prerequisites: Array<{ category: number; questId: number }> = []
+            for (const pair of needPairs) {
+                if (isMissing(pair.chapter)) {
+                    if (!isMissing(pair.node)) {
+                        invalidQuest(tableName, "need node must also be missing when need chapter is missing")
+                    }
+                    continue
                 }
-                continue
+                parsePositiveIntegerRowField(tableName, pair.chapter, "need chapter")
+                parsePositiveIntegerRowField(tableName, pair.node, "need node")
+                const needKey = `${pair.chapter}:${pair.node}`
+                const prerequisiteQuestIds = pair.nodes.get(needKey)
+                if (prerequisiteQuestIds === undefined) {
+                    invalidQuest(tableName, `need stage node ${needKey} has no quests`)
+                }
+                const category = QUEST_DERIVATION_LAYOUTS[pair.prerequisiteTableName].category
+                for (const prerequisiteId of prerequisiteQuestIds) {
+                    prerequisites.push({ category, questId: prerequisiteId })
+                }
             }
-            parsePositiveIntegerRowField(tableName, needChapter, "need chapter")
-            parsePositiveIntegerRowField(tableName, needNode, "need node")
-            const needKey = `${needChapter}:${needNode}`
-            const prerequisiteQuestIds = tableNodes.get(needKey) ?? mainNodes.get(needKey)
-            if (prerequisiteQuestIds === undefined) {
-                invalidQuest(tableName, `need stage node ${needKey} has no quests`)
-            }
+            if (prerequisites.length === 0) continue
+            const ownCategory = QUEST_DERIVATION_LAYOUTS[tableName].category
+            const frozenPrerequisites = Object.freeze(
+                prerequisites.map(prerequisite => Object.freeze({ ...prerequisite })),
+            )
             const nodeKey = `${row.path[0]}:${row.path[1]}`
             for (const questId of tableNodes.get(nodeKey) ?? []) {
-                if (prerequisiteQuestIds.includes(questId)) {
+                if (frozenPrerequisites.some(prerequisite => (
+                    prerequisite.category === ownCategory && prerequisite.questId === questId
+                ))) {
                     invalidQuest(tableName, `quest ${questId} depends on its own node`)
                 }
-                const outputKey = `${QUEST_DERIVATION_LAYOUTS[tableName].category}_${questId}`
+                const outputKey = `${ownCategory}_${questId}`
                 if (output[outputKey] !== undefined) {
                     invalidQuest(tableName, `duplicate prerequisite quest: ${questId}`)
                 }
-                const prerequisiteTableName = tableNodes.get(needKey) !== undefined
-                    ? tableName : "main_quest.json"
-                output[outputKey] = Object.freeze(
-                    prerequisiteQuestIds.map(prerequisiteId => Object.freeze({
-                        category: QUEST_DERIVATION_LAYOUTS[prerequisiteTableName].category,
-                        questId: prerequisiteId,
-                    })),
-                )
+                output[outputKey] = frozenPrerequisites
             }
         }
     }
