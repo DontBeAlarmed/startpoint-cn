@@ -184,7 +184,6 @@ const routes = async (fastify: FastifyInstance) => {
 
         updatePlayerSync({ id: playerId, degreeId: Number(degreeId) })
 
-        console.log(`[PROFILE] update_degree viewer=${viewerId} degree=${degreeId}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

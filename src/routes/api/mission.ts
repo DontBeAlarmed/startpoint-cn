@@ -62,7 +62,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         const requestList = body.category_list || [{ category: 1 }]
         const requestCategories = requestList.map(c => c.category)
-        const { responseData, missionCount } = getDb().transaction(() => {
+        const { responseData } = getDb().transaction(() => {
             const evaluationTime = new Date(getServerTime() * 1000)
             const awakeEligibility = requestList.some(entry => entry.category === 9)
                 ? createCharacterAwakeEligibilityResolver(playerId, evaluationTime)
@@ -218,10 +218,9 @@ const routes = async (fastify: FastifyInstance) => {
                 ...(automaticSettlement?.settlement.missionInfo ?? []),
             ]
             responseData.mail_arrived = getPlayerMailCountSync(playerId, true) > 0
-            return { responseData, missionCount: missionProgressList.length }
+            return { responseData }
         })()
 
-        console.log(`[MISSION] get_progress viewer=${viewerId} categories=${requestCategories} missions=${missionCount}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -263,7 +262,6 @@ const routes = async (fastify: FastifyInstance) => {
         const missionParams = Array.isArray(body.mission_param_list)
             ? body.mission_param_list
             : []
-        let updatedCount = 0
         const evaluationTime = new Date(getServerTime() * 1000)
         const awakeCandidateCharacterIds: number[] = []
         const automaticMissionIdsByCategory = new Map<number, Set<number>>()
@@ -284,7 +282,6 @@ const routes = async (fastify: FastifyInstance) => {
                         match.missionId,
                         delta,
                     )) {
-                        updatedCount++
                         if (match.category === 9) {
                             const characterId = Number(getCharacterIdFromMission(match.missionId))
                             if (Number.isSafeInteger(characterId) && characterId > 0) {
@@ -315,7 +312,6 @@ const routes = async (fastify: FastifyInstance) => {
             {},
             "mission/update_mission_progress",
         ).characterList
-        console.log(`[MISSION] update_progress viewer=${viewerId} params=${missionParams.length} db_updates=${updatedCount}`)
 
         const responseData: Record<string, unknown> = {
             ...mergeCommonResponseFragments([{

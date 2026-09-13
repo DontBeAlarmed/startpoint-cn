@@ -123,7 +123,6 @@ const routes = async (fastify: FastifyInstance) => {
             invalidatedFactKeys: [{ kind: "player" }],
         }, "item/sell").characterList
 
-        console.log(`[ITEM_SELL] account=${accountId} player=${playerId}: item ${itemId} ×${sellNumber} sold, mana +${result.manaGained} (${result.freeMana - result.manaGained} -> ${result.freeMana})`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

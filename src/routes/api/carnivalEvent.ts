@@ -90,7 +90,6 @@ const routes = async (fastify: FastifyInstance) => {
             previous_character_ids: r.previousCharacterIds ?? [null, null, null],
             previous_unison_character_ids: r.previousUnisonCharacterIds ?? [null, null, null],
         }))
-        console.log(`[CARNIVAL] response records: ${JSON.stringify(records)}`)
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({

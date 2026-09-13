@@ -196,7 +196,6 @@ const routes = async (fastify: FastifyInstance) => {
 
         const returnEquipmentList = serializeFullEquipmentList(operationResult.equipmentSnapshot)
 
-        console.log(`[UPGRADE] account=${accountId} player=${playerId}: eid=${equipmentId} rarity=${equipmentRarity} level ${equipment.level-upgradeCount}->${equipment.level} stack ${equipment.stack+upgradeCount}->${equipment.stack} craft -${upgradeCost*upgradeCount}`)
 
         reply.header("content-type", "application/x-msgpack")
         const overMax = projectItemOverflowCommonResponse(operationResult.itemOverflowDispositions)
@@ -368,7 +367,6 @@ const routes = async (fastify: FastifyInstance) => {
             })
         ))()
 
-        console.log(`[BULK_UPGRADE] account=${accountId} player=${playerId}: ${upgrades.length} equipment upgraded, craft points ${currentCraftPoints} -> ${returnItemList[wrightpieceItemId()]}`)
 
         const returnEquipmentList = serializeFullEquipmentList(operationResult.equipmentSnapshot)
 

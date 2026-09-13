@@ -97,8 +97,6 @@ const routes = async (fastify: FastifyInstance) => {
                 "error": "Bad Request", "message": "Invalid request body."
             })
         }
-        console.log(`[ATTENTION] action: viewer=${viewerId} factors=${body.priority_factors?.length ?? 0}`)
-        console.log(`[ATTENTION] action: factors_detail=${JSON.stringify(body.priority_factors)}`)
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
@@ -119,7 +117,6 @@ const routes = async (fastify: FastifyInstance) => {
                 "error": "Bad Request", "message": "Invalid request body."
             })
         }
-        console.log(`[ATTENTION] logger: viewer=${viewerId} logs=${body.client_logs?.length ?? 0}`)
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),

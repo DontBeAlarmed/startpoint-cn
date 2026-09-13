@@ -111,7 +111,6 @@ const routes = async (fastify: FastifyInstance) => {
             "message": settlement.message,
         })
 
-        console.log(`[ACTIVE_MISSION] receive viewer=${viewerId} missions=${requestList.length} items=${Object.keys(settlement.itemList).length}`)
         const overMax = projectItemOverflowCommonResponse(settlement.itemOverflowDispositions)
         const fragment: CommonResponseFragment = {
             "user_info": {
