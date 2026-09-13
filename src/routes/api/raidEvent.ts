@@ -13,7 +13,29 @@ import {
 import { PartyCategory } from "../../data/types";
 import { clientSerializeDate } from "../../data/utils";
 import { getSerializedPlayerRushEventPlayedPartiesSync, getPlayerRushEventEndlessBattleRankingSync } from "../../lib/rush";
-import { insertActiveQuest } from "../../lib/quest/active-quest-service";
+import {
+    persistActiveQuest,
+    publishActiveQuest,
+    type ActiveQuest,
+} from "../../lib/quest/active-quest-service";
+import { getPlayerActiveQuestSync } from "../../data/domains/quest_active";
+import { getRealNow } from "../../runtime/time/game-time";
+import { getQuestEntryCostByKey } from "../../lib/quest-entry-content";
+import { getStaminaCost } from "../../lib/stamina-cost";
+import { computeRealTimeStamina } from "../../lib/stamina";
+import { withEntryItemInventoryWithinTransactionSync } from "../../lib/quest/entry-item-inventory";
+import { updatePlayerSync } from "../../data/domains/player";
+import {
+    ActiveQuestAlreadyExistsError,
+    InsufficientEntryItemError,
+    InsufficientStaminaError,
+    PlayerNotFoundError,
+    runStartEntryTransaction,
+} from "../../lib/quest/start-entry";
+import {
+    AUTO_START_STOP_RESULT_CODE,
+    shouldStopAutoStartForStamina,
+} from "../../lib/quest/auto-start-stop";
 import { getQuestFromCategorySync } from "../../lib/quest-content";
 import { BattleQuest, QuestCategory } from "../../lib/types";
 import { ensureSpecialEventPartyGroupsSync, resolvePartyGroupColorId } from "../../lib/special-event-parties";
@@ -384,10 +406,13 @@ const routes = async (fastify: FastifyInstance) => {
             });
         }
 
-        // Register active quest for /single_battle_quest/finish. The request has
-        // no event_id, so derive it from the CN raid quest master data.
+        // Register the active quest for /single_battle_quest/finish through the
+        // shared start-entry transaction so the official battle_stamina_cost
+        // (CDN raid_event_quest col68) is deducted atomically with the quest
+        // registration. The request has no event_id, so derive it from the CN
+        // raid quest master data.
         const raidEventId = questData.eventId
-        insertActiveQuest(playerId, {
+        const activeQuest: ActiveQuest = {
             questId: body.quest_id,
             category: QuestCategory.RAID_EVENT,
             useBossBoostPoint: false,
@@ -399,7 +424,52 @@ const routes = async (fastify: FastifyInstance) => {
             eventId: raidEventId,
             playId: body.play_id,
             continueCount: 0
-        })
+        }
+        const questKey = `${QuestCategory.RAID_EVENT}_${body.quest_id}`
+        const staminaInfo = getStaminaCost(questKey)
+        try {
+            runStartEntryTransaction({
+                playerId,
+                entryCost: getQuestEntryCostByKey(questKey) ?? undefined,
+                staminaCost: staminaInfo.cost,
+                partyId: body.party_group_id ?? 1,
+                updatePartySlot: false,
+                activeQuest,
+                now: getRealNow(),
+            }, {
+                transaction: operation => getDb().transaction(operation)(),
+                getActiveQuest: getPlayerActiveQuestSync,
+                getPlayer: getPlayerSync,
+                computeStamina: computeRealTimeStamina,
+                withEntryItemInventory: withEntryItemInventoryWithinTransactionSync,
+                updatePlayer: updatePlayerSync,
+                persistActiveQuest,
+                publishActiveQuest,
+            })
+        } catch (error) {
+            if (error instanceof ActiveQuestAlreadyExistsError
+                || error instanceof InsufficientEntryItemError
+                || error instanceof InsufficientStaminaError
+                || error instanceof PlayerNotFoundError) {
+                console.warn(`[RAID-START] start rejected: ${error.message}`)
+                if (error instanceof InsufficientStaminaError
+                    && shouldStopAutoStartForStamina(body.is_auto_start_mode, true)) {
+                    reply.header("content-type", "application/x-msgpack");
+                    return reply.status(200).send({
+                        "data_headers": generateDataHeaders({
+                            viewer_id: viewerId,
+                            result_code: AUTO_START_STOP_RESULT_CODE,
+                        }),
+                        "data": {},
+                    })
+                }
+                return reply.status(400).send({
+                    "error": "Bad Request",
+                    "message": error.message,
+                })
+            }
+            throw error
+        }
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
