@@ -2209,6 +2209,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/battle_entry_inventory_route.test.cjs",
         "tools/open_period_boundaries.test.cjs",
         "tools/quest_prerequisite_boundaries.test.cjs",
+        "tools/raid_battle_stamina.test.cjs",
         "tools/rush_battle_stamina.test.cjs",
         "tools/party_heal_option_persistence.test.cjs",
         "tools/perf/single_battle_settlement_admission.test.cjs",
@@ -2365,6 +2366,7 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
         "tools/npc_contributor_names.test.cjs",
         "tools/npc_nickname_pool.test.cjs",
         "tools/room_cleanup_lifecycle.test.cjs",
+        "tools/room_dismissal_lifecycle.test.cjs",
         "tools/session_frame_order.test.cjs",
         "tools/session_server_lifecycle.test.cjs",
             "tools/multi_tcp_guardrails.test.cjs",
@@ -2372,7 +2374,8 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
             "tools/gift_code_lifecycle.test.cjs",
             "tools/gift_receive_route.test.cjs",
             "tools/attention_config_route.test.cjs",
-            "tools/load_identity_boundary.test.cjs",
+            "tools/active_account_state_cache.test.cjs",
+        "tools/load_identity_boundary.test.cjs",
     ])
 })
 
