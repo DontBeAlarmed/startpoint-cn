@@ -39,6 +39,7 @@ const {
     insertPlayerRushEventSync,
 } = require("../src/data/domains/rushEvent")
 const { computeRealTimeStamina } = require("../src/lib/stamina")
+const { isQuestOutOfPeriodAt } = require("../src/lib/quest/open-period")
 const { encodeCnMsgpackPayload, registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 const singleBattleRoutes = require("../src/routes/api/singleBattleQuest").default
 const rushEventRoutes = require("../src/routes/api/rushEvent").default
@@ -302,6 +303,18 @@ test("rush finish reports is_out_of_period from the quest window", async () => {
     } finally {
         resetSnapshot()
     }
+})
+
+test("bundled Raid tables preserve the ended window used by the fallback runtime", () => {
+    const raidQuests = require("../assets/raid_event_quest.json")
+    const raidQuest = raidQuests["1001"]
+    assert.ok(raidQuest, "bundled Raid asset must contain the first event quest")
+    assert.notEqual(raidQuest.availableFromMs, null)
+    assert.notEqual(raidQuest.availableUntilMs, null)
+    assert.equal(
+        isQuestOutOfPeriodAt(raidQuest, Date.parse("2024-08-14T12:00:00.000Z")),
+        true,
+    )
 })
 
 test("raid battle/start rejects an out-of-window quest with result_code 4050", async () => {
