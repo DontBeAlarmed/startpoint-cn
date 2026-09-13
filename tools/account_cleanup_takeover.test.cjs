@@ -296,4 +296,57 @@ test("takeover source must be anchored to the requesting device binding", async 
     assert.deepEqual(getAccountPlayersSync(target.id), [targetPlayer.id])
 })
 
+test("takeover re-registration stays owned by the takeover_udid device", async t => {
+    const owner = createAccount("takeover-reregister-owner")
+    const ownerViewer = 300000021
+    createViewer(owner.id, ownerViewer)
+    getDb().prepare(`UPDATE accounts SET takeover_password_hash = ?, takeover_udid = ? WHERE id = ?`)
+        .run(bcrypt.hashSync("OwnerPass1", 4), "owner-udid", owner.id)
+
+    const app = Fastify({ logger: false })
+    app.addHook("onSend", (_request, _reply, payload, done) => {
+        done(null, typeof payload === "string" ? payload : JSON.stringify(payload))
+    })
+    installTakeoverUdidGuard(app)
+    app.register(takeoverRoutes, { prefix: "/api/index.php" })
+    await app.ready()
+    t.after(() => app.close())
+
+    const credentialsBefore = JSON.stringify(getDb().prepare(
+        "SELECT takeover_password_hash, takeover_udid FROM accounts WHERE id = ?",
+    ).get(owner.id))
+
+    // Knowing the victim viewer id is not enough to overwrite existing
+    // takeover credentials: the 516 guard rejects foreign devices before the
+    // handler runs.
+    const attacker = await app.inject({
+        method: "POST",
+        url: "/api/index.php/take_over_register/register_take_over_data",
+        headers: { "content-type": "application/json", udid: "attacker-udid" },
+        payload: { viewer_id: ownerViewer, input_password: "Attacker99" },
+    })
+    assert.equal(attacker.statusCode, 200)
+    assert.equal(responseJson(attacker).data_headers.result_code, 516)
+    assert.equal(JSON.stringify(getDb().prepare(
+        "SELECT takeover_password_hash, takeover_udid FROM accounts WHERE id = ?",
+    ).get(owner.id)), credentialsBefore, "foreign device must not overwrite credentials")
+
+    // The device holding the takeover udid may legitimately reset its password.
+    const ownerReset = await app.inject({
+        method: "POST",
+        url: "/api/index.php/take_over_register/register_take_over_data",
+        headers: { "content-type": "application/json", udid: "owner-udid" },
+        payload: { viewer_id: ownerViewer, input_password: "NewOwner88" },
+    })
+    assert.equal(ownerReset.statusCode, 200)
+    assert.equal(responseJson(ownerReset).data_headers.result_code, 1)
+    assert.equal(responseJson(ownerReset).data.registered_viewer_id, ownerViewer)
+    const afterReset = getDb().prepare(
+        "SELECT takeover_password_hash, takeover_udid FROM accounts WHERE id = ?",
+    ).get(owner.id)
+    assert.equal(afterReset.takeover_udid, "owner-udid")
+    assert.ok(bcrypt.compareSync("NewOwner88", afterReset.takeover_password_hash))
+    assert.equal(bcrypt.compareSync("OwnerPass1", afterReset.takeover_password_hash), false)
+})
+
 console.log("account cleanup and takeover tests loaded")
