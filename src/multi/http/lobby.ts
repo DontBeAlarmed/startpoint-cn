@@ -5,6 +5,7 @@ import { generateDataHeaders } from "../../utils"
 import { serializeRoomStatusConnection } from "../room/serializer"
 import { isValidMultiViewerId, type MultiHttpContext } from "./context"
 import { classifyRoomJoin, roomUnavailableRaisingState } from "./join-result"
+import { resolveRoomEstablisherFollowStateSync } from "../follow-policy"
 import { issueRoomAdmission } from "./room-admission"
 
 function isPositiveSafeInteger(value: number): boolean {
@@ -128,6 +129,12 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
             })
         }
         const status = room.kind === "available" ? room.value : null
+        const establisherFollow = status === null ? 0 : resolveRoomEstablisherFollowStateSync({
+            requester: context.snapshotProvider.getParticipant(viewerId),
+            host: status.host,
+            requesterPlayerId: ctx.playerId,
+            hostPlayerId: (await context.resolvePlayerContext(status.host.viewerId))?.playerId ?? null,
+        })
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
@@ -137,7 +144,7 @@ export function registerLobbyRoutes(fastify: FastifyInstance, context: MultiHttp
                 "quest_id": status?.questId ?? 0,
                 "room_number": status?.roomNumber ?? body.room_number,
                 "establisher_viewer_id": status?.host.viewerId ?? 0,
-                "establisher_follow": 0
+                "establisher_follow": establisherFollow
             }
         })
     })
