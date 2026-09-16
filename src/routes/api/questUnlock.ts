@@ -18,11 +18,48 @@ interface UnlockBody {
     api_count: number
 }
 
+interface GetRecentOtherPlayerPartyBody {
+    category: number
+    quest_id: number
+    viewer_id: number
+}
+
 type UnlockTransactionResult =
     | { ok: true, itemList: Record<string, number> }
     | { ok: false, message: string }
 
 const routes = async (fastify: FastifyInstance) => {
+    // CN 1.8.1 QuestGetRecentOtherPlayerPartyRealRemote：读取其他玩家在本 quest 的
+    // 近期队伍。本服没有跨玩家队伍历史存储，返回客户端契约内的空投影，不虚构数据。
+    fastify.post("/get_recent_other_player_party", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = request.body as GetRecentOtherPlayerPartyBody
+        const viewerId = body.viewer_id
+        if (isNaN(viewerId) || isNaN(body.category) || isNaN(body.quest_id)) {
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Invalid request body."
+            })
+        }
+
+        const session = await getSession(viewerId.toString())
+        if (!session) {
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Invalid viewer id."
+            })
+        }
+
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            "data_headers": generateDataHeaders({
+                viewer_id: viewerId
+            }),
+            "data": {
+                "recent_other_player_party": [],
+            }
+        })
+    })
+
     fastify.post("/unlock", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as UnlockBody
 
