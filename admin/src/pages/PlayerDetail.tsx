@@ -3,7 +3,7 @@ import { Card, Descriptions, Table, Button, Space, InputNumber, Popconfirm, mess
 import { SaveOutlined, DeleteOutlined, PlusOutlined, DownloadOutlined, UploadOutlined, UndoOutlined, SearchOutlined } from "@ant-design/icons"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { apiGet, apiPost, apiPatch, apiDelete, apiUpload } from "../api/client"
+import { apiGet, apiPost, apiPatch, apiDelete, apiUpload, apiDownloadFile } from "../api/client"
 import { AdminPage, StateCard } from "../components/AdminPage"
 
 const { Text } = Typography
@@ -161,6 +161,12 @@ export default function PlayerDetail() {
         mutationFn: () => apiPost(`/api/player/${pid}/clear_receive_history`),
         onSuccess: () => { message.success("接收历史已清除"); refresh() },
         onError: (e: Error) => message.error(e.message),
+    })
+
+    // 存档导出走统一 fetch/blob 通道（携带部署层后台认证），错误就地提示而非整页跳转
+    const exportSave = useMutation({
+        mutationFn: () => apiDownloadFile(`/api/player/save?id=${pid}`, `save_${pid}.json`),
+        onError: (e: Error) => message.error(`存档导出失败：${e.message}`),
     })
 
     const resetParties = useMutation({
@@ -453,7 +459,8 @@ export default function PlayerDetail() {
                             <Popconfirm title="清除接收历史（一次性道具的领取记录）？" onConfirm={() => clearReceiveHistory.mutate()} okText="确认" cancelText="取消">
                                 <Button size="small" loading={clearReceiveHistory.isPending}>清除接收历史</Button>
                             </Popconfirm>
-                            <Button size="small" icon={<DownloadOutlined />} href={`/api/player/save?id=${pid}`} target="_blank">导出存档</Button>
+                            <Button size="small" icon={<DownloadOutlined />} loading={exportSave.isPending}
+                                onClick={() => exportSave.mutate()}>导出存档</Button>
                             <Upload accept=".json,application/json" showUploadList={false} maxCount={1}
                                 beforeUpload={file => { importSave.mutate(file); return false }}>
                                 <Button size="small" icon={<UploadOutlined />} danger loading={importSave.isPending}>导入存档(覆盖)</Button>

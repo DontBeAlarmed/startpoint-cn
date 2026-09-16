@@ -49,3 +49,29 @@ export function apiUpload<T>(url: string, file: File, fieldName = "file"): Promi
     return fetch(url, { method: "POST", headers: { Accept: "application/json" }, body: fd })
         .then(r => handle<T>(r))
 }
+
+// 附件下载：走与其它 /api 相同的 fetch 通道（携带部署层后台认证/凭据），
+// 错误就地抛 ApiError 供页面显示，成功后按 content-disposition 文件名触发保存。
+export async function apiDownloadFile(url: string, fallbackFilename: string): Promise<void> {
+    const res = await fetch(url, { headers: { Accept: "application/json" } })
+    if (!res.ok) {
+        const text = await res.text().catch(() => "")
+        let msg = text || res.statusText
+        try { const j = JSON.parse(text); if (j && typeof j.error === "string") msg = j.error } catch { /* not json */ }
+        throw new ApiError(res.status, msg)
+    }
+    const blob = await res.blob()
+    const disposition = res.headers.get("content-disposition") ?? ""
+    const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? fallbackFilename
+    const objectUrl = URL.createObjectURL(blob)
+    try {
+        const a = document.createElement("a")
+        a.href = objectUrl
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+    } finally {
+        URL.revokeObjectURL(objectUrl)
+    }
+}

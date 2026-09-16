@@ -57,4 +57,14 @@ assert.match(adminPlayerDomain, /rank_point/)
 assert.match(adminPlayerDomain, /rankPoint/)
 assert.match(serverApi, /rank: getRankDegree\(player\.rankPoint\)/)
 
+// A6: 存档导出必须是携带后台鉴权的 fetch/blob 下载，而不是裸直链
+assert.doesNotMatch(playerDetail, /href=\{`\/api\/player\/save/)
+assert.match(playerDetail, /apiDownloadFile\(`\/api\/player\/save\?id=\$\{pid\}`/)
+assert.match(playerDetail, /导出存档/)
+const apiClient = fs.readFileSync("admin/src/api/client.ts", "utf8")
+assert.match(apiClient, /export async function apiDownloadFile/)
+assert.match(apiClient, /Accept: "application\/json"/)
+assert.match(apiClient, /content-disposition/)
+assert.match(apiClient, /revokeObjectURL/)
+
 console.log("admin-account-save-ui tests passed")
