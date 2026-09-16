@@ -150,10 +150,6 @@ function countSsRankFacts(
     return state.battleCounters.rankSsCount
 }
 
-function normalizeQuestId(category: number, questId: number): number {
-    return category === 4 && questId < 10_000_000 ? questId + 10_000_000 : questId
-}
-
 function computeChapterCompleteFact(
     definition: Pick<PlannedActiveMissionDefinition, "questRange">,
     state: ActiveMissionFactState,
@@ -165,9 +161,10 @@ function computeChapterCompleteFact(
         matchesActiveMissionQuestRange(range, category, questId)
     ))
     if (targetQuestIds.length === 0) return null
+    // 事实域已统一 EX（category 4）id 到 +10M 命名空间，这里直接使用事实 id
     const clearRankByQuestId = new Map(state.questProgress
         .filter(progress => progress.category === category)
-        .map(progress => [normalizeQuestId(category, progress.questId), progress.clearRank]))
+        .map(progress => [progress.questId, progress.clearRank]))
     return targetQuestIds.every(questId => clearRankByQuestId.get(questId) === 5) ? 1 : 0
 }
 

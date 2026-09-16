@@ -10,6 +10,7 @@ import { getPlayerPartyGroupListSync } from "../../data/domains/party"
 import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { getPlayerShopPurchasesMapSync } from "../../data/domains/shopPurchase"
+import { normalizeActiveMissionQuestNamespace } from "./active-quest-range"
 import { getCharacterFacts } from "../character-content"
 import { getCharacterGrowthContent } from "../character-growth-content"
 import { getEquipmentContentCatalog } from "../equipment-content"
@@ -141,7 +142,8 @@ export function createProductionActiveMissionFactDomains(
             const progress: ActiveMissionFactQuestProgress[] = Object.entries(byCategory)
                 .flatMap(([category, progressList]) => progressList.map(quest => ({
                     category: Number(category),
-                    questId: quest.questId,
+                    // 存储保持原始 id；事实域统一投影到 +10M EX 命名空间（单一正规化点）
+                    questId: normalizeActiveMissionQuestNamespace(Number(category), quest.questId),
                     finished: quest.finished,
                     clearRank: quest.clearRank,
                     leaderCharacterId: quest.leaderCharacterId,
