@@ -15,18 +15,6 @@ async function resolveViewerId(request: FastifyRequest, reply: FastifyReply): Pr
     return viewerId as number
 }
 
-export const followCompatibilityRoutes = async (fastify: FastifyInstance) => {
-    fastify.post("/lists", async (request, reply) => {
-        const viewerId = await resolveViewerId(request, reply)
-        if (viewerId === null) return
-        reply.header("content-type", "application/x-msgpack")
-        return reply.status(200).send({
-            data_headers: generateDataHeaders({ viewer_id: viewerId }),
-            data: { follow_info: [], followed_count: 0 },
-        })
-    })
-}
-
 export const snsCompatibilityRoutes = async (fastify: FastifyInstance) => {
     fastify.post("/get", async (request, reply) => {
         const viewerId = await resolveViewerId(request, reply)

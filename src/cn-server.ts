@@ -78,7 +78,8 @@ import carnivalEventApiPlugin from "./routes/api/carnivalEvent";
 import contentsGuideApiPlugin from "./routes/api/contentsGuide";
 import profileApiPlugin from "./routes/api/profile";
 import playerHistoryApiPlugin from "./routes/api/playerHistory";
-import { followCompatibilityRoutes, snsCompatibilityRoutes } from "./routes/api/socialCompatibility";
+import { snsCompatibilityRoutes } from "./routes/api/socialCompatibility";
+import followApiPlugin from "./routes/api/follow";
 import historyApiPlugin from "./routes/api/history";
 import comicApiPlugin from "./routes/api/comic";
 import questUnlockApiPlugin from "./routes/api/questUnlock";
@@ -278,7 +279,7 @@ fastify.register(carnivalEventApiPlugin, { prefix: `${apiPrefix}/carnival_event`
 fastify.register(contentsGuideApiPlugin, { prefix: `${apiPrefix}/contents_guide` });
 fastify.register(profileApiPlugin, { prefix: `${apiPrefix}/profile` });
 fastify.register(playerHistoryApiPlugin, { prefix: `${apiPrefix}/player_history` });
-fastify.register(followCompatibilityRoutes, { prefix: `${apiPrefix}/follow` });
+fastify.register(followApiPlugin, { prefix: `${apiPrefix}/follow` });
 fastify.register(snsCompatibilityRoutes, { prefix: `${apiPrefix}/sns` });
 fastify.register(historyApiPlugin, { prefix: `${apiPrefix}/history` });
 fastify.register(questUnlockApiPlugin, { prefix: `${apiPrefix}/quest` });

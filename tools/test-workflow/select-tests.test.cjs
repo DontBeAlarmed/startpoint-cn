@@ -2024,6 +2024,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/test-workflow/schema20_resource_migration.test.cjs",
         "tools/schema28_follow_migration.test.cjs",
         "tools/follow_domain.test.cjs",
+        "tools/follow_routes.test.cjs",
         "tools/stamina_serialization.test.cjs",
         "tools/sql_write_shape.test.cjs",
     ])

@@ -154,8 +154,9 @@ async function createApp() {
     if (profile?.default) {
         await app.register(profile.default, { prefix: "/api/index.php/profile" })
     }
-    if (social?.followCompatibilityRoutes) {
-        await app.register(social.followCompatibilityRoutes, { prefix: "/api/index.php/follow" })
+    const follow = optionalModule("../src/routes/api/follow")
+    if (follow?.default) {
+        await app.register(follow.default, { prefix: "/api/index.php/follow" })
     }
     if (social?.snsCompatibilityRoutes) {
         await app.register(social.snsCompatibilityRoutes, { prefix: "/api/index.php/sns" })
@@ -521,7 +522,7 @@ test("follow and SNS compatibility routes return explicit empty client data", as
 test("CN server registers player history and social compatibility route families", () => {
     const serverSource = fs.readFileSync(path.join(__dirname, "../src/cn-server.ts"), "utf8")
     assert.match(serverSource, /playerHistoryApiPlugin/)
-    assert.match(serverSource, /followCompatibilityRoutes/)
+    assert.match(serverSource, /followApiPlugin/)
     assert.match(serverSource, /snsCompatibilityRoutes/)
     assert.match(serverSource, /\$\{apiPrefix\}\/player_history/)
     assert.match(serverSource, /\$\{apiPrefix\}\/follow/)
