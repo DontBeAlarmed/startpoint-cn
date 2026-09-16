@@ -210,3 +210,33 @@ test("historical dedicated mail remains claimable through the client API", async
         assert.equal(mail, undefined)
     }
 })
+
+test("admin custom subject/description mail carries the 999998 dummy-repo reason", async () => {
+    const account = insertAccountSync({
+        appId: "wf_cn",
+        idpAlias: "",
+        idpCode: "test",
+        idpId: `admin-custom-reason-${randomUUID()}`,
+        status: "normal",
+    })
+    const playerId = insertDefaultPlayerSync(account.id).id
+
+    const custom = await sendAdminMail(1, {
+        playerId: String(playerId),
+        type_id: String(ITEM_ID),
+        subject: "自定义标题",
+        description: "自定义正文",
+    })
+    assert.equal(custom.statusCode, 200, custom.body)
+    const customRow = getPlayerMailsSync(playerId)[0]
+    assert.equal(customRow.reason_id, 999998, "后台自定义 subject+description 邮件使用 999998")
+    assert.equal(customRow.subject, "自定义标题")
+    assert.equal(customRow.description, "自定义正文")
+
+    const plain = await sendAdminMail(1, { playerId: String(playerId), type_id: String(ITEM_ID) })
+    assert.equal(plain.statusCode, 200, plain.body)
+    const plainRow = getPlayerMailsSync(playerId)[0]
+    assert.equal(plainRow.reason_id, 0, "无自定义文案的后台邮件保持 reason_id 0")
+    assert.equal(plainRow.subject, null)
+    assert.equal(plainRow.description, null)
+})

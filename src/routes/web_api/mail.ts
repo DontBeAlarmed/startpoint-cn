@@ -165,11 +165,15 @@ const routes = async (fastify: FastifyInstance) => {
             time.virtualNowMs + expirationDays * 24 * 60 * 60 * 1000,
         ))
         let sentCount = 0
+        // CN 客户端 MailReasonLogic：reason_id 不在 ReasonTable 且 subject+description
+        // 均有值时按自定义文案渲染。官方 DummyMailRepository 以 999998 标记此类邮件
+        //（CDN reason.json 不含 999998，含 999999 兜底）。无自定义文案时保持 0。
+        const reasonId = subject !== null && desc !== null ? 999998 : 0
 
         for (const playerId of targetPlayerIds) {
             try {
                 insertMailSync(playerId, {
-                    reason_id: 0,
+                    reason_id: reasonId,
                     subject,
                     description: desc,
                     type: mailType,
