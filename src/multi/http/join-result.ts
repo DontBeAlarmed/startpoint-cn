@@ -20,6 +20,27 @@ export function roomUnavailableRaisingState(
     return 7
 }
 
+/**
+ * CN 1.8.1 MultiBattleQuestPrepareRealRemote 仅接受 raising_state 1/2/9；
+ * 3/4/7/8/10/11/12/13 会让客户端抛 ClientError 5001。除 ROOM_NOT_FOUND(→9)
+ * 外的一切失败都必须走 A-error 通道（调用方回 result_code 4507 → Failure）。
+ */
+export function prepareFailureRaisingState(
+    error: CoordinatorErrorCode,
+): 9 | null {
+    return error === "ROOM_NOT_FOUND" ? 9 : null
+}
+
+/**
+ * CN 1.8.1 MultiBattleQuestRestoreRoomRealRemote：9=Disbanded、13=NotMate；
+ * 除房间不存在外的失败按 13 处理。
+ */
+export function restoreRoomUnavailableRaisingState(
+    error: CoordinatorErrorCode,
+): 9 | 13 {
+    return error === "ROOM_NOT_FOUND" ? 9 : 13
+}
+
 export function classifyRoomJoin(
     questAvailability: MultiQuestAvailabilityProvider,
     result: CoordinatorResult<RoomStatus>,

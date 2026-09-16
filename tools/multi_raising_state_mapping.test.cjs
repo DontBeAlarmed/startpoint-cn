@@ -1,0 +1,60 @@
+"use strict"
+
+require("ts-node/register/transpile-only")
+
+const assert = require("node:assert/strict")
+const fs = require("node:fs")
+const path = require("node:path")
+const test = require("node:test")
+
+const {
+    prepareFailureRaisingState,
+    restoreRoomUnavailableRaisingState,
+    roomUnavailableRaisingState,
+} = require("../src/multi/http/join-result.ts")
+
+// CN 1.8.1 MultiBattleQuestPrepareRealRemote：raising_state 仅 1/2/9 合法
+//（3/4/7/8/10/11/12/13 抛 ClientError 5001）；其余失败走 A-error
+// 4503/4507/4509 → RoomDataNotFound/Failure/RoomDataPeriodOutdated。
+test("prepare failure mapping never emits a fatal raising_state", () => {
+    assert.equal(prepareFailureRaisingState("ROOM_NOT_FOUND"), 9)
+    assert.equal(prepareFailureRaisingState("ROOM_FULL"), null, "满房必须走 4507 A-error，不得回 raising_state 3")
+    assert.equal(prepareFailureRaisingState("ROOM_MEMBER_MISMATCH"), null)
+    assert.equal(prepareFailureRaisingState("HUB_UNAVAILABLE"), null)
+    assert.equal(prepareFailureRaisingState("QUEST_NOT_AVAILABLE"), null)
+})
+
+// CN 1.8.1 MultiBattleQuestSelectRoomRealRemote：1/2/3/4/7/8/9/10/11/12 全部合法
+//（3=Filled、7=NotPlayable、13 才致命）。
+test("select_room failure mapping keeps client-legal states", () => {
+    assert.equal(roomUnavailableRaisingState("ROOM_NOT_FOUND"), 9)
+    assert.equal(roomUnavailableRaisingState("ROOM_FULL"), 3)
+    assert.equal(roomUnavailableRaisingState("ROOM_MEMBER_MISMATCH"), 7)
+    assert.equal(roomUnavailableRaisingState("QUEST_NOT_AVAILABLE"), 7)
+})
+
+// CN 1.8.1 MultiBattleQuestRestoreRoomRealRemote：9=Disbanded、13=NotMate 合法。
+test("restore_room failure mapping uses disbanded and not-mate states", () => {
+    assert.equal(restoreRoomUnavailableRaisingState("ROOM_NOT_FOUND"), 9)
+    assert.equal(restoreRoomUnavailableRaisingState("ROOM_FULL"), 13)
+    assert.equal(restoreRoomUnavailableRaisingState("ROOM_MEMBER_MISMATCH"), 13)
+})
+
+test("multi HTTP sources use the endpoint-specific mappings", () => {
+    const roomSource = fs.readFileSync(
+        path.join(__dirname, "../src/multi/http/room.ts"), "utf8")
+    const lobbySource = fs.readFileSync(
+        path.join(__dirname, "../src/multi/http/lobby.ts"), "utf8")
+
+    // prepare 只接受 ROOM_NOT_FOUND 的 9；其余错误一律 4507 result_code
+    assert.match(roomSource, /prepareFailureRaisingState\(/)
+    assert.doesNotMatch(
+        roomSource.split("fastify.post(\"/summon\"")[0],
+        /ROOM_NOT_FOUND" \|\| error === "ROOM_FULL"/,
+        "prepareFailure 不得再把 ROOM_FULL 映射为 raising_state",
+    )
+    // select_room 保持通用映射（3/7/9 对该端点合法）
+    assert.match(lobbySource, /roomUnavailableRaisingState\(room\.error\)/)
+    // restore_room 使用 9/13 专用映射
+    assert.match(roomSource, /restoreRoomUnavailableRaisingState\(/)
+})
