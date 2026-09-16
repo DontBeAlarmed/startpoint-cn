@@ -248,3 +248,41 @@ test("cross-node host keeps the compatibility projection 1 on both endpoints", a
     })
     assert.equal(check.data.establisher_follow, 1)
 })
+
+// ---- F4: guest stamina ----
+
+const {
+    applyStaminaConsumptionRate,
+    getLocalGuestStaminaCost,
+} = require("../src/lib/stamina-cost")
+const { getQuestEntryCostByKey } = require("../src/lib/quest-entry-content")
+
+test("applyStaminaConsumptionRate matches the frozen campaign formula", () => {
+    assert.equal(applyStaminaConsumptionRate(0, 0.5), 0)
+    assert.equal(applyStaminaConsumptionRate(7, 0), 0)
+    assert.equal(applyStaminaConsumptionRate(4, 0.5), 2)
+    assert.equal(applyStaminaConsumptionRate(5, 0.9), 4, "max(1, floor(4.5)) = 4")
+    assert.equal(applyStaminaConsumptionRate(10, 1), 10)
+    assert.equal(applyStaminaConsumptionRate(1, 0.3), 1, "非零成本最低扣 1")
+})
+
+test("getLocalGuestStaminaCost halves before campaign and frees mutual follows", () => {
+    const questKey = "4_1001001"
+    const entry = getQuestEntryCostByKey(questKey)
+    assert.ok(entry && entry.stamina > 0, "测试关卡需要已知基础体力")
+    assert.equal(getLocalGuestStaminaCost(questKey, 1), 0)
+    const expected = Math.max(
+        1,
+        applyStaminaConsumptionRate(Math.floor(entry.stamina * 0.5), 1),
+    )
+    for (const state of [0, 2, 3]) {
+        assert.equal(getLocalGuestStaminaCost(questKey, state), expected)
+    }
+})
+
+test("battle start composes host full cost with follow-aware guest cost", () => {
+    const source = fs.readFileSync(
+        path.join(__dirname, "../src/multi/http/battle.ts"), "utf8")
+    assert.match(source, /isRoomHost\s*\?\s*getStaminaCost\(questKey\)\.cost\s*:\s*getLocalGuestStaminaCost\(/)
+    assert.match(source, /resolveRoomEstablisherFollowStateSync\(\{/)
+})

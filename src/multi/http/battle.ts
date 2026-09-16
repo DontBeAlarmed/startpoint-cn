@@ -20,7 +20,7 @@ import {
 import { getQuestConfigurationErrorResponse, getQuestFromCategorySync } from "../../lib/quest-content";
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings";
 import { computeRealTimeStamina } from "../../lib/stamina";
-import { getStaminaCost } from "../../lib/stamina-cost";
+import { getLocalGuestStaminaCost, getStaminaCost } from "../../lib/stamina-cost";
 import { BattleQuest } from "../../lib/types";
 import { getDb } from "../../data/db";
 import { getQuestEntryCostByKey } from "../../lib/quest-entry-content";
@@ -46,6 +46,7 @@ import {
 } from "../settlement/orchestrator";
 import { projectMultiplayerFinishResponse } from "../settlement/response";
 import { buildFinishFollowInfo } from "../../lib/quest/finish/follow-info";
+import { resolveRoomEstablisherFollowStateSync } from "../follow-policy";
 import { getPlayerMailCountSync } from "../../data/domains/mail";
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
 import { resolveLocalRescueFragmentEligibility } from "../rescue-fragment-reward";
@@ -190,11 +191,27 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             room.value.host.nodeSessionId,
             room.value.host.viewerId,
         ) === identityKey;
+        // F4：房主全额；guest 按 follow 关系（同服真实 state / 可信跨服投影 1）
+        // 计费——互关与跨服 0，其余先折半再 Campaign。关系解析在最后一个异步
+        // Coordinator 校验后完成，随后同步进入开战事务。
+        const hostContext = isRoomHost
+            ? null
+            : await context.resolvePlayerContext(room.value.host.viewerId);
+        const guestFollowState = isRoomHost
+            ? 0
+            : resolveRoomEstablisherFollowStateSync({
+                requester: participant,
+                host: room.value.host,
+                requesterPlayerId: ctx.playerId,
+                hostPlayerId: hostContext?.playerId ?? null,
+            });
         const questKey = `${category}_${quest_id}`;
         const entryCost = isRoomHost
             ? getQuestEntryCostByKey(questKey)
             : undefined;
-        const staminaCost = isRoomHost ? getStaminaCost(questKey).cost : 0;
+        const staminaCost = isRoomHost
+            ? getStaminaCost(questKey).cost
+            : getLocalGuestStaminaCost(questKey, guestFollowState);
         const coordinatorOrigin = await context.resolveCoordinatorOrigin({
             participant,
             roomNumber: battle.value.roomNumber,
