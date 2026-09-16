@@ -10,6 +10,8 @@ const assert = require("node:assert/strict")
 const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
+const { loadServerReleaseContract } = require("./server-bundle/release-contract.cjs")
+const currentDataSchema = loadServerReleaseContract(path.resolve(__dirname, "..")).currentDataSchema
 const test = require("node:test")
 const Sqlite = require("better-sqlite3")
 
@@ -28,7 +30,7 @@ test.after(() => {
     else process.env.DATA_DIR = previousDataDirectory
 })
 
-test("literal schema 24 migrates through 25 and 26 to 27 without rewriting existing Gacha state", () => {
+test("literal schema 24 migrates through 25 and 26 to the current schema without rewriting existing Gacha state", () => {
     const fresh = data.initializeDatabase()
     const account = insertAccountSync({
         appId: "wf_cn",
@@ -77,7 +79,7 @@ test("literal schema 24 migrates through 25 and 26 to 27 without rewriting exist
     fs.writeFileSync(path.join(process.env.DATA_DIR, "wdfp_data.version"), "24")
 
     const migrated = data.initializeDatabase()
-    assert.equal(migrated.pragma("user_version", { simple: true }), 27)
+    assert.equal(migrated.pragma("user_version", { simple: true }), currentDataSchema)
     assert.equal(
         migrated.pragma("table_info(players_gacha_info)")
             .some(column => column.name === "crazy_draw_count"),

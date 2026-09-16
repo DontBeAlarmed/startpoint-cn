@@ -4,7 +4,7 @@ import { generateDataHeaders } from "../../utils"
 import { getPlayerRankLevel } from "../player-context"
 import { isValidMultiViewerId, type MultiHttpContext } from "./context"
 import { classifyRoomJoin } from "./join-result"
-import { resolveRoomEstablisherFollowStateSync } from "../follow-policy"
+import { resolveRoomEstablisherFollowStateSafeSync } from "../follow-policy"
 
 export function registerSocialRoutes(fastify: FastifyInstance, context: MultiHttpContext): void {
 
@@ -41,7 +41,7 @@ export function registerSocialRoutes(fastify: FastifyInstance, context: MultiHtt
         }
 
         const host = await context.resolvePlayerContext(room.value.host.viewerId)
-        const establisherFollow = resolveRoomEstablisherFollowStateSync({
+        const establisherFollow = resolveRoomEstablisherFollowStateSafeSync({
             requester: context.snapshotProvider.getParticipant(viewerId),
             host: room.value.host,
             requesterPlayerId: ctx.playerId,

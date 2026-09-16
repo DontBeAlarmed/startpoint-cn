@@ -4,6 +4,8 @@ const assert = require("node:assert/strict")
 const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
+const { loadServerReleaseContract } = require("./server-bundle/release-contract.cjs")
+const currentDataSchema = loadServerReleaseContract(path.resolve(__dirname, "..")).currentDataSchema
 const test = require("node:test")
 const Sqlite = require("better-sqlite3")
 
@@ -46,7 +48,7 @@ test("migrates literal schema 23 to 24 and creates the public gift tables", () =
     fs.writeFileSync(path.join(process.env.DATA_DIR, "wdfp_data.version"), "23")
 
     const from23 = data.initializeDatabase()
-    assert.equal(from23.pragma("user_version", { simple: true }), 27)
+    assert.equal(from23.pragma("user_version", { simple: true }), currentDataSchema)
     assert.deepEqual(giftTables(from23), [
         "players_gift_redemptions",
         "server_gift_codes",

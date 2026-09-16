@@ -694,7 +694,10 @@ test("verifier enforces runtime, Node, data schema, entry, and admin compatibili
             dataSchema: releaseContract.currentDataSchema,
         }))
         assert.throws(
-            () => verifyServerBundle({ bundleRoot: fixture.outputRoot, dataSchema: 28 }),
+            () => verifyServerBundle({
+                bundleRoot: fixture.outputRoot,
+                dataSchema: releaseContract.currentDataSchema + 1,
+            }),
             /data schema/i,
         )
         rewriteManifest(fixture.outputRoot, manifest => { manifest.requires.minDataSchema = 2 })
@@ -702,7 +705,7 @@ test("verifier enforces runtime, Node, data schema, entry, and admin compatibili
 
         const targetFixture = buildFixture(t)
         rewriteManifest(targetFixture.outputRoot, manifest => {
-            manifest.requires.targetDataSchema = 28
+            manifest.requires.targetDataSchema = releaseContract.currentDataSchema + 1
         })
         assert.throws(() => verifyServerBundle({ bundleRoot: targetFixture.outputRoot }), /data schema/i)
     })

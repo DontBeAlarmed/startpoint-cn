@@ -38,7 +38,7 @@ const reviewedRawTableCalls = new Map([
     ["src/lib/mission/regular-state-facts.ts", ["mana_board.json"]], // Mana Board fact adapter
     ["src/lib/pass-card.ts", ["pass_card_event.json", "pass_card_event.json", "pass_card_reward.json"]], // Pass Card adapter
     ["src/lib/player-history-catalog.ts", ["player_history.json", "player_history_card_background.json", "player_history_topic.json"]], // Player History catalog
-    ["src/lib/player-rank-content.ts", ["cdndata/player_rank_full.json", "cdndata/player_rank.json"]], // Rank catalogs
+    ["src/lib/player-rank-content.ts", ["cdndata/player_rank_full.json"]], // Rank catalogs (unified full-table owner)
     ["src/lib/quest/daily-challenge.ts", ["daily_challenge_point_lookup.json", "event_challenge_point_map.json"]], // Daily Challenge catalog
     ["src/lib/quest/finish/raid-overall-rewards.ts", ["raid_event_overall_reward.json", "raid_event.json"]], // Raid reward catalog
     ["src/lib/quest/periodic-reward-content.ts", ["hard_multi_event.json", "periodic_reward_point.json", "periodic_reward.json", "hard_multi_event_quest.json"]], // Periodic reward catalog

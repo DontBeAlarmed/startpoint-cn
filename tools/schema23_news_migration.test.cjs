@@ -4,6 +4,8 @@ const assert = require("node:assert/strict")
 const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
+const { loadServerReleaseContract } = require("./server-bundle/release-contract.cjs")
+const currentDataSchema = loadServerReleaseContract(path.resolve(__dirname, "..")).currentDataSchema
 const test = require("node:test")
 const Sqlite = require("better-sqlite3")
 
@@ -50,7 +52,7 @@ test("migrates schema 22, creates an empty news table, and removes forced delive
     fs.writeFileSync(path.join(process.env.DATA_DIR, "wdfp_data.version"), "22")
 
     const migrated = data.initializeDatabase()
-    assert.equal(migrated.pragma("user_version", { simple: true }), 27)
+    assert.equal(migrated.pragma("user_version", { simple: true }), currentDataSchema)
     assert.deepEqual(migrated.prepare("SELECT * FROM server_news").all(), [])
     assert.equal(forcedNewsCount(migrated), 0)
     assert.equal(migrated.prepare(
@@ -67,7 +69,7 @@ test("creates a new database with an empty server-owned news table", () => {
     process.env.DATA_DIR = path.join(freshDirectory, "data")
 
     const fresh = data.initializeDatabase()
-    assert.equal(fresh.pragma("user_version", { simple: true }), 27)
+    assert.equal(fresh.pragma("user_version", { simple: true }), currentDataSchema)
     assert.deepEqual(fresh.prepare("SELECT * FROM server_news").all(), [])
     assert.equal(hasNewsAsset(path.join(freshDirectory, "assets")), false)
 })

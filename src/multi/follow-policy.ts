@@ -41,3 +41,17 @@ export function resolveRoomEstablisherFollowStateSync(input: {
     const getRelation = input.getRelation ?? getLocalFollowRelationSync
     return getRelation(input.requesterPlayerId, input.hostPlayerId).state
 }
+
+/**
+ * 轻量房间路由用：关系读取失败（如纯内存测试桩无数据库）时 fail-closed 为 0，
+ * 与“不可信/未解析 → 无加成”语义一致。开战计费路径不走此包装（成本必须权威）。
+ */
+export function resolveRoomEstablisherFollowStateSafeSync(input: Parameters<
+    typeof resolveRoomEstablisherFollowStateSync
+>[0]): LocalFollowState {
+    try {
+        return resolveRoomEstablisherFollowStateSync(input)
+    } catch {
+        return 0
+    }
+}
