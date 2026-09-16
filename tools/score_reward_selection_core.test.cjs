@@ -161,3 +161,32 @@ test("core accepts valid Rare groups whose probability total is below or equal t
     assert.equal(base([0, 0], [reward(1, 0.4), reward(2, 0.6)]).plan.entries.length, 1)
     assert.equal(base([0, 0.2], [reward(1, 0.4), reward(2, 0.2)]).plan.entries.length, 1)
 })
+
+test("core routes Rare ITEM rewards through the event currency resolver boundary", () => {
+    const { selectScoreRewardGrantPlanCore } = require(corePath)
+    const { RewardType, ScoreRewardType } = require("../src/lib/types/rewards")
+    const calls = []
+    const selection = selectScoreRewardGrantPlanCore({
+        groupId: 8804,
+        scoreRewards: [{ position: 1, type: ScoreRewardType.RARE_POOL, id: 9904, rarity: 1 }],
+        boostPointUsed: false,
+        commonRewardCount: 0,
+        random: sequence([0, 0], []),
+        rewardCampaignRates: { item: 1, exp: 1, mana: 1 },
+        rewardDate: new Date("2025-01-02T03:04:05.000Z"),
+        dropMultiplier: 1,
+    }, {
+        getRareScoreRewardGroup: () => [
+            { position: 2, type: RewardType.ITEM, id: 400009, count: 3, rarity: 1 },
+        ],
+        resolveEventCurrencyId(itemId, rewardDate) {
+            calls.push([itemId, rewardDate.toISOString()])
+            return itemId + 70000
+        },
+        resolveContextualItemId: () => 1,
+    })
+    assert.deepEqual(calls, [[400009, "2025-01-02T03:04:05.000Z"]])
+    assert.deepEqual(selection.plan.entries, [
+        { type: RewardType.ITEM, id: 470009, count: 3 },
+    ])
+})
