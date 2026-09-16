@@ -39,6 +39,7 @@ export interface CnCdnFilesRouteOptions {
 interface OpenedFile {
     readonly handle: FileHandle
     readonly size: number
+    readonly mtimeMs: number
 }
 
 interface CatalogZipLocation {
@@ -270,7 +271,7 @@ async function openSafeFile(
             || expectedIdentity !== undefined && !matchesFileIdentity(fileStat, expectedIdentity)) {
             throw new Error("file identity or size changed while opening")
         }
-        return { handle, size: fileStat.size }
+        return { handle, size: fileStat.size, mtimeMs: fileStat.mtimeMs }
     } catch (error) {
         await closeObserved(handle, observer)
         throw error
@@ -300,7 +301,11 @@ function sendOpenedFile(
             .send())
     }
 
-    reply.type(contentType(relativePath)).header("Accept-Ranges", "bytes")
+    // CN 客户端 IntermediateDownloadFilesLoader 持久化 Last-Modified 并在后续请求回发
+    // If-Modified-Since；这里只投影文件 mtime，不改变现有缓存/404 行为。
+    reply.type(contentType(relativePath))
+        .header("Accept-Ranges", "bytes")
+        .header("Last-Modified", new Date(openedFile.mtimeMs).toUTCString())
     if (range.kind === "partial") {
         const contentLength = range.end - range.start + 1
         reply
