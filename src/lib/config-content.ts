@@ -36,6 +36,12 @@ export interface CrazyGachaPolicy {
     readonly tenDrawMaxCount: number
 }
 
+export interface SocialCapacityPolicy {
+    readonly maxFollows: number
+    readonly maxFollowers: number
+    readonly maxDisplayFollowers: number
+}
+
 const rawByRepository = new WeakMap<ReadonlyContentRepository, RawConfig>()
 const currencyByRepository = new WeakMap<ReadonlyContentRepository, CurrencyCapacityPolicy>()
 const staminaByRepository = new WeakMap<ReadonlyContentRepository, StaminaContentPolicy>()
@@ -43,6 +49,7 @@ const equipmentCurrencyByRepository = new WeakMap<ReadonlyContentRepository, Equ
 const singleContinueByRepository = new WeakMap<ReadonlyContentRepository, SingleContinuePolicy>()
 const multiRewardByRepository = new WeakMap<ReadonlyContentRepository, MultiRewardPolicy>()
 const crazyGachaByRepository = new WeakMap<ReadonlyContentRepository, CrazyGachaPolicy>()
+const socialCapacityByRepository = new WeakMap<ReadonlyContentRepository, SocialCapacityPolicy>()
 
 function invalid(field: string): never {
     throw new TypeError(`invalid config content field: ${field}`)
@@ -110,6 +117,22 @@ export function getStaminaPolicySync(
         maxOverflow: nonNegativeSafeInteger(raw, "max_stamina_overflow"),
     })
     staminaByRepository.set(selected, policy)
+    return policy
+}
+
+export function getSocialCapacityPolicySync(
+    repository?: ReadonlyContentRepository,
+): SocialCapacityPolicy {
+    const selected = selectedRepository(repository)
+    const cached = socialCapacityByRepository.get(selected)
+    if (cached !== undefined) return cached
+    const raw = rawConfig(selected)
+    const policy = deepFreeze({
+        maxFollows: nonNegativeSafeInteger(raw, "max_follows_count"),
+        maxFollowers: nonNegativeSafeInteger(raw, "max_followers_count"),
+        maxDisplayFollowers: nonNegativeSafeInteger(raw, "max_display_followers_count"),
+    })
+    socialCapacityByRepository.set(selected, policy)
     return policy
 }
 

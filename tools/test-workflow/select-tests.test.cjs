@@ -2022,6 +2022,8 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/test-workflow/database-lifecycle.test.cjs",
         "tools/test-workflow/runtime-data-paths.test.cjs",
         "tools/test-workflow/schema20_resource_migration.test.cjs",
+        "tools/schema28_follow_migration.test.cjs",
+        "tools/follow_domain.test.cjs",
         "tools/stamina_serialization.test.cjs",
         "tools/sql_write_shape.test.cjs",
     ])

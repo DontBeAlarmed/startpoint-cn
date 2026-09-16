@@ -247,6 +247,7 @@ test("player save registry covers every current player-owned table", () => {
     assert.deepEqual(excluded, [
         "players_active_quests",
         "players_gift_redemptions",
+        "players_follows",
         "players_scheduled_resource_state",
         "scheduled_resource_rules",
     ])
@@ -552,7 +553,7 @@ test("v2 validation rejects future schemas and missing tables that existed in th
     const snapshot = exportPlayerSaveV2Sync(playerId)
 
     const future = cloneJson(snapshot)
-    future.producer.dbSchemaVersion = 28
+    future.producer.dbSchemaVersion = 29
     assert.throws(() => restorePlayerSaveV2Sync(future, playerId), /newer.*schema|future.*schema/i)
 
     const starsState = (gachaId = 80000) => ({

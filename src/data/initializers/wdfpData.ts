@@ -10,6 +10,7 @@ import {
 import { ensureSchemaColumn } from "../schema";
 import { initializeServerNewsSchemaSync } from "../schema/server-news";
 import { initializeServerGiftsSchemaSync } from "../schema/server-gifts";
+import { initializePlayerFollowsSchemaSync } from "../schema/player-follows";
 import { pruneSpecialEventPartyGroupsSync } from "../../lib/party-group-persistence";
 import { getRealNow } from "../../runtime/time/game-time";
 
@@ -59,6 +60,7 @@ export default function init(
 
     initializeServerNewsSchemaSync(database)
     initializeServerGiftsSchemaSync(database)
+    initializePlayerFollowsSchemaSync(database)
 
     // create players table
     database.prepare(`CREATE TABLE IF NOT EXISTS accounts (
