@@ -1,5 +1,5 @@
 import { Gacha, GachaRuntimeBanner } from "./types";
-import { getGachaTicketCost } from "./gacha-ticket";
+import { getConfiguredTicketWildcardFallbackCost, getGachaTicketCost } from "./gacha-ticket";
 import { GACHA_EXEC_TYPES, GACHA_PAYMENT_TYPES, isGachaExecAllowed, isGachaExecCountAllowed } from "./gacha-rules";
 
 export interface GachaExecPlayerFunds {
@@ -156,9 +156,29 @@ export function buildGachaExecPlan(input: BuildGachaExecPlanInput): GachaExecPla
                 return badRequest("Invalid payment type.")
             }
 
-            const beforeCount = input.getTicketCount?.(ticketCost.itemId) ?? -1
-            const afterCount = beforeCount - ticketCost.useTicketCount
+            let itemId = ticketCost.itemId
+            let beforeCount = input.getTicketCount?.(itemId) ?? -1
+            let afterCount = beforeCount - ticketCost.useTicketCount
             if (afterCount < 0) {
+                // 配置票不足：仅在 wildcardTicketAvailable=true 时回退同类通用票
+                const fallback = getConfiguredTicketWildcardFallbackCost(execType, numberOfExec, gacha)
+                if (fallback !== null) {
+                    const fallbackBefore = input.getTicketCount?.(fallback.itemId) ?? -1
+                    const fallbackAfter = fallbackBefore - fallback.useTicketCount
+                    if (fallbackAfter >= 0) {
+                        itemId = fallback.itemId
+                        beforeCount = fallbackBefore
+                        afterCount = fallbackAfter
+                        plan.pullCount = fallback.pullCount
+                        plan.ticket = {
+                            itemId,
+                            beforeCount,
+                            afterCount,
+                            useTicketCount: fallback.useTicketCount,
+                        }
+                        break
+                    }
+                }
                 return badRequest("Not enough tickets.")
             }
 

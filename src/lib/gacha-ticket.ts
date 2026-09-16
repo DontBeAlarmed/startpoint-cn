@@ -1,4 +1,4 @@
-import { Gacha, GachaRuntimeBanner } from "./types";
+import { Gacha, GachaRuntimeBanner, GachaType } from "./types";
 import { GACHA_EXEC_TYPES, ticketExecMatchesGachaType } from "./gacha-rules";
 
 export const GACHA_TICKET_ITEM_IDS = {
@@ -34,6 +34,34 @@ function getWildcardTicketItemId(gacha: GachaTicketDefinition | undefined, type:
         default:
             return null;
     }
+}
+
+/**
+ * 配置票不足时的通用票回退：仅在卡池 wildcardTicketAvailable=true 时，
+ * 把配置票 exec 映射到同类通用票（装备池 → 装备通用票）。不可用时返回 null。
+ */
+export function getConfiguredTicketWildcardFallbackCost(
+    type: number,
+    numberOfExec: number,
+    gacha: GachaTicketDefinition | undefined,
+): GachaTicketCost | null {
+    if (gacha === undefined || gacha.wildcardTicketAvailable !== true) return null;
+    const equipment = "kind" in gacha
+        ? gacha.kind === "equipment"
+        : gacha.type === GachaType.WEAPON;
+    let wildcardType: number | null = null;
+    if (type === GACHA_EXEC_TYPES.SINGLE_CONFIGURED_TICKET) {
+        wildcardType = equipment
+            ? GACHA_EXEC_TYPES.SINGLE_WEAPON_TICKET
+            : GACHA_EXEC_TYPES.SINGLE_TICKET;
+    } else if (type === GACHA_EXEC_TYPES.MULTI_CONFIGURED_TICKET) {
+        wildcardType = equipment
+            ? GACHA_EXEC_TYPES.MULTI_WEAPON_TICKET
+            : GACHA_EXEC_TYPES.MULTI_TICKET;
+    } else {
+        return null;
+    }
+    return getGachaTicketCost(wildcardType, numberOfExec, gacha);
 }
 
 function getTicketItemId(gacha: GachaTicketDefinition | undefined, type: number): number | null {
