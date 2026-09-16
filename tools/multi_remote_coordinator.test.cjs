@@ -738,7 +738,7 @@ test("actual missing rooms keep only the existing missing-room branches", async 
     assert.equal(prepare.data.raising_state, 9)
 })
 
-test("full rooms use the client-native raising_state 3 for select and prepare", async t => {
+test("full rooms keep select_room raising_state 3 and route prepare to 4507", async t => {
     const target = await routeServer({ result: { ok: false, error: "ROOM_FULL" } })
     t.after(() => target.app.close())
 
@@ -752,7 +752,8 @@ test("full rooms use the client-native raising_state 3 for select and prepare", 
     }))
 
     assert.equal(select.data.raising_state, 3)
-    assert.equal(prepare.data.raising_state, 3)
+    assert.equal(prepare.data_headers.result_code, 4507)
+    assert.equal("raising_state" in prepare.data, false)
 })
 
 test("battle-started rooms use the client-native raising_state 4 for select and prepare", async t => {
