@@ -24,7 +24,8 @@
 | `/episode_trial_reading/finish` | 返回空对象 | CN 客户端请求只携带 `character_id`、`quest_id`，完成回调不合并持久字段；它是卡池角色剧情试读，不是普通角色剧情阅读记录 |
 | `/patch/cn/recovery/empty.csv` | 返回恢复流程所需空文件 | CDN 恢复协议兼容资源，不代表缺少业务实现 |
 | `/reproduce/post` | 接受后丢弃设备诊断日志 | 项目不收集玩家设备日志；属于隐私边界内的兼容接收，不是存档恢复能力 |
-| `/follow/lists`、`/sns/get` | 返回空关注列表和空社交账号信息 | 当前只消除菜单 H404；关注关系及 Hub 跨服社交明确延期，不得标记为已实现 |
+| `/sns/get` | 返回空社交账号信息 | 社交账号绑定（Twitter 等）关闭，属于外围平台能力 |
+| `/follow/search_twitter` | 未实现（H404 → 客户端通用错误） | Twitter 好友搜索明确延期；不得伪造搜索结果 |
 | `/party/publish` | 校验会话后返回固定占位 `party_code`，不存储编队快照；`/party/refer` 未注册（code 不可解析） | 跨节点 Party Code 目录所有权未定，明确延期；客户端 3403/3404/3405 错误语义与所有权方案比较见仓外 Gate C 设计报告 |
 | 联机 `/micro_community` | 返回空对象，不发布到外部社区 | 外部社区关闭；本地房间不依赖该入口 |
 | 联机 `/publish_room` | 返回 `success: false` | 客户端会读取该布尔值，不能用空对象伪造发布成功 |

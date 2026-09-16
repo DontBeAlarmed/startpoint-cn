@@ -23,6 +23,7 @@
 - [数据库热路径第一阶段优化](./database-hot-path-optimization.md)
 - [配队装备与魂珠校验](./party-loadout-validation.md)
 - [经验池边界](./exp-pool.md)
+- [同服 Follow 与跨服房间兼容](./follow.md)
 - [背包与装备写入事务](./inventory-write-transactions.md)
 - [奖励发放事务](./reward-grant-transactions.md)
 - [漫画](./comic.md)

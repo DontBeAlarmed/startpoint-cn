@@ -127,7 +127,7 @@ Bundle 不包含：
 
 默认开发路径是项目根的 `.database`。嵌入模式必须显式传入由 Supervisor 管理的绝对 `DATA_DIR`。服务端在打开数据库前解析现有祖先的物理路径，拒绝 Data Volume 与 Server Bundle 或 local CDN 相等、互为祖先/后代；通过祖先符号链接指回这些只读输入也会被拒绝。替换 Server Bundle 不得覆盖 Data Volume。
 
-数据库 schema 由服务端代码拥有。当前 Bundle 接受 schema `0..27`，启动时由服务端事务化迁移到 `27`，并拒绝高于 `27` 的数据库。集中发布契约锚点以本文档末尾的 `release-contract` 块为准。Supervisor 只在停服后复制备份，不直接执行 SQL。
+数据库 schema 由服务端代码拥有。当前 Bundle 接受 schema `0..28`，启动时由服务端事务化迁移到 `28`，并拒绝高于 `28` 的数据库。集中发布契约锚点以本文档末尾的 `release-contract` 块为准。Supervisor 只在停服后复制备份，不直接执行 SQL。
 
 ### Asset Provider
 
@@ -160,7 +160,7 @@ manifest 核心字段如下：
     "node": ">=20.12.0",
     "dependencyLock": "sha256:<package-lock digest>",
     "minDataSchema": 0,
-    "targetDataSchema": 27
+    "targetDataSchema": 28
   },
   "admin": {
     "path": "web/dist",
@@ -282,7 +282,7 @@ Session 服务当前是否可用；它不是所有运行模式的共同 ready �
   },
   "database": {
     "ready": true,
-    "schema": 27
+    "schema": 28
   },
   "services": {
     "http": true,
@@ -369,7 +369,7 @@ Builder 和服务进程都不能自行操作这些指针。
 {
   "serverManifestSchemaVersion": 3,
   "runtimeApiVersion": 1,
-  "currentDataSchema": 27,
+  "currentDataSchema": 28,
   "serverEntry": "out/cn-server.js",
   "localPrepareEntry": "out/content/sync/entry.js",
   "adminPath": "web/dist",

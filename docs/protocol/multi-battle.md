@@ -175,7 +175,7 @@ Session TCP 在正常 `stop`、fatal teardown 和 startup failure 路径都会�
 
 | 路由 | 当前职责 |
 |---|---|
-| `start` | 重新校验请求节点与房间固定兼容性、玩家成员身份及关卡一致性；兼容性校验在任何本地扣费或 active quest 写入前完成。每位真人分别写入 active quest，仅房主预扣体力和 Always 门票；`raising_state=4` 已由 TCP StartBattle 建立 |
+| `start` | 重新校验请求节点与房间固定兼容性、玩家成员身份及关卡一致性；兼容性校验在任何本地扣费或 active quest 写入前完成。每位真人分别写入 active quest：房主预扣完整体力和 Always 门票，guest 按 Follow 关系计费（互关/可信跨服 0，其余折半后应用 Campaign，见 [同服 Follow 与跨服房间兼容](../systems/follow.md)）；`raising_state=4` 已由 TCP StartBattle 建立 |
 | `finish` | 由 Hub 授权 retained completion fact，再按 `play_id + category + quest_id` 校验多人 active quest，并拒绝负 Mana、非法分数/耗时、continue 次数或 Boost 余额不一致；各节点只结算自己的存档，全部剩余真人 Finalize 后由 coordinator 把房间恢复为状态 1 |
 | `abort` | 先在本地事务中退款并取消 active quest，提交后再 best-effort 通知 coordinator；房主放弃时解散房间，成员放弃时从权威当局参与者中移除并立即重判剩余成员是否全部 Finalize |
 | `play_continue` | 同时核对内存与 SQLite active quest；SQLite 提交成功后才更新内存 continue count。当前多人续关不扣星导石 |
