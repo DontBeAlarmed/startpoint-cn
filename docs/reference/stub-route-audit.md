@@ -25,6 +25,7 @@
 | `/patch/cn/recovery/empty.csv` | 返回恢复流程所需空文件 | CDN 恢复协议兼容资源，不代表缺少业务实现 |
 | `/reproduce/post` | 接受后丢弃设备诊断日志 | 项目不收集玩家设备日志；属于隐私边界内的兼容接收，不是存档恢复能力 |
 | `/follow/lists`、`/sns/get` | 返回空关注列表和空社交账号信息 | 当前只消除菜单 H404；关注关系及 Hub 跨服社交明确延期，不得标记为已实现 |
+| `/party/publish` | 校验会话后返回固定占位 `party_code`，不存储编队快照；`/party/refer` 未注册（code 不可解析） | 跨节点 Party Code 目录所有权未定，明确延期；客户端 3403/3404/3405 错误语义与所有权方案比较见仓外 Gate C 设计报告 |
 | 联机 `/micro_community` | 返回空对象，不发布到外部社区 | 外部社区关闭；本地房间不依赖该入口 |
 | 联机 `/publish_room` | 返回 `success: false` | 客户端会读取该布尔值，不能用空对象伪造发布成功 |
 | 联机 `/share_room` | 仅房主可调用并返回空成功对象 | 客户端成功回调不读取业务字段；本地 room number 和随机 token 由房间模块维护 |
