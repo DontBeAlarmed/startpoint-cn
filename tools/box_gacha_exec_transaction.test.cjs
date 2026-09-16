@@ -471,7 +471,7 @@ test("featured early stop charges only the actual draw count", async () => {
     )
 })
 
-test("box gacha keeps its legacy empty joined-character projection for a real new-character draw", async () => {
+test("box gacha projects a real new-character draw into the joined list", async () => {
     const { playerId, viewerId } = await createPlayer("box-character-projection")
 
     const response = await execBox(viewerId, 4, 1, false)
@@ -479,7 +479,7 @@ test("box gacha keeps its legacy empty joined-character projection for a real ne
     assert.equal(response.statusCode, 200, response.body)
     const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
     assert.notEqual(getPlayerCharacterSync(playerId, REWARD_CHARACTER_ID), null)
-    assert.deepEqual(payload.data.joined_character_id_list, [])
+    assert.deepEqual(payload.data.joined_character_id_list, [REWARD_CHARACTER_ID])
     assert.equal(payload.data.character_list.length, 1)
     assert.equal(payload.data.character_list[0].character_id, REWARD_CHARACTER_ID)
     assert.equal(payload.data.item_list[CURRENCY_ITEM_ID], 990)
