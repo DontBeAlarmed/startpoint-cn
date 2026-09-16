@@ -288,6 +288,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/quest_reward_route_boundary.test.cjs",
             "tools/first_clear_reward.test.cjs",
             "tools/news-visibility.test.cjs",
+            "tools/news_html_shell_projection.test.cjs",
             "tools/news_routes.test.cjs",
             "tools/forced_news_route.test.cjs",
         ],

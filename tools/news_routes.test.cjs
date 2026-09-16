@@ -140,7 +140,7 @@ test("news index filters by category and projects SQLite rows for the client", a
         id: higherId,
         title: "higher same second",
         date: "2026-08-30 16:00:00",
-        html: "<p>higher same second</p>",
+        html: "<html><body><p>higher same second</p></body></html>",
         label: 4,
         thumbnail: 7,
         thumbnail_path: null,

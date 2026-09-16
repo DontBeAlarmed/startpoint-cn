@@ -21,12 +21,23 @@ export function toCnClientNewsDate(iso: string): string {
     return shifted.toISOString().slice(0, 19).replace("T", " ")
 }
 
+// CN 1.8.1 NewsDetailDialog 将 news.html 交给 RichTextLayoutParser（flash.Xml.parse，
+// 严格 XML 单根）并按完整 <html><body> 文档下钻（客户端自带 fixture 即完整文档，
+// parseChild 分支表不含 html/body）。存储层只保存正文片段，且 validateNewsRichText
+// 允许多根片段，因此仅在此客户端投影层包装 shell；已完整包装的内容原样透传。
+export function toClientNewsHtml(bodyRichText: string): string {
+    const trimmed = bodyRichText.trim()
+    if (trimmed === "") return "<html><body></body></html>"
+    if (/^<(?:!doctype\s+html|html[\s>]|body[\s>])/i.test(trimmed)) return trimmed
+    return `<html><body>${trimmed}</body></html>`
+}
+
 export function toClientNews(row: ServerNewsRow): ClientNewsItem {
     return {
         id: row.id,
         title: row.title,
         date: toCnClientNewsDate(row.publishedAtReal),
-        html: row.bodyRichText,
+        html: toClientNewsHtml(row.bodyRichText),
         label: row.label,
         thumbnail: row.thumbnail,
         thumbnail_path: null,
