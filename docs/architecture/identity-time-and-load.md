@@ -31,25 +31,21 @@ sequenceDiagram
     S->>V: 建立 VIEWER session
     S-->>C: viewer_id + login_token
     C->>L: viewer_id
-    L->>V: 优先查询 session
-    alt session 存在
-        V-->>L: account_id
-    else session 缺失（当前兼容回退）
-        L->>L: viewer_id / keychain 作为 account_id
-    end
+    L->>V: 查询并校验 VIEWER session
+    V-->>L: account_id；缺失或类型不符则拒绝
     L->>P: 解析账号级默认 player
     P-->>L: player_id
     Note over S,L: 游戏身份不依赖全局 active player
     Note over C,A: 继承码迁移是独立事务：验证目标后重绑设备与 session，并记录审计
 ```
 
-设备注册的身份提供者只负责解析外部身份；账号、默认 player、设备绑定和 VIEWER session 仍由路由与领域层持有。当前 `/load` 保留 session 缺失时的兼容回退，这属于现状而不是推荐给新身份提供者的主路径。
+设备注册的身份提供者只负责解析外部身份；账号、默认 player、设备绑定和 VIEWER session 仍由路由与领域层持有。当前 `/load` 不接受 session 缺失时的 viewer_id/keychain 身份回退；缺少有效 VIEWER session 直接拒绝请求。新身份提供者必须先完成标准 session 建立，再进入存档加载链路。
 
 | 事实 | 证据 |
 |---|---|
 | 已知设备复用账号，新设备创建账号和默认 player | `src/routes/cn/tool.ts` |
 | 身份提供者与账号/session/player 存储解耦 | `src/lib/account-identity-provider.ts` |
-| `/load` 使用 session 优先和 viewer/keychain 兼容回退 | `src/routes/cn/load.ts` |
+| `/load` 要求有效 VIEWER session 后解析 account_id → player_id | `src/routes/cn/load.ts` |
 | account 再解析账号级默认 player | `src/data/activeAccount.ts` |
 | 继承事务重绑设备与 session 并记录审计 | `src/routes/cn/takeOver.ts` |
 
@@ -107,7 +103,7 @@ sequenceDiagram
     participant R as MsgPack 响应
 
     C->>L: viewer_id + load 请求
-    L->>ID: session 优先；缺失时 viewer_id / keychain 兼容回退
+    L->>ID: 校验 VIEWER session，再解析 account_id → player_id
     ID-->>L: player_id
     L->>PRE: 日切、真实经过时间资源结算、永久修复
     L->>BONUS: 按虚拟业务日选择 CDN 有效组并结算

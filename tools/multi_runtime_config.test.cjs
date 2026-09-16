@@ -16,6 +16,7 @@ const releaseContract = loadServerReleaseContract(projectRoot)
 const { parseCnRuntimeConfig } = require("../src/runtime/config")
 const { resolveDisplayHost } = require("../src/runtime/network-host")
 const { createMultiRuntimeService } = require("../src/multi/runtime/service")
+const { createRoom, disbandRoom } = require("../src/multi/room/manager")
 const { RemoteMultiCoordinator } = require("../src/multi/coordinator/remote")
 const {
     AuthenticationRejectionBuffer,
@@ -579,6 +580,29 @@ function hostRuntimeConfig(label = "hub.internal") {
         credentialsPath: path.join(os.tmpdir(), `unused-${label}-credentials.json`),
     }
 }
+
+test("host runtime admission does not reserve a second seat for an occupied member", async t => {
+    const harness = createServiceHarness()
+    await harness.service.start(hostRuntimeConfig("occupied-member"))
+    t.after(async () => {
+        await harness.service.stop()
+        if (room) disbandRoom(room.room_number)
+    })
+
+    const room = createRoom(701, 1701, 1, 1, 2701, 1, 3701)
+    const registry = harness.hostServices().admissionRegistry
+    const issue = (viewerId, nodeSessionId) => registry.issue({
+        roomNumber: room.room_number,
+        participant: { viewerId, nodeSessionId },
+        snapshot: { viewerId },
+        expiresAt: Date.now() + 60_000,
+    })
+
+    assert.equal(issue(701, "host-node").ok, true)
+    assert.equal(issue(702, "guest-node-1").ok, true)
+    assert.equal(issue(703, "guest-node-2").ok, true)
+    assert.deepEqual(issue(704, "guest-node-3"), { ok: false, error: "ROOM_FULL" })
+})
 
 test("runtime service forwards multiplayer tuning to the TCP lifecycle", async () => {
     const received = []

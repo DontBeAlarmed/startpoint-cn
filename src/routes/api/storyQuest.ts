@@ -44,12 +44,20 @@ interface FinishWithSkipBody {
     api_count: number
 }
 
+function isStoryFinishCategory(category: number): boolean {
+    return category === QuestCategory.MAIN || category === QuestCategory.CHARACTER
+}
+
 function processStoryQuestFinish(
     playerId: number,
     viewerId: number,
     questSection: number,
     questId: number,
 ) {
+    if (!isStoryFinishCategory(questSection)) {
+        console.log(`[STORY] category is not supported by story finish: category=${questSection}`)
+        return null
+    }
     const questData = getQuestFromCategorySync(questSection, questId)
     if (questData === null) {
         console.log(`[STORY] quest not found: category=${questSection} questId=${questId}`)

@@ -44,6 +44,15 @@ require.cache[snapshotModulePath] = {
         },
     },
 }
+const adminModulePath = require.resolve("./src/runtime/admin")
+require.cache[adminModulePath] = {
+    id: adminModulePath,
+    filename: adminModulePath,
+    loaded: true,
+    exports: {
+        registerAdminUi() {},
+    },
+}
 require("./src/server")
 `
     const env = {

@@ -261,6 +261,21 @@ const getCharacterManaNodesSync = (characterId, level) => getCharacterGrowthCont
     assert.deepEqual(decode(skipResponse).data.story_join_character_id_list, [213013])
     assert.ok(getPlayerCharacterSync(skipped.playerId, 213013))
 
+    const battleCategory = await createPlayer(8)
+    const battleCategoryResponse = await finish(
+        app,
+        battleCategory.viewerId,
+        1001,
+        "/story/finish",
+        11,
+    )
+    assert.equal(battleCategoryResponse.statusCode, 400)
+    assert.equal(
+        getPlayerSingleQuestProgressSync(battleCategory.playerId, 11, 1001),
+        null,
+        "battle event categories must not enter the story finish path",
+    )
+
     const town = await createPlayer(3)
     const prematureTownClaim = await app.inject({
         method: "POST",

@@ -1269,7 +1269,7 @@ test("newbie ten-ticket gacha consumes the configured 70030 ticket", async () =>
     assert.equal(getPlayerCollectedItemTotalSync(playerId, 70030), collectedBefore)
     const ticketWrites = routeSql.statements.filter(sql => (
         /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql)
-        && /VALUES\s*\(70030(?:\.0+)?,\s*0(?:\.0+)?,/i.test(sql)
+        && /(?:VALUES\s*|,\s*)\(70030(?:\.0+)?,\s*0(?:\.0+)?,/i.test(sql)
     ))
     assert.equal(ticketWrites.length, 1, routeSql.statements.filter(sql => (
         /^\s*INSERT\s+INTO\s+players_items\b/i.test(sql)

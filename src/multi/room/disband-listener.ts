@@ -4,11 +4,9 @@ import { setRoomDisbandListener } from "./manager"
 
 /**
  * Every disband path funnels through manager.disbandRoom, which invokes the
- * registered room disband listener. All callers rely on this choke point for
- * the client dismissal, socket teardown and abandoned active-quest release —
- * clients only leave the room on the dismissed message
- * (MultiBattleRoomScene), so a silent delete leaves ghost sockets bound to a
- * recyclable room number.
+ * registered room disband listener. The listener owns client dismissal,
+ * socket teardown and abandoned active-quest release so callers do not emit
+ * a second dismissal before deleting the room.
  */
 export function installDisbandLifecycleListener(): void {
     setRoomDisbandListener((roomNumber, hostPlayerId) => {

@@ -533,9 +533,6 @@ function disconnectRoomClient(client: SessionClient, reason: "network" | "explic
         return
     }
 
-    if (isHost && !preserveActiveBattle) {
-        sessionManager.broadcastToRoom(client.roomNumber, [1, [6, "multibattle_room_dismissed"]])
-    }
     for (const connectedClient of sessionManager.getClientsInRoom(client.roomNumber)) {
         if (connectedClient !== client) {
             connectedClient.mates = connectedClient.mates

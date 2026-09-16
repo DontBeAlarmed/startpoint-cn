@@ -312,11 +312,20 @@ test("a transport disconnect preserves the room for restore", t => {
 })
 
 test("an explicit host Bye disbands the room even while guests remain", t => {
-    const { room, host } = createLobbyRoom(t, 498, [598])
+    installDisbandLifecycleListener()
+    t.after(() => setRoomDisbandListener(null))
+    const { room, host, guests } = createLobbyRoom(t, 498, [598])
 
     handleMessage(host.socket, [0, [1]])
 
     assert.equal(getRoom(room.room_number), undefined)
+    assert.equal(
+        guests[0].socket.writes.filter(message => (
+            JSON.stringify(message) === JSON.stringify([1, [6, "multibattle_room_dismissed"]])
+        )).length,
+        1,
+        "guests must receive exactly one dismissal from the disband listener",
+    )
 })
 
 test("a host Bye after StartBattle preserves the active battle room", t => {
