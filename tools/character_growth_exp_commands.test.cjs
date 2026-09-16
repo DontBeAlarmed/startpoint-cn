@@ -150,3 +150,47 @@ test("reward EXP keeps character and bond-token reads before its single batch wr
     assert.doesNotMatch(source.slice(batchWrite), /getPlayerCharactersWithStoredGrowthByIdsSync\(/)
     assert.doesNotMatch(source.slice(batchWrite), /getPlayerSync\(/)
 })
+
+test("inject_exp leaves the save untouched when the pool is insufficient", () => {
+    const fixture = createCharacterGrowthC4Fixture()
+    try {
+        const playerId = fixture.createPlayer()
+        fixture.setPlayer(playerId, { expPool: 100 })
+        fixture.addCharacter(playerId, 1, { exp: 50 })
+
+        const characterBefore = fixture.db.prepare(
+            "SELECT exp FROM players_characters WHERE player_id = ? AND id = ?",
+        ).get(playerId, 1)
+        const countersBefore = fixture.db.prepare(
+            "SELECT * FROM players_active_mission_counters WHERE player_id = ?",
+        ).get(playerId)
+
+        assert.throws(
+            () => exp.executeInjectCharacterExp({
+                playerId,
+                characterId: 1,
+                addExp: 101,
+                evaluationTime: new Date("2026-08-31T00:00:00.000Z"),
+            }),
+            error => error.code === "INSUFFICIENT_EXP",
+        )
+
+        assert.equal(fixture.setPlayer(playerId, {}).expPool, 100, "经验池不得被扣减")
+        assert.deepEqual(
+            fixture.db.prepare(
+                "SELECT exp FROM players_characters WHERE player_id = ? AND id = ?",
+            ).get(playerId, 1),
+            characterBefore,
+            "角色经验不得被写入",
+        )
+        assert.deepEqual(
+            fixture.db.prepare(
+                "SELECT * FROM players_active_mission_counters WHERE player_id = ?",
+            ).get(playerId),
+            countersBefore,
+            "Active Mission 注入计数不得被推进",
+        )
+    } finally {
+        fixture.cleanup()
+    }
+})

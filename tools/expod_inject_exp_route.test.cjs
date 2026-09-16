@@ -245,8 +245,13 @@ async function main() {
             url: "/inject_exp",
             payload: { viewer_id: 123, character_id: 100001, exp: 1001 },
         })
-        assert.equal(over.statusCode, 400)
-        assert.equal(state().expPool, 1000, "超额消费必须拒绝且保持余额")
+        // CN 1.8.1 ExpodInjectExpRemoteInput 只有 Finished；任意 4xx 走通用错误通道
+        // （错误框 + 踢回标题）。经验不足以 200 + 未变更事实回复，且不写入任何存档。
+        assert.equal(over.statusCode, 200, over.body)
+        assert.equal(state().expPool, 1000, "超额消费必须保持余额")
+        const overData = unpack(over.rawPayload).data
+        assert.deepEqual(overData.add_exp_list, [])
+        assert.equal(overData.user_info.exp_pool, 1000)
     } finally {
         await fastify.close()
         db.close()

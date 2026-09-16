@@ -13,6 +13,7 @@ import { getMailArrivedSync } from "../../lib/mail-notification"
 import { getRealNow } from "../../runtime/time/game-time"
 import { generateDataHeaders } from "../../utils"
 import { executeInjectCharacterExp } from "../../lib/character-growth/commands/inject-exp"
+import { CharacterGrowthError } from "../../lib/character-growth/errors"
 import { executeStackToExp } from "../../lib/character-growth/commands/stack-to-exp"
 import { executeBulkStackToExp } from "../../lib/character-growth/commands/bulk-stack-to-exp"
 import { projectItemOverflowCommonResponse } from "../../lib/item-overflow/common-response"
@@ -233,6 +234,30 @@ const routes = async (fastify: FastifyInstance) => {
                 },
             })
         } catch (error) {
+            // CN 1.8.1 ExpodInjectExpRemoteInput 只有 Finished 一个构造，且 successHandler
+            // 不解析响应体；任意 4xx 都走通用错误通道（错误框 + 踢回标题）。经验池不足
+            // 属于客户端本地池过期的良性竞态：以 200 + 未变更事实回复，命令层已在任何
+            // 写入前抛出，存档不受影响。其余错误保持 4xx/5xx。
+            if (error instanceof CharacterGrowthError && error.code === "INSUFFICIENT_EXP") {
+                const player = getPlayerSync(resolved.playerId)
+                if (player !== null) {
+                    reply.header("content-type", "application/x-msgpack")
+                    return reply.status(200).send({
+                        data_headers: generateDataHeaders({ viewer_id: viewerId }),
+                        data: {
+                            ...mergeCommonResponseFragments([{
+                                user_info: {
+                                    exp_pool: player.expPool,
+                                    exp_pooled_time: expPoolRealDateToClientTimestamp(player.expPooledTime),
+                                },
+                                mail_arrived: getMailArrivedSync(resolved.playerId),
+                            }]),
+                            add_exp_list: [],
+                            active_mission_list: [],
+                        },
+                    })
+                }
+            }
             return growthFailure(reply, error)
         }
     })
