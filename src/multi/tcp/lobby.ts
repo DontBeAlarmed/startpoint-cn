@@ -36,6 +36,7 @@ let npcRecruitmentTiming: NpcRecruitmentTiming = Object.freeze({
 interface ReconnectLease {
     readonly roomNumber: string
     readonly participant: ParticipantIdentity
+    readonly connectionId: string
     readonly timer: ReturnType<typeof setTimeout>
 }
 
@@ -67,12 +68,15 @@ export function cancelReconnectLease(participant: ParticipantIdentity): void {
     reconnectLeases.delete(key)
 }
 
-function removeDisconnectedMate(roomNumber: string, viewerId: number): void {
+// 按连接身份清理 mate：同一 viewerId 重连会获得新 connectionId，
+// 裸 viewerId 清理会误删重连玩家（僵尸旧连接晚检测场景）。幂等。
+function removeDisconnectedMate(roomNumber: string, connectionId: string): void {
     const room = getRoom(roomNumber)
     if (!room) return
     const hostClient = findHostClient(roomNumber)
     for (const connectedClient of sessionManager.getClientsInRoom(roomNumber)) {
-        connectedClient.mates = connectedClient.mates.filter(mate => mate.viewerId !== viewerId)
+        connectedClient.mates = connectedClient.mates
+            .filter(mate => mate.connectionId !== connectionId)
     }
     if (hostClient) {
         room.mates = hostClient.mates.map(mate => ({
@@ -80,9 +84,9 @@ function removeDisconnectedMate(roomNumber: string, viewerId: number): void {
             com_id: mate.comId ?? 0,
         }))
         sessionManager.broadcastToRoom(roomNumber, [1, [1, hostClient.mates]])
-    } else {
-        room.mates = room.mates.filter(mate => mate.viewer_id !== viewerId)
     }
+    // 无 host 连接时 room.mates 由房间权威状态在下次 host 广播时重建；
+    // 裸 viewer_id 过滤同样会误伤重连者，故不做按 id 的删除。
 }
 
 function expireReconnectLease(key: string): void {
@@ -102,13 +106,17 @@ function expireReconnectLease(key: string): void {
     }
 
     if (removeRoomMember(lease.roomNumber, lease.participant)) {
-        removeDisconnectedMate(lease.roomNumber, lease.participant.viewerId)
+        removeDisconnectedMate(lease.roomNumber, lease.connectionId)
         const hostClient = findHostClient(lease.roomNumber)
         if (hostClient?.enterData) reconcileRematchSlots(hostClient, room)
     }
 }
 
-function scheduleReconnectLease(roomNumber: string, participant: ParticipantIdentity): void {
+function scheduleReconnectLease(
+    roomNumber: string,
+    participant: ParticipantIdentity,
+    connectionId: string,
+): void {
     cancelReconnectLease(participant)
     const key = reconnectKey(participant)
     const timer = setTimeout(() => expireReconnectLease(key), reconnectGraceMs)
@@ -116,6 +124,7 @@ function scheduleReconnectLease(roomNumber: string, participant: ParticipantIden
     reconnectLeases.set(key, Object.freeze({
         roomNumber,
         participant: Object.freeze({ ...participant }),
+        connectionId,
         timer,
     }))
 }
@@ -526,9 +535,11 @@ function disconnectRoomClient(client: SessionClient, reason: "network" | "explic
     }
 
     if (reason === "network") {
-        removeDisconnectedMate(client.roomNumber, client.viewerId)
+        removeDisconnectedMate(client.roomNumber, client.connectionId)
         sessionManager.removeClient(client)
-        if (client.participant) scheduleReconnectLease(client.roomNumber, client.participant)
+        if (client.participant) {
+            scheduleReconnectLease(client.roomNumber, client.participant, client.connectionId)
+        }
         console.log(`[LOBBY] client disconnected: role=${isHost ? "host" : "guest"} room=${client.roomNumber}`)
         return
     }
@@ -536,7 +547,7 @@ function disconnectRoomClient(client: SessionClient, reason: "network" | "explic
     for (const connectedClient of sessionManager.getClientsInRoom(client.roomNumber)) {
         if (connectedClient !== client) {
             connectedClient.mates = connectedClient.mates
-                .filter(mate => mate.viewerId !== client.viewerId)
+                .filter(mate => mate.connectionId !== client.connectionId)
         }
     }
     const hostClient = findHostClient(client.roomNumber)

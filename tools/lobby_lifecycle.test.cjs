@@ -1604,3 +1604,52 @@ test("an abandoned battle room is recycled once every participant is gone", asyn
     cleanup()
     assert.equal(getRoom(room.room_number), undefined)
 })
+
+test("a late-detected stale connection only removes its own mate", t => {
+    configureReconnectGraceMs(10_000)
+    const { room, host, guests } = createLobbyRoom(t, 508, [608])
+    const guest = guests[0]
+    addRoomMember(room.room_number, guest.client.participant)
+    host.client.mates = [host.client.yourself, guest.client.yourself]
+
+    // 断线检测延迟：guest 已用新连接重连并重新进入 mates
+    const reconnected = createLobbyClient(
+        room,
+        guest.client.viewerId,
+        "guest-reconnected-cid",
+        guest.client.participant.nodeSessionId,
+    )
+    handleParticipantReconnect(reconnected.client)
+    host.client.mates = [host.client.yourself, reconnected.client.yourself]
+    t.after(() => sessionManager.removeClientBySocket(reconnected.socket))
+
+    // 旧 socket 的网络断开此刻才被感知：会话层已把该 participant 的注册替换为
+    // 新连接（replaceRoomClient），旧 socket 查找返回 false 且不得触发任何按
+    // viewerId 的连带清理。
+    handleSocketDisconnect(guest.socket)
+
+    assert.equal(
+        host.client.mates.some(mate => mate.connectionId === "guest-reconnected-cid"),
+        true,
+        "旧连接断开不得按裸 viewerId 误删重连玩家的 mate",
+    )
+})
+
+test("expired guest lease cleanup is idempotent and connection-scoped", async t => {
+    configureReconnectGraceMs(25)
+    const { room, host, guests } = createLobbyRoom(t, 509, [609])
+    const guest = guests[0]
+    addRoomMember(room.room_number, guest.client.participant)
+    host.client.mates = [host.client.yourself, guest.client.yourself]
+
+    assert.equal(handleSocketDisconnect(guest.socket), true)
+    await new Promise(resolve => setTimeout(resolve, 40))
+
+    assert.equal(isRoomMember(room, guest.client.participant), false)
+    assert.deepEqual(
+        host.client.mates.map(mate => mate.connectionId),
+        [`host-509`],
+        "到期清理后 host 列表只剩自己",
+    )
+    void host
+})
