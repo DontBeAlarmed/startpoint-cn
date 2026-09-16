@@ -83,7 +83,7 @@ function removeDisconnectedMate(roomNumber: string, connectionId: string): void 
             viewer_id: mate.viewerId ?? null,
             com_id: mate.comId ?? 0,
         }))
-        sessionManager.broadcastToRoom(roomNumber, [1, [1, hostClient.mates]])
+        sessionManager.broadcastMateListToRoom(roomNumber, hostClient.mates)
     }
     // 无 host 连接时 room.mates 由房间权威状态在下次 host 广播时重建；
     // 裸 viewer_id 过滤同样会误伤重连者，故不做按 id 的删除。
@@ -411,8 +411,12 @@ async function handleEnterComs(
             if (!currentHostClient) return
             for (const enteredClient of sessionManager.getClientsInRoom(client.roomNumber)) {
                 if (!enteredClient.enterData) continue
-                enteredClient.mates = currentHostClient.mates
-                sessionManager.sendJson(enteredClient.socket, [1, [1, currentHostClient.mates]])
+                const projectedMates = sessionManager.projectMateListForClient(
+                    enteredClient,
+                    currentHostClient.mates,
+                )
+                enteredClient.mates = projectedMates
+                sessionManager.sendJson(enteredClient.socket, [1, [1, projectedMates]])
             }
         } catch { console.error("[LOBBY] EnterComs send-mates failed") }
     }, npcRecruitmentTiming.joinDelayMs)
@@ -486,7 +490,7 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
     if (isHost) {
         if (room) reconcileRematchSlots(client, room)
         if (client.mates.length > 1) {
-            sessionManager.broadcastToRoom(client.roomNumber, [1, [1, client.mates]], client)
+            sessionManager.broadcastMateListToRoom(client.roomNumber, client.mates, client)
         }
     } else {
         if (hostClient && client.yourself) {
@@ -514,7 +518,7 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
 
     if (!isHost) {
         const mates = hostClient?.mates ?? client.mates
-        sessionManager.broadcastToRoom(client.roomNumber, [1, [1, mates]])
+        sessionManager.broadcastMateListToRoom(client.roomNumber, mates)
     }
 
     console.log(`[LOBBY] ${isHost ? "host" : "guest"} entered: room=${client.roomNumber}`)
@@ -559,7 +563,7 @@ function disconnectRoomClient(client: SessionClient, reason: "network" | "explic
     // [6, dismissed] broadcast already tore it down — pushing a stale/empty mate list here makes the
     // remaining client's refreshMates dereference undefined character-display data and crash (F1010).
     if (getRoom(client.roomNumber) && hostClient && hostClient !== client) {
-        sessionManager.broadcastToRoom(client.roomNumber, [1, [1, hostClient.mates]])
+        sessionManager.broadcastMateListToRoom(client.roomNumber, hostClient.mates)
     }
     try { client.socket.destroy(); } catch (e) {}
     console.log(`[LOBBY] client left: role=${isHost ? "host" : "guest"} room=${client.roomNumber}`)
@@ -609,7 +613,7 @@ function handleChangeParty(_socket: net.Socket, client: SessionClient, data: any
     if (mate) {
         const room = getRoom(client.roomNumber); if (room) { room.host_party_id = pd.currentPartyId; }
         const hostClient = findHostClient(client.roomNumber)
-        sessionManager.broadcastToRoom(client.roomNumber, [1, [1, hostClient?.mates ?? client.mates]])
+        sessionManager.broadcastMateListToRoom(client.roomNumber, hostClient?.mates ?? client.mates)
     }
     console.log(`[LOBBY] party changed: room=${client.roomNumber}`)
 }
@@ -641,7 +645,7 @@ function updateCurrentMateSettings(
             com_id: mate.comId ?? 0,
         }))
     }
-    sessionManager.broadcastToRoom(client.roomNumber, [1, [1, updatedMates]])
+    sessionManager.broadcastMateListToRoom(client.roomNumber, updatedMates)
 }
 
 function handleChangeAutoplay(client: SessionClient, data: any[]): void {

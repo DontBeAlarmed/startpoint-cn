@@ -197,6 +197,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/session_server_lifecycle.test.cjs",
             "tools/multi_tcp_guardrails.test.cjs",
             "tools/multi_raising_state_mapping.test.cjs",
+            "tools/multi_mates_self_projection.test.cjs",
             "tools/gift_capability.test.cjs",
             "tools/gift_code_lifecycle.test.cjs",
             "tools/gift_receive_route.test.cjs",

@@ -1016,6 +1016,38 @@ export class SessionManager {
         return sendFrameReliably(socket, frame) !== "closed"
     }
 
+    /**
+     * 每客户端 mates 自身份投影：接收者的自身份 mate 若缺失（清理与重连/并发离开
+     * 交错时可能出现），在该接收者的投影列表中补齐。不修改权威列表，不制造重复。
+     */
+    projectMateListForClient(
+        recipient: SessionClient,
+        mates: SessionMate[],
+    ): SessionMate[] {
+        if (mates.some(mate => mate.connectionId === recipient.connectionId)) return mates
+        return recipient.yourself ? [...mates, recipient.yourself] : mates
+    }
+
+    broadcastMateListToRoom(
+        roomNumber: string,
+        mates: SessionMate[],
+        excludeClient?: SessionClient,
+    ): void {
+        const set = this.roomClients.get(roomNumber)
+        if (!set) return
+        const excludeAddr = excludeClient?.participant
+            && excludeClient.roomNumber === roomNumber
+            ? this.roomClientKey(roomNumber, excludeClient.participant)
+            : undefined
+        for (const addr of set) {
+            if (excludeAddr !== undefined && addr === excludeAddr) continue
+            const c = this.clients.get(addr)
+            if (!c) continue
+            const projected = this.projectMateListForClient(c, mates)
+            this.sendFrame(c.socket, JSON.stringify([1, [1, projected]]) + "\0")
+        }
+    }
+
     broadcastToRoom(roomNumber: string, data: any, excludeClient?: SessionClient): void {
         const set = this.roomClients.get(roomNumber)
         if (!set) return
