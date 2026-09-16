@@ -21,6 +21,7 @@ import { getQuestConfigurationErrorResponse, getQuestFromCategorySync } from "..
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings";
 import { computeRealTimeStamina } from "../../lib/stamina";
 import { getLocalGuestStaminaCost, getStaminaCost } from "../../lib/stamina-cost";
+import { resolveMultiPlayerContext } from "../player-context";
 import { BattleQuest } from "../../lib/types";
 import { getDb } from "../../data/db";
 import { getQuestEntryCostByKey } from "../../lib/quest-entry-content";
@@ -47,6 +48,7 @@ import {
 import { projectMultiplayerFinishResponse } from "../settlement/response";
 import { buildFinishFollowInfo } from "../../lib/quest/finish/follow-info";
 import { resolveRoomEstablisherFollowStateSync } from "../follow-policy";
+import { getLocalFollowRelationSync } from "../../data/domains/follow";
 import { getPlayerMailCountSync } from "../../data/domains/mail";
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
 import { resolveLocalRescueFragmentEligibility } from "../rescue-fragment-reward";
@@ -340,6 +342,12 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 viewerId,
                 ((body as any).mate_player_result || []) as Array<{ viewer_id?: number }>,
                 preparation.value.activeQuest.matePlayerIds || [],
+                resolveMultiPlayerContext,
+                console.warn,
+                {
+                    requesterPlayerId: playerId,
+                    getRelation: getLocalFollowRelationSync,
+                },
             ),
         });
         reply.header("content-type", "application/x-msgpack");
