@@ -34,6 +34,7 @@ export async function buildFinishFollowInfo(
     options: {
         readonly requesterPlayerId?: number
         readonly getRelation?: FollowRelationResolver
+        readonly allowedParticipantViewerIds?: ReadonlySet<number>
     } = {},
 ) {
     const ids = new Set<number>()
@@ -48,6 +49,8 @@ export async function buildFinishFollowInfo(
     const followInfo = []
     for (const mateViewerId of ids) {
         if (mateViewerId === viewerId || mateViewerId >= 900000000) continue
+        if (options.allowedParticipantViewerIds !== undefined
+            && !options.allowedParticipantViewerIds.has(mateViewerId)) continue
 
         let mateCtx: FollowInfoPlayerContext | null
         try {

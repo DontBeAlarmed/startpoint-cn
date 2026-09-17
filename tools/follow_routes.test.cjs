@@ -157,26 +157,28 @@ test("search_id resolves same-server viewers only", async () => {
     assert.equal(found.data.search_result.viewer_id, viewerB)
     assert.equal(found.data.search_result.follow_state, 2)
 
+    const stringFoundResponse = await postFollow("search_id", {
+        viewer_id: viewerA,
+        search_id: String(viewerB),
+    })
+    assert.equal(stringFoundResponse.statusCode, 200)
+    const stringFound = decode(stringFoundResponse)
+    assert.equal(stringFound.data_headers.result_code, 1)
+    assert.equal(stringFound.data.search_result.viewer_id, viewerB)
+
+    const malformedString = await app.inject({
+        method: "POST",
+        url: "/api/index.php/follow/search_id",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        payload: pack({ viewer_id: viewerA, search_id: ` ${viewerB}` }).toString("base64"),
+    })
+    assert.equal(malformedString.statusCode, 400)
+
     const missingResponse = await postFollow("search_id", { viewer_id: viewerA, search_id: 799999999 })
     assert.equal(missingResponse.statusCode, 200)
     const missing = decode(missingResponse)
-    assert.equal(missing.data_headers.result_code, 1)
-    assert.deepEqual(missing.data.search_result, {
-        viewer_id: null,
-        name: "",
-        rank: 0,
-        degree_id: 0,
-        role: null,
-        comment: "",
-        last_login_time: null,
-        last_login_region: null,
-        leader_character_id: null,
-        leader_character_evolution_img_level: null,
-        follow_state: 0,
-        follow_time: null,
-        followed_time: null,
-        profile_image_url: null,
-    })
+    assert.equal(missing.data_headers.result_code, 1457)
+    assert.deepEqual(missing.data, {})
 })
 
 test("capacity limits answer with A-error result codes 1451 and 1452", async () => {
@@ -243,6 +245,7 @@ test("delete_followed removes the incoming edge and bulk_edit is atomic", async 
         delete_follow_id_list: [e.viewerId],
     }))
     assert.equal(bulk.data_headers.result_code, 1)
+    assert.deepEqual(bulk.data.max_follower_user_viewer_id_list, [])
     const afterBulk = decode(await postFollow("lists", { viewer_id: c.viewerId }))
     // e 仍是 c 的粉丝（bulk 的 delete_follow_id_list 只删出边）；
     // f 是新出边。按 last_login_time 降序。

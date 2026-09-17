@@ -31,8 +31,8 @@ Follow 关系只存在于同一个 `starpoint-cn` 实例和同一套 SQLite 内�
 | `follow/lists` | 有任一方向边的同服玩家投影 + `followed_count`；按 last_login_time 降序、viewer_id 升序 |
 | `follow/add` | 单事务；幂等；上限失败 → HTTP 200 + `result_code` 1451/1452 |
 | `follow/delete` / `follow/delete_followed` | 幂等删除出边 / 入边 |
-| `follow/bulk_edit` | 单事务全或无 |
-| `follow/search_id` | 仅解析本地 session（同服边界）；未命中返回空值形态 `search_result` |
+| `follow/bulk_edit` | 单事务全或无；成功 `data` 始终包含 `max_follower_user_viewer_id_list` 数组 |
+| `follow/search_id` | 仅解析本地 session（同服边界）；目标不存在返回 HTTP 200 + A-error `1457` |
 
 业务错误走 HTTP 200 + `data_headers.result_code`（客户端 A-error 通道）；
 非法 body / 未认证沿用 400 JSON。
@@ -51,9 +51,11 @@ Follow 关系只存在于同一个 `starpoint-cn` 实例和同一套 SQLite 内�
   为 `0`；其余（0/2/3）先 `floor(raw × 0.5)` 再应用 Campaign（对折半值）；
   房主保持完整 `getStaminaCost().cost`。实际成本写入 active quest，失败/abort/
   恢复按保存值处理（与既有退款语义一致）。
-- 结算 `follow_info`（`src/lib/quest/finish/follow-info.ts`）：同节点队友投影真实
-  关系与时间；跨节点队友本地不可解析即跳过（不可关注）；NPC（viewer_id ≥
-  900000000）过滤；单队友资料失败 best-effort。
+- 结算 `follow_info`（`src/lib/quest/finish/follow-info.ts`）：以 Coordinator 最终
+  `BattleStatus.participants` 为权威参与者集合，只投影与当前请求者同一
+  `nodeSessionId` 的队友；跨节点队友即使提交相同裸 `viewer_id` 也不会回退到本地
+  session 解析（不可关注）；NPC（viewer_id ≥ 900000000）过滤；单个资料失败
+  best-effort。
 
 ## 信任链
 

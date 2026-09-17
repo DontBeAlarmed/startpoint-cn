@@ -24,6 +24,14 @@ function ok(viewerId: number, reply: FastifyReply) {
     })
 }
 
+function bulkOk(viewerId: number, reply: FastifyReply) {
+    reply.header("content-type", "application/x-msgpack")
+    return reply.status(200).send({
+        data_headers: generateDataHeaders({ viewer_id: viewerId }),
+        data: { max_follower_user_viewer_id_list: [] },
+    })
+}
+
 function aError(viewerId: number, resultCode: number, reply: FastifyReply) {
     reply.header("content-type", "application/x-msgpack")
     return reply.status(200).send({
@@ -90,7 +98,7 @@ export function registerFollowWriteRoutes(fastify: FastifyInstance): void {
         const addList = body?.add_follow_id_list
         const deleteList = body?.delete_follow_id_list
         if (!Array.isArray(addList) || !Array.isArray(deleteList)) return badRequest(reply)
-        if (addList.length + deleteList.length === 0) return ok(viewer.viewerId, reply)
+        if (addList.length + deleteList.length === 0) return bulkOk(viewer.viewerId, reply)
 
         const addTargetPlayerIds: number[] = []
         for (const followId of addList) {
@@ -113,7 +121,7 @@ export function registerFollowWriteRoutes(fastify: FastifyInstance): void {
             deleteTargetPlayerIds,
             followedAtMs: getRealNowMs(),
         })
-        if (result.ok) return ok(viewer.viewerId, reply)
+        if (result.ok) return bulkOk(viewer.viewerId, reply)
         const resultCode = ADD_FAILURE_RESULT_CODE[result.reason]
         if (resultCode === undefined) return badRequest(reply, "Invalid follow target.")
         return aError(viewer.viewerId, resultCode, reply)

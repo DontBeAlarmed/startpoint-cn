@@ -7,39 +7,20 @@ import type { LocalFollowRelation, LocalFollowState } from "../../../data/domain
 
 /** F0 冻结的 follow_info / search_result 投影（CN 1.8.1 必填 + Option 字段）。 */
 export interface FollowUserProjection {
-    readonly viewer_id: number | null
+    readonly viewer_id: number
     readonly name: string
     readonly rank: number
     readonly degree_id: number
-    readonly role: number | null
+    readonly role: number
     readonly comment: string
-    readonly last_login_time: number | null
+    readonly last_login_time: number
     readonly last_login_region: string | null
-    readonly leader_character_id: number | null
-    readonly leader_character_evolution_img_level: number | null
+    readonly leader_character_id: number
+    readonly leader_character_evolution_img_level: number
     readonly follow_state: LocalFollowState
     readonly follow_time: number | null
     readonly followed_time: number | null
     readonly profile_image_url: string | null
-}
-
-export function emptyFollowUserProjection(): FollowUserProjection {
-    return {
-        viewer_id: null,
-        name: "",
-        rank: 0,
-        degree_id: 0,
-        role: null,
-        comment: "",
-        last_login_time: null,
-        last_login_region: null,
-        leader_character_id: null,
-        leader_character_evolution_img_level: null,
-        follow_state: 0,
-        follow_time: null,
-        followed_time: null,
-        profile_image_url: null,
-    }
 }
 
 function accountPlayerId(playerId: number): number | null {

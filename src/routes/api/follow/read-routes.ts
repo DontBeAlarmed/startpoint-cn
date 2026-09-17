@@ -6,7 +6,7 @@ import {
     listLocalFollowTargetsSync,
 } from "../../../data/domains/follow"
 import { resolveFollowTarget, resolveFollowViewer } from "./context"
-import { emptyFollowUserProjection, projectRelationFor } from "./profile"
+import { projectRelationFor } from "./profile"
 
 function ok(viewerId: number, data: Record<string, unknown>, reply: FastifyReply) {
     reply.header("content-type", "application/x-msgpack")
@@ -14,6 +14,23 @@ function ok(viewerId: number, data: Record<string, unknown>, reply: FastifyReply
         data_headers: generateDataHeaders({ viewer_id: viewerId }),
         data,
     })
+}
+
+function aError(viewerId: number, resultCode: number, reply: FastifyReply) {
+    reply.header("content-type", "application/x-msgpack")
+    return reply.status(200).send({
+        data_headers: generateDataHeaders({ viewer_id: viewerId, result_code: resultCode }),
+        data: {},
+    })
+}
+
+function parseSearchViewerId(value: unknown): number | null {
+    if (typeof value === "number") {
+        return Number.isSafeInteger(value) && value > 0 ? value : null
+    }
+    if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) return null
+    const parsed = Number(value)
+    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
 }
 
 export function registerFollowReadRoutes(fastify: FastifyInstance): void {
@@ -46,16 +63,17 @@ export function registerFollowReadRoutes(fastify: FastifyInstance): void {
         const viewer = await resolveFollowViewer(request, reply)
         if (viewer === null) return
         const searchId = (request.body as { search_id?: unknown })?.search_id
-        if (!Number.isSafeInteger(searchId) || (searchId as number) <= 0) {
+        const parsedSearchId = parseSearchViewerId(searchId)
+        if (parsedSearchId === null) {
             return reply.status(400).send({ error: "Bad Request", message: "Invalid request body." })
         }
-        const targetPlayerId = await resolveFollowTarget(searchId as number)
+        const targetPlayerId = await resolveFollowTarget(parsedSearchId)
         if (targetPlayerId === null) {
-            return ok(viewer.viewerId, { search_result: emptyFollowUserProjection() }, reply)
+            return aError(viewer.viewerId, 1457, reply)
         }
         const projected = projectRelationFor(viewer.playerId, targetPlayerId)
         if (projected === null) {
-            return ok(viewer.viewerId, { search_result: emptyFollowUserProjection() }, reply)
+            return aError(viewer.viewerId, 1457, reply)
         }
         return ok(viewer.viewerId, { search_result: projected }, reply)
     })

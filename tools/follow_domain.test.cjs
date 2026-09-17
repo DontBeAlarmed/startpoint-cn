@@ -180,6 +180,33 @@ test("bulk edit applies adds and deletes atomically", () => {
     assert.equal(getLocalFollowRelationSync(a, overflowB).state, 0)
 })
 
+test("bulk edit rolls back earlier deletes and adds when a later add fails", () => {
+    const source = freshPlayer("bulk-rollback-source")
+    const original = freshPlayer("bulk-rollback-original")
+    const firstAdd = freshPlayer("bulk-rollback-first-add")
+    const secondAdd = freshPlayer("bulk-rollback-second-add")
+    addLocalFollowSync({ sourcePlayerId: source, targetPlayerId: original, followedAtMs: 1 })
+
+    const { maxFollows } = getSocialCapacityPolicySync()
+    const fillers = Array.from({ length: maxFollows - 1 }, (_, index) => (
+        freshPlayer(`bulk-rollback-filler${index}`)
+    ))
+    for (const filler of fillers) {
+        addLocalFollowSync({ sourcePlayerId: source, targetPlayerId: filler, followedAtMs: 2 })
+    }
+
+    const result = bulkEditLocalFollowsSync({
+        sourcePlayerId: source,
+        addTargetPlayerIds: [firstAdd, secondAdd],
+        deleteTargetPlayerIds: [original],
+        followedAtMs: 3,
+    })
+    assert.deepEqual(result, { ok: false, reason: "source_limit" })
+    assert.equal(getLocalFollowRelationSync(source, original).state, 2)
+    assert.equal(getLocalFollowRelationSync(source, firstAdd).state, 0)
+    assert.equal(getLocalFollowRelationSync(source, secondAdd).state, 0)
+})
+
 test("list queries return per-direction members and follower counts", () => {
     const center = freshPlayer("list-center")
     const outgoing = freshPlayer("list-out")

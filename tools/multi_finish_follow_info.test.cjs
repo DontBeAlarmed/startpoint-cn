@@ -87,6 +87,17 @@ async function relationsMain() {
     )
     assert.equal(fallback[0].follow_state, 0)
     assert.equal(fallback[0].follow_time, null)
+
+    // Coordinator 权威参与者只允许同 node 的 viewer_id 进入本地资料与关系解析。
+    const collision = await buildFinishFollowInfo(
+        800000001,
+        [{ viewer_id: 800000002 }, { viewer_id: 800000004 }],
+        [800000003],
+        resolver,
+        () => {},
+        { allowedParticipantViewerIds: new Set([800000004]) },
+    )
+    assert.deepEqual(collision.map(entry => entry.viewer_id), [800000004])
 }
 
 relationsMain().then(

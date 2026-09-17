@@ -48,7 +48,7 @@ import {
     recordCompletedMainChapterMilestoneSync,
     recordRank100MilestoneSync,
 } from "../../lib/player-history-milestones"
-import type { BattleSessionId } from "../coordinator/contracts"
+import type { BattleSessionId, ParticipantIdentity } from "../coordinator/contracts"
 import type { MultiHttpContext } from "../http/context"
 import { MultiSettlementRewardGranter } from "./reward-grant"
 import type { MultiFinishBody } from "../types"
@@ -85,6 +85,7 @@ export interface MultiplayerSettlementInput {
     readonly isRoomHost: boolean
     readonly playerId: number
     readonly questData: BattleQuest
+    readonly authoritativeParticipants: readonly ParticipantIdentity[]
 }
 
 function finalizeMultiAwakePublicationWrites(deleteActiveQuest?: () => void): void {
@@ -155,6 +156,7 @@ export async function prepareMultiplayerSettlement(
             isRoomHost: verification.isHost,
             playerId,
             questData,
+            authoritativeParticipants: finalizedBattle.value.participants,
         },
     }
 }

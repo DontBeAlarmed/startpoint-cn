@@ -28,6 +28,13 @@ interface FollowEdgeRow {
     readonly followed_at: number
 }
 
+class BulkEditFailure extends Error {
+    constructor(readonly reason: LocalFollowWriteFailureReason) {
+        super(`bulk follow edit failed: ${reason}`)
+        this.name = "BulkEditFailure"
+    }
+}
+
 function edgeExists(followerPlayerId: number, followedPlayerId: number): FollowEdgeRow | undefined {
     return getDb().prepare(`
         SELECT follower_player_id, followed_player_id, followed_at
@@ -144,18 +151,23 @@ export function bulkEditLocalFollowsSync(input: {
     deleteTargetPlayerIds: readonly number[]
     followedAtMs: number
 }): BulkEditLocalFollowsResult {
-    return getDb().transaction((): BulkEditLocalFollowsResult => {
-        for (const targetPlayerId of input.deleteTargetPlayerIds) {
-            deleteLocalFollowSync({ sourcePlayerId: input.sourcePlayerId, targetPlayerId })
-        }
-        for (const targetPlayerId of input.addTargetPlayerIds) {
-            const added = addEdgeWithinTransaction(
-                input.sourcePlayerId,
-                targetPlayerId,
-                input.followedAtMs,
-            )
-            if (!added.ok) return { ok: false, reason: added.reason }
-        }
-        return { ok: true }
-    })()
+    try {
+        return getDb().transaction(() => {
+            for (const targetPlayerId of input.deleteTargetPlayerIds) {
+                deleteLocalFollowSync({ sourcePlayerId: input.sourcePlayerId, targetPlayerId })
+            }
+            for (const targetPlayerId of input.addTargetPlayerIds) {
+                const added = addEdgeWithinTransaction(
+                    input.sourcePlayerId,
+                    targetPlayerId,
+                    input.followedAtMs,
+                )
+                if (!added.ok) throw new BulkEditFailure(added.reason)
+            }
+            return { ok: true as const }
+        })()
+    } catch (error) {
+        if (error instanceof BulkEditFailure) return { ok: false, reason: error.reason }
+        throw error
+    }
 }

@@ -331,6 +331,7 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             }
             throw error;
         }
+        const participant = context.snapshotProvider.getParticipant(viewerId);
         const response = await projectMultiplayerFinishResponse({
             activeQuest: preparation.value.activeQuest,
             body,
@@ -347,6 +348,11 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
                 {
                     requesterPlayerId: playerId,
                     getRelation: getLocalFollowRelationSync,
+                    allowedParticipantViewerIds: new Set(
+                        preparation.value.authoritativeParticipants
+                            .filter(member => member.nodeSessionId === participant.nodeSessionId)
+                            .map(member => member.viewerId),
+                    ),
                 },
             ),
         });
