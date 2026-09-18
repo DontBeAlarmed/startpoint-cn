@@ -1486,6 +1486,8 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/account_identity_provider.test.cjs",
             "tools/multi_runtime_session_options.test.cjs",
             "tools/time_semantics.test.cjs",
+            "tools/game_calendar.test.cjs",
+            "tools/game_calendar_source_guard.test.cjs",
             "tools/exp_pool_time.test.cjs",
             "tools/comic_route.test.cjs",
             "tools/admin_server_status_runtime_config.test.cjs",
