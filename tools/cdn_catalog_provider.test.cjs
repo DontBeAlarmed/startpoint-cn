@@ -966,7 +966,7 @@ test("CN runtime coordinator initializes content before HTTP and TCP listening",
 
 test("legacy bootstrap initializes the content snapshot before listening and exits on failure", () => {
     const source = fs.readFileSync(path.join(__dirname, "../src/server.ts"), "utf8")
-    const initializeIndex = source.indexOf("await initializeContentSnapshot()")
+    const initializeIndex = source.indexOf("await initializeContentSnapshot(")
     const listenIndex = source.indexOf("await fastify.listen(")
 
     assert.match(source, /import \{ initializeContentSnapshot \} from ["']\.\/content\/runtime\/content-snapshot["']/)
