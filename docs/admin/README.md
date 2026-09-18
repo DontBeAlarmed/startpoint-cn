@@ -6,7 +6,7 @@
 
 管理后台源码位于 `admin/`，使用 React、TypeScript、Vite、Ant Design 和 React Query，并构建到 `web/dist/`。服务端始终在 `/admin/` 挂载静态产物，为 `/admin/*` 中不带扩展名的客户端路由回退到同一个 `index.html`；`/admin/assets/*` 和带扩展名路径缺失时返回 404。访问 `/` 或 `/admin` 会进入 `/admin/`。
 
-管理后台采用可信网络边界：只允许本机、可信内网、可信 VPN，或部署者自有认证反向代理之后的访问。服务端不内置管理员账号、密码、Cookie、CSRF 或公网会话；管理 HTTP 不得直接暴露到不可信公网。
+管理后台采用可信网络边界：只允许本机、可信内网、可信 VPN，或部署者自有认证与来源防护反向代理之后的访问。服务端不内置管理员账号、密码、Cookie、CSRF 或公网会话；任何能访问该端口的调用方都可尝试修改或删除存档、清理账号、发送邮件和修改服务器时间，且兼容时间接口仍包含会改变状态的 GET 请求。管理 HTTP 不得直接暴露到不可信公网，也不能依赖浏览器同源策略代替服务端访问控制。
 
 `/player`、`/player/:id`、`/mail` 和 `/seeds` 仅保留到 `/admin/` 对应页面的兼容重定向。旧 `src/routes/web/` 和 `web/pages/` 已删除，不再提供服务器渲染 HTML。缺少或损坏 `web/dist/index.html`，或入口引用的本地脚本、样式、图标缺失时，运行时会在初始化阶段拒绝启动；游戏 API、管理 API和 `/healthz` 不进入 SPA fallback。服务端不再挂载通用 `/public` 静态根。
 

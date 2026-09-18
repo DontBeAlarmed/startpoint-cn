@@ -110,11 +110,12 @@ export function fixUint32Tags(buf: Buffer): Buffer {
                 const length = buf.readUint32BE(position)
                 return position + 5 + length
             }
-            case 0xd4: return position + 1
-            case 0xd5: return position + 2
-            case 0xd6: return position + 4
-            case 0xd7: return position + 8
-            case 0xd8: return position + 16
+            // fixext includes a one-byte extension type before its fixed payload.
+            case 0xd4: return position + 2
+            case 0xd5: return position + 3
+            case 0xd6: return position + 5
+            case 0xd7: return position + 9
+            case 0xd8: return position + 17
             default: {
                 if (tag >= 0xa0 && tag <= 0xbf) return position + (tag & 0x1f)
                 if (tag >= 0x90 && tag <= 0x9f) {

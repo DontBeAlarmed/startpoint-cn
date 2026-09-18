@@ -42,7 +42,7 @@
 
 | 路由族 | 状态 | 当前边界 | 注册或源码入口 | Current 文档 |
 |---|---|---|---|---|
-| 管理 Web API | **Partial** | 玩家、存档、账号清理、设备来源备注、公告、礼包、邮件、查询、服务状态、抽卡种子、服务器时间包和多人凭据/Hub probe 接口已接入；管理写接口可远程调用，服务端不提供后台账号鉴权，服主自行负责可信网络边界与访问控制；Client 模式不提供 Host 凭据管理；EX 能力清除有持久化契约测试，每日/每周任务强制重置明确不支持；破坏性操作和完整浏览器矩阵尚未验收 | `src/routes/web_api/`、`src/multi/management/`、`src/runtime/server-time/` | [管理后台](../admin/README.md)、[普通公告](../systems/news.md)、[公共礼包码](../systems/gift-codes.md)、[账号管理与继承码](../systems/account-management-and-takeover.md)、[多人 Hub 设置](../protocol/multi-hub-setup.md) |
+| 管理 Web API | **Partial** | 玩家、存档、账号清理、设备来源备注、公告、礼包、邮件、查询、服务状态、抽卡种子、服务器时间包和多人凭据/Hub probe 接口已接入；管理写接口可远程调用，服务端不提供后台账号鉴权或 CSRF 防护，且兼容时间接口仍有改变状态的 GET，服主必须提供可信网络边界与外部访问控制；Client 模式不提供 Host 凭据管理；EX 能力清除有持久化契约测试，每日/每周任务强制重置明确不支持；破坏性操作和完整浏览器矩阵尚未验收 | `src/routes/web_api/`、`src/multi/management/`、`src/runtime/server-time/` | [管理后台](../admin/README.md)、[普通公告](../systems/news.md)、[公共礼包码](../systems/gift-codes.md)、[账号管理与继承码](../systems/account-management-and-takeover.md)、[多人 Hub 设置](../protocol/multi-hub-setup.md) |
 | React 管理后台 | **Partial** | 服务端唯一管理界面；`build:server`、运行时和 Bundle 均强制要求 `/admin/` 产物，入口引用资源会在启动时校验，旧路径只做 SPA 兼容重定向；公告和礼包页面已接入，手机、平板和真实破坏性操作仍处于人工验收阶段 | `admin/`、`web/dist/`、`src/runtime/admin.ts` | [管理后台](../admin/README.md) |
 
 ## 使用规则

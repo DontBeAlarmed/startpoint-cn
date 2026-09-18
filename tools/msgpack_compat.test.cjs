@@ -155,11 +155,11 @@ function referenceFixUint32Tags(buf) {
             case 0xc7: { const l = buf[position]; copy(offset, 3 + l); return position + 2 + l }
             case 0xc8: { const l = buf.readUInt16BE(position); copy(offset, 4 + l); return position + 3 + l }
             case 0xc9: { const l = buf.readUInt32BE(position); copy(offset, 6 + l); return position + 5 + l }
-            case 0xd4: copy(offset, 2); return position + 1
-            case 0xd5: copy(offset, 3); return position + 2
-            case 0xd6: copy(offset, 5); return position + 4
-            case 0xd7: copy(offset, 9); return position + 8
-            case 0xd8: copy(offset, 17); return position + 16
+            case 0xd4: copy(offset, 3); return position + 2
+            case 0xd5: copy(offset, 4); return position + 3
+            case 0xd6: copy(offset, 6); return position + 5
+            case 0xd7: copy(offset, 10); return position + 9
+            case 0xd8: copy(offset, 18); return position + 17
             default: {
                 if (tag >= 0xa0 && tag <= 0xbf) { const l = tag & 0x1f; copy(offset, 1 + l); return position + l }
                 if (tag >= 0x90 && tag <= 0x9f) {
@@ -257,7 +257,7 @@ test("fixUint32Tags stays byte-identical across payload shapes", () => {
         be([0xd4, 0x01, 0x02]),                                              // fixext1
         be([0xd5, 0x01, 0x02, 0x03]),                                        // fixext2
         be([0xd6, 0x01, 0x02, 0x03, 0x04, 0x05]),                            // fixext4
-        be([0xd7, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]),          // fixext8
+        be([0xd7, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09]),    // fixext8
         be([0xd8, 0x01, ...Array(16).fill(0x09)]),                           // fixext16
         be([0xc7, 0x02, 0x7f, 0x01, 0x02]),                                  // ext8
         be([0xc8, 0x00, 0x02, 0x7f, 0x01, 0x02]),                            // ext16
@@ -271,6 +271,27 @@ test("fixUint32Tags stays byte-identical across payload shapes", () => {
         assertIdenticalRewrite(`crafted-${index}`, token)
     }
     assertIdenticalRewrite("crafted-stream", Buffer.concat(crafted))
+})
+
+test("fixUint32Tags skips every fixext type and payload before later uint32 tags", () => {
+    for (const [tag, payloadLength] of [
+        [0xd4, 1], [0xd5, 2], [0xd6, 4], [0xd7, 8], [0xd8, 16],
+    ]) {
+        // The final payload byte is deliberately 0xce so a one-byte-short
+        // walker would interpret it as a second uint32 tag and corrupt it.
+        const extension = Buffer.concat([
+            Buffer.from([tag, 0xff]),
+            Buffer.alloc(payloadLength, 0x01),
+        ])
+        extension[extension.length - 1] = 0xce
+        const wire = Buffer.concat([
+            extension,
+            Buffer.from([0xce, 0x00, 0x00, 0x00, 0x07]),
+        ])
+        const expected = Buffer.from(wire)
+        expected[extension.length] = 0xd2
+        assert.deepEqual(fixUint32Tags(wire), expected, `fixext tag 0x${tag.toString(16)}`)
+    }
 })
 
 test("fixUint32Tags stays byte-identical on a /load-scale payload", () => {
