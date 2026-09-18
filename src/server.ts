@@ -41,6 +41,7 @@ import indexWebApiPlugin from "./routes/web_api"
 import openapiPlugin from "./routes/openapi";
 import infodeskPlugin from "./routes/infodesk";
 import { initializeContentSnapshot } from "./content/runtime/content-snapshot";
+import { parseGameCalendarUtcOffsetMinutes } from "./time/game-calendar";
 import { initializeDatabase } from "./data";
 import { configureSerializedAssetVersionProvider } from "./data/utils/serialized-asset-version";
 import { registerAdminUi } from "./runtime/admin";
@@ -163,7 +164,13 @@ const listenPort = isNaN(envListenPort) ? 8000 : envListenPort
 async function bootstrap(): Promise<void> {
     initializeDatabase()
     initializeLegacyAssetState()
-    await initializeContentSnapshot()
+    await initializeContentSnapshot({
+        // This entry serves content too: constrain the active release to the
+        // configured game calendar. Undefined env resolves to the 480 default;
+        // an invalid value throws here, before the port opens.
+        expectedGameCalendarUtcOffsetMinutes:
+            parseGameCalendarUtcOffsetMinutes(process.env.GAME_CALENDAR_UTC_OFFSET_MINUTES),
+    })
     await fastify.listen({ port: listenPort, host: listenHost })
     console.log(`StarPoint is listening on http://${listenHost}:${listenPort}`)
 }
