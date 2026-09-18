@@ -172,6 +172,9 @@ function installBundledGameplaySnapshot({
         source: "bundled",
         assetVersion: BUNDLED_CDN_CATALOG_VERSION,
         generatorVersion: 1,
+        // Bundled fallback content always reports the legacy CN default, same
+        // as ContentRepository.loadFromSnapshot's bundled branch.
+        gameCalendarUtcOffsetMinutes: 480,
         releaseDigest: null,
     })
     const repository = deepFreeze({

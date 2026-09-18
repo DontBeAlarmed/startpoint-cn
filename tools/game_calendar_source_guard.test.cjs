@@ -1,6 +1,6 @@
 "use strict"
 
-// Source guard for the game calendar migration. Two scanned surfaces:
+// Source guard for the game calendar migration. Three scanned surfaces:
 //
 // 1. src/content/converters — no file may keep private UTC+8 offset arithmetic
 //    or its own canonical master-timestamp regex. Calendar conversion must go
@@ -12,6 +12,13 @@
 //    getters used in calendar projection. Task 6 added its UTC+9/stamina
 //    corrections to RUNTIME_TARGET_FILES and banned the load.ts toDateString
 //    day-crossing comparison in RUNTIME_FILE_EXTRA_PATTERNS.
+// 3. The full production tree (Task 7): every .ts file under src/ is scanned
+//    recursively. Only the policy module src/time/game-calendar.ts is exempt
+//    from the fixed-offset implementation families and the private master
+//    timestamp regex family — it is their canonical implementation — and it
+//    still faces the tree-wide projection bans (appended offsets, host-local
+//    getters, toDateString). The allowlist is deliberately empty: a site that
+//    trips the guard must migrate to GameCalendarPolicy, not be exempted.
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")
@@ -21,11 +28,11 @@ const test = require("node:test")
 const SRC_ROOT = path.join(__dirname, "..", "src")
 const CONVERTERS_DIR = path.join(SRC_ROOT, "content", "converters")
 
-// Private fixed-offset arithmetic (verbatim forbidden families from the
+// Fixed-offset arithmetic families (verbatim forbidden families from the
 // game calendar plan). These intentionally do NOT match `new Date(epochMs)`,
 // duration constants like `24 * 60 * 60 * 1000`, or timezone-aware ISO
 // handling such as `Date.parse("2024-08-01T12:00:00+08:00")`.
-const FORBIDDEN_PATTERNS = [
+const OFFSET_ARITHMETIC_PATTERNS = [
     { name: "UTC+8 offset arithmetic", pattern: /\b8\s*\*\s*60\s*\*\s*60/ },
     { name: "UTC+9 offset arithmetic", pattern: /\b9\s*\*\s*60\s*\*\s*60/ },
     { name: "literal hour-offset subtraction", pattern: /hour\s*-\s*[89]/ },
@@ -33,9 +40,19 @@ const FORBIDDEN_PATTERNS = [
         name: "Date.UTC with shifted hour fields",
         pattern: /Date\.UTC\([^\n]*(?:hour\s*-\s*[89]|8\s*\*\s*60)/,
     },
-    // Converter-local canonical timestamp regex definitions, e.g.
-    // /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/ — converters must
-    // validate through the policy parser instead of private regexes.
+    { name: "underscore-digit UTC+8 offset arithmetic", pattern: /\b8\s*\*\s*3600_000/ },
+    { name: "underscore-digit UTC+9 offset arithmetic", pattern: /\b9\s*\*\s*3600_000/ },
+    {
+        name: "named hour-offset constant pinned to 8 or 9",
+        pattern: /\b[A-Z_0-9]*OFFSET_HOURS\s*=\s*[89]\b/,
+    },
+]
+
+// Converter-local canonical timestamp regex definitions, e.g.
+// /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/ — converters must
+// validate through the policy parser instead of private regexes.
+const FORBIDDEN_PATTERNS = [
+    ...OFFSET_ARITHMETIC_PATTERNS,
     {
         name: "private canonical timestamp regex",
         pattern: /\\d\{4\}[^\n]*\\d\{2\}[^\n]*\\d\{2\}/,
@@ -110,6 +127,51 @@ function runtimePatternsFor(relativePath) {
     ]
 }
 
+// Full production-tree families (Task 7). The appended-offset family only
+// rejects appending to a template substitution or a concatenated string;
+// a literal timezone-aware ISO value inside one string (news-time.ts style)
+// stays legal. The master-regex family matches only the offset-less,
+// space-separated `YYYY-MM-DD HH:mm:ss` form, so UTC database serialization
+// (`...T...Z`) and timezone-aware validators never trip it.
+const PRODUCTION_TREE_FIXED_OFFSET_PATTERNS = OFFSET_ARITHMETIC_PATTERNS
+
+const PRODUCTION_TREE_WIDE_PATTERNS = [
+    {
+        name: "fixed offset appended to offset-less master data",
+        pattern: /\}\+0[89]:00|\+\s*["'`]\s*\+0[89]:00/,
+    },
+    {
+        name: "host-local Date getters in calendar projection",
+        pattern: /\bget(?:FullYear|Month|Date|Hours|Minutes|Seconds|Day)\(\)/,
+    },
+    {
+        name: "host-local toDateString day-crossing comparison",
+        pattern: /\.toDateString\(\)/,
+    },
+]
+
+const PRODUCTION_TREE_MASTER_REGEX_PATTERN = {
+    name: "private canonical master timestamp regex",
+    pattern: /\\d\{4\}[^\n]*\) \(/,
+}
+
+const CALENDAR_POLICY_FILE = "time/game-calendar.ts"
+
+// Deliberately empty. If the full-tree scan trips on a site, migrate the site
+// to GameCalendarPolicy (or tighten the pattern only if the site is genuinely
+// calendar-independent); never add allowlist entries.
+const PRODUCTION_TREE_ALLOWLIST = Object.freeze([])
+
+function patternsForProductionFile(relativePath) {
+    if (PRODUCTION_TREE_ALLOWLIST.includes(relativePath)) return []
+    if (relativePath === CALENDAR_POLICY_FILE) return [...PRODUCTION_TREE_WIDE_PATTERNS]
+    return [
+        ...PRODUCTION_TREE_WIDE_PATTERNS,
+        ...PRODUCTION_TREE_FIXED_OFFSET_PATTERNS,
+        PRODUCTION_TREE_MASTER_REGEX_PATTERN,
+    ]
+}
+
 function listConverterSourceFiles(dir = CONVERTERS_DIR) {
     const files = []
     for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => (
@@ -118,6 +180,21 @@ function listConverterSourceFiles(dir = CONVERTERS_DIR) {
         const entryPath = path.join(dir, entry.name)
         if (entry.isDirectory()) {
             files.push(...listConverterSourceFiles(entryPath))
+        } else if (entry.isFile() && entry.name.endsWith(".ts")) {
+            files.push(entryPath)
+        }
+    }
+    return files
+}
+
+function listProductionSourceFiles(dir = SRC_ROOT) {
+    const files = []
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => (
+        a.name.localeCompare(b.name)
+    ))) {
+        const entryPath = path.join(dir, entry.name)
+        if (entry.isDirectory()) {
+            files.push(...listProductionSourceFiles(entryPath))
         } else if (entry.isFile() && entry.name.endsWith(".ts")) {
             files.push(entryPath)
         }
@@ -160,6 +237,19 @@ function findRuntimeViolations() {
             relativePath,
             fs.readFileSync(filePath, "utf8"),
             runtimePatternsFor(relativePath),
+        ))
+    }
+    return violations
+}
+
+function findProductionTreeViolations() {
+    const violations = []
+    for (const filePath of listProductionSourceFiles()) {
+        const relativePath = path.relative(SRC_ROOT, filePath)
+        violations.push(...findViolations(
+            relativePath,
+            fs.readFileSync(filePath, "utf8"),
+            patternsForProductionFile(relativePath),
         ))
     }
     return violations
@@ -308,6 +398,127 @@ test("guard rejects load.ts toDateString comparisons and scans the Task 6 files"
         assert.ok(
             RUNTIME_TARGET_FILES.includes(required),
             `Task 6 file must stay guarded: ${required}`,
+        )
+    }
+})
+
+test("guard enumerates every production .ts file under src recursively", () => {
+    const files = listProductionSourceFiles()
+    assert.ok(
+        files.length > RUNTIME_TARGET_FILES.length,
+        "full-tree enumeration must exceed the explicit runtime list",
+    )
+    for (const required of [
+        path.join(SRC_ROOT, "time", "game-calendar.ts"),
+        path.join(SRC_ROOT, "time", "game-calendar-provider.ts"),
+        path.join(SRC_ROOT, "routes", "cn", "load.ts"),
+        path.join(SRC_ROOT, "content", "converters", "context.ts"),
+        path.join(SRC_ROOT, "lib", "news-time.ts"),
+        path.join(SRC_ROOT, "multi", "management", "service.ts"),
+    ]) {
+        assert.ok(
+            files.includes(required),
+            `full-tree scan must include ${required}`,
+        )
+    }
+})
+
+test("full production tree contains no hardcoded calendar implementation", () => {
+    assert.equal(
+        PRODUCTION_TREE_ALLOWLIST.length,
+        0,
+        "the production-tree allowlist must stay empty; migrate sites to GameCalendarPolicy instead",
+    )
+    const violations = findProductionTreeViolations()
+    assert.deepEqual(
+        violations,
+        [],
+        `Production sources must route calendar math through GameCalendarPolicy `
+            + `(src/time/game-calendar.ts); only the policy module may implement `
+            + `the fixed offset and the canonical master format:\n`
+            + violations.join("\n"),
+    )
+})
+
+test("full-tree guard flags every audited hardcoded calendar form", () => {
+    const samples = [
+        ["const CN_OFFSET_MS = 8 * 60 * 60 * 1000", "UTC+8 offset arithmetic"],
+        ["const shiftMs = 9*60*60*1000", "UTC+9 offset arithmetic"],
+        ["const shift = nowMs + 8 * 3600_000", "underscore-digit UTC+8 offset arithmetic"],
+        ["const shift = nowMs + 9 * 3600_000", "underscore-digit UTC+9 offset arithmetic"],
+        ["if (startHour > 0) useHour(hour - 9)", "literal hour-offset subtraction"],
+        ["const utc = Date.UTC(year, month, day, 8 * 60, minute)", "Date.UTC with shifted hour fields"],
+        ["JST_OFFSET_HOURS = 9", "named hour-offset constant pinned to 8 or 9"],
+        ['Date.parse(`${value.replace(" ", "T")}+08:00`)', "fixed offset appended to offset-less master data"],
+        ['const appended = rawValue + "+09:00"', "fixed offset appended to offset-less master data"],
+        ["const label = `${dt.getFullYear()}-${dt.getMonth() + 1}`", "host-local Date getters in calendar projection"],
+        ["if (now.toDateString() !== login.toDateString()) throw new Error()", "host-local toDateString day-crossing comparison"],
+        ['const match = /^(\\d{4})-(\\d{2})-(\\d{2}) (\\d{2}):(\\d{2}):(\\d{2})$/.exec(value)', "private canonical master timestamp regex"],
+    ]
+    for (const [line, expected] of samples) {
+        const violations = findViolations(
+            "lib/sample.ts",
+            `const padding = 1 // unrelated\n${line}`,
+            patternsForProductionFile("lib/sample.ts"),
+        )
+        assert.ok(
+            violations.some(violation => violation.includes(expected)),
+            `full-tree guard must flag ${expected}: ${line} -> ${JSON.stringify(violations)}`,
+        )
+    }
+})
+
+test("full-tree guard keeps UTC serialization, tz-aware ISO, durations, and the policy module legal", () => {
+    // The policy module is the canonical implementation of the fixed offset
+    // and the master format, but tree-wide bans still face it.
+    const policyPatterns = patternsForProductionFile("time/game-calendar.ts")
+    assert.deepEqual(findViolations(
+        "time/game-calendar.ts",
+        'const MASTER_TIMESTAMP = /^(\\d{4})-(\\d{2})-(\\d{2}) (\\d{2}):(\\d{2}):(\\d{2})$/',
+        policyPatterns,
+    ), [])
+    assert.deepEqual(findViolations(
+        "time/game-calendar.ts",
+        "const wallMs = epochMs + offsetMinutes * MS_PER_MINUTE",
+        policyPatterns,
+    ), [])
+    assert.equal(
+        findViolations(
+            "time/game-calendar.ts",
+            "return value.toDateString()",
+            policyPatterns,
+        ).length,
+        1,
+        "tree-wide projection bans still apply to the policy module",
+    )
+
+    // UTC database/protocol serialization stays legal outside the policy.
+    assert.deepEqual(findViolations(
+        "multi/management/service.ts",
+        'const ISO_TIMESTAMP_PATTERN = /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2}):(\\d{2})(?:\\.\\d{1,3})?Z$/',
+        patternsForProductionFile("multi/management/service.ts"),
+    ), [])
+
+    // news-time.ts explicit timezone-aware ISO handling stays legal.
+    assert.deepEqual(findViolations(
+        "lib/news-time.ts",
+        'const TIMEZONE_AWARE_TIMESTAMP = /^(\\d{4})-(\\d{2})-(\\d{2})[T ](\\d{2}):(\\d{2}):(\\d{2})(?:\\.(\\d+))?(Z|[+-]\\d{2}:\\d{2})$/',
+        patternsForProductionFile("lib/news-time.ts"),
+    ), [])
+
+    const allowed = [
+        "const wall = new Date(epochMs)",
+        "const DAY_MS = 24 * 60 * 60 * 1000",
+        "const shifted = new Date(nowMs + calendar.utcOffsetMinutes * 60_000 - entry.resetTimeMs)",
+        'const at = Date.parse("2024-08-01T12:00:00+08:00")',
+        "const offsetMs = calendar.utcOffsetMinutes * 60_000",
+        "if (epochMs % 1000 !== 0) throw new RangeError()",
+    ]
+    for (const line of allowed) {
+        assert.deepEqual(
+            findViolations("lib/sample.ts", line, patternsForProductionFile("lib/sample.ts")),
+            [],
+            `must not reject legitimate code: ${line}`,
         )
     }
 })

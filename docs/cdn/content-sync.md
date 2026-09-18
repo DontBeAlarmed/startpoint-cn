@@ -137,6 +137,8 @@ bash scripts/start-cn.sh
 
 同步失败时入口以非零状态退出，游戏服务不会启动。失败不会把半成品提升为 current，也不会自动带着旧指针继续启动。
 
+Release manifest 记录生成时使用的 `gameCalendarUtcOffsetMinutes`，并把它纳入 Release 身份：配置的日历偏移变化后，既有 Release 不再满足复用判定，normal 同步会自动重建；服务启动时要求 `RuntimeConfig` 与当前 Release 的偏移一致，不一致时启动失败关闭。缺少该字段的历史 manifest 只按 CN 默认值 `480` 读取，且不得在非默认偏移下使用。详见[游戏业务日历策略](../architecture/game-calendar-policy.md)。
+
 `node out/cn-server.js` 是低级调试入口，不执行自动同步。它只读取当时已有的 current Release；没有 current 时使用 bundled fallback。直接入口不会检查 CDN 是否刚被修改，因此操作者必须事先完成同步和验证。
 
 ## 手动命令

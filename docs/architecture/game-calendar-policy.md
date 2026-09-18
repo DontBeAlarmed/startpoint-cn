@@ -130,3 +130,15 @@ CN 默认 `480` 下需要纠正的现有行为包括：
 - TypeScript、文档、仓库卫生与受支持构建。
 
 客户端人工验收至少覆盖卡池最后一小时、第二玛纳板开放整点、履历期起止、体力减免边界和北京时间 05:00 日切。非默认偏移只有配套客户端与主数据时才可声明受支持。
+
+## 实施状态
+
+上述架构契约已落地，当前已合并的模块与验证：
+
+- 纯策略与提供器：`src/time/game-calendar.ts`（`createGameCalendarPolicy()`、canonical 主数据解析/反向格式化、业务日/周/月 bucket）与 `src/time/game-calendar-provider.ts`（进程级一次性冻结提供器，`getGameCalendar()` 为统一读取入口）。
+- 启动冻结：`CnRuntimeConfig.gameCalendarUtcOffsetMinutes` 在 `src/runtime/config.ts` 解析校验，`src/cn-server.ts` 在 Content Snapshot 初始化与路由注册前注入 `productionGameCalendarProvider`。
+- Content Release 身份：manifest 字段 `gameCalendarUtcOffsetMinutes`（`src/content/sync/schema.ts`）、偏移变化触发重建的复用判定（`src/content/sync/engine.ts`）、读取同一配置的 Content Sync CLI（`src/content/sync/cli.ts`）、启动不匹配 fail closed 的加载防线（`src/content/runtime/content-repository.ts`）；bundled fallback 固定报告 `480`。
+- Converter 通道：预计算 epoch 的转换器统一通过 `ContentConverterContext.gameCalendar`（`src/content/converters/context.ts` 及 quest、box-gacha、reward、election 等转换器）。
+- 运行时业务迁移：`time-utils`、商店 period、box gacha、bond token、character election、mission（catalog、event-entry-facts、active-plan-builder）、item inventory、reward campaign、news、pass card、admin clairvoyance、gacha catalog/owner period、character growth、player history、stamina campaign，以及 `cn/load.ts` 删除 `toDateString()` 日切分支。
+- 只读可观测性：`/api/server/status` 的 `cdn.gameCalendar` 同时返回 `configuredUtcOffsetMinutes` 与 `contentUtcOffsetMinutes`（`src/lib/admin-content-status.ts`、`src/routes/web_api/server.ts`）；管理后台总览展示两个值并在不一致时显示警示标签，无在线编辑入口。
+- 防回归与验证：`tools/game_calendar_source_guard.test.cjs` 用 `node:fs` 递归扫描全部生产 `.ts` 文件（仅对固定偏移实现模式豁免 `src/time/game-calendar.ts` 本身），拒绝私有 UTC+8/UTC+9 算术、无时区主数据追加偏移、宿主本地 Date 字段和私有 canonical 时间戳正则；另有策略、提供器、启动配置、Release 身份、converter、业务边界和后台状态的专项测试覆盖上文验收条件。

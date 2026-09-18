@@ -69,6 +69,10 @@ interface ServerStatus {
             contentDigest: string
             multiBattleContentDigest: string
         }
+        gameCalendar: {
+            configuredUtcOffsetMinutes: number
+            contentUtcOffsetMinutes: number
+        }
         configuredDir: string
         directoryPresent: boolean
         archiveCount: number
@@ -379,6 +383,16 @@ export default function Dashboard() {
                                     </Descriptions.Item>
                                     <Descriptions.Item label="内容来源">
                                         {status.cdn.contentRelease.source === "release" ? "Content Release" : "内置基线"}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="游戏日历偏移">
+                                        <Space wrap>
+                                            <Tag>配置 {status.cdn.gameCalendar.configuredUtcOffsetMinutes}</Tag>
+                                            <Tag>内容 {status.cdn.gameCalendar.contentUtcOffsetMinutes}</Tag>
+                                            {status.cdn.gameCalendar.configuredUtcOffsetMinutes
+                                                !== status.cdn.gameCalendar.contentUtcOffsetMinutes && (
+                                                <Tag color="orange">配置与内容 Release 偏移不一致</Tag>
+                                            )}
+                                        </Space>
                                     </Descriptions.Item>
                                     <Descriptions.Item label="Release">
                                         <Typography.Text code>

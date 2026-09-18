@@ -29,13 +29,13 @@
 
 TCP 心跳、Hub 会话、房间清理、发送队列背压和临时文件名使用真实流逝时间。这些时间不属于游戏业务时间，可以保留真实时钟，但应通过 `getRealNowMs()` 或依赖注入的 `now()` 获取，以便测试控制。
 
-## 已确认的时间口径风险
+## 游戏日历口径风险的修复状态
 
-定向审计确认 CN 客户端把无时区主数据时间按 UTC+8 解释：`boot_ffc6.as` 将 `JAPAN_STANDARD_OFFSET_MILLISECONDS` 设为 `28800000`，`ParseTools.parseDateTime()` 从 UTC 构造值中减去该偏移。服务端 `src/lib/gacha-catalog/period.ts` 当前却固定减去 UTC+9。对同一个 `2024-08-14 20:00:00`，客户端语义是 `2024-08-14T12:00:00.000Z`，服务端解析结果是 `2024-08-14T11:00:00.000Z`，相差一小时。
+定向审计确认 CN 客户端把无时区主数据时间按 UTC+8 解释：`boot_ffc6.as` 将 `JAPAN_STANDARD_OFFSET_MILLISECONDS` 设为 `28800000`，`ParseTools.parseDateTime()` 从 UTC 构造值中减去该偏移。修复前，服务端 `src/lib/gacha-catalog/period.ts` 固定减去 UTC+9，对同一个 `2024-08-14 20:00:00` 比客户端语义提前一小时，造成卡池、兑换和玩家周期边界整体漂移。
 
-该差异会让卡池开始边界在服务端提前一小时开放，结束边界也提前一小时关闭。结束边界内可表现为客户端仍显示卡池或兑换入口，但服务端已经以 `1351`/`1361` 等开放期错误拒绝；它影响所有复用 `parseGachaJstTimestamp()` 的卡池、兑换和玩家周期判断。此项目前只完成证据化，尚未改动常量，修复前仍需对历史资产与客户端流程做定向验收。
+上述发现已由[游戏业务日历策略](../architecture/game-calendar-policy.md)统一修复：`src/time/game-calendar.ts` 提供按启动配置冻结的固定偏移策略（CN 默认 `480`，即 UTC+8），`gacha-catalog/period.ts` 的 UTC+9 解析、`stamina-campaign.ts` 依赖宿主 `TZ` 的无时区解析和 `cn/load.ts` 依赖宿主 `TZ` 的 `toDateString()` 日切比较都已迁移或删除。业务模块不再自行实现日历算术，解析结果不再随进程 `TZ` 改变。
 
-另有两处宿主时区依赖需要与上述确定性偏差分开处理：`stamina-campaign.ts` 用 `new Date("YYYY-MM-DD HH:mm:ss")` 解析无时区活动时间，结果随进程 `TZ` 改变；`cn/load.ts` 用 `toDateString()` 比较虚拟登录日期，额外对齐分支也随进程 `TZ` 改变。前者可能让体力活动窗口整体漂移，后者可能在日历日边界额外改写 `lastLoginTime`；统一的 UTC+8、05:00 日重置仍由 `time-utils.ts` 处理，不能把该分支风险扩大解释为所有日重置失效。
+该修复只改变无时区主数据字符串与业务日/周/月边界的解释。SQLite 中保存的 ISO 时间、Unix 秒/毫秒和网络 epoch 仍然表示绝对 UTC 时刻，不做日历换算；这一 UTC 存储口径与游戏日历口径的区分贯穿上文的全部时间入口。
 
 ## 可控性要求
 

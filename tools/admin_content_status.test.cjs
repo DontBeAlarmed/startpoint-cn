@@ -44,6 +44,7 @@ function snapshotWithPatches() {
                 source: "release",
                 assetVersion: "1.4.56",
                 generatorVersion: 3,
+                gameCalendarUtcOffsetMinutes: 480,
                 releaseDigest: `sha256:${"d".repeat(64)}`,
                 contentDigest: `sha256:${"e".repeat(64)}`,
                 multiBattleContentDigest: `sha256:${"f".repeat(64)}`,
@@ -62,9 +63,14 @@ test("builds active overlay status from the pinned content snapshot", () => {
             patchUploadRoot: "/private/data/upload",
         },
         configuredCdnDir: "/private/cdn",
+        configuredGameCalendarUtcOffsetMinutes: 480,
     })
 
     assert.equal(result.baseUrl, "http://127.0.0.1:8001/patch/cn")
+    assert.deepEqual(result.gameCalendar, {
+        configuredUtcOffsetMinutes: 480,
+        contentUtcOffsetMinutes: 480,
+    })
     assert.deepEqual(result.baseline, {
         mode: "official-cn-overlay",
         source: "国服最终 CDN",
@@ -98,6 +104,7 @@ test("builds active overlay status from the pinned content snapshot", () => {
         source: "release",
         assetVersion: "1.4.56",
         generatorVersion: 3,
+        gameCalendarUtcOffsetMinutes: 480,
         releaseDigest: `sha256:${"d".repeat(64)}`,
         contentDigest: `sha256:${"e".repeat(64)}`,
         multiBattleContentDigest: `sha256:${"f".repeat(64)}`,
@@ -113,6 +120,7 @@ test("reports an empty overlay without inventing patch state", () => {
         source: "bundled",
         assetVersion: "1.4.54",
         generatorVersion: 3,
+        gameCalendarUtcOffsetMinutes: 480,
         releaseDigest: null,
         contentDigest: `sha256:${"1".repeat(64)}`,
         multiBattleContentDigest: `sha256:${"2".repeat(64)}`,
@@ -122,6 +130,7 @@ test("reports an empty overlay without inventing patch state", () => {
         snapshot,
         assetProvider: { mode: "client-owned" },
         configuredCdnDir: ".cdn",
+        configuredGameCalendarUtcOffsetMinutes: 480,
     })
 
     assert.equal(result.baseUrl, null)
@@ -135,4 +144,8 @@ test("reports an empty overlay without inventing patch state", () => {
     assert.equal(result.contentRelease.source, "bundled")
     assert.equal(result.contentRelease.contentDigest, `sha256:${"1".repeat(64)}`)
     assert.equal(result.contentRelease.multiBattleContentDigest, `sha256:${"2".repeat(64)}`)
+    assert.deepEqual(result.gameCalendar, {
+        configuredUtcOffsetMinutes: 480,
+        contentUtcOffsetMinutes: 480,
+    })
 })

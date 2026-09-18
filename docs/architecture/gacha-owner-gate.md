@@ -66,7 +66,7 @@ Character/Equipment exchange rate 各有 3 条 actual rarity 规则，当前值�
 
 ## 4. 时间语义
 
-Gacha Master 调用客户端 `ParseTools.parseJstDataToUtcTime`，因此 banner、ticket expiry 和 Gacha Campaign 字符串按 UTC+9 解析，起止边界首尾包含。不得机械复用 Shop 的 UTC+8 period helper。
+CN 1.8.1 客户端启动时把 `AppTime_Impl_.JAPAN_STANDARD_OFFSET_MILLISECONDS` 设为 `28800000`（UTC+8）。Gacha Master 调用的 `ParseTools.parseJstDataToUtcTime` 只是上游遗留的 JST 符号名，实际按该运行时偏移解析，不得按符号名机械解释为真实 UTC+9。服务端把 banner、ticket expiry 和 Gacha Campaign 字符串交给配置冻结的游戏日历策略（CN 默认 `480`，即 UTC+8）解析，与 Shop 等其他领域共用同一 [GameCalendarPolicy](game-calendar-policy.md)；起止边界首尾包含。
 
 - `baseBannerPeriod` 保存 Master 时期；Comeback/Stars 使用玩家专属 `playerEffectivePeriod`，缺少时 fail closed，不退回 base period；
 - 普通 Stone、paid daily与普通 campaign使用player-effective/base period；
