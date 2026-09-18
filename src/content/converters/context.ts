@@ -44,4 +44,3 @@ export function gameCalendarSupportedYearRange(
         exclusiveMaxEpochMs: calendar.parseMasterTimestamp(SUPPORTED_WALL_YEAR_MAX_EXCLUSIVE),
     }
 }
-
