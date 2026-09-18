@@ -129,3 +129,22 @@ test("box gacha converter rejects reward and settings box-set drift", async () =
         /box gacha 1 box sets do not match/i,
     )
 })
+
+test("box gacha converter validates period strings through the injected game calendar", async () => {
+    assert.equal(typeof convertBoxGachaTables, "function", "应导出 convertBoxGachaTables")
+    const parsed = []
+    const gameCalendar = {
+        utcOffsetMinutes: 480,
+        parseMasterTimestamp: value => {
+            parsed.push(value)
+            return 0
+        },
+    }
+    const output = await convertBoxGachaTables(fixture().reader, { gameCalendar })
+
+    assert.ok(parsed.includes("2025-01-01 05:00:00"), "availableFrom must reach the policy parser")
+    assert.ok(parsed.includes("2025-01-31 11:59:59"), "availableUntil must reach the policy parser")
+    const settings = output["box_gacha_box_settings.json"]["1"]["1"]
+    assert.equal(settings.availableFrom, "2025-01-01 05:00:00")
+    assert.equal(settings.availableUntil, "2025-01-31 11:59:59")
+})

@@ -3,6 +3,7 @@ import {
     type AdditionalRewardConversionOutput,
     type AdditionalRewardSourceReader,
 } from "../converters/additional-reward"
+import type { ContentConverterContext } from "../converters/context"
 import {
     convertCharacters,
     type CharacterConversionInput,
@@ -146,15 +147,18 @@ export function deriveCharacterManaAdmissionSeedTableName(
 export interface DefaultContentTableBuilderDependencies {
     readonly convertAdditionalRewards?: (
         reader: AdditionalRewardSourceReader,
+        context: ContentConverterContext,
     ) => AdditionalRewardConversionOutput | Promise<AdditionalRewardConversionOutput>
     readonly convertBoxGachaTables?: (
         reader: BoxGachaSourceReader,
+        context: ContentConverterContext,
     ) => BoxGachaConversionOutput | Promise<BoxGachaConversionOutput>
     readonly convertCharacters?: (
         input: CharacterConversionInput,
     ) => CharacterConversionOutput | Promise<CharacterConversionOutput>
     readonly convertCharacterElections?: (
         input: CharacterElectionConversionInput,
+        context: ContentConverterContext,
     ) => CharacterElectionConversionOutput | Promise<CharacterElectionConversionOutput>
     readonly convertGachas?: (
         reader: GachaSourceReader,
@@ -172,9 +176,11 @@ export interface DefaultContentTableBuilderDependencies {
     readonly convertItemEquipmentTables?: (
         reader: ItemEquipmentSourceReader,
         compatibility: ItemEquipmentConversionCompatibility,
+        context: ContentConverterContext,
     ) => ItemEquipmentConversionOutput | Promise<ItemEquipmentConversionOutput>
     readonly convertShops?: (
         reader: ShopSourceReader,
+        context: ContentConverterContext,
     ) => ShopConversionOutput | Promise<ShopConversionOutput>
     readonly convertSkillEffects?: (
         input: SkillEffectConversionInput,
@@ -184,16 +190,19 @@ export interface DefaultContentTableBuilderDependencies {
     ) => RewardConversionOutput | Promise<RewardConversionOutput>
     readonly convertRewardCampaigns?: (
         reader: RewardCampaignSourceReader,
+        context: ContentConverterContext,
     ) => RewardCampaignConversionOutput | Promise<RewardCampaignConversionOutput>
     readonly convertQuests?: (
         reader: QuestSourceReader,
         compatibility: QuestConversionCompatibility,
+        context: ContentConverterContext,
     ) => QuestConversionOutput | Promise<QuestConversionOutput>
     readonly convertPeriodicRewards?: (
         reader: PeriodicRewardSourceReader,
     ) => PeriodicRewardConversionOutput | Promise<PeriodicRewardConversionOutput>
     readonly convertLoginBonuses?: (
         reader: LoginBonusSourceReader,
+        context: ContentConverterContext,
     ) => LoginBonusConversionOutput | Promise<LoginBonusConversionOutput>
     readonly importBundledTable?: typeof importBundledTable
 }
@@ -419,6 +428,7 @@ async function runCharacterConverter(
 async function runCharacterElectionConverter(
     reader: StrictOrderedMapReader,
     convert: NonNullable<DefaultContentTableBuilderDependencies["convertCharacterElections"]>,
+    converterContext: ContentConverterContext,
 ): Promise<CharacterElectionConversionOutput> {
     const [electionRows, excludeRows, characterRows, encyclopediaRows] = await Promise.all([
         reader.read("master/character_election/character_election.orderedmap"),
@@ -426,7 +436,7 @@ async function runCharacterElectionConverter(
         reader.read("master/character/character.orderedmap"),
         reader.readNested("master/encyclopedia/encyclopedia.orderedmap"),
     ])
-    return convert({ electionRows, excludeRows, characterRows, encyclopediaRows })
+    return convert({ electionRows, excludeRows, characterRows, encyclopediaRows }, converterContext)
 }
 
 async function runSkillEffectConverter(
@@ -505,6 +515,12 @@ export function createDefaultContentTableBuilder(
             const reader = new StrictOrderedMapReader(context, staticPaths)
             await authorizeDynamicSources(reader, context.definitions)
 
+            // Exactly one frozen converter context per build; every migrated
+            // converter (and nested Shop helper) shares it.
+            const converterContext: ContentConverterContext = Object.freeze({
+                gameCalendar: context.gameCalendar,
+            })
+
             const values = new Map<string, unknown>()
             const converterIds = new Set(context.definitions.map(definition => definition.converterId))
             const bundledCache = new Map<string, Promise<unknown>>()
@@ -519,11 +535,11 @@ export function createDefaultContentTableBuilder(
                 addConverterOutput(
                     values,
                     "additional-reward",
-                    await additionalRewardConverter(reader),
+                    await additionalRewardConverter(reader, converterContext),
                 )
             }
             if (converterIds.has("box-gacha")) {
-                addConverterOutput(values, "box-gacha", await boxGachaConverter(reader))
+                addConverterOutput(values, "box-gacha", await boxGachaConverter(reader, converterContext))
             }
             if (converterIds.has("character")) {
                 addConverterOutput(
@@ -536,7 +552,7 @@ export function createDefaultContentTableBuilder(
                 addConverterOutput(
                     values,
                     "character-election",
-                    await runCharacterElectionConverter(reader, characterElectionConverter),
+                    await runCharacterElectionConverter(reader, characterElectionConverter, converterContext),
                 )
             }
             if (converterIds.has("character-mana-admission")) {
@@ -565,17 +581,17 @@ export function createDefaultContentTableBuilder(
                         equipmentLookup: await readBundled("equipment_lookup.json") as Readonly<
                             Record<string, { readonly category?: unknown }>
                         >,
-                    }),
+                    }, converterContext),
                 )
             }
             if (converterIds.has("login-bonus")) {
-                addConverterOutput(values, "login-bonus", await loginBonusConverter(reader))
+                addConverterOutput(values, "login-bonus", await loginBonusConverter(reader, converterContext))
             }
             if (converterIds.has("mana-node")) {
                 addConverterOutput(values, "mana-node", await manaNodeConverter(reader))
             }
             if (converterIds.has("shop")) {
-                addConverterOutput(values, "shop", await shopConverter(reader))
+                addConverterOutput(values, "shop", await shopConverter(reader, converterContext))
             }
             if (converterIds.has("skill-effects")) {
                 addConverterOutput(
@@ -591,7 +607,7 @@ export function createDefaultContentTableBuilder(
                 addConverterOutput(
                     values,
                     "reward-campaign",
-                    await rewardCampaignConverter(reader),
+                    await rewardCampaignConverter(reader, converterContext),
                 )
             }
             if (converterIds.has("quest")) {
@@ -599,7 +615,7 @@ export function createDefaultContentTableBuilder(
                     practiceQuests: await readBundled("practice_quest.json") as Readonly<
                         Record<string, { readonly name?: unknown }>
                     >,
-                }))
+                }, converterContext))
             }
             if (converterIds.has("periodic-reward")) {
                 addConverterOutput(

@@ -4,6 +4,11 @@ import {
     QUEST_CATEGORIES_BY_RANGE_KIND,
 } from "../quest-range-shape"
 import type { OrderedMapTextRow } from "../sync/ordered-map"
+import {
+    resolveContentConverterContext,
+    type ContentConverterContext,
+} from "./context"
+import type { GameCalendarPolicy } from "../../time/game-calendar"
 import { parseCsvLine } from "./csv"
 
 export const REWARD_CAMPAIGN_PATH = "master/campaign/reward_campaign.orderedmap"
@@ -105,23 +110,16 @@ function parsePositiveInteger(value: string, subject: string): number {
     return parsed
 }
 
-function parseCnTimestamp(value: string, subject: string): number {
-    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value)
-    if (match === null) return invalidCampaign(`${subject} must be a CN timestamp`)
-    const parts = match.slice(1).map(Number)
-    const [year, month, day, hour, minute, second] = parts
-    const utc = new Date(0)
-    utc.setUTCFullYear(year, month - 1, day)
-    utc.setUTCHours(hour, minute, second, 0)
-    const normalized = [
-        utc.getUTCFullYear(), utc.getUTCMonth() + 1, utc.getUTCDate(),
-        utc.getUTCHours(), utc.getUTCMinutes(), utc.getUTCSeconds(),
-    ]
-    if (parts.some((part, index) => part !== normalized[index])) {
-        return invalidCampaign(`${subject} is not a real timestamp`)
+function parseCnTimestamp(
+    value: string,
+    subject: string,
+    calendar: GameCalendarPolicy,
+): number {
+    try {
+        return calendar.parseMasterTimestamp(value)
+    } catch {
+        return invalidCampaign(`${subject} must be a valid CN timestamp`)
     }
-    // CN keeps the upstream JST symbol names but initializes AppTime to UTC+8.
-    return utc.getTime() - 8 * 60 * 60 * 1000
 }
 
 function parseTimeSpan(value: string, subject: string): number {
@@ -181,7 +179,9 @@ function questRange(fields: readonly string[], questKind: number): {
 
 export async function convertRewardCampaigns(
     reader: RewardCampaignSourceReader,
+    context?: ContentConverterContext,
 ): Promise<RewardCampaignConversionOutput> {
+    const { gameCalendar } = resolveContentConverterContext(context)
     const rows = await reader.read(REWARD_CAMPAIGN_PATH)
     const output: Record<string, unknown> = {}
     for (const row of rows) {
@@ -200,8 +200,8 @@ export async function convertRewardCampaigns(
         if (repeatKind !== 0 && repeatKind !== 1) {
             invalidCampaign(`reward_campaign[${row.key}].repeatKind must be 0 or 1`)
         }
-        const startAtMs = parseCnTimestamp(fields[1], `reward_campaign[${row.key}].startAt`)
-        const endAtMs = parseCnTimestamp(fields[2], `reward_campaign[${row.key}].endAt`)
+        const startAtMs = parseCnTimestamp(fields[1], `reward_campaign[${row.key}].startAt`, gameCalendar)
+        const endAtMs = parseCnTimestamp(fields[2], `reward_campaign[${row.key}].endAt`, gameCalendar)
         if (endAtMs < startAtMs) invalidCampaign(`reward_campaign[${row.key}] has an inverted period`)
         const rewardKind = parseInteger(fields[5], `reward_campaign[${row.key}].rewardKind`)
         if (rewardKind < 0 || rewardKind > 2) invalidCampaign(`reward kind is unsupported: ${rewardKind}`)

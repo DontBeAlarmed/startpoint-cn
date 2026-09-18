@@ -18,6 +18,7 @@ const {
     QUEST_TIME_RANGE_COLUMNS,
 } = require("../src/content/converters/quest")
 const { TABLE_SOURCES } = require("../src/content/sync/table-registry")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 
 const PERMANENT_PERIOD = {
     availableFromMs: null,
@@ -142,6 +143,36 @@ test("quest TimeRange accepts only years 1970 through 2200 and preserves UTC+8 b
             /invalid quest content.*TimeRange/i,
         )
     }
+})
+
+test("quest TimeRange epochs follow the injected game calendar offset", () => {
+    const battle = row(119, {
+        0: 1001002,
+        1: "偏移校验",
+        3: 2,
+        4: "2024-08-16 12:00:00",
+        5: "2024-08-29 23:59:59",
+        84: 1,
+    })
+    const base = convertQuestTree(
+        "main_quest.json",
+        { 1: { 1: { 2: [battle] } } },
+        { gameCalendar: createGameCalendarPolicy(480) },
+    )
+    const shifted = convertQuestTree(
+        "main_quest.json",
+        { 1: { 1: { 2: [battle] } } },
+        { gameCalendar: createGameCalendarPolicy(540) },
+    )
+
+    assert.equal(
+        shifted[1001002].availableFromMs - base[1001002].availableFromMs,
+        -3_600_000,
+    )
+    assert.equal(
+        shifted[1001002].availableUntilMs - base[1001002].availableUntilMs,
+        -3_600_000,
+    )
 })
 
 test("quest conversion rejects malformed and inverted non-empty TimeRange values", () => {

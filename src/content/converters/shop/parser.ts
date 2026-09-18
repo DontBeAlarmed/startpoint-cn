@@ -1,5 +1,9 @@
 import type { OrderedMapTextRow } from "../../sync/ordered-map"
 import type { ShopItem, ShopItems } from "../../../lib/types/shop"
+import {
+    resolveContentConverterContext,
+    type ContentConverterContext,
+} from "../context"
 import { parseCsvLine } from "../csv"
 
 const INTEGER_PATTERN = /^(?:0|-?[1-9]\d*)$/
@@ -88,30 +92,26 @@ function parseOptionalMonths(value: string, subject: string): number[] | undefin
     return months
 }
 
-export function parseShopDate(value: string, subject: string): string {
-    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value)
-    if (match === null) invalidShop(`${subject} must be a CN date-time: ${value}`)
-    const parts = match.slice(1).map(Number)
-    const [year, month, day, hour, minute, second] = parts
-    const normalized = new Date(0)
-    normalized.setUTCFullYear(year, month - 1, day)
-    normalized.setUTCHours(hour, minute, second, 0)
-    const normalizedParts = [
-        normalized.getUTCFullYear(),
-        normalized.getUTCMonth() + 1,
-        normalized.getUTCDate(),
-        normalized.getUTCHours(),
-        normalized.getUTCMinutes(),
-        normalized.getUTCSeconds(),
-    ]
-    if (parts.some((part, index) => part !== normalizedParts[index])) {
+export function parseShopDate(
+    value: string,
+    subject: string,
+    context?: ContentConverterContext,
+): string {
+    const { gameCalendar } = resolveContentConverterContext(context)
+    try {
+        gameCalendar.parseMasterTimestamp(value)
+    } catch {
         invalidShop(`${subject} must be a valid CN date-time: ${value}`)
     }
     return value
 }
 
-export function parseOptionalShopDate(value: string, subject: string): string | null {
-    return value === "" || value === "(None)" ? null : parseShopDate(value, subject)
+export function parseOptionalShopDate(
+    value: string,
+    subject: string,
+    context?: ContentConverterContext,
+): string | null {
+    return value === "" || value === "(None)" ? null : parseShopDate(value, subject, context)
 }
 
 export function parseShopCosts(
@@ -182,15 +182,17 @@ export function parseShopItem(
     fields: readonly string[],
     layout: ShopLayout,
     id: string,
+    context?: ContentConverterContext,
 ): ShopItem {
     const subject = `${layout.tableName}[${id}]`
     const item: ShopItem = {
         costs: parseShopCosts(fields, layout.costStarts, subject),
         rewards: parseShopRewards(fields, layout.rewardStarts, subject),
-        availableFrom: parseShopDate(fields[layout.availableFrom], `${subject}.availableFrom`),
+        availableFrom: parseShopDate(fields[layout.availableFrom], `${subject}.availableFrom`, context),
         availableUntil: parseOptionalShopDate(
             fields[layout.availableUntil],
             `${subject}.availableUntil`,
+            context,
         ),
         stock: parseStock(fields, layout, subject),
     }
@@ -224,6 +226,10 @@ export function parseShopItem(
 export function convertFlatShop(
     rows: readonly ParsedShopRow[],
     layout: ShopLayout,
+    context?: ContentConverterContext,
 ): ShopItems {
-    return Object.fromEntries(rows.map(([id, fields]) => [id, parseShopItem(fields, layout, id)]))
+    return Object.fromEntries(rows.map(([id, fields]) => [
+        id,
+        parseShopItem(fields, layout, id, context),
+    ]))
 }

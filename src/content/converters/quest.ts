@@ -5,6 +5,12 @@ import {
     validateQuestUnlockCostTable,
 } from "../validation/quest-derived-output"
 import {
+    gameCalendarSupportedYearRange,
+    resolveContentConverterContext,
+    type ContentConverterContext,
+} from "./context"
+import type { GameCalendarPolicy } from "../../time/game-calendar"
+import {
     convertOrderedMapJson,
     type CsvOrderedMapTree,
 } from "./ordered-map-json"
@@ -351,44 +357,40 @@ function parseMilliseconds(tableName: string, value: string | undefined, field: 
 }
 
 function parseCnQuestTime(
+    calendar: GameCalendarPolicy,
     tableName: QuestTableName,
     value: string | undefined,
     field: "availableFromMs" | "availableUntilMs",
 ): number | null {
     if (isMissing(value)) return null
-    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value as string)
-    if (match === null) invalidQuest(tableName, `TimeRange ${field} must be a CN timestamp`)
-    const parts = match.slice(1).map(Number)
-    const [year, month, day, hour, minute, second] = parts
-    if (year < 1970 || year > 2200) {
+    let parsed: number
+    try {
+        parsed = calendar.parseMasterTimestamp(value as string)
+    } catch {
+        invalidQuest(tableName, `TimeRange ${field} must be a CN timestamp`)
+    }
+    const range = gameCalendarSupportedYearRange(calendar)
+    if (parsed < range.minEpochMs || parsed >= range.exclusiveMaxEpochMs) {
         invalidQuest(tableName, `TimeRange ${field} year must be between 1970 and 2200`)
     }
-    const utcWithoutOffset = Date.UTC(year, month - 1, day, hour, minute, second)
-    const normalized = new Date(utcWithoutOffset)
-    if (normalized.getUTCFullYear() !== year
-        || normalized.getUTCMonth() + 1 !== month
-        || normalized.getUTCDate() !== day
-        || normalized.getUTCHours() !== hour
-        || normalized.getUTCMinutes() !== minute
-        || normalized.getUTCSeconds() !== second) {
-        invalidQuest(tableName, `TimeRange ${field} is not a real timestamp`)
-    }
-    const parsed = utcWithoutOffset - 8 * 60 * 60 * 1000
     if (!Number.isSafeInteger(parsed)) invalidQuest(tableName, `TimeRange ${field} is out of range`)
     return parsed
 }
 
 function parseQuestTimeRange(
+    calendar: GameCalendarPolicy,
     tableName: QuestTableName,
     fields: readonly string[],
 ): { readonly availableFromMs: number | null; readonly availableUntilMs: number | null } {
     const [fromColumn, untilColumn] = QUEST_TIME_RANGE_COLUMNS[tableName]
     const availableFromMs = parseCnQuestTime(
+        calendar,
         tableName,
         fields[fromColumn],
         "availableFromMs",
     )
     const availableUntilMs = parseCnQuestTime(
+        calendar,
         tableName,
         fields[untilColumn],
         "availableUntilMs",
@@ -743,9 +745,11 @@ function specialQuest(tableName: QuestTableName, row: QuestRow): Record<string, 
 export function convertQuestTree(
     tableName: QuestTableName,
     tree: CsvOrderedMapTree,
+    context?: ContentConverterContext,
 ): Readonly<Record<string, unknown>> {
     const source = QUEST_TABLE_SOURCES[tableName]
     if (!source) return invalidQuest(tableName, "table is not registered")
+    const { gameCalendar } = resolveContentConverterContext(context)
     const layout = STANDARD_LAYOUTS[tableName]
     const output: Record<string, unknown> = {}
     for (const row of collectRows(tableName, tree, source.nestingDepth)) {
@@ -756,7 +760,7 @@ export function convertQuestTree(
         if (!/^[1-9]\d*$/.test(questId)) invalidQuest(tableName, `invalid quest id: ${questId}`)
         if (output[questId] !== undefined) invalidQuest(tableName, `duplicate quest id: ${questId}`)
         output[questId] = {
-            ...parseQuestTimeRange(tableName, row.fields),
+            ...parseQuestTimeRange(gameCalendar, tableName, row.fields),
             ...(layout
                 ? standardQuest(tableName, row, layout)
                 : specialQuest(tableName, row)),
@@ -1071,6 +1075,7 @@ export function buildEventChallengePointMap(
 export async function convertQuests(
     reader: QuestSourceReader,
     compatibility: QuestConversionCompatibility,
+    context?: ContentConverterContext,
 ): Promise<QuestConversionOutput> {
     const convertedSources = await Promise.all(
         (Object.entries(QUEST_TABLE_SOURCES) as Array<[
@@ -1079,7 +1084,7 @@ export async function convertQuests(
         ]>).map(async ([tableName, source]) => {
             const raw = await reader.readDynamic(source.logicalPath)
             const tree = convertOrderedMapJson(raw, source.nestingDepth)
-            return [tableName, tree, convertQuestTree(tableName, tree)] as const
+            return [tableName, tree, convertQuestTree(tableName, tree, context)] as const
         }),
     )
     const questTables = Object.fromEntries(convertedSources.map(

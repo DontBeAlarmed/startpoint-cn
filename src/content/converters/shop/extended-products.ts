@@ -8,6 +8,7 @@ import {
     type ShopItem,
     type ShopItems,
 } from "../../../lib/types/shop"
+import type { ContentConverterContext } from "../context"
 import {
     invalidShop,
     parseOptionalShopInteger,
@@ -59,7 +60,10 @@ function parseSpecialRewards(fields: readonly string[], subject: string): {
     return { rewards, ...(passCardPoints === undefined ? {} : { passCardPoints }) }
 }
 
-export function convertSpecialPackShop(rows: readonly OrderedMapTextRow[]): ShopItems {
+export function convertSpecialPackShop(
+    rows: readonly OrderedMapTextRow[],
+    context?: ContentConverterContext,
+): ShopItems {
     const parsed = requireShopRows(rows, "special_pack_shop", 46)
     return Object.fromEntries(parsed.map(([id, fields]) => {
         const subject = `special_pack_shop[${id}]`
@@ -77,8 +81,8 @@ export function convertSpecialPackShop(rows: readonly OrderedMapTextRow[]): Shop
         const item: ShopItem = {
             costs: parseShopCosts(fields, [12, 14, 16, 18], subject),
             rewards: parsedRewards.rewards,
-            availableFrom: parseShopDate(fields[20], `${subject}.availableFrom`),
-            availableUntil: parseOptionalShopDate(fields[21], `${subject}.availableUntil`),
+            availableFrom: parseShopDate(fields[20], `${subject}.availableFrom`, context),
+            availableUntil: parseOptionalShopDate(fields[21], `${subject}.availableUntil`, context),
             stock: positive(parseShopInteger(fields[23], `${subject}.stock`), `${subject}.stock`),
             userCost: { type: ShopItemUserCostType.PAID_BEADS, amount: price },
             purchaseKind: specialExchangeCampaignId === 0
@@ -101,7 +105,10 @@ export function convertSpecialPackShop(rows: readonly OrderedMapTextRow[]): Shop
     }))
 }
 
-export function convertManaShop(rows: readonly OrderedMapTextRow[]): ShopItems {
+export function convertManaShop(
+    rows: readonly OrderedMapTextRow[],
+    context?: ContentConverterContext,
+): ShopItems {
     const parsed = requireShopRows(rows, "mana_shop", 24)
     return Object.fromEntries(parsed.map(([id, fields]) => {
         const subject = `mana_shop[${id}]`
@@ -122,8 +129,8 @@ export function convertManaShop(rows: readonly OrderedMapTextRow[]): ShopItems {
                 type: ShopItemRewardType.MANA,
                 count: purchaseCount + additionalCount,
             } as ShopItemReward],
-            availableFrom: parseShopDate(fields[14], `${subject}.availableFrom`),
-            availableUntil: parseOptionalShopDate(fields[15], `${subject}.availableUntil`),
+            availableFrom: parseShopDate(fields[14], `${subject}.availableFrom`, context),
+            availableUntil: parseOptionalShopDate(fields[15], `${subject}.availableUntil`, context),
             stock: positive(parseShopInteger(fields[17], `${subject}.stock`), `${subject}.stock`),
             userCost: { type: ShopItemUserCostType.BEADS, amount: price },
         }

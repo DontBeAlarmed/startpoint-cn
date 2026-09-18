@@ -540,6 +540,32 @@ test("shop converter validates CN calendar values without local timezone normali
     assert.equal(output["general_shop.json"]["20"].availableFrom, "2024-02-29 23:59:59")
 })
 
+test("shop converter validates period strings through the injected game calendar", async () => {
+    assert.equal(typeof convertShops, "function", "应导出 convertShops")
+    const parsed = []
+    const gameCalendar = {
+        utcOffsetMinutes: 480,
+        parseMasterTimestamp: value => {
+            parsed.push(value)
+            return 0
+        },
+    }
+    const output = await convertShops(createFixture().reader, { gameCalendar })
+
+    for (const expected of [
+        "2024-01-01 00:00:00",
+        "2023-01-01 05:00:00",
+        "2024-02-01 12:00:00",
+        "2024-02-29 11:59:59",
+        "2022-12-22 12:00:00",
+        "2023-01-06 11:59:59",
+    ]) {
+        assert.ok(parsed.includes(expected), `calendar must validate ${expected}`)
+    }
+    assert.equal(output["general_shop.json"]["20"].availableFrom, "2024-01-01 00:00:00")
+    assert.equal(output["general_shop.json"]["220032"].availableFrom, "2023-01-01 05:00:00")
+})
+
 test("shop converter rejects duplicate keys, malformed shapes, and unknown categories", async t => {
     assert.equal(typeof convertShops, "function", "商店转换器应导出 convertShops")
     await t.test("duplicate product", async () => {

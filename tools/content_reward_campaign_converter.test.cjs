@@ -8,6 +8,7 @@ const {
     convertRewardCampaigns,
 } = require("../src/content/converters/reward-campaign")
 const bundledCampaigns = require("../assets/reward_campaign.json")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 
 function row(key, values) {
     const fields = Array.from({ length: 11 }, () => "")
@@ -91,6 +92,34 @@ test("reward campaign converter preserves weekly day and reset time", async () =
         categories: [1],
         keyQueries: [null, null, null],
     })
+})
+
+test("reward campaign epochs follow the injected game calendar offset", async () => {
+    const reader = {
+        async read() {
+            return [row(1, {
+                0: 0, 1: "2024-07-11 12:00:00", 2: "2024-08-01 23:59:59",
+                5: 0, 6: 2, 7: 0, 8: "(None)", 9: "(None)", 10: "(None)",
+            })]
+        },
+    }
+    const base = await convertRewardCampaigns(reader, {
+        gameCalendar: createGameCalendarPolicy(480),
+    })
+    const shifted = await convertRewardCampaigns(reader, {
+        gameCalendar: createGameCalendarPolicy(540),
+    })
+
+    assert.equal(
+        shifted["reward_campaign.json"][1].startAtMs
+            - base["reward_campaign.json"][1].startAtMs,
+        -3_600_000,
+    )
+    assert.equal(
+        shifted["reward_campaign.json"][1].endAtMs
+            - base["reward_campaign.json"][1].endAtMs,
+        -3_600_000,
+    )
 })
 
 test("reward campaign converter rejects malformed recurrence and rates", async () => {

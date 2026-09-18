@@ -9,6 +9,7 @@ const {
     ADDITIONAL_REWARD_PATHS,
     convertAdditionalRewards,
 } = require("../src/content/converters/additional-reward")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 
 function fields(length, values) {
     const result = Array(length).fill("")
@@ -20,7 +21,7 @@ function row(key, values) {
     return { key: String(key), text: values.join(",") }
 }
 
-test("additional reward converter joins groups, collect-item rules and boss pickup schedules", async () => {
+function fixtureSources() {
     const flat = new Map([
         [ADDITIONAL_REWARD_PATHS.collectItemEvents, [row(1, fields(28, {
             20: "2024-08-01 12:00:00",
@@ -54,6 +55,11 @@ test("additional reward converter joins groups, collect-item rules and boss pick
                 "2024-08-10 12:00:00", "2024-08-11 23:59:59"]),
         ] }]],
     ])
+    return { flat, nested }
+}
+
+test("additional reward converter joins groups, collect-item rules and boss pickup schedules", async () => {
+    const { flat, nested } = fixtureSources()
 
     const output = await convertAdditionalRewards({
         read: async path => flat.get(path) ?? [],
@@ -88,4 +94,25 @@ test("additional reward converter joins groups, collect-item rules and boss pick
             availableRank: 3,
         }],
     })
+})
+
+test("additional reward epochs follow the injected game calendar offset", async () => {
+    const base = await convertAdditionalRewards({
+        read: async path => fixtureSources().flat.get(path) ?? [],
+        readNested: async path => fixtureSources().nested.get(path) ?? [],
+    }, { gameCalendar: createGameCalendarPolicy(480) })
+    const shifted = await convertAdditionalRewards({
+        read: async path => fixtureSources().flat.get(path) ?? [],
+        readNested: async path => fixtureSources().nested.get(path) ?? [],
+    }, { gameCalendar: createGameCalendarPolicy(540) })
+
+    const baseCollect = base["additional_reward_rules.json"].collectItemRules[0]
+    const shiftedCollect = shifted["additional_reward_rules.json"].collectItemRules[0]
+    assert.equal(shiftedCollect.startAtMs - baseCollect.startAtMs, -3_600_000)
+    assert.equal(shiftedCollect.endAtMs - baseCollect.endAtMs, -3_600_000)
+
+    const baseBoss = base["additional_reward_rules.json"].bossPickupRules[0]
+    const shiftedBoss = shifted["additional_reward_rules.json"].bossPickupRules[0]
+    assert.equal(shiftedBoss.startAtMs - baseBoss.startAtMs, -3_600_000)
+    assert.equal(shiftedBoss.endAtMs - baseBoss.endAtMs, -3_600_000)
 })

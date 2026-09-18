@@ -1,5 +1,10 @@
 import { deepFreeze } from "../deep-freeze"
 import type { OrderedMapTextRow } from "../sync/ordered-map"
+import {
+    resolveContentConverterContext,
+    type ContentConverterContext,
+} from "./context"
+import type { GameCalendarPolicy } from "../../time/game-calendar"
 import { parseCsvLine } from "./csv"
 import {
     validateEquipmentContentTables,
@@ -62,8 +67,6 @@ type ParsedRow = readonly [string, readonly string[]]
 
 const ITEM_EFFECT_KIND_MIN = 0
 const ITEM_EFFECT_KIND_MAX = 22
-const CN_CONTENT_TIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/
-const CN_CONTENT_UTC_OFFSET_MS = 8 * 60 * 60 * 1000
 
 function invalidItemEquipment(reason: string): never {
     throw new Error(`invalid item/equipment content: ${reason}`)
@@ -142,29 +145,17 @@ function parseItemEffectKind(value: string, subject: string): ItemEffectKindConv
     return parsed as ItemEffectKindConversionCode
 }
 
-function parseCnContentTime(value: string, subject: string): number {
-    const match = CN_CONTENT_TIME_PATTERN.exec(value)
-    if (!match) {
-        invalidItemEquipment(`${subject} must be a UTC+8 second-precision time: ${value}`)
+function parseCnContentTime(
+    calendar: GameCalendarPolicy,
+    value: string,
+    subject: string,
+): number {
+    let epochMs: number
+    try {
+        epochMs = calendar.parseMasterTimestamp(value)
+    } catch {
+        invalidItemEquipment(`${subject} must be a valid UTC+8 second-precision time: ${value}`)
     }
-    const [, yearText, monthText, dayText, hourText, minuteText, secondText] = match
-    const year = Number(yearText)
-    const month = Number(monthText)
-    const day = Number(dayText)
-    const hour = Number(hourText)
-    const minute = Number(minuteText)
-    const second = Number(secondText)
-    const utcWallClock = Date.UTC(year, month - 1, day, hour, minute, second)
-    const check = new Date(utcWallClock)
-    if (check.getUTCFullYear() !== year
-        || check.getUTCMonth() !== month - 1
-        || check.getUTCDate() !== day
-        || check.getUTCHours() !== hour
-        || check.getUTCMinutes() !== minute
-        || check.getUTCSeconds() !== second) {
-        invalidItemEquipment(`${subject} must be a valid UTC+8 time: ${value}`)
-    }
-    const epochMs = utcWallClock - CN_CONTENT_UTC_OFFSET_MS
     if (!Number.isSafeInteger(epochMs) || epochMs < 0) {
         invalidItemEquipment(
             `${subject} must convert to a non-negative safe epoch millisecond: ${value}`,
@@ -173,8 +164,12 @@ function parseCnContentTime(value: string, subject: string): number {
     return epochMs
 }
 
-function parseOptionalCnContentEndTime(value: string, subject: string): number | null {
-    return value === "(None)" ? null : parseCnContentTime(value, subject)
+function parseOptionalCnContentEndTime(
+    calendar: GameCalendarPolicy,
+    value: string,
+    subject: string,
+): number | null {
+    return value === "(None)" ? null : parseCnContentTime(calendar, value, subject)
 }
 
 function requireText(value: string, subject: string): string {
@@ -313,6 +308,7 @@ function convertItemBonusSelect(
 function convertItems(
     rows: readonly OrderedMapTextRow[],
     bonusSelect: ReadonlyMap<string, readonly SelectReward[]>,
+    calendar: GameCalendarPolicy,
 ): {
     readonly data: Record<string, unknown>
     readonly ids: number[]
@@ -335,8 +331,8 @@ function convertItems(
         const category = parseNonNegativeInteger(fields[14], `item[${id}].category`)
         const salePrice = parseNonNegativeInteger(fields[16], `item[${id}].salePrice`)
         const parsedMaxCount = parsePositiveInteger(fields[18], `item[${id}].maxCount`)
-        const startTimeMs = parseCnContentTime(fields[19], `item[${id}].startTime`)
-        const endTimeMs = parseOptionalCnContentEndTime(fields[20], `item[${id}].endTime`)
+        const startTimeMs = parseCnContentTime(calendar, fields[19], `item[${id}].startTime`)
+        const endTimeMs = parseOptionalCnContentEndTime(calendar, fields[20], `item[${id}].endTime`)
         const sellable = parseBoolean(fields[21], `item[${id}].sellable`)
         if (endTimeMs !== null && endTimeMs < startTimeMs) {
             invalidItemEquipment(`item[${id}] endTime must not precede startTime`)
@@ -399,7 +395,9 @@ function convertItems(
 export async function convertItemEquipmentTables(
     reader: ItemEquipmentSourceReader,
     compatibility: ItemEquipmentConversionCompatibility = { equipmentLookup: {} },
+    context?: ContentConverterContext,
 ): Promise<ItemEquipmentConversionOutput> {
+    const { gameCalendar } = resolveContentConverterContext(context)
     const [equipmentRows, craftRows, dissolveRateRows, itemRows, itemBonusSelectRows] = await Promise.all([
         reader.read(EQUIPMENT_PATH),
         reader.read(EQUIPMENT_CRAFT_PATH),
@@ -408,7 +406,7 @@ export async function convertItemEquipmentTables(
         reader.read(ITEM_BONUS_SELECT_PATH),
     ])
     const equipment = convertEquipment(equipmentRows, compatibility)
-    const items = convertItems(itemRows, convertItemBonusSelect(itemBonusSelectRows))
+    const items = convertItems(itemRows, convertItemBonusSelect(itemBonusSelectRows), gameCalendar)
     const equipmentCraft = convertEquipmentCraft(craftRows, dissolveRateRows)
     validateItemContentTables({
         effects: items.data,

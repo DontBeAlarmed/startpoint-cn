@@ -1,4 +1,10 @@
 import { deepFreeze } from "../deep-freeze"
+import {
+    gameCalendarSupportedYearRange,
+    resolveContentConverterContext,
+    type ContentConverterContext,
+} from "./context"
+import type { GameCalendarPolicy } from "../../time/game-calendar"
 import { convertOrderedMapJson, type CsvOrderedMapTree } from "./ordered-map-json"
 
 export const LOGIN_BONUS_SOURCE = "master/bonus/login_bonus.orderedmap"
@@ -178,31 +184,32 @@ function parsePositiveInteger(value: string | undefined, subject: string): numbe
     return parsed
 }
 
-function parseJstTimestamp(value: string | undefined, subject: string): number {
-    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value ?? "")
-    if (match === null) invalidLoginBonus(`${subject} must be a JST date-time: ${String(value)}`)
-    const [, yearText, monthText, dayText, hourText, minuteText, secondText] = match
-    const year = Number(yearText)
-    const month = Number(monthText)
-    const day = Number(dayText)
-    const hour = Number(hourText)
-    const minute = Number(minuteText)
-    const second = Number(secondText)
-    const maxDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
-    if (year < 1970 || year > 2200
-        || month < 1 || month > 12
-        || day < 1 || day > maxDay
-        || hour > 23 || minute > 59 || second > 59) {
+function parseJstTimestamp(
+    value: string | undefined,
+    subject: string,
+    calendar: GameCalendarPolicy,
+): number {
+    let parsed: number
+    try {
+        parsed = calendar.parseMasterTimestamp(value ?? "")
+    } catch {
+        invalidLoginBonus(`${subject} must be a valid JST date-time: ${String(value)}`)
+    }
+    const range = gameCalendarSupportedYearRange(calendar)
+    if (parsed < range.minEpochMs || parsed >= range.exclusiveMaxEpochMs) {
         invalidLoginBonus(`${subject} is outside the supported JST date-time range: ${value}`)
     }
-    // The CN 1.8.1 bootstrap assigns the legacy JST-named client constant to UTC+8.
-    return Date.UTC(year, month - 1, day, hour, minute, second) - 8 * 60 * 60 * 1000
+    return parsed
 }
 
-function parseOptionalJstTimestamp(value: string | undefined, subject: string): number | null {
+function parseOptionalJstTimestamp(
+    value: string | undefined,
+    subject: string,
+    calendar: GameCalendarPolicy,
+): number | null {
     return value === undefined || value === "" || value === "(None)"
         ? null
-        : parseJstTimestamp(value, subject)
+        : parseJstTimestamp(value, subject, calendar)
 }
 
 function parseOptionalPositiveInteger(value: string | undefined, subject: string): number | null {
@@ -290,7 +297,11 @@ function parseReward(
     return { kind, count }
 }
 
-function convertGroup(groupId: string, tree: CsvOrderedMapTree): LoginBonusGroup {
+function convertGroup(
+    groupId: string,
+    tree: CsvOrderedMapTree,
+    calendar: GameCalendarPolicy,
+): LoginBonusGroup {
     const indices = Object.keys(tree)
         .map(index => parsePositiveInteger(index, `${groupId}.index`))
         .sort((left, right) => left - right)
@@ -307,15 +318,17 @@ function convertGroup(groupId: string, tree: CsvOrderedMapTree): LoginBonusGroup
     const groupType = LOGIN_BONUS_GROUP_TYPES[Number(rows[0][0])]
 
     const periods = rows.map(fields => ({
-        availableFromMs: parseJstTimestamp(fields[41], `${groupId}.availableFrom`),
-        availableUntilMs: parseOptionalJstTimestamp(fields[42], `${groupId}.availableUntil`),
+        availableFromMs: parseJstTimestamp(fields[41], `${groupId}.availableFrom`, calendar),
+        availableUntilMs: parseOptionalJstTimestamp(fields[42], `${groupId}.availableUntil`, calendar),
         conditionPeriodFromMs: parseOptionalJstTimestamp(
             fields[38],
             `${groupId}.conditionPeriodFrom`,
+            calendar,
         ),
         conditionPeriodUntilMs: parseOptionalJstTimestamp(
             fields[39],
             `${groupId}.conditionPeriodUntil`,
+            calendar,
         ),
         comebackInactivityDays: parseOptionalPositiveInteger(
             fields[40],
@@ -370,21 +383,26 @@ function convertGroup(groupId: string, tree: CsvOrderedMapTree): LoginBonusGroup
     }
 }
 
-export function convertLoginBonusTree(tree: CsvOrderedMapTree): LoginBonusCatalog {
+export function convertLoginBonusTree(
+    tree: CsvOrderedMapTree,
+    context?: ContentConverterContext,
+): LoginBonusCatalog {
+    const { gameCalendar } = resolveContentConverterContext(context)
     const output: Record<string, LoginBonusGroup> = {}
     for (const groupId of Object.keys(tree).sort()) {
         if (groupId.length === 0) invalidLoginBonus("group id must not be empty")
-        output[groupId] = convertGroup(groupId, requireGroupTree(groupId, tree[groupId]))
+        output[groupId] = convertGroup(groupId, requireGroupTree(groupId, tree[groupId]), gameCalendar)
     }
     return validateLoginBonusCatalog(output)
 }
 
 export async function convertLoginBonuses(
     reader: LoginBonusSourceReader,
+    context?: ContentConverterContext,
 ): Promise<LoginBonusConversionOutput> {
     const raw = await reader.readDynamic(LOGIN_BONUS_SOURCE)
     return deepFreeze({
-        "login_bonus.json": convertLoginBonusTree(convertOrderedMapJson(raw, 2)),
+        "login_bonus.json": convertLoginBonusTree(convertOrderedMapJson(raw, 2), context),
     })
 }
 

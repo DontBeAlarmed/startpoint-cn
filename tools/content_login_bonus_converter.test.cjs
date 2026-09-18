@@ -10,6 +10,7 @@ const {
     selectActiveLoginBonusGroups,
     selectActiveNormalLoginBonusGroup,
 } = require("../src/content/converters/login-bonus")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 
 function row(values) {
     const fields = Array(48).fill("")
@@ -188,6 +189,29 @@ test("overlapping Normal groups follow the client earliest-start selection", () 
     assert.equal(
         selectActiveNormalLoginBonusGroup(catalog, Date.parse("2024-08-14T04:00:00.000Z"))?.groupId,
         "earlier",
+    )
+})
+
+test("login bonus epochs follow the injected game calendar offset", () => {
+    const tree = {
+        normal: group(0, "2024-07-11 12:00:00", "2050-01-01 04:59:59", [
+            [1, [{ kind: 0, count: 50 }]],
+        ]),
+    }
+    const base = convertLoginBonusTree(tree, {
+        gameCalendar: createGameCalendarPolicy(480),
+    })
+    const shifted = convertLoginBonusTree(tree, {
+        gameCalendar: createGameCalendarPolicy(540),
+    })
+
+    assert.equal(
+        shifted.normal.availableFromMs - base.normal.availableFromMs,
+        -3_600_000,
+    )
+    assert.equal(
+        shifted.normal.availableUntilMs - base.normal.availableUntilMs,
+        -3_600_000,
     )
 })
 

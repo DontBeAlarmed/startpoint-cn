@@ -1,6 +1,11 @@
 import { deepFreeze } from "../deep-freeze"
 import { QUEST_CATEGORIES_BY_RANGE_KIND } from "../quest-range-shape"
 import type { NestedOrderedMapTextRows, OrderedMapTextRow } from "../sync/ordered-map"
+import {
+    resolveContentConverterContext,
+    type ContentConverterContext,
+} from "./context"
+import type { GameCalendarPolicy } from "../../time/game-calendar"
 import { parseCsvLine } from "./csv"
 import { validateAdditionalRewardTable } from "../validation/additional-reward-output"
 
@@ -54,22 +59,16 @@ function parseNonNegativeInteger(value: string, subject: string): number {
     return parsed
 }
 
-function parseTimestamp(value: string, subject: string): number {
-    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value)
-    if (match === null) invalidAdditionalReward(`${subject} must be a CN date-time`)
-    const parts = match.slice(1).map(Number)
-    const [year, month, day, hour, minute, second] = parts
-    const utc = new Date(0)
-    utc.setUTCFullYear(year, month - 1, day)
-    utc.setUTCHours(hour, minute, second, 0)
-    const normalized = [
-        utc.getUTCFullYear(), utc.getUTCMonth() + 1, utc.getUTCDate(),
-        utc.getUTCHours(), utc.getUTCMinutes(), utc.getUTCSeconds(),
-    ]
-    if (parts.some((part, index) => part !== normalized[index])) {
-        invalidAdditionalReward(`${subject} is not a real date-time`)
+function parseTimestamp(
+    value: string,
+    subject: string,
+    calendar: GameCalendarPolicy,
+): number {
+    try {
+        return calendar.parseMasterTimestamp(value)
+    } catch {
+        return invalidAdditionalReward(`${subject} must be a valid CN date-time`)
     }
-    return utc.getTime() - 8 * 60 * 60 * 1000
 }
 
 function parseFields(row: OrderedMapTextRow, subject: string, count: number): readonly string[] {
@@ -156,7 +155,9 @@ function nestedByKey(
 
 export async function convertAdditionalRewards(
     reader: AdditionalRewardSourceReader,
+    context?: ContentConverterContext,
 ): Promise<AdditionalRewardConversionOutput> {
+    const { gameCalendar } = resolveContentConverterContext(context)
     const [
         groupRows,
         collectEventRows,
@@ -210,8 +211,8 @@ export async function convertAdditionalRewards(
     for (const eventRow of collectEventRows) {
         const eventId = parsePositiveInteger(eventRow.key, `collect_item_event key ${eventRow.key}`)
         const fields = parseFields(eventRow, `collect_item_event[${eventId}]`, 28)
-        const startAtMs = parseTimestamp(fields[20], `collect_item_event[${eventId}].startAt`)
-        const endAtMs = parseTimestamp(fields[21], `collect_item_event[${eventId}].endAt`)
+        const startAtMs = parseTimestamp(fields[20], `collect_item_event[${eventId}].startAt`, gameCalendar)
+        const endAtMs = parseTimestamp(fields[21], `collect_item_event[${eventId}].endAt`, gameCalendar)
         if (endAtMs < startAtMs) invalidAdditionalReward(`collect_item_event[${eventId}] period is inverted`)
         for (const relationRow of questRelations.get(String(eventId)) ?? []) {
             const sequence = parsePositiveInteger(
@@ -265,8 +266,8 @@ export async function convertAdditionalRewards(
     for (const eventRow of bossEventRows) {
         const eventId = parsePositiveInteger(eventRow.key, `boss pickup event ${eventRow.key}`)
         const fields = parseFields(eventRow, `boss_battle_multi_pickup_event[${eventId}]`, 8)
-        const startAtMs = parseTimestamp(fields[6], `boss pickup event ${eventId}.startAt`)
-        const endAtMs = parseTimestamp(fields[7], `boss pickup event ${eventId}.endAt`)
+        const startAtMs = parseTimestamp(fields[6], `boss pickup event ${eventId}.startAt`, gameCalendar)
+        const endAtMs = parseTimestamp(fields[7], `boss pickup event ${eventId}.endAt`, gameCalendar)
         if (endAtMs < startAtMs) invalidAdditionalReward(`boss pickup event ${eventId} period is inverted`)
         bossPeriods.set(eventId, { startAtMs, endAtMs })
     }
@@ -294,11 +295,11 @@ export async function convertAdditionalRewards(
             }
             const startAtMs = Math.max(
                 eventPeriod.startAtMs,
-                parseTimestamp(fields[6], `boss pickup schedule ${eventId}.${scheduleId}.startAt`),
+                parseTimestamp(fields[6], `boss pickup schedule ${eventId}.${scheduleId}.startAt`, gameCalendar),
             )
             const endAtMs = Math.min(
                 eventPeriod.endAtMs,
-                parseTimestamp(fields[7], `boss pickup schedule ${eventId}.${scheduleId}.endAt`),
+                parseTimestamp(fields[7], `boss pickup schedule ${eventId}.${scheduleId}.endAt`, gameCalendar),
             )
             if (endAtMs < startAtMs) {
                 invalidAdditionalReward(`boss pickup schedule ${eventId}.${scheduleId} is outside its event`)

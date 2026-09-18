@@ -12,6 +12,8 @@ try {
     if (error?.code !== "MODULE_NOT_FOUND") throw error
 }
 
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
+
 const SOURCES = Object.freeze({
     equipment: "master/item/equipment.orderedmap",
     craft: "master/item/equipment_craft_point_exchange.orderedmap",
@@ -320,7 +322,7 @@ for (const { name, overrides, expected } of [
     {
         name: "invalid UTC+8 date",
         overrides: { 19: "2020-02-30 00:00:00" },
-        expected: /startTime must be a valid UTC\+8 time/i,
+        expected: /startTime must be a valid UTC\+8 second-precision time/i,
     },
     {
         name: "1969 time with a negative epoch",
@@ -330,7 +332,7 @@ for (const { name, overrides, expected } of [
     {
         name: "time without second precision",
         overrides: { 19: "2020-01-01 00:00" },
-        expected: /startTime must be a UTC\+8 second-precision time/i,
+        expected: /startTime must be a valid UTC\+8 second-precision time/i,
     },
     {
         name: "inverted availability window",
@@ -350,6 +352,23 @@ for (const { name, overrides, expected } of [
         await assert.rejects(convertItemEquipmentTables(source.reader), expected)
     })
 }
+
+test("item inventory policy epochs follow the injected game calendar offset", async () => {
+    const base = await convertItemEquipmentTables(
+        fixture().reader,
+        { equipmentLookup: {} },
+        { gameCalendar: createGameCalendarPolicy(480) },
+    )
+    const shifted = await convertItemEquipmentTables(
+        fixture().reader,
+        { equipmentLookup: {} },
+        { gameCalendar: createGameCalendarPolicy(540) },
+    )
+
+    const baseStart = base["item_inventory_policy.json"].byItemId["100"].startTimeMs
+    const shiftedStart = shifted["item_inventory_policy.json"].byItemId["100"].startTimeMs
+    assert.equal(shiftedStart - baseStart, -3_600_000)
+})
 
 test("item inventory policy requires all 23 Item columns", async () => {
     const source = fixture({
