@@ -8,6 +8,7 @@ const {
     getDayBucket,
     getBusinessDayKey,
 } = require("../src/lib/time-utils")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 const {
     getDailyChallengePointId,
     assertDailyChallengePointAvailable,
@@ -23,6 +24,15 @@ assert.equal(getBusinessDayKey(at("2026-08-26T20:59:59.000Z"), 5), "2026-08-26")
 assert.equal(getBusinessDayKey(at("2026-08-26T21:00:00.000Z"), 5), "2026-08-27")
 assert.deepEqual(getDayBucket(at("2026-08-26T16:00:00.000Z"), 0), { y: 2026, m: 7, d: 27 })
 assert.deepEqual(getDayBucket(at("2026-08-26T22:59:59.000Z"), 23), { y: 2026, m: 7, d: 26 })
+
+// An explicit +540 calendar must move the same instant one hour forward in
+// business-day projection: 15:30Z is 23:30 (+480) but 00:30 next day (+540).
+assert.deepEqual(getDayBucket(at("2024-08-13T15:30:00.000Z"), 0), { y: 2024, m: 7, d: 13 })
+assert.deepEqual(
+    getDayBucket(at("2024-08-13T15:30:00.000Z"), 0, createGameCalendarPolicy(540)),
+    { y: 2024, m: 7, d: 14 },
+    "+540 日历必须把业务日推进一小时",
+)
 
 assert.equal(
     getShopPurchasePeriodKeys(Date.parse("2026-08-26T20:59:59.000Z"), undefined, 5).daily,

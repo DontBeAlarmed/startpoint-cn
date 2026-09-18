@@ -1,3 +1,5 @@
+import { GameCalendarError, type GameCalendarPolicy } from "../../time/game-calendar"
+import { getGameCalendar } from "../../time/game-calendar-provider"
 import type {
     ActiveMissionReward,
     ParsedActiveMissionDefinition,
@@ -20,7 +22,6 @@ import {
     parseActiveMissionTableValues,
 } from "./active-plan-table"
 
-const CN_MASTER_OFFSET_MILLISECONDS = 8 * 60 * 60 * 1000
 const NONE_VALUES = new Set<unknown>([undefined, null, "", "(None)"])
 
 const SUPPORTED_PATTERNS: ReadonlySet<number> = new Set([
@@ -143,37 +144,24 @@ function parseStageReference(
     return { missionId, stage }
 }
 
-export function parseCnMasterDateTime(value: string): number {
-    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value)
-    if (!match) throw new TypeError(`Invalid CN master date time: ${value}`)
-
-    const [, yearText, monthText, dayText, hourText, minuteText, secondText] = match
-    const [year, month, day, hour, minute, second] = [
-        yearText,
-        monthText,
-        dayText,
-        hourText,
-        minuteText,
-        secondText,
-    ].map(Number)
-    if (year < 1970 || year > 2200
-        || month < 1 || month > 12
-        || day < 1 || day > 31
-        || hour > 23 || minute > 59 || second > 59) {
+export function parseCnMasterDateTime(
+    value: string,
+    calendar: GameCalendarPolicy = getGameCalendar(),
+): number {
+    // Active Mission master data keeps its historical supported wall-year
+    // window; field validity and the fixed-offset conversion are the policy's.
+    const year = Number(value.slice(0, 4))
+    if (!Number.isSafeInteger(year) || year < 1970 || year > 2200) {
         throw new TypeError(`Invalid CN master date time: ${value}`)
     }
-
-    const utcWithoutOffset = Date.UTC(year, month - 1, day, hour, minute, second)
-    const normalized = new Date(utcWithoutOffset)
-    if (normalized.getUTCFullYear() !== year
-        || normalized.getUTCMonth() !== month - 1
-        || normalized.getUTCDate() !== day
-        || normalized.getUTCHours() !== hour
-        || normalized.getUTCMinutes() !== minute
-        || normalized.getUTCSeconds() !== second) {
-        throw new TypeError(`Invalid CN master date time: ${value}`)
+    try {
+        return calendar.parseMasterTimestamp(value)
+    } catch (error) {
+        if (error instanceof GameCalendarError) {
+            throw new TypeError(`Invalid CN master date time: ${value}`)
+        }
+        throw error
     }
-    return utcWithoutOffset - CN_MASTER_OFFSET_MILLISECONDS
 }
 
 export const parseJstDateTime = parseCnMasterDateTime

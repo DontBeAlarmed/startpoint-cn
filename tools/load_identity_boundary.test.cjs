@@ -2,6 +2,11 @@
 
 require("ts-node/register/transpile-only")
 
+// Pin the host timezone to UTC for this whole test process: the load response
+// must format numeric last_login_time through the game calendar policy, not
+// through host-local Date getters.
+process.env.TZ = "UTC"
+
 const assert = require("node:assert/strict")
 const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")
@@ -22,7 +27,9 @@ const data = require("../src/data")
 const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 const cnLoadRoutes = require("../src/routes/cn/load").default
+const { wrapOptionFields } = require("../src/routes/cn/load")
 const { encodeCnMsgpackPayload, registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 const { getTimeOffset, setServerTimeOffset } = require("../src/utils")
 
@@ -147,6 +154,19 @@ test("load without a VIEWER session cannot read or settle an account by id", asy
         "SELECT last_login_time FROM players WHERE id = ?",
     ).get(playerId)
     assert.deepEqual(after, before, "rejected loads must not trigger idempotent settlement")
+})
+
+test("numeric last_login_time is formatted with the configured calendar under host TZ=UTC", () => {
+    assert.equal(process.env.TZ, "UTC", "本测试进程必须固定在 UTC 主机时区")
+    const seconds = Math.floor(Date.parse("2024-08-14T12:00:00.000Z") / 1000)
+    const payload = { user_info: { last_login_time: seconds } }
+    wrapOptionFields(payload, "1.4.54", { host: "127.0.0.1", port: 8003 })
+    assert.equal(
+        payload.user_info.last_login_time,
+        createGameCalendarPolicy(480).formatMasterTimestamp(seconds * 1000),
+        "数字 last_login_time 必须按游戏日历格式化，而不是主机本地时区",
+    )
+    assert.equal(payload.user_info.last_login_time, "2024-08-14 20:00:00")
 })
 
 test("load accepts the sessioned viewer id and rejects non-VIEWER sessions", async () => {

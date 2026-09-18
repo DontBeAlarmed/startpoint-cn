@@ -4,6 +4,8 @@ import {
     type ServerNewsRow,
 } from "../data/domains/news"
 import { getRealNow } from "../runtime/time/game-time"
+import type { GameCalendarPolicy } from "../time/game-calendar"
+import { getGameCalendar } from "../time/game-calendar-provider"
 
 export interface ClientNewsItem {
     readonly id: number
@@ -16,9 +18,13 @@ export interface ClientNewsItem {
     readonly added_time: null
 }
 
-export function toCnClientNewsDate(iso: string): string {
-    const shifted = new Date(Date.parse(iso) + 8 * 60 * 60 * 1000)
-    return shifted.toISOString().slice(0, 19).replace("T", " ")
+// publishedAtReal is an absolute UTC database timestamp; the client-facing
+// "YYYY-MM-DD HH:MM:SS" projection goes through the game calendar policy.
+export function toCnClientNewsDate(
+    iso: string,
+    calendar: GameCalendarPolicy = getGameCalendar(),
+): string {
+    return calendar.formatMasterTimestamp(Date.parse(iso))
 }
 
 // CN 1.8.1 NewsDetailDialog 将 news.html 交给 RichTextLayoutParser（flash.Xml.parse，

@@ -9,6 +9,7 @@ const {
     getCharacterElectionCatalog,
     isCharacterElectionOpenAt,
 } = require("../src/lib/character-election")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 const { createFrozenTestContentRepository } = require("./helpers/content-snapshot-fixture.cjs")
 
 function repository(table = {
@@ -44,4 +45,20 @@ test("Character Election Catalog rejects malformed rules", () => {
         { 1: { stringId: "x", startTime: "2022-01-01 00:00:00", endTime: "2022-01-02 00:00:00", keywordIds: [] } },
         { 1: { stringId: "x", startTime: "2022-01-01 00:00:00", endTime: "2022-01-02 00:00:00", keywordIds: [1, 1] } },
     ]) assert.throws(() => buildCharacterElectionCatalog(repository(table)))
+})
+
+test("Character Election start is closed at start-1 and open at start under +540", () => {
+    const calendar540 = createGameCalendarPolicy(540)
+    const catalog = buildCharacterElectionCatalog(repository(), calendar540)
+    const descriptor = catalog.resolve(1)
+    assert.notEqual(descriptor, null)
+    const start540 = Date.parse("2022-05-02T12:00:00+09:00")
+    const end540 = Date.parse("2022-05-13T23:59:59+09:00")
+    assert.equal(descriptor.startAt, start540, "选举开始必须按 +540 主表口径解释")
+    assert.equal(descriptor.endAt, end540)
+    assert.equal(isCharacterElectionOpenAt(descriptor, new Date(start540 - 1)), false,
+        "+540 开始边界前一刻必须关闭")
+    assert.equal(isCharacterElectionOpenAt(descriptor, new Date(start540)), true)
+    assert.equal(isCharacterElectionOpenAt(descriptor, new Date(end540)), true)
+    assert.equal(isCharacterElectionOpenAt(descriptor, new Date(end540 + 1)), false)
 })

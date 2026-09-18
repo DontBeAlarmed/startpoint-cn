@@ -4,6 +4,8 @@ import {
     recordPlayerEventMissionLoginDaySync,
 } from "../../data/domains/event_mission_entry_facts"
 import { PartyCategory } from "../../data/types"
+import { GameCalendarError, type GameCalendarPolicy } from "../../time/game-calendar"
+import { getGameCalendar } from "../../time/game-calendar-provider"
 import { MissionCatalogStage, MissionMasterDefinition, getMissionCatalog, isMissionMasterDefinitionEnabledAt } from "./mission-catalog"
 
 export type EventEntryRuleProducer =
@@ -241,26 +243,17 @@ function parseIntegerToken(value: unknown): number | undefined {
     return Number.isSafeInteger(parsed) ? parsed : undefined
 }
 
-function isLeapYear(year: number): boolean {
-    return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
-}
-
-function daysInMonth(year: number, month: number): number {
-    if (month === 2) return isLeapYear(year) ? 29 : 28
-    return [4, 6, 9, 11].includes(month) ? 30 : 31
-}
-
-function parseCnMasterTime(value: string | undefined): number | undefined {
+function parseCnMasterTime(
+    value: string | undefined,
+    calendar: GameCalendarPolicy = getGameCalendar(),
+): number | undefined {
     if (value === undefined) return undefined
-    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value)
-    if (!match) return undefined
-    const [year, month, day, hour, minute, second] = match.slice(1).map(Number)
-    if (year < 1 || month < 1 || month > 12
-        || day < 1 || day > daysInMonth(year, month)
-        || hour < 0 || hour > 23
-        || minute < 0 || minute > 59
-        || second < 0 || second > 59) return undefined
-    return Date.UTC(year, month - 1, day, hour - 8, minute, second)
+    try {
+        return calendar.parseMasterTimestamp(value)
+    } catch (error) {
+        if (error instanceof GameCalendarError) return undefined
+        throw error
+    }
 }
 
 function hasExactTargets(rewards: unknown, targets: readonly number[]): boolean {
@@ -465,9 +458,14 @@ export function getProducerBackedEventEntryMissionIds(
         .sort((left, right) => left - right)
 }
 
-function getCnNaturalDay(date: Date): number | undefined {
+export function getEventLoginNaturalDay(
+    date: Date,
+    calendar: GameCalendarPolicy = getGameCalendar(),
+): number | undefined {
     const time = date.getTime()
-    return Number.isFinite(time) ? Math.floor((time + 8 * 3600_000) / 86400_000) : undefined
+    if (!Number.isFinite(time)) return undefined
+    const bucket = calendar.getDayBucket(time)
+    return Date.UTC(bucket.y, bucket.m, bucket.d) / 86_400_000
 }
 
 export function getEventLoginMissionId(evaluationTime: Date): number | null {
@@ -481,7 +479,7 @@ export function getEventLoginMissionId(evaluationTime: Date): number | null {
 
 export function recordEventLoginMissionFactSync(playerId: number, evaluationTime: Date): boolean {
     const missionId = getEventLoginMissionId(evaluationTime)
-    const naturalDay = getCnNaturalDay(evaluationTime)
+    const naturalDay = getEventLoginNaturalDay(evaluationTime)
     return missionId === null || naturalDay === undefined
         ? false
         : recordPlayerEventMissionLoginDaySync(playerId, missionId, naturalDay)

@@ -1,5 +1,7 @@
 import { deepFreeze } from "../../content/deep-freeze"
 import { getStrictRuntimeContentTableSync } from "../../content/runtime/table-access"
+import type { GameCalendarPolicy } from "../../time/game-calendar"
+import { getGameCalendar } from "../../time/game-calendar-provider"
 
 export type ItemEffectKindCode =
     | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
@@ -31,10 +33,16 @@ const POLICY_FIELDS = [
     "startTimeMs",
 ] as const
 const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/
-const CN_CONTENT_UTC_OFFSET_MS = 8 * 60 * 60 * 1000
-const CN_CONTENT_MAX_EPOCH_MS = Date.UTC(9999, 11, 31, 23, 59, 59)
-    - CN_CONTENT_UTC_OFFSET_MS
-const parsedCatalogs = new WeakMap<object, ItemInventoryPolicyCatalog>()
+
+/** Furthest representable master epoch, derived from the active calendar. */
+function maxRepresentableEpochMs(calendar: GameCalendarPolicy): number {
+    return Date.UTC(9999, 11, 31, 23, 59, 59) - calendar.utcOffsetMinutes * 60_000
+}
+
+// Parsed catalogs are keyed by source object and by the calendar offset they
+// were parsed under, so a catalog parsed under one offset can never be served
+// for another.
+const parsedCatalogs = new WeakMap<object, { readonly offsetMinutes: number; readonly catalog: ItemInventoryPolicyCatalog }>()
 
 function invalidCatalog(reason: string): never {
     throw new TypeError(`invalid item inventory policy catalog: ${reason}`)
@@ -54,18 +62,26 @@ function requireNonNegativeSafeInteger(value: unknown, subject: string): number 
     return value as number
 }
 
-function requireRuntimeEpochMs(value: unknown, subject: string): number {
+function requireRuntimeEpochMs(
+    value: unknown,
+    subject: string,
+    calendar: GameCalendarPolicy,
+): number {
     const epochMs = requireNonNegativeSafeInteger(value, subject)
     if (epochMs % 1000 !== 0) {
         invalidCatalog(`${subject} must have second precision`)
     }
-    if (epochMs > CN_CONTENT_MAX_EPOCH_MS) {
-        invalidCatalog(`${subject} exceeds the UTC+8 four-digit year range`)
+    if (epochMs > maxRepresentableEpochMs(calendar)) {
+        invalidCatalog(`${subject} exceeds the game calendar four-digit year range`)
     }
     return epochMs
 }
 
-function parsePolicy(itemId: string, value: unknown): ItemInventoryPolicy {
+function parsePolicy(
+    itemId: string,
+    value: unknown,
+    calendar: GameCalendarPolicy,
+): ItemInventoryPolicy {
     const policy = requireObject(value, `byItemId[${itemId}]`)
     const fields = Object.keys(policy).sort()
     if (fields.length !== POLICY_FIELDS.length
@@ -98,12 +114,14 @@ function parsePolicy(itemId: string, value: unknown): ItemInventoryPolicy {
     const startTimeMs = requireRuntimeEpochMs(
         policy.startTimeMs,
         `byItemId[${itemId}].startTimeMs`,
+        calendar,
     )
     const endTimeMs = policy.endTimeMs === null
         ? null
         : requireRuntimeEpochMs(
             policy.endTimeMs,
             `byItemId[${itemId}].endTimeMs`,
+            calendar,
         )
     if (endTimeMs !== null && endTimeMs < startTimeMs) {
         invalidCatalog(`byItemId[${itemId}] has an inverted time window`)
@@ -122,10 +140,13 @@ function parsePolicy(itemId: string, value: unknown): ItemInventoryPolicy {
     }
 }
 
-export function parseItemInventoryPolicyCatalog(raw: unknown): ItemInventoryPolicyCatalog {
+export function parseItemInventoryPolicyCatalog(
+    raw: unknown,
+    calendar: GameCalendarPolicy = getGameCalendar(),
+): ItemInventoryPolicyCatalog {
     const root = requireObject(raw, "root")
     const cached = parsedCatalogs.get(root)
-    if (cached) return cached
+    if (cached && cached.offsetMinutes === calendar.utcOffsetMinutes) return cached.catalog
     const rootFields = Object.keys(root).sort()
     if (rootFields.length !== 2
         || rootFields[0] !== "byItemId"
@@ -141,7 +162,7 @@ export function parseItemInventoryPolicyCatalog(raw: unknown): ItemInventoryPoli
         if (!POSITIVE_INTEGER_PATTERN.test(itemId) || !Number.isSafeInteger(Number(itemId))) {
             invalidCatalog(`byItemId key must be a canonical positive safe integer: ${itemId}`)
         }
-        const policy = parsePolicy(itemId, rawByItemId[itemId])
+        const policy = parsePolicy(itemId, rawByItemId[itemId], calendar)
         byItemId[itemId] = policy
         if (policy.effectKind === 9) expectedEventTradeIds.push(Number(itemId))
     }
@@ -159,7 +180,7 @@ export function parseItemInventoryPolicyCatalog(raw: unknown): ItemInventoryPoli
         invalidCatalog("eventTradeItemIds must exactly match EventTrade policies in ascending order")
     }
     const catalog = deepFreeze({ byItemId, eventTradeItemIds })
-    parsedCatalogs.set(root, catalog)
+    parsedCatalogs.set(root, { offsetMinutes: calendar.utcOffsetMinutes, catalog })
     return catalog
 }
 

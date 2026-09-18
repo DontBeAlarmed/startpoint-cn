@@ -29,6 +29,7 @@ const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 const { createNewsSync } = require("../src/data/domains/news")
 const gameTime = require("../src/runtime/time/game-time")
 const { getTimeOffset, setServerTimeOffset } = require("../src/utils")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 
 const restoreContentSnapshot = installBundledGameplaySnapshot()
@@ -324,4 +325,18 @@ test("load does not set the forced-news header", async t => {
 
     assert.equal(response.statusCode, 200, response.body)
     assert.equal(Object.hasOwn(decode(response).data_headers, "force_news"), false)
+})
+
+test("client news date projection follows an explicit +540 calendar", () => {
+    // publishedAtReal stays an absolute UTC database timestamp; only the
+    // client-facing projection is calendar dependent.
+    assert.equal(
+        newsCatalog.toCnClientNewsDate("2026-08-30T08:00:01.000Z"),
+        "2026-08-30 16:00:01",
+    )
+    assert.equal(
+        newsCatalog.toCnClientNewsDate("2026-08-30T08:00:01.000Z", createGameCalendarPolicy(540)),
+        "2026-08-30 17:00:01",
+        "+540 投影必须把同一绝对时刻晚一小时呈现给客户端",
+    )
 })

@@ -15,7 +15,9 @@ const {
 const mission = require("../src/lib/mission")
 const {
     getMissionCatalog,
+    isMissionMasterDefinitionEnabledAt,
 } = require("../src/lib/mission/mission-catalog")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 const {
     bundledMissionContentRepository,
 } = require("./helpers/mission-catalog-bundled.cjs")
@@ -209,6 +211,36 @@ test("uses CN master time boundaries and event scope with invalid dates closed",
     assert.equal(catalog.isEnabledAt(4, 1, new Date("2026-01-01T04:00:00.000Z"), 8), false)
     assert.equal(catalog.isEnabledAt(4, 1, new Date("invalid"), 7), false)
     assert.equal(catalog.isEnabledAt(4, 999, new Date("2026-01-01T04:00:00.000Z"), 7), false)
+})
+
+test("mission master start and end follow an explicit +540 calendar", () => {
+    const tables = emptyTables()
+    addMission(tables, 4, "1", { 1: [rewardRow(4, 101, 1)] }, {
+        eventId: 7,
+        start: "2026-01-01 12:00:00",
+        end: "2026-01-02 11:59:59",
+    })
+    const definition = getMissionCatalog(repository(tables)).getDefinition(4, 1)
+    const calendar540 = createGameCalendarPolicy(540)
+    // +540 moves both window edges one hour earlier in absolute time.
+    assert.equal(
+        isMissionMasterDefinitionEnabledAt(definition, new Date("2026-01-01T03:00:00.000Z"), 7, calendar540),
+        true,
+        "+540 开始边界必须包含等号",
+    )
+    assert.equal(
+        isMissionMasterDefinitionEnabledAt(definition, new Date("2026-01-01T02:59:59.999Z"), 7, calendar540),
+        false,
+    )
+    assert.equal(
+        isMissionMasterDefinitionEnabledAt(definition, new Date("2026-01-02T02:59:59.000Z"), 7, calendar540),
+        true,
+        "+540 结束边界必须包含等号",
+    )
+    assert.equal(
+        isMissionMasterDefinitionEnabledAt(definition, new Date("2026-01-02T03:00:00.000Z"), 7, calendar540),
+        false,
+    )
 })
 
 test("keeps the historical cumulative login mission open after its official start", () => {

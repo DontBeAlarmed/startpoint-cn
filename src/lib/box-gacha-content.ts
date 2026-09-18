@@ -1,5 +1,7 @@
 import { deepFreeze } from "../content/deep-freeze"
 import { getContentSnapshot, type ReadonlyContentRepository } from "../content/runtime/content-snapshot"
+import { GameCalendarError, type GameCalendarPolicy } from "../time/game-calendar"
+import { getGameCalendar } from "../time/game-calendar-provider"
 import type {
     BoxGacha,
     BoxGachaBoxSettings,
@@ -48,23 +50,15 @@ function sameKeys(left: object, right: object): boolean {
     return Object.keys(left).sort().join(",") === Object.keys(right).sort().join(",")
 }
 
-function parseCnTimestamp(value: string, subject: string): number {
-    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value)
-    if (match === null) throw new BoxGachaContentError(`${subject} is invalid.`)
-    const parts = match.slice(1).map(Number)
-    const [year, month, day, hour, minute, second] = parts
-    const normalized = new Date(0)
-    normalized.setUTCFullYear(year, month - 1, day)
-    normalized.setUTCHours(hour, minute, second, 0)
-    if (parts.some((part, index) => part !== [
-        normalized.getUTCFullYear(),
-        normalized.getUTCMonth() + 1,
-        normalized.getUTCDate(),
-        normalized.getUTCHours(),
-        normalized.getUTCMinutes(),
-        normalized.getUTCSeconds(),
-    ][index])) throw new BoxGachaContentError(`${subject} is invalid.`)
-    return normalized.getTime() - 8 * 60 * 60 * 1000
+function parseCnTimestamp(value: string, subject: string, calendar: GameCalendarPolicy): number {
+    try {
+        return calendar.parseMasterTimestamp(value)
+    } catch (error) {
+        if (error instanceof GameCalendarError) {
+            throw new BoxGachaContentError(`${subject} is invalid.`)
+        }
+        throw error
+    }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -75,13 +69,14 @@ function validateSettings(
     rawSettings: unknown,
     boxIds: ReadonlySet<number>,
     subject: string,
+    calendar: GameCalendarPolicy,
 ): { availableFromMs: number; availableUntilMs: number } {
     if (!isRecord(rawSettings)) throw new BoxGachaContentError(`${subject} settings are invalid.`)
     const settings = rawSettings as unknown as BoxGachaBoxSettings
-    const from = parseCnTimestamp(settings.availableFrom, `${subject} start`)
+    const from = parseCnTimestamp(settings.availableFrom, `${subject} start`, calendar)
     const until = settings.availableUntil === null
         ? Infinity
-        : parseCnTimestamp(settings.availableUntil, `${subject} end`)
+        : parseCnTimestamp(settings.availableUntil, `${subject} end`, calendar)
     if (until < from) throw new BoxGachaContentError(`${subject} period is reversed.`)
     if (settings.requiredBoxId !== null
         && (!Number.isSafeInteger(settings.requiredBoxId) || !boxIds.has(settings.requiredBoxId))) {
@@ -99,6 +94,7 @@ function validateSettings(
 
 export function buildBoxGachaContentCatalog(
     repository: ReadonlyContentRepository,
+    calendar: GameCalendarPolicy = getGameCalendar(),
 ): BoxGachaContentCatalog {
     const definitions = repository.table<RawBoxGachas>("box_gacha.json")
     const rewards = repository.table<RawBoxRewards>("box_reward.json")
@@ -143,6 +139,7 @@ export function buildBoxGachaContentCatalog(
                 boxSettings[boxIdText],
                 boxIds,
                 `Box Gacha ${gachaId}/${boxId}`,
+                calendar,
             )
             let summedAvailable = 0
             for (const [rewardIdText, reward] of Object.entries(box)) {

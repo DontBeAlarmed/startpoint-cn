@@ -12,8 +12,10 @@ const {
     getCategoryMissionRewardStageDefinition,
 } = require("../src/lib/mission/rewards")
 const { getComputer } = require("../src/lib/mission/registry")
-const { getPassCardRewardDefinition } = require("../src/lib/pass-card")
+const { getPassCardEventDefinition, getPassCardRewardDefinition } = require("../src/lib/pass-card")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 const passCardRewards = require("../assets/pass_card_reward.json")
+const passCardEvents = require("../assets/pass_card_event.json")
 
 const missionTypesSource = fs.readFileSync(path.resolve(__dirname, "../src/lib/mission/types.ts"), "utf8")
 const passComputerSource = fs.readFileSync(path.resolve(__dirname, "../src/lib/mission/pass.ts"), "utf8")
@@ -86,6 +88,22 @@ assert.deepEqual(getPassCardRewardDefinition(150), {
 })
 for (const rewardId of Object.keys(passCardRewards).map(Number)) {
     assert.notEqual(getPassCardRewardDefinition(rewardId), undefined)
+}
+
+{
+    // Pass-card event start/end/force times must follow an explicit +540
+    // calendar: every master timestamp shifts one hour earlier in absolute
+    // time compared with the +480 default.
+    const calendar540 = createGameCalendarPolicy(540)
+    const definition540 = getPassCardEventDefinition(1, calendar540)
+    const row = passCardEvents["1"][0]
+    assert.equal(definition540.startTime, calendar540.parseMasterTimestamp(row[8]))
+    assert.equal(definition540.endTime, calendar540.parseMasterTimestamp(row[9]))
+    assert.equal(definition540.forceTime, calendar540.parseMasterTimestamp(row[10]))
+    const definition480 = getPassCardEventDefinition(1)
+    assert.equal(definition480.startTime, definition540.startTime + 3_600_000,
+        "+480 与 +540 的开始时刻必须相差一小时")
+    assert.equal(definition480.forceTime, definition540.forceTime + 3_600_000)
 }
 
 assert.equal(

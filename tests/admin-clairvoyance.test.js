@@ -16,6 +16,8 @@ const {
     installFrozenTestContentSnapshot,
 } = require("../tools/helpers/content-snapshot-fixture.cjs")
 
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
+
 const {
     buildShortUpCharacterGachaTimeline,
 } = require("../src/lib/admin-clairvoyance")
@@ -188,6 +190,40 @@ try {
     // (facts) + character_text.json (display text) = 11 reads, then cached.
     assert.strictEqual(tableReads, 11, "同一个固定 Repository 只应构建一次静态千里眼数据")
     assert.notStrictEqual(cachedFirst.currentTime, cachedSecond.currentTime)
+
+    // Timeline ISO start/end must follow an explicit +540 calendar (the same
+    // master wall time lands one absolute hour earlier than under +480) and
+    // the cache must be keyed by calendar offset so the two policies never
+    // bleed into each other. The cache-probe snapshot only carries gacha
+    // 900002, so sample that pool.
+    const calendar540 = createGameCalendarPolicy(540)
+    const timeline540 = buildShortUpCharacterGachaTimeline(new Date("2021-10-18T14:00:00.000Z"), calendar540)
+    const sample480 = cachedFirst.timeline.find((gacha) => gacha.id === 900002)
+    const sample540 = timeline540.timeline.find((gacha) => gacha.id === 900002)
+    assert(sample480 && sample540, "两种日历口径都必须包含卡池 #900002")
+    assert.strictEqual(
+        sample540.startTime,
+        new Date(Date.parse(sample480.startTime) - 3_600_000).toISOString(),
+        "同一主表时刻在 +540 下必须对应提前一小时的绝对 ISO 时刻",
+    )
+    assert.strictEqual(
+        sample540.endTime,
+        new Date(Date.parse(sample480.endTime) - 3_600_000).toISOString(),
+    )
+    assert.strictEqual(sample480.durationDays, sample540.durationDays)
+    assert.notStrictEqual(timeline540.timeline, cachedFirst.timeline, "缓存必须按日历偏移区分")
+    const reread540 = buildShortUpCharacterGachaTimeline(new Date("2021-10-18T14:00:00.000Z"), calendar540)
+    assert.strictEqual(
+        reread540.timeline.find((gacha) => gacha.id === 900002).startTime,
+        sample540.startTime,
+        "+540 重复请求必须命中 +540 的缓存",
+    )
+    const reread480 = buildShortUpCharacterGachaTimeline(new Date("2021-10-18T14:00:00.000Z"))
+    assert.strictEqual(
+        reread480.timeline.find((gacha) => gacha.id === 900002).startTime,
+        sample480.startTime,
+        "+480 重复请求必须命中 +480 的缓存",
+    )
 } finally {
     for (const { item, hasRarity, rarity } of originalRarities) {
         if (hasRarity) item.rarity = rarity

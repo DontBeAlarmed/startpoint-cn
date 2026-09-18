@@ -1,4 +1,6 @@
 import { getContentSnapshot } from "../content/runtime/content-snapshot"
+import { GameCalendarError, type GameCalendarPolicy } from "../time/game-calendar"
+import { getGameCalendar } from "../time/game-calendar-provider"
 import type { ActiveMissionReward } from "./mission/rewards"
 
 export interface PassCardEventDefinition {
@@ -28,10 +30,17 @@ function integer(value: unknown): number | undefined {
     return Number.isSafeInteger(parsed) ? parsed : undefined
 }
 
-function cnTimestamp(value: unknown): number | undefined {
+function cnTimestamp(
+    value: unknown,
+    calendar: GameCalendarPolicy,
+): number | undefined {
     if (typeof value !== "string" || value === "") return undefined
-    const parsed = Date.parse(`${value.replace(" ", "T")}+08:00`)
-    return Number.isFinite(parsed) ? parsed : undefined
+    try {
+        return calendar.parseMasterTimestamp(value)
+    } catch (error) {
+        if (error instanceof GameCalendarError) return undefined
+        throw error
+    }
 }
 
 function parseReward(row: readonly unknown[], kindIndex: number): ActiveMissionReward | undefined {
@@ -57,23 +66,29 @@ function parseReward(row: readonly unknown[], kindIndex: number): ActiveMissionR
     }
 }
 
-export function getPassCardEventDefinition(eventId: number): PassCardEventDefinition | undefined {
+export function getPassCardEventDefinition(
+    eventId: number,
+    calendar: GameCalendarPolicy = getGameCalendar(),
+): PassCardEventDefinition | undefined {
     const passCardEvents = getContentSnapshot().repository.table<Record<string, unknown>>(
         "pass_card_event.json",
     )
     const row = firstRow(passCardEvents[String(eventId)])
     const thresholdPoint = row ? integer(row[4]) : undefined
     const levelThreshold = row ? integer(row[5]) : undefined
-    const startTime = row ? cnTimestamp(row[8]) : undefined
-    const endTime = row ? cnTimestamp(row[9]) : undefined
-    const forceTime = row ? cnTimestamp(row[10]) : undefined
+    const startTime = row ? cnTimestamp(row[8], calendar) : undefined
+    const endTime = row ? cnTimestamp(row[9], calendar) : undefined
+    const forceTime = row ? cnTimestamp(row[10], calendar) : undefined
     if (thresholdPoint === undefined
         || levelThreshold === undefined || levelThreshold <= 0
         || startTime === undefined || endTime === undefined || forceTime === undefined) return undefined
     return { eventId, thresholdPoint, levelThreshold, startTime, endTime, forceTime }
 }
 
-export function getActivePassCardEventDefinitionAt(at: Date): PassCardEventDefinition | undefined {
+export function getActivePassCardEventDefinitionAt(
+    at: Date,
+    calendar: GameCalendarPolicy = getGameCalendar(),
+): PassCardEventDefinition | undefined {
     const passCardEvents = getContentSnapshot().repository.table<Record<string, unknown>>(
         "pass_card_event.json",
     )
@@ -81,7 +96,7 @@ export function getActivePassCardEventDefinitionAt(at: Date): PassCardEventDefin
         .map(eventId => integer(eventId))
         .filter((eventId): eventId is number => eventId !== undefined)
         .sort((left, right) => left - right)
-        .map(eventId => getPassCardEventDefinition(eventId))
+        .map(eventId => getPassCardEventDefinition(eventId, calendar))
         .find((event): event is PassCardEventDefinition =>
             event !== undefined && isPassCardEventActiveAt(event, at),
         )

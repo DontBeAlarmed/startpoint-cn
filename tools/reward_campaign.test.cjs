@@ -10,6 +10,7 @@ const {
     resolveRewardCampaignRates,
 } = require("../src/lib/reward-campaign")
 const { RewardType } = require("../src/lib/types")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 const bundledCampaigns = require("../assets/reward_campaign.json")
 
 const window = {
@@ -53,6 +54,21 @@ assert.deepEqual(
 assert.deepEqual(
     resolveRewardCampaignRates(campaigns, 13, 1002, new Date("2024-08-01T00:00:00Z")),
     { item: 1, exp: 1, mana: 1 },
+)
+
+// Campaign 5 is weekly, dayOfWeek 1 (Monday) with a 05:00 reset. The instant
+// 2024-07-14T20:30Z is Sunday 23:30 under +480 (reset not yet crossed) but
+// Monday 00:30 under +540, so the weekly bucket must open there.
+assert.deepEqual(
+    resolveRewardCampaignRates(
+        campaigns,
+        13,
+        1002,
+        new Date("2024-07-14T20:30:00Z"),
+        createGameCalendarPolicy(540),
+    ),
+    { item: 3, exp: 1.5, mana: 2 },
+    "+540 周桶必须在提前一小时的时刻跨过周一重置",
 )
 
 const rates = { item: 2, exp: 1.5, mana: 2 }

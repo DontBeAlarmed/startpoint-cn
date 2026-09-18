@@ -13,6 +13,7 @@ const {
     getBoxGachaContent,
     getBoxGachaContentCatalog,
 } = require("../src/lib/box-gacha-content")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 const {
     createFrozenTestContentRepository,
 } = require("./helpers/content-snapshot-fixture.cjs")
@@ -87,6 +88,24 @@ test("Box Gacha catalog accepts the CN Degree reward type 7", () => {
     }
 
     assert.doesNotThrow(() => buildBoxGachaContentCatalog(repository(source)))
+})
+
+test("Box Gacha open and close boundaries follow an explicit +540 calendar", () => {
+    const calendar540 = createGameCalendarPolicy(540)
+    const catalog = buildBoxGachaContentCatalog(repository(), calendar540)
+    // Box 1 window: 2024-01-01 00:00:00 .. 2024-01-31 23:59:59 in master time.
+    const start540 = Date.parse("2024-01-01T00:00:00+09:00")
+    const end540 = Date.parse("2024-01-31T23:59:59+09:00")
+    assert.deepEqual(findAvailableBoxGachaIdsForReward(catalog, 0, 90001, start540 - 1), [],
+        "+540 开放边界前一刻必须关闭")
+    assert.deepEqual(findAvailableBoxGachaIdsForReward(catalog, 0, 90001, start540), [10])
+    assert.deepEqual(findAvailableBoxGachaIdsForReward(catalog, 0, 90001, end540), [10])
+    assert.deepEqual(findAvailableBoxGachaIdsForReward(catalog, 0, 90001, end540 + 1), [],
+        "+540 关闭边界后一刻必须关闭")
+
+    // The production (+480) catalog must never satisfy the +540 window.
+    const catalog480 = buildBoxGachaContentCatalog(repository())
+    assert.deepEqual(findAvailableBoxGachaIdsForReward(catalog480, 0, 90001, start540), [])
 })
 
 test("Box Gacha catalog rejects mismatched counts and missing prerequisite boxes", () => {

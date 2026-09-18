@@ -29,6 +29,7 @@ const {
     ShopOfferScheduleError,
 } = shop
 const { ShopType } = require("../src/lib/types")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 const { selectShopSalesCatalogItems } = require("../src/lib/shop/sales-catalog")
 const { buildShopSalesListSync } = require("../src/lib/shop-sales-list")
 const {
@@ -336,6 +337,27 @@ test("effective offer resolves CN UTC+8 month, row period and purchase discrimin
         ),
         error => error instanceof ShopOfferPeriodError,
     )
+})
+
+test("shop period parsing and business month accept an explicit +540 calendar", () => {
+    const calendar540 = createGameCalendarPolicy(540)
+    const epoch480 = shop.parseShopCnTimestamp("2025-06-26 12:00:00")
+    const epoch540 = shop.parseShopCnTimestamp("2025-06-26 12:00:00", calendar540)
+    assert.equal(epoch540 - epoch480, -3_600_000, "+540 必须把同一主表时间解释为提前一小时的 UTC 时刻")
+    assert.equal(
+        shop.parseShopCnTimestamp("2025-06-26 12:00:00", calendar540),
+        Date.parse("2025-06-26T12:00:00+09:00"),
+    )
+    assert.throws(
+        () => shop.parseShopCnTimestamp("2025-02-30 12:00:00", calendar540),
+        error => error instanceof shop.ShopPeriodFormatError,
+    )
+
+    // 15:30Z on the last day of August is 23:30 (+480, month 8) but
+    // 2024-09-01 00:30 (+540, month 9).
+    const monthBoundary = Date.parse("2024-08-31T15:30:00.000Z")
+    assert.equal(shop.getShopCnMonth(monthBoundary), 8)
+    assert.equal(shop.getShopCnMonth(monthBoundary, calendar540), 9, "+540 的营业月必须推进一小时")
 })
 
 test("schedule selection is inclusive, host-timezone independent and fails closed on ambiguity", () => {

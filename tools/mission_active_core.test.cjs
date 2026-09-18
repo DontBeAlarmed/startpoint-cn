@@ -28,6 +28,7 @@ const {
 } = require("../src/lib/mission/active-plan")
 const { validateMissionRewardClaims } = require("../src/lib/mission/claims")
 const { filterToActiveMissions } = require("../src/lib/mission/filter")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 
 const rewardRow = []
 rewardRow[3] = "99"
@@ -184,6 +185,12 @@ assert.equal(
     "国服客户端沿用 JST 符号名，但主表日期实际按 UTC+8 转为 UTC",
 )
 assert.throws(() => parseCnMasterDateTime("2024-02-30 00:00:00"), /CN master/i)
+assert.equal(
+    parseCnMasterDateTime("2024-08-14 21:00:00", createGameCalendarPolicy(540)),
+    Date.parse("2024-08-14T12:00:00.000Z"),
+    "显式 +540 日历必须把同一主表时间解释为提前一小时的 UTC 时刻",
+)
+assert.throws(() => parseCnMasterDateTime("2024-02-30 00:00:00", createGameCalendarPolicy(540)), /CN master/i)
 
 const parsedMission = parseActiveMissionDefinition(9003, releaseTables["mission_active.json"][9003][0])
 assert.deepEqual(

@@ -4,6 +4,8 @@ import {
     type ReadonlyContentRepository,
 } from "../content/runtime/content-snapshot"
 import { getVirtualNow } from "../runtime/time/game-time"
+import type { GameCalendarPolicy } from "../time/game-calendar"
+import { getGameCalendar } from "../time/game-calendar-provider"
 import { getLegacyGachas } from "./gacha-legacy-content"
 import {
     getCharacterFacts,
@@ -80,14 +82,21 @@ interface StaticClairvoyanceTimeline {
     readonly searchIndex: ClairvoyanceSearchRow[]
 }
 
-const staticTimelineByRepository = new WeakMap<ReadonlyContentRepository, StaticClairvoyanceTimeline>()
+// Cached static timelines are keyed by repository identity and by the
+// calendar offset they were rendered under, so a timeline built under one
+// offset can never be served for another.
+const staticTimelineByRepository = new WeakMap<ReadonlyContentRepository, Map<number, StaticClairvoyanceTimeline>>()
 
-function parseCdnDate(value: string): Date {
-    return new Date(`${value.replace(" ", "T")}+08:00`)
+function parseCdnDate(value: string, calendar: GameCalendarPolicy): Date {
+    return new Date(calendar.parseMasterTimestamp(value))
 }
 
-function durationDays(startDate: string, endDate: string): number {
-    return (parseCdnDate(endDate).getTime() - parseCdnDate(startDate).getTime()) / 86400_000
+function durationDays(
+    startDate: string,
+    endDate: string,
+    calendar: GameCalendarPolicy,
+): number {
+    return (parseCdnDate(endDate, calendar).getTime() - parseCdnDate(startDate, calendar).getTime()) / 86400_000
 }
 
 function toRateUpCharacters(
@@ -126,11 +135,12 @@ function toGacha(
     rawGacha: RawGacha,
     facts: CharacterFacts,
     textFacts: CharacterTextFacts,
+    calendar: GameCalendarPolicy,
 ): ClairvoyanceGacha | null {
     if (rawGacha.type !== CHARACTER_GACHA_TYPE) return null
     const pageKind = rawGacha.pageKind ?? NORMAL_PAGE_KIND
     if (pageKind !== NORMAL_PAGE_KIND) return null
-    const days = durationDays(rawGacha.startDate, rawGacha.endDate)
+    const days = durationDays(rawGacha.startDate, rawGacha.endDate, calendar)
     if (days <= 0 || days > SHORT_TERM_MAX_DAYS) return null
     const rateUpCharacters = toRateUpCharacters(rawGacha, facts, textFacts)
     if (rateUpCharacters.length === 0) return null
@@ -141,8 +151,8 @@ function toGacha(
         pageKind,
         startDate: rawGacha.startDate,
         endDate: rawGacha.endDate,
-        startTime: parseCdnDate(rawGacha.startDate).toISOString(),
-        endTime: parseCdnDate(rawGacha.endDate).toISOString(),
+        startTime: parseCdnDate(rawGacha.startDate, calendar).toISOString(),
+        endTime: parseCdnDate(rawGacha.endDate, calendar).toISOString(),
         durationDays: Math.round(days * 10) / 10,
         rateUpCharacters,
     }
@@ -170,28 +180,42 @@ function buildSearchIndex(timeline: ClairvoyanceGacha[]): ClairvoyanceSearchRow[
     return [...byCharacter.values()].sort((a, b) => a.characterId - b.characterId)
 }
 
-function buildStaticTimeline(repository: ReadonlyContentRepository): StaticClairvoyanceTimeline {
+function buildStaticTimeline(
+    repository: ReadonlyContentRepository,
+    calendar: GameCalendarPolicy,
+): StaticClairvoyanceTimeline {
     const gachas = getLegacyGachas(repository) as Record<string, RawGacha>
     const facts = getCharacterFacts(repository)
     const textFacts = getCharacterTextFacts(repository)
     const timeline = Object.entries(gachas)
-        .map(([id, rawGacha]) => toGacha(id, rawGacha, facts, textFacts))
+        .map(([id, rawGacha]) => toGacha(id, rawGacha, facts, textFacts, calendar))
         .filter((gacha): gacha is ClairvoyanceGacha => gacha !== null)
         .sort((a, b) => a.startTime.localeCompare(b.startTime) || a.id - b.id)
     return deepFreeze({ timeline, searchIndex: buildSearchIndex(timeline) })
 }
 
-function getStaticTimeline(repository: ReadonlyContentRepository): StaticClairvoyanceTimeline {
-    const cached = staticTimelineByRepository.get(repository)
+function getStaticTimeline(
+    repository: ReadonlyContentRepository,
+    calendar: GameCalendarPolicy,
+): StaticClairvoyanceTimeline {
+    let byOffset = staticTimelineByRepository.get(repository)
+    if (byOffset === undefined) {
+        byOffset = new Map<number, StaticClairvoyanceTimeline>()
+        staticTimelineByRepository.set(repository, byOffset)
+    }
+    const cached = byOffset.get(calendar.utcOffsetMinutes)
     if (cached !== undefined) return cached
-    const built = buildStaticTimeline(repository)
-    staticTimelineByRepository.set(repository, built)
+    const built = buildStaticTimeline(repository, calendar)
+    byOffset.set(calendar.utcOffsetMinutes, built)
     return built
 }
 
-export function buildShortUpCharacterGachaTimeline(now: Date = getVirtualNow()): ClairvoyanceTimeline {
+export function buildShortUpCharacterGachaTimeline(
+    now: Date = getVirtualNow(),
+    calendar: GameCalendarPolicy = getGameCalendar(),
+): ClairvoyanceTimeline {
     const repository = getContentSnapshot().repository
-    const staticTimeline = getStaticTimeline(repository)
+    const staticTimeline = getStaticTimeline(repository, calendar)
     const nowMs = now.getTime()
     return {
         scope: "short-up-character-gacha",

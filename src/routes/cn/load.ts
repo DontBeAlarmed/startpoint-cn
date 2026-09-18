@@ -54,6 +54,7 @@ import {
     type LoginBonusSettlement,
 } from "../../lib/login-bonus";
 import { getGameTimeContext } from "../../runtime/time/game-time";
+import { getGameCalendar } from "../../time/game-calendar-provider";
 import { getDailyChallengeCatalog } from "../../lib/quest/daily-challenge";
 import { settleScheduledResourcesSync } from "../../lib/scheduled-resource-settlement";
 import { settleEventTradeExpiryOnLoadSync } from "../../lib/event-trade-expiry-settlement";
@@ -85,7 +86,7 @@ interface CnLoadBody {
     viewer_id?: number;
 }
 
-function wrapOptionFields(
+export function wrapOptionFields(
     d: any,
     availableAssetVersion: string,
     crashEndpoint: { readonly host: string; readonly port: number },
@@ -94,9 +95,7 @@ function wrapOptionFields(
 
     if (d.user_info) {
         if (typeof d.user_info.last_login_time === 'number') {
-            const dt = new Date(d.user_info.last_login_time * 1000);
-            const p = (n: number) => n.toString().padStart(2, '0');
-            d.user_info.last_login_time = `${dt.getFullYear()}-${p(dt.getMonth()+1)}-${p(dt.getDate())} ${p(dt.getHours())}:${p(dt.getMinutes())}:${p(dt.getSeconds())}`;
+            d.user_info.last_login_time = getGameCalendar().formatMasterTimestamp(d.user_info.last_login_time * 1000);
         }
         d.user_info.is_bought_fund_ex_quest ??= false;
         d.user_info.is_bought_fund_main_quest ??= false;

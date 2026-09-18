@@ -32,6 +32,7 @@ const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const {
     getAuthoritativeEventEntryMissionIds,
+    getEventLoginNaturalDay,
     getOpenCharacterElectionVoteMissionId,
     getProducerBackedEventEntryMissionIds,
     recordEventLoginMissionFactSync,
@@ -39,6 +40,7 @@ const {
     recordRaidSummaryMissionFactSync,
     validateEventEntryRule,
 } = require("../src/lib/mission/event-entry-facts")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 const missionCatalog = require("../src/lib/mission/mission-catalog")
 const { getMissionCatalog } = missionCatalog
 const getMissionMasterDefinition = (category, missionId) => getMissionCatalog().getDefinition(category, missionId)
@@ -429,6 +431,22 @@ test("Raid SET edit facts fail closed for ordinary edits, illegal input, closed 
     }
     assert.deepEqual(getPlayerCategoryMissionsSync(noFactPlayerId, 3), {})
 })
+test("Event login natural day key follows an explicit +540 calendar", () => {
+    const calendar540 = createGameCalendarPolicy(540)
+    const instant = new Date("2019-11-27T15:59:59.999Z")
+    assert.equal(
+        getEventLoginNaturalDay(instant),
+        Date.UTC(2019, 10, 27) / 86_400_000,
+        "+480 默认口径下该时刻仍是 11-27 自然日",
+    )
+    assert.equal(
+        getEventLoginNaturalDay(instant, calendar540),
+        Date.UTC(2019, 10, 28) / 86_400_000,
+        "+540 口径下同一时刻必须推进到 11-28 自然日",
+    )
+    assert.equal(getEventLoginNaturalDay(new Date("invalid"), calendar540), undefined)
+})
+
 test("Event login records one fact per CN natural day without historical backfill", () => {
     assert.equal(recordEventLoginMissionFactSync(playerId, new Date("2019-11-27T04:00:00.000Z")), true)
     assert.equal(recordEventLoginMissionFactSync(playerId, new Date("2019-11-27T15:59:59.999Z")), false)

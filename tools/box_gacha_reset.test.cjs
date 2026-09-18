@@ -260,7 +260,10 @@ const {
     BoxGachaResetUnavailableError,
     BoxGachaStateNotFoundError,
     resetBoxGachaSync,
+    validateBoxGachaPeriod,
 } = resetModule;
+
+const { createGameCalendarPolicy } = require("../src/time/game-calendar");
 
 const {
     parseBoxGachaResetRequest,
@@ -565,5 +568,36 @@ assert.match(
     /fastify\.post\("\/reset"[\s\S]*?parseBoxGachaResetRequest[\s\S]*?resolvePlayerIdSync[\s\S]*?nowMs: getServerTime\(\) \* 1000[\s\S]*?sendBoxGachaResultCode[\s\S]*?"all_box_info": getAllBoxList\(playerId, boxGachaId, boxGachaData\.boxes\)/,
     "reset route must validate input, resolve the active player, use global server time, return protocol result codes, and return complete all_box_info",
 );
+
+{
+    // Explicit +540 calendar: the inclusive reset window must open exactly at
+    // the +09:00 epoch of the master timestamps and close one hour earlier in
+    // absolute time than the +480 default window.
+    const calendar540 = createGameCalendarPolicy(540);
+    const windowSettings = {
+        ...settings["28"]["5"],
+        availableFrom: "2025-06-26 12:00:00",
+        availableUntil: "2025-06-26 14:00:00",
+    };
+    const start540 = Date.parse("2025-06-26T12:00:00+09:00");
+    const end540 = Date.parse("2025-06-26T14:00:00+09:00");
+    assert.throws(
+        () => validateBoxGachaPeriod(windowSettings, start540 - 1, calendar540),
+        BoxGachaInvalidPeriodError,
+        "+540 开放边界前一刻必须拒绝",
+    );
+    assert.doesNotThrow(() => validateBoxGachaPeriod(windowSettings, start540, calendar540));
+    assert.doesNotThrow(() => validateBoxGachaPeriod(windowSettings, end540, calendar540));
+    assert.throws(
+        () => validateBoxGachaPeriod(windowSettings, end540 + 1, calendar540),
+        BoxGachaInvalidPeriodError,
+        "+540 关闭边界后一刻必须拒绝",
+    );
+    assert.throws(
+        () => validateBoxGachaPeriod(windowSettings, start540),
+        BoxGachaInvalidPeriodError,
+        "+480 默认窗口不得接受 +540 的开放时刻",
+    );
+}
 
 console.log("box gacha reset asset, transaction, and route tests passed");

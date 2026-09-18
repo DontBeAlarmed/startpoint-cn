@@ -2,6 +2,8 @@ import {
     getContentSnapshot,
     type ReadonlyContentRepository,
 } from "../../content/runtime/content-snapshot"
+import { GameCalendarError, type GameCalendarPolicy } from "../../time/game-calendar"
+import { getGameCalendar } from "../../time/game-calendar-provider"
 import { getEquipmentCurrencyPolicySync } from "../config-content"
 import { parseMissionCatalogSource } from "./mission-catalog-source"
 
@@ -50,7 +52,13 @@ export interface MissionCatalog {
         missionId: number,
         stage: number,
     ) => MissionCatalogStage | undefined
-    readonly isEnabledAt: (category: number, missionId: number, at: Date, eventId?: number) => boolean
+    readonly isEnabledAt: (
+        category: number,
+        missionId: number,
+        at: Date,
+        eventId?: number,
+        calendar?: GameCalendarPolicy,
+    ) => boolean
     readonly getAwakeMissionIdsByCharacter: (characterId: number | string) => readonly number[]
 }
 
@@ -70,21 +78,17 @@ function stageKey(category: number, missionId: number, stage: number): string {
     return `${category}:${missionId}:${stage}`
 }
 
-function parseMasterCnTime(value: string | undefined): number | undefined {
+function parseMasterCnTime(
+    value: string | undefined,
+    calendar: GameCalendarPolicy = getGameCalendar(),
+): number | undefined {
     if (value === undefined) return undefined
-    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value)
-    if (!match) return Number.NaN
-    const [year, month, day, hour, minute, second] = match.slice(1).map(Number)
-    const local = new Date(0)
-    local.setUTCFullYear(year, month - 1, day)
-    local.setUTCHours(hour, minute, second, 0)
-    if (local.getUTCFullYear() !== year
-        || local.getUTCMonth() !== month - 1
-        || local.getUTCDate() !== day
-        || local.getUTCHours() !== hour
-        || local.getUTCMinutes() !== minute
-        || local.getUTCSeconds() !== second) return Number.NaN
-    return local.getTime() - 8 * 60 * 60 * 1000
+    try {
+        return calendar.parseMasterTimestamp(value)
+    } catch (error) {
+        if (error instanceof GameCalendarError) return Number.NaN
+        throw error
+    }
 }
 
 function positiveSafeInteger(value: unknown): number | undefined {
@@ -96,6 +100,7 @@ export function isMissionMasterDefinitionEnabledAt(
     definition: MissionMasterDefinition,
     at: Date,
     eventId?: number,
+    calendar: GameCalendarPolicy = getGameCalendar(),
 ): boolean {
     if (definition.requiresEventScope) {
         const definitionEventId = positiveSafeInteger(definition.eventId)
@@ -108,8 +113,8 @@ export function isMissionMasterDefinitionEnabledAt(
     const now = at.getTime()
     if (!Number.isFinite(now)) return false
 
-    const start = parseMasterCnTime(definition.enableStart)
-    const end = parseMasterCnTime(definition.enableEnd)
+    const start = parseMasterCnTime(definition.enableStart, calendar)
+    const end = parseMasterCnTime(definition.enableEnd, calendar)
     if (start !== undefined && (!Number.isFinite(start) || start > now)) return false
     if (end !== undefined && (!Number.isFinite(end) || now > end)) return false
     return true
@@ -201,10 +206,16 @@ class SnapshotMissionCatalog implements MissionCatalog {
         return this.#stageByKey.get(stageKey(category, missionId, stage))
     }
 
-    isEnabledAt(category: number, missionId: number, at: Date, eventId?: number): boolean {
+    isEnabledAt(
+        category: number,
+        missionId: number,
+        at: Date,
+        eventId?: number,
+        calendar?: GameCalendarPolicy,
+    ): boolean {
         const definition = this.getDefinition(category, missionId)
         if (!definition) return false
-        return isMissionMasterDefinitionEnabledAt(definition, at, eventId)
+        return isMissionMasterDefinitionEnabledAt(definition, at, eventId, calendar)
     }
 
     getAwakeMissionIdsByCharacter(characterId: number | string): readonly number[] {

@@ -2,6 +2,8 @@ import {
     getContentSnapshot,
     type ReadonlyContentRepository,
 } from "../../content/runtime/content-snapshot"
+import { GameCalendarError, type GameCalendarPolicy } from "../../time/game-calendar"
+import { getGameCalendar } from "../../time/game-calendar-provider"
 
 export interface BondTokenExchangeProduct {
     readonly equipmentId: number
@@ -11,11 +13,10 @@ export interface BondTokenExchangeProduct {
     readonly availableUntilMs: number
 }
 
-const catalogs = new WeakMap<ReadonlyContentRepository, BondTokenCatalog>()
-
-// CDN period 字符串按 CN 时区（UTC+8）解释，与 shop period 私服口径一致；客户端按 JST
-// 解析，真实数据 period=2019-01-01→2200-02-05 两种口径下均常开，差异不可达。
-const CN_OFFSET_MS = 8 * 60 * 60 * 1000
+// Cached catalogs are keyed by repository identity and by the calendar offset
+// they were parsed under, so a catalog parsed under one offset can never be
+// served for another.
+const catalogs = new WeakMap<ReadonlyContentRepository, Map<number, BondTokenCatalog>>()
 
 function parseNonNegativeSafeInteger(value: unknown, subject: string): number {
     const parsed = Number(value)
@@ -46,33 +47,25 @@ interface BondTokenCatalog {
     readonly list: (nowMs: number) => readonly BondTokenExchangeProduct[]
 }
 
-function parseCnPeriodTimestamp(value: string, subject: string): number {
-    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value)
-    if (match === null) {
-        throw new Error(`Bond token exchange ${subject} is invalid: ${value}`)
+function parseCnPeriodTimestamp(
+    value: string,
+    subject: string,
+    calendar: GameCalendarPolicy,
+): number {
+    try {
+        return calendar.parseMasterTimestamp(value)
+    } catch (error) {
+        if (error instanceof GameCalendarError) {
+            throw new Error(`Bond token exchange ${subject} is invalid: ${value}`)
+        }
+        throw error
     }
-    const parts = [match[1], match[2], match[3], match[4], match[5], match[6]].map(Number)
-    const [year, month, day, hour, minute, second] = parts
-    const utcMs = Date.UTC(year, month - 1, day, hour, minute, second)
-    const normalized = new Date(utcMs)
-    const normalizedParts = [
-        normalized.getUTCFullYear(),
-        normalized.getUTCMonth() + 1,
-        normalized.getUTCDate(),
-        normalized.getUTCHours(),
-        normalized.getUTCMinutes(),
-        normalized.getUTCSeconds(),
-    ]
-    if (
-        !Number.isFinite(utcMs)
-        || parts.some((part, index) => part !== normalizedParts[index])
-    ) {
-        throw new Error(`Bond token exchange ${subject} is invalid: ${value}`)
-    }
-    return utcMs - CN_OFFSET_MS
 }
 
-function buildBondTokenCatalog(repository: ReadonlyContentRepository): BondTokenCatalog {
+function buildBondTokenCatalog(
+    repository: ReadonlyContentRepository,
+    calendar: GameCalendarPolicy,
+): BondTokenCatalog {
     const bondTokenExchange = repository.table<Record<string, readonly string[][]>>(
         "bond_token_exchange.json",
     )
@@ -90,8 +83,8 @@ function buildBondTokenCatalog(repository: ReadonlyContentRepository): BondToken
             equipmentId,
             cost: parsePositiveSafeInteger(entry[0], `cost of ${equipmentId}`),
             stock: parseNonNegativeSafeInteger(entry[1], `stock of ${equipmentId}`),
-            availableFromMs: parseCnPeriodTimestamp(entry[2], `period start of ${equipmentId}`),
-            availableUntilMs: parseCnPeriodTimestamp(entry[3], `period end of ${equipmentId}`),
+            availableFromMs: parseCnPeriodTimestamp(entry[2], `period start of ${equipmentId}`, calendar),
+            availableUntilMs: parseCnPeriodTimestamp(entry[3], `period end of ${equipmentId}`, calendar),
         })
         if (product.availableFromMs > product.availableUntilMs) {
             throw new Error(`Bond token exchange ${equipmentId} period is reversed`)
@@ -123,11 +116,17 @@ function buildBondTokenCatalog(repository: ReadonlyContentRepository): BondToken
 
 export function getBondTokenExchangeCatalog(
     repository: ReadonlyContentRepository = getContentSnapshot().repository,
+    calendar: GameCalendarPolicy = getGameCalendar(),
 ): BondTokenCatalog {
-    const cached = catalogs.get(repository)
+    let byOffset = catalogs.get(repository)
+    if (byOffset === undefined) {
+        byOffset = new Map<number, BondTokenCatalog>()
+        catalogs.set(repository, byOffset)
+    }
+    const cached = byOffset.get(calendar.utcOffsetMinutes)
     if (cached !== undefined) return cached
-    const catalog = buildBondTokenCatalog(repository)
-    catalogs.set(repository, catalog)
+    const catalog = buildBondTokenCatalog(repository, calendar)
+    byOffset.set(calendar.utcOffsetMinutes, catalog)
     return catalog
 }
 

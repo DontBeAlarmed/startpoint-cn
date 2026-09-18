@@ -1,6 +1,8 @@
 import { RewardType } from "./types"
 import { getContentSnapshot } from "../content/runtime/content-snapshot"
 import type { ReadonlyContentRepository } from "../content/runtime/content-snapshot"
+import type { GameCalendarPolicy } from "../time/game-calendar"
+import { getGameCalendar } from "../time/game-calendar-provider"
 import { validateRewardCampaignTable } from "../content/converters/reward-campaign"
 
 export interface RewardCampaignEntry {
@@ -57,7 +59,11 @@ function matchesCampaign(entry: RewardCampaignEntry, category: number, questId: 
     return true
 }
 
-function matchesRepeat(entry: RewardCampaignEntry, nowMs: number): boolean {
+function matchesRepeat(
+    entry: RewardCampaignEntry,
+    nowMs: number,
+    calendar: GameCalendarPolicy,
+): boolean {
     if (entry.repeatKind !== "weekly") return true
     if (!Number.isSafeInteger(entry.dayOfWeek)
         || entry.dayOfWeek! < 0
@@ -65,7 +71,9 @@ function matchesRepeat(entry: RewardCampaignEntry, nowMs: number): boolean {
         || !Number.isSafeInteger(entry.resetTimeMs)
         || entry.resetTimeMs! < 0
         || entry.resetTimeMs! >= 24 * 60 * 60 * 1000) return false
-    const shifted = new Date(nowMs + 8 * 60 * 60 * 1000 - entry.resetTimeMs!)
+    const shifted = new Date(
+        nowMs + calendar.utcOffsetMinutes * 60_000 - entry.resetTimeMs!,
+    )
     return shifted.getUTCDay() === entry.dayOfWeek
 }
 
@@ -74,12 +82,13 @@ export function resolveRewardCampaignRates(
     category: number,
     questId: number,
     now: Date,
+    calendar: GameCalendarPolicy = getGameCalendar(),
 ): RewardCampaignRates {
     const nowMs = now.getTime()
     const rates = { ...DEFAULT_RATES }
     for (const entry of Object.values(campaigns)) {
         if (nowMs < entry.startAtMs || nowMs > entry.endAtMs
-            || !matchesRepeat(entry, nowMs)
+            || !matchesRepeat(entry, nowMs, calendar)
             || !matchesCampaign(entry, category, questId)) continue
         if (entry.rewardKind === 0) rates.item = Math.max(rates.item, entry.rate)
         else if (entry.rewardKind === 1) rates.exp = Math.max(rates.exp, entry.rate)
