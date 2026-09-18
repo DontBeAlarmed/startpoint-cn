@@ -8,6 +8,8 @@ import {
     getContentSnapshot,
     type ReadonlyContentRepository,
 } from "../content/runtime/content-snapshot"
+import { GameCalendarError, type GameCalendarPolicy } from "../time/game-calendar"
+import { getGameCalendar } from "../time/game-calendar-provider"
 import { buildCharacterManaMutationContent } from "./character-mana-mutation-content"
 import type { CharacterManaMutationContent } from "./character-mana-mutation-types"
 import type { ManaNode } from "./types"
@@ -83,42 +85,24 @@ function parseCanonicalNonNegativeInteger(value: unknown): number | null {
     return Number.isSafeInteger(parsed) ? parsed : null
 }
 
-const JST_OFFSET_HOURS = 9
-const JST_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/
-
-function parseJstDate(value: unknown, field: string): Date {
+// Strict shape/validity checking is delegated to GameCalendarPolicy; the
+// historical "JST" name follows the master-data column semantics, while the
+// actual offset is the CN client's fixed calendar offset (UTC+8).
+function parseJstDate(value: unknown, field: string, calendar: GameCalendarPolicy): Date {
     if (typeof value !== "string") throw new Error(`${field} must be a JST date string`)
-    const match = JST_DATE_PATTERN.exec(value)
-    if (!match) throw new Error(`${field} has an invalid JST date format`)
-    const [, yearText, monthText, dayText, hourText, minuteText, secondText] = match
-    const year = Number(yearText)
-    const month = Number(monthText)
-    const day = Number(dayText)
-    const hour = Number(hourText)
-    const minute = Number(minuteText)
-    const second = Number(secondText)
-    const utc = new Date(Date.UTC(
-        year,
-        month - 1,
-        day,
-        hour - JST_OFFSET_HOURS,
-        minute,
-        second,
-    ))
-    const jst = new Date(utc.getTime() + JST_OFFSET_HOURS * 60 * 60 * 1000)
-    if (jst.getUTCFullYear() !== year
-        || jst.getUTCMonth() + 1 !== month
-        || jst.getUTCDate() !== day
-        || jst.getUTCHours() !== hour
-        || jst.getUTCMinutes() !== minute
-        || jst.getUTCSeconds() !== second) {
-        throw new Error(`${field} is not a real JST calendar time`)
+    try {
+        return new Date(calendar.parseMasterTimestamp(value))
+    } catch (error) {
+        if (error instanceof GameCalendarError) {
+            throw new Error(`${field} has an invalid JST date format`)
+        }
+        throw error
     }
-    return utc
 }
 
 export function parseManaBoard2OpenConditionTable(
     table: Record<string, unknown>,
+    calendar: GameCalendarPolicy = getGameCalendar(),
 ): ReadonlyMap<number, ManaBoard2OpenCondition> {
     if (!table || typeof table !== "object" || Array.isArray(table)) {
         throw new Error("mana_board2_open_condition table must be an object")
@@ -131,8 +115,8 @@ export function parseManaBoard2OpenConditionTable(
             || !Array.isArray(rawRows[0]) || rawRows[0].length !== 2) {
             throw new Error(`mana_board2_open_condition row ${characterIdText} is malformed`)
         }
-        const startTime = parseJstDate(rawRows[0][0], `row ${characterIdText} start_time`)
-        const endTime = parseJstDate(rawRows[0][1], `row ${characterIdText} end_time`)
+        const startTime = parseJstDate(rawRows[0][0], `row ${characterIdText} start_time`, calendar)
+        const endTime = parseJstDate(rawRows[0][1], `row ${characterIdText} end_time`, calendar)
         if (startTime.getTime() > endTime.getTime()) {
             throw new Error(`mana_board2_open_condition row ${characterIdText} has an inverted range`)
         }
@@ -149,6 +133,7 @@ function parseCanonicalPositiveInteger(value: unknown): number | null {
 
 export function buildCharacterGrowthContent(
     repository: ReadonlyContentRepository,
+    calendar: GameCalendarPolicy = getGameCalendar(),
 ): CharacterGrowthContent {
     const manaNodes = table<ManaNodeTable>(repository, "mana_node.json")
     const manaBoard = table<ManaBoardTable>(repository, "mana_board.json")
@@ -280,6 +265,7 @@ export function buildCharacterGrowthContent(
             if (secondBoardOpenConditions === null) {
                 secondBoardOpenConditions = parseManaBoard2OpenConditionTable(
                     table<Record<string, unknown>>(repository, "mana_board2_open_condition.json"),
+                    calendar,
                 )
             }
             return secondBoardOpenConditions

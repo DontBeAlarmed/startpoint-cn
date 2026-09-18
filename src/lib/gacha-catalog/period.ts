@@ -1,31 +1,34 @@
 import type { GachaPeriod } from "./model"
-
-const JST_OFFSET_MS = 9 * 60 * 60 * 1000
+import { GameCalendarError, type GameCalendarPolicy } from "../../time/game-calendar"
+import { getGameCalendar } from "../../time/game-calendar-provider"
 
 export class GachaPeriodError extends Error {
     readonly resultCode = 1351
 }
 
-export function parseGachaJstTimestamp(value: string): number {
-    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value)
-    if (match === null) throw new TypeError(`Invalid Gacha period: ${value}.`)
-    const parts = match.slice(1).map(Number)
-    const [year, month, day, hour, minute, second] = parts
-    const date = new Date(0)
-    date.setUTCFullYear(year, month - 1, day)
-    date.setUTCHours(hour, minute, second, 0)
-    const normalized = [
-        date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate(),
-        date.getUTCHours(), date.getUTCMinutes(), date.getUTCSeconds(),
-    ]
-    if (parts.some((part, index) => part !== normalized[index])) {
-        throw new TypeError(`Invalid Gacha period: ${value}.`)
+// Compatibility alias kept for gacha-catalog consumers: strict parsing and the
+// CN client's fixed offset now come from the game calendar policy, so the
+// historical "Jst" name no longer implies a hard-coded UTC+9 conversion.
+export function parseGachaJstTimestamp(
+    value: string,
+    calendar: GameCalendarPolicy = getGameCalendar(),
+): number {
+    try {
+        return calendar.parseMasterTimestamp(value)
+    } catch (error) {
+        if (error instanceof GameCalendarError) {
+            throw new TypeError(`Invalid Gacha period: ${value}.`)
+        }
+        throw error
     }
-    return date.getTime() - JST_OFFSET_MS
 }
 
-export function isGachaPeriodAvailable(period: GachaPeriod, nowMs: number): boolean {
+export function isGachaPeriodAvailable(
+    period: GachaPeriod,
+    nowMs: number,
+    calendar: GameCalendarPolicy = getGameCalendar(),
+): boolean {
     return Number.isFinite(nowMs)
-        && nowMs >= parseGachaJstTimestamp(period.availableFrom)
-        && nowMs <= parseGachaJstTimestamp(period.availableUntil)
+        && nowMs >= parseGachaJstTimestamp(period.availableFrom, calendar)
+        && nowMs <= parseGachaJstTimestamp(period.availableUntil, calendar)
 }

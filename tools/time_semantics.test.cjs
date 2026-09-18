@@ -47,6 +47,16 @@ try {
     assert.match(staminaSource, /getRealNowMs\(\)/)
     assert.doesNotMatch(staminaSource, /getServerTime\(|getServerDate\(/)
 
+    const loadSource = fs.readFileSync(
+        path.join(__dirname, "../src/routes/cn/load.ts"),
+        "utf8",
+    )
+    assert.doesNotMatch(
+        loadSource,
+        /\.toDateString\(\)/,
+        "load.ts must not compare dates with host-local toDateString(); dailyResetPlayerDataSync owns lastLoginTime",
+    )
+
     const playerSource = fs.readFileSync(
         path.join(__dirname, "../src/data/domains/player.ts"),
         "utf8",

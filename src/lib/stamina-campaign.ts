@@ -1,4 +1,6 @@
 import { getContentSnapshot, type ReadonlyContentRepository } from "../content/runtime/content-snapshot";
+import { type GameCalendarPolicy } from "../time/game-calendar";
+import { getGameCalendar } from "../time/game-calendar-provider";
 import { QuestCategory } from "./types";
 
 type LevelSelector =
@@ -27,7 +29,10 @@ function parseLevelSelector(raw: string): LevelSelector {
     return { kind: "within", ids: raw.split(",").map(Number) }
 }
 
-function buildCampaigns(campaignData: CampaignTable): readonly StaminaCampaign[] {
+function buildCampaigns(
+    campaignData: CampaignTable,
+    calendar: GameCalendarPolicy = getGameCalendar(),
+): readonly StaminaCampaign[] {
     const campaigns: StaminaCampaign[] = []
     for (const [id, rows] of Object.entries(campaignData)) {
         const row = rows[0]
@@ -41,8 +46,10 @@ function buildCampaigns(campaignData: CampaignTable): readonly StaminaCampaign[]
                 parseLevelSelector(row[8]),
                 parseLevelSelector(row[9]),
             ],
-            startTime: new Date(row[1]),
-            endTime: new Date(row[2]),
+            // Master windows are offset-less wall-clock strings: they must go
+            // through the game calendar policy, never host-local Date parsing.
+            startTime: new Date(calendar.parseMasterTimestamp(row[1])),
+            endTime: new Date(calendar.parseMasterTimestamp(row[2])),
         })
     }
     return Object.freeze(campaigns)

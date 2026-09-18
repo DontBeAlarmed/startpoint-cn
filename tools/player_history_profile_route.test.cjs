@@ -43,6 +43,7 @@ const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snaps
             "player_history_topic.json",
         ],
     })
+const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 test.after(() => { restoreContentSnapshot() })
 setServerTime(new Date("2025-07-25T00:00:00.000Z"))
 const db = getDb()
@@ -304,6 +305,41 @@ test("player history milestones roll back with their caller transaction", () => 
         throw new Error("injected rollback")
     })(), /injected rollback/)
     assert.deepEqual(getPlayerHistoryMilestonesSync(otherPlayer.id), [])
+})
+
+test("player history windows open at the CN calendar boundary under offset 480", () => {
+    const restoreBoundarySnapshot = installBundledGameplaySnapshot({
+        additionalTableNames: [
+            "player_history.json",
+            "player_history_card_background.json",
+            "player_history_topic.json",
+        ],
+        tableOverrides: {
+            "player_history.json": {
+                "1": [[
+                    "player_history",
+                    "2025-07-17 12:00:00",
+                    "2025-07-17 12:00:00",
+                    "2099-12-31 23:59:59",
+                ]],
+            },
+        },
+    })
+    try {
+        const { loadPlayerHistoryCatalog } = require("../src/lib/player-history-catalog")
+        assert.throws(
+            () => loadPlayerHistoryCatalog(Date.parse("2025-07-17T03:59:59.999Z")),
+            /no history period is available/,
+            "history must still be closed one millisecond before the CN boundary",
+        )
+        assert.equal(
+            loadPlayerHistoryCatalog(Date.parse("2025-07-17T04:00:00.000Z")).playerHistoryId,
+            1,
+            "master start 2025-07-17 12:00:00 must open at 04:00:00.000Z (UTC+8), not 03:00:00.000Z",
+        )
+    } finally {
+        restoreBoundarySnapshot()
+    }
 })
 
 test("opening player history never backfills missing milestones", async () => {

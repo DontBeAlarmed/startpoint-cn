@@ -623,6 +623,23 @@ test("Stars exchange uses its independent player period and preserves cumulative
     assert.equal(historyCount(missing.playerId), 0)
 })
 
+test("player period reverse formatting delegates to the game calendar without JST arithmetic", () => {
+    const source = fs.readFileSync(
+        path.join(__dirname, "../src/lib/gacha-owner/player-period.ts"),
+        "utf8",
+    )
+    assert.match(
+        source,
+        /formatMasterTimestamp\(unixSeconds \* 1000\)/,
+        "player periods must format through GameCalendarPolicy.formatMasterTimestamp",
+    )
+    assert.doesNotMatch(
+        source,
+        /9\s*\*\s*60\s*\*\s*60/,
+        "player-period.ts must not add its own UTC+9 offset",
+    )
+})
+
 test("gacha exec rolls every persistent result back on late mission failure", async t => {
     const { playerId, viewerId } = await createPlayer("gacha-exec")
     updatePlayerSync({ id: playerId, freeVmoney: 1000, vmoney: 800 })

@@ -210,6 +210,13 @@ test("weighted pools are shared by odds identity and precompute cumulative weigh
     )
 })
 
+test("gacha master timestamps parse in the CN client calendar, not JST+9", () => {
+    assert.equal(
+        new Date(parseGachaJstTimestamp("2024-08-14 20:00:00")).toISOString(),
+        "2024-08-14T12:00:00.000Z",
+    )
+})
+
 test("JST period boundaries are inclusive and standard campaign resolution keeps history", () => {
     const catalog = buildGachaCatalog(repository())
     const banner = catalog.banners["1638"]

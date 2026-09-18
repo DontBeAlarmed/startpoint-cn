@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import path from "node:path";
 import { DEFAULT_SERVER_PORTS } from "../../runtime/release-contract";
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { collectPlayerDataPooledExpSync, dailyResetPlayerDataSync, getPlayerSync, refreshPlayerDailyChallengePointsForRealDaySync, updatePlayerSync } from "../../data/domains/player"
+import { collectPlayerDataPooledExpSync, dailyResetPlayerDataSync, getPlayerSync, refreshPlayerDailyChallengePointsForRealDaySync } from "../../data/domains/player"
 import {
     getPlayerActiveQuestSync,
     updatePlayerActiveQuestCoordinatorOriginSync,
@@ -323,12 +323,6 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                 return reply.status(500).send({ error: "Internal Server Error", message: "No player data." });
             }
             player = refreshedPlayer;
-        }
-
-        // 若自定义时间与 lastLogin 不同步，强制对齐（防止客户端弹"日期变了"）
-        if (now.toDateString() !== player.lastLoginTime.toDateString()) {
-            updatePlayerSync({ id: player.id, lastLoginTime: now });
-            player.lastLoginTime = now;
         }
 
         let activeQuest: ActiveQuest | null = getPlayerActiveQuestSync(playerId);

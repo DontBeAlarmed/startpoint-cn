@@ -1,4 +1,6 @@
 import { getDb } from "../../data/db"
+import { type GameCalendarPolicy } from "../../time/game-calendar"
+import { getGameCalendar } from "../../time/game-calendar-provider"
 import {
     getPlayerGachaDetailSync,
     getPlayerStarsGachaCampaignByGachaSync,
@@ -9,14 +11,14 @@ import { getGachaCatalog, parseGachaJstTimestamp } from "../gacha-catalog"
 import type { GachaBanner, GachaPeriod } from "../gacha-catalog"
 import type { PlayerStarsGachaCampaign } from "../../data/types"
 
-function jstMasterTimestamp(unixSeconds: number): string {
+function jstMasterTimestamp(
+    unixSeconds: number,
+    calendar: GameCalendarPolicy = getGameCalendar(),
+): string {
     if (!Number.isSafeInteger(unixSeconds) || unixSeconds < 0) {
         throw new TypeError("Gacha player period must be a non-negative Unix timestamp")
     }
-    return new Date(unixSeconds * 1000 + 9 * 60 * 60 * 1000)
-        .toISOString()
-        .slice(0, 19)
-        .replace("T", " ")
+    return calendar.formatMasterTimestamp(unixSeconds * 1000)
 }
 
 function period(startTime: number, endTime: number): GachaPeriod {

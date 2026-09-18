@@ -129,6 +129,33 @@ test("rush campaigns apply through the entry cost with the same selectors", () =
     }
 })
 
+test("campaign windows open at the CN calendar boundary regardless of host timezone", () => {
+    const previousTZ = process.env.TZ
+    process.env.TZ = "UTC"
+    try {
+        withCampaignTable({
+            "990006": campaignRow({
+                rate: 0.5, questType: 0,
+                start: "2024-08-14 20:00:00", end: "2024-12-31 23:59:59",
+            }),
+        })
+        assert.equal(
+            getActiveCampaignRate(QuestCategory.MAIN, 1001002, new Date("2024-08-14T11:59:59.999Z")),
+            1,
+            "the campaign must stay closed one millisecond before the CN boundary",
+        )
+        assert.equal(
+            getActiveCampaignRate(QuestCategory.MAIN, 1001002, new Date("2024-08-14T12:00:00.000Z")),
+            0.5,
+            "master start 2024-08-14 20:00:00 must open at 12:00:00.000Z (UTC+8) under TZ=UTC",
+        )
+    } finally {
+        withCampaignTable({})
+        if (previousTZ === undefined) delete process.env.TZ
+        else process.env.TZ = previousTZ
+    }
+})
+
 after(() => {
     closeDatabase()
     restoreContentSnapshot()

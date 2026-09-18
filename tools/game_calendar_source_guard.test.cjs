@@ -9,8 +9,9 @@
 // 2. The Task 5 runtime business-calendar files (src/lib/**, src/routes/**) —
 //    the same forbidden families, plus offset literals appended to offset-less
 //    master data (including underscore-digit variants) and host-local Date
-//    getters used in calendar projection. Task 6 appends its own files to
-//    RUNTIME_TARGET_FILES / RUNTIME_FILE_EXTRA_PATTERNS when it lands.
+//    getters used in calendar projection. Task 6 added its UTC+9/stamina
+//    corrections to RUNTIME_TARGET_FILES and banned the load.ts toDateString
+//    day-crossing comparison in RUNTIME_FILE_EXTRA_PATTERNS.
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")
@@ -59,10 +60,10 @@ const RUNTIME_EXTRA_PATTERNS = [
 
 const RUNTIME_PATTERNS = [...FORBIDDEN_PATTERNS, ...RUNTIME_EXTRA_PATTERNS]
 
-// Task 5 runtime business-calendar files, relative to src/. Task 6 appends
-// its files (gacha-catalog/period, gacha-owner/player-period,
-// character-growth-content, player-history-catalog, stamina-campaign, and a
-// load.ts pattern for the toDateString branch) to these structures.
+// Task 5 runtime business-calendar files, plus the Task 6 UTC+9/stamina/load
+// corrections (gacha-catalog/period, gacha-owner/player-period,
+// character-growth-content, player-history-catalog, stamina-campaign; load.ts
+// gains a per-file toDateString ban in RUNTIME_FILE_EXTRA_PATTERNS).
 const RUNTIME_TARGET_FILES = Object.freeze([
     // Task 5 — runtime business calendar migration.
     "lib/time-utils.ts",
@@ -81,12 +82,26 @@ const RUNTIME_TARGET_FILES = Object.freeze([
     "lib/pass-card.ts",
     "lib/admin-clairvoyance.ts",
     "routes/cn/load.ts",
+    // Task 6 — confirmed UTC+9 paths and the stamina host-timezone defect.
+    "lib/gacha-catalog/period.ts",
+    "lib/gacha-owner/player-period.ts",
+    "lib/character-growth-content.ts",
+    "lib/player-history-catalog.ts",
+    "lib/stamina-campaign.ts",
 ])
 
-// Per-file additional forbidden patterns. load.ts stays empty for now: its
-// legacy `toDateString()` day-crossing branch (kept, not rejected, until
-// Task 6 deletes it) uses no host-local Date getters and no offset literals.
-const RUNTIME_FILE_EXTRA_PATTERNS = Object.freeze({})
+// Per-file additional forbidden patterns. load.ts must never reintroduce the
+// legacy host-local `toDateString()` day-crossing comparison on lastLoginTime:
+// dailyResetPlayerDataSync already updates it in both crossed-day and
+// same-day paths.
+const RUNTIME_FILE_EXTRA_PATTERNS = Object.freeze({
+    "routes/cn/load.ts": Object.freeze([
+        {
+            name: "host-local toDateString day-crossing comparison",
+            pattern: /\.toDateString\(\)/,
+        },
+    ]),
+})
 
 function runtimePatternsFor(relativePath) {
     return [
@@ -256,24 +271,43 @@ test("runtime guard allows epoch construction, durations, policy offsets, and tz
     }
 })
 
-test("guard exempts news-time.ts and keeps load.ts toDateString branch unflagged for now", () => {
+test("guard rejects load.ts toDateString comparisons and scans the Task 6 files", () => {
     // news-time.ts parses explicit timezone-aware ISO values only; it is
     // exempt from the runtime calendar guard by design.
     assert.equal(RUNTIME_TARGET_FILES.includes("lib/news-time.ts"), false)
 
-    // The load.ts legacy toDateString day-crossing comparison survives until
-    // Task 6 deletes it; the current load.ts pattern set must not reject it.
-    assert.equal((RUNTIME_FILE_EXTRA_PATTERNS["routes/cn/load.ts"] ?? []).length, 0)
-    const toDateStringSample = fs
+    // Task 6 deleted the load.ts legacy toDateString day-crossing branch;
+    // the per-file pattern must now reject any reintroduction, and the load.ts
+    // source must prove its absence.
+    const loadExtraPatterns = RUNTIME_FILE_EXTRA_PATTERNS["routes/cn/load.ts"] ?? []
+    assert.equal(loadExtraPatterns.length, 1)
+    const deletedBranchSample =
+        "if (now.toDateString() !== player.lastLoginTime.toDateString()) {"
+    assert.ok(
+        findViolations(
+            "routes/cn/load.ts",
+            deletedBranchSample,
+            runtimePatternsFor("routes/cn/load.ts"),
+        ).some(violation => violation.includes("toDateString")),
+        "the deleted toDateString branch must now be rejected by the guard",
+    )
+    const loadSource = fs
         .readFileSync(path.join(SRC_ROOT, "routes", "cn", "load.ts"), "utf8")
-        .split(/\r?\n/)
-        .filter(line => line.includes("toDateString()"))
-    assert.ok(toDateStringSample.length > 0, "load.ts must still contain the legacy toDateString branch")
-    for (const line of toDateStringSample) {
-        assert.deepEqual(
-            findViolations("routes/cn/load.ts", line, runtimePatternsFor("routes/cn/load.ts")),
-            [],
-            `Task 6 will delete it; the guard must not reject it yet: ${line.trim()}`,
+    assert.doesNotMatch(
+        loadSource,
+        /\.toDateString\(\)/,
+        "load.ts must not contain the legacy toDateString day-crossing branch",
+    )
+    for (const required of [
+        "lib/gacha-catalog/period.ts",
+        "lib/gacha-owner/player-period.ts",
+        "lib/character-growth-content.ts",
+        "lib/player-history-catalog.ts",
+        "lib/stamina-campaign.ts",
+    ]) {
+        assert.ok(
+            RUNTIME_TARGET_FILES.includes(required),
+            `Task 6 file must stay guarded: ${required}`,
         )
     }
 })
