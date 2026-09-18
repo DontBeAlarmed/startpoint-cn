@@ -179,9 +179,13 @@ function createHarness(overrides = {}) {
             tcp: { host: "127.0.0.1", port: 18003 },
         },
         assetProvider: { mode: "client-owned" },
+        gameCalendarUtcOffsetMinutes: 480,
     }
     const dependencies = {
         loadConfig() { calls.push("config"); return config },
+        configureGameCalendar(value) {
+            calls.push(["game-calendar", value.gameCalendarUtcOffsetMinutes])
+        },
         configureHttp(value) { calls.push(["configure-http", value]) },
         initializeDatabase() { calls.push("database") },
         restoreServerTime() { calls.push("time") },
@@ -356,6 +360,7 @@ test("successful startup follows the embedded contract order", async () => {
 
     assert.deepEqual(harness.calls, [
         "config",
+        ["game-calendar", 480],
         "database",
         "time",
         ["content", "client-owned"],
@@ -371,6 +376,41 @@ test("successful startup follows the embedded contract order", async () => {
     assert.equal(harness.processTarget.listenerCount("SIGINT"), 1)
 
     await harness.coordinator.stop()
+})
+
+test("game calendar is configured once after config and before database, time, and content", async () => {
+    const harness = createHarness()
+
+    await harness.coordinator.start()
+
+    assert.deepEqual(harness.calls.slice(0, 5), [
+        "config",
+        ["game-calendar", 480],
+        "database",
+        "time",
+        ["content", "client-owned"],
+    ])
+    assert.equal(harness.coordinator.getPhase(), "ready")
+    await harness.coordinator.stop()
+})
+
+test("game calendar configuration failure reports the config startup stage", async () => {
+    const harness = createHarness({
+        configureGameCalendar() {
+            harness.calls.push("game-calendar-failure")
+            throw new Error("invalid game calendar configuration")
+        },
+    })
+
+    await harness.coordinator.start()
+
+    assert.equal(harness.coordinator.getPhase(), "failed")
+    assert.deepEqual(harness.startupStages, ["config"])
+    assert.equal(harness.exitCodes[0], 10)
+    assert.equal(harness.calls.includes("database"), false)
+    assert.equal(harness.calls.some(call => (
+        Array.isArray(call) && call[0] === "content"
+    )), false)
 })
 
 test("startup error classes retain stable exit codes including reserved runtime pack", () => {

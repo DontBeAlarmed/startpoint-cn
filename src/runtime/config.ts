@@ -18,6 +18,10 @@ import {
     type ContentPathEnvironment,
 } from "../content/paths"
 import {
+    GameCalendarError,
+    parseGameCalendarUtcOffsetMinutes,
+} from "../time/game-calendar"
+import {
     DEFAULT_MULTI_BATTLE_TUNING,
     DEFAULT_MULTI_TRANSPORT_TUNING,
     type MultiBattleTuning,
@@ -54,6 +58,7 @@ export interface RuntimeEnvironment extends AssetModeEnvironment {
     readonly MULTI_HUB_CREDENTIALS_FILE?: string
     readonly SUMMON_COM_SECONDS?: string
     readonly DAILY_RESET_HOUR?: string
+    readonly GAME_CALENDAR_UTC_OFFSET_MINUTES?: string
     readonly EMBEDDED_RUNTIME?: string
     readonly DATA_DIR?: string
     readonly COMIC_DIR?: string
@@ -120,6 +125,7 @@ export interface CnRuntimeConfig {
     readonly comicDir: string | null
     readonly summonComSeconds: number
     readonly dailyResetHour: number
+    readonly gameCalendarUtcOffsetMinutes: number
 }
 
 export interface ParseCnRuntimeConfigOptions {
@@ -194,6 +200,15 @@ function parseDailyResetHour(value: string | undefined): number {
     const hour = parseNonNegativeInteger(value, 5)
     if (hour > 23) throw new RuntimeConfigError()
     return hour
+}
+
+function parseGameCalendarUtcOffset(value: string | undefined): number {
+    try {
+        return parseGameCalendarUtcOffsetMinutes(value)
+    } catch (error) {
+        if (error instanceof GameCalendarError) throw new RuntimeConfigError()
+        throw error
+    }
 }
 
 function resolvePhysicalPath(filePath: string): string {
@@ -502,6 +517,9 @@ export function parseCnRuntimeConfig({
     const comicDir = resolveComicDir(env, projectRoot)
     const summonComSeconds = parseNonNegativeInteger(env.SUMMON_COM_SECONDS, 5)
     const dailyResetHour = parseDailyResetHour(env.DAILY_RESET_HOUR)
+    const gameCalendarUtcOffsetMinutes = parseGameCalendarUtcOffset(
+        env.GAME_CALENDAR_UTC_OFFSET_MINUTES,
+    )
     validateEmbeddedRuntime(env, projectRoot, assetProvider, comicDir)
     return Object.freeze({
         http,
@@ -514,5 +532,6 @@ export function parseCnRuntimeConfig({
         comicDir,
         summonComSeconds,
         dailyResetHour,
+        gameCalendarUtcOffsetMinutes,
     })
 }

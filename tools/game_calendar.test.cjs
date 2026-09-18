@@ -9,6 +9,10 @@ const {
     createGameCalendarPolicy,
     parseGameCalendarUtcOffsetMinutes,
 } = require("../src/time/game-calendar")
+const {
+    createGameCalendarProvider,
+    getGameCalendar,
+} = require("../src/time/game-calendar-provider")
 
 test("calendar offset configuration defaults to CN and accepts fixed minute offsets", () => {
     assert.equal(DEFAULT_GAME_CALENDAR_UTC_OFFSET_MINUTES, 480)
@@ -63,4 +67,32 @@ test("formatting rejects non-finite values outside the four-digit contract", () 
     for (const value of [Number.NaN, Number.POSITIVE_INFINITY]) {
         assert.throws(() => cn.formatMasterTimestamp(value), /epoch/i)
     }
+})
+
+test("calendar provider same-value initialization is idempotent", () => {
+    const provider = createGameCalendarProvider(480)
+    const first = provider.initialize(480)
+    assert.equal(first.utcOffsetMinutes, 480)
+    assert.equal(provider.initialize(480), first)
+    assert.equal(provider.get(), first)
+    assert.equal(Object.isFrozen(provider.get()), true)
+})
+
+test("calendar provider rejects conflicting initialization after init or read", () => {
+    const initialized = createGameCalendarProvider(480)
+    initialized.initialize(480)
+    for (const value of [540, 841]) {
+        assert.throws(() => initialized.initialize(value), /game calendar/i)
+    }
+    assert.equal(initialized.get().utcOffsetMinutes, 480)
+
+    const read = createGameCalendarProvider(330)
+    assert.equal(read.get().utcOffsetMinutes, 330)
+    assert.throws(() => read.initialize(480), /game calendar/i)
+    assert.equal(read.get().utcOffsetMinutes, 330)
+})
+
+test("production game calendar accessor returns the frozen CN default", () => {
+    assert.equal(getGameCalendar().utcOffsetMinutes, 480)
+    assert.equal(getGameCalendar(), getGameCalendar())
 })

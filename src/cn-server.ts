@@ -25,6 +25,7 @@ import {
     createRuntimeCoordinator,
     RuntimeCoordinator,
 } from "./runtime/lifecycle";
+import { productionGameCalendarProvider } from "./time/game-calendar-provider";
 import { registerRuntimeHealthRoute } from "./runtime/health";
 import { loadBundleMetadata } from "./runtime/bundle-metadata";
 import { registerAdminUi } from "./runtime/admin";
@@ -401,6 +402,9 @@ runtimeCoordinator = createRuntimeCoordinator({
             });
         }
         return config;
+    },
+    configureGameCalendar: config => {
+        productionGameCalendarProvider.initialize(config.gameCalendarUtcOffsetMinutes);
     },
     configureHttp: configureRuntimeHttp,
     initializeDatabase,

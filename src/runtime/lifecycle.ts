@@ -27,6 +27,14 @@ export interface RuntimeSignalTarget {
 
 export interface RuntimeCoordinatorDependencies {
     readonly loadConfig: () => CnRuntimeConfig
+    /**
+     * Freezes the process-wide game calendar (runtime stage "config") after
+     * config parsing and before database, time, and content initialization.
+     * Optional so minimal harnesses that never touch the calendar keep
+     * booting on the provider's frozen default; production (cn-server)
+     * always supplies it.
+     */
+    readonly configureGameCalendar?: (config: CnRuntimeConfig) => void
     readonly configureHttp: (config: CnRuntimeConfig) => void
     readonly initializeDatabase: () => void
     readonly restoreServerTime: () => void
@@ -209,6 +217,7 @@ class Coordinator implements RuntimeCoordinator {
             this.registerSignals()
             this.stage = "config"
             this.config = this.dependencies.loadConfig()
+            this.dependencies.configureGameCalendar?.(this.config)
             if (this.interrupted()) return
 
             this.stage = "database"
