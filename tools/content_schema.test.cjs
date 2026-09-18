@@ -30,6 +30,7 @@ function validReleaseInput() {
         assetVersion: "1.4.55",
         runtimeSchemaVersion: 1,
         generatorVersion: 1,
+        gameCalendarUtcOffsetMinutes: 480,
         tables: {
             "cdndata/character_text.json": {
                 object: DIGEST_C,
@@ -60,6 +61,28 @@ function validReleaseInput() {
 
 function validManifest() {
     return createReleaseManifest(validReleaseInput())
+}
+
+/**
+ * Builds a historical manifest exactly as releases were persisted before the
+ * game calendar field existed: the digest is computed over the pre-change
+ * digest input (no `gameCalendarUtcOffsetMinutes`), never hard-coded.
+ */
+function legacyManifestWithDigestComputedWithoutCalendarField() {
+    const input = validReleaseInput()
+    const legacyDigestInput = {
+        schemaVersion: input.schemaVersion,
+        assetVersion: input.assetVersion,
+        runtimeSchemaVersion: input.runtimeSchemaVersion,
+        generatorVersion: input.generatorVersion,
+        tables: input.tables,
+        catalog: input.catalog,
+        summary: input.summary,
+    }
+    return {
+        ...legacyDigestInput,
+        releaseDigest: sha256Object(canonicalJsonBuffer(legacyDigestInput)),
+    }
 }
 
 test("exports the initial content schema versions", () => {
@@ -152,6 +175,7 @@ test("release manifests are deterministic and exclude releaseDigest from its dig
             "character.json": input.tables["character.json"],
             "cdndata/character_text.json": input.tables["cdndata/character_text.json"],
         },
+        gameCalendarUtcOffsetMinutes: input.gameCalendarUtcOffsetMinutes,
         generatorVersion: input.generatorVersion,
         runtimeSchemaVersion: input.runtimeSchemaVersion,
         assetVersion: input.assetVersion,
@@ -167,6 +191,47 @@ test("release manifests are deterministic and exclude releaseDigest from its dig
         manifest.releaseDigest,
     )
     assert.deepEqual(parseReleaseManifest(JSON.parse(JSON.stringify(manifest))), manifest)
+})
+
+test("new release manifests bind the game calendar offset into identity", () => {
+    const first = createReleaseManifest({ ...validReleaseInput(), gameCalendarUtcOffsetMinutes: 480 })
+    const second = createReleaseManifest({ ...validReleaseInput(), gameCalendarUtcOffsetMinutes: 540 })
+    assert.equal(first.gameCalendarUtcOffsetMinutes, 480)
+    assert.notEqual(first.releaseDigest, second.releaseDigest)
+})
+
+test("legacy release manifests normalize missing calendar offset to CN 480", () => {
+    const legacy = legacyManifestWithDigestComputedWithoutCalendarField()
+    const parsed = parseReleaseManifest(legacy)
+    assert.equal(parsed.gameCalendarUtcOffsetMinutes, 480)
+    assert.equal(parsed.releaseDigest, legacy.releaseDigest)
+})
+
+test("release manifests reject invalid calendar offsets", () => {
+    for (const value of [841, -841, 1.5, "480"])
+        assert.throws(() => createReleaseManifest({
+            ...validReleaseInput(), gameCalendarUtcOffsetMinutes: value,
+        }), /calendar/i)
+})
+
+test("manifest parsing accepts exactly the legacy and current shapes", () => {
+    const legacy = legacyManifestWithDigestComputedWithoutCalendarField()
+    assert.throws(() => parseReleaseManifest({
+        ...legacy,
+        releaseDigest: DIGEST_A,
+    }), /releaseDigest does not match manifest content/)
+
+    const current = validManifest()
+    assert.equal(parseReleaseManifest(JSON.parse(JSON.stringify(current))).gameCalendarUtcOffsetMinutes, 480)
+    // A legacy digest cannot be paired with the current key set.
+    assert.throws(() => parseReleaseManifest({
+        ...legacy,
+        gameCalendarUtcOffsetMinutes: 480,
+    }), /releaseDigest does not match manifest content/)
+    assert.throws(() => parseReleaseManifest({
+        ...legacy,
+        unexpected: true,
+    }), /unknown or missing fields/)
 })
 
 test("strictly parses valid release manifests and current pointers", () => {

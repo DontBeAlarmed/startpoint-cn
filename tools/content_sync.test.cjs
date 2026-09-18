@@ -882,6 +882,7 @@ test("check reuses current release objects without rereading its summary", async
     const manifest = {
         assetVersion: "1.4.54",
         generatorVersion: 1,
+        gameCalendarUtcOffsetMinutes: 480,
         summary: { object: `sha256:${"b".repeat(64)}` },
         tables: Object.fromEntries(TEST_TABLE_SOURCES.map(definition => [
             definition.tableName,
@@ -1116,6 +1117,27 @@ test("engine builds each release with exactly one frozen game calendar policy", 
     assert.equal(Object.isFrozen(contexts[0].gameCalendar), true)
     assert.equal(contexts[1].gameCalendar.utcOffsetMinutes, 540)
     assert.notEqual(contexts[1].gameCalendar, contexts[0].gameCalendar)
+})
+
+test("changing the game calendar offset forces a full rebuild with reason game-calendar", async t => {
+    const fixture = engineFixture(t)
+    const first = await sync(fixture, { gameCalendarUtcOffsetMinutes: 480 })
+    const second = await sync(fixture, { gameCalendarUtcOffsetMinutes: 540 })
+
+    assert.equal(first.reason, "missing")
+    assert.equal(second.status, "synchronized")
+    assert.equal(second.action, "synchronize")
+    assert.equal(second.reason, "game-calendar")
+    assert.notEqual(second.releaseDigest, first.releaseDigest)
+    assert.equal(fixture.calls.builder, 2)
+
+    const manifest = await readCurrentRelease(fixture.store)
+    assert.equal(manifest.gameCalendarUtcOffsetMinutes, 540)
+
+    const restored = await sync(fixture, { gameCalendarUtcOffsetMinutes: 480 })
+    assert.equal(restored.reason, "game-calendar")
+    assert.equal(restored.releaseDigest, first.releaseDigest)
+    assert.equal(fixture.calls.builder, 3)
 })
 
 test("catalog, tables, and summary are stored without physical or absolute paths", async t => {

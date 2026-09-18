@@ -83,6 +83,7 @@ async function writeRelease(store, marker, options = {}) {
         assetVersion: options.assetVersion ?? "1.4.55",
         runtimeSchemaVersion: CONTENT_RUNTIME_SCHEMA_VERSION,
         generatorVersion: options.generatorVersion ?? CONTENT_GENERATOR_VERSION,
+        gameCalendarUtcOffsetMinutes: options.gameCalendarUtcOffsetMinutes ?? 480,
         tables,
         catalog: { object: catalog },
         summary: { object: summary },
@@ -103,6 +104,7 @@ test("missing current loads and freezes every registered bundled fallback table"
         source: "bundled",
         assetVersion: "1.4.54",
         generatorVersion: CONTENT_GENERATOR_VERSION,
+        gameCalendarUtcOffsetMinutes: 480,
         releaseDigest: null,
         contentDigest: expectedBundledDigest(bundledTables),
         multiBattleContentDigest: repository.info().multiBattleContentDigest,
@@ -294,12 +296,53 @@ test("release tables and info are deeply frozen and keep one cached reference", 
         source: "release",
         assetVersion: "1.4.55",
         generatorVersion: 7,
+        gameCalendarUtcOffsetMinutes: 480,
         releaseDigest: manifest.releaseDigest,
         contentDigest: expectedContentDigest,
         multiBattleContentDigest: repository.info().multiBattleContentDigest,
     })
     assertDeepFrozen(repository.info())
     assert.strictEqual(repository.info(), repository.info())
+})
+
+test("loading rejects a game calendar offset mismatch before tables can be read", async t => {
+    const fixture = createLegacyLayout(t)
+    const { manifest } = await writeRelease(fixture.store, "calendar-480", {
+        gameCalendarUtcOffsetMinutes: 480,
+    })
+    assert.equal(manifest.gameCalendarUtcOffsetMinutes, 480)
+
+    await assert.rejects(
+        ContentRepository.load({
+            ...fixture.options,
+            expectedGameCalendarUtcOffsetMinutes: 540,
+        }),
+        error => /game calendar.*480.*540/i.test(error.message),
+    )
+
+    // Bundled fallback content is legacy CN 480 and must equally fail closed.
+    const bundled = createLegacyLayout(t)
+    await assert.rejects(
+        ContentRepository.load(
+            { ...bundled.options, expectedGameCalendarUtcOffsetMinutes: 540 },
+            { importBundledTable: async () => {
+                throw new Error("bundled tables must not be imported")
+            } },
+        ),
+        error => /game calendar.*480.*540/i.test(error.message),
+    )
+})
+
+test("loading accepts the expected game calendar offset and serves tables", async t => {
+    const fixture = createLegacyLayout(t)
+    await writeRelease(fixture.store, "calendar-match", { gameCalendarUtcOffsetMinutes: 480 })
+
+    const repository = await ContentRepository.load({
+        ...fixture.options,
+        expectedGameCalendarUtcOffsetMinutes: 480,
+    })
+    assert.equal(repository.info().gameCalendarUtcOffsetMinutes, 480)
+    assert.equal(repository.table("character.json").marker, "calendar-match")
 })
 
 test("repository exposes no own property containing its table storage", async t => {

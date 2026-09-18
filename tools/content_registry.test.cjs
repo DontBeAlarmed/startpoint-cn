@@ -605,6 +605,7 @@ test("quest prerequisites converter is versioned so v1 releases re-convert", () 
         assetVersion: "1.4.54",
         runtimeSchemaVersion: CONTENT_RUNTIME_SCHEMA_VERSION,
         generatorVersion: 3,
+        gameCalendarUtcOffsetMinutes: 480,
         tables: Object.fromEntries(TABLE_SOURCES.map(definition => [
             definition.tableName,
             {
@@ -658,6 +659,7 @@ test("registry and release manifest explicitly describe referenced gacha odds so
         assetVersion: "1.4.55",
         runtimeSchemaVersion: CONTENT_RUNTIME_SCHEMA_VERSION,
         generatorVersion: 1,
+        gameCalendarUtcOffsetMinutes: 480,
         tables: {
             "gacha.json": {
                 object: TEST_DIGEST,

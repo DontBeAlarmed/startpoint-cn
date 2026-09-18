@@ -136,6 +136,7 @@ async function installLightweightRelease(fixture, targetVersion, options = {}) {
         assetVersion: targetVersion,
         runtimeSchemaVersion: CONTENT_RUNTIME_SCHEMA_VERSION,
         generatorVersion: 1,
+        gameCalendarUtcOffsetMinutes: 480,
         tables,
         catalog: { object: catalogObject },
         summary: { object: summaryObject },

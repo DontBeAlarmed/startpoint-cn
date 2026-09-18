@@ -7,6 +7,7 @@ import {
     resolveContentPaths,
     type ContentPathEnvironment,
 } from "../paths"
+import { DEFAULT_GAME_CALENDAR_UTC_OFFSET_MINUTES } from "../../time/game-calendar"
 import { importBundledTable as defaultImportBundledTable } from "../sync/bundled-importer"
 import { ContentObjectStore } from "../sync/object-store"
 import {
@@ -27,6 +28,12 @@ export interface ContentRepositoryInfo {
     readonly source: "bundled" | "release"
     readonly assetVersion: string
     readonly generatorVersion: number
+    /**
+     * Game calendar offset the loaded content was built under: the release
+     * manifest value for release-backed content, and the legacy CN default
+     * (480) for bundled fallback content.
+     */
+    readonly gameCalendarUtcOffsetMinutes: number
     readonly releaseDigest: `sha256:${string}` | null
     readonly contentDigest: ContentDigest
     readonly multiBattleContentDigest: ContentDigest
@@ -35,6 +42,12 @@ export interface ContentRepositoryInfo {
 export interface ContentRepositoryOptions {
     readonly projectRoot: string
     readonly env?: ContentPathEnvironment
+    /**
+     * Runtime game calendar offset the loaded content must match. A mismatch
+     * rejects the load before any table can be read, so content built under a
+     * different offset can never be served.
+     */
+    readonly expectedGameCalendarUtcOffsetMinutes?: number
 }
 
 export interface ContentRepositoryDependencies {
@@ -55,6 +68,18 @@ function digestTableEntries(entries: readonly (readonly [string, unknown])[]): C
         }))
         .sort((left, right) => compareCodePoint(left.tableName, right.tableName))
     return sha256Object(canonicalJsonBuffer(identities))
+}
+
+function assertExpectedGameCalendarUtcOffsetMinutes(
+    expected: number | undefined,
+    actual: number,
+): void {
+    if (expected === undefined || expected === actual) return
+    throw new Error(
+        `content was built for game calendar UTC offset ${actual} `
+        + `but the server expects ${expected}; `
+        + "synchronize content for the configured game calendar offset",
+    )
 }
 
 export class ContentRepository {
@@ -103,6 +128,13 @@ export class ContentRepository {
         })
 
         if (release === null) {
+            // Bundled fallback content is legacy CN content: it only ever
+            // matches the default offset, and the check must run before any
+            // bundled table is imported.
+            assertExpectedGameCalendarUtcOffsetMinutes(
+                options.expectedGameCalendarUtcOffsetMinutes,
+                DEFAULT_GAME_CALENDAR_UTC_OFFSET_MINUTES,
+            )
             const importer = dependencies.importBundledTable ?? defaultImportBundledTable
             const entries = await mapWithConcurrency(
                 TABLE_SOURCES,
@@ -121,6 +153,7 @@ export class ContentRepository {
                     source: "bundled",
                     assetVersion: BUNDLED_CDN_CATALOG_VERSION,
                     generatorVersion: CONTENT_GENERATOR_VERSION,
+                    gameCalendarUtcOffsetMinutes: DEFAULT_GAME_CALENDAR_UTC_OFFSET_MINUTES,
                     releaseDigest: null,
                     contentDigest,
                     multiBattleContentDigest: buildMultiBattleContentDigest(tables),
@@ -129,6 +162,10 @@ export class ContentRepository {
             ))
         }
 
+        assertExpectedGameCalendarUtcOffsetMinutes(
+            options.expectedGameCalendarUtcOffsetMinutes,
+            release.manifest.gameCalendarUtcOffsetMinutes,
+        )
         assertReleaseTableRegistry(release.manifest)
         const entries = TABLE_SOURCES.map(definition => (
             [
@@ -143,6 +180,7 @@ export class ContentRepository {
                 source: "release",
                 assetVersion: release.manifest.assetVersion,
                 generatorVersion: release.manifest.generatorVersion,
+                gameCalendarUtcOffsetMinutes: release.manifest.gameCalendarUtcOffsetMinutes,
                 releaseDigest: release.manifest.releaseDigest,
                 contentDigest,
                 multiBattleContentDigest: buildMultiBattleContentDigestFromObjects(

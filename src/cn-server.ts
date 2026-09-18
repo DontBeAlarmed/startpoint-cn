@@ -418,6 +418,9 @@ runtimeCoordinator = createRuntimeCoordinator({
             assetMode: config.assetProvider.mode,
             localCdn: config.assetProvider.mode === "local",
             contentEnvironment: config.contentEnvironment,
+            // The snapshot must match the frozen RuntimeConfig offset; a
+            // release built under another calendar fails startup here.
+            expectedGameCalendarUtcOffsetMinutes: config.gameCalendarUtcOffsetMinutes,
         }),
     }),
     readyHttp: async () => {

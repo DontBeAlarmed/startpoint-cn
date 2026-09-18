@@ -426,6 +426,7 @@ test("non-local snapshot initialization ignores CDN_DIR and uses bundled 1.4.54 
         source: "bundled",
         assetVersion: "1.4.54",
         generatorVersion: 3,
+        gameCalendarUtcOffsetMinutes: 480,
         releaseDigest: null,
         contentDigest: "sha256:0c99a7191c9d00ca4a828b2a10887365a66e1cd539fb13b3ab56f620e428b60b",
         multiBattleContentDigest: "sha256:be3d9148c416cf089156d1003b274c25cc5c00165eb117854d2ab7b414d8fa29",

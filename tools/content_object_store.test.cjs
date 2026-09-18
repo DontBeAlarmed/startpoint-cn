@@ -9,7 +9,7 @@ const test = require("node:test")
 require("ts-node/register/transpile-only")
 
 const { ContentObjectStore } = require("../src/content/sync/object-store")
-const { canonicalJsonBuffer } = require("../src/content/sync/canonical-json")
+const { canonicalJsonBuffer, sha256Object } = require("../src/content/sync/canonical-json")
 
 const MISSING_DIGEST = `sha256:${"f".repeat(64)}`
 
@@ -61,6 +61,7 @@ function releaseInput(objects, overrides = {}) {
         assetVersion: "1.4.55",
         runtimeSchemaVersion: 1,
         generatorVersion: 1,
+        gameCalendarUtcOffsetMinutes: 480,
         tables: {
             "character.json": {
                 object: objects.table,
@@ -99,6 +100,7 @@ async function writeManyObjectRelease(store, tableCount = 20) {
         assetVersion: "1.4.55",
         runtimeSchemaVersion: 1,
         generatorVersion: 1,
+        gameCalendarUtcOffsetMinutes: 480,
         tables,
         catalog: { object: catalog },
         summary: { object: summary },
@@ -165,6 +167,47 @@ test("different releases reuse unchanged objects and manifests are deterministic
     assert.equal(listJsonFiles(path.join(contentStoreDir, "objects")).length, 4)
     assert.equal(listJsonFiles(path.join(contentStoreDir, "releases")).length, 2)
     assert.deepEqual(await store.readRelease(releasePath(contentStoreDir, first)), first)
+})
+
+test("legacy manifests without a calendar field load as legacy CN 480", async t => {
+    const { contentStoreDir, store } = createFixture(t)
+    const objects = await writeReleaseObjects(store)
+    const input = releaseInput(objects)
+    // Persist a manifest exactly as releases were stored before the calendar
+    // field existed: digest computed over the legacy digest input.
+    const legacyDigestInput = {
+        schemaVersion: input.schemaVersion,
+        assetVersion: input.assetVersion,
+        runtimeSchemaVersion: input.runtimeSchemaVersion,
+        generatorVersion: input.generatorVersion,
+        tables: input.tables,
+        catalog: input.catalog,
+        summary: input.summary,
+    }
+    const legacyManifest = {
+        ...legacyDigestInput,
+        releaseDigest: sha256Object(canonicalJsonBuffer(legacyDigestInput)),
+    }
+    const legacyDirectory = path.join(
+        contentStoreDir,
+        "releases",
+        `${legacyManifest.assetVersion}-${legacyManifest.releaseDigest.slice("sha256:".length)}`,
+    )
+    fs.mkdirSync(legacyDirectory, { recursive: true })
+    fs.writeFileSync(
+        path.join(legacyDirectory, "manifest.json"),
+        canonicalJsonBuffer(legacyManifest),
+    )
+
+    await store.activate(legacyManifest)
+    const release = await store.readCurrentRelease()
+
+    assert.equal(release.manifest.gameCalendarUtcOffsetMinutes, 480)
+    assert.equal(release.manifest.releaseDigest, legacyManifest.releaseDigest)
+    assert.deepEqual(
+        await store.readRelease(releasePath(contentStoreDir, release.manifest)),
+        release.manifest,
+    )
 })
 
 test("current release snapshot reads each unique object once and preserves references", async t => {

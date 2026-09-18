@@ -397,8 +397,13 @@ export class ContentObjectStore {
 
         let manifest: ContentReleaseManifest
         try {
-            manifest = parseReleaseManifest(JSON.parse(bytes.toString("utf8")))
-            if (!bytes.equals(canonicalJsonBuffer(manifest))) {
+            const rawValue: unknown = JSON.parse(bytes.toString("utf8"))
+            manifest = parseReleaseManifest(rawValue)
+            // Legacy manifests normalize to the CN default offset on parse, so
+            // their stored bytes stay canonical in the legacy shape (without
+            // the calendar field). Current manifests must match exactly.
+            if (!bytes.equals(canonicalJsonBuffer(manifest))
+                && !bytes.equals(canonicalJsonBuffer(rawValue))) {
                 throw new Error("stored bytes are not canonical JSON")
             }
         } catch (error) {

@@ -39,6 +39,7 @@ export type ContentSyncReason =
     | "missing"
     | "asset-version"
     | "generator-version"
+    | "game-calendar"
     | "source-state"
     | "table-registry"
     | "forced"
@@ -226,12 +227,19 @@ function decideReason(
     scan: ContentTargetScan,
     current: CurrentRelease | null,
     generatorVersion: number,
+    gameCalendar: GameCalendarPolicy,
     definitions: readonly TableSourceDefinition[],
 ): ContentSyncReason {
     if (mode === "force") return "forced"
     if (current === null) return "missing"
     if (current.manifest.assetVersion !== scan.targetVersion) return "asset-version"
     if (current.manifest.generatorVersion !== generatorVersion) return "generator-version"
+    if (current.manifest.gameCalendarUtcOffsetMinutes !== gameCalendar.utcOffsetMinutes) {
+        // Manifest identity already binds the offset; a mismatch means the
+        // current release was built under a different calendar and can never
+        // be reused.
+        return "game-calendar"
+    }
     if (summaryPatchSourceDigest(current.summary) !== patchSourceDigest(scan)) return "source-state"
     if (getReleaseTableRegistryError(current.manifest, definitions) !== null) return "table-registry"
     return "up-to-date"
@@ -365,6 +373,7 @@ async function synchronize(
         assetVersion: scan.targetVersion,
         runtimeSchemaVersion: CONTENT_RUNTIME_SCHEMA_VERSION,
         generatorVersion,
+        gameCalendarUtcOffsetMinutes: gameCalendar.utcOffsetMinutes,
         tables,
         catalog: { object: catalogObject },
         summary: { object: summaryObject },
@@ -409,7 +418,7 @@ export async function runContentSync(
     if (mode === "check") {
         const scan = await scanTarget(paths)
         const current = await readCurrentRelease(store)
-        const reason = decideReason(mode, scan, current, generatorVersion, definitions)
+        const reason = decideReason(mode, scan, current, generatorVersion, gameCalendar, definitions)
         return resultWithoutRelease("check", scan.targetVersion, current, reason)
     }
 
@@ -420,7 +429,7 @@ export async function runContentSync(
     try {
         const scan = await scanTarget(paths)
         const current = await readCurrentRelease(store)
-        const reason = decideReason(mode, scan, current, generatorVersion, definitions)
+        const reason = decideReason(mode, scan, current, generatorVersion, gameCalendar, definitions)
         if (reason === "up-to-date") {
             return resultWithoutRelease("skipped", scan.targetVersion, current, reason)
         }
