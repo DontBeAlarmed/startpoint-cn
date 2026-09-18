@@ -165,7 +165,11 @@ const TEST_GROUPS = Object.freeze({
     },
     "quick:protocol": {
         execution: "parallel",
-        timeoutMs: 60_000,
+        // Spawn-heavy group: global_embedded_startup boots src/server.ts under
+        // ts-node (~15-25s per probe; ts-node 10 has no persistent transpile
+        // cache) and the lifecycle suites spawn servers, so 60s per file
+        // flakes under group load (same rationale as integration:party).
+        timeoutMs: 120_000,
         tests: [
             "tools/handshake_lifecycle.test.cjs",
             "tools/global_embedded_startup.test.cjs",
