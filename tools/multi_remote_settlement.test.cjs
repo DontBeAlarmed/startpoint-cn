@@ -505,6 +505,7 @@ const {
 } = require("../src/data/domains/item")
 const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 const { getPlayerPeriodicRewardPointsSync } = require("../src/data/domains/campaign")
+const { givePlayerDegreeSync } = require("../src/data/domains/degree")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const {
     insertPlayerCharacterManaNodesSync,
@@ -2050,7 +2051,7 @@ test("multi finish delegates preparation, settlement writes, and response projec
     assert.doesNotMatch(responseSource, /buildFinishFollowInfo/)
 })
 
-test("production /finish projects the settled degree instead of a constant", async () => {
+test("production /finish preserves the equipped degree when rank changes", async () => {
     let home
     try {
         home = await openProductionHome(
@@ -2060,7 +2061,13 @@ test("production /finish projects the settled degree instead of a constant", asy
             { verify: async () => ({ ok: true, isHost: true }) },
         )
         const playId = "b2-degree-projection"
-        updatePlayerSync({ id: home.playerId, rankPoint: 95 })
+        const equippedDegreeId = 61020
+        assert.equal(givePlayerDegreeSync(home.playerId, equippedDegreeId), true)
+        updatePlayerSync({
+            id: home.playerId,
+            degreeId: equippedDegreeId,
+            rankPoint: 95,
+        })
         const started = await home.app.inject({
             method: "POST",
             url: "/start",
@@ -2075,11 +2082,10 @@ test("production /finish projects the settled degree instead of a constant", asy
         })
         assert.equal(finished.statusCode, 200, finished.body)
         const userInfo = JSON.parse(finished.body).data.user_info
-        // The settled rank must cross into a real degree and the response must
-        // project that degree instead of the constant 1.
         assert.notEqual(userInfo.rank_point, 95)
-        assert.equal(userInfo.degree_id, getRankDegree(userInfo.rank_point))
-        assert.notEqual(userInfo.degree_id, 1)
+        assert.notEqual(getRankDegree(userInfo.rank_point), equippedDegreeId)
+        assert.equal(userInfo.degree_id, equippedDegreeId)
+        assert.equal(getPlayerSync(home.playerId).degreeId, equippedDegreeId)
     } finally {
         await closeProductionHome(home)
     }

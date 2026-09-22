@@ -26,7 +26,10 @@ target 计划条目只包含正向资产 command 和连续数组位置。抽取�
 
 事务拥有者入口同样要求活动事务，并在首笔写入前重新规范化完整 Plan，但不查询完整玩家前后态，也不建立 savepoint。它先各读取一次 `knownPlayerBefore.freeMana`、`freeVmoney` 和 `expPool`，复制为不含额外字段的普通对象；身份、字段缺失或非负安全整数校验失败时抛出 `RewardGrantContractValidationError` 且零写入。每条 MANA、BEADS 或 EXP 奖励都先计算对应最终值，确认仍是非负安全整数后，才修改内存中的 `playerAfter` 与累计 delta；溢出时分别以 `freeMana`、`freeVmoney` 或 `expPool` 标识错误，并由事务拥有者回滚此前写入。纯货币、纯装备、空计划和首次角色获得不会激活 Inventory；发生 direct Item 或运行时重复角色补偿时，Inventory 在当前事务中读取明确 Item 前态，但通过 `caller-verified` 复用 RewardGrant 入口已有的玩家存在性合同，不重复查询 Player。执行过程最后在 Inventory flush 后用一条 `players` UPDATE 写入本 Plan 的最终三项余额与 mana 累计。owner CHARACTER 继续复用角色写入返回的首次获得事实，不为了 `joined_character_id_list` 预查一次角色所有权。
 
-Mission 的 `degreeId` 不再传入 RewardGrant。RewardGrant 先完成标准资产和 Player resource update，Mission source 随后以窄 Player update 写入当前 degree；degree、标准奖励和 stage receipt 仍处于同一外层事务。含 degree+standard 的 batch 因 owner 分离固定增加一次 `players` UPDATE，属于已审查接受的 `O(1)` 性能成本。
+Mission 的 `degreeId` 不进入 RewardGrant。Mission source 通过 `givePlayerDegreeSync()` 只增加称号所有权，响应返回
+`degree_list` 增量，持久化后的完整拥有列表由 `/profile/get_degree_list` 提供；它不会修改 `players.degree_id` 或在
+`user_info.degree_id` 中投影新称号。称号、标准奖励和 stage receipt 仍处于同一外层事务，只有显式的
+`/profile/update_degree` 可以切换当前展示称号。
 
 该入口不提供“调用方捕获错误后计划仍独立回滚”的保证；执行错误必须离开最外层事务回调，由事务拥有者回滚全部结算写入。它也不额外查询玩家存在性，空计划加不存在玩家不属于该内部入口的 API 保证；事务拥有者负责保证玩家与已知状态属于同一结算上下文。
 
@@ -73,4 +76,4 @@ RewardGrant 的 transaction-owner、within 和 standalone 三条路径都通过�
 
 ## 后续迁移
 
-单人 finish、Multi、Mission、Carnival、Story 和 Raid 已通过各自 source-local adapter 使用 typed target；各领域仍负责 clear/S+、任务进度、活动状态、receipt、Mission facts、Growth publication 和响应。Mission 的 degree patch 已回到 Mission/Player adapter；含 degree+standard 的 batch 固定增加一次窄 Player UPDATE。普通/bulk shop、Gacha、Box 和邮件标准附件已在各自最外层事务中启用 typed owner；`TREASURE_EQUIPMENT` 继续使用装备强化专用路径。所有回滚仍由最外层事务拥有者负责，本模块不提供 Unit of Work、事件总线或插件扩展。
+单人 finish、Multi、Mission、Carnival、Story 和 Raid 已通过各自 source-local adapter 使用 typed target；各领域仍负责 clear/S+、任务进度、活动状态、receipt、Mission facts、Growth publication 和响应。Mission 在来源事务中写入 owned degree 并返回 `degree_list`，不生成当前称号 patch。普通/bulk shop、Gacha、Box 和邮件标准附件已在各自最外层事务中启用 typed owner；`TREASURE_EQUIPMENT` 继续使用装备强化专用路径。所有回滚仍由最外层事务拥有者负责，本模块不提供 Unit of Work、事件总线或插件扩展。

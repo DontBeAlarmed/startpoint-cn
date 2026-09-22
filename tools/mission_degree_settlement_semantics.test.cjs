@@ -21,8 +21,9 @@ delete process.env.WDFP_DATABASE_DIR
 
 const { initializeDatabase } = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
+const { getPlayerDegreeIdsSync } = require("../src/data/domains/degree")
 const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
-const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
+const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { getDb } = require("../src/data/db")
 const { settleMissionCategories } = require("../src/lib/mission/settlement")
 const legacyFixture = require("./fixtures/mission-degree/legacy-f8be414.json")
@@ -99,7 +100,7 @@ function captureSettlement(playerId) {
     }
 }
 
-test("Category 5 Session settlement matches the complete legacy response and remains idempotent", () => {
+test("Category 5 Session settlement preserves the equipped degree and remains idempotent", () => {
     const sessionPlayerId = createPlayer()
     const first = captureSettlement(sessionPlayerId)
     const repeated = captureSettlement(sessionPlayerId)
@@ -108,7 +109,11 @@ test("Category 5 Session settlement matches the complete legacy response and rem
         "characterList", "degreeIds", "equipmentList", "itemList",
         "missionInfo", "passCardPoints", "userInfo",
     ])
-    assert.deepEqual(first.response, legacyFixture.settlement.first.response)
+    const expectedFirstResponse = structuredClone(legacyFixture.settlement.first.response)
+    expectedFirstResponse.userInfo = null
+    assert.deepEqual(first.response, expectedFirstResponse)
+    assert.deepEqual(getPlayerDegreeIdsSync(sessionPlayerId), [1000])
+    assert.equal(getPlayerSync(sessionPlayerId).degreeId, 1)
     assert.deepEqual(first.persisted, legacyFixture.settlement.first.persisted)
     assert.deepEqual(first.counts, { candidates: 1, computed: 1, progressChanged: 1 })
     assert.equal(first.rewards > 0, true)

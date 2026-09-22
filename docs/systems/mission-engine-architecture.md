@@ -399,7 +399,7 @@ Settlement BASE fixture 与负载 reference 分别由固定无参数 generator
 按边界蓝图（Mission 拥有 catalog、candidate、fact evaluation、progress/stage、receipt 与奖励协调；只消费来源事实，不拥有来源状态），以下读写口径为声明式 sanctioned 边界：
 
 - **Typed read port**：Mission 对来源域（Growth/Inventory/Quest/Party/Shop/Pass/PassCard）的读取统一经 `src/lib/mission/production-fact-loaders.ts` 的 loader 注册表（按 FactKey 声明、惰性、批量、无全表扫描）；Active 引擎的 `active-fact-session` 同口径。computer 的 legacy `buildContext` 直读路径生产不可达（DEBT-T03 删除对象）。
-- **Receipt 层 sanctioned 写**：`grants.ts` 中 kind 6（称号 `givePlayerDegreeSync` + players.degree_id 持久化）与 kind 7（Pass 点 `addPlayerPassCardPointWithChangeSync`）为收据层域函数写；kind 0-5 货币/资产一律经 RewardGrant typed plan（D17 合同），无旁路。
+- **Receipt 层 sanctioned 写**：`grants.ts` 中 kind 6 只通过 `givePlayerDegreeSync` 增加称号所有权并返回 `degree_list`，不得修改 `players.degree_id` 或返回新的 `user_info.degree_id`；kind 7（Pass 点 `addPlayerPassCardPointWithChangeSync`）为收据层域函数写；kind 0-5 货币/资产一律经 RewardGrant typed plan（D17 合同），无旁路。
 - **Prepare 前置写**：`settlement-prepare` 的 pass 登录基线初始化（幂等）按 D15 蓝图保留。
 - **Quest 域计数归属**：multi-clear 计数自 D24 起由 multi settlement writer（`multi/settlement/orchestrator.ts`）在 quest 结算层调用，mission battle facts 只记录 mission 自有事实表。
 

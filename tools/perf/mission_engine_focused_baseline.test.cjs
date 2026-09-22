@@ -97,8 +97,8 @@ test("snapshot pins the completed mission engine structural performance values",
         getProgressNoInvalidation: { sqlReads: 14, sqlWrites: 1, missionComputes: 110 },
         // Battle finish no longer claims category 9 rewards (page-owned);
         // 6 reward writes removed at both single and multi boundaries.
-        singleBattleFinish: { sqlReads: 28, sqlWrites: 26, missionComputes: 425 },
-        multiBattleFinish: { sqlReads: 29, sqlWrites: 31, missionComputes: 425 },
+        singleBattleFinish: { sqlReads: 28, sqlWrites: 25, missionComputes: 425 },
+        multiBattleFinish: { sqlReads: 29, sqlWrites: 30, missionComputes: 425 },
     })
 })
 
@@ -366,7 +366,9 @@ test("current focused mission engine behavior matches the checked-in behavior", 
     }, {
         session: { sqlReads: 8, sqlWrites: 1, missionComputes: 5 },
     })
-    assert.deepEqual(behavior.behavior, legacyDegreeFixture.settlement)
+    const expectedDegreeBehavior = structuredClone(legacyDegreeFixture.settlement)
+    expectedDegreeBehavior.first.response.userInfo = null
+    assert.deepEqual(behavior.behavior, expectedDegreeBehavior)
 })
 
 test("cleanup attempts every scenario and suite restoration after failures", async () => {

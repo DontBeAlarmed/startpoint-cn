@@ -734,7 +734,7 @@
             }
           ],
           "player": {
-            "degreeId": 15020,
+            "degreeId": 1,
             "expPool": 26,
             "freeMana": 2031,
             "freeVmoney": 360,
@@ -1154,7 +1154,7 @@
             "user_info": {
               "boost_point": 10,
               "boss_boost_point": 3,
-              "degree_id": 15020,
+              "degree_id": 1,
               "exp_pool": 26,
               "exp_pooled_time": "fixture-pool-time",
               "free_mana": 2031,
@@ -1175,17 +1175,17 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "2d37010066ea4c126a531ad91fdd31c8ee748ce21a62e6a59d0474421abc866f",
+      "behaviorSha256": "4f1d811d335a1064f307756e9516ff498baa7cdc0d2259a5b34d4145d92253c4",
       "sql": {
-        "statements": 102,
+        "statements": 101,
         "selectStatements": 58,
-        "writeStatements": 38,
+        "writeStatements": 37,
         "transactionStatements": 6,
         "byTable": {
           "players": {
-            "statements": 14,
+            "statements": 13,
             "reads": 7,
-            "writes": 7
+            "writes": 6
           },
           "players_active_mission_counters": {
             "statements": 1,
@@ -1453,15 +1453,15 @@
       },
       "behaviorSha256": "ece93a5759d57939832dd018021034f586638e6c14584eb71c241c6f4ff00a9e",
       "sql": {
-        "statements": 90,
+        "statements": 89,
         "selectStatements": 47,
-        "writeStatements": 37,
+        "writeStatements": 36,
         "transactionStatements": 6,
         "byTable": {
           "players": {
-            "statements": 13,
+            "statements": 12,
             "reads": 6,
-            "writes": 7
+            "writes": 6
           },
           "players_active_mission_counters": {
             "statements": 1,
@@ -1895,7 +1895,7 @@
             }
           ],
           "player": {
-            "degreeId": 15020,
+            "degreeId": 1,
             "expPool": 13,
             "freeMana": 2031,
             "freeVmoney": 160,
@@ -2132,7 +2132,7 @@
             "user_info": {
               "boost_point": 10,
               "boss_boost_point": 3,
-              "degree_id": 15020,
+              "degree_id": 1,
               "exp_pool": 13,
               "exp_pooled_time": "fixture-pool-time",
               "free_mana": 2031,
@@ -2153,17 +2153,17 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "06c71db1402b897d3e241a6e51933f4b363cf3994f2d8e9f45de007037d3cc8a",
+      "behaviorSha256": "2a80131b6469aa46f269ff00f1ad9248cefc4e9de2402062739bf72572c31302",
       "sql": {
-        "statements": 94,
+        "statements": 93,
         "selectStatements": 57,
-        "writeStatements": 29,
+        "writeStatements": 28,
         "transactionStatements": 8,
         "byTable": {
           "players": {
-            "statements": 13,
+            "statements": 12,
             "reads": 7,
-            "writes": 6
+            "writes": 5
           },
           "players_active_mission_battle_facts": {
             "statements": 1,
@@ -2774,7 +2774,7 @@
             }
           ],
           "player": {
-            "degreeId": 15020,
+            "degreeId": 1,
             "expPool": 26,
             "freeMana": 2031,
             "freeVmoney": 360,
@@ -3248,7 +3248,7 @@
               }
             ],
             "player": {
-              "degreeId": 15020,
+              "degreeId": 1,
               "expPool": 26,
               "freeMana": 2031,
               "freeVmoney": 360,
@@ -3907,7 +3907,7 @@
               }
             ],
             "player": {
-              "degreeId": 15020,
+              "degreeId": 1,
               "expPool": 52,
               "freeMana": 3562,
               "freeVmoney": 370,
@@ -4112,7 +4112,7 @@
               "user_info": {
                 "boost_point": 10,
                 "boss_boost_point": 3,
-                "degree_id": 15020,
+                "degree_id": 1,
                 "exp_pool": 52,
                 "exp_pooled_time": "fixture-pool-time",
                 "free_mana": 3562,
@@ -4134,7 +4134,7 @@
           }
         }
       },
-      "behaviorSha256": "6f4773883c19cfa0f6ca794bdd7e0ea8f4ca4545449e32b422fd698066be12ef",
+      "behaviorSha256": "d3e51fa563ee2c840f9812d2d67ee9bfef2fa954912fe23bc1c49a6f8a82c350",
       "sql": {
         "statements": 88,
         "selectStatements": 57,

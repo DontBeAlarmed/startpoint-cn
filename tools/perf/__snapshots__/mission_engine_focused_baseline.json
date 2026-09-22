@@ -23,7 +23,7 @@
     },
     "degree-behavior-characterization": {
       "sqlReads": 10,
-      "sqlWrites": 4,
+      "sqlWrites": 3,
       "missionComputes": 2,
       "behavior": {
         "first": {
@@ -49,12 +49,7 @@
               }
             ],
             "passCardPoints": {},
-            "userInfo": {
-              "degree_id": 1000,
-              "exp_pool": 0,
-              "free_mana": 2000,
-              "free_vmoney": 100
-            }
+            "userInfo": null
           }
         },
         "repeated": {
@@ -76,7 +71,7 @@
           }
         }
       },
-      "behaviorSha256": "053ad90e26988cbdb0c3ac6544b810a0cd1c219a66905a6cce9d1fa44d28498a"
+      "behaviorSha256": "b8498bbfe3e4d7d1b89ba6b03430c5f5cc3e6a5a92bf58168f80dfa7883d7296"
     },
     "event-focused": {
       "sqlReads": 7,
@@ -280,7 +275,7 @@
     },
     "single-battle-finish": {
       "sqlReads": 28,
-      "sqlWrites": 26,
+      "sqlWrites": 25,
       "missionComputes": 425,
       "behavior": {
         "adapter": "mission-finish-boundary",
@@ -409,7 +404,7 @@
     },
     "multi-battle-finish": {
       "sqlReads": 29,
-      "sqlWrites": 31,
+      "sqlWrites": 30,
       "missionComputes": 425,
       "behavior": {
         "adapter": "mission-finish-boundary",

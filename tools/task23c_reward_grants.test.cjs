@@ -294,7 +294,7 @@ test("Carnival standard-plus-degree callback reuse rejects before record, degree
     assert.deepEqual(result.owner, result.ownerBefore)
 })
 
-test("Mission standard callback preserves mixed domain rewards, duplicate compensation, and response privacy", () => {
+test("Mission standard callback grants a degree without replacing the equipped degree", () => {
     const playerId = createPlayer("mission")
     const itemId = 990102
     const equipmentId = 5060042
@@ -344,13 +344,15 @@ test("Mission standard callback preserves mixed domain rewards, duplicate compen
     assert.equal(granter.characterList.length, 1)
     assert.equal(Object.hasOwn(granter.characterList[0], "isNew"), false)
     assert.deepEqual(granter.degreeList, [degreeId])
-    assert.equal(playerAfter.degreeId, degreeId)
+    assert.deepEqual(getPlayerDegreeIdsSync(playerId), [degreeId])
+    assert.equal(playerAfter.degreeId, playerBefore.degreeId)
     assert.equal(getPlayerPassCardStateSync(playerId, 3).point, 10)
     assert.equal(playerAfter.freeVmoney, playerBefore.freeVmoney + 7)
     assert.equal(playerAfter.freeMana, playerBefore.freeMana + 11)
     assert.equal(playerAfter.expPool, playerBefore.expPool + 13)
     assert.equal(playerAfter.totalManaObtained, playerBefore.totalManaObtained + 11)
     assert.equal(granter.getUserInfo().free_mana, playerAfter.freeMana)
+    assert.equal(Object.hasOwn(granter.getUserInfo(), "degree_id"), false)
 })
 
 test("default Mission RewardGrant owner is no heavier than an explicitly injected owner", () => {

@@ -305,7 +305,6 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         missionRewardGranter,
         /executeRewardGrantExecutionPlanAsTransactionOwnerSync\([\s\S]*this\.playerId[\s\S]*knownPlayerBefore/,
     )
-    assert.match(missionRewardGranter, /updatePlayerSync\(\{ id: this\.playerId, degreeId: this\.latestDegreeId \}\)/)
     assert.doesNotMatch(
         missionRewardGranter,
         /item-cap-plan|event-trade|mana-capacity|domains\/mail|getDb\(\)\.transaction|SAVEPOINT/,

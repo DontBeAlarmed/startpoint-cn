@@ -14,7 +14,7 @@ D16 已把正常业务 Item 写入迁移到唯一 Inventory owner，并让 Rewar
 
 D17 不重写各来源业务，而是把 RewardGrant 收敛为有限的正向协调核：计划只保留正向资产命令和稳定顺序，执行委托各资产 owner，结果明确区分请求量、实际正向获得量、执行期 after-state 和最终聚合 after-state。来源 adapter 通过同长度、同顺序的本地 metadata 与 entry outcome 关联，继续拥有客户端响应、receipt、progress、payment 和 publication。
 
-B0 还确认了三处必须由 D17 关闭的边界缺口：source-owned Inventory context 目前由 RewardGrant `flush()` 并关闭；Mission 的 `degreeId` patch 被并入 RewardGrant Currency SQL；Active Mission 使用事务外 Player 快照创建 granter，不能证明 transaction-owner 的 known state 来自当前事务。
+B0 还确认了三处必须由 D17 关闭的边界缺口：source-owned Inventory context 目前由 RewardGrant `flush()` 并关闭；Mission 的称号所有权写入与当前展示 `degreeId` patch 被错误并入 RewardGrant Currency SQL；Active Mission 使用事务外 Player 快照创建 granter，不能证明 transaction-owner 的 known state 来自当前事务。
 
 ## 2. 三层证据
 
@@ -269,7 +269,7 @@ Plan、entry、outcome、asset collections 和 `playerAfter` 都必须创建 own
 
 Executor 只能依赖比 RewardGrant 更底层的资产 owner/adapter。Mission、Quest、Shop、Mail、Gacha、Battle 和 Event 不能被 RewardGrant core 反向导入。
 
-Currency/EXP 的最终 SQL 必须移出 RewardGrant core，成为窄 Player resource grant adapter；D17 不借此建立拥有所有货币和扣费规则的 Currency 巨型 owner。当前 `RewardGrantOwnerPlayerUpdate.degreeId` 必须移回 Mission/Player adapter，并保持 degree、标准奖励和 stage receipt 的同事务关系。
+Currency/EXP 的最终 SQL 必须移出 RewardGrant core，成为窄 Player resource grant adapter；D17 不借此建立拥有所有货币和扣费规则的 Currency 巨型 owner。称号所有权必须回到 Mission domain，并与标准奖励和 stage receipt 保持同一事务；获得称号不能生成 Player 当前展示 `degreeId` patch。
 
 ## 9. 消费者迁移
 
