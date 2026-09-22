@@ -32,8 +32,9 @@
 
 ## 普通道具出售
 
-`sellItemSync()` 在事务中重新读取出售配置、持有数、已装备能力魂和玛纳上限，并一次完成道具扣除、免费玛纳及
-累计获得玛纳更新。玩家字段写入失败时不会留下已扣道具。
+`sellItemSync()` 在事务中重新读取出售配置、持有数和玛纳上限，并一次完成道具扣除、免费玛纳及累计获得玛纳更新。
+能力魂出售后固定保留客户端保护的 3 枚；不同配队预设复用同一份能力魂库存，不按跨配队引用数累计占用。玩家字段
+写入失败时不会留下已扣道具。
 
 ## 装备保护与分解
 
@@ -56,8 +57,9 @@
 ## 回归与性能
 
 `tools/inventory_write_transaction.test.cjs` 与 `tools/item_use_cultivate_pack.test.cjs` 使用真实 Fastify 路由和 SQLite
-trigger，覆盖重复体力道具、计划态最终库存写入、体力更新失败、道具售出玛纳失败、三种装备分解奖励失败以及批量保护
-第二项失败，以及保护装备拒绝。所有故障都要求请求前后存档快照一致；同道具扣返场景还锁定结算阶段只读取一次 `players_items`。
+trigger，覆盖重复体力道具、计划态最终库存写入、体力更新失败、道具售出玛纳失败、能力魂跨配队复用与固定保留 3 枚、
+三种装备分解奖励失败以及批量保护第二项失败，以及保护装备拒绝。所有故障都要求请求前后存档快照一致；同道具扣返场景
+还锁定结算阶段只读取一次 `players_items`。
 
 Inventory owner 测试另外覆盖 standalone/within/batch 生命周期、同 Item 合并、累计获得量、maintenance/save 边界和中途故障回滚。EventTrade `/load` 测试覆盖首次转换、重复幂等、paid+free 容量、overflow Mail、非 EventTrade/no-end、提交后响应和 late failure rollback；Mail claim 测试覆盖 Item/Mana 容量阻塞、receive_all 跳过和过期 EventTrade 自动出售。
 

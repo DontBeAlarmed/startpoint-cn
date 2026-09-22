@@ -1,9 +1,10 @@
 import { getItemSaleSync } from "./item-content";
 import { getCurrencyCapacityPolicySync } from "./config-content"
-import { countAbilitySoulUsedInPartiesSync } from "../data/domains/party"
 import { getPlayerSync, updatePlayerSync } from "../data/domains/player"
 import { getDb } from "../data/db";
 import { withInventoryBatchContextWithinTransactionSync } from "./inventory"
+
+const ABILITY_SOUL_RESERVED_COUNT = 3
 
 export type ItemSellResult =
     | {
@@ -22,7 +23,7 @@ export type ItemSellResult =
  * Sell items for mana. Performs server-side validation:
  * - Item must be sellable (CDN sellable=true)
  * - Player must own enough items
- * - Ability souls in use by parties cannot be sold
+ * - Ability soul sales must preserve the three copies protected by the client
  * - Mana must not overflow max_mana
  */
 export function sellItemSync(
@@ -57,13 +58,9 @@ export function sellItemSync(
                 return { ok: false, error: "Not enough items owned." }
             }
 
-            // Ability soul check: cannot sell souls equipped in parties
-            if (saleData.category === 5) {
-                const usedInParties = countAbilitySoulUsedInPartiesSync(playerId, itemId)
-                const sellable = ownedCount - usedInParties
-                if (sellable < sellNumber) {
-                    return { ok: false, error: "Some ability souls are in use. Cannot sell more than available." }
-                }
+            if (saleData.category === 5
+                && ownedCount - sellNumber < ABILITY_SOUL_RESERVED_COUNT) {
+                return { ok: false, error: "At least three ability souls must remain." }
             }
 
             // Check mana limit

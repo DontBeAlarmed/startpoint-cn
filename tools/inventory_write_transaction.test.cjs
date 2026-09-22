@@ -23,10 +23,11 @@ const {
     insertPlayerEquipmentSync,
 } = require("../src/data/domains/equipment")
 const { getPlayerItemSync } = require("../src/data/domains/item")
+const { updatePlayerPartySync } = require("../src/data/domains/party")
 const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
-const { SessionType } = require("../src/data/types")
+const { PartyCategory, SessionType } = require("../src/data/types")
 const equipmentRoutes = require("../src/routes/api/equipment").default
 const itemRoutes = require("../src/routes/api/item").default
 const sellRoutes = require("../src/routes/api/sell").default
@@ -61,6 +62,21 @@ function addEquipment(playerId, equipmentId, stack = 1, protection = false) {
         enhancementLevel: 0,
         protection,
         stack,
+    })
+}
+
+function addAbilitySoulParty(playerId, slot, abilitySoulId) {
+    updatePlayerPartySync(playerId, slot, {
+        name: `Soul ${slot}`,
+        characterIds: [null, null, null],
+        unisonCharacterIds: [null, null, null],
+        equipmentIds: [null, null, null],
+        abilitySoulIds: [abilitySoulId, null, null],
+        edited: true,
+        options: { allowOtherPlayersToHealMe: true },
+        category: PartyCategory.NORMAL,
+        currentBattlePower: 0,
+        beforeBattlePower: 0,
     })
 }
 
@@ -168,6 +184,39 @@ test("item sale rolls item deduction back when mana update fails", async t => {
     assert.equal(response.statusCode, 500)
     assert.equal(getPlayerItemSync(playerId, 30005), 10)
     assert.equal(getPlayerSync(playerId).freeMana, beforeMana)
+})
+
+test("ability soul sale reuses the same inventory across party presets", async () => {
+    const { playerId, viewerId } = await createPlayer("ability-soul-party-reuse")
+    const abilitySoulId = 100001
+    setInventoryFixtureItemExactSync(playerId, abilitySoulId, 17)
+    for (let slot = 1; slot <= 7; slot += 1) {
+        addAbilitySoulParty(playerId, slot, abilitySoulId)
+    }
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/item/sell",
+        payload: { viewer_id: viewerId, item_id: abilitySoulId, sell_number: 14 },
+    })
+
+    assert.equal(response.statusCode, 200, response.body)
+    assert.equal(getPlayerItemSync(playerId, abilitySoulId), 3)
+})
+
+test("ability soul sale always preserves three copies", async () => {
+    const { playerId, viewerId } = await createPlayer("ability-soul-reserve")
+    const abilitySoulId = 100001
+    setInventoryFixtureItemExactSync(playerId, abilitySoulId, 4)
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/item/sell",
+        payload: { viewer_id: viewerId, item_id: abilitySoulId, sell_number: 2 },
+    })
+
+    assert.equal(response.statusCode, 400, response.body)
+    assert.equal(getPlayerItemSync(playerId, abilitySoulId), 4)
 })
 
 test("sell_equipment sells the base equipment when duplicate stack is zero", async () => {
