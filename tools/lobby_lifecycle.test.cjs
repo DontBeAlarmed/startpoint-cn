@@ -1557,8 +1557,10 @@ test("lobby mutations are gated while the room battle is occupied", async t => {
     await flushPromises()
     assert.equal(room.is_npc_mode, false)
 
-    // After the battle ends (scene cleared), host re-Enter legally returns the
-    // room to preparation for the rematch.
+    // After the official release (room returns to Ready before the battle
+    // runtime is cleared), host re-Enter legally returns the room to
+    // preparation for the rematch.
+    updateRoomState(room.room_number, 1)
     sessionManager.clearBattleExpectedCount(room.room_number)
     handleMessage(host.socket, [0, [0, { party: { marker: "rematch" } }]])
     assert.equal(room.raising_state, 1)

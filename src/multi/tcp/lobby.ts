@@ -326,7 +326,7 @@ async function handleEnterComs(
 ): Promise<void> {
     const room = getRoom(client.roomNumber)
     if (!room) return
-    if (room.raising_state === 4 && sessionManager.isRoomBattleOccupied(client.roomNumber)) {
+    if (roomBattleLocksLobbyMutations(client.roomNumber)) {
         console.log(`[LOBBY] EnterComs rejected: room=${client.roomNumber} battle in progress`)
         return
     }
@@ -441,13 +441,14 @@ async function handleEnterComs(
     }, npcRecruitmentTiming.joinDelayMs + npcRecruitmentTiming.readyDelayMs)
 }
 
-// A running battle locks the lobby: state mutations, party edits, ready flags,
-// and NPC recruitment are invalid while members hold the battle. Once the
-// battle scene is cleared the lock releases and the host may re-enter for the
-// rematch (Battle → Ready stays a legal machine transition).
+// An unreleased battle locks the lobby: while raising_state=4 the party,
+// ready flags, NPC roster, and room state belong to the frozen battle, no
+// matter whether battle sockets are currently online (socket presence only
+// reflects occupancy, not battle ownership). Only the official release,
+// which returns the room to Ready, reopens these mutations for the rematch.
 function roomBattleLocksLobbyMutations(roomNumber: string): boolean {
     const room = getRoom(roomNumber)
-    return room?.raising_state === 4 && sessionManager.isRoomBattleOccupied(roomNumber)
+    return room?.raising_state === 4
 }
 
 function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): void {
