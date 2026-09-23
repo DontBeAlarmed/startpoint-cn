@@ -1485,6 +1485,7 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/multi_client_fallback.test.cjs",
             "tools/account_identity_provider.test.cjs",
             "tools/multi_runtime_session_options.test.cjs",
+            "tools/api_index_time_semantics.test.cjs",
             "tools/time_semantics.test.cjs",
             "tools/game_calendar.test.cjs",
             "tools/game_calendar_source_guard.test.cjs",
@@ -1529,6 +1530,15 @@ test("registers focused runtime state and socket smoke groups", () => {
         timeoutMs: 360_000,
         tests: ["tools/runtime_compiled_smoke.test.cjs"],
     })
+})
+
+test("maps legacy load time semantics to the focused runtime group", () => {
+    const expected = ["full", "integration:database", "quick:runtime"]
+    assert.deepEqual(selectTestGroups(["src/routes/api/index.ts"]), expected)
+    assert.deepEqual(selectTestGroups(["tools/api_index_time_semantics.test.cjs"]), ["quick:runtime"])
+    assert.equal(TEST_GROUPS["quick:runtime"].tests.includes(
+        "tools/api_index_time_semantics.test.cjs",
+    ), true)
 })
 
 test("routes multiplayer management adapters to the runtime regressions", () => {

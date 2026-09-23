@@ -230,6 +230,10 @@ const SOURCE_RULES = [
         groups: ["full", "integration:database", "integration:mission", "quick:protocol"],
     },
     {
+        pattern: /^(?:src\/routes\/api\/index\.ts|tools\/api_index_time_semantics\.test\.cjs)$/,
+        groups: ["full", "integration:database", "quick:runtime"],
+    },
+    {
         pattern: /^src\/routes\/cn\/tool\.ts$/,
         groups: ["full", "integration:database", "quick:protocol", "quick:runtime"],
     },

@@ -45,6 +45,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/multi_client_fallback.test.cjs",
             "tools/account_identity_provider.test.cjs",
             "tools/multi_runtime_session_options.test.cjs",
+            "tools/api_index_time_semantics.test.cjs",
             "tools/time_semantics.test.cjs",
             "tools/game_calendar.test.cjs",
             "tools/game_calendar_source_guard.test.cjs",

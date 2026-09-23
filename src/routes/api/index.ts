@@ -16,7 +16,7 @@ import { getPlayerTriggeredTutorialsSync } from "../../data/domains/tutorial"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders } from "../../utils";
-import { getRealNow } from "../../runtime/time/game-time";
+import { getGameTimeContext } from "../../runtime/time/game-time";
 
 interface LoadBody {
     app_secret: string,
@@ -64,10 +64,11 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "No players bound to account."
         })
 
-        // get last login time
-        dailyResetPlayerDataSync(player)
+        // Login/day-reset follows the virtual game calendar shared by all routes.
+        const gameTime = getGameTimeContext()
+        dailyResetPlayerDataSync(player, gameTime.virtualNow)
         getDb().transaction(() => {
-            refreshPlayerDailyChallengePointsForRealDaySync(playerId, getRealNow())
+            refreshPlayerDailyChallengePointsForRealDaySync(playerId, gameTime.realNow)
         })()
 
         // collect the player's pooled exp
