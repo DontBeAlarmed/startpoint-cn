@@ -717,7 +717,8 @@ function beginBattle(client: SessionClient): boolean {
     try {
         sessionManager.setBattleParticipants(client.roomNumber, participants, client.participant)
     } catch (error) {
-        console.error(`[LOBBY] StartBattle rejected: room=${client.roomNumber}`, error)
+        const reason = error instanceof Error ? error.message : String(error)
+        console.error(`[LOBBY] StartBattle rejected: room=${client.roomNumber} reason=${reason}`)
         sessionManager.clearBattleExpectedCount(client.roomNumber)
         return false
     }
