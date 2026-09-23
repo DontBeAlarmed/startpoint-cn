@@ -198,7 +198,8 @@ Session TCP 在正常 `stop`、fatal teardown 和 startup failure 路径都会�
 
 `raising_state` 是国服客户端 HTTP 响应解析器要求的字段。下表中的 Ready、Waiting、Battle 等名称来自客户端各数值分支对应的输入类型；“当前语义”描述的是服务端在这些客户端分支约束下采用的状态机行为。
 
-当前房间内存状态仍只写入 1、2、4；3、9 和 13 是 HTTP 加入/恢复响应的客户端投影，不会写入房间状态。
+当前房间内存状态仍只写入 1、2、4；`updateRoomState` 在运行时拒绝其余任何值
+（含 HTTP 投影 3/9/13），拒绝时不改动房间与状态机。3、9 和 13 是 HTTP 加入/恢复响应的客户端投影，不会写入房间状态。
 
 | 值 | 当前语义 | 写入或返回时机 |
 |---:|---|---|
@@ -239,7 +240,7 @@ Session TCP 在正常 `stop`、fatal teardown 和 startup failure 路径都会�
 
 客户端协议中的 `MeetingNotifyMessage.Bye`（Notify index 1）是客户端定义的无参数枚举消息，不是 HTTP 字段，也不等同于“玩家主动退出房间”。客户端停止使用当前 `cooperation_room` 连接时会发送它，主动离开和进入战斗时的连接切换都可能走同一消息；因此服务端必须结合 `raising_state` 解释，不能仅凭名称判断为解散。
 
-成员资格在房间内保存完整 `nodeSessionId + viewerId`，不从当前在线 socket 反推，因此远程成员临时离线后不会退化成 `embedded + viewerId`。结算事实的授权、Finalize 和移除也使用相同复合键；服务端不能在这些状态中只用 viewer 区分成员。成员资格与 socket 在线状态分开保存：战斗前普通网络断开只移除连接并启动 `MULTI_ROOM_RECONNECT_GRACE_MS` 宽限，宽限内保留 `restore_room` 资格；明确 `Bye` 仍立即释放 guest 或解散 host。进入 `raising_state=4` 后，切换 battle socket 产生的 `Bye` 只关闭 lobby 连接，必须保留房间、当局成员快照和 SceneReady 屏障，直到战斗结算或中止流程清理。
+成员资格在房间内保存完整 `nodeSessionId + viewerId`，不从当前在线 socket 反推，因此远程成员临时离线后不会退化成 `embedded + viewerId`。结算事实的授权、Finalize 和移除也使用相同复合键；服务端不能在这些状态中只用 viewer 区分成员。成员资格与 socket 在线状态分开保存：战斗前普通网络断开只移除连接并启动 `MULTI_ROOM_RECONNECT_GRACE_MS` 宽限，宽限内保留 `restore_room` 资格；明确 `Bye` 仍立即释放 guest 或解散 host。进入 `raising_state=4` 后，切换 battle socket 产生的 `Bye` 只关闭 lobby 连接，必须保留房间、当局成员快照和 SceneReady 屏障，直到战斗结算或中止流程清理。`raising_state=4` 期间 lobby 的 Enter、ChangeParty、Ready 和 EnterComs 一律被拒绝（写锁绑定房间生命周期，与 battle socket 是否在线无关）；只有正式 release 把房间转回 1 后，重赛 lobby 写入才重新开放。
 
 ### 6.2 Battle socket 握手
 
@@ -270,7 +271,7 @@ SceneReady 只统计已登记的 battle client。
 | 2 | ChangeParty | 更新当前 party 并广播 Mates |
 | 3 | Ready | 更新准备状态并广播 StateChanged |
 | 4 | Heartbeat | 回 AckHeartbeat |
-| 6 | StartBattle | 设置预期 battle client 数量、`raising_state=4`，并广播 Start |
+| 6 | StartBattle | 校验（host、无已发布战斗、真人成员可解析、状态机可进入 Battle）通过后发布预期 battle client 数量并进入 `raising_state=4`，再广播 Start；校验失败或房间拒绝进入 Battle 时整体拒绝并回滚已发布的 runtime，不广播 |
 | 7 | ChangeAutoplayMode | 更新发送方的 `autoplayMode`；第二参数为 `true` 时同时把 `autoSpeedLevel` 重置为 1，并广播最新 Mates |
 | 8 | ChangeAutoStart | 更新发送方的 `autoStart` 并广播最新 Mates |
 | 10 | EnterComs | 调用 NPC 招募流程 |
@@ -375,7 +376,7 @@ create_room
 每个玩家的 `finish` 完成以下操作：
 
 - 在本地写事务前查询 Hub 保留的参与者、`battleSessionId` 和 Finalize 完成事实；
-- 通过 coordinator 处理权威房间生命周期；全部真人已 Finalize 时释放当局 battle 状态并把房间恢复为 Ready；
+- 通过 coordinator 处理权威房间生命周期；全部真人已 Finalize 时释放当局 battle 状态并把房间恢复为 Ready。释放是窄提交边界：房间先成功转回 Ready，然后才清理 battle runtime；转换被拒时 facts、成员快照与 SceneReady 状态全部保留（finish 重试授权不丢失），由后续 finalize、abort、节点失效清理重试收敛，或最终落入下述 abandoned 战斗房间回收。参与者已全部移除且无人 Finalize 的空战局视为 abandoned，不视为"全部完成"，不会触发成功 release；
 - 在玩家自己的 SQLite 事务内重新比对并消费 active quest，同时结算奖励、关卡进度和任务 tracker；
 - 本地事务失败时整体回滚，active quest 与 Hub 限时保留的完成事实可供重试。
 
@@ -406,9 +407,13 @@ cleaner 默认每 60 秒扫描一次非战斗房间：
 |---|---:|
 | `state=1/2` 且成员少于 3 | 15 分钟 |
 | `state=1/2` 且成员达到 3 | 30 分钟 |
-| `state=4` | cleaner 跳过 |
+| `state=4` 且仍有 lobby/battle socket | 跳过（战斗房间不按空闲过期） |
+| `state=4` 且 lobby/battle socket 全空 | 再等待 15 分钟 abandoned 战斗宽限后回收 |
 
-过期前 30 秒，服务端可以发送 RemainingTime。`state=4` 不存在通用“战斗 10 分钟自动清理”规则。
+`state=4` 的房间不再被永久跳过：最后一个 lobby/battle socket 消失时房间记录
+`battle_empty_since_ms`，超过 `abandonedBattleExpiryMs`（默认 15 分钟）后由
+`disbandRoom` 回收并幂等释放 battle facts；宽限覆盖了成员只是落后于 HTTP
+finish 的场景。过期前 30 秒，服务端可以发送 RemainingTime。`state=4` 不存在通用"战斗 10 分钟自动清理"规则。
 
 ## 11. Battle relay 与场景屏障
 
@@ -420,7 +425,7 @@ Battle 顶层消息仍使用 Typepacker 数组：
 | 1 | Broadcast | 中继给同房其他 battle client |
 | 2 | Send | 中继定向消息结构 |
 
-普通 `Broadcast` 帧会被包装为带来源 connection ID 的服务端消息，并发送给同房其他 battle client。移动、技能、FEVER、协力球和自动战斗等普通帧可以沿这条路径中继。
+普通 `Broadcast` 帧会被包装为带来源 connection ID 的服务端消息，并发送给同房其他 battle client。移动、技能、FEVER、协力球和自动战斗等普通帧可以沿这条路径中继。中继不等待 SceneReady 屏障：屏障完成前到达的 relay 帧会被 CN 客户端的等待态命令队列重新排队，待 BattleStart 开战后按序消费（依据 1.8.1 反编译 `BattleSceneWaitForMateStateImpl` 与 `CommandQueue_Impl_.tryProcessCommands`），因此服务端不在屏障前缓存或拒绝普通 relay 帧。
 
 SceneReady 当前可用：
 
@@ -468,9 +473,14 @@ CN Notify 索引已经按 `SceneReady=0`、`LevelNext=1`、`Finalize=2`、`Measu
 | `tools/perf/multi_snapshot_baseline.test.cjs` | 快照行为签名、依赖调用与 SQLite SELECT 上界 |
 | `tools/perf/multi_settlement_baseline.test.cjs` | 完整 finish 响应签名、授权顺序、事务与 SQL 上界 |
 | `tools/perf/hub_baseline.test.cjs` | 动态端口双服房间、心跳、故障注入与资源归零 |
-| `tools/room_cleanup_lifecycle.test.cjs` | 15/30 分钟清理与 `raising_state=4` 跳过 |
+| `tools/room_cleanup_lifecycle.test.cjs` | 15/30 分钟清理与 abandoned 战斗房间 15 分钟回收 |
 | `tools/session_frame_order.test.cjs` | Room/Battle 握手后同包首帧顺序与拒绝清理 |
 | `tools/session_server_lifecycle.test.cjs` | TCP 启停和会话生命周期 |
+| `tools/multi_lobby_battle_lock.test.cjs` | `raising_state=4` 期间 lobby 写锁与 release 后重开 |
+| `tools/multi_battle_start_boundary.test.cjs` | StartBattle 提交边界与故障回滚 |
+| `tools/multi_release_boundary.test.cjs` | 释放边界、deferred 保留与幂等 |
+| `tools/multi_session_client_state.test.cjs` | 已删除的连接级死状态模型保护 |
+| `tools/multi_runtime_snapshot.test.cjs` | battle runtime 只读快照与跨 Map invariant |
 | `tests/multi-hub-process.test.js` | 三编译进程、独立 SQLite、兼容/时间/身份准入、BothBoss、会话轮换与 Hub degraded |
 | `tools/multi_player_context.test.cjs` | viewer、账号与存档映射 |
 | `tools/npc_contributor_names.test.cjs` | NPC 昵称数据契约 |
