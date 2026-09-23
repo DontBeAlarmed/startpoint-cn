@@ -3,10 +3,9 @@
 // Protocol arrays follow typepacker useEnumIndex=true format (see sessionServer.ts).
 
 import * as net from "net"
-import { Result, ClientState, BattleState } from "../types"
+import { Result } from "../types"
 import { RoomState } from "../types"
 import { RoomStateMachine } from "./RoomStateMachine"
-import { ClientStateMachine } from "./ClientStateMachine"
 import {
     participantKey,
     type NodeSessionId,
@@ -62,8 +61,6 @@ export interface SessionClient {
     mates: SessionMate[]
     enterData: unknown
     yourself?: SessionMate
-    clientState: ClientStateMachine
-    battleState: BattleState
 }
 
 export interface BattleParticipant {
@@ -205,8 +202,6 @@ export class SessionManager {
             buffer: "",
             mates: [],
             enterData: null,
-            clientState: new ClientStateMachine(ClientState.Connecting),
-            battleState: BattleState.Initializing,
         }
     }
 

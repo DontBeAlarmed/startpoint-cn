@@ -181,6 +181,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/multi_lobby_battle_lock.test.cjs",
             "tools/multi_battle_start_boundary.test.cjs",
             "tools/multi_release_boundary.test.cjs",
+            "tools/multi_session_client_state.test.cjs",
             "tools/multi_battle_heartbeat.test.cjs",
             "tools/multi_compatibility.test.cjs",
             "tools/multi_coordinator_contract.test.cjs",

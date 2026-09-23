@@ -202,21 +202,6 @@ export enum RoomState {
     Disbanded = 4,
 }
 
-export enum ClientState {
-    Connecting = 0,
-    Handshaking = 1,
-    InLobby = 2,
-    InBattle = 3,
-    Disconnected = 4,
-}
-
-export enum BattleState {
-    Initializing = 0,
-    Fighting = 1,
-    Finished = 2,
-    Aborted = 3,
-}
-
 // === Result type for unified error handling ===
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string }
 
