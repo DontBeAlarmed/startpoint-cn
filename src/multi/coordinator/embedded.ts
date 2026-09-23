@@ -386,8 +386,22 @@ export class EmbeddedMultiCoordinator implements MultiCoordinator {
 
     private releaseIfFullyFinalized(status: BattleStatus): boolean {
         if (!sessionManager.isBattleFullyFinalized(status)) return false
-        updateRoomState(status.roomNumber, 1)
-        sessionManager.clearBattleExpectedCount(status.roomNumber)
+        return this.releaseBattle(status.roomNumber)
+    }
+
+    // Narrow release boundary: the room must return to Ready before any battle
+    // runtime is cleared. A refused 4 -> 1 transition keeps the battle facts,
+    // participant snapshot, and SceneReady state, so finish retries stay
+    // authorized and a later finalize, abort, or node-session cleanup can
+    // re-attempt the release. The room meanwhile stays lobby-locked by
+    // raising_state=4, which prevents a new battle from overlapping the
+    // deferred release.
+    private releaseBattle(roomNumber: string): boolean {
+        if (!updateRoomState(roomNumber, 1)) {
+            console.warn(`[MULTI] battle release deferred: room=${roomNumber} refused Ready`)
+            return false
+        }
+        sessionManager.clearBattleExpectedCount(roomNumber)
         return true
     }
 

@@ -2356,6 +2356,7 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
         "tools/multi_battle_multiscene.test.cjs",
         "tools/multi_lobby_battle_lock.test.cjs",
         "tools/multi_battle_start_boundary.test.cjs",
+        "tools/multi_release_boundary.test.cjs",
         "tools/multi_battle_heartbeat.test.cjs",
         "tools/multi_compatibility.test.cjs",
         "tools/multi_coordinator_contract.test.cjs",
