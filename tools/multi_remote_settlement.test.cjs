@@ -238,6 +238,55 @@ test("Hub battle facts discard unfinished records when their room is released", 
     }), { ok: false, error: "ROOM_NOT_FOUND" })
 })
 
+test("an emptied battle is abandoned, not fully finalized", () => {
+    const store = new BattleFactStore({ createBattleSessionId: () => "emptied-battle" })
+    store.startBattle({ roomNumber: "123456", host, participants: [host, guest] })
+    // Every participant left through abort/node-session cleanup before any
+    // finalize: the record is empty and must not read as "everyone finished".
+    assert.equal(store.removeParticipant({ participant: host, roomNumber: "123456" }).ok, true)
+    assert.equal(store.removeParticipant({ participant: guest, roomNumber: "123456" }).ok, true)
+    assert.equal(store.hasAnyFinalized({ roomNumber: "123456", battleSessionId: "emptied-battle" }), false)
+
+    assert.equal(
+        store.isFullyFinalized({ roomNumber: "123456", battleSessionId: "emptied-battle" }),
+        false,
+        "an empty participant set is an abandoned battle, not a completed one",
+    )
+})
+
+test("removing the last guest still releases when the remaining host finalized", () => {
+    const store = new BattleFactStore({ createBattleSessionId: () => "last-guest-battle" })
+    store.startBattle({ roomNumber: "123456", host, participants: [host, guest] })
+    store.markFinalized({ participant: host, roomNumber: "123456", battleSessionId: "last-guest-battle" })
+
+    assert.equal(store.removeParticipant({
+        participant: guest,
+        roomNumber: "123456",
+    }).ok, true, "an unfinalized last guest can still leave")
+
+    assert.equal(store.isFullyFinalized({
+        roomNumber: "123456",
+        battleSessionId: "last-guest-battle",
+    }), true, "all remaining real participants finalized still releases")
+})
+
+test("removing the last finalized guest still releases with a finalized host", () => {
+    const store = new BattleFactStore({ createBattleSessionId: () => "last-done-guest-battle" })
+    store.startBattle({ roomNumber: "123456", host, participants: [host, guest] })
+    store.markFinalized({ participant: host, roomNumber: "123456", battleSessionId: "last-done-guest-battle" })
+    store.markFinalized({ participant: guest, roomNumber: "123456", battleSessionId: "last-done-guest-battle" })
+
+    assert.equal(store.removeParticipant({
+        participant: guest,
+        roomNumber: "123456",
+    }).ok, true, "a finalized last guest can still be removed")
+
+    assert.equal(store.isFullyFinalized({
+        roomNumber: "123456",
+        battleSessionId: "last-done-guest-battle",
+    }), true)
+})
+
 test("Hub battle facts reject forged participants and bound retained records", () => {
     assert.equal(typeof BattleFactStore, "function")
     let sequence = 0
