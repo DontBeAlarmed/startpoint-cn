@@ -12,6 +12,19 @@ const {
     restoreRoomUnavailableRaisingState,
     roomUnavailableRaisingState,
 } = require("../src/multi/http/join-result.ts")
+const {
+    createRoom,
+    disbandRoom,
+    updateRoomState,
+} = require("../src/multi/room/manager")
+const { sessionManager } = require("../src/multi/state/SessionManager")
+const { RoomState } = require("../src/multi/types")
+
+function createOwnerRoom(t) {
+    const room = createRoom(8100001, 1, 1, 1, 5101, 0, 1, true)
+    t.after(() => disbandRoom(room.room_number))
+    return room
+}
 
 // CN 1.8.1 MultiBattleQuestPrepareRealRemote：raising_state 仅 1/2/9 合法
 //（3/4/7/8/10/11/12/13 抛 ClientError 5001）；其余失败走 A-error
@@ -57,4 +70,54 @@ test("multi HTTP sources use the endpoint-specific mappings", () => {
     assert.match(lobbySource, /roomUnavailableRaisingState\(room\.error\)/)
     // restore_room 使用 9/13 专用映射
     assert.match(roomSource, /restoreRoomUnavailableRaisingState\(/)
+})
+
+test("room owner persists only raising_state 1/2/4 through the state machine", t => {
+    const room = createOwnerRoom(t)
+    assert.equal(room.raising_state, 2)
+    const machine = sessionManager.getRoomState(room.room_number)
+    assert.equal(machine.getState(), RoomState.Filled)
+
+    assert.equal(updateRoomState(room.room_number, 1), true)
+    assert.equal(room.raising_state, 1)
+    assert.equal(machine.getState(), RoomState.Ready)
+
+    assert.equal(updateRoomState(room.room_number, 4), true)
+    assert.equal(room.raising_state, 4)
+    assert.equal(machine.getState(), RoomState.Battle)
+
+    assert.equal(updateRoomState(room.room_number, 1), true)
+    assert.equal(room.raising_state, 1)
+    assert.equal(machine.getState(), RoomState.Ready)
+
+    assert.equal(updateRoomState(room.room_number, 1), true, "same-state rewrite stays legal")
+})
+
+test("unknown raising states fail closed without touching the room or machine", t => {
+    const room = createOwnerRoom(t)
+    assert.equal(updateRoomState(room.room_number, 4), true)
+    const machine = sessionManager.getRoomState(room.room_number)
+    const raisingBefore = room.raising_state
+    const machineBefore = machine.getState()
+
+    for (const bad of [0, 3, 7, 9, 13, 99, 2.5, Number.NaN, "4", null, undefined]) {
+        assert.equal(
+            updateRoomState(room.room_number, bad),
+            false,
+            `state=${String(bad)} must fail closed`,
+        )
+        assert.equal(room.raising_state, raisingBefore, `state=${String(bad)} must not touch the room`)
+        assert.equal(machine.getState(), machineBefore, `state=${String(bad)} must not touch the machine`)
+    }
+})
+
+test("room owner keeps the persistable state union exhaustive and typed", () => {
+    const managerSource = fs.readFileSync(
+        path.join(__dirname, "../src/multi/room/manager.ts"), "utf8")
+    assert.match(managerSource, /PersistentRaisingState/)
+    assert.doesNotMatch(
+        managerSource,
+        /export function updateRoomState\(roomNumber: string, state: number\)/,
+        "updateRoomState must not accept an untyped state",
+    )
 })

@@ -288,18 +288,34 @@ export function removeRoomMember(roomNumber: string, participant: ParticipantIde
 // 2 (recruiting, room created with the host) → Filled, 1 (preparation after
 // host Enter) → Ready, 4 → Battle. StartBattle is legal from both Filled and
 // Ready; Battle → Ready stays legal for the post-battle rematch re-entry.
-const RAISING_STATE_TO_ROOM_STATE = new Map<number, RoomState>([
+// The room owner persists only these values; 3/7/9/13 are HTTP response
+// projections for the CN client parser and must never become room states.
+export type PersistentRaisingState = 1 | 2 | 4
+
+function isPersistentRaisingState(value: unknown): value is PersistentRaisingState {
+    return value === 1 || value === 2 || value === 4
+}
+
+const RAISING_STATE_TO_ROOM_STATE: ReadonlyMap<PersistentRaisingState, RoomState> = new Map([
     [2, RoomState.Filled],
     [1, RoomState.Ready],
     [4, RoomState.Battle],
 ])
 
-export function updateRoomState(roomNumber: string, state: number): boolean {
+export function updateRoomState(
+    roomNumber: string,
+    state: PersistentRaisingState,
+): boolean {
     const room = rooms.get(roomNumber);
     if (!room) return false;
+    if (!isPersistentRaisingState(state)) {
+        console.warn(`[MULTI] room state rejected: ${roomNumber} ${String(state)}`);
+        return false;
+    }
     const machine = sessionManager.getRoomState(roomNumber)
     const target = RAISING_STATE_TO_ROOM_STATE.get(state)
-    if (target !== undefined && machine.getState() !== target) {
+    if (target === undefined) return false;
+    if (machine.getState() !== target) {
         const transition = machine.tryTransition(target)
         if (!transition.allowed) {
             console.warn(`[MULTI] room state transition rejected: ${roomNumber} ${transition.reason}`);
