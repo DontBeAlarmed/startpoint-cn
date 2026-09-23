@@ -8,6 +8,7 @@ import { RoomState } from "../types"
 import { RoomStateMachine } from "./RoomStateMachine"
 import {
     participantKey,
+    type BattleSessionId,
     type NodeSessionId,
     type ParticipantIdentity,
 } from "../coordinator/contracts"
@@ -65,6 +66,74 @@ export interface SessionClient {
 
 export interface BattleParticipant {
     participant: ParticipantIdentity
+}
+
+export interface BattleRuntimeSnapshot {
+    readonly roomNumber: string
+    readonly hasBattle: boolean
+    readonly expectedCount: number | null
+    readonly sceneGeneration: number | null
+    readonly barrierReleased: boolean
+    readonly battleSessionId: BattleSessionId | null
+    readonly hostParticipant: ParticipantIdentity | null
+    readonly participantIdentities: readonly ParticipantIdentity[]
+    readonly participantConnectionIds: readonly string[]
+    readonly battleClientConnectionIds: readonly string[]
+    readonly sceneReadyConnectionIds: readonly string[]
+    readonly finalizedParticipantKeys: readonly string[]
+    readonly battleFactParticipantIdentities: readonly ParticipantIdentity[]
+}
+
+/**
+ * Pure diagnostic over a battle runtime snapshot: returns the list of
+ * cross-map inconsistencies (empty when healthy). Test and triage only —
+ * it never repairs state.
+ */
+export function checkBattleRuntimeInvariants(
+    snapshot: BattleRuntimeSnapshot,
+): readonly string[] {
+    const violations: string[] = []
+    const identityKeys = new Set(snapshot.participantIdentities.map(participant => (
+        participantKey(participant.nodeSessionId, participant.viewerId)
+    )))
+
+    if (snapshot.hostParticipant !== null
+        && !identityKeys.has(participantKey(
+            snapshot.hostParticipant.nodeSessionId,
+            snapshot.hostParticipant.viewerId,
+        ))) {
+        violations.push("HOST_NOT_IN_PARTICIPANTS")
+    }
+    if (snapshot.expectedCount !== null && snapshot.expectedCount < 0) {
+        violations.push("NEGATIVE_EXPECTED_COUNT")
+    }
+    const registeredConnections = new Set(snapshot.battleClientConnectionIds)
+    const unregisteredReady = snapshot.sceneReadyConnectionIds
+        .filter(connectionId => !registeredConnections.has(connectionId))
+    if (unregisteredReady.length > 0 || snapshot.sceneReadyConnectionIds.length > snapshot.battleClientConnectionIds.length) {
+        violations.push("SCENE_READY_EXCEEDS_CONNECTIONS")
+    }
+    if (snapshot.hasBattle && snapshot.sceneGeneration === null) {
+        violations.push("MISSING_SCENE_GENERATION")
+    }
+
+    const factKeys = new Set(snapshot.battleFactParticipantIdentities.map(participant => (
+        participantKey(participant.nodeSessionId, participant.viewerId)
+    )))
+    if (snapshot.participantConnectionIds.length > 0 && snapshot.battleSessionId === null) {
+        violations.push("BATTLE_FACT_MISSING")
+    } else if (snapshot.participantConnectionIds.length === 0 && snapshot.battleSessionId !== null) {
+        violations.push("PARTICIPANTS_MISSING")
+    } else if (snapshot.battleSessionId !== null) {
+        for (const key of identityKeys) {
+            if (!factKeys.has(key)) { violations.push("BATTLE_FACT_PARTICIPANT_MISMATCH"); break }
+        }
+        for (const key of factKeys) {
+            if (!identityKeys.has(key)) { violations.push("BATTLE_FACT_PARTICIPANT_MISMATCH"); break }
+        }
+    }
+
+    return violations
 }
 
 export class SessionManager {
@@ -732,6 +801,45 @@ export class SessionManager {
     /** True once a StartBattle published this room's expected-count runtime. */
     hasBattleExpectedCount(roomNumber: string): boolean {
         return this.battleExpectedCount.has(roomNumber)
+    }
+
+    /**
+     * Frozen read-only view over every map that describes one room's battle
+     * runtime. Diagnostic only: no owner migration, no mutable leak — the
+     * underlying maps stay the single writers.
+     */
+    getBattleRuntimeSnapshot(roomNumber: string): BattleRuntimeSnapshot {
+        const participants = this.battleParticipants.get(roomNumber)
+        const participantEntries = [...(participants?.entries() ?? [])]
+        const host = this.battleHostParticipants.get(roomNumber)
+        return Object.freeze({
+            roomNumber,
+            hasBattle: this.battleExpectedCount.has(roomNumber),
+            expectedCount: this.battleExpectedCount.get(roomNumber) ?? null,
+            sceneGeneration: this.battleSceneGeneration.get(roomNumber) ?? null,
+            barrierReleased: this.isBattleSceneBarrierReleased(roomNumber),
+            battleSessionId: this.battleFacts.getActiveBattleSessionId(roomNumber),
+            hostParticipant: host ? Object.freeze({ ...host }) : null,
+            participantIdentities: Object.freeze(
+                participantEntries.map(([, value]) => Object.freeze({ ...value.participant })),
+            ),
+            participantConnectionIds: Object.freeze(
+                participantEntries.map(([connectionId]) => connectionId),
+            ),
+            battleClientConnectionIds: Object.freeze(
+                [...(this.battleClients.get(roomNumber) ?? [])],
+            ),
+            sceneReadyConnectionIds: Object.freeze(
+                [...(this.sceneReadyClients.get(roomNumber) ?? [])],
+            ),
+            finalizedParticipantKeys: Object.freeze(
+                [...(this.finalizedBattleParticipantKeys.get(roomNumber) ?? [])],
+            ),
+            battleFactParticipantIdentities: Object.freeze(
+                (this.battleFacts.getActiveBattleParticipants(roomNumber) ?? [])
+                    .map(participant => Object.freeze({ ...participant })),
+            ),
+        })
     }
 
     /**

@@ -223,6 +223,14 @@ export class BattleFactStore {
         return this.activeBattleByRoom.get(roomNumber) ?? null
     }
 
+    /** Read-only identities of the room's active battle record, if any. */
+    getActiveBattleParticipants(roomNumber: string): readonly ParticipantIdentity[] | null {
+        this.prune()
+        const battleSessionId = this.activeBattleByRoom.get(roomNumber)
+        const record = battleSessionId ? this.records.get(battleSessionId) : undefined
+        return record ? record.participants.map(participant => participant) : null
+    }
+
     getCounts(): BattleFactCounts {
         this.prune()
         let active = 0
