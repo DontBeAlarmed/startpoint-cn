@@ -734,6 +734,11 @@ export class SessionManager {
         return (this.battleExpectedCount.get(roomNumber) ?? -1) === 0
     }
 
+    /** True once a StartBattle published this room's expected-count runtime. */
+    hasBattleExpectedCount(roomNumber: string): boolean {
+        return this.battleExpectedCount.has(roomNumber)
+    }
+
     /**
      * True while a started battle still occupies the room: members hold battle
      * sockets or handshakes are still pending. Lobby mutation gates consume

@@ -10,6 +10,7 @@ import {
 import { NpcMateProvider } from "../npc/controller"
 import { ensureNpcRoster, getActiveNpcRoster } from "../npc/nickname-pool"
 import type { MultiRoom } from "../../lib/types"
+import { RoomState } from "../types"
 import {
     getLobbyLifecycleGuard,
     LobbyLifecycleGuard,
@@ -683,33 +684,59 @@ function handleHeartbeat(socket: net.Socket, client: SessionClient, _data: any[]
     sessionManager.sendJson(socket, [1, [11, client.connectionId]])
 }
 
-function handleStartBattle(_socket: net.Socket, client: SessionClient, _data: any[]): void {
+// Narrow StartBattle commit boundary: validate without side effects, publish
+// the battle runtime, then move the room into Battle. If the room refuses the
+// transition the freshly published runtime is rolled back, so a rejected
+// start can never leave a half-committed battle behind.
+function beginBattle(client: SessionClient): boolean {
     const room = getRoom(client.roomNumber)
     if (!room || !client.participant
-        || !sessionManager.isRoomHostParticipant(client.roomNumber, client.participant)) return
-    if ((sessionManager as any).battleExpectedCount?.has?.(client.roomNumber)) return
-
-    advanceRecruitmentGeneration(room)
-    client.enterData = null
+        || !sessionManager.isRoomHostParticipant(client.roomNumber, client.participant)) return false
+    if (sessionManager.hasBattleExpectedCount(client.roomNumber)) return false
 
     const realMembers = client.mates.filter(mate => !mate.comId)
-    sessionManager.setBattleParticipants(client.roomNumber, realMembers.flatMap(mate => {
+    if (realMembers.length === 0) return false
+    const participants: Array<{ connectionId: string, participant: ParticipantIdentity }> = []
+    for (const mate of realMembers) {
         const member = sessionManager.getUniqueRoomClientByViewerId(
             Number(mate.viewerId),
             client.roomNumber,
         )
-        if (!member?.participant) return []
-        return [{
+        if (!member?.participant) return false
+        participants.push({
             connectionId: String(mate.connectionId ?? ""),
             participant: member.participant,
-        }]
-    }), client.participant)
-    updateRoomState(client.roomNumber, 4)
+        })
+    }
+    if (!sessionManager.getRoomState(client.roomNumber).canTransition(RoomState.Battle)) {
+        console.warn(`[LOBBY] StartBattle rejected: room=${client.roomNumber} cannot enter Battle`)
+        return false
+    }
+
+    advanceRecruitmentGeneration(room)
+    try {
+        sessionManager.setBattleParticipants(client.roomNumber, participants, client.participant)
+    } catch (error) {
+        console.error(`[LOBBY] StartBattle rejected: room=${client.roomNumber}`, error)
+        sessionManager.clearBattleExpectedCount(client.roomNumber)
+        return false
+    }
+    if (!updateRoomState(client.roomNumber, 4)) {
+        console.warn(`[LOBBY] StartBattle rolled back: room=${client.roomNumber} refused Battle`)
+        sessionManager.clearBattleExpectedCount(client.roomNumber)
+        return false
+    }
+    client.enterData = null
+    return true
+}
+
+function handleStartBattle(_socket: net.Socket, client: SessionClient, _data: any[]): void {
+    if (!beginBattle(client)) return
 
     autoStartingRooms.delete(client.roomNumber)
     const members = [...client.mates]
     sessionManager.broadcastToRoom(client.roomNumber, [1, [5, members]])
-    console.log(`[LOBBY] StartBattle: room=${client.roomNumber} mates=${client.mates.length} expected=${realMembers.length}`)
+    console.log(`[LOBBY] StartBattle: room=${client.roomNumber} mates=${client.mates.length} expected=${members.filter(mate => !mate.comId).length}`)
 }
 
 function handleNotify(socket: net.Socket, client: SessionClient, data: any[]): void {
