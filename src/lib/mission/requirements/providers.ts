@@ -14,16 +14,21 @@ import { parsePositiveSafeIntegerMasterValue } from "../master-value"
 import { getAwakeRequirement } from "./provider-awake"
 import { getDegreeRequirement } from "./provider-degree"
 import { getEventRequirement } from "./provider-event"
+import {
+    PASS_DAILY_COMPUTED_CONDITIONS,
+    PASS_EVENT_COMPUTED_LOGIN_CONDITION,
+    PASS_EVENT_PERSISTED_CONDITIONS,
+    PASS_WEEK_CONDITIONS,
+    PASS_WEEK_EMOTION_CONDITION,
+    REGULAR_COMPUTED_FACTS_BY_CONDITION,
+    REGULAR_CRAFT_POINT_CONDITION,
+    REGULAR_EX_RANK_SS_SECTION,
+    REGULAR_PERSISTED_CONDITIONS,
+    REGULAR_QUEST_RANGE_CONDITIONS,
+    REGULAR_QUEST_SECTION_BY_RANGE_KIND,
+    REGULAR_TYPE_28_FACTS_BY_STATISTICS_CODE,
+} from "./condition-routing"
 import type { MissionFactRequirementDraft, MissionRef } from "./types"
-
-const REGULAR_PERSISTED_PATTERNS = new Set([
-    "total_attained_drop_mana_count",
-    "get_mvp",
-    "treasure_shop_used_mana_count",
-    "challenge_single_battle_play",
-    "total_ability_soul_use_count",
-    "twitter_check_mission_001",
-])
 
 const DAILY_BATTLE_PRODUCER_TYPES: ReadonlySet<number> = new Set([
     14, 16, 17, 18, 23, 26, 49, 50, 51, 52,
@@ -32,49 +37,22 @@ const DAILY_BATTLE_PRODUCER_TYPES: ReadonlySet<number> = new Set([
 const DAILY_PERIODIC_COMPUTED_TYPES: ReadonlySet<number> = new Set([0, 28, 39])
 const DAILY_GACHA_DRAW_CONDITION_TYPE = 78
 
-const REGULAR_FACTS: Readonly<Record<string, readonly FactKey[]>> = Object.freeze({
-    max_combo: [{ kind: "player" }],
-    rank_ss: [{ kind: "missionBattleCounters" }],
-    use_dash: [{ kind: "player" }],
-    single_battle_play: [{ kind: "missionBattleCounters" }],
-    use_power_flip: [{ kind: "player" }],
-    use_skill: [{ kind: "missionBattleCounters" }],
-    character_level: [{ kind: "characters" }],
-    user_rank: [{ kind: "player" }],
-    clear_episode: [{ kind: "questProgress", sections: [3] }],
-    total_login: [{ kind: "player" }],
-    special_total_login_2anv: [{ kind: "player" }],
-    multi_battle_play: [{ kind: "missionBattleCounters" }],
-    multi_play_host: [{ kind: "missionBattleCounters" }],
-    multi_play_guest: [{ kind: "missionBattleCounters" }],
-    max_skill_chain: [{ kind: "degreeBattleStats" }],
-    max_power_achievement: [{ kind: "degreeBattleStats" }],
-    fever: [{ kind: "degreeBattleStats" }],
-    characters_count: [{ kind: "characters" }],
-    got_equip_kind_count: [{ kind: "equipment" }],
-    max_score: [{ kind: "missionBattleCounters" }],
-    enemy_kill: [{ kind: "degreeBattleStats" }],
-    weak_point_attack: [{ kind: "degreeBattleStats" }],
-    character_80_level: [{ kind: "characters" }],
-    total_released_mana_node_count: [{ kind: "characterManaNodes" }],
-    over_limit_total_count: [{ kind: "characters" }],
-    total_obtained_bond_token_count: [{ kind: "characters" }],
-    total_mana_addition_count: [{ kind: "player" }],
-    ex_rank_ss: [{ kind: "questProgress", sections: [4] }],
-    total_equipment_awaking_count: [{ kind: "equipment" }],
-    total_equipment_5_level_count: [{ kind: "equipment" }],
-    manaboard_2nd_open_count: [{ kind: "characters" }],
-    manaboard_2nd_complete_count: [
-        { kind: "characters" },
-        { kind: "characterManaNodes" },
-    ],
-})
+function isMasterRangeKind(value: unknown): boolean {
+    return typeof value === "string" && /^\d+$/.test(value)
+}
 
+/**
+ * Condition-number routing for Regular missions. The retired pattern-name
+ * tables (REGULAR_FACTS / REGULAR_PERSISTED_PATTERNS) survive as startup
+ * cross-checks in routing-validation.ts; routing itself reads only the
+ * condition number, the range kind, and the zone-statistics code.
+ */
 function getRegularRequirement(
     definition: MissionMasterDefinition,
     catalog: MissionCatalog,
 ): MissionFactRequirementDraft {
-    if (definition.pattern === "total_craft_point_addition_count") {
+    const conditionType = Number(definition.row[2])
+    if (conditionType === REGULAR_CRAFT_POINT_CONDITION) {
         return {
             mode: "computed",
             facts: [{
@@ -83,16 +61,53 @@ function getRegularRequirement(
             }],
         }
     }
-    const facts = REGULAR_FACTS[definition.pattern]
-    if (facts) return { mode: "computed", facts }
-    if (REGULAR_PERSISTED_PATTERNS.has(definition.pattern)) return { mode: "persisted" }
+    const directFacts = REGULAR_COMPUTED_FACTS_BY_CONDITION[conditionType]
+    if (directFacts) return { mode: "computed", facts: directFacts }
+    if (REGULAR_PERSISTED_CONDITIONS.has(conditionType)) return { mode: "persisted" }
 
-    const questSection = getRegularQuestFactSection(definition, catalog)
-    if (questSection !== undefined) {
-        return {
-            mode: "computed",
-            facts: [{ kind: "questProgress", sections: [questSection] }],
+    if (REGULAR_QUEST_RANGE_CONDITIONS.has(conditionType)) {
+        // Quest-range shapes: a range kind hands the row to the quest-rule
+        // resolver (sections by range kind, selectors validated there);
+        // rangeless battle-count shapes keep the battle-counter capability.
+        if (isMasterRangeKind(definition.row[7])) {
+            if (conditionType === 26) {
+                // EX SS ranks (range kind 1) count inside the EX section
+                // directly; any other pinned range fails closed.
+                if (Number(definition.row[7]) !== 1) {
+                    return {
+                        mode: "unsupported",
+                        reason: "Regular mission has no authoritative computed mapping or atomic producer.",
+                    }
+                }
+                return {
+                    mode: "computed",
+                    facts: [{
+                        kind: "questProgress",
+                        sections: [REGULAR_EX_RANK_SS_SECTION],
+                    }],
+                }
+            }
+            const questSection = getRegularQuestFactSection(definition, catalog)
+            if (questSection !== undefined
+                && questSection === REGULAR_QUEST_SECTION_BY_RANGE_KIND[Number(definition.row[7])]) {
+                return {
+                    mode: "computed",
+                    facts: [{ kind: "questProgress", sections: [questSection] }],
+                }
+            }
+            return {
+                mode: "unsupported",
+                reason: "Regular mission has no authoritative computed mapping or atomic producer.",
+            }
         }
+        if (conditionType === 14 || conditionType === 26) {
+            return { mode: "computed", facts: [{ kind: "missionBattleCounters" }] }
+        }
+    }
+
+    if (conditionType === 28) {
+        const facts = REGULAR_TYPE_28_FACTS_BY_STATISTICS_CODE[Number(definition.row[3])]
+        if (facts) return { mode: "computed", facts }
     }
     return {
         mode: "unsupported",
@@ -187,6 +202,12 @@ function getCollectRequirement(definition: MissionMasterDefinition): MissionFact
     return { mode: "unsupported", reason: "Collect mission shape has no authoritative fact source." }
 }
 
+/**
+ * Condition-number routing for Pass missions: the daily snapshot family
+ * (category 6), the pass-week snapshot family with its emotion producer
+ * (category 7), and the event-login plus persisted battle producers
+ * (category 8).
+ */
 function getPassRequirement(definition: MissionMasterDefinition): MissionFactRequirementDraft {
     const eventId = definition.eventId
     if (!Number.isSafeInteger(eventId) || eventId! <= 0) {
@@ -194,34 +215,38 @@ function getPassRequirement(definition: MissionMasterDefinition): MissionFactReq
     }
     const patternType = definition.patternType
     if (definition.category === 6) {
-        const snapshot: FactKey = { kind: "periodicSnapshot", snapshotKind: "daily" }
-        if (patternType === 14 || patternType === 16) {
-            return { mode: "computed", facts: [{ kind: "missionBattleCounters" }, snapshot] }
-        }
-        if (patternType === 28 || patternType === 39) {
-            return { mode: "computed", facts: [{ kind: "player" }, snapshot] }
-        }
+        const facts = patternType === undefined
+            ? undefined
+            : PASS_DAILY_COMPUTED_CONDITIONS[patternType]
+        if (facts) return { mode: "computed", facts }
     }
     if (definition.category === 7) {
-        const snapshot: FactKey = {
-            kind: "periodicSnapshot",
-            snapshotKind: "passWeek",
-            eventId: eventId!,
+        if (patternType === PASS_WEEK_EMOTION_CONDITION) return { mode: "persisted" }
+        if (patternType !== undefined && PASS_WEEK_CONDITIONS.has(patternType)) {
+            const snapshot: FactKey = {
+                kind: "periodicSnapshot",
+                snapshotKind: "passWeek",
+                eventId: eventId!,
+            }
+            return {
+                mode: "computed",
+                facts: [
+                    patternType === 16 ? { kind: "missionBattleCounters" } : { kind: "player" },
+                    snapshot,
+                ],
+            }
         }
-        if (patternType === 16) {
-            return { mode: "computed", facts: [{ kind: "missionBattleCounters" }, snapshot] }
-        }
-        if (patternType === 39) return { mode: "computed", facts: [{ kind: "player" }, snapshot] }
-        if (patternType === 85) return { mode: "persisted" }
     }
     if (definition.category === 8) {
-        if (patternType === 0) {
+        if (patternType === PASS_EVENT_COMPUTED_LOGIN_CONDITION) {
             return {
                 mode: "computed",
                 facts: [{ kind: "player" }, { kind: "passState", eventId: eventId! }],
             }
         }
-        if (patternType === 16 || patternType === 23) return { mode: "persisted" }
+        if (patternType !== undefined && PASS_EVENT_PERSISTED_CONDITIONS.has(patternType)) {
+            return { mode: "persisted" }
+        }
     }
     return {
         mode: "unsupported",

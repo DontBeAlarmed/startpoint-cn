@@ -41,6 +41,8 @@ import { registerCnMsgpackOnSend } from "./routes/cn/msgpack";
 import indexWebApiPlugin from "./routes/web_api";
 import seedsWebApiPlugin from "./routes/web_api/seeds";
 import { getDefaultGachaSeedQuarantine } from "./lib/gacha-seed-quarantine";
+import { getMissionCatalog } from "./lib/mission/mission-catalog";
+import { assertMissionConditionRouting } from "./lib/mission/requirements/routing-validation";
 import reproduceApiPlugin from "./routes/api/reproduce";
 import tutorialApiPlugin from "./routes/api/tutorial";
 import gachaApiPlugin from "./routes/api/gacha";
@@ -424,6 +426,10 @@ runtimeCoordinator = createRuntimeCoordinator({
         }),
     }),
     readyHttp: async () => {
+        // Startup data-validity gate: content that moves an audited mission
+        // pattern off its condition-number capability must fail startup
+        // instead of silently re-routing settlement facts.
+        assertMissionConditionRouting(getMissionCatalog());
         await fastify.ready();
         accountCleanupService.start();
         receiveHistoryRetentionService.start();

@@ -1,3 +1,4 @@
+import type { FactKey } from "./facts/fact-key"
 import type { MissionCatalogStage, MissionMasterDefinition } from "./mission-catalog"
 
 export type EventCurrentStateFact =
@@ -62,6 +63,36 @@ export function getEventCurrentStateRule(
         && definition.row[10] === "(None)"
         ? rule
         : undefined
+}
+
+/** Fact domains each current-state fact counts from, single-sourced with the rules. */
+const CURRENT_STATE_FACT_KEYS: Readonly<Record<EventCurrentStateFact, readonly FactKey[]>> = Object.freeze({
+    maxCharacterLevel: Object.freeze<readonly FactKey[]>([{ kind: "characters" }]),
+    overLimitCount: Object.freeze<readonly FactKey[]>([{ kind: "characters" }]),
+    mainChapterClear: Object.freeze<readonly FactKey[]>([{ kind: "questProgress", sections: [1] }]),
+    characterEpisodeClearCount: Object.freeze<readonly FactKey[]>([
+        { kind: "characters" },
+        { kind: "questProgress", sections: [3] },
+    ]),
+    manaBoardNodeCount: Object.freeze<readonly FactKey[]>([
+        { kind: "characters" },
+        { kind: "characterManaNodes" },
+    ]),
+    equipmentAwakeningCount: Object.freeze<readonly FactKey[]>([{ kind: "equipment" }]),
+    hasEquippedAbilitySoul: Object.freeze<readonly FactKey[]>([
+        { kind: "items" },
+        { kind: "partyGroups", category: 1 },
+    ]),
+})
+
+/**
+ * Requirement facts for a current-state mission, derived from its rule's
+ * fact field. This replaces the missionId-keyed switch provider-event.ts
+ * used to carry: the rule table is the single authority.
+ */
+export function getEventCurrentStateFactKeys(missionId: number): readonly FactKey[] | undefined {
+    const rule = EVENT_CURRENT_STATE_RULES[missionId]
+    return rule === undefined ? undefined : CURRENT_STATE_FACT_KEYS[rule.fact]
 }
 
 export function getEventCurrentStateRuleMissionIds(): readonly number[] {

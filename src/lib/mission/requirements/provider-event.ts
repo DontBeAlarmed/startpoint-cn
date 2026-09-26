@@ -1,7 +1,9 @@
 import type { MissionCatalog, MissionMasterDefinition } from "../mission-catalog"
 import { getEventQuestMapping } from "../event-content"
+import { getEventCurrentStateFactKeys } from "../event-current-state-rules"
 import type { FactKey } from "../facts/fact-key"
 import type { MissionFactRequirementDraft, MissionRef } from "./types"
+import { EVENT_QUEST_SECTIONS_BY_CONDITION_AND_RANGE } from "./condition-routing"
 import {
     buildEventRequirementView,
     isEventCurrentStateMission,
@@ -30,26 +32,6 @@ function parseMissionDependencies(definition: MissionMasterDefinition): readonly
         : []
 }
 
-function currentStateFacts(missionId: number): readonly FactKey[] {
-    if ([1201, 1202, 1203].includes(missionId)) {
-        return [{ kind: "questProgress", sections: [1] }]
-    }
-    if (missionId === 1204) {
-        return [{ kind: "characters" }, { kind: "questProgress", sections: [3] }]
-    }
-    if ([1205, 1206, 1207, 1217, 1218, 1219].includes(missionId)) {
-        return [{ kind: "characters" }, { kind: "characterManaNodes" }]
-    }
-    if (missionId === 1212 || missionId === 1307) return [{ kind: "equipment" }]
-    if (missionId === 1220) {
-        return [
-            { kind: "items" },
-            { kind: "partyGroups", category: 1 },
-        ]
-    }
-    return [{ kind: "characters" }]
-}
-
 function questFacts(catalog: MissionCatalog, definition: MissionMasterDefinition): readonly FactKey[] {
     const mapping = getEventQuestMapping(catalog, definition.pattern) as QuestMapEntry | undefined
     const sections = mapping?.categories?.filter(category => (
@@ -57,22 +39,14 @@ function questFacts(catalog: MissionCatalog, definition: MissionMasterDefinition
     ))
     if (sections && sections.length > 0) return [{ kind: "questProgress", sections }]
 
+    // Condition + range-kind fallback sections (single-channel table); the
+    // haniwa family is range kind 15 of condition 23, not a pattern prefix.
     const patternType = Number(definition.row[2])
     const rangeKind = Number(definition.row[7])
-    if (patternType === 14 && rangeKind === 1) {
-        return [{ kind: "questProgress", sections: [4] }]
-    }
-    if (patternType === 14 && rangeKind === 12) {
-        return [{ kind: "questProgress", sections: [6, 13, 14, 20] }]
-    }
-    if (patternType === 14 && rangeKind === 13) {
-        return [{ kind: "questProgress", sections: [13] }]
-    }
-    if (patternType === 15 && (rangeKind === 8 || rangeKind === 17)) {
-        return [{ kind: "questProgress", sections: [rangeKind === 8 ? 11 : 24] }]
-    }
-    if (patternType === 23 && definition.pattern.startsWith("haniwa_carnival_mission_")) {
-        return [{ kind: "questProgress", sections: [22] }]
+    const tableSections = EVENT_QUEST_SECTIONS_BY_CONDITION_AND_RANGE[patternType]
+    const fallback = tableSections === undefined ? undefined : tableSections[rangeKind]
+    if (fallback !== undefined) {
+        return [{ kind: "questProgress", sections: [...fallback] }]
     }
     return [{ kind: "questProgress", sections: "all" }]
 }
@@ -84,7 +58,12 @@ interface EventDependencyFacts {
 
 function directComputedFacts(catalog: MissionCatalog, definition: MissionMasterDefinition): readonly FactKey[] {
     const { missionId } = definition
-    if (isEventCurrentStateMission(missionId)) return currentStateFacts(missionId)
+    if (isEventCurrentStateMission(missionId)) {
+        // Facts derive from the rule table's fact field; the characters
+        // fallback keeps the historical default for any rule without a
+        // fact-key mapping (none in the current table).
+        return getEventCurrentStateFactKeys(missionId) ?? [{ kind: "characters" }]
+    }
     if (Number(definition.row[2]) === 37) {
         const itemId = Number(definition.row[12])
         return Number.isSafeInteger(itemId) && itemId > 0

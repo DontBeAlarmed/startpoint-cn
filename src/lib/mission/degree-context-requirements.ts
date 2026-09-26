@@ -1,7 +1,23 @@
 import { getDegreeClientProgressPattern } from "./client-progress"
-import { MissionCatalog, MissionMasterDefinition, getMissionCatalog } from "./mission-catalog"
+import {
+    DEFAULT_CRAFT_POINT_ITEM_ID,
+    MissionCatalog,
+    MissionMasterDefinition,
+    getMissionCatalog,
+} from "./mission-catalog"
 import { parsePositiveSafeIntegerMasterValue } from "./master-value"
 import { getCategoryMissionRewardStageDefinition } from "./rewards"
+import {
+    DEGREE_CHALLENGE_RULES_BY_RANGE_KIND,
+    DEGREE_CLIENT_PROGRESS_CONDITIONS,
+    DEGREE_COLLECT_ITEM_COLUMN,
+    DEGREE_COLLECT_ITEM_CONDITION,
+    DEGREE_FACT_FAMILIES_BY_CONDITION,
+    DEGREE_PERSISTED_CONDITIONS,
+    DEGREE_PRACTICE_RANGE_KIND,
+    DEGREE_TYPE_23_SECTION_BY_RANGE_KIND,
+    DEGREE_TYPE_28_FAMILY_BY_STATISTICS_CODE,
+} from "./requirements/condition-routing"
 
 export const DEGREE_SUPPORTED_FAMILIES = {
     playerRank: "degree_player_rank_growth_", companionCount: "degree_companion_add_",
@@ -107,43 +123,16 @@ export function getEpisodeChapter(
     return parsePositiveSafeIntegerMasterValue(definition.row[9])
 }
 
-const PLAYER_PREFIXES = [
-    DEGREE_SUPPORTED_FAMILIES.playerRank, DEGREE_SUPPORTED_FAMILIES.staminaUseCount,
-    DEGREE_SUPPORTED_FAMILIES.loginCount, DEGREE_SUPPORTED_FAMILIES.dashUse,
-    DEGREE_SUPPORTED_FAMILIES.comboOneTime,
-] as const
-
-const CHARACTER_PREFIXES = [
-    DEGREE_SUPPORTED_FAMILIES.companionCount, DEGREE_SUPPORTED_FAMILIES.overLimitCount,
-    DEGREE_SUPPORTED_FAMILIES.bondTokenCount,
-] as const
-
-const BATTLE_COUNTER_PREFIXES = [
-    DEGREE_SUPPORTED_FAMILIES.singleSsCount, DEGREE_SUPPORTED_FAMILIES.multiClearCount,
-    DEGREE_SUPPORTED_FAMILIES.multiHostClearCount, DEGREE_SUPPORTED_FAMILIES.challengeDungeonClear,
-    DEGREE_SUPPORTED_FAMILIES.scoreClearSingle, DEGREE_SUPPORTED_FAMILIES.timeClearSingle,
-    DEGREE_SUPPORTED_FAMILIES.skillUse,
-] as const
-
 const AGGREGATE_BOSS_BATTLE_CLEAR_PATTERNS: ReadonlyMap<number, string> = new Map([
     [30000, "degree_boss_battle_clear_1"],
     [30010, "degree_boss_battle_clear_2"],
     [30020, "degree_boss_battle_clear_3"],
 ])
 
-const DEGREE_BATTLE_STAT_PREFIXES = [
-    DEGREE_SUPPORTED_FAMILIES.feverCount, DEGREE_SUPPORTED_FAMILIES.feverTime,
-    DEGREE_SUPPORTED_FAMILIES.debuffEnemy, DEGREE_SUPPORTED_FAMILIES.clearEnemyBuff,
-    DEGREE_SUPPORTED_FAMILIES.clearSelfDebuff, DEGREE_SUPPORTED_FAMILIES.buffParty,
-    DEGREE_SUPPORTED_FAMILIES.healParty, DEGREE_SUPPORTED_FAMILIES.emotionUse,
-    DEGREE_SUPPORTED_FAMILIES.enemyKill, DEGREE_SUPPORTED_FAMILIES.weakPointAttack,
-    DEGREE_SUPPORTED_FAMILIES.powerFlipLv3, DEGREE_SUPPORTED_FAMILIES.coffinReduced,
-    DEGREE_SUPPORTED_FAMILIES.damageMax, DEGREE_SUPPORTED_FAMILIES.revivalCoffinMax,
-    DEGREE_SUPPORTED_FAMILIES.partyPowerMax, DEGREE_SUPPORTED_FAMILIES.skillChainMax,
-] as const
-
-function startsWithAny(pattern: string, prefixes: readonly string[]): boolean {
-    return prefixes.some(prefix => pattern.startsWith(prefix))
+function parseNonnegativeCondition(value: unknown): number | undefined {
+    const parsed = parsePositiveSafeIntegerMasterValue(value)
+    if (parsed !== undefined) return parsed
+    return value === "0" || value === 0 ? 0 : undefined
 }
 
 function isAggregateBossBattleClearDefinition(definition: MissionMasterDefinition): boolean {
@@ -160,95 +149,93 @@ function isAggregateBossBattleClearDefinition(definition: MissionMasterDefinitio
         && definition.row[12] === "(None)"
 }
 
-function isPersistedProgressDefinition(definition: MissionMasterDefinition): boolean {
-    const conditionType = parsePositiveSafeIntegerMasterValue(definition.row[3])
-    if (getDegreeClientProgressPattern(definition) !== undefined) return true
-    if (conditionType === 3 && definition.pattern.startsWith("degree_treasure_shop_mana_use_")) return true
-    if (conditionType === 19 && definition.pattern.startsWith("degree_mvp_get_")) return true
-    if (conditionType === 34 && definition.pattern.startsWith("degree_equipment_awake_")) return true
-    if (conditionType === 35 && definition.pattern.startsWith("degree_abilitiesoul_use_")) return true
-    if (conditionType !== 23 || definition.row[11] !== "" || definition.row[12] !== "(None)") {
-        return false
-    }
-    const rangeKind = parsePositiveSafeIntegerMasterValue(definition.row[8])
-    return rangeKind === 2 || (rangeKind === 5 && definition.row[10] === "")
-}
-
+/**
+ * Condition-number routing for Degree missions. Pinned audited contracts —
+ * the three aggregate boss counters and the client-reported selectors —
+ * stay first and fail closed on field drift; everything else routes by
+ * condition number with the range kind, statistics code, and selector
+ * columns as discriminators. The retired DEGREE_SUPPORTED_FAMILIES prefix
+ * routing survives as a startup cross-check in
+ * requirements/routing-validation.ts.
+ */
 export function getDegreeMissionFactRequirements(
     definition: MissionMasterDefinition,
     catalog?: MissionCatalog,
 ): DegreeMissionFactRequirements | undefined {
     if (definition.category !== 5) return undefined
-    const { missionId, pattern } = definition
+    const { missionId } = definition
     if (AGGREGATE_BOSS_BATTLE_CLEAR_PATTERNS.has(missionId)) {
         return isAggregateBossBattleClearDefinition(definition)
             ? { factFamilies: ["missionBattleCounters"] }
             : undefined
     }
-    if (isPersistedProgressDefinition(definition)) return { factFamilies: [] }
+    // Condition 0 (login days) is a legal master value; parse non-negative.
+    const conditionType = parseNonnegativeCondition(definition.row[3])
+    if (conditionType === undefined) return undefined
 
-    const conditionType = parsePositiveSafeIntegerMasterValue(definition.row[3])
-    if (startsWithAny(pattern, PLAYER_PREFIXES)) return { factFamilies: ["player"] }
-    if (startsWithAny(pattern, CHARACTER_PREFIXES)) return { factFamilies: ["characters"] }
-    if (pattern.startsWith(DEGREE_SUPPORTED_FAMILIES.manaBoardCount)) {
-        return { factFamilies: ["manaNodes"] }
-    }
-    if (startsWithAny(pattern, BATTLE_COUNTER_PREFIXES)) {
-        return { factFamilies: ["missionBattleCounters"] }
-    }
-    if (startsWithAny(pattern, DEGREE_BATTLE_STAT_PREFIXES)) {
-        return { factFamilies: ["degreeBattleStats"] }
-    }
-    if (isAuthoritativeCharacterLevelMission(missionId, definition, catalog)) {
-        return { factFamilies: ["characters"] }
-    }
-    if (getSpecificCharacterBondId(missionId, definition) !== undefined) {
-        return { factFamilies: ["characters"] }
-    }
-    if (isSecondManaBoardAggregateMission(missionId, definition)
-        || getSecondManaBoardCharacterId(missionId, definition) !== undefined) {
-        return { factFamilies: ["characters", "manaNodes"] }
-    }
-    if (getEpisodeChapter(missionId, definition) !== undefined) {
-        return { factFamilies: ["episodeChapters"] }
-    }
-    if (conditionType === 21 && pattern.startsWith(DEGREE_SUPPORTED_FAMILIES.episodeClearCount)) {
-        return { factFamilies: ["episodeClearCount"] }
-    }
-    if (conditionType === 26 && pattern.startsWith("degree_practice_rank_ss_clear_")) {
-        return { factFamilies: ["practiceRanks"] }
-    }
-    if (conditionType === 45 && pattern.startsWith("degree_treasure_shop_buy_count_")) {
-        return { factFamilies: ["treasureShop"] }
-    }
-    if (conditionType === 14 && pattern.startsWith("degree_boss_battle_ex_clear_single_")) {
-        return { factFamilies: [], finishedQuestSection: 2, bossBattleSuperQuest: true }
+    // Client-reported progress selectors and operation-backed shapes.
+    if (DEGREE_CLIENT_PROGRESS_CONDITIONS.has(conditionType)) return { factFamilies: [] }
+    if (DEGREE_PERSISTED_CONDITIONS.has(conditionType)) return { factFamilies: [] }
+
+    const rangeKind = parsePositiveSafeIntegerMasterValue(definition.row[8])
+    if (conditionType === 23) {
+        // Selector-shaped battle clears keep their atomic producer; the
+        // haniwa (15) and steam-robot (19) range kinds are finished quests.
+        if (definition.row[11] === "" && definition.row[12] === "(None)"
+            && (rangeKind === 2 || (rangeKind === 5 && definition.row[10] === ""))) {
+            return { factFamilies: [] }
+        }
+        const section = rangeKind === undefined
+            ? undefined
+            : DEGREE_TYPE_23_SECTION_BY_RANGE_KIND[rangeKind]
+        return section === undefined
+            ? undefined
+            : { factFamilies: [], finishedQuestSection: section }
     }
     if (conditionType === 14) {
-        const sectionByRangeKind: Readonly<Record<number, number>> = { 5: 7, 9: 18, 14: 21 }
-        const rangeKind = parsePositiveSafeIntegerMasterValue(definition.row[8])
-        const section = rangeKind === undefined ? undefined : sectionByRangeKind[rangeKind]
-        if (section !== undefined) return { factFamilies: [], finishedQuestSection: section }
+        const rule = rangeKind === undefined
+            ? undefined
+            : DEGREE_CHALLENGE_RULES_BY_RANGE_KIND[rangeKind]
+        if (rule === undefined) return undefined
+        return rule.kind === "battleCounters"
+            ? { factFamilies: ["missionBattleCounters"] }
+            : {
+                factFamilies: [],
+                finishedQuestSection: rule.section,
+                ...(rule.bossBattleSuperQuest ? { bossBattleSuperQuest: true } : {}),
+            }
     }
-    if (conditionType === 23) {
-        const sectionByRangeKind: Readonly<Record<number, number>> = { 15: 22, 19: 26 }
-        const rangeKind = parsePositiveSafeIntegerMasterValue(definition.row[8])
-        const section = rangeKind === undefined ? undefined : sectionByRangeKind[rangeKind]
-        if (section !== undefined) return { factFamilies: [], finishedQuestSection: section }
+    if (conditionType === 26) {
+        if (rangeKind === DEGREE_PRACTICE_RANGE_KIND) return { factFamilies: ["practiceRanks"] }
+        if (rangeKind === undefined) return { factFamilies: ["missionBattleCounters"] }
+        return undefined
     }
-    if (conditionType === 37 && pattern.startsWith(DEGREE_SUPPORTED_FAMILIES.craftPointGet)) {
-        return { factFamilies: ["craftPoint"] }
+    if (conditionType === 28) {
+        const families = DEGREE_TYPE_28_FAMILY_BY_STATISTICS_CODE[Number(definition.row[4])]
+        return families === undefined ? undefined : { factFamilies: families }
     }
-    if (conditionType === 37 && pattern.startsWith("degree_collect_item_event_")) {
-        const itemId = parsePositiveSafeIntegerMasterValue(definition.row[13])
-        return itemId !== undefined
-            ? { factFamilies: ["collectedItems"], collectedItemId: itemId }
+    if (conditionType === DEGREE_COLLECT_ITEM_CONDITION) {
+        const itemId = parsePositiveSafeIntegerMasterValue(
+            definition.row[DEGREE_COLLECT_ITEM_COLUMN],
+        )
+        if (itemId === undefined) return undefined
+        return itemId === DEFAULT_CRAFT_POINT_ITEM_ID
+            ? { factFamilies: ["craftPoint"] }
+            : { factFamilies: ["collectedItems"], collectedItemId: itemId }
+    }
+    if (conditionType === 44) {
+        return getSpecificCharacterBondId(missionId, definition) !== undefined
+            ? { factFamilies: ["characters"] }
             : undefined
     }
-    if (conditionType === 36 && pattern.startsWith("degree_equipment_lv5_get_")) {
-        return { factFamilies: ["equipment"] }
+    if (conditionType === 22) {
+        const chapter = parsePositiveSafeIntegerMasterValue(definition.row[9])
+        return chapter === undefined
+            ? undefined
+            : { factFamilies: ["episodeChapters"] }
     }
-    return undefined
+    const families = DEGREE_FACT_FAMILIES_BY_CONDITION[conditionType]
+    return families === undefined ? undefined : { factFamilies: families }
 }
 
 export function getDegreeContextRequirements(

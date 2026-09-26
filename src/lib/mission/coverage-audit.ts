@@ -204,18 +204,20 @@ function degreePartition(): MissionCoveragePartition {
 }
 
 function passPartition(): MissionCoveragePartition {
+    // Provider-backed, same as the daily/collect/weekly partitions: the
+    // requirement provider is the single routing authority for the pass
+    // categories, so the partition cannot drift from settlement routing.
+    const catalog = getMissionCatalog()
     const definitions = [6, 7, 8].map(category => ({
         category,
-        definitions: getMissionCatalog().getDefinitions(category),
+        definitions: catalog.getDefinitions(category),
     }))
     const automated = new Set<string>()
     for (const { category, definitions: entries } of definitions) {
         for (const definition of entries) {
-            const type = definition.patternType
-            const supported = category === 6 && [14, 16, 28, 39].includes(type ?? -1)
-                || category === 7 && [16, 39, 85].includes(type ?? -1)
-                || category === 8 && [0, 16, 23].includes(type ?? -1)
-            if (supported) automated.add(`${category}:${definition.missionId}`)
+            if (getMissionRequirementDraft(definition, catalog).mode !== "unsupported") {
+                automated.add(`${category}:${definition.missionId}`)
+            }
         }
     }
     return createPartition(definitions, automated, (_category, definition) => (
