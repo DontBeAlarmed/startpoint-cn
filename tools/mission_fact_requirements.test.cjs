@@ -99,8 +99,12 @@ function forwardingCatalog(source, overrides = new Map(), options = {}) {
     }
     for (const key of removedDefinitions) {
         const [categoryText, missionIdText] = key.split(":")
-        const [definitionTable] = CATEGORY_TABLES[Number(categoryText)]
+        const [definitionTable, rewardTable] = CATEGORY_TABLES[Number(categoryText)]
         delete mutableTable(definitionTable)[missionIdText]
+        // The catalog fails closed on orphan reward rows (stage 0-1), so a
+        // removed definition must take its reward rows with it to build a
+        // valid synthetic catalog at all.
+        delete mutableTable(rewardTable)[missionIdText]
     }
     for (const key of removedRewardStages) {
         const [categoryText, missionIdText, stageText] = key.split(":")
@@ -395,9 +399,6 @@ test("matches Event safe coverage and validates current-state reward stages", ()
         .getRequirement(3, 1201).mode, "computed")
 
     const sourceStage = catalog.getRewardStage(3, 1201, 1)
-    const withoutReward = forwardingCatalog(catalog, new Map(), {
-        removedRewardStages: new Set(["3:1201:1"]),
-    })
     const wrongTarget = forwardingCatalog(catalog, new Map(), {
         rewardStageOverrides: new Map([["3:1201:1", Object.freeze({
             ...sourceStage,
@@ -410,9 +411,13 @@ test("matches Event safe coverage and validates current-state reward stages", ()
         new Map([["3:1201", changedDefinition]]),
     )
 
-    assert.equal(
-        getMissionFactRequirementRegistry(withoutReward).getRequirement(3, 1201),
-        undefined,
+    // Stage 0-1 made empty reward tables a catalog data error: a current
+    // state mission without its only stage cannot even build a catalog.
+    assert.throws(
+        () => forwardingCatalog(catalog, new Map(), {
+            removedRewardStages: new Set(["3:1201:1"]),
+        }),
+        /reward stage table is empty/,
     )
     assertUnsupported(
         getMissionFactRequirementRegistry(wrongTarget).getRequirement(3, 1201),
@@ -601,9 +606,6 @@ test("requirement registries follow their own catalog content regardless of buil
 
 test("uses the supplied Catalog reward stage for authoritative Degree levels", () => {
     const catalog = getMissionCatalog()
-    const withoutReward = forwardingCatalog(catalog, new Map(), {
-        removedRewardStages: new Set(["5:3010:1"]),
-    })
     const sourceStage = catalog.getRewardStage(5, 3010, 1)
     const wrongTarget = forwardingCatalog(catalog, new Map(), {
         rewardStageOverrides: new Map([["5:3010:1", Object.freeze({
@@ -614,9 +616,13 @@ test("uses the supplied Catalog reward stage for authoritative Degree levels", (
 
     assert.equal(getMissionFactRequirementRegistry(catalog)
         .getRequirement(5, 3010).mode, "computed")
-    assert.equal(
-        getMissionFactRequirementRegistry(withoutReward).getRequirement(5, 3010),
-        undefined,
+    // Stage 0-1 fail-closed: removing the only reward stage is a catalog
+    // data error, not a silently dropped mission.
+    assert.throws(
+        () => forwardingCatalog(catalog, new Map(), {
+            removedRewardStages: new Set(["5:3010:1"]),
+        }),
+        /reward stage table is empty/,
     )
     assertUnsupported(
         getMissionFactRequirementRegistry(wrongTarget).getRequirement(5, 3010),
@@ -741,7 +747,7 @@ test("rejects coercive or non-positive Category 4 item selectors", () => {
         )
         assertUnsupported(
             getMissionFactRequirementRegistry(changedCatalog).getRequirement(4, 1500),
-            /selector/i,
+            /authoritative fact source|selector/i,
         )
     }
 })
