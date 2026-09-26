@@ -5,7 +5,8 @@ import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getQuestFromCategorySync } from "../../lib/quest-content";
 import { getQuestUnlockCost } from "../../lib/quest-entry-content";
-import { generateDataHeaders } from "../../utils";
+import { generateDataHeaders, getServerTime } from "../../utils";
+import { isQuestOutOfPeriodAt, QUEST_OUT_OF_PERIOD_RESULT_CODE } from "../../lib/quest/open-period";
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
@@ -104,6 +105,21 @@ const routes = async (fastify: FastifyInstance) => {
             return reply.status(400).send({
                 "error": "Bad Request",
                 "message": "Quest not found."
+            })
+        }
+
+        // Unlocking must not burn one-time items on quests whose content
+        // window has already closed; quests without window columns stay
+        // unlockable, matching the battle-start gates.
+        if (isQuestOutOfPeriodAt(questData, getServerTime() * 1000)) {
+            console.log(`[QUEST] unlock out of period: category=${category} questId=${questId}`)
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(200).send({
+                "data_headers": generateDataHeaders({
+                    viewer_id: viewerId,
+                    result_code: QUEST_OUT_OF_PERIOD_RESULT_CODE,
+                }),
+                "data": {},
             })
         }
 

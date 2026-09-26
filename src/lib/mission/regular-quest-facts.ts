@@ -114,6 +114,18 @@ export function getRegularQuestFactSection(
     return getRegularQuestRule(definition, catalog)?.section
 }
 
+export function getRegularQuestMissionIdsBySection(
+    section: number,
+    catalog: MissionCatalog = getMissionCatalog(),
+): readonly number[] {
+    const missionIds: number[] = []
+    for (const [missionId, rule] of getRegularQuestRules(catalog)) {
+        if (rule.section === section) missionIds.push(missionId)
+    }
+    missionIds.sort((left, right) => left - right)
+    return Object.freeze(missionIds)
+}
+
 export function computeRegularQuestProgress(
     missionId: number,
     ctx: CategoryContext,

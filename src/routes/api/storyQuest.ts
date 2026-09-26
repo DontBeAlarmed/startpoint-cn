@@ -20,7 +20,8 @@ import {
 } from "../../lib/common-response/entities";
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
 import type { CommonResponseFragment } from "../../lib/common-response/model";
-import { settleCharacterStoryFactMissions } from "../../lib/mission/story-fact-settlement";
+import { settleCharacterStoryFactMissions, settleMainStoryFactMissions } from "../../lib/mission/story-fact-settlement";
+import { isQuestOutOfPeriodAt, QUEST_OUT_OF_PERIOD_RESULT_CODE } from "../../lib/quest/open-period";
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { getQuestJoinCharacterIds } from "../../lib/story-join-character";
 import { generateDataHeaders, getServerTime } from "../../utils";
@@ -54,7 +55,7 @@ function isStoryFinishCategory(category: number): boolean {
 
 type StoryFinishResult =
     | { ok: true, data: Record<string, unknown> }
-    | { ok: false, reason: "unsupported-category" | "quest-not-found" | "battle-quest" }
+    | { ok: false, reason: "unsupported-category" | "quest-not-found" | "battle-quest" | "out-of-period" }
 
 type StoryFinishFailureReason = Exclude<StoryFinishResult, { ok: true }>["reason"]
 
@@ -62,6 +63,7 @@ const storyFinishFailureMessages: Record<StoryFinishFailureReason, string> = {
     "unsupported-category": "Unsupported story quest category.",
     "quest-not-found": "Story quest not found.",
     "battle-quest": "Battle quest cannot be finished through story endpoint.",
+    "out-of-period": "Story quest is out of its open period.",
 }
 
 function storyFinishFailureBody(reason: StoryFinishFailureReason): { error: string, message: string } {
@@ -89,6 +91,13 @@ function processStoryQuestFinish(
     if (questData.sPlusReward !== undefined) {
         console.log(`[STORY] battle quest rejected: category=${questSection} questId=${questId}`)
         return { ok: false, reason: "battle-quest" }
+    }
+    // The CN 1.8.1 client maps result code 4050 on story finish to a
+    // dedicated OutOfPeriodError that backs out of the quest; quests whose
+    // window columns are absent stay open, matching the battle-start gates.
+    if (isQuestOutOfPeriodAt(questData, getServerTime() * 1000)) {
+        console.log(`[STORY] finish out of period: category=${questSection} questId=${questId}`)
+        return { ok: false, reason: "out-of-period" }
     }
 
     const transactionResult = getDb().transaction(() => {
@@ -135,9 +144,12 @@ function processStoryQuestFinish(
         }
 
         const evaluationTime = new Date(getServerTime() * 1000)
-        const missionSettlement = firstClear && questSection === QuestCategory.CHARACTER
-            ? settleCharacterStoryFactMissions(playerId, evaluationTime)
-            : null
+        const missionSettlement = !firstClear ? null
+            : questSection === QuestCategory.CHARACTER
+                ? settleCharacterStoryFactMissions(playerId, evaluationTime)
+                : questSection === QuestCategory.MAIN
+                    ? settleMainStoryFactMissions(playerId, evaluationTime)
+                    : null
         const playerAfter = getPlayerSync(playerId)
         if (playerAfter === null) throw new Error(`Player ${playerId} disappeared during story settlement.`)
         const existingCharacterList = [
@@ -206,6 +218,24 @@ function processStoryQuestFinish(
     return { ok: true, data: transactionResult }
 }
 
+function sendStoryFinishFailure(
+    reply: FastifyReply,
+    viewerId: number,
+    result: Extract<StoryFinishResult, { ok: false }>,
+) {
+    if (result.reason === "out-of-period") {
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            "data_headers": generateDataHeaders({
+                viewer_id: viewerId,
+                result_code: QUEST_OUT_OF_PERIOD_RESULT_CODE,
+            }),
+            "data": {},
+        })
+    }
+    return reply.status(400).send(storyFinishFailureBody(result.reason))
+}
+
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/finish", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as FinishBody
@@ -229,7 +259,7 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         const result = processStoryQuestFinish(playerId, viewerId, body.category, body.quest_id)
-        if (!result.ok) return reply.status(400).send(storyFinishFailureBody(result.reason))
+        if (!result.ok) return sendStoryFinishFailure(reply, viewerId, result)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -261,7 +291,7 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         const result = processStoryQuestFinish(playerId, viewerId, body.category, body.quest_id)
-        if (!result.ok) return reply.status(400).send(storyFinishFailureBody(result.reason))
+        if (!result.ok) return sendStoryFinishFailure(reply, viewerId, result)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
