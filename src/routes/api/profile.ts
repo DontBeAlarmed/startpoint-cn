@@ -8,7 +8,8 @@ import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 // removed getAccountPlayers "../../data/wdfpData";
-import { generateDataHeaders } from "../../utils";
+import { generateDataHeaders, getServerDate } from "../../utils";
+import { recordCollectProfileViewMissionFactsSync } from "../../lib/mission/collect-entry-facts";
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
 import { getOwnedPlayerDegreeIdsSync } from "../../data/domains/degree";
 import {
@@ -57,6 +58,12 @@ const routes = async (fastify: FastifyInstance) => {
 
         const player = getPlayerSync(playerId)
         if (!player) return reply.status(400).send({ error: "Bad Request", message: "Player not found." })
+
+        // Condition-88 collect missions (player_history_check): the client
+        // reports nothing for them; this request is the only server-visible
+        // own-profile view signal, so the fact is counted here. Record-only —
+        // the collect mission screen pulls progress on open.
+        recordCollectProfileViewMissionFactsSync(playerId, getServerDate())
 
         const characters = getPlayerCharactersSync(playerId)
         const charCount = Object.keys(characters).length

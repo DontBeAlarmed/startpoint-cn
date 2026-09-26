@@ -1024,6 +1024,17 @@ export default function init(
         FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
     )`).run()
 
+    // Collect-table login dedup lives in its own table: collect and event
+    // mission id spaces overlap (both carry e.g. id 1660), so the event
+    // table's (player_id, mission_id) key cannot host both categories.
+    database.prepare(`CREATE TABLE IF NOT EXISTS players_collect_mission_login_days (
+        player_id INTEGER NOT NULL,
+        mission_id INTEGER NOT NULL,
+        last_counted_day INTEGER NOT NULL,
+        PRIMARY KEY (player_id, mission_id),
+        FOREIGN KEY (player_id) REFERENCES players (id) ON DELETE CASCADE
+    )`).run()
+
     database.prepare(`CREATE TABLE IF NOT EXISTS players_character_election_votes (
         player_id INTEGER NOT NULL,
         election_id INTEGER NOT NULL,

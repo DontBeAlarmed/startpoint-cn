@@ -169,6 +169,8 @@ function getWeeklyRequirement(definition: MissionMasterDefinition): MissionFactR
 
 const COLLECT_BATTLE_PRODUCER_TYPES: ReadonlySet<number> = new Set([14, 16, 17, 18, 23, 26])
 const COLLECT_MANA_CONDITION_TYPE = 46
+const COLLECT_EVENT_LOGIN_CONDITION_TYPE = 0
+const COLLECT_PROFILE_VIEW_CONDITION_TYPE = 88
 
 function getCollectRequirement(definition: MissionMasterDefinition): MissionFactRequirementDraft {
     const itemId = parsePositiveSafeIntegerMasterValue(definition.row[14])
@@ -182,22 +184,19 @@ function getCollectRequirement(definition: MissionMasterDefinition): MissionFact
     }
     // Condition-number routing: battle shapes are served by the per-battle
     // producer through the collect range layout; mana spend by the spend-time
-    // hook. Both carry their own enable-window gates.
+    // hook; window login (0) and profile view (88) by the collect entry
+    // facts. All carry their own enable-window gates.
     const conditionType = Number(definition.row[4])
     if (COLLECT_BATTLE_PRODUCER_TYPES.has(conditionType)
         || conditionType === COLLECT_MANA_CONDITION_TYPE
-        || conditionType === 28 || conditionType === 31 || conditionType === 39) {
+        || conditionType === 28 || conditionType === 31 || conditionType === 39
+        || conditionType === COLLECT_EVENT_LOGIN_CONDITION_TYPE
+        || conditionType === COLLECT_PROFILE_VIEW_CONDITION_TYPE) {
         return { mode: "persisted" }
     }
     const currentState = getCollectCurrentStateShape(conditionType)
     if (currentState !== undefined) {
         return { mode: "computed", facts: currentState.facts }
-    }
-    if (conditionType === 0) {
-        return { mode: "unsupported", reason: "collect-event-window-login-fact-unavailable" }
-    }
-    if (conditionType === 88) {
-        return { mode: "unsupported", reason: "player-history-view-fact-unavailable" }
     }
     return { mode: "unsupported", reason: "Collect mission shape has no authoritative fact source." }
 }

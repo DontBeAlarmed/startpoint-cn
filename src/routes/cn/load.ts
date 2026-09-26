@@ -29,7 +29,8 @@ import { reconcileActiveMissionFactsWithResult } from "../../lib/mission/active-
 import {
     getEventLoginMissionId,
     recordEventLoginMissionFactSync,
-} from "../../lib/mission/event-entry-facts";
+} from "../../lib/mission/event-entry-facts"
+import { recordCollectLoginMissionFactsSync } from "../../lib/mission/collect-entry-facts"
 import { settleLoginFactMissions } from "../../lib/mission/login-fact-settlement";
 import { setCnMsgpackPendingEncoder } from "./msgpack";
 import { settleMissionCategories } from "../../lib/mission/settlement";
@@ -491,6 +492,18 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                     composeMissionSettlementResponse(
                         (payload as { data: Record<string, unknown> }).data,
                         projectMissionSettlementFragment(eventLoginSettlement),
+                        accountId,
+                    )
+                }
+                const collectLoginMissionIds = recordCollectLoginMissionFactsSync(playerId, now)
+                if (collectLoginMissionIds.length > 0) {
+                    const collectLoginSettlement = settleMissionCategories(playerId, [{
+                        category: 4,
+                        missionIds: collectLoginMissionIds,
+                    }], now)
+                    composeMissionSettlementResponse(
+                        (payload as { data: Record<string, unknown> }).data,
+                        projectMissionSettlementFragment(collectLoginSettlement),
                         accountId,
                     )
                 }
