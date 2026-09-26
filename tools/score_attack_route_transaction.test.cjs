@@ -348,6 +348,10 @@ stubModule("../src/data/domains/quest", {
         )
     },
     updatePlayerQuestProgressSync() {},
+    // The single write helper counts archived single clears since the
+    // quest-clear-archive fact landed; the stub keeps it a no-op like the
+    // other quest-counter writes this fixture isolates away.
+    incrementPlayerQuestSingleClearSync() {},
 })
 stubModule("../src/data/domains/character_clear", { incrementPlayerCharacterClearSync() {} })
 stubModule("../src/data/domains/mission_battle_facts", { recordMissionBattleResultSync() {} })

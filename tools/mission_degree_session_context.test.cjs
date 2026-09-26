@@ -57,7 +57,12 @@ test("Degree compute keeps using rules bound into an already-built context", () 
 
 test("Degree Session follows the supplied Catalog mission pattern instead of global Content", () => {
     const catalog = customDegreeCatalog(definitions => {
+        // Single-channel routing keys on the condition number (the client's
+        // MissionPatternKind id), so a drifted row moves its condition cell
+        // together with the pattern; pattern-only drift is startup
+        // validation territory (requirements/routing-validation.ts).
         definitions[1000][0][1] = "degree_companion_add_custom"
+        definitions[1000][0][3] = "4"
     })
     const calls = []
     const session = createSession(catalog, [1000], {
