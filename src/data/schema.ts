@@ -86,6 +86,11 @@ const schemaColumns = {
         column: "multi_clear_count",
         definition: "INTEGER NOT NULL DEFAULT 0",
     },
+    "players_quest_progress.single_clear_count": {
+        table: "players_quest_progress",
+        column: "single_clear_count",
+        definition: "INTEGER NOT NULL DEFAULT 0",
+    },
     "players_quest_progress.unlocked": {
         table: "players_quest_progress",
         column: "unlocked",

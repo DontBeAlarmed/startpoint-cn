@@ -693,6 +693,7 @@ export default function init(
         best_elapsed_time_ms INTEGER,
         leader_character_id INTEGER,
         multi_clear_count INTEGER NOT NULL DEFAULT 0,
+        single_clear_count INTEGER NOT NULL DEFAULT 0,
         host_finished INTEGER,
         player_id INTEGER NOT NULL,
         PRIMARY KEY (section, quest_id, player_id),
@@ -798,6 +799,16 @@ export default function init(
     ensureSchemaColumn(database, "players_quest_progress.leader_character_id")
     ensureSchemaColumn(database, "players_quest_progress.multi_clear_count")
     ensureSchemaColumn(database, "players_quest_progress.unlocked")
+    // Recomputable single-clear archive (mission completion D-3): legacy
+    // archives and restores of saves taken before the column gain it at
+    // zero; a finished row proves at least one clear, so the backfill pins
+    // the safe lower bound. Idempotent by the zero guard.
+    ensureSchemaColumn(database, "players_quest_progress.single_clear_count")
+    database.prepare(`
+        UPDATE players_quest_progress
+        SET single_clear_count = 1
+        WHERE finished = 1 AND single_clear_count = 0
+    `).run()
 
     ensureQuestHostFinishedStorageSync(database)
 
