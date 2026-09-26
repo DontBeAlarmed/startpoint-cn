@@ -21,9 +21,11 @@ const REGULAR_PERSISTED_PATTERNS = new Set([
     "twitter_check_mission_001",
 ])
 
-const DAILY_BATTLE_PRODUCER_IDS = new Set([
-    2, 7, 12, 10075, 800115, 800116, 800117, 800124, 800125, 800126, 800392,
+const DAILY_BATTLE_PRODUCER_TYPES: ReadonlySet<number> = new Set([
+    14, 16, 17, 18, 23, 26, 49, 50, 51, 52,
 ])
+
+const DAILY_PERIODIC_COMPUTED_TYPES: ReadonlySet<number> = new Set([0, 28, 39])
 
 const REGULAR_FACTS: Readonly<Record<string, readonly FactKey[]>> = Object.freeze({
     max_combo: [{ kind: "player" }],
@@ -112,7 +114,14 @@ function getDailyRequirement(definition: MissionMasterDefinition): MissionFactRe
         || definition.pattern === "daily_quest_stamina_use_2024_02") {
         return { mode: "computed", facts: [{ kind: "player" }, snapshot] }
     }
-    if (DAILY_BATTLE_PRODUCER_IDS.has(definition.missionId)) return { mode: "persisted" }
+    // Condition-number routing (data-driven): battle shapes are served by
+    // the per-battle producer through the shared quest-range translator;
+    // login, dash, and stamina shapes compute from periodic player facts.
+    const conditionType = Number(definition.row[2])
+    if (DAILY_BATTLE_PRODUCER_TYPES.has(conditionType)) return { mode: "persisted" }
+    if (DAILY_PERIODIC_COMPUTED_TYPES.has(conditionType)) {
+        return { mode: "computed", facts: [{ kind: "player" }, snapshot] }
+    }
     return {
         mode: "unsupported",
         reason: "Daily mission has no authoritative computed mapping or atomic producer.",

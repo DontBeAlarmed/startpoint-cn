@@ -112,7 +112,11 @@ assert.deepEqual(
 
 for (const invalid of [
     { questId: 200016001 },
-    { questId: 200015006 },
+    // Real advent quest of a different event (event 4): rejected by the
+    // event selector. Fabricated suffix ids inside the event no longer
+    // reject here — range semantics match the id space, and the finish
+    // pipeline guarantees the quest exists before producers run.
+    { questId: 4001 },
     { questCategory: 1, questId: 200015001 },
     { isMulti: false },
     { questAccomplished: false },
@@ -244,7 +248,10 @@ assert.deepEqual(
         isMulti: true,
         isMultiHost: true,
     }), anyBattleTime),
-    [800392],
+    // 2025-06-26 also has the 领主特选 boss-coop dailies (800380..800382,
+    // all-BossBattle wildcard) and the 应援特卖 any-coop daily (800391)
+    // open; condition-number routing counts them alongside 800392.
+    [800380, 800381, 800382, 800391, 800392],
     "通关单人/协力战斗每日任务必须接受成功协力结算",
 )
 recordDailyMissionBattleFacts({ ...anySingleBattleContext, questAccomplished: false }, anyBattleTime)
