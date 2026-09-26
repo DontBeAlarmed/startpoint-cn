@@ -247,7 +247,7 @@ test("propagates parent directory fsync errors without masking them during clean
 })
 
 test("ignores only unsupported parent directory fsync errors", () => {
-  for (const code of ["EINVAL", "ENOTSUP", "EOPNOTSUPP"]) {
+  for (const code of ["EINVAL", "ENOTSUP", "EOPNOTSUPP", "EPERM", "EISDIR"]) {
     const paths = makePaths()
     let calls = 0
     const store = makeStore(paths, {
