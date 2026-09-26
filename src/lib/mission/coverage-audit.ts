@@ -6,6 +6,7 @@ import { getProducerBackedEventEntryMissionIds } from "./event-entry-facts"
 import { getAwakeMissionRuleFamilies } from "./awake-rule-catalog"
 import type { AwakeMissionRuleFamilyName } from "./awake-rule-catalog"
 import { MissionMasterDefinition, getMissionCatalog } from "./mission-catalog"
+import { getMissionRequirementDraft } from "./requirements/providers"
 
 export interface MissionCoverageEntry {
     readonly category: number
@@ -27,9 +28,11 @@ export interface MissionCoveragePartition {
 }
 
 export interface MissionCoverageAudit {
-    readonly schemaVersion: 1
+    readonly schemaVersion: 2
     readonly regular: MissionCoveragePartition
+    readonly daily: MissionCoveragePartition
     readonly event: MissionCoveragePartition
+    readonly collect: MissionCoveragePartition
     readonly degree: MissionCoveragePartition
     readonly awake: {
         readonly total: number
@@ -45,6 +48,7 @@ export interface MissionCoverageAudit {
         readonly unresolvedMissionIds: readonly number[]
     }
     readonly pass: MissionCoveragePartition
+    readonly weekly: MissionCoveragePartition
 }
 
 function eventFallbackReason(row: readonly unknown[]): string {
@@ -84,6 +88,41 @@ const REGULAR_FALLBACK_REASON_BY_MISSION_ID: ReadonlyMap<number, string> = new M
     [107, "external-social-check-not-supported"],
     [108, "anniversary-window-semantics-unverified"],
 ])
+
+function dailyFallbackReason(definition: MissionMasterDefinition): string {
+    const patternType = Number(definition.row[2])
+    if (patternType === 20) return "rescue-source-unavailable"
+    return `authoritative-daily-fact-unavailable:type-${Number.isSafeInteger(patternType) ? patternType : "unknown"}`
+}
+
+function collectFallbackReason(definition: MissionMasterDefinition): string {
+    const patternType = Number(definition.row[4])
+    return `authoritative-collect-fact-unavailable:type-${Number.isSafeInteger(patternType) ? patternType : "unknown"}`
+}
+
+/**
+ * Daily, collect, and weekly partitions are derived from the requirement
+ * provider itself: a mission is automated when the provider routes it to a
+ * computed mapping or an atomic producer, and fallback otherwise. The
+ * provider is the single authority for these categories' wiring, so the
+ * partition can never drift from the actual settlement routing.
+ */
+function requirementBackedPartition(
+    category: number,
+    reason: (definition: MissionMasterDefinition) => string,
+): MissionCoveragePartition {
+    const catalog = getMissionCatalog()
+    const definitions = catalog.getDefinitions(category)
+    const automated = new Set<string>()
+    for (const definition of definitions) {
+        if (getMissionRequirementDraft(definition, catalog).mode !== "unsupported") {
+            automated.add(`${category}:${definition.missionId}`)
+        }
+    }
+    return createPartition([{ category, definitions }], automated, (_category, definition) => (
+        reason(definition)
+    ))
+}
 
 function regularPartition(): MissionCoveragePartition {
     return createPartition(
@@ -210,11 +249,17 @@ function awakeCoverage(): MissionCoverageAudit["awake"] {
 
 export function getMissionCoverageAudit(): MissionCoverageAudit {
     return Object.freeze({
-        schemaVersion: 1,
+        schemaVersion: 2,
         regular: regularPartition(),
+        daily: requirementBackedPartition(2, dailyFallbackReason),
         event: eventPartition(),
+        collect: requirementBackedPartition(4, collectFallbackReason),
         degree: degreePartition(),
         awake: awakeCoverage(),
         pass: passPartition(),
+        weekly: requirementBackedPartition(
+            10,
+            () => "authoritative-weekly-fact-unavailable",
+        ),
     })
 }
