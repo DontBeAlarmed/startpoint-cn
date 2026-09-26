@@ -6,6 +6,8 @@ import {
     updatePlayerCharacterSync,
 } from "../../../data/domains/character"
 import { incrementActiveMissionUsedManaCountSync } from "../../../data/domains/active_mission_counters"
+import { recordCollectMissionManaSpend } from "../../mission/collect-battle-facts"
+import { getServerTime } from "../../../utils"
 import { publishActiveMissionOwnerStateWithinTransaction } from "../../mission/active-publication-owner"
 import { recordSecondManaBoardCompletionMilestoneSync } from "../../../lib/player-history-milestones"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
@@ -177,6 +179,7 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
                     paidMana: resources.paidManaAfter,
                 })
                 incrementActiveMissionUsedManaCountSync(command.playerId, resources.totalManaCost)
+                recordCollectMissionManaSpend(command.playerId, resources.totalManaCost, new Date(getServerTime() * 1000))
                 for (const [itemId, amount] of resources.totalItemCosts) {
                     inventory.deduct(itemId, amount)
                 }

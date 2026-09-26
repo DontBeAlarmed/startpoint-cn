@@ -214,15 +214,16 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
     )
 
     assertPartition(report.collect)
+    assert.equal(
+        report.collect.automatedMissions.filter(entry => entry.missionId === 1660).length,
+        1,
+        "收集表全清依赖任务(如 1660)必须进入依赖结算覆盖",
+    )
     assert.deepEqual(
         { total: report.collect.total, automated: report.collect.automated, fallback: report.collect.fallback },
-        { total: 997, automated: 279, fallback: 718 },
+        { total: 997, automated: 650, fallback: 347 },
     )
-    assert.equal(
-        report.collect.fallbackMissions.filter(entry => entry.reason === "authoritative-collect-fact-unavailable:type-13").length,
-        120,
-        "收集表 120 条全清依赖任务必须留在 fallback 直到依赖结算接入",
-    )
+
 
     assertPartition(report.weekly)
     assert.deepEqual(

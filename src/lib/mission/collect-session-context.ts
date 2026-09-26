@@ -24,6 +24,13 @@ export function buildCollectCategoryContextFromSession(
         const collectedFacts = candidate.requirement.facts.filter(
             (fact): fact is CollectedItemsFactKey => fact.kind === "collectedItems",
         )
+        // Dependency-shaped computed missions (complete-all, condition 13)
+        // legitimately carry no collected-item facts; their progress derives
+        // from their dependency list in the post-evaluate completion pass.
+        if (collectedFacts.length === 0
+            && (candidate.requirement.missionDependencies?.length ?? 0) > 0) {
+            continue
+        }
         const selectedItemIds = collectedFacts.length === 1
             ? collectedFacts[0].itemIds
             : undefined

@@ -6,6 +6,8 @@ import {
 } from "../../../data/domains/character"
 import type { PlayerCharacter } from "../../../data/types"
 import { incrementActiveMissionUsedManaCountSync } from "../../../data/domains/active_mission_counters"
+import { recordCollectMissionManaSpend } from "../../mission/collect-battle-facts"
+import { getServerTime } from "../../../utils"
 import { publishActiveMissionOwnerStateWithinTransaction } from "../../mission/active-publication-owner"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
 import { getCharacterGrowthContent } from "../../character-growth-content"
@@ -162,6 +164,7 @@ export function executeAwakeManaNodes(command: AwakeManaNodesCommand): AwakeMana
                     paidMana: resources.paidManaAfter,
                 })
                 incrementActiveMissionUsedManaCountSync(command.playerId, resources.totalManaCost)
+                recordCollectMissionManaSpend(command.playerId, resources.totalManaCost, new Date(getServerTime() * 1000))
                 for (const [itemId, amount] of resources.totalItemCosts) {
                     inventory.deduct(itemId, amount)
                 }

@@ -4,6 +4,8 @@ import {
     getPlayerShopPurchaseCountsByTypeBulkSync,
 } from "../../data/domains/shopPurchase"
 import { incrementActiveMissionUsedManaCountSync } from "../../data/domains/active_mission_counters"
+import { recordCollectMissionManaSpend } from "../mission/collect-battle-facts"
+import { getServerTime } from "../../utils"
 import { publishActiveMissionOwnerStateWithinTransaction } from "../mission/active-publication-owner"
 import { getPlayerSync } from "../../data/domains/player"
 import { getDb } from "../../data/db"
@@ -187,6 +189,7 @@ export function executeShopPurchaseSync(
             let missionSettlement = null
             if (plan.manaSpent > 0) {
                 incrementActiveMissionUsedManaCountSync(input.playerId, plan.manaSpent)
+                recordCollectMissionManaSpend(input.playerId, plan.manaSpent, new Date(getServerTime() * 1000))
                 if (input.shopType === ShopType.TREASURE) {
                     missionSettlement = settleMissionOperationFactsSync(
                         input.playerId,

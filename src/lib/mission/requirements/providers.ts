@@ -1,5 +1,8 @@
 import type { FactKey } from "../facts/fact-key"
-import { getDailyCompletionDependencies } from "../daily-completion"
+import {
+    getDailyCompletionDependencies,
+    getCollectCompletionDependencies,
+} from "../daily-completion"
 import {
     getMissionCatalogCraftPointItemId,
     type MissionCatalog,
@@ -139,11 +142,28 @@ function getWeeklyRequirement(definition: MissionMasterDefinition): MissionFactR
     return { mode: "unsupported", reason: "Weekly mission pattern is not authoritative." }
 }
 
+const COLLECT_BATTLE_PRODUCER_TYPES: ReadonlySet<number> = new Set([14, 16, 17, 18, 23, 26])
+const COLLECT_MANA_CONDITION_TYPE = 46
+
 function getCollectRequirement(definition: MissionMasterDefinition): MissionFactRequirementDraft {
     const itemId = parsePositiveSafeIntegerMasterValue(definition.row[14])
-    return itemId !== undefined
-        ? { mode: "computed", facts: [{ kind: "collectedItems", itemIds: [itemId] }] }
-        : { mode: "unsupported", reason: "Collect mission item selector is invalid." }
+    if (itemId !== undefined) {
+        return { mode: "computed", facts: [{ kind: "collectedItems", itemIds: [itemId] }] }
+    }
+    const dependencies = getCollectCompletionDependencies(definition)
+        .map(missionId => ({ category: 4, missionId }))
+    if (dependencies.length > 0) {
+        return { mode: "computed", missionDependencies: dependencies }
+    }
+    // Condition-number routing: battle shapes are served by the per-battle
+    // producer through the collect range layout; mana spend by the spend-time
+    // hook. Both carry their own enable-window gates.
+    const conditionType = Number(definition.row[4])
+    if (COLLECT_BATTLE_PRODUCER_TYPES.has(conditionType)
+        || conditionType === COLLECT_MANA_CONDITION_TYPE) {
+        return { mode: "persisted" }
+    }
+    return { mode: "unsupported", reason: "Collect mission shape has no authoritative fact source." }
 }
 
 function getPassRequirement(definition: MissionMasterDefinition): MissionFactRequirementDraft {

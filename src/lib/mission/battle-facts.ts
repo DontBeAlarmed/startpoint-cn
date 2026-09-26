@@ -12,6 +12,7 @@ import { recordActiveMissionSpecificBattleFactsSync } from "./active-mission-spe
 import { createActiveBattleFactContext } from "./active-battle-fact-context"
 import { getActiveMissionPlan } from "./active-plan"
 import { recordDailyMissionBattleFacts } from "./daily-battle-facts"
+import { recordCollectMissionBattleFacts } from "./collect-battle-facts"
 import {
     getExactDegreeQuestClearMissionIds,
     recordDegreeMissionBattleFacts,
@@ -118,6 +119,7 @@ export function recordMissionBattleFacts(
     if (!ctx.questAccomplished) return { awakeMissionIds: [], degreeMissionIds: [] }
     recordDegreeBattleStatisticsSync(ctx)
     recordDailyMissionBattleFacts(ctx, evaluationTime)
+    recordCollectMissionBattleFacts(ctx, evaluationTime)
     recordEventMissionBattleFacts(ctx, evaluationTime)
     const degreeMissionIds = recordDegreeMissionBattleFacts({
         playerId: ctx.playerId,
