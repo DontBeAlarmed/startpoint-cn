@@ -96,6 +96,11 @@ function dailyFallbackReason(definition: MissionMasterDefinition): string {
 }
 
 function collectFallbackReason(definition: MissionMasterDefinition): string {
+    const draft = getMissionRequirementDraft(definition, getMissionCatalog())
+    if (draft.mode === "unsupported" && draft.reason !== undefined
+        && draft.reason !== "Collect mission shape has no authoritative fact source.") {
+        return draft.reason
+    }
     const patternType = Number(definition.row[4])
     return `authoritative-collect-fact-unavailable:type-${Number.isSafeInteger(patternType) ? patternType : "unknown"}`
 }

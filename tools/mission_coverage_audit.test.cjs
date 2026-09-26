@@ -219,8 +219,16 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
         "收集表全清依赖任务(如 1660)必须进入依赖结算覆盖",
     )
     assert.deepEqual(
+        report.collect.fallbackMissions.map(entry => [entry.missionId, entry.reason]),
+        [
+            [2089, "collect-event-window-login-fact-unavailable"],
+            [10166, "player-history-view-fact-unavailable"],
+        ],
+        "收集表仅剩的两条必须按精确缺口具名,不得泛化",
+    )
+    assert.deepEqual(
         { total: report.collect.total, automated: report.collect.automated, fallback: report.collect.fallback },
-        { total: 997, automated: 975, fallback: 22 },
+        { total: 997, automated: 995, fallback: 2 },
     )
 
 

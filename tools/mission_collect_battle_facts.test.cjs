@@ -239,4 +239,30 @@ assert.deepEqual(
 )
 assert.equal(collectProgress(2096), 40)
 
+// Current-state shapes (2024-03 window, event 11001): 2098 completes when
+// any character has a proven over-limit step; the state is a safe lower
+// bound merged with persisted progress.
+const { insertPlayerCharacterSync } = require("../src/data/domains/character")
+const stateTime = new Date("2024-01-01T00:00:00.000Z")
+insertPlayerCharacterSync(playerId, 10, {
+    entryCount: 1,
+    evolutionLevel: 0,
+    overLimitStep: 1,
+    protection: false,
+    joinTime: stateTime,
+    updateTime: stateTime,
+    exp: 0,
+    stack: 0,
+    manaBoardIndex: 1,
+    bondTokenList: [],
+})
+const stateSettlement = settleMissionCategories(playerId, [{ category: 4, eventId: 11001 }], new Date("2024-03-10T12:00:00.000Z"))
+assert.deepEqual(
+    stateSettlement.missionInfo.map(info => info.mission_id).includes(2098),
+    true,
+    "上限突破 current-state 任务必须在角色突破后结算",
+)
+const stateProgress = getPlayerCategoryMissionsSync(playerId, 4)[2098]?.progress ?? 0
+assert.equal(stateProgress, 1, "current-state 进度取安全下界 1")
+
 console.log("mission collect battle facts tests passed")

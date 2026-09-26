@@ -9,6 +9,7 @@ import {
     type MissionMasterDefinition,
 } from "../mission-catalog"
 import { getRegularQuestFactSection } from "../regular-quest-facts"
+import { getCollectCurrentStateShape } from "../collect-current-state"
 import { parsePositiveSafeIntegerMasterValue } from "../master-value"
 import { getAwakeRequirement } from "./provider-awake"
 import { getDegreeRequirement } from "./provider-degree"
@@ -172,6 +173,16 @@ function getCollectRequirement(definition: MissionMasterDefinition): MissionFact
         || conditionType === COLLECT_MANA_CONDITION_TYPE
         || conditionType === 28 || conditionType === 31 || conditionType === 39) {
         return { mode: "persisted" }
+    }
+    const currentState = getCollectCurrentStateShape(conditionType)
+    if (currentState !== undefined) {
+        return { mode: "computed", facts: currentState.facts }
+    }
+    if (conditionType === 0) {
+        return { mode: "unsupported", reason: "collect-event-window-login-fact-unavailable" }
+    }
+    if (conditionType === 88) {
+        return { mode: "unsupported", reason: "player-history-view-fact-unavailable" }
     }
     return { mode: "unsupported", reason: "Collect mission shape has no authoritative fact source." }
 }
