@@ -6,6 +6,7 @@ import {
     matchesBattleCountCondition,
     BATTLE_COUNT_CONDITION_TYPES,
 } from "./battle-count-condition"
+import { sumCollectZoneStatistic } from "./collect-battle-facts"
 
 /**
  * Daily battle facts are routed by condition number through the shared
@@ -31,6 +32,17 @@ export function recordDailyMissionBattleFacts(
     const matchedMissionIds: number[] = []
     for (const definition of catalog.getDefinitions(2)) {
         const conditionType = Number(definition.row[2])
+        if (conditionType === 28) {
+            // Non-dash zone-statistics dailies (statistics code in column 3);
+            // dash rows are computed from the periodic dash total.
+            if (getMissionRequirementDraft(definition, catalog).mode !== "persisted") continue
+            if (!isMissionMasterDefinitionEnabledAt(definition, evaluationTime)) continue
+            const amount = sumCollectZoneStatistic(context, definition.row[3])
+            if (amount === null || amount <= 0) continue
+            incrementPlayerCategoryMissionSync(context.playerId, 2, definition.missionId, amount)
+            matchedMissionIds.push(definition.missionId)
+            continue
+        }
         if (!BATTLE_COUNT_CONDITION_TYPES.has(conditionType)) continue
         // Computed shapes (core play/dash/stamina patterns) are served by the
         // periodic computer; producers only own persisted-mode rows.

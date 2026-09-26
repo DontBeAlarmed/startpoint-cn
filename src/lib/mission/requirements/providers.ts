@@ -127,6 +127,11 @@ function getDailyRequirement(definition: MissionMasterDefinition): MissionFactRe
         return { mode: "persisted" }
     }
     if (DAILY_PERIODIC_COMPUTED_TYPES.has(conditionType)) {
+        // Dash rows keep the periodic computed path (statistics code 2);
+        // other zone-statistics codes go through the per-battle producer.
+        if (conditionType === 28 && Number(definition.row[3]) !== 2) {
+            return { mode: "persisted" }
+        }
         return { mode: "computed", facts: [{ kind: "player" }, snapshot] }
     }
     return {
@@ -164,7 +169,8 @@ function getCollectRequirement(definition: MissionMasterDefinition): MissionFact
     // hook. Both carry their own enable-window gates.
     const conditionType = Number(definition.row[4])
     if (COLLECT_BATTLE_PRODUCER_TYPES.has(conditionType)
-        || conditionType === COLLECT_MANA_CONDITION_TYPE) {
+        || conditionType === COLLECT_MANA_CONDITION_TYPE
+        || conditionType === 28 || conditionType === 31 || conditionType === 39) {
         return { mode: "persisted" }
     }
     return { mode: "unsupported", reason: "Collect mission shape has no authoritative fact source." }

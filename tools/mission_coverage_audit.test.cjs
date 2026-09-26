@@ -220,7 +220,7 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
     )
     assert.deepEqual(
         { total: report.collect.total, automated: report.collect.automated, fallback: report.collect.fallback },
-        { total: 997, automated: 650, fallback: 347 },
+        { total: 997, automated: 975, fallback: 22 },
     )
 
 

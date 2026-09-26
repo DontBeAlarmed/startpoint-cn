@@ -188,4 +188,55 @@ assert.deepEqual(
     "依赖全部达标后,七条依赖与 1660 必须在同一次结算完成",
 )
 
+// Action shapes: 1745 (type 28, FEVER code 5, target 20, window from
+// 2020-07-31), 1738 (type 31, skill chain 9, window from 2020-07-21),
+// and a stamina-39 row 2096 (event 11001, target 100).
+const actionContext = context({
+    statistics: {
+        clear_phase: 1,
+        party: { characters: [], unison_characters: [] },
+        zones: [
+            { fever_count: 3, use_dash_count: 2, enemy_kill_count: 9 },
+            { fever_count: 2, use_dash_count: 1, enemy_kill_count: 4 },
+        ],
+        max_skill_chain_count: 11,
+    },
+})
+const actionTime = new Date("2020-08-01T12:00:00.000Z")
+// 1749 (enemy, code 7) shares the window; the dash row 1756 only opens on
+// 2020-08-13, so a second call inside its window proves the dash code.
+assert.deepEqual(
+    require("../src/lib/mission/collect-battle-facts").recordCollectMissionZoneStatisticsFacts(actionContext, actionTime),
+    [1745, 1749],
+    "zone 统计码必须按各自字段求和计入",
+)
+assert.equal(collectProgress(1745), 5, "FEVER 码 5 求和为 3+2")
+assert.equal(collectProgress(1749), 13, "敌人码 7 求和为 9+4")
+assert.deepEqual(
+    require("../src/lib/mission/collect-battle-facts").recordCollectMissionZoneStatisticsFacts(actionContext, new Date("2020-08-14T12:00:00.000Z")),
+    [1745, 1749, 1756],
+    "冲刺码 2 的任务开放后必须计入",
+)
+assert.equal(collectProgress(1756), 3, "冲刺码 2 求和为 2+1")
+assert.deepEqual(
+    require("../src/lib/mission/collect-battle-facts").recordCollectMissionSkillChainFacts(actionContext, actionTime),
+    [1738],
+    "技能连锁条件必须记录本场最大连锁",
+)
+assert.equal(collectProgress(1738), 11)
+assert.deepEqual(
+    require("../src/lib/mission/collect-battle-facts").recordCollectMissionSkillChainFacts(
+        { ...actionContext, statistics: { ...actionContext.statistics, max_skill_chain_count: 7 } },
+        actionTime,
+    ),
+    [1738],
+)
+assert.equal(collectProgress(1738), 11, "连锁进度必须只增不减")
+assert.deepEqual(
+    require("../src/lib/mission/collect-battle-facts").recordCollectMissionStaminaSpend(playerId, 40, new Date("2024-03-10T12:00:00.000Z")),
+    [2096, 2106, 2115],
+    "体力消耗记账必须命中开放期内的全部收集任务",
+)
+assert.equal(collectProgress(2096), 40)
+
 console.log("mission collect battle facts tests passed")

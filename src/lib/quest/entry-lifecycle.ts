@@ -1,4 +1,6 @@
 import { getRealNow } from "../../runtime/time/game-time"
+import { recordCollectMissionStaminaSpend } from "../mission/collect-battle-facts"
+import { getServerTime } from "../../utils"
 import { assertDailyChallengePointAvailable } from "./daily-challenge"
 import { STAMINA_OVERFLOW_MAX, computeRealTimeStamina } from "../stamina"
 import type { StartEntryCost } from "./start-entry"
@@ -252,6 +254,7 @@ export function commitEntryResources<TActiveQuest extends EntryLifecycleActiveQu
                 id: playerId,
                 totalStaminaUsed: (player.totalStaminaUsed ?? 0) + staminaUsed,
             })
+            recordCollectMissionStaminaSpend(playerId, staminaUsed, new Date(getServerTime() * 1000))
         }
     }
 
