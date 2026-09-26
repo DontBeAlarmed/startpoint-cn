@@ -53,8 +53,6 @@ function inAnniversaryWindow(definition) {
 // the documented out-of-scope shapes with named reasons.
 const ALLOWED_UNSUPPORTED = new Set([
     "rescue-source-unavailable",
-    "collect-event-window-login-fact-unavailable",
-    "player-history-view-fact-unavailable",
 ])
 
 test("every anniversary-window daily and collect mission is routed at replay time", () => {

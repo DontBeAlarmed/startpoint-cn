@@ -86,7 +86,6 @@ const REGULAR_FALLBACK_REASON_BY_MISSION_ID: ReadonlyMap<number, string> = new M
     [89, "rescue-source-unavailable"],
     [100, "rescue-source-unavailable"],
     [107, "external-social-check-not-supported"],
-    [108, "anniversary-window-semantics-unverified"],
 ])
 
 function dailyFallbackReason(definition: MissionMasterDefinition): string {
