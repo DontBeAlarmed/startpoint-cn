@@ -29,6 +29,7 @@ const DAILY_BATTLE_PRODUCER_TYPES: ReadonlySet<number> = new Set([
 ])
 
 const DAILY_PERIODIC_COMPUTED_TYPES: ReadonlySet<number> = new Set([0, 28, 39])
+const DAILY_GACHA_DRAW_CONDITION_TYPE = 78
 
 const REGULAR_FACTS: Readonly<Record<string, readonly FactKey[]>> = Object.freeze({
     max_combo: [{ kind: "player" }],
@@ -121,7 +122,10 @@ function getDailyRequirement(definition: MissionMasterDefinition): MissionFactRe
     // the per-battle producer through the shared quest-range translator;
     // login, dash, and stamina shapes compute from periodic player facts.
     const conditionType = Number(definition.row[2])
-    if (DAILY_BATTLE_PRODUCER_TYPES.has(conditionType)) return { mode: "persisted" }
+    if (DAILY_BATTLE_PRODUCER_TYPES.has(conditionType)
+        || conditionType === DAILY_GACHA_DRAW_CONDITION_TYPE) {
+        return { mode: "persisted" }
+    }
     if (DAILY_PERIODIC_COMPUTED_TYPES.has(conditionType)) {
         return { mode: "computed", facts: [{ kind: "player" }, snapshot] }
     }

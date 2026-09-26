@@ -1,4 +1,6 @@
 import { deepFreeze } from "../../content/deep-freeze"
+import { incrementActiveMissionGachaCharacterCountSync } from "../../data/domains/active_mission_counters"
+import { recordDailyGachaDrawFacts } from "../mission/gacha-draw-facts"
 import { getDb } from "../../data/db"
 import {
     clearPlayerCrazyGachaResultsSync,
@@ -334,6 +336,8 @@ export function selectCrazyGachaCandidateSync(input: {
             inventory,
         )
         const characters = new Map<number, Readonly<Record<string, unknown>>>()
+        incrementActiveMissionGachaCharacterCountSync(input.playerId, characterIds.length)
+        recordDailyGachaDrawFacts(input.playerId, characterIds.length, new Date(input.nowMs))
         const rewardItems: Record<number, number> = {}
         for (let index = 0; index < grant.entries.length; index += 1) {
             const outcome = grant.entries[index].outcome

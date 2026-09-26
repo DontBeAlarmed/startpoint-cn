@@ -1,4 +1,6 @@
 import { deepFreeze } from "../../content/deep-freeze"
+import { incrementActiveMissionGachaCharacterCountSync } from "../../data/domains/active_mission_counters"
+import { recordDailyGachaDrawFacts } from "../mission/gacha-draw-facts"
 import { getDb } from "../../data/db"
 import { getPlayerGachaInfoSync, updatePlayerGachaInfoSync } from "../../data/domains/gacha"
 import { insertReceiveHistoryBatchSync, MailType } from "../../data/domains/mail"
@@ -151,6 +153,8 @@ export function executeGachaExchangeSync(
         let characters: Readonly<Record<string, unknown>>[] = []
         let equipment: Readonly<Record<string, unknown>>[] = []
         if (outcome.kind === "character") {
+            incrementActiveMissionGachaCharacterCountSync(command.playerId, 1)
+            recordDailyGachaDrawFacts(command.playerId, 1, new Date(command.nowMs))
             characters = records([outcome.after], "Character")
             if (outcome.compensationItem !== null) {
                 rewardItems[outcome.compensationItem.itemId] = outcome.compensationItem.afterAmount

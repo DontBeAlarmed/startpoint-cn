@@ -10,6 +10,7 @@ import {
     incrementActiveMissionGachaCampaignCountSync,
     incrementActiveMissionGachaCharacterCountSync,
 } from "../../data/domains/active_mission_counters"
+import { recordDailyGachaDrawFacts } from "../mission/gacha-draw-facts"
 import { publishActiveMissionOwnerStateWithinTransaction } from "../mission/active-publication-owner"
 import { insertReceiveHistoryBatchSync, MailType } from "../../data/domains/mail"
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
@@ -304,6 +305,7 @@ export function executeGachaDrawSync(command: GachaExecCommand): GachaExecResult
                 else updatePlayerGachaInfoSync(command.playerId, nextGachaData)
                 if (prepared.banner.kind === "character") {
                     incrementActiveMissionGachaCharacterCountSync(command.playerId, drawResult.length)
+                    recordDailyGachaDrawFacts(command.playerId, drawResult.length, new Date(command.nowMs))
                 }
                 if (plan.campaign !== null) {
                     incrementActiveMissionGachaCampaignCountSync(command.playerId)

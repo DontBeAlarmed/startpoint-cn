@@ -191,7 +191,7 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
     assertPartition(report.daily)
     assert.deepEqual(
         { total: report.daily.total, automated: report.daily.automated, fallback: report.daily.fallback },
-        { total: 656, automated: 646, fallback: 10 },
+        { total: 656, automated: 651, fallback: 5 },
     )
     assert.deepEqual(
         report.daily.automatedMissions
@@ -208,7 +208,6 @@ test("mission coverage audit reproduces current authoritative partitions", () =>
             return counts
         }, {}),
         {
-            "authoritative-daily-fact-unavailable:type-78": 5,
             "rescue-source-unavailable": 5,
         },
     )
