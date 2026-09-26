@@ -4,6 +4,7 @@ import { getMissionCatalog, isMissionMasterDefinitionEnabledAt } from "./mission
 import { getMissionRequirementDraft } from "./requirements/providers"
 import { matchesBattleCountCondition } from "./battle-count-condition"
 import { COLLECT_MISSION_RANGE_LAYOUT } from "./quest-range-translator"
+import { matchesZoneStatisticsCountCondition } from "./battle-count-condition"
 
 const COLLECT_BATTLE_CONDITION_TYPES: ReadonlySet<number> = new Set([14, 16, 17, 18, 23, 26])
 const COLLECT_MANA_CONDITION_TYPE = 46
@@ -138,6 +139,11 @@ export function recordCollectMissionZoneStatisticsFacts(
 
     const matchedMissionIds: number[] = []
     for (const definition of missions) {
+        if (!matchesZoneStatisticsCountCondition(
+            definition.row,
+            context,
+            COLLECT_MISSION_RANGE_LAYOUT,
+        )) continue
         const field = ZONE_STATISTICS_FIELDS[Number(definition.row[5])]
         const amount = field === undefined
             ? null

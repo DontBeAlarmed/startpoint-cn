@@ -7,6 +7,7 @@ import {
     BATTLE_COUNT_CONDITION_TYPES,
 } from "./battle-count-condition"
 import { sumCollectZoneStatistic } from "./collect-battle-facts"
+import { matchesZoneStatisticsCountCondition } from "./battle-count-condition"
 
 /**
  * Daily battle facts are routed by condition number through the shared
@@ -37,6 +38,7 @@ export function recordDailyMissionBattleFacts(
             // dash rows are computed from the periodic dash total.
             if (getMissionRequirementDraft(definition, catalog).mode !== "persisted") continue
             if (!isMissionMasterDefinitionEnabledAt(definition, evaluationTime)) continue
+            if (!matchesZoneStatisticsCountCondition(definition.row, context)) continue
             const amount = sumCollectZoneStatistic(context, definition.row[3])
             if (amount === null || amount <= 0) continue
             incrementPlayerCategoryMissionSync(context.playerId, 2, definition.missionId, amount)

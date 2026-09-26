@@ -102,13 +102,14 @@ function computeDaily(missionId: number, pattern: string, ctx: CategoryContext, 
         return Math.max(dbProgress, periodValue(ctx.player.totalStaminaUsed ?? 0, snapshot?.staminaUsed))
     }
     // Condition-number fallback for non-core shapes of the same semantics:
-    // login days, dash usage, and stamina usage over the daily period.
+    // login days, dash usage (statistics code 2 only — other codes are
+    // producer-served, mirroring the provider routing), and stamina.
     const definition = getMissionCatalog().getDefinition(2, missionId)
     const conditionType = definition === undefined ? undefined : Number(definition.row[2])
     if (conditionType === 0) {
         return Math.max(dbProgress, periodValue(ctx.player.totalLoginDays ?? 0, snapshot?.loginDays))
     }
-    if (conditionType === 28) {
+    if (conditionType === 28 && Number(definition?.row[3]) === 2) {
         return Math.max(dbProgress, periodValue(ctx.player.totalDashes ?? 0, snapshot?.dashCount))
     }
     if (conditionType === 39) {

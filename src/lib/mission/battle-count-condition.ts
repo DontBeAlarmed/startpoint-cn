@@ -20,8 +20,12 @@ const SINGLE_MODE = 1
 const MULTI_MODE = 2
 const ANY_MODE = 3
 
-function battleMode(row: readonly unknown[], conditionType: number): number {
-    const explicit = Number(row[5])
+function battleMode(
+    row: readonly unknown[],
+    conditionType: number,
+    layout: MissionQuestRangeLayout,
+): number {
+    const explicit = Number(row[layout.battleKindCol])
     if (explicit === SINGLE_MODE || explicit === MULTI_MODE || explicit === ANY_MODE) {
         return explicit
     }
@@ -45,7 +49,7 @@ export function matchesBattleCountCondition(
     context: BattleCountConditionContext,
     layout: MissionQuestRangeLayout = STANDARD_MISSION_RANGE_LAYOUT,
 ): boolean {
-    const mode = battleMode(row, conditionType)
+    const mode = battleMode(row, conditionType, layout)
     if (mode === SINGLE_MODE && context.isMulti === true) return false
     if (mode === MULTI_MODE && context.isMulti !== true) return false
     if (conditionType === 17 && context.isMultiHost !== true) return false
@@ -59,6 +63,26 @@ export function matchesBattleCountCondition(
         }
     }
 
+    const range: TranslatedMissionQuestRange | null = translateMissionQuestRange(row, layout)
+    if (range === null) return false
+    return range.matches(context.questCategory, context.questId)
+}
+
+/**
+ * Shared gate for condition 28 (battle_zone_statistics_count) rows: the
+ * battle-kind parameter and the range containment use the same per-family
+ * layout as the battle-count conditions, so statistics sums can never count
+ * battles the row's own range excludes. A blank battle-kind column means
+ * the official default "any battle".
+ */
+export function matchesZoneStatisticsCountCondition(
+    row: readonly unknown[],
+    context: BattleCountConditionContext,
+    layout: MissionQuestRangeLayout = STANDARD_MISSION_RANGE_LAYOUT,
+): boolean {
+    const mode = battleMode(row, 28, layout)
+    if (mode === SINGLE_MODE && context.isMulti === true) return false
+    if (mode === MULTI_MODE && context.isMulti !== true) return false
     const range: TranslatedMissionQuestRange | null = translateMissionQuestRange(row, layout)
     if (range === null) return false
     return range.matches(context.questCategory, context.questId)

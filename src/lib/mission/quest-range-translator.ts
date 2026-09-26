@@ -17,24 +17,35 @@
 export interface MissionQuestRangeLayout {
     readonly kindCol: number
     readonly selectorCols: readonly [number, number, number]
+    /**
+     * Column holding the battle_kind parameter (1 single / 2 multi / 3 any).
+     * Differs per table family: standard tables parse it at column 5
+     * (DailyMissionValues parseAt5), collect tables at column 7
+     * (CollectItemEventMissionValues parseAt7), pass tables at column 6
+     * (PassCardEventMissionValues parseAt6) — all client-verified.
+     */
+    readonly battleKindCol: number
 }
 
 /** regular / daily / event tables: kind at 7, selectors at 8..10. */
 export const STANDARD_MISSION_RANGE_LAYOUT: MissionQuestRangeLayout = Object.freeze({
     kindCol: 7,
     selectorCols: Object.freeze([8, 9, 10] as const),
+    battleKindCol: 5,
 })
 
 /** collect tables: kind at 9, selectors at 10..12. */
 export const COLLECT_MISSION_RANGE_LAYOUT: MissionQuestRangeLayout = Object.freeze({
     kindCol: 9,
     selectorCols: Object.freeze([10, 11, 12] as const),
+    battleKindCol: 7,
 })
 
 /** pass tables: kind at 8, selectors at 9..11. */
 export const PASS_MISSION_RANGE_LAYOUT: MissionQuestRangeLayout = Object.freeze({
     kindCol: 8,
     selectorCols: Object.freeze([9, 10, 11] as const),
+    battleKindCol: 6,
 })
 
 type SegmentStructure = "triple" | "eventId" | "practice" | "none"
