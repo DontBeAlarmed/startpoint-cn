@@ -45,7 +45,29 @@ interface FinishWithSkipBody {
 }
 
 function isStoryFinishCategory(category: number): boolean {
-    return category === QuestCategory.MAIN || category === QuestCategory.CHARACTER
+    return category === QuestCategory.MAIN
+        || category === QuestCategory.CHARACTER
+        || category === QuestCategory.ADVENT_EVENT_SINGLE
+        || category === QuestCategory.STORY_EVENT_SINGLE
+}
+
+type StoryFinishResult =
+    | { ok: true, data: Record<string, unknown> }
+    | { ok: false, reason: "unsupported-category" | "quest-not-found" | "battle-quest" }
+
+type StoryFinishFailureReason = Exclude<StoryFinishResult, { ok: true }>["reason"]
+
+const storyFinishFailureMessages: Record<StoryFinishFailureReason, string> = {
+    "unsupported-category": "Unsupported story quest category.",
+    "quest-not-found": "Story quest not found.",
+    "battle-quest": "Battle quest cannot be finished through story endpoint.",
+}
+
+function storyFinishFailureBody(reason: StoryFinishFailureReason): { error: string, message: string } {
+    return {
+        "error": "Bad Request",
+        "message": storyFinishFailureMessages[reason],
+    }
 }
 
 function processStoryQuestFinish(
@@ -53,22 +75,22 @@ function processStoryQuestFinish(
     viewerId: number,
     questSection: number,
     questId: number,
-) {
+): StoryFinishResult {
     if (!isStoryFinishCategory(questSection)) {
-        console.log(`[STORY] category is not supported by story finish: category=${questSection}`)
-        return null
+        console.log(`[STORY] category is not supported by story finish: category=${questSection} questId=${questId}`)
+        return { ok: false, reason: "unsupported-category" }
     }
     const questData = getQuestFromCategorySync(questSection, questId)
     if (questData === null) {
         console.log(`[STORY] quest not found: category=${questSection} questId=${questId}`)
-        return null
+        return { ok: false, reason: "quest-not-found" }
     }
     if (questData.sPlusReward !== undefined) {
         console.log(`[STORY] battle quest rejected: category=${questSection} questId=${questId}`)
-        return null
+        return { ok: false, reason: "battle-quest" }
     }
 
-    return getDb().transaction(() => {
+    const transactionResult = getDb().transaction(() => {
         const playerBefore = getPlayerSync(playerId)
         if (playerBefore === null) return null
 
@@ -176,6 +198,11 @@ function processStoryQuestFinish(
         }
         return responseData
     })()
+    if (transactionResult === null) {
+        console.log(`[STORY] story finish transaction returned null: category=${questSection} questId=${questId}`)
+        return { ok: false, reason: "quest-not-found" }
+    }
+    return { ok: true, data: transactionResult }
 }
 
 const routes = async (fastify: FastifyInstance) => {
@@ -201,15 +228,12 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         const result = processStoryQuestFinish(playerId, viewerId, body.category, body.quest_id)
-        if (result === null) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Invalid quest ID provided."
-        })
+        if (!result.ok) return reply.status(400).send(storyFinishFailureBody(result.reason))
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": result
+            "data": result.data
         })
     })
 
@@ -236,15 +260,12 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         const result = processStoryQuestFinish(playerId, viewerId, body.category, body.quest_id)
-        if (result === null) return reply.status(400).send({
-            "error": "Bad Request",
-            "message": "Invalid quest ID provided."
-        })
+        if (!result.ok) return reply.status(400).send(storyFinishFailureBody(result.reason))
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": result
+            "data": result.data
         })
     })
 }
