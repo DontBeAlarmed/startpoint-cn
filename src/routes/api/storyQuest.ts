@@ -49,6 +49,7 @@ function isStoryFinishCategory(category: number): boolean {
         || category === QuestCategory.CHARACTER
         || category === QuestCategory.ADVENT_EVENT_SINGLE
         || category === QuestCategory.STORY_EVENT_SINGLE
+        || category === QuestCategory.WORLD_STORY_EVENT
 }
 
 type StoryFinishResult =
