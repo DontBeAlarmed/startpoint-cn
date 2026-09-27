@@ -150,6 +150,20 @@ test("multiple problems are all reported with table and id", () => {
     )
 })
 
+test("duplicate stage table keys are a named row error, not a silent fold", () => {
+    const problems = captureProblems(repositoryWith({
+        "mission_regular_reward.json": { "101": {
+            "1": [validRewardRow()],
+            "01": [validRewardRow()],
+        } },
+    }))
+    assert.deepEqual(problems, [{
+        table: "mission_regular_reward.json mission 101",
+        id: "01",
+        reason: "table key appears more than once",
+    }])
+})
+
 test("bundled gameplay snapshot parses the real tables without problems", () => {
     const restore = require("./helpers/install-bundled-gameplay-snapshot.cjs")
         .installBundledGameplaySnapshot()

@@ -21,6 +21,19 @@ const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 const {
     bundledMissionContentRepository,
 } = require("./helpers/mission-catalog-bundled.cjs")
+const {
+    MissionCatalogDataError,
+} = require("../src/lib/mission/mission-catalog-source")
+
+function captureRowProblems(repository) {
+    try {
+        getMissionCatalog(repository)
+    } catch (error) {
+        assert.ok(error instanceof MissionCatalogDataError, "must throw MissionCatalogDataError")
+        return error.problems
+    }
+    return assert.fail("expected the catalog to reject this content")
+}
 
 const CATEGORY_LAYOUTS = Object.freeze({
     1: { definition: "mission_regular.json", reward: "mission_regular_reward.json", pattern: 0, start: 25, end: 26, progress: 1, rewardStart: 5 },
@@ -306,7 +319,7 @@ test("parses CN master dates strictly with leap-day validation", () => {
     assert.equal(catalog.isEnabledAt(1, 91, new Date("2025-01-01T00:00:00.000Z")), true)
 })
 
-test("requires authoritative positive safe event ids for categories 4, 6, 7, and 8", () => {
+test("rejects non-authoritative event ids and pattern types with named row errors", () => {
     const invalidEventIds = [
         undefined,
         "(None)",
@@ -315,36 +328,43 @@ test("requires authoritative positive safe event ids for categories 4, 6, 7, and
         "1.5",
         String(Number.MAX_SAFE_INTEGER + 1),
     ]
-    const tables = emptyTables()
     for (const category of [4, 6, 7, 8]) {
         const layout = CATEGORY_LAYOUTS[category]
         invalidEventIds.forEach((eventId, index) => {
             const missionId = index + 1
+            const tables = emptyTables()
             addMission(tables, category, String(missionId), {
                 1: [rewardRow(category, category * 1000 + missionId, 1)],
             }, { eventId: 1, pattern: `bad-event-${category}-${missionId}` })
             tables[layout.definition][String(missionId)][0][layout.event] = eventId
-        })
-        addMission(tables, category, "99", {
-            1: [rewardRow(category, category * 1000 + 99, 1)],
-        }, {
-            eventId: 7,
-            pattern: `valid-event-${category}`,
-            patternType: category === 8 ? 0 : 3,
+            const problems = captureRowProblems(repository(tables))
+            assert.deepEqual(problems, [{
+                table: layout.definition,
+                id: String(missionId),
+                reason: "event id column is not a positive integer",
+            }])
         })
     }
-    addMission(tables, 6, "100", { 1: [rewardRow(6, 6100, 1)] }, {
+
+    const patternTypeTables = emptyTables()
+    addMission(patternTypeTables, 6, "100", { 1: [rewardRow(6, 6100, 1)] }, {
         eventId: 7,
         pattern: "bad-pattern-type",
         patternType: "16junk",
     })
+    assert.deepEqual(captureRowProblems(repository(patternTypeTables)), [{
+        table: "mission_pass_daily.json",
+        id: "100",
+        reason: "pattern type column is not a non-negative integer",
+    }])
 
-    const catalog = getMissionCatalog(repository(tables))
-    for (const category of [4, 6, 7, 8]) {
-        assert.deepEqual(catalog.getMissionIds(category), [99], `category ${category}`)
-        assert.equal(catalog.getDefinition(category, 99).eventId, 7)
-    }
-    assert.equal(catalog.getDefinition(8, 99).patternType, 0)
+    // A valid event-scoped mission still parses, and the client-mirroring
+    // availability rule keeps non-positive or non-integer event scopes closed.
+    const validTables = emptyTables()
+    addMission(validTables, 4, "99", {
+        1: [rewardRow(4, 4099, 1)],
+    }, { eventId: 7, pattern: "valid-event-4" })
+    const catalog = getMissionCatalog(repository(validTables))
     const enabledAt = new Date("2026-06-01T00:00:00.000Z")
     for (const eventId of invalidEventIds) {
         assert.equal(catalog.isEnabledAt(4, 99, enabledAt, eventId), false)
@@ -352,61 +372,112 @@ test("requires authoritative positive safe event ids for categories 4, 6, 7, and
     assert.equal(catalog.isEnabledAt(4, 99, enabledAt, 7), true)
 })
 
-test("isolates invalid, duplicate, incomplete, and malformed missions from valid candidates", () => {
-    const tables = emptyTables()
-    const definitions = tables["mission_regular.json"]
-    const rewardTable = tables["mission_regular_reward.json"]
-    definitions["1"] = [definitionRow(1, "duplicate")]
-    definitions["01"] = [definitionRow(1, "duplicate")]
-    rewardTable["1"] = { 1: [rewardRow(1, 101, 1)] }
-    rewardTable["01"] = { 1: [rewardRow(1, 102, 1)] }
-    definitions["001"] = [definitionRow(1, "duplicate")]
-    rewardTable["001"] = { 1: [rewardRow(1, 103, 1)] }
-    definitions["0"] = [definitionRow(1, "invalid")]
-    rewardTable["0"] = { 1: [rewardRow(1, 1, 1)] }
-    definitions["20"] = [definitionRow(1, "definition-only")]
-    rewardTable["30"] = { 1: [rewardRow(1, 301, 1)] }
-    definitions["40"] = [definitionRow(1, "bad-stage")]
-    rewardTable["40"] = {
-        1: [rewardRow(1, 401, 1)],
-        2: [rewardRow(1, 402, 2), rewardRow(1, 403, 3)],
+test("reports duplicate, non-positive, incomplete, orphan, and malformed rows as named errors", () => {
+    function isolatedProblem(missions, rewards) {
+        const tables = emptyTables()
+        tables["mission_regular.json"] = missions
+        tables["mission_regular_reward.json"] = rewards
+        return captureRowProblems(repository(tables))
     }
-    definitions["50"] = [definitionRow(1, "duplicate-stage")]
-    rewardTable["50"] = {
-        1: [rewardRow(1, 501, 1)],
-        "01": [rewardRow(1, 502, 2)],
-    }
-    definitions["60"] = [definitionRow(1, "bad-reward")]
-    rewardTable["60"] = { 1: [rewardRow(1, "bad", "bad")] }
-    definitions["70"] = [definitionRow(1, "duplicate-reward-mission")]
-    rewardTable["70"] = { 1: [rewardRow(1, 701, 1)] }
-    rewardTable["070"] = { 1: [rewardRow(1, 702, 1)] }
-    addMission(tables, 1, "80", {
-        1: [rewardRow(1, 801, 8)],
-    }, { pattern: "valid-neighbor" })
+    const row = () => rewardRow(1, 901, 1)
 
-    const catalog = getMissionCatalog(repository(tables))
-    assert.deepEqual(catalog.getMissionIds(1), [80])
-    assert.equal(catalog.getDefinition(1, 80).pattern, "valid-neighbor")
-    assert.deepEqual(catalog.getDefinitionsByPattern("valid-neighbor").map(value => value.missionId), [80])
-    assert.deepEqual(catalog.getRewardStages(1, 80).map(value => value.stage), [1])
-    assert.equal(catalog.getRewardStage(1, 80, 1).missionRewardId, 801)
-    for (const pattern of [
-        "duplicate", "invalid", "definition-only", "bad-stage", "duplicate-stage", "bad-reward",
-        "duplicate-reward-mission",
-    ]) assert.deepEqual(catalog.getDefinitionsByPattern(pattern), [])
+    // Duplicate mission keys (raw "1"/"01"/"001" all normalize to id 1);
+    // the dropped definition also orphans its reward rows.
+    assert.deepEqual(isolatedProblem({
+        "1": [definitionRow(1, "duplicate")],
+        "01": [definitionRow(1, "duplicate")],
+    }, { "1": { 1: [row()] } }), [
+        {
+            table: "mission_regular.json",
+            id: "01",
+            reason: "table key appears more than once",
+        },
+        {
+            table: "mission_regular_reward.json",
+            id: "1",
+            reason: "reward stage rows exist without a mission definition",
+        },
+    ])
+    // Non-positive table keys fail on both sides.
+    assert.deepEqual(isolatedProblem({
+        "0": [definitionRow(1, "invalid")],
+    }, { "0": { 1: [row()] } }), [
+        {
+            table: "mission_regular.json",
+            id: "0",
+            reason: "table key is not a positive integer id",
+        },
+        {
+            table: "mission_regular_reward.json",
+            id: "0",
+            reason: "table key is not a positive integer id",
+        },
+    ])
+    // Definition without reward stage rows.
+    assert.deepEqual(isolatedProblem({
+        "20": [definitionRow(1, "definition-only")],
+    }, {}), [{
+        table: "mission_regular_reward.json",
+        id: "20",
+        reason: "mission has no reward stage rows",
+    }])
+    // Reward rows without a mission definition.
+    assert.deepEqual(isolatedProblem({}, {
+        "30": { 1: [row()] },
+    }), [{
+        table: "mission_regular_reward.json",
+        id: "30",
+        reason: "reward stage rows exist without a mission definition",
+    }])
+    // Malformed stage row bundle.
+    assert.deepEqual(isolatedProblem({
+        "40": [definitionRow(1, "bad-stage")],
+    }, { "40": { 1: [row()], 2: [row(), row()] } }), [{
+        table: "mission_regular_reward.json mission 40",
+        id: "2",
+        reason: "reward stage row bundle must contain exactly one row",
+    }])
+    // Duplicate stage table keys are named, never silently folded.
+    assert.deepEqual(isolatedProblem({
+        "50": [definitionRow(1, "duplicate-stage")],
+    }, { "50": { 1: [row()], "01": [row()] } }), [{
+        table: "mission_regular_reward.json mission 50",
+        id: "01",
+        reason: "table key appears more than once",
+    }])
+    // Malformed reward id/amount and duplicate reward mission keys.
+    assert.deepEqual(isolatedProblem({
+        "60": [definitionRow(1, "bad-reward")],
+    }, { "60": { 1: [rewardRow(1, "bad", "bad")] } }), [{
+        table: "mission_regular_reward.json mission 60",
+        id: "1",
+        reason: "mission reward id or target progress column is invalid",
+    }])
+    assert.deepEqual(isolatedProblem({
+        "70": [definitionRow(1, "duplicate-reward-mission")],
+    }, { "70": { 1: [row()] }, "070": { 1: [row()] } }), [
+        {
+            table: "mission_regular_reward.json",
+            id: "070",
+            reason: "table key appears more than once",
+        },
+        {
+            table: "mission_regular_reward.json",
+            id: "70",
+            reason: "mission has no reward stage rows",
+        },
+    ])
 })
 
-test("rejects malformed standard definitions and reward fields while preserving a healthy neighbor", () => {
-    const tables = emptyTables()
+test("rejects malformed standard definition and reward fields with named row errors", () => {
     const invalidRows = [
-        [11, row => { row[0] = "101junk" }],
-        [12, row => { row[0] = String(Number.MAX_SAFE_INTEGER + 1) }],
-        [13, row => { row[1] = "-1" }],
-        [14, row => { row[1] = "1junk" }],
-        [15, row => { row[5] = "-1" }],
-        [16, row => { row[6] = "-1" }],
-        [17, row => { row[6] = "-1junk" }],
+        [11, row => { row[0] = "101junk" }, "mission reward id or target progress column is invalid"],
+        [12, row => { row[0] = String(Number.MAX_SAFE_INTEGER + 1) }, "mission reward id or target progress column is invalid"],
+        [13, row => { row[1] = "-1" }, "mission reward id or target progress column is invalid"],
+        [14, row => { row[1] = "1junk" }, "mission reward id or target progress column is invalid"],
+        [15, row => { row[5] = "-1" }, "reward slot 1 kind is not a non-negative integer"],
+        [16, row => { row[6] = "-1" }, "reward slot 1 amount is not a non-negative integer"],
+        [17, row => { row[6] = "-1junk" }, "reward slot 1 amount is not a non-negative integer"],
         [18, row => {
             row[5] = "0"
             row[6] = "1"
@@ -414,46 +485,61 @@ test("rejects malformed standard definitions and reward fields while preserving 
             row[8] = "-1junk"
             row[9] = String(Number.MAX_SAFE_INTEGER + 1)
             row[10] = "NaN"
-        }],
-        [19, row => { row[7] = "0" }],
+        }, "reward slot 1 id column 2 is not a positive integer"],
+        [19, row => { row[7] = "0" }, "reward slot 1 id column 2 is not a positive integer"],
         [20, row => {
             row[5] = "2"
             row[9] = "0"
-        }],
+        }, "reward slot 1 id column 4 is not a positive integer"],
         [21, row => {
             row[5] = "4"
             row[8] = "0"
-        }],
+        }, "reward slot 1 id column 3 is not a positive integer"],
         [22, row => {
             row[5] = "6"
             row[6] = "0"
             row[10] = "0"
-        }],
-        [24, row => { row[1] = "Infinity" }],
-        [25, row => { row[5] = "NaN" }],
+        }, "reward slot 1 id column 5 is not a positive integer"],
+        [24, row => { row[1] = "Infinity" }, "mission reward id or target progress column is invalid"],
+        [25, row => { row[5] = "NaN" }, "reward slot 1 kind is not a non-negative integer"],
         [26, row => {
             row[5] = "(None)"
             row[6] = "-1junk"
             row[7] = "101junk"
-        }],
-        [27, row => { row[0] = "0" }],
-        [28, row => { row[6] = "Infinity" }],
-        [29, row => { row[1] = String(Number.MAX_SAFE_INTEGER + 1) }],
+        }, "reward slot 1 amount is not a non-negative integer"],
+        [27, row => { row[0] = "0" }, "mission reward id or target progress column is invalid"],
+        [28, row => { row[6] = "Infinity" }, "reward slot 1 amount is not a non-negative integer"],
+        [29, row => { row[1] = String(Number.MAX_SAFE_INTEGER + 1) }, "mission reward id or target progress column is invalid"],
     ]
-    for (const [missionId, mutate] of invalidRows) {
+    for (const [missionId, mutate, reason] of invalidRows) {
+        const tables = emptyTables()
         const row = rewardRow(1, missionId * 100 + 1, 1)
         mutate(row)
         addMission(tables, 1, String(missionId), { 1: [row] }, {
             pattern: `malformed-standard-${missionId}`,
         })
+        assert.deepEqual(captureRowProblems(repository(tables)), [{
+            table: "mission_regular_reward.json mission " + missionId,
+            id: "1",
+            reason,
+        }], `malformed standard row ${missionId}`)
     }
-    addMission(tables, 1, "23", { 1: [rewardRow(1, 2301, 1)] }, { pattern: "   " })
-    addMission(tables, 1, "99", { 1: [rewardRow(1, 9901, 9)] }, {
+
+    // A whitespace pattern fails at the definition level.
+    const blankTables = emptyTables()
+    addMission(blankTables, 1, "23", { 1: [rewardRow(1, 2301, 1)] }, { pattern: "   " })
+    assert.deepEqual(captureRowProblems(repository(blankTables)), [{
+        table: "mission_regular.json",
+        id: "23",
+        reason: "pattern column is empty or (None)",
+    }])
+
+    // The healthy neighbor parses on its own with unchanged semantics.
+    const healthyTables = emptyTables()
+    addMission(healthyTables, 1, "99", { 1: [rewardRow(1, 9901, 9)] }, {
         pattern: "  healthy-standard  ",
     })
-
-    const catalog = getMissionCatalog(repository(tables))
-    assert.deepEqual(catalog.getMissionIds(1), [99])
+    const catalog = getMissionCatalog(repository(healthyTables))
     assert.equal(catalog.getDefinition(1, 99).pattern, "  healthy-standard  ")
     assert.deepEqual(catalog.getRewardStage(1, 99, 1), {
         stage: 1,
@@ -463,38 +549,46 @@ test("rejects malformed standard definitions and reward fields while preserving 
     })
 })
 
-test("fails a whole awake mission when its authoritative character or special reward is malformed", () => {
-    const tables = emptyTables()
-    addMission(tables, 9, "11", { 1: [rewardRow(9, 111, 1)] }, {
+test("rejects malformed awake authority and special rewards with named row errors", () => {
+    const badCharacterTables = emptyTables()
+    addMission(badCharacterTables, 9, "11", { 1: [rewardRow(9, 111, 1)] }, {
         characterId: 0,
         pattern: "bad-character",
     })
-    addMission(tables, 9, "12", { 1: [rewardRow(9, 121, 1, {
+    assert.deepEqual(captureRowProblems(repository(badCharacterTables)), [{
+        table: "mission_char_awake.json",
+        id: "11",
+        reason: "awake character id column is not a positive integer",
+    }])
+
+    const badSpecialTables = emptyTables()
+    addMission(badSpecialTables, 9, "12", { 1: [rewardRow(9, 121, 1, {
         specialKind: "0",
         characterId: "123",
         boardIndex: undefined,
         awakeLevel: "2",
     })] }, { characterId: 123, pattern: "bad-special" })
-
-    const catalog = getMissionCatalog(repository(tables))
-    assert.deepEqual(catalog.getMissionIds(9), [])
-    assert.deepEqual(catalog.getAwakeMissionIdsByCharacter(123), [])
+    assert.deepEqual(captureRowProblems(repository(badSpecialTables)), [{
+        table: "mission_char_awake_reward.json mission 12",
+        id: "1",
+        reason: "awake special reward character/board/level column is invalid",
+    }])
 })
 
-test("rejects malformed awake special fields while preserving audited positive boundaries", () => {
-    const tables = emptyTables()
+test("rejects malformed awake special fields and clear seconds with named row errors", () => {
     const invalidRows = [
-        [21, row => { row[1] = "0junk" }],
-        [22, row => { row[1] = "-1" }],
-        [23, row => { row[2] = "101junk" }],
-        [24, row => { row[2] = String(Number.MAX_SAFE_INTEGER + 1) }],
-        [25, row => { row[3] = "0" }],
-        [26, row => { row[4] = "0" }],
-        [27, row => { row[6] = "-1" }],
-        [28, row => { row[6] = "90junk" }],
-        [29, row => { row[6] = String(Number.MAX_SAFE_INTEGER + 1) }],
+        [21, row => { row[1] = "0junk" }, "awake special reward kind is not a non-negative integer"],
+        [22, row => { row[1] = "-1" }, "awake special reward kind is not a non-negative integer"],
+        [23, row => { row[2] = "101junk" }, "awake special reward character/board/level column is invalid"],
+        [24, row => { row[2] = String(Number.MAX_SAFE_INTEGER + 1) }, "awake special reward character/board/level column is invalid"],
+        [25, row => { row[3] = "0" }, "awake special reward character/board/level column is invalid"],
+        [26, row => { row[4] = "0" }, "awake special reward character/board/level column is invalid"],
+        [27, row => { row[6] = "-1" }, "awake target clear seconds column is invalid"],
+        [28, row => { row[6] = "90junk" }, "awake target clear seconds column is invalid"],
+        [29, row => { row[6] = String(Number.MAX_SAFE_INTEGER + 1) }, "awake target clear seconds column is invalid"],
     ]
-    for (const [missionId, mutate] of invalidRows) {
+    for (const [missionId, mutate, reason] of invalidRows) {
+        const tables = emptyTables()
         const row = rewardRow(9, missionId * 10 + 1, 1, {
             specialKind: "0",
             characterId: "123",
@@ -507,17 +601,23 @@ test("rejects malformed awake special fields while preserving audited positive b
             characterId: 123,
             pattern: `malformed-awake-${missionId}`,
         })
+        assert.deepEqual(captureRowProblems(repository(tables)), [{
+            table: "mission_char_awake_reward.json mission " + missionId,
+            id: "1",
+            reason,
+        }], `malformed awake row ${missionId}`)
     }
-    addMission(tables, 9, "99", { 1: [rewardRow(9, 991, 1, {
+
+    // The audited positive boundary (targetClearSeconds 0) still parses.
+    const healthyTables = emptyTables()
+    addMission(healthyTables, 9, "99", { 1: [rewardRow(9, 991, 1, {
         specialKind: "0",
         characterId: "123",
         boardIndex: "1",
         awakeLevel: "1",
         targetClearSeconds: "0",
     })] }, { characterId: 123, pattern: "healthy-awake" })
-
-    const catalog = getMissionCatalog(repository(tables))
-    assert.deepEqual(catalog.getMissionIds(9), [99])
+    const catalog = getMissionCatalog(repository(healthyTables))
     assert.deepEqual(catalog.getRewardStage(9, 99, 1).specialReward, {
         characterId: 123,
         boardIndex: 1,

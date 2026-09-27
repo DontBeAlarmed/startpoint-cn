@@ -299,6 +299,9 @@ function parseStages(
     const tableName = `${source.rewardTable} mission ${missionId}`
     const normalized = normalizeEntries(stageTable, tableName)
     problems.push(...normalized.problems)
+    if (normalized.problems.length > 0) {
+        return { ok: false, problems: Object.freeze(problems) }
+    }
     if (normalized.values.size === 0) {
         problems.push({
             table: source.rewardTable,
