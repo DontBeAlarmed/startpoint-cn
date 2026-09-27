@@ -28,3 +28,6 @@ tsconfig.tsbuildinfo
 assets/gacha_odds/
 .cdn/zip_index.json
 tmp/
+
+# local implementation plans (kept untracked on purpose)
+docs/plans/
