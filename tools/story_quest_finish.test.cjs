@@ -79,9 +79,14 @@ const ADVENT_BATTLE_QUEST_ID = 100002003
 const STORY_SINGLE_PURE_STORY_QUEST_ID = 100002001
 // assets/story_event_single_quest.json["100002007"]: sPlusRewardId=1 (battle node).
 const STORY_SINGLE_BATTLE_QUEST_ID = 100002007
+// assets/world_story_event_quest.json["100100001"]: clearRewardId=1, no battle fields.
+const WORLD_STORY_PURE_STORY_QUEST_ID = 100100001
+// assets/world_story_event_quest.json["100100003"]: sPlusRewardId=1 (battle node).
+const WORLD_STORY_BATTLE_QUEST_ID = 100100003
 
 const ADVENT_EVENT_SINGLE_CATEGORY = 7 // QuestCategory.ADVENT_EVENT_SINGLE
 const STORY_EVENT_SINGLE_CATEGORY = 10 // QuestCategory.STORY_EVENT_SINGLE
+const WORLD_STORY_EVENT_CATEGORY = 18 // QuestCategory.WORLD_STORY_EVENT
 const UNKNOWN_CATEGORY = 999
 const NONEXISTENT_STORY_QUEST_ID = 199999999
 
@@ -105,6 +110,7 @@ const STORY_SINGLE_CLEAR_REWARD_FREE_VMONEY = 15
 // content data.
 const adventEventQuestTable = require("../assets/advent_event_quest.json")
 const storyEventSingleQuestTable = require("../assets/story_event_single_quest.json")
+const worldStoryEventQuestTable = require("../assets/world_story_event_quest.json")
 const clearRewardTable = require("../assets/clear_reward.json")
 const storyJoinCharacterTable = require("../assets/story_join_character.json")
 
@@ -574,6 +580,25 @@ test("content guardrail: bundled quest nodes and clear rewards match the focused
         1,
         "story_event_single_quest 100002007 must stay a battle node (sPlusRewardId present)",
     )
+    // World story (category 18) facts: 100100001 is a pure story node whose
+    // clear_reward 1 grant is the shared beads/freeVmoney row pinned above;
+    // 100100003 is a battle node. 100100001 also exists in
+    // world_story_event_boss_battle_quest.json (category 19, battle) — the
+    // category-scoped table lookup is what keeps the two apart.
+    assert.deepEqual(
+        {
+            clearRewardId: worldStoryEventQuestTable[String(WORLD_STORY_PURE_STORY_QUEST_ID)]?.clearRewardId,
+            sPlusRewardId: worldStoryEventQuestTable[String(WORLD_STORY_PURE_STORY_QUEST_ID)]?.sPlusRewardId,
+        },
+        { clearRewardId: 1, sPlusRewardId: undefined },
+        "world_story_event_quest 100100001 must stay a pure story node "
+        + "(clearRewardId 1, no battle sPlusRewardId)",
+    )
+    assert.equal(
+        worldStoryEventQuestTable[String(WORLD_STORY_BATTLE_QUEST_ID)]?.sPlusRewardId,
+        1,
+        "world_story_event_quest 100100003 must stay a battle node (sPlusRewardId present)",
+    )
     // RewardType.CHARACTER=2: clear_reward 100101 grants character 263009 —
     // the observable first-clear reward the category 7 tests assert on.
     assert.deepEqual(
@@ -596,6 +621,8 @@ test("content guardrail: bundled quest nodes and clear rewards match the focused
         ADVENT_BATTLE_QUEST_ID,
         STORY_SINGLE_PURE_STORY_QUEST_ID,
         STORY_SINGLE_BATTLE_QUEST_ID,
+        WORLD_STORY_PURE_STORY_QUEST_ID,
+        WORLD_STORY_BATTLE_QUEST_ID,
     ])
     const joinCharacterQuestIds = Object.values(storyJoinCharacterTable)
         .flatMap(rows => rows.map(row => Number(row[4])))
@@ -1058,5 +1085,185 @@ test("category 7 nonexistent quest 199999999 stays rejected with 400", async () 
         captureRewardObservableState(playerId),
         before,
         "rejected nonexistent quest must not change observable reward state",
+    )
+})
+
+// ---------------------------------------------------------------------------
+// World story event coverage (category 18 / WORLD_STORY_EVENT)
+//
+// The client resolves world story single quests (SingleQuestIdKind index 9) to
+// category 18 and sends their pure story nodes through story_quest/finish
+// (StoryQuestFinishLoadingTask handles them and its response path contains
+// WorldStoryEventSequelDetector.stockFirstClearedQuestToBeContinued for kind
+// index 9). 472 of the 913 bundled world_story_event rows have no battle
+// fields at all; they hit the same whitelist gap category 7/10 did.
+// ---------------------------------------------------------------------------
+
+test("[RED] category 18 pure story node 100100001 finishes via story_quest/finish", async t => {
+    t.diagnostic(
+        "RED evidence: expected to FAIL until the story finish category whitelist is extended to "
+        + "WORLD_STORY_EVENT(18). Baseline answers HTTP 400 "
+        + "('[STORY] category is not supported by story finish: category=18'). "
+        + "The assertion below targets the desired end state (HTTP 200) and must not be flipped.",
+    )
+    const { playerId, viewerId } = await createPlayer(21)
+    const before = captureRewardObservableState(playerId)
+    assert.equal(
+        getPlayerSingleQuestProgressSync(playerId, WORLD_STORY_EVENT_CATEGORY, WORLD_STORY_PURE_STORY_QUEST_ID),
+        null,
+        "fresh player must have no progress row for the world story node",
+    )
+    const result = await focusedFinish(viewerId, WORLD_STORY_PURE_STORY_QUEST_ID, WORLD_STORY_EVENT_CATEGORY)
+    assert.equal(
+        result.statusCode,
+        200,
+        `pure story world_story_event node must finish with 200, got: ${JSON.stringify(result)}`,
+    )
+    assert.ok(result.data, "story finish success response must include data")
+    assert.deepEqual(
+        result.data.story_join_character_id_list,
+        [],
+        "world story node 100100001 must not grant story join characters",
+    )
+    const progress = getPlayerSingleQuestProgressSync(
+        playerId,
+        WORLD_STORY_EVENT_CATEGORY,
+        WORLD_STORY_PURE_STORY_QUEST_ID,
+    )
+    assert.ok(progress, "story finish must create a progress row for world_story_event 100100001")
+    assert.equal(progress.finished, true, "story finish must mark quest 100100001 finished for category 18")
+    // Observable reward delta (grounded by the clear_reward 1 guardrail): the
+    // same beads row category 10's node uses, so first clear grants freeVmoney.
+    const after = captureRewardObservableState(playerId)
+    assert.equal(
+        after.freeVmoney,
+        before.freeVmoney + STORY_SINGLE_CLEAR_REWARD_FREE_VMONEY,
+        "first clear must grant clear_reward 1's 15 beads as freeVmoney",
+    )
+    assert.deepEqual(after.characters, before.characters, "world story clear reward must not grant characters")
+    assert.deepEqual(after.equipment, before.equipment, "world story clear reward must not grant equipment")
+    assert.deepEqual(after.items, before.items, "world story clear reward must not grant items")
+    assert.equal(after.freeMana, before.freeMana, "world story clear reward must not change free mana")
+    assert.equal(after.expPool, before.expPool, "world story clear reward must not change the exp pool")
+    assert.equal(
+        result.data.user_info.free_vmoney,
+        after.freeVmoney,
+        "response user_info must reflect the granted freeVmoney",
+    )
+})
+
+test("[RED] category 18 pure story node 100100001 finishes via story_quest/finish_with_skip", async t => {
+    t.diagnostic(
+        "RED evidence: expected to FAIL until the story finish category whitelist is extended; "
+        + "baseline answers HTTP 400 ('[STORY] category is not supported by story finish: category=18'). "
+        + "The assertion below targets the desired end state (HTTP 200) and must not be flipped.",
+    )
+    const { playerId, viewerId } = await createPlayer(22)
+    const result = await focusedFinish(
+        viewerId,
+        WORLD_STORY_PURE_STORY_QUEST_ID,
+        WORLD_STORY_EVENT_CATEGORY,
+        "finish_with_skip",
+    )
+    assert.equal(
+        result.statusCode,
+        200,
+        `pure story world_story_event node must finish_with_skip with 200, got: ${JSON.stringify(result)}`,
+    )
+    assert.ok(result.data, "story finish_with_skip success response must include data")
+    const progress = getPlayerSingleQuestProgressSync(
+        playerId,
+        WORLD_STORY_EVENT_CATEGORY,
+        WORLD_STORY_PURE_STORY_QUEST_ID,
+    )
+    assert.ok(progress, "finish_with_skip must create a progress row for world_story_event 100100001")
+    assert.equal(progress.finished, true, "finish_with_skip must mark quest 100100001 finished for category 18")
+})
+
+// After the whitelist extension the category-18 battle node reaches the
+// sPlusReward guard instead of the category gate, so the rejection carries the
+// discriminated battle-quest message and "[STORY]" log tag.
+test("category 18 battle world_story_event node 100100003 (sPlusRewardId) stays rejected with 400", async () => {
+    const { playerId, viewerId } = await createPlayer(23)
+    const before = captureRewardObservableState(playerId)
+    assert.equal(
+        getPlayerSingleQuestProgressSync(playerId, WORLD_STORY_EVENT_CATEGORY, WORLD_STORY_BATTLE_QUEST_ID),
+        null,
+        "no progress row may exist before the rejected call",
+    )
+    const { result, lines } = await captureStoryFinishLogs(() =>
+        focusedFinish(viewerId, WORLD_STORY_BATTLE_QUEST_ID, WORLD_STORY_EVENT_CATEGORY))
+    assert.equal(
+        result.statusCode,
+        400,
+        `battle world_story_event node must stay rejected with 400, got: ${JSON.stringify(result)}`,
+    )
+    assert.equal(result.body.error, "Bad Request", "400 body must keep the Bad Request shape")
+    assert.equal(
+        result.body.message,
+        BATTLE_QUEST_REJECTION_MESSAGE,
+        "battle quest rejection must use the discriminated battle-quest message",
+    )
+    assert.ok(
+        lines.some(line => line.startsWith("[STORY] battle quest rejected:")),
+        `server log must record the battle quest rejection separately, got: ${JSON.stringify(lines)}`,
+    )
+    assert.equal(
+        getPlayerSingleQuestProgressSync(playerId, WORLD_STORY_EVENT_CATEGORY, WORLD_STORY_BATTLE_QUEST_ID),
+        null,
+        "rejected battle quest must not create quest progress",
+    )
+    assert.deepEqual(
+        captureRewardObservableState(playerId),
+        before,
+        "rejected battle quest must not change observable reward state",
+    )
+})
+
+// Final-review follow-up: quest id 100002001 exists in BOTH the category 7 and
+// the category 10 tables with different rewards. The suite used to finish the
+// two on different players, so a refactor of the (player_id, section, quest_id)
+// progress key — e.g. dropping section — would not have been caught. One player
+// finishing both categories must keep two independent progress rows and grant
+// each first-clear reward exactly once.
+test("same player finishing quest 100002001 of category 7 and 10 keeps independent progress and rewards", async () => {
+    const { playerId, viewerId } = await createPlayer(24)
+    const before = captureRewardObservableState(playerId)
+
+    const adventFinish = await focusedFinish(viewerId, ADVENT_PURE_STORY_QUEST_ID, ADVENT_EVENT_SINGLE_CATEGORY)
+    assert.equal(adventFinish.statusCode, 200, `advent finish must succeed: ${JSON.stringify(adventFinish.body)}`)
+
+    const storySingleFinish = await focusedFinish(viewerId, STORY_SINGLE_PURE_STORY_QUEST_ID, STORY_EVENT_SINGLE_CATEGORY)
+    assert.equal(
+        storySingleFinish.statusCode,
+        200,
+        `story_event_single finish must succeed: ${JSON.stringify(storySingleFinish.body)}`,
+    )
+
+    assert.equal(
+        getPlayerSingleQuestProgressSync(playerId, ADVENT_EVENT_SINGLE_CATEGORY, ADVENT_PURE_STORY_QUEST_ID)?.finished,
+        true,
+        "category 7 progress row for 100002001 must exist and be finished",
+    )
+    assert.equal(
+        getPlayerSingleQuestProgressSync(playerId, STORY_EVENT_SINGLE_CATEGORY, STORY_SINGLE_PURE_STORY_QUEST_ID)?.finished,
+        true,
+        "category 10 progress row for 100002001 must exist and be finished",
+    )
+
+    const after = captureRewardObservableState(playerId)
+    assert.equal(
+        after.freeVmoney,
+        before.freeVmoney + STORY_SINGLE_CLEAR_REWARD_FREE_VMONEY,
+        "the category 10 beads grant must land exactly once across the two finishes",
+    )
+    assert.equal(
+        after.characters.length,
+        before.characters.length + 1,
+        "the category 7 clear-reward character must be granted exactly once across the two finishes",
+    )
+    assert.ok(
+        after.characters.some(([characterId]) => characterId === ADVENT_CLEAR_REWARD_CHARACTER_ID),
+        "the granted character must be clear_reward 100101's character 263009",
     )
 })
