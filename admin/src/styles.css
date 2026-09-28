@@ -1007,6 +1007,7 @@ html[data-theme="dark"] {
 .admin-badge-ok { color: var(--wind); border: 1.5px solid var(--wind); background: var(--ok-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .admin-badge-info { color: var(--water); border: 1.5px solid var(--water); background: var(--info-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .admin-badge-warn { color: var(--thunder); border: 1.5px solid var(--thunder); background: var(--warn-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.admin-badge-muted { color: var(--ink-soft); border: 1.5px solid var(--ink-soft); background: var(--th-bg); border-radius: 6px; padding: 3px 9px; font-size: 12px; font-weight: 600; line-height: 1; white-space: nowrap; }
 
 /* dashboard hero: card 「游戏主界面」 banner at the top of the overview page —
    2px strong border + star/sky tinted gradient wash + 右上角星黄光晕 (approved review
@@ -1696,4 +1697,13 @@ html[data-theme="dark"] .admin-res-lv {
   font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12px;
   white-space: pre-wrap;
+}
+
+/* news/gifts ops tables: the action column stays on one line — mobile-first: cells wrap
+   freely below 768px, the action row freezes to a single line above (删除按钮纪律:
+   桌面操作列不换行) */
+@media (min-width: 768px) {
+  .admin-ops-table .admin-action-row {
+    flex-wrap: nowrap;
+  }
 }

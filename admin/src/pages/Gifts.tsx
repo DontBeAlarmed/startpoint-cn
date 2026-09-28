@@ -6,9 +6,11 @@ import {
     Popconfirm,
     Space,
     Table,
+    Typography,
     message,
 } from "antd"
-import { Eye, Pencil, Plus, Trash2 } from "lucide-react"
+import { ReloadOutlined } from "@ant-design/icons"
+import { Eye, Pencil, Plus } from "lucide-react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { ApiError, apiDelete, apiGet, apiPost } from "../api/client"
@@ -84,25 +86,45 @@ export default function Gifts() {
         },
     })
 
+    const refresh = () => {
+        queryClient.invalidateQueries({ queryKey: ["adminGifts"] })
+        queryClient.invalidateQueries({ queryKey: ["adminGiftRedemptions"] })
+    }
+
     return (
         <AdminPage
-            eyebrow="OPERATIONS"
+            eyebrow="GIFTS"
             title="礼包"
             description="维护公共兑换 code 和奖励定义；领取记录只用于运营查看。"
             actions={(
-                <Button
-                    type="primary"
-                    icon={<Plus size={16} />}
-                    onClick={() => {
-                        setEditorGift(null)
-                        setEditorOpen(true)
-                    }}
-                >
-                    新建礼包
-                </Button>
+                <>
+                    <Button
+                        icon={<ReloadOutlined />}
+                        loading={gifts.isFetching}
+                        onClick={refresh}
+                    >
+                        刷新
+                    </Button>
+                    <Button
+                        type="primary"
+                        icon={<Plus size={16} />}
+                        onClick={() => {
+                            setEditorGift(null)
+                            setEditorOpen(true)
+                        }}
+                    >
+                        新建礼包
+                    </Button>
+                </>
             )}
         >
             <Space direction="vertical" size="large" className="admin-stack">
+                <div className="admin-page-note">
+                    <Typography.Text strong>礼包维护须知</Typography.Text>
+                    <Typography.Text type="secondary">
+                        删除礼包不可恢复，会清除全部领取记录，同 code 重建后可重新领取；启动中的礼包不提供编辑入口，需先停止再修改。
+                    </Typography.Text>
+                </div>
                 {gifts.isError && (
                     <Alert
                         type="error"
@@ -114,6 +136,7 @@ export default function Gifts() {
                 <Card title="公共礼包" className="admin-table-card">
                     <Table<AdminGiftRow>
                         rowKey="id"
+                        className="admin-ops-table"
                         loading={gifts.isLoading}
                         dataSource={gifts.data?.rows ?? []}
                         scroll={{ x: "max-content" }}
@@ -136,7 +159,7 @@ export default function Gifts() {
                                 width: 90,
                                 responsive: ["sm"] as any,
                                 render: (_, row) => (
-                                    <span className={row.status === "active" ? "admin-badge-ok" : "admin-badge-warn"}>
+                                    <span className={row.status === "active" ? "admin-badge-ok" : "admin-badge-muted"}>
                                         {row.status === "active" ? "启用" : "停止"}
                                     </span>
                                 ),
@@ -192,7 +215,7 @@ export default function Gifts() {
                                                 okButtonProps={{ danger: true }}
                                                 onConfirm={() => remove.mutate(row)}
                                             >
-                                                <Button danger size="small" icon={<Trash2 size={15} />}>
+                                                <Button size="small" type="text" danger>
                                                     删除
                                                 </Button>
                                             </Popconfirm>

@@ -83,7 +83,9 @@ export default function GiftRedemptions({ gift, onClose }: GiftRedemptionsProps)
                             dataIndex: "inherited",
                             width: 90,
                             responsive: ["sm"] as any,
-                            render: (value: boolean) => (value ? "是" : "否"),
+                            render: (value: boolean) => (value
+                                ? <span className="admin-badge-info">是</span>
+                                : <span className="admin-badge-muted">否</span>),
                         },
                         {
                             title: "来源 Player",

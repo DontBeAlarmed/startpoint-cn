@@ -1,6 +1,6 @@
 import { useEffect } from "react"
 import { Button, Form, Input, InputNumber, Modal, Select, Space, message } from "antd"
-import { Plus, Trash2 } from "lucide-react"
+import { Plus } from "lucide-react"
 import { useMutation, useQuery } from "@tanstack/react-query"
 
 import { apiGet, apiPatch, apiPost } from "../../api/client"
@@ -226,11 +226,11 @@ export default function GiftEditor({ gift, open, onClose, onSaved }: GiftEditorP
                                             <Button
                                                 type="text"
                                                 danger
-                                                icon={<Trash2 size={15} />}
                                                 disabled={fields.length <= 1}
                                                 onClick={() => remove(field.name)}
-                                                aria-label="移除奖励"
-                                            />
+                                            >
+                                                移除
+                                            </Button>
                                         </Space>
                                     )
                                 })}

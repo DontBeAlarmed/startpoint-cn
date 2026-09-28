@@ -7,10 +7,11 @@ import {
     Space,
     Switch,
     Table,
-    Tag,
+    Typography,
     message,
 } from "antd"
-import { Pencil, Plus, Trash2 } from "lucide-react"
+import { ReloadOutlined } from "@ant-design/icons"
+import { Pencil, Plus } from "lucide-react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { ApiError, apiDelete, apiGet, apiPatch } from "../api/client"
@@ -85,18 +86,37 @@ export default function News() {
         setEditorOpen(true)
     }
 
+    const refresh = () => {
+        queryClient.invalidateQueries({ queryKey: ["adminNews"] })
+    }
+
     return (
         <AdminPage
-            eyebrow="OPERATIONS"
+            eyebrow="NEWS"
             title="公告"
             description="维护客户端的主题公告、活动通知和问题公告；系统类别暂缓。"
             actions={(
-                <Button type="primary" icon={<Plus size={16} />} onClick={openCreate}>
-                    新建公告
-                </Button>
+                <>
+                    <Button
+                        icon={<ReloadOutlined />}
+                        loading={news.isFetching}
+                        onClick={refresh}
+                    >
+                        刷新
+                    </Button>
+                    <Button type="primary" icon={<Plus size={16} />} onClick={openCreate}>
+                        新建公告
+                    </Button>
+                </>
             )}
         >
             <Space direction="vertical" size="large" className="admin-stack">
+                <div className="admin-page-note">
+                    <Typography.Text strong>公告维护须知</Typography.Text>
+                    <Typography.Text type="secondary">
+                        删除公告为物理删除且无法恢复；公告内容使用客户端 RichText 标签，不支持属性和外部链接。
+                    </Typography.Text>
+                </div>
                 {news.isError && (
                     <Alert
                         type="error"
@@ -108,6 +128,7 @@ export default function News() {
                 <Card title="普通公告" className="admin-table-card">
                     <Table<AdminNewsRow>
                         rowKey="id"
+                        className="admin-ops-table"
                         loading={news.isLoading}
                         dataSource={news.data?.rows ?? []}
                         scroll={{ x: "max-content" }}
@@ -130,7 +151,7 @@ export default function News() {
                                 width: 100,
                                 responsive: ["sm"] as any,
                                 render: (category: AdminNewsRow["category"]) => (
-                                    <Tag>{CATEGORY_LABELS[category]}</Tag>
+                                    <span className="admin-badge-info">{CATEGORY_LABELS[category]}</span>
                                 ),
                             },
                             {
@@ -176,7 +197,7 @@ export default function News() {
                                             okButtonProps={{ danger: true }}
                                             onConfirm={() => remove.mutate(row)}
                                         >
-                                            <Button danger size="small" icon={<Trash2 size={15} />}>
+                                            <Button size="small" type="text" danger>
                                                 删除
                                             </Button>
                                         </Popconfirm>
