@@ -42,6 +42,9 @@ const GENERAL_KIND_MANA = 3
 const GENERAL_KIND_POOLED_EXP = 4
 const GENERAL_KIND_DEGREE = 7
 
+// 客户端 getSummary dummy 的百分位取值域为 [0.5, 100],0 不在设计包络内
+const RANK_PERCENTAGE_MINIMUM = 0.5
+
 const rankingEventIdQuestMap: Record<number, number> = {
     [1]: 1001,
     [2]: 2001,
@@ -84,8 +87,12 @@ export function getRankingPlacement(
     const leaderCharacterId = progress.leaderCharacterId
     if (!Number.isSafeInteger(leaderCharacterId) || leaderCharacterId! <= 0) return null
     const leaderCharacter = getPlayerCharacterSync(playerId, leaderCharacterId!)
-    const rankPercentage = getPlayerQuestLocalRankPercentageSync(playerId, QuestCategory.RANKING_EVENT_SINGLE, questId)
-    if (leaderCharacter === null || rankPercentage === null) return null
+    const rawPercentage = getPlayerQuestLocalRankPercentageSync(playerId, QuestCategory.RANKING_EVENT_SINGLE, questId)
+    if (leaderCharacter === null || rawPercentage === null) return null
+    // 并列第一名会算出精确的 0,而客户端结果动画在该输入下计算 ranks[-1] 崩溃
+    // (F1009,rate 恰为 1.0);客户端离线 dummy 的合法输入域为 [0.5, 100],取其下界。
+    // 0.5 仍落在最小档位边界(3%)之内,不改变任何档位与发放。
+    const rankPercentage = Math.max(rawPercentage, RANK_PERCENTAGE_MINIMUM)
 
     return {
         questId,

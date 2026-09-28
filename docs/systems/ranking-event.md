@@ -36,7 +36,9 @@ CN 1.8.1 只会请求 `ranking_event/get_summary` 和 `ranking_event/receive_rew
 ### 档位判定（与客户端显示同源）
 
 `rank_percentage` 为 0-100、越小越强（"严格优于当前记录的人数 / 参与人数 × 100"），与
-`get_summary` 摘要同源。档位选行复刻客户端 `getRankRating` 的比较方向：取表中第一个
+`get_summary` 摘要同源。并列第一名会算出精确的 0，而客户端结果弹窗动画在 rate=1.0（仅 percent=0
+可达到）时以 `ranks[-1]` 崩溃（F1009，2026-09-28 实机证实）；客户端离线 dummy 的合法输入域为
+[0.5, 100]，因此服务端将百分位钳制为不低于 0.5——不改变任何档位（最小边界 3%）与发放。档位选行复刻客户端 `getRankRating` 的比较方向：取表中第一个
 `rank_border >= rank_percentage/100` 的行，溢出取最低档。奖励发放与摘要显示读同一张官方表、
 同一个百分位来源（`src/lib/ranking-reward.ts` 的接缝），保证"客户端展示的档位 = 实际发放的档位"
 （客户端奖励一览按同一张表本地渲染）。`rank_border_top` 同样随摘要下发本服真实榜首记录
