@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react"
-import { Alert, Button, Card, InputNumber, Skeleton, Space, Switch, Typography, message } from "antd"
-import { SaveOutlined } from "@ant-design/icons"
+import { Alert, Button, Card, InputNumber, Popconfirm, Skeleton, Space, Switch, Typography, Upload, message } from "antd"
+import { DeleteOutlined, SaveOutlined, UploadOutlined } from "@ant-design/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { apiGet, apiPatch } from "../api/client"
+import { apiDelete, apiGet, apiPatch, apiUpload } from "../api/client"
 import { AdminPage } from "../components/AdminPage"
 
 interface GameplaySettings {
@@ -12,6 +12,13 @@ interface GameplaySettings {
     multiRescueHostRewardsEnabled: boolean
     rush700011To700017CompatibilityEnabled: boolean
     updatedAt: string
+}
+
+interface DefaultSaveMeta {
+    exists: boolean
+    playerName?: string | null
+    exportedAt?: string | null
+    sourcePlayerId?: number | null
 }
 export default function GameplaySettings() {
     const queryClient = useQueryClient()
@@ -23,6 +30,24 @@ export default function GameplaySettings() {
         queryKey: ["serverGameplaySettings"],
         queryFn: () => apiGet<GameplaySettings>("/api/server/settings/gameplay"),
     })
+
+    const { data: defSave } = useQuery({
+        queryKey: ["defaultSave"],
+        queryFn: () => apiGet<DefaultSaveMeta>("/api/server/defaultSave"),
+    })
+
+    const uploadDefault = useMutation({
+        mutationFn: (file: File) => apiUpload("/api/server/defaultSave", file),
+        onSuccess: () => { message.success("默认存档已设置"); queryClient.invalidateQueries({ queryKey: ["defaultSave"] }) },
+        onError: (e: Error) => message.error(e.message),
+    })
+
+    const clearDefault = useMutation({
+        mutationFn: () => apiDelete("/api/server/defaultSave"),
+        onSuccess: () => { message.success("默认存档已清除"); queryClient.invalidateQueries({ queryKey: ["defaultSave"] }) },
+        onError: (e: Error) => message.error(e.message),
+    })
+
     const saveMultiplier = useMutation({
         mutationFn: (dropMultiplier: number) => apiPatch<GameplaySettings>(
             "/api/server/settings/gameplay",
@@ -247,6 +272,50 @@ export default function GameplaySettings() {
                                     开启后 700011–700017 复用 700001–700007 的文件夹奖励、商店与购买期；关闭后完全回到官方末期空奖励、空商店行为。整体开关，无部分开启状态。
                                 </Typography.Text>
                             </div>
+                        </Space>
+                    </Card>
+                    <Card
+                        title="当前默认存档"
+                        extra={defSave?.exists
+                            ? <span className="admin-badge-ok">已设置</span>
+                            : <span className="admin-badge-info">未设置（新建存档为空档）</span>}
+                    >
+                        <Space direction="vertical" size="middle" className="admin-stack">
+                            <div className="admin-page-note">
+                                <Typography.Text type="secondary">
+                                    上传玩家详情页「导出存档」得到的 JSON。之后任意账户「新建存档」时，将用它替换空存档。
+                                </Typography.Text>
+                            </div>
+                            {defSave?.exists && (
+                                <Space wrap size={4}>
+                                    <Typography.Text>模板玩家：{defSave.playerName || "-"}</Typography.Text>
+                                    {defSave.exportedAt && (
+                                        <Typography.Text type="secondary">
+                                            导出于 {new Date(defSave.exportedAt).toLocaleString("zh-CN")}
+                                        </Typography.Text>
+                                    )}
+                                </Space>
+                            )}
+                            <Space wrap>
+                                <Upload
+                                    showUploadList={false}
+                                    accept=".json"
+                                    beforeUpload={(file) => { uploadDefault.mutate(file as File); return false }}
+                                >
+                                    <Button icon={<UploadOutlined />} loading={uploadDefault.isPending}>
+                                        {defSave?.exists ? "替换默认存档" : "上传默认存档"}
+                                    </Button>
+                                </Upload>
+                                {defSave?.exists && (
+                                    <Popconfirm
+                                        title="清除默认存档？之后新建存档将为空档。"
+                                        onConfirm={() => clearDefault.mutate()}
+                                        okText="确认" cancelText="取消" okButtonProps={{ danger: true }}
+                                    >
+                                        <Button danger icon={<DeleteOutlined />} loading={clearDefault.isPending}>清除</Button>
+                                    </Popconfirm>
+                                )}
+                            </Space>
                         </Space>
                     </Card>
                 </Space>

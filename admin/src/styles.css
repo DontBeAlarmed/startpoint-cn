@@ -996,13 +996,9 @@ html[data-theme="dark"] {
     column-gap: 32px;
   }
 
-  /* explicit placement: left column 版本 → 来源与存储, right column 覆盖范围 → 内容摘要 → 游戏日历 → Snapshot 中已声明补丁 */
+  /* explicit placement: left column Snapshot 中已声明补丁, right column 内容摘要 */
   .admin-dash-cols > .admin-dash-section:nth-child(1) { grid-area: 1 / 1; }
-  .admin-dash-cols > .admin-dash-section:nth-child(2) { grid-area: 2 / 1; }
-  .admin-dash-cols > .admin-dash-section:nth-child(3) { grid-area: 1 / 2; }
-  .admin-dash-cols > .admin-dash-section:nth-child(4) { grid-area: 2 / 2; }
-  .admin-dash-cols > .admin-dash-section:nth-child(5) { grid-area: 3 / 2; }
-  .admin-dash-cols > .admin-dash-section:nth-child(6) { grid-area: 4 / 2; }
+  .admin-dash-cols > .admin-dash-section:nth-child(2) { grid-area: 1 / 2; }
 }
 
 .admin-dash-section-body {
@@ -1085,6 +1081,71 @@ html[data-theme="dark"] {
   column-gap: 8px;
   row-gap: 2px;
   min-width: 0;
+}
+
+/* dashboard: C 图标卡格 icon feature tiles — each fact reads as one small elevated tile:
+   centered big star-stroke icon on top, small soft label, prominent value.
+   Tile anatomy follows the approved mockup (elevated bg + 1px line + 11px radius).
+   Mobile-first: two wrapped columns below 768px; 4-up (5-up for .admin-feats-5) rows above. */
+.admin-feats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  min-width: 0;
+}
+
+.admin-feat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  padding: 12px 8px;
+  text-align: center;
+  background: var(--th-bg);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+}
+
+.admin-feat-icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  margin: 0 auto 6px;
+  stroke: var(--star-deep);
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+html[data-theme="dark"] .admin-feat-icon {
+  stroke: var(--star);
+}
+
+.admin-feat-label {
+  color: var(--ink-soft);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+.admin-feat-value {
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 768px) {
+  .admin-feats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .admin-feats.admin-feats-5 {
+    grid-template-columns: repeat(5, 1fr);
+  }
 }
 
 /* player detail: edit/read Descriptions share the muted label voice of the old inline editors */
