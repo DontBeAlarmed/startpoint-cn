@@ -8,7 +8,6 @@ import {
     Modal,
     Popconfirm,
     Space,
-    Tag,
     Typography,
 } from "antd"
 import { ArrowLeft, Ellipsis, Pencil, Plus, Trash2 } from "lucide-react"
@@ -187,10 +186,11 @@ export function AccountsMobileView({
                                             <Button onClick={() => setRenamingDeviceId(null)}>取消</Button>
                                         </div>
                                     ) : (
-                                        <div className="admin-mobile-device" key={device.deviceId}>
-                                            <Tag>{device.name ?? `设备 ${device.deviceId}`}</Tag>
+                                        <div className="admin-dev-edit" key={device.deviceId}>
+                                            <span className="admin-dev-edit-name">{device.name ?? `设备 ${device.deviceId}`}</span>
                                             <Button
                                                 type="text"
+                                                size="small"
                                                 icon={<Pencil size={14} />}
                                                 aria-label="修改设备名称"
                                                 onClick={() => {

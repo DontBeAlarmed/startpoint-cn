@@ -566,7 +566,6 @@ body {
 .admin-mobile-view-toolbar,
 .admin-mobile-list-heading,
 .admin-mobile-actions,
-.admin-mobile-device,
 .admin-mobile-inline-editor {
   display: flex;
   flex-wrap: wrap;
@@ -632,13 +631,68 @@ body {
   margin-top: 10px;
 }
 
-.admin-mobile-device {
-  justify-content: space-between;
-}
-
 .admin-mobile-inline-editor .ant-input {
   min-width: min(100%, 180px);
   flex: 1 1 180px;
+}
+
+/* accounts page (approved mockup accounts-v2): panel-head star tick — the 账号管理 card
+   and the per-account 存档列表 card both read as game-console panels */
+.admin-accounts-card .ant-card-head-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-accounts-card .ant-card-head-title::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  background: var(--star);
+  clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+}
+
+/* accounts tables read fully centered (mockup .tl-table th/td) — same scoped pattern as
+   .admin-player-tabs; every other admin table keeps its left-align reading semantics */
+.admin-accounts-table .ant-table th,
+.admin-accounts-table .ant-table td {
+  text-align: center;
+}
+
+/* accounts: 存档名 links into 玩家详情 with the water data-link voice (mockup .save-link) */
+.admin-save-link {
+  color: var(--water);
+}
+
+/* accounts: merged device pill — 设备识别名 + ✎ live in ONE elevated chip (mockup .dev-edit);
+   shared by the desktop 绑定设备 cell and the mobile device list. Mobile-first: the pill is
+   a compact unbreakable chip at every width and never stretches the table cell. */
+.admin-dev-edit {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 3px 1px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--th-bg);
+  font-size: 12px;
+}
+
+.admin-dev-edit-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-dev-edit .ant-btn {
+  flex: none;
+  color: var(--ink-soft);
+}
+
+.admin-dev-edit .ant-btn:hover,
+.admin-dev-edit .ant-btn:focus-visible {
+  color: var(--ink);
 }
 
 /* 定时资源弹框：高度交还内容自然流动，超出视口由 AntD wrap 层负责滚动，
