@@ -170,7 +170,30 @@ async function main() {
             viewer_id: viewerId,
             ranking_event_id: 1,
         })
-        assert.equal(reward.statusCode, 404, "未实现真实发奖前不得返回 status=1")
+        assert.equal(reward.statusCode, 200, reward.body)
+        assert.ok(
+            String(reward.headers["content-type"]).includes("application/x-msgpack"),
+            "领奖响应必须保持 application/x-msgpack 协议形状",
+        )
+        assert.deepEqual(
+            decode(reward).data,
+            { status: 3 },
+            "无奖励来源时以官方 status=3(未参赛/无可领)诚实应答,不得伪装 status=1",
+        )
+
+        const rewardRepeat = await post(fastify, "/receive_reward", {
+            viewer_id: viewerId,
+            ranking_event_id: 1,
+        })
+        assert.equal(rewardRepeat.statusCode, 200, rewardRepeat.body)
+        assert.deepEqual(decode(rewardRepeat).data, { status: 3 }, "重复领奖请求保持同一诚实应答")
+
+        const rewardUnknownEvent = await post(fastify, "/receive_reward", {
+            viewer_id: viewerId,
+            ranking_event_id: 999,
+        })
+        assert.equal(rewardUnknownEvent.statusCode, 200, rewardUnknownEvent.body)
+        assert.deepEqual(decode(rewardUnknownEvent).data, { status: 3 }, "未知活动同样按官方无可领语义应答")
     } finally {
         await fastify.close()
         cleanup()

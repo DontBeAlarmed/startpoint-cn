@@ -1,4 +1,5 @@
-// Ranking Event local summary. Frozen ranking rewards remain unsupported.
+// Ranking Event local summary. Ranking rewards are not distributed: the
+// receive_reward endpoint answers the official "nothing to claim" status.
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getPlayerQuestLocalRankPercentageSync, getPlayerSingleQuestProgressSync } from "../../data/domains/quest"
@@ -12,6 +13,11 @@ interface GetSummaryBody {
     viewer_id: number,
     ranking_event_id: number,
     quest_kind: number
+}
+
+interface ReceiveRewardBody {
+    viewer_id: number,
+    ranking_event_id: number
 }
 
 const rankingEventIdQuestMap: Record<number, number> = {
@@ -116,6 +122,45 @@ const routes = async (fastify: FastifyInstance) => {
                 viewer_id: viewerId
             }),
             "data": summary
+        })
+    })
+
+    fastify.post("/receive_reward", async (request: FastifyRequest, reply: FastifyReply) => {
+        if (request.body === null
+            || typeof request.body !== "object"
+            || Array.isArray(request.body)) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Invalid request body."
+        })
+        const body = request.body as ReceiveRewardBody
+
+        const viewerId = body.viewer_id
+        const eventId = body.ranking_event_id
+        if (!Number.isSafeInteger(viewerId) || viewerId <= 0
+            || !Number.isSafeInteger(eventId) || eventId <= 0) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Invalid request body."
+        })
+
+        const viewerIdSession = await getSession(viewerId.toString())
+        if (!viewerIdSession) return reply.status(400).send({
+            "error": "Bad Request",
+            "message": "Invalid viewer id."
+        })
+
+        // The server distributes no ranking rewards, so there is never anything
+        // to claim: answer with the official status=3 ("no reward to receive")
+        // instead of pretending a successful claim. When a future activity
+        // introduces real reward sources, extend this endpoint with the
+        // status=1/2 branches and a settlement transaction at the same spot.
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            "data_headers": generateDataHeaders({
+                viewer_id: viewerId
+            }),
+            "data": {
+                "status": 3
+            }
         })
     })
 
