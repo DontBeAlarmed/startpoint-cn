@@ -45,7 +45,8 @@ interface Lookups {
     quests: Record<string, string>
 }
 
-// 资源编辑 8 项（approved mockup player-v2，Rank 居首）：左侧图标列 + 右侧居中输入，逐项保存
+// 资源编辑 11 项（图标砖结构沿用 approved mockup player-v2，Rank 居首；羁绊证/Boss Boost/Boost
+// 为重构前页面既有编辑字段，修复轮恢复，仅补配同款星描边图标）
 const resourceFields: { key: string; label: string; icon?: ReactNode; lvBadge?: boolean }[] = [
     { key: "rankPoint", label: "Rank", lvBadge: true },
     { key: "expPool", label: "经验池", icon: <path d="M12 3c3.5 4.5 7 8.2 7 11.2a7 7 0 0 1-14 0c0-3 3.5-6.7 7-11.2z" /> },
@@ -63,6 +64,9 @@ const resourceFields: { key: string; label: string; icon?: ReactNode; lvBadge?: 
         ),
     },
     { key: "starCrumb", label: "星屑", icon: <path d="M13.5 2.5l5.5 7.5-2.5 11.5-7.5-3.5.5-8.5z" /> },
+    { key: "bondToken", label: "羁绊证", icon: (<><circle cx="9" cy="12" r="5" /><circle cx="15" cy="12" r="5" /></>) },
+    { key: "bossBoostPoint", label: "Boss Boost", icon: <path d="M13 2L5 13h6l-1 9 8-11h-6z" /> },
+    { key: "boostPoint", label: "Boost", icon: <path d="M12 19V5M5 12l7-7 7 7" /> },
 ]
 
 export default function PlayerDetail() {
@@ -477,6 +481,22 @@ export default function PlayerDetail() {
                     </div>
                     <Switch checked={player.enableAuto3x} loading={editField.isPending}
                         onChange={v => editField.mutate({ field: "enableAuto3x", value: v })} />
+                </div>
+                <div className="admin-setrow">
+                    <div className="admin-setrow-copy">
+                        <div className="admin-setrow-label">等级(称号ID)</div>
+                    </div>
+                    <div className="admin-setrow-control">
+                        {fieldControl("degreeId", { min: 0 })}
+                    </div>
+                </div>
+                <div className="admin-setrow">
+                    <div className="admin-setrow-copy">
+                        <div className="admin-setrow-label">队长角色ID</div>
+                    </div>
+                    <div className="admin-setrow-control">
+                        {fieldControl("leaderCharacterId", { min: 0 })}
+                    </div>
                 </div>
                 <div className="admin-setrow">
                     <div className="admin-setrow-copy">
