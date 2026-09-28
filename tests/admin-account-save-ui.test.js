@@ -29,12 +29,22 @@ assert.match(accounts, /AccountsMobileView/)
 assert.match(accounts, /className="admin-edit-compact"[\s\S]*?onClick=\{event => event\.stopPropagation\(\)\}[\s\S]*?onKeyDown=\{event => event\.stopPropagation\(\)\}/)
 assert.doesNotMatch(accounts, /role: "button"/)
 assert.match(mobileView, /admin-account-mobile-list/)
-assert.match(mobileView, /返回账号列表/)
+assert.doesNotMatch(mobileView, /返回账号列表/)
+assert.match(mobileView, /存档列表/)
 assert.match(mobileView, /编辑存档/)
 assert.match(mobileView, /player\.rank/)
 assert.match(mobileView, /className="admin-mobile-inline-editor"[\s\S]*?onKeyDown=\{event => event\.stopPropagation\(\)\}/)
 assert.doesNotMatch(mobileView, /role="button"/)
 assert.doesNotMatch(accounts, /row\.degreeId \|\| 1/)
+
+// 存档列表 is an inline panel below the always-visible account table (mockup accounts-v2-review),
+// not a whole-card view switch with a back entry
+assert.match(accounts, /存档列表/)
+assert.doesNotMatch(accounts, /管理存档/)
+assert.doesNotMatch(accounts, /返回账号列表/)
+assert.match(accounts, /scrollIntoView\(\{ behavior: "smooth", block: "start" \}\)/)
+assert.match(accounts, /toggleSavePanel/)
+assert.match(accounts, /admin-badge-info">\{savePlayers\.length\} 个存档</)
 
 const accountMutationCount = (accounts.match(/= useMutation\(\{/g) || []).length
 const accountMutationErrorCount = (accounts.match(/onError:/g) || []).length

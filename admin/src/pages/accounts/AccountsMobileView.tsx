@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
     Button,
     Dropdown,
@@ -10,7 +10,7 @@ import {
     Space,
     Typography,
 } from "antd"
-import { ArrowLeft, Ellipsis, Pencil, Plus, Trash2 } from "lucide-react"
+import { Ellipsis, Pencil, Plus, Trash2 } from "lucide-react"
 
 import type { AccountRow, PlayerBrief } from "./types"
 
@@ -20,7 +20,6 @@ interface AccountsMobileViewProps {
     loading: boolean
     renamePending: boolean
     onSelectAccount: (accountId: number) => void
-    onBack: () => void
     onOpenPlayer: (playerId: number) => void
     onNewSave: (accountId: number) => Promise<unknown>
     onDeleteAccount: (accountId: number) => Promise<unknown>
@@ -37,7 +36,6 @@ export function AccountsMobileView({
     loading,
     renamePending,
     onSelectAccount,
-    onBack,
     onOpenPlayer,
     onNewSave,
     onDeleteAccount,
@@ -51,6 +49,13 @@ export function AccountsMobileView({
     const [saveName, setSaveName] = useState("")
     const [renamingDeviceId, setRenamingDeviceId] = useState<number | null>(null)
     const [deviceName, setDeviceName] = useState("")
+    const savePanelRef = useRef<HTMLDivElement | null>(null)
+    const selectedAccountId = selectedAccount?.id ?? null
+
+    // same inline-panel semantics as desktop: open/switch scrolls the save section into view
+    useEffect(() => {
+        if (selectedAccountId !== null) savePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    }, [selectedAccountId])
 
     const submitSaveName = async (playerId: number) => {
         await onRenameSave(playerId, saveName)
@@ -69,89 +74,6 @@ export function AccountsMobileView({
             okButtonProps: { danger: true },
             onOk: () => onDeleteSave(player.id),
         })
-    }
-
-    if (selectedAccount) {
-        return (
-            <div className="admin-account-mobile-list">
-                <div className="admin-mobile-view-toolbar">
-                    <Button icon={<ArrowLeft size={16} />} onClick={onBack}>返回账号列表</Button>
-                    <Button type="primary" icon={<Plus size={16} />} onClick={() => onNewSave(selectedAccount.id)}>
-                        新建存档
-                    </Button>
-                </div>
-                {selectedAccount.players.length === 0 ? <Empty description="暂无存档" /> : (
-                    <List
-                        dataSource={selectedAccount.players}
-                        renderItem={player => (
-                            <List.Item
-                                className="admin-mobile-list-item admin-mobile-list-item-clickable"
-                                onClick={() => onOpenPlayer(player.id)}
-                            >
-                                <div className="admin-mobile-list-content">
-                                    {renamingSaveId === player.id ? (
-                                        <div
-                                            className="admin-mobile-inline-editor"
-                                            onClick={event => event.stopPropagation()}
-                                            onKeyDown={event => event.stopPropagation()}
-                                        >
-                                            <Input
-                                                value={saveName}
-                                                maxLength={64}
-                                                onChange={event => setSaveName(event.target.value)}
-                                                onPressEnter={() => submitSaveName(player.id)}
-                                            />
-                                            <Button type="primary" loading={renamePending} onClick={() => submitSaveName(player.id)}>确定</Button>
-                                            <Button onClick={() => setRenamingSaveId(null)}>取消</Button>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <div className="admin-mobile-list-heading">
-                                                <Typography.Text strong>{player.name}</Typography.Text>
-                                                <Typography.Text>Rank {player.rank}</Typography.Text>
-                                            </div>
-                                            <Typography.Text type="secondary">存档 #{player.id}</Typography.Text>
-                                            <div className="admin-mobile-tags">
-                                                {player.isDefault && <span className="admin-badge-info">账号默认</span>}
-                                                {player.isActive && <span className="admin-badge-ok">当前活动</span>}
-                                            </div>
-                                            <div className="admin-mobile-actions" onClick={event => event.stopPropagation()}>
-                                                <Button type="primary" icon={<Pencil size={15} />} onClick={() => onOpenPlayer(player.id)}>
-                                                    编辑存档
-                                                </Button>
-                                                <Dropdown
-                                                    trigger={["click"]}
-                                                    menu={{
-                                                        items: [
-                                                            { key: "activate", label: "设为默认并切换", disabled: player.isDefault && player.isActive },
-                                                            { key: "rename", label: "重命名" },
-                                                            { key: "clone", label: "复制" },
-                                                            { key: "delete", label: "删除", danger: true },
-                                                        ],
-                                                        onClick: ({ key, domEvent }) => {
-                                                            domEvent.stopPropagation()
-                                                            if (key === "activate") void onActivateSave(player.id)
-                                                            if (key === "rename") {
-                                                                setRenamingSaveId(player.id)
-                                                                setSaveName(player.name)
-                                                            }
-                                                            if (key === "clone") void onCloneSave(player.id, selectedAccount.id)
-                                                            if (key === "delete") confirmDeleteSave(player)
-                                                        },
-                                                    }}
-                                                >
-                                                    <Button icon={<Ellipsis size={16} />} aria-label={`存档 ${player.name} 的更多操作`} />
-                                                </Dropdown>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            </List.Item>
-                        )}
-                    />
-                )}
-            </div>
-        )
     }
 
     return (
@@ -203,7 +125,7 @@ export function AccountsMobileView({
                                 </Space>
                             )}
                             <div className="admin-mobile-actions">
-                                <Button type="primary" onClick={() => onSelectAccount(account.id)}>管理存档</Button>
+                                <Button type="primary" onClick={() => onSelectAccount(account.id)}>存档列表</Button>
                                 <Button icon={<Plus size={15} />} onClick={() => onNewSave(account.id)}>新建存档</Button>
                                 <Popconfirm
                                     title={`删除账号 ${account.id} 及所有存档？`}
@@ -219,6 +141,86 @@ export function AccountsMobileView({
                     </List.Item>
                 )}
             />
+            {selectedAccount && (
+                <div className="admin-mobile-save-panel" ref={savePanelRef}>
+                    <div className="admin-mobile-view-toolbar">
+                        <Typography.Text strong>账号 {selectedAccount.id} · 存档列表</Typography.Text>
+                        <Button type="primary" icon={<Plus size={16} />} onClick={() => onNewSave(selectedAccount.id)}>
+                            新建存档
+                        </Button>
+                    </div>
+                    {selectedAccount.players.length === 0 ? <Empty description="暂无存档" /> : (
+                        <List
+                            dataSource={selectedAccount.players}
+                            renderItem={player => (
+                                <List.Item
+                                    className="admin-mobile-list-item admin-mobile-list-item-clickable"
+                                    onClick={() => onOpenPlayer(player.id)}
+                                >
+                                    <div className="admin-mobile-list-content">
+                                        {renamingSaveId === player.id ? (
+                                            <div
+                                                className="admin-mobile-inline-editor"
+                                                onClick={event => event.stopPropagation()}
+                                                onKeyDown={event => event.stopPropagation()}
+                                            >
+                                                <Input
+                                                    value={saveName}
+                                                    maxLength={64}
+                                                    onChange={event => setSaveName(event.target.value)}
+                                                    onPressEnter={() => submitSaveName(player.id)}
+                                                />
+                                                <Button type="primary" loading={renamePending} onClick={() => submitSaveName(player.id)}>确定</Button>
+                                                <Button onClick={() => setRenamingSaveId(null)}>取消</Button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="admin-mobile-list-heading">
+                                                    <Typography.Text strong>{player.name}</Typography.Text>
+                                                    <Typography.Text>Rank {player.rank}</Typography.Text>
+                                                </div>
+                                                <Typography.Text type="secondary">存档 #{player.id}</Typography.Text>
+                                                <div className="admin-mobile-tags">
+                                                    {player.isDefault && <span className="admin-badge-info">账号默认</span>}
+                                                    {player.isActive && <span className="admin-badge-ok">当前活动</span>}
+                                                </div>
+                                                <div className="admin-mobile-actions" onClick={event => event.stopPropagation()}>
+                                                    <Button type="primary" icon={<Pencil size={15} />} onClick={() => onOpenPlayer(player.id)}>
+                                                        编辑存档
+                                                    </Button>
+                                                    <Dropdown
+                                                        trigger={["click"]}
+                                                        menu={{
+                                                            items: [
+                                                                { key: "activate", label: "设为默认并切换", disabled: player.isDefault && player.isActive },
+                                                                { key: "rename", label: "重命名" },
+                                                                { key: "clone", label: "复制" },
+                                                                { key: "delete", label: "删除", danger: true },
+                                                            ],
+                                                            onClick: ({ key, domEvent }) => {
+                                                                domEvent.stopPropagation()
+                                                                if (key === "activate") void onActivateSave(player.id)
+                                                                if (key === "rename") {
+                                                                    setRenamingSaveId(player.id)
+                                                                    setSaveName(player.name)
+                                                                }
+                                                                if (key === "clone") void onCloneSave(player.id, selectedAccount.id)
+                                                                if (key === "delete") confirmDeleteSave(player)
+                                                            },
+                                                        }}
+                                                    >
+                                                        <Button icon={<Ellipsis size={16} />} aria-label={`存档 ${player.name} 的更多操作`} />
+                                                    </Dropdown>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </List.Item>
+                            )}
+                        />
+                    )}
+                </div>
+            )}
         </div>
     )
 }

@@ -636,6 +636,13 @@ body {
   flex: 1 1 180px;
 }
 
+/* mobile inline save section: expands below the always-visible account list
+   (same semantics as the desktop inline panel — no drill-in, no back button) */
+.admin-mobile-save-panel {
+  padding: 14px;
+  border-block-start: 1px solid var(--line);
+}
+
 /* accounts page (approved mockup accounts-v2): panel-head star tick — the 账号管理 card
    and the per-account 存档列表 card both read as game-console panels */
 .admin-accounts-card .ant-card-head-title {
@@ -660,9 +667,21 @@ body {
   text-align: center;
 }
 
+/* accounts op cells: center the row actions (mockup .row-actions is justify-content:center) —
+   scoped so the shared .admin-action-row on Mail/News/Gifts keeps its own layout; nowrap also
+   keeps the 导出 loading state from wrapping onto a second line */
+.admin-accounts-table .admin-action-row {
+  justify-content: center;
+  flex-wrap: nowrap;
+}
+
 /* accounts: 存档名 links into 玩家详情 with the water data-link voice (mockup .save-link) */
 .admin-save-link {
   color: var(--water);
+}
+
+.admin-save-link:hover {
+  text-decoration: underline;
 }
 
 /* accounts: merged device pill — 设备识别名 + ✎ live in ONE elevated chip (mockup .dev-edit);

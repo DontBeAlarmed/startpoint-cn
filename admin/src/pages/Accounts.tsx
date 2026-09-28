@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Card, Table, Button, Space, Popconfirm, Input, message, Tag, Grid, Tooltip, Typography } from "antd"
-import { PlusOutlined, EditOutlined, LeftOutlined, InfoCircleOutlined, ReloadOutlined } from "@ant-design/icons"
+import { PlusOutlined, EditOutlined, InfoCircleOutlined, ReloadOutlined } from "@ant-design/icons"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import { apiGet, apiPost, apiDownloadFile } from "../api/client"
@@ -20,6 +20,13 @@ export default function Accounts() {
     const [renameName, setRenameName] = useState("")
     const [renameDeviceId, setRenameDeviceId] = useState<number | null>(null)
     const [renameDeviceName, setRenameDeviceName] = useState("")
+    const savePanelRef = useRef<HTMLDivElement | null>(null)
+
+    // inline save panel (mockup accounts-v2-review): the account table stays visible and the
+    // panel expands below it — open/switch scrolls the panel into view, collapse does not
+    useEffect(() => {
+        if (selectedAccountId !== null) savePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    }, [selectedAccountId])
 
     const { data: accounts = [], isLoading, isFetching } = useQuery({
         queryKey: ["accounts"],
@@ -31,6 +38,10 @@ export default function Accounts() {
 
     const refresh = () => {
         qc.invalidateQueries({ queryKey: ["accounts"] })
+    }
+    // single-open inline panel: same row button toggles, another row switches the panel
+    const toggleSavePanel = (accountId: number) => {
+        setSelectedAccountId(current => (current === accountId ? null : accountId))
     }
     const showMutationError = (error: Error) => message.error(error.message)
 
@@ -175,7 +186,7 @@ export default function Accounts() {
             title: "操作", width: "24%",
             render: (_: unknown, row: AccountRow) => (
                 <div className="admin-action-row">
-                    <Button size="small" type="primary" onClick={() => setSelectedAccountId(row.id)}>管理存档</Button>
+                    <Button size="small" type="primary" onClick={() => toggleSavePanel(row.id)}>存档列表</Button>
                     <Popconfirm title={`删除账号 ${row.id} 及所有存档？`} onConfirm={() => deleteAccount.mutate(row.id)} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
                         <Button size="small" type="text" danger>删除</Button>
                     </Popconfirm>
@@ -258,18 +269,14 @@ export default function Accounts() {
                     新建和复制存档会设为该账号默认并切换为当前活动；删除默认存档后，服务端会在该账号剩余存档中回退到第一个可用存档。删除最后一个存档会同时删除账号。
                 </Typography.Text>
             </div>
-            {isMobile ? (
-                <Card
-                    title={selectedAccount ? `账号 ${selectedAccount.id} · 存档列表` : "账号管理"}
-                    className="admin-mobile-list-card"
-                >
+            {isMobile && (
+                <Card title="账号管理" className="admin-mobile-list-card">
                     <AccountsMobileView
                         accounts={accounts}
                         selectedAccount={selectedAccount}
                         loading={isLoading}
                         renamePending={renameSave.isPending || renameDevice.isPending}
-                        onSelectAccount={setSelectedAccountId}
-                        onBack={() => setSelectedAccountId(null)}
+                        onSelectAccount={toggleSavePanel}
                         onOpenPlayer={playerId => navigate(`/players/${playerId}`)}
                         onNewSave={accountId => newSave.mutateAsync(accountId)}
                         onDeleteAccount={accountId => deleteAccount.mutateAsync(accountId)}
@@ -280,34 +287,8 @@ export default function Accounts() {
                         onRenameDevice={(deviceId, name) => renameDevice.mutateAsync({ deviceId, name })}
                     />
                 </Card>
-            ) : selectedAccount ? (
-                <Card
-                    title={`账号 ${selectedAccount.id} · 存档列表`}
-                    className="admin-table-card admin-accounts-card"
-                    extra={(
-                        <Space wrap size={8}>
-                            <Button size="small" icon={<LeftOutlined />} onClick={() => setSelectedAccountId(null)}>返回账号列表</Button>
-                            <span className="admin-badge-info">{savePlayers.length} 个存档</span>
-                            <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => newSave.mutate(selectedAccount.id)}>新建存档</Button>
-                        </Space>
-                    )}
-                >
-                    <Table
-                        rowKey="id"
-                        columns={saveColumns}
-                        dataSource={savePlayers}
-                        pagination={false}
-                        size="small"
-                        scroll={{ x: 860 }}
-                        className="admin-accounts-table"
-                        locale={{ emptyText: "暂无存档" }}
-                        onRow={row => ({
-                            className: "admin-clickable-table-row",
-                            onClick: () => navigate(`/players/${row.id}`),
-                        })}
-                    />
-                </Card>
-            ) : (
+            )}
+            {!isMobile && (
                 <Card title="账号管理" className="admin-table-card admin-accounts-card">
                     <Table
                         rowKey="id"
@@ -320,6 +301,35 @@ export default function Accounts() {
                         className="admin-accounts-table"
                     />
                 </Card>
+            )}
+            {!isMobile && selectedAccount && (
+                <div ref={savePanelRef}>
+                    <Card
+                        title={`账号 ${selectedAccount.id} · 存档列表`}
+                        className="admin-table-card admin-accounts-card"
+                        extra={(
+                            <Space wrap size={8}>
+                                <span className="admin-badge-info">{savePlayers.length} 个存档</span>
+                                <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => newSave.mutate(selectedAccount.id)}>新建存档</Button>
+                            </Space>
+                        )}
+                    >
+                        <Table
+                            rowKey="id"
+                            columns={saveColumns}
+                            dataSource={savePlayers}
+                            pagination={false}
+                            size="small"
+                            scroll={{ x: 860 }}
+                            className="admin-accounts-table"
+                            locale={{ emptyText: "暂无存档" }}
+                            onRow={row => ({
+                                className: "admin-clickable-table-row",
+                                onClick: () => navigate(`/players/${row.id}`),
+                            })}
+                        />
+                    </Card>
+                </div>
             )}
 
         </Space>
