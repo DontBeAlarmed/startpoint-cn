@@ -1707,3 +1707,19 @@ html[data-theme="dark"] .admin-res-lv {
     flex-wrap: nowrap;
   }
 }
+
+/* ── batch 4: seeds 页专属 ───────────────────────────────────────────────────
+   seeds: catalog stat row borrows the dashboard .admin-stat-band voice — flat
+   label-over-value facts, no boxes (本机隔离 >0 reads in thunder via
+   .admin-seed-stat-alert). Mobile-first: inherits the band's 2-col grid on
+   narrow screens; four equal columns at desktop (dashboard default is five). */
+@media (min-width: 768px) {
+  .admin-seed-stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.admin-seed-stat-alert {
+  color: var(--thunder);
+}
+

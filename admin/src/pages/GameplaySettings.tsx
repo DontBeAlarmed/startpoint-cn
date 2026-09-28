@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { Alert, Button, Card, InputNumber, Popconfirm, Skeleton, Space, Switch, Typography, Upload, message } from "antd"
-import { DeleteOutlined, SaveOutlined, UploadOutlined } from "@ant-design/icons"
+import { SaveOutlined, UploadOutlined } from "@ant-design/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { apiDelete, apiGet, apiPatch, apiUpload } from "../api/client"
@@ -115,10 +115,16 @@ export default function GameplaySettings() {
 
     return (
         <AdminPage
-            eyebrow="Gameplay"
+            eyebrow="SETTINGS"
             title="游戏设置"
             description="调整服务端运行时游戏规则，保存后无需重启。"
         >
+            <div className="admin-page-note">
+                <Typography.Text strong>保存方式说明</Typography.Text>
+                <Typography.Text type="secondary">
+                    各设置项独立保存：修改后对应卡片内的「保存」按钮才可用，保存后立即生效。
+                </Typography.Text>
+            </div>
             {settings.isLoading ? (
                 <Card title="关卡固定掉落倍率">
                     <Skeleton active paragraph={{ rows: 2 }} />
@@ -312,7 +318,7 @@ export default function GameplaySettings() {
                                         onConfirm={() => clearDefault.mutate()}
                                         okText="确认" cancelText="取消" okButtonProps={{ danger: true }}
                                     >
-                                        <Button danger icon={<DeleteOutlined />} loading={clearDefault.isPending}>清除</Button>
+                                        <Button type="text" danger loading={clearDefault.isPending}>清除</Button>
                                     </Popconfirm>
                                 )}
                             </Space>

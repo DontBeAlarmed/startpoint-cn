@@ -15,7 +15,7 @@ import {
     Typography,
     message,
 } from "antd"
-import { Pencil, Plus, Trash2 } from "lucide-react"
+import { Pencil, Plus } from "lucide-react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import dayjs, { type Dayjs } from "dayjs"
 
@@ -196,6 +196,7 @@ export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps)
             >
                 <Table<ScheduledResourceRule>
                     rowKey="id"
+                    className="admin-ops-table"
                     loading={rules.isLoading}
                     dataSource={rules.data ?? []}
                     pagination={{ pageSize: 10, hideOnSinglePage: true }}
@@ -235,7 +236,7 @@ export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps)
                             fixed: "right",
                             render: (_, rule) => (
                                 <div className="admin-action-row">
-                                    <Button icon={<Pencil size={15} />} onClick={() => openEdit(rule)}>编辑</Button>
+                                    <Button size="small" icon={<Pencil size={15} />} onClick={() => openEdit(rule)}>编辑</Button>
                                     <Popconfirm
                                         title="删除这条定时补充规则？"
                                         okText="删除"
@@ -243,7 +244,7 @@ export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps)
                                         okButtonProps={{ danger: true }}
                                         onConfirm={() => remove.mutate(rule.id)}
                                     >
-                                        <Button danger icon={<Trash2 size={15} />}>删除</Button>
+                                        <Button size="small" type="text" danger>删除</Button>
                                     </Popconfirm>
                                 </div>
                             ),
