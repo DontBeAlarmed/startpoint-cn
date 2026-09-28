@@ -1,5 +1,6 @@
 import { ReactNode, useMemo, useState } from "react"
 import { Card, Form, Select, InputNumber, Input, Button, message, Alert, Typography, Radio, Modal, Descriptions, Table, Space } from "antd"
+import { ReloadOutlined } from "@ant-design/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiGet, apiPost } from "../api/client"
 import { AdminPage } from "../components/AdminPage"
@@ -145,9 +146,9 @@ export default function Mail() {
     // 预览确认：暂存待发送的表单值 + 计算好的对象描述/角色数
     const [confirm, setConfirm] = useState<null | { values: any; count: number; targetText: string; attachmentText: string }>(null)
 
-    const { data: accounts = [] } = useQuery({ queryKey: ["accounts"], queryFn: () => apiGet<AccountRow[]>("/api/server/accounts") })
-    const { data: players = [] } = useQuery({ queryKey: ["players"], queryFn: () => apiGet<PlayerBrief[]>("/api/player") })
-    const { data: history = [] } = useQuery({ queryKey: ["mailHistory"], queryFn: () => apiGet<MailRecord[]>("/api/mail/history") })
+    const { data: accounts = [], isFetching: accountsFetching } = useQuery({ queryKey: ["accounts"], queryFn: () => apiGet<AccountRow[]>("/api/server/accounts") })
+    const { data: players = [], isFetching: playersFetching } = useQuery({ queryKey: ["players"], queryFn: () => apiGet<PlayerBrief[]>("/api/player") })
+    const { data: history = [], isFetching: historyFetching } = useQuery({ queryKey: ["mailHistory"], queryFn: () => apiGet<MailRecord[]>("/api/mail/history") })
     const { data: attachmentLookup, isLoading: attachmentLoading, isError: attachmentError } = useQuery({
         queryKey: ["mailAttachmentLookup", type],
         queryFn: () => apiGet<AttachmentLookup>(attachmentEndpoint!),
@@ -167,6 +168,14 @@ export default function Mail() {
     )
 
     const totalSaves = accounts.reduce((n, a) => n + a.saveCount, 0)
+
+    const refresh = () => {
+        qc.invalidateQueries({ queryKey: ["accounts"] })
+        qc.invalidateQueries({ queryKey: ["players"] })
+        qc.invalidateQueries({ queryKey: ["mailHistory"] })
+        qc.invalidateQueries({ queryKey: ["mailAttachmentLookup"] })
+        qc.invalidateQueries({ queryKey: ["itemMaxCounts"] })
+    }
 
     const send = useMutation({
         mutationFn: (v: any) => apiPost<SendResult>("/api/mail/send", {
@@ -217,8 +226,23 @@ export default function Mail() {
             eyebrow="MAIL"
             title="邮件"
             description="按全体、账号或单个存档发送附件邮件。高风险发送动作会先展示目标和附件摘要。"
+            actions={
+                <Button
+                    icon={<ReloadOutlined />}
+                    loading={accountsFetching || playersFetching || historyFetching}
+                    onClick={refresh}
+                >
+                    刷新
+                </Button>
+            }
         >
         <Space direction="vertical" size="large" className="admin-stack">
+            <div className="admin-page-note">
+                <Text strong>发送须知</Text>
+                <Text type="secondary">
+                    发送成功后会保留发送对象设置并清空附件与文案；邮件一旦送达无法撤回，群发前请在确认弹窗中核对目标和附件摘要。
+                </Text>
+            </div>
             <Card title="发送邮件">
                 <Alert type={targetMode === "all" ? "warning" : "info"} showIcon style={{ marginBottom: 16 }}
                     message={
@@ -382,7 +406,7 @@ export default function Mail() {
 
             <ScheduledResourceRules players={players} />
 
-            <Card title="最近群发记录" size="small" className="admin-table-card">
+            <Card title="最近群发记录" className="admin-table-card">
                 <Table<MailRecord & { key: number }>
                     rowKey="key"
                     size="small"
