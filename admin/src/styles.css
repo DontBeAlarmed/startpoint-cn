@@ -839,7 +839,78 @@ html[data-theme="dark"] {
 .admin-badge-info { color: var(--water); border: 1.5px solid var(--water); background: var(--info-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; }
 .admin-badge-warn { color: var(--thunder); border: 1.5px solid var(--thunder); background: var(--warn-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; }
 
-/* dashboard: flat stat band under the page note — five metrics stacked label-over-value
+/* dashboard hero: flat 「游戏主界面」 strip at the top of the overview page —
+   virtual clock left, status chips middle, five relocated band metrics right.
+   No boxes: the strip is whitespace rhythm only, same flat language as .admin-page-note.
+   Mobile-first: zones wrap as whole blocks (never clipped) — on wide desktops all three
+   share one row, on narrower widths the band drops to its own full-width line. */
+.admin-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 32px;
+  min-width: 0;
+}
+
+.admin-hero-clock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 0 auto;
+  min-width: 0;
+}
+
+.admin-hero-clock-label {
+  flex: 0 0 auto;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.admin-hero-clock-value {
+  min-width: 0;
+  color: var(--ink);
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.admin-hero-clock-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+  min-width: 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.admin-hero-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.admin-hero .admin-stat-band {
+  flex: 1 1 560px;
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .admin-hero-clock-value {
+    font-size: 38px;
+  }
+}
+
+/* dashboard: flat stat band living inside the hero — five metrics stacked label-over-value
    on equal columns, no boxes (same flat language as .admin-page-note).
    Mobile-first: 2-up wrap below 768px; five equal columns above. */
 .admin-stat-band {

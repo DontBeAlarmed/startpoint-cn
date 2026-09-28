@@ -1,8 +1,7 @@
 import type { ReactNode } from "react"
 import { Alert, Button, Card, Col, Popconfirm, Row, Space, Statistic, Tag, Typography, Upload, message } from "antd"
-import { DeleteOutlined, ExperimentOutlined, MailOutlined, ReloadOutlined, TeamOutlined, UploadOutlined } from "@ant-design/icons"
+import { DeleteOutlined, ReloadOutlined, UploadOutlined } from "@ant-design/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useNavigate } from "react-router-dom"
 import { apiDelete, apiGet, apiUpload } from "../api/client"
 import { AdminPage } from "../components/AdminPage"
 
@@ -19,6 +18,12 @@ interface DefaultSaveMeta {
     playerName?: string | null
     exportedAt?: string | null
     sourcePlayerId?: number | null
+}
+
+interface ServerTime {
+    servertime: number
+    date: string
+    isCustom: boolean
 }
 
 interface ServerStatus {
@@ -166,7 +171,6 @@ function DashKvItem({ label, children }: { label: string; children: ReactNode })
 
 export default function Dashboard() {
     const qc = useQueryClient()
-    const navigate = useNavigate()
 
     const { data: accounts = [], isError: accountsError, isFetching: accountsFetching } = useQuery({
         queryKey: ["accounts"],
@@ -176,6 +180,12 @@ export default function Dashboard() {
     const { data: status, isLoading: statusLoading, isError: statusError, isFetching: statusFetching } = useQuery({
         queryKey: ["serverStatus"],
         queryFn: () => apiGet<ServerStatus>("/api/server/status"),
+        refetchInterval: 30_000,
+    })
+
+    const { data: serverTime, isLoading: serverTimeLoading, isError: serverTimeError } = useQuery({
+        queryKey: ["serverTime"],
+        queryFn: () => apiGet<ServerTime>("/api/server/currentTime"),
         refetchInterval: 30_000,
     })
 
@@ -204,6 +214,12 @@ export default function Dashboard() {
         qc.invalidateQueries({ queryKey: ["serverStatus"] })
     }
 
+    const heroClockText = serverTimeLoading
+        ? "加载中..."
+        : serverTimeError || !serverTime
+            ? "接口不可用"
+            : serverTime.date.replace("T", " ").slice(0, 19)
+
     return (
         <AdminPage
             eyebrow="OPERATIONS"
@@ -220,46 +236,84 @@ export default function Dashboard() {
             }
         >
             <Space direction="vertical" size="large" className="admin-stack">
+                <div className="admin-hero">
+                    <div className="admin-hero-clock">
+                        <span className="admin-hero-clock-label">服务器虚拟时间</span>
+                        <span className="admin-hero-clock-value">{heroClockText}</span>
+                        <div className="admin-hero-clock-sub">
+                            {serverTime && (
+                                <span className={serverTime.isCustom ? "admin-badge-warn" : "admin-badge-info"}>
+                                    {serverTime.isCustom ? "自定义模拟" : "跟随系统"}
+                                </span>
+                            )}
+                            {serverTime && <span>UTC：{serverTime.date.replace("T", " ")}</span>}
+                        </div>
+                    </div>
+                    <div className="admin-hero-chips">
+                        {status && <span className="admin-badge-ok">服务运行中</span>}
+                        {statusError && <span className="admin-badge-warn">状态异常</span>}
+                        {status && (
+                            <>
+                                <Tag>{multiModeLabels[status.multiplayer.mode]}</Tag>
+                                <span className={multiStateBadgeClasses[status.multiplayer.state]}>
+                                    {multiStateLabels[status.multiplayer.state]}
+                                </span>
+                                <span className={status.multiplayer.coordinator.available ? "admin-badge-ok" : "admin-badge-info"}>
+                                    {status.multiplayer.coordinator.kind === "local" ? "本地协调器" : "远程协调器"}
+                                </span>
+                            </>
+                        )}
+                    </div>
+                    {(status || !accountsError) && (
+                        <div className="admin-stat-band">
+                            {status && (
+                                <>
+                                    <div className="admin-stat-band-item">
+                                        <span className="admin-stat-band-label">运行时间</span>
+                                        <span className="admin-stat-band-value">{formatDuration(status.server.uptimeSeconds)}</span>
+                                    </div>
+                                    <div className="admin-stat-band-item">
+                                        <span className="admin-stat-band-label">RSS 内存</span>
+                                        <span className="admin-stat-band-value">{formatBytes(status.server.memory.rss)}</span>
+                                    </div>
+                                    <div className="admin-stat-band-item">
+                                        <span className="admin-stat-band-label">活跃房间</span>
+                                        <span className="admin-stat-band-value">{status.multiplayer.activeRooms ?? "未知"}</span>
+                                    </div>
+                                </>
+                            )}
+                            {!accountsError && (
+                                <>
+                                    <div className="admin-stat-band-item">
+                                        <span className="admin-stat-band-label">账号总数</span>
+                                        <span className="admin-stat-band-value">{accountCount}</span>
+                                    </div>
+                                    <div className="admin-stat-band-item">
+                                        <span className="admin-stat-band-label">存档总数</span>
+                                        <span className="admin-stat-band-value">{saveCount}</span>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
+
                 <div className="admin-page-note">
                     <Typography.Text strong>唯一内置管理后台</Typography.Text>
                     <Typography.Text type="secondary">此管理后台随服务端一同构建，用于统一查看运行状态并执行日常管理操作。</Typography.Text>
                 </div>
 
-                {(status || !accountsError) && (
-                    <div className="admin-stat-band">
-                        {status && (
-                            <>
-                                <div className="admin-stat-band-item">
-                                    <span className="admin-stat-band-label">运行时间</span>
-                                    <span className="admin-stat-band-value">{formatDuration(status.server.uptimeSeconds)}</span>
-                                </div>
-                                <div className="admin-stat-band-item">
-                                    <span className="admin-stat-band-label">RSS 内存</span>
-                                    <span className="admin-stat-band-value">{formatBytes(status.server.memory.rss)}</span>
-                                </div>
-                                <div className="admin-stat-band-item">
-                                    <span className="admin-stat-band-label">活跃房间</span>
-                                    <span className="admin-stat-band-value">{status.multiplayer.activeRooms ?? "未知"}</span>
-                                </div>
-                            </>
-                        )}
-                        {!accountsError && (
-                            <>
-                                <div className="admin-stat-band-item">
-                                    <span className="admin-stat-band-label">账号总数</span>
-                                    <span className="admin-stat-band-value">{accountCount}</span>
-                                </div>
-                                <div className="admin-stat-band-item">
-                                    <span className="admin-stat-band-label">存档总数</span>
-                                    <span className="admin-stat-band-value">{saveCount}</span>
-                                </div>
-                            </>
-                        )}
-                    </div>
+                {accountsError && (
+                    <Alert
+                        type="error"
+                        showIcon
+                        message="概览数据加载失败"
+                        description="接口 /api/server/accounts 不可用。"
+                    />
                 )}
 
                 <Row gutter={[16, 16]}>
-                    <Col xs={24} md={8}>
+                    <Col xs={24} md={12}>
                         <Card title="服务端状态" style={{ height: "100%" }} className="admin-dash-card">
                             {statusLoading && !status ? (
                                 <Alert type="info" showIcon message="正在加载服务端状态" />
@@ -280,7 +334,7 @@ export default function Dashboard() {
                             )}
                         </Card>
                     </Col>
-                    <Col xs={24} md={16}>
+                    <Col xs={24} md={12}>
                         <Card title="多人联机状态" style={{ height: "100%" }} className="admin-dash-card">
                             {statusLoading && !status ? (
                                 <Alert type="info" showIcon message="正在加载多人联机状态" />
@@ -487,37 +541,8 @@ export default function Dashboard() {
                 </Row>
 
                 <Row gutter={[16, 16]}>
-                    <Col xs={24} md={12}>
-                        <Card title="账号 / 存档概况" style={{ height: "100%" }} className="admin-dash-card">
-                            <div className="admin-dash-sections">
-                                <div className="admin-dash-section">
-                                    <div className="admin-dash-section-title">快捷入口</div>
-                                    <div className="admin-dash-section-body">
-                                        <Space wrap>
-                                            <Button icon={<TeamOutlined />} onClick={() => navigate("/accounts")}>账号 / 存档</Button>
-                                            <Button icon={<MailOutlined />} onClick={() => navigate("/mail")}>邮件</Button>
-                                            <Button icon={<ExperimentOutlined />} onClick={() => navigate("/seeds")}>动画种子</Button>
-                                        </Space>
-                                    </div>
-                                </div>
-                                {accountsError ? (
-                                    <div className="admin-dash-section">
-                                        <div className="admin-dash-section-title">账号与存档</div>
-                                        <div className="admin-dash-section-body">
-                                            <Alert
-                                                type="error"
-                                                showIcon
-                                                message="概览数据加载失败"
-                                                description="接口 /api/server/accounts 不可用。"
-                                            />
-                                        </div>
-                                    </div>
-                                ) : null}
-                            </div>
-                        </Card>
-                    </Col>
-                    <Col xs={24} md={12}>
-                        <Card title="默认存档" style={{ height: "100%" }} className="admin-dash-card">
+                    <Col span={24}>
+                        <Card title="当前默认存档" style={{ height: "100%" }} className="admin-dash-card">
                             <div className="admin-dash-sections">
                                 <div className="admin-dash-section">
                                     <div className="admin-dash-section-title">默认存档说明</div>
