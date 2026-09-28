@@ -257,7 +257,7 @@ async function main() {
         assert.equal(championData.status, 1, "首次领取返回 status=1")
         assert.equal(championData.best_record.elapsed_time_ms, 300)
         assert.equal(championData.best_record.is_accomplished, true)
-        assert.equal(championData.rank_percentage, 0)
+        assert.equal(championData.rank_percentage, 0.5, "并列第一的百分位钳制为客户端合法下界 0.5")
         assert.equal(championData.leader_character_id, 341005)
         assert.deepEqual(championData.rank_border_top, {
             elapsed_time_ms: 300,
@@ -265,7 +265,7 @@ async function main() {
             score: 777777,
         }, "rank_border_top 必须是本服真实榜首记录(此处即冠军本人)")
         assert.equal(captureClaimState(championId).claimed, 1, "首领成功必须写入领取记录")
-        const championTier = selectTier(1, 0)
+        const championTier = selectTier(1, 0.5)
         const championGrants = expectedGrantsFromTier(championTier)
         const championAfter = captureClaimState(championId)
         assert.deepEqual(
@@ -293,7 +293,7 @@ async function main() {
         assert.equal(championRepeat.statusCode, 200, championRepeat.body)
         const championRepeatData = decode(championRepeat).data
         assert.equal(championRepeatData.status, 2, "重复领取返回 status=2")
-        assert.equal(championRepeatData.rank_percentage, 0, "重复领取携带同一摘要")
+        assert.equal(championRepeatData.rank_percentage, 0.5, "重复领取携带同一摘要")
         assert.deepEqual(captureClaimState(championId), championStable, "重复领取不得再次发放")
 
         // viewer(百分位 2/3)首领 → 按同一规则落到低档
