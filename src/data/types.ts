@@ -180,6 +180,7 @@ export interface PlayerPartyOptions {
 export interface RawPlayerParty {
     slot: number
     name: string
+    allow_other_players_to_heal_me: number
     character_id_1: number
     character_id_2: number
     character_id_3: number
@@ -269,6 +270,7 @@ export interface RawPlayerGachaInfo {
     is_daily_first: number
     is_account_first: number
     gacha_exchange_point?: number
+    crazy_draw_count?: number | null
 }
 
 export interface PlayerGachaInfo {
@@ -276,6 +278,41 @@ export interface PlayerGachaInfo {
     isDailyFirst: boolean
     isAccountFirst: boolean
     gachaExchangePoint?: number
+    crazyDrawCount?: number | null
+}
+
+export interface PlayerGachaDetail {
+    gachaId: number
+    dailyOneCount: number | null
+    dailyTenCount: number | null
+    comebackPeriodStartTime: number | null
+    comebackPeriodEndTime: number | null
+}
+
+export interface RawPlayerGachaDetail {
+    gacha_id: number
+    daily_one_count: number | null
+    daily_ten_count: number | null
+    comeback_period_start_time: number | null
+    comeback_period_end_time: number | null
+}
+
+export interface PlayerStarsGachaCampaign {
+    campaignId: number
+    gachaId: number
+    periodStartTime: number
+    periodEndTime: number
+    freeOneTimes: number
+    freeTenTimes: number
+}
+
+export interface RawPlayerStarsGachaCampaign {
+    campaign_id: number
+    gacha_id: number
+    period_start_time: number
+    period_end_time: number
+    free_one_times: number
+    free_ten_times: number
 }
 
 export interface RawPlayerGachaCampaign {
@@ -674,6 +711,36 @@ export interface UserGachaInfo {
     is_daily_first: boolean
     is_account_first: boolean
     gacha_exchange_point?: number
+    daily_one_count?: number
+    daily_ten_count?: number
+    comeback_campaign?: { period_start_time: number, period_end_time: number }
+    stars_campaign?: { period_start_time: number, period_end_time: number }
+    crazy_draw_count?: number
+}
+
+export interface PlayerCrazyGachaResult {
+    gachaId: number
+    slotIndex: 0 | 1 | 2
+    position: number
+    characterId: number
+    movieId: string | null
+    seed: number | null
+    entryCount: number | null
+    exBoostItemId: number | null
+    exBoostItemCount: number | null
+}
+
+export interface PlayerGachaConversion {
+    gachaId: number
+    pendingPoint: number
+    convertedAt: number
+    shown: boolean
+}
+
+export interface UserStarsGachaCampaign {
+    campaign_id: number
+    free_one_times: number
+    free_ten_times: number
 }
 
 export interface UserDrawnQuest {
@@ -732,6 +799,7 @@ export interface ClientPlayerData {
     quest_progress: Record<string, UserQuestProgress[]>
     last_main_quest_id: number | null
     gacha_info_list: UserGachaInfo[]
+    stars_gacha_campaign_list: UserStarsGachaCampaign[]
     available_asset_version: string
     should_prompt_takeover_registration: boolean
     has_unread_news_item: boolean
@@ -770,6 +838,8 @@ export interface MergedPlayerData {
     questProgress: Record<string, PlayerQuestProgress[]>,
     gachaInfoList: PlayerGachaInfo[],
     gachaCampaignList: PlayerGachaCampaign[],
+    gachaDetailList: PlayerGachaDetail[],
+    starsGachaCampaignList: PlayerStarsGachaCampaign[],
     drawnQuestList: PlayerDrawnQuest[],
     periodicRewardPointList: PlayerPeriodicRewardPoint[],
     allActiveMissionList: Record<string, PlayerActiveMission>,

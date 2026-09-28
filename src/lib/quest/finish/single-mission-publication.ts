@@ -1,10 +1,9 @@
-import { getContentSnapshot } from "../../../content/runtime/content-snapshot"
 import {
     getAwakeBattleMissionIds,
-    reconcileActiveMissionFacts,
     settleAwakeMissionCandidatesWithEvaluation,
     settleMissionCategoriesWithEvaluation,
 } from "../../mission"
+import { publishActiveMissionOwnerStateWithinTransaction } from "../../mission/active-publication-owner"
 import { buildBattleMissionSettlementScopes } from "../../mission/battle-facts"
 import type { FactKey } from "../../mission/facts/fact-key"
 import type { MissionSettlementResult } from "../../mission/settlement"
@@ -42,6 +41,7 @@ export function settleSingleMissionEvaluations(input: {
             input.evaluationTime,
             undefined,
             input.rewardDependencies,
+            { claimStageRewards: false },
         )
         : null
     return {
@@ -55,11 +55,11 @@ export function settleSingleMissionEvaluations(input: {
             })),
             resolver: awakeMissionEvaluation.resolver,
         },
-        activeMissionList: reconcileActiveMissionFacts({
+        activeMissionList: publishActiveMissionOwnerStateWithinTransaction({
             playerId: input.playerId,
-            repository: getContentSnapshot().repository,
             now: input.evaluationTime,
-        }),
+            source: "single-finish",
+        }).activeMissionList,
         invalidatedFactKeys: [
             ...(missionEvaluation?.invalidatedFactKeys ?? []),
             ...(awakeMissionEvaluation?.invalidatedFactKeys ?? []),

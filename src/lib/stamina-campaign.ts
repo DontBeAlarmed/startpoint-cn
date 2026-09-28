@@ -1,20 +1,38 @@
-import bundledCampaignData from "../../assets/stamina_campaign.json";
-import { getRuntimeContentTableSync } from "../content/runtime/table-access";
+import { getContentSnapshot, type ReadonlyContentRepository } from "../content/runtime/content-snapshot";
+import { type GameCalendarPolicy } from "../time/game-calendar";
+import { getGameCalendar } from "../time/game-calendar-provider";
 import { QuestCategory } from "./types";
+
+type LevelSelector =
+    | { readonly kind: "all" }
+    | { readonly kind: "within"; readonly ids: readonly number[] };
 
 interface StaminaCampaign {
     id: string;
     rate: number;
     questType: number;
-    questIds: string;
-    eventIds: string;
+    // Level selectors in CDN column order: [eventIds(row7), middle(row8), questIds(row9)].
+    // "(None)" leaves the level unconstrained, "" matches nothing, "1,2" matches 1 or 2.
+    selectors: readonly [LevelSelector, LevelSelector, LevelSelector];
     startTime: Date;
     endTime: Date;
 }
 
 type CampaignTable = Record<string, string[][]>
 
-function buildCampaigns(campaignData: CampaignTable): readonly StaminaCampaign[] {
+/** CDN quest types whose selector triple is a full three-level id path (Main/Ex/BossBattle). */
+const THREE_LEVEL_QUEST_TYPES: ReadonlySet<number> = new Set([0, 1, 2]);
+
+function parseLevelSelector(raw: string): LevelSelector {
+    if (raw === "(None)") return { kind: "all" }
+    if (raw === "") return { kind: "within", ids: [] }
+    return { kind: "within", ids: raw.split(",").map(Number) }
+}
+
+function buildCampaigns(
+    campaignData: CampaignTable,
+    calendar: GameCalendarPolicy = getGameCalendar(),
+): readonly StaminaCampaign[] {
     const campaigns: StaminaCampaign[] = []
     for (const [id, rows] of Object.entries(campaignData)) {
         const row = rows[0]
@@ -23,26 +41,28 @@ function buildCampaigns(campaignData: CampaignTable): readonly StaminaCampaign[]
             id,
             rate: parseFloat(row[5]),
             questType: parseInt(row[6]),
-            questIds: row[9] || "",
-            eventIds: row[7] || "",
-            startTime: new Date(row[1]),
-            endTime: new Date(row[2]),
+            selectors: [
+                parseLevelSelector(row[7]),
+                parseLevelSelector(row[8]),
+                parseLevelSelector(row[9]),
+            ],
+            // Master windows are offset-less wall-clock strings: they must go
+            // through the game calendar policy, never host-local Date parsing.
+            startTime: new Date(calendar.parseMasterTimestamp(row[1])),
+            endTime: new Date(calendar.parseMasterTimestamp(row[2])),
         })
     }
     return Object.freeze(campaigns)
 }
 
-const campaignsByTable = new WeakMap<CampaignTable, readonly StaminaCampaign[]>()
+const campaignsByRepository = new WeakMap<ReadonlyContentRepository, readonly StaminaCampaign[]>()
 
 function getCampaigns(): readonly StaminaCampaign[] {
-    const table = getRuntimeContentTableSync(
-        "stamina_campaign.json",
-        bundledCampaignData as CampaignTable,
-    )
-    const cached = campaignsByTable.get(table)
+    const repository = getContentSnapshot().repository
+    const cached = campaignsByRepository.get(repository)
     if (cached) return cached
-    const campaigns = buildCampaigns(table)
-    campaignsByTable.set(table, campaigns)
+    const campaigns = buildCampaigns(repository.table<CampaignTable>("stamina_campaign.json"))
+    campaignsByRepository.set(repository, campaigns)
     return campaigns
 }
 
@@ -69,15 +89,41 @@ const CATEGORY_TO_CDN_TYPE: Record<number, number> = {
     [QuestCategory.HARD_MULTI_EVENT]: 19,
 };
 
-function matchesQuestId(campaign: StaminaCampaign, questId: number): boolean {
-    if (campaign.questIds === "(None)" || campaign.questIds === "") return true;
-    const ids = campaign.questIds.split(",").map(Number);
-    return ids.includes(questId);
-}
-
-function matchesEvent(campaign: StaminaCampaign, _questId: number): boolean {
-    if (campaign.eventIds === "(None)" || campaign.eventIds === "") return false;
-    return true;
+/**
+ * Official selector semantics (CN 1.8.1 QuestRangeReferenceIdKindTools +
+ * StaminaCampaignValues): a campaign targets a quest by matching the quest id's
+ * digit path against the selector lists. Main/Ex/BossBattle campaigns
+ * (questType 0/1/2) consult all three levels against the twice-by-1000
+ * decomposition of the quest id; every event-type campaign (questType >= 3)
+ * consults [eventIds, questIds] against [floor(id/1000), id%1000] and ignores
+ * the middle column. "(None)" leaves a level unconstrained, an empty list
+ * matches nothing at that level, and a multi-id event list degrades to its
+ * first id, mirroring the client's keyFromId single-id coercion (only
+ * single-id rows exist in the CDN data).
+ */
+function matchesSelectors(campaign: StaminaCampaign, questId: number): boolean {
+    let path: readonly number[]
+    let levels: readonly number[]
+    if (THREE_LEVEL_QUEST_TYPES.has(campaign.questType)) {
+        path = [
+            Math.floor(questId / 1_000_000),
+            Math.floor(questId / 1_000) % 1_000,
+            questId % 1_000,
+        ]
+        levels = [0, 1, 2]
+    } else {
+        path = [Math.floor(questId / 1_000), questId % 1_000]
+        levels = [0, 2]
+    }
+    for (let index = 0; index < levels.length; index++) {
+        const selector = campaign.selectors[levels[index]]
+        if (selector.kind === "all") continue
+        const ids = index === 0 && selector.ids.length > 1
+            ? selector.ids.slice(0, 1)
+            : selector.ids
+        if (!ids.includes(path[index])) return false
+    }
+    return true
 }
 
 export function getActiveCampaignRate(
@@ -92,7 +138,7 @@ export function getActiveCampaignRate(
     for (const c of getCampaigns()) {
         if (c.questType !== cdnType) continue;
         if (serverDate < c.startTime || serverDate > c.endTime) continue;
-        if (!matchesQuestId(c, questId) && !matchesEvent(c, questId)) continue;
+        if (!matchesSelectors(c, questId)) continue;
         rate = Math.min(rate, c.rate);
     }
     return rate;

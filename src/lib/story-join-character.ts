@@ -1,8 +1,6 @@
-import bundledStoryJoinCharacters from "../../assets/story_join_character.json"
-
 import { getPlayerCharacterSync } from "../data/domains/character"
 import { getPlayerSingleQuestProgressSync } from "../data/domains/quest"
-import { getRuntimeContentTableSync } from "../content/runtime/table-access"
+import { getContentSnapshot } from "../content/runtime/content-snapshot"
 import { QuestCategory } from "./types"
 
 type RawStoryJoinCharacterTable = Record<string, unknown>
@@ -107,9 +105,8 @@ export function parseStoryJoinCharacterTable(
 }
 
 function getDefinitions(): readonly StoryJoinCharacterDefinition[] {
-    return parseStoryJoinCharacterTable(getRuntimeContentTableSync(
+    return parseStoryJoinCharacterTable(getContentSnapshot().repository.table<RawStoryJoinCharacterTable>(
         "story_join_character.json",
-        bundledStoryJoinCharacters as RawStoryJoinCharacterTable,
     ))
 }
 

@@ -1,13 +1,12 @@
 import { incrementPlayerCategoryMissionSync } from "../../data/domains/mission"
 import type { FinishContext } from "../quest/finish/types"
-import { getMissionMasterDefinition } from "./master-data"
-
+import { getMissionCatalog } from "./mission-catalog"
 const BATTLE_MANA_MISSION_ID = 4
 const MVP_MISSION_ID = 29
 const EXPERT_SINGLE_MISSION_ID = 94
 
 function hasExpectedPattern(missionId: number, pattern: string): boolean {
-    return getMissionMasterDefinition(1, missionId)?.pattern === pattern
+    return getMissionCatalog().getDefinition(1, missionId)?.pattern === pattern
 }
 
 export function recordRegularMissionBattleFactsSync(

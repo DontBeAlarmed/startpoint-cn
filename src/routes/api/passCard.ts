@@ -13,8 +13,14 @@ import { getSession } from "../../data/domains/session"
 import { MissionRewardGranter } from "../../lib/mission/grants"
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication"
 import { getPassCardEventDefinition, getPassCardRewardDefinition, isPassCardEventActiveAt } from "../../lib/pass-card"
+import {
+    projectCharacterPatch,
+    projectEquipmentEntity,
+} from "../../lib/common-response/entities"
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
+import type { CommonResponseFragment } from "../../lib/common-response/model"
 import { generateDataHeaders, getServerTime } from "../../utils"
-import { projectItemOverflowCommonResponse } from "../../lib/item-overflow"
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow/common-response"
 
 interface PassCardBody {
     viewer_id: number
@@ -168,22 +174,29 @@ export default async function passCardRoutes(fastify: FastifyInstance): Promise<
             "pass-card/receive_all",
         ).characterList
         const overMax = projectItemOverflowCommonResponse(result.itemOverflowDispositions)
+        const fragment: CommonResponseFragment = {
+            item_list: result.itemList,
+            character_list: characterList.map(
+                character => projectCharacterPatch(character),
+            ),
+            equipment_list: result.equipmentList.map(
+                equipment => projectEquipmentEntity(equipment),
+            ),
+            ...(result.hasPlayerChanges() ? { user_info: result.getUserInfo() } : {}),
+            mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
+            ...(overMax.length > 0 ? { over_max: overMax } : {}),
+        }
 
         reply.header("content-type", "application/x-msgpack")
         return reply.send({
             data_headers: generateDataHeaders({ viewer_id: body.viewer_id }),
             data: {
                 all_received_record: responseRecords(playerId, body.pass_card_id),
-                item_list: result.itemList,
-                character_list: characterList,
-                equipment_list: result.equipmentList,
+                ...mergeCommonResponseFragments([fragment]),
                 degree_list: result.degreeList.map(degreeId => ({
                     viewer_id: body.viewer_id,
                     degree_id: degreeId,
                 })),
-                ...(result.hasPlayerChanges() ? { user_info: result.getUserInfo() } : {}),
-                mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
-                ...(overMax.length > 0 ? { over_max: overMax } : {}),
             },
         })
     })

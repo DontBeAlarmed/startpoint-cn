@@ -7,7 +7,13 @@ import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
 import { getPlayerMailCountSync } from "../../data/domains/mail"
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { createCharacterAwakeEligibilityResolver, evaluateMissionProgressStageB, getCharacterIdFromMission, getCurrentStage, getMissionCatalog, mergeMissionSettlementResponse, settleAwakeMissionCandidatesWithEvaluation, settleMissionCategories, settleMissionCategoriesWithEvaluation } from "../../lib/mission/index";
+import { createCharacterAwakeEligibilityResolver, evaluateMissionProgressStageB, getCharacterIdFromMission, getCurrentStage, getMissionCatalog, settleAwakeMissionCandidatesWithEvaluation, settleMissionCategories, settleMissionCategoriesWithEvaluation } from "../../lib/mission/index";
+import {
+    composeMissionSettlementResponse,
+    projectMissionSettlementFragment,
+} from "../../lib/mission/response-fragment";
+import { projectCharacterPatch } from "../../lib/common-response/entities";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { resolveClientProgressTargets } from "../../lib/mission/client-progress";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -56,7 +62,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         const requestList = body.category_list || [{ category: 1 }]
         const requestCategories = requestList.map(c => c.category)
-        const { responseData, missionCount } = getDb().transaction(() => {
+        const { responseData } = getDb().transaction(() => {
             const evaluationTime = new Date(getServerTime() * 1000)
             const awakeEligibility = requestList.some(entry => entry.category === 9)
                 ? createCharacterAwakeEligibilityResolver(playerId, evaluationTime)
@@ -113,6 +119,24 @@ const routes = async (fastify: FastifyInstance) => {
             const awakeProgressByMission = new Map(
                 (awakeSettlement?.evaluation.missions ?? []).map(mission => [mission.missionId, mission]),
             )
+            const awakeGrowthCharacterList = awakeSettlement === null
+                ? []
+                : publishCharacterGrowthOwnerStateBestEffort(
+                    playerId,
+                    [],
+                    [awakeSettlement.settlement.characterList as Record<string, unknown>[]],
+                    {
+                        evaluatedAwakeUnlocks: {
+                            progressList: awakeSettlement.evaluation.missions.map(mission => ({
+                                missionId: mission.missionId,
+                                progress: mission.finalProgress,
+                            })),
+                            resolver: awakeSettlement.resolver,
+                        },
+                    },
+                    "mission/get_mission_progress",
+                    evaluationTime,
+                ).characterList
             const automaticMissionIdsByRequest = requestList.map(requestEntry => (
                 automaticSettlement?.prepared.scopes.find(scope => (
                     scope.category === requestEntry.category
@@ -156,31 +180,47 @@ const routes = async (fastify: FastifyInstance) => {
 
             const responseData: Record<string, unknown> = {
                 mission_progress_list: missionProgressList,
-                mission_info: [],
-                item_list: {},
-                character_list: [],
-                equipment_list: [],
+                ...mergeCommonResponseFragments([{
+                    mission_info: [],
+                    item_list: {},
+                    character_list: [],
+                    equipment_list: [],
+                }]),
                 degree_list: [],
             }
             if (automaticSettlement) {
-                mergeMissionSettlementResponse(
+                composeMissionSettlementResponse(
                     responseData,
-                    automaticSettlement.settlement,
+                    projectMissionSettlementFragment(automaticSettlement.settlement),
                     viewerId,
                 )
             }
             if (awakeResult) {
-                mergeMissionSettlementResponse(responseData, awakeResult, viewerId)
+                const awakeFragment = projectMissionSettlementFragment(awakeResult)
+                composeMissionSettlementResponse(
+                    responseData,
+                    awakeGrowthCharacterList.length > 0
+                        ? {
+                            ...awakeFragment,
+                            common: {
+                                ...awakeFragment.common,
+                                character_list: awakeGrowthCharacterList.map(
+                                    projectCharacterPatch,
+                                ),
+                            },
+                        }
+                        : awakeFragment,
+                    viewerId,
+                )
             }
             responseData.mission_info = [
                 ...(awakeResult?.missionInfo ?? []),
                 ...(automaticSettlement?.settlement.missionInfo ?? []),
             ]
             responseData.mail_arrived = getPlayerMailCountSync(playerId, true) > 0
-            return { responseData, missionCount: missionProgressList.length }
+            return { responseData }
         })()
 
-        console.log(`[MISSION] get_progress viewer=${viewerId} categories=${requestCategories} missions=${missionCount}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -222,7 +262,6 @@ const routes = async (fastify: FastifyInstance) => {
         const missionParams = Array.isArray(body.mission_param_list)
             ? body.mission_param_list
             : []
-        let updatedCount = 0
         const evaluationTime = new Date(getServerTime() * 1000)
         const awakeCandidateCharacterIds: number[] = []
         const automaticMissionIdsByCategory = new Map<number, Set<number>>()
@@ -243,7 +282,6 @@ const routes = async (fastify: FastifyInstance) => {
                         match.missionId,
                         delta,
                     )) {
-                        updatedCount++
                         if (match.category === 9) {
                             const characterId = Number(getCharacterIdFromMission(match.missionId))
                             if (Number.isSafeInteger(characterId) && characterId > 0) {
@@ -274,18 +312,25 @@ const routes = async (fastify: FastifyInstance) => {
             {},
             "mission/update_mission_progress",
         ).characterList
-        console.log(`[MISSION] update_progress viewer=${viewerId} params=${missionParams.length} db_updates=${updatedCount}`)
 
         const responseData: Record<string, unknown> = {
-            mission_info: [],
+            ...mergeCommonResponseFragments([{
+                mission_info: [],
+                character_list: characterList.map(
+                    character => projectCharacterPatch(character),
+                ),
+                item_list: {},
+                equipment_list: [],
+                mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
+            }]),
             degree_list: [],
-            character_list: characterList,
-            item_list: {},
-            equipment_list: [],
-            mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
         }
         if (automaticSettlement) {
-            mergeMissionSettlementResponse(responseData, automaticSettlement, viewerId)
+            composeMissionSettlementResponse(
+                responseData,
+                projectMissionSettlementFragment(automaticSettlement),
+                viewerId,
+            )
         }
 
         reply.header("content-type", "application/x-msgpack")

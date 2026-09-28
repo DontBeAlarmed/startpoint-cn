@@ -204,7 +204,10 @@ test.before(async () => {
         } = require("../src/data/domains/player"))
         ;({ insertSessionWithToken } = require("../src/data/domains/session"))
         ;({ SessionType } = require("../src/data/types"))
-        characterAssets = require("../src/lib/assets")
+characterAssets = {
+            getCharacterDataSync: characterId => require("../src/lib/character-content").getCharacterFacts().get(characterId),
+            getCharacterManaNodesSync: (characterId, level) => require("../src/lib/character-growth-content").getCharacterGrowthContent().getManaBoardNodes(characterId, level),
+        }
         ;({ characterExpCaps } = require("../src/lib/character"))
         itemRoutes = require("../src/routes/api/item").default
         ;({ registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack"))

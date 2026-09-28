@@ -2,7 +2,10 @@ import { getDb } from "../../../data/db"
 import { getPlayerSync } from "../../../data/domains/player"
 import { updatePlayerCharacterSync } from "../../../data/domains/character"
 import { incrementActiveMissionInjectedExpCountSync } from "../../../data/domains/active_mission_counters"
+import { publishActiveMissionOwnerStateWithinTransaction } from "../../mission/active-publication-owner"
 import { createCharacterGrowthRequestContext } from "../request-context"
+import { convergeBondTokenForExpWithinTransaction } from "../bond-token-qualification"
+import type { BondTokenStatus } from "../model"
 import { growthError } from "../errors"
 import {
     addSafeInteger,
@@ -13,6 +16,7 @@ import {
     validatePositiveAmount,
 } from "../mutation-support"
 import { calculateCharacterExpAfter } from "../exp-calculation"
+import { mutationContent } from "../node-command-support"
 
 export interface InjectCharacterExpCommand {
     readonly playerId: number
@@ -29,6 +33,8 @@ export interface InjectCharacterExpResult {
     readonly addExpList: readonly Record<string, number>[]
     readonly overflowExp: number
     readonly expPool: number
+    readonly bondTokens: ReadonlyMap<number, BondTokenStatus>
+    readonly activeMissionList: readonly unknown[]
     readonly replayed: false
 }
 
@@ -60,7 +66,31 @@ export function executeInjectCharacterExp(command: InjectCharacterExpCommand): I
         )
         updatePlayerExpPoolSync(command.playerId, afterPool)
         updatePlayerCharacterSync(command.playerId, command.characterId, { exp: calculation.afterExp })
+        const bondConvergence = convergeBondTokenForExpWithinTransaction(
+            command.playerId,
+            command.characterId,
+            context.bondTokens(),
+            {
+                rarity: before.rarity,
+                beforeExp: before.exp,
+                exp: calculation.afterExp,
+                loadBoardFacts: () => {
+                    const boardOneContent = mutationContent(command.characterId, 1)
+                    return {
+                        requiredNodeIds: [...Object.keys(boardOneContent.nodes).map(Number)],
+                        learnedNodeIds: new Set(context.normalManaNodes().keys()),
+                    }
+                },
+            },
+        )
+        const afterBondTokens = new Map(context.bondTokens())
+        if (bondConvergence.granted) afterBondTokens.set(1, 1)
         incrementActiveMissionInjectedExpCountSync(command.playerId)
+        const activeMission = publishActiveMissionOwnerStateWithinTransaction({
+            playerId: command.playerId,
+            now: command.evaluationTime,
+            source: "character-growth/inject-exp",
+        })
         return {
             command: "inject_exp",
             before,
@@ -74,6 +104,8 @@ export function executeInjectCharacterExp(command: InjectCharacterExpCommand): I
             }],
             overflowExp: calculation.overflowExp,
             expPool: afterPool,
+            bondTokens: afterBondTokens,
+            activeMissionList: activeMission.activeMissionList,
             replayed: false,
         } as InjectCharacterExpResult
     })()

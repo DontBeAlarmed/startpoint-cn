@@ -1,5 +1,9 @@
 import { canonicalJsonBuffer, sha256Object } from "./canonical-json"
 import { deepFreeze } from "../deep-freeze"
+import {
+    DEFAULT_GAME_CALENDAR_UTC_OFFSET_MINUTES,
+    createGameCalendarPolicy,
+} from "../../time/game-calendar"
 
 export const CONTENT_SCHEMA_VERSION = 1
 export const CONTENT_RUNTIME_SCHEMA_VERSION = 1
@@ -41,11 +45,23 @@ export interface ContentReleaseManifest {
     readonly runtimeSchemaVersion: 1
     /** Generator version that produced this release; it may differ from the current constant. */
     readonly generatorVersion: number
+    /**
+     * Game calendar offset frozen for this release. It is part of the release
+     * digest, so content built under one offset can never be mixed with
+     * content built under another.
+     */
+    readonly gameCalendarUtcOffsetMinutes: number
     readonly releaseDigest: `sha256:${string}`
     readonly tables: Readonly<Record<string, ContentTableReference>>
     readonly catalog: { readonly object: `sha256:${string}` }
     readonly summary: { readonly object: `sha256:${string}` }
 }
+
+/**
+ * Historical release manifests predate the calendar identity field. They are
+ * only ever interpretable as legacy CN content (offset 480).
+ */
+type LegacyContentReleaseManifest = Omit<ContentReleaseManifest, "gameCalendarUtcOffsetMinutes">
 
 export interface ContentCurrentPointer {
     readonly schemaVersion: 1
@@ -63,11 +79,23 @@ const SEMVER_PATTERN = new RegExp(
     + "(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$",
 )
 
+/** Release manifests before the game calendar identity field existed. */
+const LEGACY_RELEASE_KEYS = [
+    "schemaVersion",
+    "assetVersion",
+    "runtimeSchemaVersion",
+    "generatorVersion",
+    "releaseDigest",
+    "tables",
+    "catalog",
+    "summary",
+] as const
 const RELEASE_KEYS = [
     "schemaVersion",
     "assetVersion",
     "runtimeSchemaVersion",
     "generatorVersion",
+    "gameCalendarUtcOffsetMinutes",
     "releaseDigest",
     "tables",
     "catalog",
@@ -295,7 +323,55 @@ function parseTableReference(value: unknown, field: string): ContentTableReferen
     }
 }
 
-function parseReleaseShape(value: unknown): ContentReleaseManifest {
+function parseReleaseTables(manifest: Record<string, unknown>): Record<string, ContentTableReference> {
+    const rawTables = requireRecord(manifest.tables, "manifest.tables")
+    const tableEntries = Object.entries(rawTables)
+    if (tableEntries.length === 0) throw new TypeError("manifest.tables must not be empty")
+
+    const tables: Record<string, ContentTableReference> = {}
+    for (const [tableName, reference] of tableEntries) {
+        requireTableName(tableName)
+        tables[tableName] = parseTableReference(reference, `manifest.tables.${tableName}`)
+    }
+    return tables
+}
+
+function parseLegacyReleaseShape(value: unknown): LegacyContentReleaseManifest {
+    canonicalJsonBuffer(value)
+    const manifest = requireRecord(value, "manifest")
+    requireExactKeys(manifest, LEGACY_RELEASE_KEYS, "manifest")
+
+    if (manifest.schemaVersion !== CONTENT_SCHEMA_VERSION) {
+        throw new TypeError(`manifest.schemaVersion must be ${CONTENT_SCHEMA_VERSION}`)
+    }
+    if (manifest.runtimeSchemaVersion !== CONTENT_RUNTIME_SCHEMA_VERSION) {
+        throw new TypeError(
+            `manifest.runtimeSchemaVersion must be ${CONTENT_RUNTIME_SCHEMA_VERSION}`,
+        )
+    }
+
+    return {
+        schemaVersion: CONTENT_SCHEMA_VERSION,
+        assetVersion: requireSemver(manifest.assetVersion, "manifest.assetVersion"),
+        runtimeSchemaVersion: CONTENT_RUNTIME_SCHEMA_VERSION,
+        generatorVersion: requirePositiveInteger(
+            manifest.generatorVersion,
+            "manifest.generatorVersion",
+        ),
+        releaseDigest: requireDigest(manifest.releaseDigest, "manifest.releaseDigest"),
+        tables: parseReleaseTables(manifest),
+        catalog: parseObjectReference(manifest.catalog, "manifest.catalog"),
+        summary: parseObjectReference(manifest.summary, "manifest.summary"),
+    }
+}
+
+function requireGameCalendarUtcOffsetMinutes(value: unknown): number {
+    // Same canonical -840..840 signed-integer contract as the runtime config
+    // parser and the sync engine's frozen policy.
+    return createGameCalendarPolicy(value as number).utcOffsetMinutes
+}
+
+function parseCurrentReleaseShape(value: unknown): ContentReleaseManifest {
     canonicalJsonBuffer(value)
     const manifest = requireRecord(value, "manifest")
     requireExactKeys(manifest, RELEASE_KEYS, "manifest")
@@ -309,16 +385,6 @@ function parseReleaseShape(value: unknown): ContentReleaseManifest {
         )
     }
 
-    const rawTables = requireRecord(manifest.tables, "manifest.tables")
-    const tableEntries = Object.entries(rawTables)
-    if (tableEntries.length === 0) throw new TypeError("manifest.tables must not be empty")
-
-    const tables: Record<string, ContentTableReference> = {}
-    for (const [tableName, reference] of tableEntries) {
-        requireTableName(tableName)
-        tables[tableName] = parseTableReference(reference, `manifest.tables.${tableName}`)
-    }
-
     return {
         schemaVersion: CONTENT_SCHEMA_VERSION,
         assetVersion: requireSemver(manifest.assetVersion, "manifest.assetVersion"),
@@ -327,8 +393,11 @@ function parseReleaseShape(value: unknown): ContentReleaseManifest {
             manifest.generatorVersion,
             "manifest.generatorVersion",
         ),
+        gameCalendarUtcOffsetMinutes: requireGameCalendarUtcOffsetMinutes(
+            manifest.gameCalendarUtcOffsetMinutes,
+        ),
         releaseDigest: requireDigest(manifest.releaseDigest, "manifest.releaseDigest"),
-        tables,
+        tables: parseReleaseTables(manifest),
         catalog: parseObjectReference(manifest.catalog, "manifest.catalog"),
         summary: parseObjectReference(manifest.summary, "manifest.summary"),
     }
@@ -337,6 +406,21 @@ function parseReleaseShape(value: unknown): ContentReleaseManifest {
 function manifestDigestInput(
     manifest: Omit<ContentReleaseManifest, "releaseDigest">,
 ): Omit<ContentReleaseManifest, "releaseDigest"> {
+    return {
+        schemaVersion: manifest.schemaVersion,
+        assetVersion: manifest.assetVersion,
+        runtimeSchemaVersion: manifest.runtimeSchemaVersion,
+        generatorVersion: manifest.generatorVersion,
+        gameCalendarUtcOffsetMinutes: manifest.gameCalendarUtcOffsetMinutes,
+        tables: manifest.tables,
+        catalog: manifest.catalog,
+        summary: manifest.summary,
+    }
+}
+
+function legacyManifestDigestInput(
+    manifest: Omit<LegacyContentReleaseManifest, "releaseDigest">,
+): Omit<LegacyContentReleaseManifest, "releaseDigest"> {
     return {
         schemaVersion: manifest.schemaVersion,
         assetVersion: manifest.assetVersion,
@@ -351,8 +435,14 @@ function manifestDigestInput(
 export function digestReleaseManifest(
     manifest: ContentReleaseManifest,
 ): `sha256:${string}` {
-    const parsed = parseReleaseShape(manifest)
+    const parsed = parseCurrentReleaseShape(manifest)
     return sha256Object(canonicalJsonBuffer(manifestDigestInput(parsed)))
+}
+
+function digestLegacyReleaseManifest(
+    manifest: LegacyContentReleaseManifest,
+): `sha256:${string}` {
+    return sha256Object(canonicalJsonBuffer(legacyManifestDigestInput(manifest)))
 }
 
 export function createReleaseManifest(
@@ -361,11 +451,12 @@ export function createReleaseManifest(
     canonicalJsonBuffer(input)
     const rawInput = requireRecord(input, "manifest input")
     requireExactKeys(rawInput, RELEASE_INPUT_KEYS, "manifest input")
-    const provisional = parseReleaseShape({
+    const provisional = parseCurrentReleaseShape({
         schemaVersion: rawInput.schemaVersion,
         assetVersion: rawInput.assetVersion,
         runtimeSchemaVersion: rawInput.runtimeSchemaVersion,
         generatorVersion: rawInput.generatorVersion,
+        gameCalendarUtcOffsetMinutes: rawInput.gameCalendarUtcOffsetMinutes,
         tables: rawInput.tables,
         catalog: rawInput.catalog,
         summary: rawInput.summary,
@@ -378,11 +469,26 @@ export function createReleaseManifest(
 }
 
 export function parseReleaseManifest(value: unknown): ContentReleaseManifest {
-    const manifest = parseReleaseShape(value)
-    if (manifest.releaseDigest !== digestReleaseManifest(manifest)) {
+    const manifest = requireRecord(value, "manifest")
+    if (Object.prototype.hasOwnProperty.call(manifest, "gameCalendarUtcOffsetMinutes")) {
+        const parsed = parseCurrentReleaseShape(manifest)
+        if (parsed.releaseDigest !== digestReleaseManifest(parsed)) {
+            throw new TypeError("manifest.releaseDigest does not match manifest content")
+        }
+        return deepFreeze(parsed)
+    }
+    // Historical manifests carry no calendar identity: verify their digest
+    // against the legacy digest input FIRST, and only then normalize to the
+    // legacy CN default. The default must never leak into legacy verification.
+    const legacy = parseLegacyReleaseShape(manifest)
+    if (legacy.releaseDigest !== digestLegacyReleaseManifest(legacy)) {
         throw new TypeError("manifest.releaseDigest does not match manifest content")
     }
-    return deepFreeze(manifest)
+    return deepFreeze({
+        ...legacyManifestDigestInput(legacy),
+        gameCalendarUtcOffsetMinutes: DEFAULT_GAME_CALENDAR_UTC_OFFSET_MINUTES,
+        releaseDigest: legacy.releaseDigest,
+    })
 }
 
 export function parseCurrentPointer(value: unknown): ContentCurrentPointer {

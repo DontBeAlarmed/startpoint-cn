@@ -14,10 +14,10 @@
 | `assets/equipment_enhancement_shop.json` | 追忆装备阶段强化商品 |
 | `src/data/domains/shopPurchase.ts` | 玩家按商店类型、日/月周期和总量记录购买次数 |
 | `src/data/domains/shop-campaign-lineup.ts` | 玩家首次选择的 campaign lineup |
-| `src/lib/event-shop-purchase.ts` | 通用购买校验与事务 |
-| `src/routes/api/shop.ts` | 列表与购买端点 |
+| `src/lib/shop/` | immutable catalog、共用购买计划、唯一事务 owner 与响应投影 |
+| `src/routes/api/shop.ts`、`src/routes/api/shop/purchase-routes.ts` | 列表、Campaign、体力恢复与购买 HTTP adapter |
 
-运行时商品读取由 `src/lib/assets.ts` 和当前 Content repository 接线决定。某张资产存在不等于客户端一定有对应 ID；返回列表仍需遵守客户端主数据和活动开放期。
+运行时商品读取由当前 Content repository 对应的 immutable Shop catalog 决定。某张资产存在不等于客户端一定有对应 ID；返回列表仍需遵守客户端主数据和活动开放期。
 
 ## 商品列表
 
@@ -38,19 +38,18 @@ GeneralShop 额外通过 `cdn_general_shop_whitelist.json` 过滤客户端主数
 
 ## 通用购买事务
 
-`/shop/buy` 先校验 viewer、商品、正整数购买数量、库存与余额。普通购买由 `executeGenericShopPurchaseSync()` 在单一 SQLite 事务内完成：
+`/shop/buy` 只负责请求、会话、错误映射和提交后发布。8 类购买都进入同一条 `prepareShopPurchase()` → `executeShopPurchaseSync()` 链：
 
-1. 读取最新玩家状态与购买次数；
-2. 对活动商店执行开放期校验；
-3. 校验 Mana、星导石、羁绊证或道具成本；
-4. 扣除货币和道具；
-5. 按购买数量展开并发放全部奖励；
-6. 按商店类型累加当前日、当前月和总购买次数；若支付类型为玛纳，同时累计 Active Mission 的实际玛纳消费量；
-7. 返回最终玩家、物品、角色与装备状态。
+1. 从当前 snapshot catalog O(1) 解析 authoritative offer、开放期和动态成本；
+2. 在唯一 Shop 外层事务内批量读取最新玩家、购买次数与必要 Campaign Lineup；
+3. 校验全部次数限制、货币和道具成本，并预验证 Equipment/Pass effects；
+4. 在一个 shared Inventory context 中写入 payment after-state、扣除 Item 并执行 typed RewardGrant；
+5. 应用 Equipment/Pass effect，再从原始 snapshot 写购买次数与 Mana/Mission facts；
+6. 返回 typed absolute facts，由纯 projector 生成响应，提交后再发布角色成长和 `mail_arrived`。
 
 任一步失败都回滚整个购买，不保留“已扣成本但未发奖”或“已发奖但未记库存”的部分状态。购买数量必须是正安全整数。
 
-普通星导石与 Mana 价格按国服客户端的总余额语义处理：分别以 `free_vmoney + vmoney`、`free_mana + paid_mana` 判断可购买，并按免费余额优先、付费余额补足的顺序扣款。显式 `PAID_BEADS` 商品仍只允许扣付费星导石。单买、批量购买、追忆装备强化与星导石恢复体力共用同一纯扣款计划；响应同时返回对应的免费与付费余额，且该计算不增加数据库读取。
+普通星导石与 Mana 价格按国服客户端的总余额语义处理：分别以 `free_vmoney + vmoney`、`free_mana + paid_mana` 判断可购买，并按免费余额优先、付费余额补足的顺序扣款。显式 `PAID_BEADS` 商品仍只允许扣付费星导石。single、bulk 与追忆装备强化共用 Shop purchase plan；恢复体力继续使用同一底层 free-first 算法，但不是 Shop transaction owner 的一部分。
 
 官方表中的 `buy_max_count` 只限制单次请求数量，不是永久库存。总次数限制来自 `max_frequency`，周期限制来自 `daily_stock` 和 `monthly_stock`；列表中的 `stock_quantity` 取三个剩余限制的最小值，三者都未配置时返回 `-1`。日库存按北京时间每日 05:00 重置，月库存按每月 1 日北京时间 05:00 重置；General Shop 的 `specified_months` 会把月周期锚定到指定月份。商品 ID 在不同商店类型之间允许重名，所有计数都以 `shop_type + shop_item_id` 隔离。
 
@@ -68,7 +67,7 @@ GeneralShop 额外通过 `cdn_general_shop_whitelist.json` 过滤客户端主数
 
 ## 追忆装备强化
 
-`ShopType.TREASURE_EQUIPMENT` 使用独立路径：
+`ShopType.TREASURE_EQUIPMENT` 使用 Shop owner 内的窄 Equipment effect adapter：
 
 - 商品描述目标装备、阶段与 `enhancementMaxLevel`；
 - `planEquipmentEnhancementPurchase()` 根据当前强化等级计算目标等级；

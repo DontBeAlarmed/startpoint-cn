@@ -7,10 +7,12 @@ export {
 } from "./effective-offer"
 export type {
     EffectiveShopOffer,
+    ShopCampaignDescriptor,
     ShopCatalog,
     ShopCatalogEntry,
     ShopCatalogScope,
     ShopNavigationProduct,
+    ShopEventCurrencyWindow,
     ShopPurchaseProduct,
 } from "./model"
 export {

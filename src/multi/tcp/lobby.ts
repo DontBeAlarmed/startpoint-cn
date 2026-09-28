@@ -10,6 +10,7 @@ import {
 import { NpcMateProvider } from "../npc/controller"
 import { ensureNpcRoster, getActiveNpcRoster } from "../npc/nickname-pool"
 import type { MultiRoom } from "../../lib/types"
+import { RoomState } from "../types"
 import {
     getLobbyLifecycleGuard,
     LobbyLifecycleGuard,
@@ -36,6 +37,7 @@ let npcRecruitmentTiming: NpcRecruitmentTiming = Object.freeze({
 interface ReconnectLease {
     readonly roomNumber: string
     readonly participant: ParticipantIdentity
+    readonly connectionId: string
     readonly timer: ReturnType<typeof setTimeout>
 }
 
@@ -67,22 +69,25 @@ export function cancelReconnectLease(participant: ParticipantIdentity): void {
     reconnectLeases.delete(key)
 }
 
-function removeDisconnectedMate(roomNumber: string, viewerId: number): void {
+// 按连接身份清理 mate：同一 viewerId 重连会获得新 connectionId，
+// 裸 viewerId 清理会误删重连玩家（僵尸旧连接晚检测场景）。幂等。
+function removeDisconnectedMate(roomNumber: string, connectionId: string): void {
     const room = getRoom(roomNumber)
     if (!room) return
     const hostClient = findHostClient(roomNumber)
     for (const connectedClient of sessionManager.getClientsInRoom(roomNumber)) {
-        connectedClient.mates = connectedClient.mates.filter(mate => mate.viewerId !== viewerId)
+        connectedClient.mates = connectedClient.mates
+            .filter(mate => mate.connectionId !== connectionId)
     }
     if (hostClient) {
         room.mates = hostClient.mates.map(mate => ({
             viewer_id: mate.viewerId ?? null,
             com_id: mate.comId ?? 0,
         }))
-        sessionManager.broadcastToRoom(roomNumber, [1, [1, hostClient.mates]])
-    } else {
-        room.mates = room.mates.filter(mate => mate.viewer_id !== viewerId)
+        sessionManager.broadcastMateListToRoom(roomNumber, hostClient.mates)
     }
+    // 无 host 连接时 room.mates 由房间权威状态在下次 host 广播时重建；
+    // 裸 viewer_id 过滤同样会误伤重连者，故不做按 id 的删除。
 }
 
 function expireReconnectLease(key: string): void {
@@ -97,19 +102,22 @@ function expireReconnectLease(key: string): void {
         lease.participant,
     )
     if (isHost) {
-        sessionManager.broadcastToRoom(lease.roomNumber, [1, [6, "multibattle_room_dismissed"]])
         disbandRoom(lease.roomNumber)
         return
     }
 
     if (removeRoomMember(lease.roomNumber, lease.participant)) {
-        removeDisconnectedMate(lease.roomNumber, lease.participant.viewerId)
+        removeDisconnectedMate(lease.roomNumber, lease.connectionId)
         const hostClient = findHostClient(lease.roomNumber)
         if (hostClient?.enterData) reconcileRematchSlots(hostClient, room)
     }
 }
 
-function scheduleReconnectLease(roomNumber: string, participant: ParticipantIdentity): void {
+function scheduleReconnectLease(
+    roomNumber: string,
+    participant: ParticipantIdentity,
+    connectionId: string,
+): void {
     cancelReconnectLease(participant)
     const key = reconnectKey(participant)
     const timer = setTimeout(() => expireReconnectLease(key), reconnectGraceMs)
@@ -117,6 +125,7 @@ function scheduleReconnectLease(roomNumber: string, participant: ParticipantIden
     reconnectLeases.set(key, Object.freeze({
         roomNumber,
         participant: Object.freeze({ ...participant }),
+        connectionId,
         timer,
     }))
 }
@@ -318,6 +327,10 @@ async function handleEnterComs(
 ): Promise<void> {
     const room = getRoom(client.roomNumber)
     if (!room) return
+    if (roomBattleLocksLobbyMutations(client.roomNumber)) {
+        console.log(`[LOBBY] EnterComs rejected: room=${client.roomNumber} battle in progress`)
+        return
+    }
     room.is_npc_mode = true
     const requestId = beginRecruitmentRequest(room)
 
@@ -399,8 +412,12 @@ async function handleEnterComs(
             if (!currentHostClient) return
             for (const enteredClient of sessionManager.getClientsInRoom(client.roomNumber)) {
                 if (!enteredClient.enterData) continue
-                enteredClient.mates = currentHostClient.mates
-                sessionManager.sendJson(enteredClient.socket, [1, [1, currentHostClient.mates]])
+                const projectedMates = sessionManager.projectMateListForClient(
+                    enteredClient,
+                    currentHostClient.mates,
+                )
+                enteredClient.mates = projectedMates
+                sessionManager.sendJson(enteredClient.socket, [1, [1, projectedMates]])
             }
         } catch { console.error("[LOBBY] EnterComs send-mates failed") }
     }, npcRecruitmentTiming.joinDelayMs)
@@ -425,9 +442,23 @@ async function handleEnterComs(
     }, npcRecruitmentTiming.joinDelayMs + npcRecruitmentTiming.readyDelayMs)
 }
 
+// An unreleased battle locks the lobby: while raising_state=4 the party,
+// ready flags, NPC roster, and room state belong to the frozen battle, no
+// matter whether battle sockets are currently online (socket presence only
+// reflects occupancy, not battle ownership). Only the official release,
+// which returns the room to Ready, reopens these mutations for the rematch.
+function roomBattleLocksLobbyMutations(roomNumber: string): boolean {
+    const room = getRoom(roomNumber)
+    return room?.raising_state === 4
+}
+
 function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): void {
     const ed = data[1]
     if (!ed?.party || !client.yourself) return
+    if (roomBattleLocksLobbyMutations(client.roomNumber)) {
+        console.log(`[LOBBY] enter rejected: room=${client.roomNumber} battle in progress`)
+        return
+    }
 
     const room = getRoom(client.roomNumber)
     const isHost = !!client.participant
@@ -461,7 +492,7 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
     if (isHost) {
         if (room) reconcileRematchSlots(client, room)
         if (client.mates.length > 1) {
-            sessionManager.broadcastToRoom(client.roomNumber, [1, [1, client.mates]], client)
+            sessionManager.broadcastMateListToRoom(client.roomNumber, client.mates, client)
         }
     } else {
         if (hostClient && client.yourself) {
@@ -489,7 +520,7 @@ function handleEnter(_socket: net.Socket, client: SessionClient, data: any[]): v
 
     if (!isHost) {
         const mates = hostClient?.mates ?? client.mates
-        sessionManager.broadcastToRoom(client.roomNumber, [1, [1, mates]])
+        sessionManager.broadcastMateListToRoom(client.roomNumber, mates)
     }
 
     console.log(`[LOBBY] ${isHost ? "host" : "guest"} entered: room=${client.roomNumber}`)
@@ -510,20 +541,19 @@ function disconnectRoomClient(client: SessionClient, reason: "network" | "explic
     }
 
     if (reason === "network") {
-        removeDisconnectedMate(client.roomNumber, client.viewerId)
+        removeDisconnectedMate(client.roomNumber, client.connectionId)
         sessionManager.removeClient(client)
-        if (client.participant) scheduleReconnectLease(client.roomNumber, client.participant)
+        if (client.participant) {
+            scheduleReconnectLease(client.roomNumber, client.participant, client.connectionId)
+        }
         console.log(`[LOBBY] client disconnected: role=${isHost ? "host" : "guest"} room=${client.roomNumber}`)
         return
     }
 
-    if (isHost && !preserveActiveBattle) {
-        sessionManager.broadcastToRoom(client.roomNumber, [1, [6, "multibattle_room_dismissed"]])
-    }
     for (const connectedClient of sessionManager.getClientsInRoom(client.roomNumber)) {
         if (connectedClient !== client) {
             connectedClient.mates = connectedClient.mates
-                .filter(mate => mate.viewerId !== client.viewerId)
+                .filter(mate => mate.connectionId !== client.connectionId)
         }
     }
     const hostClient = findHostClient(client.roomNumber)
@@ -535,7 +565,7 @@ function disconnectRoomClient(client: SessionClient, reason: "network" | "explic
     // [6, dismissed] broadcast already tore it down — pushing a stale/empty mate list here makes the
     // remaining client's refreshMates dereference undefined character-display data and crash (F1010).
     if (getRoom(client.roomNumber) && hostClient && hostClient !== client) {
-        sessionManager.broadcastToRoom(client.roomNumber, [1, [1, hostClient.mates]])
+        sessionManager.broadcastMateListToRoom(client.roomNumber, hostClient.mates)
     }
     try { client.socket.destroy(); } catch (e) {}
     console.log(`[LOBBY] client left: role=${isHost ? "host" : "guest"} room=${client.roomNumber}`)
@@ -560,6 +590,10 @@ function handleBye(_socket: net.Socket, client: SessionClient, _data: any[]): vo
 }
 
 function handleChangeParty(_socket: net.Socket, client: SessionClient, data: any[]): void {
+    if (roomBattleLocksLobbyMutations(client.roomNumber)) {
+        console.log(`[LOBBY] party change rejected: room=${client.roomNumber} battle in progress`)
+        return
+    }
     const pd = data[1]
     if (pd?.party && client.yourself) {
         if (client.snapshot) {
@@ -581,7 +615,7 @@ function handleChangeParty(_socket: net.Socket, client: SessionClient, data: any
     if (mate) {
         const room = getRoom(client.roomNumber); if (room) { room.host_party_id = pd.currentPartyId; }
         const hostClient = findHostClient(client.roomNumber)
-        sessionManager.broadcastToRoom(client.roomNumber, [1, [1, hostClient?.mates ?? client.mates]])
+        sessionManager.broadcastMateListToRoom(client.roomNumber, hostClient?.mates ?? client.mates)
     }
     console.log(`[LOBBY] party changed: room=${client.roomNumber}`)
 }
@@ -613,7 +647,7 @@ function updateCurrentMateSettings(
             com_id: mate.comId ?? 0,
         }))
     }
-    sessionManager.broadcastToRoom(client.roomNumber, [1, [1, updatedMates]])
+    sessionManager.broadcastMateListToRoom(client.roomNumber, updatedMates)
 }
 
 function handleChangeAutoplay(client: SessionClient, data: any[]): void {
@@ -629,6 +663,10 @@ function handleChangeAutoStart(client: SessionClient, data: any[]): void {
 }
 
 function handleReady(_socket: net.Socket, client: SessionClient, data: any[]): void {
+    if (roomBattleLocksLobbyMutations(client.roomNumber)) {
+        console.log(`[LOBBY] ready change rejected: room=${client.roomNumber} battle in progress`)
+        return
+    }
     const readyState = Array.isArray(data[1]) ? data[1][0] : data[1]
     client.isReady = readyState === 1
 
@@ -646,33 +684,60 @@ function handleHeartbeat(socket: net.Socket, client: SessionClient, _data: any[]
     sessionManager.sendJson(socket, [1, [11, client.connectionId]])
 }
 
-function handleStartBattle(_socket: net.Socket, client: SessionClient, _data: any[]): void {
+// Narrow StartBattle commit boundary: validate without side effects, publish
+// the battle runtime, then move the room into Battle. If the room refuses the
+// transition the freshly published runtime is rolled back, so a rejected
+// start can never leave a half-committed battle behind.
+function beginBattle(client: SessionClient): boolean {
     const room = getRoom(client.roomNumber)
     if (!room || !client.participant
-        || !sessionManager.isRoomHostParticipant(client.roomNumber, client.participant)) return
-    if ((sessionManager as any).battleExpectedCount?.has?.(client.roomNumber)) return
-
-    advanceRecruitmentGeneration(room)
-    client.enterData = null
+        || !sessionManager.isRoomHostParticipant(client.roomNumber, client.participant)) return false
+    if (sessionManager.hasBattleExpectedCount(client.roomNumber)) return false
 
     const realMembers = client.mates.filter(mate => !mate.comId)
-    sessionManager.setBattleParticipants(client.roomNumber, realMembers.flatMap(mate => {
+    if (realMembers.length === 0) return false
+    const participants: Array<{ connectionId: string, participant: ParticipantIdentity }> = []
+    for (const mate of realMembers) {
         const member = sessionManager.getUniqueRoomClientByViewerId(
             Number(mate.viewerId),
             client.roomNumber,
         )
-        if (!member?.participant) return []
-        return [{
+        if (!member?.participant) return false
+        participants.push({
             connectionId: String(mate.connectionId ?? ""),
             participant: member.participant,
-        }]
-    }), client.participant)
-    updateRoomState(client.roomNumber, 4)
+        })
+    }
+    if (!sessionManager.getRoomState(client.roomNumber).canTransition(RoomState.Battle)) {
+        console.warn(`[LOBBY] StartBattle rejected: room=${client.roomNumber} cannot enter Battle`)
+        return false
+    }
+
+    advanceRecruitmentGeneration(room)
+    try {
+        sessionManager.setBattleParticipants(client.roomNumber, participants, client.participant)
+    } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error)
+        console.error(`[LOBBY] StartBattle rejected: room=${client.roomNumber} reason=${reason}`)
+        sessionManager.clearBattleExpectedCount(client.roomNumber)
+        return false
+    }
+    if (!updateRoomState(client.roomNumber, 4)) {
+        console.warn(`[LOBBY] StartBattle rolled back: room=${client.roomNumber} refused Battle`)
+        sessionManager.clearBattleExpectedCount(client.roomNumber)
+        return false
+    }
+    client.enterData = null
+    return true
+}
+
+function handleStartBattle(_socket: net.Socket, client: SessionClient, _data: any[]): void {
+    if (!beginBattle(client)) return
 
     autoStartingRooms.delete(client.roomNumber)
     const members = [...client.mates]
     sessionManager.broadcastToRoom(client.roomNumber, [1, [5, members]])
-    console.log(`[LOBBY] StartBattle: room=${client.roomNumber} mates=${client.mates.length} expected=${realMembers.length}`)
+    console.log(`[LOBBY] StartBattle: room=${client.roomNumber} mates=${client.mates.length} expected=${members.filter(mate => !mate.comId).length}`)
 }
 
 function handleNotify(socket: net.Socket, client: SessionClient, data: any[]): void {
@@ -697,15 +762,21 @@ function handleNotify(socket: net.Socket, client: SessionClient, data: any[]): v
     }
 }
 
+// Client2Server.Broadcast(1, payload)/Send(2, targets, payload) must be relayed
+// as MeetingServer2Client.Messages(2, senderConnectionId, payload); echoing the
+// raw client frame would make receivers parse the payload as a single
+// MeetingServerMessage and lets any member inject arbitrary server messages.
+// The sender renders its own emotion locally, so relays exclude it.
 function handleBroadcast(_socket: net.Socket, client: SessionClient, data: any[]): void {
-    sessionManager.broadcastToRoom(client.roomNumber, data)
+    sessionManager.broadcastToRoom(client.roomNumber, [2, client.connectionId, data[1]], client)
 }
 
-function handleSend(_socket: net.Socket, _client: SessionClient, data: any[]): void {
-    const targetViewerId = data[1] as number
-    const roomNumber = _client.roomNumber
-    const target = sessionManager.getUniqueRoomClientByViewerId(targetViewerId, roomNumber)
-    if (target) sessionManager.sendJson(target.socket, data)
+function handleSend(_socket: net.Socket, client: SessionClient, data: any[]): void {
+    const targetViewerIds = Array.isArray(data[1]) ? data[1] : [data[1]]
+    for (const targetViewerId of targetViewerIds) {
+        const target = sessionManager.getUniqueRoomClientByViewerId(targetViewerId, client.roomNumber)
+        if (target) sessionManager.sendJson(target.socket, [2, client.connectionId, data[2]])
+    }
 }
 
 export function handleMessage(socket: net.Socket, data: unknown): void {

@@ -11,9 +11,9 @@ const projectRoot = path.resolve(__dirname, "..")
 const sourceRoot = path.join(projectRoot, "src")
 const { TABLE_SOURCES } = require("../src/content/sync/table-registry")
 
-const cdnTables = new Set(
+const runtimeTables = new Set(
     TABLE_SOURCES
-        .filter(definition => definition.scope === "cdn")
+        .filter(definition => definition.scope !== "server")
         .map(definition => definition.tableName),
 )
 
@@ -21,28 +21,6 @@ const bundledStartupExceptions = new Map([
     ["src/data/updaters/wdfpData.ts", new Map([
         ["mission_char_awake_reward.json", "数据库初始化早于 ContentSnapshot，历史 schema 默认值必须使用 bundled 表"],
     ])],
-])
-
-// This is the audit baseline produced by the architecture review. Existing
-// asset adapters outside this set already route through lib/assets.ts; these
-// are the remaining production modules that still need an explicit boundary.
-const runtimeBoundaryCandidates = new Set([
-    "src/lib/mission/active-master-data.ts",
-    "src/lib/mission/awake-rule-catalog.ts",
-    "src/lib/mission/character-queries.ts",
-    "src/lib/mission/computer-event.ts",
-    "src/lib/mission/event-entry-facts.ts",
-    "src/lib/mission/master-data.ts",
-    "src/lib/mission/rewards.ts",
-    "src/lib/mission/stages.ts",
-    "src/lib/pass-card.ts",
-    "src/lib/stamina-campaign.ts",
-    "src/multi/player-context.ts",
-    "src/routes/api/exBoost.ts",
-    "src/routes/api/exchange.ts",
-    "src/routes/web_api/mail.ts",
-    "src/routes/web_api/validation.ts",
-    "src/data/updaters/wdfpData.ts",
 ])
 
 function listSources(directory) {
@@ -57,12 +35,12 @@ function importedCdnFallbacks(source) {
     for (const match of source.matchAll(
         /import\s+([A-Za-z_$][\w$]*)\s+from\s+["'](?:\.\.\/)+assets\/([^"']+)["']/g,
     )) {
-        if (cdnTables.has(match[2])) fallbacks.set(match[2], match[1])
+        if (runtimeTables.has(match[2])) fallbacks.set(match[2], match[1])
     }
     for (const match of source.matchAll(
         /const\s+([A-Za-z_$][\w$]*)\s*=\s*require\(["'](?:\.\.\/)+assets\/([^"']+)["']\)/g,
     )) {
-        if (cdnTables.has(match[2])) fallbacks.set(match[2], match[1])
+        if (runtimeTables.has(match[2])) fallbacks.set(match[2], match[1])
     }
     return fallbacks
 }
@@ -95,7 +73,6 @@ test("production modules route CDN-scoped bundled fallbacks through ContentSnaps
         const tables = [...fallbacks.keys()]
         if (tables.length === 0) continue
         const relativeFile = path.relative(projectRoot, filePath).replaceAll(path.sep, "/")
-        if (!runtimeBoundaryCandidates.has(relativeFile)) continue
         const exceptions = bundledStartupExceptions.get(relativeFile) ?? new Map()
         for (const table of tables) {
             if (exceptions.has(table)) continue

@@ -7,6 +7,9 @@ require("ts-node/register/transpile-only")
 const adventEventQuests = require("../assets/advent_event_quest.json")
 const additionalRewardRules = require("../assets/additional_reward_rules.json")
 const { QuestCategory, RewardType } = require("../src/lib/types")
+const { installFrozenTestContentSnapshot } = require("./helpers/content-snapshot-fixture.cjs")
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
 const {
     getRescueFragmentReward,
     resolveLocalRescueFragmentEligibility,
@@ -15,6 +18,26 @@ const {
     RESCUE_SILVER_FRAGMENT_ITEM_ID,
     settleRescueFragmentReward,
 } = require("../src/multi/rescue-fragment-reward")
+
+process.once("exit", restoreContentSnapshot)
+
+test("rescue reward mapping follows the active runtime quest snapshot", () => {
+    const installed = installFrozenTestContentSnapshot({
+        tables: {
+            "boss_battle_quest.json": {
+                777001: { rankPointReward: 1 },
+            },
+        },
+    })
+    try {
+        assert.deepEqual(
+            getRescueFragmentReward(QuestCategory.BOSS_BATTLE, 777001),
+            { type: RewardType.ITEM, id: RESCUE_SILVER_FRAGMENT_ITEM_ID, count: 10 },
+        )
+    } finally {
+        installed.restore()
+    }
+})
 
 test("maps supported multiplayer quest tiers to ten rescue fragments", () => {
     assert.deepEqual(

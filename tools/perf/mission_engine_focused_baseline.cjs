@@ -28,10 +28,8 @@ const SNAPSHOT_PATH = path.join(
     "mission_engine_focused_baseline.json",
 )
 const SCENARIO_KEYS = Object.freeze([
-    "degree-routing-fallback",
     "degree-focused",
     "degree-behavior-characterization",
-    "event-routing-fallback",
     "event-focused",
     "event-behavior-characterization",
     "awake-character-page",
@@ -52,14 +50,14 @@ function getRuntimeDependencies() {
     const item = require("../../src/data/domains/item")
     const mission = require("../../src/data/domains/mission")
     const player = require("../../src/data/domains/player")
-    const assets = require("../../src/lib/assets")
+    const characterContent = require("../../src/lib/character-content")
+    const characterGrowthContent = require("../../src/lib/character-growth-content")
     const characterLib = require("../../src/lib/character")
     const awakeSettlement = require("../../src/lib/mission/awake-settlement")
     const battleFacts = require("../../src/lib/mission/battle-facts")
-    const patterns = require("../../src/lib/mission/patterns")
+    const missionCatalog = require("../../src/lib/mission/mission-catalog")
     const { getComputer } = require("../../src/lib/mission/registry")
     const { settleMissionCategories } = require("../../src/lib/mission/settlement")
-    const stages = require("../../src/lib/mission/stages")
     const missionRoutes = require("../../src/routes/api/mission").default
     const { resolveRuntimeDataPaths } = require("../../src/runtime/data-paths")
     const { getTimeOffset, setServerTimeOffset } = require("../../src/utils")
@@ -75,12 +73,15 @@ function getRuntimeDependencies() {
         ...item,
         ...mission,
         ...player,
-        ...assets,
-        ...characterLib,
+        ...characterContent,
+        ...characterGrowthContent,
+            ...characterLib,
         ...awakeSettlement,
         ...battleFacts,
-        ...patterns,
-        ...stages,
+        ...missionCatalog,
+        isMissionEnabledAt: (category, missionId, at, eventId) => (
+            missionCatalog.getMissionCatalog().isEnabledAt(category, missionId, at, eventId)
+        ),
         createBasePlayer: SCENARIOS[0].create,
         createFocusedScenarios,
         getComputer,

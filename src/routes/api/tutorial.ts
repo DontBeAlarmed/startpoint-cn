@@ -13,10 +13,12 @@ import { getSession } from "../../data/domains/session"
 import { getDb } from "../../data/db"
 import { executeRewardGrantExecutionPlanAsTransactionOwnerSync } from "../../lib/reward-grant"
 import { createRewardGrantItemOverflowPolicy } from "../../lib/reward-grant-item-overflow"
-import { projectItemOverflowCommonResponse } from "../../lib/item-overflow"
+import { projectCharacterPatch } from "../../lib/common-response/entities"
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow/common-response"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { getGachaSync } from "../../lib/assets";
+import { getGachaCatalog } from "../../lib/gacha-catalog";
 import { rewardPlayerGachaDrawResultSync } from "../../lib/gacha";
 import { givePlayerCharacterSync } from "../../lib/character";
 import { randomInt } from "crypto";
@@ -94,9 +96,18 @@ function buildTutorialGachaReplayData(
     const character = getPlayerCharacterSync(playerId, characterId)
     return {
         "step": effectiveNextStep,
-        "user_info": {
-            "free_vmoney": player.freeVmoney,
-        },
+        ...mergeCommonResponseFragments([{
+            "user_info": {
+                "free_vmoney": player.freeVmoney,
+            },
+            "character_list": character === null
+                ? []
+                : [projectCharacterPatch(
+                    serializeTutorialReplayCharacter(viewerId, characterId, character),
+                )],
+            "item_list": {},
+            "mail_arrived": getMailArrivedSync(playerId),
+        }]),
         "gacha": {
             "draw": [{
                 "character_id": characterId,
@@ -110,12 +121,7 @@ function buildTutorialGachaReplayData(
                 "is_daily_first": false,
             }],
         },
-        "character_list": character === null
-            ? []
-            : [serializeTutorialReplayCharacter(viewerId, characterId, character)],
-        "item_list": {},
         "encyclopedia_info": [],
-        "mail_arrived": getMailArrivedSync(playerId),
         "start_time": getServerTime(),
     }
 }
@@ -130,19 +136,23 @@ function buildTutorialPresentReplayData(
 
     return {
         "step": effectiveNextStep,
-        "user_info": {
-            "free_vmoney": player.freeVmoney,
-        },
-        "character_list": character === null
-            ? []
-            : [serializeTutorialReplayCharacter(0, freeTutorialCharacterId, character)],
-        "item_list": {},
+        ...mergeCommonResponseFragments([{
+            "user_info": {
+                "free_vmoney": player.freeVmoney,
+            },
+            "character_list": character === null
+                ? []
+                : [projectCharacterPatch(
+                    serializeTutorialReplayCharacter(0, freeTutorialCharacterId, character),
+                )],
+            "item_list": {},
+            "mail_arrived": getMailArrivedSync(playerId),
+        }]),
         "encyclopedia_info": {
             [`1${freeTutorialCharacterId}01`]: {
                 "read": false,
             },
         },
-        "mail_arrived": getMailArrivedSync(playerId),
         "start_time": getServerTime(),
     }
 }
@@ -231,7 +241,12 @@ const routes = async (fastify: FastifyInstance) => {
             && !isNaN(body.gacha_id)
             ? body.gacha_id
             : null
-        const gachaData = gachaId === null ? null : getGachaSync(gachaId)
+        const gachaData = gachaId === null
+            ? null
+            : getGachaCatalog().banners[String(gachaId)]?.definition ?? null
+        const tutorialGachaCost = gachaData?.page.kind === 0 || gachaData?.page.kind === 8
+            ? gachaData.page.singleCost
+            : null
 
         let deferredCharacterSampledLog: (() => void) | undefined
         const result = getDb().transaction(() => {
@@ -266,7 +281,8 @@ const routes = async (fastify: FastifyInstance) => {
                 return { ok: true, data: receipt.responseData } as const
             }
 
-            if (effectiveNextStep === TUTORIAL_GACHA_EFFECTIVE_STEP && gachaData === null) {
+            if (effectiveNextStep === TUTORIAL_GACHA_EFFECTIVE_STEP
+                && (gachaData === null || tutorialGachaCost === null)) {
                 return {
                     ok: false,
                     message: gachaId === null
@@ -349,7 +365,7 @@ const routes = async (fastify: FastifyInstance) => {
                     number: 1,
                 })
 
-                const newFreeVmoney = currentPlayer.freeVmoney - gachaData!.singleCost
+                const newFreeVmoney = currentPlayer.freeVmoney - tutorialGachaCost!
                 updatePlayerSync({
                     id: playerId,
                     tutorialStep: storedNextStep,
@@ -383,14 +399,25 @@ const routes = async (fastify: FastifyInstance) => {
                     })()
                     : existingCharacterList
 
+                const overMax = rewardResult.itemOverflowDispositions === undefined
+                    ? undefined
+                    : projectItemOverflowCommonResponse(rewardResult.itemOverflowDispositions)
                 const data = {
                     "step": effectiveNextStep,
-                    "user_info": {
-                        "free_vmoney": newFreeVmoney,
-                        ...(rewardResult.playerAfter === undefined
+                    ...mergeCommonResponseFragments([{
+                        "user_info": {
+                            "free_vmoney": newFreeVmoney,
+                            ...(rewardResult.playerAfter === undefined
+                                ? {}
+                                : { "free_mana": rewardResult.playerAfter.freeMana }),
+                        },
+                        "character_list": characterList.map(entry => projectCharacterPatch(entry)),
+                        "item_list": rewardResult.items,
+                        "mail_arrived": getMailArrivedSync(playerId),
+                        ...(overMax === undefined || overMax.length === 0
                             ? {}
-                            : { "free_mana": rewardResult.playerAfter.freeMana }),
-                    },
+                            : { "over_max": overMax }),
+                    }]),
                     "gacha": {
                         "draw": rewardResult.draw,
                         "gacha_info_list": [
@@ -401,19 +428,8 @@ const routes = async (fastify: FastifyInstance) => {
                             }
                         ],
                     },
-                    "character_list": characterList,
-                    "item_list": rewardResult.items,
                     "encyclopedia_info": [],
-                    "mail_arrived": getMailArrivedSync(playerId),
                     "start_time": getServerTime(),
-                    ...(rewardResult.itemOverflowDispositions === undefined
-                        ? {}
-                        : (() => {
-                            const overMax = projectItemOverflowCommonResponse(
-                                rewardResult.itemOverflowDispositions,
-                            )
-                            return overMax.length > 0 ? { "over_max": overMax } : {}
-                        })()),
                 }
                 upsertTutorialStepReceiptSync(playerId, {
                     completedStep,
@@ -479,17 +495,19 @@ const routes = async (fastify: FastifyInstance) => {
 
                 const data = {
                     "step": effectiveNextStep,
-                    "user_info": {
-                        "free_vmoney": newVMoney
-                    },
-                    "character_list": characterList,
-                    "item_list": itemList,
+                    ...mergeCommonResponseFragments([{
+                        "user_info": {
+                            "free_vmoney": newVMoney,
+                        },
+                        "character_list": characterList.map(entry => projectCharacterPatch(entry)),
+                        "item_list": itemList,
+                        "mail_arrived": true,
+                    }]),
                     "encyclopedia_info": {
                         [`1${freeTutorialCharacterId}01`]: {
                             "read": false
                         }
                     },
-                    "mail_arrived": true,
                     "start_time": getServerTime()
                 }
                 upsertTutorialStepReceiptSync(playerId, {

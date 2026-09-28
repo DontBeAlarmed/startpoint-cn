@@ -70,6 +70,10 @@ interface ServerStatus {
             contentDigest: string
             multiBattleContentDigest: string
         }
+        gameCalendar: {
+            configuredUtcOffsetMinutes: number
+            contentUtcOffsetMinutes: number
+        }
         configuredDir: string
         directoryPresent: boolean
         archiveCount: number
@@ -447,6 +451,17 @@ export default function Dashboard() {
                                                 </Typography.Text>
                                             </div>
                                         </div>
+                                    </div>
+                                    <div className="admin-dash-section">
+                                        <div className="admin-dash-section-title">游戏日历</div>
+                                        <Space wrap>
+                                            <Tag>配置 {status.cdn.gameCalendar.configuredUtcOffsetMinutes}</Tag>
+                                            <Tag>内容 {status.cdn.gameCalendar.contentUtcOffsetMinutes}</Tag>
+                                            {status.cdn.gameCalendar.configuredUtcOffsetMinutes
+                                                !== status.cdn.gameCalendar.contentUtcOffsetMinutes && (
+                                                <Tag color="orange">配置与内容 Release 偏移不一致</Tag>
+                                            )}
+                                        </Space>
                                     </div>
                                     <div className="admin-dash-section">
                                         <div className="admin-dash-section-title">Snapshot 中已声明补丁</div>

@@ -1,12 +1,8 @@
-import bundledMainQuests from "../../assets/main_quest.json"
-
-import { getRuntimeContentTableSync } from "../content/runtime/table-access"
 import { getDb } from "../data/db"
 import { recordPlayerHistoryMilestoneSync } from "../data/domains/player-history-facts"
 import { getRealNow } from "../runtime/time/game-time"
 import { getRankDegree } from "./stamina"
-
-type MainQuestTable = Record<string, unknown>
+import { getMainQuestIdsForChapter } from "./quest-content"
 
 export function recordHundredCharactersMilestoneSync(
     playerId: number,
@@ -61,13 +57,7 @@ export function recordCompletedMainChapterMilestoneSync(
 ): boolean {
     const chapter = Math.floor(questId / 1_000_000)
     if (!Number.isSafeInteger(chapter) || chapter < 1 || chapter > 12) return false
-    const mainQuests = getRuntimeContentTableSync(
-        "main_quest.json",
-        bundledMainQuests as MainQuestTable,
-    ) as MainQuestTable
-    const chapterQuestIds = Object.keys(mainQuests).map(Number).filter(id => (
-        Math.floor(id / 1_000_000) === chapter
-    ))
+    const chapterQuestIds = getMainQuestIdsForChapter(chapter)
     if (chapterQuestIds.length === 0) return false
     // Main progression is linear, so only the chapter's final quest can
     // complete the chapter. Avoid a full chapter count after every stage.

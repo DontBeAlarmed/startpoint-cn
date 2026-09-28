@@ -10,10 +10,8 @@ const path = require("node:path")
 const test = require("node:test")
 
 const EXPECTED_SCENARIO_KEYS = [
-    "degree-routing-fallback",
     "degree-focused",
     "degree-behavior-characterization",
-    "event-routing-fallback",
     "event-focused",
     "event-behavior-characterization",
     "awake-character-page",
@@ -25,7 +23,7 @@ const EXPECTED_SCENARIO_KEYS = [
     "multi-battle-finish",
 ]
 const APPROVED_SETTLEMENT_SHA256 =
-    "8dc7a2aaf98d93b1e7285f4968bed570694ad3f39b0c5f3846c9e94fce77670d"
+    "cd5d857fcf87d8e4a807de6218147b25cffcedb607e011cdd27cc48e305a3f7e"
 const snapshotPath = path.join(
     __dirname,
     "__snapshots__",
@@ -97,8 +95,10 @@ test("snapshot pins the completed mission engine structural performance values",
     }, {
         awakeCharacterPage: { sqlReads: 11, sqlWrites: 0, missionComputes: 7 },
         getProgressNoInvalidation: { sqlReads: 14, sqlWrites: 1, missionComputes: 110 },
-        singleBattleFinish: { sqlReads: 31, sqlWrites: 32, missionComputes: 425 },
-        multiBattleFinish: { sqlReads: 32, sqlWrites: 38, missionComputes: 425 },
+        // Battle finish no longer claims category 9 rewards (page-owned);
+        // 6 reward writes removed at both single and multi boundaries.
+        singleBattleFinish: { sqlReads: 28, sqlWrites: 25, missionComputes: 425 },
+        multiBattleFinish: { sqlReads: 29, sqlWrites: 30, missionComputes: 425 },
     })
 })
 
@@ -242,18 +242,6 @@ test("behavior baseline comparison ignores performance metric improvements", () 
     )
 })
 
-test("Event Session focused settlement preserves behavior without increasing SQL or compute", () => {
-    const scenarios = readSnapshot().scenarios
-    const legacy = scenarios["event-routing-fallback"]
-    const session = scenarios["event-focused"]
-
-    assert.deepEqual(session.behavior, legacy.behavior)
-    assert.equal(session.behaviorSha256, legacy.behaviorSha256)
-    assert.equal(session.sqlReads <= legacy.sqlReads, true)
-    assert.equal(session.sqlWrites, legacy.sqlWrites)
-    assert.equal(session.missionComputes, legacy.missionComputes)
-})
-
 test("compute counter installation rolls back earlier wrappers when a later patch fails", () => {
     const { installComputeCounter } = require("./mission_engine_focused_baseline.cjs")
     const firstOriginal = function firstOriginal() { return 1 }
@@ -367,25 +355,20 @@ test("current focused mission engine behavior matches the checked-in behavior", 
             name,
         )
     }
-    const routingFallback = current.scenarios["degree-routing-fallback"]
     const session = current.scenarios["degree-focused"]
     const behavior = current.scenarios["degree-behavior-characterization"]
     assert.deepEqual({
-        routingFallback: {
-            sqlReads: routingFallback.sqlReads,
-            sqlWrites: routingFallback.sqlWrites,
-            missionComputes: routingFallback.missionComputes,
-        },
         session: {
             sqlReads: session.sqlReads,
             sqlWrites: session.sqlWrites,
             missionComputes: session.missionComputes,
         },
     }, {
-        routingFallback: { sqlReads: 9, sqlWrites: 1, missionComputes: 5 },
         session: { sqlReads: 8, sqlWrites: 1, missionComputes: 5 },
     })
-    assert.deepEqual(behavior.behavior, legacyDegreeFixture.settlement)
+    const expectedDegreeBehavior = structuredClone(legacyDegreeFixture.settlement)
+    expectedDegreeBehavior.first.response.userInfo = null
+    assert.deepEqual(behavior.behavior, expectedDegreeBehavior)
 })
 
 test("cleanup attempts every scenario and suite restoration after failures", async () => {

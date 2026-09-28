@@ -8,6 +8,10 @@ const test = require("node:test")
 
 require("ts-node/register/transpile-only")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
+
 const BetterSqlite3 = require("better-sqlite3")
 const {
     ensureActiveQuestCoordinatorOriginStorageSync,

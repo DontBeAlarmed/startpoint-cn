@@ -2,6 +2,10 @@
 
 require("ts-node/register/transpile-only")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
+
 const assert = require("node:assert/strict")
 const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")
@@ -129,7 +133,8 @@ const {
     DegreeComputer,
     getDegreeComputedMissionIds,
 } = require("../src/lib/mission/computer-degree")
-const { getMissionMasterDefinitions } = require("../src/lib/mission/master-data")
+const { getMissionCatalog } = require("../src/lib/mission/mission-catalog")
+const { buildMissionComputerContext } = require("./helpers/mission-session-context.cjs")
 const {
     buildBattleMissionSettlementScopes,
 } = require("../src/lib/mission/battle-facts")
@@ -144,7 +149,7 @@ const assertUntouched = families => {
     }
 }
 
-const fullContext = DegreeComputer.buildContext(playerId, 5, evaluationTime)
+const fullContext = buildMissionComputerContext(playerId, 5, undefined, { computer: DegreeComputer, evaluationTime })
 const fullFamilies = touchedFamilies()
 for (const family of [
     "player", "character", "mana", "battleCounters", "degreeBattleStats",
@@ -154,7 +159,7 @@ for (const family of [
 }
 
 resetCalls()
-const rankContext = DegreeComputer.buildContext(playerId, 5, evaluationTime, [1000])
+const rankContext = buildMissionComputerContext(playerId, 5, [1000], { computer: DegreeComputer, evaluationTime })
 assert.equal(DegreeComputer.compute(1000, rankContext, 0), DegreeComputer.compute(1000, fullContext, 0))
 assert.equal(countFamily("player") > 0, true, "rank-only 必须正向触发玩家事实探针")
 assertUntouched([
@@ -163,7 +168,7 @@ assertUntouched([
 ])
 
 resetCalls()
-const battleStatContext = DegreeComputer.buildContext(playerId, 5, evaluationTime, [16000])
+const battleStatContext = buildMissionComputerContext(playerId, 5, [16000], { computer: DegreeComputer, evaluationTime })
 assert.equal(DegreeComputer.compute(16000, battleStatContext, 0), DegreeComputer.compute(16000, fullContext, 0))
 assert.equal(countFamily("degreeBattleStats") > 0, true, "FEVER 候选必须读取称号战斗统计")
 assertUntouched([
@@ -173,12 +178,10 @@ assertUntouched([
 
 const representativeMissionIds = [1000, 111001, 33000, 16000, 57010, 70000]
 resetCalls()
-const scopedContext = DegreeComputer.buildContext(
-    playerId,
-    5,
+const scopedContext = buildMissionComputerContext(playerId, 5, representativeMissionIds, {
+    computer: DegreeComputer,
     evaluationTime,
-    representativeMissionIds,
-)
+})
 for (const missionId of representativeMissionIds) {
     assert.equal(
         DegreeComputer.compute(missionId, scopedContext, 0),
@@ -195,7 +198,10 @@ const battleDegreeScope = buildBattleMissionSettlementScopes([])
     .find(scope => typeof scope === "object" && scope.category === 5)
 assert.ok(battleDegreeScope, "真实战斗 scope 必须包含 Category 5")
 resetCalls()
-DegreeComputer.buildContext(playerId, 5, evaluationTime, battleDegreeScope.missionIds)
+buildMissionComputerContext(playerId, 5, battleDegreeScope.missionIds, {
+    computer: DegreeComputer,
+    evaluationTime,
+})
 const battleFamilies = touchedFamilies()
 for (const family of ["player", "character", "battleCounters", "degreeBattleStats", "questProgress", "selectedItems"]) {
     assert.equal(battleFamilies.has(family), true, `真实 battle scope 探针未触发 ${family}`)
@@ -208,12 +214,10 @@ assert.equal(
 )
 
 resetCalls()
-const fallbackContext = DegreeComputer.buildContext(
-    playerId,
-    5,
+const fallbackContext = buildMissionComputerContext(playerId, 5, [25000, 70004, 999999], {
+    computer: DegreeComputer,
     evaluationTime,
-    [25000, 70004, 999999],
-)
+})
 for (const missionId of [25000, 70004, 999999]) {
     assert.equal(DegreeComputer.compute(missionId, fallbackContext, 7), 7)
 }
@@ -226,7 +230,7 @@ const {
     getDegreeMissionFactRequirements,
 } = require("../src/lib/mission/degree-context-requirements")
 const computedMissionIds = new Set(getDegreeComputedMissionIds())
-const classificationMismatches = getMissionMasterDefinitions(5)
+const classificationMismatches = getMissionCatalog().getDefinitions(5)
     .filter(definition => (
         computedMissionIds.has(definition.missionId)
         !== (getDegreeMissionFactRequirements(definition) !== undefined)

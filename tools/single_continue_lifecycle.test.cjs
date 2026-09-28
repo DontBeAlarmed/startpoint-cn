@@ -318,7 +318,7 @@ test("single battle continue route delegates transaction and writes to the lifec
 
     assert.match(continueBlock, /runSingleContinueLifecycleTransaction\s*\(/)
     assert.match(continueBlock, /parseSingleContinueExpectedCount/)
-    assert.match(continueBlock, /getConfigSync\(\)\.continue_virtual_money/)
+    assert.match(continueBlock, /getSingleContinuePolicySync\(\)\.vmoneyCost/)
     assert.doesNotMatch(continueBlock, /statistics\.continue_count/)
     assert.doesNotMatch(continueBlock, /const continueVmoneyCost = 50/)
     assert.doesNotMatch(continueBlock, /getDb\(\)\.transaction\s*\(/)

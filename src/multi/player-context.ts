@@ -2,8 +2,8 @@ import { resolvePlayerIdSync } from "../data/activeAccount"
 import { getPlayerSync } from "../data/domains/player"
 import { getSession } from "../data/domains/session"
 import type { Player } from "../data/types"
-import bundledPlayerRankTable from "../../assets/cdndata/player_rank.json"
-import { getRuntimeContentTableSync } from "../content/runtime/table-access"
+
+export { getPlayerRankLevel } from "../lib/player-rank-content"
 
 export interface MultiPlayerContext {
     playerId: number
@@ -14,19 +14,6 @@ export interface MultiPlayerContextDependencies {
     getSession: (viewerId: string) => Promise<{ accountId: number } | null>
     resolvePlayerIdSync: (accountId: number) => number | null
     getPlayerSync: (playerId: number) => Player | null
-}
-
-export function getPlayerRankLevel(rankPoint: number): number {
-    const playerRankTable = getRuntimeContentTableSync(
-        "cdndata/player_rank.json",
-        bundledPlayerRankTable as Record<string, unknown[][]>,
-    )
-    let level = 1
-    for (const [rank, data] of Object.entries(playerRankTable)) {
-        const threshold = Number(data?.[0]?.[1])
-        if (Number.isFinite(threshold) && rankPoint >= threshold) level = Number(rank)
-    }
-    return level
 }
 
 export async function resolveMultiPlayerContext(

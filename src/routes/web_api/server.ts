@@ -52,8 +52,8 @@ interface TimeQuery {
 export interface ServerRoutesOptions {
     readonly getMultiStatus?: () => Promise<AdminMultiStatus> | AdminMultiStatus
     readonly serverTimeService?: ServerTimeService
-    readonly runtimeConfig?: Pick<CnRuntimeConfig, "http" | "httpDisplayHost" | "assetProvider">
-    readonly getRuntimeConfig?: () => Pick<CnRuntimeConfig, "http" | "httpDisplayHost" | "assetProvider"> | null
+    readonly runtimeConfig?: Pick<CnRuntimeConfig, "http" | "httpDisplayHost" | "assetProvider" | "gameCalendarUtcOffsetMinutes">
+    readonly getRuntimeConfig?: () => Pick<CnRuntimeConfig, "http" | "httpDisplayHost" | "assetProvider" | "gameCalendarUtcOffsetMinutes"> | null
 }
 
 function httpTimePackage(snapshot: ServerTimeSnapshot): ServerTimePackage {
@@ -77,10 +77,12 @@ function legacyTimeResponse(
 
 const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) => {
     const serverTimeService = options.serverTimeService ?? new ServerTimeService()
-    const fallbackRuntimeConfig: Pick<CnRuntimeConfig, "http" | "httpDisplayHost" | "assetProvider"> = {
+    const fallbackRuntimeConfig: Pick<CnRuntimeConfig, "http" | "httpDisplayHost" | "assetProvider" | "gameCalendarUtcOffsetMinutes"> = {
         http: { host: "127.0.0.1", port: DEFAULT_SERVER_PORTS.http },
         httpDisplayHost: "127.0.0.1",
         assetProvider: { mode: "client-owned" },
+        // Isolated route tests without RuntimeConfig use the CN default.
+        gameCalendarUtcOffsetMinutes: 480,
     }
 
     fastify.get("/status", async (_request: FastifyRequest, reply: FastifyReply) => {
@@ -94,6 +96,7 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
             snapshot: getContentSnapshot(),
             assetProvider: runtimeConfig.assetProvider,
             configuredCdnDir,
+            configuredGameCalendarUtcOffsetMinutes: runtimeConfig.gameCalendarUtcOffsetMinutes,
         })
         let multiplayer: AdminMultiStatus
         try {

@@ -13,9 +13,12 @@ import { getMailArrivedSync } from "../../lib/mail-notification"
 import { getRealNow } from "../../runtime/time/game-time"
 import { generateDataHeaders } from "../../utils"
 import { executeInjectCharacterExp } from "../../lib/character-growth/commands/inject-exp"
+import { CharacterGrowthError } from "../../lib/character-growth/errors"
 import { executeStackToExp } from "../../lib/character-growth/commands/stack-to-exp"
 import { executeBulkStackToExp } from "../../lib/character-growth/commands/bulk-stack-to-exp"
-import { projectItemOverflowCommonResponse } from "../../lib/item-overflow"
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow/common-response"
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
+import { projectCharacterPatch } from "../../lib/common-response/entities"
 import { sendGrowthMutationError } from "./character/mana-mutation-http"
 import {
     EXP_CHARACTER_GROWTH_FIELDS,
@@ -65,7 +68,7 @@ function characterListEntry(
     viewerId: number,
     after: CharacterGrowthProjectionState,
     character: PlayerCharacterProjectionData,
-    options: { readonly includeViewer?: boolean, readonly includeStack?: boolean, readonly includeOverLimit?: boolean } = {},
+    options: { readonly includeViewer?: boolean, readonly includeStack?: boolean, readonly includeOverLimit?: boolean, readonly includeBondTokens?: boolean } = {},
 ): Record<string, unknown> {
     return projectCharacterGrowthIncrement(
         { after, changedNodeIds: [] },
@@ -75,6 +78,7 @@ function characterListEntry(
                 ...EXP_CHARACTER_GROWTH_FIELDS,
                 ...(options.includeOverLimit === true ? ["over_limit_step" as const] : []),
                 ...(options.includeStack === true ? ["stack" as const] : []),
+                ...(options.includeBondTokens === true ? ["bond_token_list" as const] : []),
             ],
             ...(options.includeViewer === true ? { viewerId } : {}),
         },
@@ -112,20 +116,25 @@ const routes = async (fastify: FastifyInstance) => {
             return reply.status(200).send({
                 data_headers: generateDataHeaders({ viewer_id: viewerId }),
                 data: {
-                    user_info: {
-                        exp_pool: result.expPool,
-                        exp_pooled_time: expPoolRealDateToClientTimestamp(player.expPooledTime),
-                        ...(result.itemOverflowDispositions.some(entry => entry.kind === "sold")
-                            ? { free_mana: result.overflowFreeManaAfter }
-                            : {}),
-                    },
-                    character_list: [characterListEntry(viewerId, result.after, character, {
-                        includeViewer: true, includeStack: true,
-                    })],
+                    ...mergeCommonResponseFragments([{
+                        user_info: {
+                            exp_pool: result.expPool,
+                            exp_pooled_time: expPoolRealDateToClientTimestamp(player.expPooledTime),
+                            ...(result.itemOverflowDispositions.some(entry => entry.kind === "sold")
+                                ? { free_mana: result.overflowFreeManaAfter }
+                                : {}),
+                        },
+                        character_list: [projectCharacterPatch(characterListEntry(
+                            viewerId,
+                            result.after,
+                            character,
+                            { includeViewer: true, includeStack: true },
+                        ))],
+                        item_list: { 990008: result.itemCount },
+                        mail_arrived: getMailArrivedSync(resolved.playerId),
+                        ...(overMax.length > 0 ? { over_max: overMax } : {}),
+                    }]),
                     converted_exp_info: { add_exp: result.addExp },
-                    item_list: { 990008: result.itemCount },
-                    mail_arrived: getMailArrivedSync(resolved.playerId),
-                    ...(overMax.length > 0 ? { over_max: overMax } : {}),
                 },
             })
         } catch (error) {
@@ -158,18 +167,22 @@ const routes = async (fastify: FastifyInstance) => {
             return reply.status(200).send({
                 data_headers: generateDataHeaders({ viewer_id: viewerId }),
                 data: {
-                    character_list: characterList,
+                    ...mergeCommonResponseFragments([{
+                        character_list: characterList.map(
+                            entry => projectCharacterPatch(entry),
+                        ),
+                        item_list: getPlayerItemsSync(resolved.playerId),
+                        user_info: {
+                            exp_pool: result.expPool,
+                            exp_pooled_time: expPoolRealDateToClientTimestamp(result.expPooledTime),
+                            ...(result.itemOverflowDispositions.some(entry => entry.kind === "sold")
+                                ? { free_mana: result.overflowFreeManaAfter }
+                                : {}),
+                        },
+                        mail_arrived: getMailArrivedSync(resolved.playerId),
+                        ...(overMax.length > 0 ? { over_max: overMax } : {}),
+                    }]),
                     converted_exp_info: { add_exp: result.addExp },
-                    item_list: getPlayerItemsSync(resolved.playerId),
-                    user_info: {
-                        exp_pool: result.expPool,
-                        exp_pooled_time: expPoolRealDateToClientTimestamp(result.expPooledTime),
-                        ...(result.itemOverflowDispositions.some(entry => entry.kind === "sold")
-                            ? { free_mana: result.overflowFreeManaAfter }
-                            : {}),
-                    },
-                    mail_arrived: getMailArrivedSync(resolved.playerId),
-                    ...(overMax.length > 0 ? { over_max: overMax } : {}),
                 },
             })
         } catch (error) {
@@ -205,16 +218,46 @@ const routes = async (fastify: FastifyInstance) => {
             return reply.status(200).send({
                 data_headers: generateDataHeaders({ viewer_id: viewerId }),
                 data: {
+                    ...mergeCommonResponseFragments([{
+                        character_list: [projectCharacterPatch(characterListEntry(viewerId, {
+                            ...result.after,
+                            bondTokens: result.bondTokens,
+                        }, character, { includeBondTokens: true }))],
+                        user_info: {
+                            exp_pool: result.expPool,
+                            exp_pooled_time: expPoolRealDateToClientTimestamp(player.expPooledTime),
+                        },
+                        mail_arrived: getMailArrivedSync(resolved.playerId),
+                    }]),
                     add_exp_list: result.addExpList,
-                    character_list: [characterListEntry(viewerId, result.after, character)],
-                    user_info: {
-                        exp_pool: result.expPool,
-                        exp_pooled_time: expPoolRealDateToClientTimestamp(player.expPooledTime),
-                    },
-                    mail_arrived: getMailArrivedSync(resolved.playerId),
+                    active_mission_list: result.activeMissionList,
                 },
             })
         } catch (error) {
+            // CN 1.8.1 ExpodInjectExpRemoteInput 只有 Finished 一个构造，且 successHandler
+            // 不解析响应体；任意 4xx 都走通用错误通道（错误框 + 踢回标题）。经验池不足
+            // 属于客户端本地池过期的良性竞态：以 200 + 未变更事实回复，命令层已在任何
+            // 写入前抛出，存档不受影响。其余错误保持 4xx/5xx。
+            if (error instanceof CharacterGrowthError && error.code === "INSUFFICIENT_EXP") {
+                const player = getPlayerSync(resolved.playerId)
+                if (player !== null) {
+                    reply.header("content-type", "application/x-msgpack")
+                    return reply.status(200).send({
+                        data_headers: generateDataHeaders({ viewer_id: viewerId }),
+                        data: {
+                            ...mergeCommonResponseFragments([{
+                                user_info: {
+                                    exp_pool: player.expPool,
+                                    exp_pooled_time: expPoolRealDateToClientTimestamp(player.expPooledTime),
+                                },
+                                mail_arrived: getMailArrivedSync(resolved.playerId),
+                            }]),
+                            add_exp_list: [],
+                            active_mission_list: [],
+                        },
+                    })
+                }
+            }
             return growthFailure(reply, error)
         }
     })

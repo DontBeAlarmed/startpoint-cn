@@ -331,20 +331,16 @@ class InventoryBatchContextImpl implements InventoryBatchContext {
             .sort((left, right) => left.stored.itemId - right.stored.itemId)
             .map(item => ({ item, result: this.toResult(item) }))
         this.closed = true
+        const absoluteRows: { itemId: number; amount: number }[] = []
+        const obtainedRows: { itemId: number; obtainedAmount: number }[] = []
         for (const { result } of rows) {
-            this.repository.writeAbsoluteItemSync(
-                this.playerId,
-                result.itemId,
-                result.afterAmount,
-            )
+            absoluteRows.push({ itemId: result.itemId, amount: result.afterAmount })
             if (result.obtainedAmount > 0) {
-                this.repository.recordPositiveObtainedSync(
-                    this.playerId,
-                    result.itemId,
-                    result.obtainedAmount,
-                )
+                obtainedRows.push({ itemId: result.itemId, obtainedAmount: result.obtainedAmount })
             }
         }
+        this.repository.writeAbsoluteItemsBatchSync(this.playerId, absoluteRows)
+        this.repository.recordPositiveObtainedBatchSync(this.playerId, obtainedRows)
         this.flushed = true
         return Object.freeze(rows.map(({ result }) => result))
     }

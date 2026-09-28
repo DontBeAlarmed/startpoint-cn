@@ -50,14 +50,14 @@ function createPlayer(runtime) {
 function prepareReadyFixture(runtime) {
     const playerId = createPlayer(runtime)
     runtime.insertDefaultPlayerCharacterSync(playerId, CHARACTER_ID)
-    const rarity = runtime.getCharacterDataSync(CHARACTER_ID).rarity
+    const rarity = runtime.getCharacterFacts().get(CHARACTER_ID).rarity
     runtime.updatePlayerCharacterSync(playerId, CHARACTER_ID, {
         exp: runtime.characterExpCaps[rarity][0],
     })
     runtime.insertPlayerCharacterManaNodesSync(
         playerId,
         CHARACTER_ID,
-        Object.keys(runtime.getCharacterManaNodesSync(CHARACTER_ID, 1)).map(Number),
+        Object.keys(runtime.getCharacterGrowthContent().getManaBoardNodes(CHARACTER_ID, 1)).map(Number),
     )
     for (const [missionId, progress] of AWAKE_PROGRESS) {
         runtime.updatePlayerCategoryMissionSync(playerId, 9, missionId, progress)

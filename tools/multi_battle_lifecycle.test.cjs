@@ -186,6 +186,6 @@ test("multi battle routes use the shared lifecycle boundaries", () => {
     assert.ok(settlementWrites > activeQuestDelete)
     assert.ok(deleteAfterSettlement > settlementWrites)
     assert.match(source, /const entryCost = isRoomHost[\s\S]*?: undefined;/)
-    assert.match(source, /const staminaCost = isRoomHost \? getStaminaCost\(questKey\)\.cost : 0;/)
+    assert.match(source, /const staminaCost = isRoomHost\s*\?\s*getStaminaCost\(questKey\)\.cost\s*:\s*getLocalGuestStaminaCost\(questKey, guestFollowState\);/)
     assert.doesNotMatch(source, /activeData\.continueCount\+\+/)
 })

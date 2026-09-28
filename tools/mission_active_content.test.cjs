@@ -11,6 +11,9 @@ const activeMasterPath = path.join(projectRoot, "src", "lib", "mission", "active
 assert.equal(fs.existsSync(generatorPath), true, "Active Mission 官方表生成器必须存在")
 assert.equal(fs.existsSync(activeMasterPath), true, "Active Mission 运行时主数据读取器必须存在")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
 const {
     getActiveMissionEventMasterDefinitions,
     getActiveMissionMasterDefinitions,

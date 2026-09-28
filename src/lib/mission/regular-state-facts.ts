@@ -1,6 +1,5 @@
-import bundledCharacters from "../../../assets/character.json"
-import bundledManaBoard from "../../../assets/mana_board.json"
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
+import { getContentSnapshot } from "../../content/runtime/content-snapshot"
+import { getCharacterFacts } from "../character-content"
 import {
     getPlayerCharactersManaNodesSync,
     getPlayerCharactersSync,
@@ -8,7 +7,7 @@ import {
 import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
 import { getPlayerCollectedItemTotalSync } from "../../data/domains/item"
 import type { PlayerCharacter, PlayerEquipment } from "../../data/types"
-import { getConfigSync } from "../assets"
+import { getEquipmentCurrencyPolicySync } from "../config-content"
 import { characterExpCaps } from "../character"
 
 type RawCharacterTable = Record<string, { readonly rarity?: unknown }>
@@ -17,6 +16,7 @@ type RawManaBoard = Record<string, Record<string, Record<string, readonly unknow
 export interface RegularStateFacts {
     characterCount: number
     level80CharacterCount: number
+    maxCharacterLevel: number
     manaBoardNodeCount: number
     overLimitCount: number
     bondTokenCount: number
@@ -49,6 +49,27 @@ function reachesCharacterLevel80(rarity: number, experience: number): boolean {
         && experience >= thresholds[thresholdIndex]
 }
 
+function provenCharacterLevel(rarity: number, experience: number): number {
+    const thresholds = characterExpCaps[rarity]
+    if (!thresholds || !Number.isSafeInteger(experience) || experience < 0) return 0
+    const baseLevel = 40 + (rarity - 1) * 10
+    let level = 0
+    for (let index = 0; index < thresholds.length; index++) {
+        if (experience >= thresholds[index]) level = baseLevel + index * 5
+    }
+    return level
+}
+
+function characterFactsTable(characterIds: readonly string[]): RawCharacterTable {
+    const facts = getCharacterFacts()
+    const table: Record<string, { rarity: number }> = {}
+    for (const id of characterIds) {
+        const entry = facts.get(id)
+        if (entry !== null) table[id] = { rarity: entry.rarity }
+    }
+    return table
+}
+
 function getSecondBoardNodeIds(
     boardTable: RawManaBoard,
     characterId: string,
@@ -72,12 +93,16 @@ export function deriveRegularStateFacts(sources: RegularStateFactSources): Regul
     const manaBoardTable = sources.manaBoardTable ?? {}
 
     let level80CharacterCount = 0
+    let maxCharacterLevel = 0
     let secondManaBoardOpenCount = 0
     let secondManaBoardCompleteCount = 0
     for (const [characterId, character] of Object.entries(characters)) {
         const rarity = Number(characterTable[characterId]?.rarity)
-        if (Number.isSafeInteger(rarity) && reachesCharacterLevel80(rarity, character.exp)) {
-            level80CharacterCount++
+        if (Number.isSafeInteger(rarity)) {
+            if (reachesCharacterLevel80(rarity, character.exp)) {
+                level80CharacterCount++
+            }
+            maxCharacterLevel = Math.max(maxCharacterLevel, provenCharacterLevel(rarity, character.exp))
         }
         const secondBoardNodeIds = getSecondBoardNodeIds(manaBoardTable, characterId)
         if (secondBoardNodeIds === null) continue
@@ -98,6 +123,7 @@ export function deriveRegularStateFacts(sources: RegularStateFactSources): Regul
     return {
         characterCount: Object.keys(characters).length,
         level80CharacterCount,
+        maxCharacterLevel,
         manaBoardNodeCount: Object.values(manaNodes)
             .reduce((total, nodes) => total + nodes.length, 0),
         overLimitCount: Object.values(characters)
@@ -115,9 +141,10 @@ export function deriveRegularStateFacts(sources: RegularStateFactSources): Regul
 }
 
 export function getRegularStateFactsSync(playerId: number): RegularStateFacts {
-    const craftPointItemId = getConfigSync().craft_point_item_id || 100000
+    const craftPointItemId = getEquipmentCurrencyPolicySync().craftPointItemId
+    const characters = getPlayerCharactersSync(playerId)
     return deriveRegularStateFacts({
-        characters: getPlayerCharactersSync(playerId),
+        characters,
         characterManaNodes: getPlayerCharactersManaNodesSync(playerId),
         equipment: getPlayerEquipmentListSync(playerId),
         collectedItemTotals: {
@@ -126,14 +153,8 @@ export function getRegularStateFactsSync(playerId: number): RegularStateFacts {
                 craftPointItemId,
             ),
         },
-        characterTable: getRuntimeContentTableSync<RawCharacterTable>(
-            "character.json",
-            bundledCharacters as RawCharacterTable,
-        ),
-        manaBoardTable: getRuntimeContentTableSync<RawManaBoard>(
-            "mana_board.json",
-            bundledManaBoard as RawManaBoard,
-        ),
+        characterTable: characterFactsTable(Object.keys(characters)),
+        manaBoardTable: getContentSnapshot().repository.table<RawManaBoard>("mana_board.json"),
         craftPointItemId,
     })
 }

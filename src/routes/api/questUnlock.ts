@@ -3,10 +3,10 @@ import { getPlayerQuestProgressSync, insertPlayerQuestProgressSync, updatePlayer
 import { getPlayerSync, updatePlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { getQuestFromCategorySync } from "../../lib/assets";
+import { getQuestFromCategorySync } from "../../lib/quest-content";
+import { getQuestUnlockCost } from "../../lib/quest-entry-content";
 import { generateDataHeaders } from "../../utils";
-import bundledQuestUnlockCosts from "../../../assets/quest_unlock_costs.json";
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
 import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
@@ -18,11 +18,48 @@ interface UnlockBody {
     api_count: number
 }
 
+interface GetRecentOtherPlayerPartyBody {
+    category: number
+    quest_id: number
+    viewer_id: number
+}
+
 type UnlockTransactionResult =
     | { ok: true, itemList: Record<string, number> }
     | { ok: false, message: string }
 
 const routes = async (fastify: FastifyInstance) => {
+    // CN 1.8.1 QuestGetRecentOtherPlayerPartyRealRemote：读取其他玩家在本 quest 的
+    // 近期队伍。本服没有跨玩家队伍历史存储，返回客户端契约内的空投影，不虚构数据。
+    fastify.post("/get_recent_other_player_party", async (request: FastifyRequest, reply: FastifyReply) => {
+        const body = request.body as GetRecentOtherPlayerPartyBody
+        const viewerId = body.viewer_id
+        if (isNaN(viewerId) || isNaN(body.category) || isNaN(body.quest_id)) {
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Invalid request body."
+            })
+        }
+
+        const session = await getSession(viewerId.toString())
+        if (!session) {
+            return reply.status(400).send({
+                "error": "Bad Request",
+                "message": "Invalid viewer id."
+            })
+        }
+
+        reply.header("content-type", "application/x-msgpack")
+        return reply.status(200).send({
+            "data_headers": generateDataHeaders({
+                viewer_id: viewerId
+            }),
+            "data": {
+                "recent_other_player_party": [],
+            }
+        })
+    })
+
     fastify.post("/unlock", async (request: FastifyRequest, reply: FastifyReply) => {
         const body = request.body as UnlockBody
 
@@ -70,10 +107,7 @@ const routes = async (fastify: FastifyInstance) => {
             })
         }
 
-        const unlockCost = getRuntimeContentTableSync(
-            "quest_unlock_costs.json",
-            bundledQuestUnlockCosts as Record<string, { itemIds: number[], itemCounts: number[] }>,
-        )[String(questId)]
+        const unlockCost = getQuestUnlockCost(questId)
         if (!unlockCost || unlockCost.itemIds.length === 0) {
             return reply.status(400).send({
                 "error": "Bad Request",
@@ -137,10 +171,10 @@ const routes = async (fastify: FastifyInstance) => {
             "data_headers": generateDataHeaders({
                 viewer_id: viewerId
             }),
-            "data": {
+            "data": mergeCommonResponseFragments([{
                 "item_list": result.itemList,
-                "mail_arrived": getMailArrivedSync(playerId)
-            }
+                "mail_arrived": getMailArrivedSync(playerId),
+            }])
         })
     })
 }

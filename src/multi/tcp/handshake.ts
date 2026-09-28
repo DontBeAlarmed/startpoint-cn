@@ -14,7 +14,6 @@ import {
 } from "../room/manager"
 import { sessionManager } from "../state/SessionManager"
 import type { SessionClient } from "../state/SessionManager"
-import { ClientState } from "../types"
 import {
     embeddedAdmissionRegistry,
     type AdmissionProvider,
@@ -186,7 +185,6 @@ export async function handleHandshake(
             normalizedRoomNumber,
             normalizedConnectionId,
         )
-        client.clientState.tryTransition(ClientState.Handshaking)
         client.participant = admission.participant
         client.snapshot = admission.snapshot
         client.npcPartySnapshots = admission.snapshot.npcParties

@@ -11,9 +11,19 @@ const schemaColumns = {
         column: "multi_rescue_host_rewards_enabled",
         definition: "INTEGER NOT NULL DEFAULT 1",
     },
+    "server_gameplay_settings.rush_700011_to_700017_compatibility_enabled": {
+        table: "server_gameplay_settings",
+        column: "rush_700011_to_700017_compatibility_enabled",
+        definition: "INTEGER NOT NULL DEFAULT 1",
+    },
     "players.tutorial_gacha_character_id": {
         table: "players",
         column: "tutorial_gacha_character_id",
+        definition: "INTEGER DEFAULT NULL",
+    },
+    "players_gacha_info.crazy_draw_count": {
+        table: "players_gacha_info",
+        column: "crazy_draw_count",
         definition: "INTEGER DEFAULT NULL",
     },
     "players.total_stamina_used": {
@@ -135,6 +145,11 @@ const schemaColumns = {
         table: "players_characters",
         column: "illustration_settings",
         definition: "TEXT",
+    },
+    "players_parties.allow_other_players_to_heal_me": {
+        table: "players_parties",
+        column: "allow_other_players_to_heal_me",
+        definition: "INTEGER NOT NULL DEFAULT 1",
     },
     "players_parties.current_battle_power": {
         table: "players_parties",

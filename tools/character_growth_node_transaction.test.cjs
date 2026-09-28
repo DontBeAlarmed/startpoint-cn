@@ -25,7 +25,8 @@ const {
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { getPlayerItemsSync } = require("../src/data/domains/item")
 const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
-const { getCharacterManaNodesSync } = require("../src/lib/assets")
+const { getCharacterGrowthContent } = require("../src/lib/character-growth-content")
+const getCharacterManaNodesSync = (characterId, level) => getCharacterGrowthContent().getManaBoardNodes(characterId, level)
 const { characterExpCaps } = require("../src/lib/character")
 const { getDb } = require("../src/data/db")
 

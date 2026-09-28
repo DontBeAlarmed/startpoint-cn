@@ -10,7 +10,7 @@ import { playerOwnsEquipmentSync, updatePlayerEquipmentSync } from "../../data/d
 import { updatePlayerPartyGroupSync } from "../../data/domains/party"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { getBoxGachaSync } from "../../lib/assets";
+import { getBoxGachaContent, getBoxGachaContentCatalog } from "../../lib/box-gacha-content";
 import { parseBoxGachaResetRequest, sendBoxGachaResultCode } from "../../lib/box-gacha-protocol";
 import { BoxGachaInvalidPeriodError, BoxGachaResetError, resetBoxGachaSync, validateBoxGachaPeriod } from "../../lib/box-gacha-reset";
 import { grantBoxGachaDrawInTransactionOwnerWithInventorySync } from "../../lib/box-gacha-reward-grant";
@@ -21,7 +21,12 @@ import { BoxGachaBoxes, PlayerRewardResult } from "../../lib/types";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time";
 import type { FactKey } from "../../lib/mission/facts/fact-key"
-import { projectItemOverflowCommonResponse } from "../../lib/item-overflow"
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow/common-response"
+import {
+    projectCharacterPatch,
+    projectEquipmentEntity,
+} from "../../lib/common-response/entities";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
 
 interface GetBoxListBody {
     box_gacha_id: number
@@ -113,7 +118,7 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "No players bound to account."
         })
 
-        const boxGachaData = getBoxGachaSync(boxGachaId)
+        const boxGachaData = getBoxGachaContent(getBoxGachaContentCatalog(), boxGachaId)
         const settings = boxGachaData?.boxSettings[boxId]
         const availableCount = boxGachaData?.availableCounts[boxId]
         if (
@@ -190,7 +195,7 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get box asset data.
-        const boxGachaData = getBoxGachaSync(boxGachaId)
+        const boxGachaData = getBoxGachaContent(getBoxGachaContentCatalog(), boxGachaId)
         if (boxGachaData === null) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid box gacha id."
@@ -252,7 +257,6 @@ const routes = async (fastify: FastifyInstance) => {
         const boxId = body.box_id
         const pullCount = body.number
         const stopOnFeaturedRewards = body.stop_on_featured_rewards
-        console.log(`[BOX] exec: boxGachaId=${boxGachaId} boxId=${boxId} pullCount=${pullCount}`)
         if (
             !Number.isSafeInteger(viewerId)
             || viewerId <= 0
@@ -281,7 +285,7 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get box gacha data
-        const boxGachaData = getBoxGachaSync(boxGachaId)
+        const boxGachaData = getBoxGachaContent(getBoxGachaContentCatalog(), boxGachaId)
         if (boxGachaData === null) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid box gacha id."
@@ -471,11 +475,25 @@ const routes = async (fastify: FastifyInstance) => {
                 viewer_id: viewerId
             }),
             "data": {
-                "user_info": {
-                    "free_mana": settlement.player.freeMana + (settlement.rewardResult?.user_info.free_mana ?? 0),
-                    "exp_pool": settlement.player.expPool + (settlement.rewardResult?.user_info.exp_pool ?? 0),
-                    "exp_pooled_time": expPoolRealDateToClientTimestamp(settlement.player.expPooledTime),
-                },
+                ...mergeCommonResponseFragments([{
+                    "user_info": {
+                        "free_mana": settlement.player.freeMana + (settlement.rewardResult?.user_info.free_mana ?? 0),
+                        "exp_pool": settlement.player.expPool + (settlement.rewardResult?.user_info.exp_pool ?? 0),
+                        "exp_pooled_time": expPoolRealDateToClientTimestamp(settlement.player.expPooledTime),
+                    },
+                    "character_list": characterList.map(
+                        character => projectCharacterPatch(character),
+                    ),
+                    "equipment_list": (settlement.rewardResult?.equipment_list ?? []).map(
+                        equipment => projectEquipmentEntity(equipment),
+                    ),
+                    "item_list": {
+                        [pullCurrencyId]: settlement.newPullCurrency,
+                        ...(settlement.rewardResult?.items ?? {})
+                    },
+                    "mail_arrived": getMailArrivedSync(playerId),
+                    ...(overMax.length > 0 ? { "over_max": overMax } : {})
+                }]),
                 "drawn_reward_list": settlement.drawnRewards.map(reward => {
                     return {
                         "reward_id": reward.id,
@@ -484,14 +502,6 @@ const routes = async (fastify: FastifyInstance) => {
                 }),
                 "all_box_info": allBoxInfo,
                 "joined_character_id_list": settlement.rewardResult?.joined_character_id_list ?? [],
-                "character_list": characterList,
-                "equipment_list": settlement.rewardResult?.equipment_list ?? [],
-                "item_list": {
-                    [pullCurrencyId]: settlement.newPullCurrency,
-                    ...(settlement.rewardResult?.items ?? {})
-                },
-                "mail_arrived": getMailArrivedSync(playerId),
-                ...(overMax.length > 0 ? { "over_max": overMax } : {})
             }
         })
     })
@@ -501,7 +511,6 @@ const routes = async (fastify: FastifyInstance) => {
 
         const viewerId = body.viewer_id
         const boxGachaId = body.box_gacha_id
-        console.log(`[BOX] get_box_list: boxGachaId=${boxGachaId}`)
         if (isNaN(viewerId) || isNaN(boxGachaId)) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
@@ -523,7 +532,7 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         // get box gacha data
-        const boxGachaData = getBoxGachaSync(boxGachaId)
+        const boxGachaData = getBoxGachaContent(getBoxGachaContentCatalog(), boxGachaId)
         if (boxGachaData === null) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid box gacha id."

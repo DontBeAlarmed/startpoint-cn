@@ -1,8 +1,5 @@
-import bundledActiveMissions from "../../../assets/mission_active.json"
-import bundledActiveMissionEvents from "../../../assets/mission_active_event.json"
-import bundledActiveRewards from "../../../assets/mission_active_reward.json"
 import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
+import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import {
     buildActiveMissionPlanSource,
     type ActiveMissionPlanSource,
@@ -196,58 +193,20 @@ export function getActiveMissionPlanRewardStages(
 }
 
 const plansByRepository = new WeakMap<ReadonlyContentRepository, ActiveMissionPlan>()
-const plansByMissionTable = new WeakMap<object, WeakMap<object, WeakMap<object, ActiveMissionPlan>>>()
 
 function buildPlan(missions: unknown, events: unknown, rewards: unknown): ActiveMissionPlan {
     return new SnapshotActiveMissionPlan(buildActiveMissionPlanSource(missions, events, rewards))
 }
 
-function getTableCachedPlan(
-    missions: object,
-    events: object,
-    rewards: object,
-): ActiveMissionPlan {
-    let byEvent = plansByMissionTable.get(missions)
-    if (!byEvent) {
-        byEvent = new WeakMap()
-        plansByMissionTable.set(missions, byEvent)
-    }
-    let byReward = byEvent.get(events)
-    if (!byReward) {
-        byReward = new WeakMap()
-        byEvent.set(events, byReward)
-    }
-    const cached = byReward.get(rewards)
-    if (cached) return cached
-    const plan = buildPlan(missions, events, rewards)
-    byReward.set(rewards, plan)
-    return plan
-}
-
-function runtimeTable<T>(tableName: string, bundled: T): T {
-    return getRuntimeContentTableSync(tableName, bundled)
-}
-
 export function getActiveMissionPlan(repository?: ReadonlyContentRepository): ActiveMissionPlan {
-    if (repository) {
-        const cached = plansByRepository.get(repository)
-        if (cached) return cached
-        const plan = buildPlan(
-            repository.table("mission_active.json"),
-            repository.table("mission_active_event.json"),
-            repository.table("mission_active_reward.json"),
-        )
-        plansByRepository.set(repository, plan)
-        return plan
-    }
-
-    const missions = runtimeTable("mission_active.json", bundledActiveMissions)
-    const events = runtimeTable("mission_active_event.json", bundledActiveMissionEvents)
-    const rewards = runtimeTable("mission_active_reward.json", bundledActiveRewards)
-    if (typeof missions === "object" && missions !== null
-        && typeof events === "object" && events !== null
-        && typeof rewards === "object" && rewards !== null) {
-        return getTableCachedPlan(missions, events, rewards)
-    }
-    return buildPlan(missions, events, rewards)
+    const source = repository ?? getContentSnapshot().repository
+    const cached = plansByRepository.get(source)
+    if (cached) return cached
+    const plan = buildPlan(
+        source.table("mission_active.json"),
+        source.table("mission_active_event.json"),
+        source.table("mission_active_reward.json"),
+    )
+    plansByRepository.set(source, plan)
+    return plan
 }

@@ -110,12 +110,17 @@ const bundledQuestTables = Object.fromEntries(QUEST_TABLE_NAMES.map(tableName =>
 ]))
 
 const tables = {
+    "cdndata/player_rank_full.json": require("../assets/cdndata/player_rank_full.json"),
     ...getBundledStandardMissionTables(),
     ...bundledQuestTables,
+    "mission_event_battle_rules.json": require("../assets/mission_event_battle_rules.json"),
+    "mission_event_quest_map.json": require("../assets/mission_event_quest_map.json"),
     "daily_challenge_point_lookup.json": require("../assets/daily_challenge_point_lookup.json"),
-    "hard_multi_event.json": {},
-    "hard_multi_event_quest.json": {},
-    "periodic_reward_point.json": {},
+    "event_challenge_point_map.json": require("../assets/event_challenge_point_map.json"),
+    "hard_multi_event.json": require("../assets/hard_multi_event.json"),
+    "hard_multi_event_quest.json": require("../assets/hard_multi_event_quest.json"),
+    "periodic_reward_point.json": require("../assets/periodic_reward_point.json"),
+    "periodic_reward.json": require("../assets/periodic_reward.json"),
     "mission_regular.json": require("../assets/mission_regular.json"),
     "mission_daily.json": require("../assets/mission_daily.json"),
     "mission_event.json": require("../assets/mission_event.json"),
@@ -134,6 +139,10 @@ const tables = {
     "item_max_count.json": require("../assets/item_max_count.json"),
     "login_bonus.json": require("../assets/login_bonus.json"),
     "mana_node.json": require("../assets/mana_node.json"),
+    "mana_board.json": require("../assets/mana_board.json"),
+    "mana_node_awake.json": require("../assets/mana_node_awake.json"),
+    "character_level.json": require("../assets/character_level.json"),
+    "level_required_mana_node.json": require("../assets/level_required_mana_node.json"),
     "mana_board2_open_condition.json": {},
     "mission_active.json": {
         90001: [missionRow({ eventId: 901, pattern: 57, questKind: 0, questA: 1, questB: 8, questC: 4 })],
@@ -197,28 +206,14 @@ const tables = {
     },
 }
 
-const repository = {
-    info: () => ({
-        source: "release",
-        assetVersion: "active-reconcile-test",
-        generatorVersion: 1,
-        releaseDigest: "sha256:active-reconcile-test",
-    }),
-    table: tableName => {
-        if (!(tableName in tables)) throw new Error(`unexpected table ${tableName}`)
-        return tables[tableName]
-    },
-}
-
-const { productionContentSnapshotProvider } = require("../src/content/runtime/content-snapshot")
-const previousSnapshot = productionContentSnapshotProvider.snapshot
-productionContentSnapshotProvider.snapshot = {
-    cdn: { targetVersion: "active-reconcile-test" },
-    repository,
-}
-restoreSnapshot = () => {
-    productionContentSnapshotProvider.snapshot = previousSnapshot
-}
+const {
+    installFrozenTestContentSnapshot,
+} = require("./helpers/content-snapshot-fixture.cjs")
+const installedContentSnapshot = installFrozenTestContentSnapshot({
+    targetVersion: "active-reconcile-test",
+    tables,
+})
+restoreSnapshot = installedContentSnapshot.restore
 
 const {
     getActiveMissionPlan: originalGetActiveMissionPlan,
@@ -324,7 +319,7 @@ async function main() {
     `)
 
     observedActiveMissionPlans.length = 0
-    const first = reconcileActiveMissionFacts({ playerId, repository, now: serverNow })
+    const first = reconcileActiveMissionFacts({ playerId, now: serverNow })
     assert.equal(
         observedActiveMissionPlans.length,
         1,
@@ -368,7 +363,7 @@ async function main() {
 
     updatePlayerSync({ id: playerId, totalLoginDays: 1, totalStaminaUsed: 5 })
     assert.deepEqual(
-        reconcileActiveMissionFacts({ playerId, repository, now: serverNow }),
+        reconcileActiveMissionFacts({ playerId, now: serverNow }),
         [],
         "绝对事实降低与重复 reconcile 都不得产生增量或回退",
     )
@@ -386,7 +381,7 @@ async function main() {
         END
     `)
     assert.throws(
-        () => reconcileActiveMissionFacts({ playerId, repository, now: serverNow }),
+        () => reconcileActiveMissionFacts({ playerId, now: serverNow }),
         /forced active reconciliation failure/,
     )
     assert.equal(getPlayerActiveMissionsSync(playerId)[90004].progress, 3, "数据库异常必须回滚较早写入")

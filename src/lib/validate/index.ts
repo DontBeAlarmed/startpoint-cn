@@ -4,6 +4,7 @@
 import { SaveValidator, TemporalFilter } from "./types"
 import { MaxLevelValidator } from "./max-level"
 import { PartySlotValidator } from "./party-slot"
+import type { Player } from "../../data/types"
 
 const PERMANENT_VALIDATORS: SaveValidator[] = [
     MaxLevelValidator,
@@ -15,11 +16,11 @@ const TEMPORAL_FILTERS: TemporalFilter[] = [
 ]
 
 /** Run all permanent validators. Returns total fixes applied. */
-export function runPermanentValidators(playerId: number): number {
+export function runPermanentValidators(playerId: number, player?: Player): number {
     let totalFixes = 0
     for (const v of PERMANENT_VALIDATORS) {
         try {
-            totalFixes += v.validate(playerId)
+            totalFixes += v.validate(playerId, player)
         } catch (e) {
             console.error(`[VALIDATE:${v.name}] error:`, e)
         }

@@ -114,7 +114,10 @@ async function main() {
     const ownedStoryCharacter = await createPlayer(7)
     const { givePlayerCharacterSync } = require("../src/lib/character")
     assert.ok(givePlayerCharacterSync(ownedStoryCharacter.playerId, 10)?.character)
-    const { getCharacterDataSync, getCharacterManaNodesSync } = require("../src/lib/assets")
+    const { getCharacterFacts } = require("../src/lib/character-content")
+const { getCharacterGrowthContent } = require("../src/lib/character-growth-content")
+const getCharacterDataSync = characterId => getCharacterFacts().get(characterId)
+const getCharacterManaNodesSync = (characterId, level) => getCharacterGrowthContent().getManaBoardNodes(characterId, level)
     const { characterExpCaps } = require("../src/lib/character")
     const ownedAsset = getCharacterDataSync(10)
     const ownedManaNodes = getCharacterManaNodesSync(10, 1)
@@ -257,6 +260,21 @@ async function main() {
     assert.equal(skipResponse.statusCode, 200, skipResponse.body)
     assert.deepEqual(decode(skipResponse).data.story_join_character_id_list, [213013])
     assert.ok(getPlayerCharacterSync(skipped.playerId, 213013))
+
+    const battleCategory = await createPlayer(8)
+    const battleCategoryResponse = await finish(
+        app,
+        battleCategory.viewerId,
+        1001,
+        "/story/finish",
+        11,
+    )
+    assert.equal(battleCategoryResponse.statusCode, 400)
+    assert.equal(
+        getPlayerSingleQuestProgressSync(battleCategory.playerId, 11, 1001),
+        null,
+        "battle event categories must not enter the story finish path",
+    )
 
     const town = await createPlayer(3)
     const prematureTownClaim = await app.inject({

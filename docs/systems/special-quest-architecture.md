@@ -4,7 +4,7 @@
 
 ## 结论
 
-狂热激战（Rush）、土俑（Carnival）、战阵（Raid）和无限演武（ScoreAttackEvent）的主数据与模式状态已经分开。四种模式的特有结算分别位于 `src/lib/quest/finish/*-handler.ts`；战阵由客户端作为本地三队 Raid 启动，不属于常规多人房间。目前属于“模式逻辑可独立测试，但仍共享通用结算路由”的模块化架构。本项目当前不把“完全插件化”作为目标：共享入场、结算、奖励和事务基础设施是有意保留的公共边界，新增模式只需沿现有 handler 和注册点接入。
+狂热激战（Rush）、土俑（Carnival）、战阵（Raid）和无限演武（ScoreAttackEvent）的主数据与模式状态已经分开。D26 由 typed descriptor 选择且最多调用一个 built-in handler，四种模式的特有结算仍分别位于 `src/lib/quest/finish/*-handler.ts`，依赖由 `single-event-settlement.ts` 组装；战阵由客户端作为本地三队 Raid 启动，不属于常规多人房间。当前是“模式逻辑独立、共享有限 descriptor/hook 与通用 Single 事务”的模块化架构，不追求完全插件化或通用 Event 状态机。
 
 ## 战阵协议语义
 

@@ -23,7 +23,7 @@ const { getPlayerItemSync } = require("../src/data/domains/item")
 const { getPlayerMailsSync, MailType } = require("../src/data/domains/mail")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { getPlayerActiveQuestSync } = require("../src/data/domains/quest_active")
-const { getQuestFromCategorySync } = require("../src/lib/assets")
+const { getQuestFromCategorySync } = require("../src/lib/quest-content")
 const {
     activeQuests,
     insertActiveQuest,
@@ -194,9 +194,13 @@ test("Multi base Mana and sellable clear overflow share one authoritative Player
         playerId: fixture.playerId,
         settlement,
         viewerId: fixture.body.viewer_id,
+        mailArrived: false,
+        followInfo: [],
     })
     assert.equal(response.data.user_info.free_mana, MAX_MANA)
     assert.equal(response.data.item_list[ITEM_ID], ITEM_MAX)
+    assert.equal(response.data.mail_arrived, false)
+    assert.deepEqual(response.data.follow_info, [])
     assert.deepEqual(response.data.over_max, [{
         process_type: 2,
         amount_sold: ITEM_SALE_PRICE,

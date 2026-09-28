@@ -10,6 +10,7 @@ const {
     buildEventChallengePointMap,
     buildQuestEntryCosts,
     buildQuestLookup,
+    buildQuestPrerequisites,
     buildQuestUnlockCosts,
     convertQuestTree,
     QUEST_AUXILIARY_SOURCES,
@@ -17,6 +18,7 @@ const {
     QUEST_TIME_RANGE_COLUMNS,
 } = require("../src/content/converters/quest")
 const { TABLE_SOURCES } = require("../src/content/sync/table-registry")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 
 const PERMANENT_PERIOD = {
     availableFromMs: null,
@@ -141,6 +143,36 @@ test("quest TimeRange accepts only years 1970 through 2200 and preserves UTC+8 b
             /invalid quest content.*TimeRange/i,
         )
     }
+})
+
+test("quest TimeRange epochs follow the injected game calendar offset", () => {
+    const battle = row(119, {
+        0: 1001002,
+        1: "偏移校验",
+        3: 2,
+        4: "2024-08-16 12:00:00",
+        5: "2024-08-29 23:59:59",
+        84: 1,
+    })
+    const base = convertQuestTree(
+        "main_quest.json",
+        { 1: { 1: { 2: [battle] } } },
+        { gameCalendar: createGameCalendarPolicy(480) },
+    )
+    const shifted = convertQuestTree(
+        "main_quest.json",
+        { 1: { 1: { 2: [battle] } } },
+        { gameCalendar: createGameCalendarPolicy(540) },
+    )
+
+    assert.equal(
+        shifted[1001002].availableFromMs - base[1001002].availableFromMs,
+        -3_600_000,
+    )
+    assert.equal(
+        shifted[1001002].availableUntilMs - base[1001002].availableUntilMs,
+        -3_600_000,
+    )
 })
 
 test("quest conversion rejects malformed and inverted non-empty TimeRange values", () => {
@@ -546,12 +578,139 @@ test("quest derived tables use authoritative categories, costs and names", () =>
     })
 })
 
+test("quest prerequisites derive stage-node chains and reject malformed stage rows", () => {
+    const questTrees = {
+        "main_quest.json": {
+            1: {
+                1: { 1: [["1001001"]] },
+                2: { 1: [["1002001"]] },
+                8: { 1: [["1008001"], ["1008002"]] },
+            },
+        },
+        "ex_quest.json": {
+            1: {
+                1: { 1: [["11001001"]] },
+                2: { 1: [["11002001"]] },
+                3: { 1: [["11003001"]] },
+                8: { 1: [["11008001"]] },
+            },
+        },
+    }
+    const stageNodeTrees = {
+        "main_quest.json": {
+            1: {
+                1: [["1001", "第1关", "(None)", "", "0", "", ""]],
+                2: [["1002", "第2关", "1", "1", "0", "", ""]],
+                8: [["1008", "第8关", "1", "1", "0", "", ""]],
+            },
+        },
+        // ExStageNodeLogic.isViewable: need_main_stage_node (cols 2,3) always
+        // resolves against the MAIN table via MainStageNodeLogic, while
+        // need_stage_node (cols 4,5) resolves against the EX table itself.
+        // Node 1:1's needMain target collides with EX's own 1:8 node.
+        "ex_quest.json": {
+            1: {
+                1: [["1001", "EX第1关", "1", "8", "(None)", "", "0", "", ""]],
+                2: [["1002", "EX第2关", "(None)", "", "1", "1", "0", "", ""]],
+                3: [["1003", "EX第3关", "1", "1", "1", "2", "0", "", ""]],
+                8: [["1008", "EX第8关", "(None)", "", "1", "2", "0", "", ""]],
+            },
+        },
+    }
+    assert.deepEqual(buildQuestPrerequisites(questTrees, stageNodeTrees), {
+        // Main chains stay same-table (MainStageNodeValues cols 2,3).
+        "1_1002001": [{ category: 1, questId: 1001001 }],
+        "1_1008001": [{ category: 1, questId: 1001001 }],
+        "1_1008002": [{ category: 1, questId: 1001001 }],
+        // EX needMain resolves to the main node even when the EX table has a
+        // colliding node number (must not fall back to EX 1:8's quests).
+        "4_11001001": [
+            { category: 1, questId: 1008001 },
+            { category: 1, questId: 1008002 },
+        ],
+        // EX internal chains gate on the EX table's own node quests.
+        "4_11002001": [{ category: 4, questId: 11001001 }],
+        "4_11008001": [{ category: 4, questId: 11002001 }],
+        // Both set: the union of needMain (main) and needStage (ex) quests.
+        "4_11003001": [
+            { category: 1, questId: 1001001 },
+            { category: 4, questId: 11002001 },
+        ],
+    })
+    assert.equal(Object.isFrozen(buildQuestPrerequisites(questTrees, stageNodeTrees)), true)
+
+    // Truncated stage rows must not silently become "no prerequisites".
+    assert.throws(() => buildQuestPrerequisites(questTrees, {
+        "main_quest.json": { 1: { 2: [["1002", "第2关"]] } },
+    }), /at least 4 columns/i)
+    // EX rows carry a second need pair at columns 5 and 6.
+    assert.throws(() => buildQuestPrerequisites(questTrees, {
+        "main_quest.json": stageNodeTrees["main_quest.json"],
+        "ex_quest.json": { 1: { 2: [["1002", "EX第2关", "(None)", "", "1"]] } },
+    }), /at least 6 columns/i)
+
+    // A missing need chapter must not be paired with a present need node.
+    assert.throws(() => buildQuestPrerequisites(questTrees, {
+        "main_quest.json": { 1: { 2: [["1002", "第2关", "(None)", "1"]] } },
+    }), /need node must also be missing/i)
+    assert.throws(() => buildQuestPrerequisites(questTrees, {
+        "main_quest.json": stageNodeTrees["main_quest.json"],
+        "ex_quest.json": { 1: { 2: [["1002", "EX第2关", "1", "1", "(None)", "1"]] } },
+    }), /need node must also be missing/i)
+    assert.throws(() => buildQuestPrerequisites(questTrees, {
+        "main_quest.json": stageNodeTrees["main_quest.json"],
+        "ex_quest.json": { 1: { 2: [["1002", "EX第2关", "(None)", "1", "1", "1"]] } },
+    }), /need node must also be missing/i)
+
+    // An EX needMain target must exist in the MAIN table; a colliding EX node
+    // must not satisfy it.
+    assert.throws(() => buildQuestPrerequisites({
+        "main_quest.json": { 1: { 1: { 1: [["1001001"]] } } },
+        "ex_quest.json": questTrees["ex_quest.json"],
+    }, {
+        "main_quest.json": stageNodeTrees["main_quest.json"],
+        "ex_quest.json": { 1: { 1: [["1001", "EX第1关", "1", "9", "(None)", "", "0", "", ""]] } },
+    }), /need stage node 1:9 has no quests/i)
+
+    // Non-canonical integers are rejected, not coerced by Number().
+    assert.throws(() => buildQuestPrerequisites(questTrees, {
+        "main_quest.json": { 1: { 2: [["1002.0", "第2关", "1", "1"]] } },
+    }), /multiplied id must be a canonical positive integer/i)
+    assert.throws(() => buildQuestPrerequisites(questTrees, {
+        "main_quest.json": { 1: { 2: [["1002", "第2关", "1", "1.0"]] } },
+    }), /need node must be a canonical positive integer/i)
+    assert.throws(() => buildQuestPrerequisites({
+        "main_quest.json": { 1: { 2: { 1: [[" 1002001"]] } } },
+    }, stageNodeTrees), /quest id must be a canonical positive integer/i)
+
+    // A quest mapped by two stage nodes is a duplicate, not an overwrite.
+    assert.throws(() => buildQuestPrerequisites({
+        "main_quest.json": { 1: { 1: { 1: [["1001001"]] }, 2: { 1: [["1002001"]] }, 3: { 1: [["1002001"]] } } },
+    }, {
+        "main_quest.json": {
+            1: {
+                2: [["1002", "第2关", "1", "1"]],
+                3: [["1003", "第3关", "1", "1"]],
+            },
+        },
+    }), /duplicate prerequisite quest/i)
+
+    // EX derivation needs the main quest tree; deriving without it must fail.
+    assert.throws(() => buildQuestPrerequisites({
+        "ex_quest.json": questTrees["ex_quest.json"],
+    }, {
+        "ex_quest.json": stageNodeTrees["ex_quest.json"],
+    }), /main quest tree is required/i)
+})
+
 test("challenge point derivatives come from their authoritative master rows", () => {
     assert.deepEqual(QUEST_AUXILIARY_SOURCES, {
         dailyChallengePoint: "master/quest/event/daily_challenge_point.orderedmap",
         expertSingleEvent: "master/quest/event/expert_single_event.orderedmap",
         soloTimeAttackEvent: "master/quest/event/solo_time_attack_event.orderedmap",
         practiceQuest: "master/quest/practice/practice_quest.orderedmap",
+        mainStageNode: "master/quest/main_stage_node.orderedmap",
+        exStageNode: "master/quest/ex_stage_node.orderedmap",
     })
     assert.deepEqual(buildDailyChallengePointLookup({
         1: [["expert", "9999", "999", "true", "挑战次数"]],

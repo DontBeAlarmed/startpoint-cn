@@ -45,7 +45,12 @@ import {
     createEmbeddedMultiHttpContext,
     type MultiHttpContext,
 } from "../http/context"
-import { getRoomOccupiedMemberCount, listActiveRooms } from "../room/manager"
+import {
+    getRoom,
+    getRoomOccupiedMemberCount,
+    isRoomViewerMember,
+    listActiveRooms,
+} from "../room/manager"
 import { sessionManager } from "../state/SessionManager"
 import {
     isSessionServerListening,
@@ -251,6 +256,10 @@ class Service implements MultiRuntimeService {
             const authenticationRejections = new AuthenticationRejectionBuffer()
             const admissionRegistry = new AdmissionRegistry({
                 getOccupiedMemberCount: getRoomOccupiedMemberCount,
+                isOccupiedMember: (roomNumber, viewerId) => {
+                    const room = getRoom(roomNumber)
+                    return room !== undefined && isRoomViewerMember(room, viewerId)
+                },
             })
             const coordinator = new EmbeddedMultiCoordinator({
                 allowRemoteParticipants: true,

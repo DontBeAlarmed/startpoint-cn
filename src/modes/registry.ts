@@ -8,9 +8,10 @@
  *
  * Where a module's own configuration lives: in the module, not here. The
  * content registry belongs to the base server, and the seam does not extend
- * it for a mode's private tables — `ModeHost.table` reads base-registered
- * tables only. A module declares itself through its exported manifest and
- * may read files it ships alongside itself.
+ * it for a mode's private tables — `host.content` (Mode API v2) exposes a
+ * fixed set of named read-only queries instead of arbitrary table reads. A
+ * module declares itself through its exported manifest and may read files it
+ * ships alongside itself.
  *
  * Capability follows transaction context. Hooks that run inside an explicit
  * database transaction receive a `ModeTransactionHost` carrying write
@@ -37,28 +38,24 @@
  * Contract version. The loader reads a module's exported manifest and
  * refuses a mismatched module *before* handing it a host, so an
  * incompatible module never gets to call one.
+ *
+ * v2 (D27) is a breaking change: the v1 `table<T>(name)` arbitrary
+ * base-registry read is gone. Read-only content access is a fixed set of
+ * named queries on `host.content`; there is deliberately no v1 shim that
+ * could still read any registered table.
  */
-export const MODE_API_VERSION = 1
+export const MODE_API_VERSION = 2
 
-export interface ModeHostServerApi {
+/** Named read-only content queries available to every hook host. */
+export interface ModeHostContentApi {
     readonly getCharacterElement: (characterId: number) => number | null
-    readonly updatePlayerEquipment: (
-        playerId: number, equipmentId: number, patch: { level: number },
-    ) => void
-    readonly givePlayerCharactersExp: (
-        playerId: number, characterIds: number[], amount: number,
-    ) => unknown
 }
 
 /** Read-only host. Handed to hooks that do not run inside a transaction. */
 export interface ModeHost {
     readonly apiVersion: number
-    /**
-     * Reads a table the base server has registered in its content registry.
-     * Throws for anything else: the seam does not host mode-private tables,
-     * and a mode's own switches belong in its manifest or its own files.
-     */
-    readonly table: <T>(tableName: string) => T
+    /** Fixed named content queries (Mode API v2); no arbitrary table reads. */
+    readonly content: ModeHostContentApi
     readonly log: (message: string) => void
 }
 
@@ -69,6 +66,15 @@ export interface ModeHost {
  */
 export interface ModeTransactionHost extends ModeHost {
     readonly server: ModeHostServerApi
+}
+
+export interface ModeHostServerApi {
+    readonly updatePlayerEquipment: (
+        playerId: number, equipmentId: number, patch: { level: number },
+    ) => void
+    readonly givePlayerCharactersExp: (
+        playerId: number, characterIds: number[], amount: number,
+    ) => unknown
 }
 
 export interface ModeRewardEntry {

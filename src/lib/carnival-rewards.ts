@@ -1,5 +1,4 @@
-import carnivalRewardData from "../../assets/carnival_event_total_score_reward.json"
-import { getRuntimeContentTableSync } from "../content/runtime/table-access"
+import { getContentSnapshot } from "../content/runtime/content-snapshot"
 import {
     createRewardGrantExecutionPlan,
     snapshotRewardGrantExecutionResultForPlan,
@@ -67,9 +66,8 @@ function toRewardGrantCommand(
 }
 
 export function getCarnivalRewardDefinitions(eventId?: number): CarnivalRewardDefinition[] {
-    const carnivalRewardDefinitions = Object.values(getRuntimeContentTableSync(
+    const carnivalRewardDefinitions = Object.values(getContentSnapshot().repository.table<Record<string, CarnivalRewardDefinition>>(
         "carnival_event_total_score_reward.json",
-        carnivalRewardData as Record<string, CarnivalRewardDefinition>,
     ))
     return eventId === undefined
         ? carnivalRewardDefinitions

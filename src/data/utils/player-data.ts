@@ -9,6 +9,10 @@ import { getPlayerDailyChallengePointListSync, getPlayerSync, updatePlayerSync }
 import { getPlayerDrawnQuestsSync, getPlayerQuestProgressSync } from "../domains/quest"
 import { getPlayerEquipmentListSync } from "../domains/equipment"
 import { getPlayerGachaCampaignListSync, getPlayerGachaInfoListSync } from "../domains/gacha"
+import {
+    getPlayerGachaDetailListSync,
+    getPlayerStarsGachaCampaignListSync,
+} from "../domains/gacha-state"
 import { getPlayerItemsSync } from "../domains/item"
 import { getPlayerMailCountSync } from "../domains/mail"
 import { getPlayerMultiSpecialExchangeCampaignsSync, getPlayerPeriodicRewardPointsSync, getPlayerStartDashExchangeCampaignsSync } from "../domains/campaign"
@@ -17,10 +21,9 @@ import { getPlayerPartyGroupListSync } from "../domains/party"
 import { getPlayerTriggeredTutorialsSync } from "../domains/tutorial"
 import { computeAwakeSummary, createAwakeRequestContext, filterToActiveMissions, reconcileAwakeUnlocksFromProgress } from "../../lib/mission/index"
 import { reconcileAwakeEvolutionLevelsSync } from "../../lib/mission/awake-evolution-repair"
-import { computeManaBoardAwakeFromNodes, mergeManaBoardAwakeMaps } from "../../lib/character-helpers"
+import { computeManaBoardAwakeFromNodes, mergeManaBoardAwakeMaps } from "../../lib/character-mana-board-maps"
 import { getDb } from "../db"
 import { getCarnivalSaveStateSync } from "../../lib/carnival-save-state"
-import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import { getPlayerCharacterAwakeUnlockRecordSync } from "../domains/character_awake"
 import { reconcileInterruptedStartTutorialSync } from "../../lib/start-tutorial-state"
 import { projectMergedCharacterGrowthState } from "../../lib/character-growth/save/project-growth-state"
@@ -29,6 +32,8 @@ export { getDefaultPlayerData } from "./default-player"
 export interface GetClientSerializedDataOptions extends SerializePlayerDataOptions {
     readonly activeMissionsOverride?: ReturnType<typeof getPlayerActiveMissionsSync>
     readonly playerOverride?: NonNullable<ReturnType<typeof getPlayerSync>>
+    /** Normal-category party groups when the caller already read them this request. */
+    readonly partyGroupListOverride?: ReturnType<typeof getPlayerPartyGroupListSync>
 }
 
 function restoreActiveMissionPayloadShape(
@@ -95,19 +100,20 @@ export function getClientSerializedData(
         characterManaNodeList: awakeEligibility.manaNodes,
         characterManaNodeAwakeLevels: nodeAwakeLevels,
         manaBoardAwakeMap,
-        partyGroupList: getPlayerPartyGroupListSync(playerId),
+        partyGroupList: options.partyGroupListOverride ?? getPlayerPartyGroupListSync(playerId),
         itemList: getPlayerItemsSync(playerId),
         equipmentList: getPlayerEquipmentListSync(playerId),
         questProgress: getPlayerQuestProgressSync(playerId),
         gachaInfoList: getPlayerGachaInfoListSync(playerId),
         gachaCampaignList: getPlayerGachaCampaignListSync(playerId),
+        gachaDetailList: getPlayerGachaDetailListSync(playerId),
+        starsGachaCampaignList: getPlayerStarsGachaCampaignListSync(playerId),
         drawnQuestList: getPlayerDrawnQuestsSync(playerId),
         periodicRewardPointList: getPlayerPeriodicRewardPointsSync(playerId),
         allActiveMissionList: filterToActiveMissions(
             options.activeMissionsOverride
                 ? restoreActiveMissionPayloadShape(options.activeMissionsOverride)
                 : getPlayerActiveMissionsSync(playerId),
-            getContentSnapshot().repository,
         ),
         boxGachaList: getPlayerBoxGachasSync(playerId),
         purchasedTimesList: {},
@@ -152,6 +158,8 @@ export function getMergedPlayerDataSync(
         questProgress: getPlayerQuestProgressSync(playerId),
         gachaInfoList: getPlayerGachaInfoListSync(playerId),
         gachaCampaignList: getPlayerGachaCampaignListSync(playerId),
+        gachaDetailList: getPlayerGachaDetailListSync(playerId),
+        starsGachaCampaignList: getPlayerStarsGachaCampaignListSync(playerId),
         drawnQuestList: getPlayerDrawnQuestsSync(playerId),
         periodicRewardPointList: getPlayerPeriodicRewardPointsSync(playerId),
         allActiveMissionList: getPlayerActiveMissionsSync(playerId),

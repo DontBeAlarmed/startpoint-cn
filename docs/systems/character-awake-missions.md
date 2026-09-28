@@ -264,19 +264,17 @@ lib/mission/
 ├── index.ts           barrel export
 ├── types.ts           MissionComputer + CategoryContext 接口
 ├── registry.ts        分类→MissionComputer 分发表
-├── stages.ts          阶段阈值 (getCurrentStage, getCompletedStageNumbers)
+├── mission-catalog.ts snapshot-scoped definition/pattern/stage/Awake 索引与阶段派生
 ├── rewards.ts         奖励、奖励 ID 和 AwakeManaBoard 特殊奖励解析
 ├── awake-eligibility.ts  官方入口基础资格与新解锁统一门控
 ├── awake-settlement.ts  category 9 进入页面时的幂等奖励结算
-├── patterns.ts        pattern→mission 索引 (getMissionsByPattern)
 ├── character-queries.ts  角色→任务映射
 ├── computer-regular.ts   category 1/2 (pattern 分发)
 ├── computer-degree.ts    category 5 (等级任务)
-├── computer-awake.ts     category 9 (角色觉醒，预缓存 DB)
-└── computer-fallback.ts  默认回退 DB progress
+└── computer-awake.ts     category 9 (角色觉醒，Session facts)
 ```
 
-- `MissionComputer` 接口：`buildContext()` 一次预取 DB → `compute()` 纯计算
+- `MissionComputer` 接口：`buildContextFromSession()` 从声明式 facts 构造上下文 → `compute()` 纯计算
 - 新分类只需实现接口 + 注册到 `registry.ts` 一行
 - cat9 请求级预缓存：eligibility resolver 一次读取 `getPlayerCharactersSync` 与
   `getPlayerCharactersManaNodesSync`，角色通关事实由 `getPlayerCharacterClearsSync` 批量读取；单角色请求先缩小
@@ -296,11 +294,13 @@ lib/mission/
   `AwakeManaBoard(character_id, board_index, awake_level)` 作为特殊奖励处理。
 - 奖励发放、阶段领取状态和玩家货币更新在同一个 SQLite 事务中提交；重复进入页面不会重复发奖。
 
-### 解锁与领奖时序（2026-07-17）✅
+### 解锁与领奖时序（2026-07-17，2026-09-12 收口）✅
 
 第二页解锁与第一页领奖使用独立的持久状态：前者保存在
 `players_character_awake_unlocks`，后者保存在
-`players_category_mission_stages.status`。
+`players_category_mission_stages.status`。2026-09-12 起单人/多人战斗 finish 与各成长
+入口一律只写进度并即时发布解锁，不代领普通觉醒奖励；category 9 第一页
+`get_mission_progress` 是普通觉醒奖励的唯一领取入口，领取后同事务发布缺失的解锁。
 
 - 任务未全部完成时，客户端进入第一页；`get_mission_progress` 自动结算当前已完成且未领取的奖励，
   第二页继续锁定。

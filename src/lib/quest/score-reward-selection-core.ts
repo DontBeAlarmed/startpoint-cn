@@ -159,8 +159,12 @@ export function selectScoreRewardGrantPlanCore(
         const command = normalizeRareReward(
             reward,
             amount,
-            input.questElement,
-            dependencies.resolveContextualItemId,
+            {
+                questElement: input.questElement,
+                rewardDate: input.rewardDate,
+                resolveContextualItemId: dependencies.resolveContextualItemId,
+                resolveEventCurrencyId: dependencies.resolveEventCurrencyId,
+            },
         )
         dropMetadata.push(Object.freeze({
             entryIndex: entries.length,

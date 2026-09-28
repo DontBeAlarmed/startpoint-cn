@@ -3,6 +3,12 @@ import type {
     NestedOrderedMapTextRows,
     OrderedMapTextRow,
 } from "../sync/ordered-map"
+import {
+    gameCalendarSupportedYearRange,
+    resolveContentConverterContext,
+    type ContentConverterContext,
+} from "./context"
+import type { GameCalendarPolicy } from "../../time/game-calendar"
 import { parseCsvLine } from "./csv"
 
 const ELECTION_COLUMN_COUNT = 4
@@ -14,7 +20,6 @@ const ENCYCLOPEDIA_KIND_COLUMN = 4
 const ENCYCLOPEDIA_CHARACTER_COLUMN = 5
 
 const POSITIVE_INTEGER_PATTERN = /^[1-9]\d*$/
-const MASTER_TIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/
 
 export interface ReadonlyCharacterElectionRule {
     readonly stringId: string
@@ -49,25 +54,22 @@ function parsePositiveInteger(value: string, subject: string): number {
     return parsed
 }
 
-function isLeapYear(year: number): boolean {
-    return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
-}
-
-function daysInMonth(year: number, month: number): number {
-    if (month === 2) return isLeapYear(year) ? 29 : 28
-    return [4, 6, 9, 11].includes(month) ? 30 : 31
-}
-
-function parseMasterTime(value: string, subject: string): number {
-    const match = MASTER_TIME_PATTERN.exec(value)
-    if (!match) invalid(`${subject} must use YYYY-MM-DD HH:mm:ss`)
-    const [year, month, day, hour, minute, second] = match.slice(1).map(Number)
-    if (year < 1970 || year > 2200 || month < 1 || month > 12
-        || day < 1 || day > daysInMonth(year, month)
-        || hour > 23 || minute > 59 || second > 59) {
+function parseMasterTime(
+    value: string,
+    subject: string,
+    calendar: GameCalendarPolicy,
+): number {
+    let parsed: number
+    try {
+        parsed = calendar.parseMasterTimestamp(value)
+    } catch {
+        invalid(`${subject} must use YYYY-MM-DD HH:mm:ss`)
+    }
+    const range = gameCalendarSupportedYearRange(calendar)
+    if (parsed < range.minEpochMs || parsed >= range.exclusiveMaxEpochMs) {
         invalid(`${subject} is not a valid calendar time`)
     }
-    return Date.UTC(year, month - 1, day, hour - 8, minute, second)
+    return parsed
 }
 
 function parseRows(
@@ -190,7 +192,9 @@ function parsePositiveOrZeroInteger(value: string, subject: string): number {
 
 export function convertCharacterElections(
     input: CharacterElectionConversionInput,
+    context?: ContentConverterContext,
 ): CharacterElectionConversionOutput {
+    const { gameCalendar } = resolveContentConverterContext(context)
     const elections = parseRows(input.electionRows, "election", ELECTION_COLUMN_COUNT)
     const excludes = parseExcludes(input.excludeRows)
     const identities = parseCharacterIdentities(input.characterRows)
@@ -221,8 +225,8 @@ export function convertCharacterElections(
         if (!/^[A-Za-z0-9_]+$/.test(stringId)) {
             invalid(`election[${electionId}] stringId must be a stable identifier`)
         }
-        const start = parseMasterTime(startTime, `election[${electionId}] startTime`)
-        const end = parseMasterTime(endTime, `election[${electionId}] endTime`)
+        const start = parseMasterTime(startTime, `election[${electionId}] startTime`, gameCalendar)
+        const end = parseMasterTime(endTime, `election[${electionId}] endTime`, gameCalendar)
         if (start > end) invalid(`election[${electionId}] period is reversed`)
         const excluded = excludes.get(electionId)!
         output[String(electionId)] = {

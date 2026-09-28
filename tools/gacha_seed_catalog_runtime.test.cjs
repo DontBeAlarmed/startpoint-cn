@@ -124,6 +124,18 @@ try {
     })
     assert.equal(filtered.select("normal", 5, new Set()), 101)
 
+    let quarantineChecks = 0
+    const sparse = new GachaSeedCatalog({
+        catalogDir: temporaryRoot,
+        isQuarantined: () => {
+            quarantineChecks += 1
+            return false
+        },
+        randomInt: () => 0,
+    })
+    assert.equal(sparse.select("normal", 5, new Set()), 101)
+    assert.equal(quarantineChecks, 1, "normal selection must not scan the full seed bucket")
+
     const manifestPath = path.join(temporaryRoot, "manifest.json")
     const mutateManifest = mutator => {
         const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"))
@@ -187,27 +199,30 @@ assert.equal(
     "only the rarity_5_guarantee planner may derive a placeholder seed from character id",
 )
 assert.equal(
-    gachaSource.indexOf("const characterMoviePlan = gacha.type")
+    gachaSource.indexOf("const characterMoviePlan = (")
         < gachaSource.indexOf("return rewardGachaDrawResultThroughGrantOwnerSync"),
     true,
     "all seeds must be planned before owner reward execution",
 )
-const gachaRouteSource = fs.readFileSync(
-    path.join(__dirname, "..", "src", "routes", "api", "gacha.ts"),
+const gachaOwnerSource = fs.readFileSync(
+    path.join(__dirname, "..", "src", "lib", "gacha-owner", "execute.ts"),
     "utf8",
 )
-const regularRouteMoviePlanPosition = gachaRouteSource.indexOf(
-    "const characterMoviePlan = isCharacterGacha",
+const regularOwnerMoviePlanPosition = gachaOwnerSource.indexOf(
+    "const characterMoviePlan = prepared.banner.kind",
 )
+assert.notEqual(regularOwnerMoviePlanPosition, -1)
 for (const writeAnchor of [
     "inventory.deduct(",
-    "insertPlayerGachaCampaignSync(playerId",
-    "updatePlayerGachaCampaignSync(playerId",
+    "insertPlayerGachaCampaignSync(command.playerId",
+    "updatePlayerGachaCampaignSync(",
 ]) {
+    const writePosition = gachaOwnerSource.indexOf(writeAnchor)
+    assert.notEqual(writePosition, -1, `missing owner write anchor ${writeAnchor}`)
     assert.equal(
-        regularRouteMoviePlanPosition < gachaRouteSource.indexOf(writeAnchor),
+        regularOwnerMoviePlanPosition < writePosition,
         true,
-        `the regular route must plan seeds before ${writeAnchor}`,
+        `the regular owner must plan seeds before ${writeAnchor}`,
     )
 }
 

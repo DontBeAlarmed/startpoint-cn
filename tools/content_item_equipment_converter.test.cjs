@@ -12,6 +12,8 @@ try {
     if (error?.code !== "MODULE_NOT_FOUND") throw error
 }
 
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
+
 const SOURCES = Object.freeze({
     equipment: "master/item/equipment.orderedmap",
     craft: "master/item/equipment_craft_point_exchange.orderedmap",
@@ -19,6 +21,8 @@ const SOURCES = Object.freeze({
     item: "master/item/item.orderedmap",
     itemBonusSelect: "master/item/item_bonus_select.orderedmap",
 })
+
+const SELECT_REWARD_ITEM_IDS = Object.freeze([100, 101, 102, 104, 105, 106])
 
 function row(key, fields) {
     return { key, text: fields.join(",") }
@@ -46,12 +50,12 @@ function itemFields(overrides = {}) {
 function itemBonusSelectFields(overrides = {}) {
     const fields = [
         "测试资源箱",
-        "1", "300", "2",
-        "1", "300", "6",
-        "1", "300", "10",
-        "1", "300", "14",
-        "1", "300", "43",
-        "1", "300", "47",
+        "1", "300", String(SELECT_REWARD_ITEM_IDS[0]),
+        "1", "300", String(SELECT_REWARD_ITEM_IDS[1]),
+        "1", "300", String(SELECT_REWARD_ITEM_IDS[2]),
+        "1", "300", String(SELECT_REWARD_ITEM_IDS[3]),
+        "1", "300", String(SELECT_REWARD_ITEM_IDS[4]),
+        "1", "300", String(SELECT_REWARD_ITEM_IDS[5]),
         "999999",
     ]
     for (const [index, value] of Object.entries(overrides)) fields[Number(index)] = value
@@ -63,11 +67,11 @@ function fixture(overrides = {}) {
         [SOURCES.equipment, [
             row("5010001", equipmentFields()),
             row("5029999", equipmentFields({
-                0: "new_equipment",
-                1: "新增装备",
-                9: "false",
-                10: "5029999",
-                11: "4",
+            0: "new_equipment",
+            1: "新增装备",
+            9: "false",
+            10: "5029999",
+            11: "5",
             })),
         ]],
         [SOURCES.craft, [
@@ -103,6 +107,9 @@ function fixture(overrides = {}) {
                 21: "false",
                 22: "900",
             })),
+            row("104", itemFields({ 2: "选择素材104", 6: "0", 7: "" })),
+            row("105", itemFields({ 2: "选择素材105", 6: "0", 7: "" })),
+            row("106", itemFields({ 2: "选择素材106", 6: "0", 7: "" })),
         ]],
         [SOURCES.itemBonusSelect, [
             row("900", itemBonusSelectFields()),
@@ -165,7 +172,7 @@ test("item and equipment converter derives the ten authoritative runtime tables"
         "equipment_ids.json": [5010001, 5029999],
         "equipment_lookup.json": {
             "5010001": { name: "测试剑", rarity: "5", category: "剑" },
-            "5029999": { name: "新增装备", rarity: "4", category: "未分类" },
+            "5029999": { name: "新增装备", rarity: "5", category: "未分类" },
         },
         "item_data.json": {
             "100": { effectKind: 2, effectValue: 25 },
@@ -174,16 +181,16 @@ test("item and equipment converter derives the ten authoritative runtime tables"
                 effectKind: 22,
                 effectValue: 0,
                 selectRewards: [
-                    { itemId: 2, amount: 300 },
-                    { itemId: 6, amount: 300 },
-                    { itemId: 10, amount: 300 },
-                    { itemId: 14, amount: 300 },
-                    { itemId: 43, amount: 300 },
-                    { itemId: 47, amount: 300 },
+                    { itemId: 100, amount: 300 },
+                    { itemId: 101, amount: 300 },
+                    { itemId: 102, amount: 300 },
+                    { itemId: 104, amount: 300 },
+                    { itemId: 105, amount: 300 },
+                    { itemId: 106, amount: 300 },
                 ],
             },
         },
-        "item_ids.json": [100, 101, 102, 103],
+        "item_ids.json": [100, 101, 102, 103, 104, 105, 106],
         "item_inventory_policy.json": {
             byItemId: {
                 "100": {
@@ -222,6 +229,33 @@ test("item and equipment converter derives the ten authoritative runtime tables"
                     startTimeMs: Date.UTC(2015, 11, 31, 15, 59, 59),
                     endTimeMs: null,
                 },
+                "104": {
+                    effectKind: 0,
+                    category: 9,
+                    salePrice: 100,
+                    maxCount: 9999,
+                    sellable: true,
+                    startTimeMs: Date.UTC(2015, 11, 31, 15, 59, 59),
+                    endTimeMs: null,
+                },
+                "105": {
+                    effectKind: 0,
+                    category: 9,
+                    salePrice: 100,
+                    maxCount: 9999,
+                    sellable: true,
+                    startTimeMs: Date.UTC(2015, 11, 31, 15, 59, 59),
+                    endTimeMs: null,
+                },
+                "106": {
+                    effectKind: 0,
+                    category: 9,
+                    salePrice: 100,
+                    maxCount: 9999,
+                    sellable: true,
+                    startTimeMs: Date.UTC(2015, 11, 31, 15, 59, 59),
+                    endTimeMs: null,
+                },
             },
             eventTradeItemIds: [101],
         },
@@ -230,18 +264,27 @@ test("item and equipment converter derives the ten authoritative runtime tables"
             "101": "活动素材",
             "102": "比例体力药",
             "103": "测试资源箱",
+            "104": "选择素材104",
+            "105": "选择素材105",
+            "106": "选择素材106",
         },
         "item_max_count.json": {
             "100": 9999,
             "101": 9999,
             "102": 9999,
             "103": 9999,
+            "104": 9999,
+            "105": 9999,
+            "106": 9999,
         },
         "item_sale.json": {
             "100": { category: 9, sale_price: 100, sellable: true },
             "101": { category: 3, sale_price: 5, sellable: false },
             "102": { category: 9, sale_price: 100, sellable: true },
             "103": { category: 9, sale_price: 100, sellable: false },
+            "104": { category: 9, sale_price: 100, sellable: true },
+            "105": { category: 9, sale_price: 100, sellable: true },
+            "106": { category: 9, sale_price: 100, sellable: true },
         },
     })
     assertDeepFrozen(output)
@@ -279,7 +322,7 @@ for (const { name, overrides, expected } of [
     {
         name: "invalid UTC+8 date",
         overrides: { 19: "2020-02-30 00:00:00" },
-        expected: /startTime must be a valid UTC\+8 time/i,
+        expected: /startTime must be a valid UTC\+8 second-precision time/i,
     },
     {
         name: "1969 time with a negative epoch",
@@ -289,7 +332,7 @@ for (const { name, overrides, expected } of [
     {
         name: "time without second precision",
         overrides: { 19: "2020-01-01 00:00" },
-        expected: /startTime must be a UTC\+8 second-precision time/i,
+        expected: /startTime must be a valid UTC\+8 second-precision time/i,
     },
     {
         name: "inverted availability window",
@@ -309,6 +352,23 @@ for (const { name, overrides, expected } of [
         await assert.rejects(convertItemEquipmentTables(source.reader), expected)
     })
 }
+
+test("item inventory policy epochs follow the injected game calendar offset", async () => {
+    const base = await convertItemEquipmentTables(
+        fixture().reader,
+        { equipmentLookup: {} },
+        { gameCalendar: createGameCalendarPolicy(480) },
+    )
+    const shifted = await convertItemEquipmentTables(
+        fixture().reader,
+        { equipmentLookup: {} },
+        { gameCalendar: createGameCalendarPolicy(540) },
+    )
+
+    const baseStart = base["item_inventory_policy.json"].byItemId["100"].startTimeMs
+    const shiftedStart = shifted["item_inventory_policy.json"].byItemId["100"].startTimeMs
+    assert.equal(shiftedStart - baseStart, -3_600_000)
+})
 
 test("item inventory policy requires all 23 Item columns", async () => {
     const source = fixture({
@@ -369,11 +429,11 @@ test("cultivate pack conversion rejects a missing Item candidate", async () => {
 
 test("cultivate pack conversion rejects duplicate Item candidates", async () => {
     const source = fixture({
-        [SOURCES.itemBonusSelect]: [row("900", itemBonusSelectFields({ 6: "2" }))],
+        [SOURCES.itemBonusSelect]: [row("900", itemBonusSelectFields({ 6: "100" }))],
     })
     await assert.rejects(
         convertItemEquipmentTables(source.reader),
-        /item_bonus_select\[900\] has duplicate Item candidate: 2/i,
+        /item_bonus_select\[900\] has duplicate Item candidate: 100/i,
     )
 })
 

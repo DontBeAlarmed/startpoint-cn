@@ -4,6 +4,11 @@ const { pack, unpack } = require("msgpackr")
 
 require("ts-node/register/transpile-only")
 
+// singleBattleQuest reads the challenge point map at route registration.
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
+
 function stubModule(relativePath, exports) {
     const modulePath = require.resolve(relativePath)
     require.cache[modulePath] = {
@@ -27,13 +32,11 @@ const unusedRouteDependencies = [
     "../src/data/domains/rushEvent",
     "../src/data/domains/session",
     "../src/data/types",
-    "../src/lib/assets",
     "../src/lib/carnival-rewards",
     "../src/lib/character",
     "../src/lib/equipment",
     "../src/lib/mission",
     "../src/lib/mission/battle-facts",
-    "../src/lib/quest",
     "../src/lib/quest/finish/carnival-handler",
     "../src/lib/quest/finish/challenge-point",
     "../src/lib/quest/finish/character-clear-tracker",

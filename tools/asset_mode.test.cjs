@@ -426,9 +426,10 @@ test("non-local snapshot initialization ignores CDN_DIR and uses bundled 1.4.54 
         source: "bundled",
         assetVersion: "1.4.54",
         generatorVersion: 3,
+        gameCalendarUtcOffsetMinutes: 480,
         releaseDigest: null,
-        contentDigest: "sha256:cb0322c111d2d58516139ae9ab077a394c49044625c343a78c53ce28f46f9f58",
-        multiBattleContentDigest: "sha256:918d4a8d30fa7651c2c9361a872a05dd9bbb5670172b20f870cd269cb4d7513f",
+        contentDigest: "sha256:0c99a7191c9d00ca4a828b2a10887365a66e1cd539fb13b3ab56f620e428b60b",
+        multiBattleContentDigest: "sha256:be3d9148c416cf089156d1003b274c25cc5c00165eb117854d2ab7b414d8fa29",
     })
     assert.equal(localValidationCalls, 0)
 })

@@ -160,11 +160,17 @@ export function normalizeRareScoreRewardGroup(
     return normalized
 }
 
+export interface RareRewardCommandContext {
+    readonly questElement?: number
+    readonly rewardDate: Date
+    readonly resolveContextualItemId: ScoreRewardContextualItemResolver
+    readonly resolveEventCurrencyId: (itemId: number, rewardDate: Date) => number
+}
+
 export function normalizeRareReward(
     reward: NormalizedRareScoreReward,
     amount: number,
-    questElement: number | undefined,
-    resolveContextualItemId: ScoreRewardContextualItemResolver,
+    context: RareRewardCommandContext,
 ): RewardGrantCommand {
     switch (reward.type) {
         case RewardType.CHARACTER:
@@ -174,16 +180,22 @@ export function normalizeRareReward(
         case RewardType.EXP:
             return { type: reward.type, count: amount }
         case RewardType.ITEM:
+            // 与 common 路径同一事件代币世代解析边界；非代币道具幂等返回原 id。
+            return {
+                type: reward.type,
+                id: context.resolveEventCurrencyId(reward.id, context.rewardDate),
+                count: amount,
+            }
         case RewardType.EQUIPMENT:
             return { type: reward.type, id: reward.id, count: amount }
         case RewardType.ELEMENT:
         case RewardType.AETHER:
             return {
                 type: reward.type,
-                id: resolveContextualItemId(
+                id: context.resolveContextualItemId(
                     reward.type === RewardType.ELEMENT ? "element" : "aether",
                     reward.id,
-                    questElement,
+                    context.questElement,
                 ),
                 count: amount,
             }

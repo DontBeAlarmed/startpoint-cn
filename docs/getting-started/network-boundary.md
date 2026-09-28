@@ -17,6 +17,7 @@
 | `MULTI_HUB_TOKEN` | `client` 模式使用的节点明文令牌，只放在本机 `.env` 或壳私有运行配置中 |
 | `SUMMON_COM_SECONDS` | 客户端抽卡演出配置，默认 `5` 秒；只在启动时读取 |
 | `DAILY_RESET_HOUR` | 中国时区每日/每周周期边界小时，默认 `5`；取值 `0～23`，只在启动时读取 |
+| `GAME_CALENDAR_UTC_OFFSET_MINUTES` | 游戏业务日历的固定 UTC 偏移（分钟），默认 `480`（UTC+8）；范围 `-840..840`，只在启动时读取，必须与客户端和内容主数据的日历一致，而不是按服主所在地选择 |
 
 绑定 `0.0.0.0` 表示监听所有本机网络接口，不等于服务端自动获得公网安全能力。`CDN_BASE_URL` 和 `SESSION_PUBLIC_HOST` 必须是客户端实际能够访问的地址，但项目不负责配置路由器、域名或外部网络。
 
@@ -45,6 +46,8 @@
 表中前九项传输与战斗调优值均须为正安全整数。`SESSION_MAX_FRAME_BYTES` 和 `MULTI_SEND_QUEUE_MAX_BYTES` 最低为 `1024`，`SESSION_MAX_BUFFER_BYTES` 不得小于 `SESSION_MAX_FRAME_BYTES`；`SESSION_HANDSHAKE_TIMEOUT_MS`、`MULTI_SEND_QUEUE_MAX_AGE_MS`、`BATTLE_LOADING_LEASE_MS` 和 `BATTLE_HEARTBEAT_LEASE_MS` 最高为 `2147483647`，`SESSION_TCP_KEEPALIVE_MS` 不受这一计时器上限约束。非法值会抛出 `INVALID_RUNTIME_CONFIG`，服务不会启动。
 
 `SUMMON_COM_SECONDS` 和 `DAILY_RESET_HOUR` 也属于同一份启动配置。后台 `/api/server/status` 使用启动时的 `RuntimeConfig` 与当前 `ContentSnapshot`，不会在每次请求时重新读取环境变量；客户端 `/load` 的抽卡演出和周期边界因此在同一进程内保持稳定。
+
+`GAME_CALENDAR_UTC_OFFSET_MINUTES` 在启动时解析一次并冻结为进程级游戏日历偏移；运行中修改 `.env` 不会生效，修改后必须重启服务。游戏日历是客户端和主数据版本的属性：该值必须与客户端实际使用的日历一致，而不是按服主所在地选择；启动时它还必须与当前 Content Release 声明的偏移一致，否则服务失败关闭。管理后台总览只读展示配置值与 Release 值，不提供在线修改。详见[游戏业务日历策略](../architecture/game-calendar-policy.md)。
 
 联机地址只按 `SESSION_PUBLIC_HOST`、`CN_PUBLIC_HOST`、`CN_LISTEN_HOST` 的顺序选择，完全不读取 HTTP 请求。前两项都未设置且 `CN_LISTEN_HOST` 是 `0.0.0.0` 或 `::` 时，服务端使用操作系统网络接口枚举中的首个非回环 IPv4，找不到时回退到 `127.0.0.1`。多网卡、VPN 或虚拟网卡环境中自动结果可能不是客户端可达地址，应显式设置 `SESSION_PUBLIC_HOST`。
 

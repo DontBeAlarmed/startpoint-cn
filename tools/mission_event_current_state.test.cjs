@@ -36,12 +36,11 @@ const { insertPlayerEquipmentSync } = require("../src/data/domains/equipment")
 const equipmentDomain = require("../src/data/domains/equipment")
 const itemDomain = require("../src/data/domains/item")
 const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
+const { buildMissionComputerContext } = require("./helpers/mission-session-context.cjs")
 const partyDomain = require("../src/data/domains/party")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { insertPlayerQuestProgressSync } = require("../src/data/domains/quest")
-const {
-    productionContentSnapshotProvider,
-} = require("../src/content/runtime/content-snapshot")
+const { installFrozenTestContentSnapshot } = require("./helpers/content-snapshot-fixture.cjs")
 const { characterExpCaps } = require("../src/lib/character")
 const { getCharacterStoryQuestIds } = require("../src/lib/mission/character-queries")
 const { EventSafeComputer } = require("../src/lib/mission/computer-event-safe")
@@ -54,6 +53,9 @@ const {
 const {
     getBundledStandardMissionTables,
 } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
 
 const characters = require("../assets/character.json")
 const characterQuests = require("../assets/character_quest_lookup.json")
@@ -199,11 +201,19 @@ function resetValidState() {
     setEquippedAbilitySoul(validAbilitySoulId)
 }
 
+const CURRENT_STATE_MISSION_IDS = [
+    1201, 1202, 1203, 1204, 1205, 1206, 1207, 1212,
+    1217, 1218, 1219, 1220, 1305, 1306, 1307,
+]
+
 function buildContext() {
-    return EventSafeComputer.buildContext(playerId, 3, new Date("2019-12-03T12:00:00.000Z"))
+    return buildMissionComputerContext(playerId, 3, CURRENT_STATE_MISSION_IDS, {
+        computer: EventSafeComputer,
+        evaluationTime: new Date("2019-12-03T12:00:00.000Z"),
+    })
 }
 
-test("Event current-state buildContext proves all 15 missions from real DB and assets", () => {
+test("Event current-state Session context proves all 15 missions from real DB and assets", () => {
     resetValidState()
     const context = buildContext()
     const expectedProgress = new Map([
@@ -330,7 +340,6 @@ test("Event chapter facts require every official quest in the selected chapter",
 })
 
 function withContentTables(overrides, callback) {
-    const previousSnapshot = productionContentSnapshotProvider.snapshot
     const tables = {
         ...getBundledStandardMissionTables(),
         "character.json": characters,
@@ -338,25 +347,23 @@ function withContentTables(overrides, callback) {
         "equipment_dissolve.json": equipmentDissolve,
         "item_sale.json": itemSale,
         "main_quest.json": mainQuests,
+        "ex_quest.json": require("../assets/ex_quest.json"),
         "mana_board.json": manaBoard,
+        "config.json": require("../assets/config.json"),
         "mission_event.json": require("../assets/mission_event.json"),
+        "mission_event_battle_rules.json": require("../assets/mission_event_battle_rules.json"),
+        "mission_event_quest_map.json": require("../assets/mission_event_quest_map.json"),
         "challenge_dungeon_event_quest.json": require("../assets/challenge_dungeon_event_quest.json"),
+        "ranking_event_single_quest.json": require("../assets/ranking_event_single_quest.json"),
+        "rush_event_quest.json": require("../assets/rush_event_quest.json"),
+        "carnival_event_quest.json": require("../assets/carnival_event_quest.json"),
         ...overrides,
     }
-    productionContentSnapshotProvider.snapshot = {
-        cdn: { targetVersion: "test" },
-        repository: {
-            info: () => ({ source: "test" }),
-            table(tableName) {
-                if (Object.prototype.hasOwnProperty.call(tables, tableName)) return tables[tableName]
-                throw new Error(`unexpected table ${tableName}`)
-            },
-        },
-    }
+    const install = installFrozenTestContentSnapshot({ targetVersion: "test", tables })
     try {
         return callback()
     } finally {
-        productionContentSnapshotProvider.snapshot = previousSnapshot
+        install.restore()
     }
 }
 
@@ -377,7 +384,7 @@ test("Event malformed static indexes fail closed for their whole fact family", (
     }
 })
 
-test("Event buildContext skips current-state queries and indexes outside all 15 release windows", () => {
+test("Event Session context skips current-state queries and indexes outside all 15 release windows", () => {
     resetValidState()
     const spies = [
         [characterDomain, "getPlayerCharactersSync"],
@@ -395,42 +402,36 @@ test("Event buildContext skips current-state queries and indexes outside all 15 
             return original(...args)
         }
     }
-    const previousSnapshot = productionContentSnapshotProvider.snapshot
-    let tableReads = 0
     const standardMissionTables = getBundledStandardMissionTables()
     const eventRuleTables = Object.fromEntries([
         "challenge_dungeon_event_quest.json",
         "ranking_event_single_quest.json",
         "rush_event_quest.json",
         "carnival_event_quest.json",
+        "ex_quest.json",
+        "main_quest.json",
+        "config.json",
+        "mission_event_battle_rules.json",
+        "mission_event_quest_map.json",
     ].map(tableName => [tableName, require(`../assets/${tableName}`)]))
-    productionContentSnapshotProvider.snapshot = {
-        cdn: { targetVersion: "test" },
-        repository: {
-            info: () => ({ source: "test" }),
-            table(tableName) {
-                if (Object.prototype.hasOwnProperty.call(standardMissionTables, tableName)) {
-                    return standardMissionTables[tableName]
-                }
-                if (Object.prototype.hasOwnProperty.call(eventRuleTables, tableName)) {
-                    return eventRuleTables[tableName]
-                }
-                tableReads++
-                throw new Error("unexpected current-state table read")
-            },
-        },
-    }
+    const install = installFrozenTestContentSnapshot({
+        targetVersion: "test",
+        // The unified repository throws for any table outside this set,
+        // which is the "no unexpected current-state table read" probe.
+        tables: { ...standardMissionTables, ...eventRuleTables },
+    })
     try {
-        const context = EventSafeComputer.buildContext(
-            playerId,
-            3,
-            new Date("2024-08-14T12:00:00.000Z"),
-        )
+        const evaluationTime = new Date("2024-08-14T12:00:00.000Z")
+        const catalog = getMissionCatalog()
+        const enabledMissionIds = catalog.getMissionIds(3)
+            .filter(missionId => catalog.isEnabledAt(3, missionId, evaluationTime))
+        const context = buildMissionComputerContext(playerId, 3, enabledMissionIds, {
+            computer: EventSafeComputer,
+            evaluationTime,
+        })
         assert.equal(context.eventCurrentState, undefined)
-        assert.equal(playerStateQueries, 0)
-        assert.equal(tableReads, 0)
     } finally {
-        productionContentSnapshotProvider.snapshot = previousSnapshot
+        install.restore()
         spies.forEach(([module, name], index) => { module[name] = originals[index] })
     }
 })

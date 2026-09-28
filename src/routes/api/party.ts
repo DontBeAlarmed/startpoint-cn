@@ -20,6 +20,8 @@ import { validatePartyLoadouts } from "../../lib/party-loadout-validation";
 import { settleAbilitySoulEquipFactsSync } from "../../lib/mission/operation-fact-settlement";
 import { settleMissionCategories, type MissionSettlementResult } from "../../lib/mission/settlement";
 import { mergeMissionSettlementResponse } from "../../lib/mission/response";
+import { publishActiveMissionOwnerStateWithinTransaction } from "../../lib/mission/active-publication-owner";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
 
 interface PartyInfoListItem {
     party_edited: boolean
@@ -492,11 +494,6 @@ const routes = async (fastify: FastifyInstance) => {
 
         // update each slot
         const characterOwnedMap: Record<number, boolean> = {}
-        const editCategories: number[] = []
-        for (const updateInfo of body.party_info_list) {
-            editCategories.push(updateInfo.party_category)
-        }
-        console.log(`[PARTY] edit: viewer=${viewerId} parties=${body.party_info_list.length} categories=${JSON.stringify(editCategories)} mainPartyId=${body.main_party_id}`)
 
         const mapOwnedCharacters = (characterId: number | null): number | null => {
             let isOwned = characterId === null ? false : characterOwnedMap[characterId]
@@ -539,7 +536,6 @@ const routes = async (fastify: FastifyInstance) => {
 
         const mappedParties = body.party_info_list.map(updateInfo => {
             const parsed = parseGlobalPartyId(updateInfo.party_id)!
-            console.log(`[PARTY] edit: player=${playerId} id=${updateInfo.party_id} -> group=${parsed.groupId} slot=${parsed.slot} name="${updateInfo.party_name}" chars=${updateInfo.character_ids?.filter(Boolean).length || 0}`)
             return {
                 parsed,
                 party: {
@@ -616,16 +612,24 @@ const routes = async (fastify: FastifyInstance) => {
                     }], evaluationTime))
                 }
             }
-            return settlements
+            const activeMission = publishActiveMissionOwnerStateWithinTransaction({
+                playerId,
+                now: evaluationTime,
+                source: "party/edit",
+            })
+            return { settlements, activeMissionList: activeMission.activeMissionList }
         })()
 
         reply.header("content-type", "application/x-msgpack")
         const responseData: Record<string, unknown> = {
-            "mail_arrived": getMailArrivedSync(playerId)
+            ...mergeCommonResponseFragments([{
+                "mail_arrived": getMailArrivedSync(playerId)
+            }]),
         }
-        for (const settlement of missionSettlements) {
+        for (const settlement of missionSettlements.settlements) {
             mergeMissionSettlementResponse(responseData, settlement, viewerId)
         }
+        responseData.active_mission_list = missionSettlements.activeMissionList
         return reply.status(200).send({
             "data_headers": generateDataHeaders({
                 viewer_id: viewerId

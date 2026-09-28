@@ -7,34 +7,29 @@ function routeSource(relativePath) {
     return fs.readFileSync(path.join(__dirname, "..", relativePath), "utf8")
 }
 
-for (const [name, settlementPath, responsePath] of [
-    ["单人", "src/lib/quest/finish/single-settlement-writes.ts", "src/lib/quest/finish/single-response-projector.ts"],
-    ["联机", "src/multi/settlement/orchestrator.ts", "src/multi/settlement/response.ts"],
+const sharedValues = routeSource("src/lib/quest/finish/battle-settlement-values.ts")
+for (const [name, settlementPath, valueAdapterPath, responsePath] of [
+    ["单人", "src/lib/quest/finish/single-settlement-writes.ts", "src/lib/quest/finish/single-settlement-value-plan.ts", "src/lib/quest/finish/single-response-projector.ts"],
+    ["联机", "src/multi/settlement/orchestrator.ts", "src/multi/settlement/value-plan.ts", "src/multi/settlement/response.ts"],
 ]) {
     test(`${name}结算复用同一服务器时间并接入奖励活动倍率`, () => {
         const source = routeSource(settlementPath)
+        const valueAdapter = routeSource(valueAdapterPath)
         const responseSource = routeSource(responsePath)
-        assert.match(source, /const settlementTime = new Date\(getServerTime\(\) \* 1000\)/)
+        assert.match(valueAdapter, /const settlementTime = new Date\(getServerTime\(\) \* 1000\)/)
         assert.match(
-            source,
-            /getRewardCampaignRates\(\s*questCategory,\s*questId,\s*settlementTime,?\s*\)/,
+            valueAdapter,
+            /getRewardCampaignRates\([\s\S]*?settlementTime,?\s*\)/,
         )
-        assert.match(
-            source,
-            /calculateFixedQuestMana\(\s*questData\.manaReward,\s*rewardCampaignRates,\s*useBoostPoint,?\s*\)/,
-        )
-        assert.match(
-            source,
-            /calculateFixedQuestPoolExp\(\s*questData\.poolExpReward,\s*rewardCampaignRates,\s*useBoostPoint,?\s*\)/,
-        )
-        assert.match(
-            source,
-            /calculateCharacterBattleExp\([\s\S]*?,\s*rewardCampaignRates,?\s*\)/,
-        )
+        assert.match(valueAdapter, /createBattleSettlementValuePlan\s*\(/)
+        assert.match(sharedValues, /calculateFixedQuestMana\s*\(/)
+        assert.match(sharedValues, /calculateFixedQuestPoolExp\s*\(/)
+        assert.match(sharedValues, /calculateCharacterBattleExp\s*\(/)
+        assert.match(source, /\{\s*settlementTime,\s*valuePlan\s*\}/)
         assert.match(source, /rewardCampaignRates[,\n]/)
         assert.match(source, /rewardDate:\s*settlementTime/)
         assert.match(source, /recordMissionBattleFacts\(finishCtx, settlementTime\)/)
-        assert.match(source, /expPool:\s*[^,\n]+\+\s*fixedPoolExpReward/)
+        assert.match(source, /\.\.\.playerValues/)
         assert.match(responseSource, /"reward_pool_exp":\s*fixedPoolExpReward/)
     })
 }

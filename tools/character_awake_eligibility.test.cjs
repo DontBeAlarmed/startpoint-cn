@@ -51,8 +51,10 @@ const {
 } = require("../src/data/domains/character_awake")
 const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 const { insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
-const characterAssets = require("../src/lib/assets")
-const { getCharacterDataSync, getCharacterManaNodesSync } = characterAssets
+const characterContent = require("../src/lib/character-content")
+const characterGrowthContent = require("../src/lib/character-growth-content")
+const getCharacterDataSync = id => characterContent.getCharacterFacts().get(id)
+const getCharacterManaNodesSync = (id, level) => characterGrowthContent.getCharacterGrowthContent().getManaBoardNodes(id, level)
 const { characterExpCaps } = require("../src/lib/character")
 const {
     createCharacterAwakeEligibilityResolver,
@@ -125,11 +127,15 @@ async function testEligibilityAndCleanup() {
     const emptyBoard = createPlayer("awake-empty-board")
     setBaseCap(emptyBoard.playerId)
     assert.equal(upsertPlayerCharacterAwakeUnlockSync(emptyBoard.playerId, characterId, 1, 1), true)
-    const originalGetCharacterManaNodesSync = characterAssets.getCharacterManaNodesSync
-    characterAssets.getCharacterManaNodesSync = (candidateCharacterId, boardIndex) =>
-        Number(candidateCharacterId) === characterId && Number(boardIndex) === 1
-            ? {}
-            : originalGetCharacterManaNodesSync(candidateCharacterId, boardIndex)
+    // Simulate board-one content having zero nodes via a snapshot override.
+    const manaNodeTable = structuredClone(require("../assets/mana_node.json"))
+    manaNodeTable[String(characterId)] = {
+        ...manaNodeTable[String(characterId)],
+        "1": {},
+    }
+    const restoreEmptyBoard = installBundledGameplaySnapshot({
+        tableOverrides: { "mana_node.json": manaNodeTable },
+    })
     try {
         assert.equal(isCharacterAwakeBaseReady(emptyBoard.playerId, characterId), false)
         assert.equal(
@@ -146,17 +152,23 @@ async function testEligibilityAndCleanup() {
             "empty board-one master data must not delete an existing unlock",
         )
     } finally {
-        characterAssets.getCharacterManaNodesSync = originalGetCharacterManaNodesSync
+        restoreEmptyBoard()
     }
 
     const missingAsset = createPlayer("awake-missing-asset")
     learnBoardOne(missingAsset.playerId)
     assert.equal(upsertPlayerCharacterAwakeUnlockSync(missingAsset.playerId, characterId, 1, 1), true)
-    const originalGetCharacterDataSync = characterAssets.getCharacterDataSync
-    characterAssets.getCharacterDataSync = candidateCharacterId =>
-        Number(candidateCharacterId) === characterId
-            ? null
-            : originalGetCharacterDataSync(candidateCharacterId)
+    // Simulate missing character master data via a snapshot override.
+    const characterTable = structuredClone(require("../assets/character.json"))
+    const characterContentTable = structuredClone(require("../assets/cdndata/character.json"))
+    delete characterTable[String(characterId)]
+    delete characterContentTable[String(characterId)]
+    const restoreMissingCharacter = installBundledGameplaySnapshot({
+        tableOverrides: {
+            "character.json": characterTable,
+            "cdndata/character.json": characterContentTable,
+        },
+    })
     try {
         assert.equal(
             isCharacterAwakeNewUnlockEligible(
@@ -172,7 +184,7 @@ async function testEligibilityAndCleanup() {
             "missing character master data must not delete an existing unlock",
         )
     } finally {
-        characterAssets.getCharacterDataSync = originalGetCharacterDataSync
+        restoreMissingCharacter()
     }
 
     const lowLevel = createPlayer("awake-low-level")
@@ -317,8 +329,8 @@ function testEligibilityResolverCachesBatchState() {
     learnBoardOne(playerId)
 
     const originalPrepare = db.prepare.bind(db)
-    const originalGetCharacterDataSync = characterAssets.getCharacterDataSync
-    const originalGetCharacterManaNodesSync = characterAssets.getCharacterManaNodesSync
+    const originalGetCharacterFacts = characterContent.getCharacterFacts
+    const originalGetCharacterGrowthContent = characterGrowthContent.getCharacterGrowthContent
     const counts = {
         characterBatch: 0,
         manaNodeBatch: 0,
@@ -341,13 +353,25 @@ function testEligibilityResolverCachesBatchState() {
         }
         return originalPrepare(sql)
     }
-    characterAssets.getCharacterDataSync = candidateCharacterId => {
-        if (Number(candidateCharacterId) === characterId) counts.characterAsset++
-        return originalGetCharacterDataSync(candidateCharacterId)
+    characterContent.getCharacterFacts = (...args) => {
+        const facts = originalGetCharacterFacts(...args)
+        return {
+            ...facts,
+            get: candidateCharacterId => {
+                if (Number(candidateCharacterId) === characterId) counts.characterAsset++
+                return facts.get(candidateCharacterId)
+            },
+        }
     }
-    characterAssets.getCharacterManaNodesSync = (candidateCharacterId, boardIndex) => {
-        if (Number(candidateCharacterId) === characterId && Number(boardIndex) === 1) counts.boardAsset++
-        return originalGetCharacterManaNodesSync(candidateCharacterId, boardIndex)
+    characterGrowthContent.getCharacterGrowthContent = (...args) => {
+        const content = originalGetCharacterGrowthContent(...args)
+        return {
+            ...content,
+            getManaBoardNodes: (candidateCharacterId, boardIndex) => {
+                if (Number(candidateCharacterId) === characterId && Number(boardIndex) === 1) counts.boardAsset++
+                return content.getManaBoardNodes(candidateCharacterId, boardIndex)
+            },
+        }
     }
 
     try {
@@ -366,8 +390,8 @@ function testEligibilityResolverCachesBatchState() {
         })
     } finally {
         db.prepare = originalPrepare
-        characterAssets.getCharacterDataSync = originalGetCharacterDataSync
-        characterAssets.getCharacterManaNodesSync = originalGetCharacterManaNodesSync
+        characterContent.getCharacterFacts = originalGetCharacterFacts
+        characterGrowthContent.getCharacterGrowthContent = originalGetCharacterGrowthContent
     }
 }
 

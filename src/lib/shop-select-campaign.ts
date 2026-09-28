@@ -1,9 +1,5 @@
-import { parseShopCnTimestamp } from "./shop/period"
-import type {
-    ShopItem,
-    ShopSelectItemCampaign,
-    ShopSelectItemCampaigns,
-} from "./types/shop"
+import type { ShopCampaignDescriptor, ShopCatalog } from "./shop"
+import type { ShopItem } from "./types/shop"
 
 export const SHOP_CAMPAIGN_PERIOD_ERROR_CODE = 1652
 
@@ -14,24 +10,22 @@ export class ShopCampaignPeriodError extends Error {
 }
 
 export function requireAvailableShopCampaign(
-    campaigns: Readonly<ShopSelectItemCampaigns>,
+    catalog: Pick<ShopCatalog, "campaignsByKey">,
     shopType: number,
     campaignId: number,
     lineupId: number | null,
     nowMs: number,
-): Readonly<ShopSelectItemCampaign> {
+): Readonly<ShopCampaignDescriptor> {
     if ((shopType !== 4 && shopType !== 7)
         || !Number.isSafeInteger(campaignId) || campaignId <= 0
         || !Number.isFinite(nowMs)) {
         throw new ShopCampaignValidationError("Invalid shop campaign request.")
     }
-    const campaign = campaigns[String(shopType)]?.[String(campaignId)]
+    const campaign = catalog.campaignsByKey[`${shopType}:${campaignId}`]
     if (campaign === undefined) {
         throw new ShopCampaignValidationError("Shop campaign does not exist.")
     }
-    const availableFrom = parseShopCnTimestamp(campaign.availableFrom)
-    const availableUntil = parseShopCnTimestamp(campaign.availableUntil)
-    if (nowMs < availableFrom || nowMs > availableUntil) {
+    if (nowMs < campaign.availableFromMs || nowMs > campaign.availableUntilMs) {
         throw new ShopCampaignPeriodError("Shop campaign is outside its available period.")
     }
     if (lineupId !== null && (

@@ -5,22 +5,28 @@ import { getPlayerSingleQuestProgressSync, insertPlayerQuestProgressSync, update
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { getQuestFromCategorySync } from "../../lib/assets";
+import { getQuestFromCategorySync } from "../../lib/quest-content";
 import { givePlayerCharacterSync } from "../../lib/character";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { grantStoryRewardWithinTransactionSync } from "../../lib/story-reward-grant"
+import { reconcileActiveMissionFacts } from "../../lib/mission";
 import {
-    mergeMissionSettlementResponse,
-    reconcileActiveMissionFacts,
-} from "../../lib/mission";
+    composeMissionSettlementResponse,
+    projectMissionSettlementFragment,
+} from "../../lib/mission/response-fragment";
+import {
+    projectCharacterPatch,
+    projectEquipmentEntity,
+} from "../../lib/common-response/entities";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
+import type { CommonResponseFragment } from "../../lib/common-response/model";
 import { settleCharacterStoryFactMissions } from "../../lib/mission/story-fact-settlement";
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { getQuestJoinCharacterIds } from "../../lib/story-join-character";
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 import { QuestCategory } from "../../lib/types";
 import { recordCompletedMainChapterMilestoneSync } from "../../lib/player-history-milestones";
-import { projectItemOverflowCommonResponse } from "../../lib/item-overflow";
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow/common-response";
 
 interface FinishBody {
     party_id: number,
@@ -38,12 +44,20 @@ interface FinishWithSkipBody {
     api_count: number
 }
 
+function isStoryFinishCategory(category: number): boolean {
+    return category === QuestCategory.MAIN || category === QuestCategory.CHARACTER
+}
+
 function processStoryQuestFinish(
     playerId: number,
     viewerId: number,
     questSection: number,
     questId: number,
 ) {
+    if (!isStoryFinishCategory(questSection)) {
+        console.log(`[STORY] category is not supported by story finish: category=${questSection}`)
+        return null
+    }
     const questData = getQuestFromCategorySync(questSection, questId)
     if (questData === null) {
         console.log(`[STORY] quest not found: category=${questSection} questId=${questId}`)
@@ -109,7 +123,6 @@ function processStoryQuestFinish(
         ]
         const activeMissionList = reconcileActiveMissionFacts({
             playerId,
-            repository: getContentSnapshot().repository,
             now: evaluationTime.getTime(),
         })
         const characterList = publishCharacterGrowthOwnerStateBestEffort(
@@ -127,28 +140,39 @@ function processStoryQuestFinish(
             "story/finish",
             evaluationTime,
         ).characterList
-        const responseData: Record<string, unknown> = {
+        const overMax = projectItemOverflowCommonResponse(
+            rewardResult?.itemOverflowDispositions ?? [],
+        )
+        const fragment: CommonResponseFragment = {
             user_info: {
                 free_vmoney: playerAfter.freeVmoney,
                 free_mana: playerAfter.freeMana,
                 exp_pool: playerAfter.expPool,
             },
-            character_list: characterList,
-            joined_character_id_list: rewardResult?.joined_character_id_list ?? [],
-            equipment_list: rewardResult?.equipment_list ?? [],
+            character_list: characterList.map(
+                character => projectCharacterPatch(character),
+            ),
+            equipment_list: (rewardResult?.equipment_list ?? []).map(
+                equipment => projectEquipmentEntity(equipment),
+            ),
             item_list: rewardResult?.items ?? {},
+            mail_arrived: getMailArrivedSync(playerId),
+            ...(overMax.length > 0 ? { over_max: overMax } : {}),
+        }
+        const responseData: Record<string, unknown> = {
+            ...mergeCommonResponseFragments([fragment]),
+            joined_character_id_list: rewardResult?.joined_character_id_list ?? [],
             story_join_character_id_list: storyJoinCharacterIds,
             user_notice_list: [],
             presigned_quest_category: [],
             active_mission_list: activeMissionList,
-            mail_arrived: getMailArrivedSync(playerId),
         }
-        const overMax = projectItemOverflowCommonResponse(
-            rewardResult?.itemOverflowDispositions ?? [],
-        )
-        if (overMax.length > 0) responseData.over_max = overMax
         if (missionSettlement) {
-            mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)
+            composeMissionSettlementResponse(
+                responseData,
+                projectMissionSettlementFragment(missionSettlement),
+                viewerId,
+            )
         }
         return responseData
     })()

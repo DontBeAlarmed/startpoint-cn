@@ -5,15 +5,22 @@ const test = require("node:test")
 
 require("ts-node/register/transpile-only")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
+
 const {
     productionContentSnapshotProvider,
 } = require("../src/content/runtime/content-snapshot")
 const mission = require("../src/lib/mission")
 const {
     getMissionCatalog,
+    isMissionMasterDefinitionEnabledAt,
 } = require("../src/lib/mission/mission-catalog")
-const masterData = require("../src/lib/mission/master-data")
-const rewards = require("../src/lib/mission/rewards")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
+const {
+    bundledMissionContentRepository,
+} = require("./helpers/mission-catalog-bundled.cjs")
 
 const CATEGORY_LAYOUTS = Object.freeze({
     1: { definition: "mission_regular.json", reward: "mission_regular_reward.json", pattern: 0, start: 25, end: 26, progress: 1, rewardStart: 5 },
@@ -204,6 +211,36 @@ test("uses CN master time boundaries and event scope with invalid dates closed",
     assert.equal(catalog.isEnabledAt(4, 1, new Date("2026-01-01T04:00:00.000Z"), 8), false)
     assert.equal(catalog.isEnabledAt(4, 1, new Date("invalid"), 7), false)
     assert.equal(catalog.isEnabledAt(4, 999, new Date("2026-01-01T04:00:00.000Z"), 7), false)
+})
+
+test("mission master start and end follow an explicit +540 calendar", () => {
+    const tables = emptyTables()
+    addMission(tables, 4, "1", { 1: [rewardRow(4, 101, 1)] }, {
+        eventId: 7,
+        start: "2026-01-01 12:00:00",
+        end: "2026-01-02 11:59:59",
+    })
+    const definition = getMissionCatalog(repository(tables)).getDefinition(4, 1)
+    const calendar540 = createGameCalendarPolicy(540)
+    // +540 moves both window edges one hour earlier in absolute time.
+    assert.equal(
+        isMissionMasterDefinitionEnabledAt(definition, new Date("2026-01-01T03:00:00.000Z"), 7, calendar540),
+        true,
+        "+540 开始边界必须包含等号",
+    )
+    assert.equal(
+        isMissionMasterDefinitionEnabledAt(definition, new Date("2026-01-01T02:59:59.999Z"), 7, calendar540),
+        false,
+    )
+    assert.equal(
+        isMissionMasterDefinitionEnabledAt(definition, new Date("2026-01-02T02:59:59.000Z"), 7, calendar540),
+        true,
+        "+540 结束边界必须包含等号",
+    )
+    assert.equal(
+        isMissionMasterDefinitionEnabledAt(definition, new Date("2026-01-02T03:00:00.000Z"), 7, calendar540),
+        false,
+    )
 })
 
 test("keeps the historical cumulative login mission open after its official start", () => {
@@ -513,11 +550,11 @@ test("deep-freezes every public cached value", () => {
     assert.equal(catalog.getDefinition(9, 11).row[1], "123")
 })
 
-test("switches from the bundled pre-init catalog to runtime repository identity", () => {
+test("pre-init catalog access fails closed and follows the installed runtime repository", () => {
     const previousSnapshot = productionContentSnapshotProvider.snapshot
     try {
         productionContentSnapshotProvider.snapshot = null
-        const bundledCatalog = getMissionCatalog()
+        assert.throws(() => getMissionCatalog(), /CONTENT_SNAPSHOT_NOT_INITIALIZED/)
         const tables = emptyTables()
         addMission(tables, 1, "999", { 1: [rewardRow(1, 999001, 1)] })
         const runtimeRepository = repository(tables, "runtime")
@@ -528,7 +565,6 @@ test("switches from the bundled pre-init catalog to runtime repository identity"
         }
 
         const runtimeCatalog = getMissionCatalog()
-        assert.notEqual(runtimeCatalog, bundledCatalog)
         assert.equal(runtimeCatalog, getMissionCatalog(runtimeRepository))
         assert.deepEqual(runtimeCatalog.getMissionIds(1), [999])
     } finally {
@@ -537,29 +573,15 @@ test("switches from the bundled pre-init catalog to runtime repository identity"
 })
 
 test("bundled catalog covers categories 1-10 with authoritative counts and samples", () => {
-    const previousSnapshot = productionContentSnapshotProvider.snapshot
-    try {
-        productionContentSnapshotProvider.snapshot = null
-        const catalog = getMissionCatalog()
+    const catalog = getMissionCatalog(bundledMissionContentRepository)
+    {
         const expectedCounts = [120, 656, 2512, 997, 1288, 76, 76, 115, 144, 2]
         assert.deepEqual(
             expectedCounts.map((_, index) => catalog.getMissionIds(index + 1).length),
             expectedCounts,
         )
-        assert.equal(catalog.getDefinition(1, 107).pattern, masterData.getMissionMasterDefinition(1, 107).pattern)
-        assert.equal(catalog.getDefinition(9, 11).row[1], masterData.getMissionMasterDefinition(9, 11).row[1])
-        assert.deepEqual(
-            catalog.getRewardStage(1, 107, 1).rewards,
-            rewards.getRegularMissionRewards(107, 1),
-        )
-        assert.deepEqual(
-            catalog.getRewardStage(9, 11, 1).rewards,
-            rewards.getAwakeMissionRewards(11, 1),
-        )
         for (let category = 1; category <= 10; category++) {
             assert.ok(catalog.getDefinitions(category).length > 0, `category ${category}`)
         }
-    } finally {
-        productionContentSnapshotProvider.snapshot = previousSnapshot
     }
 })

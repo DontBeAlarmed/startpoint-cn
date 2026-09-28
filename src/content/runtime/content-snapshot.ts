@@ -165,12 +165,20 @@ export interface ContentSnapshotRuntimeConfiguration {
     readonly assetMode: AssetMode
     readonly localCdn: boolean
     readonly contentEnvironment: Readonly<ContentPathEnvironment>
+    /** Present only when the caller constrains the expected calendar offset. */
+    readonly expectedGameCalendarUtcOffsetMinutes?: number
 }
 
 export interface InitializeContentSnapshotOptions {
     readonly assetMode?: AssetMode
     readonly localCdn?: boolean
     readonly contentEnvironment?: ContentPathEnvironment
+    /**
+     * Runtime game calendar offset the active content must have been built
+     * under. A mismatch fails initialization before the production snapshot is
+     * published.
+     */
+    readonly expectedGameCalendarUtcOffsetMinutes?: number
 }
 
 export type ContentSnapshotConfigurationErrorCode =
@@ -210,10 +218,18 @@ function normalizeRuntimeConfiguration(
             "content snapshot runtime configuration is invalid",
         )
     }
-    return Object.freeze({
+    const configuration: ContentSnapshotRuntimeConfiguration = {
         assetMode,
         localCdn,
         contentEnvironment: snapshotContentPathEnvironment(options.contentEnvironment ?? process.env),
+    }
+    // The expected calendar offset participates in the configuration lock only
+    // when provided; absent means "do not constrain", which keeps legacy
+    // configuration shapes canonical.
+    if (options.expectedGameCalendarUtcOffsetMinutes === undefined) return Object.freeze(configuration)
+    return Object.freeze({
+        ...configuration,
+        expectedGameCalendarUtcOffsetMinutes: options.expectedGameCalendarUtcOffsetMinutes,
     })
 }
 
@@ -236,6 +252,8 @@ function lockRuntimeConfiguration(
     }
     if (current.assetMode !== requested.assetMode
         || current.localCdn !== requested.localCdn
+        || current.expectedGameCalendarUtcOffsetMinutes
+            !== requested.expectedGameCalendarUtcOffsetMinutes
         || !sameContentEnvironment(current.contentEnvironment, requested.contentEnvironment)) {
         throw new ContentSnapshotConfigurationError(
             "CONTENT_SNAPSHOT_CONFIGURATION_CONFLICT",
@@ -332,6 +350,8 @@ export interface ProjectContentSnapshotProviderOptions {
     readonly projectRoot: string
     readonly env?: ContentPathEnvironment
     readonly localCdn?: boolean
+    /** Runtime offset the active release must have been built under. */
+    readonly expectedGameCalendarUtcOffsetMinutes?: number
     readonly dependencies?: ProjectContentSnapshotProviderDependencies
 }
 
@@ -378,6 +398,7 @@ export function createProjectContentSnapshotProvider({
     projectRoot,
     env = process.env,
     localCdn = true,
+    expectedGameCalendarUtcOffsetMinutes,
     dependencies = {},
 }: ProjectContentSnapshotProviderOptions): ContentSnapshotProvider {
     const resolvedProjectRoot = path.resolve(projectRoot)
@@ -409,7 +430,11 @@ export function createProjectContentSnapshotProvider({
             return loadSnapshotPair(
                 () => catalogLoader.loadFromSnapshot(release, paths),
                 () => ContentRepository.loadFromSnapshot(
-                    { projectRoot: resolvedProjectRoot, env },
+                    {
+                        projectRoot: resolvedProjectRoot,
+                        env,
+                        expectedGameCalendarUtcOffsetMinutes,
+                    },
                     release,
                     dependencies.repository,
                     paths,
@@ -442,6 +467,8 @@ export const productionContentSnapshotProvider = createConfiguredContentSnapshot
             projectRoot: resolveContentProjectRoot(__dirname),
             env: configuration.contentEnvironment,
             localCdn: configuration.localCdn,
+            expectedGameCalendarUtcOffsetMinutes:
+                configuration.expectedGameCalendarUtcOffsetMinutes,
         })
     ),
 })

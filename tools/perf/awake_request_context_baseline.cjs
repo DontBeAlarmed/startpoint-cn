@@ -39,7 +39,8 @@ function getRuntimeDependencies() {
     const awakeData = require("../../src/data/domains/character_awake")
     const mission = require("../../src/data/domains/mission")
     const player = require("../../src/data/domains/player")
-    const assets = require("../../src/lib/assets")
+    const characterContent = require("../../src/lib/character-content")
+    const characterGrowthContent = require("../../src/lib/character-growth-content")
     const characterLib = require("../../src/lib/character")
     const awakeMission = require("../../src/lib/mission")
     const { getDb } = require("../../src/data/db")
@@ -56,7 +57,8 @@ function getRuntimeDependencies() {
         ...awakeData,
         ...mission,
         ...player,
-        ...assets,
+        ...characterContent,
+        ...characterGrowthContent,
         ...characterLib,
         ...awakeMission,
         fixedTime: AWAKE_REQUEST_CONTEXT_FIXED_TIME,

@@ -1,4 +1,5 @@
 import type { FactKey } from "../facts/fact-key"
+import { getDailyCompletionDependencies } from "../daily-completion"
 import {
     getMissionCatalogCraftPointItemId,
     type MissionCatalog,
@@ -9,7 +10,6 @@ import { parsePositiveSafeIntegerMasterValue } from "../master-value"
 import { getAwakeRequirement } from "./provider-awake"
 import { getDegreeRequirement } from "./provider-degree"
 import { getEventRequirement } from "./provider-event"
-import { matchesCurrentMissionComputerDefinition } from "./computer-compatibility"
 import type { MissionFactRequirementDraft, MissionRef } from "./types"
 
 const REGULAR_PERSISTED_PATTERNS = new Set([
@@ -22,7 +22,7 @@ const REGULAR_PERSISTED_PATTERNS = new Set([
 ])
 
 const DAILY_BATTLE_PRODUCER_IDS = new Set([
-    10075, 800115, 800116, 800117, 800124, 800125, 800126, 800392,
+    2, 7, 12, 10075, 800115, 800116, 800117, 800124, 800125, 800126, 800392,
 ])
 
 const REGULAR_FACTS: Readonly<Record<string, readonly FactKey[]>> = Object.freeze({
@@ -32,7 +32,7 @@ const REGULAR_FACTS: Readonly<Record<string, readonly FactKey[]>> = Object.freez
     single_battle_play: [{ kind: "missionBattleCounters" }],
     use_power_flip: [{ kind: "player" }],
     use_skill: [{ kind: "missionBattleCounters" }],
-    character_level: [{ kind: "player" }],
+    character_level: [{ kind: "characters" }],
     user_rank: [{ kind: "player" }],
     clear_episode: [{ kind: "questProgress", sections: [3] }],
     total_login: [{ kind: "player" }],
@@ -63,14 +63,6 @@ const REGULAR_FACTS: Readonly<Record<string, readonly FactKey[]>> = Object.freez
     ],
 })
 
-function parsePositiveIntegerList(value: unknown): readonly number[] | null {
-    if (typeof value !== "string" || value === "" || value === "(None)") return null
-    const values = value.split(",").map(Number)
-    return values.length > 0 && values.every(value => Number.isSafeInteger(value) && value > 0)
-        ? values
-        : null
-}
-
 function getRegularRequirement(
     definition: MissionMasterDefinition,
     catalog: MissionCatalog,
@@ -88,13 +80,11 @@ function getRegularRequirement(
     if (facts) return { mode: "computed", facts }
     if (REGULAR_PERSISTED_PATTERNS.has(definition.pattern)) return { mode: "persisted" }
 
-    if (matchesCurrentMissionComputerDefinition(definition)) {
-        const questSection = getRegularQuestFactSection(definition)
-        if (questSection !== undefined) {
-            return {
-                mode: "computed",
-                facts: [{ kind: "questProgress", sections: [questSection] }],
-            }
+    const questSection = getRegularQuestFactSection(definition, catalog)
+    if (questSection !== undefined) {
+        return {
+            mode: "computed",
+            facts: [{ kind: "questProgress", sections: [questSection] }],
         }
     }
     return {
@@ -104,8 +94,7 @@ function getRegularRequirement(
 }
 
 function dailyDependencies(definition: MissionMasterDefinition): readonly MissionRef[] {
-    if (Number(definition.row[2]) !== 13) return []
-    return (parsePositiveIntegerList(definition.row[17]) ?? [])
+    return getDailyCompletionDependencies(definition)
         .map(missionId => ({ category: 2, missionId }))
 }
 

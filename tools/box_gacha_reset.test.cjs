@@ -191,24 +191,43 @@ assert.deepEqual(settings["28"]["5"], {
 assert.equal(settings["28"]["4"].resetKind, 0);
 
 require("ts-node/register/transpile-only");
-const { getBoxGachaSync } = require("../src/lib/assets.ts");
+const {
+    BoxGachaContentError,
+    buildBoxGachaContentCatalog,
+    getBoxGachaContent,
+} = require("../src/lib/box-gacha-content.ts");
+const boxDefinitions = JSON.parse(fs.readFileSync(
+    path.resolve(projectRoot, "assets/box_gacha.json"),
+    "utf8",
+));
+const boxRewards = JSON.parse(fs.readFileSync(
+    path.resolve(projectRoot, "assets/box_reward.json"),
+    "utf8",
+));
+function boxRepository(boxSettings) {
+    return {
+        info: () => ({ source: "test" }),
+        table(tableName) {
+            if (tableName === "box_gacha.json") return boxDefinitions;
+            if (tableName === "box_reward.json") return boxRewards;
+            if (tableName === "box_gacha_box_settings.json") return boxSettings;
+            throw new Error(`unexpected Box Gacha table ${tableName}`);
+        },
+    };
+}
+const boxCatalog = buildBoxGachaContentCatalog(boxRepository(settings));
 assert.deepEqual(
-    getBoxGachaSync(28)?.boxSettings,
+    getBoxGachaContent(boxCatalog, 28)?.boxSettings,
     settings["28"],
-    "asset loader must expose box settings for the selected gacha",
+    "typed Box Gacha catalog must expose settings for the selected gacha",
 );
 
-const settings28 = settings["28"];
-try {
-    delete settings["28"];
-    assert.equal(
-        getBoxGachaSync(28),
-        null,
-        "asset loader must return null when box settings are missing",
-    );
-} finally {
-    settings["28"] = settings28;
-}
+const incompleteSettings = structuredClone(settings);
+delete incompleteSettings["28"];
+assert.throws(
+    () => buildBoxGachaContentCatalog(boxRepository(incompleteSettings)),
+    BoxGachaContentError,
+);
 
 const missingFeatures = [];
 let resetModule;
@@ -241,7 +260,10 @@ const {
     BoxGachaResetUnavailableError,
     BoxGachaStateNotFoundError,
     resetBoxGachaSync,
+    validateBoxGachaPeriod,
 } = resetModule;
+
+const { createGameCalendarPolicy } = require("../src/time/game-calendar");
 
 const {
     parseBoxGachaResetRequest,
@@ -546,5 +568,36 @@ assert.match(
     /fastify\.post\("\/reset"[\s\S]*?parseBoxGachaResetRequest[\s\S]*?resolvePlayerIdSync[\s\S]*?nowMs: getServerTime\(\) \* 1000[\s\S]*?sendBoxGachaResultCode[\s\S]*?"all_box_info": getAllBoxList\(playerId, boxGachaId, boxGachaData\.boxes\)/,
     "reset route must validate input, resolve the active player, use global server time, return protocol result codes, and return complete all_box_info",
 );
+
+{
+    // Explicit +540 calendar: the inclusive reset window must open exactly at
+    // the +09:00 epoch of the master timestamps and close one hour earlier in
+    // absolute time than the +480 default window.
+    const calendar540 = createGameCalendarPolicy(540);
+    const windowSettings = {
+        ...settings["28"]["5"],
+        availableFrom: "2025-06-26 12:00:00",
+        availableUntil: "2025-06-26 14:00:00",
+    };
+    const start540 = Date.parse("2025-06-26T12:00:00+09:00");
+    const end540 = Date.parse("2025-06-26T14:00:00+09:00");
+    assert.throws(
+        () => validateBoxGachaPeriod(windowSettings, start540 - 1, calendar540),
+        BoxGachaInvalidPeriodError,
+        "+540 开放边界前一刻必须拒绝",
+    );
+    assert.doesNotThrow(() => validateBoxGachaPeriod(windowSettings, start540, calendar540));
+    assert.doesNotThrow(() => validateBoxGachaPeriod(windowSettings, end540, calendar540));
+    assert.throws(
+        () => validateBoxGachaPeriod(windowSettings, end540 + 1, calendar540),
+        BoxGachaInvalidPeriodError,
+        "+540 关闭边界后一刻必须拒绝",
+    );
+    assert.throws(
+        () => validateBoxGachaPeriod(windowSettings, start540),
+        BoxGachaInvalidPeriodError,
+        "+480 默认窗口不得接受 +540 的开放时刻",
+    );
+}
 
 console.log("box gacha reset asset, transaction, and route tests passed");

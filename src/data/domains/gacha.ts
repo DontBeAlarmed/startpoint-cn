@@ -15,7 +15,8 @@ function buildPlayerGachaInfo(
         gachaId: rawInfo.gacha_id,
         isDailyFirst: deserializeBoolean(rawInfo.is_daily_first),
         isAccountFirst: deserializeBoolean(rawInfo.is_account_first),
-        gachaExchangePoint: rawInfo.gacha_exchange_point
+        gachaExchangePoint: rawInfo.gacha_exchange_point,
+        crazyDrawCount: rawInfo.crazy_draw_count,
     }
 }
 
@@ -29,7 +30,7 @@ export function getPlayerGachaInfoListSync(
     playerId: number
 ): PlayerGachaInfo[] {
     const rawInfo = getDb().prepare(`
-    SELECT gacha_id, is_daily_first, is_account_first, gacha_exchange_point
+    SELECT gacha_id, is_daily_first, is_account_first, gacha_exchange_point, crazy_draw_count
     FROM players_gacha_info
     WHERE player_id = ?
     `).all(playerId) as RawPlayerGachaInfo[]
@@ -51,7 +52,7 @@ export function getPlayerGachaInfoSync(
     gachaId: number
 ): PlayerGachaInfo | null {
     const rawInfo = getDb().prepare(`
-    SELECT gacha_id, is_daily_first, is_account_first, gacha_exchange_point
+    SELECT gacha_id, is_daily_first, is_account_first, gacha_exchange_point, crazy_draw_count
     FROM players_gacha_info
     WHERE player_id = ? AND gacha_id = ?
     `).get(playerId, gachaId) as RawPlayerGachaInfo
@@ -70,13 +71,16 @@ export function insertPlayerGachaInfoSync(
     gachaInfo: PlayerGachaInfo
 ) {
     getDb().prepare(`
-    INSERT INTO players_gacha_info (gacha_id, is_daily_first, is_account_first, gacha_exchange_point, player_id)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO players_gacha_info (
+        gacha_id, is_daily_first, is_account_first, gacha_exchange_point,
+        crazy_draw_count, player_id
+    ) VALUES (?, ?, ?, ?, ?, ?)
     `).run(
         gachaInfo.gachaId,
         serializeBoolean(gachaInfo.isDailyFirst),
         serializeBoolean(gachaInfo.isAccountFirst),
         gachaInfo.gachaExchangePoint == undefined ? null : gachaInfo.gachaExchangePoint,
+        gachaInfo.crazyDrawCount == undefined ? null : gachaInfo.crazyDrawCount,
         playerId
     )
 }
@@ -113,7 +117,8 @@ export function updatePlayerGachaInfoSync(
     const fieldMap: Record<string, string> = {
         'isDailyFirst': 'is_daily_first',
         'isAccountFirst': 'is_account_first',
-        'gachaExchangePoint': 'gacha_exchange_point'
+        'gachaExchangePoint': 'gacha_exchange_point',
+        'crazyDrawCount': 'crazy_draw_count'
     }
 
     const sets: string[] = []

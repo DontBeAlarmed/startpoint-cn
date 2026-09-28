@@ -2,7 +2,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { getConfigSync } from "../../lib/assets";
+import { getStaminaPolicySync } from "../../lib/config-content"
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils";
 import { getRealNow } from "../../runtime/time/game-time";
 import { sellItemSync } from "../../lib/item-sell";
@@ -15,7 +15,10 @@ import {
     ItemUseValidationError,
     settleItemUseInCallerTransactionSync,
 } from "../../lib/item-use-settlement";
-import { projectItemOverflowCommonResponse } from "../../lib/item-overflow";
+import { projectCharacterPatch } from "../../lib/common-response/entities";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
+import type { CommonResponseFragment } from "../../lib/common-response/model";
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow/common-response";
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/use_item", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -39,7 +42,7 @@ const routes = async (fastify: FastifyInstance) => {
                 settleItemUseInCallerTransactionSync(
                     playerId,
                     body,
-                    getConfigSync().max_stamina_overflow,
+                    getStaminaPolicySync().maxOverflow,
                 )
             ))()
         } catch (error) {
@@ -60,25 +63,28 @@ const routes = async (fastify: FastifyInstance) => {
         const { plan, itemList: itemListMap } = settlement
         const recoveryTime = plan.stamina?.recoveryTime ?? getRealNow()
 
-        reply.header("content-type", "application/x-msgpack")
-        const responseData: Record<string, unknown> = {
-            "item_list": itemListMap,
-            "mail_arrived": getMailArrivedSync(playerId),
-        }
         const dispositions = settlement.itemOverflowDispositions ?? []
         const overMax = projectItemOverflowCommonResponse(dispositions)
-        if (overMax.length > 0) responseData.over_max = overMax
-        if (plan.stamina !== null) {
-            responseData.user_info = {
-                "stamina": plan.stamina.after,
-                "stamina_heal_time": realToVirtual(recoveryTime),
-                ...(dispositions.some(entry => entry.kind === "sold")
-                    ? { "free_mana": settlement.freeManaAfter }
+        const fragment: CommonResponseFragment = {
+            "item_list": itemListMap,
+            "mail_arrived": getMailArrivedSync(playerId),
+            ...(overMax.length > 0 ? { "over_max": overMax } : {}),
+            ...(plan.stamina !== null
+                ? {
+                    "user_info": {
+                        "stamina": plan.stamina.after,
+                        "stamina_heal_time": realToVirtual(recoveryTime),
+                        ...(dispositions.some(entry => entry.kind === "sold")
+                            ? { "free_mana": settlement.freeManaAfter }
+                            : {}),
+                    },
+                }
+                : dispositions.some(entry => entry.kind === "sold")
+                    ? { "user_info": { "free_mana": settlement.freeManaAfter } }
                     : {}),
-            }
-        } else if (dispositions.some(entry => entry.kind === "sold")) {
-            responseData.user_info = { "free_mana": settlement.freeManaAfter }
         }
+        reply.header("content-type", "application/x-msgpack")
+        const responseData = mergeCommonResponseFragments([fragment])
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": responseData,
@@ -117,19 +123,18 @@ const routes = async (fastify: FastifyInstance) => {
             invalidatedFactKeys: [{ kind: "player" }],
         }, "item/sell").characterList
 
-        console.log(`[ITEM_SELL] account=${accountId} player=${playerId}: item ${itemId} ×${sellNumber} sold, mana +${result.manaGained} (${result.freeMana - result.manaGained} -> ${result.freeMana})`)
-
-        const responseData: Record<string, unknown> = {
-            "item_list": { [itemId]: result.newCount },
-            "user_info": { "free_mana": result.freeMana },
-            "mail_arrived": getMailArrivedSync(playerId)
-        }
-        if (characterList.length > 0) responseData.character_list = characterList
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": responseData
+            "data": mergeCommonResponseFragments([{
+                "item_list": { [itemId]: result.newCount },
+                "user_info": { "free_mana": result.freeMana },
+                "mail_arrived": getMailArrivedSync(playerId),
+                ...(characterList.length > 0
+                    ? { "character_list": characterList.map(c => projectCharacterPatch(c)) }
+                    : {}),
+            }]),
         })
     })
 }

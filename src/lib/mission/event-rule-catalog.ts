@@ -1,5 +1,5 @@
-import eventQuestMap from "../../../assets/mission_event_quest_map.json"
 import { cloneAndFreeze, readonlyMap } from "./degree-immutable"
+import { getEventQuestMapping } from "./event-content"
 import {
     getEventCurrentStateRule,
     type EventCurrentStateRule,
@@ -56,17 +56,12 @@ function readTable(catalog: MissionCatalog, tableName: string): RawTable | null 
         tablesByCatalog.set(catalog, tables)
     }
     if (tables.has(tableName)) return tables.get(tableName) ?? null
-    try {
-        const table = getMissionCatalogContentTable<unknown>(catalog, tableName)
-        const parsed = table !== null && typeof table === "object" && !Array.isArray(table)
-            ? table as RawTable
-            : null
-        tables.set(tableName, parsed)
-        return parsed
-    } catch {
-        tables.set(tableName, null)
-        return null
-    }
+    const table = getMissionCatalogContentTable<unknown>(catalog, tableName)
+    const parsed = table !== null && typeof table === "object" && !Array.isArray(table)
+        ? table as RawTable
+        : null
+    tables.set(tableName, parsed)
+    return parsed
 }
 
 function parsePositiveIntegerList(value: unknown): readonly number[] | null {
@@ -88,11 +83,10 @@ function parseStrictPositiveIntegerList(value: unknown): readonly number[] | nul
     )) ? values : null
 }
 
-function getQuestMapping(definition: MissionMasterDefinition): EventQuestMapping | undefined {
+function getQuestMapping(catalog: MissionCatalog, definition: MissionMasterDefinition): EventQuestMapping | undefined {
     if (Number(definition.row[2]) !== TARGET_MISSION_CLEAR_PATTERN_TYPE) return undefined
-    const raw = (eventQuestMap as Readonly<Record<string, unknown>>)[definition.pattern]
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined
-    const mapping = raw as Record<string, unknown>
+    const mapping = getEventQuestMapping(catalog, definition.pattern)
+    if (mapping === undefined) return undefined
     if (mapping.countMode !== "single"
         || !Array.isArray(mapping.categories)
         || !Array.isArray(mapping.questIds)) return undefined
@@ -170,10 +164,7 @@ function getTimeClearRule(
     let questCategory: number
     if (rangeKind === 8) {
         const quests = readTable(catalog, "ranking_event_single_quest.json")
-        const raw = (eventQuestMap as Readonly<Record<string, unknown>>)[definition.pattern]
-        const mapping = raw && typeof raw === "object" && !Array.isArray(raw)
-            ? raw as Record<string, unknown>
-            : undefined
+        const mapping = getEventQuestMapping(catalog, definition.pattern)
         if (quests === null || quests[String(questId)] === undefined
             || mapping?.countMode !== "finish"
             || !Array.isArray(mapping.categories)
@@ -267,7 +258,7 @@ function buildRules(catalog: MissionCatalog): ReadonlyMap<number, EventRule> {
                         rule = { kind: "aggregate", missionIds }
                     }
                 } else {
-                    const mapping = getQuestMapping(definition)
+                    const mapping = getQuestMapping(catalog, definition)
                     if (mapping) rule = { kind: "questMapping", ...mapping }
                 }
             }

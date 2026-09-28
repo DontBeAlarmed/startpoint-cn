@@ -14,7 +14,7 @@ D16 已把正常业务 Item 写入迁移到唯一 Inventory owner，并让 Rewar
 
 D17 不重写各来源业务，而是把 RewardGrant 收敛为有限的正向协调核：计划只保留正向资产命令和稳定顺序，执行委托各资产 owner，结果明确区分请求量、实际正向获得量、执行期 after-state 和最终聚合 after-state。来源 adapter 通过同长度、同顺序的本地 metadata 与 entry outcome 关联，继续拥有客户端响应、receipt、progress、payment 和 publication。
 
-B0 还确认了三处必须由 D17 关闭的边界缺口：source-owned Inventory context 目前由 RewardGrant `flush()` 并关闭；Mission 的 `degreeId` patch 被并入 RewardGrant Currency SQL；Active Mission 使用事务外 Player 快照创建 granter，不能证明 transaction-owner 的 known state 来自当前事务。
+B0 还确认了三处必须由 D17 关闭的边界缺口：source-owned Inventory context 目前由 RewardGrant `flush()` 并关闭；Mission 的称号所有权写入与当前展示 `degreeId` patch 被错误并入 RewardGrant Currency SQL；Active Mission 使用事务外 Player 快照创建 granter，不能证明 transaction-owner 的 known state 来自当前事务。
 
 ## 2. 三层证据
 
@@ -269,7 +269,7 @@ Plan、entry、outcome、asset collections 和 `playerAfter` 都必须创建 own
 
 Executor 只能依赖比 RewardGrant 更底层的资产 owner/adapter。Mission、Quest、Shop、Mail、Gacha、Battle 和 Event 不能被 RewardGrant core 反向导入。
 
-Currency/EXP 的最终 SQL 必须移出 RewardGrant core，成为窄 Player resource grant adapter；D17 不借此建立拥有所有货币和扣费规则的 Currency 巨型 owner。当前 `RewardGrantOwnerPlayerUpdate.degreeId` 必须移回 Mission/Player adapter，并保持 degree、标准奖励和 stage receipt 的同事务关系。
+Currency/EXP 的最终 SQL 必须移出 RewardGrant core，成为窄 Player resource grant adapter；D17 不借此建立拥有所有货币和扣费规则的 Currency 巨型 owner。称号所有权必须回到 Mission domain，并与标准奖励和 stage receipt 保持同一事务；获得称号不能生成 Player 当前展示 `degreeId` patch。
 
 ## 9. 消费者迁移
 
@@ -382,7 +382,7 @@ Pre-execution metadata/plan mismatch 必须在调用 RewardGrant 和任何来源
 
 上方 consumer ledger 每一行均已有明确的“已迁移”或“已证明无消费者并删除”状态和替代测试。当前结构 guard 验证：生产代码禁止导入 RewardGrant internal 模块；消费者只通过 public barrel；RewardGrant core 不反向依赖来源域；迁移 facade 已删除，真实 source-local adapter 继续保留。
 
-现有 `awake_reconcile_callsite_matrix` 保护 Mission/Awake 的事务与 publication，不属于 DEBT-T06；D17 只更新它识别的 RewardGrant owner symbol，不删除。Inventory 的零 direct-SQL/第二 Item owner 守卫同样保留。
+Mission/Awake 的事务与 publication 曾由 `awake_reconcile_callsite_matrix` 及其 inventory 守卫（D17 时代）；该 D14 迁移期矩阵已按 DEBT-T01 于 D23 删除，替代为 `tools/character_growth_writer_boundary.test.cjs` 的声明式零 bypass 扫描（Character 持久表 SQL 写入、owner 批量原语与 Awake publication 写入方隔离）。随矩阵删除的 inventory 冻结约束不再恢复；RewardGrant 侧的结构 guard（barrel API、依赖方向、迁移 facade 消失）继续独立生效。
 
 ## 14. B0 性能基线
 
@@ -401,7 +401,7 @@ D17 起点没有 RewardGrant 专属快照；现有 Mission、Awake、Single/Mult
 
 D17 建立独立 core admission：空 plan、单/重复/distinct Item、单 Character、同 Character 首获后连续重复、已拥有 Character 多次补偿、同 Equipment 多 entry、direct Item 与 Character compensation 命中同 Item、多资产、standalone/within/transaction-owner；计真实 SQL execution、事务/savepoint、executor 激活、typed result schema/hash 和结果大小。真实来源继续使用现有 focused/performance baseline，不能用 core 微测替代来源事务。
 
-跨域客户端 DTO 重复属于 DEBT-T07，必须留到 D28；D17 不以删除响应 fixture 为退出条件。
+跨域客户端 DTO 重复属于 DEBT-T07，必须留到 D28；D17 不以删除响应 fixture 为退出条件。（D28 已按此裁决以公共字段 characterization + 域内最小 adapter case 关闭 DEBT-T07，见 [Common Response Projector Gate](./common-response-projector-gate.md)。）
 
 ## 15. 实施顺序与退出
 

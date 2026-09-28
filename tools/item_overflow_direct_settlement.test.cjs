@@ -9,6 +9,8 @@ const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), "item-overflow-direct-"))
 const previousDataDirectory = process.env.DATA_DIR
 process.env.DATA_DIR = directory
@@ -39,6 +41,7 @@ test.before(() => {
 })
 
 test.after(() => {
+    restoreContentSnapshot()
     data.closeDatabase()
     fs.rmSync(directory, { recursive: true, force: true })
     if (previousDataDirectory === undefined) delete process.env.DATA_DIR

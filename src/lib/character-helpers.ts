@@ -7,15 +7,15 @@ import { getPlayerCharacterSync } from "../data/domains/character"
 import { getSession } from "../data/domains/session"
 import { resolvePlayerIdSync } from "../data/activeAccount"
 import { getPlayerItemSync } from "../data/domains/item"
-import { updatePlayerCharacterBondTokenSync } from "../data/domains/character"
 import { generateDataHeaders } from "../utils"
-import { getBondTokenStatus, projectSortedBondTokens } from "./character-growth/invariants"
-import type { BondTokenStatus } from "./character-growth/model"
-import { growthError } from "./character-growth/errors"
+import { projectCharacterPatch, projectEquipmentPatch } from "./common-response/entities"
+import { mergeCommonResponseFragments } from "./common-response/merge"
 import {
     characterGrowthProjectionStateFromPlayerCharacter,
     projectCharacterGrowthEntry,
 } from "./character-growth/response-projector"
+
+export { computeManaBoardAwakeFromNodes, mergeManaBoardAwakeMaps } from "./character-mana-board-maps"
 
 // ─── Response types ───
 
@@ -27,6 +27,7 @@ export interface CharacterResponseData {
     evolution: Object
     mail_arrived: boolean
     mission_info?: Record<string, unknown>[]
+    active_mission_list?: readonly unknown[]
     equipment_list?: Record<string, unknown>[]
     degree_list?: Record<string, unknown>[]
 }
@@ -118,26 +119,6 @@ export function computeItemDeductions(
     return result
 }
 
-/** Merges mission-unlocked and persisted mana-board awake levels. */
-export function mergeManaBoardAwakeMaps(
-    ...maps: Map<string, Record<number, number>>[]
-): Map<string, Record<number, number>> {
-    const merged = new Map<string, Record<number, number>>()
-
-    for (const map of maps) {
-        for (const [characterId, boardLevels] of map) {
-            const current = merged.get(characterId) ?? {}
-            for (const [boardIndex, awakeLevel] of Object.entries(boardLevels)) {
-                const index = Number(boardIndex)
-                current[index] = Math.max(current[index] ?? 0, awakeLevel)
-            }
-            merged.set(characterId, current)
-        }
-    }
-
-    return merged
-}
-
 /** Builds the minimal common-response entries needed to refresh Awake unlocks. */
 export function buildManaBoardAwakeCharacterList(
     characters: Record<string, PlayerCharacter>,
@@ -195,93 +176,41 @@ export function validateManaBoardAwakeRequest(
     return null
 }
 
-// ─── Bond token ───
-
-export interface BondTokenResult {
-    bondTokenList: Object[]
-    bondTokenGranted: boolean
-}
-
-/**
- * Checks board completion and updates the independently earned bond token.
- */
-export function updateBondTokenForCompletedBoard(
-    playerId: number,
-    characterId: number,
-    characterData: PlayerCharacter,
-    boardIndex: number,
-    isBoardComplete: boolean
-): BondTokenResult {
-    const tokenMap = new Map<number, BondTokenStatus>(characterData.bondTokenList.map(entry => [
-        entry.manaBoardIndex,
-        entry.status as BondTokenStatus,
-    ]))
-    return updateBondTokenForCompletedBoardFromGrowthState(
-        playerId,
-        characterId,
-        tokenMap,
-        boardIndex,
-        isBoardComplete,
-    )
-}
-
-export function updateBondTokenForCompletedBoardFromGrowthState(
-    playerId: number,
-    characterId: number,
-    tokenMap: ReadonlyMap<number, BondTokenStatus>,
-    boardIndex: number,
-    isBoardComplete: boolean,
-): BondTokenResult {
-    const currentStatus = getBondTokenStatus(tokenMap, boardIndex)
-    if (currentStatus === null) {
-        throw growthError(
-            "INVALID_GROWTH_STATE",
-            `completed mana board ${boardIndex} is missing its bond token row.`,
-        )
-    }
-    const bondTokenGranted = currentStatus === 0
-        && isBoardComplete
-
-    if (bondTokenGranted) {
-        updatePlayerCharacterBondTokenSync(playerId, characterId, { manaBoardIndex: boardIndex, status: 1 })
-    }
-
-    const nextTokenMap = new Map(tokenMap)
-    if (bondTokenGranted) nextTokenMap.set(boardIndex, 1)
-    return {
-        bondTokenGranted,
-        bondTokenList: projectSortedBondTokens(nextTokenMap),
-    }
-}
-
 /** Sends a standard-format mana-related response. */
 export function sendCharacterResponse(
     reply: FastifyReply,
     viewerId: number,
     data: CharacterResponseData
 ) {
+    const {
+        user_info,
+        character_list,
+        item_list,
+        mail_arrived,
+        mission_info,
+        equipment_list,
+        ...endpointLocal
+    } = data
+    const common = mergeCommonResponseFragments([{
+        user_info,
+        character_list: character_list.map(character => projectCharacterPatch(character)),
+        item_list,
+        mail_arrived,
+        ...(mission_info === undefined ? {} : { mission_info }),
+        ...(equipment_list === undefined
+            ? {}
+            : {
+                equipment_list: equipment_list.map(
+                    equipment => projectEquipmentPatch(equipment),
+                ),
+            }),
+    }])
     reply.header("content-type", "application/x-msgpack")
     return reply.status(200).send({
         "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-        "data": data,
+        "data": {
+            ...common,
+            ...endpointLocal,
+        },
     })
-}
-
-// ─── Mana board awake level computation ───
-
-/** Computes persisted mana-board awake levels from node state. */
-export function computeManaBoardAwakeFromNodes(
-    characterManaNodeAwakeLevels: Record<string, Record<number, number>>
-): Map<string, Record<number, number>> {
-    const result = new Map<string, Record<number, number>>()
-    for (const [charId, nodeLevels] of Object.entries(characterManaNodeAwakeLevels)) {
-        let maxLevel = 0
-        for (const awakeLevel of Object.values(nodeLevels)) {
-            if (awakeLevel > maxLevel) maxLevel = awakeLevel
-        }
-        if (maxLevel > 0) {
-            result.set(charId, { 1: maxLevel })
-        }
-    }
-    return result
 }

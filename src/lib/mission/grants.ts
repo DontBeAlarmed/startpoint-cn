@@ -43,7 +43,6 @@ export class MissionRewardGranter {
     private freeMana: number
     private expPool: number
     private totalManaGained = 0
-    private latestDegreeId: number | undefined
     private readonly invalidatedFacts = new Map<string, FactKey>()
     private standardRewardGranted = false
     private readonly pendingStandardEntries: RewardGrantCommand[] = []
@@ -106,7 +105,6 @@ export class MissionRewardGranter {
                         && !this.degreeList.includes(reward.degreeId)
                         && givePlayerDegreeSync(this.playerId, reward.degreeId)) {
                         this.degreeList.push(reward.degreeId)
-                        this.latestDegreeId = reward.degreeId
                         this.addInvalidation({ kind: "player" })
                     }
                     break
@@ -237,11 +235,8 @@ export class MissionRewardGranter {
                 freeVmoney: this.freeVmoney,
                 freeMana: this.freeMana,
                 expPool: this.expPool,
-                ...(this.latestDegreeId !== undefined ? { degreeId: this.latestDegreeId } : {}),
                 totalManaObtained: (this.player.totalManaObtained ?? 0) + this.totalManaGained,
             })
-        } else if (this.latestDegreeId !== undefined) {
-            updatePlayerSync({ id: this.playerId, degreeId: this.latestDegreeId })
         }
         this.addInvalidation({ kind: "player" })
         return this.invalidatedFactKeys
@@ -265,7 +260,6 @@ export class MissionRewardGranter {
         return this.freeVmoney !== this.player.freeVmoney
             || this.freeMana !== this.player.freeMana
             || this.expPool !== this.player.expPool
-            || this.latestDegreeId !== undefined
     }
 
     getUserInfo(): Record<string, number> {
@@ -273,7 +267,6 @@ export class MissionRewardGranter {
             free_vmoney: this.freeVmoney,
             free_mana: this.freeMana,
             exp_pool: this.expPool,
-            ...(this.latestDegreeId !== undefined ? { degree_id: this.latestDegreeId } : {}),
         }
     }
 

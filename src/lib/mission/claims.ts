@@ -45,7 +45,7 @@ export function validateMissionRewardClaims(
 
     const claims: ValidatedMissionRewardClaim[] = []
     const seen = new Set<string>()
-    const plan = getActiveMissionPlan(context?.repository)
+    const plan = context?.plan ?? getActiveMissionPlan()
     const availabilityMissions = context
         ? normalizeAvailabilityMissions(activeMissions)
         : null

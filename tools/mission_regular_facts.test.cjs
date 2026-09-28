@@ -6,6 +6,8 @@ const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "mission-regular-facts-db-"))
 const previousDataDirectory = process.env.DATA_DIR
 const previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR
@@ -14,6 +16,7 @@ delete process.env.WDFP_DATABASE_DIR
 let db
 
 function cleanup() {
+    restoreContentSnapshot()
     if (db?.open) db.close()
     fs.rmSync(databaseDirectory, { recursive: true, force: true })
     if (previousDataDirectory === undefined) delete process.env.DATA_DIR
@@ -41,6 +44,7 @@ const {
     updatePlayerSync,
 } = require("../src/data/domains/player")
 const { getComputer } = require("../src/lib/mission/registry")
+const { buildMissionComputerContext } = require("./helpers/mission-session-context.cjs")
 const { settleMissionCategories } = require("../src/lib/mission/settlement")
 const { getSnapshot, takeSnapshot } = require("../src/lib/mission/snapshot")
 const { getRankDegree } = require("../src/lib/stamina")
@@ -216,7 +220,7 @@ takeSnapshot(playerId, "weekly", {
 })
 
 const regular = getComputer(1)
-const regularContext = regular.buildContext(playerId, 1)
+const regularContext = buildMissionComputerContext(playerId, 1)
 assert.equal(regular.compute(2, regularContext, 0), 1, "SS 评价按 clear_rank=5 的累计达成次数计算")
 assert.equal(regular.compute(3, regularContext, 0), 10)
 assert.equal(regular.compute(6, regularContext, 0), 3, "重复通关同一关也必须增加累计通关")
@@ -228,14 +232,14 @@ assert.equal(regular.compute(26, regularContext, 0), 1)
 assert.equal(regular.compute(27, regularContext, 0), 14)
 
 const daily = getComputer(2)
-const dailyContext = daily.buildContext(playerId, 2)
+const dailyContext = buildMissionComputerContext(playerId, 2)
 assert.equal(daily.compute(11, dailyContext, 0), 3)
 assert.equal(daily.compute(13, dailyContext, 0), 15)
 assert.equal(daily.compute(14, dailyContext, 0), 10)
 assert.equal(daily.compute(16, dailyContext, 0), 50)
 
 const weekly = getComputer(10)
-const weeklyContext = weekly.buildContext(playerId, 10)
+const weeklyContext = buildMissionComputerContext(playerId, 10)
 assert.equal(weekly.compute(1, weeklyContext, 0), 3, "每周登录必须读取 category 10 自身主数据")
 assert.equal(weekly.compute(2, weeklyContext, 0), 15, "每周协力必须读取本周期累计通关")
 
@@ -245,7 +249,7 @@ assert.deepEqual(
     [1, 2],
     "每周只应结算现有的登录与协力两条任务",
 )
-const reloadedWeeklyContext = getComputer(10).buildContext(playerId, 10)
+const reloadedWeeklyContext = buildMissionComputerContext(playerId, 10)
 assert.equal(weekly.compute(1, reloadedWeeklyContext, 0), 3, "重新读取仍应保留本周登录进度")
 assert.equal(weekly.compute(2, reloadedWeeklyContext, 0), 15, "重新读取仍应保留本周协力进度")
 assert.deepEqual(
@@ -310,7 +314,7 @@ for (let index = 0; index < 3; index++) {
         accomplished: true,
     })
 }
-const boundaryWeeklyContext = getComputer(10).buildContext(boundaryPlayerId, 10)
+const boundaryWeeklyContext = buildMissionComputerContext(boundaryPlayerId, 10)
 assert.equal(getComputer(10).compute(2, boundaryWeeklyContext, 0), 3)
 assert.equal(
     dailyResetPlayerDataSync(
@@ -320,7 +324,7 @@ assert.equal(
     false,
     "同一周重复 load 不得再次重置",
 )
-const repeatedLoadContext = getComputer(10).buildContext(boundaryPlayerId, 10)
+const repeatedLoadContext = buildMissionComputerContext(boundaryPlayerId, 10)
 assert.equal(
     getComputer(10).compute(2, repeatedLoadContext, 0),
     3,
@@ -490,12 +494,15 @@ insertPlayerQuestProgressSync(playerId, 15, {
     finished: true,
 })
 
-const expandedRegularContext = regular.buildContext(playerId, 1)
+const expandedRegularContext = buildMissionComputerContext(playerId, 1)
 assert.equal(regular.compute(8, expandedRegularContext, 0), 100, "技能成就应读取成功结算累计")
+// character_level follows the highest proven owned-character level; the
+// fixture characters are below the first rarity EXP threshold, so it stays 0
+// regardless of the player Rank (mission 22 keeps the Rank fact).
 assert.equal(
     regular.compute(9, expandedRegularContext, 0),
-    getRankDegree(10_000),
-    "character_level 是玩家等级成就，不读取角色经验",
+    0,
+    "character_level 按持有角色最高已证等级计算，不读取玩家 Rank",
 )
 assert.equal(regular.compute(10, expandedRegularContext, 0), 1, "第 1 章全部普通关卡完成后应达成")
 assert.equal(regular.compute(16, expandedRegularContext, 0), 1, "第 1 章全部高难关卡完成后应达成")
@@ -518,7 +525,7 @@ assert.equal(
 assert.equal(regular.compute(68, expandedRegularContext, 0), 1, "只有实际达到 5 级的装备才计数")
 recordMissionOperationFactsSync(playerId, "treasure_mana", 250)
 recordMissionOperationFactsSync(playerId, "equipment_upgrade", 3)
-const operationRegularContext = regular.buildContext(playerId, 1)
+const operationRegularContext = buildMissionComputerContext(playerId, 1)
 const operationProgress = getPlayerCategoryMissionsSync(playerId, 1)
 assert.equal(
     regular.compute(41, operationRegularContext, operationProgress[41].progress),
@@ -532,7 +539,7 @@ assert.equal(
 )
 deletePlayerEquipmentSync(playerId, 200001)
 assert.equal(
-    regular.compute(67, regular.buildContext(playerId, 1), operationProgress[67].progress),
+    regular.compute(67, buildMissionComputerContext(playerId, 1), operationProgress[67].progress),
     3,
     "装备被移除后仍必须保留累计觉醒历史",
 )

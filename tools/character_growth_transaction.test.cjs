@@ -43,7 +43,8 @@ const { insertDefaultPlayerSync, getPlayerSync, updatePlayerSync } = require("..
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
 const { characterExpCaps } = require("../src/lib/character")
-const { getCharacterManaNodesSync } = require("../src/lib/assets")
+const { getCharacterGrowthContent } = require("../src/lib/character-growth-content")
+const getCharacterManaNodesSync = (characterId, level) => getCharacterGrowthContent().getManaBoardNodes(characterId, level)
 const manaRoutes = require("../src/routes/api/character/mana").default
 const bondRoutes = require("../src/routes/api/character/bond").default
 const characterRoutes = require("../src/routes/api/character").default

@@ -174,31 +174,54 @@ const activeQuests = {
     },
 }
 
+const runtimeContentTables = {
+    "config.json": require("../assets/config.json"),
+    "daily_challenge_point_lookup.json": require("../assets/daily_challenge_point_lookup.json"),
+    "event_challenge_point_map.json": require("../assets/event_challenge_point_map.json"),
+    "item_inventory_policy.json": require("../assets/item_inventory_policy.json"),
+    "reward_element_map.json": require("../assets/reward_element_map.json"),
+    "mission_active.json": require("../assets/mission_active.json"),
+    "mission_active_event.json": require("../assets/mission_active_event.json"),
+    "mission_active_reward.json": require("../assets/mission_active_reward.json"),
+    "additional_reward_rules.json": {
+        groups: {
+            9001: [{ index: 1, groupStringId: "test", type: 0, id: 40502, number: 2, weight: 1 }],
+        },
+        collectItemRules: [{
+            eventId: 1,
+            startAtMs: 0,
+            endAtMs: 4_102_444_800_000,
+            prerequisite: null,
+            categories: [27],
+            keyQueries: [null, null],
+            thresholds: [{ enemyLevelMin: 60, groupId: 9001 }],
+        }],
+        bossPickupRules: [],
+    },
+}
+
 stubModule("../src/data/db", { getDb: () => db })
+stubModule("../src/lib/mission/active-publication-owner", {
+    publishActiveMissionOwnerStateWithinTransaction: () => ({
+        activeMissionList: [],
+        activeMissions: {},
+    }),
+})
+
 stubModule("../src/data/domains/server-settings", {
     getServerGameplaySettingsSync: () => ({ dropMultiplier: 3 }),
 })
 stubModule("../src/content/runtime/content-snapshot", {
-    getContentSnapshot: () => ({ repository: {} }),
+    getContentSnapshot: () => ({
+        repository: {
+            table: tableName => runtimeContentTables[tableName],
+        },
+    }),
 })
 stubModule("../src/content/runtime/table-access", {
-    getRuntimeContentTableSync(tableName, fallback) {
-        if (tableName !== "additional_reward_rules.json") return fallback
-        return {
-            groups: {
-                9001: [{ index: 1, groupStringId: "test", type: 0, id: 40502, number: 2, weight: 1 }],
-            },
-            collectItemRules: [{
-                eventId: 1,
-                startAtMs: 0,
-                endAtMs: 4_102_444_800_000,
-                prerequisite: null,
-                categories: [27],
-                keyQueries: [null, null],
-                thresholds: [{ enemyLevelMin: 60, groupId: 9001 }],
-            }],
-            bossPickupRules: [],
-        }
+    getStrictRuntimeContentTableSync(tableName) {
+        if (tableName in runtimeContentTables) return runtimeContentTables[tableName]
+        throw new Error(`unexpected strict runtime table ${tableName}`)
     },
 })
 stubModule("../src/data/domains/quest_active", {
@@ -386,8 +409,15 @@ stubModule("../src/data/domains/carnivalEvent", {
 })
 stubModule("../src/data/domains/degree", { givePlayerDegreeSync: () => false })
 stubModule("../src/data/activeAccount", { resolvePlayerIdSync: () => 17 })
-stubModule("../src/lib/assets", {
+// Quest lookups moved to quest-content; assets only re-exports them.
+stubModule("../src/lib/quest-content", {
+    ...require("../src/lib/quest-content"),
     getQuestFromCategorySync: () => scoreQuest,
+})
+// Rush/event reward lookups moved to rush-event-content; stubs target the
+// owning module because assets only re-exports them as getter bindings.
+stubModule("../src/lib/rush-event-content", {
+    ...require("../src/lib/rush-event-content"),
     getRushEventFolderClearRewards: () => [],
     getScoreAttackBorderRewards: () => require("../assets/score_attack_border_reward.json"),
 })
@@ -411,6 +441,7 @@ stubModule("../src/lib/reward-campaign", {
     calculateFixedQuestMana: rewardCampaignLogic.calculateFixedQuestMana,
     calculateFixedQuestPoolExp: rewardCampaignLogic.calculateFixedQuestPoolExp,
     calculateScoreRewardAmount: rewardCampaignLogic.calculateScoreRewardAmount,
+    getRewardCampaignTable: () => ({}),
     getRewardCampaignRates(category, questId, now) {
         rewardCampaignCalls.push({ category, questId, now })
         return { item: 2, exp: 2, mana: 2 }
@@ -423,14 +454,6 @@ stubModule("../src/lib/mission", {
     reconcileActiveMissionFacts: () => [],
     reconcileAwakeUnlockCharacterList: (_playerId, list) => list,
     settleAwakeMissionCandidatesWithEvaluation: () => null,
-    settleAwakeBattleMissions: () => ({
-        missionInfo: [],
-        itemList: {},
-        characterList: [],
-        equipmentList: [],
-        degreeIds: [],
-        passCardPoints: {},
-    }),
     settleMissionCategories: () => ({
         missionInfo: [],
         itemList: {},

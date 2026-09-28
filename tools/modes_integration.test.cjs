@@ -7,6 +7,10 @@
 
 require("ts-node/register/transpile-only")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
+
 const assert = require("node:assert/strict")
 const test = require("node:test")
 const fs = require("node:fs")
@@ -198,7 +202,7 @@ test("a settlement module throwing rolls back writes made in the same transactio
             db.prepare("UPDATE players SET name = ? WHERE id = ?").run("written-by-base", playerId)
             registry.dispatchModeRushFinish({}, {
                 apiVersion: registry.MODE_API_VERSION,
-                table: () => { throw new Error("unused") },
+                content: { getCharacterElement: () => { throw new Error("unused") } },
                 log: () => {},
                 server: {},
             })

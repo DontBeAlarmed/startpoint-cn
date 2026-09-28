@@ -48,6 +48,14 @@ function defaultItemInventoryPolicy() {
     return policy
 }
 
+function noIncidentalAdditionalRewards() {
+    const table = structuredClone(fixture.DETERMINISTIC_ADDITIONAL_REWARDS)
+    // Keep the converter's range shape valid; use impossible query IDs to
+    // disable the fixture rule without constructing an invalid catalog.
+    table.collectItemRules[0].keyQueries = [[999999999], [999999999], [999999999]]
+    return table
+}
+
 async function withSingleBattleHarness(name, operation, {
     additionalSettlementOverride,
     tableOverrides = {},
@@ -149,6 +157,7 @@ module.exports = {
     VIEWER_ID: fixture.VIEWER_ID,
     createActiveQuest: fixture.createActiveQuest,
     finishPayload: fixture.finishPayload,
+    noIncidentalAdditionalRewards,
     stableActiveQuest: fixture.stableActiveQuest,
     withSingleBattleHarness,
 }

@@ -1,6 +1,6 @@
 // Mission computer core types
 
-import type { Player, PlayerCharacter, RawPlayerQuestProgress } from "../../data/types"
+import type { Player } from "../../data/types"
 import type { SnapshotData } from "./snapshot"
 import type { MissionBattleCounters } from "../../data/domains/mission_battle_facts"
 import type { DegreeBattleStats } from "../../data/domains/degree_battle_stats"
@@ -8,6 +8,11 @@ import type { RegularStateFacts } from "./regular-state-facts"
 import type { MissionEvaluationSession } from "./evaluation-session"
 import type { DegreeRule } from "./degree-rule-catalog"
 import type { EventRule } from "./event-rule-catalog"
+
+export interface RegularQuestRule {
+    readonly section: number
+    readonly candidates: readonly number[]
+}
 
 export interface PlayerQuestProgressEntry {
     questId: number
@@ -27,6 +32,12 @@ export interface CategoryContext {
     totalQuestClears: number
     totalStories: number
     rankCounts: Record<string, number>
+    /** Rank projected from the same Content snapshot as this evaluation Session. */
+    playerRankDegree?: number
+    /** Regular quest selectors projected from the Session Catalog. */
+    regularQuestRules?: ReadonlyMap<number, RegularQuestRule>
+    /** Mission patterns projected from the Session Catalog for pure computers. */
+    missionPatterns?: ReadonlyMap<number, string>
     collectedItemTotals?: Record<string, number>
     collectMissionItemIds?: ReadonlyMap<number, number>
     regularStats?: {
@@ -93,17 +104,10 @@ export interface MissionComputer {
     readonly name: string
 
     /**
-     * Build pre-cached context for this category.
+     * Build pre-cached context for this category from a declared-fact Session.
      * All DB I/O happens here — compute() must be pure.
      */
-    buildContext(
-        playerId: number,
-        category: number,
-        evaluationTime: Date,
-        missionIds?: readonly number[],
-    ): CategoryContext
-
-    buildContextFromSession?(
+    buildContextFromSession(
         session: MissionEvaluationSession,
         category: number,
         missionIds: readonly number[],

@@ -48,6 +48,7 @@ test("server status uses startup runtime config instead of request-time environm
                 cdnRoot: "/runtime/cdn/cn",
                 patchUploadRoot: "/runtime/data/upload",
             },
+            gameCalendarUtcOffsetMinutes: 480,
         },
     })
 
@@ -63,6 +64,10 @@ test("server status uses startup runtime config instead of request-time environm
     assert.equal(body.server.listenPort, "9101")
     assert.equal(body.cdn.baseUrl, "http://configured.example:9101/patch/cn")
     assert.equal(body.cdn.configuredDir, "/runtime/cdn")
+    assert.deepEqual(body.cdn.gameCalendar, {
+        configuredUtcOffsetMinutes: 480,
+        contentUtcOffsetMinutes: 480,
+    })
 })
 
 test("server status falls back to the release HTTP default without runtime config", async t => {
@@ -73,4 +78,8 @@ test("server status falls back to the release HTTP default without runtime confi
     const response = await app.inject({ method: "GET", url: "/status" })
     assert.equal(response.statusCode, 200, response.body)
     assert.equal(response.json().server.listenPort, "8001")
+    assert.deepEqual(response.json().cdn.gameCalendar, {
+        configuredUtcOffsetMinutes: 480,
+        contentUtcOffsetMinutes: 480,
+    })
 })

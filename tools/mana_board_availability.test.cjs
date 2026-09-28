@@ -7,8 +7,10 @@ const assert = require("node:assert/strict")
 const {
     getVisibleManaBoardIndex,
     isSecondManaBoardAvailable,
-    parseManaBoard2OpenConditionTable,
 } = require("../src/lib/mana-board-availability")
+const {
+    parseManaBoard2OpenConditionTable,
+} = require("../src/lib/character-growth-content")
 
 const sample = {
     111105: [["2024-09-05 12:00:00", "2199-12-31 23:59:59"]],
@@ -16,15 +18,15 @@ const sample = {
 const parsed = parseManaBoard2OpenConditionTable(sample)
 assert.equal(
     parsed.get(111105).startTime.toISOString(),
-    "2024-09-05T03:00:00.000Z",
-    "官方日历字段必须按 JST 转换为 UTC 时刻",
+    "2024-09-05T04:00:00.000Z",
+    "官方日历字段必须按 CN 客户端日历（UTC+8）转换为 UTC 时刻",
 )
 assert.equal(
-    isSecondManaBoardAvailable(111105, 5, new Date("2024-09-05T02:59:59.000Z"), parsed),
+    isSecondManaBoardAvailable(111105, 5, new Date("2024-09-05T03:59:59.999Z"), parsed),
     false,
 )
 assert.equal(
-    isSecondManaBoardAvailable(111105, 5, new Date("2024-09-05T03:00:00.000Z"), parsed),
+    isSecondManaBoardAvailable(111105, 5, new Date("2024-09-05T04:00:00.000Z"), parsed),
     true,
 )
 assert.equal(
@@ -38,11 +40,11 @@ assert.equal(
     "缺失官方条件必须 fail closed",
 )
 assert.equal(
-    getVisibleManaBoardIndex(2, 111105, 5, new Date("2024-09-05T02:59:59.000Z"), parsed),
+    getVisibleManaBoardIndex(2, 111105, 5, new Date("2024-09-05T03:59:59.999Z"), parsed),
     1,
 )
 assert.equal(
-    getVisibleManaBoardIndex(2, 111105, 5, new Date("2024-09-05T03:00:00.000Z"), parsed),
+    getVisibleManaBoardIndex(2, 111105, 5, new Date("2024-09-05T04:00:00.000Z"), parsed),
     2,
 )
 assert.equal(getVisibleManaBoardIndex(1, 111105, 5, new Date(), parsed), 1)

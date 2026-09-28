@@ -14,7 +14,7 @@
   体力和登录天数的当前基线。旧存档升级时以升级时状态创建基线，避免把历史累计量误算成本周期进度。
 - `get_mission_progress` 会检查任务开放时间、收集任务 `event_id`，并独立处理每个角色觉醒
   `character_id` 请求。
-- 主数据由 `master-data.ts` 按分类解释列位置：category 1、2、3、10 的 pattern 位于 `row[0]`，
+- 主数据由 snapshot-scoped `MissionCatalog` 按分类解释列位置：category 1、2、3、10 的 pattern 位于 `row[0]`，
   category 4 同时读取 `row[0]` 的 event ID 与 `row[2]` 的 pattern，category 5 使用 `row[1]`，
   category 6/7/8 使用 `row[0]` 的 Pass 活动 ID、`row[1]` 的 pattern 和 `row[3]` 的 pattern type，
   category 9 使用 `row[2]`。开放期统一按国服 UTC+8 解释，不再由各计算器分别猜测列号。
@@ -35,6 +35,9 @@
   使用全部 zone 的 `encoffinment_count` 总和为 0。核心解锁与领奖流程已通过客户端，144 条条件尚未逐条验收。
 - category 1、2、6、7、8、10 的 `get_mission_progress` 会兼容补结算已完成但历史入口未发奖的阶段；携带角色 ID 的 category 9 请求仍是
   觉醒第一页的正式领奖入口。
+- 觉醒（category 9）奖励时点（2026-09-12 收口）：单人/多人战斗 finish、成长命令与 `/load` 只写进度并按进度即时发布三板解锁，
+  不领取普通觉醒奖励、不返回对应 `mission_info`；`get_mission_progress` category 9 一次领取全部已完成未领奖励，并在同事务发布
+  三板解锁与角色 patch。
 - ActiveMission 领奖会在原子发奖前校验任务存在、阶段定义、完成阈值、既有领奖状态与重复请求。
 - ActiveMission 奖励保留 kind 0（星导石），并把物品、装备、角色、玛纳、经验和称号写入正确的响应集合。
 - Active Mission 的 96 条任务定义、4 个事件定义和奖励表已从官方 1.4.54 资源纳入运行资产与 Content registry；
@@ -52,6 +55,11 @@
 - category 2 使用每日快照差值。默认服务器时间下当前开放 11 条每日任务，现已 `11/11` 自动计算：常驻
   `11/13/14/16/17` 共 5 条，活动每日共 6 条。常驻 all-clear `17` 只汇总单人通关、协力通关、冲刺和
   消耗体力四项，不包含活动任务。
+- 2026-09-12 起 daily all-clear 逐条按自身 CDN `row[17]` 依赖集计算（5→1,3,2,4；10→6,8,7,9；
+  15→11,13,12,14；17→11,13,16,14），不再使用全局硬编码核心 pattern 集；`timeOffset` 回放四代历史窗口
+  （UTC+8 05:00 代际切换）由 `tools/mission_daily_history_replay.test.cjs` 锁定。
+- `weekevent_battle_play(_2/_3)`（任务 2/7/12）由战斗 finish producer 驱动：CDN selector（type 14 +
+  QuestRange kind 12 → category 6/13/14/20）+ 单人成功结算，每场 +1，开放期按主数据 UTC+8。
 - 活动每日 `800115..800117` 使用 Advent selector `200015`，只接受 category 7 范围内匹配活动的协力成功；
   `800124..800126` 使用 BossBattle 全范围，只接受 category 2 的领主战协力成功。每条任务仍按自身开放期和
   奖励阈值独立增长。`mission_daily` 历史总表共有 656 条，本项目不宣称全部支持。
@@ -99,7 +107,7 @@
 - category 3 共 2512 条，旧 `mission_event_quest_map.json` 名义映射 2305 条，缺失 207 条；默认
   `2024-08-14 12:00 UTC` 时没有正在开放的缺失项。映射中 `single/multi/finish` 数量分别为 396/1679/230。
 - 旧 map 只展开关卡 ID，未完整保留活动期、难度、评级、房主/成员、救援来源、阶段和客户端战斗检查等维度；
-  1034 条已映射任务仍带有未应用的关卡或评级过滤。它只供 `computer-event.ts` 历史审计，不能作为自动事实或安全发奖依据。
+  1034 条已映射任务仍带有未应用的关卡或评级过滤。它只供 `event-coverage-report.ts` 离线历史审计，不能作为自动事实或安全发奖依据。
 - 230 条 `finish` 实为限时通关任务，审计计算器已按奖励表秒数和最佳毫秒记录修正，不再把一次普通通关判定为全部档位完成。
   该计算器只用于审计和后续规则迁移。
 - 旧 939 条宽松自动规则已全部移除，`mission_event_quest_map.json` 只保留历史审计用途。新的兼容行为不读取旧 map，
@@ -128,7 +136,7 @@
   其余 27 条仍使用持久化 fallback。
   任务页不从旧 `mission_event_quest_map.json` 直接推算；只有通过精确事实白名单闭合的规则才会自动计算或持久化。安全计算器当前登记 407 条，其中 6 条目标为 1 的 type 14 任务可从历史完成记录回填；它们同时拥有 finish 生产者，因此不在 2485 条总覆盖中重复计数。生产上下文保留数据库返回的全部关卡 category，不再只装载 Ranking/Rush 两类。
   新增 15 条当前状态任务逐 ID 校验 `mission_event` pattern、章节 selector 和 `mission_event_reward` 全部 target：type 5 的 1305 只按官方 EXP 上限阈值证明 50/60/70 级下界；type 7 的 1205/1206/1207/1217/1218/1219 只统计能在对应角色官方玛纳板确认 multiplied ID 的当前节点；type 9 的 1306 先按角色 rarity 校验官方最大突破步数，再汇总当前突破次数；type 21 的 1204 从 `character_quest_lookup` row[0..2] 建立精确角色归属后统计已完成记录，不使用 quest ID 前缀；type 22 的 1201/1202/1203 要求主线 category 1 对应章节的官方全部关卡完成，不把任意 quest clear 数当章节。type 34 的 1212/1307 只汇总存在官方正整数 `max_level` 且 `1 <= level <= max_level` 的当前装备觉醒级数 `level - 1`，不读取 `enhancement_level` 或 stack；type 35 的 1220 因官方 target 仅为 1，逐个普通 party 独立校验官方 item category 5 和该 party 内使用数不超过玩家持有量，只要存在一个合法非空 party 即证明进度，不把不同 preset 同时占用库存。官方静态索引任一行异常会关闭对应事实族；玩家非法角色、节点、装备或 party 只排除自身贡献，保留其他已验证安全下界。所有合法结果仍与持久化 progress 取最大值。
-  官方表派生索引按启动后冻结的 Content repository 对象缓存，不支持也不引入热更新。`buildContext` 只有在 evaluationTime 下至少一条上述任务开放时才读取新增角色、玛纳板、装备、物品和 party 玩家状态；15 条均关闭时不构建索引、不执行新增查询。
+  官方表派生索引按启动后冻结的 Content repository 对象缓存，不支持也不引入热更新。evaluationTime 下这 15 条 current-state 任务均关闭时，不会为它们形成候选或声明 current-state facts；即使其他开放的 Event 任务仍需构造 category context，也不会因此触发角色、玛纳板、装备、物品或 party fact loader，也不会构造 current-state 静态索引。
   后续只剩缺少权威救援来源的 Attention 谓词。
 - 948 条 type 16 空 selector 已作为独立兼容层闭合：579 条全 BossBattle、9 条指定 Boss group、342 条指定 WorldStory event、18 条指定 Advent event。该结论由 CN/GL 主数据重复形状、任务文案和外层范围共同支持，但没有官方后端源码，因此必须标记为兼容推断并等待历史活动客户端验收。
 - 10 条 type 87 逐 ID 校验 HardMulti category 26、成功多人 SS、精确 event/quest 和唯一奖励 target 1；再按客户端枚举索引分别读取队长攻击力下降、队长光耐下降、全队麻痹或各 zone 棺柩统计。600002/900812 另要求 `clearTime <= 180000`。真实活动暗机兵结算已证明 `client_checks=[]`，该字段不再作为条件来源；统计缺失或非法时 fail closed。剩余 27 条全部为 type 20 Attention。

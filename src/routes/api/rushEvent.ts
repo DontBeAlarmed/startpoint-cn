@@ -23,23 +23,53 @@ import { getDefaultPlayerPartyGroupsSync } from "../../data/domains/player"
 import { getPlayerCharacterSync } from "../../data/domains/character"
 import { ensurePlayerPartyGroupListSync, getPlayerPartyGroupListSync } from "../../data/domains/party"
 import { getSession } from "../../data/domains/session"
+import { getQuestFromCategorySync } from "../../lib/quest-content";
 import {
-    getQuestFromCategorySync,
     getRushEventFolderMaxRoundSync,
     getRushEventQuestConfigurationErrorResponse,
     getRushEventRankingRewards,
     type RushEventRankingRewardEntry,
-} from "../../lib/assets";
+} from "../../lib/rush-event-content";
 import { BattleQuest, QuestCategory } from "../../lib/types";
 import { generateDataHeaders, getServerDate, getServerTime } from "../../utils";
 import type { FinishBody } from "./singleBattleQuest";
-import { insertActiveQuest } from "../../lib/quest/active-quest-service";
+import {
+    persistActiveQuest,
+    publishActiveQuest,
+    type ActiveQuest,
+} from "../../lib/quest/active-quest-service";
+import { getPlayerActiveQuestSync } from "../../data/domains/quest_active";
+import { getRealNow } from "../../runtime/time/game-time";
 import { getPlayerRushEventEndlessBattleRankingSync, getSerializedPlayerRushEventPlayedPartiesSync } from "../../lib/rush";
 import { clientSerializeDate } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { ensureSpecialEventPartyGroupsSync, getGlobalPartyId } from "../../lib/special-event-parties";
 import { getDb } from "../../data/db";
-import { canStartRushEventFolderBattle } from "../../lib/rush-folder-progression";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
+import {
+    canRestartClearedRushEventFolderForAutoStart,
+    canStartRushEventFolderBattle,
+} from "../../lib/rush-folder-progression";
+import { getQuestEntryCostByKey } from "../../lib/quest-entry-content";
+import { getStaminaCost } from "../../lib/stamina-cost";
+import {
+    isQuestOutOfPeriodAt,
+    QUEST_OUT_OF_PERIOD_RESULT_CODE,
+} from "../../lib/quest/open-period";
+import { computeRealTimeStamina } from "../../lib/stamina";
+import { withEntryItemInventoryWithinTransactionSync } from "../../lib/quest/entry-item-inventory";
+import { updatePlayerSync, getPlayerSync } from "../../data/domains/player";
+import {
+    ActiveQuestAlreadyExistsError,
+    InsufficientEntryItemError,
+    InsufficientStaminaError,
+    PlayerNotFoundError,
+    runStartEntryTransaction,
+} from "../../lib/quest/start-entry";
+import {
+    AUTO_START_STOP_RESULT_CODE,
+    shouldStopAutoStartForStamina,
+} from "../../lib/quest/auto-start-stop";
 
 interface SummaryBody {
     event_id: number,
@@ -103,7 +133,6 @@ const routes = async (fastify: FastifyInstance) => {
 
         const viewerId = body.viewer_id
         const eventId = body.event_id
-        console.log(`[RUSH] summary: viewer=${viewerId} eventId=${eventId}`)
         if (isNaN(viewerId) || isNaN(eventId)) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
@@ -134,7 +163,6 @@ const routes = async (fastify: FastifyInstance) => {
 
         // get serialized parties
         const serializedPlayedParties = getSerializedPlayerRushEventPlayedPartiesSync(playerId, eventId)
-        console.log(`[RUSH] summary: folderParties=${Object.keys(serializedPlayedParties.folderParties ?? {}).length} endlessParties=${Object.keys(serializedPlayedParties.endlessParties ?? {}).length}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -163,7 +191,6 @@ const routes = async (fastify: FastifyInstance) => {
         const viewerId = body.viewer_id
         const eventId = body.event_id
         const folderId = body.folder_id
-        console.log(`[RUSH] select_folder: viewer=${viewerId} eventId=${eventId} folderId=${folderId}`)
         if (isNaN(viewerId) || isNaN(eventId) || isNaN(folderId)) return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
@@ -323,8 +350,8 @@ const routes = async (fastify: FastifyInstance) => {
         const isAutoStartMode = body.is_auto_start_mode
         const partyId = body.party_id
         const questId = body.quest_id
-        console.log(`[RUSH] battle/start: viewer=${viewerId} questId=${questId} partyId=${partyId} autoStart=${isAutoStartMode}`)
-        if (isNaN(viewerId) || isNaN(partyId) || isNaN(questId) || isAutoStartMode === undefined) return reply.status(400).send({
+        if (isNaN(viewerId) || isNaN(partyId) || isNaN(questId)
+            || typeof isAutoStartMode !== "boolean") return reply.status(400).send({
             "error": "Bad Request",
             "message": "Invalid request body."
         })
@@ -362,22 +389,50 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "Quest doesn't exist."
         })
 
+        if (isQuestOutOfPeriodAt(questData, getServerTime() * 1000)) {
+            console.log(`[RUSH] battle/start out of period: questId=${questId}`)
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(200).send({
+                "data_headers": generateDataHeaders({
+                    viewer_id: viewerId,
+                    result_code: QUEST_OUT_OF_PERIOD_RESULT_CODE,
+                }),
+                "data": {},
+            })
+        }
+
+        let restartsClearedFolderForAutoStart = false
         if (questData.rushEventRound !== 0) {
             const rushEventData = getPlayerRushEventSync(playerId, questData.rushEventId)
             const playedParties = getPlayerRushEventPlayedPartiesSync(playerId, questData.rushEventId)
-            if (!canStartRushEventFolderBattle({
+            const progression = {
                 quest: questData,
                 rushEvent: rushEventData,
                 playedParties,
-                getQuest: id => getQuestFromCategorySync(QuestCategory.RUSH_EVENT, id),
-            })) return reply.status(400).send({
+                getQuest: (id: number) => getQuestFromCategorySync(QuestCategory.RUSH_EVENT, id),
+            }
+            const continuesSelectedFolder = canStartRushEventFolderBattle(progression)
+            if (!continuesSelectedFolder) {
+                restartsClearedFolderForAutoStart = canRestartClearedRushEventFolderForAutoStart({
+                    quest: questData,
+                    rushEvent: rushEventData,
+                    playedParties,
+                    isAutoStartMode,
+                    clearedFolderIds: getPlayerRushEventClearedFoldersSync(
+                        playerId,
+                        questData.rushEventId,
+                    ),
+                })
+            }
+            if (!continuesSelectedFolder
+                && !restartsClearedFolderForAutoStart) return reply.status(400).send({
                 "error": "Bad Request",
                 "message": "Rush event folder progression is invalid."
             })
         }
 
         // insert active quest for '/single_battle_quest/finish' endpoint
-        insertActiveQuest(playerId, {
+        const activeQuest: ActiveQuest = {
             questId: questId,
             category: QuestCategory.RUSH_EVENT,
             useBoostPoint: false,
@@ -388,7 +443,60 @@ const routes = async (fastify: FastifyInstance) => {
             rescueFragmentEligible: false,
             playId: body.play_id,
             continueCount: 0
-        })
+        }
+        const questKey = `${QuestCategory.RUSH_EVENT}_${questId}`
+        const staminaInfo = getStaminaCost(questKey)
+        try {
+            runStartEntryTransaction({
+                playerId,
+                entryCost: getQuestEntryCostByKey(questKey) ?? undefined,
+                staminaCost: staminaInfo.cost,
+                partyId,
+                updatePartySlot: questData.fixedParty === undefined,
+                activeQuest,
+                now: getRealNow(),
+            }, {
+                transaction: operation => getDb().transaction(operation)(),
+                getActiveQuest: getPlayerActiveQuestSync,
+                getPlayer: getPlayerSync,
+                computeStamina: computeRealTimeStamina,
+                withEntryItemInventory: withEntryItemInventoryWithinTransactionSync,
+                updatePlayer: updatePlayerSync,
+                persistActiveQuest,
+                beforePersist: () => {
+                    if (!restartsClearedFolderForAutoStart) return
+                    selectPlayerRushEventFolderSync(
+                        playerId,
+                        questData.rushEventId!,
+                        questData.rushEventFolderId!,
+                    )
+                },
+                publishActiveQuest,
+            })
+        } catch (error) {
+            if (error instanceof ActiveQuestAlreadyExistsError
+                || error instanceof InsufficientEntryItemError
+                || error instanceof InsufficientStaminaError
+                || error instanceof PlayerNotFoundError) {
+                console.warn(`[RUSH-START] start rejected: ${error.message}`)
+                if (error instanceof InsufficientStaminaError
+                    && shouldStopAutoStartForStamina(isAutoStartMode, true)) {
+                    reply.header("content-type", "application/x-msgpack")
+                    return reply.status(200).send({
+                        "data_headers": generateDataHeaders({
+                            viewer_id: viewerId,
+                            result_code: AUTO_START_STOP_RESULT_CODE,
+                        }),
+                        "data": {},
+                    })
+                }
+                return reply.status(400).send({
+                    "error": "Bad Request",
+                    "message": error.message,
+                })
+            }
+            throw error
+        }
 
         const headers = generateDataHeaders({
             viewer_id: viewerId
@@ -398,9 +506,11 @@ const routes = async (fastify: FastifyInstance) => {
         return reply.status(200).send({
             "data_headers": headers,
             "data": {
-                "user_info": {
-                    "last_main_quest_id": body.quest_id
-                },
+                ...mergeCommonResponseFragments([{
+                    "user_info": {
+                        "last_main_quest_id": body.quest_id
+                    },
+                }]),
                 "is_multi": "single",
                 "start_time": headers['servertime'],
                 "quest_name": ""
@@ -422,7 +532,6 @@ const routes = async (fastify: FastifyInstance) => {
         const questType: ResetQuestType = body.quest_type
         const resetTargetId: number | undefined = body.reset_target_id
         const isResetAfterTargetRound: boolean | undefined = body.is_reset_after_target_round
-        console.log(`[RUSH] reset: viewer=${viewerId} eventId=${eventId} questType=${questType} resetTargetId=${resetTargetId} isResetAfterTarget=${isResetAfterTargetRound}`)
         if (!Number.isSafeInteger(viewerId) || viewerId <= 0
             || !Number.isSafeInteger(eventId) || eventId <= 0
             || (questType !== ResetQuestType.FOLDER && questType !== ResetQuestType.ENDLESS)
@@ -542,7 +651,6 @@ const routes = async (fastify: FastifyInstance) => {
         const body = request.body as { event_id: number, viewer_id: number, api_count: number };
         const viewerId = body.viewer_id;
         const eventId = body.event_id;
-        console.log(`[RUSH] reward: viewer=${viewerId} eventId=${eventId}`)
         if (!viewerId || isNaN(viewerId) || isNaN(eventId)) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         });
@@ -575,8 +683,6 @@ const routes = async (fastify: FastifyInstance) => {
             }
         }
 
-        console.log(`[RUSH] reward: rank=${rankNumber} rewards=${rewardList.length}`)
-
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
@@ -599,7 +705,6 @@ const routes = async (fastify: FastifyInstance) => {
         const body = request.body as { event_id: number, viewer_id: number, api_count: number };
         const viewerId = body.viewer_id;
         const eventId = body.event_id;
-        console.log(`[RUSH] endless_battle: viewer=${viewerId} eventId=${eventId}`)
         if (!viewerId || isNaN(viewerId) || isNaN(eventId)) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         });
@@ -620,8 +725,6 @@ const routes = async (fastify: FastifyInstance) => {
             : { endlessParties: null, folderParties: null }
         const maxRound = rushEventData?.endlessBattleMaxRound ?? null
         const nextRound = rushEventData?.endlessBattleNextRound ?? 1
-
-        console.log(`[RUSH] endless_battle: maxRound=${maxRound} nextRound=${nextRound}`)
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

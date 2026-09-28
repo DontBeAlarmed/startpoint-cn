@@ -59,7 +59,7 @@ Pass Category 7/8 的迁移保留了必要的前置写入：Category 7 在缺少
 
 第二阶段不能直接删除。任务奖励可能新增角色、装备或物品，当前行为会让相关进度在同一次任务页响应中立即更新，但不会在该请求内再次发奖。目标架构必须保留这一显示语义。
 
-此外，`patterns.ts` 当前在模块加载时建立普通对象索引。CN 启动顺序允许任务模块先于 Runtime Content snapshot 初始化，因此 bundled 表与 runtime 表不一致时，索引可能在进程启动后保持陈旧。
+D24 已删除旧 `patterns.ts` 索引外壳；definition、pattern、stage 与 Awake 角色索引统一由 snapshot-scoped `MissionCatalog` 持有。CN 启动阶段使用 bundled fallback，Runtime Content snapshot 就绪后按 repository identity 获得独立缓存，不会复用启动前索引。
 
 ## 设计边界
 
@@ -393,6 +393,48 @@ Settlement BASE fixture 与负载 reference 分别由固定无参数 generator
 普通 benchmark 不提供 reference 写入入口。
 
 整个优化路线完成后再执行全服务混合负载，覆盖登录、load、战斗、商店、抽卡、邮件和生产等价日志级别。联机与 Hub 留到可重复双服环境建立后加入。若混合负载失败，必须先 profile 到具体模块；日志、数据库写锁、商店、CDN 或 Hub 的瓶颈不得通过改造任务类别框架掩盖。
+
+## Sanctioned 边界（D24 Mission Owner 收口声明）
+
+按边界蓝图（Mission 拥有 catalog、candidate、fact evaluation、progress/stage、receipt 与奖励协调；只消费来源事实，不拥有来源状态），以下读写口径为声明式 sanctioned 边界：
+
+- **Typed read port**：Mission 对来源域（Growth/Inventory/Quest/Party/Shop/Pass/PassCard）的读取统一经 `src/lib/mission/production-fact-loaders.ts` 的 loader 注册表（按 FactKey 声明、惰性、批量、无全表扫描）；Active 引擎的 `active-fact-session` 同口径。computer 的 legacy `buildContext` 直读路径生产不可达（DEBT-T03 删除对象）。
+- **Receipt 层 sanctioned 写**：`grants.ts` 中 kind 6 只通过 `givePlayerDegreeSync` 增加称号所有权并返回 `degree_list`，不得修改 `players.degree_id` 或返回新的 `user_info.degree_id`；kind 7（Pass 点 `addPlayerPassCardPointWithChangeSync`）为收据层域函数写；kind 0-5 货币/资产一律经 RewardGrant typed plan（D17 合同），无旁路。
+- **Prepare 前置写**：`settlement-prepare` 的 pass 登录基线初始化（幂等）按 D15 蓝图保留。
+- **Quest 域计数归属**：multi-clear 计数自 D24 起由 multi settlement writer（`multi/settlement/orchestrator.ts`）在 quest 结算层调用，mission battle facts 只记录 mission 自有事实表。
+
+## H4 Active Mission 事实时点(2026-09-12 收口)
+
+Active Mission 的权威事实时点统一为 after-write 固定点:`publishActiveMissionOwnerStateWithinTransaction`
+(`src/lib/mission/active-publication-owner.ts`)要求调用方处于打开的业务事务中,在最后一个权威业务写之后执行,
+读取写后事实、一次收敛依赖链、返回 `activeMissionList` 增量;固定点或状态写失败与业务写同事务回滚,不做
+best-effort 吞错。owner 不拥有业务事务、不编码 HTTP 响应、不调用 Character Growth owner、不跨请求缓存。
+
+已接入入口(全部为「业务写之后、同事务、单次固定点、响应带增量」):
+
+| 入口 | 接线点 | source |
+|---|---|---|
+| 单人战斗 finish | `single-mission-publication.ts` | `single-finish` |
+| 多人战斗 finish | `multi/settlement/orchestrator.ts` | `multi-finish` |
+| 角色故事 finish | `routes/api/storyQuest.ts`(兼容 wrapper,等价 after-write) | — |
+| `/load` | `routes/cn/load.ts`(兼容 wrapper) | — |
+| 编队 /party/edit | `routes/api/party.ts` | `party/edit` |
+| 抽卡 exec | `gacha-owner/execute.ts` | `gacha/exec` |
+| 经验注入 | `character-growth/commands/inject-exp.ts` | `character-growth/inject-exp` |
+| 玛纳板学习/觉醒 | `learn-mana-nodes.ts` / `awake-mana-nodes.ts` | `character-growth/*` |
+| 装备觉醒/批量 | `routes/api/equipment.ts` | `equipment/*` |
+| 商店购买 | `shop/purchase-owner.ts` | `shop/purchase` |
+| 信赖之证领取 | `routes/api/character/bond.ts` | `character/receive_bond_token` |
+| 内容指南 start | `mission/contents-guide-start.ts` | `contents_guide/start`(含依赖固定点) |
+
+`active_mission_list` 是 `CommonResponseFragment` 的可选通用字段(追加语义合并);Active Mission 奖励仍由
+`/active_mission/receive` 手动领取,进度发布不自动发奖。pattern 57 显式声明 `questProgress` 事实。
+
+## D24 收口状态
+
+D24 已完成 Mission owner 收口。`master-data.ts`、`patterns.ts`、`stages.ts`、旧 Event/Fallback computer 与 Active raw-fact compatibility adapter 已退役；类别 1～10 的生产求值统一通过 `MissionEvaluationSession` 和必选的 `buildContextFromSession`，不再保留 legacy DB 直读 fallback。标准任务奖励继续由 category reward-stage definition 协调到 RewardGrant；Active plan 与 Awake 特殊奖励仍保持各自的权威来源。
+
+迁移期的 catalog wrapper、legacy/session equivalence 和 routing-fallback 场景已由 Catalog 合同、七类 actual family 行为测试、Awake 专项、事务回滚与结构性能基线替代。`mission_settlement_pipeline_interfaces.test.cjs` 只保留三段式 API 不从公共 barrel 暴露的运行时合同，不再冻结历史阶段名称、Task 编号或旧全量测试数量。DEBT-T03 与 DEBT-T04 均在 D24 关闭。
 
 ## 已知后续项
 

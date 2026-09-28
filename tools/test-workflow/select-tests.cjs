@@ -15,12 +15,40 @@ const HUB_AUTHENTICATION_GROUPS = [
 
 const SOURCE_RULES = [
     {
+        pattern: /^docs\/(?:architecture\/(?:README|domain-boundary-blueprint)|reference\/routes-status|status\/support-matrix)\.md$/,
+        groups: ["quick:workflow"],
+    },
+    {
+        pattern: /^(?:src\/data\/domains\/shopPurchase\.ts|tools\/shop_purchase_count_storage\.test\.cjs)$/,
+        groups: ["integration:database"],
+    },
+    {
+        pattern: /^(?:src\/data\/domains\/gacha(?:-lifecycle)?-state\.ts|tools\/schema25_gacha_state_migration\.test\.cjs)$/,
+        groups: ["integration:database", "integration:rules", "quick:gacha"],
+    },
+    {
+        pattern: /^src\/data\/domains\/reward-acquisition\.ts$/,
+        groups: ["integration:database", "integration:rules", "quick:gacha"],
+    },
+    {
+        pattern: /^src\/lib\/gacha-owner\/save-validation\.ts$/,
+        groups: ["integration:database"],
+    },
+    {
+        pattern: /^tools\/gacha_save_validation\.test\.cjs$/,
+        groups: ["integration:database"],
+    },
+    {
         pattern: /^tools\/character_growth_(?:lavu_orderings|gate_acceptance)\.test\.cjs$/,
         groups: ["quick:character-growth"],
     },
     {
         pattern: /^(?:src\/lib\/character-growth\/(?:response-projector|load-projector)\.ts|tools\/character_growth_(?:response_projector|load_projector|client_merge)\.test\.cjs)$/,
         groups: ["quick:character-growth"],
+    },
+    {
+        pattern: /^src\/lib\/character-growth\/bond-token-qualification\.ts$/,
+        groups: ["integration:mission", "quick:character-growth"],
     },
     {
         pattern: /^(?:src\/lib\/character-growth\/save\/.*\.ts|tools\/character_growth_save_validation\.test\.cjs)$/,
@@ -31,16 +59,12 @@ const SOURCE_RULES = [
         groups: ["quick:character-growth", "quick:character", "integration:database", "integration:mission"],
     },
     {
-        pattern: /^(?:src\/lib\/character-growth\/(?:model|errors|invariants|content-facts|request-context|batch-context|repository|result|resource-plan|node-state|node-command-support|mutation-support|exp-calculation|exp-caps|limits|commands\/(?:receive-bond-token|open-mana-board|learn-mana-nodes|awake-mana-nodes|inject-exp|stack-to-exp|bulk-stack-to-exp|over-limit|bulk-over-limit|grant-character-exp|grant-character-stack))\.ts|tools\/(?:character_growth_(?:core|context|bond_command|open_board_command|node_commands|awake_node_commands|node_transaction|exp_commands|stack_commands|over_limit_commands|exp_transaction)\.test\.cjs|helpers\/character-growth-c4-fixture\.cjs)|tools\/perf\/character_growth_context_admission\.test\.cjs)$/,
+        pattern: /^(?:src\/lib\/character-growth\/(?:model|errors|invariants|content-facts|request-context|batch-context|repository|result|resource-plan|node-state|node-command-support|mutation-support|exp-calculation|exp-caps|limits|commands\/(?:receive-bond-token|open-mana-board|learn-mana-nodes|awake-mana-nodes|inject-exp|stack-to-exp|bulk-stack-to-exp|over-limit|bulk-over-limit|grant-character-exp|grant-character-stack|set-character-metadata|set-ex-boost))\.ts|tools\/(?:character_growth_(?:core|context|bond_command|open_board_command|node_commands|awake_node_commands|node_transaction|exp_commands|stack_commands|over_limit_commands|exp_transaction|metadata_commands)\.test\.cjs|helpers\/character-growth-c4-fixture\.cjs)|tools\/perf\/character_growth_context_admission\.test\.cjs)$/,
         groups: ["quick:character-growth"],
     },
     {
         pattern: /^(?:src\/routes\/api\/character\/(?:bond|mana|mana-awake|mana-mutation-http)\.ts|src\/lib\/character-helpers\.ts|tools\/character_growth_(?:transaction|open_board_transaction|node_transaction)\.test\.cjs)$/,
         groups: ["quick:character"],
-    },
-    {
-        pattern: /^tools\/(?:active_mission_evaluator_equivalence\.test|helpers\/active-mission-legacy-evaluator)\.cjs$/,
-        groups: ["integration:mission"],
     },
     {
         pattern: /^tools\/helpers\/mission-degree-session-fixture\.cjs$/,
@@ -161,6 +185,41 @@ const SOURCE_RULES = [
         groups: ["quick:content"],
     },
     {
+        pattern: /^(?:src\/content\/runtime\/table-access\.ts|tools\/(?:content_runtime_index_(?:contract|boundary)\.test\.cjs|helpers\/content-snapshot-fixture\.cjs))$/,
+        groups: ["quick:content"],
+    },
+    {
+        pattern: /^(?:src\/lib\/(?:item-content|equipment-content)\.ts|tools\/item_equipment_content\.test\.cjs)$/,
+        groups: ["admin", "integration:quest", "integration:rules", "quick:content"],
+    },
+    {
+        pattern: /^(?:src\/lib\/equipment-dissolve\.ts|src\/routes\/api\/(?:equipment|sell)\.ts|tools\/equipment_dissolve\.test\.cjs)$/,
+        groups: ["admin", "integration:quest", "integration:rules", "quick:content"],
+    },
+    {
+        pattern: /^src\/lib\/quest\/finish\/raid-overall-rewards\.ts$/,
+        groups: ["integration:event", "integration:mission", "quick:content", "quick:quest"],
+    },
+    {
+        pattern: /^src\/lib\/quest\/periodic-reward-content\.ts$/,
+        groups: ["integration:event", "integration:mission", "quick:content", "quick:quest"],
+    },
+    {
+        pattern: /^(?:src\/lib\/config-content\.ts|tools\/config_content\.test\.cjs)$/,
+        groups: [
+            "admin",
+            "integration:database",
+            "integration:mission",
+            "integration:party",
+            "integration:quest",
+            "integration:reward-grant",
+            "integration:rules",
+            "quick:content",
+            "quick:gacha",
+            "quick:quest",
+        ],
+    },
+    {
         pattern: /^src\/lib\/character-content\.ts$/,
         groups: ["quick:content", "admin", "integration:quest"],
     },
@@ -169,6 +228,10 @@ const SOURCE_RULES = [
     {
         pattern: /^src\/routes\/cn\/load\.ts$/,
         groups: ["full", "integration:database", "integration:mission", "quick:protocol"],
+    },
+    {
+        pattern: /^(?:src\/routes\/api\/index\.ts|tools\/api_index_time_semantics\.test\.cjs)$/,
+        groups: ["full", "integration:database", "quick:runtime"],
     },
     {
         pattern: /^src\/routes\/cn\/tool\.ts$/,
@@ -242,7 +305,15 @@ const SOURCE_RULES = [
         groups: ["integration:mission", "integration:quest", "quick:quest"],
     },
     {
-        pattern: /^src\/lib\/quest\/finish\/single-settlement-(?:response-state|writes)\.ts$/,
+        pattern: /^src\/lib\/quest\/finish\/battle-(?:quest-progress-plan|settlement-values)\.ts$/,
+        groups: ["integration:party", "integration:quest", "quick:quest"],
+    },
+    {
+        pattern: /^tools\/battle_(?:quest_progress_plan|settlement_boundary|settlement_values)\.test\.cjs$/,
+        groups: ["integration:quest"],
+    },
+    {
+        pattern: /^src\/lib\/quest\/finish\/(?:single-quest-progress-write|single-settlement-(?:response-state|value-plan|writes))\.ts$/,
         groups: [
             "integration:compiled",
             "integration:event",
@@ -256,6 +327,14 @@ const SOURCE_RULES = [
     {
         pattern: /^src\/lib\/quest\/finish\/periodic-reward-handler\.ts$/,
         groups: ["integration:mission", "integration:party", "quick:quest"],
+    },
+    {
+        pattern: /^(?:src\/lib\/quest\/finish\/event-settlement-(?:descriptor|hook)\.ts|tools\/event_settlement_(?:descriptor|hook)\.test\.cjs)$/,
+        groups: ["integration:event"],
+    },
+    {
+        pattern: /^src\/lib\/quest\/finish\/single-event-settlement\.ts$/,
+        groups: ["integration:compiled", "integration:event", "integration:quest", "integration:reward-grant", "quick:modes", "quick:quest"],
     },
     {
         pattern: /^src\/lib\/quest\/finish\/single-response-projector\.ts$/,
@@ -282,10 +361,6 @@ const SOURCE_RULES = [
     {
         pattern: /^(?:src\/lib\/quest\/finish\/(?:single-settlement-reward-grant|single-standard-reward-callbacks)\.ts|tools\/(?:single_settlement_reward_grant|task23c_reward_grants)\.test\.cjs)$/,
         groups: ["integration:reward-grant"],
-    },
-    {
-        pattern: /^src\/lib\/quest\/finish\/single-mission-settlement\.ts$/,
-        groups: ["integration:mission", "integration:quest", "integration:reward-grant", "quick:quest"],
     },
     {
         pattern: /^(?:src\/lib\/quest\/score-reward-(?:selection(?:-core)?|normalization|projection|settlement)\.ts|docs\/systems\/quest-score-rewards\.md)$/,
@@ -367,6 +442,46 @@ const SOURCE_RULES = [
         groups: ["quick:gacha"],
     },
     {
+        pattern: /^(?:src\/lib\/gacha-catalog\/.*\.ts|tools\/gacha_catalog\.test\.cjs)$/,
+        groups: ["quick:content", "quick:gacha"],
+    },
+    {
+        pattern: /^src\/lib\/box-gacha-content\.ts$/,
+        groups: ["integration:event", "quick:content"],
+    },
+    {
+        pattern: /^tools\/box_gacha_content\.test\.cjs$/,
+        groups: ["quick:content"],
+    },
+    {
+        pattern: /^(?:src\/lib\/gacha-owner\/.*\.ts|src\/routes\/api\/gacha\/crazy-routes\.ts|tools\/gacha_(?:execution_owner|crazy_conversion)\.test\.cjs)$/,
+        groups: ["integration:rules", "quick:gacha"],
+    },
+    {
+        pattern: /^(?:assets\/star_crumb_exchange(?:_cost)?\.json|src\/lib\/star-crumb-exchange\/.*\.ts|src\/routes\/api\/exchange\.ts)$/,
+        groups: ["integration:rules", "quick:content"],
+    },
+    {
+        pattern: /^(?:assets\/bond_token_exchange\.json|src\/data\/domains\/bondTokenExchange\.ts|src\/lib\/bond-token-exchange\/.*\.ts)$/,
+        groups: ["integration:database", "integration:rules", "quick:content"],
+    },
+    {
+        pattern: /^src\/lib\/gacha-owner\/post-commit\.ts$/,
+        groups: ["integration:mission"],
+    },
+    {
+        pattern: /^(?:src\/content\/converters\/gacha\.ts|src\/lib\/types\/gacha\.ts|tools\/content_gacha_converter\.test\.cjs|assets\/(?:gacha(?:_campaign(?:_definitions)?|_exchange_rate|_pool)?|stars_gacha_campaign|equipment_lookup)\.json)$/,
+        groups: ["quick:content", "quick:gacha"],
+    },
+    {
+        pattern: /^src\/lib\/gacha-legacy-content\.ts$/,
+        groups: ["admin", "integration:rules", "quick:content", "quick:gacha"],
+    },
+    {
+        pattern: /^src\/lib\/admin-clairvoyance\.ts$/,
+        groups: ["admin", "quick:content", "quick:gacha"],
+    },
+    {
         pattern: /^src\/lib\/story-reward-grant\.ts$/,
         groups: ["integration:mission", "integration:quest"],
     },
@@ -379,12 +494,36 @@ const SOURCE_RULES = [
         groups: ["integration:mission", "integration:party"],
     },
     {
-        pattern: /^(?:src\/lib\/(?:event-shop-purchase|shop-reward-grant)\.ts|src\/lib\/economy\/free-first-deduction\.ts|src\/routes\/api\/shop\.ts)$/,
+        pattern: /^(?:src\/lib\/shop-reward-grant\.ts|src\/lib\/economy\/free-first-deduction\.ts|src\/routes\/api\/shop\.ts)$/,
         groups: ["integration:reward-grant", "integration:rules"],
     },
     {
         pattern: /^(?:src\/lib\/shop\/(?:index|purchase-plan|purchase-period|purchase-rewards|purchase-validation)\.ts|tools\/shop_purchase_plan\.test\.cjs)$/,
         groups: ["integration:rules"],
+    },
+    {
+        pattern: /^(?:src\/lib\/shop\/(?:owner|purchase-owner|payment-adapter|equipment-enhancement-adapter|pass-card-adapter|result)\.ts|tools\/shop_purchase_owner\.test\.cjs)$/,
+        groups: ["integration:rules"],
+    },
+    {
+        pattern: /^(?:src\/lib\/shop\/response-projector\.ts|tools\/shop_response_projector\.test\.cjs)$/,
+        groups: ["integration:rules"],
+    },
+    {
+        pattern: /^src\/lib\/shop\/sales-catalog\.ts$/,
+        groups: ["integration:event", "integration:rules"],
+    },
+    {
+        pattern: /^src\/lib\/shop\/sales-stock\.ts$/,
+        groups: ["integration:event", "quick:content"],
+    },
+    {
+        pattern: /^src\/lib\/rush-final-operation-override\.ts$/,
+        groups: ["integration:event", "integration:rules", "quick:content"],
+    },
+    {
+        pattern: /^src\/routes\/api\/shop\/purchase-routes\.ts$/,
+        groups: ["integration:event", "integration:mission", "integration:rules"],
     },
     {
         pattern: /^(?:src\/lib\/mail-reward-grant\.ts|src\/routes\/api\/mail\.ts|docs\/systems\/mail\.md)$/,
@@ -411,6 +550,18 @@ const SOURCE_RULES = [
         groups: ["quick:content"],
     },
     {
+        pattern: /^src\/lib\/shop\/(?:catalog|model)\.ts$/,
+        groups: ["integration:event", "integration:rules"],
+    },
+    {
+        pattern: /^src\/lib\/event-currency\.ts$/,
+        groups: ["integration:rules"],
+    },
+    {
+        pattern: /^src\/lib\/shop-select-campaign\.ts$/,
+        groups: ["integration:event", "integration:rules"],
+    },
+    {
         pattern: /^(?:src\/lib\/item-overflow\/direct-settlement\.ts|tools\/item_overflow_direct_settlement\.test\.cjs)$/,
         groups: ["integration:database", "integration:rules"],
     },
@@ -419,8 +570,8 @@ const SOURCE_RULES = [
         groups: ["integration:reward-grant"],
     },
     {
-        pattern: /^src\/routes\/api\/gacha\.ts$/,
-        groups: ["integration:reward-grant", "integration:rules", "quick:gacha"],
+        pattern: /^src\/routes\/api\/gacha(?:\.ts|\/exchange-routes\.ts)$/,
+        groups: ["integration:reward-grant", "integration:rules", "quick:content", "quick:gacha"],
     },
     {
         pattern: /^src\/routes\/api\/tutorial\.ts$/,
@@ -450,6 +601,34 @@ const SOURCE_RULES = [
         groups: ["integration:quest", "quick:quest"],
     },
     {
+        pattern: /^src\/lib\/(?:quest-content|player-rank-content|stamina)\.ts$/,
+        groups: ["integration:mission", "integration:party", "integration:quest", "quick:content"],
+    },
+    {
+        pattern: /^src\/lib\/quest-entry-content\.ts$/,
+        groups: ["integration:party", "integration:quest", "integration:rules", "quick:content"],
+    },
+    {
+        pattern: /^src\/lib\/quest\/daily-challenge\.ts$/,
+        groups: ["admin", "integration:database", "integration:quest", "quick:content", "quick:quest"],
+    },
+    {
+        pattern: /^src\/lib\/mission\/awake-rule-catalog\.ts$/,
+        groups: ["integration:mission"],
+    },
+    {
+        pattern: /^(?:src\/lib\/encyclopedia-content\.ts|src\/routes\/api\/encyclopedia\.ts|tools\/encyclopedia_content\.test\.cjs)$/,
+        groups: ["quick:content"],
+    },
+    {
+        pattern: /^src\/content\/validation\/(?:runtime-table|item-equipment-output|quest-derived-output|additional-reward-output|periodic-reward-output)\.ts$/,
+        groups: ["quick:content"],
+    },
+    {
+        pattern: /^src\/lib\/rescue-fragment-content\.ts$/,
+        groups: ["integration:party", "quick:content"],
+    },
+    {
         pattern: /^src\/lib\/mission\/awake-unlock\.ts$/,
         groups: ["integration:mission", "integration:mission-compiled"],
     },
@@ -474,6 +653,18 @@ const SOURCE_RULES = [
         groups: ["quick:character", "integration:database"],
     },
     {
+        pattern: /^(?:assets\/ex_(?:ability|boost|status)\.json|src\/lib\/ex-boost-content\.ts)$/,
+        groups: ["integration:database", "quick:character", "quick:content"],
+    },
+    {
+        pattern: /^(?:assets\/character_election\.json|src\/lib\/character-election\.ts|src\/routes\/api\/characterElection\.ts|src\/data\/domains\/character_election\.ts)$/,
+        groups: ["integration:mission", "quick:content"],
+    },
+    {
+        pattern: /^tools\/(?:ex_boost_content|character_election_content|exchange_content_boundary)\.test\.cjs$/,
+        groups: ["quick:content"],
+    },
+    {
         pattern: /^(?:src\/routes\/api\/(?:equipment|item|sell)\.ts|src\/lib\/item-sell\.ts)$/,
         groups: ["integration:rules"],
     },
@@ -486,16 +677,28 @@ const SOURCE_RULES = [
         groups: ["integration:rules"],
     },
     {
-        pattern: /^src\/lib\/mission\/(?:battle-facts|event-battle-facts|event-entry-facts|computer-event|coverage-audit|computer-degree|degree-battle-facts|degree-candidates|degree-context-requirements|degree-operation-facts)\.ts$/,
+        pattern: /^src\/lib\/mission\/(?:battle-facts|event-battle-facts|event-coverage-report|event-entry-facts|coverage-audit|computer-degree|degree-battle-facts|degree-candidates|degree-context-requirements|degree-operation-facts)\.ts$/,
         groups: ["integration:mission"],
     },
     {
-        pattern: /^(?:src\/lib\/mission\/(?:awake-eligibility|awake-evaluation-settlement|awake-request-context(?:-scope|-state)?|awake-reward-facts|awake-settlement|awake-unlock|awake-unlock-response|compute-awake-summary|evaluation-session|fact-loaders|index|mission-catalog|mission-catalog-source|production-fact-loaders)\.ts|src\/data\/domains\/(?:character_clear|party_co_clear)\.ts|tools\/mission_awake_reward_owner\.test\.cjs)$/,
+        pattern: /^src\/lib\/mission\/(?:registry|rewards|computer-awake|computer-event-safe|client-progress|daily-battle-facts|pass-battle-facts|event-single-clear-rules|login-fact-settlement|story-fact-settlement)\.ts$/,
+        groups: ["integration:mission"],
+    },
+    {
+        pattern: /^(?:src\/lib\/mission\/(?:awake-eligibility|awake-evaluation-settlement|awake-request-context(?:-scope|-state)?|awake-reward-facts|awake-settlement|awake-unlock|awake-unlock-response|compute-awake-summary|evaluation-session|event-content|fact-loaders|index|mission-catalog|mission-catalog-source|production-fact-loaders)\.ts|src\/data\/domains\/(?:character_clear|party_co_clear)\.ts|tools\/mission_awake_reward_owner\.test\.cjs)$/,
         groups: ["integration:mission"],
     },
     {
         pattern: /^tools\/helpers\/mission-evaluation-(?:rejected-(?:observer|promise)-worker|session-fixture)\.cjs$/,
         groups: ["integration:mission"],
+    },
+    {
+        pattern: /^tools\/helpers\/(?:mission-session-context|active-mission-fact-progress)\.cjs$/,
+        groups: ["integration:mission"],
+    },
+    {
+        pattern: /^tools\/(?:event_content_boundary|mission_catalog_startup_boundary|quest_practice_content_boundary|stamina_content_boundary)\.test\.cjs$/,
+        groups: ["quick:content"],
     },
     {
         pattern: /^tools\/helpers\/awake-owner-fact-publication-fixture\.cjs$/,
@@ -538,11 +741,11 @@ const SOURCE_RULES = [
         groups: ["integration:mission"],
     },
     {
-        pattern: /^(?:tools\/awake_request_context\.test\.cjs|tools\/awake_reconcile_callsite_matrix\.test\.cjs|tools\/perf\/awake_request_context_(?:admission|baseline|report|runner|scenarios)(?:\.test)?\.cjs|tools\/perf\/__snapshots__\/awake_request_context_baseline\.json)$/,
+        pattern: /^(?:tools\/awake_request_context\.test\.cjs|tools\/character_growth_writer_boundary\.test\.cjs|tools\/perf\/awake_request_context_(?:admission|baseline|report|runner|scenarios)(?:\.test)?\.cjs|tools\/perf\/__snapshots__\/awake_request_context_baseline\.json)$/,
         groups: ["integration:mission"],
     },
     {
-        pattern: /^(?:tools\/awake_reconcile_owner_call_inventory\.json|tools\/perf\/awake_owner_focused_(?:admission|baseline(?:\.test)?|fixture|observer|report|scenarios)\.cjs|tools\/perf\/__snapshots__\/awake_owner_focused_baseline\.json)$/,
+        pattern: /^(?:tools\/perf\/awake_owner_focused_(?:admission|baseline(?:\.test)?|fixture|observer|report|scenarios)\.cjs|tools\/perf\/__snapshots__\/awake_owner_focused_baseline\.json)$/,
         groups: ["integration:mission"],
     },
     {
@@ -632,7 +835,7 @@ const SOURCE_RULES = [
     },
     { pattern: /^tools\/perf\/hub_baseline(?:_helpers)?\.cjs$/, groups: ["integration:multi-hub"] },
     {
-        pattern: /^src\/multi\/settlement\/(?:orchestrator|response)\.ts$/,
+        pattern: /^src\/multi\/settlement\/(?:orchestrator|quest-progress-write|response|value-plan)\.ts$/,
         groups: ["integration:mission", "integration:party"],
     },
     {
@@ -642,11 +845,11 @@ const SOURCE_RULES = [
     { pattern: /^src\/multi\//, groups: ["quick:protocol", "integration:multi-hub"] },
     { pattern: /^src\/multi\/tcp\/server\.ts$/, groups: ["integration:runtime"] },
     {
-        pattern: /^src\/data\/(?!player-save\/|defaultSave\.ts$|domains\/(?:gift|item-maintenance|news)\.ts$|schema\/server-(?:gifts|news)\.ts$)/,
+        pattern: /^src\/data\/(?!player-save\/|defaultSave\.ts$|domains\/(?:bondTokenExchange|gift|item-maintenance|news)\.ts$|schema\/server-(?:gifts|news)\.ts$)/,
         groups: ["integration:database", "full"],
     },
     {
-        pattern: /^src\/routes\/(?!api\/(?:gift|news|singleBattleQuest)\.ts$|web_api\/)/,
+        pattern: /^src\/routes\/(?!api\/(?:encyclopedia|exchange|gift|news|singleBattleQuest)\.ts$|api\/gacha\/crazy-routes\.ts$|web_api\/)/,
         groups: ["full"],
     },
 ]

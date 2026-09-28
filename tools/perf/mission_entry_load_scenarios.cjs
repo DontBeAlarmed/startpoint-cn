@@ -3,6 +3,7 @@
 require("ts-node/register/transpile-only")
 
 const crypto = require("node:crypto")
+const fs = require("node:fs")
 const path = require("node:path")
 const Fastify = require("fastify")
 const { pack, unpack } = require("msgpackr")
@@ -38,12 +39,69 @@ function getRuntimeDependencies(runtimeRoot = projectRoot) {
     const character = fromRuntime("src/data/domains/character")
     const mission = fromRuntime("src/data/domains/mission")
     const player = fromRuntime("src/data/domains/player")
-    const assets = fromRuntime("src/lib/assets")
+    // D27 C6 deleted the assets barrel on current trees; archived BASE
+    // runtimes still ship it and the legacy growth readers in
+    // characterGrowthCompat below fall back to those names.
+    const assetsPath = path.join(resolvedRoot, "src/lib/assets")
+    const assetsExists = [".ts", ".js", ".cjs"].some(extension =>
+        fs.existsSync(`${assetsPath}${extension}`),
+    )
+    const assets = assetsExists ? fromRuntime("src/lib/assets") : null
     const characterLib = fromRuntime("src/lib/character")
     const awakeSettlement = fromRuntime("src/lib/mission/awake-settlement")
     const battleFacts = fromRuntime("src/lib/mission/battle-facts")
-    const patterns = fromRuntime("src/lib/mission/patterns")
-    const stages = fromRuntime("src/lib/mission/stages")
+    // Wrapper retirement (D24 C2) moved stage/pattern helpers into the
+    // catalog on current trees; archived BASE runtimes still ship the old
+    // wrapper modules. Merge whatever exists and adapt the legacy names.
+    const missionCompat = {}
+    for (const modulePath of [
+        "src/lib/mission/mission-catalog",
+        "src/lib/mission/patterns",
+        "src/lib/mission/stages",
+    ]) {
+        const absolutePath = path.join(resolvedRoot, modulePath)
+        const exists = [".ts", ".js", ".cjs"].some(extension =>
+            fs.existsSync(`${absolutePath}${extension}`),
+        )
+        if (exists) Object.assign(missionCompat, fromRuntime(modulePath))
+    }
+    const missionCatalog = missionCompat
+    if (typeof missionCompat.isMissionEnabledAt !== "function" && typeof missionCompat.getMissionCatalog === "function") {
+        missionCompat.isMissionEnabledAt = (category, missionId, at, eventId) => (
+            missionCompat.getMissionCatalog().isEnabledAt(category, missionId, at, eventId)
+        )
+    }
+    if (typeof missionCompat.getMissionIdsByCategory !== "function" && typeof missionCompat.getMissionCatalog === "function") {
+        missionCompat.getMissionIdsByCategory = category => (
+            missionCompat.getMissionCatalog().getMissionIds(category)
+        )
+    }
+    // C3-Growth moved the character/growth readers out of assets on current
+    // trees; archived BASE runtimes still ship them under the legacy names.
+    // Merge the typed modules when present and adapt the legacy readers.
+    const characterGrowthCompat = {}
+    for (const modulePath of [
+        "src/lib/character-content",
+        "src/lib/character-growth-content",
+    ]) {
+        const absolutePath = path.join(resolvedRoot, modulePath)
+        const exists = [".ts", ".js", ".cjs"].some(extension =>
+            fs.existsSync(`${absolutePath}${extension}`),
+        )
+        if (exists) Object.assign(characterGrowthCompat, fromRuntime(modulePath))
+    }
+    if (typeof characterGrowthCompat.getCharacterFacts !== "function") {
+        characterGrowthCompat.getCharacterFacts = () => ({
+            get: characterId => assets.getCharacterDataSync(characterId),
+        })
+    }
+    if (typeof characterGrowthCompat.getCharacterGrowthContent !== "function") {
+        characterGrowthCompat.getCharacterGrowthContent = () => ({
+            getManaBoardNodes: (characterId, level) => (
+                assets.getCharacterManaNodesSync(characterId, level)
+            ),
+        })
+    }
     const { getComputer } = fromRuntime("src/lib/mission/registry")
     const { settleMissionCategories } = fromRuntime("src/lib/mission/settlement")
     const missionRoutes = fromRuntime("src/routes/api/mission").default
@@ -62,10 +120,13 @@ function getRuntimeDependencies(runtimeRoot = projectRoot) {
         ...player,
         ...assets,
         ...characterLib,
+        ...characterGrowthCompat,
         ...awakeSettlement,
         ...battleFacts,
-        ...patterns,
-        ...stages,
+        ...missionCatalog,
+        isMissionEnabledAt: (category, missionId, at, eventId) => (
+            missionCatalog.getMissionCatalog().isEnabledAt(category, missionId, at, eventId)
+        ),
         bondRoutes,
         getComputer,
         getTimeOffset,

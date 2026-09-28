@@ -575,5 +575,5 @@ D14 已完成 C1-C6 迁移，没有保留方案 A facade 或 Growth 双写。唯
 | `/load` 完整投影 | `src/lib/character-growth/load-projector.ts`、`src/data/utils/serialize-player.ts` |
 | v2 save 投影与终态校验 | `src/lib/character-growth/save/project-growth-state.ts`、`validate-growth-state.ts`、`src/data/player-save/v2.ts` |
 | 两种可达成长顺序 | `tools/character_growth_lavu_orderings.test.cjs`、`tools/character_growth_gate_acceptance.test.cjs` |
-| owner 与事务边界 | `tools/awake_reconcile_callsite_matrix.test.cjs`、`tools/character_growth_owner_transactions.test.cjs`、`tools/character_growth_transaction.test.cjs` |
+| owner 与事务边界 | `tools/character_growth_writer_boundary.test.cjs`（D23 起的最小依赖 guard，替代已删除的 D14 迁移期 AST 矩阵）、`tools/character_growth_owner_transactions.test.cjs`、`tools/character_growth_transaction.test.cjs` |
 | SQL 与性能 admission | `tools/perf/character_growth_context_admission.test.cjs`、`tools/perf/awake_owner_focused_baseline.test.cjs`、`tools/perf/single_battle_settlement_baseline.test.cjs`、`tools/perf/multi_settlement_baseline.test.cjs` |

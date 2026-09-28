@@ -47,6 +47,7 @@ const {
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getMergedPlayerDataSync } = require("../src/data/utils/player-data")
 const { serializePlayerData } = require("../src/data/utils/serialize-player")
+const { buildMissionComputerContext } = require("./helpers/mission-session-context.cjs")
 const {
     CollectComputer,
     getCollectMissionItemId,
@@ -80,7 +81,7 @@ assert.equal(getPlayerCollectedItemTotalSync(playerId, 80001), 10)
 assert.equal(grantInventoryFixtureItemSync(playerId, 80001, 4), 7)
 assert.equal(getPlayerCollectedItemTotalSync(playerId, 80001), 14)
 
-const collectContext = CollectComputer.buildContext(playerId, 4)
+const collectContext = buildMissionComputerContext(playerId, 4, undefined, { computer: CollectComputer })
 assert.equal(CollectComputer.compute(1500, collectContext, 0), 14)
 
 assert.throws(() => db.transaction(() => {

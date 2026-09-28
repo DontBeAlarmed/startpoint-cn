@@ -69,7 +69,9 @@ test("single battle baseline captures isolated real Fastify and SQLite scenarios
     assert.ok(first.observedRewards.score.length > 0)
     assert.ok(first.observedRewards.additional.length > 0)
     assert.ok(first.observedRewards.mission.length > 0)
-    assert.ok(first.observedRewards.awake.length > 0)
+    // Finish records Awake progress only; page-owned category 9 rewards stay
+    // unclaimed so the battle response observes no awake reward entries.
+    assert.deepEqual(first.observedRewards.awake, [])
 
     const repeated = report.scenarios.finish_repeat_clear.behavior
     assert.deepEqual(repeated.second.observedRewards.firstClear, [])

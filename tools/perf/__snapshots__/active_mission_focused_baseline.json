@@ -5141,7 +5141,7 @@
         },
         "items": [
           {
-            "id": 992001,
+            "id": 1,
             "amount": 1
           }
         ],
@@ -5351,35 +5351,35 @@
         },
         "items": [
           {
-            "id": 992001,
+            "id": 1,
             "amount": 1
           },
           {
-            "id": 992002,
+            "id": 2,
             "amount": 1
           },
           {
-            "id": 992003,
+            "id": 3,
             "amount": 1
           },
           {
-            "id": 992004,
+            "id": 4,
             "amount": 1
           },
           {
-            "id": 992005,
+            "id": 5,
             "amount": 1
           },
           {
-            "id": 992006,
+            "id": 6,
             "amount": 1
           },
           {
-            "id": 992007,
+            "id": 7,
             "amount": 1
           },
           {
-            "id": 992008,
+            "id": 8,
             "amount": 1
           }
         ],
@@ -6045,131 +6045,131 @@
         },
         "items": [
           {
-            "id": 992001,
+            "id": 1,
             "amount": 1
           },
           {
-            "id": 992002,
+            "id": 2,
             "amount": 1
           },
           {
-            "id": 992003,
+            "id": 3,
             "amount": 1
           },
           {
-            "id": 992004,
+            "id": 4,
             "amount": 1
           },
           {
-            "id": 992005,
+            "id": 5,
             "amount": 1
           },
           {
-            "id": 992006,
+            "id": 6,
             "amount": 1
           },
           {
-            "id": 992007,
+            "id": 7,
             "amount": 1
           },
           {
-            "id": 992008,
+            "id": 8,
             "amount": 1
           },
           {
-            "id": 992009,
+            "id": 9,
             "amount": 1
           },
           {
-            "id": 992010,
+            "id": 10,
             "amount": 1
           },
           {
-            "id": 992011,
+            "id": 11,
             "amount": 1
           },
           {
-            "id": 992012,
+            "id": 12,
             "amount": 1
           },
           {
-            "id": 992013,
+            "id": 13,
             "amount": 1
           },
           {
-            "id": 992014,
+            "id": 14,
             "amount": 1
           },
           {
-            "id": 992015,
+            "id": 15,
             "amount": 1
           },
           {
-            "id": 992016,
+            "id": 16,
             "amount": 1
           },
           {
-            "id": 992017,
+            "id": 42,
             "amount": 1
           },
           {
-            "id": 992018,
+            "id": 43,
             "amount": 1
           },
           {
-            "id": 992019,
+            "id": 44,
             "amount": 1
           },
           {
-            "id": 992020,
+            "id": 45,
             "amount": 1
           },
           {
-            "id": 992021,
+            "id": 46,
             "amount": 1
           },
           {
-            "id": 992022,
+            "id": 47,
             "amount": 1
           },
           {
-            "id": 992023,
+            "id": 48,
             "amount": 1
           },
           {
-            "id": 992024,
+            "id": 49,
             "amount": 1
           },
           {
-            "id": 992025,
+            "id": 50,
             "amount": 1
           },
           {
-            "id": 992026,
+            "id": 51,
             "amount": 1
           },
           {
-            "id": 992027,
+            "id": 52,
             "amount": 1
           },
           {
-            "id": 992028,
+            "id": 53,
             "amount": 1
           },
           {
-            "id": 992029,
+            "id": 54,
             "amount": 1
           },
           {
-            "id": 992030,
+            "id": 55,
             "amount": 1
           },
           {
-            "id": 992031,
+            "id": 56,
             "amount": 1
           },
           {
-            "id": 992032,
+            "id": 57,
             "amount": 1
           }
         ],
@@ -6310,16 +6310,11 @@
       "rewardState": {
         "player": {
           "freeVmoney": 115,
-          "freeMana": 2020,
-          "expPool": 13,
-          "totalManaObtained": 20
+          "freeMana": 2000,
+          "expPool": 0,
+          "totalManaObtained": 0
         },
-        "items": [
-          {
-            "id": 910001,
-            "amount": 2
-          }
-        ],
+        "items": [],
         "characters": [
           {
             "id": 1,
@@ -6327,7 +6322,7 @@
             "evolutionLevel": 0,
             "overLimitStep": 0,
             "protection": 0,
-            "exp": 23,
+            "exp": 10,
             "stack": 0,
             "manaBoardIndex": 1,
             "exBoostStatusId": null,

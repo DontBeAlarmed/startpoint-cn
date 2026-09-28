@@ -117,6 +117,11 @@ export function matchesActiveMissionQuestRange(
         && matchesOptionalSelector(range.questNumbers, questId % 1_000)
 }
 
+/** Active Mission 事实域的统一 EX（category 4）关卡 id 命名空间：+10_000_000。 */
+export function normalizeActiveMissionQuestNamespace(category: number, questId: number): number {
+    return category === 4 && questId < 10_000_000 ? questId + 10_000_000 : questId
+}
+
 /** 兼容 34.3 已发布的命名；新代码统一使用 matchesActiveMissionQuestRange。 */
 export const matchesPlannedActiveMissionQuestRange = matchesActiveMissionQuestRange
 

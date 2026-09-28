@@ -1,4 +1,3 @@
-import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
 import {
     getActiveMissionPlan,
     getActiveMissionPlanRewardStages,
@@ -29,7 +28,6 @@ export interface ActiveMissionQuestProgress {
 }
 
 export interface ActiveMissionAvailabilityContext {
-    readonly repository: ReadonlyContentRepository
     readonly plan?: ActiveMissionPlan
     readonly now: number | Date
     readonly activeMissions: Readonly<Record<string, ActiveMissionProgressState>>
@@ -51,30 +49,26 @@ export interface ActiveMissionProgressSettlement {
 }
 
 export interface ActiveMissionProgressSettlementOptions {
-    readonly repository?: ReadonlyContentRepository
     readonly plan?: ActiveMissionPlan
     readonly clearSeconds?: number
 }
 
 export function getActiveMissionRewardStageIds(
     missionId: number,
-    repository: ReadonlyContentRepository,
     plan?: ActiveMissionPlan,
 ): number[] {
-    return getActiveMissionPlanRewardStages(plan ?? getActiveMissionPlan(repository), missionId)
+    return getActiveMissionPlanRewardStages(plan ?? getActiveMissionPlan(), missionId)
         .map(stage => stage.stage)
 }
 
 function isMissionCurrentStageComplete(
     missionId: number,
     state: ActiveMissionProgressState | undefined,
-    repository: ReadonlyContentRepository,
-    plan?: ActiveMissionPlan,
+    plan: ActiveMissionPlan,
 ): boolean {
-    const resolvedPlan = plan ?? getActiveMissionPlan(repository)
-    const stageIds = getActiveMissionRewardStageIds(missionId, repository, resolvedPlan)
+    const stageIds = getActiveMissionRewardStageIds(missionId, plan)
     if (stageIds.length === 0) return false
-    const rewardStages = getActiveMissionPlanRewardStages(resolvedPlan, missionId)
+    const rewardStages = getActiveMissionPlanRewardStages(plan, missionId)
     const progress = state?.progress ?? 0
     for (const stage of stageIds) {
         const definition = rewardStages.find(candidate => candidate.stage === stage)
@@ -86,10 +80,9 @@ function isMissionCurrentStageComplete(
 export function getActiveMissionEventReleasePhase(
     eventId: number,
     activeMissions: Readonly<Record<string, ActiveMissionProgressState>>,
-    repository: ReadonlyContentRepository,
     plan?: ActiveMissionPlan,
 ): number {
-    const resolvedPlan = plan ?? getActiveMissionPlan(repository)
+    const resolvedPlan = plan ?? getActiveMissionPlan()
     const maxPhase = resolvedPlan.getEvent(eventId)?.maxPhase
     if (maxPhase === undefined || maxPhase <= 0) return 0
 
@@ -102,7 +95,6 @@ export function getActiveMissionEventReleasePhase(
         if (!phaseMissions.every(mission => isMissionCurrentStageComplete(
             mission.missionId,
             activeMissions[String(mission.missionId)],
-            repository,
             resolvedPlan,
         ))) break
         releasedPhase = phase + 1
@@ -113,13 +105,12 @@ export function getActiveMissionEventReleasePhase(
 function isStageReceivedAndComplete(
     activeMissions: Readonly<Record<string, ActiveMissionProgressState>>,
     reference: ActiveMissionStageReference | undefined,
-    repository: ReadonlyContentRepository,
-    plan?: ActiveMissionPlan,
+    plan: ActiveMissionPlan,
 ): boolean {
     if (!reference) return true
     const state = activeMissions[String(reference.missionId)]
     const definition = getActiveMissionPlanRewardStages(
-        plan ?? getActiveMissionPlan(repository),
+        plan,
         reference.missionId,
     ).find(stage => stage.stage === reference.stage)
     return state?.stages?.[String(reference.stage)] === true
@@ -143,7 +134,7 @@ function isActiveMissionUsable(
     period: "enable" | "show",
 ): boolean {
     try {
-        const plan = context.plan ?? getActiveMissionPlan(context.repository)
+        const plan = context.plan ?? getActiveMissionPlan()
         const mission = plan.getMission(missionId)?.mission
         if (!mission) return false
         const event = plan.getEvent(mission.eventId)
@@ -164,19 +155,16 @@ function isActiveMissionUsable(
             || (mission.phase !== undefined && mission.phase > getActiveMissionEventReleasePhase(
                 mission.eventId,
                 context.activeMissions,
-                context.repository,
                 plan,
             ))
             || !isStageReceivedAndComplete(
                 context.activeMissions,
                 mission.need,
-                context.repository,
                 plan,
             )
             || !isStageReceivedAndComplete(
                 context.activeMissions,
                 mission.show,
-                context.repository,
                 plan,
             )) {
             return false
@@ -210,7 +198,7 @@ export function settleActiveMissionProgress(
     if (!Number.isFinite(authoritativeProgress) || authoritativeProgress < 0) {
         throw new TypeError("Active Mission absolute progress must be a finite non-negative number.")
     }
-    const plan = options.plan ?? getActiveMissionPlan(options.repository)
+    const plan = options.plan ?? getActiveMissionPlan()
     const mission = plan.getMission(missionId)
     if (!mission) {
         throw new TypeError(`Unknown Active Mission ${missionId}.`)

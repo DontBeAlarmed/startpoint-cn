@@ -19,7 +19,7 @@ const MODE_CAPABILITIES = [
     "mode.hook.quest-start@1",
     "mode.hook.rush-finish@1",
     "mode.hook.rush-parties-serialized@1",
-    "mode.host.base-table@1",
+    "mode.host.content-query@1",
     "mode.host.transaction-server@1",
 ]
 
@@ -117,7 +117,7 @@ test("builds the exact frozen v1 capabilities body from local public facts", () 
             patchVersions: ["1.4.55", "1.4.58"],
         },
         modes: {
-            api: 1,
+            api: 2,
             serverCapabilities: MODE_CAPABILITIES,
             loaded: [{
                 name: "fixture",

@@ -1,5 +1,6 @@
 import path from "node:path"
 
+import { parseGameCalendarUtcOffsetMinutes } from "../../time/game-calendar"
 import {
     runContentSync,
     type ContentSyncMode,
@@ -86,10 +87,14 @@ export async function runContentSyncCli(
 
     try {
         const { mode } = parseContentSyncArguments(argv)
+        const env = dependencies.env ?? process.env
         const result = await runSync({
             projectRoot,
-            env: dependencies.env ?? process.env,
+            env,
             mode,
+            gameCalendarUtcOffsetMinutes: parseGameCalendarUtcOffsetMinutes(
+                env.GAME_CALENDAR_UTC_OFFSET_MINUTES,
+            ),
         })
         stdout.write(`${JSON.stringify(printableResult(result))}\n`)
         setExitCode(0)

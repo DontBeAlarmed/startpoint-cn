@@ -9,8 +9,26 @@ const {
     installBundledGameplaySnapshot,
 } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 
+function raidOverallRewardRow(eventId) {
+    const row = Array(37).fill("")
+    row[0] = String(eventId)
+    row[2] = "0"
+    row[3] = "1"
+    row[7] = "0"
+    row[8] = "40001"
+    row[9] = "1"
+    return row
+}
+
 test("gameplay readers use the active Content snapshot instead of static bundled tables", t => {
     const restore = installBundledGameplaySnapshot({
+        additionalTableNames: [
+            "gacha.json",
+            "gacha_pool.json",
+            "gacha_campaign_definitions.json",
+            "stars_gacha_campaign.json",
+            "gacha_exchange_rate.json",
+        ],
         tableOverrides: {
             "box_gacha.json": {
                 "77": { itemId: 70077, count: 10, availableCounts: { "1": 2 } },
@@ -44,7 +62,7 @@ test("gameplay readers use the active Content snapshot instead of static bundled
                 },
             },
             "equipment_gacha_movie_probability.json": {
-                "fixture": {
+                "77": {
                     stringId: "fixture",
                     probabilityEruption: 0.5,
                     probabilityTreasureUp3To5: 0,
@@ -54,6 +72,14 @@ test("gameplay readers use the active Content snapshot instead of static bundled
                     guaranteeProbabilityTreasureUp4To5: 0,
                     guaranteeProbabilityTreasureUp3To4: 0,
                 },
+            },
+            "gacha.json": {},
+            "gacha_pool.json": {},
+            "gacha_campaign_definitions.json": {},
+            "stars_gacha_campaign.json": {},
+            "gacha_exchange_rate.json": {
+                character: { "3": 250, "4": 250, "5": 250 },
+                equipment: { "3": 250, "4": 250, "5": 250 },
             },
             "ex_boost.json": {
                 "99001": { tier: 3, count: 2, element: 4 },
@@ -67,16 +93,16 @@ test("gameplay readers use the active Content snapshot instead of static bundled
                 "5": { dissolve_craft: 91, awakening_craft: 92, dissolve_star: 93 },
             },
             "equipment_dissolve.json": {
-                "9950001": {
-                    ability_soul_id: 9950002,
+                "5950001": {
+                    ability_soul_id: 5950002,
                     obtain_source: 0,
                     generate_ability_soul: true,
                     max_level: 5,
                 },
             },
-            "equipment_ids.json": [9950001],
+            "equipment_ids.json": [5950001],
             "equipment_lookup.json": {
-                "9950001": { name: "快照装备", rarity: "5", category: "未分类" },
+                "5950001": { name: "快照装备", rarity: "5", category: "未分类" },
             },
             "item_data.json": {
                 "990100": { effectKind: 3, effectValue: 75 },
@@ -118,13 +144,20 @@ test("gameplay readers use the active Content snapshot instead of static bundled
             "raid_event.json": {
                 "77": { requiredKillCount: 321 },
             },
+            "raid_event_overall_reward.json": {
+                "77": [raidOverallRewardRow(77)],
+            },
         },
     })
     t.after(restore)
 
     const carnival = require("../src/lib/carnival-rewards")
+    const boxGachaContent = require("../src/lib/box-gacha-content")
+    const equipmentContent = require("../src/lib/equipment-content")
     const equipmentMovie = require("../src/lib/gacha-equipment-movie")
-    const assets = require("../src/lib/assets")
+    const exBoostContent = require("../src/lib/ex-boost-content")
+    const itemContent = require("../src/lib/item-content")
+    const growthContent = require("../src/lib/character-growth-content")
     const raid = require("../src/lib/raid-event-master")
 
     assert.deepEqual(carnival.getCarnivalRewardDefinitions(77), [{
@@ -136,37 +169,38 @@ test("gameplay readers use the active Content snapshot instead of static bundled
     }])
     assert.equal(carnival.getCarnivalRewardDefinitions(1).length, 0)
     assert.equal(
-        equipmentMovie.getEquipmentGachaMovieProbabilitySync("fixture").probabilityEruption,
+        equipmentMovie.getEquipmentGachaMovieProbabilitySync("77").probabilityEruption,
         0.5,
     )
     assert.equal(equipmentMovie.getEquipmentGachaMovieProbabilitySync("1"), null)
-    assert.deepEqual(assets.getExBoostItemSync(99001), { tier: 3, count: 2, element: 4 })
-    assert.equal(assets.getExBoostItemSync(10001), null)
-    assert.deepEqual(assets.getExStatusPoolSync(2), [992])
-    assert.deepEqual(assets.getEquipmentCraftSync(5), {
+    const exCatalog = exBoostContent.getExBoostContentCatalog()
+    assert.deepEqual(exCatalog.resolveMaterial(99001), { tier: 3, count: 2, element: 4 })
+    assert.equal(exCatalog.resolveMaterial(10001), null)
+    assert.deepEqual(exCatalog.resolveStatusPool(2), [992])
+    assert.deepEqual(equipmentContent.getEquipmentCraftSync(5), {
         dissolve_craft: 91,
         awakening_craft: 92,
         dissolve_star: 93,
     })
-    assert.deepEqual(assets.getEquipmentDissolveSync(9950001), {
-        ability_soul_id: 9950002,
+    assert.deepEqual(equipmentContent.getEquipmentDissolveSync(5950001), {
+        ability_soul_id: 5950002,
         obtain_source: 0,
         generate_ability_soul: true,
         max_level: 5,
     })
-    assert.deepEqual(assets.getItemEffectSync(990100), { effectKind: 3, effectValue: 75 })
-    assert.deepEqual(assets.getItemSaleSync(990100), {
+    assert.deepEqual(itemContent.getItemEffectSync(990100), { effectKind: 3, effectValue: 75 })
+    assert.deepEqual(itemContent.getItemSaleSync(990100), {
         category: 9,
         sale_price: 77,
         sellable: true,
     })
-    assert.deepEqual(assets.getEquipmentIdsSync(), [9950001])
-    assert.deepEqual(assets.getEquipmentLookupSync(), {
-        "9950001": { name: "快照装备", rarity: "5", category: "未分类" },
+    assert.deepEqual(equipmentContent.getEquipmentIdsSync(), [5950001])
+    assert.deepEqual(equipmentContent.getEquipmentLookupSync(), {
+        "5950001": { name: "快照装备", rarity: "5", category: "未分类" },
     })
-    assert.deepEqual(assets.getItemIdsSync(), [990100])
-    assert.deepEqual(assets.getItemLookupSync(), { "990100": "快照体力药" })
-    assert.deepEqual(assets.getCharacterManaNodesSync(99101, 1), {
+    assert.deepEqual(itemContent.getItemIdsSync(), [990100])
+    assert.deepEqual(itemContent.getItemLookupSync(), { "990100": "快照体力药" })
+    assert.deepEqual(growthContent.getCharacterGrowthContent().getManaBoardNodes(99101, 1), {
         "9910101": {
             items: { "1": 3 },
             manaCost: 60,
@@ -175,13 +209,16 @@ test("gameplay readers use the active Content snapshot instead of static bundled
             field6: "1",
         },
     })
-    assert.equal(assets.getCharacterManaBoardCountSync(99101), 1)
-    assert.equal(assets.getCharacterManaNodesSync(1, 1), null)
-    assert.deepEqual(assets.getManaNodeAwakeCost(99101, 9910101, 5), {
+    assert.equal(growthContent.getCharacterGrowthContent().getManaBoardCount(99101), 1)
+    assert.equal(growthContent.getCharacterGrowthContent().getManaBoardNodes(1, 1), null)
+    assert.deepEqual(growthContent.getCharacterGrowthContent().getManaNodeAwakeCost(99101, 9910101, 5), {
         items: { "1": 3 },
         manaAmount: 100,
     })
-    assert.deepEqual(assets.getBoxGachaSync(77), {
+    assert.deepEqual(boxGachaContent.getBoxGachaContent(
+        boxGachaContent.getBoxGachaContentCatalog(),
+        77,
+    ), {
         redeemItemId: 70077,
         redeemItemCount: 10,
         boxes: {
@@ -201,6 +238,9 @@ test("gameplay readers use the active Content snapshot instead of static bundled
             },
         },
     })
-    assert.equal(assets.getBoxGachaSync(1), null)
+    assert.equal(boxGachaContent.getBoxGachaContent(
+        boxGachaContent.getBoxGachaContentCatalog(),
+        1,
+    ), null)
     assert.equal(raid.getRaidEventRequiredKillCount(77), 321)
 })

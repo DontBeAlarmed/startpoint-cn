@@ -35,6 +35,16 @@ initializeDatabase({
         verbose: sql => sqlStatements.push(sql),
     }),
 })
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot({
+        additionalTableNames: [
+            "player_history.json",
+            "player_history_card_background.json",
+            "player_history_topic.json",
+        ],
+    })
+const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+test.after(() => { restoreContentSnapshot() })
 setServerTime(new Date("2025-07-25T00:00:00.000Z"))
 const db = getDb()
 const account = insertAccountSync({
@@ -145,8 +155,9 @@ async function createApp() {
     if (profile?.default) {
         await app.register(profile.default, { prefix: "/api/index.php/profile" })
     }
-    if (social?.followCompatibilityRoutes) {
-        await app.register(social.followCompatibilityRoutes, { prefix: "/api/index.php/follow" })
+    const follow = optionalModule("../src/routes/api/follow")
+    if (follow?.default) {
+        await app.register(follow.default, { prefix: "/api/index.php/follow" })
     }
     if (social?.snsCompatibilityRoutes) {
         await app.register(social.snsCompatibilityRoutes, { prefix: "/api/index.php/sns" })
@@ -294,6 +305,41 @@ test("player history milestones roll back with their caller transaction", () => 
         throw new Error("injected rollback")
     })(), /injected rollback/)
     assert.deepEqual(getPlayerHistoryMilestonesSync(otherPlayer.id), [])
+})
+
+test("player history windows open at the CN calendar boundary under offset 480", () => {
+    const restoreBoundarySnapshot = installBundledGameplaySnapshot({
+        additionalTableNames: [
+            "player_history.json",
+            "player_history_card_background.json",
+            "player_history_topic.json",
+        ],
+        tableOverrides: {
+            "player_history.json": {
+                "1": [[
+                    "player_history",
+                    "2025-07-17 12:00:00",
+                    "2025-07-17 12:00:00",
+                    "2099-12-31 23:59:59",
+                ]],
+            },
+        },
+    })
+    try {
+        const { loadPlayerHistoryCatalog } = require("../src/lib/player-history-catalog")
+        assert.throws(
+            () => loadPlayerHistoryCatalog(Date.parse("2025-07-17T03:59:59.999Z")),
+            /no history period is available/,
+            "history must still be closed one millisecond before the CN boundary",
+        )
+        assert.equal(
+            loadPlayerHistoryCatalog(Date.parse("2025-07-17T04:00:00.000Z")).playerHistoryId,
+            1,
+            "master start 2025-07-17 12:00:00 must open at 04:00:00.000Z (UTC+8), not 03:00:00.000Z",
+        )
+    } finally {
+        restoreBoundarySnapshot()
+    }
 })
 
 test("opening player history never backfills missing milestones", async () => {
@@ -512,7 +558,7 @@ test("follow and SNS compatibility routes return explicit empty client data", as
 test("CN server registers player history and social compatibility route families", () => {
     const serverSource = fs.readFileSync(path.join(__dirname, "../src/cn-server.ts"), "utf8")
     assert.match(serverSource, /playerHistoryApiPlugin/)
-    assert.match(serverSource, /followCompatibilityRoutes/)
+    assert.match(serverSource, /followApiPlugin/)
     assert.match(serverSource, /snsCompatibilityRoutes/)
     assert.match(serverSource, /\$\{apiPrefix\}\/player_history/)
     assert.match(serverSource, /\$\{apiPrefix\}\/follow/)

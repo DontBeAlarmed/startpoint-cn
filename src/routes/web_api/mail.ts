@@ -3,7 +3,8 @@ import { getAllAccountsSync, getAccountPlayersSync, getAccountSync } from "../..
 import { insertMailSync } from "../../data/domains/mail"
 import { getPlayerSync } from "../../data/domains/player"
 import { wantsJson } from "./http"
-import { getEquipmentIdsSync, getItemIdsSync } from "../../lib/assets"
+import { getEquipmentIdsSync } from "../../lib/equipment-content"
+import { getItemIdsSync } from "../../lib/item-content"
 import { isValidCharacterId } from "./validation"
 import {
     ADMIN_MAIL_MAX_INT,
@@ -12,8 +13,10 @@ import {
 } from "../../lib/admin-mail-rules"
 import { getGameTimeContext } from "../../runtime/time/game-time"
 import { clientSerializeDate } from "../../data/utils/date"
-import bundledItemMaxCounts from "../../../assets/item_max_count.json"
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
+import {
+    findItemInventoryPolicy,
+    getItemInventoryPolicyCatalog,
+} from "../../lib/inventory/item-inventory-policy"
 
 const VALID_MAIL_TYPES: Set<number> = new Set([1, 4, 5, 6, 7, 8, 9, 10])
 
@@ -106,10 +109,7 @@ const routes = async (fastify: FastifyInstance) => {
         const desc = body.description && body.description.trim() ? body.description.trim() : null
 
         const itemMaxCount = mailType === 1 && typeId !== null
-            ? getRuntimeContentTableSync<Readonly<Record<string, number>>>(
-                "item_max_count.json",
-                bundledItemMaxCounts,
-            )[String(typeId)]
+            ? findItemInventoryPolicy(getItemInventoryPolicyCatalog(), typeId)?.maxCount
             : undefined
         const attachmentValidation = validateMailAttachment({
             mailType,
@@ -165,11 +165,15 @@ const routes = async (fastify: FastifyInstance) => {
             time.virtualNowMs + expirationDays * 24 * 60 * 60 * 1000,
         ))
         let sentCount = 0
+        // CN 客户端 MailReasonLogic：reason_id 不在 ReasonTable 且 subject+description
+        // 均有值时按自定义文案渲染。官方 DummyMailRepository 以 999998 标记此类邮件
+        //（CDN reason.json 不含 999998，含 999999 兜底）。无自定义文案时保持 0。
+        const reasonId = subject !== null && desc !== null ? 999998 : 0
 
         for (const playerId of targetPlayerIds) {
             try {
                 insertMailSync(playerId, {
-                    reason_id: 0,
+                    reason_id: reasonId,
                     subject,
                     description: desc,
                     type: mailType,

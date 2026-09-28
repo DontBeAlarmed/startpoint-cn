@@ -1,6 +1,18 @@
 require("ts-node/register/transpile-only");
 
 const assert = require("assert");
+const { after } = require("node:test");
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+  .installBundledGameplaySnapshot({
+    additionalTableNames: [
+      "gacha.json",
+      "gacha_pool.json",
+      "gacha_campaign_definitions.json",
+      "stars_gacha_campaign.json",
+      "gacha_exchange_rate.json",
+    ],
+  });
+after(restoreContentSnapshot);
 
 const {
   computeEquipmentGachaMovieEffects,
@@ -51,16 +63,13 @@ assert.deepStrictEqual(
   },
 );
 
-assert.deepStrictEqual(
-  computeEquipmentGachaMovieEffectsForGacha(
+assert.throws(
+  () => computeEquipmentGachaMovieEffectsForGacha(
     { equipmentMovieProbabilityId: "missing" },
     [{ id: 5020008, rank: 5, isGuarantee: false }],
     neverRoll,
   ),
-  {
-    isErupt: false,
-    draws: [{ equipmentId: 5020008, treasureUpType: 0 }],
-  },
+  /profile does not exist/,
 );
 
 assert.deepStrictEqual(

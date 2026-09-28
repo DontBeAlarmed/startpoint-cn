@@ -17,7 +17,49 @@ const previousDataDirectory = process.env.DATA_DIR
 process.env.DATA_DIR = databaseDirectory
 
 const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
-    .installBundledGameplaySnapshot()
+    .installBundledGameplaySnapshot({
+        tableOverrides: {
+            "equipment_craft.json": {
+                "1": { dissolve_craft: 1, awakening_craft: 5, dissolve_star: 0 },
+                "2": { dissolve_craft: 2, awakening_craft: 10, dissolve_star: 0 },
+                "3": { dissolve_craft: 3, awakening_craft: 15, dissolve_star: 1 },
+                "5": { dissolve_craft: 5, awakening_craft: 25, dissolve_star: 15 },
+            },
+            "equipment_dissolve.json": {
+                "1111001": {
+                    ability_soul_id: 1111001,
+                    obtain_source: 0,
+                    generate_ability_soul: false,
+                    max_level: 5,
+                },
+                "2222001": {
+                    ability_soul_id: 2222001,
+                    obtain_source: 0,
+                    generate_ability_soul: false,
+                    max_level: 5,
+                },
+                "3333001": {
+                    ability_soul_id: 3333001,
+                    obtain_source: 0,
+                    generate_ability_soul: true,
+                    max_level: 5,
+                },
+                "100001": {
+                    ability_soul_id: 100001,
+                    obtain_source: 1,
+                    generate_ability_soul: true,
+                    max_level: 5,
+                },
+            },
+            "equipment_ids.json": [1111001, 2222001, 3333001, 100001],
+            "equipment_lookup.json": {
+                "1111001": { name: "测试装备A", rarity: "1", category: "未分类" },
+                "2222001": { name: "测试装备B", rarity: "2", category: "未分类" },
+                "3333001": { name: "无关测试装备", rarity: "3", category: "未分类" },
+                "100001": { name: "主线宝珠", rarity: "5", category: "主线宝珠" },
+            },
+        },
+    })
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const {
@@ -40,6 +82,7 @@ const CRAFT_POINT_ITEM_ID = 100000
 const EQUIPMENT_A = 1111001
 const EQUIPMENT_B = 2222001
 const UNRELATED_EQUIPMENT = 3333001
+const SUBMILLION_EQUIPMENT = 100001
 const MISSING_EQUIPMENT = 4444001
 const EXPECTED_MAX_EQUIPMENT_BATCH_IDS = 32765
 const BOUNDARY_EQUIPMENT_IDS = Array.from(
@@ -99,7 +142,11 @@ function equipmentSelects(statements) {
     ))
 }
 
-function assertSingleBatchReadAndFullResponse(statements, uniqueIdCount) {
+function assertSingleBatchReadAndFullResponse(
+    statements,
+    uniqueIdCount,
+    { ownerEquipmentFactRead = false } = {},
+) {
     const selects = equipmentSelects(statements)
     const batchReads = selects.filter(statement => /\bid\s+IN\s*\(/i.test(statement))
     const singleReads = selects.filter(statement => /\bid\s*=\s*/i.test(statement))
@@ -107,7 +154,14 @@ function assertSingleBatchReadAndFullResponse(statements, uniqueIdCount) {
 
     assert.equal(batchReads.length, 1, selects.join("\n---\n"))
     assert.equal(singleReads.length, 0, selects.join("\n---\n"))
-    assert.equal(fullReads.length, 1, selects.join("\n---\n"))
+    // One full read projects the response inventory; upgrade routes add a
+    // second constant full read for the H4 owner's after-write equipment
+    // fact snapshot (sell routes produce no mission facts and read once).
+    assert.equal(
+        fullReads.length,
+        ownerEquipmentFactRead ? 2 : 1,
+        selects.join("\n---\n"),
+    )
 
     const inValues = batchReads[0].match(/\bid\s+IN\s*\(([^)]*)\)/i)?.[1]
     assert.ok(inValues, batchReads[0])
@@ -219,7 +273,7 @@ test("bulk_upgrade reads unique requested equipment once and returns the full in
     }))
 
     const responseData = decodeSuccess(response)
-    assertSingleBatchReadAndFullResponse(statements, 3)
+    assertSingleBatchReadAndFullResponse(statements, 3, { ownerEquipmentFactRead: true })
     assert.deepEqual(equipmentById(responseData, EQUIPMENT_A), {
         equipment_id: EQUIPMENT_A,
         protection: false,
@@ -266,6 +320,78 @@ test("sell_stack aggregates duplicate entries from one requested-equipment snaps
     assert.equal(equipmentById(responseData, EQUIPMENT_A).stack, 1)
     assert.equal(equipmentById(responseData, EQUIPMENT_B).stack, 1)
     assert.ok(equipmentById(responseData, UNRELATED_EQUIPMENT))
+})
+
+test("single equipment upgrade uses lookup rarity for sub-million equipment", async () => {
+    const { playerId, viewerId } = await createPlayer("submillion-upgrade")
+    addEquipment(playerId, SUBMILLION_EQUIPMENT, { stack: 1 })
+    setInventoryFixtureItemExactSync(playerId, CRAFT_POINT_ITEM_ID, 25)
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/equipment/upgrade",
+        payload: {
+            viewer_id: viewerId,
+            equipment_id: SUBMILLION_EQUIPMENT,
+            use_stack: true,
+            upgrade_count: 1,
+        },
+    })
+    const responseData = decodeSuccess(response)
+    assert.equal(equipmentById(responseData, SUBMILLION_EQUIPMENT).level, 2)
+    assert.equal(getPlayerItemSync(playerId, CRAFT_POINT_ITEM_ID), 0)
+})
+
+test("single equipment sell uses lookup rarity for sub-million equipment", async () => {
+    const { playerId, viewerId } = await createPlayer("submillion-sell-equipment")
+    addEquipment(playerId, SUBMILLION_EQUIPMENT, { stack: 0 })
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/equipment/sell_equipment",
+        payload: {
+            viewer_id: viewerId,
+            equipment_list: [{ equipment_id: SUBMILLION_EQUIPMENT }],
+        },
+    })
+    const responseData = decodeSuccess(response)
+    assert.equal(responseData.data.item_list[CRAFT_POINT_ITEM_ID], 5)
+    assert.equal(getPlayerEquipmentSync(playerId, SUBMILLION_EQUIPMENT), null)
+})
+
+test("bulk equipment sell uses lookup rarity for sub-million equipment", async () => {
+    const { playerId, viewerId } = await createPlayer("submillion-bulk-sell")
+    addEquipment(playerId, SUBMILLION_EQUIPMENT, { stack: 1 })
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/equipment/bulk_sell_stack",
+        payload: {
+            viewer_id: viewerId,
+            equipment_ids: [SUBMILLION_EQUIPMENT],
+        },
+    })
+    const responseData = decodeSuccess(response)
+    assert.equal(responseData.data.item_list[CRAFT_POINT_ITEM_ID], 5)
+    assert.equal(getPlayerEquipmentSync(playerId, SUBMILLION_EQUIPMENT).stack, 0)
+})
+
+test("bulk equipment upgrade uses lookup rarity for sub-million equipment", async () => {
+    const { playerId, viewerId } = await createPlayer("submillion-bulk-upgrade")
+    addEquipment(playerId, SUBMILLION_EQUIPMENT, { stack: 1 })
+    setInventoryFixtureItemExactSync(playerId, CRAFT_POINT_ITEM_ID, 25)
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/equipment/bulk_upgrade",
+        payload: {
+            viewer_id: viewerId,
+            equipment_ids: [SUBMILLION_EQUIPMENT],
+        },
+    })
+    const responseData = decodeSuccess(response)
+    assert.equal(equipmentById(responseData, SUBMILLION_EQUIPMENT).level, 2)
+    assert.equal(getPlayerItemSync(playerId, CRAFT_POINT_ITEM_ID), 0)
 })
 
 test("bulk_sell_stack deduplicates IDs, skips missing equipment, and returns the full inventory", async () => {

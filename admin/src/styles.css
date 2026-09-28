@@ -925,12 +925,13 @@ html[data-theme="dark"] {
     column-gap: 32px;
   }
 
-  /* explicit placement: left column 版本 → 来源与存储, right column 覆盖范围 → 内容摘要 → Snapshot 中已声明补丁 */
+  /* explicit placement: left column 版本 → 来源与存储, right column 覆盖范围 → 内容摘要 → 游戏日历 → Snapshot 中已声明补丁 */
   .admin-dash-cols > .admin-dash-section:nth-child(1) { grid-area: 1 / 1; }
   .admin-dash-cols > .admin-dash-section:nth-child(2) { grid-area: 2 / 1; }
   .admin-dash-cols > .admin-dash-section:nth-child(3) { grid-area: 1 / 2; }
   .admin-dash-cols > .admin-dash-section:nth-child(4) { grid-area: 2 / 2; }
   .admin-dash-cols > .admin-dash-section:nth-child(5) { grid-area: 3 / 2; }
+  .admin-dash-cols > .admin-dash-section:nth-child(6) { grid-area: 4 / 2; }
 }
 
 .admin-dash-section-body {

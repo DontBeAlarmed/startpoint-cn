@@ -233,6 +233,25 @@ export function receiveAllMailsSync(
 }
 
 /**
+ * Batch-marks unreceived mails as received; returns the number of rows marked.
+ * Same per-row guard as receiveMailSync's UPDATE (owner + still unreceived).
+ */
+export function markPlayerMailsReceivedSync(
+    playerId: number,
+    mailIds: readonly number[],
+): number {
+    const ids = [...new Set(mailIds)]
+    if (ids.length === 0) return 0
+    const now = getRealNow().toISOString().replace('T', ' ').substring(0, 19)
+    const placeholders = ids.map(() => "?").join(", ")
+    return getDb().prepare(
+        `UPDATE players_mails
+        SET receive_time = ?
+        WHERE player_id = ? AND receive_time = '0000-00-00 00:00:00' AND id IN (${placeholders})`,
+    ).run(now, playerId, ...ids).changes
+}
+
+/**
  * Deletes all mail for a player (admin recovery: clear mailbox).
  * @returns number of mail rows deleted.
  */
@@ -266,6 +285,40 @@ export function insertReceiveHistorySync(
         INSERT INTO players_receive_history (player_id, type, type_id, number, reason_id, create_time)
         VALUES (?, ?, ?, ?, ?, ?)
     `).run(playerId, record.type, record.type_id, record.number, record.reason_id ?? 0, now)
+}
+
+export function insertReceiveHistoryBatchSync(
+    playerId: number,
+    records: readonly {
+        readonly type: number
+        readonly type_id: number | null
+        readonly number: number
+        readonly reason_id?: number
+    }[],
+    occurredAt: Date = getRealNow(),
+): void {
+    if (records.length === 0) return
+    if (!Number.isSafeInteger(playerId) || playerId <= 0 || !Number.isFinite(occurredAt.getTime())) {
+        throw new TypeError("Invalid receive history batch identity or time")
+    }
+    const createTime = occurredAt.toISOString().replace("T", " ").substring(0, 19)
+    const values = records.flatMap(record => [
+        playerId,
+        record.type,
+        record.type_id,
+        record.number,
+        record.reason_id ?? 0,
+        createTime,
+    ])
+    const placeholders = records.map(() => "(?, ?, ?, ?, ?, ?)").join(", ")
+    const result = getDb().prepare(`
+        INSERT INTO players_receive_history (
+            player_id, type, type_id, number, reason_id, create_time
+        ) VALUES ${placeholders}
+    `).run(...values)
+    if (result.changes !== records.length) {
+        throw new Error("Receive history batch did not write every entry")
+    }
 }
 
 export function getReceiveHistorySync(

@@ -1,23 +1,10 @@
-import { getPlayerCollectedItemTotalsSync, getPlayerItemsSync } from "../../data/domains/item"
-import { getPlayerCategoryMissionsSync } from "../../data/domains/mission"
-import { getPlayerSync } from "../../data/domains/player"
-import { getPlayerQuestProgressSync } from "../../data/domains/quest"
-import { getPlayerCharactersManaNodesSync, getPlayerCharactersSync } from "../../data/domains/character"
-import { getPlayerEquipmentListSync } from "../../data/domains/equipment"
-import { getPlayerPartyGroupListSync } from "../../data/domains/party"
+import type { PlayerQuestProgress } from "../../data/types"
 import {
-    ContentSnapshotError,
     getContentSnapshot,
 } from "../../content/runtime/content-snapshot"
 import { buildCharacterStoryQuestIndex } from "./character-queries"
 import { characterExpCaps } from "../character"
 import { readonlyMap, readonlySet } from "./degree-immutable"
-import bundledCharacters from "../../../assets/character.json"
-import bundledCharacterQuests from "../../../assets/character_quest_lookup.json"
-import bundledEquipmentDissolve from "../../../assets/equipment_dissolve.json"
-import bundledItemSale from "../../../assets/item_sale.json"
-import bundledMainQuests from "../../../assets/main_quest.json"
-import bundledManaBoard from "../../../assets/mana_board.json"
 import {
     getMissionCatalog,
     getMissionCatalogContentTable,
@@ -42,7 +29,6 @@ type RawManaBoardTable = Record<string, Record<string, Record<string, readonly u
 
 const staticIndexByRepository = new WeakMap<object, EventCurrentStateStaticIndex>()
 const staticIndexByCatalog = new WeakMap<MissionCatalog, EventCurrentStateStaticIndex>()
-let bundledStaticIndex: EventCurrentStateStaticIndex | undefined
 
 function unavailableStaticIndex(): EventCurrentStateStaticIndex {
     return Object.freeze({
@@ -60,18 +46,6 @@ export function getEventCurrentStateMissionIds(): readonly number[] {
         .filter(([, rule]) => rule.kind === "currentState")
         .map(([missionId]) => missionId)
         .sort((left, right) => left - right)
-}
-
-function getEnabledEventCurrentStateMissionIds(
-    catalog: MissionCatalog,
-    evaluationTime: Date,
-): readonly number[] {
-    if (!Number.isFinite(evaluationTime.getTime())) return []
-    return [...getEventRuleCatalog(catalog)]
-        .filter(([missionId, rule]) => (
-            rule.kind === "currentState" && catalog.isEnabledAt(3, missionId, evaluationTime)
-        ))
-        .map(([missionId]) => missionId)
 }
 
 function getOfficialManaNodeIds(
@@ -243,23 +217,8 @@ export function getEventCurrentStateStaticIndex(
         const built = buildStaticIndex(<T>(tableName: string) => repository.table<T>(tableName))
         staticIndexByRepository.set(repository, built)
         return built
-    } catch (error) {
-        if (!(error instanceof ContentSnapshotError)
-            || error.code !== "CONTENT_SNAPSHOT_NOT_INITIALIZED") {
-            return unavailableStaticIndex()
-        }
-        if (!bundledStaticIndex) {
-            const tables: Readonly<Record<string, unknown>> = {
-                "character.json": bundledCharacters,
-                "character_quest_lookup.json": bundledCharacterQuests,
-                "equipment_dissolve.json": bundledEquipmentDissolve,
-                "item_sale.json": bundledItemSale,
-                "main_quest.json": bundledMainQuests,
-                "mana_board.json": bundledManaBoard,
-            }
-            bundledStaticIndex = buildStaticIndex(<T>(tableName: string) => tables[tableName] as T)
-        }
-        return bundledStaticIndex
+    } catch {
+        return unavailableStaticIndex()
     }
 }
 
@@ -373,7 +332,7 @@ export function getEventItemMissionItemId(missionId: number): number | undefined
 }
 
 export function buildEventSafeQuestProgress(
-    rawProgress: ReturnType<typeof getPlayerQuestProgressSync>,
+    rawProgress: Readonly<Record<string, readonly PlayerQuestProgress[]>>,
 ): CategoryContext["questProgress"] {
     return Object.fromEntries(Object.entries(rawProgress).map(([category, progress]) => [
         category,
@@ -390,54 +349,6 @@ export function buildEventSafeQuestProgress(
 
 export const EventSafeComputer: MissionComputer = {
     name: "EventSafe",
-
-    buildContext(playerId: number, category: number, evaluationTime: Date): CategoryContext {
-        const player = getPlayerSync(playerId)
-        if (!player) throw new Error(`Player ${playerId} not found during event mission evaluation.`)
-        const rawProgress = getPlayerQuestProgressSync(playerId)
-        const catalog = getMissionCatalog()
-        const eventRules = getEventRuleCatalog(catalog)
-        const currentStateMissionIds = [...eventRules]
-            .filter(([, rule]) => rule.kind === "currentState")
-            .map(([missionId]) => missionId)
-        const includeCurrentState = getEnabledEventCurrentStateMissionIds(
-            catalog,
-            evaluationTime,
-        ).length > 0
-        return {
-            category,
-            playerId,
-            player,
-            questProgress: buildEventSafeQuestProgress(rawProgress),
-            totalQuestClears: 0,
-            totalStories: 0,
-            rankCounts: {},
-            eventRules,
-            collectedItemTotals: getPlayerCollectedItemTotalsSync(playerId),
-            eventMissionProgress: new Map(
-                Object.entries(getPlayerCategoryMissionsSync(playerId, 3))
-                    .map(([missionId, mission]) => [Number(missionId), mission.progress] as const),
-            ),
-            ...(includeCurrentState ? {
-                eventCurrentState: deriveEventCurrentState(
-                    {
-                        characters: getPlayerCharactersSync(playerId),
-                        characterManaNodes: getPlayerCharactersManaNodesSync(playerId),
-                        questProgress: buildEventSafeQuestProgress(rawProgress),
-                        equipment: getPlayerEquipmentListSync(playerId),
-                        items: getPlayerItemsSync(playerId),
-                        partyGroups: getPlayerPartyGroupListSync(playerId),
-                    },
-                    getEventCurrentStateStaticIndex(catalog),
-                    currentStateMissionIds,
-                    missionId => {
-                        const rule = eventRules.get(missionId)
-                        return rule?.kind === "currentState" ? rule.rule : undefined
-                    },
-                ),
-            } : {}),
-        }
-    },
 
     buildContextFromSession(session, category, missionIds): CategoryContext {
         const { buildEventCategoryContextFromSession } = require("./event-session-context") as

@@ -6,8 +6,9 @@ import {
 } from "../../../data/domains/character"
 import type { PlayerCharacter } from "../../../data/types"
 import { incrementActiveMissionUsedManaCountSync } from "../../../data/domains/active_mission_counters"
+import { publishActiveMissionOwnerStateWithinTransaction } from "../../mission/active-publication-owner"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
-import { getManaNodeAwakeCost } from "../../assets"
+import { getCharacterGrowthContent } from "../../character-growth-content"
 import { buildCharacterEvolutionResponse } from "../../character-evolution"
 import { withInventoryBatchContextWithinTransactionSync } from "../../inventory"
 import type { BondTokenStatus, CharacterGrowthCoreFact } from "../model"
@@ -49,6 +50,7 @@ export interface AwakeManaNodesResult extends CharacterGrowthCommandResult {
     readonly evolution: Object
     readonly responseNodeEntries: readonly { readonly multiplied_id: number; readonly awake_level: number }[]
     readonly missionFacts: Readonly<{ readonly usedMana: number }>
+    readonly activeMissionList: readonly unknown[]
 }
 
 function validateCommand(command: AwakeManaNodesCommand): readonly number[] {
@@ -101,7 +103,7 @@ export function executeAwakeManaNodes(command: AwakeManaNodesCommand): AwakeMana
         const awakeCosts: Record<string, { manaCost: number; items: Record<string, number> }> = {}
         for (const nodeId of requestedNodeIds) {
             if ((boardLevels.get(nodeId) ?? 0) >= command.targetAwakeLevel) continue
-            const cost = getManaNodeAwakeCost(command.characterId, nodeId, character.rarity)
+            const cost = getCharacterGrowthContent().getManaNodeAwakeCost(command.characterId, nodeId, character.rarity)
             if (cost === null) {
                 throw growthError("AWAKE_COST_MISSING", `awake cost for node ${nodeId} is unavailable.`)
             }
@@ -203,6 +205,11 @@ export function executeAwakeManaNodes(command: AwakeManaNodesCommand): AwakeMana
             } : {}),
             missionSettlement: null,
             missionFacts: { usedMana: resources?.totalManaCost ?? 0 },
+            activeMissionList: publishActiveMissionOwnerStateWithinTransaction({
+                playerId: command.playerId,
+                now: command.evaluationTime,
+                source: "character-growth/awake-mana-nodes",
+            }).activeMissionList,
             replayed: false,
             character: characterData,
             responseNodeEntries: plan.responseNodeEntries,

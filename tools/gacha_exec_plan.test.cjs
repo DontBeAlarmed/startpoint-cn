@@ -28,6 +28,7 @@ const equipmentGacha = {
   type: 1,
   singleCost: 75,
   multiCost: 750,
+  discountCost: 25,
   onceTicketItemId: 20005,
   tenTicketItemId: 20006,
 };
@@ -89,27 +90,13 @@ assert.deepStrictEqual(
   buildGachaExecPlan({
     gacha: characterGacha,
     paymentType: GACHA_PAYMENT_TYPES.TICKET,
-    execType: GACHA_EXEC_TYPES.MULTI_TICKET,
+    execType: GACHA_EXEC_TYPES.MULTI_CONFIGURED_TICKET,
     numberOfExec: 2,
     playerFunds,
     playerGachaData,
     getTicketCount: (itemId) => itemId === 20002 ? 2 : 0,
   }),
-  {
-    ok: true,
-    plan: {
-      pullCount: 20,
-      freeVmoney: 1000,
-      paidVmoney: 800,
-      ticket: {
-        itemId: 20002,
-        beforeCount: 2,
-        afterCount: 0,
-        useTicketCount: 2,
-      },
-      campaign: null,
-    },
-  },
+  { ok: false, status: 400, message: "Invalid number of gacha executions." },
 );
 
 assert.deepStrictEqual(
@@ -149,8 +136,8 @@ assert.deepStrictEqual(
       pageKind: GACHA_PAGE_KINDS.TEN_TIMES_PER_ACCOUNT,
       tenTimesPerAccountCost: 1000,
     },
-    paymentType: GACHA_PAYMENT_TYPES.FREE_VMONEY,
-    execType: GACHA_EXEC_TYPES.VMONEY_MULTI,
+    paymentType: GACHA_PAYMENT_TYPES.VMONEY,
+    execType: GACHA_EXEC_TYPES.ACCOUNT_PAID_MULTI,
     numberOfExec: 1,
     playerFunds,
     playerGachaData: {
@@ -165,4 +152,169 @@ assert.deepStrictEqual(
   },
 );
 
+assert.deepStrictEqual(
+  buildGachaExecPlan({
+    gacha: {
+      ...characterGacha,
+      pageKind: GACHA_PAGE_KINDS.TEN_TIMES_PER_ACCOUNT,
+      tenTimesPerAccountCost: 600,
+    },
+    paymentType: GACHA_PAYMENT_TYPES.VMONEY,
+    execType: GACHA_EXEC_TYPES.ACCOUNT_PAID_MULTI,
+    numberOfExec: 1,
+    playerFunds,
+    playerGachaData,
+  }),
+  {
+    ok: true,
+    plan: {
+      pullCount: 10,
+      freeVmoney: 1000,
+      paidVmoney: 200,
+      ticket: null,
+      campaign: null,
+    },
+  },
+);
+
+for (const [paymentType, execType] of [
+  [GACHA_PAYMENT_TYPES.FREE_VMONEY, GACHA_EXEC_TYPES.DAILY_SINGLE],
+  [GACHA_PAYMENT_TYPES.VMONEY, GACHA_EXEC_TYPES.VMONEY_MULTI],
+  [GACHA_PAYMENT_TYPES.CAMPAIGN, GACHA_EXEC_TYPES.VMONEY_SINGLE],
+  [GACHA_PAYMENT_TYPES.FREE_VMONEY, GACHA_EXEC_TYPES.CAMPAIGN_MULTI],
+]) {
+  assert.deepStrictEqual(buildGachaExecPlan({
+    gacha: characterGacha,
+    paymentType,
+    execType,
+    numberOfExec: 1,
+    playerFunds,
+    playerGachaData,
+  }), {
+    ok: false,
+    status: 400,
+    message: "Gacha execution type is not allowed for this gacha.",
+  });
+}
+
 console.log("gacha_exec_plan tests passed");
+
+// B4: 配置票不足时按 wildcardTicketAvailable 回退通用票
+const wildcardCharacterGacha = { ...characterGacha, wildcardTicketAvailable: true };
+const {
+  GACHA_TICKET_ITEM_IDS,
+} = require("../src/lib/gacha-ticket.ts");
+
+assert.deepStrictEqual(
+  buildGachaExecPlan({
+    gacha: wildcardCharacterGacha,
+    paymentType: GACHA_PAYMENT_TYPES.TICKET,
+    execType: GACHA_EXEC_TYPES.MULTI_CONFIGURED_TICKET,
+    numberOfExec: 1,
+    playerFunds,
+    playerGachaData,
+    getTicketCount: itemId => itemId === 20002 ? 0 : itemId === GACHA_TICKET_ITEM_IDS.characterMulti ? 1 : 0,
+  }),
+  {
+    ok: true,
+    plan: {
+      pullCount: 10,
+      freeVmoney: playerFunds.freeVmoney,
+      paidVmoney: playerFunds.paidVmoney,
+      ticket: {
+        itemId: GACHA_TICKET_ITEM_IDS.characterMulti,
+        beforeCount: 1,
+        afterCount: 0,
+        useTicketCount: 1,
+      },
+      campaign: null,
+    },
+  },
+  "配置票不足且允许 wildcard 时应回退通用票",
+);
+
+assert.deepStrictEqual(
+  buildGachaExecPlan({
+    gacha: characterGacha, // wildcardTicketAvailable: false
+    paymentType: GACHA_PAYMENT_TYPES.TICKET,
+    execType: GACHA_EXEC_TYPES.MULTI_CONFIGURED_TICKET,
+    numberOfExec: 1,
+    playerFunds,
+    playerGachaData,
+    getTicketCount: itemId => itemId === 20002 ? 0 : itemId === GACHA_TICKET_ITEM_IDS.characterMulti ? 1 : 0,
+  }),
+  { ok: false, status: 400, message: "Not enough tickets." },
+  "不允许 wildcard 时禁止回退",
+);
+
+assert.deepStrictEqual(
+  buildGachaExecPlan({
+    gacha: wildcardCharacterGacha,
+    paymentType: GACHA_PAYMENT_TYPES.TICKET,
+    execType: GACHA_EXEC_TYPES.MULTI_CONFIGURED_TICKET,
+    numberOfExec: 1,
+    playerFunds,
+    playerGachaData,
+    getTicketCount: () => 0,
+  }),
+  { ok: false, status: 400, message: "Not enough tickets." },
+  "配置票与通用票都不足时失败",
+);
+
+assert.deepStrictEqual(
+  buildGachaExecPlan({
+    gacha: { ...wildcardCharacterGacha, type: 1, onceTicketItemId: 20005, tenTicketItemId: 20006 },
+    paymentType: GACHA_PAYMENT_TYPES.TICKET,
+    execType: GACHA_EXEC_TYPES.MULTI_CONFIGURED_TICKET,
+    numberOfExec: 1,
+    playerFunds,
+    playerGachaData,
+    getTicketCount: itemId => itemId === 20006 ? 0 : itemId === GACHA_TICKET_ITEM_IDS.equipmentMulti ? 2 : 0,
+  }),
+  {
+    ok: true,
+    plan: {
+      pullCount: 10,
+      freeVmoney: playerFunds.freeVmoney,
+      paidVmoney: playerFunds.paidVmoney,
+      ticket: {
+        itemId: GACHA_TICKET_ITEM_IDS.equipmentMulti,
+        beforeCount: 2,
+        afterCount: 1,
+        useTicketCount: 1,
+      },
+      campaign: null,
+    },
+  },
+  "装备池配置票不足应回退装备通用票",
+);
+
+assert.deepStrictEqual(
+  buildGachaExecPlan({
+    gacha: wildcardCharacterGacha,
+    paymentType: GACHA_PAYMENT_TYPES.TICKET,
+    execType: GACHA_EXEC_TYPES.MULTI_CONFIGURED_TICKET,
+    numberOfExec: 1,
+    playerFunds,
+    playerGachaData,
+    getTicketCount: itemId => itemId === 20002 ? 1 : 0,
+  }),
+  {
+    ok: true,
+    plan: {
+      pullCount: 10,
+      freeVmoney: playerFunds.freeVmoney,
+      paidVmoney: playerFunds.paidVmoney,
+      ticket: {
+        itemId: 20002,
+        beforeCount: 1,
+        afterCount: 0,
+        useTicketCount: 1,
+      },
+      campaign: null,
+    },
+  },
+  "配置票足够时优先使用配置票",
+);
+
+console.log("gacha exec plan tests passed");

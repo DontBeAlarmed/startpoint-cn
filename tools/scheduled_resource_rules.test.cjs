@@ -13,7 +13,7 @@ try {
 }
 
 const authority = {
-    itemMaxCounts: { "1": 99, "2": 9999 },
+    itemMaxCount: itemId => ({ "1": 99, "2": 9999 })[String(itemId)] ?? null,
     maxFreeVmoney: 999999,
     playerExists: playerId => playerId === 7,
 }

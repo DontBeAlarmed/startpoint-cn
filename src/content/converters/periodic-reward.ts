@@ -3,6 +3,7 @@ import {
     convertOrderedMapJson,
     type CsvOrderedMapTree,
 } from "./ordered-map-json"
+import { validatePeriodicRewardTables } from "../validation/periodic-reward-output"
 
 export const PERIODIC_REWARD_TABLE_SOURCES = Object.freeze({
     "hard_multi_event.json": {
@@ -193,10 +194,14 @@ function convertPeriodicRewardTable(tree: CsvOrderedMapTree): Record<string, unk
 export function convertPeriodicRewardTrees(
     trees: PeriodicRewardTrees,
 ): PeriodicRewardConversionOutput {
+    const events = convertHardMultiEvents(trees.hardMultiEvents)
+    const rewards = convertPeriodicRewardTable(trees.periodicRewards)
+    const points = convertPeriodicRewardPoints(trees.periodicRewardPoints)
+    validatePeriodicRewardTables({ events, points, rewards })
     return deepFreeze({
-        "hard_multi_event.json": convertHardMultiEvents(trees.hardMultiEvents),
-        "periodic_reward.json": convertPeriodicRewardTable(trees.periodicRewards),
-        "periodic_reward_point.json": convertPeriodicRewardPoints(trees.periodicRewardPoints),
+        "hard_multi_event.json": events,
+        "periodic_reward.json": rewards,
+        "periodic_reward_point.json": points,
     })
 }
 

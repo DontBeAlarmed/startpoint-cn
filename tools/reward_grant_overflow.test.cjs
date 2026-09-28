@@ -7,6 +7,8 @@ const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "reward-grant-overflow-"))
 const previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR
 process.env.WDFP_DATABASE_DIR = databaseDirectory
@@ -259,6 +261,7 @@ assert.throws(() => database.transaction(() => executeRewardGrantExecutionPlanAs
 assert.equal(getPlayerItemSync(playerId, itemId), 10)
 
 database.close()
+restoreContentSnapshot()
 if (previousDatabaseDirectory === undefined) delete process.env.WDFP_DATABASE_DIR
 else process.env.WDFP_DATABASE_DIR = previousDatabaseDirectory
 fs.rmSync(databaseDirectory, { recursive: true, force: true })

@@ -6,7 +6,10 @@ import { buildNpcMates } from "../npc/builder";
 import { isValidMultiViewerId, type MultiHttpContext } from "./context";
 import type { CoordinatorErrorCode } from "../coordinator/contracts";
 import { classifyRoomJoin } from "./join-result";
-import { roomUnavailableRaisingState } from "./join-result";
+import {
+    prepareFailureRaisingState,
+    restoreRoomUnavailableRaisingState,
+} from "./join-result";
 import { issueRoomAdmission } from "./room-admission";
 
 async function hasValidViewer(context: MultiHttpContext, viewerId: number): Promise<boolean> {
@@ -33,9 +36,12 @@ function prepareFailure(
     error: CoordinatorErrorCode,
 ): FastifyReply {
     reply.header("content-type", "application/x-msgpack");
-    if (error === "ROOM_NOT_FOUND" || error === "ROOM_FULL") return reply.status(200).send({
+    // prepare 客户端仅 1/2/9 合法；只有 ROOM_NOT_FOUND 走 raising_state(9)，
+    // 其余（含满房）走 A-error 4507 → Failure。
+    const raisingState = prepareFailureRaisingState(error);
+    if (raisingState !== null) return reply.status(200).send({
         "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-        "data": unavailableRoomData(roomNumber, roomUnavailableRaisingState(error)),
+        "data": unavailableRoomData(roomNumber, raisingState),
     });
     return reply.status(200).send({
         "data_headers": generateDataHeaders({ viewer_id: viewerId, result_code: 4507 }),
@@ -188,7 +194,7 @@ export function registerRoomRoutes(fastify: FastifyInstance, context: MultiHttpC
                 "data": {
                     ...unavailableRoomData(
                         body.room_number,
-                        room.error === "ROOM_NOT_FOUND" ? 9 : 13,
+                        restoreRoomUnavailableRaisingState(room.error),
                     ),
                     is_same_room: true,
                 },

@@ -621,6 +621,7 @@ test("default release builder fails explicitly for a missing dynamic gacha refer
         convertCharacterElections: async () => converterOutput("character-election"),
         convertCharacterManaAdmissionTables: async () => converterOutput("character-mana-admission"),
         convertGachas: async () => converterOutput("gacha"),
+        convertItemEquipmentTables: async () => converterOutput("item-equipment"),
         convertShops: async () => converterOutput("shop"),
         convertSkillEffects: async () => converterOutput("skill-effects"),
         importBundledTable: async (_root, tableName) => ({ imported: tableName }),
@@ -661,10 +662,19 @@ test("default release builder rejects an incomplete converter output", async () 
     delete incompleteCharacterOutput["character.json"]
     const builder = createDefaultContentTableBuilder({
         convertAdditionalRewards: async () => converterOutput("additional-reward"),
+        convertBoxGachaTables: async () => converterOutput("box-gacha"),
         convertCharacters: async () => incompleteCharacterOutput,
         convertCharacterElections: async () => converterOutput("character-election"),
         convertCharacterManaAdmissionTables: async () => converterOutput("character-mana-admission"),
         convertGachas: async () => converterOutput("gacha"),
+        convertGameplayTables: async () => converterOutput("gameplay"),
+        convertItemEquipmentTables: async () => converterOutput("item-equipment"),
+        convertLoginBonuses: async () => converterOutput("login-bonus"),
+        convertManaNodes: async () => converterOutput("mana-node"),
+        convertPeriodicRewards: async () => converterOutput("periodic-reward"),
+        convertQuests: async () => converterOutput("quest"),
+        convertRewardCampaigns: async () => converterOutput("reward-campaign"),
+        convertRewards: async () => converterOutput("reward"),
         convertShops: async () => converterOutput("shop"),
         convertSkillEffects: async () => converterOutput("skill-effects"),
         importBundledTable: async (_root, tableName) => ({ imported: tableName }),
@@ -732,10 +742,19 @@ test("default release builder bounds parallel reads and imports while preserving
     const reads = []
     const builder = createDefaultContentTableBuilder({
         convertAdditionalRewards: async () => converterOutput("additional-reward"),
+        convertBoxGachaTables: async () => converterOutput("box-gacha"),
         convertCharacters: async () => converterOutput("character"),
         convertCharacterElections: async () => converterOutput("character-election"),
         convertCharacterManaAdmissionTables: async () => converterOutput("character-mana-admission"),
         convertGachas: async () => converterOutput("gacha"),
+        convertGameplayTables: async () => converterOutput("gameplay"),
+        convertItemEquipmentTables: async () => converterOutput("item-equipment"),
+        convertLoginBonuses: async () => converterOutput("login-bonus"),
+        convertManaNodes: async () => converterOutput("mana-node"),
+        convertPeriodicRewards: async () => converterOutput("periodic-reward"),
+        convertQuests: async () => converterOutput("quest"),
+        convertRewardCampaigns: async () => converterOutput("reward-campaign"),
+        convertRewards: async () => converterOutput("reward"),
         convertShops: async () => converterOutput("shop"),
         convertSkillEffects: async () => converterOutput("skill-effects"),
         importBundledTable: async (_root, tableName) => {
@@ -863,6 +882,7 @@ test("check reuses current release objects without rereading its summary", async
     const manifest = {
         assetVersion: "1.4.54",
         generatorVersion: 1,
+        gameCalendarUtcOffsetMinutes: 480,
         summary: { object: `sha256:${"b".repeat(64)}` },
         tables: Object.fromEntries(TEST_TABLE_SOURCES.map(definition => [
             definition.tableName,
@@ -1070,6 +1090,54 @@ test("generator changes, upgrades, explicit rollbacks, and force trigger rebuild
     assert.equal(forced.releaseDigest, rollback.releaseDigest)
     assert.notEqual(generator.releaseDigest, initial.releaseDigest)
     assert.equal(fixture.calls.builder, 5)
+})
+
+test("engine builds each release with exactly one frozen game calendar policy", async t => {
+    const fixture = engineFixture(t)
+    const contexts = []
+    fixture.dependencies.tableBuilder = {
+        build: async context => {
+            fixture.calls.builder++
+            contexts.push(context)
+            return tableValues()
+        },
+    }
+
+    await sync(fixture)
+    await assert.rejects(
+        sync(fixture, { gameCalendarUtcOffsetMinutes: 841 }),
+        /game calendar/i,
+    )
+
+    fixture.setTargetVersion("1.5.0")
+    await sync(fixture, { gameCalendarUtcOffsetMinutes: 540 })
+
+    assert.equal(contexts.length, 2)
+    assert.equal(contexts[0].gameCalendar.utcOffsetMinutes, 480)
+    assert.equal(Object.isFrozen(contexts[0].gameCalendar), true)
+    assert.equal(contexts[1].gameCalendar.utcOffsetMinutes, 540)
+    assert.notEqual(contexts[1].gameCalendar, contexts[0].gameCalendar)
+})
+
+test("changing the game calendar offset forces a full rebuild with reason game-calendar", async t => {
+    const fixture = engineFixture(t)
+    const first = await sync(fixture, { gameCalendarUtcOffsetMinutes: 480 })
+    const second = await sync(fixture, { gameCalendarUtcOffsetMinutes: 540 })
+
+    assert.equal(first.reason, "missing")
+    assert.equal(second.status, "synchronized")
+    assert.equal(second.action, "synchronize")
+    assert.equal(second.reason, "game-calendar")
+    assert.notEqual(second.releaseDigest, first.releaseDigest)
+    assert.equal(fixture.calls.builder, 2)
+
+    const manifest = await readCurrentRelease(fixture.store)
+    assert.equal(manifest.gameCalendarUtcOffsetMinutes, 540)
+
+    const restored = await sync(fixture, { gameCalendarUtcOffsetMinutes: 480 })
+    assert.equal(restored.reason, "game-calendar")
+    assert.equal(restored.releaseDigest, first.releaseDigest)
+    assert.equal(fixture.calls.builder, 3)
 })
 
 test("catalog, tables, and summary are stored without physical or absolute paths", async t => {
@@ -1417,16 +1485,20 @@ test("CLI parses mutually exclusive modes, returns exit codes, and never prints 
     let stdout = ""
     let stderr = ""
     let exitCode = null
+    let capturedCalendarOffset = null
     const success = await runContentSyncCli(["--check"], {
         projectRoot,
-        runSync: async options => ({
-            status: "check",
-            action: "skip",
-            targetVersion: "1.4.54",
-            currentVersion: "1.4.54",
-            reason: "up-to-date",
-            mode: options.mode,
-        }),
+        runSync: async options => {
+            capturedCalendarOffset = options.gameCalendarUtcOffsetMinutes
+            return {
+                status: "check",
+                action: "skip",
+                targetVersion: "1.4.54",
+                currentVersion: "1.4.54",
+                reason: "up-to-date",
+                mode: options.mode,
+            }
+        },
         stdout: { write: value => { stdout += value } },
         stderr: { write: value => { stderr += value } },
         setExitCode: value => { exitCode = value },
@@ -1434,6 +1506,7 @@ test("CLI parses mutually exclusive modes, returns exit codes, and never prints 
     assert.equal(success, 0)
     assert.equal(exitCode, 0)
     assert.equal(stderr, "")
+    assert.equal(capturedCalendarOffset, 480)
     assert.deepEqual(JSON.parse(stdout), {
         status: "check",
         action: "skip",
@@ -1441,6 +1514,40 @@ test("CLI parses mutually exclusive modes, returns exit codes, and never prints 
         currentVersion: "1.4.54",
         reason: "up-to-date",
     })
+
+    capturedCalendarOffset = null
+    const injected = await runContentSyncCli(["--check"], {
+        projectRoot,
+        env: { GAME_CALENDAR_UTC_OFFSET_MINUTES: "+540" },
+        runSync: async options => {
+            capturedCalendarOffset = options.gameCalendarUtcOffsetMinutes
+            return {
+                status: "check",
+                action: "skip",
+                targetVersion: "1.4.54",
+                currentVersion: "1.4.54",
+                reason: "up-to-date",
+            }
+        },
+        stdout: { write: value => { stdout += value } },
+        stderr: { write: value => { stderr += value } },
+        setExitCode: value => { exitCode = value },
+    })
+    assert.equal(injected, 0)
+    assert.equal(capturedCalendarOffset, 540)
+
+    const invalidCalendar = await runContentSyncCli(["--check"], {
+        projectRoot,
+        env: { GAME_CALENDAR_UTC_OFFSET_MINUTES: "UTC+8" },
+        runSync: async () => {
+            throw new Error("runSync must not run for an invalid calendar offset")
+        },
+        stdout: { write: value => { stdout += value } },
+        stderr: { write: value => { stderr += value } },
+        setExitCode: value => { exitCode = value },
+    })
+    assert.equal(invalidCalendar, 1)
+    assert.match(stderr, /game calendar/i)
 
     stdout = ""
     stderr = ""

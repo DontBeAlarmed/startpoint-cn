@@ -1,8 +1,5 @@
-import {
-    getMissionMasterDefinitions,
-    type MissionMasterDefinition,
-} from "./master-data"
 import { settleMissionCategories, type MissionSettlementResult } from "./settlement"
+import { MissionMasterDefinition, getMissionCatalog } from "./mission-catalog"
 
 const regularCandidateCache = new WeakMap<readonly MissionMasterDefinition[], readonly number[]>()
 const degreeCandidateCache = new WeakMap<readonly MissionMasterDefinition[], readonly number[]>()
@@ -25,8 +22,8 @@ export function settleCharacterStoryFactMissions(
     playerId: number,
     evaluationTime: Date,
 ): MissionSettlementResult {
-    const regularDefinitions = getMissionMasterDefinitions(1)
-    const degreeDefinitions = getMissionMasterDefinitions(5)
+    const regularDefinitions = getMissionCatalog().getDefinitions(1)
+    const degreeDefinitions = getMissionCatalog().getDefinitions(5)
     return settleMissionCategories(playerId, [
         {
             category: 1,

@@ -113,6 +113,7 @@ const DIRECT_ORDERED_MAP_TABLES = [
     ["raid_event_overall_reward.json", 1, "master/quest/event/raid_event_overall_reward.orderedmap"],
     ["reward_element_map.json", 3, "master/reward/reward_element_map.orderedmap"],
     ["stamina_campaign.json", 1, "master/campaign/stamina_campaign.orderedmap"],
+    ["bond_token_exchange.json", 1, "master/shop/bond_token_exchange.orderedmap"],
     ["star_crumb_exchange.json", 1, "master/shop/star_crumb_exchange.orderedmap"],
     ["star_crumb_exchange_cost.json", 1, "master/shop/star_crumb_exchange_cost.orderedmap"],
 ] as const satisfies ReadonlyArray<readonly [string, 1 | 2 | 3, string]>
@@ -345,6 +346,7 @@ function questDerivedDefinition(
     tableName: QuestDerivedTableName,
     sourceOrderedMaps: readonly string[],
     bundledSources: readonly string[] = [],
+    converterVersion: number = 1,
 ): TableSourceInput {
     return {
         tableName,
@@ -352,8 +354,8 @@ function questDerivedDefinition(
         sourceOrderedMaps,
         bundledSources,
         converterId: "quest",
-        converterVersion: 1,
-        outputShapeVersion: 1,
+        converterVersion,
+        outputShapeVersion: converterVersion,
     }
 }
 
@@ -420,16 +422,44 @@ const definitionInputs: TableSourceInput[] = [
         sourceOrderedMaps: ["master/gacha/gacha.orderedmap"],
         dynamicSources: [GACHA_ODDS_DYNAMIC_SOURCE],
         converterId: "gacha",
-        converterVersion: 1,
-        outputShapeVersion: 1,
+        converterVersion: 2,
+        outputShapeVersion: 2,
     },
     {
-        tableName: "gacha_campaign.json",
+        tableName: "gacha_campaign_definitions.json",
         scope: "cdn",
         sourceOrderedMaps: ["master/gacha/gacha_campaign.orderedmap"],
         converterId: "gacha",
-        converterVersion: 1,
-        outputShapeVersion: 1,
+        converterVersion: 2,
+        outputShapeVersion: 2,
+    },
+    {
+        tableName: "stars_gacha_campaign.json",
+        scope: "cdn",
+        sourceOrderedMaps: ["master/campaign/stars_gacha/stars_gacha_campaign.orderedmap"],
+        converterId: "gacha",
+        converterVersion: 2,
+        outputShapeVersion: 2,
+    },
+    {
+        tableName: "gacha_exchange_rate.json",
+        scope: "cdn",
+        sourceOrderedMaps: [
+            "master/gacha/exchange_point/character_exchange_rate.orderedmap",
+            "master/gacha/exchange_point/equipment_exchange_rate.orderedmap",
+        ],
+        converterId: "gacha",
+        converterVersion: 2,
+        outputShapeVersion: 2,
+    },
+    {
+        tableName: "gacha_pool.json",
+        scope: "cdn",
+        sourceOrderedMaps: ["master/gacha/gacha.orderedmap"],
+        dynamicSources: [GACHA_ODDS_DYNAMIC_SOURCE],
+        converterId: "gacha",
+        converterVersion: 2,
+        outputShapeVersion: 2,
     },
     {
         tableName: "reward_campaign.json",
@@ -452,16 +482,16 @@ const definitionInputs: TableSourceInput[] = [
         scope: "cdn",
         sourceOrderedMaps: ["master/gacha/gacha.orderedmap"],
         converterId: "gacha",
-        converterVersion: 1,
-        outputShapeVersion: 1,
+        converterVersion: 2,
+        outputShapeVersion: 2,
     },
     {
         tableName: "cdndata/gacha_feature_content.json",
         scope: "cdn",
         sourceOrderedMaps: ["master/gacha/gacha_feature_content.orderedmap"],
         converterId: "gacha",
-        converterVersion: 1,
-        outputShapeVersion: 1,
+        converterVersion: 2,
+        outputShapeVersion: 2,
     },
     {
         tableName: "cdndata/active_mission_skill_effects.json",
@@ -654,6 +684,21 @@ const definitionInputs: TableSourceInput[] = [
     questDerivedDefinition(
         "quest_unlock_costs.json",
         Object.values(QUEST_TABLE_SOURCES).map(source => source.logicalPath),
+    ),
+    questDerivedDefinition(
+        "quest_prerequisites.json",
+        [
+            QUEST_AUXILIARY_SOURCES.mainStageNode,
+            QUEST_AUXILIARY_SOURCES.exStageNode,
+            QUEST_TABLE_SOURCES["main_quest.json"].logicalPath,
+            QUEST_TABLE_SOURCES["ex_quest.json"].logicalPath,
+        ],
+        // v2: ex rows re-derive need_main_stage_node against the main table
+        // only and start consuming the ex-internal need_stage_node pair, so
+        // releases derived by the v1 converter (both its number[] shape and
+        // its collision/ungated output) must be re-converted.
+        [],
+        2,
     ),
     ...BUNDLED_TABLE_NAMES.map(bundledDefinition),
     ...SERVER_TABLE_NAMES.map(serverDefinition),

@@ -211,6 +211,39 @@ test("serves complete responses with byte metadata", async t => {
     await waitForBalancedHandles(observer)
 })
 
+test("serves full, HEAD, and Range responses with the file Last-Modified date", async t => {
+    const { app, cdnRoot, observer } = await createFixture(t)
+    const filePath = path.join(cdnRoot, "objects", "ordinary.bin")
+    const expected = new Date(fs.statSync(filePath).mtimeMs).toUTCString()
+
+    const full = await app.inject({ method: "GET", url: "/patch/cn/objects/ordinary.bin" })
+    assert.equal(full.statusCode, 200)
+    assert.equal(full.headers["last-modified"], expected)
+
+    const head = await app.inject({ method: "HEAD", url: "/patch/cn/objects/ordinary.bin" })
+    assert.equal(head.statusCode, 200)
+    assert.equal(head.headers["last-modified"], expected)
+
+    const partial = await app.inject({
+        method: "GET",
+        url: "/patch/cn/objects/ordinary.bin",
+        headers: { range: "bytes=0-3" },
+    })
+    assert.equal(partial.statusCode, 206)
+    assert.equal(partial.headers["content-range"], "bytes 0-3/8")
+    assert.equal(partial.headers["last-modified"], expected)
+
+    await waitForBalancedHandles(observer)
+})
+
+test("does not serve Last-Modified for missing paths", async t => {
+    const { app } = await createFixture(t)
+
+    const response = await app.inject({ method: "GET", url: "/patch/cn/objects/absent.bin" })
+    assert.equal(response.statusCode, 404)
+    assert.equal(Object.hasOwn(response.headers, "last-modified"), false)
+})
+
 test("serves manifest-selected patch ZIPs with GET, HEAD, and Range", async t => {
     const relativePath = "archive-common-diff/p55.zip"
     const bytes = Buffer.from("0123456789")

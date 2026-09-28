@@ -5,6 +5,7 @@ export interface ServerGameplaySettings {
     readonly dropMultiplier: number
     readonly multiRescueFragmentRewardsEnabled: boolean
     readonly multiRescueHostRewardsEnabled: boolean
+    readonly rush700011To700017CompatibilityEnabled: boolean
     readonly updatedAt: string
 }
 
@@ -12,6 +13,7 @@ interface RawServerGameplaySettings {
     readonly drop_multiplier: number
     readonly multi_rescue_fragment_rewards_enabled: number
     readonly multi_rescue_host_rewards_enabled: number
+    readonly rush_700011_to_700017_compatibility_enabled: number
     readonly updated_at: string
 }
 
@@ -19,6 +21,7 @@ export interface UpdateServerGameplaySettings {
     readonly dropMultiplier: number
     readonly multiRescueFragmentRewardsEnabled?: boolean
     readonly multiRescueHostRewardsEnabled?: boolean
+    readonly rush700011To700017CompatibilityEnabled?: boolean
 }
 
 function validateDropMultiplier(value: unknown): asserts value is number {
@@ -33,6 +36,7 @@ function mapSettings(row: RawServerGameplaySettings | undefined): ServerGameplay
         dropMultiplier: row.drop_multiplier,
         multiRescueFragmentRewardsEnabled: row.multi_rescue_fragment_rewards_enabled === 1,
         multiRescueHostRewardsEnabled: row.multi_rescue_host_rewards_enabled === 1,
+        rush700011To700017CompatibilityEnabled: row.rush_700011_to_700017_compatibility_enabled === 1,
         updatedAt: row.updated_at,
     }
 }
@@ -40,7 +44,8 @@ function mapSettings(row: RawServerGameplaySettings | undefined): ServerGameplay
 export function getServerGameplaySettingsSync(): ServerGameplaySettings {
     const row = getDb().prepare(`
         SELECT drop_multiplier, multi_rescue_fragment_rewards_enabled,
-            multi_rescue_host_rewards_enabled, updated_at
+            multi_rescue_host_rewards_enabled,
+            rush_700011_to_700017_compatibility_enabled, updated_at
         FROM server_gameplay_settings
         WHERE id = 1
     `).get() as RawServerGameplaySettings | undefined
@@ -59,12 +64,17 @@ export function updateServerGameplaySettingsSync(
         && typeof settings.multiRescueHostRewardsEnabled !== "boolean") {
         throw new Error("invalid multi rescue host reward setting")
     }
+    if (settings.rush700011To700017CompatibilityEnabled !== undefined
+        && typeof settings.rush700011To700017CompatibilityEnabled !== "boolean") {
+        throw new Error("invalid rush 700011 to 700017 compatibility setting")
+    }
     const updatedAt = getRealNow().toISOString()
     const result = getDb().prepare(`
         UPDATE server_gameplay_settings
         SET drop_multiplier = ?,
             multi_rescue_fragment_rewards_enabled = COALESCE(?, multi_rescue_fragment_rewards_enabled),
             multi_rescue_host_rewards_enabled = COALESCE(?, multi_rescue_host_rewards_enabled),
+            rush_700011_to_700017_compatibility_enabled = COALESCE(?, rush_700011_to_700017_compatibility_enabled),
             updated_at = ?
         WHERE id = 1
     `).run(
@@ -73,6 +83,8 @@ export function updateServerGameplaySettingsSync(
             ? null : settings.multiRescueFragmentRewardsEnabled ? 1 : 0,
         settings.multiRescueHostRewardsEnabled === undefined
             ? null : settings.multiRescueHostRewardsEnabled ? 1 : 0,
+        settings.rush700011To700017CompatibilityEnabled === undefined
+            ? null : settings.rush700011To700017CompatibilityEnabled ? 1 : 0,
         updatedAt,
     )
     if (result.changes !== 1) throw new Error("server gameplay settings are not initialized")

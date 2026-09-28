@@ -214,13 +214,26 @@ export class BattleFactStore {
     isFullyFinalized(input: Pick<BattleSessionInput, "roomNumber" | "battleSessionId">): boolean {
         this.prune()
         const record = this.records.get(input.battleSessionId)
+        // An emptied record (every participant aborted or swept, nobody
+        // finalized) is an abandoned battle, not a completed one: it must go
+        // through the abandoned-room cleanup instead of a successful rematch
+        // release, so 0 === 0 must never read as "everyone finished".
         return record?.roomNumber === input.roomNumber
+            && record.participants.length > 0
             && record.finalizedParticipantKeys.size === record.participants.length
     }
 
     getActiveBattleSessionId(roomNumber: string): BattleSessionId | null {
         this.prune()
         return this.activeBattleByRoom.get(roomNumber) ?? null
+    }
+
+    /** Read-only identities of the room's active battle record, if any. */
+    getActiveBattleParticipants(roomNumber: string): readonly ParticipantIdentity[] | null {
+        this.prune()
+        const battleSessionId = this.activeBattleByRoom.get(roomNumber)
+        const record = battleSessionId ? this.records.get(battleSessionId) : undefined
+        return record ? record.participants.map(participant => participant) : null
     }
 
     getCounts(): BattleFactCounts {

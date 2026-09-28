@@ -9,6 +9,10 @@ import type {
     ShopCostItemScheduleRows,
     ShopSelectItemCampaigns,
 } from "../../lib/types/shop"
+import {
+    resolveContentConverterContext,
+    type ContentConverterContext,
+} from "./context"
 import { convertShopCostItemSchedules } from "./shop/cost-schedule"
 import {
     convertManaShop,
@@ -202,6 +206,7 @@ function convertSelectCampaigns(
     campaignRows: readonly ParsedRow[],
     lineupRows: readonly ParsedRow[],
     tableName: string,
+    context?: ContentConverterContext,
 ): Record<string, { availableFrom: string; availableUntil: string; lineupIds: number[] }> {
     const campaigns: Record<
         string,
@@ -211,11 +216,12 @@ function convertSelectCampaigns(
         const exchangeableUntil = parseOptionalDate(
             fields[8],
             `${tableName}[${campaignId}].exchangeableUntil`,
+            context,
         )
         campaigns[campaignId] = {
-            availableFrom: parseDate(fields[6], `${tableName}[${campaignId}].availableFrom`),
+            availableFrom: parseDate(fields[6], `${tableName}[${campaignId}].availableFrom`, context),
             availableUntil: exchangeableUntil
-                ?? parseDate(fields[7], `${tableName}[${campaignId}].availableUntil`),
+                ?? parseDate(fields[7], `${tableName}[${campaignId}].availableUntil`, context),
             lineupIds: [],
         }
     }
@@ -246,7 +252,11 @@ function requireCampaignItemReference(
     }
 }
 
-export async function convertShops(reader: ShopSourceReader): Promise<ShopConversionOutput> {
+export async function convertShops(
+    reader: ShopSourceReader,
+    context?: ContentConverterContext,
+): Promise<ShopConversionOutput> {
+    const resolvedContext = resolveContentConverterContext(context)
     const generalRows = requireRows(await reader.read(GENERAL_SHOP_PATH), "general_shop", 47)
     const eventRows = requireRows(await reader.read(EVENT_ITEM_SHOP_PATH), "event_item_shop", 51)
     const eventCampaignRows = requireRows(
@@ -304,11 +314,13 @@ export async function convertShops(reader: ShopSourceReader): Promise<ShopConver
             eventCampaignRows,
             eventLineupRows,
             "event_shop_select_item_campaign",
+            resolvedContext,
         ),
         "7": convertSelectCampaigns(
             bossCampaignRows,
             bossLineupRows,
             "boss_coin_shop_select_item_campaign",
+            resolvedContext,
         ),
     }
     const shopItemCampaignMap: ShopItemCampaignMap = { "4": {}, "7": {} }
@@ -323,6 +335,7 @@ export async function convertShops(reader: ShopSourceReader): Promise<ShopConver
             fields,
             EVENT_LAYOUT,
             id,
+            resolvedContext,
         )
         Object.assign(item, parseCampaignReference(fields, 4, 5, `event_item_shop[${id}]`))
         requireCampaignItemReference(item, shopSelectItemCampaigns["4"], `event_item_shop[${id}]`)
@@ -343,7 +356,7 @@ export async function convertShops(reader: ShopSourceReader): Promise<ShopConver
     for (const [id, fields] of bossRows) {
         const categoryId = fields[0]
         requireCategory(bossCategories, categoryId, "boss_coin_shop")
-        const item = parseShopItem(fields, BOSS_LAYOUT, id)
+        const item = parseShopItem(fields, BOSS_LAYOUT, id, resolvedContext)
         Object.assign(item, parseCampaignReference(fields, 3, 4, `boss_coin_shop[${id}]`))
         requireCampaignItemReference(item, shopSelectItemCampaigns["7"], `boss_coin_shop[${id}]`)
         if (item.campaignId !== undefined) {
@@ -367,7 +380,7 @@ export async function convertShops(reader: ShopSourceReader): Promise<ShopConver
         if (productKind !== 0 && productKind !== 1) {
             invalidShop(`equipment_enhancement_shop[${id}].kind must be 0 or 1`)
         }
-        const item = parseShopItem(fields, EQUIPMENT_LAYOUT, id)
+        const item = parseShopItem(fields, EQUIPMENT_LAYOUT, id, resolvedContext)
         item.shopCategoryId = parseInteger(
             categoryId,
             `equipment_enhancement_shop[${id}].category`,
@@ -392,18 +405,18 @@ export async function convertShops(reader: ShopSourceReader): Promise<ShopConver
     }
 
     return deepFreeze({
-        "general_shop.json": convertFlatShop(generalRows, GENERAL_LAYOUT),
+        "general_shop.json": convertFlatShop(generalRows, GENERAL_LAYOUT, resolvedContext),
         "event_item_shop.json": eventItemShop,
         "event_item_shop_id_map.json": eventItemShopIdMap,
         "boss_coin_shop.json": bossCoinShop,
         "boss_coin_shop_item_category_map.json": bossCoinShopItemCategoryMap,
         "shop_select_item_campaign.json": shopSelectItemCampaigns,
         "shop_item_campaign.json": shopItemCampaignMap,
-        "star_grain_shop.json": convertFlatShop(starGrainRows, STAR_GRAIN_LAYOUT),
-        "treasure_shop.json": convertFlatShop(treasureRows, TREASURE_LAYOUT),
+        "star_grain_shop.json": convertFlatShop(starGrainRows, STAR_GRAIN_LAYOUT, resolvedContext),
+        "treasure_shop.json": convertFlatShop(treasureRows, TREASURE_LAYOUT, resolvedContext),
         "equipment_enhancement_shop.json": equipmentEnhancementShop,
-        "special_pack_shop.json": convertCompleteSpecialPackShop(specialPackRows),
-        "mana_shop.json": convertManaShop(manaRows),
-        "shop_cost_item_schedule.json": convertShopCostItemSchedules(costScheduleGroups),
+        "special_pack_shop.json": convertCompleteSpecialPackShop(specialPackRows, resolvedContext),
+        "mana_shop.json": convertManaShop(manaRows, resolvedContext),
+        "shop_cost_item_schedule.json": convertShopCostItemSchedules(costScheduleGroups, resolvedContext),
     })
 }

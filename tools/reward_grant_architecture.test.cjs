@@ -1,6 +1,7 @@
 "use strict"
 
 const assert = require("node:assert/strict")
+const { execFileSync } = require("node:child_process")
 const fs = require("node:fs")
 const path = require("node:path")
 const test = require("node:test")
@@ -13,6 +14,7 @@ const targetCoreFiles = [
     "execution-outcome.ts",
     "execution-plan.ts",
     "execution-result.ts",
+    "projection.ts",
     "snapshot.ts",
     "transaction-executor.ts",
 ]
@@ -75,6 +77,32 @@ test("public RewardGrant barrel exposes only the target typed contract", () => {
     assert.doesNotMatch(index, /\.\/executor|\.\/plan|\.\/types|owner-executor|entry-result/)
     assert.match(read("src/lib/reward-grant/execution-plan.ts"), /createRewardGrantExecutionPlan/)
     assert.match(read("src/lib/reward-grant/transaction-executor.ts"), /executeRewardGrantExecutionPlanSync/)
+})
+
+test("public RewardGrant projection entrypoint stays side-effect-free", () => {
+    const projection = read("src/lib/reward-grant/projection.ts")
+    assert.match(projection, /collectRewardGrantItemOverflowDispositions/)
+    assert.match(projection, /RewardGrantExecutionResult/)
+    assert.doesNotMatch(projection, /transaction-executor|data\/|routes\//)
+
+    const loadedSourceFiles = JSON.parse(execFileSync(process.execPath, [
+        "-r",
+        "ts-node/register/transpile-only",
+        "-e",
+        `require("./src/lib/reward-grant/projection"); console.log(JSON.stringify(
+            Object.keys(require.cache)
+                .filter(file => file.includes("/src/"))
+                .map(file => file.slice(process.cwd().length + 1))
+        ))`,
+    ], {
+        cwd: projectRoot,
+        encoding: "utf8",
+    }))
+    assert.deepEqual(
+        loadedSourceFiles.filter(file => /^(?:src\/data|src\/content|src\/routes|src\/lib\/(?:mail|mission|character-growth))/.test(file)),
+        [],
+        loadedSourceFiles.join("\n"),
+    )
 })
 
 test("production consumers use the public barrel and contain no legacy result fields", () => {

@@ -14,6 +14,9 @@ const {
     getRoom,
     isRoomMember,
     removeRoomMember,
+    setRoomDisbandListener,
+    startRoomCleanup,
+    stopRoomCleanup,
     updateRoomState,
 } = require("../src/multi/room/manager")
 let lobbyLifecycle = {}
@@ -33,6 +36,7 @@ const {
     resetNpcRecruitmentTiming,
 } = require("../src/multi/tcp/lobby")
 const { NpcMateProvider } = require("../src/multi/npc/controller")
+const { installDisbandLifecycleListener } = require("../src/multi/room/disband-listener")
 
 function deferred() {
     let resolve
@@ -308,11 +312,20 @@ test("a transport disconnect preserves the room for restore", t => {
 })
 
 test("an explicit host Bye disbands the room even while guests remain", t => {
-    const { room, host } = createLobbyRoom(t, 498, [598])
+    installDisbandLifecycleListener()
+    t.after(() => setRoomDisbandListener(null))
+    const { room, host, guests } = createLobbyRoom(t, 498, [598])
 
     handleMessage(host.socket, [0, [1]])
 
     assert.equal(getRoom(room.room_number), undefined)
+    assert.equal(
+        guests[0].socket.writes.filter(message => (
+            JSON.stringify(message) === JSON.stringify([1, [6, "multibattle_room_dismissed"]])
+        )).length,
+        1,
+        "guests must receive exactly one dismissal from the disband listener",
+    )
 })
 
 test("a host Bye after StartBattle preserves the active battle room", t => {
@@ -385,6 +398,23 @@ test("a network-disconnected host is disbanded only after the reconnect grace", 
     assert.equal(handleSocketDisconnect(host.socket), true)
     assert.equal(getRoom(room.room_number), room)
     await new Promise(resolve => setTimeout(resolve, 40))
+    assert.equal(getRoom(room.room_number), undefined)
+})
+
+test("an expired host reconnect lease broadcasts dismissal only once", { concurrency: false }, async t => {
+    installDisbandLifecycleListener()
+    t.after(() => setRoomDisbandListener(null))
+    configureReconnectGraceMs(25)
+    const { room, host, guests } = createLobbyRoom(t, 507, [607])
+    const guest = guests[0]
+
+    assert.equal(handleSocketDisconnect(host.socket), true)
+    await new Promise(resolve => setTimeout(resolve, 40))
+
+    const dismissed = guest.socket.writes.filter(message => (
+        JSON.stringify(message) === JSON.stringify([1, [6, "multibattle_room_dismissed"]])
+    ))
+    assert.equal(dismissed.length, 1)
     assert.equal(getRoom(room.room_number), undefined)
 })
 
@@ -1466,4 +1496,162 @@ test("active com_id 2 selects the second configured NPC party", async t => {
     const npc = host.client.mates.find(mate => mate.comId === 2)
     assert.ok(npc)
     assert.deepEqual(npc.party, { marker: "npc-party-1" })
+})
+
+test("lobby Broadcast relays as MeetingServer2Client.Messages with the sender id", async t => {
+    const { host, guests } = createLobbyRoom(t, 4601, [4602])
+    const payload = [[0, 3]]
+    const hostWritesBefore = host.socket.writes.length
+
+    handleMessage(host.socket, [1, payload])
+
+    // Receivers get Messages(2, senderConnectionId, payload); the sender renders
+    // its own emotion locally and must not receive its own relay.
+    assert.deepEqual(guests[0].socket.writes.at(-1), [2, host.client.connectionId, payload])
+    assert.equal(host.socket.writes.length, hostWritesBefore)
+})
+
+test("lobby Send relays as MeetingServer2Client.Messages to the targeted member", async t => {
+    const { host, guests } = createLobbyRoom(t, 4603, [4604])
+    const payload = [[0, 5]]
+    const hostWritesBefore = host.socket.writes.length
+
+    handleMessage(host.socket, [2, [guests[0].client.participant.viewerId], payload])
+
+    assert.deepEqual(guests[0].socket.writes.at(-1), [2, host.client.connectionId, payload])
+    assert.equal(host.socket.writes.length, hostWritesBefore)
+})
+
+test("lobby mutations are gated while the room battle is occupied", async t => {
+    const { room, host, guests } = createLobbyRoom(t, 4701, [4702])
+    const guest = guests[0]
+    handleMessage(host.socket, [0, [0, { party: { marker: "pre" } }]])
+    handleMessage(guest.socket, [0, [0, { party: { marker: "guest" } }]])
+    assert.equal(room.raising_state, 1)
+    const hostMateBefore = host.client.mates.find(mate => mate.viewerId === 4701)
+
+    handleMessage(host.socket, [0, [6]])
+    assert.equal(room.raising_state, 4)
+
+    // Host re-Enter mid-battle must not reset the room to preparation.
+    handleMessage(host.socket, [0, [0, { party: { marker: "during-battle" } }]])
+    assert.equal(room.raising_state, 4, "battle state must survive a mid-battle host Enter")
+
+    // ChangeParty mid-battle must not mutate the party or the room party id.
+    const hostPartyIdBefore = room.host_party_id
+    const hostWritesBefore = host.socket.writes.length
+    handleMessage(host.socket, [0, [2, { party: { marker: "mid-battle-party" }, currentPartyId: 7 }]])
+    const hostMateAfterParty = host.client.mates.find(mate => mate.viewerId === 4701)
+    assert.deepEqual(hostMateAfterParty.party, hostMateBefore.party)
+    assert.equal(room.host_party_id, hostPartyIdBefore)
+
+    // Ready mid-battle must not flip the ready state.
+    handleMessage(guest.socket, [0, [3, [1]]])
+    const guestMate = guest.client.mates.find(mate => mate.viewerId === 4702)
+    assert.deepEqual(guestMate.state, [0])
+    assert.equal(guest.client.isReady, false)
+    assert.equal(host.socket.writes.length, hostWritesBefore)
+
+    // EnterComs mid-battle must not start NPC recruitment.
+    handleMessage(host.socket, [0, [10]])
+    await flushPromises()
+    assert.equal(room.is_npc_mode, false)
+
+    // After the official release (room returns to Ready before the battle
+    // runtime is cleared), host re-Enter legally returns the room to
+    // preparation for the rematch.
+    updateRoomState(room.room_number, 1)
+    sessionManager.clearBattleExpectedCount(room.room_number)
+    handleMessage(host.socket, [0, [0, { party: { marker: "rematch" } }]])
+    assert.equal(room.raising_state, 1)
+})
+
+test("an abandoned battle room is recycled once every participant is gone", async t => {
+    const { room, host, guests } = createLobbyRoom(t, 4801, [4802])
+    const guest = guests[0]
+    handleMessage(host.socket, [0, [0, { party: {} }]])
+    handleMessage(guest.socket, [0, [0, { party: {} }]])
+    handleMessage(host.socket, [0, [6]])
+    assert.equal(room.raising_state, 4)
+    const battleSessionId = sessionManager.getActiveBattleSessionId(room.room_number)
+    assert.notEqual(battleSessionId, undefined)
+
+    let cleanup
+    startRoomCleanup({
+        createInterval(callback) {
+            cleanup = callback
+            return { unref() {} }
+        },
+        clearInterval() {},
+        abandonedBattleExpiryMs: 40,
+    })
+    t.after(() => stopRoomCleanup())
+
+    // Active lobby participants keep the battle room alive.
+    cleanup()
+    assert.equal(getRoom(room.room_number), room, "occupied battle room must survive the sweep")
+
+    // Everyone disappears without finish/abort: the room survives the grace,
+    // then the sweep recycles it together with its battle facts.
+    sessionManager.removeClient(host.client)
+    sessionManager.removeClient(guest.client)
+    cleanup()
+    assert.equal(getRoom(room.room_number), room, "battle room must survive inside the grace")
+    await new Promise(resolve => setTimeout(resolve, 60))
+
+    cleanup()
+    assert.equal(getRoom(room.room_number), undefined, "abandoned battle room must be recycled")
+    assert.equal(sessionManager.getActiveBattleSessionId(room.room_number), null)
+    // Idempotent: sweeping again after deletion is a no-op.
+    cleanup()
+    assert.equal(getRoom(room.room_number), undefined)
+})
+
+test("a late-detected stale connection only removes its own mate", t => {
+    configureReconnectGraceMs(10_000)
+    const { room, host, guests } = createLobbyRoom(t, 508, [608])
+    const guest = guests[0]
+    addRoomMember(room.room_number, guest.client.participant)
+    host.client.mates = [host.client.yourself, guest.client.yourself]
+
+    // 断线检测延迟：guest 已用新连接重连并重新进入 mates
+    const reconnected = createLobbyClient(
+        room,
+        guest.client.viewerId,
+        "guest-reconnected-cid",
+        guest.client.participant.nodeSessionId,
+    )
+    handleParticipantReconnect(reconnected.client)
+    host.client.mates = [host.client.yourself, reconnected.client.yourself]
+    t.after(() => sessionManager.removeClientBySocket(reconnected.socket))
+
+    // 旧 socket 的网络断开此刻才被感知：会话层已把该 participant 的注册替换为
+    // 新连接（replaceRoomClient），旧 socket 查找返回 false 且不得触发任何按
+    // viewerId 的连带清理。
+    handleSocketDisconnect(guest.socket)
+
+    assert.equal(
+        host.client.mates.some(mate => mate.connectionId === "guest-reconnected-cid"),
+        true,
+        "旧连接断开不得按裸 viewerId 误删重连玩家的 mate",
+    )
+})
+
+test("expired guest lease cleanup is idempotent and connection-scoped", async t => {
+    configureReconnectGraceMs(25)
+    const { room, host, guests } = createLobbyRoom(t, 509, [609])
+    const guest = guests[0]
+    addRoomMember(room.room_number, guest.client.participant)
+    host.client.mates = [host.client.yourself, guest.client.yourself]
+
+    assert.equal(handleSocketDisconnect(guest.socket), true)
+    await new Promise(resolve => setTimeout(resolve, 40))
+
+    assert.equal(isRoomMember(room, guest.client.participant), false)
+    assert.deepEqual(
+        host.client.mates.map(mate => mate.connectionId),
+        [`host-509`],
+        "到期清理后 host 列表只剩自己",
+    )
+    void host
 })

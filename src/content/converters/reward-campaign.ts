@@ -1,13 +1,19 @@
 import { deepFreeze } from "../deep-freeze"
+import {
+    hasValidQuestRangeShape,
+    QUEST_CATEGORIES_BY_RANGE_KIND,
+} from "../quest-range-shape"
 import type { OrderedMapTextRow } from "../sync/ordered-map"
+import {
+    resolveContentConverterContext,
+    type ContentConverterContext,
+} from "./context"
+import type { GameCalendarPolicy } from "../../time/game-calendar"
 import { parseCsvLine } from "./csv"
 
 export const REWARD_CAMPAIGN_PATH = "master/campaign/reward_campaign.orderedmap"
-
-const CATEGORY_BY_QUEST_KIND: readonly (readonly number[])[] = [
-    [1], [4], [2], [6], [14], [7], [10], [13], [11], [18], [19], [15],
-    [6, 14, 13, 20], [20], [21], [22], [23], [24], [25], [26], [27],
-]
+// CN 1.8.1's final catalog contains only 1x–2x campaign rates.
+const MAX_REWARD_CAMPAIGN_RATE = 2
 
 export interface RewardCampaignSourceReader {
     read(logicalPath: string): Promise<readonly OrderedMapTextRow[]>
@@ -15,6 +21,76 @@ export interface RewardCampaignSourceReader {
 
 export interface RewardCampaignConversionOutput {
     readonly "reward_campaign.json": Readonly<Record<string, unknown>>
+}
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
+/** Validates the converted runtime shape so release readers share converter invariants. */
+export function validateRewardCampaignTable(
+    raw: unknown,
+): Readonly<Record<string, unknown>> {
+    if (!isRecord(raw)) invalidCampaign("catalog root must be an object")
+    const table = raw as Readonly<Record<string, unknown>>
+    if (Object.keys(table).length === 0) invalidCampaign("catalog must not be empty")
+    for (const [idText, rawEntry] of Object.entries(table)) {
+        if (!/^[1-9]\d*$/.test(idText)
+            || !Number.isSafeInteger(Number(idText))) {
+            invalidCampaign(`campaign key must be a canonical positive integer: ${idText}`)
+        }
+        if (!isRecord(rawEntry)) invalidCampaign(`campaign ${idText} must be an object`)
+        const entry = rawEntry as Readonly<Record<string, unknown>>
+        if (entry.id !== Number(idText)) invalidCampaign(`campaign ${idText} id does not match key`)
+        if (entry.repeatKind !== "once" && entry.repeatKind !== "weekly") {
+            invalidCampaign(`campaign ${idText} repeatKind is invalid`)
+        }
+        if (typeof entry.startAtMs !== "number" || !Number.isFinite(entry.startAtMs)
+            || typeof entry.endAtMs !== "number" || !Number.isFinite(entry.endAtMs)
+            || entry.endAtMs < entry.startAtMs) {
+            invalidCampaign(`campaign ${idText} period is invalid`)
+        }
+        if (!Number.isSafeInteger(entry.rewardKind)
+            || (entry.rewardKind as number) < 0
+            || (entry.rewardKind as number) > 2) {
+            invalidCampaign(`campaign ${idText} rewardKind is invalid`)
+        }
+        if (typeof entry.rate !== "number" || !Number.isFinite(entry.rate)
+            || entry.rate < 1 || entry.rate > MAX_REWARD_CAMPAIGN_RATE) {
+            invalidCampaign(`campaign ${idText} rate must be from 1 through ${MAX_REWARD_CAMPAIGN_RATE}`)
+        }
+        if (!Array.isArray(entry.categories) || entry.categories.length === 0
+            || entry.categories.some(category => !Number.isSafeInteger(category) || category <= 0)) {
+            invalidCampaign(`campaign ${idText} categories are invalid`)
+        }
+        if (!Array.isArray(entry.keyQueries)
+            || entry.keyQueries.some(query => query !== null && (
+                !Array.isArray(query)
+                || query.some(value => !Number.isSafeInteger(value) || value <= 0)
+                || new Set(query).size !== query.length
+            ))) {
+            invalidCampaign(`campaign ${idText} keyQueries are invalid`)
+        }
+        if (!hasValidQuestRangeShape(
+            entry.categories as readonly number[],
+            (entry.keyQueries as readonly unknown[]).length,
+        )) {
+            invalidCampaign(`campaign ${idText} quest range shape is invalid`)
+        }
+        if (entry.repeatKind === "weekly") {
+            if (!Number.isSafeInteger(entry.dayOfWeek)
+                || (entry.dayOfWeek as number) < 0
+                || (entry.dayOfWeek as number) > 6
+                || !Number.isSafeInteger(entry.resetTimeMs)
+                || (entry.resetTimeMs as number) < 0
+                || (entry.resetTimeMs as number) >= 24 * 60 * 60 * 1000) {
+                invalidCampaign(`campaign ${idText} weekly schedule is invalid`)
+            }
+        } else if (entry.dayOfWeek !== undefined || entry.resetTimeMs !== undefined) {
+            invalidCampaign(`campaign ${idText} once schedule has weekly fields`)
+        }
+    }
+    return deepFreeze(table)
 }
 
 function invalidCampaign(reason: string): never {
@@ -34,23 +110,16 @@ function parsePositiveInteger(value: string, subject: string): number {
     return parsed
 }
 
-function parseCnTimestamp(value: string, subject: string): number {
-    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value)
-    if (match === null) return invalidCampaign(`${subject} must be a CN timestamp`)
-    const parts = match.slice(1).map(Number)
-    const [year, month, day, hour, minute, second] = parts
-    const utc = new Date(0)
-    utc.setUTCFullYear(year, month - 1, day)
-    utc.setUTCHours(hour, minute, second, 0)
-    const normalized = [
-        utc.getUTCFullYear(), utc.getUTCMonth() + 1, utc.getUTCDate(),
-        utc.getUTCHours(), utc.getUTCMinutes(), utc.getUTCSeconds(),
-    ]
-    if (parts.some((part, index) => part !== normalized[index])) {
-        return invalidCampaign(`${subject} is not a real timestamp`)
+function parseCnTimestamp(
+    value: string,
+    subject: string,
+    calendar: GameCalendarPolicy,
+): number {
+    try {
+        return calendar.parseMasterTimestamp(value)
+    } catch {
+        return invalidCampaign(`${subject} must be a valid CN timestamp`)
     }
-    // CN keeps the upstream JST symbol names but initializes AppTime to UTC+8.
-    return utc.getTime() - 8 * 60 * 60 * 1000
 }
 
 function parseTimeSpan(value: string, subject: string): number {
@@ -82,7 +151,7 @@ function questRange(fields: readonly string[], questKind: number): {
     categories: readonly number[]
     keyQueries: readonly (readonly number[] | null)[]
 } {
-    const categories = CATEGORY_BY_QUEST_KIND[questKind]
+    const categories = QUEST_CATEGORIES_BY_RANGE_KIND[questKind]
     if (categories === undefined) invalidCampaign(`quest kind is unsupported: ${questKind}`)
     if (questKind <= 2) {
         return {
@@ -110,7 +179,9 @@ function questRange(fields: readonly string[], questKind: number): {
 
 export async function convertRewardCampaigns(
     reader: RewardCampaignSourceReader,
+    context?: ContentConverterContext,
 ): Promise<RewardCampaignConversionOutput> {
+    const { gameCalendar } = resolveContentConverterContext(context)
     const rows = await reader.read(REWARD_CAMPAIGN_PATH)
     const output: Record<string, unknown> = {}
     for (const row of rows) {
@@ -129,13 +200,15 @@ export async function convertRewardCampaigns(
         if (repeatKind !== 0 && repeatKind !== 1) {
             invalidCampaign(`reward_campaign[${row.key}].repeatKind must be 0 or 1`)
         }
-        const startAtMs = parseCnTimestamp(fields[1], `reward_campaign[${row.key}].startAt`)
-        const endAtMs = parseCnTimestamp(fields[2], `reward_campaign[${row.key}].endAt`)
+        const startAtMs = parseCnTimestamp(fields[1], `reward_campaign[${row.key}].startAt`, gameCalendar)
+        const endAtMs = parseCnTimestamp(fields[2], `reward_campaign[${row.key}].endAt`, gameCalendar)
         if (endAtMs < startAtMs) invalidCampaign(`reward_campaign[${row.key}] has an inverted period`)
         const rewardKind = parseInteger(fields[5], `reward_campaign[${row.key}].rewardKind`)
         if (rewardKind < 0 || rewardKind > 2) invalidCampaign(`reward kind is unsupported: ${rewardKind}`)
         const rate = Number(fields[6])
-        if (!Number.isFinite(rate) || rate < 1) invalidCampaign("campaign rate must be at least 1")
+        if (!Number.isFinite(rate) || rate < 1 || rate > MAX_REWARD_CAMPAIGN_RATE) {
+            invalidCampaign(`campaign rate must be from 1 through ${MAX_REWARD_CAMPAIGN_RATE}`)
+        }
         const questKind = parseInteger(fields[7], `reward_campaign[${row.key}].questKind`)
         const range = questRange(fields, questKind)
         const repeat = repeatKind === 0
@@ -167,5 +240,5 @@ export async function convertRewardCampaigns(
             ...range,
         }
     }
-    return deepFreeze({ "reward_campaign.json": output })
+    return deepFreeze({ "reward_campaign.json": validateRewardCampaignTable(output) })
 }

@@ -9,6 +9,8 @@ export interface AdminContentStatusOptions {
     readonly snapshot: ContentSnapshot
     readonly assetProvider: AssetProviderConfig
     readonly configuredCdnDir: string
+    /** Frozen startup value from CnRuntimeConfig; never read from process.env at request time. */
+    readonly configuredGameCalendarUtcOffsetMinutes: number
 }
 
 function compareVersions(left: string, right: string): number {
@@ -25,6 +27,7 @@ export function buildAdminContentStatus({
     snapshot,
     assetProvider,
     configuredCdnDir,
+    configuredGameCalendarUtcOffsetMinutes,
 }: AdminContentStatusOptions) {
     const archiveBytesByPath = new Map<string, number>()
     for (const edge of snapshot.cdn.edges) {
@@ -84,6 +87,13 @@ export function buildAdminContentStatus({
         extension,
         storage,
         contentRelease: repository,
+        // Read-only operator visibility: the frozen startup calendar offset and
+        // the offset the active content release was built under. Production
+        // startup rejects a mismatch, so equal values are the steady state.
+        gameCalendar: deepFreeze({
+            configuredUtcOffsetMinutes: configuredGameCalendarUtcOffsetMinutes,
+            contentUtcOffsetMinutes: repository.gameCalendarUtcOffsetMinutes,
+        }),
         // Temporary flat fields retained for older admin clients.
         configuredDir: storage.configuredDir,
         directoryPresent: storage.directoryPresent,

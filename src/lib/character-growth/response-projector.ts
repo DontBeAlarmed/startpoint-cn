@@ -1,6 +1,7 @@
 import type { PlayerCharacter, PlayerCharacterExBoost, PlayerCharacterProjectionData } from "../../data/types"
 import { clientSerializeDate } from "../../data/utils/date"
 import { getServerTime } from "../../utils"
+import { projectCharacterPatch } from "../common-response/entities"
 import { growthError } from "./errors"
 import { projectSortedBondTokens, validateAwakeLevel, validateBondTokenStatus, validateBoardIndex } from "./invariants"
 import type { BondTokenStatus } from "./model"
@@ -332,7 +333,8 @@ export function projectCharacterGrowthIncrement(
         characterId,
         state: result.after,
     })
-    if (options.includeChangedNodes !== true) return { character_list: [character] }
+    const characterPatch = projectCharacterPatch(character)
+    if (options.includeChangedNodes !== true) return { character_list: [characterPatch] }
     const nodes = result.after.normalManaNodes
     if (nodes === undefined) {
         throw growthError("INVALID_GROWTH_STATE", "Growth result did not observe mana nodes.")
@@ -355,7 +357,7 @@ export function projectCharacterGrowthIncrement(
         }
     })
     return {
-        character_list: [character],
+        character_list: [characterPatch],
         user_character_mana_node_list: {
             [String(characterId)]: entries,
         },

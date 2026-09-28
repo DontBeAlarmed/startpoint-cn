@@ -4,6 +4,10 @@ const assert = require("node:assert/strict")
 const test = require("node:test")
 
 require("ts-node/register/transpile-only")
+
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
 const { BUNDLED_CDN_CATALOG_VERSION } = require("../src/content/constants")
 const { characterExpCaps } = require("../src/lib/character")
 const {

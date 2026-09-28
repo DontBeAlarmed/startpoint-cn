@@ -29,16 +29,8 @@ function cleanup() {
 }
 process.once("exit", cleanup)
 
-const { productionContentSnapshotProvider } = require("../src/content/runtime/content-snapshot")
-const previousSnapshot = productionContentSnapshotProvider.snapshot
-productionContentSnapshotProvider.snapshot = {
-    cdn: { targetVersion: "mission-raid-summary-test" },
-    repository: {
-        info: () => ({ source: "bundled", assetVersion: "test", generatorVersion: 1, releaseDigest: null }),
-        table: tableName => require(path.join(__dirname, "../assets", tableName)),
-    },
-}
-restoreSnapshot = () => { productionContentSnapshotProvider.snapshot = previousSnapshot }
+restoreSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot({ additionalTableNames: ["gacha.json", "gacha_pool.json", "gacha_campaign_definitions.json", "stars_gacha_campaign.json", "gacha_exchange_rate.json", "equipment_gacha_movie_probability.json", "raid_event_overall_reward.json"] })
 
 const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")

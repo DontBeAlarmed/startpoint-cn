@@ -1,4 +1,3 @@
-import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
 import { getActiveMissionCountersSync } from "../../data/domains/active_mission_counters"
 import { getActiveMissionBattleFactsSync } from "../../data/domains/active_mission_battle_facts"
 import { getActiveMissionConditionalBattleFactsSync } from "../../data/domains/active_mission_battle_condition_facts"
@@ -11,7 +10,11 @@ import { getPlayerPartyGroupListSync } from "../../data/domains/party"
 import { getPlayerSync } from "../../data/domains/player"
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
 import { getPlayerShopPurchasesMapSync } from "../../data/domains/shopPurchase"
-import { getCharacterManaNodesSync } from "../assets"
+import { normalizeActiveMissionQuestNamespace } from "./active-quest-range"
+import { getCharacterFacts } from "../character-content"
+import { getCharacterGrowthContent } from "../character-growth-content"
+import { getEquipmentContentCatalog } from "../equipment-content"
+import { getActiveMissionFactContent } from "./active-mission-fact-content"
 import { ShopType } from "../types"
 import { getCharacterStoryQuestIds } from "./character-queries"
 import type {
@@ -123,27 +126,8 @@ function normalizeActiveMissions(
     }]))
 }
 
-function readTable<T>(repository: ReadonlyContentRepository, tableName: string): T {
-    try {
-        return repository.table<T>(tableName)
-    } catch {
-        return {} as T
-    }
-}
-
-function battleQuestIds(table: Readonly<Record<string, unknown>>, offset: number): number[] {
-    return Object.entries(table).flatMap(([questId, quest]) => {
-        const parsedQuestId = Number(questId)
-        if (!Number.isSafeInteger(parsedQuestId)
-            || quest === null
-            || typeof quest !== "object"
-            || !("rankPointReward" in quest)) return []
-        return [parsedQuestId + offset]
-    })
-}
 
 export function createProductionActiveMissionFactDomains(
-    repository: ReadonlyContentRepository,
     playerOverride?: NonNullable<ReturnType<typeof getPlayerSync>>,
 ): ActiveMissionFactDomains {
     return {
@@ -153,11 +137,13 @@ export function createProductionActiveMissionFactDomains(
             return { rows: 1, facts: { player } }
         },
         questProgress: playerId => {
+            const content = getActiveMissionFactContent()
             const byCategory = getPlayerQuestProgressSync(playerId)
             const progress: ActiveMissionFactQuestProgress[] = Object.entries(byCategory)
                 .flatMap(([category, progressList]) => progressList.map(quest => ({
                     category: Number(category),
-                    questId: quest.questId,
+                    // 存储保持原始 id；事实域统一投影到 +10M EX 命名空间（单一正规化点）
+                    questId: normalizeActiveMissionQuestNamespace(Number(category), quest.questId),
                     finished: quest.finished,
                     clearRank: quest.clearRank,
                     leaderCharacterId: quest.leaderCharacterId,
@@ -170,8 +156,8 @@ export function createProductionActiveMissionFactDomains(
                     questProgress: progress,
                     finishedQuestIds: new Set(progress.filter(quest => quest.finished).map(quest => quest.questId)),
                     chapterQuestIds: {
-                        "1": battleQuestIds(readTable(repository, "main_quest.json"), 0),
-                        "4": battleQuestIds(readTable(repository, "ex_quest.json"), 10_000_000),
+                        "1": [...content.getBattleQuestIds("main")],
+                        "4": [...content.getBattleQuestIds("ex")],
                     },
                 },
             }
@@ -182,10 +168,10 @@ export function createProductionActiveMissionFactDomains(
         },
         characters: playerId => {
             const characterList = getPlayerCharactersSync(playerId)
-            const table = readTable<Record<string, { readonly rarity?: number }>>(repository, "character.json")
+            const characterFacts = getCharacterFacts()
             const characters = Object.fromEntries(Object.entries(characterList).map(([id, character]) => [id, {
                 ...character,
-                rarity: table[id]?.rarity,
+                rarity: characterFacts.get(id)?.rarity,
             }]))
             return {
                 rows: Object.keys(characters).length,
@@ -218,7 +204,7 @@ export function createProductionActiveMissionFactDomains(
                 const boards: Record<string, number[]> = {}
                 const slots: Record<string, number> = {}
                 for (let level = 1; level <= 2; level++) {
-                    const board = getCharacterManaNodesSync(characterId, level)
+                    const board = getCharacterGrowthContent().getManaBoardNodes(characterId, level)
                     if (!board) continue
                     boards[String(level)] = Object.keys(board).map(Number)
                     for (const [nodeId, node] of Object.entries(board)) {
@@ -235,11 +221,11 @@ export function createProductionActiveMissionFactDomains(
         },
         equipment: playerId => {
             const list = getPlayerEquipmentListSync(playerId)
-            const table = readTable<Record<string, { readonly max_level?: number }>>(repository, "equipment_dissolve.json")
+            const dissolveById = getEquipmentContentCatalog().dissolveById
             const equipment = Object.entries(list).map(([id, item]) => ({
                 level: item.level,
                 enhancementLevel: item.enhancementLevel,
-                maxLevel: table[id]?.max_level ?? 5,
+                maxLevel: dissolveById[id]?.max_level ?? 5,
             }))
             return { rows: equipment.length, facts: { equipment } }
         },
@@ -250,7 +236,7 @@ export function createProductionActiveMissionFactDomains(
                     + (party.abilitySoulIds ?? []).filter(id => id !== null && id !== undefined).length, 0), 0)
             return { rows: Object.keys(groups).length, facts: { partyAbilitySoulCount: count } }
         },
-        shopPurchases: playerId => loadShopPurchaseFacts(playerId, repository),
+        shopPurchases: playerId => loadShopPurchaseFacts(playerId),
         counters: playerId => {
             const counters = getActiveMissionCountersSync(playerId)
             return {
@@ -281,19 +267,13 @@ export function createProductionActiveMissionFactDomains(
 
 function loadShopPurchaseFacts(
     playerId: number,
-    repository: ReadonlyContentRepository,
 ): ActiveMissionFactLoadResult {
+    const content = getActiveMissionFactContent()
     const treasure = getPlayerShopPurchasesMapSync(playerId, ShopType.TREASURE)
     const boss = getPlayerShopPurchasesMapSync(playerId, ShopType.BOSS_COIN)
-    const treasureIds = new Set(Object.keys(readTable<Record<string, unknown>>(repository, "treasure_shop.json")))
-    const bossIds = new Set(Object.keys(readTable<Record<string, unknown>>(repository, "boss_coin_shop_item_category_map.json")))
-    const bossEquipmentIds = new Set<string>()
-    const bossShop = readTable<Record<string, Record<string, { readonly rewards?: readonly { readonly type?: number }[] }>>>(repository, "boss_coin_shop.json")
-    for (const category of Object.values(bossShop)) {
-        for (const [itemId, item] of Object.entries(category ?? {})) {
-            if (item.rewards?.some(reward => reward.type === 4)) bossEquipmentIds.add(itemId)
-        }
-    }
+    const treasureIds = content.getTreasureShopItemIds()
+    const bossIds = content.getBossCoinShopItemIds()
+    const bossEquipmentIds = content.getBossCoinEquipmentShopItemIds()
     const count = (entries: Record<string, number>, ids: ReadonlySet<string>) => Object.entries(entries)
         .reduce((total, [itemId, value]) => ids.has(itemId) ? total + Math.max(0, value) : total, 0)
     return {

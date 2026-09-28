@@ -2,18 +2,20 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { getAccountPlayers } from "../../data/domains/account"
-import { getPlayerCharacterSync, playerOwnsCharacterSync, updatePlayerCharacterSync } from "../../data/domains/character"
+import { getPlayerCharacterSync, playerOwnsCharacterSync } from "../../data/domains/character"
 import { getPlayerItemSync } from "../../data/domains/item"
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
-import { getCharacterDataSync, getExBoostItemSync, getExStatusPoolSync } from "../../lib/assets"
+import { getCharacterFacts } from "../../lib/character-content"
+import { getExBoostContentCatalog, type ExBoostAbilityDrawPools } from "../../lib/ex-boost-content"
 import { generateDataHeaders } from "../../utils"
 import { randomInt } from "crypto"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { characterMaxOverLimits } from "./character"
-import bundledExAbility from "../../../assets/ex_ability.json"
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
-import { getMailArrivedSync } from "../../lib/mail-notification";
+import { setCharacterExBoostWithinTransactionSync } from "../../lib/character-growth/commands/set-ex-boost"
+import { getMailArrivedSync } from "../../lib/mail-notification"
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
+import { projectCharacterPatch } from "../../lib/common-response/entities";
 import { getDb } from "../../data/db";
 import {
     deletePendingExBoostDrawSync,
@@ -76,53 +78,6 @@ function projectExBoostCharacter(
     })
 }
 
-// ---- A/B group classification from orderedmap ability names ----
-
-const A_PREFIXES = ['atk_self_', 'skilldamage_self_', 'directdamage_self_',
-    'abilitydamage_self_', 'abilitydagame_self_',
-    'atk_party_', 'skilldamage_party_', 'directdamage_party_',
-    'abilitydamage_party_', 'abilitydagame_party_',
-    'powerflipdamage_', 'hp_self_']
-
-// These match A_PREFIXES but are actually B-group (buff extend/duration)
-const B_OVERRIDES = ['powerflipdamage_buffextend_']
-
-interface AbilityInfo { id: number, name: string, group: 'A' | 'B', rarity: number }
-
-function classifyAbilities(data: Record<string, string[][]>): AbilityInfo[] {
-    const list: AbilityInfo[] = []
-    for (const [id, raw] of Object.entries(data)) {
-        const name = raw[0]?.[0] || ''
-        const isBOverride = B_OVERRIDES.some(p => name.startsWith(p))
-        const isA = !isBOverride && A_PREFIXES.some(p => name.startsWith(p))
-        let rarity = 1 // brown
-        if (name.endsWith('_r5')) rarity = 3
-        else if (name.endsWith('_r4')) rarity = 2
-        list.push({ id: Number(id), name, group: isA ? 'A' : 'B', rarity })
-    }
-    return list
-}
-
-type ExAbilityTable = Record<string, string[][]>
-const abilitiesByTable = new WeakMap<ExAbilityTable, readonly AbilityInfo[]>()
-
-function getAllAbilities(): readonly AbilityInfo[] {
-    const table = getRuntimeContentTableSync(
-        "ex_ability.json",
-        bundledExAbility as ExAbilityTable,
-    )
-    const cached = abilitiesByTable.get(table)
-    if (cached) return cached
-    const abilities = Object.freeze(classifyAbilities(table))
-    abilitiesByTable.set(table, abilities)
-    return abilities
-}
-
-// 6 pools: A/B × gold(3)/silver(2)/brown(1)
-function poolCopy(abilities: readonly AbilityInfo[], group: 'A' | 'B', rarity: number): number[] {
-    return abilities.filter(a => a.group === group && a.rarity === rarity).map(a => a.id)
-}
-
 // ---- Official material probability table (6 rarities × 3 colors) ----
 
 interface MaterialProbs { a1: number, b1: number, a2: number, b2: number, a3: number, b3: number }
@@ -154,20 +109,6 @@ const MATERIAL_PROBS: Record<number, MaterialProbs> = {}
     }
 }
 
-// ---- Draw pools (regenerated per draw to allow mutation) ----
-
-function freshPools(): { A: Record<number, number[]>, B: Record<number, number[]> } {
-    const allAbilities = getAllAbilities()
-    return {
-        A: { 1: poolCopy(allAbilities, 'A', 1), 2: poolCopy(allAbilities, 'A', 2), 3: poolCopy(allAbilities, 'A', 3) },
-        B: { 1: poolCopy(allAbilities, 'B', 1), 2: poolCopy(allAbilities, 'B', 2), 3: poolCopy(allAbilities, 'B', 3) },
-    }
-}
-
-export function getRuntimeExAbilityPools(): { A: Record<number, number[]>, B: Record<number, number[]> } {
-    return freshPools()
-}
-
 // ---- Draw logic ----
 
 function drawOneAbility(groupPools: Record<number, number[]>, probs: MaterialProbs, group: 'A' | 'B'): number | null {
@@ -191,6 +132,7 @@ function drawOneAbility(groupPools: Record<number, number[]>, probs: MaterialPro
 function drawExBoostAbilities(
     materialId: number,
     exStatusPool: number[],
+    pools: ExBoostAbilityDrawPools,
 ): { statusId: number, abilityIdList: number[] } {
     // Always get 1 status
     const statusId = exStatusPool[randomInt(exStatusPool.length)]
@@ -198,7 +140,6 @@ function drawExBoostAbilities(
     const probs = MATERIAL_PROBS[materialId]
     if (!probs) return { statusId, abilityIdList: [] }
 
-    const pools = freshPools()
     const abilityIdList: number[] = []
 
     // Independent A-group draw
@@ -239,12 +180,13 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
         "error": "Bad Request", "message": "Player does not own character."
     })
 
-    const characterAssetData = getCharacterDataSync(characterId)
+    const characterAssetData = getCharacterFacts().get(characterId)
     if (!characterAssetData) return reply.status(500).send({
         "error": "Internal Server Error", "message": "Character does not have data."
     })
 
-    const costItemData = getExBoostItemSync(costItemId)
+    const exBoostContent = getExBoostContentCatalog()
+    const costItemData = exBoostContent.resolveMaterial(costItemId)
     if (!costItemData) return reply.status(400).send({
         "error": "Bad Request", "message": "Attempt to use invalid cost item."
     })
@@ -268,8 +210,10 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
                     status_id: pendingDraw.statusId,
                     ability_id_list: pendingDraw.abilityIdList,
                 },
-                item_list: { [String(costItemId)]: currentCostItemAmount },
-                mail_arrived: getMailArrivedSync(playerId),
+                ...mergeCommonResponseFragments([{
+                    item_list: { [String(costItemId)]: currentCostItemAmount },
+                    mail_arrived: getMailArrivedSync(playerId),
+                }]),
             },
         })
     }
@@ -280,14 +224,16 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
         return reply.status(200).send({
             data_headers: generateDataHeaders({ viewer_id: viewerId }),
             data: {
-                character_list: [projectExBoostCharacter(
-                    viewerId,
-                    characterId,
-                    characterData,
-                    characterData.exBoost,
-                )],
-                item_list: { [String(costItemId)]: currentCostItemAmount },
-                mail_arrived: getMailArrivedSync(playerId),
+                ...mergeCommonResponseFragments([{
+                    character_list: [projectCharacterPatch(projectExBoostCharacter(
+                        viewerId,
+                        characterId,
+                        characterData,
+                        characterData.exBoost,
+                    ))],
+                    item_list: { [String(costItemId)]: currentCostItemAmount },
+                    mail_arrived: getMailArrivedSync(playerId),
+                }]),
             },
         })
     }
@@ -309,12 +255,16 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
     })
 
     const drawTier = costItemData.tier
-    const exStatusPool = getExStatusPoolSync(drawTier)
+    const exStatusPool = exBoostContent.resolveStatusPool(drawTier)
     if (exStatusPool === null) return reply.status(500).send({
         "error": "Internal Server Error", "message": "Status pool not found."
     })
 
-    const draw = drawExBoostAbilities(costItemId, exStatusPool)
+    const draw = drawExBoostAbilities(
+        costItemId,
+        [...exStatusPool],
+        exBoostContent.createAbilityDrawPools(),
+    )
     const drawResult: ExBoostDrawResult = {
         characterId, statusId: draw.statusId, abilityIdList: draw.abilityIdList
     }
@@ -323,34 +273,37 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
 
     reply.header("content-type", "application/x-msgpack")
     if (autoAccept) {
-        const characterUpdate: Parameters<typeof updatePlayerCharacterSync>[2] = {
-            exBoost: { statusId: drawResult.statusId, abilityIdList: drawResult.abilityIdList },
-        }
-        const settledCostItemAmount = getDb().transaction(() => (
+        const settled = getDb().transaction(() => (
             withInventoryBatchContextWithinTransactionSync({
                 playerId,
                 preloadItemIds: [costItemId],
             }, inventory => {
                 const itemResult = inventory.deduct(costItemId, costItemData.count)
                 inventory.flush()
-                updatePlayerCharacterSync(playerId, characterId, characterUpdate)
-                return itemResult.afterAmount
+                const exBoostWrite = setCharacterExBoostWithinTransactionSync({
+                    playerId,
+                    characterId,
+                    statusId: drawResult.statusId,
+                    abilityIdList: drawResult.abilityIdList,
+                })
+                return { afterAmount: itemResult.afterAmount, updateTime: exBoostWrite.updateTime }
             })
         ))()
-        const updateTime = characterUpdate.updateTime
-        if (updateTime === undefined) throw new Error("EX Boost update did not record update time")
+        const updateTime = settled.updateTime
         return reply.status(200).send({
             data_headers: headers,
             data: {
-                character_list: [projectExBoostCharacter(
-                    viewerId,
-                    characterId,
-                    characterData,
-                    drawResult,
-                    updateTime,
-                )],
-                item_list: { [String(costItemId)]: settledCostItemAmount },
-                mail_arrived: getMailArrivedSync(playerId),
+                ...mergeCommonResponseFragments([{
+                    character_list: [projectCharacterPatch(projectExBoostCharacter(
+                        viewerId,
+                        characterId,
+                        characterData,
+                        drawResult,
+                        updateTime,
+                    ))],
+                    item_list: { [String(costItemId)]: settled.afterAmount },
+                    mail_arrived: getMailArrivedSync(playerId),
+                }]),
             },
         })
     } else {
@@ -370,8 +323,10 @@ const drawExpBoost = async (request: FastifyRequest, reply: FastifyReply, autoAc
             data: {
                 character_id: characterId,
                 draw_result: { status_id: drawResult.statusId, ability_id_list: drawResult.abilityIdList },
-                item_list: { [String(costItemId)]: settledCostItemAmount },
-                mail_arrived: getMailArrivedSync(playerId),
+                ...mergeCommonResponseFragments([{
+                    item_list: { [String(costItemId)]: settledCostItemAmount },
+                    mail_arrived: getMailArrivedSync(playerId),
+                }]),
             },
         })
     }
@@ -407,26 +362,30 @@ const routes = async (fastify: FastifyInstance) => {
         if (characterData === null) return reply.status(400).send({
             "error": "Bad Request", "message": "Player does not own character."
         })
-        const characterUpdate: Parameters<typeof updatePlayerCharacterSync>[2] = {
-            exBoost: { statusId: drawResult.statusId, abilityIdList: drawResult.abilityIdList },
-        }
-        getDb().transaction(() => {
-            updatePlayerCharacterSync(playerId, characterId, characterUpdate)
+        const settled = getDb().transaction(() => {
+            const exBoostWrite = setCharacterExBoostWithinTransactionSync({
+                playerId,
+                characterId,
+                statusId: drawResult.statusId,
+                abilityIdList: drawResult.abilityIdList,
+            })
             deletePendingExBoostDrawSync(playerId)
+            return exBoostWrite
         })()
-        const updateTime = characterUpdate.updateTime
-        if (updateTime === undefined) throw new Error("EX Boost update did not record update time")
+        const updateTime = settled.updateTime
         return reply.status(200).send({
             data_headers: headers,
             data: {
-                character_list: [projectExBoostCharacter(
-                    viewerId,
-                    characterId,
-                    characterData,
-                    drawResult,
-                    updateTime,
-                )],
-                mail_arrived: getMailArrivedSync(playerId),
+                ...mergeCommonResponseFragments([{
+                    character_list: [projectCharacterPatch(projectExBoostCharacter(
+                        viewerId,
+                        characterId,
+                        characterData,
+                        drawResult,
+                        updateTime,
+                    ))],
+                    mail_arrived: getMailArrivedSync(playerId),
+                }]),
             },
         })
     })

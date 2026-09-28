@@ -24,7 +24,7 @@ export interface ScheduledResourceSettlementInput {
     readonly player: SettlementPlayer
     readonly realNow: Date
     readonly dailyResetHour: number
-    readonly itemMaxCounts: Readonly<Record<string, number>>
+    readonly itemMaxCount: (itemId: number) => number | null
     readonly maxFreeVmoney: number
 }
 
@@ -54,7 +54,7 @@ export function settleScheduledResourcesSync(
     const validRules = rules.filter(rule => {
         if (!isActiveAt(rule, nowMs)) return false
         return validateScheduledResourceRuleInput(rule, {
-            itemMaxCounts: input.itemMaxCounts,
+            itemMaxCount: input.itemMaxCount,
             maxFreeVmoney: input.maxFreeVmoney,
             playerExists: playerId => playerId === input.player.id,
         }).ok

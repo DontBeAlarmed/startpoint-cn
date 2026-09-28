@@ -1,4 +1,6 @@
 import { PlayerBoxGacha } from "../data/types"
+import { GameCalendarError, type GameCalendarPolicy } from "../time/game-calendar"
+import { getGameCalendar } from "../time/game-calendar-provider"
 import { BoxGachaBoxSettings } from "./types/box-gacha"
 
 export interface BoxGachaResetInput {
@@ -8,6 +10,7 @@ export interface BoxGachaResetInput {
     availableCount: number
     settings: BoxGachaBoxSettings
     nowMs: number
+    calendar?: GameCalendarPolicy
 }
 
 export interface BoxGachaResetDependencies {
@@ -68,19 +71,26 @@ export class BoxGachaNotEmptyError extends BoxGachaResetError {
     }
 }
 
-function parseCnTimestamp(value: string): number {
-    const timestamp = Date.parse(`${value.replace(" ", "T")}+08:00`)
-    if (!Number.isFinite(timestamp)) {
-        throw new BoxGachaResetError(`Invalid box gacha period: ${value}.`)
+function parseCnTimestamp(value: string, calendar: GameCalendarPolicy): number {
+    try {
+        return calendar.parseMasterTimestamp(value)
+    } catch (error) {
+        if (error instanceof GameCalendarError) {
+            throw new BoxGachaResetError(`Invalid box gacha period: ${value}.`)
+        }
+        throw error
     }
-    return timestamp
 }
 
-export function validateBoxGachaPeriod(settings: BoxGachaBoxSettings, nowMs: number): void {
-    const availableFromMs = parseCnTimestamp(settings.availableFrom)
+export function validateBoxGachaPeriod(
+    settings: BoxGachaBoxSettings,
+    nowMs: number,
+    calendar: GameCalendarPolicy = getGameCalendar(),
+): void {
+    const availableFromMs = parseCnTimestamp(settings.availableFrom, calendar)
     const availableUntilMs = settings.availableUntil === null
         ? Infinity
-        : parseCnTimestamp(settings.availableUntil)
+        : parseCnTimestamp(settings.availableUntil, calendar)
     if (nowMs < availableFromMs || nowMs > availableUntilMs) {
         throw new BoxGachaInvalidPeriodError()
     }
@@ -90,7 +100,7 @@ export function resetBoxGachaSync(
     input: BoxGachaResetInput,
     dependencies: BoxGachaResetDependencies,
 ): PlayerBoxGacha {
-    validateBoxGachaPeriod(input.settings, input.nowMs)
+    validateBoxGachaPeriod(input.settings, input.nowMs, input.calendar ?? getGameCalendar())
 
     return dependencies.transaction(() => {
         const currentBox = dependencies.getBox(input.playerId, input.boxGachaId, input.boxId)

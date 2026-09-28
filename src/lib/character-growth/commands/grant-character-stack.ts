@@ -1,7 +1,7 @@
 import { getDb } from "../../../data/db"
 import { getPlayerCharacterSync } from "../../../data/domains/character"
 import type { PlayerCharacter } from "../../../data/types"
-import { getCharacterDataSync } from "../../assets"
+import { getCharacterFacts } from "../../character-content"
 import { withInventoryBatchContextWithinTransactionSync } from "../../inventory"
 import type { Element, GivePlayerCharacterResult } from "../../types"
 import { createRewardGrantItemOverflowPolicy } from "../../reward-grant-item-overflow"
@@ -18,6 +18,13 @@ const duplicateItemByRarityAndElement: Readonly<Record<number, Readonly<Record<n
     4: { 0: 14002, 1: 14005, 2: 14008, 3: 14011, 4: 14017, 5: 14014 },
     5: { 0: 14003, 1: 14006, 2: 14009, 3: 14012, 4: 14018, 5: 14015 },
 })
+
+export function getCharacterStackCompensationItemId(
+    rarity: number,
+    element: Element,
+): number | undefined {
+    return duplicateItemByRarityAndElement[rarity]?.[element]
+}
 
 export interface GrantCharacterStackCommand {
     readonly playerId: number
@@ -40,9 +47,9 @@ export function grantCharacterStackWithinTransactionSync(
     validateGrowthCommandIds(command.playerId, command.characterId)
     const character = knownCharacter ?? getPlayerCharacterSync(command.playerId, command.characterId)
     if (character === null) return null
-    const asset = getCharacterDataSync(command.characterId)
+    const asset = getCharacterFacts().get(command.characterId)
     if (asset === null) return null
-    const itemId = duplicateItemByRarityAndElement[asset.rarity]?.[asset.element as Element]
+    const itemId = getCharacterStackCompensationItemId(asset.rarity, asset.element as Element)
     const stack = addSafeInteger(character.stack, 1, "character.stack")
 
     const updateStack = (): GivePlayerCharacterResult => {

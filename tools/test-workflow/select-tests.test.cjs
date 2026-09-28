@@ -6,7 +6,176 @@ const test = require("node:test")
 const { AGGREGATE_GROUPS, TEST_GROUPS } = require("./groups.cjs")
 const { selectTestGroups } = require("./select-tests.cjs")
 
+test("maps the D27 runtime index seam and fixtures to quick content", () => {
+    for (const file of [
+        "src/content/runtime/table-access.ts",
+        "tools/content_runtime_index_contract.test.cjs",
+        "tools/content_runtime_index_boundary.test.cjs",
+        "tools/helpers/content-snapshot-fixture.cjs",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["quick:content"], file)
+    }
+    assert.ok(TEST_GROUPS["quick:content"].tests.includes(
+        "tools/content_runtime_index_contract.test.cjs",
+    ))
+    assert.ok(TEST_GROUPS["quick:content"].tests.includes(
+        "tools/content_runtime_index_boundary.test.cjs",
+    ))
+})
+
+test("maps D27 strict Quest, Daily, Awake and Encyclopedia boundaries to focused groups", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest-entry-content.ts"]),
+        ["integration:party", "integration:quest", "integration:rules", "quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest/daily-challenge.ts"]),
+        ["admin", "integration:database", "integration:quest", "quick:content", "quick:quest"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/mission/awake-rule-catalog.ts"]),
+        ["integration:mission"],
+    )
+    for (const file of [
+        "src/lib/encyclopedia-content.ts",
+        "src/routes/api/encyclopedia.ts",
+        "tools/encyclopedia_content.test.cjs",
+    ]) assert.deepEqual(selectTestGroups([file]), ["quick:content"], file)
+})
+
+test("maps D27 Item and Equipment typed content to affected focused groups", () => {
+    const expected = ["admin", "integration:quest", "integration:rules", "quick:content"]
+    for (const file of [
+        "src/lib/item-content.ts",
+        "src/lib/equipment-content.ts",
+        "src/lib/equipment-dissolve.ts",
+    ]) assert.deepEqual(selectTestGroups([file]), expected, file)
+    for (const file of [
+        "src/routes/api/equipment.ts",
+        "src/routes/api/sell.ts",
+    ]) assert.deepEqual(
+        selectTestGroups([file]),
+        ["admin", "full", "integration:quest", "integration:rules", "quick:content"],
+        file,
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/item_equipment_content.test.cjs"]),
+        ["quick:content"],
+    )
+})
+
+test("maps D27 Raid reward parsing and route transaction boundaries to focused groups", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest/finish/raid-overall-rewards.ts"]),
+        ["integration:event", "integration:mission", "quick:content", "quick:quest"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest/periodic-reward-content.ts"]),
+        ["integration:event", "integration:mission", "quick:content", "quick:quest"],
+    )
+    assert.deepEqual(selectTestGroups(["tools/equipment_dissolve.test.cjs"]), ["integration:rules"])
+})
+
+test("maps D27 narrow Config policies to every affected focused group", () => {
+    const expected = [
+        "admin",
+        "integration:database",
+        "integration:mission",
+        "integration:party",
+        "integration:quest",
+        "integration:reward-grant",
+        "integration:rules",
+        "quick:content",
+        "quick:gacha",
+        "quick:quest",
+    ]
+    assert.deepEqual(selectTestGroups(["src/lib/config-content.ts"]), expected)
+    assert.deepEqual(selectTestGroups(["tools/config_content.test.cjs"]), ["quick:content"])
+})
+
+test("maps D27 Shop typed content to the affected focused groups", () => {
+    for (const file of ["src/lib/shop/catalog.ts", "src/lib/shop/model.ts"]) {
+        assert.deepEqual(
+            selectTestGroups([file]),
+            ["integration:event", "integration:rules", "quick:content"],
+            file,
+        )
+    }
+    assert.deepEqual(
+        selectTestGroups(["src/lib/event-currency.ts"]),
+        ["integration:rules"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/shop-select-campaign.ts"]),
+        ["integration:event", "integration:rules"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/how-to-get.ts"]),
+        ["integration:event"],
+    )
+})
+
+test("maps D27 Gacha and Box Gacha typed content to independent focused groups", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/lib/gacha-catalog/catalog.ts"]),
+        ["quick:content", "quick:gacha"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/gacha-owner/save-validation.ts"]),
+        ["integration:database", "integration:rules", "quick:gacha"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/gacha_save_validation.test.cjs"]),
+        ["integration:database"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/box-gacha-content.ts"]),
+        ["integration:event", "quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/box_gacha_content.test.cjs"]),
+        ["quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/routes/api/tutorial.ts"]),
+        ["full", "integration:quest", "integration:reward-grant", "quick:gacha"],
+    )
+})
+
+test("maps D27 Exchange, EX Boost and Election Content boundaries", () => {
+    for (const file of [
+        "assets/star_crumb_exchange.json",
+        "assets/star_crumb_exchange_cost.json",
+        "src/lib/star-crumb-exchange/catalog.ts",
+    ]) assert.deepEqual(selectTestGroups([file]), ["integration:rules", "quick:content"], file)
+    for (const file of [
+        "assets/bond_token_exchange.json",
+        "src/lib/bond-token-exchange/catalog.ts",
+    ]) assert.deepEqual(
+        selectTestGroups([file]),
+        ["integration:database", "integration:rules", "quick:content"],
+        file,
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/ex-boost-content.ts"]),
+        ["integration:database", "quick:character", "quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/character-election.ts"]),
+        ["integration:mission", "quick:content"],
+    )
+    for (const file of [
+        "tools/ex_boost_content.test.cjs",
+        "tools/character_election_content.test.cjs",
+        "tools/exchange_content_boundary.test.cjs",
+    ]) assert.deepEqual(selectTestGroups([file]), ["quick:content"], file)
+})
+
 test("maps representative source files to focused groups", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/data/domains/gacha-state.ts"]),
+        ["full", "integration:database", "integration:rules", "quick:gacha"],
+    )
     assert.deepEqual(
         selectTestGroups(["src/lib/quest/finish/session-validator.ts"]),
         ["integration:quest", "quick:quest"],
@@ -63,6 +232,10 @@ test("maps representative source files to focused groups", () => {
         ["integration:mission"],
     )
     assert.deepEqual(
+        selectTestGroups(["src/lib/mission/event-coverage-report.ts"]),
+        ["integration:mission"],
+    )
+    assert.deepEqual(
         selectTestGroups(["src/lib/mission/coverage-audit.ts"]),
         ["integration:mission"],
     )
@@ -105,7 +278,8 @@ test("maps representative source files to focused groups", () => {
             ["integration:reward-grant", "integration:rules", "quick:gacha"],
         )
     }
-    assert.deepEqual(selectTestGroups(["src/routes/api/gacha.ts"]), ["full", "integration:reward-grant", "integration:rules", "quick:gacha"])
+    assert.deepEqual(selectTestGroups(["src/routes/api/gacha.ts"]), ["full", "integration:reward-grant", "integration:rules", "quick:content", "quick:gacha"])
+    assert.deepEqual(selectTestGroups(["src/routes/api/gacha/exchange-routes.ts"]), ["full", "integration:reward-grant", "integration:rules", "quick:content", "quick:gacha"])
     assert.deepEqual(selectTestGroups(["src/routes/api/tutorial.ts"]), ["full", "integration:quest", "integration:reward-grant", "quick:gacha"])
     assert.deepEqual(selectTestGroups(["src/routes/api/boxGacha.ts"]), ["full", "integration:event"])
     assert.deepEqual(
@@ -130,13 +304,62 @@ test("maps representative source files to focused groups", () => {
     )
     assert.deepEqual(selectTestGroups(["docs/protocol/seed-verification.md"]), ["quick:seed"])
     assert.deepEqual(selectTestGroups(["src/lib/gacha-draw.ts"]), ["quick:gacha"])
+    assert.deepEqual(
+        selectTestGroups(["src/lib/gacha-owner/execute.ts"]),
+        ["integration:rules", "quick:gacha"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/gacha-owner/post-commit.ts"]),
+        ["integration:mission", "integration:rules", "quick:gacha"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/data/domains/reward-acquisition.ts"]),
+        ["full", "integration:database", "integration:rules", "quick:gacha"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/gacha-owner/save-validation.ts"]),
+        ["integration:database", "integration:rules", "quick:gacha"],
+    )
+    for (const file of [
+        "src/content/converters/gacha.ts",
+        "src/lib/types/gacha.ts",
+        "assets/gacha.json",
+        "assets/gacha_campaign_definitions.json",
+        "assets/gacha_exchange_rate.json",
+        "assets/gacha_pool.json",
+        "assets/stars_gacha_campaign.json",
+        "assets/equipment_lookup.json",
+    ]) {
+        assert.deepEqual(
+            selectTestGroups([file]),
+            ["quick:content", "quick:gacha"],
+            file,
+        )
+    }
+    assert.deepEqual(
+        selectTestGroups(["tools/content_gacha_converter.test.cjs"]),
+        ["quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/gacha-legacy-content.ts"]),
+        ["admin", "integration:rules", "quick:content", "quick:gacha"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/admin-clairvoyance.ts"]),
+        ["admin", "quick:content", "quick:gacha"],
+    )
+    for (const sharedFile of [
+        "src/content/sync/table-registry.ts",
+        "src/lib/types/index.ts",
+    ]) {
+        assert.deepEqual(selectTestGroups([sharedFile]), ["full"], sharedFile)
+    }
     assert.deepEqual(selectTestGroups(["src/lib/sampled-log.ts"]), ["quick:workflow"])
     assert.deepEqual(
         selectTestGroups(["src/lib/hot-path-log-formatters.ts"]),
         ["quick:gacha", "quick:quest"],
     )
     for (const file of [
-        "src/lib/event-shop-purchase.ts",
         "src/lib/shop-reward-grant.ts",
     ]) {
         assert.deepEqual(
@@ -163,6 +386,49 @@ test("maps representative source files to focused groups", () => {
     }
     assert.deepEqual(
         selectTestGroups(["tools/shop_purchase_plan.test.cjs"]),
+        ["integration:rules"],
+    )
+    for (const file of [
+        "src/lib/shop/owner.ts",
+        "src/lib/shop/purchase-owner.ts",
+        "src/lib/shop/payment-adapter.ts",
+        "src/lib/shop/equipment-enhancement-adapter.ts",
+        "src/lib/shop/pass-card-adapter.ts",
+        "src/lib/shop/result.ts",
+    ]) {
+        assert.deepEqual(
+            selectTestGroups([file]),
+            ["integration:rules", "quick:content"],
+            file,
+        )
+    }
+    assert.deepEqual(
+        selectTestGroups(["tools/shop_purchase_owner.test.cjs"]),
+        ["integration:rules"],
+    )
+    for (const file of [
+        "src/lib/shop/response-projector.ts",
+    ]) {
+        assert.deepEqual(
+            selectTestGroups([file]),
+            ["integration:rules", "quick:content"],
+            file,
+        )
+    }
+    assert.deepEqual(
+        selectTestGroups(["src/lib/shop/sales-catalog.ts"]),
+        ["integration:event", "integration:rules", "quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/lib/shop/sales-stock.ts"]),
+        ["integration:event", "quick:content"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["src/routes/api/shop/purchase-routes.ts"]),
+        ["full", "integration:event", "integration:mission", "integration:rules"],
+    )
+    assert.deepEqual(
+        selectTestGroups(["tools/shop_response_projector.test.cjs"]),
         ["integration:rules"],
     )
     assert.deepEqual(
@@ -390,6 +656,14 @@ test("maps representative source files to focused groups", () => {
         selectTestGroups(["src/multi/settlement/orchestrator.ts"]),
         ["integration:mission", "integration:multi-hub", "integration:party", "quick:protocol"],
     )
+    for (const file of [
+        "src/multi/settlement/quest-progress-write.ts",
+        "src/multi/settlement/value-plan.ts",
+    ]) assert.deepEqual(
+        selectTestGroups([file]),
+        ["integration:mission", "integration:multi-hub", "integration:party", "quick:protocol"],
+        file,
+    )
     assert.deepEqual(
         selectTestGroups(["src/data/domains/mission.ts"]),
         ["full", "integration:database", "integration:mission"],
@@ -422,6 +696,63 @@ test("maps representative source files to focused groups", () => {
     assert.deepEqual(selectTestGroups(["tools/perf/hub_baseline_helpers.cjs"]), ["integration:multi-hub"])
     assert.deepEqual(selectTestGroups(["tools/perf/hub_baseline.test.cjs"]), ["integration:multi-hub"])
     assert.deepEqual(selectTestGroups(["admin/src/App.tsx"]), ["admin"])
+})
+
+test("maps bond token qualification to Growth and Mission leaves", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/lib/character-growth/bond-token-qualification.ts"]),
+        ["integration:mission", "quick:character-growth"],
+    )
+})
+
+test("maps Character metadata aggregate commands to the Growth leaf", () => {
+    for (const file of [
+        "src/lib/character-growth/commands/set-character-metadata.ts",
+        "src/lib/character-growth/commands/set-ex-boost.ts",
+        "tools/character_growth_metadata_commands.test.cjs",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["quick:character-growth"])
+    }
+})
+
+test("maps Star Crumb Exchange to its content and transaction leaves without full", () => {
+    for (const file of [
+        "src/lib/star-crumb-exchange/catalog.ts",
+        "src/lib/star-crumb-exchange/owner.ts",
+        "src/routes/api/exchange.ts",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["integration:rules", "quick:content"])
+    }
+    assert.deepEqual(
+        selectTestGroups(["tools/economy_write_transaction.test.cjs"]),
+        ["integration:rules"],
+    )
+    for (const file of [
+        "docs/architecture/README.md",
+        "docs/architecture/domain-boundary-blueprint.md",
+        "docs/reference/routes-status.md",
+        "docs/status/support-matrix.md",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["quick:workflow"])
+    }
+})
+
+test("maps Bond Token Exchange and Crazy routes to focused leaves", () => {
+    for (const file of [
+        "assets/bond_token_exchange.json",
+        "src/data/domains/bondTokenExchange.ts",
+        "src/lib/bond-token-exchange/catalog.ts",
+        "src/lib/bond-token-exchange/owner.ts",
+    ]) {
+        assert.deepEqual(
+            selectTestGroups([file]),
+            ["integration:database", "integration:rules", "quick:content"],
+        )
+    }
+    assert.deepEqual(
+        selectTestGroups(["src/routes/api/gacha/crazy-routes.ts"]),
+        ["integration:rules", "quick:gacha"],
+    )
 })
 
 test("keeps unknown content files on the full suite", () => {
@@ -596,10 +927,6 @@ test("maps single finish settlement implementation and regression precisely", ()
         ["integration:quest"],
     )
     assert.deepEqual(
-        selectTestGroups(["src/lib/quest/finish/single-mission-settlement.ts"]),
-        ["integration:mission", "integration:quest", "integration:reward-grant", "quick:quest"],
-    )
-    assert.deepEqual(
         selectTestGroups(["src/lib/mission/settlement.ts"]),
         ["integration:mission", "integration:reward-grant"],
     )
@@ -608,7 +935,7 @@ test("maps single finish settlement implementation and regression precisely", ()
         ["integration:mission", "integration:reward-grant"],
     )
     assert.deepEqual(
-        selectTestGroups(["tools/single_finish_orchestrator_architecture.test.cjs"]),
+        selectTestGroups(["tools/battle_settlement_boundary.test.cjs"]),
         ["integration:quest"],
     )
     assert.deepEqual(
@@ -622,6 +949,34 @@ test("maps single finish settlement implementation and regression precisely", ()
     assert.deepEqual(
         selectTestGroups(["tools/single_finish_request_validation.test.cjs"]),
         ["integration:quest"],
+    )
+})
+
+test("maps the shared battle settlement value plan to both adapters", () => {
+    for (const file of [
+        "src/lib/quest/finish/battle-settlement-values.ts",
+        "src/lib/quest/finish/battle-quest-progress-plan.ts",
+    ]) assert.deepEqual(
+        selectTestGroups([file]),
+        ["integration:party", "integration:quest", "quick:quest"],
+        file,
+    )
+    for (const file of [
+        "tools/battle_settlement_values.test.cjs",
+        "tools/battle_quest_progress_plan.test.cjs",
+    ]) assert.deepEqual(selectTestGroups([file]), ["integration:quest"], file)
+})
+
+test("maps the finite Event descriptor to the Event focused group", () => {
+    for (const file of [
+        "src/lib/quest/finish/event-settlement-descriptor.ts",
+        "src/lib/quest/finish/event-settlement-hook.ts",
+        "tools/event_settlement_descriptor.test.cjs",
+        "tools/event_settlement_hook.test.cjs",
+    ]) assert.deepEqual(selectTestGroups([file]), ["integration:event"], file)
+    assert.deepEqual(
+        selectTestGroups(["src/lib/quest/finish/single-event-settlement.ts"]),
+        ["integration:compiled", "integration:event", "integration:quest", "integration:reward-grant", "quick:modes", "quick:quest"],
     )
 })
 
@@ -732,9 +1087,9 @@ test("maps the public reward grant layer and its regressions to one focused leaf
         "tools/reward_grant_architecture.test.cjs",
         "tools/score_reward_selection_core.test.cjs",
         "tools/score_reward_selection.test.cjs",
+        "tools/common_response_acquisition.test.cjs",
         "tools/single_settlement_reward_grant.test.cjs",
         "tools/task23c_reward_grants.test.cjs",
-        "tools/shop_reward_grant.test.cjs",
         "tools/mail_reward_grant.test.cjs",
         "tools/mail_reward_owner.test.cjs",
         "tools/load_scheduled_resource_settlement.test.cjs",
@@ -947,6 +1302,13 @@ test("maps the single battle settlement baseline family to integration quest", (
     }
 })
 
+test("maps the shared Rush final-operation override to its three consumers", () => {
+    assert.deepEqual(
+        selectTestGroups(["src/lib/rush-final-operation-override.ts"]),
+        ["integration:event", "integration:rules", "quick:content"],
+    )
+})
+
 test("upgrades package and unknown source changes to full", () => {
     assert.deepEqual(selectTestGroups(["package.json"]), ["full"])
     assert.deepEqual(selectTestGroups(["src/unmapped/new-feature.ts"]), ["full"])
@@ -1123,7 +1485,10 @@ test("registers focused runtime state and socket smoke groups", () => {
             "tools/multi_client_fallback.test.cjs",
             "tools/account_identity_provider.test.cjs",
             "tools/multi_runtime_session_options.test.cjs",
+            "tools/api_index_time_semantics.test.cjs",
             "tools/time_semantics.test.cjs",
+            "tools/game_calendar.test.cjs",
+            "tools/game_calendar_source_guard.test.cjs",
             "tools/exp_pool_time.test.cjs",
             "tools/comic_route.test.cjs",
             "tools/admin_server_status_runtime_config.test.cjs",
@@ -1165,6 +1530,15 @@ test("registers focused runtime state and socket smoke groups", () => {
         timeoutMs: 360_000,
         tests: ["tools/runtime_compiled_smoke.test.cjs"],
     })
+})
+
+test("maps legacy load time semantics to the focused runtime group", () => {
+    const expected = ["full", "integration:database", "quick:runtime"]
+    assert.deepEqual(selectTestGroups(["src/routes/api/index.ts"]), expected)
+    assert.deepEqual(selectTestGroups(["tools/api_index_time_semantics.test.cjs"]), ["quick:runtime"])
+    assert.equal(TEST_GROUPS["quick:runtime"].tests.includes(
+        "tools/api_index_time_semantics.test.cjs",
+    ), true)
 })
 
 test("routes multiplayer management adapters to the runtime regressions", () => {
@@ -1396,14 +1770,24 @@ test("registers every test in exactly one leaf group and full covers runtime reg
 test("registers mission catalog and fact store regressions in the mission leaf group", () => {
     assert.deepEqual(selectTestGroups(["tools/mission_catalog.test.cjs"]), ["integration:mission"])
     assert.ok(TEST_GROUPS["integration:mission"].tests.includes("tools/mission_catalog.test.cjs"))
-    assert.deepEqual(selectTestGroups(["tools/mission_catalog_wrappers.test.cjs"]), ["integration:mission"])
-    assert.ok(TEST_GROUPS["integration:mission"].tests.includes("tools/mission_catalog_wrappers.test.cjs"))
     assert.deepEqual(selectTestGroups(["tools/mission_fact_key.test.cjs"]), ["integration:mission"])
     assert.ok(TEST_GROUPS["integration:mission"].tests.includes("tools/mission_fact_key.test.cjs"))
     for (const file of [
+        "src/lib/mission/registry.ts",
+        "src/lib/mission/rewards.ts",
+        "src/lib/mission/computer-awake.ts",
+        "src/lib/mission/computer-event-safe.ts",
+        "src/lib/mission/client-progress.ts",
+        "src/lib/mission/daily-battle-facts.ts",
+        "src/lib/mission/pass-battle-facts.ts",
+        "src/lib/mission/event-single-clear-rules.ts",
+        "src/lib/mission/login-fact-settlement.ts",
+        "src/lib/mission/story-fact-settlement.ts",
+    ]) {
+        assert.deepEqual(selectTestGroups([file]), ["integration:mission"], file)
+    }
+    for (const file of [
         "tools/mission_collected_items_batch.test.cjs",
-        "tools/mission_collect_legacy_context.test.cjs",
-        "tools/mission_collect_session_equivalence.test.cjs",
         "tools/mission_collect_session_invariant.test.cjs",
         "tools/mission_collect_session_scope.test.cjs",
         "tools/mission_collect_session_settlement.test.cjs",
@@ -1412,8 +1796,6 @@ test("registers mission catalog and fact store regressions in the mission leaf g
         "tools/mission_evaluation_quest_scoped.test.cjs",
         "tools/mission_evaluation_session.test.cjs",
         "tools/mission_master_value.test.cjs",
-        "tools/mission_periodic_session_migration.test.cjs",
-        "tools/mission_regular_session_equivalence.test.cjs",
         "tools/mission_regular_session_scope.test.cjs",
         "tools/mission_regular_session_settlement.test.cjs",
         "tools/mission_regular_state_derivation.test.cjs",
@@ -1471,7 +1853,7 @@ test("routes Awake request-context core, baseline, and callsite files to the mis
         "tools/character_growth_owner_publication.test.cjs",
         "tools/character_growth_owner_transactions.test.cjs",
         "tools/awake_request_context.test.cjs",
-        "tools/awake_reconcile_callsite_matrix.test.cjs",
+        "tools/character_growth_writer_boundary.test.cjs",
         "tools/perf/awake_request_context_admission.cjs",
         "tools/perf/awake_request_context_admission.test.cjs",
         "tools/perf/awake_request_context_baseline.cjs",
@@ -1487,7 +1869,6 @@ test("routes Awake request-context core, baseline, and callsite files to the mis
 
 test("routes Awake owner-focused evidence files precisely to the mission group", () => {
     for (const file of [
-        "tools/awake_reconcile_owner_call_inventory.json",
         "tools/perf/awake_owner_focused_admission.cjs",
         "tools/perf/awake_owner_focused_baseline.cjs",
         "tools/perf/awake_owner_focused_baseline.test.cjs",
@@ -1539,15 +1920,6 @@ test("routes active mission focused metrics, baseline, and production boundaries
         "integration:database",
         "integration:mission",
     ])
-    for (const file of [
-        "tools/active_mission_evaluator_equivalence.test.cjs",
-        "tools/helpers/active-mission-legacy-evaluator.cjs",
-    ]) {
-        assert.deepEqual(selectTestGroups([file]), ["integration:mission"], file)
-        assert.ok(TEST_GROUPS["integration:mission"].tests.includes(
-            "tools/active_mission_evaluator_equivalence.test.cjs",
-        ))
-    }
 })
 
 test("keeps external data concerns out of self-contained runtime tests", () => {
@@ -1613,6 +1985,7 @@ test("keeps isolated test groups parallel while infrastructure groups stay seria
         assert.equal(TEST_GROUPS[group].execution, "parallel")
     }
     assert.equal(TEST_GROUPS["quick:runtime"].timeoutMs, 60_000)
+    assert.equal(TEST_GROUPS["quick:gacha"].timeoutMs, 60_000)
     assert.equal(TEST_GROUPS["integration:compiled"].execution, "parallel")
     assert.equal(TEST_GROUPS["integration:runtime"].execution, "serial")
     assert.equal(TEST_GROUPS["integration:mission-compiled"].execution, "parallel")
@@ -1629,6 +2002,7 @@ test("keeps isolated test groups parallel while infrastructure groups stay seria
 
 test("splits isolated integration tests into focused domains", () => {
     assert.deepEqual(TEST_GROUPS["integration:database"].tests, [
+        "tools/shop_purchase_count_storage.test.cjs",
         "tools/account_cleanup_admin.test.cjs",
         "tools/account_cleanup_takeover.test.cjs",
         "tools/admin_scheduled_resource_routes.test.cjs",
@@ -1647,25 +2021,30 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_category_batch_read.test.cjs",
         "tools/player_history_profile_route.test.cjs",
         "tools/player_save_v2.test.cjs",
+        "tools/gacha_save_validation.test.cjs",
         "tools/character_growth_save_validation.test.cjs",
         "tools/receive_history_retention.test.cjs",
         "tools/scheduled_resource_storage.test.cjs",
         "tools/server_gameplay_settings.test.cjs",
-        "tools/shop_purchase_period_storage.test.cjs",
-        "tools/shop_purchase_snapshot_contract.test.cjs",
         "tools/news_storage.test.cjs",
         "tools/schema23_news_migration.test.cjs",
         "tools/schema24_gift_migration.test.cjs",
+        "tools/schema25_gacha_state_migration.test.cjs",
         "tools/test-workflow/database-isolation.test.cjs",
         "tools/test-workflow/database-lifecycle.test.cjs",
         "tools/test-workflow/runtime-data-paths.test.cjs",
         "tools/test-workflow/schema20_resource_migration.test.cjs",
+        "tools/schema28_follow_migration.test.cjs",
+        "tools/follow_domain.test.cjs",
+        "tools/follow_routes.test.cjs",
         "tools/stamina_serialization.test.cjs",
         "tools/sql_write_shape.test.cjs",
     ])
     assert.deepEqual(TEST_GROUPS["integration:event"].tests, [
         "tools/box_gacha_exec_transaction.test.cjs",
         "tools/carnival_rewards.test.cjs",
+        "tools/event_settlement_descriptor.test.cjs",
+        "tools/event_settlement_hook.test.cjs",
         "tools/event_route_reachability.test.cjs",
         "tools/how_to_get_route.test.cjs",
         "tools/practice_battle_history.test.cjs",
@@ -1677,9 +2056,9 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/raid_event_summary_route.test.cjs",
         "tools/ranking_event_route.test.cjs",
         "tools/rush_event_battle_flow.test.cjs",
-        "tools/rush_event_shop.test.cjs",
         "tools/rush_event_shop_route.test.cjs",
         "tools/rush_event_reset_route.test.cjs",
+        "tools/rush_final_operation_override.test.cjs",
         "tools/shop_campaign_lineup.test.cjs",
         "tools/shop_sales_list_bulk_reads.test.cjs",
         "tools/score_attack_history.test.cjs",
@@ -1702,7 +2081,7 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/character_growth_owner_publication.test.cjs",
         "tools/character_growth_owner_transactions.test.cjs",
         "tools/awake_request_context.test.cjs",
-        "tools/awake_reconcile_callsite_matrix.test.cjs",
+        "tools/character_growth_writer_boundary.test.cjs",
         "tools/load_awake_full_recovery.test.cjs",
         "tools/mission_awake_evaluation_settlement.test.cjs",
         "tools/mission_awake_reward_owner.test.cjs",
@@ -1715,12 +2094,15 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_progress_stage_b.test.cjs",
         "tools/mission_progress_stage_b_route.test.cjs",
         "tools/mission_progress_stage_b_integration.test.cjs",
+        "tools/mission_degree_response_composition.test.cjs",
+        "tools/mission_response_fragment.test.cjs",
         "tools/mission_reward_invalidation.test.cjs",
         "tools/mission_reward_invalidation_integration.test.cjs",
         "tools/mission_collect_progress.test.cjs",
         "tools/mission-client-check-diagnostics.test.cjs",
         "tools/mission_coverage_audit.test.cjs",
         "tools/mission_daily_battle_facts.test.cjs",
+        "tools/mission_daily_history_replay.test.cjs",
         "tools/mission_degree_candidates.test.cjs",
         "tools/mission_degree_battle_context.test.cjs",
         "tools/mission_degree_characterization.test.cjs",
@@ -1750,8 +2132,6 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_event_session_semantics.test.cjs",
         "tools/mission_event_session_settlement.test.cjs",
         "tools/mission_collected_items_batch.test.cjs",
-        "tools/mission_collect_legacy_context.test.cjs",
-        "tools/mission_collect_session_equivalence.test.cjs",
         "tools/mission_collect_session_invariant.test.cjs",
         "tools/mission_collect_session_scope.test.cjs",
         "tools/mission_collect_session_settlement.test.cjs",
@@ -1766,9 +2146,11 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_active_content.test.cjs",
         "tools/mission_active_core.test.cjs",
         "tools/active_mission_plan.test.cjs",
-        "tools/active_mission_evaluator_equivalence.test.cjs",
+        "tools/active_mission_owner_publication.test.cjs",
+        "tools/active_mission_operation_publication.test.cjs",
         "tools/active_mission_counter_storage.test.cjs",
         "tools/active_mission_fact_session.test.cjs",
+        "tools/active_mission_ex_quest_clear_facts.test.cjs",
         "tools/active_mission_fixed_point.test.cjs",
         "tools/party_action_counter.test.cjs",
         "tools/expod_inject_exp_route.test.cjs",
@@ -1784,19 +2166,15 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/active_mission_receive_route.test.cjs",
         "tools/contents_guide_start_route.test.cjs",
         "tools/mission_catalog.test.cjs",
-        "tools/mission_catalog_wrappers.test.cjs",
-        "tools/mission_master_data.test.cjs",
         "tools/mission_pass.test.cjs",
         "tools/mission_pass_battle_facts.test.cjs",
         "tools/mission_pass_content.test.cjs",
         "tools/mission_pass_route.test.cjs",
         "tools/mission_pass_settlement.test.cjs",
         "tools/pass_card_point_change.test.cjs",
-        "tools/mission_periodic_session_migration.test.cjs",
         "tools/mission_progress_route.test.cjs",
         "tools/mission_regular_chapter_regressions.test.cjs",
         "tools/mission_regular_facts.test.cjs",
-        "tools/mission_regular_session_equivalence.test.cjs",
         "tools/mission_regular_session_scope.test.cjs",
         "tools/mission_regular_session_settlement.test.cjs",
         "tools/mission_regular_state_derivation.test.cjs",
@@ -1837,10 +2215,19 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/mission_time_utils.test.cjs",
         "tools/pass_card_purchase_route.test.cjs",
         "tools/pass_card_route.test.cjs",
+        "tools/stamina_campaign_targeting.test.cjs",
     ])
     assert.deepEqual(TEST_GROUPS["integration:quest"].tests, [
         "tools/auto_start_stamina_stop.test.cjs",
+        "tools/battle_quest_progress_plan.test.cjs",
+        "tools/battle_settlement_boundary.test.cjs",
+        "tools/battle_settlement_values.test.cjs",
         "tools/battle_entry_inventory_route.test.cjs",
+        "tools/open_period_boundaries.test.cjs",
+        "tools/quest_prerequisite_boundaries.test.cjs",
+        "tools/raid_battle_stamina.test.cjs",
+        "tools/rush_battle_stamina.test.cjs",
+        "tools/party_heal_option_persistence.test.cjs",
         "tools/perf/single_battle_settlement_admission.test.cjs",
         "tools/perf/single_battle_settlement_baseline.test.cjs",
         "tools/quest_entry_lifecycle.test.cjs",
@@ -1853,7 +2240,6 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/single_finish_authority_transaction.test.cjs",
         "tools/single_finish_final_projection.test.cjs",
         "tools/single_finish_awake_reward_owner.test.cjs",
-        "tools/single_finish_orchestrator_architecture.test.cjs",
         "tools/single_finish_response_projector.test.cjs",
         "tools/single_finish_request_validation.test.cjs",
         "tools/story_quest_finish.test.cjs",
@@ -1864,6 +2250,8 @@ test("splits isolated integration tests into focused domains", () => {
         "tools/multi_settlement_overflow.test.cjs",
         "tools/perf/multi_settlement_baseline.test.cjs",
         "tools/perf/multi_snapshot_baseline.test.cjs",
+        "tools/multi_response_projection.test.cjs",
+        "tools/multi_settlement_active_mission.test.cjs",
         "tools/rescue_fragment_reward.test.cjs",
         "tools/special_quest_party.test.cjs",
     ])
@@ -1882,6 +2270,10 @@ test("quick workflow includes documentation and package script contracts", () =>
         "tools/test-workflow/select-tests.test.cjs",
         "tools/test-workflow/run.test.cjs",
         "tools/test-workflow/verify-cn-build.test.cjs",
+        "tools/c5_common_projection_route.test.cjs",
+        "tools/common_response_entities.test.cjs",
+        "tools/common_response_projector.test.cjs",
+        "tools/debt_t07_field_characterization.test.cjs",
         "tools/perf/http_metrics.test.cjs",
         "tools/perf/http_baseline.test.cjs",
         "tools/perf/tcp_baseline.test.cjs",
@@ -1921,9 +2313,10 @@ test("keeps compiled-output and external-data tests out of quick", () => {
         "tools/single_continue_route_errors.test.cjs",
         "tools/score_reward_lottery.test.cjs",
         "tools/reward_campaign.test.cjs",
-        "tools/shop_bulk_purchase.test.cjs",
         "tools/shop_purchase_plan.test.cjs",
-        "tools/shop_reward_purchase_contract.test.cjs",
+        "tools/shop_purchase_owner.test.cjs",
+        "tools/shop_response_projector.test.cjs",
+        "tools/exchange_response_projection.test.cjs",
         "tools/mail_notification.test.cjs",
         "tools/mail_notification_write_routes.test.cjs",
         "tools/mail_reward_fixture.test.cjs",
@@ -1960,7 +2353,9 @@ test("keeps compiled-output and external-data tests out of quick", () => {
 })
 
 test("quick protocol includes multi runtime lifecycle coverage", () => {
-    assert.equal(TEST_GROUPS["quick:protocol"].timeoutMs, 60_000)
+    // Spawn-heavy group: global_embedded_startup probes ts-node-compile the
+    // full server graph, so the per-file budget is double the default.
+    assert.equal(TEST_GROUPS["quick:protocol"].timeoutMs, 120_000)
     assert.deepEqual(TEST_GROUPS["quick:protocol"].tests, [
         "tools/handshake_lifecycle.test.cjs",
         "tools/global_embedded_startup.test.cjs",
@@ -1969,6 +2364,11 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
         "tools/multi_admission.test.cjs",
         "tools/multi_battle_relay_snapshot.test.cjs",
         "tools/multi_battle_multiscene.test.cjs",
+        "tools/multi_lobby_battle_lock.test.cjs",
+        "tools/multi_battle_start_boundary.test.cjs",
+        "tools/multi_release_boundary.test.cjs",
+        "tools/multi_session_client_state.test.cjs",
+        "tools/multi_runtime_snapshot.test.cjs",
         "tools/multi_battle_heartbeat.test.cjs",
         "tools/multi_compatibility.test.cjs",
         "tools/multi_coordinator_contract.test.cjs",
@@ -1989,12 +2389,19 @@ test("quick protocol includes multi runtime lifecycle coverage", () => {
         "tools/npc_contributor_names.test.cjs",
         "tools/npc_nickname_pool.test.cjs",
         "tools/room_cleanup_lifecycle.test.cjs",
+        "tools/room_dismissal_lifecycle.test.cjs",
         "tools/session_frame_order.test.cjs",
         "tools/session_server_lifecycle.test.cjs",
             "tools/multi_tcp_guardrails.test.cjs",
+        "tools/multi_raising_state_mapping.test.cjs",
+        "tools/multi_follow_stamina.test.cjs",
+        "tools/multi_mates_self_projection.test.cjs",
             "tools/gift_capability.test.cjs",
             "tools/gift_code_lifecycle.test.cjs",
             "tools/gift_receive_route.test.cjs",
+            "tools/attention_config_route.test.cjs",
+            "tools/active_account_state_cache.test.cjs",
+        "tools/load_identity_boundary.test.cjs",
     ])
 })
 

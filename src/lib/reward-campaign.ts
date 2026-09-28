@@ -1,6 +1,9 @@
 import { RewardType } from "./types"
-import bundledRewardCampaigns from "../../assets/reward_campaign.json"
-import { getRuntimeContentTableSync } from "../content/runtime/table-access"
+import { getContentSnapshot } from "../content/runtime/content-snapshot"
+import type { ReadonlyContentRepository } from "../content/runtime/content-snapshot"
+import type { GameCalendarPolicy } from "../time/game-calendar"
+import { getGameCalendar } from "../time/game-calendar-provider"
+import { validateRewardCampaignTable } from "../content/converters/reward-campaign"
 
 export interface RewardCampaignEntry {
     readonly id: number
@@ -24,6 +27,19 @@ export interface RewardCampaignRates {
 }
 
 const DEFAULT_RATES: RewardCampaignRates = Object.freeze({ item: 1, exp: 1, mana: 1 })
+const campaignTables = new WeakMap<ReadonlyContentRepository, RewardCampaignTable>()
+
+export function getRewardCampaignTable(
+    repository: ReadonlyContentRepository = getContentSnapshot().repository,
+): RewardCampaignTable {
+    const cached = campaignTables.get(repository)
+    if (cached !== undefined) return cached
+    const table = validateRewardCampaignTable(
+        repository.table("reward_campaign.json"),
+    ) as RewardCampaignTable
+    campaignTables.set(repository, table)
+    return table
+}
 
 function questKeyParts(category: number, questId: number): number[] {
     if (category === 1 || category === 2 || category === 4) {
@@ -43,7 +59,11 @@ function matchesCampaign(entry: RewardCampaignEntry, category: number, questId: 
     return true
 }
 
-function matchesRepeat(entry: RewardCampaignEntry, nowMs: number): boolean {
+function matchesRepeat(
+    entry: RewardCampaignEntry,
+    nowMs: number,
+    calendar: GameCalendarPolicy,
+): boolean {
     if (entry.repeatKind !== "weekly") return true
     if (!Number.isSafeInteger(entry.dayOfWeek)
         || entry.dayOfWeek! < 0
@@ -51,7 +71,9 @@ function matchesRepeat(entry: RewardCampaignEntry, nowMs: number): boolean {
         || !Number.isSafeInteger(entry.resetTimeMs)
         || entry.resetTimeMs! < 0
         || entry.resetTimeMs! >= 24 * 60 * 60 * 1000) return false
-    const shifted = new Date(nowMs + 8 * 60 * 60 * 1000 - entry.resetTimeMs!)
+    const shifted = new Date(
+        nowMs + calendar.utcOffsetMinutes * 60_000 - entry.resetTimeMs!,
+    )
     return shifted.getUTCDay() === entry.dayOfWeek
 }
 
@@ -60,12 +82,13 @@ export function resolveRewardCampaignRates(
     category: number,
     questId: number,
     now: Date,
+    calendar: GameCalendarPolicy = getGameCalendar(),
 ): RewardCampaignRates {
     const nowMs = now.getTime()
     const rates = { ...DEFAULT_RATES }
     for (const entry of Object.values(campaigns)) {
         if (nowMs < entry.startAtMs || nowMs > entry.endAtMs
-            || !matchesRepeat(entry, nowMs)
+            || !matchesRepeat(entry, nowMs, calendar)
             || !matchesCampaign(entry, category, questId)) continue
         if (entry.rewardKind === 0) rates.item = Math.max(rates.item, entry.rate)
         else if (entry.rewardKind === 1) rates.exp = Math.max(rates.exp, entry.rate)
@@ -79,11 +102,7 @@ export function getRewardCampaignRates(
     questId: number,
     now: Date,
 ): RewardCampaignRates {
-    const campaigns = getRuntimeContentTableSync(
-        "reward_campaign.json",
-        bundledRewardCampaigns as RewardCampaignTable,
-    )
-    return resolveRewardCampaignRates(campaigns, category, questId, now)
+    return resolveRewardCampaignRates(getRewardCampaignTable(), category, questId, now)
 }
 
 function eligibleRate(rewardType: RewardType, rates: RewardCampaignRates): number | null {

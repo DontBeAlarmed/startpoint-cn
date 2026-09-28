@@ -50,11 +50,11 @@ const { updatePlayerCategoryMissionSync } = require("../src/data/domains/mission
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
-const {
-    getCharacterDataSync,
-    getCharacterManaNodesSync,
-    getManaNodeAwakeCost,
-} = require("../src/lib/assets")
+const { getCharacterFacts } = require("../src/lib/character-content")
+const { getCharacterGrowthContent } = require("../src/lib/character-growth-content")
+const getCharacterDataSync = characterId => getCharacterFacts().get(characterId)
+const getCharacterManaNodesSync = (characterId, level) => getCharacterGrowthContent().getManaBoardNodes(characterId, level)
+const getManaNodeAwakeCost = (characterId, nodeId, rarity) => getCharacterGrowthContent().getManaNodeAwakeCost(characterId, nodeId, rarity)
 const { characterExpCaps } = require("../src/lib/character")
 const manaRoutes = require("../src/routes/api/character/mana").default
 const { getTimeOffset, setServerTime, setServerTimeOffset } = require("../src/utils")

@@ -1,5 +1,9 @@
 require("ts-node/register/transpile-only")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
+
 const assert = require("node:assert/strict")
 const fs = require("node:fs")
 const path = require("node:path")
@@ -29,11 +33,6 @@ stubModule("../src/lib/quest/finish/party-co-clear-tracker", {
 })
 stubModule("../src/lib/quest/finish/powerflip-tracker", {
     trackPowerflip: ctx => calls.push(["powerflip", ctx.questId]),
-})
-stubModule("../src/data/domains/quest", {
-    incrementPlayerQuestMultiClearSync: (playerId, category, questId) => {
-        calls.push(["multi", playerId, category, questId])
-    },
 })
 stubModule("../src/data/domains/mission_battle_facts", {
     recordMissionBattleResultSync: (playerId, result) => {
@@ -70,7 +69,7 @@ const {
     buildBattleMissionSettlementScopes,
     recordMissionBattleFacts,
 } = require("../src/lib/mission/battle-facts")
-const { getMissionMasterDefinitions } = require("../src/lib/mission/master-data")
+const { getMissionCatalog } = require("../src/lib/mission/mission-catalog")
 
 assert.equal(
     typeof buildBattleMissionSettlementScopes,
@@ -97,7 +96,7 @@ assert.equal(degreeScope.missionIds.includes(32000), true, "本场战力称号�
 assert.equal(degreeScope.missionIds.includes(35000), true, "本场最大伤害称号必须进入候选")
 assert.equal(degreeScope.missionIds.includes(39000), true, "本场复活棺柩称号必须进入候选")
 assert.equal(
-    degreeScope.missionIds.length < getMissionMasterDefinitions(5).length,
+    degreeScope.missionIds.length < getMissionCatalog().getDefinitions(5).length,
     true,
     "battle category 5 候选必须小于全量 1288",
 )
@@ -172,12 +171,11 @@ assert.deepEqual(calls, [
     ["degree", 1001],
     ["active-specific", 1001],
     ["active-conditional", 1001],
-    ["multi", 1, 1, 1001],
     ["character", 1001],
     ["leader-powerflip", 1001],
     ["party", 1001],
     ["powerflip", 1001],
-])
+], "multi-clear quest counter moved to the multi settlement writer (D24)")
 
 const singleBattleSource = fs.readFileSync(
     path.join(__dirname, "../src/lib/quest/finish/single-settlement-writes.ts"),
@@ -199,14 +197,21 @@ const singleGrowthPublicationSource = fs.readFileSync(
     path.join(__dirname, "../src/lib/quest/finish/single-growth-publication.ts"),
     "utf8",
 )
+const singleValuePlanSource = fs.readFileSync(
+    path.join(__dirname, "../src/lib/quest/finish/single-settlement-value-plan.ts"),
+    "utf8",
+)
 const singleTransactionStart = singleBattleSource.indexOf("export function executeSingleSettlementWrites(")
-const singleEvaluationTime = singleBattleSource.indexOf(
+const singleEvaluationTime = singleValuePlanSource.indexOf(
     "const settlementTime = new Date(getServerTime() * 1000)",
+)
+const singleValuePlanCall = singleBattleSource.indexOf(
+    "createSingleSettlementValuePlan({",
     singleTransactionStart,
 )
 const singleFactCall = singleBattleSource.indexOf(
     "recordMissionBattleFacts(finishCtx, settlementTime)",
-    singleEvaluationTime,
+    singleValuePlanCall,
 )
 const singleCharacterExp = singleBattleSource.indexOf(
     "givePlayerCharactersExpSync(",
@@ -252,8 +257,9 @@ const singleWritesBinding = singleOrchestratorSource.indexOf(
     "executeSingleSettlementWrites({",
     singleTransactionBinding,
 )
-assert.equal(singleEvaluationTime > singleTransactionStart, true, "单人 finish 必须在事务体内固定任务时间")
-assert.equal(singleFactCall > singleEvaluationTime, true, "单人任务事实必须使用事务时间")
+assert.equal(singleEvaluationTime >= 0, true, "单人 value adapter 必须固定任务时间")
+assert.equal(singleValuePlanCall > singleTransactionStart, true, "单人 finish 必须在事务体内创建 value plan")
+assert.equal(singleFactCall > singleValuePlanCall, true, "单人任务事实必须使用 value plan 的事务时间")
 assert.equal(singleCharacterExp > singleFactCall, true, "单人角色经验必须在任务事实后写入")
 assert.equal(singleGrowthPreparation > singleCharacterExp, true, "单人称号结算必须看到本场角色经验")
 assert.equal(singleMissionEvaluationCall >= 0, true, "单人成长发布适配器必须调用任务结算")
@@ -290,14 +296,21 @@ const multiResponseSource = fs.readFileSync(
     path.join(__dirname, "../src/multi/settlement/response.ts"),
     "utf8",
 )
+const multiValuePlanSource = fs.readFileSync(
+    path.join(__dirname, "../src/multi/settlement/value-plan.ts"),
+    "utf8",
+)
 const multiTransactionStart = multiBattleSource.indexOf("const executeFinishWrites =")
-const multiEvaluationTime = multiBattleSource.indexOf(
+const multiEvaluationTime = multiValuePlanSource.indexOf(
     "const settlementTime = new Date(getServerTime() * 1000)",
+)
+const multiValuePlanCall = multiBattleSource.indexOf(
+    "createMultiSettlementValuePlan({",
     multiTransactionStart,
 )
 const multiFactCall = multiBattleSource.indexOf(
     "recordMissionBattleFacts(finishCtx, settlementTime)",
-    multiEvaluationTime,
+    multiValuePlanCall,
 )
 const multiCharacterExp = multiBattleSource.indexOf(
     "givePlayerCharactersExpSync(",
@@ -312,23 +325,24 @@ const multiAwakeSettlement = multiBattleSource.indexOf(
     multiSettlementTime,
 )
 const multiGeneralMerge = multiResponseSource.indexOf(
-    "mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)",
+    "composeMissionSettlementResponse(\n        responseData,\n        projectMissionSettlementFragment(missionSettlement),\n        viewerId,\n    )",
 )
 const multiAwakeMerge = multiResponseSource.indexOf(
-    "mergeMissionSettlementResponse(responseData, awakeMissionSettlement, viewerId)",
+    "composeMissionSettlementResponse(\n        responseData,\n        projectMissionSettlementFragment(awakeMissionSettlement),\n        viewerId,\n    )",
     multiGeneralMerge,
 )
 const multiTransactionCall = multiBattleSource.indexOf("runMultiActiveQuestSettlementTransaction(")
 const multiActiveDelete = multiBattleSource.indexOf("delete activeQuests[input.playerId]", multiTransactionCall)
 const multiCoordinatorFinalize = multiBattleSource.indexOf("context.coordinator.finalizeBattle({")
 assert.equal(multiTransactionStart >= 0, true, "多人 finish 必须定义同步结算事务体")
-assert.equal(multiEvaluationTime > multiTransactionStart, true, "多人 finish 必须在事务体内固定任务时间")
-assert.equal(multiFactCall > multiTransactionStart, true)
+assert.equal(multiEvaluationTime >= 0, true, "多人 value adapter 必须固定任务时间")
+assert.equal(multiValuePlanCall > multiTransactionStart, true, "多人 finish 必须在事务体内创建 value plan")
+assert.equal(multiFactCall > multiValuePlanCall, true, "多人任务事实必须使用 value plan 的事务时间")
 assert.equal(multiCharacterExp > multiFactCall, true, "多人角色经验必须在任务事实后写入")
 assert.equal(multiSettlementTime > multiCharacterExp, true, "多人称号结算必须看到本场角色经验")
 assert.equal(multiAwakeSettlement > multiFactCall, true, "多人 finish 必须把本场 facts 传入觉醒 seam")
 assert.equal(multiAwakeSettlement > multiSettlementTime, true, "多人觉醒 seam 必须位于通用结算之后")
-assert.equal(multiGeneralMerge >= 0 && multiAwakeMerge > multiGeneralMerge, true, "多人响应必须先合并通用结算再合并觉醒结算")
+assert.equal(multiGeneralMerge >= 0 && multiAwakeMerge > multiGeneralMerge, true, "多人响应必须先组合通用结算再组合觉醒结算")
 assert.match(
     multiBattleSource,
     /const existingCharacterList = \[[\s\S]*?awakeMissionSettlement\.characterList[\s\S]*?publishCharacterGrowthOwnerStateBestEffort\(\s*input\.playerId,\s*candidateCharacterIds,\s*\[existingCharacterList\],/,

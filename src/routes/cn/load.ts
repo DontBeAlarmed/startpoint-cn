@@ -2,13 +2,15 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import path from "node:path";
 import { DEFAULT_SERVER_PORTS } from "../../runtime/release-contract";
 import { generateDataHeaders, getServerTime } from "../../utils";
-import { collectPlayerDataPooledExpSync, dailyResetPlayerDataSync, getPlayerSync, refreshPlayerDailyChallengePointsForRealDaySync, updatePlayerSync } from "../../data/domains/player"
+import { collectPlayerDataPooledExpSync, dailyResetPlayerDataSync, getPlayerSync, refreshPlayerDailyChallengePointsForRealDaySync } from "../../data/domains/player"
 import {
     getPlayerActiveQuestSync,
     updatePlayerActiveQuestCoordinatorOriginSync,
     updatePlayerActiveQuestEntryItemCountSync,
 } from "../../data/domains/quest_active"
 import { getSession } from "../../data/domains/session"
+import { SessionType } from "../../data/types"
+import { getPlayerPartyGroupListSync } from "../../data/domains/party"
 import { getDb } from "../../data/db"
 import { getClientSerializedData } from "../../data/utils";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -16,16 +18,13 @@ import { getRoom } from "../../multi/room/manager";
 import { runPermanentValidators } from "../../lib/validate";
 import { restoreActiveQuestFromStorage } from "../../lib/quest/entry-lifecycle";
 import { ActiveQuest, publishActiveQuest, runAbortActiveQuestTransaction } from "../../lib/quest/active-quest-service";
-import type { StartEntryCost } from "../../lib/quest/start-entry";
+import { getQuestEntryCost } from "../../lib/quest-entry-content";
 import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 import {
     parseAssetProviderConfig,
     resolveAssetLoadState,
     type AssetProviderConfig,
 } from "../../content/cdn/asset-mode";
-import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json";
-import bundledLoginBonuses from "../../../assets/login_bonus.json";
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
 import { reconcileActiveMissionFactsWithResult } from "../../lib/mission/active-reconciliation";
 import {
     getEventLoginMissionId,
@@ -34,7 +33,10 @@ import {
 import { settleLoginFactMissions } from "../../lib/mission/login-fact-settlement";
 import { setCnMsgpackPendingEncoder } from "./msgpack";
 import { settleMissionCategories } from "../../lib/mission/settlement";
-import { mergeMissionSettlementResponse } from "../../lib/mission/response";
+import {
+    composeMissionSettlementResponse,
+    projectMissionSettlementFragment,
+} from "../../lib/mission/response-fragment";
 import { getFavoritePartyGroupListSync } from "../../lib/profileFavorite";
 import {
     isValidBattleSessionId,
@@ -47,17 +49,28 @@ import type {
     MultiSettlementIdentity,
 } from "../../multi/settlement/verifier";
 import {
+    getLoginBonusCatalog,
     settleLoginBonusesSync,
     type LoginBonusSettlement,
 } from "../../lib/login-bonus";
-import type { LoginBonusCatalog } from "../../content/converters/login-bonus";
 import { getGameTimeContext } from "../../runtime/time/game-time";
+import { getGameCalendar } from "../../time/game-calendar-provider";
+import { getDailyChallengeCatalog } from "../../lib/quest/daily-challenge";
 import { settleScheduledResourcesSync } from "../../lib/scheduled-resource-settlement";
 import { settleEventTradeExpiryOnLoadSync } from "../../lib/event-trade-expiry-settlement";
 import { isGiftCodeEnabledSync } from "../../lib/gift-code/capability";
-import type { ConfigValues } from "../../lib/types/config";
+import { getCurrencyCapacityPolicySync } from "../../lib/config-content";
+import {
+    findItemInventoryPolicy,
+    getItemInventoryPolicyCatalog,
+} from "../../lib/inventory/item-inventory-policy";
 import { projectItemOverflowCommonResponse } from "../../lib/item-overflow";
 import { collectRewardGrantItemOverflowDispositions } from "../../lib/reward-grant";
+import {
+    projectCrazyGachaLoadStateSync,
+    projectPendingGachaConversionsSync,
+    settleExpiredGachaPointsOnLoadSync,
+} from "../../lib/gacha-owner";
 
 interface CnLoadBody {
     device_id: number;
@@ -73,7 +86,7 @@ interface CnLoadBody {
     viewer_id?: number;
 }
 
-function wrapOptionFields(
+export function wrapOptionFields(
     d: any,
     availableAssetVersion: string,
     crashEndpoint: { readonly host: string; readonly port: number },
@@ -82,9 +95,7 @@ function wrapOptionFields(
 
     if (d.user_info) {
         if (typeof d.user_info.last_login_time === 'number') {
-            const dt = new Date(d.user_info.last_login_time * 1000);
-            const p = (n: number) => n.toString().padStart(2, '0');
-            d.user_info.last_login_time = `${dt.getFullYear()}-${p(dt.getMonth()+1)}-${p(dt.getDate())} ${p(dt.getHours())}:${p(dt.getMinutes())}:${p(dt.getSeconds())}`;
+            d.user_info.last_login_time = getGameCalendar().formatMasterTimestamp(d.user_info.last_login_time * 1000);
         }
         d.user_info.is_bought_fund_ex_quest ??= false;
         d.user_info.is_bought_fund_main_quest ??= false;
@@ -122,33 +133,17 @@ function wrapOptionFields(
     d.premium_bonus_mailed_item_list = [];
     d.ex_boost_draw_result = null;
     d.pass_force_reward = false;
-    d.crazy_gacha_result_list = [];
-    d.last_crazy_gacha_draw_result = [];
+    d.crazy_gacha_result_list ??= {};
+    d.last_crazy_gacha_draw_result ??= [];
     d.fund_receive_list = [];
     d.login_info = {};
     d.tower_dungeon_list = [];
     d.special_exchange_campaign_list = [];
     d.win_lottery_active_mission_list = [];
-    d.stars_gacha_campaign_list = [];
-    // Build favorite_party_group_list from user_party_group_list
-    // Required for HomeScene kind=1 (profile_favorite) to work without F1010
-    // fromPartyInfo expects party_name/party_edited (not name/edited like fromPartyInfoLite)
-    d.favorite_party_group_list = Object.entries(d.user_party_group_list || {}).map(([groupId, group]: [string, any]) => ({
-        party_group_id: Number(groupId),
-        party_group_color_id: group.color_id,
-        party_list: Object.entries(group.list || {}).map(([partyId, party]: [string, any]) => ({
-            party_id: Number(partyId),
-            party_name: party.name,
-            character_ids: party.character_ids,
-            unison_character_ids: party.unison_character_ids,
-            equipment_ids: party.equipment_ids,
-            ability_soul_ids: party.ability_soul_ids,
-            options: party.options,
-            party_edited: party.edited,
-            current_battle_power: party.current_battle_power,
-            before_battle_power: party.before_battle_power,
-        }))
-    }));
+    d.stars_gacha_campaign_list ??= [];
+    // favorite_party_group_list is assigned after wrapOptionFields from
+    // getFavoritePartyGroupListSync (profile favorite selection with leader
+    // context); building a placeholder here would only be overwritten.
 
     d.ranking_event_reward = [];
     d.party_list = [];
@@ -210,10 +205,24 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
     fastify.post("/load", async (request: FastifyRequest, reply: FastifyReply) => {
         try {
         const body = request.body as CnLoadBody;
-        const viewerId = body.viewer_id || body.keychain || 1;
+        // The official client always calls /load with a viewer identity it
+        // obtained from /tool/signup (keychain is the same viewer id from the
+        // local store, and viewer sessions never expire). A viewer id without
+        // a VIEWER session is unknown to this server and must never be read
+        // as an account id: the historical fallbacks (`|| 1`, then
+        // `accountId = viewerId`) served account 1's — or any enumerable
+        // account's — full save and idempotent settlement to unauthenticated
+        // callers.
+        const viewerId = body.viewer_id || body.keychain;
+        if (!Number.isSafeInteger(viewerId) || viewerId < 1) {
+            return reply.status(400).send({ error: "Bad Request", message: "Invalid viewer id." });
+        }
 
         const session = await getSession(String(viewerId));
-        const accountId = session ? session.accountId : (body.viewer_id || body.keychain || 1);
+        if (session === null || session.type !== SessionType.VIEWER) {
+            return reply.status(400).send({ error: "Bad Request", message: "Invalid viewer id." });
+        }
+        const accountId = session.accountId;
         const playerId = resolvePlayerIdSync(accountId);
         if (!playerId) {
             return reply.status(400).send({ error: "Bad Request", message: "No player found" });
@@ -223,6 +232,9 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
         if (player === null) {
             return reply.status(500).send({ error: "Internal Server Error", message: "No player data." });
         }
+        // Damaged login/daily catalogs must fail before daily reset or validator writes.
+        const loginBonusCatalog = getLoginBonusCatalog()
+        getDailyChallengeCatalog()
 
         const gameTime = getGameTimeContext();
         const now = gameTime.virtualNow;
@@ -239,7 +251,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
         collectPlayerDataPooledExpSync(player);
 
         // Run save validators (permanent fixes: max_level, etc.)
-        const validatorFixes = runPermanentValidators(playerId);
+        const validatorFixes = runPermanentValidators(playerId, player);
         if (validatorFixes > 0) {
             const refreshedPlayer = getPlayerSync(playerId);
             if (refreshedPlayer === null) {
@@ -253,10 +265,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             virtualNowMs: now.getTime(),
             realNowMs: gameTime.realNowMs,
             dailyResetHour: options.dailyResetHour ?? 5,
-            catalog: getRuntimeContentTableSync(
-                "login_bonus.json",
-                bundledLoginBonuses as LoginBonusCatalog,
-            ),
+            catalog: loginBonusCatalog,
             previousLastLoginMs,
             isBeginner,
         });
@@ -269,16 +278,16 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
         }
 
         const contentSnapshot = getContentSnapshot();
+        const currencyPolicy = getCurrencyCapacityPolicySync(contentSnapshot.repository);
+        const itemPolicyCatalog = getItemInventoryPolicyCatalog();
         const scheduledResourceSettlement = settleScheduledResourcesSync({
             player,
             realNow: gameTime.realNow,
             dailyResetHour: options.dailyResetHour ?? 5,
-            itemMaxCounts: contentSnapshot.repository.table<Readonly<Record<string, number>>>(
-                "item_max_count.json",
+            itemMaxCount: itemId => (
+                findItemInventoryPolicy(itemPolicyCatalog, itemId)?.maxCount ?? null
             ),
-            maxFreeVmoney: contentSnapshot.repository.table<ConfigValues>(
-                "config.json",
-            ).max_virtual_money,
+            maxFreeVmoney: currencyPolicy.maxVmoney,
         })
         if (scheduledResourceSettlement.status === "granted") {
             const refreshedPlayer = getPlayerSync(playerId);
@@ -292,9 +301,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             playerId,
             player,
             nowMs: now.getTime(),
-            maxMana: contentSnapshot.repository.table<ConfigValues>(
-                "config.json",
-            ).max_mana,
+            maxMana: currencyPolicy.maxMana,
         });
         if (eventTradeExpirySettlement.status === "converted") {
             const refreshedPlayer = getPlayerSync(playerId);
@@ -304,10 +311,18 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             player = refreshedPlayer;
         }
 
-        // 若自定义时间与 lastLogin 不同步，强制对齐（防止客户端弹"日期变了"）
-        if (now.toDateString() !== player.lastLoginTime.toDateString()) {
-            updatePlayerSync({ id: player.id, lastLoginTime: now });
-            player.lastLoginTime = now;
+        const gachaPointConversion = settleExpiredGachaPointsOnLoadSync({
+            playerId,
+            player,
+            nowMs: now.getTime(),
+            maxStarCrumb: currencyPolicy.maxStarCrumb,
+        });
+        if (gachaPointConversion.status === "converted") {
+            const refreshedPlayer = getPlayerSync(playerId);
+            if (refreshedPlayer === null) {
+                return reply.status(500).send({ error: "Internal Server Error", message: "No player data." });
+            }
+            player = refreshedPlayer;
         }
 
         let activeQuest: ActiveQuest | null = getPlayerActiveQuestSync(playerId);
@@ -361,12 +376,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
             }
             if (activeQuest) {
                 activeQuest = restoreActiveQuestFromStorage(playerId, activeQuest, {
-                    getEntryCost: (category, questId) => (
-                        getRuntimeContentTableSync(
-                            "quest_entry_costs.json",
-                            bundledQuestEntryCosts as Record<string, StartEntryCost>,
-                        )
-                    )[`${category}_${questId}`],
+                    getEntryCost: (category, questId) => getQuestEntryCost(category, questId),
                     persistEntryItemCount: updatePlayerActiveQuestEntryItemCountSync,
                     publishActiveQuest,
                 });
@@ -375,9 +385,13 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
 
         const activeMissionReconciliation = reconcileActiveMissionFactsWithResult({
             playerId,
-            repository: contentSnapshot.repository,
+            playerOverride: player,
             now: getServerTime() * 1000,
         });
+
+        // The response projects the same normal-category party groups twice
+        // (serialization + profile-favorite fallback); read them once here.
+        const normalPartyGroups = getPlayerPartyGroupListSync(playerId);
 
         const responsePayload = (() => {
             const clientData = getClientSerializedData(playerId, {
@@ -385,11 +399,11 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                 summonComSeconds: options.summonComSeconds,
                 activeMissionsOverride: activeMissionReconciliation.activeMissions,
                 playerOverride: player,
+                partyGroupListOverride: normalPartyGroups,
             }) as any;
             if (clientData === null) throw new Error("No player data.");
 
             const resVer = request.headers['res_ver'] as string | undefined;
-            console.log(`[CN-LOAD] res_ver=${resVer || '(not sent)'} account=${accountId} player=${playerId} party_slot=${clientData?.user_info?.party_slot}`);
             const snapshotTargetVersion = assetProvider.mode === "client-owned"
                 ? ""
                 : contentSnapshot.cdn.targetVersion;
@@ -398,9 +412,14 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                 host: options.httpDisplayHost ?? "127.0.0.1",
                 port: options.httpPort ?? DEFAULT_SERVER_PORTS.http,
             });
+            const crazyGacha = projectCrazyGachaLoadStateSync(playerId);
+            clientData.crazy_gacha_result_list = crazyGacha.crazyGachaResultList;
+            clientData.last_crazy_gacha_draw_result = crazyGacha.lastCrazyGachaDrawResult;
+            clientData.converted_gacha_list = projectPendingGachaConversionsSync(playerId);
             clientData.favorite_party_group_list = getFavoritePartyGroupListSync(
                 playerId,
                 player.leaderCharacterId,
+                normalPartyGroups,
             );
             if (loginBonusSettlement.status === "none") {
                 clientData.bonus_index_list = [];
@@ -457,9 +476,9 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
         setCnMsgpackPendingEncoder(reply, (payload, encoder) => (
             getDb().transaction(() => {
                 const loginMissionSettlement = settleLoginFactMissions(playerId, now)
-                mergeMissionSettlementResponse(
+                composeMissionSettlementResponse(
                     (payload as { data: Record<string, unknown> }).data,
-                    loginMissionSettlement,
+                    projectMissionSettlementFragment(loginMissionSettlement),
                     accountId,
                 )
                 const eventLoginMissionId = getEventLoginMissionId(now)
@@ -469,9 +488,9 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
                         category: 3,
                         missionIds: [eventLoginMissionId],
                     }], now)
-                    mergeMissionSettlementResponse(
+                    composeMissionSettlementResponse(
                         (payload as { data: Record<string, unknown> }).data,
-                        eventLoginSettlement,
+                        projectMissionSettlementFragment(eventLoginSettlement),
                         accountId,
                     )
                 }

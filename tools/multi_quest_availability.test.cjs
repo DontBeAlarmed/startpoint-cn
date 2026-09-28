@@ -121,9 +121,11 @@ test("activity classification is declared with QuestCategory constants", () => {
 })
 
 test("multi start rechecks local quest availability before entry writes", async t => {
-    const assets = require("../src/lib/assets")
-    const originalGetQuest = assets.getQuestFromCategorySync
-    assets.getQuestFromCategorySync = () => ({
+    // The quest lookup moved to quest-content; assets only re-exports it as a
+    // getter-only binding, so the runtime patch targets the owning module.
+    const questContent = require("../src/lib/quest-content")
+    const originalGetQuest = questContent.getQuestFromCategorySync
+    questContent.getQuestFromCategorySync = () => ({
         name: "活动关卡",
         availableFromMs: 20,
         availableUntilMs: 30,
@@ -137,7 +139,7 @@ test("multi start rechecks local quest availability before entry writes", async 
         throw new Error("entry transaction must not run")
     }
     t.after(() => {
-        assets.getQuestFromCategorySync = originalGetQuest
+        questContent.getQuestFromCategorySync = originalGetQuest
         startEntry.runStartEntryTransaction = originalRunStart
     })
 

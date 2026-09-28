@@ -8,6 +8,11 @@ const { unpack } = require("msgpackr")
 
 require("ts-node/register/transpile-only")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
+
+
 const dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "how-to-get-route-"))
 const previousDataDirectory = process.env.DATA_DIR
 const previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR
@@ -19,7 +24,6 @@ const { getDb } = require("../src/data/db")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
-const { productionContentSnapshotProvider } = require("../src/content/runtime/content-snapshot")
 
 initializeDatabase()
 const db = getDb()
@@ -43,9 +47,32 @@ db.prepare(`
 `).run(player.id, "2024-08-14T12:00:00.000Z")
 
 const snapshotTables = {
+    "cdn_general_shop_whitelist.json": [],
+    "shop_cost_item_schedule.json": {},
     "general_shop.json": {},
     "star_grain_shop.json": {},
     "treasure_shop.json": {},
+    "special_pack_shop.json": {
+        "51001": {
+            costs: [],
+            rewards: [{ type: 0, id: 1001, count: 1 }],
+            availableFrom: "2024-08-01 00:00:00",
+            availableUntil: null,
+            stock: 1,
+            purchaseKind: "purchase",
+            specialExchangeCampaignId: 0,
+        },
+        "51002": {
+            costs: [],
+            rewards: [{ type: 0, id: 1001, count: 1 }],
+            availableFrom: "2024-08-01 00:00:00",
+            availableUntil: null,
+            stock: 1,
+            purchaseKind: "specialExchangeLink",
+            specialExchangeCampaignId: 10,
+        },
+    },
+    "mana_shop.json": {},
     "equipment_enhancement_shop.json": {},
     "event_item_shop.json": {
         "11": {
@@ -149,17 +176,9 @@ const snapshotTables = {
     },
 }
 
-const previousSnapshot = productionContentSnapshotProvider.snapshot
-productionContentSnapshotProvider.snapshot = {
-    cdn: { targetVersion: "1.4.54" },
-    repository: {
-        info: () => ({ source: "test", assetVersion: "1.4.54", generatorVersion: 1, releaseDigest: null }),
-        table(tableName) {
-            if (!(tableName in snapshotTables)) throw new Error(`unexpected test table ${tableName}`)
-            return snapshotTables[tableName]
-        },
-    },
-}
+const restoreContentFixture = require("./helpers/content-snapshot-fixture.cjs")
+    .installFrozenTestContentSnapshot({ targetVersion: "1.4.54", tables: snapshotTables })
+    .restore
 
 function decode(response) {
     assert.equal(response.headers["content-type"], "application/x-msgpack")
@@ -192,7 +211,7 @@ async function createApp() {
 }
 
 test.after(async () => {
-    productionContentSnapshotProvider.snapshot = previousSnapshot
+    restoreContentFixture()
     if (db.open) db.close()
     fs.rmSync(dataDirectory, { recursive: true, force: true })
     if (previousDataDirectory === undefined) delete process.env.DATA_DIR
@@ -214,7 +233,8 @@ test("how-to-get route returns authoritative sources and keeps the request read-
         assert.equal(response.statusCode, 200, response.body)
         const decoded = decode(response)
         assert.deepEqual(decoded.data.box_gacha_id_list, [3001])
-        assert.deepEqual(decoded.data.shop_sales_list.map(item => item.shop_item_id), [41001])
+        assert.deepEqual(decoded.data.shop_sales_list.map(item => item.shop_item_id), [51001, 41001])
+        assert.equal(decoded.data.shop_sales_list.some(item => item.shop_item_id === 51002), false)
         assert.deepEqual(decoded.data.unselected_lineup_shop_sales_list, [])
         assert.ok(decoded.data.shop_sales_list.every(item => "group_info" in item && "shop_type" in item))
         assert.deepEqual(snapshot(), before)
@@ -230,7 +250,7 @@ test("how-to-get route returns authoritative sources and keeps the request read-
             payload: { viewer_id: viewerId, api_count: 1, item_id: 1001 },
         })
         const unselectedData = decode(unselectedResponse).data
-        assert.deepEqual(unselectedData.shop_sales_list, [])
+        assert.deepEqual(unselectedData.shop_sales_list.map(item => item.shop_item_id), [51001])
         assert.deepEqual(
             unselectedData.unselected_lineup_shop_sales_list.map(item => item.shop_item_id),
             [41001, 41002],

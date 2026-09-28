@@ -3,18 +3,24 @@
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
-    deletePlayerEquipmentSync, getPlayerEquipmentSync, getPlayerEquipmentsByIdsSync,
-    normalizeEquipmentBatchIds, updatePlayerEquipmentSync,
+    deletePlayerEquipmentsByIdsSync, deletePlayerEquipmentSync, getPlayerEquipmentSync, getPlayerEquipmentsByIdsSync,
+    normalizeEquipmentBatchIds, updatePlayerEquipmentStacksToZeroSync, updatePlayerEquipmentSync,
 } from "../../data/domains/equipment";
 import { getSession } from "../../data/domains/session";
 import { generateDataHeaders } from "../../utils";
-import { clientSerializeEquipment, buildFullEquipmentList } from "../../lib/equipment";
+import { buildFullEquipmentList } from "../../lib/equipment";
 import { calculateDissolveRewards } from "../../lib/equipment-dissolve";
 import { asAccountId, asPlayerId, AccountId, PlayerId } from "../../lib/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { getConfigSync } from "../../lib/assets";
+import { getEquipmentCurrencyPolicySync } from "../../lib/config-content"
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
+import { projectEquipmentEntity } from "../../lib/common-response/entities";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
+import type {
+    CommonResponseFragment,
+    CommonResponseProjection,
+} from "../../lib/common-response/model";
 import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
 import { createRewardGrantItemOverflowPolicy } from "../../lib/reward-grant-item-overflow";
 import {
@@ -43,8 +49,8 @@ interface BulkSellStackBody {
     equipment_ids: number[]
 }
 
-const wrightpieceItemId = () => getConfigSync().craft_point_item_id || 100000
-const starGrainItemId = () => getConfigSync().star_grain_item_id || 990008
+const wrightpieceItemId = () => getEquipmentCurrencyPolicySync().craftPointItemId
+const starGrainItemId = () => getEquipmentCurrencyPolicySync().starGrainItemId
 
 function grantDissolveRewardsWithinTransactionSync(
     playerId: number,
@@ -101,16 +107,23 @@ function grantDissolveRewardsWithinTransactionSync(
     })
 }
 
-function overflowResponseFields(settlement: ReturnType<
-    typeof grantDissolveRewardsWithinTransactionSync
->): Record<string, unknown> {
+function dissolveResponseData(
+    settlement: ReturnType<typeof grantDissolveRewardsWithinTransactionSync>,
+    playerId: number,
+): CommonResponseProjection {
     const overMax = projectItemOverflowCommonResponse(settlement.itemOverflowDispositions)
-    return {
+    const fragment: CommonResponseFragment = {
+        equipment_list: buildFullEquipmentList(playerId).map(
+            equipment => projectEquipmentEntity(equipment),
+        ),
+        item_list: settlement.itemList,
+        mail_arrived: getMailArrivedSync(playerId),
         ...(overMax.length > 0 ? { over_max: overMax } : {}),
         ...(settlement.itemOverflowDispositions.some(entry => entry.kind === "sold")
             ? { user_info: { free_mana: settlement.overflowFreeManaAfter } }
             : {}),
     }
+    return mergeCommonResponseFragments([fragment])
 }
 
 const routes = async (fastify: FastifyInstance) => {
@@ -165,8 +178,9 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         const rewardSettlement = getDb().transaction(() => {
-            for (const equipmentId of soldIds) {
-                deletePlayerEquipmentSync(playerId, equipmentId)
+            const deleted = deletePlayerEquipmentsByIdsSync(playerId, soldIds)
+            if (deleted !== soldIds.length) {
+                throw new Error(`sell_equipment expected to remove ${soldIds.length} equipment rows, removed ${deleted}`)
             }
             return grantDissolveRewardsWithinTransactionSync(
                 playerId,
@@ -176,23 +190,10 @@ const routes = async (fastify: FastifyInstance) => {
             )
         })()
 
-        const returnEquipmentList = buildFullEquipmentList(playerId)
-
-        const craftLog = totalCraftPoints > 0 ? `craft +${totalCraftPoints} ` : ""
-        const starLog = totalStarGrains > 0 ? `star +${totalStarGrains} ` : ""
-        const soulTypes = Object.keys(totalAbilitySouls).length
-        const soulDetail = Object.entries(totalAbilitySouls).map(([id, c]) => `${id}×${c}`).join(' ')
-        console.log(`[SELL_EQUIP] account=${accountId} player=${playerId}: ${soldIds.length} equipment sold (${soldIds.join(',')}), ${craftLog}${starLog}ability souls: ${soulTypes} types [${soulDetail}]`)
-
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {
-                "equipment_list": returnEquipmentList,
-                "item_list": rewardSettlement.itemList,
-                "mail_arrived": getMailArrivedSync(playerId),
-                ...overflowResponseFields(rewardSettlement),
-            }
+            "data": dissolveResponseData(rewardSettlement, playerId),
         })
     })
 
@@ -274,21 +275,10 @@ const routes = async (fastify: FastifyInstance) => {
             )
         })()
 
-        const returnEquipmentList = buildFullEquipmentList(playerId)
-
-        const soulTypes = Object.keys(totalAbilitySouls).length
-        const soulDetail = Object.entries(totalAbilitySouls).map(([id, c]) => `${id}×${c}`).join(' ')
-        console.log(`[SELL_STACK] account=${accountId} player=${playerId}: ${toSellEquipmentList.length} equipment stack sold, craft +${totalCraftPoints} star +${totalStarGrains} ability souls: ${soulTypes} types [${soulDetail}]`)
-
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {
-                "equipment_list": returnEquipmentList,
-                "item_list": rewardSettlement.itemList,
-                "mail_arrived": getMailArrivedSync(playerId),
-                ...overflowResponseFields(rewardSettlement),
-            }
+            "data": dissolveResponseData(rewardSettlement, playerId),
         })
     })
 
@@ -336,7 +326,6 @@ const routes = async (fastify: FastifyInstance) => {
             for (const [soulId, count] of Object.entries(rewards.abilitySouls)) {
                 totalAbilitySouls[parseInt(soulId)] = (totalAbilitySouls[parseInt(soulId)] ?? 0) + count
             }
-            console.log(`[BULK_SELL] account=${accountId} player=${playerId}  -> eid=${equipmentId} stack=${stack} rarity=${Math.floor(equipmentId/1000000)} craft=${rewards.craftPoints} star=${rewards.starGrains} souls=${JSON.stringify(rewards.abilitySouls)}`)
             toSell.push(equipmentId)
         }
 
@@ -344,13 +333,18 @@ const routes = async (fastify: FastifyInstance) => {
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-                "data": { "equipment_list": [], "item_list": {}, "mail_arrived": getMailArrivedSync(playerId) }
+                "data": mergeCommonResponseFragments([{
+                    equipment_list: [],
+                    item_list: {},
+                    mail_arrived: getMailArrivedSync(playerId),
+                }]),
             })
         }
 
         const rewardSettlement = getDb().transaction(() => {
-            for (const equipmentId of toSell) {
-                updatePlayerEquipmentSync(playerId, equipmentId, { stack: 0 })
+            const dissolved = updatePlayerEquipmentStacksToZeroSync(playerId, toSell)
+            if (dissolved !== toSell.length) {
+                throw new Error(`bulk sell expected to dissolve ${toSell.length} equipment rows, updated ${dissolved}`)
             }
             return grantDissolveRewardsWithinTransactionSync(
                 playerId,
@@ -360,23 +354,10 @@ const routes = async (fastify: FastifyInstance) => {
             )
         })()
 
-        const returnEquipmentList = buildFullEquipmentList(playerId)
-
-        const craftLog = totalCraftPoints > 0 ? `craft +${totalCraftPoints} ` : ""
-        const starLog = totalStarGrains > 0 ? `star +${totalStarGrains} ` : ""
-        const soulTypes = Object.keys(totalAbilitySouls).length
-        const soulDetail = Object.entries(totalAbilitySouls).map(([id, c]) => `${id}×${c}`).join(' ')
-        console.log(`[BULK_SELL] account=${accountId} player=${playerId}: ${toSell.length} equipment dissolved (${toSell.join(',')}), ${craftLog}${starLog}ability souls: ${soulTypes} types [${soulDetail}]`)
-
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {
-                "equipment_list": returnEquipmentList,
-                "item_list": rewardSettlement.itemList,
-                "mail_arrived": getMailArrivedSync(playerId),
-                ...overflowResponseFields(rewardSettlement),
-            }
+            "data": dissolveResponseData(rewardSettlement, playerId),
         })
     })
 }

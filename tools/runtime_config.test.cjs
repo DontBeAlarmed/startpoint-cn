@@ -325,3 +325,19 @@ for (const value of ["", "0", "65536", "1.5", " 80", "80 ", "+80", "1e3", "NaN",
         })
     }
 }
+
+test("runtime config freezes the game calendar offset with a CN default", () => {
+    const defaults = parseCnRuntimeConfig({ projectRoot, env: { ASSET_MODE: "client-owned" } })
+    assert.equal(defaults.gameCalendarUtcOffsetMinutes, 480)
+    const jp = parseCnRuntimeConfig({
+        projectRoot,
+        env: { ASSET_MODE: "client-owned", GAME_CALENDAR_UTC_OFFSET_MINUTES: "+540" },
+    })
+    assert.equal(jp.gameCalendarUtcOffsetMinutes, 540)
+    for (const value of ["", "0480", "841", "UTC+8"]) {
+        assert.throws(() => parseCnRuntimeConfig({
+            projectRoot,
+            env: { ASSET_MODE: "client-owned", GAME_CALENDAR_UTC_OFFSET_MINUTES: value },
+        }), /invalid runtime/i)
+    }
+})

@@ -16,12 +16,19 @@ const {
     planEventTradeExpiry,
 } = require("../src/lib/inventory/event-trade-expiry-plan")
 const { planManaCapacity } = require("../src/lib/inventory/mana-capacity-plan")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 const {
     installBundledGameplaySnapshot,
 } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 
+const restoreDefaultSnapshot = installBundledGameplaySnapshot()
+test.after(restoreDefaultSnapshot)
+
+const CALENDAR_540 = createGameCalendarPolicy(540)
 const CN_CONTENT_MAX_EPOCH_MS = Date.UTC(9999, 11, 31, 23, 59, 59)
     - 8 * 60 * 60 * 1000
+const CN_CONTENT_MAX_EPOCH_MS_540 = Date.UTC(9999, 11, 31, 23, 59, 59)
+    - 9 * 60 * 60 * 1000
 
 function policy(overrides = {}) {
     return {
@@ -53,7 +60,7 @@ function assertDeepFrozen(value, seen = new Set()) {
     for (const key of Reflect.ownKeys(value)) assertDeepFrozen(value[key], seen)
 }
 
-test("typed Item policy uses the deeply frozen bundled fallback before runtime initialization", () => {
+test("typed Item policy uses the deeply frozen initialized runtime snapshot", () => {
     const loaded = getItemInventoryPolicyCatalog()
     assert.ok(Object.keys(loaded.byItemId).length > 1_000)
     assert.ok(loaded.eventTradeItemIds.length > 0)
@@ -124,9 +131,9 @@ for (const [name, overrides, expected] of [
     ["non-second start epoch", { startTimeMs: 1_001 }, /startTimeMs must have second precision/i],
     ["non-second end epoch", { endTimeMs: 5_001 }, /endTimeMs must have second precision/i],
     [
-        "epoch above the UTC+8 four-digit year range",
+        "epoch above the game calendar four-digit year range",
         { startTimeMs: CN_CONTENT_MAX_EPOCH_MS + 1_000, endTimeMs: null },
-        /startTimeMs exceeds the UTC\+8 four-digit year range/i,
+        /startTimeMs exceeds the game calendar four-digit year range/i,
     ],
 ]) {
     test(`typed Item policy rejects ${name}`, () => {
@@ -137,14 +144,33 @@ for (const [name, overrides, expected] of [
     })
 }
 
+test("maximum four-digit master epoch is derived from the injected +540 calendar", () => {
+    const loaded = parseItemInventoryPolicyCatalog({
+        byItemId: {
+            "2": policy({ startTimeMs: CN_CONTENT_MAX_EPOCH_MS_540, endTimeMs: null }),
+        },
+        eventTradeItemIds: [2],
+    }, CALENDAR_540)
+    assert.equal(loaded.byItemId["2"].startTimeMs, CN_CONTENT_MAX_EPOCH_MS_540)
+    assert.throws(
+        () => parseItemInventoryPolicyCatalog({
+            byItemId: {
+                "2": policy({ startTimeMs: CN_CONTENT_MAX_EPOCH_MS_540 + 1_000, endTimeMs: null }),
+            },
+            eventTradeItemIds: [2],
+        }, CALENDAR_540),
+        /startTimeMs exceeds the game calendar four-digit year range/i,
+    )
+})
+
 test("active runtime snapshot fails closed for invalid epoch precision and range", () => {
     const invalidPolicies = [
         [policy({ startTimeMs: 1_001 }), /startTimeMs must have second precision/i],
         [policy({ endTimeMs: 5_001 }), /endTimeMs must have second precision/i],
-        [
-            policy({ startTimeMs: CN_CONTENT_MAX_EPOCH_MS + 1_000, endTimeMs: null }),
-            /startTimeMs exceeds the UTC\+8 four-digit year range/i,
-        ],
+    [
+        policy({ startTimeMs: CN_CONTENT_MAX_EPOCH_MS + 1_000, endTimeMs: null }),
+        /startTimeMs exceeds the game calendar four-digit year range/i,
+    ],
     ]
     for (const [invalidPolicy, expected] of invalidPolicies) {
         const restore = installBundledGameplaySnapshot({

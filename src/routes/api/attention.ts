@@ -70,6 +70,10 @@ const routes = async (fastify: FastifyInstance) => {
                     "disable_intent_disconnect_duration_seconds": 300,
                     "disable_unintent_disconnect_duration_seconds": 5,
                     "disable_remote_error_duration_seconds": 300,
+                    // All 23 fields below are strictly validated by the client's
+                    // shared early-success transformer; summon_com_seconds comes
+                    // from CDN attention_config column 23.
+                    "summon_com_seconds": 20,
                     "attention_animation_time_seconds": 6,
                     "disable_expire_count_limit": 4,
                     "disable_expire_duration_seconds": 180,
@@ -93,8 +97,6 @@ const routes = async (fastify: FastifyInstance) => {
                 "error": "Bad Request", "message": "Invalid request body."
             })
         }
-        console.log(`[ATTENTION] action: viewer=${viewerId} factors=${body.priority_factors?.length ?? 0}`)
-        console.log(`[ATTENTION] action: factors_detail=${JSON.stringify(body.priority_factors)}`)
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
@@ -115,7 +117,6 @@ const routes = async (fastify: FastifyInstance) => {
                 "error": "Bad Request", "message": "Invalid request body."
             })
         }
-        console.log(`[ATTENTION] logger: viewer=${viewerId} logs=${body.client_logs?.length ?? 0}`)
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),

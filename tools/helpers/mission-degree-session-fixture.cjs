@@ -6,7 +6,7 @@ const { productionContentSnapshotProvider } = require("../../src/content/runtime
 const { MissionEvaluationSession } = require("../../src/lib/mission/evaluation-session")
 const { MissionFactLoaderRegistry } = require("../../src/lib/mission/fact-loaders")
 const { getFactKeyId } = require("../../src/lib/mission/facts/fact-key")
-const { bundledMissionContentRepository } = require("../../src/lib/mission/mission-catalog-source")
+const { bundledMissionContentRepository } = require("./mission-catalog-bundled.cjs")
 const { getMissionCatalog } = require("../../src/lib/mission/mission-catalog")
 const { getMissionFactRequirementRegistry } = require("../../src/lib/mission/requirements/registry")
 const { DegreeComputer, computeDegreeProgress } = require("../../src/lib/mission/computer-degree")
@@ -15,6 +15,13 @@ const {
     EMPTY_BATTLE_COUNTERS,
     EMPTY_DEGREE_BATTLE_STATS,
 } = require("../../src/lib/mission/degree-state-derivation")
+
+// Baseline global snapshot so strict runtime defaults (requirement registry's
+// "current computer definition" comparisons) match the bundled data the
+// degree tests assert against; installGlobalRepository() overrides it.
+const restoreContentSnapshot = require("./install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
 
 function clone(value) {
     return JSON.parse(JSON.stringify(value))
@@ -44,6 +51,18 @@ function installGlobalRepository(repository) {
         archiveSources: { schemaVersion: 1, archives: [] },
         repository,
     }
+}
+
+function captureGlobalSnapshot() {
+    return productionContentSnapshotProvider.snapshot
+}
+
+function restoreGlobalSnapshot(snapshot) {
+    productionContentSnapshotProvider.snapshot = snapshot
+}
+
+function clearGlobalSnapshot() {
+    productionContentSnapshotProvider.snapshot = null
 }
 
 function player(rankPoint = 0) {
@@ -137,7 +156,9 @@ module.exports = {
     assertLoaderKeys,
     buildDegreeRuleCatalog,
     bundledMissionContentRepository,
+    captureGlobalSnapshot,
     character,
+    clearGlobalSnapshot,
     clone,
     computeDegreeProgress,
     createSession,
@@ -147,6 +168,6 @@ module.exports = {
     getMissionFactRequirementRegistry,
     installGlobalRepository,
     player,
-    productionContentSnapshotProvider,
     repositoryWith,
+    restoreGlobalSnapshot,
 }

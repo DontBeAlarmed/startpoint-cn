@@ -1,12 +1,11 @@
 import {
-    ContentSnapshotError,
     getContentSnapshot,
     type ReadonlyContentRepository,
 } from "../../content/runtime/content-snapshot"
-import {
-    bundledMissionContentRepository,
-    parseMissionCatalogSource,
-} from "./mission-catalog-source"
+import { GameCalendarError, type GameCalendarPolicy } from "../../time/game-calendar"
+import { getGameCalendar } from "../../time/game-calendar-provider"
+import { getEquipmentCurrencyPolicySync } from "../config-content"
+import { parseMissionCatalogSource } from "./mission-catalog-source"
 
 export interface MissionMasterDefinition {
     readonly category: number
@@ -53,7 +52,13 @@ export interface MissionCatalog {
         missionId: number,
         stage: number,
     ) => MissionCatalogStage | undefined
-    readonly isEnabledAt: (category: number, missionId: number, at: Date, eventId?: number) => boolean
+    readonly isEnabledAt: (
+        category: number,
+        missionId: number,
+        at: Date,
+        eventId?: number,
+        calendar?: GameCalendarPolicy,
+    ) => boolean
     readonly getAwakeMissionIdsByCharacter: (characterId: number | string) => readonly number[]
 }
 
@@ -73,21 +78,17 @@ function stageKey(category: number, missionId: number, stage: number): string {
     return `${category}:${missionId}:${stage}`
 }
 
-function parseMasterCnTime(value: string | undefined): number | undefined {
+function parseMasterCnTime(
+    value: string | undefined,
+    calendar: GameCalendarPolicy = getGameCalendar(),
+): number | undefined {
     if (value === undefined) return undefined
-    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value)
-    if (!match) return Number.NaN
-    const [year, month, day, hour, minute, second] = match.slice(1).map(Number)
-    const local = new Date(0)
-    local.setUTCFullYear(year, month - 1, day)
-    local.setUTCHours(hour, minute, second, 0)
-    if (local.getUTCFullYear() !== year
-        || local.getUTCMonth() !== month - 1
-        || local.getUTCDate() !== day
-        || local.getUTCHours() !== hour
-        || local.getUTCMinutes() !== minute
-        || local.getUTCSeconds() !== second) return Number.NaN
-    return local.getTime() - 8 * 60 * 60 * 1000
+    try {
+        return calendar.parseMasterTimestamp(value)
+    } catch (error) {
+        if (error instanceof GameCalendarError) return Number.NaN
+        throw error
+    }
 }
 
 function positiveSafeInteger(value: unknown): number | undefined {
@@ -99,6 +100,7 @@ export function isMissionMasterDefinitionEnabledAt(
     definition: MissionMasterDefinition,
     at: Date,
     eventId?: number,
+    calendar: GameCalendarPolicy = getGameCalendar(),
 ): boolean {
     if (definition.requiresEventScope) {
         const definitionEventId = positiveSafeInteger(definition.eventId)
@@ -111,8 +113,8 @@ export function isMissionMasterDefinitionEnabledAt(
     const now = at.getTime()
     if (!Number.isFinite(now)) return false
 
-    const start = parseMasterCnTime(definition.enableStart)
-    const end = parseMasterCnTime(definition.enableEnd)
+    const start = parseMasterCnTime(definition.enableStart, calendar)
+    const end = parseMasterCnTime(definition.enableEnd, calendar)
     if (start !== undefined && (!Number.isFinite(start) || start > now)) return false
     if (end !== undefined && (!Number.isFinite(end) || now > end)) return false
     return true
@@ -204,10 +206,16 @@ class SnapshotMissionCatalog implements MissionCatalog {
         return this.#stageByKey.get(stageKey(category, missionId, stage))
     }
 
-    isEnabledAt(category: number, missionId: number, at: Date, eventId?: number): boolean {
+    isEnabledAt(
+        category: number,
+        missionId: number,
+        at: Date,
+        eventId?: number,
+        calendar?: GameCalendarPolicy,
+    ): boolean {
         const definition = this.getDefinition(category, missionId)
         if (!definition) return false
-        return isMissionMasterDefinitionEnabledAt(definition, at, eventId)
+        return isMissionMasterDefinitionEnabledAt(definition, at, eventId, calendar)
     }
 
     getAwakeMissionIdsByCharacter(characterId: number | string): readonly number[] {
@@ -220,20 +228,8 @@ class SnapshotMissionCatalog implements MissionCatalog {
 const catalogByRepository = new WeakMap<ReadonlyContentRepository, MissionCatalog>()
 const repositoryByCatalog = new WeakMap<MissionCatalog, ReadonlyContentRepository>()
 
-function currentRepository(): ReadonlyContentRepository {
-    try {
-        return getContentSnapshot().repository
-    } catch (error) {
-        if (error instanceof ContentSnapshotError
-            && error.code === "CONTENT_SNAPSHOT_NOT_INITIALIZED") {
-            return bundledMissionContentRepository
-        }
-        throw error
-    }
-}
-
 export function getMissionCatalog(repository?: ReadonlyContentRepository): MissionCatalog {
-    const selectedRepository = repository ?? currentRepository()
+    const selectedRepository = repository ?? getContentSnapshot().repository
     const cached = catalogByRepository.get(selectedRepository)
     if (cached) return cached
     const catalog = Object.freeze(new SnapshotMissionCatalog(selectedRepository))
@@ -254,14 +250,62 @@ export function getMissionCatalogContentTable<T>(
 export const DEFAULT_CRAFT_POINT_ITEM_ID = 100000
 
 export function getMissionCatalogCraftPointItemId(catalog: MissionCatalog): number {
-    let config: Record<string, unknown>
-    try {
-        config = getMissionCatalogContentTable(catalog, "config.json")
-    } catch {
-        return DEFAULT_CRAFT_POINT_ITEM_ID
+    const repository = repositoryByCatalog.get(catalog)
+    if (repository === undefined) return DEFAULT_CRAFT_POINT_ITEM_ID
+    return getEquipmentCurrencyPolicySync(repository).craftPointItemId
+}
+
+/** Client-visible standard mission categories (Awake is 9). */
+export const MISSION_CATEGORIES: readonly number[] = Object.freeze([
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+])
+
+export function getCurrentStage(
+    category: number,
+    missionId: number,
+    progress: number,
+    repository?: ReadonlyContentRepository,
+): number {
+    const stages = getMissionCatalog(repository).getRewardStages(category, missionId)
+    if (stages.length === 0) return 1
+    let current = stages[stages.length - 1].stage
+    for (const stage of stages) {
+        if (progress < stage.targetProgress) {
+            current = stage.stage
+            break
+        }
     }
-    const itemId = Number(config.craft_point_item_id)
-    return Number.isSafeInteger(itemId) && itemId > 0
-        ? itemId
-        : DEFAULT_CRAFT_POINT_ITEM_ID
+    return current
+}
+
+export function getCompletedStageNumbers(
+    category: number,
+    missionId: number,
+    progress: number,
+    repository?: ReadonlyContentRepository,
+): number[] {
+    return getMissionCatalog(repository)
+        .getRewardStages(category, missionId)
+        .filter(stage => progress >= stage.targetProgress)
+        .map(stage => stage.stage)
+}
+
+export function isMissionProgressComplete(
+    category: number,
+    missionId: number,
+    progress: number,
+    repository?: ReadonlyContentRepository,
+): boolean {
+    const stages = getMissionCatalog(repository).getRewardStages(category, missionId)
+    return stages.length > 0 && stages.every(stage => progress >= stage.targetProgress)
+}
+
+export function getMissionStageIds(
+    category: number,
+    missionId: number,
+    repository?: ReadonlyContentRepository,
+): number[] {
+    return getMissionCatalog(repository)
+        .getRewardStages(category, missionId)
+        .map(stage => stage.stage)
 }

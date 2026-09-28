@@ -1,8 +1,4 @@
-import {
-    getMissionMasterDefinitions,
-    type MissionMasterDefinition,
-} from "./master-data"
-
+import { MissionMasterDefinition, getMissionCatalog } from "./mission-catalog"
 interface DegreeMissionCandidate {
     readonly missionId: number
     readonly targetCharacterId?: number
@@ -59,7 +55,7 @@ export function getDegreeMissionIdsForConditionTypes(
     const characterIdSet = new Set(
         (characterIds ?? []).filter(characterId => getPositiveInteger(characterId) !== undefined),
     )
-    const index = getConditionIndex(getMissionMasterDefinitions(5))
+    const index = getConditionIndex(getMissionCatalog().getDefinitions(5))
     const missionIds = new Set<number>()
 
     for (const conditionType of new Set(conditionTypes)) {

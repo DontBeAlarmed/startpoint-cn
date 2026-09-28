@@ -9,6 +9,10 @@ const {
     runMultiSettlementBaseline,
 } = require("./multi_settlement_baseline.cjs")
 require("ts-node/register/transpile-only")
+
+const restoreContentSnapshot = require("../helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
 const settlementOrchestrator = require("../../src/multi/settlement/orchestrator")
 const settlementResponse = require("../../src/multi/settlement/response")
 const {

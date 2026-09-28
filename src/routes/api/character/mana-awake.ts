@@ -80,6 +80,7 @@ export function registerAwakeManaNodeRoute(fastify: FastifyInstance): void {
             },
             item_list: mapToRecord(resourceState?.items ?? new Map()),
             evolution: result.evolution,
+            active_mission_list: result.activeMissionList,
             mail_arrived: getMailArrivedSync(session.playerId),
         })
     })

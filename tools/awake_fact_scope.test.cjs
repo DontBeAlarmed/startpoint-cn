@@ -21,7 +21,8 @@ const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const characterDomain = require("../src/data/domains/character")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
-const characterAssets = require("../src/lib/assets")
+const characterContent = require("../src/lib/character-content")
+const characterGrowthContent = require("../src/lib/character-growth-content")
 const { characterExpCaps } = require("../src/lib/character")
 const { publishAwakeCharacterListBestEffort } = require(
     "../src/lib/mission/awake-best-effort-context",
@@ -83,14 +84,14 @@ function createPlayer(label, characterIds = []) {
 }
 
 function makeBaseReady(playerId, characterId) {
-    const asset = characterAssets.getCharacterDataSync(characterId)
+    const asset = characterContent.getCharacterFacts().get(characterId)
     characterDomain.updatePlayerCharacterSync(playerId, characterId, {
         exp: characterExpCaps[asset.rarity][0],
     })
     characterDomain.insertPlayerCharacterManaNodesSync(
         playerId,
         characterId,
-        Object.keys(characterAssets.getCharacterManaNodesSync(characterId, 1)).map(Number),
+        Object.keys(characterGrowthContent.getCharacterGrowthContent().getManaBoardNodes(characterId, 1)).map(Number),
     )
 }
 

@@ -12,6 +12,8 @@ try {
     if (error?.code !== "MODULE_NOT_FOUND") throw error
 }
 
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
+
 const PATHS = Object.freeze({
     general: "master/shop/general_shop.orderedmap",
     event: "master/shop/event_item_shop.orderedmap",
@@ -538,6 +540,76 @@ test("shop converter validates CN calendar values without local timezone normali
     leapDay.sources.set(PATHS.general, [generalRowWithDate("2024-02-29 23:59:59")])
     const output = await convertShops(leapDay.reader)
     assert.equal(output["general_shop.json"]["20"].availableFrom, "2024-02-29 23:59:59")
+})
+
+// Sources whose columns the converter reads period strings from. The two
+// category tables (bossCategory/equipmentCategory) only contribute keys, so
+// their filler cells are not period strings.
+const PERIOD_SOURCE_PATHS = Object.freeze([
+    PATHS.general,
+    PATHS.event,
+    PATHS.eventCampaign,
+    PATHS.boss,
+    PATHS.bossCampaign,
+    PATHS.starGrain,
+    PATHS.treasure,
+    PATHS.equipment,
+    PATHS.specialPack,
+    PATHS.mana,
+    PATHS.costSchedule,
+])
+
+const PERIOD_LITERAL_PATTERN = /\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/g
+
+function fixturePeriodStrings(fixture, logicalPaths) {
+    const found = new Set()
+    for (const logicalPath of logicalPaths) {
+        const groups = fixture.nestedSources.get(logicalPath)
+            ?? fixture.sources.get(logicalPath)
+        for (const group of groups ?? []) {
+            const texts = Array.isArray(group.rows)
+                ? group.rows.map(nested => nested.text)
+                : [group.text]
+            for (const text of texts) {
+                for (const match of text.matchAll(PERIOD_LITERAL_PATTERN)) {
+                    found.add(match[0])
+                }
+            }
+        }
+    }
+    return found
+}
+
+test("shop converter validates every fixture period string through the injected game calendar", async () => {
+    assert.equal(typeof convertShops, "function", "应导出 convertShops")
+    const parsed = []
+    const real = createGameCalendarPolicy(480)
+    const gameCalendar = {
+        utcOffsetMinutes: 480,
+        parseMasterTimestamp: value => {
+            parsed.push(value)
+            return real.parseMasterTimestamp(value)
+        },
+    }
+    const fixture = createFixture()
+    const output = await convertShops(fixture.reader, { gameCalendar })
+
+    // Log-driven comparison: every period literal on a consumed source must
+    // reach the policy parser, so a dropped context argument at any of the
+    // converter's call sites (flat shops, parseShopItem callers, select
+    // campaigns, special pack, mana shop, cost schedules) fails here.
+    const expected = fixturePeriodStrings(fixture, PERIOD_SOURCE_PATHS)
+    const recorded = new Set(parsed)
+    const unrecorded = [...expected].filter(value => !recorded.has(value)).sort()
+    // convertSelectCampaigns short-circuits availableUntil when the row's
+    // exchangeableUntil (column 8) is present, so the event and boss campaign
+    // column-7 values never reach the parser by design.
+    assert.deepEqual(unrecorded, ["2022-12-29 11:59:59", "2024-03-08 11:59:59"])
+    const unexpected = [...recorded].filter(value => !expected.has(value)).sort()
+    assert.deepEqual(unexpected, [], "policy must only receive fixture period strings")
+
+    assert.equal(output["general_shop.json"]["20"].availableFrom, "2024-01-01 00:00:00")
+    assert.equal(output["general_shop.json"]["220032"].availableFrom, "2023-01-01 05:00:00")
 })
 
 test("shop converter rejects duplicate keys, malformed shapes, and unknown categories", async t => {

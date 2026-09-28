@@ -8,7 +8,10 @@ const { pack, unpack } = require("msgpackr")
 require("ts-node/register/transpile-only")
 
 const { after } = require("node:test")
-const { installBundledShopSnapshot } = require("./helpers/install-bundled-shop-snapshot.cjs")
+const {
+    installBundledShopSnapshot,
+    installRefreshedShopRepositoryIdentity,
+} = require("./helpers/install-bundled-shop-snapshot.cjs")
 const restoreBundledShopSnapshot = installBundledShopSnapshot()
 after(restoreBundledShopSnapshot)
 
@@ -16,31 +19,13 @@ const shopRouteSource = fs.readFileSync(
     path.join(__dirname, "../src/routes/api/shop.ts"),
     "utf8",
 )
-assert.doesNotMatch(
-    shopRouteSource,
-    /getBulkPurchaseCountsForRoute|getPlayerShopPurchasesMapSync/,
-    "shop route must not retain a bulk purchase-count compatibility fallback",
+const purchaseRouteSource = fs.readFileSync(
+    path.join(__dirname, "../src/routes/api/shop/purchase-routes.ts"),
+    "utf8",
 )
-assert.match(
-    shopRouteSource,
-    /getPurchaseCounts:\s*getPlayerShopPurchaseCountSnapshotSync/,
-    "buy route must directly inject the typed single-item snapshot reader",
-)
-assert.match(
-    shopRouteSource,
-    /addPurchaseCounts:\s*addPlayerShopPurchaseCountsByTypeFromSnapshotSync/,
-    "buy route must reuse the validated single-item snapshot",
-)
-assert.match(
-    shopRouteSource,
-    /getPurchaseCountsBulk:\s*getPlayerShopPurchaseCountsByTypeBulkSync/,
-    "bulk_buy route must directly inject the typed bulk reader",
-)
-assert.match(
-    shopRouteSource,
-    /addPurchaseCountsFromSnapshot:\s*addPlayerShopPurchaseCountsByTypeFromSnapshotSync/,
-    "bulk_buy route must directly inject the snapshot-owned writer",
-)
+assert.match(shopRouteSource, /registerShopPurchaseRoutes\(fastify, dailyResetHour\)/)
+assert.doesNotMatch(shopRouteSource, /executeGenericShop|getShopItemSync|recordEquipmentEnhancement/)
+assert.equal((purchaseRouteSource.match(/executeShopPurchaseSync\(/g) ?? []).length, 2)
 
 function stubModule(relativePath, exports) {
     const modulePath = require.resolve(relativePath)
@@ -97,6 +82,15 @@ db.exec(`
         lineup_id INTEGER NOT NULL,
         PRIMARY KEY (player_id, shop_type, campaign_id)
     );
+    CREATE TABLE server_gameplay_settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        drop_multiplier INTEGER NOT NULL DEFAULT 1,
+        multi_rescue_fragment_rewards_enabled INTEGER NOT NULL DEFAULT 1,
+        multi_rescue_host_rewards_enabled INTEGER NOT NULL DEFAULT 1,
+        rush_700011_to_700017_compatibility_enabled INTEGER NOT NULL DEFAULT 1,
+        updated_at TEXT NOT NULL
+    );
+    INSERT INTO server_gameplay_settings (id, updated_at) VALUES (1, '2026-09-10T00:00:00.000Z');
     INSERT INTO player_state VALUES (17, 0, 0, 1000, 100, 20, 50);
     INSERT INTO item_state VALUES (17, 2370001, 1000);
     INSERT INTO item_state VALUES (17, 49100, 3);
@@ -268,6 +262,8 @@ stubModule("../src/data/domains/equipment", {
         return row === undefined ? null : {
             level: row.level,
             enhancementLevel: row.enhancement_level,
+            protection: false,
+            stack: 0,
         }
     },
     playerOwnsEquipmentSync(playerId, equipmentId) {
@@ -350,6 +346,12 @@ stubModule("../src/data/domains/active_mission_counters", {
         `).run(playerId, amount)
     },
 })
+stubModule("../src/lib/mission/active-publication-owner", {
+    publishActiveMissionOwnerStateWithinTransaction: () => ({
+        activeMissionList: [],
+        activeMissions: {},
+    }),
+})
 stubModule("../src/lib/mission/operation-fact-settlement", {
     settleMissionOperationFactsSync: (...args) => {
         degreeOperationCalls.push(args)
@@ -387,8 +389,7 @@ stubModule("../src/runtime/time/game-time", {
     getVirtualNowMs: () => globalNowSeconds * 1000,
     getVirtualNow: () => new Date(globalNowSeconds * 1000),
 })
-stubModule("../src/lib/shop-reward-grant", {
-    grantShopRewardsInTransactionOwnerWithInventorySync(
+function grantStubShopRewards(
         playerId,
         rewards,
         knownPlayerBefore,
@@ -429,6 +430,44 @@ stubModule("../src/lib/shop-reward-grant", {
                 expPool: knownPlayerBefore.expPool + expPool,
             },
         }
+}
+stubModule("../src/lib/shop-reward-grant", {
+    grantShopRewardsTypedInTransactionOwnerWithInventorySync(
+        playerId,
+        rewards,
+        knownPlayerBefore,
+        inventory,
+    ) {
+        const legacy = grantStubShopRewards(
+            playerId,
+            rewards,
+            knownPlayerBefore,
+            inventory,
+        )
+        return {
+            execution: {
+                entries: [],
+                assets: {
+                    items: Object.entries(legacy.rewardResult.items).map(([itemId, afterAmount]) => ({
+                        itemId: Number(itemId),
+                        requestedAmount: 0,
+                        acceptedAmount: 0,
+                        overflowAmount: 0,
+                        beforeAmount: 0,
+                        afterAmount,
+                    })),
+                    characters: [],
+                    equipment: [],
+                    currencies: [],
+                },
+                playerAfter: {
+                    playerId,
+                    ...legacy.playerAfter,
+                },
+            },
+            invalidatedFactKeys: [],
+            itemOverflowDispositions: [],
+        }
     },
 })
 stubModule("../src/lib/stamina", { computeRealTimeStamina: () => 100 })
@@ -445,6 +484,13 @@ stubModule("../src/lib/mission", {
 const shopRoutes = require("../src/routes/api/shop.ts").default
 const eventItemShopAsset = require("../assets/event_item_shop.json")
 const equipmentEnhancementShopAsset = require("../assets/equipment_enhancement_shop.json")
+const treasureShopAsset = require("../assets/treasure_shop.json")
+const specialPackShopAsset = require("../assets/special_pack_shop.json")
+const manaShopAsset = require("../assets/mana_shop.json")
+const bossCoinShopAsset = require("../assets/boss_coin_shop.json")
+const generalShopAsset = require("../assets/general_shop.json")
+const starGrainShopAsset = require("../assets/star_grain_shop.json")
+const shopCostScheduleAsset = require("../assets/shop_cost_item_schedule.json")
 
 async function createServer() {
     const fastify = Fastify()
@@ -461,6 +507,14 @@ async function createServer() {
 
 function decode(response) {
     return unpack(response.rawPayload)
+}
+
+function setRushCompatibilityEnabled(enabled) {
+    db.prepare(`
+        UPDATE server_gameplay_settings
+        SET rush_700011_to_700017_compatibility_enabled = ?, updated_at = ?
+        WHERE id = 1
+    `).run(enabled ? 1 : 0, new Date().toISOString())
 }
 
 async function getRushSales(fastify, eventType, eventId) {
@@ -483,6 +537,123 @@ async function getRushSales(fastify, eventType, eventId) {
 async function main() {
     const fastify = await createServer()
     try {
+        globalNowSeconds = Date.parse("2022-12-23T12:00:00+08:00") / 1000
+        for (const url of ["/buy", "/bulk_buy"]) {
+            const malformed = await fastify.inject({ method: "POST", url, payload: null })
+            assert.equal(malformed.statusCode, 400)
+        }
+        const specialSalesResponse = await fastify.inject({
+            method: "POST",
+            url: "/get_sales_list",
+            payload: {
+                viewer_id: 123,
+                shop_types: [3],
+                boss_coin_shop_category_ids: [],
+                equipment_enhancement_shop_category_ids: [],
+                browse_treasure_flag: false,
+                event_list: [],
+            },
+        })
+        const specialSales = decode(specialSalesResponse).data.sales_list
+        assert.equal(specialSales.some(item => item.shop_item_id === 200001), true)
+        assert.equal(specialSales.some(item => item.shop_item_id === 200002), true)
+        const beforeNavigationBuy = snapshot()
+        const navigationBuy = await fastify.inject({
+            method: "POST",
+            url: "/buy",
+            payload: { viewer_id: 123, shop_type: 3, shop_item_id: 200001, number: 1 },
+        })
+        assert.equal(navigationBuy.statusCode, 400)
+        assert.deepEqual(snapshot(), beforeNavigationBuy)
+
+        globalNowSeconds = Date.parse("2024-10-12T12:00:00+08:00") / 1000
+        db.prepare("UPDATE player_state SET free_vmoney = 100, bond_token = 100 WHERE id = 17").run()
+        setItem(17, 990008, 100)
+        for (const [shopType, shopItemId] of [
+            [5, 200001],
+            [7, 200103],
+            [8, 100001],
+            [9, 100000],
+        ]) {
+            const response = await fastify.inject({
+                method: "POST",
+                url: "/buy",
+                payload: { viewer_id: 123, shop_type: shopType, shop_item_id: shopItemId, number: 1 },
+            })
+            assert.equal(response.statusCode, 200, `shop type ${shopType}: ${response.body}`)
+            assert.equal(decode(response).data_headers.result_code, 1)
+        }
+        setItem(17, 40000, 100)
+
+        const periodProducts = [
+            [2, 200001, treasureShopAsset["200001"]],
+            [3, 220040, specialPackShopAsset["220040"]],
+            [4, 700000, eventItemShopAsset["11"]["700001"]["700000"]],
+            [5, 200001, manaShopAsset["200001"]],
+            [7, 200103, Object.values(bossCoinShopAsset).map(items => items["200103"]).find(Boolean)],
+            [8, 100001, generalShopAsset["100001"]],
+            [9, 100000, starGrainShopAsset["100000"]],
+            [10, 2001, equipmentEnhancementShopAsset["2001"]],
+        ]
+        const originalPeriods = periodProducts.map(([, , product]) => ({
+            availableFrom: product.availableFrom,
+            availableUntil: product.availableUntil,
+        }))
+        for (const [, , product] of periodProducts) {
+            product.availableFrom = "2019-01-01 00:00:00"
+            product.availableUntil = "2020-01-01 00:00:00"
+        }
+        const restorePeriodIdentity = installRefreshedShopRepositoryIdentity()
+        try {
+            const beforePeriods = snapshot()
+            for (const [shopType, shopItemId] of periodProducts) {
+                const response = await fastify.inject({
+                    method: "POST",
+                    url: "/buy",
+                    payload: { viewer_id: 123, shop_type: shopType, shop_item_id: shopItemId, number: 1 },
+                })
+                assert.equal(response.statusCode, 200)
+                assert.equal(decode(response).data_headers.result_code, 2053, `shop type ${shopType}`)
+                assert.deepEqual(snapshot(), beforePeriods)
+            }
+        } finally {
+            restorePeriodIdentity()
+            periodProducts.forEach(([, , product], index) => {
+                product.availableFrom = originalPeriods[index].availableFrom
+                product.availableUntil = originalPeriods[index].availableUntil
+            })
+        }
+
+        globalNowSeconds = Date.parse("2024-08-12T12:00:00+08:00") / 1000
+        setItem(17, 40122, 75)
+        setItem(17, 40052, 75)
+        const scheduledPurchase = await fastify.inject({
+            method: "POST",
+            url: "/buy",
+            payload: { viewer_id: 123, shop_type: 8, shop_item_id: 220032, number: 1 },
+        })
+        assert.equal(scheduledPurchase.statusCode, 200, scheduledPurchase.body)
+        assert.equal(getItem(17, 40122), 0)
+        assert.equal(getItem(17, 40052), 0)
+
+        const scheduleRows = shopCostScheduleAsset.equipment_awaking_crystal_piece
+        shopCostScheduleAsset.equipment_awaking_crystal_piece = scheduleRows.filter(row => row.month !== 8)
+        const restoreScheduleIdentity = installRefreshedShopRepositoryIdentity()
+        try {
+            setItem(17, 40122, 75)
+            setItem(17, 40052, 75)
+            const beforeMissingSchedule = snapshot()
+            const missingSchedule = await fastify.inject({
+                method: "POST",
+                url: "/buy",
+                payload: { viewer_id: 123, shop_type: 8, shop_item_id: 220032, number: 1 },
+            })
+            assert.equal(missingSchedule.statusCode, 500)
+            assert.deepEqual(snapshot(), beforeMissingSchedule)
+        } finally {
+            restoreScheduleIdentity()
+            shopCostScheduleAsset.equipment_awaking_crystal_piece = scheduleRows
+        }
         globalNowSeconds = Date.parse("2022-12-23T12:00:00+08:00") / 1000
         const campaignBefore = await fastify.inject({
             method: "POST",
@@ -575,6 +746,7 @@ async function main() {
         eventItemShopAsset["11"]["700011"] = {
             "999999": eventItemShopAsset["11"]["700001"]["700000"],
         }
+        const restoreExactShopIdentity = installRefreshedShopRepositoryIdentity()
         try {
             const beforeExactShopPurchase = snapshot()
             const oldItemPurchase = await fastify.inject({
@@ -590,6 +762,7 @@ async function main() {
             )
             assert.deepEqual(snapshot(), beforeExactShopPurchase)
         } finally {
+            restoreExactShopIdentity()
             delete eventItemShopAsset["11"]["700011"]
         }
 
@@ -615,6 +788,56 @@ async function main() {
         assert.equal((await getRushSales(fastify, 11, 700011)).length, 33)
         globalNowSeconds = Date.parse("2025-08-15T00:00:00+08:00") / 1000
         assert.equal((await getRushSales(fastify, 11, 700011)).length, 0)
+
+        setRushCompatibilityEnabled(false)
+        try {
+            globalNowSeconds = Date.parse("2025-07-12T12:00:00+08:00") / 1000
+            assert.equal(
+                (await getRushSales(fastify, 11, 700011)).length,
+                0,
+                "关闭策略后 700011 商店必须回到官方末期空列表",
+            )
+            assert.equal(
+                (await getRushSales(fastify, 11, 700017)).length,
+                0,
+                "关闭策略后 700017 商店必须回到官方末期空列表",
+            )
+            assert.equal(
+                (await getRushSales(fastify, 11, 700001)).length,
+                0,
+                "关闭策略后源活动列表不得携带常驻期兼容",
+            )
+            setItem(17, 2370001, 1000)
+            const beforeDisabledPurchase = snapshot()
+            const disabledPurchase = await fastify.inject({
+                method: "POST",
+                url: "/buy",
+                payload: { viewer_id: 123, shop_type: 4, shop_item_id: 700032, number: 1 },
+            })
+            assert.equal(disabledPurchase.statusCode, 200)
+            assert.equal(
+                decode(disabledPurchase).data_headers.result_code,
+                2053,
+                "关闭策略后常驻期直购必须按官方原始开放期拒绝（2053）",
+            )
+            assert.deepEqual(snapshot(), beforeDisabledPurchase)
+            const disabledBulk = await fastify.inject({
+                method: "POST",
+                url: "/bulk_buy",
+                payload: { viewer_id: 123, shop_type: 4, buy_item_list: { 700032: 1 } },
+            })
+            assert.equal(disabledBulk.statusCode, 200)
+            assert.equal(decode(disabledBulk).data_headers.result_code, 2053)
+        } finally {
+            setRushCompatibilityEnabled(true)
+        }
+
+        globalNowSeconds = Date.parse("2025-07-12T12:00:00+08:00") / 1000
+        assert.equal(
+            (await getRushSales(fastify, 11, 700011)).length,
+            33,
+            "重新开启策略后私服兼容立即恢复且无缓存残留",
+        )
 
         globalNowSeconds = Date.parse("2023-12-18T12:00:00+08:00") / 1000
         assert.equal(
@@ -723,6 +946,20 @@ async function main() {
         assert.equal(insufficientBulk.statusCode, 400)
         assert.deepEqual(snapshot(), beforeInsufficientBulk)
 
+        setItem(17, 40000, 0)
+        const beforeBossFailure = snapshot()
+        const failedBossBulk = await fastify.inject({
+            method: "POST",
+            url: "/bulk_buy",
+            payload: {
+                viewer_id: 123,
+                shop_type: 7,
+                buy_item_list: { 200101: 1, 200102: 1 },
+            },
+        })
+        assert.equal(failedBossBulk.statusCode, 400)
+        assert.deepEqual(snapshot(), beforeBossFailure)
+        setItem(17, 40000, 100)
         const bossBulk = await fastify.inject({
             method: "POST",
             url: "/bulk_buy",
@@ -781,7 +1018,9 @@ async function main() {
 
         const enhancementItem = equipmentEnhancementShopAsset["2001"]
         enhancementItem.userCost = { type: 1, amount: 30 }
+        const restoreEnhancementIdentity = installRefreshedShopRepositoryIdentity()
         const grantsBeforeEnhancement = shopRewardGrantCalls
+        globalNowSeconds = Date.parse("2024-10-12T12:00:00+08:00") / 1000
         db.prepare("UPDATE player_state SET free_mana = 10, paid_mana = 100 WHERE id = 17").run()
         try {
             const enhancementPurchase = await fastify.inject({
@@ -802,12 +1041,14 @@ async function main() {
             )
             assert.equal(
                 shopRewardGrantCalls,
-                grantsBeforeEnhancement,
-                "追忆强化专用分支不得迁移到标准 RewardGrant adapter",
+                grantsBeforeEnhancement + 1,
+                "追忆强化必须通过空 RewardGrant 计划统一 flush shared Inventory",
             )
         } finally {
+            restoreEnhancementIdentity()
             delete enhancementItem.userCost
         }
+        globalNowSeconds = Date.parse("2023-12-01T00:00:00+08:00") / 1000
 
         const reloadedServer = await createServer()
         try {

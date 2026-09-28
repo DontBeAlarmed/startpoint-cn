@@ -39,9 +39,11 @@ const rareGroups = {
     3999: [],
 }
 
-stubModule("../src/lib/assets", {
-    getRareScoreRewardGroup: groupId => rareGroups[groupId] ?? null,
-})
+// The quest lookup moved to quest-content; assets only re-exports it as a
+// getter-only binding, so the runtime patch targets the owning module.
+const questContentStub = { ...require("../src/lib/quest-content") }
+questContentStub.getRareScoreRewardGroup = groupId => rareGroups[groupId] ?? null
+stubModule("../src/lib/quest-content", questContentStub)
 stubModule("../src/lib/event-currency", {
     resolveEventCurrencyId: (itemId, at) => {
         assert.equal(at.toISOString(), "2024-08-14T12:00:00.000Z")
@@ -66,6 +68,9 @@ stubModule("../src/utils", {
 })
 
 const rewardElementMap = require("../assets/reward_element_map.json")
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot({ additionalTableNames: ["reward_element_map.json"] })
+process.once("exit", () => { restoreContentSnapshot() })
 const { RewardType, ScoreRewardType } = require("../src/lib/types/rewards")
 
 function sequence(values, calls) {

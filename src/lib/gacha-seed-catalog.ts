@@ -243,19 +243,28 @@ export class GachaSeedCatalog {
         }
 
         const rarityKey = String(6 - rarity)
-        const available = pool[rarityKey]["0"].filter(
+        const seeds = pool[rarityKey]["0"]
+        const rejectionAttempts = Math.min(32, seeds.length)
+        for (let attempt = 0; attempt < rejectionAttempts; attempt += 1) {
+            const index = this.chooseIndex(seeds.length)
+            if (!Number.isInteger(index) || index < 0 || index >= seeds.length) {
+                throw new Error("Gacha seed random index is outside the available pool")
+            }
+            const seed = seeds[index]
+            if (usedSeeds.has(seed) || this.isQuarantined(movieId, seed)) continue
+            usedSeeds.add(seed)
+            return seed
+        }
+        // Dense or adversarial exclusions are exceptional. Keep the normal
+        // draw O(1), then use a deterministic linear fallback for progress.
+        const fallback = seeds.find(
             seed => !usedSeeds.has(seed) && !this.isQuarantined(movieId, seed),
         )
-        if (available.length === 0) {
+        if (fallback === undefined) {
             throw new Error(`No available gacha seed for ${movieId} rarity ${rarity}`)
         }
-        const index = this.chooseIndex(available.length)
-        if (!Number.isInteger(index) || index < 0 || index >= available.length) {
-            throw new Error("Gacha seed random index is outside the available pool")
-        }
-        const seed = available[index]
-        usedSeeds.add(seed)
-        return seed
+        usedSeeds.add(fallback)
+        return fallback
     }
 
     status(): GachaSeedCatalogStatus {

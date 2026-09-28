@@ -172,7 +172,7 @@ export function validateSingleFinishRequest(
         || typeof body.play_id !== "string"
         || body.play_id.length === 0
         || !isNonNegativeSafeInteger(body.continue_count)
-        || !isNonNegativeSafeInteger(body.add_mana)
+        || !isNonNegativeInt32(body.add_mana)
         || !isPositiveSafeInteger(body.elapsed_time_ms)
         || typeof body.score !== "number"
         || !Number.isFinite(body.score)

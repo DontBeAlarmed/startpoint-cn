@@ -4,10 +4,8 @@ const assert = require("node:assert/strict")
 const test = require("node:test")
 const { validateCharacterStackConversion } = require("../src/lib/character-stack")
 const bundledCharacters = require("../assets/character.json")
-const {
-    productionContentSnapshotProvider,
-} = require("../src/content/runtime/content-snapshot")
-const { getCharacterDataSync } = require("../src/lib/assets")
+const { installFrozenTestContentSnapshot } = require("./helpers/content-snapshot-fixture.cjs")
+const { getCharacterFacts } = require("../src/lib/character-content")
 
 assert.equal(validateCharacterStackConversion(2, 1, false), null)
 assert.equal(validateCharacterStackConversion(2, 2, false), null)
@@ -17,35 +15,29 @@ assert.equal(validateCharacterStackConversion(2, 0, false), "Invalid conversion 
 assert.equal(validateCharacterStackConversion(2, -1, false), "Invalid conversion count.")
 assert.equal(validateCharacterStackConversion(2, 1.5, false), "Invalid conversion count.")
 
-test("getCharacterDataSync 从当前 Snapshot Repository 读取角色元数据", t => {
-    const previousSnapshot = productionContentSnapshotProvider.snapshot
-    const releaseCharacter = Object.freeze({
-        name: "release-character",
-        rarity: 5,
-        element: 4,
-        skill_count: 6,
-    })
-    const requestedTables = []
-    productionContentSnapshotProvider.snapshot = Object.freeze({
-        cdn: Object.freeze({ targetVersion: "test-release" }),
-        repository: Object.freeze({
-            info: () => Object.freeze({
-                source: "release",
-                assetVersion: "test-release",
-                generatorVersion: 1,
-                releaseDigest: null,
-            }),
-            table: (tableName) => {
-                requestedTables.push(tableName)
-                assert.equal(tableName, "character.json")
-                return Object.freeze({ "111129": releaseCharacter })
+test("CharacterFacts 从当前 Snapshot Repository 读取角色元数据", t => {
+    // The unified fixture repository throws for any table it was not given,
+    // so CharacterFacts reading anything beyond character.json fails loudly.
+    const install = installFrozenTestContentSnapshot({
+        targetVersion: "test-release",
+        tables: {
+            "character.json": {
+                "111129": {
+                    name: "release-character",
+                    rarity: 5,
+                    element: 4,
+                    skill_count: 6,
+                },
             },
-        }),
+        },
     })
-    t.after(() => { productionContentSnapshotProvider.snapshot = previousSnapshot })
+    t.after(install.restore)
 
     assert.equal(bundledCharacters["111129"].skill_count, 3)
-    assert.strictEqual(getCharacterDataSync(111129), releaseCharacter)
-    assert.deepEqual(requestedTables, ["character.json"])
-    assert.equal(getCharacterDataSync(99999999), null)
+    assert.deepEqual(getCharacterFacts().get(111129), {
+        rarity: 5,
+        element: 4,
+        skillCount: 6,
+    })
+    assert.equal(getCharacterFacts().get(99999999), null)
 })

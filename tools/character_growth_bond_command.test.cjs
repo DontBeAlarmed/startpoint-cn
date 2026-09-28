@@ -25,7 +25,7 @@ const {
 const { getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getDb } = require("../src/data/db")
 const { receiveBondToken } = require("../src/lib/character-growth/commands/receive-bond-token")
-const { updateBondTokenForCompletedBoard } = require("../src/lib/character-helpers")
+const { convergeBondTokenForLearnedBoardWithinTransaction } = require("../src/lib/character-growth/bond-token-qualification")
 const { createCharacterGrowthRequestContext } = require("../src/lib/character-growth/request-context")
 
 initializeDatabase()
@@ -178,13 +178,63 @@ test("completed-board helper rejects a missing token row instead of manufacturin
     const character = getPlayerCharacterSync(playerId, 1)
     const beforeBond = getPlayerSync(playerId).bondToken
     assert.throws(
-        () => updateBondTokenForCompletedBoard(playerId, 1, character, 1, true),
+        () => db.transaction(() => convergeBondTokenForLearnedBoardWithinTransaction(
+            playerId,
+            1,
+            new Map(),
+            {
+                boardIndex: 1,
+                rarity: character.rarity ?? 3,
+                exp: character.exp,
+                requiredNodeIds: [],
+                learnedNodeIds: new Set(),
+            },
+        ))(),
         error => error.code === "INVALID_GROWTH_STATE",
     )
     assert.equal(getPlayerSync(playerId).bondToken, beforeBond)
     assert.deepEqual(
         getPlayerCharacterSync(playerId, 1).bondTokenList,
         [{ manaBoardIndex: 2, status: 0 }],
+    )
+})
+
+test("Awake bond-token mission requires both character tokens claimed, not player balance", () => {
+    const { AwakeComputer } = require("../src/lib/mission/computer-awake")
+    const missionId = 1410033
+    const contextFor = tokens => ({
+        category: 9,
+        charData: new Map([["141003", { bondTokenList: tokens }]]),
+    })
+
+    assert.equal(
+        AwakeComputer.compute(missionId, contextFor([
+            { manaBoardIndex: 1, status: 0 },
+            { manaBoardIndex: 2, status: 1 },
+        ]), 0),
+        0,
+        "0/1：第一张未领取不得完成",
+    )
+    assert.equal(
+        AwakeComputer.compute(missionId, contextFor([
+            { manaBoardIndex: 1, status: 2 },
+            { manaBoardIndex: 2, status: 1 },
+        ]), 0),
+        0,
+        "2/1：第二张仅可领取仍未完成，玩家余额不参与判定",
+    )
+    assert.equal(
+        AwakeComputer.compute(missionId, contextFor([
+            { manaBoardIndex: 1, status: 2 },
+            { manaBoardIndex: 2, status: 2 },
+        ]), 0),
+        1,
+        "2/2：两张均已领取才完成",
+    )
+    assert.equal(
+        AwakeComputer.compute(missionId, contextFor([]), 0),
+        0,
+        "空列表不得完成",
     )
 })
 

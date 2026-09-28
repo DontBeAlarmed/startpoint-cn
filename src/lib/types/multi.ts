@@ -64,6 +64,8 @@ export interface MultiRoom {
     member_participants: MultiRoomParticipant[]
     mates: Array<{ viewer_id: number | null, com_id: number, player_id?: number }>
     share_room_options: number
+    /** Wall-clock ms when a battle room last had zero connected participants. */
+    battle_empty_since_ms?: number
     is_npc_mode: boolean
     npc_count: number  // fixed NPC count per battle: 0=unrecruited, 1/2=fixed count
     npc_roster: RoomNpcAssignment[]

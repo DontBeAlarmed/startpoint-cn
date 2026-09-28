@@ -3,15 +3,23 @@ import { getPlayerActiveQuestSync } from "../../data/domains/quest_active"
 import { getPlayerDailyChallengePointListSync, getPlayerSync, refreshPlayerDailyChallengePointsForRealDaySync, updatePlayerSync } from "../../data/domains/player"
 import { getPlayerMailCountSync } from "../../data/domains/mail"
 import {
-    getConfigSync,
     getQuestConfigurationErrorResponse,
     getQuestFromCategorySync,
-} from "../../lib/assets"
+} from "../../lib/quest-content"
+import { getQuestEntryCostByKey } from "../../lib/quest-entry-content"
+import { getEventChallengePointMap } from "../../lib/quest/daily-challenge"
+import { getSingleContinuePolicySync } from "../../lib/config-content"
 import type { BattleQuest } from "../../lib/types"
 import { generateDataHeaders, getServerTime, realToVirtual } from "../../utils"
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time"
 import { computeRealTimeStamina } from "../../lib/stamina"
 import { getStaminaCost } from "../../lib/stamina-cost"
+import {
+    isQuestOutOfPeriodAt,
+    QUEST_OUT_OF_PERIOD_RESULT_CODE,
+} from "../../lib/quest/open-period"
+import { getQuestPrerequisites } from "../../lib/quest-entry-content"
+import { getPlayerSingleQuestProgressSync } from "../../data/domains/quest"
 import { getRealNow } from "../../runtime/time/game-time"
 import { dispatchModeQuestStart } from "../../modes/registry"
 import { createModeHost } from "../../modes/loader"
@@ -21,14 +29,12 @@ import {
 import { settleSingleBattleQuest } from "../../lib/quest/finish/single-orchestrator"
 import { buildSingleFinishResponse } from "../../lib/quest/finish/single-response-projector"
 import type { SingleFinishResponseHeaders } from "../../lib/quest/finish/single-response-projector"
-import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json"
-import bundledEventChallengePointMap from "../../../assets/event_challenge_point_map.json"
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access"
 import {
     mergeMissionSettlementResponse,
     settleMissionCategories,
 } from "../../lib/mission"
 import type { MissionSettlementResult } from "../../lib/mission"
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
 import { getDb } from "../../data/db"
 import {
     ActiveQuestAlreadyExistsError,
@@ -37,7 +43,6 @@ import {
     InsufficientStaminaError,
     PlayerNotFoundError,
     runStartEntryTransaction,
-    StartEntryCost,
 } from "../../lib/quest/start-entry"
 import {
     ActiveQuest,
@@ -116,18 +121,9 @@ interface PlayContinueBody {
     statistics: QuestStatistics
 }
 
-function summarizeItemList(itemList: Record<string, number>): string {
-    const entries = Object.entries(itemList)
-    if (entries.length === 0) return "none"
-    return entries.map(([itemId, amount]) => `${itemId}:${amount}`).join(",")
-}
-
 const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteOptions = {}) => {
     const dailyResetHour = options.dailyResetHour ?? 5
-    const challengePointMap = getRuntimeContentTableSync(
-        "event_challenge_point_map.json",
-        bundledEventChallengePointMap as Record<string, number>,
-    )
+    const challengePointMap = getEventChallengePointMap()
 
     fastify.post("/finish", async (request: FastifyRequest, reply: FastifyReply) => {
         const validationResult = validateSingleFinishRequest(request.body)
@@ -204,31 +200,20 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
             category,
         })
         const resolvedIdentity = abortResult.resolvedIdentity
-        const observedActiveQuest = abortResult.observedActiveQuest
-        console.log([
-            "[SINGLE_ABORT]",
-            `player=${playerId}`,
-            `viewer=${viewerId}`,
-            `missing_play=${playId === null}`,
-            `missing_quest=${questId === null}`,
-            `missing_category=${category === null}`,
-            `active=${observedActiveQuest ? `${observedActiveQuest.category}_${observedActiveQuest.questId}` : "none"}`,
-            `resolved=${resolvedIdentity.category}_${resolvedIdentity.questId}`,
-            `cancelled=${abortResult.cancelled}`,
-            `refund=${summarizeItemList(abortResult.itemList)}`,
-        ].join(" "))
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": headers,
             "data": {
-                "user_info": {},
+                ...mergeCommonResponseFragments([{
+                    "user_info": {},
+                    "item_list": abortResult.itemList,
+                }]),
                 "category_id": resolvedIdentity.category,
                 "is_multi": "single",
                 "start_time": headers['servertime'],
                 "quest_name": "",
-                "item_list": abortResult.itemList
-            }
+            },
         })
     })
 
@@ -269,6 +254,36 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
             })
         }
 
+        const prerequisites = getQuestPrerequisites(category, questId)
+        if (prerequisites !== undefined) {
+            const uncleared = prerequisites.filter(prerequisite => (
+                getPlayerSingleQuestProgressSync(
+                    playerId,
+                    prerequisite.category,
+                    prerequisite.questId,
+                )?.finished !== true
+            ))
+            if (uncleared.length > 0) {
+                console.log(`[BATTLE] start locked: category=${category} questId=${questId} missing=${uncleared.map(prerequisite => `${prerequisite.category}_${prerequisite.questId}`).join(",")}`)
+                return reply.status(400).send({
+                    "error": "Bad Request",
+                    "message": "Quest prerequisite is not cleared."
+                })
+            }
+        }
+
+        if (isQuestOutOfPeriodAt(questData, getServerTime() * 1000)) {
+            console.log(`[BATTLE] start out of period: category=${category} questId=${questId}`)
+            reply.header("content-type", "application/x-msgpack")
+            return reply.status(200).send({
+                "data_headers": generateDataHeaders({
+                    viewer_id: viewerId,
+                    result_code: QUEST_OUT_OF_PERIOD_RESULT_CODE,
+                }),
+                "data": {},
+            })
+        }
+
         // Mode seam: installed mode modules may veto the start (entry rules).
         try {
             dispatchModeQuestStart({ playerId, questId, questCategory: category }, singleBattleModeHost)
@@ -281,12 +296,8 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
 
         // Validate and persist all quest-start state atomically.
         const questKey = `${category}_${questId}`
-        const entryCost = getRuntimeContentTableSync(
-            "quest_entry_costs.json",
-            bundledQuestEntryCosts as Record<string, StartEntryCost>,
-        )[questKey]
+        const entryCost = getQuestEntryCostByKey(questKey)
         const staminaInfo = getStaminaCost(questKey)
-        console.log(`[BATTLE] start entry: questId=${questId} questKey=${questKey} entryCost=${JSON.stringify(entryCost)} discountRate=${staminaInfo.rate} baseStamina=${staminaInfo.baseCost}→${staminaInfo.cost}`)
         const staminaCost = staminaInfo.cost
         const challengePointId = getDailyChallengePointId(
             category,
@@ -358,7 +369,7 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
                 || error instanceof PlayerNotFoundError
                 || error instanceof DailyChallengePointExhaustedError
                 || error instanceof DailyChallengePointUnavailableError) {
-                console.warn(`[BATTLE-START] player ${playerId}: ${error.message}`)
+                console.warn(`[BATTLE-START] start rejected: ${error.message}`)
                 if (error instanceof InsufficientStaminaError
                     && shouldStopAutoStartForStamina(isAutoStartMode, true)) {
                     reply.header("content-type", "application/x-msgpack")
@@ -377,7 +388,6 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
             }
             throw error
         }
-        console.log(`[BATTLE-START] stamina: ${startResult.beforeStamina} -> ${startResult.afterStamina} (cost: ${staminaCost}, rate: ${staminaInfo.rate})`)
 
         const dataHeaders = generateDataHeaders({
             viewer_id: viewerId
@@ -385,12 +395,14 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
 
         reply.header("content-type", "application/x-msgpack")
         const responseData: Record<string, any> = {
-                "user_info": {
-                    "last_main_quest_id": body.quest_id,
-                    "stamina": startResult.afterStamina,
-                    "stamina_heal_time": realToVirtual(startTime)
-                },
-                "item_list": buildStartEntryItemList(startResult),
+                ...mergeCommonResponseFragments([{
+                    "user_info": {
+                        "last_main_quest_id": body.quest_id,
+                        "stamina": startResult.afterStamina,
+                        "stamina_heal_time": realToVirtual(startTime)
+                    },
+                    "item_list": buildStartEntryItemList(startResult),
+                }]),
                 "category_id": body.category,
                 "is_multi": "single",
                 "start_time": dataHeaders['servertime'],
@@ -429,10 +441,15 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
         const expectedContinueCount = parseSingleContinueExpectedCount(body.statistics)
         if (expectedContinueCount === null) return sendBadRequest("Invalid request body.")
 
-        const continueVmoneyCost = (
-            options.getContinueVmoneyCost
-                ?? (() => getConfigSync().continue_virtual_money)
-        )()
+        let continueVmoneyCost: number
+        try {
+            continueVmoneyCost = (
+                options.getContinueVmoneyCost
+                    ?? (() => getSingleContinuePolicySync().vmoneyCost)
+            )()
+        } catch {
+            continueVmoneyCost = Number.NaN
+        }
         if (!Number.isSafeInteger(continueVmoneyCost) || continueVmoneyCost <= 0) {
             request.log.error(
                 { code: "SINGLE_CONTINUE_CONFIG_INVALID" },

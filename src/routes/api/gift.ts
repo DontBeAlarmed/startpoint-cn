@@ -4,7 +4,8 @@ import { getSession } from "../../data/domains/session"
 import { getPlayerSync } from "../../data/domains/player"
 import { SessionType } from "../../data/types"
 import { receiveGiftCodeSync } from "../../lib/gift-code/redemption"
-import { projectItemOverflowCommonResponse } from "../../lib/item-overflow"
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow/common-response"
 import { generateDataHeaders } from "../../utils"
 
 function isRequestBody(value: unknown): value is Record<string, unknown> {
@@ -60,6 +61,10 @@ const routes = async (fastify: FastifyInstance) => {
         }
 
         reply.header("content-type", "application/x-msgpack")
+        const overflow = result.resultCode === 1 ? result.itemOverflow : undefined
+        const overMax = overflow === undefined
+            ? []
+            : projectItemOverflowCommonResponse(overflow.dispositions)
         const data: Record<string, unknown> = {
             result_code: result.resultCode,
             all_gift_info: result.rewards.map(reward => ({
@@ -67,16 +72,15 @@ const routes = async (fastify: FastifyInstance) => {
                 type_id: reward.typeId,
                 number: reward.number,
             })),
-        }
-        if (result.resultCode === 1 && result.itemOverflow !== undefined) {
-            const overMax = projectItemOverflowCommonResponse(result.itemOverflow.dispositions)
-            if (overMax.length > 0) {
-                data.over_max = overMax
-                data.item_list = result.itemOverflow.itemList
-                if (result.itemOverflow.freeManaAfter !== null) {
-                    data.user_info = { free_mana: result.itemOverflow.freeManaAfter }
-                }
-            }
+            ...(overflow !== undefined && overMax.length > 0
+                ? mergeCommonResponseFragments([{
+                    over_max: overMax,
+                    item_list: overflow.itemList,
+                    ...(overflow.freeManaAfter !== null
+                        ? { user_info: { free_mana: overflow.freeManaAfter } }
+                        : {}),
+                }])
+                : {}),
         }
         return reply.status(200).send({
             data_headers: generateDataHeaders({ viewer_id: viewerId }),

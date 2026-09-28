@@ -32,6 +32,7 @@ const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const {
     getAuthoritativeEventEntryMissionIds,
+    getEventLoginNaturalDay,
     getOpenCharacterElectionVoteMissionId,
     getProducerBackedEventEntryMissionIds,
     recordEventLoginMissionFactSync,
@@ -39,17 +40,20 @@ const {
     recordRaidSummaryMissionFactSync,
     validateEventEntryRule,
 } = require("../src/lib/mission/event-entry-facts")
-const masterData = require("../src/lib/mission/master-data")
-const { getMissionMasterDefinition } = masterData
-const {
-    productionContentSnapshotProvider,
-} = require("../src/content/runtime/content-snapshot")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
+const missionCatalog = require("../src/lib/mission/mission-catalog")
+const { getMissionCatalog } = missionCatalog
+const getMissionMasterDefinition = (category, missionId) => getMissionCatalog().getDefinition(category, missionId)
+const { installFrozenTestContentSnapshot } = require("./helpers/content-snapshot-fixture.cjs")
 const {
     getBundledStandardMissionTables,
 } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 const { PartyCategory } = require("../src/data/types")
 const eventRewards = require("../assets/mission_event_reward.json")
 
+const restoreBundledSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreBundledSnapshot() })
 initializeDatabase()
 db = getDb()
 const account = insertAccountSync({
@@ -391,8 +395,8 @@ test("Raid SET edit facts fail closed for ordinary edits, illegal input, closed 
         null,
     ), false, "非 Date 的运行时输入必须 fail closed 而不是抛错")
 
-    const originalEnabledAt = masterData.isMissionDefinitionEnabledAt
-    masterData.isMissionDefinitionEnabledAt = definition => (
+    const originalEnabledAt = missionCatalog.isMissionMasterDefinitionEnabledAt
+    missionCatalog.isMissionMasterDefinitionEnabledAt = definition => (
         [400054, 400055, 400056, 400072, 400073, 400074].includes(definition.missionId)
     )
     try {
@@ -403,22 +407,18 @@ test("Raid SET edit facts fail closed for ordinary edits, illegal input, closed 
             new Date("2024-05-23T04:00:00.000Z"),
         ), false, "多个活动族同时开放时必须拒绝猜测")
     } finally {
-        masterData.isMissionDefinitionEnabledAt = originalEnabledAt
+        missionCatalog.isMissionMasterDefinitionEnabledAt = originalEnabledAt
     }
 
-    const previousSnapshot = productionContentSnapshotProvider.snapshot
     const driftEventDefinitions = structuredClone(require("../assets/mission_event.json"))
     driftEventDefinitions["400054"][0][2] = "81"
     const driftTables = getBundledStandardMissionTables({
         "mission_event.json": driftEventDefinitions,
     })
-    productionContentSnapshotProvider.snapshot = {
-        cdn: { targetVersion: "event-entry-master-drift" },
-        repository: {
-            info: () => ({ source: "test" }),
-            table: tableName => driftTables[tableName],
-        },
-    }
+    const { restore: restoreDriftSnapshot } = installFrozenTestContentSnapshot({
+        targetVersion: "event-entry-master-drift",
+        tables: driftTables,
+    })
     try {
         assert.equal(recordRaidSetEditMissionFactsSync(
             noFactPlayerId,
@@ -427,10 +427,26 @@ test("Raid SET edit facts fail closed for ordinary edits, illegal input, closed 
             new Date("2024-05-23T04:00:00.000Z"),
         ), false, "任一族内主数据不符时不得写入部分事实")
     } finally {
-        productionContentSnapshotProvider.snapshot = previousSnapshot
+        restoreDriftSnapshot()
     }
     assert.deepEqual(getPlayerCategoryMissionsSync(noFactPlayerId, 3), {})
 })
+test("Event login natural day key follows an explicit +540 calendar", () => {
+    const calendar540 = createGameCalendarPolicy(540)
+    const instant = new Date("2019-11-27T15:59:59.999Z")
+    assert.equal(
+        getEventLoginNaturalDay(instant),
+        Date.UTC(2019, 10, 27) / 86_400_000,
+        "+480 默认口径下该时刻仍是 11-27 自然日",
+    )
+    assert.equal(
+        getEventLoginNaturalDay(instant, calendar540),
+        Date.UTC(2019, 10, 28) / 86_400_000,
+        "+540 口径下同一时刻必须推进到 11-28 自然日",
+    )
+    assert.equal(getEventLoginNaturalDay(new Date("invalid"), calendar540), undefined)
+})
+
 test("Event login records one fact per CN natural day without historical backfill", () => {
     assert.equal(recordEventLoginMissionFactSync(playerId, new Date("2019-11-27T04:00:00.000Z")), true)
     assert.equal(recordEventLoginMissionFactSync(playerId, new Date("2019-11-27T15:59:59.999Z")), false)

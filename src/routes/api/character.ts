@@ -1,7 +1,7 @@
 // Handles the insertion of mana into characters.
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { getPlayerCharacterSync, updatePlayerCharacterSync } from "../../data/domains/character"
+import { getPlayerCharacterSync } from "../../data/domains/character"
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { generateDataHeaders } from "../../utils";
@@ -10,11 +10,17 @@ import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDb } from "../../data/db";
 import { executeOverLimit } from "../../lib/character-growth/commands/over-limit"
 import { executeBulkOverLimit } from "../../lib/character-growth/commands/bulk-over-limit"
+import {
+    setCharacterIllustrationSettings,
+    setCharacterProtection,
+} from "../../lib/character-growth/commands/set-character-metadata"
 import { sendGrowthMutationError } from "./character/mana-mutation-http"
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { canClaimTownStoryCharacter } from "../../lib/story-join-character";
 import { getRealNow } from "../../runtime/time/game-time";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
+import { projectCharacterPatch } from "../../lib/common-response/entities";
 import {
     FULL_CHARACTER_GROWTH_FIELDS,
     OVER_LIMIT_CHARACTER_GROWTH_FIELDS,
@@ -88,35 +94,27 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         const uniqueCharacterIds = [...new Set(characterIds)]
-        getDb().transaction(() => {
-            for (const characterId of uniqueCharacterIds) {
-                if (getPlayerCharacterSync(playerId, characterId) !== null) {
-                    updatePlayerCharacterSync(playerId, characterId, {
-                        protection: body.protection
-                    })
-                }
-            }
-        })()
-
-        const characterList = uniqueCharacterIds.flatMap(characterId => {
-            const character = getPlayerCharacterSync(playerId, characterId)
-            if (!character) return []
-            return [projectCharacterGrowthEntry({
-                characterId,
-                character,
-                state: characterGrowthProjectionStateFromPlayerCharacter(characterId, character),
-                fields: [...FULL_CHARACTER_GROWTH_FIELDS, "evolution_img_level"],
-                viewerId,
-            })]
+        const updatedCharacters = setCharacterProtection({
+            playerId,
+            characterIds: uniqueCharacterIds,
+            protection: body.protection,
         })
+
+        const characterList = updatedCharacters.flatMap(({ characterId, character }) => [projectCharacterGrowthEntry({
+            characterId,
+            character,
+            state: characterGrowthProjectionStateFromPlayerCharacter(characterId, character),
+            fields: [...FULL_CHARACTER_GROWTH_FIELDS, "evolution_img_level"],
+            viewerId,
+        })])
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {
-                "character_list": characterList,
+            "data": mergeCommonResponseFragments([{
+                "character_list": characterList.map(entry => projectCharacterPatch(entry)),
                 "mail_arrived": getMailArrivedSync(playerId),
-            }
+            }]),
         })
     })
 
@@ -155,9 +153,10 @@ const routes = async (fastify: FastifyInstance) => {
             "message": "Character not owned."
         })
 
-        // update character
-        updatePlayerCharacterSync(playerId, characterId, {
-            illustrationSettings: illustration_settings
+        setCharacterIllustrationSettings({
+            playerId,
+            characterId,
+            illustrationSettings: illustration_settings,
         })
 
         reply.header("content-type", "application/x-msgpack")
@@ -196,17 +195,19 @@ const routes = async (fastify: FastifyInstance) => {
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 data_headers: generateDataHeaders({ viewer_id: viewerId }),
-                data: {
+                data: mergeCommonResponseFragments([{
                     character_list: [...projectCharacterGrowthIncrement({
                         after: result.after,
                         changedNodeIds: [],
                     }, {
                         character,
                         fields: OVER_LIMIT_CHARACTER_GROWTH_FIELDS,
-                    }).character_list],
-                    item_list: result.itemId === undefined ? {} : { [result.itemId]: result.itemCount },
+                    }).character_list].map(entry => projectCharacterPatch(entry)),
+                    item_list: (result.itemId === undefined
+                        ? {}
+                        : { [result.itemId]: result.itemCount }) as Record<string, number>,
                     mail_arrived: getMailArrivedSync(playerId),
-                },
+                }]),
             })
         } catch (error) {
             return growthFailure(reply, error)
@@ -245,10 +246,10 @@ const routes = async (fastify: FastifyInstance) => {
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 data_headers: generateDataHeaders({ viewer_id: viewerId }),
-                data: {
-                    character_list: characterList,
+                data: mergeCommonResponseFragments([{
+                    character_list: characterList.map(entry => projectCharacterPatch(entry)),
                     mail_arrived: getMailArrivedSync(playerId),
-                },
+                }]),
             })
         } catch (error) {
             return growthFailure(reply, error)

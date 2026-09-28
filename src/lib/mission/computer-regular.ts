@@ -1,81 +1,11 @@
-import { getMissionBattleCountersSync } from "../../data/domains/mission_battle_facts"
-import { getDegreeBattleStatsSync } from "../../data/domains/degree_battle_stats"
-import { getPlayerQuestProgressSync } from "../../data/domains/quest"
-import { getPlayerSync } from "../../data/domains/player"
-import { getRankDegree } from "../stamina"
-import { getMissionPattern } from "./patterns"
-import { getMissionMasterDefinitions } from "./master-data"
 import {
     computeRegularQuestProgress,
     isRegularQuestMissionSupported,
 } from "./regular-quest-facts"
-import { getRegularStateFactsSync } from "./regular-state-facts"
-import { getSnapshot } from "./snapshot"
 import { buildPeriodicCategoryContextFromSession } from "./periodic-session-context"
 import { buildRegularCategoryContextFromSession } from "./regular-session-context"
 import type { MissionComputer, CategoryContext } from "./types"
-
-function buildStats(playerId: number, category: number): CategoryContext {
-    const player = getPlayerSync(playerId)!
-    const questProgressRaw = getPlayerQuestProgressSync(playerId)
-
-    let totalQuestClears = 0
-    let totalStories = 0
-    let ssClears = 0
-    let sClears = 0
-    let aClears = 0
-    let bClears = 0
-    let exRankSsCount = 0
-    const questProgress: CategoryContext["questProgress"] = {}
-
-    for (const [section, quests] of Object.entries(questProgressRaw)) {
-        const list: CategoryContext["questProgress"][string] = []
-        for (const qp of quests) {
-            list.push({
-                questId: qp.questId,
-                finished: qp.finished,
-                clearRank: qp.clearRank,
-                bestElapsedTimeMs: qp.bestElapsedTimeMs,
-                leaderCharacterId: qp.leaderCharacterId,
-                multiClearCount: qp.multiClearCount,
-            })
-            if (!qp.finished) continue
-            totalQuestClears++
-            if (section === "3") totalStories++
-            if (qp.clearRank === 5) ssClears++
-            else if (qp.clearRank === 4) sClears++
-            else if (qp.clearRank === 3) aClears++
-            else if (qp.clearRank === 2) bClears++
-            if (section === "4" && qp.clearRank === 5) exRankSsCount++
-        }
-        questProgress[section] = list
-    }
-
-    const snapshot = category === 2 || category === 6
-        ? getSnapshot(playerId, "daily")
-        : category === 7 || category === 10
-            ? getSnapshot(playerId, "weekly")
-            : null
-
-    return {
-        category,
-        playerId,
-        player,
-        questProgress,
-        totalQuestClears,
-        totalStories,
-        rankCounts: { rank_ss: ssClears, rank_s: sClears, rank_a: aClears, rank_b: bClears },
-        ...(category === 1 ? {
-            regularStats: {
-                exRankSsCount,
-                degreeBattleStats: getDegreeBattleStatsSync(playerId),
-                state: getRegularStateFactsSync(playerId),
-            },
-        } : {}),
-        battleCounters: getMissionBattleCountersSync(playerId),
-        snapshot,
-    }
-}
+import { getMissionCatalog } from "./mission-catalog"
 
 function periodValue(current: number, baseline: number | undefined): number {
     return Math.max(0, current - (baseline ?? 0))
@@ -96,10 +26,10 @@ const LIFETIME_PATTERNS = new Set([
     "total_ability_soul_use_count", "get_mvp",
 ])
 
-export function getRegularComputedMissionIds(): readonly number[] {
-    return Object.freeze(getMissionMasterDefinitions(1)
+export function getRegularComputedMissionIds(catalog = getMissionCatalog()): readonly number[] {
+    return Object.freeze(catalog.getDefinitions(1)
         .filter(definition => LIFETIME_PATTERNS.has(definition.pattern)
-            || isRegularQuestMissionSupported(definition.missionId))
+            || isRegularQuestMissionSupported(definition.missionId, catalog))
         .map(definition => definition.missionId)
         .sort((left, right) => left - right))
 }
@@ -114,7 +44,7 @@ function computeLifetime(pattern: string, ctx: CategoryContext, dbProgress: numb
     if (pattern === "use_dash") return Math.max(dbProgress, ctx.player.totalDashes ?? 0)
     if (pattern === "single_battle_play") return Math.max(dbProgress, counters.singleClearCount)
     if (pattern === "use_power_flip") return Math.max(dbProgress, ctx.player.totalPowerflips ?? 0)
-    if (pattern === "user_rank") return Math.max(dbProgress, getRankDegree(ctx.player.rankPoint))
+    if (pattern === "user_rank") return Math.max(dbProgress, ctx.playerRankDegree ?? dbProgress)
     if (pattern === "total_login" || pattern === "special_total_login_2anv") {
         return Math.max(dbProgress, ctx.player.totalLoginDays ?? 0)
     }
@@ -122,7 +52,7 @@ function computeLifetime(pattern: string, ctx: CategoryContext, dbProgress: numb
     if (pattern === "multi_play_host") return Math.max(dbProgress, counters.multiHostClearCount)
     if (pattern === "multi_play_guest") return Math.max(dbProgress, counters.multiGuestClearCount)
     if (pattern === "use_skill") return Math.max(dbProgress, counters.skillUseCount)
-    if (pattern === "character_level") return Math.max(dbProgress, getRankDegree(ctx.player.rankPoint))
+    if (pattern === "character_level") return Math.max(dbProgress, state.maxCharacterLevel)
     if (pattern === "clear_episode") return Math.max(dbProgress, ctx.totalStories)
     if (pattern === "weak_point_attack") return Math.max(dbProgress, battleStats.weakPointAttackCount)
     if (pattern === "max_skill_chain") return Math.max(dbProgress, battleStats.skillChainMax)
@@ -189,10 +119,6 @@ function computeWeekly(pattern: string, ctx: CategoryContext, dbProgress: number
 export const RegularComputer: MissionComputer = {
     name: "Regular",
 
-    buildContext(playerId: number, category: number): CategoryContext {
-        return buildStats(playerId, category)
-    },
-
     buildContextFromSession(session, category, missionIds): CategoryContext {
         if (category === 1) {
             return buildRegularCategoryContextFromSession(session, missionIds)
@@ -209,7 +135,7 @@ export const RegularComputer: MissionComputer = {
     },
 
     compute(missionId: number, ctx: CategoryContext, dbProgress: number): number {
-        const pattern = getMissionPattern(ctx.category, missionId)
+        const pattern = ctx.missionPatterns?.get(missionId) ?? ""
         if (ctx.category === 1) {
             const questProgress = computeRegularQuestProgress(missionId, ctx)
             if (questProgress !== undefined) return Math.max(dbProgress, questProgress)

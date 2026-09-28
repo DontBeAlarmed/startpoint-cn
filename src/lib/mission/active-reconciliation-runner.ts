@@ -1,4 +1,3 @@
-import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
 import type { ActiveMissionProgressDelta, ActiveMissionProgressState } from "./active-core"
 import { isActiveMissionAvailable, settleActiveMissionProgress } from "./active-core"
 import { evaluateActiveMissionFact } from "./active-fact-evaluator"
@@ -19,7 +18,6 @@ export interface ActiveMissionEventEligibilityContext {
 
 export interface ActiveMissionReconciliationRunnerInput {
     readonly playerId: number
-    readonly repository: ReadonlyContentRepository
     readonly now: number | Date
     readonly plan: ActiveMissionPlan
     readonly session: ActiveMissionFactSession
@@ -184,7 +182,6 @@ export function runActiveMissionReconciliation(
             try {
                 available = isEligibleEvent(input, definition)
                     && isActiveMissionAvailable(missionId, {
-                        repository: input.repository,
                         plan: input.plan,
                         now: input.now,
                         activeMissions,
@@ -209,7 +206,7 @@ export function runActiveMissionReconciliation(
                 missionId,
                 activeMissions[String(missionId)],
                 authoritativeProgress,
-                { repository: input.repository, plan: input.plan },
+                { plan: input.plan },
             )
             if (settlement.delta === null) continue
 

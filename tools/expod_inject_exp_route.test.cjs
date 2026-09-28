@@ -94,7 +94,9 @@ stubModule("../src/data/domains/item", {
     getPlayerItemsSync: () => ({}),
 })
 stubModule("../src/routes/api/character", { characterMaxOverLimits: () => 0 })
-stubModule("../src/lib/assets", { getCharacterDataSync: () => null })
+stubModule("../src/lib/character-content", {
+    getCharacterFacts: () => ({ exists: () => false, get: () => null }),
+})
 stubModule("../src/data/utils", { clientSerializeDate: value => value })
 stubModule("../src/lib/character-stack", { validateCharacterStackConversion: () => null })
 stubModule("../src/utils", {
@@ -147,6 +149,7 @@ stubModule("../src/lib/character-growth/commands/inject-exp", {
         return {
             addExpList: [{ character_id: characterId, add_exp: addExp }],
             expPool,
+            bondTokens: new Map([[1, 0]]),
             after: {
                 playerId,
                 characterId,
@@ -199,6 +202,10 @@ async function main() {
         assert.equal(state().expPool, 1000)
         assert.equal(state().characterExp, 1000)
         assert.equal(state().counters.totalInjectedExpCount, 1)
+        assert.deepEqual(
+            unpack(success.rawPayload).data.character_list[0].bond_token_list,
+            [{ mana_board_index: 1, status: 0 }],
+        )
 
         const beforeFailure = state()
         failExpWrite = true
@@ -238,8 +245,13 @@ async function main() {
             url: "/inject_exp",
             payload: { viewer_id: 123, character_id: 100001, exp: 1001 },
         })
-        assert.equal(over.statusCode, 400)
-        assert.equal(state().expPool, 1000, "超额消费必须拒绝且保持余额")
+        // CN 1.8.1 ExpodInjectExpRemoteInput 只有 Finished；任意 4xx 走通用错误通道
+        // （错误框 + 踢回标题）。经验不足以 200 + 未变更事实回复，且不写入任何存档。
+        assert.equal(over.statusCode, 200, over.body)
+        assert.equal(state().expPool, 1000, "超额消费必须保持余额")
+        const overData = unpack(over.rawPayload).data
+        assert.deepEqual(overData.add_exp_list, [])
+        assert.equal(overData.user_info.exp_pool, 1000)
     } finally {
         await fastify.close()
         db.close()

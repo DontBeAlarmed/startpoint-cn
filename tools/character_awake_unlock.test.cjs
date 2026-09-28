@@ -212,7 +212,8 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     const mailSource = readRouteSource("mail.ts")
     const itemSource = readRouteSource("item.ts")
     const shopSource = readRouteSource("shop.ts")
-    const shopPurchaseSource = readProjectSource("src/lib/event-shop-purchase.ts")
+    const shopPurchaseRouteSource = readProjectSource("src/routes/api/shop/purchase-routes.ts")
+    const shopPurchaseSource = readProjectSource("src/lib/shop/purchase-owner.ts")
     const shopRewardGrantSource = readProjectSource("src/lib/shop-reward-grant.ts")
     const routeSources = [
         singleBattleSource,
@@ -221,7 +222,7 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
         missionSource,
         mailSource,
         itemSource,
-        shopSource,
+        shopPurchaseRouteSource,
     ]
 
     assert.match(
@@ -245,15 +246,19 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     )
     assert.doesNotMatch(singleAwakeWrapperSource, /players_character_awake_unlocks/)
 
-    for (const source of routeSources.filter(source => source !== singleBattleSource)) {
+    for (const source of routeSources.filter(source => (
+        source !== singleBattleSource && source !== shopPurchaseRouteSource
+    ))) {
         assert.equal(source.includes("reconcileAwakeUnlockCharacterList"), true)
     }
+    assert.match(shopPurchaseRouteSource, /character-growth\/owner-publication/)
 
     const singleBattleCall = singleBattleSource.lastIndexOf("publishPreparedSingleGrowthPublication(")
     assert.equal(singleBattleCall > singleBattleSource.indexOf("recordMissionBattleFacts(finishCtx, settlementTime)"), true)
     assert.equal(singleBattleCall > singleBattleSource.indexOf("givePlayerCharactersExpSync("), true)
-    assert.equal(singleBattleCall > singleBattleSource.indexOf("handleRushEventFinish("), true)
-    assert.equal(singleBattleCall > singleBattleSource.indexOf("handleCarnivalEventFinish({"), true)
+    const singleEventSettlementCall = singleBattleSource.indexOf("settleSingleBuiltInEvent(")
+    assert.equal(singleEventSettlementCall >= 0, true)
+    assert.equal(singleBattleCall > singleEventSettlementCall, true)
     const singleBattlePublicationPreparation = singleBattleSource.lastIndexOf(
         "prepareSingleGrowthPublication({",
         singleBattleCall,
@@ -270,7 +275,10 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     ]) {
         assert.equal(singleBattleMergeBlock.includes(existingSegment), true)
     }
-    assert.equal(singleBattleProjectorSource.includes('"character_list": [...characterList]'), true)
+    assert.equal(
+        singleBattleProjectorSource.includes('"character_list": characterList.map('),
+        true,
+    )
 
     const storyCall = storySource.lastIndexOf("reconcileAwakeUnlockCharacterList(")
     assert.equal(countOccurrences(storySource, "reconcileAwakeUnlockCharacterList("), 1)
@@ -294,7 +302,9 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     )
 
     const missionUpdateBlock = missionSource.split('fastify.post("/update_mission_progress"')[1]
-    assert.equal(countOccurrences(missionSource, "reconcileAwakeUnlockCharacterList("), 1)
+    const missionGetBlock = missionSource.split('fastify.post("/get_mission_progress"')[1]
+        .split('fastify.post("/update_mission_progress"')[0]
+    assert.equal(countOccurrences(missionSource, "reconcileAwakeUnlockCharacterList("), 2)
     assert.equal(
         missionUpdateBlock.indexOf("reconcileAwakeUnlockCharacterList(")
             > missionUpdateBlock.indexOf("})()"),
@@ -304,6 +314,23 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     assert.equal(missionUpdateBlock.includes("givePlayerReward"), false)
     assert.equal(missionUpdateBlock.includes("incrementPlayerCategoryMissionStage"), false)
     assert.equal(missionUpdateBlock.includes("character_list: characterList"), true)
+    assert.equal(
+        missionGetBlock.includes("reconcileAwakeUnlockCharacterList("),
+        true,
+        "category 9 page must publish the unlock owner in the same request",
+    )
+    assert.equal(
+        missionGetBlock.indexOf("reconcileAwakeUnlockCharacterList(")
+            > missionGetBlock.indexOf("settleAwakeMissionCandidatesWithEvaluation("),
+        true,
+        "page publication runs after the page reward settlement",
+    )
+    assert.equal(
+        missionGetBlock.indexOf("reconcileAwakeUnlockCharacterList(")
+            < missionGetBlock.indexOf("})()"),
+        true,
+        "page publication stays inside the get_mission_progress transaction",
+    )
 
     const mailIndexBlock = mailSource.split('fastify.post("/index"')[1]
         .split('fastify.post("/receive"')[0]
@@ -339,43 +366,12 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
         true
     )
 
-    const shopBuyBlock = shopSource.split('fastify.post("/buy"')[1]
-        .split('fastify.post("/get_sales_list"')[0]
-    const enhancementBlock = shopBuyBlock.slice(
-        shopBuyBlock.indexOf("// Equipment enhancement shop"),
-        shopBuyBlock.indexOf("let purchaseResult")
-    )
-    const shopReadOnlyBlock = shopSource.split('fastify.post("/get_sales_list"')[1]
-        .split('fastify.post("/bulk_buy"')[0]
-    const shopBulkBuyBlock = shopSource.split('fastify.post("/bulk_buy"')[1]
-    const genericShopPurchaseBlock = shopPurchaseSource
-        .split("export function executeGenericShopPurchaseSync(")[1]
-        .split("export function executeGenericShopBatchPurchaseSync(")[0]
-    assert.equal(countOccurrences(shopSource, "reconcileAwakeUnlockCharacterList("), 2)
-    assert.equal(enhancementBlock.includes("reconcileAwakeUnlockCharacterList("), false)
+    assert.equal(countOccurrences(shopPurchaseRouteSource, "reconcileAwakeUnlockCharacterList("), 2)
+    assert.equal(countOccurrences(shopPurchaseRouteSource, "executeShopPurchaseSync("), 2)
     assert.equal(
-        shopBuyBlock.indexOf("reconcileAwakeUnlockCharacterList(")
-            > shopBuyBlock.indexOf("executeGenericShopPurchaseSync("),
+        shopPurchaseSource.indexOf("addPlayerShopPurchaseCountsByTypeFromSnapshotSync(")
+            > shopPurchaseSource.indexOf("grantShopRewardsTypedInTransactionOwnerWithInventorySync("),
         true
-    )
-    assert.equal(
-        genericShopPurchaseBlock.indexOf("dependencies.addPurchaseCounts(")
-            > genericShopPurchaseBlock.indexOf("dependencies.grantRewards("),
-        true
-    )
-    assert.equal(
-        genericShopPurchaseBlock.indexOf("dependencies.grantPassCardPoints(")
-            > genericShopPurchaseBlock.indexOf("dependencies.grantRewards("),
-        true
-    )
-    assert.equal(
-        genericShopPurchaseBlock.indexOf("dependencies.recordManaSpent(")
-            > genericShopPurchaseBlock.indexOf("dependencies.grantRewards("),
-        true
-    )
-    assert.deepEqual(
-        findPropertyAssignmentValues(shopBuyBlock, "grantRewards"),
-        ["grantShopRewardsInTransactionOwnerWithInventorySync"]
     )
     const createShopPlanCall = getOnlyCall(shopRewardGrantSource, "createShopRewardPlan")
     const typedShopGrantCall = getOnlyCall(
@@ -392,12 +388,7 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     )
     const finalizeShopGrantCall = getOnlyCall(shopRewardGrantSource, "finalize")
     assert.equal(validateShopGrantCall.position < finalizeShopGrantCall.position, true)
-    assert.equal(shopReadOnlyBlock.includes("reconcileAwakeUnlockCharacterList("), false)
-    assert.equal(
-        shopBulkBuyBlock.indexOf("reconcileAwakeUnlockCharacterList(")
-            > shopBulkBuyBlock.indexOf("executeGenericShopBatchPurchaseSync("),
-        true
-    )
+    assert.equal(shopSource.includes("publishCharacterGrowthOwnerStateBestEffort("), false)
 
     for (const source of routeSources.filter(source => source !== missionSource)) {
         assert.equal(source.includes("settleAwakeMissionRewards"), false)
@@ -409,6 +400,7 @@ testAuthoritativeMutationRoutesPublishAwakeUnlocks()
 function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     const multiRouteSource = readProjectSource("src/multi/http/battle.ts")
     const multiSettlementSource = readProjectSource("src/multi/settlement/orchestrator.ts")
+    const multiProgressSource = readProjectSource("src/multi/settlement/quest-progress-write.ts")
     const multiResponseSource = readProjectSource("src/multi/settlement/response.ts")
     const activeMissionSource = readRouteSource("activeMission.ts")
     const boxGachaSource = readRouteSource("boxGacha.ts")
@@ -443,6 +435,9 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     for (const persistenceCall of [
         "insertPlayerQuestProgressSync",
         "updatePlayerQuestProgressSync",
+    ]) assert.equal(getLastCallPosition(multiProgressSource, persistenceCall) >= 0, true)
+    for (const persistenceCall of [
+        "writeMultiQuestProgressWithinTransactionSync",
         "updatePlayerSync",
         "grantScoreRewards",
         "recordMissionBattleFacts",
@@ -454,7 +449,10 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
         multiSettlementSource.indexOf("runMultiActiveQuestSettlementTransaction(") > multiCall.position,
         true,
     )
-    assert.deepEqual(findPropertyAssignmentValues(multiResponseSource, "character_list"), ["characterList"])
+    assert.deepEqual(
+        findPropertyAssignmentValues(multiResponseSource, "character_list"),
+        ["characterList.map(\n            character => projectCharacterPatch(character),\n        )"],
+    )
     assert.match(multiFinishBlock, /runMultiplayerSettlementOrchestration\(/)
     assert.equal(findCalls(multiStartBlock, "reconcileAwakeUnlockCharacterList").length, 0)
     assert.equal(findCalls(multiAbortBlock, "reconcileAwakeUnlockCharacterList").length, 0)
@@ -480,7 +478,10 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     assert.deepEqual(activeMissionCall.enclosingTransactionCallbacks, ["getDb().transaction"])
     const activeMissionTransactionCall = getOnlyCall(activeReceiveBlock, "transaction")
     assert.equal(activeMissionTransactionCall.assignedVariable, "settlement")
-    assert.deepEqual(findPropertyAssignmentValues(activeReceiveBlock, "character_list"), ["settlement.characterList"])
+    assert.deepEqual(
+        findPropertyAssignmentValues(activeReceiveBlock, "character_list"),
+        ["settlement.characterList.map(\n                character => projectCharacterPatch(character),\n            )"],
+    )
 
     const boxCloseBlock = getRouteBlock(boxGachaSource, "/close", "/exec")
     const boxExecBlock = getRouteBlock(boxGachaSource, "/exec", "/get_box_list")
@@ -506,7 +507,10 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     }
     assert.deepEqual(boxGachaCall.conditionalConditions, [])
     assert.deepEqual(boxGachaCall.enclosingLoops, [])
-    assert.deepEqual(findPropertyAssignmentValues(boxExecBlock, "character_list"), ["characterList"])
+    assert.deepEqual(
+        findPropertyAssignmentValues(boxExecBlock, "character_list"),
+        ["characterList.map(\n                        character => projectCharacterPatch(character),\n                    )"],
+    )
     assert.equal(findCalls(boxCloseBlock, "reconcileAwakeUnlockCharacterList").length, 0)
     assert.equal(findCalls(boxReadOnlyBlock, "reconcileAwakeUnlockCharacterList").length, 0)
 
@@ -523,60 +527,51 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
     const characterSource = readRouteSource("character.ts")
     const tutorialSource = readRouteSource("tutorial.ts")
 
-    const gachaEquipmentBlock = getRouteBlock(gachaSource, "/exchange_equipment", "/exchange_character")
-    const gachaCharacterBlock = getRouteBlock(gachaSource, "/exchange_character", "/exec")
-    const gachaExecBlock = getRouteBlock(gachaSource, "/exec")
-    assert.equal(findCalls(gachaSource, "reconcileAwakeUnlockCharacterList").length, 2)
-    assert.equal(findCalls(gachaEquipmentBlock, "reconcileAwakeUnlockCharacterList").length, 0)
+    // D20 后 exec/exchange/crazy select 的 Growth 发布统一经 runGachaPostCommitEffects 的
+    // publishGrowth 回调；每个路由文件恰好一处字面发布调用，且位于 owner 同步调用
+    // （事务已提交）之后。发布写入方隔离由 character_growth_writer_boundary.test.cjs 守卫。
+    const gachaExchangeRoutesSource = readRouteSource("gacha/exchange-routes.ts")
+    const gachaCrazyRoutesSource = readRouteSource("gacha/crazy-routes.ts")
+    assert.equal(findCalls(gachaSource, "reconcileAwakeUnlockCharacterList").length, 1)
+    assert.equal(
+        gachaSource.indexOf("reconcileAwakeUnlockCharacterList(")
+            > gachaSource.indexOf("runGachaPostCommitEffects("),
+        true,
+    )
+    assert.equal(findCalls(gachaExchangeRoutesSource, "reconcileAwakeUnlockCharacterList").length, 1)
+    assert.equal(
+        gachaExchangeRoutesSource.indexOf("reconcileAwakeUnlockCharacterList(")
+            > gachaExchangeRoutesSource.indexOf("executeGachaExchangeSync("),
+        true,
+    )
+    assert.equal(findCalls(gachaCrazyRoutesSource, "reconcileAwakeUnlockCharacterList").length, 1)
+    assert.equal(
+        gachaCrazyRoutesSource.indexOf("reconcileAwakeUnlockCharacterList(")
+            > gachaCrazyRoutesSource.indexOf("selectCrazyGachaCandidateSync("),
+        true,
+    )
 
-    const gachaExchangeCall = getOnlyCall(gachaCharacterBlock, "reconcileAwakeUnlockCharacterList")
-    assert.deepEqual(gachaExchangeCall.arguments, ["playerId", "[characterId]", "[existingCharacterList]", "{}", '"gacha/character-grant"'])
-    assert.deepEqual(gachaExchangeCall.conditionalConditions, [])
-    assert.equal(gachaExchangeCall.position > getLastCallPosition(gachaCharacterBlock, "givePlayerCharacterSync"), true)
-    assert.equal(gachaExchangeCall.position > getLastCallPosition(gachaCharacterBlock, "updatePlayerGachaInfoSync"), true)
-    const gachaExchangeExistingList = findVariableInitializers(gachaCharacterBlock, "existingCharacterList")
-    assert.equal(gachaExchangeExistingList.length, 1)
-    assert.equal(gachaExchangeExistingList[0].startsWith("giveResult.character"), true)
-    assert.equal(gachaExchangeExistingList[0].includes("? [giveResult.character"), true)
-    assert.equal(gachaExchangeExistingList[0].endsWith(": []"), true)
-    assert.deepEqual(findPropertyAssignmentValues(gachaCharacterBlock, "character_list"), ["characterList"])
-
-    const gachaExecCall = getOnlyCall(gachaExecBlock, "reconcileAwakeUnlockCharacterList")
-    assert.deepEqual(gachaExecCall.arguments, ["playerId", "[]", "[existingCharacterList]", "{}", '"gacha/exec"'])
-    assert.deepEqual(gachaExecCall.conditionalConditions, [])
-    for (const persistenceCall of [
-        "rewardPlayerGachaDrawResultSync",
-        "insertReceiveHistorySync",
-        "insertPlayerGachaInfoSync",
-        "updatePlayerGachaInfoSync",
-        "updatePlayerSync",
-    ]) {
-        assert.equal(gachaExecCall.position > getLastCallPosition(gachaExecBlock, persistenceCall), true)
-    }
-    const gachaExecExistingList = findVariableInitializers(gachaExecBlock, "existingCharacterList")
-    assert.equal(gachaExecExistingList.length, 1)
-    assert.equal(gachaExecExistingList[0].startsWith("rewardResult.characters.filter("), true)
-    assert.equal(gachaExecExistingList[0].includes("character !== undefined"), true)
-    assert.equal(gachaExecExistingList[0].includes("character !== null"), true)
-    assert.equal(gachaExecExistingList[0].includes('typeof character === "object"'), true)
-    assert.equal(gachaExecExistingList[0].includes("!Array.isArray(character)"), true)
-    assert.deepEqual(findPropertyAssignmentValues(gachaExecBlock, "character_list"), ["characterList"])
-
+    // D21 后 Star Crumb 事务整体收敛进 executeStarCrumbExchangeSync owner；
+    // 路由只剩 session 解析、owner 调用、post-commit 发布与 projector
     const starCrumbBlock = getRouteBlock(exchangeSource, "/star_crumb")
     const starCrumbCall = getOnlyCall(starCrumbBlock, "reconcileAwakeUnlockCharacterList")
     assert.equal(findCalls(exchangeSource, "reconcileAwakeUnlockCharacterList").length, 1)
     assert.deepEqual(starCrumbCall.arguments, [
         "playerId",
-        "kind === 0 ? [targetId] : []",
-        "[settlement.characterList]",
+        'result.product.kind === "character" ? [result.product.targetId] : []',
+        "[result.characters]",
         "{}",
         '"exchange/star_crumb"',
     ])
     assert.deepEqual(starCrumbCall.conditionalConditions, [])
-    assert.equal(starCrumbCall.position > getLastCallPosition(starCrumbBlock, "givePlayerCharacterSync"), true)
-    assert.equal(starCrumbCall.position > getLastCallPosition(starCrumbBlock, "updatePlayerSync"), true)
-    assert.equal(starCrumbBlock.includes("if (result.character) characterList.push(result.character"), true)
-    assert.deepEqual(findPropertyAssignmentValues(starCrumbBlock, "character_list"), ["characterList"])
+    assert.equal(
+        starCrumbCall.position > getLastCallPosition(starCrumbBlock, "executeStarCrumbExchangeSync"),
+        true,
+    )
+    assert.equal(starCrumbBlock.includes("getDb().transaction"), false)
+    assert.equal(starCrumbBlock.includes("givePlayerCharacterSync"), false)
+    assert.equal(starCrumbBlock.includes("givePlayerEquipmentSync"), false)
+    assert.equal(starCrumbBlock.includes("updatePlayerSync"), false)
 
     const townReadOnlyBlock = getRouteBlock(characterSource, "/set_illustration_settings", "/over_limit")
     const townOverLimitBlock = getRouteBlock(characterSource, "/over_limit", "/bulk_over_limit")
@@ -646,7 +641,9 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
     assert.equal(tutorialStep15ExistingList[0].includes("character !== null"), true)
     assert.equal(tutorialStep15ExistingList[0].includes('typeof character === "object"'), true)
     assert.equal(tutorialStep15ExistingList[0].includes("!Array.isArray(character)"), true)
-    assert.deepEqual(findPropertyAssignmentValues(tutorialStep15Block, "character_list"), ["characterList"])
+    assert.deepEqual(findPropertyAssignmentValues(tutorialStep15Block, "character_list"), [
+        "characterList.map(entry => projectCharacterPatch(entry))",
+    ])
 
     const tutorialStep16Call = getOnlyCall(tutorialStep16Block, "reconcileAwakeUnlockCharacterList")
     assert.deepEqual(tutorialStep16Call.arguments, [
@@ -671,7 +668,9 @@ function testCharacterGrantRoutesPublishAwakeUnlocks() {
     assert.equal(tutorialStep16ItemList[0].startsWith("giveResult?.item"), true)
     assert.equal(tutorialStep16ItemList[0].includes("[giveResult.item.id]"), true)
     assert.equal(tutorialStep16ItemList[0].includes("giveResult.item.count"), true)
-    assert.deepEqual(findPropertyAssignmentValues(tutorialStep16Block, "character_list"), ["characterList"])
+    assert.deepEqual(findPropertyAssignmentValues(tutorialStep16Block, "character_list"), [
+        "characterList.map(entry => projectCharacterPatch(entry))",
+    ])
     assert.deepEqual(findPropertyAssignmentValues(tutorialStep16Block, "item_list"), ["itemList"])
 
     for (const source of [gachaSource, exchangeSource, characterSource, tutorialSource]) {
@@ -787,7 +786,10 @@ const {
     updatePlayerCharacterSync,
 } = require("../src/data/domains/character")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
-const { getCharacterDataSync, getCharacterManaNodesSync } = require("../src/lib/assets")
+const { getCharacterFacts } = require("../src/lib/character-content")
+const { getCharacterGrowthContent } = require("../src/lib/character-growth-content")
+const getCharacterDataSync = characterId => getCharacterFacts().get(characterId)
+const getCharacterManaNodesSync = (characterId, level) => getCharacterGrowthContent().getManaBoardNodes(characterId, level)
 const { characterExpCaps, givePlayerCharacterSync } = require("../src/lib/character")
 const {
     createAwakeRequestContext,

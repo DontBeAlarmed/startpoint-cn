@@ -407,9 +407,14 @@ function createResourceFixture({
     )
     assert.match(roomManagerSource, /setRoomDisbandListener\(/)
     assert.match(roomManagerSource, /notifyRoomDisbanded\(/)
+    const disbandListenerSource = fs.readFileSync(
+        path.join(projectRoot, "src/multi/room/disband-listener.ts"),
+        "utf8",
+    )
+    assert.match(disbandListenerSource, /setRoomDisbandListener\(/)
+    assert.match(disbandListenerSource, /releaseAbandonedMultiActiveQuest\(/)
     const tcpSource = fs.readFileSync(path.join(projectRoot, "src/multi/tcp/server.ts"), "utf8")
-    assert.match(tcpSource, /setRoomDisbandListener\(/)
-    assert.match(tcpSource, /releaseAbandonedMultiActiveQuest\(/)
+    assert.match(tcpSource, /installDisbandLifecycleListener\(/)
 }
 
 {

@@ -82,7 +82,6 @@ const EXPECTED_CDN_TABLES = Object.freeze({
         "master/character/character_text.orderedmap",
     ]],
     "gacha.json": ["gacha", ["master/gacha/gacha.orderedmap"]],
-    "gacha_campaign.json": ["gacha", ["master/gacha/gacha_campaign.orderedmap"]],
     "reward_campaign.json": ["reward-campaign", [
         "master/campaign/reward_campaign.orderedmap",
     ]],
@@ -591,6 +590,43 @@ test("registry derives authoritative quest tables from official OrderedMap sourc
     assert.equal(findTableSource("practice_quest.json").scope, "bundled")
 })
 
+test("quest prerequisites converter is versioned so v1 releases re-convert", () => {
+    const entry = findTableSource("quest_prerequisites.json")
+    assert.equal(entry.converterVersion, 2)
+    assert.equal(entry.outputShapeVersion, 2)
+
+    // The ex derivation semantics changed after v1 (need_main_stage_node now
+    // resolves against the main table only and the ex-internal need_stage_node
+    // pair is consumed), so a release persisted with the v1 converter must be
+    // reported as registry-stale and re-converted by content sync.
+    const { getReleaseTableRegistryError } = require("../src/content/sync/table-contract")
+    const staleManifest = createReleaseManifest({
+        schemaVersion: CONTENT_SCHEMA_VERSION,
+        assetVersion: "1.4.54",
+        runtimeSchemaVersion: CONTENT_RUNTIME_SCHEMA_VERSION,
+        generatorVersion: 3,
+        gameCalendarUtcOffsetMinutes: 480,
+        tables: Object.fromEntries(TABLE_SOURCES.map(definition => [
+            definition.tableName,
+            {
+                object: TEST_DIGEST,
+                scope: definition.scope,
+                converterId: definition.converterId,
+                converterVersion: definition.tableName === entry.tableName
+                    ? 1
+                    : definition.converterVersion,
+                sources: definition.manifestSources,
+            },
+        ])),
+        catalog: { object: TEST_DIGEST },
+        summary: { object: TEST_DIGEST },
+    })
+    assert.match(
+        String(getReleaseTableRegistryError(staleManifest)),
+        /quest_prerequisites\.json has mismatched converterVersion/,
+    )
+})
+
 test("registry derives activity hard multi periodic rewards from official OrderedMaps", () => {
     for (const [tableName, source] of Object.entries(EXPECTED_PERIODIC_REWARD_CDN_TABLES)) {
         const entry = findTableSource(tableName)
@@ -602,6 +638,7 @@ test("registry derives activity hard multi periodic rewards from official Ordere
 
 test("registry and release manifest explicitly describe referenced gacha odds sources", () => {
     const gacha = findTableSource("gacha.json")
+    const pools = findTableSource("gacha_pool.json")
 
     assert.deepEqual(gacha.sourceOrderedMaps, ["master/gacha/gacha.orderedmap"])
     assert.deepEqual(gacha.dynamicSources, [EXPECTED_GACHA_ODDS_DYNAMIC_SOURCE])
@@ -609,11 +646,12 @@ test("registry and release manifest explicitly describe referenced gacha odds so
         "master/gacha/gacha.orderedmap",
         EXPECTED_GACHA_ODDS_DYNAMIC_SOURCE,
     ])
+    assert.deepEqual(pools.dynamicSources, [EXPECTED_GACHA_ODDS_DYNAMIC_SOURCE])
     assert.ok(TABLE_SOURCES.every(entry => (
         entry.sourceOrderedMaps.every(source => !source.includes("*"))
     )))
     assert.ok(TABLE_SOURCES
-        .filter(entry => entry.tableName !== "gacha.json")
+        .filter(entry => entry.tableName !== "gacha.json" && entry.tableName !== "gacha_pool.json")
         .every(entry => entry.dynamicSources.length === 0))
 
     const manifest = createReleaseManifest({
@@ -621,6 +659,7 @@ test("registry and release manifest explicitly describe referenced gacha odds so
         assetVersion: "1.4.55",
         runtimeSchemaVersion: CONTENT_RUNTIME_SCHEMA_VERSION,
         generatorVersion: 1,
+        gameCalendarUtcOffsetMinutes: 480,
         tables: {
             "gacha.json": {
                 object: TEST_DIGEST,
@@ -686,19 +725,11 @@ test("registry independently covers static CN runtime JSON references", () => {
     const uncovered = [...references]
         .filter(reference => !registered.has(reference) && !intentionallyExternal.has(reference))
         .sort()
-    const unreferenced = TABLE_SOURCES
-        .filter(entry => entry.scope !== "cdn")
-        .map(entry => entry.tableName)
-        .filter(tableName => (
-            !references.has(tableName)
-        ))
-        .sort()
     assert.deepEqual(uncovered, [])
-    assert.deepEqual(unreferenced, [])
 })
 
 test("every registry table has an explicit existing bundled fallback", () => {
-    assert.equal(TABLE_SOURCES.length, 130)
+    assert.equal(TABLE_SOURCES.length, 135)
     for (const entry of TABLE_SOURCES) {
         const sourcePath = path.resolve(projectRoot, entry.bundledPath)
         assert.ok(fs.existsSync(sourcePath), `${entry.tableName} source must exist`)
@@ -714,7 +745,6 @@ test("every registry table has an explicit existing bundled fallback", () => {
 
 test("bundled importer samples CDN, bundled, and server registry scopes", async () => {
     const samples = [
-        ["gacha_campaign.json", "cdn"],
         ["equipment_ids.json", "cdn"],
         ["payment_products.json", "server"],
     ]

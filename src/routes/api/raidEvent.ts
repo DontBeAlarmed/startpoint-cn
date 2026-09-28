@@ -5,12 +5,38 @@ import { getPlayerCharactersSync } from "../../data/domains/character"
 import { ensurePlayerPartyGroupListSync, getPlayerPartyGroupListSync } from "../../data/domains/party"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
-import { generateDataHeaders, getServerDate } from "../../utils";
+import { generateDataHeaders, getServerDate, getServerTime } from "../../utils";
+import {
+    isQuestOutOfPeriodAt,
+    QUEST_OUT_OF_PERIOD_RESULT_CODE,
+} from "../../lib/quest/open-period";
 import { PartyCategory } from "../../data/types";
 import { clientSerializeDate } from "../../data/utils";
 import { getSerializedPlayerRushEventPlayedPartiesSync, getPlayerRushEventEndlessBattleRankingSync } from "../../lib/rush";
-import { insertActiveQuest } from "../../lib/quest/active-quest-service";
-import { getQuestFromCategorySync } from "../../lib/assets";
+import {
+    persistActiveQuest,
+    publishActiveQuest,
+    type ActiveQuest,
+} from "../../lib/quest/active-quest-service";
+import { getPlayerActiveQuestSync } from "../../data/domains/quest_active";
+import { getRealNow } from "../../runtime/time/game-time";
+import { getQuestEntryCostByKey } from "../../lib/quest-entry-content";
+import { getStaminaCost } from "../../lib/stamina-cost";
+import { computeRealTimeStamina } from "../../lib/stamina";
+import { withEntryItemInventoryWithinTransactionSync } from "../../lib/quest/entry-item-inventory";
+import { updatePlayerSync } from "../../data/domains/player";
+import {
+    ActiveQuestAlreadyExistsError,
+    InsufficientEntryItemError,
+    InsufficientStaminaError,
+    PlayerNotFoundError,
+    runStartEntryTransaction,
+} from "../../lib/quest/start-entry";
+import {
+    AUTO_START_STOP_RESULT_CODE,
+    shouldStopAutoStartForStamina,
+} from "../../lib/quest/auto-start-stop";
+import { getQuestFromCategorySync } from "../../lib/quest-content";
 import { BattleQuest, QuestCategory } from "../../lib/types";
 import { ensureSpecialEventPartyGroupsSync, resolvePartyGroupColorId } from "../../lib/special-event-parties";
 import {
@@ -21,8 +47,14 @@ import {
 } from "../../data/domains/raidEvent";
 import { getDb } from "../../data/db";
 import { grantRaidEventRewardsWithinTransactionSync } from "../../lib/raid-event-reward-grant"
-import { projectItemOverflowCommonResponse } from "../../lib/item-overflow"
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow/common-response"
 import {
+    projectCharacterPatch,
+    projectEquipmentEntity,
+} from "../../lib/common-response/entities";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
+import {
+    getRaidEventRewardCatalog,
     getRaidEventOverallRewardDefinitions,
     toRaidEventRewardResponse,
 } from "../../lib/quest/finish/raid-overall-rewards";
@@ -84,6 +116,9 @@ const routes = async (fastify: FastifyInstance) => {
         if (requiredKillCount === undefined) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid raid event id."
         })
+        // Validate the complete reward/event catalog before creating default
+        // rush state or entering any settlement write transaction.
+        getRaidEventRewardCatalog()
         const rewardDefinitions = getRaidEventOverallRewardDefinitions(eventId)
         const evaluationTime = getServerDate()
 
@@ -95,7 +130,6 @@ const routes = async (fastify: FastifyInstance) => {
         }
         const clearedFolderIdList = getPlayerRushEventClearedFoldersSync(playerId, eventId)
         const serializedPlayedParties = getSerializedPlayerRushEventPlayedPartiesSync(playerId, eventId)
-        console.log(`[RAID] summary: folderParties=${Object.keys(serializedPlayedParties.folderParties ?? {}).length} endlessParties=${Object.keys(serializedPlayedParties.endlessParties ?? {}).length}`)
 
         const summary = getDb().transaction(() => {
             let missionSettlement: MissionSettlementResult | null = null
@@ -163,6 +197,27 @@ const routes = async (fastify: FastifyInstance) => {
         ]))
 
         reply.header("content-type", "application/x-msgpack");
+        const overMax = projectItemOverflowCommonResponse(
+            rewardResult?.itemOverflowDispositions ?? [],
+        )
+        const commonFragment = {
+            ...(rewardResult == null ? {} : {
+                user_info: {
+                    free_mana: summary.player.freeMana,
+                    free_vmoney: summary.player.freeVmoney,
+                    exp_pool: summary.player.expPool,
+                },
+                character_list: (characterList ?? []).map(
+                    character => projectCharacterPatch(character),
+                ),
+                equipment_list: rewardResult.equipment_list.map(
+                    equipment => projectEquipmentEntity(equipment),
+                ),
+                item_list: rewardResult.items,
+            }),
+            mail_arrived: getMailArrivedSync(playerId),
+            ...(overMax.length > 0 ? { over_max: overMax } : {}),
+        }
         const responseData: Record<string, unknown> = {
                 "aggregated_time": clientSerializeDate(getServerDate()),
                 "auto_start_point": 0,
@@ -176,17 +231,9 @@ const routes = async (fastify: FastifyInstance) => {
                     "total_kill_count": summary.raidBossState.totalKillCount,
                 },
                 ...(rewardResult ? {
-                    "user_info": {
-                        "free_mana": summary.player.freeMana,
-                        "free_vmoney": summary.player.freeVmoney,
-                        "exp_pool": summary.player.expPool,
-                    },
-                    "character_list": characterList,
                     "joined_character_id_list": rewardResult.joined_character_id_list,
-                    "equipment_list": rewardResult.equipment_list,
-                    "item_list": rewardResult.items,
                 } : {}),
-                "mail_arrived": getMailArrivedSync(playerId),
+                ...mergeCommonResponseFragments([commonFragment]),
                 "endless_battle_next_round": rushEventData.endlessBattleNextRound,
                 "active_rush_battle_folder_id": rushEventData.activeRushBattleFolderId,
                 "endless_battle_played_max_round": rushEventData.endlessBattleNextRound,
@@ -195,10 +242,6 @@ const routes = async (fastify: FastifyInstance) => {
                 "rush_battle_played_party_list": serializedPlayedParties.folderParties,
                 "endless_battle_my_ranking": getPlayerRushEventEndlessBattleRankingSync(playerId, eventId, { rushEventData }),
         }
-        const overMax = projectItemOverflowCommonResponse(
-            rewardResult?.itemOverflowDispositions ?? [],
-        )
-        if (overMax.length > 0) responseData.over_max = overMax
         if (summary.missionSettlement) {
             mergeMissionSettlementResponse(responseData, summary.missionSettlement, viewerId)
         }
@@ -314,12 +357,6 @@ const routes = async (fastify: FastifyInstance) => {
             "party_list": partyList
         }]
 
-        const partyDump = userPartyGroupList.map(g => ({
-            gid: g.party_group_id,
-            parties: g.party_list.map(p => ({ pid: p.party_id, chars: p.character_ids, unisons: p.unison_character_ids }))
-        }))
-        console.log(`[RAID] party: response=${JSON.stringify(partyDump)}`)
-
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
@@ -338,7 +375,6 @@ const routes = async (fastify: FastifyInstance) => {
             viewer_id: number, api_count: number
         };
         const viewerId = body.viewer_id;
-        console.log(`[RAID] battle/start body: questId=${body.quest_id} eventId=${body.event_id} partyGroup=${body.party_group_id}`)
         if (!viewerId || isNaN(viewerId)) return reply.status(400).send({
             "error": "Bad Request", "message": "Invalid request body."
         });
@@ -358,10 +394,25 @@ const routes = async (fastify: FastifyInstance) => {
             "error": "Bad Request", "message": "Quest doesn't exist."
         })
 
-        // Register active quest for /single_battle_quest/finish. The request has
-        // no event_id, so derive it from the CN raid quest master data.
+        if (isQuestOutOfPeriodAt(questData, getServerTime() * 1000)) {
+            console.log(`[RAID] battle/start out of period: questId=${body.quest_id}`)
+            reply.header("content-type", "application/x-msgpack");
+            return reply.status(200).send({
+                "data_headers": generateDataHeaders({
+                    viewer_id: viewerId,
+                    result_code: QUEST_OUT_OF_PERIOD_RESULT_CODE,
+                }),
+                "data": {}
+            });
+        }
+
+        // Register the active quest for /single_battle_quest/finish through the
+        // shared start-entry transaction so the official battle_stamina_cost
+        // (CDN raid_event_quest col68) is deducted atomically with the quest
+        // registration. The request has no event_id, so derive it from the CN
+        // raid quest master data.
         const raidEventId = questData.eventId
-        insertActiveQuest(playerId, {
+        const activeQuest: ActiveQuest = {
             questId: body.quest_id,
             category: QuestCategory.RAID_EVENT,
             useBossBoostPoint: false,
@@ -373,7 +424,52 @@ const routes = async (fastify: FastifyInstance) => {
             eventId: raidEventId,
             playId: body.play_id,
             continueCount: 0
-        })
+        }
+        const questKey = `${QuestCategory.RAID_EVENT}_${body.quest_id}`
+        const staminaInfo = getStaminaCost(questKey)
+        try {
+            runStartEntryTransaction({
+                playerId,
+                entryCost: getQuestEntryCostByKey(questKey) ?? undefined,
+                staminaCost: staminaInfo.cost,
+                partyId: body.party_group_id ?? 1,
+                updatePartySlot: false,
+                activeQuest,
+                now: getRealNow(),
+            }, {
+                transaction: operation => getDb().transaction(operation)(),
+                getActiveQuest: getPlayerActiveQuestSync,
+                getPlayer: getPlayerSync,
+                computeStamina: computeRealTimeStamina,
+                withEntryItemInventory: withEntryItemInventoryWithinTransactionSync,
+                updatePlayer: updatePlayerSync,
+                persistActiveQuest,
+                publishActiveQuest,
+            })
+        } catch (error) {
+            if (error instanceof ActiveQuestAlreadyExistsError
+                || error instanceof InsufficientEntryItemError
+                || error instanceof InsufficientStaminaError
+                || error instanceof PlayerNotFoundError) {
+                console.warn(`[RAID-START] start rejected: ${error.message}`)
+                if (error instanceof InsufficientStaminaError
+                    && shouldStopAutoStartForStamina(body.is_auto_start_mode, true)) {
+                    reply.header("content-type", "application/x-msgpack");
+                    return reply.status(200).send({
+                        "data_headers": generateDataHeaders({
+                            viewer_id: viewerId,
+                            result_code: AUTO_START_STOP_RESULT_CODE,
+                        }),
+                        "data": {},
+                    })
+                }
+                return reply.status(400).send({
+                    "error": "Bad Request",
+                    "message": error.message,
+                })
+            }
+            throw error
+        }
 
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send({

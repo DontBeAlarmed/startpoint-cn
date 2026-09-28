@@ -2,7 +2,6 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { resolvePlayerIdSync } from "../../data/activeAccount"
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
-import { getContentSnapshot } from "../../content/runtime/content-snapshot"
 import {
     startContentsGuideMission,
     StartContentsGuideMissionInput,
@@ -46,11 +45,9 @@ const routes = async (
             "error": "Bad Request", "message": "Invalid player."
         })
 
-        const snapshot = getContentSnapshot()
         const result = (options.startMission ?? startContentsGuideMission)({
             playerId,
             eventId,
-            repository: snapshot.repository,
             now: getServerTime() * 1000,
         })
         if (!result.ok) return reply.status(400).send({
@@ -61,7 +58,7 @@ const routes = async (
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
-                "active_mission_list": result.delta === null ? [] : [result.delta]
+                "active_mission_list": result.deltas
             }
         });
     });

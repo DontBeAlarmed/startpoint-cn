@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { MailType, RawPlayerMail, deleteExpiredPlayerMailsSync, deletePlayerMailsByIdsSync, getPlayerMailCountSync, getPlayerMailSync, getPlayerMailsByIdsSync, getPlayerMailsSync, isPlayerMailExpiredAt, receiveMailSync } from "../../data/domains/mail"
+import { MailType, RawPlayerMail, deleteExpiredPlayerMailsSync, deletePlayerMailsByIdsSync, getPlayerMailCountSync, getPlayerMailSync, getPlayerMailsByIdsSync, getPlayerMailsSync, isPlayerMailExpiredAt, markPlayerMailsReceivedSync, receiveMailSync } from "../../data/domains/mail"
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount";
@@ -13,9 +13,13 @@ import {
     UnsupportedMailAttachmentError,
 } from "../../lib/mail-reward-grant";
 import {
-    projectItemOverflowCommonResponse,
-    type PlannedItemOverflowDisposition,
-} from "../../lib/item-overflow";
+    projectCharacterPatch,
+    projectEquipmentEntity,
+} from "../../lib/common-response/entities";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
+import type { CommonResponseFragment } from "../../lib/common-response/model";
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow/common-response";
+import type { PlannedItemOverflowDisposition } from "../../lib/item-overflow/disposition";
 
 interface IndexBody {
     api_count: number
@@ -35,7 +39,11 @@ interface ReceiveAllBody {
     mail_ids: number[]
 }
 
-class MailNotAvailableError extends Error {}
+class MailNotAvailableError extends Error {
+    constructor(public readonly resultCode: 2001 | 2002 | 2004) {
+        super("Mail not available")
+    }
+}
 const MAX_RECEIVE_ALL_MAIL_IDS = 500
 
 function getMailAwakeInvalidatedFactKeys(
@@ -69,21 +77,19 @@ function finalizeMailReceiveAwakePublicationWrites(
 function finalizeMailReceiveAllAwakePublicationWrites(
     playerId: number,
     validMailIds: readonly number[],
-    mailMap: ReadonlyMap<number, RawPlayerMail>,
 ): number[] {
-    const claimed: number[] = []
-    for (const mailId of validMailIds) {
-        if (receiveMailSync(playerId, mailId, mailMap.get(mailId)) !== null) {
-            claimed.push(mailId)
-            if (deletePlayerMailsByIdsSync(playerId, [mailId]) !== 1) {
-                throw new Error(`Mail ${mailId} could not be removed after receipt.`)
-            }
-        }
-    }
-    if (claimed.length !== validMailIds.length) {
+    if (validMailIds.length === 0) return []
+    // Only settled (claimed) ids reach here. Per-mail mark-then-delete collapses
+    // to mark-all-then-delete-all inside the same transaction; each mail is still
+    // marked received before it is removed.
+    const marked = markPlayerMailsReceivedSync(playerId, validMailIds)
+    if (marked !== validMailIds.length) {
         throw new Error("Mail state changed while mails were being received.")
     }
-    return claimed
+    if (deletePlayerMailsByIdsSync(playerId, validMailIds) !== validMailIds.length) {
+        throw new Error("Mail state changed while mails were being received.")
+    }
+    return [...validMailIds]
 }
 
 function formatMailResponse(mail: RawPlayerMail) {
@@ -164,11 +170,17 @@ const routes = async (fastify: FastifyInstance) => {
         }
         try {
             const evaluationTime = getVirtualNow()
-            const mail = getPlayerMailSync(playerId, mailId, true)
-            if (!mail) throw new MailNotAvailableError()
+            // The client handles 2001/2002/2004 in MailReceiveRealRemote's
+            // graceful channel (ReceiveErrorNoPresent/AlreadyReceive/
+            // PeriodOutdated), so these stay HTTP 200 with a result code.
+            const mail = getPlayerMailSync(playerId, mailId)
+            if (!mail) throw new MailNotAvailableError(2001)
+            if (mail.receive_time !== "0000-00-00 00:00:00") {
+                throw new MailNotAvailableError(2002)
+            }
             if (isPlayerMailExpiredAt(mail, getVirtualNow())) {
                 deletePlayerMailsByIdsSync(playerId, [mail.id])
-                throw new MailNotAvailableError()
+                throw new MailNotAvailableError(2004)
             }
             settlement = getDb().transaction(() => {
                 const player = getPlayerSync(playerId)
@@ -193,10 +205,16 @@ const routes = async (fastify: FastifyInstance) => {
                 }
             })()
         } catch (error) {
-            if (error instanceof MailNotAvailableError) return reply.status(400).send({
-                error: "Bad Request",
-                message: "Mail not found or already received"
-            })
+            if (error instanceof MailNotAvailableError) {
+                reply.header("content-type", "application/x-msgpack")
+                return reply.status(200).send({
+                    data_headers: generateDataHeaders({
+                        viewer_id: viewerId,
+                        result_code: error.resultCode,
+                    }),
+                    data: {},
+                })
+            }
             if (error instanceof MailRewardCapacityError) return reply.status(400).send({
                 error: "Mail reward cannot fit",
                 message: error.message,
@@ -208,22 +226,35 @@ const routes = async (fastify: FastifyInstance) => {
         const { equipmentList, itemList, userInfo, reconciledCharacterList } = settlement
 
         const totalCount = getPlayerMailCountSync(playerId)
-
+        const overMax = projectItemOverflowCommonResponse(
+            settlement.itemOverflowDispositions ?? [],
+        )
+        const fragment: CommonResponseFragment = {
+            mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
+            ...(overMax.length > 0 ? { over_max: overMax } : {}),
+            ...(reconciledCharacterList.length > 0
+                ? {
+                    character_list: reconciledCharacterList.map(
+                        character => projectCharacterPatch(character),
+                    ),
+                }
+                : {}),
+            ...(equipmentList.length > 0
+                ? {
+                    equipment_list: equipmentList.map(
+                        equipment => projectEquipmentEntity(equipment),
+                    ),
+                }
+                : {}),
+            ...(Object.keys(itemList).length > 0 ? { item_list: itemList } : {}),
+            ...(Object.keys(userInfo).length > 0 ? { user_info: userInfo } : {}),
+        }
         const responseData: Record<string, any> = {
             auto_sale_expired_mail: settlement.autoSaleExpiredMailCount > 0,
             dispose_expired_mail: false,
             total_count: totalCount,
-            mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
+            ...mergeCommonResponseFragments([fragment]),
         }
-        const overMax = projectItemOverflowCommonResponse(
-            settlement.itemOverflowDispositions ?? [],
-        )
-        if (overMax.length > 0) responseData.over_max = overMax
-
-        if (reconciledCharacterList.length > 0) responseData.character_list = reconciledCharacterList
-        if (equipmentList.length > 0) responseData.equipment_list = equipmentList
-        if (Object.keys(itemList).length > 0) responseData.item_list = itemList
-        if (Object.keys(userInfo).length > 0) responseData.user_info = userInfo
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
@@ -329,7 +360,6 @@ const routes = async (fastify: FastifyInstance) => {
                 const finalized = finalizeMailReceiveAllAwakePublicationWrites(
                     playerId,
                     claimed,
-                    mailMap,
                 )
                 if (finalized.length !== claimed.length) {
                     throw new Error("Mail state changed while mails were being received.")
@@ -386,6 +416,27 @@ const routes = async (fastify: FastifyInstance) => {
             itemOverflowDispositions,
         } = settlement
 
+        const overMax = projectItemOverflowCommonResponse(itemOverflowDispositions)
+        const receiveAllFragment: CommonResponseFragment = {
+            mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
+            ...(reconciledCharacterList.length > 0
+                ? {
+                    character_list: reconciledCharacterList.map(
+                        character => projectCharacterPatch(character),
+                    ),
+                }
+                : {}),
+            ...(equipmentList.length > 0
+                ? {
+                    equipment_list: equipmentList.map(
+                        equipment => projectEquipmentEntity(equipment),
+                    ),
+                }
+                : {}),
+            ...(Object.keys(itemList).length > 0 ? { item_list: itemList } : {}),
+            ...(Object.keys(userInfo).length > 0 ? { user_info: userInfo } : {}),
+            ...(overMax.length > 0 ? { over_max: overMax } : {}),
+        }
         const responseData: Record<string, any> = {
             already_mail_count: alreadyCount,
             auto_sale_expired_mail_count: autoSaleExpiredMailCount,
@@ -396,15 +447,8 @@ const routes = async (fastify: FastifyInstance) => {
             max_overed_mail_count: blockedCount,
             outdated_mail_count: outdatedCount,
             total_count: getPlayerMailCountSync(playerId),
-            mail_arrived: getPlayerMailCountSync(playerId, true) > 0,
+            ...mergeCommonResponseFragments([receiveAllFragment]),
         }
-
-        if (reconciledCharacterList.length > 0) responseData.character_list = reconciledCharacterList
-        if (equipmentList.length > 0) responseData.equipment_list = equipmentList
-        if (Object.keys(itemList).length > 0) responseData.item_list = itemList
-        if (Object.keys(userInfo).length > 0) responseData.user_info = userInfo
-        const overMax = projectItemOverflowCommonResponse(itemOverflowDispositions)
-        if (overMax.length > 0) responseData.over_max = overMax
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({

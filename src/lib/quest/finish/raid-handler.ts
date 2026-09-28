@@ -1,5 +1,7 @@
 import { RushEventBattleType } from "../../../data/types"
 import { QuestCategory } from "../../types"
+import { isQuestOutOfPeriodAt } from "../open-period"
+import { getServerTime } from "../../../utils"
 
 export interface RaidBossState {
     readonly weightedKillCount: number
@@ -45,6 +47,10 @@ export function handleRaidEventFinish(params: {
     party: { characters: ({ id: number | null } | null)[], unison_characters: ({ id: number | null } | null)[], equipments: ({ id: number | null } | null)[], ability_soul_ids: (number | null)[] }
     playerId: number
     questId: number
+    questData?: {
+        availableFromMs?: number | null
+        availableUntilMs?: number | null
+    }
     getEvoLevelsFn: (playerId: number, charIds: (number | null)[]) => (number | null)[]
     insertPartyFn: (playerId: number, eventId: number, partyData: {
         characterIds: (number | null)[]
@@ -101,7 +107,7 @@ export function handleRaidEventFinish(params: {
 
     return {
         auto_start_point: 0,
-        is_out_of_period: false,
+        is_out_of_period: isQuestOutOfPeriodAt(params.questData ?? {}, getServerTime() * 1000),
         quest_boss: { kill_count: questKillCount },
         raid_boss: {
             hp_percentage: getRaidBossHpPercentage(nextState, requiredKillCount),

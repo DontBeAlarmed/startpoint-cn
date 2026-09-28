@@ -10,10 +10,14 @@ import { prepareDataVolume } from "../data-paths"
 import { getRealNowMs } from "../time/game-time"
 
 const SERVER_TIME_KEYS = ["generatedAt", "mode", "offsetMs"] as const
+// Windows reports an unsupported parent-directory fsync as EPERM/EISDIR, not
+// EINVAL/ENOTSUP/EOPNOTSUPP, so both spellings belong here.
 const UNSUPPORTED_DIRECTORY_SYNC_CODES = new Set([
     "EINVAL",
     "ENOTSUP",
     "EOPNOTSUPP",
+    "EPERM",
+    "EISDIR",
 ])
 
 export interface ServerTimeStoreOptions {

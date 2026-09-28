@@ -107,9 +107,13 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/lib/character-growth/commands/learn-mana-nodes.ts",
         "src/lib/character-growth/commands/over-limit.ts",
         "src/lib/character-growth/commands/stack-to-exp.ts",
-        "src/lib/event-shop-purchase.ts",
         "src/lib/event-trade-expiry-settlement.ts",
+        "src/lib/gacha-owner/conversion.ts",
+        "src/lib/gacha-owner/crazy.ts",
+        "src/lib/gacha-owner/exchange.ts",
+        "src/lib/gacha-owner/execute.ts",
         "src/lib/gacha-reward-grant.ts",
+        "src/lib/gift-code/validation.ts",
         "src/lib/item-overflow/disposition.ts",
         "src/lib/item-sell.ts",
         "src/lib/item-use-settlement.ts",
@@ -120,14 +124,17 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "src/lib/reward-grant/execution-engine.ts",
         "src/lib/reward-grant/transaction-executor.ts",
         "src/lib/shop-reward-grant.ts",
+        "src/lib/shop/purchase-owner.ts",
+        "src/lib/star-crumb-exchange/owner.ts",
         "src/routes/api/boxGacha.ts",
         "src/routes/api/equipment.ts",
         "src/routes/api/exBoost.ts",
-        "src/routes/api/exchange.ts",
-        "src/routes/api/gacha.ts",
         "src/routes/api/questUnlock.ts",
         "src/routes/api/sell.ts",
-        "src/routes/api/shop.ts",
+        "src/routes/cn/load.ts",
+        "src/routes/web_api/lookup.ts",
+        "src/routes/web_api/mail.ts",
+        "src/routes/web_api/scheduled-resource.ts",
     ]
     assert.deepEqual(importedOutsideInventory.sort(), reviewedMigrations)
     for (const relativePath of reviewedMigrations) {
@@ -167,21 +174,21 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
     assert.doesNotMatch(rewardTransactionExecutor, /data\/domains\/item/)
     assert.match(rewardTransactionExecutor, /getInventoryBatchCheckpoint[\s\S]*inventory\.flush/)
     const shopPurchase = fs.readFileSync(
-        path.join(projectRoot, "src/lib/event-shop-purchase.ts"),
+        path.join(projectRoot, "src/lib/shop/purchase-owner.ts"),
         "utf8",
     )
     assert.doesNotMatch(shopPurchase, /\b(?:getItem|setItem)\s*:/)
-    assert.match(shopPurchase, /dependencies\.withInventory\(/)
-    assert.match(shopPurchase, /dependencies\.grantRewards\([\s\S]*inventory/)
-    const gachaRoute = fs.readFileSync(
-        path.join(projectRoot, "src/routes/api/gacha.ts"),
+    assert.match(shopPurchase, /withDeferredInventoryBatchContextWithinTransactionSync\(/)
+    assert.match(shopPurchase, /grantShopRewardsTypedInTransactionOwnerWithInventorySync\([\s\S]*inventory/)
+    const gachaOwner = fs.readFileSync(
+        path.join(projectRoot, "src/lib/gacha-owner/execute.ts"),
         "utf8",
     )
-    assert.match(gachaRoute, /withDeferredInventoryBatchContextWithinTransactionSync\(/)
-    assert.match(gachaRoute, /getTicketCount:\s*itemId\s*=>\s*inventory\.read\(itemId\)\.afterAmount/)
-    assert.match(gachaRoute, /inventory\.deduct\([\s\S]*execPlan\.ticket\.useTicketCount/)
+    assert.match(gachaOwner, /withDeferredInventoryBatchContextWithinTransactionSync\(/)
+    assert.match(gachaOwner, /getTicketCount:\s*itemId\s*=>\s*inventory\.read\(itemId\)\.afterAmount/)
+    assert.match(gachaOwner, /inventory\.deduct\([\s\S]*plan\.ticket\.useTicketCount/)
     assert.match(
-        gachaRoute,
+        gachaOwner,
         /grantGachaRewardPlanInTransactionOwnerWithInventorySync\([\s\S]*id:\s*player\.id[\s\S]*inventory/,
     )
     const gachaRewardGrant = fs.readFileSync(
@@ -274,12 +281,16 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         "utf8",
     )
     assert.match(singleSettlementWrites, /getPlayerItemSync/)
+    const singleEventSettlement = fs.readFileSync(
+        path.join(projectRoot, "src/lib/quest/finish/single-event-settlement.ts"),
+        "utf8",
+    )
     assert.match(
-        singleSettlementWrites,
-        /grantCarnivalRewards\([\s\S]*standardRewardGrant: standardRewardGrant\.forCarnival/,
+        singleEventSettlement,
+        /grantCarnivalRewards\([\s\S]*standardRewardGrant: input\.standardRewardGrant\.forCarnival/,
     )
     assert.doesNotMatch(
-        singleSettlementWrites,
+        singleEventSettlement,
         /grantCarnivalRewards\([\s\S]*giveItem:/,
     )
     const missionRewardGranter = fs.readFileSync(
@@ -294,7 +305,6 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
         missionRewardGranter,
         /executeRewardGrantExecutionPlanAsTransactionOwnerSync\([\s\S]*this\.playerId[\s\S]*knownPlayerBefore/,
     )
-    assert.match(missionRewardGranter, /updatePlayerSync\(\{ id: this\.playerId, degreeId: this\.latestDegreeId \}\)/)
     assert.doesNotMatch(
         missionRewardGranter,
         /item-cap-plan|event-trade|mana-capacity|domains\/mail|getDb\(\)\.transaction|SAVEPOINT/,
@@ -320,14 +330,13 @@ test("C3 Inventory imports match the reviewed writer migration inventory", () =>
 })
 
 test("caller-verified late migration paths establish transaction-local Player existence", () => {
-    const shop = fs.readFileSync(path.join(projectRoot, "src/routes/api/shop.ts"), "utf8")
-    const equipmentEnhancementTransaction = shop.match(
-        /\/\/ Equipment enhancement shop:[\s\S]*?getDb\(\)\.transaction\(\(\) => \{([\s\S]*?)\n\s*\}\)\(\)/,
-    )?.[1]
-    assert.ok(equipmentEnhancementTransaction)
+    const shop = fs.readFileSync(
+        path.join(projectRoot, "src/lib/shop/purchase-owner.ts"),
+        "utf8",
+    )
     assert.match(
-        equipmentEnhancementTransaction,
-        /const currentPlayer = getPlayerSync\(playerId\)[\s\S]*withShopInventorySync\(/,
+        shop,
+        /getDb\(\)\.transaction\(\(\) => \{[\s\S]*const player = getPlayerSync\(input\.playerId\)[\s\S]*withDeferredInventoryBatchContextWithinTransactionSync\(/,
     )
 
     const scheduled = fs.readFileSync(
@@ -403,7 +412,6 @@ test("capped positive grants expose one reviewed overflow disposition path", () 
         "src/lib/quest/finish/periodic-reward-handler.ts",
         "src/lib/reward-grant/execution-engine.ts",
         "src/routes/api/equipment.ts",
-        "src/routes/api/exchange.ts",
         "src/routes/api/sell.ts",
     ])
     assert.deepEqual(itemMailWriterFiles.sort(), [

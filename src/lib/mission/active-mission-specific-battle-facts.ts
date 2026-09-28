@@ -1,4 +1,5 @@
 import { getContentSnapshot } from "../../content/runtime/content-snapshot"
+import { getCharacterFacts } from "../character-content"
 import { incrementActiveMissionBattleFactSync } from "../../data/domains/active_mission_battle_facts"
 import type { FinishContext } from "../quest/finish/types"
 import {
@@ -199,16 +200,9 @@ function resolveDefinitions(
 }
 
 function createRecorderContext(context: FinishContext): ActiveBattleFactContext {
-    let repository
-    try {
-        repository = getContentSnapshot().repository
-    } catch {
-        repository = undefined
-    }
     return createActiveBattleFactContext(
         context,
-        getActiveMissionPlan(repository),
-        repository,
+        getActiveMissionPlan(),
     )
 }
 
@@ -226,23 +220,18 @@ export function recordActiveMissionSpecificBattleFactsSync(
             ? activeContext.allPartyCharacterIds
             : []
     }))
-    let characterTable: Record<string, { readonly element?: number }> = {}
-    if (activeContext.repository) {
-        try {
-            characterTable = activeContext.repository.table<Record<string, { readonly element?: number }>>("character.json")
-        } catch {
-            characterTable = {}
-        }
-    }
+    const characterFacts = getCharacterFacts()
     const characters: Record<string, ActiveMissionBattleCharacterState> = {}
     for (const characterId of targetCharacterIds) {
-        const element = characterTable?.[String(characterId)]?.element
-        if (Number.isSafeInteger(element)) characters[String(characterId)] = { element: element as number }
+        const element = characterFacts.get(characterId)?.element
+        if (element !== undefined && Number.isSafeInteger(element)) {
+            characters[String(characterId)] = { element }
+        }
     }
     let skillEffects: Readonly<Record<string, ActiveMissionSkillEffectState>> | undefined
     if (definitions.some(definition => getDefinitionPattern(definition) === SKILL_EFFECT_PATTERN)) {
         try {
-            skillEffects = activeContext.repository?.table<{
+            skillEffects = getContentSnapshot().repository.table<{
                 readonly schemaVersion?: number
                 readonly characters?: Readonly<Record<string, ActiveMissionSkillEffectState>>
             }>("cdndata/active_mission_skill_effects.json").characters

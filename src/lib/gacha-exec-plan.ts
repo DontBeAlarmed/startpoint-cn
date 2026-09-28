@@ -1,6 +1,6 @@
-import { Gacha, GachaType } from "./types";
-import { getGachaTicketCost } from "./gacha-ticket";
-import { GACHA_EXEC_TYPES, GACHA_PAGE_KINDS, GACHA_PAYMENT_TYPES, isGachaExecAllowed } from "./gacha-rules";
+import { Gacha, GachaRuntimeBanner } from "./types";
+import { getConfiguredTicketWildcardFallbackCost, getGachaTicketCost } from "./gacha-ticket";
+import { GACHA_EXEC_TYPES, GACHA_PAYMENT_TYPES, isGachaExecAllowed, isGachaExecCountAllowed } from "./gacha-rules";
 
 export interface GachaExecPlayerFunds {
     freeVmoney: number
@@ -45,7 +45,7 @@ export type GachaExecPlanResult =
     | { ok: false, status: 400, message: string }
 
 export interface BuildGachaExecPlanInput {
-    gacha: Gacha
+    gacha: Gacha | GachaRuntimeBanner
     paymentType: number
     execType: number
     numberOfExec: number
@@ -53,6 +53,30 @@ export interface BuildGachaExecPlanInput {
     playerGachaData: GachaExecPlayerGachaData
     getTicketCount?: (itemId: number) => number | null
     getCampaignState?: () => GachaExecCampaignState | null
+}
+
+function freeVmoneyCost(
+    gacha: Gacha | GachaRuntimeBanner,
+    multi: boolean,
+): number | undefined {
+    if ("kind" in gacha) {
+        if (gacha.page.kind !== 0 && gacha.page.kind !== 8) return undefined
+        return multi ? gacha.page.multiCost : gacha.page.singleCost
+    }
+    return multi ? gacha.multiCost : gacha.singleCost
+}
+
+function paidVmoneyCost(
+    gacha: Gacha | GachaRuntimeBanner,
+    accountMulti: boolean,
+): number | undefined {
+    if ("kind" in gacha) {
+        if (accountMulti) {
+            return gacha.page.kind === 1 ? gacha.page.accountPaidTenCost : undefined
+        }
+        return gacha.page.kind === 0 ? gacha.page.dailyPaidCost : undefined
+    }
+    return accountMulti ? gacha.tenTimesPerAccountCost : gacha.discountCost
 }
 
 function ok(plan: GachaExecPlan): GachaExecPlanResult {
@@ -80,6 +104,10 @@ function ensureNonNegativeFunds(plan: GachaExecPlan): GachaExecPlanResult {
     return ok(plan)
 }
 
+function isPositiveCost(value: number | undefined): value is number {
+    return Number.isSafeInteger(value) && value !== undefined && value > 0
+}
+
 export function buildGachaExecPlan(input: BuildGachaExecPlanInput): GachaExecPlanResult {
     const { gacha, paymentType, execType, numberOfExec, playerFunds, playerGachaData } = input
 
@@ -87,7 +115,14 @@ export function buildGachaExecPlan(input: BuildGachaExecPlanInput): GachaExecPla
         return badRequest("Gacha execution type is not allowed for this gacha.")
     }
 
-    if (gacha.pageKind === GACHA_PAGE_KINDS.TEN_TIMES_PER_ACCOUNT && !playerGachaData.isAccountFirst) {
+    if (!isGachaExecCountAllowed(execType, numberOfExec)) {
+        return badRequest("Invalid number of gacha executions.")
+    }
+    if (execType === GACHA_EXEC_TYPES.CRAZY_MULTI_TICKET) {
+        return badRequest("Crazy Gacha requires the candidate lifecycle.")
+    }
+
+    if (execType === GACHA_EXEC_TYPES.ACCOUNT_PAID_MULTI && !playerGachaData.isAccountFirst) {
         return badRequest("Already did account-limited summon.")
     }
 
@@ -96,9 +131,8 @@ export function buildGachaExecPlan(input: BuildGachaExecPlanInput): GachaExecPla
     switch (paymentType) {
         case GACHA_PAYMENT_TYPES.FREE_VMONEY: {
             const isMulti = execType === GACHA_EXEC_TYPES.VMONEY_MULTI
-            const cost = (gacha.pageKind === GACHA_PAGE_KINDS.TEN_TIMES_PER_ACCOUNT && isMulti)
-                ? (gacha.tenTimesPerAccountCost ?? gacha.multiCost)
-                : (isMulti ? gacha.multiCost : gacha.singleCost)
+            const cost = freeVmoneyCost(gacha, isMulti)
+            if (!isPositiveCost(cost)) return badRequest("Gacha cost is invalid.")
             const overflow = cost > plan.freeVmoney ? cost - plan.freeVmoney : 0
             plan.freeVmoney = overflow > 0 ? 0 : plan.freeVmoney - cost
             plan.paidVmoney = overflow > 0 ? plan.paidVmoney - overflow : plan.paidVmoney
@@ -106,12 +140,14 @@ export function buildGachaExecPlan(input: BuildGachaExecPlanInput): GachaExecPla
             break
         }
         case GACHA_PAYMENT_TYPES.VMONEY: {
-            if (!playerGachaData.isDailyFirst) {
+            if (execType === GACHA_EXEC_TYPES.DAILY_SINGLE && !playerGachaData.isDailyFirst) {
                 return badRequest("Already did daily paid summon.")
             }
-
-            plan.paidVmoney -= gacha.type === GachaType.CHARACTER ? 50 : 25
-            plan.pullCount = 1
+            const accountMulti = execType === GACHA_EXEC_TYPES.ACCOUNT_PAID_MULTI
+            const cost = paidVmoneyCost(gacha, accountMulti)
+            if (!isPositiveCost(cost)) return badRequest("Gacha cost is invalid.")
+            plan.paidVmoney -= cost
+            plan.pullCount = accountMulti ? 10 : 1
             break
         }
         case GACHA_PAYMENT_TYPES.TICKET: {
@@ -120,9 +156,29 @@ export function buildGachaExecPlan(input: BuildGachaExecPlanInput): GachaExecPla
                 return badRequest("Invalid payment type.")
             }
 
-            const beforeCount = input.getTicketCount?.(ticketCost.itemId) ?? -1
-            const afterCount = beforeCount - ticketCost.useTicketCount
+            let itemId = ticketCost.itemId
+            let beforeCount = input.getTicketCount?.(itemId) ?? -1
+            let afterCount = beforeCount - ticketCost.useTicketCount
             if (afterCount < 0) {
+                // 配置票不足：仅在 wildcardTicketAvailable=true 时回退同类通用票
+                const fallback = getConfiguredTicketWildcardFallbackCost(execType, numberOfExec, gacha)
+                if (fallback !== null) {
+                    const fallbackBefore = input.getTicketCount?.(fallback.itemId) ?? -1
+                    const fallbackAfter = fallbackBefore - fallback.useTicketCount
+                    if (fallbackAfter >= 0) {
+                        itemId = fallback.itemId
+                        beforeCount = fallbackBefore
+                        afterCount = fallbackAfter
+                        plan.pullCount = fallback.pullCount
+                        plan.ticket = {
+                            itemId,
+                            beforeCount,
+                            afterCount,
+                            useTicketCount: fallback.useTicketCount,
+                        }
+                        break
+                    }
+                }
                 return badRequest("Not enough tickets.")
             }
 

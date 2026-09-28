@@ -1,4 +1,10 @@
 import { deepFreeze } from "../deep-freeze"
+import {
+    gameCalendarSupportedYearRange,
+    resolveContentConverterContext,
+    type ContentConverterContext,
+} from "./context"
+import type { GameCalendarPolicy } from "../../time/game-calendar"
 import { convertOrderedMapJson, type CsvOrderedMapTree } from "./ordered-map-json"
 
 export const LOGIN_BONUS_SOURCE = "master/bonus/login_bonus.orderedmap"
@@ -49,6 +55,122 @@ export interface LoginBonusConversionOutput {
     readonly "login_bonus.json": LoginBonusCatalog
 }
 
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
+function requireFiniteTimestamp(value: unknown, subject: string): number {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+        invalidLoginBonus(`${subject} must be finite`)
+    }
+    return value
+}
+
+function requireNullableTimestamp(value: unknown, subject: string): number | null {
+    return value === null ? null : requireFiniteTimestamp(value, subject)
+}
+
+/** Validates the generated wire catalog before converters or runtime readers expose it. */
+export function validateLoginBonusCatalog(raw: unknown): LoginBonusCatalog {
+    if (!isRecord(raw)) invalidLoginBonus("catalog root must be an object")
+    const catalog = raw as Readonly<Record<string, unknown>>
+    const groupIds = Object.keys(catalog)
+    if (groupIds.length === 0) invalidLoginBonus("no login bonus groups were found")
+    for (const groupId of groupIds) {
+        if (groupId.length === 0) invalidLoginBonus("group id must not be empty")
+        const rawGroup = catalog[groupId]
+        if (!isRecord(rawGroup)) invalidLoginBonus(`${groupId} must be an object`)
+        const group = rawGroup as Readonly<Record<string, unknown>>
+        if (!LOGIN_BONUS_GROUP_TYPES.includes(group.groupType as LoginBonusGroupType)) {
+            invalidLoginBonus(`${groupId}.groupType is invalid: ${String(group.groupType)}`)
+        }
+        const availableFromMs = requireFiniteTimestamp(
+            group.availableFromMs,
+            `${groupId}.availableFromMs`,
+        )
+        const availableUntilMs = requireNullableTimestamp(
+            group.availableUntilMs,
+            `${groupId}.availableUntilMs`,
+        )
+        if (availableUntilMs !== null && availableUntilMs < availableFromMs) {
+            invalidLoginBonus(`${groupId} availability period is inverted`)
+        }
+        const conditionFrom = requireNullableTimestamp(
+            group.conditionPeriodFromMs,
+            `${groupId}.conditionPeriodFromMs`,
+        )
+        const conditionUntil = requireNullableTimestamp(
+            group.conditionPeriodUntilMs,
+            `${groupId}.conditionPeriodUntilMs`,
+        )
+        if ((conditionFrom === null) !== (conditionUntil === null)
+            || (conditionFrom !== null && conditionUntil !== null && conditionUntil < conditionFrom)) {
+            invalidLoginBonus(`${groupId} comeback condition period is invalid`)
+        }
+        if (group.comebackInactivityDays !== null
+            && (!Number.isSafeInteger(group.comebackInactivityDays)
+                || (group.comebackInactivityDays as number) <= 0)) {
+            invalidLoginBonus(`${groupId}.comebackInactivityDays must be null or positive`)
+        }
+        if (group.linkedComebackGroupId !== null
+            && (typeof group.linkedComebackGroupId !== "string"
+                || group.linkedComebackGroupId.length === 0)) {
+            invalidLoginBonus(`${groupId}.linkedComebackGroupId must be null or non-empty`)
+        }
+        if (group.includeBeginner !== null && typeof group.includeBeginner !== "boolean") {
+            invalidLoginBonus(`${groupId}.includeBeginner must be null or boolean`)
+        }
+        if (!Array.isArray(group.entries) || group.entries.length === 0) {
+            invalidLoginBonus(`${groupId}.entries must be a non-empty array`)
+        }
+        group.entries.forEach((rawEntry, offset) => {
+            if (!isRecord(rawEntry)) invalidLoginBonus(`${groupId}.entries[${offset}] is invalid`)
+            const entry = rawEntry as Readonly<Record<string, unknown>>
+            if (entry.index !== offset + 1) {
+                invalidLoginBonus(`${groupId} indices must start at 1 and be contiguous`)
+            }
+            if (!Array.isArray(entry.rewards) || entry.rewards.length === 0) {
+                invalidLoginBonus(`${groupId}[${offset + 1}] has no rewards`)
+            }
+            entry.rewards.forEach((rawReward, rewardOffset) => {
+                if (!isRecord(rawReward)) {
+                    invalidLoginBonus(`${groupId}[${offset + 1}].reward[${rewardOffset}] is invalid`)
+                }
+                const reward = rawReward as Readonly<Record<string, unknown>>
+                if (!Number.isSafeInteger(reward.kind)
+                    || (reward.kind as number) < 0
+                    || (reward.kind as number) > 4) {
+                    invalidLoginBonus(`${groupId}[${offset + 1}].reward[${rewardOffset}].kind is invalid`)
+                }
+                if (!Number.isSafeInteger(reward.count) || (reward.count as number) <= 0) {
+                    invalidLoginBonus(`${groupId}[${offset + 1}].reward[${rewardOffset}].count must be positive`)
+                }
+                const kind = reward.kind as number
+                if ((kind === 1 || kind === 2)
+                    && (!Number.isSafeInteger(reward.id) || (reward.id as number) <= 0)) {
+                    invalidLoginBonus(`${groupId}[${offset + 1}].reward[${rewardOffset}].id must be positive`)
+                }
+                if (kind === 2 && reward.count !== 1) {
+                    invalidLoginBonus(`${groupId}[${offset + 1}].character count must be exactly 1`)
+                }
+            })
+        })
+    }
+    for (const [groupId, rawGroup] of Object.entries(catalog)) {
+        const group = rawGroup as Readonly<Record<string, unknown>>
+        const linked = group.linkedComebackGroupId
+        if (linked === null) continue
+        if (linked === groupId) continue
+        const linkedGroup = catalog[linked as string]
+        if (!isRecord(linkedGroup)
+            || !["Comeback", "ComebackCn", "ComebackJp"]
+                .includes(String(linkedGroup.groupType))) {
+            invalidLoginBonus(`${groupId} references an invalid comeback group: ${String(linked)}`)
+        }
+    }
+    return deepFreeze(catalog) as LoginBonusCatalog
+}
+
 function invalidLoginBonus(reason: string): never {
     throw new Error(`invalid login bonus content: ${reason}`)
 }
@@ -62,31 +184,32 @@ function parsePositiveInteger(value: string | undefined, subject: string): numbe
     return parsed
 }
 
-function parseJstTimestamp(value: string | undefined, subject: string): number {
-    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value ?? "")
-    if (match === null) invalidLoginBonus(`${subject} must be a JST date-time: ${String(value)}`)
-    const [, yearText, monthText, dayText, hourText, minuteText, secondText] = match
-    const year = Number(yearText)
-    const month = Number(monthText)
-    const day = Number(dayText)
-    const hour = Number(hourText)
-    const minute = Number(minuteText)
-    const second = Number(secondText)
-    const maxDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
-    if (year < 1970 || year > 2200
-        || month < 1 || month > 12
-        || day < 1 || day > maxDay
-        || hour > 23 || minute > 59 || second > 59) {
+function parseJstTimestamp(
+    value: string | undefined,
+    subject: string,
+    calendar: GameCalendarPolicy,
+): number {
+    let parsed: number
+    try {
+        parsed = calendar.parseMasterTimestamp(value ?? "")
+    } catch {
+        invalidLoginBonus(`${subject} must be a valid JST date-time: ${String(value)}`)
+    }
+    const range = gameCalendarSupportedYearRange(calendar)
+    if (parsed < range.minEpochMs || parsed >= range.exclusiveMaxEpochMs) {
         invalidLoginBonus(`${subject} is outside the supported JST date-time range: ${value}`)
     }
-    // The CN 1.8.1 bootstrap assigns the legacy JST-named client constant to UTC+8.
-    return Date.UTC(year, month - 1, day, hour, minute, second) - 8 * 60 * 60 * 1000
+    return parsed
 }
 
-function parseOptionalJstTimestamp(value: string | undefined, subject: string): number | null {
+function parseOptionalJstTimestamp(
+    value: string | undefined,
+    subject: string,
+    calendar: GameCalendarPolicy,
+): number | null {
     return value === undefined || value === "" || value === "(None)"
         ? null
-        : parseJstTimestamp(value, subject)
+        : parseJstTimestamp(value, subject, calendar)
 }
 
 function parseOptionalPositiveInteger(value: string | undefined, subject: string): number | null {
@@ -174,7 +297,11 @@ function parseReward(
     return { kind, count }
 }
 
-function convertGroup(groupId: string, tree: CsvOrderedMapTree): LoginBonusGroup {
+function convertGroup(
+    groupId: string,
+    tree: CsvOrderedMapTree,
+    calendar: GameCalendarPolicy,
+): LoginBonusGroup {
     const indices = Object.keys(tree)
         .map(index => parsePositiveInteger(index, `${groupId}.index`))
         .sort((left, right) => left - right)
@@ -191,15 +318,17 @@ function convertGroup(groupId: string, tree: CsvOrderedMapTree): LoginBonusGroup
     const groupType = LOGIN_BONUS_GROUP_TYPES[Number(rows[0][0])]
 
     const periods = rows.map(fields => ({
-        availableFromMs: parseJstTimestamp(fields[41], `${groupId}.availableFrom`),
-        availableUntilMs: parseOptionalJstTimestamp(fields[42], `${groupId}.availableUntil`),
+        availableFromMs: parseJstTimestamp(fields[41], `${groupId}.availableFrom`, calendar),
+        availableUntilMs: parseOptionalJstTimestamp(fields[42], `${groupId}.availableUntil`, calendar),
         conditionPeriodFromMs: parseOptionalJstTimestamp(
             fields[38],
             `${groupId}.conditionPeriodFrom`,
+            calendar,
         ),
         conditionPeriodUntilMs: parseOptionalJstTimestamp(
             fields[39],
             `${groupId}.conditionPeriodUntil`,
+            calendar,
         ),
         comebackInactivityDays: parseOptionalPositiveInteger(
             fields[40],
@@ -254,22 +383,26 @@ function convertGroup(groupId: string, tree: CsvOrderedMapTree): LoginBonusGroup
     }
 }
 
-export function convertLoginBonusTree(tree: CsvOrderedMapTree): LoginBonusCatalog {
+export function convertLoginBonusTree(
+    tree: CsvOrderedMapTree,
+    context?: ContentConverterContext,
+): LoginBonusCatalog {
+    const { gameCalendar } = resolveContentConverterContext(context)
     const output: Record<string, LoginBonusGroup> = {}
     for (const groupId of Object.keys(tree).sort()) {
         if (groupId.length === 0) invalidLoginBonus("group id must not be empty")
-        output[groupId] = convertGroup(groupId, requireGroupTree(groupId, tree[groupId]))
+        output[groupId] = convertGroup(groupId, requireGroupTree(groupId, tree[groupId]), gameCalendar)
     }
-    if (Object.keys(output).length === 0) invalidLoginBonus("no login bonus groups were found")
-    return deepFreeze(output)
+    return validateLoginBonusCatalog(output)
 }
 
 export async function convertLoginBonuses(
     reader: LoginBonusSourceReader,
+    context?: ContentConverterContext,
 ): Promise<LoginBonusConversionOutput> {
     const raw = await reader.readDynamic(LOGIN_BONUS_SOURCE)
     return deepFreeze({
-        "login_bonus.json": convertLoginBonusTree(convertOrderedMapJson(raw, 2)),
+        "login_bonus.json": convertLoginBonusTree(convertOrderedMapJson(raw, 2), context),
     })
 }
 

@@ -1,6 +1,8 @@
 import { getFactKeyId, type PeriodicSnapshotKind } from "./facts/fact-key"
 import type { MissionEvaluationSession } from "./evaluation-session"
 import type { CategoryContext } from "./types"
+import { getMissionCatalogContentTable } from "./mission-catalog"
+import { parsePlayerRankContent } from "../player-rank-content"
 
 function getCategoryFactIds(
     session: MissionEvaluationSession,
@@ -36,14 +38,29 @@ export function buildPeriodicCategoryContextFromSession(
     const battleKey = { kind: "missionBattleCounters" } as const
     const snapshotKey = { kind: "periodicSnapshot", snapshotKind } as const
 
+    const player = session.getFact({ kind: "player" })
+    const missionPatterns = new Map(missionIds.flatMap(missionId => {
+        const pattern = session.catalog.getDefinition(category, missionId)?.pattern
+        return pattern === undefined ? [] : [[missionId, pattern] as const]
+    }))
+    const needsPlayerRank = [...missionPatterns.values()].some(pattern =>
+        pattern === "user_rank" || pattern === "character_level")
+    const playerRankDegree = needsPlayerRank
+        ? parsePlayerRankContent(
+            getMissionCatalogContentTable(session.catalog, "cdndata/player_rank_full.json"),
+        ).getRankDegree(player.rankPoint)
+        : undefined
+
     return {
         category,
         playerId: session.playerId,
-        player: session.getFact({ kind: "player" }),
+        player,
         questProgress: {},
         totalQuestClears: 0,
         totalStories: 0,
         rankCounts: { rank_ss: 0, rank_s: 0, rank_a: 0, rank_b: 0 },
+        ...(playerRankDegree === undefined ? {} : { playerRankDegree }),
+        missionPatterns,
         ...(factIds.has(getFactKeyId(battleKey))
             ? { battleCounters: session.getFact(battleKey) }
             : {}),

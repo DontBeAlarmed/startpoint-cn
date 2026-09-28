@@ -9,6 +9,7 @@ interface GameplaySettingsBody {
     readonly dropMultiplier?: unknown
     readonly multiRescueFragmentRewardsEnabled?: unknown
     readonly multiRescueHostRewardsEnabled?: unknown
+    readonly rush700011To700017CompatibilityEnabled?: unknown
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -28,7 +29,11 @@ const routes = async (fastify: FastifyInstance) => {
         const hasMultiplier = Object.prototype.hasOwnProperty.call(body, "dropMultiplier")
         const hasRescueSetting = Object.prototype.hasOwnProperty.call(body, "multiRescueFragmentRewardsEnabled")
         const hasHostRescueSetting = Object.prototype.hasOwnProperty.call(body, "multiRescueHostRewardsEnabled")
-        if (!hasMultiplier && !hasRescueSetting && !hasHostRescueSetting) {
+        const hasRushCompatibilitySetting = Object.prototype.hasOwnProperty.call(
+            body,
+            "rush700011To700017CompatibilityEnabled",
+        )
+        if (!hasMultiplier && !hasRescueSetting && !hasHostRescueSetting && !hasRushCompatibilitySetting) {
             return reply.status(400).send({ error: "未知的游戏设置字段" })
         }
         if (hasMultiplier && (!Number.isSafeInteger(body.dropMultiplier)
@@ -42,6 +47,10 @@ const routes = async (fastify: FastifyInstance) => {
         if (hasHostRescueSetting && typeof body.multiRescueHostRewardsEnabled !== "boolean") {
             return reply.status(400).send({ error: "房主救援碎片开关必须是布尔值" })
         }
+        if (hasRushCompatibilitySetting
+            && typeof body.rush700011To700017CompatibilityEnabled !== "boolean") {
+            return reply.status(400).send({ error: "狂热激战常驻批次兼容开关必须是布尔值" })
+        }
         const current = getServerGameplaySettingsSync()
         return reply.status(200).send(updateServerGameplaySettingsSync({
             dropMultiplier: hasMultiplier ? body.dropMultiplier as number : current.dropMultiplier,
@@ -49,6 +58,8 @@ const routes = async (fastify: FastifyInstance) => {
                 ? body.multiRescueFragmentRewardsEnabled as boolean : undefined,
             multiRescueHostRewardsEnabled: hasHostRescueSetting
                 ? body.multiRescueHostRewardsEnabled as boolean : undefined,
+            rush700011To700017CompatibilityEnabled: hasRushCompatibilitySetting
+                ? body.rush700011To700017CompatibilityEnabled as boolean : undefined,
         }))
     })
 }

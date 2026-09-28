@@ -2,6 +2,10 @@
 
 require("ts-node/register/transpile-only")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
+
 const assert = require("node:assert/strict")
 const { randomUUID } = require("node:crypto")
 const Fastify = require("fastify")
@@ -132,6 +136,10 @@ stubModule("../src/lib/mission/index", {
                     receivedStages: [],
                 }],
                 observer: { candidateCount: 1, computeCount: 1, loaderCalls: [] },
+            },
+            resolver: {
+                characters: new Map(),
+                isNewUnlockEligible: () => false,
             },
             settlement: {
                 missionInfo: [{ mission_category_id: 9, mission_id: 901, mission_reward_id: 9011 }],

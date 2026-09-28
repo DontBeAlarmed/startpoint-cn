@@ -29,14 +29,48 @@ const { getPlayerItemSync } = require("../src/data/domains/item")
 const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getDb } = require("../src/data/db")
-const { getCharacterDataSync, getCharacterManaNodesSync } = require("../src/lib/assets")
+const { getCharacterFacts } = require("../src/lib/character-content")
+const { getCharacterGrowthContent } = require("../src/lib/character-growth-content")
+const getCharacterDataSync = characterId => getCharacterFacts().get(characterId)
+const getCharacterManaNodesSync = (characterId, level) => getCharacterGrowthContent().getManaBoardNodes(characterId, level)
 const { characterExpCaps } = require("../src/lib/character")
-const { AwakeComputer } = require("../src/lib/mission/computer-awake")
 const { MissionEvaluationSession } = require("../src/lib/mission/evaluation-session")
 const {
-    settleAwakeBattleMissions,
+    getAwakeBattleMissionIds,
+    settleAwakeMissionCandidates,
     settleAwakeMissionCandidatesWithEvaluation,
 } = require("../src/lib/mission/awake-settlement")
+
+function emptyAwakeSettlement() {
+    return {
+        missionInfo: [],
+        itemList: {},
+        characterList: [],
+        equipmentList: [],
+        degreeIds: [],
+        passCardPoints: {},
+    }
+}
+
+// Battle-finish composition retired from production (single/multi finish call
+// the pieces directly); tests keep the same wrapper semantics locally. Battle
+// paths only record progress — the category 9 page is the sole reward owner.
+function settleAwakeBattleMissions(params) {
+    if (!params.questAccomplished) return emptyAwakeSettlement()
+    const missionIds = getAwakeBattleMissionIds(
+        params.characterIds,
+        params.directlyChangedMissionIds,
+    )
+    if (missionIds.length === 0) return emptyAwakeSettlement()
+    return settleAwakeMissionCandidatesWithEvaluation(
+        params.playerId,
+        missionIds,
+        params.evaluationTime,
+        undefined,
+        {},
+        { claimStageRewards: false },
+    ).settlement
+}
 const {
     publishCharacterGrowthOwnerStateBestEffort,
 } = require("../src/lib/character-growth/owner-publication")
@@ -91,32 +125,29 @@ function expectedRewardBalances(before) {
 test("battle seam evaluates immutable Session results and leaves Growth publication to the owner", () => {
     const playerId = createEligiblePlayer("awake-seam")
     const before = itemAmounts(playerId)
-    const originalLegacyBuilder = AwakeComputer.buildContext
-    AwakeComputer.buildContext = () => { throw new Error("awake settlement must not use legacy context") }
-    let settlement
-    try {
-        settlement = settleAwakeBattleMissions({
-            playerId,
-            questAccomplished: true,
-            characterIds: [341005],
-            directlyChangedMissionIds: [],
-            evaluationTime,
-        })
-    } finally {
-        AwakeComputer.buildContext = originalLegacyBuilder
-    }
+    const settlement = settleAwakeBattleMissions({
+        playerId,
+        questAccomplished: true,
+        characterIds: [341005],
+        directlyChangedMissionIds: [],
+        evaluationTime,
+    })
 
-    assert.deepEqual(settlement.missionInfo, awakeMissionIds.map(missionId => ({
-        mission_category_id: 9,
-        mission_id: missionId,
-        mission_reward_id: missionId * 10 + 1,
-    })))
-    assert.deepEqual(settlement.itemList, expectedRewardBalances(before))
-    assert.equal(
+    assert.deepEqual(settlement.missionInfo, [], "战斗结算不得代领 category 9 奖励")
+    assert.deepEqual(settlement.itemList, {})
+    assert.deepEqual(
         settlement.characterList.some(entry => entry.character_id === 341005),
         false,
     )
     assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has("341005"), false)
+    assert.deepEqual(Object.fromEntries(Object.entries(getPlayerCategoryMissionsSync(playerId, 9))
+        .map(([missionId, mission]) => [missionId, mission.progress])), {
+        3410051: 5,
+        3410052: 5,
+        3410053: 5,
+        3410054: 3,
+    }, "战斗结算必须写入觉醒进度")
+
     const published = publishCharacterGrowthOwnerStateBestEffort(
         playerId,
         [341005],
@@ -128,15 +159,22 @@ test("battle seam evaluates immutable Session results and leaves Growth publicat
     assert.deepEqual(
         published.characterList.find(entry => entry.character_id === 341005)?.mana_board_awake,
         { 1: 1 },
+        "完成最终条件的战斗必须在同事务发布三板解锁",
     )
     assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(playerId).get("341005"), { 1: 1 })
-    assert.deepEqual(Object.fromEntries(Object.entries(getPlayerCategoryMissionsSync(playerId, 9))
-        .map(([missionId, mission]) => [missionId, mission.progress])), {
-        3410051: 5,
-        3410052: 5,
-        3410053: 5,
-        3410054: 3,
-    })
+
+    const pageSettlement = settleAwakeMissionCandidates(
+        playerId,
+        awakeMissionIds,
+        evaluationTime,
+    )
+    assert.deepEqual(pageSettlement.missionInfo, awakeMissionIds.map(missionId => ({
+        mission_category_id: 9,
+        mission_id: missionId,
+        mission_reward_id: missionId * 10 + 1,
+    })), "觉醒任务第一页一次领取全部已完成未领奖励")
+    assert.deepEqual(pageSettlement.itemList, expectedRewardBalances(before))
+    assert.deepEqual(itemAmounts(playerId), expectedRewardBalances(before))
 
     const repeated = settleAwakeBattleMissions({
         playerId,
@@ -149,6 +187,42 @@ test("battle seam evaluates immutable Session results and leaves Growth publicat
     assert.deepEqual(repeated.itemList, {})
     assert.deepEqual(repeated.characterList, [])
     assert.deepEqual(itemAmounts(playerId), expectedRewardBalances(before))
+    const repeatedPage = settleAwakeMissionCandidates(
+        playerId,
+        awakeMissionIds,
+        evaluationTime,
+    )
+    assert.deepEqual(repeatedPage.missionInfo, [], "重复页面请求不得重复发奖")
+    assert.deepEqual(itemAmounts(playerId), expectedRewardBalances(before))
+})
+
+test("battle seam keeps stage receipts unclaimed and still invalidates awake eligibility", () => {
+    const playerId = createEligiblePlayer("awake-battle-unclaimed")
+    const before = itemAmounts(playerId)
+    const result = settleAwakeMissionCandidatesWithEvaluation(
+        playerId,
+        awakeMissionIds,
+        evaluationTime,
+        undefined,
+        {},
+        { claimStageRewards: false },
+    )
+    assert.ok(result)
+
+    assert.deepEqual(result.settlement.missionInfo, [])
+    assert.deepEqual(result.settlement.itemList, {})
+    assert.equal(
+        result.invalidatedFactKeys.map(getFactKeyId).includes("awakeEligibility"),
+        true,
+        "进度完成特殊阶段时必须失效 awakeEligibility，即使未领取",
+    )
+    assert.deepEqual(itemAmounts(playerId), before, "非领取模式不得改变任何库存")
+    assert.equal(db.prepare(`
+        SELECT COUNT(*) AS count
+        FROM players_category_mission_stages
+        WHERE player_id = ? AND category = 9
+    `).get(playerId).count, 0, "非领取模式不得写任何 stage 领取状态")
+    assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has("341005"), false)
 })
 
 test("special Awake reward invalidates Growth publication when a new stage is received", () => {
@@ -250,7 +324,12 @@ for (const routeKind of ["single", "multi"]) {
                     directlyChangedMissionIds: [],
                     evaluationTime,
                 })
-                assert.equal(settlement.missionInfo.length, 4)
+                assert.deepEqual(settlement.missionInfo, [])
+                assert.deepEqual(
+                    Object.keys(getPlayerCategoryMissionsSync(playerId, 9)).length,
+                    4,
+                    "战斗结算在事务内已写入进度",
+                )
                 assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has("341005"), false)
                 throw new Error(`injected ${routeKind} finish failure`)
             })(),

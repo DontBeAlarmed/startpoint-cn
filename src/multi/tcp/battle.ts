@@ -1,5 +1,5 @@
 import * as net from "net"
-import { getQuestFromCategorySync } from "../../lib/assets"
+import { getQuestFromCategorySync } from "../../lib/quest-content"
 import { QuestCategory } from "../../lib/types"
 import { getRoom } from "../room/manager"
 import { sessionManager, SessionClient } from "../state/SessionManager"

@@ -1,5 +1,10 @@
 import path from "node:path"
 
+import {
+    DEFAULT_GAME_CALENDAR_UTC_OFFSET_MINUTES,
+    createGameCalendarPolicy,
+    type GameCalendarPolicy,
+} from "../../time/game-calendar"
 import { buildCdnCatalog } from "../cdn/catalog-builder"
 import { createArchiveSourceManifest } from "../cdn/archive-sources"
 import type { CdnCatalog, CdnCatalogInput } from "../cdn/types"
@@ -34,6 +39,7 @@ export type ContentSyncReason =
     | "missing"
     | "asset-version"
     | "generator-version"
+    | "game-calendar"
     | "source-state"
     | "table-registry"
     | "forced"
@@ -65,6 +71,13 @@ export interface ContentSyncOptions {
     readonly env?: ContentPathEnvironment
     readonly mode?: ContentSyncMode
     readonly generatorVersion?: number
+    /**
+     * Frozen game calendar offset for the produced release. The CLI parses
+     * GAME_CALENDAR_UTC_OFFSET_MINUTES once and passes the number here; the
+     * engine never reads process.env itself and falls back to the CN default
+     * (480) for callers that omit it.
+     */
+    readonly gameCalendarUtcOffsetMinutes: number
 }
 
 export interface ContentTableBuildContext {
@@ -74,6 +87,8 @@ export interface ContentTableBuildContext {
     readonly catalog: CdnCatalog
     readonly archiveIndex: ArchiveIndex
     readonly definitions: readonly TableSourceDefinition[]
+    /** The one policy frozen for this sync invocation; shared by all tables. */
+    readonly gameCalendar: GameCalendarPolicy
 }
 
 export interface ContentTableBuilder {
@@ -212,12 +227,19 @@ function decideReason(
     scan: ContentTargetScan,
     current: CurrentRelease | null,
     generatorVersion: number,
+    gameCalendar: GameCalendarPolicy,
     definitions: readonly TableSourceDefinition[],
 ): ContentSyncReason {
     if (mode === "force") return "forced"
     if (current === null) return "missing"
     if (current.manifest.assetVersion !== scan.targetVersion) return "asset-version"
     if (current.manifest.generatorVersion !== generatorVersion) return "generator-version"
+    if (current.manifest.gameCalendarUtcOffsetMinutes !== gameCalendar.utcOffsetMinutes) {
+        // Manifest identity already binds the offset; a mismatch means the
+        // current release was built under a different calendar and can never
+        // be reused.
+        return "game-calendar"
+    }
     if (summaryPatchSourceDigest(current.summary) !== patchSourceDigest(scan)) return "source-state"
     if (getReleaseTableRegistryError(current.manifest, definitions) !== null) return "table-registry"
     return "up-to-date"
@@ -295,6 +317,7 @@ async function synchronize(
     current: CurrentRelease | null,
     reason: ContentSyncReason,
     generatorVersion: number,
+    gameCalendar: GameCalendarPolicy,
     dependencies: ContentSyncDependencies,
 ): Promise<ContentSyncResult> {
     const materialize = dependencies.materializeCatalog ?? materializeContentCatalogInput
@@ -327,6 +350,7 @@ async function synchronize(
         catalog,
         archiveIndex,
         definitions,
+        gameCalendar,
     }), definitions)
 
     const tables: Record<string, ContentTableReference> = {}
@@ -349,6 +373,7 @@ async function synchronize(
         assetVersion: scan.targetVersion,
         runtimeSchemaVersion: CONTENT_RUNTIME_SCHEMA_VERSION,
         generatorVersion,
+        gameCalendarUtcOffsetMinutes: gameCalendar.utcOffsetMinutes,
         tables,
         catalog: { object: catalogObject },
         summary: { object: summaryObject },
@@ -376,6 +401,13 @@ export async function runContentSync(
     const generatorVersion = requireGeneratorVersion(
         options.generatorVersion ?? CONTENT_GENERATOR_VERSION,
     )
+    // Exactly one policy per sync invocation; createGameCalendarPolicy
+    // enforces the same canonical -840..840 signed-integer contract as the
+    // env parser. Release building and manifest writing below consume this
+    // exact instance.
+    const gameCalendar = createGameCalendarPolicy(
+        options.gameCalendarUtcOffsetMinutes ?? DEFAULT_GAME_CALENDAR_UTC_OFFSET_MINUTES,
+    )
     const resolvePaths = dependencies.resolvePaths ?? resolveContentPaths
     const paths = resolvePaths({ projectRoot, env: options.env ?? process.env })
     const createStore = dependencies.createStore ?? (resolved => new ContentObjectStore(resolved))
@@ -386,7 +418,7 @@ export async function runContentSync(
     if (mode === "check") {
         const scan = await scanTarget(paths)
         const current = await readCurrentRelease(store)
-        const reason = decideReason(mode, scan, current, generatorVersion, definitions)
+        const reason = decideReason(mode, scan, current, generatorVersion, gameCalendar, definitions)
         return resultWithoutRelease("check", scan.targetVersion, current, reason)
     }
 
@@ -397,7 +429,7 @@ export async function runContentSync(
     try {
         const scan = await scanTarget(paths)
         const current = await readCurrentRelease(store)
-        const reason = decideReason(mode, scan, current, generatorVersion, definitions)
+        const reason = decideReason(mode, scan, current, generatorVersion, gameCalendar, definitions)
         if (reason === "up-to-date") {
             return resultWithoutRelease("skipped", scan.targetVersion, current, reason)
         }
@@ -409,6 +441,7 @@ export async function runContentSync(
             current,
             reason,
             generatorVersion,
+            gameCalendar,
             dependencies,
         )
     } catch (error) {

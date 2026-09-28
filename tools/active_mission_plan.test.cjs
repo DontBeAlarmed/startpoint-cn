@@ -9,7 +9,7 @@ const bundledEvents = require("../assets/mission_active_event.json")
 const bundledRewards = require("../assets/mission_active_reward.json")
 const { getActiveMissionPlan } = require("../src/lib/mission/active-plan")
 const { parseActiveMissionEventDefinition } = require("../src/lib/mission/active-plan")
-const { getActiveMissionRewards } = require("../src/lib/mission/rewards")
+const { getActiveMissionPlanRewardStages } = require("../src/lib/mission/active-plan")
 
 function clone(value) {
     return JSON.parse(JSON.stringify(value))
@@ -53,13 +53,13 @@ for (const stringId of ["", "(None)"]) {
     assert.equal(parseActiveMissionEventDefinition(1, row).stringId, stringId)
 }
 
-const copiedRewards = getActiveMissionRewards(11010, 1, repositoryA)
-assert.equal(copiedRewards[0].amount, 5)
-copiedRewards[0].amount = 999999
-copiedRewards[0].itemId = 999999
-assert.deepEqual(getActiveMissionRewards(11010, 1, repositoryA), [
-    { kind: 1, amount: 5, itemId: 101 },
-])
+assert.deepEqual(
+    getActiveMissionPlanRewardStages(getActiveMissionPlan(repositoryA), 11010)
+        .find(stage => stage.stage === 1)?.rewards,
+    [
+        { kind: 1, amount: 5, itemId: 101 },
+    ],
+)
 
 const duplicateMissionTables = {
     "mission_active.json": {
@@ -204,7 +204,7 @@ const expectedFactKinds = new Map([
     [16, ["battleCounters"]], [17, ["battleCounters"]], [21, ["characters"]], [23, []],
     [26, ["battleCounters"]], [34, ["equipment"]], [35, ["party"]], [36, ["equipment"]],
     [39, ["player"]], [45, ["shopPurchases"]], [46, ["counters"]], [48, ["manaNodes"]],
-    [57, []], [58, ["counters"]], [59, ["counters"]], [60, ["counters"]],
+    [57, ["questProgress"]], [58, ["counters"]], [59, ["counters"]], [60, ["counters"]],
     [61, ["characters"]], [62, ["manaNodes"]], [63, ["counters"]], [64, ["shopPurchases"]],
     [65, ["counters"]], [66, []], [71, ["conditionalBattleFacts"]],
     [72, ["conditionalBattleFacts"]], [73, ["conditionalBattleFacts"]], [78, ["counters"]],

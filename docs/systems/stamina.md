@@ -75,7 +75,7 @@ start 的扣除是预扣语义：active quest 会保存本次实际 `stamina_cos
 
 多人结算已经实现 rank point 与 degree 更新。跨级时同样在当前体力上增加 `getMaxStamina(newDegreeId)` 并重置恢复时间，然后通过 `user_info` 返回新体力；数据库写入和响应投影复用同一绝对上限计算，最终都不会超过 `999`。
 
-多人入场成本仍只由房主承担。房主成功 finish 确认消耗 `total_stamina_used`；房主 abort、失败 finish 或房间失效释放保存成本。成员 start 保存零成本，成功不增加客机体力消耗，未完成也不退款。
+多人入场成本由房主承担完整关卡体力；guest 按 Follow 关系计费（`src/lib/stamina-cost.ts` 的 `getLocalGuestStaminaCost`）：互关（`follow_state=1`）与可信跨服 guest 实际成本为 0，其余（0/2/3）先 `floor(raw × 0.5)` 再应用 Campaign（对折半值，非零最低 1）。guest 成本在 start 预扣并保存到各自 active quest，abort/失败 finish/房间失效与房主同一释放 owner 退款；成功 finish 才确认 `total_stamina_used`。跨服判定只信任 Coordinator 的 `nodeSessionId`（见[同服 Follow 与跨服房间兼容](./follow.md)）。
 
 ## 活动折扣
 
@@ -99,7 +99,7 @@ start 的扣除是预扣语义：active quest 会保存本次实际 `stamina_cos
 
 ## 已知边界
 
-- 多人入场成本由房主承担，成员不扣房主的体力或入场道具；
+- 多人入场：房主承担完整体力与 Always 门票；guest 按 Follow 关系计费（互关/可信跨服免费，其余半价再打折），不扣房主的入场道具；
 - 自动连战在体力不足时仍按普通入场返回 H400，客户端缺少官方的非致命停止语义；
 - 体力与门票在 start 预扣并保存实际成本，未完成路径复用同一释放 owner 返还；单人和协力 finish 的数据库写入也已有总事务，详见[战斗关卡结算事务](./quest-finish-transactions.md)；
 - 客户端显示和长时间离线恢复仍需结合服务器 `timeOffset` 做人工验收。

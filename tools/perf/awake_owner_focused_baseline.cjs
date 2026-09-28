@@ -119,7 +119,8 @@ function loadRuntime(fixture) {
     const mailDomain = require("../../src/data/domains/mail")
     const tutorialDomain = require("../../src/data/domains/tutorial")
     const questDomain = require("../../src/data/domains/quest")
-    const assets = require("../../src/lib/assets")
+    const characterContent = require("../../src/lib/character-content")
+    const characterGrowthContent = require("../../src/lib/character-growth-content")
     const { characterExpCaps, givePlayerCharacterSync } = require("../../src/lib/character")
     const {
         createAwakeRequestContext,
@@ -133,7 +134,10 @@ function loadRuntime(fixture) {
 
     return {
         fixture,
-        assets,
+        assets: {
+            getCharacterFacts: characterContent.getCharacterFacts,
+            getCharacterGrowthContent: characterGrowthContent.getCharacterGrowthContent,
+        },
         awakeDomain,
         characterDomain,
         characterExpCaps,
@@ -257,6 +261,10 @@ async function runAwakeOwnerFocusedBaseline() {
         fixture = await createAwakeOwnerFactPublicationFixture({
             additionalTableNames: [
                 "gacha.json",
+                "gacha_pool.json",
+                "gacha_campaign_definitions.json",
+                "stars_gacha_campaign.json",
+                "gacha_exchange_rate.json",
                 "shop_item_campaign.json",
                 "shop_select_item_campaign.json",
             ],

@@ -4,46 +4,61 @@ const assert = require("assert")
 const bundledCharacters = require("../assets/character.json")
 const bundledCharacterText = require("../assets/cdndata/character_text.json")
 const bundledGachas = require("../assets/gacha.json")
+const bundledGachaPools = require("../assets/gacha_pool.json")
+const bundledCampaigns = require("../assets/gacha_campaign_definitions.json")
+const bundledStarsCampaigns = require("../assets/stars_gacha_campaign.json")
+const bundledEquipmentLookup = require("../assets/equipment_lookup.json")
+const bundledItemLookup = require("../assets/item_lookup.json")
+const bundledMovieProbability = require("../assets/equipment_gacha_movie_probability.json")
+const bundledExchangeRates = require("../assets/gacha_exchange_rate.json")
 
 const {
-    productionContentSnapshotProvider,
-} = require("../src/content/runtime/content-snapshot")
-const { getCharacterDataSync } = require("../src/lib/assets")
+    installFrozenTestContentSnapshot,
+} = require("../tools/helpers/content-snapshot-fixture.cjs")
+
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 
 const {
     buildShortUpCharacterGachaTimeline,
 } = require("../src/lib/admin-clairvoyance")
 
-function repository(characterMeta, characterText, gachas = bundledGachas) {
-    return Object.freeze({
-        info: () => Object.freeze({
-            source: "release",
-            assetVersion: "test-release",
-            generatorVersion: 1,
-            releaseDigest: null,
-        }),
-        table: (tableName) => {
-            if (tableName === "gacha.json") return gachas
-            if (tableName === "character.json") return characterMeta
-            if (tableName === "cdndata/character_text.json") return characterText
-            throw new Error(`unexpected content table: ${tableName}`)
-        },
-    })
+function tables(
+    characterMeta,
+    characterText,
+    gachas = bundledGachas,
+    gachaPools = bundledGachaPools,
+    // Partial-injection repositories only carry gacha 900002, so the bundled
+    // campaign/stars definitions would dangle; they must be empty there. The
+    // gacha catalog validates every remaining auxiliary table strictly.
+    { campaignTables = true } = {},
+) {
+    return {
+        "gacha.json": gachas,
+        "gacha_pool.json": gachaPools,
+        "character.json": characterMeta,
+        "cdndata/character_text.json": characterText,
+        "gacha_campaign_definitions.json": campaignTables ? bundledCampaigns : {},
+        "stars_gacha_campaign.json": campaignTables ? bundledStarsCampaigns : {},
+        "gacha_exchange_rate.json": bundledExchangeRates,
+        "equipment_lookup.json": bundledEquipmentLookup,
+        "item_lookup.json": bundledItemLookup,
+        "equipment_gacha_movie_probability.json": bundledMovieProbability,
+    }
 }
 
-const previousSnapshot = productionContentSnapshotProvider.snapshot
-const targetGachaItems = Object.values(bundledGachas["900002"].pool)
-    .flat()
+const restoreBundledBaseline = installFrozenTestContentSnapshot({
+    targetVersion: "1.4.54",
+    tables: tables(bundledCharacters, bundledCharacterText),
+}).restore
+
+const targetGachaItems = Object.values(bundledGachas["900002"].poolOddsIds)
+    .flatMap(oddsId => bundledGachaPools[oddsId])
     .filter(item => item.id === 121069)
 const originalRarities = targetGachaItems.map(item => ({
     item,
     hasRarity: Object.hasOwn(item, "rarity"),
     rarity: item.rarity,
 }))
-productionContentSnapshotProvider.snapshot = Object.freeze({
-    cdn: Object.freeze({ targetVersion: "1.4.54" }),
-    repository: repository(bundledCharacters, bundledCharacterText),
-})
 
 try {
     const timeline = buildShortUpCharacterGachaTimeline(new Date("2021-10-18T14:00:00.000Z"))
@@ -63,26 +78,43 @@ try {
     assert.strictEqual(beastFighter.name, "谢胧")
     assert(beastFighter.gachas.some((gacha) => gacha.id === 900002), "角色搜索应能反查到对应卡池")
 
+    // Catalog validation pins character.json rarity to the pool rank (5), so
+    // the injected table overrides rarity-compatible fields only; element 8
+    // stays distinct from the bundled value and proves the override flows.
     const injectedCharacter = Object.freeze({
         name: "",
-        rarity: 9,
+        rarity: 5,
         element: 8,
         skill_count: 6,
     })
     const injectedTextRow = Array(12).fill("")
     injectedTextRow[0] = "Release角色名"
     injectedTextRow[3] = "Release角色称号"
+    // The injected pools still reference other characters for rarity checks.
+    const injectedCharacters = Object.freeze({
+        ...bundledCharacters,
+        "121069": injectedCharacter,
+    })
+    const injectedText = Object.freeze({
+        ...bundledCharacterText,
+        "121069": Object.freeze([Object.freeze(injectedTextRow)]),
+    })
     const injectedGacha = structuredClone(bundledGachas["900002"])
     injectedGacha.name = "Release卡池名"
-    const injectedGachaItems = Object.values(injectedGacha.pool)
-        .flat()
-        .filter(item => item.id === 121069)
-    productionContentSnapshotProvider.snapshot = Object.freeze({
-        cdn: Object.freeze({ targetVersion: "test-release" }),
-        repository: repository(
-            Object.freeze({ "121069": injectedCharacter }),
-            Object.freeze({ "121069": Object.freeze([Object.freeze(injectedTextRow)]) }),
+    const injectedGachaPools = Object.fromEntries(
+        Object.values(injectedGacha.poolOddsIds).map(oddsId => [
+            oddsId,
+            structuredClone(bundledGachaPools[oddsId]),
+        ]),
+    )
+    const { restore: restoreInjected } = installFrozenTestContentSnapshot({
+        targetVersion: "test-release",
+        tables: tables(
+            injectedCharacters,
+            injectedText,
             Object.freeze({ "900002": Object.freeze(injectedGacha) }),
+            Object.freeze(injectedGachaPools),
+            { campaignTables: false },
         ),
     })
 
@@ -99,14 +131,26 @@ try {
         "gacha 行提供 rarity 时应保持原有优先级",
     )
 
-    for (const { item } of originalRarities) delete item.rarity
-    for (const item of injectedGachaItems) delete item.rarity
-    productionContentSnapshotProvider.snapshot = Object.freeze({
-        cdn: Object.freeze({ targetVersion: "test-release-without-gacha-rarity" }),
-        repository: repository(
-            Object.freeze({ "121069": injectedCharacter }),
-            Object.freeze({ "121069": Object.freeze([Object.freeze(injectedTextRow)]) }),
+    // The first timeline build deep-freezes the shared pool items through the
+    // gacha catalog, so deleting `rarity` in place is a silent no-op now. The
+    // no-gacha-rarity case instead installs fresh clones with the field
+    // stripped; catalog validation only pins `rank`, never `item.rarity`.
+    const injectedGachaPoolsWithoutRarity = Object.fromEntries(
+        Object.entries(injectedGachaPools).map(([oddsId, items]) => [
+            oddsId,
+            items.map(item => item.id === 121069
+                ? Object.fromEntries(Object.entries(item).filter(([field]) => field !== "rarity"))
+                : item),
+        ]),
+    )
+    const { restore: restoreWithoutRarity } = installFrozenTestContentSnapshot({
+        targetVersion: "test-release-without-gacha-rarity",
+        tables: tables(
+            injectedCharacters,
+            injectedText,
             Object.freeze({ "900002": Object.freeze(injectedGacha) }),
+            Object.freeze(injectedGachaPoolsWithoutRarity),
+            { campaignTables: false },
         ),
     })
     const releaseTimeline = buildShortUpCharacterGachaTimeline(
@@ -126,41 +170,66 @@ try {
     assert.strictEqual(releaseCharacter.title, "Release角色称号")
     assert.strictEqual(releaseCharacter.rarity, injectedCharacter.rarity)
     assert.strictEqual(releaseCharacter.element, injectedCharacter.element)
-    assert.strictEqual(getCharacterDataSync(121069), injectedCharacter)
 
     let tableReads = 0
-    const cachedRepository = Object.freeze({
-        info: () => Object.freeze({
-            source: "release",
-            assetVersion: "cache-test",
-            generatorVersion: 1,
-            releaseDigest: null,
-        }),
-        table: (tableName) => {
-            tableReads++
-            if (tableName === "gacha.json") return Object.freeze({ "900002": Object.freeze(injectedGacha) })
-            if (tableName === "character.json") return Object.freeze({ "121069": injectedCharacter })
-            if (tableName === "cdndata/character_text.json") {
-                return Object.freeze({ "121069": Object.freeze([Object.freeze(injectedTextRow)]) })
-            }
-            throw new Error(`unexpected content table: ${tableName}`)
-        },
-    })
-    productionContentSnapshotProvider.snapshot = Object.freeze({
-        cdn: Object.freeze({ targetVersion: "cache-test" }),
-        repository: cachedRepository,
+    const { restore: restoreCacheProbe } = installFrozenTestContentSnapshot({
+        targetVersion: "cache-test",
+        onTableRead: () => { tableReads++ },
+        tables: tables(
+            injectedCharacters,
+            injectedText,
+            Object.freeze({ "900002": Object.freeze(injectedGacha) }),
+            Object.freeze(injectedGachaPools),
+            { campaignTables: false },
+        ),
     })
 
     const cachedFirst = buildShortUpCharacterGachaTimeline(new Date("2021-10-18T14:00:00.000Z"))
     const cachedSecond = buildShortUpCharacterGachaTimeline(new Date("2021-10-18T15:00:00.000Z"))
-    assert.strictEqual(tableReads, 3, "同一个固定 Repository 只应构建一次静态千里眼数据")
+    // One build per fixed repository: 9 gacha catalog tables + character.json
+    // (facts) + character_text.json (display text) = 11 reads, then cached.
+    assert.strictEqual(tableReads, 11, "同一个固定 Repository 只应构建一次静态千里眼数据")
     assert.notStrictEqual(cachedFirst.currentTime, cachedSecond.currentTime)
+
+    // Timeline ISO start/end must follow an explicit +540 calendar (the same
+    // master wall time lands one absolute hour earlier than under +480) and
+    // the cache must be keyed by calendar offset so the two policies never
+    // bleed into each other. The cache-probe snapshot only carries gacha
+    // 900002, so sample that pool.
+    const calendar540 = createGameCalendarPolicy(540)
+    const timeline540 = buildShortUpCharacterGachaTimeline(new Date("2021-10-18T14:00:00.000Z"), calendar540)
+    const sample480 = cachedFirst.timeline.find((gacha) => gacha.id === 900002)
+    const sample540 = timeline540.timeline.find((gacha) => gacha.id === 900002)
+    assert(sample480 && sample540, "两种日历口径都必须包含卡池 #900002")
+    assert.strictEqual(
+        sample540.startTime,
+        new Date(Date.parse(sample480.startTime) - 3_600_000).toISOString(),
+        "同一主表时刻在 +540 下必须对应提前一小时的绝对 ISO 时刻",
+    )
+    assert.strictEqual(
+        sample540.endTime,
+        new Date(Date.parse(sample480.endTime) - 3_600_000).toISOString(),
+    )
+    assert.strictEqual(sample480.durationDays, sample540.durationDays)
+    assert.notStrictEqual(timeline540.timeline, cachedFirst.timeline, "缓存必须按日历偏移区分")
+    const reread540 = buildShortUpCharacterGachaTimeline(new Date("2021-10-18T14:00:00.000Z"), calendar540)
+    assert.strictEqual(
+        reread540.timeline.find((gacha) => gacha.id === 900002).startTime,
+        sample540.startTime,
+        "+540 重复请求必须命中 +540 的缓存",
+    )
+    const reread480 = buildShortUpCharacterGachaTimeline(new Date("2021-10-18T14:00:00.000Z"))
+    assert.strictEqual(
+        reread480.timeline.find((gacha) => gacha.id === 900002).startTime,
+        sample480.startTime,
+        "+480 重复请求必须命中 +480 的缓存",
+    )
 } finally {
     for (const { item, hasRarity, rarity } of originalRarities) {
         if (hasRarity) item.rarity = rarity
         else delete item.rarity
     }
-    productionContentSnapshotProvider.snapshot = previousSnapshot
+    restoreBundledBaseline()
 }
 
 console.log("admin-clairvoyance tests passed")

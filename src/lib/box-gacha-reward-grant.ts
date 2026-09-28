@@ -78,7 +78,10 @@ function projectBoxGachaRewardResult(result: RewardGrantExecutionResult): Player
             exp_pool: currency.expPool ?? 0,
         },
         character_list: result.assets.characters.map(entry => entry.after),
-        joined_character_id_list: [],
+        // 仅本次首次获得的角色（RewardGrant joined 事实）；重复角色走补偿道具，不入列
+        joined_character_id_list: result.assets.characters
+            .filter(entry => entry.joined)
+            .map(entry => entry.characterId),
         equipment_list: result.assets.equipment.map(entry => entry.after),
         items,
         itemOverflowDispositions: collectRewardGrantItemOverflowDispositions(result),

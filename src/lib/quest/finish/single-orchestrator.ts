@@ -2,10 +2,12 @@ import type { PlayerQuestProgress } from "../../../data/types"
 import {
     getQuestConfigurationErrorResponse,
     getQuestFromCategorySync,
+} from "../../quest-content"
+import {
     getRushEventFolderMaxRoundSync,
     getRushEventQuestConfigurationErrorResponse,
     getScoreAttackBorderRewards,
-} from "../../assets"
+} from "../../rush-event-content"
 import { QuestCategory, type BattleQuest } from "../../types"
 import { activeQuests, type ActiveQuest } from "../active-quest-service"
 import {
@@ -30,6 +32,8 @@ import {
     type SingleSettlementWritesResult,
 } from "./single-settlement-writes"
 import { recordScoreRewardSettlement } from "../score-reward-settlement"
+import { getAdditionalRewardTable } from "../../additional-reward"
+import { getRewardCampaignTable } from "../../reward-campaign"
 
 export interface SingleFinishFailure {
     ok: false
@@ -65,14 +69,12 @@ export function settleSingleBattleQuest({
     body: ValidatedSingleFinishBody
     dailyResetHour?: number
 }): SingleFinishResult {
-    console.log(`[FINISH] req: playerId=${playerId} questId=${body.quest_id} category=${body.category} activeExists=${memoryActiveQuest !== undefined} multi=${memoryActiveQuest?.isMulti ?? false}`)
     if (memoryActiveQuest === undefined) {
         return failure(400, "Bad Request", "No active quest to finish.")
     }
 
     const questCategory = memoryActiveQuest.category
     const questId = memoryActiveQuest.questId
-    console.log(`[FINISH] active: category=${questCategory} questId=${questId}`)
     let questData: BattleQuest | null
     try {
         questData = getQuestFromCategorySync(questCategory, questId)
@@ -144,6 +146,9 @@ export function settleSingleBattleQuest({
         questProgress: PlayerQuestProgress | null
     }
     try {
+        // Validate the complete reward Content closure before opening the write transaction.
+        getRewardCampaignTable()
+        getAdditionalRewardTable()
         transactionResult = runSingleFinishSettlementTransaction({
             playerId,
             memoryQuest: memoryActiveQuest,

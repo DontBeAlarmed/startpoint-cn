@@ -29,6 +29,13 @@ const {
     ShopOfferScheduleError,
 } = shop
 const { ShopType } = require("../src/lib/types")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
+const { selectShopSalesCatalogItems } = require("../src/lib/shop/sales-catalog")
+const { buildShopSalesListSync } = require("../src/lib/shop-sales-list")
+const {
+    RUSH_FINAL_OPERATION_OVERRIDE,
+    resolveRushFinalOperationOverride,
+} = require("../src/lib/rush-final-operation-override")
 
 function item(overrides = {}) {
     return {
@@ -88,6 +95,7 @@ function fixtureTables() {
             "11": {
                 "700001": {
                     "310001": item({
+                        costs: [{ id: 70001, amount: 1 }],
                         availableUntil: "2024-12-31 23:59:59",
                         rewards: [{ type: 0, id: 777, count: 2 }],
                     }),
@@ -137,6 +145,7 @@ function bundledRepository() {
     const assetsRoot = path.resolve(__dirname, "../assets")
     const tableNames = [
         "shop_item_campaign.json",
+        "shop_select_item_campaign.json",
         "cdn_general_shop_whitelist.json",
         "shop_cost_item_schedule.json",
         "treasure_shop.json",
@@ -169,7 +178,7 @@ test("loading the Shop catalog boundary does not load database modules", () => {
     assert.deepEqual(shopLoadBoundaryViolations, [])
 })
 
-test("Shop catalog exposes typed scopes, stable indexes and compatibility windows", () => {
+test("Shop catalog exposes typed scopes and stable indexes without private overrides", () => {
     assert.equal(typeof buildShopCatalog, "function")
     const catalog = buildShopCatalog(repository())
 
@@ -188,38 +197,94 @@ test("Shop catalog exposes typed scopes, stable indexes and compatibility window
     })
     assert.equal(catalog.entries[`${ShopType.GENERAL}:220032`].listed, true)
     assert.equal(catalog.entries[`${ShopType.GENERAL}:999999`].listed, false)
-    assert.deepEqual(catalog.eventProductIds["11:700011"], [310001])
-    assert.deepEqual(catalog.entries[`${ShopType.EVENT_ITEM}:310001`].periods[1], {
-        availableFrom: "2025-06-26 12:00:00",
-        availableUntil: "2025-08-14 23:59:59",
-    })
+    assert.equal(
+        catalog.eventProductIds["11:700011"],
+        undefined,
+        "official-only catalog must not index private override products",
+    )
+    assert.equal(
+        catalog.entries[`${ShopType.EVENT_ITEM}:310001`].periods.length,
+        1,
+        "official-only catalog must not bake compatibility periods into entries",
+    )
     assert.deepEqual(catalog.equipmentGroupProductIds["3:21:5020042"], [700001, 700002])
     assert.deepEqual(catalog.rewardProductKeys["0:777"], [
         `${ShopType.GENERAL}:999999`,
         `${ShopType.EVENT_ITEM}:310001`,
     ])
+    assert.deepEqual(catalog.campaignsByKey["4:10"], {
+        shopType: ShopType.EVENT_ITEM,
+        campaignId: 10,
+        availableFromMs: shop.parseShopCnTimestamp("2024-01-01 00:00:00"),
+        availableUntilMs: shop.parseShopCnTimestamp("2025-01-01 00:00:00"),
+        lineupIds: [1010],
+    })
+    assert.deepEqual(catalog.eventCurrencyWindowsByItemId["70001"], [{
+        fromMs: shop.parseShopCnTimestamp("2024-01-01 00:00:00"),
+        untilMs: shop.parseShopCnTimestamp("2024-12-31 23:59:59"),
+    }], "Rush compatibility must not become an official Event Currency window")
     assert.equal(Object.isFrozen(catalog), true)
     assert.equal(Object.isFrozen(catalog.entries), true)
     assert.equal(Object.isFrozen(catalog.entries[`${ShopType.EVENT_ITEM}:310001`]), true)
 })
 
-test("Rush compatibility window reaches resolver boundaries and is not applied over real target rows", () => {
+test("rush final-operation override composes at query time and never touches official rows", () => {
     const start = shop.parseShopCnTimestamp("2025-06-26 12:00:00")
     const end = shop.parseShopCnTimestamp("2025-08-14 23:59:59")
-    const first = buildShopCatalog(repository())
+    const catalog = buildShopCatalog(repository())
     const key = `${ShopType.EVENT_ITEM}:310001`
-    assert.equal(resolveEffectiveShopOffer(first, ShopType.EVENT_ITEM, 310001, start).shopItemId, 310001)
-    assert.equal(resolveEffectiveShopOffer(first, ShopType.EVENT_ITEM, 310001, end).shopItemId, 310001)
+    assert.equal(catalog.entries[key].periods.length, 1)
+
+    assert.equal(RUSH_FINAL_OPERATION_OVERRIDE[700011].provenance, "PRIVATE_OVERRIDE")
+    assert.equal(RUSH_FINAL_OPERATION_OVERRIDE[700011].sourceEventId, 700001)
+    const override = resolveRushFinalOperationOverride(true)
+    assert.equal(resolveRushFinalOperationOverride(false), null)
+
+    assert.equal(
+        resolveEffectiveShopOffer(catalog, ShopType.EVENT_ITEM, 310001, start, override).shopItemId,
+        310001,
+    )
+    assert.equal(
+        resolveEffectiveShopOffer(catalog, ShopType.EVENT_ITEM, 310001, end, override).shopItemId,
+        310001,
+    )
     assert.throws(
-        () => resolveEffectiveShopOffer(first, ShopType.EVENT_ITEM, 310001, start - 1),
+        () => resolveEffectiveShopOffer(catalog, ShopType.EVENT_ITEM, 310001, start - 1, override),
         error => error instanceof ShopOfferPeriodError,
     )
     assert.throws(
-        () => resolveEffectiveShopOffer(first, ShopType.EVENT_ITEM, 310001, end + 1),
+        () => resolveEffectiveShopOffer(catalog, ShopType.EVENT_ITEM, 310001, end + 1, override),
         error => error instanceof ShopOfferPeriodError,
     )
-    assert.equal(first.entries[key].periods.length, 2)
-    assert.equal(buildShopCatalog(repository()).entries[key].periods.length, 2)
+    assert.throws(
+        () => resolveEffectiveShopOffer(catalog, ShopType.EVENT_ITEM, 310001, start),
+        error => error instanceof ShopOfferPeriodError,
+        "without the override the official period must reject final-operation purchases",
+    )
+    assert.equal(catalog.entries[key].periods.length, 1, "composition must not mutate the catalog")
+
+    const targetView = selectShopSalesCatalogItems(catalog, {
+        shopTypes: [],
+        eventList: [{ eventType: 11, eventIds: [700011] }],
+        bossCategoryIds: [],
+    }, override)
+    assert.deepEqual(Object.keys(targetView[ShopType.EVENT_ITEM] ?? {}), ["310001"])
+    assert.deepEqual(
+        targetView[ShopType.EVENT_ITEM]["310001"].compatibilityPeriods,
+        [{ availableFrom: "2025-06-26 12:00:00", availableUntil: "2025-08-14 23:59:59" }],
+    )
+    const officialView = selectShopSalesCatalogItems(catalog, {
+        shopTypes: [],
+        eventList: [{ eventType: 11, eventIds: [700011] }],
+        bossCategoryIds: [],
+    }, null)
+    assert.equal(officialView[ShopType.EVENT_ITEM], undefined)
+    const disabledView = selectShopSalesCatalogItems(catalog, {
+        shopTypes: [],
+        eventList: [{ eventType: 11, eventIds: [700011] }],
+        bossCategoryIds: [],
+    }, resolveRushFinalOperationOverride(false))
+    assert.equal(disabledView[ShopType.EVENT_ITEM], undefined)
 
     const targetTables = fixtureTables()
     targetTables["event_item_shop.json"]["11"]["700011"] = {
@@ -228,6 +293,24 @@ test("Rush compatibility window reaches resolver boundaries and is not applied o
     const targetCatalog = buildShopCatalog(repository(targetTables))
     assert.deepEqual(targetCatalog.eventProductIds["11:700011"], [310999])
     assert.equal(targetCatalog.entries[key].periods.length, 1)
+    assert.throws(
+        () => resolveEffectiveShopOffer(
+            targetCatalog,
+            ShopType.EVENT_ITEM,
+            310001,
+            start,
+            override,
+        ),
+        error => error instanceof ShopOfferPeriodError,
+        "exact official target rows must win over the override",
+    )
+    const exactView = selectShopSalesCatalogItems(targetCatalog, {
+        shopTypes: [],
+        eventList: [{ eventType: 11, eventIds: [700011] }],
+        bossCategoryIds: [],
+    }, override)
+    assert.deepEqual(Object.keys(exactView[ShopType.EVENT_ITEM]), ["310999"])
+    assert.equal(exactView[ShopType.EVENT_ITEM]["310999"].compatibilityPeriods, undefined)
 })
 
 test("effective offer resolves CN UTC+8 month, row period and purchase discriminant", () => {
@@ -254,6 +337,27 @@ test("effective offer resolves CN UTC+8 month, row period and purchase discrimin
         ),
         error => error instanceof ShopOfferPeriodError,
     )
+})
+
+test("shop period parsing and business month accept an explicit +540 calendar", () => {
+    const calendar540 = createGameCalendarPolicy(540)
+    const epoch480 = shop.parseShopCnTimestamp("2025-06-26 12:00:00")
+    const epoch540 = shop.parseShopCnTimestamp("2025-06-26 12:00:00", calendar540)
+    assert.equal(epoch540 - epoch480, -3_600_000, "+540 必须把同一主表时间解释为提前一小时的 UTC 时刻")
+    assert.equal(
+        shop.parseShopCnTimestamp("2025-06-26 12:00:00", calendar540),
+        Date.parse("2025-06-26T12:00:00+09:00"),
+    )
+    assert.throws(
+        () => shop.parseShopCnTimestamp("2025-02-30 12:00:00", calendar540),
+        error => error instanceof shop.ShopPeriodFormatError,
+    )
+
+    // 15:30Z on the last day of August is 23:30 (+480, month 8) but
+    // 2024-09-01 00:30 (+540, month 9).
+    const monthBoundary = Date.parse("2024-08-31T15:30:00.000Z")
+    assert.equal(shop.getShopCnMonth(monthBoundary), 8)
+    assert.equal(shop.getShopCnMonth(monthBoundary, calendar540), 9, "+540 的营业月必须推进一小时")
 })
 
 test("schedule selection is inclusive, host-timezone independent and fails closed on ambiguity", () => {
@@ -357,6 +461,44 @@ test("catalog rejects invalid navigation product invariants", () => {
     assert.throws(() => buildShopCatalog(repository(missingCampaign)), /Invalid special exchange link/)
 })
 
+test("catalog rejects malformed or dangling Campaign definitions", () => {
+    const malformedPeriod = fixtureTables()
+    malformedPeriod["shop_select_item_campaign.json"]["4"]["10"].availableFrom = "invalid"
+    assert.throws(() => buildShopCatalog(repository(malformedPeriod)), /Invalid shop period/)
+
+    const missingCampaign = fixtureTables()
+    delete missingCampaign["shop_select_item_campaign.json"]["4"]["10"]
+    assert.throws(() => buildShopCatalog(repository(missingCampaign)), /campaign does not exist/)
+
+    const missingLineup = fixtureTables()
+    missingLineup["shop_select_item_campaign.json"]["4"]["10"].lineupIds = [9999]
+    assert.throws(() => buildShopCatalog(repository(missingLineup)), /lineup does not exist/)
+})
+
+test("runtime repository whitelist is the only General listing authority", () => {
+    const tables = fixtureTables()
+    tables["cdn_general_shop_whitelist.json"] = [999999]
+    const catalog = buildShopCatalog(repository(tables))
+    const selected = selectShopSalesCatalogItems(catalog, {
+        shopTypes: [ShopType.GENERAL],
+        eventList: [],
+        bossCategoryIds: [],
+    })
+    assert.deepEqual(Object.keys(selected[ShopType.GENERAL]), ["999999"])
+    const sales = buildShopSalesListSync({
+        playerId: 1,
+        itemsByType: selected,
+        nowMs: Date.parse("2024-08-01T00:00:00Z"),
+        isItemVisible: () => true,
+    }, {
+        getPurchaseCountsBulk: (_playerId, queries) => new Map(queries.map(query => [
+            `${query.shopType}:${query.shopItemId}:${query.keys.daily}:${query.keys.monthly}`,
+            { daily: 0, monthly: 0, total: 0 },
+        ])),
+    }).salesList
+    assert.deepEqual(sales.map(sale => sale.shop_item_id), [999999])
+})
+
 test("bundled shop content builds one complete immutable catalog", () => {
     const source = bundledRepository()
     const buildStartedAt = performance.now()
@@ -367,12 +509,14 @@ test("bundled shop content builds one complete immutable catalog", () => {
         Object.fromEntries(Object.entries(catalog.productIdsByType).map(([type, ids]) => [type, ids.length])),
         { 2: 108, 3: 158, 4: 8532, 5: 3, 7: 6132, 8: 290, 9: 74, 10: 191 },
     )
-    assert.equal(Object.keys(catalog.eventProductIds).length, 161)
+    assert.equal(Object.keys(catalog.eventProductIds).length, 154)
     assert.equal(Object.keys(catalog.bossProductIds).length, 50)
     assert.equal(Object.keys(catalog.equipmentGroupProductIds).length, 29)
     assert.equal(Object.keys(catalog.rewardProductKeys).length, 812)
     assert.equal(Object.keys(catalog.scheduleRowsByMonth).length, 12)
-    assert.equal(catalog.eventProductIds["11:700011"].length, 33)
+    assert.equal(Object.keys(catalog.campaignsByKey).length, 6)
+    assert.equal(Object.keys(catalog.eventCurrencyWindowsByItemId).length > 0, true)
+    assert.equal(catalog.eventProductIds["11:700011"], undefined)
     assert.equal(Object.isFrozen(catalog.scheduleRowsByMonth), true)
 
     const special = catalog.productIdsByType[String(ShopType.SPECIAL_PACK)]
@@ -393,15 +537,16 @@ test("bundled shop content builds one complete immutable catalog", () => {
     assert.equal(catalog.entries[`${ShopType.GENERAL}:220032`].listed, true)
     assert.equal(catalog.productIdsByType[String(ShopType.GENERAL)]
         .every(id => catalog.entries[`${ShopType.GENERAL}:${id}`].listed === true), true)
-    const rushItemId = catalog.eventProductIds["11:700011"][0]
+    const rushItemId = catalog.eventProductIds["11:700001"][0]
     const rushEntry = catalog.entries[`${ShopType.EVENT_ITEM}:${rushItemId}`]
-    assert.equal(rushEntry.periods.some(period => period.availableFrom === "2025-06-26 12:00:00"), true)
+    assert.equal(rushEntry.periods.length, 1, "bundled catalog stays official-only")
     assert.equal(
         resolveEffectiveShopOffer(
             catalog,
             ShopType.EVENT_ITEM,
             rushItemId,
             shop.parseShopCnTimestamp("2025-07-01 12:00:00"),
+            resolveRushFinalOperationOverride(true),
         ).shopItemId,
         rushItemId,
     )
@@ -413,5 +558,5 @@ test("bundled shop content builds one complete immutable catalog", () => {
     const lookupDurationMs = performance.now() - lookupStartedAt
     assert.ok(buildDurationMs < 2_000, `catalog build took ${buildDurationMs.toFixed(1)}ms`)
     assert.ok(lookupDurationMs < 500, `100k catalog lookups took ${lookupDurationMs.toFixed(1)}ms`)
-    assert.equal(source.calls.length, 11)
+    assert.equal(source.calls.length, 12)
 })

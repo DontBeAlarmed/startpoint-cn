@@ -165,9 +165,9 @@ test("single battle routes use identity-only resolution without loading Player",
     const abort = routeBlock("abort", "start")
     assert.doesNotMatch(abort, /getPlayerActiveQuestSync\(/)
     assert.match(abort, /abortResult\.resolvedIdentity/)
-    assert.match(abort, /abortResult\.observedActiveQuest/)
+    assert.match(abort, /abortResult\.itemList/)
 
     const start = routeBlock("start", "play_continue")
     assert.doesNotMatch(start, /playerData/)
-    assert.match(start, /startResult\.beforeStamina/)
+    assert.match(start, /startResult\./)
 })

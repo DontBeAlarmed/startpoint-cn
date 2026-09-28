@@ -124,3 +124,27 @@ export function deletePlayerEquipmentSync(playerId: number, equipmentId: string 
     DELETE FROM players_equipment WHERE id = ? AND player_id = ?
     `).run(Number(equipmentId), playerId)
 }
+
+/** Batch-dissolve helper: sets stack = 0 on every owned equipment id, returns updated row count. */
+export function updatePlayerEquipmentStacksToZeroSync(
+    playerId: number,
+    equipmentIds: readonly number[],
+): number {
+    if (equipmentIds.length === 0) return 0
+    const placeholders = equipmentIds.map(() => "?").join(", ")
+    return getDb().prepare(`
+    UPDATE players_equipment SET stack = 0 WHERE player_id = ? AND id IN (${placeholders})
+    `).run(playerId, ...equipmentIds).changes
+}
+
+/** Batch delete of owned equipment ids (caller validates ownership), returns deleted row count. */
+export function deletePlayerEquipmentsByIdsSync(
+    playerId: number,
+    equipmentIds: readonly number[],
+): number {
+    if (equipmentIds.length === 0) return 0
+    const placeholders = equipmentIds.map(() => "?").join(", ")
+    return getDb().prepare(`
+    DELETE FROM players_equipment WHERE player_id = ? AND id IN (${placeholders})
+    `).run(playerId, ...equipmentIds).changes
+}

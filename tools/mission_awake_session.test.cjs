@@ -27,7 +27,7 @@ const {
 } = require("../src/data/domains/mission")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { getDb } = require("../src/data/db")
-const { AwakeComputer, buildAwakeContext } = require("../src/lib/mission/computer-awake")
+const { AwakeComputer } = require("../src/lib/mission/computer-awake")
 const { MissionEvaluationSession } = require("../src/lib/mission/evaluation-session")
 const { getMissionCatalog } = require("../src/lib/mission/mission-catalog")
 const { createProductionMissionFactLoaderRegistry } = require("../src/lib/mission/production-fact-loaders")
@@ -86,7 +86,7 @@ test("battle candidates use only Catalog character indexes and valid direct miss
     assert.deepEqual(requestedCharacters, [341005, 999999])
 })
 
-test("all-complete Session plans child facts and scoped evaluation matches legacy", () => {
+test("all-complete Session plans child facts and scoped evaluation matches full scope", () => {
     const playerId = createPlayer("awake-session")
     updatePlayerCategoryMissionSync(playerId, 9, 3410051, 1)
     updatePlayerCategoryMissionSync(playerId, 9, 3410052, 4)
@@ -111,14 +111,27 @@ test("all-complete Session plans child facts and scoped evaluation matches legac
         "player",
     ])
 
-    const legacyContext = buildAwakeContext(playerId)
     const scopedContext = AwakeComputer.buildContextFromSession(session, 9, [3410054])
+    const fullSession = new MissionEvaluationSession({
+        playerId,
+        evaluationTime,
+        catalog,
+        requirementRegistry: registry,
+        candidates: [3410051, 3410052, 3410053, 3410054].map(missionId => ({ category: 9, missionId })),
+        orchestratorFacts: [{ kind: "player" }],
+        loaders: createProductionMissionFactLoaderRegistry(),
+    })
+    const fullContext = AwakeComputer.buildContextFromSession(
+        fullSession,
+        9,
+        [3410051, 3410052, 3410053, 3410054],
+    )
     const persisted = getPlayerCategoryMissionsSync(playerId, 9)
     for (const missionId of [3410051, 3410052, 3410053, 3410054]) {
         const dbProgress = persisted[missionId]?.progress ?? 0
         assert.equal(
             AwakeComputer.compute(missionId, scopedContext, dbProgress),
-            AwakeComputer.compute(missionId, legacyContext, dbProgress),
+            AwakeComputer.compute(missionId, fullContext, dbProgress),
             `mission ${missionId}`,
         )
     }
@@ -128,14 +141,7 @@ test("all-complete Session plans child facts and scoped evaluation matches legac
         [{ category: 9, missionIds: [3410054] }],
         evaluationTime,
     )
-    const originalLegacyBuilder = AwakeComputer.buildContext
-    AwakeComputer.buildContext = () => { throw new Error("Category 9 evaluation must use Session context") }
-    let evaluation
-    try {
-        evaluation = evaluateMissionCandidates(prepared)
-    } finally {
-        AwakeComputer.buildContext = originalLegacyBuilder
-    }
+    const evaluation = evaluateMissionCandidates(prepared)
 
     assert.deepEqual(evaluation.missions, [{
         category: 9,
@@ -359,7 +365,7 @@ test("persisted Awake families declare their own scoped progress fact", () => {
     }])
 })
 
-test("full and mission-scoped Awake Session contexts match legacy mission by mission", () => {
+test("full and mission-scoped Awake Session contexts stay consistent mission by mission", () => {
     const playerId = createPlayer("awake-full-scoped-equivalence")
     updatePlayerCategoryMissionSync(playerId, 9, 2310012, 2)
     updatePlayerCategoryMissionSync(playerId, 9, 3310032, 1)
@@ -379,14 +385,17 @@ test("full and mission-scoped Awake Session contexts match legacy mission by mis
         observer: { onLoaderCall(key) { fullLoaderCalls.push(key.kind) } },
     })
     const fullContext = AwakeComputer.buildContextFromSession(fullSession, 9, missionIds)
-    const legacyContext = buildAwakeContext(playerId)
+    const fullProgressByMission = new Map(missionIds.map(missionId => [
+        missionId,
+        AwakeComputer.compute(missionId, fullContext, persisted[missionId]?.progress ?? 0),
+    ]))
 
     for (const missionId of missionIds) {
         const dbProgress = persisted[missionId]?.progress ?? 0
-        const legacyProgress = AwakeComputer.compute(missionId, legacyContext, dbProgress)
+        const fullProgress = fullProgressByMission.get(missionId)
         assert.equal(
             AwakeComputer.compute(missionId, fullContext, dbProgress),
-            legacyProgress,
+            fullProgress,
             `full mission ${missionId}`,
         )
         const scopedSession = new MissionEvaluationSession({
@@ -405,7 +414,7 @@ test("full and mission-scoped Awake Session contexts match legacy mission by mis
         )
         assert.equal(
             AwakeComputer.compute(missionId, scopedContext, dbProgress),
-            legacyProgress,
+            fullProgress,
             `scoped mission ${missionId}`,
         )
     }

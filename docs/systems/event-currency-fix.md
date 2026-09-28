@@ -16,7 +16,9 @@
 
 - bundled `assets/score_reward.json` 保留兼容基线；Content Release 从官方 Score Reward OrderedMap 动态生成原始 ID。
 - 根据 `item_lookup.json` 的名称，从 `event_item_shop.json` 建立代币世代族。
-- 发奖时按照全局服务器时间选择商店开放期匹配的代币 ID。
+- 发奖时按照全局服务器时间选择商店开放期匹配的代币 ID。分数奖励的 common 与
+  Rare 两条路径都经过 `resolveEventCurrencyId` 同一世代解析边界
+  （`score-reward-normalization.ts` 的 Rare ITEM 分支）；非代币道具幂等返回原 ID。
 - 不修改无关道具 ID。
 
 Content Sync 的真实 CDN smoke 按奖励组、位置、bundled ID 与官方 ID 元组精确锁定 47 个同名奖励行；差异位置改变、名称不同、数量变化或其他字段漂移都会失败。这些差异属于活动代币世代，不是 CDN 下载偏差。

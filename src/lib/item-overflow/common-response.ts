@@ -4,6 +4,7 @@ import {
 } from "./disposition"
 
 export interface CommonResponseItemOverflow {
+    readonly [field: string]: unknown
     readonly process_type: 1 | 2
     readonly item: Readonly<{
         readonly item_id: number

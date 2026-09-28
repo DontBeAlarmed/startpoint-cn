@@ -67,11 +67,18 @@ const QUEST_TABLE_NAMES = [
     "daily_challenge_point_lookup.json",
     "event_challenge_point_map.json",
     "quest_entry_costs.json",
+    "quest_prerequisites.json",
     "quest_lookup.json",
     "quest_unlock_costs.json",
 ]
 const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
+    "cdndata/player_rank_full.json",
+    "cdndata/player_rank.json",
+    "mission_event_battle_rules.json",
+    "mission_event_quest_map.json",
+    "practice_quest.json",
     "additional_reward_rules.json",
+    "bond_token_exchange.json",
     "box_gacha.json",
     "box_gacha_box_settings.json",
     "box_reward.json",
@@ -87,6 +94,7 @@ const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
     "equipment_dissolve.json",
     "equipment_ids.json",
     "equipment_lookup.json",
+    "encyclopedia.json",
     "item_data.json",
     "item_ids.json",
     "item_inventory_policy.json",
@@ -109,6 +117,7 @@ const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
     "periodic_reward.json",
     "periodic_reward_point.json",
     "raid_event.json",
+    "raid_event_overall_reward.json",
     "reward_campaign.json",
     "stamina_campaign.json",
     "star_crumb_exchange.json",
@@ -116,6 +125,14 @@ const GAMEPLAY_DYNAMIC_TABLE_NAMES = [
     "special_pack_shop.json",
     "mana_shop.json",
     "shop_cost_item_schedule.json",
+    "cdn_general_shop_whitelist.json",
+    "general_shop.json",
+    "star_grain_shop.json",
+    "equipment_enhancement_shop.json",
+    "event_item_shop.json",
+    "boss_coin_shop.json",
+    "shop_item_campaign.json",
+    "shop_select_item_campaign.json",
     "story_join_character.json",
     "treasure_shop.json",
 ]
@@ -126,11 +143,19 @@ function installBundledGameplaySnapshot({
     additionalTableNames = [],
 } = {}) {
     const previousSnapshot = productionContentSnapshotProvider.snapshot
+    const bundledCharacterTable = require(path.join(projectRoot, "assets", CHARACTER_TABLE_NAME))
+    const bundledCharacterContentTable = require(
+        path.join(projectRoot, "assets", CHARACTER_CONTENT_TABLE_NAME)
+    )
     const characterTable = deepFreeze(structuredClone(
-        require(path.join(projectRoot, "assets", CHARACTER_TABLE_NAME))
+        Object.prototype.hasOwnProperty.call(tableOverrides, CHARACTER_TABLE_NAME)
+            ? tableOverrides[CHARACTER_TABLE_NAME]
+            : bundledCharacterTable
     ))
     const characterContentTable = deepFreeze(structuredClone(
-        require(path.join(projectRoot, "assets", CHARACTER_CONTENT_TABLE_NAME))
+        Object.prototype.hasOwnProperty.call(tableOverrides, CHARACTER_CONTENT_TABLE_NAME)
+            ? tableOverrides[CHARACTER_CONTENT_TABLE_NAME]
+            : bundledCharacterContentTable
     ))
     const gameplayTables = Object.fromEntries(
         [...REWARD_TABLE_NAMES, ...QUEST_TABLE_NAMES, ...GAMEPLAY_DYNAMIC_TABLE_NAMES, ...additionalTableNames]
@@ -147,6 +172,9 @@ function installBundledGameplaySnapshot({
         source: "bundled",
         assetVersion: BUNDLED_CDN_CATALOG_VERSION,
         generatorVersion: 1,
+        // Bundled fallback content always reports the legacy CN default, same
+        // as ContentRepository.loadFromSnapshot's bundled branch.
+        gameCalendarUtcOffsetMinutes: 480,
         releaseDigest: null,
     })
     const repository = deepFreeze({

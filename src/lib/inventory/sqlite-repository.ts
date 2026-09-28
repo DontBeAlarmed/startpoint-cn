@@ -199,4 +199,98 @@ export class InventorySqliteRepository {
             )
         }
     }
+
+    /** Batch absolute write; per-row semantics identical to writeAbsoluteItemSync. */
+    writeAbsoluteItemsBatchSync(
+        playerId: number,
+        rows: readonly { readonly itemId: number; readonly amount: number }[],
+    ): void {
+        requireActiveTransaction()
+        const ownerId = positiveId(playerId, "INVALID_PLAYER_ID", "playerId")
+        const CHUNK_ROWS = 1000
+        for (let start = 0; start < rows.length; start += CHUNK_ROWS) {
+            const chunk = rows.slice(start, start + CHUNK_ROWS)
+            const values: unknown[] = []
+            const placeholders: string[] = []
+            for (const row of chunk) {
+                const id = positiveId(row.itemId, "INVALID_ITEM_ID", "itemId")
+                const afterAmount = nonNegativeAmount(row.amount, `item ${id} afterAmount`)
+                placeholders.push("(?, ?, ?)")
+                values.push(id, afterAmount, ownerId)
+            }
+            const result = getDb().prepare(`
+                INSERT INTO players_items (id, amount, player_id)
+                VALUES ${placeholders.join(", ")}
+                ON CONFLICT(id, player_id) DO UPDATE SET
+                    amount = excluded.amount
+            `).run(...values)
+            if (result.changes !== chunk.length) {
+                throw new Error(
+                    `inventory absolute write affected ${result.changes} of ${chunk.length} rows`,
+                )
+            }
+        }
+    }
+
+    /** Batch obtained-history write; per-row guard and errors identical to recordPositiveObtainedSync. */
+    recordPositiveObtainedBatchSync(
+        playerId: number,
+        rows: readonly { readonly itemId: number; readonly obtainedAmount: number }[],
+    ): void {
+        requireActiveTransaction()
+        const ownerId = positiveId(playerId, "INVALID_PLAYER_ID", "playerId")
+        const CHUNK_ROWS = 1000
+        for (let start = 0; start < rows.length; start += CHUNK_ROWS) {
+            const chunk = rows.slice(start, start + CHUNK_ROWS)
+            for (const row of chunk) {
+                positiveId(row.itemId, "INVALID_ITEM_ID", "itemId")
+                if (!Number.isSafeInteger(row.obtainedAmount) || row.obtainedAmount <= 0) {
+                    throw new InventoryValidationError(
+                        "INVALID_AMOUNT",
+                        "obtainedAmount must be a positive safe integer",
+                    )
+                }
+            }
+            const values: unknown[] = []
+            const placeholders: string[] = []
+            for (const row of chunk) {
+                placeholders.push("(?, ?, ?)")
+                values.push(ownerId, row.itemId, row.obtainedAmount)
+            }
+            values.push(MAX_SAFE_INTEGER)
+            const result = getDb().prepare(`
+                INSERT INTO players_collected_items (player_id, item_id, total_obtained)
+                VALUES ${placeholders.join(", ")}
+                ON CONFLICT(player_id, item_id) DO UPDATE SET
+                    total_obtained = total_obtained + excluded.total_obtained
+                WHERE typeof(players_collected_items.total_obtained) = 'integer'
+                  AND players_collected_items.total_obtained >= 0
+                  AND players_collected_items.total_obtained <= ? - excluded.total_obtained
+            `).run(...values)
+            if (result.changes === chunk.length) continue
+            // Diagnose the failing row without further writes; errors mirror the
+            // single-row path verbatim and the caller's transaction rolls back.
+            for (const row of chunk) {
+                const stored = getDb().prepare(`
+                    SELECT total_obtained, typeof(total_obtained) AS storage_type
+                    FROM players_collected_items
+                    WHERE player_id = ? AND item_id = ?
+                `).get(ownerId, row.itemId) as RawCollectedItemState | undefined
+                if (stored === undefined) continue
+                if (stored.storage_type !== "integer"
+                    || !Number.isSafeInteger(stored.total_obtained)
+                    || stored.total_obtained < 0
+                ) {
+                    throw new InventoryValidationError(
+                        "INVALID_STORED_STATE",
+                        `collected total for item ${row.itemId} is not a non-negative safe SQLite integer`,
+                    )
+                }
+            }
+            throw new InventoryValidationError(
+                "SAFE_INTEGER_OVERFLOW",
+                "collected total for a batched item is invalid or exceeds the safe integer range",
+            )
+        }
+    }
 }

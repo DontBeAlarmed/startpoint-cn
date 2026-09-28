@@ -12,13 +12,14 @@ const {
     getMissionCatalog,
     getMissionFactRequirementRegistry,
 } = require("../src/lib/mission")
-const {
-    productionContentSnapshotProvider,
-} = require("../src/content/runtime/content-snapshot")
+const { installFrozenTestContentSnapshot } = require("./helpers/content-snapshot-fixture.cjs")
 const { EventSafeComputer } = require("../src/lib/mission/computer-event-safe")
 const {
     getBundledStandardMissionTables,
 } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
 
 const catalog = getMissionCatalog()
 const registry = getMissionFactRequirementRegistry(catalog)
@@ -49,6 +50,11 @@ function catalogWithEventDefinitions(eventDefinitions) {
         "ranking_event_single_quest.json": require("../assets/ranking_event_single_quest.json"),
         "rush_event_quest.json": require("../assets/rush_event_quest.json"),
         "carnival_event_quest.json": require("../assets/carnival_event_quest.json"),
+        "main_quest.json": require("../assets/main_quest.json"),
+        "ex_quest.json": require("../assets/ex_quest.json"),
+        "mission_event_battle_rules.json": require("../assets/mission_event_battle_rules.json"),
+        "mission_event_quest_map.json": require("../assets/mission_event_quest_map.json"),
+        "config.json": require("../assets/config.json"),
     }
     return getMissionCatalog({
         info: () => ({ source: "test" }),
@@ -183,23 +189,20 @@ test("Event compute stays bound to the Session Catalog after the global snapshot
         loaders: createLoaders(),
     })
     const context = EventSafeComputer.buildContextFromSession(session, 3, [2316])
-    const previousSnapshot = productionContentSnapshotProvider.snapshot
-    productionContentSnapshotProvider.snapshot = {
-        cdn: { targetVersion: "event-compute-must-not-read-global" },
-        repository: {
-            info: () => ({ source: "test" }),
-            table(tableName) {
-                throw new Error(`unexpected global Event compute table read: ${tableName}`)
-            },
+    const install = installFrozenTestContentSnapshot({
+        targetVersion: "event-compute-must-not-read-global",
+        tables: {},
+        onTableRead: tableName => {
+            throw new Error(`unexpected global Event compute table read: ${tableName}`)
         },
-    }
+    })
     try {
         assert.equal(EventSafeComputer.compute(2316, {
             ...context,
             collectedItemTotals: { 80111: 12 },
         }, 3), 12)
     } finally {
-        productionContentSnapshotProvider.snapshot = previousSnapshot
+        install.restore()
     }
 })
 

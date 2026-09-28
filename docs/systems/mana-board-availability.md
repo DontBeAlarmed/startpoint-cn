@@ -2,7 +2,8 @@
 
 CN 客户端通过 `master/mana_board/mana_board2_open_condition.orderedmap` 决定角色是否能显示第二块玛纳板。
 `GeneralCharacterLogic.canManaBoard2Open()` 要求角色稀有度高于二星，并以客户端收到的服务器时间检查角色专属
-`start_time <= now <= end_time`。主数据日期按官方 `ParseTools.parseJstDataToUtcTime` 语义解释为 JST。
+`start_time <= now <= end_time`。主数据日期经官方 `ParseTools.parseJstDataToUtcTime` 解析；`JST` 只是上游遗留
+符号名，CN 客户端启动时实际把偏移设为 `28800000`（UTC+8），服务端按配置冻结的游戏日历偏移（默认 `480`）解释。
 
 ## 已修正风险
 
@@ -24,8 +25,9 @@ CN 客户端通过 `master/mana_board/mana_board2_open_condition.orderedmap` 决
 
 ## 时间语义
 
-运行时一律读取全局服务器时间，不读取单存档 `time_offset`。JST 只用于把官方表中的日历文本转换为绝对时刻，
-不是另一套运行时偏移。开始和结束边界均包含在开放期内，与 CN 客户端比较符号一致；缺表、缺角色行、非法日期
+运行时一律读取全局服务器时间，不读取单存档 `time_offset`。官方表中的日历文本由配置冻结的游戏日历策略
+（CN 默认 `480`，即 UTC+8）转换为绝对时刻；`JST` 只是官方解析入口的遗留符号名，不代表真实 UTC+9，
+也不是另一套运行时偏移。开始和结束边界均包含在开放期内，与 CN 客户端比较符号一致；缺表、缺角色行、非法日期
 或未知角色均 fail closed。
 
 ## Content Sync

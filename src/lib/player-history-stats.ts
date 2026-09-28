@@ -1,13 +1,11 @@
-import bundledCharacters from "../../assets/character.json"
-import bundledEquipmentDissolve from "../../assets/equipment_dissolve.json"
-
-import { getRuntimeContentTableSync } from "../content/runtime/table-access"
 import { getDb } from "../data/db"
 import { getPlayerCharactersSync } from "../data/domains/character"
 import { getPlayerEquipmentListSync } from "../data/domains/equipment"
 import { getPlayerHistoryMilestonesSync } from "../data/domains/player-history-facts"
 import type { Player } from "../data/types"
+import { getCharacterFacts } from "./character-content"
 import { characterExpCaps } from "./character"
+import { getEquipmentContentCatalog } from "./equipment-content"
 import {
     createEmptyPlayerHistoryTopicValues,
     PlayerHistoryTopicValueList,
@@ -31,8 +29,9 @@ interface RawAggregateCounters {
     tower_floor_clear_count: number
 }
 
-type CharacterTable = Record<string, { readonly rarity?: unknown }>
-type EquipmentDissolveTable = Record<string, { readonly max_level?: unknown }>
+function getEquipmentMaxLevel(equipmentId: string): number | undefined {
+    return getEquipmentContentCatalog().dissolveById[equipmentId]?.max_level
+}
 
 const GUILD_GIRL_EQUIPMENT_IDS = Object.freeze([
     5010045, 5040020, 5100011, 5030028, 5010032, 5010056,
@@ -80,25 +79,18 @@ export function loadPlayerHistoryTopicValuesSync(
     const characters = getPlayerCharactersSync(playerId)
     const equipment = getPlayerEquipmentListSync(playerId)
     const counters = getAggregateCountersSync(playerId)
-    const characterTable = getRuntimeContentTableSync(
-        "character.json",
-        bundledCharacters as CharacterTable,
-    ) as CharacterTable
-    const equipmentTable = getRuntimeContentTableSync(
-        "equipment_dissolve.json",
-        bundledEquipmentDissolve as EquipmentDissolveTable,
-    ) as EquipmentDissolveTable
+    const characterFacts = getCharacterFacts()
 
     const level100Count = Object.entries(characters).reduce((count, [characterId, character]) => {
-        const rarity = Number(characterTable[characterId]?.rarity)
-        return Number.isSafeInteger(rarity) && isLevel100(rarity, character.exp) ? count + 1 : count
+        const rarity = characterFacts.get(characterId)?.rarity
+        return rarity !== undefined && Number.isSafeInteger(rarity) && isLevel100(rarity, character.exp) ? count + 1 : count
     }, 0)
     const bondTokenCount = Object.values(characters).reduce((count, character) => (
         count + character.bondTokenList.filter(token => token.status >= 1).length
     ), 0)
     const maxLevelEquipmentCount = Object.entries(equipment).reduce((count, [equipmentId, owned]) => {
-        const maxLevel = Number(equipmentTable[equipmentId]?.max_level)
-        return Number.isSafeInteger(maxLevel) && maxLevel > 0 && owned.level >= maxLevel
+        const maxLevel = getEquipmentMaxLevel(equipmentId)
+        return maxLevel !== undefined && Number.isSafeInteger(maxLevel) && maxLevel > 0 && owned.level >= maxLevel
             ? count + 1
             : count
     }, 0)

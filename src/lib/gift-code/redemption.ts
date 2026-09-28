@@ -152,6 +152,9 @@ export function receiveGiftCodeSync(playerId: number, rawKey: unknown): GiftRece
 
         const dispositions = collectRewardGrantItemOverflowDispositions(grant)
         return {
+            // CN 1.8.1 MenuTopScene.RC_GIFT_KEY_OK = 1: successGiftHandler only
+            // opens the reward dialog when the body result_code is exactly 1;
+            // any other value (including 0) is shown as a gift error.
             resultCode: 1,
             rewards,
             ...(dispositions.length === 0

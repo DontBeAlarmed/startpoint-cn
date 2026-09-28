@@ -1,8 +1,8 @@
-import raidOverallRewardAsset from "../../../../assets/raid_event_overall_reward.json"
 import {
-    ContentSnapshotError,
     getContentSnapshot,
+    type ReadonlyContentRepository,
 } from "../../../content/runtime/content-snapshot"
+import { deepFreeze } from "../../../content/deep-freeze"
 import { RewardType } from "../../types"
 import type { CurrencyReward, EquipmentItemReward } from "../../types"
 
@@ -48,10 +48,18 @@ export function toPlayerReward(grant: RaidOverallRewardGrant): EquipmentItemRewa
     }
 }
 
-function parsePositiveInteger(value: unknown): number | undefined {
+function parseOptionalPositiveInteger(value: unknown, label: string): number | undefined {
     if (value === undefined || value === null || value === "" || value === "(None)") return undefined
+    if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) {
+        throw new Error(`invalid ${label}`)
+    }
     const parsed = Number(value)
-    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined
+    if (!Number.isSafeInteger(parsed)) throw new Error(`invalid ${label}`)
+    return parsed
+}
+
+function parsePositiveInteger(value: unknown): number | undefined {
+    return parseOptionalPositiveInteger(value, "positive integer")
 }
 
 function isEmptyMasterValue(value: unknown): boolean {
@@ -71,6 +79,9 @@ function parseReward(
         }
         return undefined
     }
+    if (typeof rawKind !== "string" || !/^(?:0|[1-9]\d*)$/.test(rawKind)) {
+        throw new Error(`invalid raid reward kind at column ${offset}`)
+    }
     const kind = Number(rawKind)
     const amount = parsePositiveInteger(row[offset + 2])
     if (!Number.isSafeInteger(kind) || kind < 0) {
@@ -82,28 +93,35 @@ function parseReward(
         if (itemId === undefined) throw new Error(`invalid raid reward item id at column ${offset + 1}`)
         return { kind: "item", itemId, amount }
     }
-    if (kind === 2) return { kind: "stone", amount }
-    if (kind === 3) return { kind: "mana", amount }
+    if (kind === 2 || kind === 3) {
+        if (!isEmptyMasterValue(rawId)) {
+            throw new Error(`invalid raid reward currency id at column ${offset + 1}`)
+        }
+        return { kind: kind === 2 ? "stone" : "mana", amount }
+    }
     throw new Error(`unsupported reward kind ${kind} at column ${offset}`)
 }
 
-function parseRow(id: number, row: readonly unknown[]): RaidOverallRewardDefinition | undefined {
+function parseRow(id: number, row: readonly unknown[]): RaidOverallRewardDefinition {
+    if (row.length !== 37) throw new Error(`invalid raid reward row ${id}: expected 37 columns`)
     const eventId = parsePositiveInteger(row[0])
-    const requirementKind = String(row[2] ?? "")
+    const requirementKind = row[2]
     const rewards = Array.from({ length: 10 }, (_, index) => parseReward(row, 7 + index * 3))
         .filter((reward): reward is RaidOverallRewardDefinition["rewards"][number] => reward !== undefined)
-    if (eventId === undefined || rewards.length === 0) return undefined
+    if (eventId === undefined) throw new Error(`invalid raid reward event id for ${id}`)
+    if (rewards.length === 0) throw new Error(`raid reward ${id} has no rewards`)
 
     if (requirementKind === "0") {
         const threshold = parsePositiveInteger(row[3])
-        return threshold === undefined
-            ? undefined
-            : { id, eventId, requirement: { kind: "total", threshold }, rewards }
+        if (threshold === undefined) throw new Error(`invalid raid reward threshold for ${id}`)
+        return { id, eventId, requirement: { kind: "total", threshold }, rewards }
     }
-    if (requirementKind !== "1") return undefined
-    const start = parsePositiveInteger(row[3])
+    if (requirementKind !== "1") {
+        throw new Error(`unsupported raid reward requirement ${String(requirementKind)}`)
+    }
+    const start = parseOptionalPositiveInteger(row[3], "raid reward start")
     const interval = parsePositiveInteger(row[4])
-    if (interval === undefined) return undefined
+    if (interval === undefined) throw new Error(`invalid raid reward interval for ${id}`)
     return {
         id,
         eventId,
@@ -113,34 +131,76 @@ function parseRow(id: number, row: readonly unknown[]): RaidOverallRewardDefinit
 }
 
 type RawRaidOverallRewardTable = Record<string, readonly (readonly unknown[])[]>
+type RawRaidEventTable = Record<string, { readonly requiredKillCount?: unknown }>
 
-function getRewardTable(): RawRaidOverallRewardTable {
-    try {
-        return getContentSnapshot().repository.table<RawRaidOverallRewardTable>(
-            "raid_event_overall_reward.json",
-        )
-    } catch (error) {
-        if (!(error instanceof ContentSnapshotError)
-            || error.code !== "CONTENT_SNAPSHOT_NOT_INITIALIZED") throw error
-        return raidOverallRewardAsset as RawRaidOverallRewardTable
-    }
+interface RaidEventRewardCatalog {
+    readonly definitions: readonly RaidOverallRewardDefinition[]
+    readonly requiredKillCountByEventId: Readonly<Record<string, number>>
 }
+
+const catalogs = new WeakMap<ReadonlyContentRepository, RaidEventRewardCatalog>()
 
 export function parseRaidEventOverallRewardDefinitions(
     table: RawRaidOverallRewardTable,
 ): readonly RaidOverallRewardDefinition[] {
-    return Object.entries(table).flatMap(([id, rows]) => {
-        const parsed = Array.isArray(rows) && rows.length === 1
-            ? parseRow(Number(id), rows[0])
-            : undefined
-        return parsed ? [parsed] : []
-    })
+    if (table === null || typeof table !== "object" || Array.isArray(table)) {
+        throw new TypeError("invalid raid event overall reward table")
+    }
+    const entries = Object.entries(table)
+    if (entries.length === 0) throw new TypeError("raid event overall reward table must not be empty")
+    return deepFreeze(entries.map(([idText, rows]) => {
+        if (!/^[1-9]\d*$/.test(idText) || !Number.isSafeInteger(Number(idText))) {
+            throw new Error(`invalid raid reward id ${idText}`)
+        }
+        if (!Array.isArray(rows) || rows.length !== 1 || !Array.isArray(rows[0])) {
+            throw new Error(`raid reward ${idText} must contain exactly one row`)
+        }
+        return parseRow(Number(idText), rows[0])
+    }).sort((left, right) => left.id - right.id))
+}
+
+export function getRaidEventRewardCatalog(
+    repository: ReadonlyContentRepository = getContentSnapshot().repository,
+): RaidEventRewardCatalog {
+    const cached = catalogs.get(repository)
+    if (cached !== undefined) return cached
+    const definitions = parseRaidEventOverallRewardDefinitions(
+        repository.table<RawRaidOverallRewardTable>("raid_event_overall_reward.json"),
+    )
+    const events = repository.table<RawRaidEventTable>("raid_event.json")
+    if (events === null || typeof events !== "object" || Array.isArray(events)) {
+        throw new TypeError("invalid raid event table")
+    }
+    const requiredKillCountByEventId: Record<string, number> = {}
+    for (const [eventId, event] of Object.entries(events)) {
+        if (!/^[1-9]\d*$/.test(eventId) || !Number.isSafeInteger(Number(eventId))) {
+            throw new Error(`invalid raid event id ${eventId}`)
+        }
+        const requiredKillCount = event?.requiredKillCount
+        if (typeof requiredKillCount !== "number"
+            || !Number.isSafeInteger(requiredKillCount)
+            || requiredKillCount <= 0) {
+            throw new Error(`invalid raid event ${eventId} required kill count`)
+        }
+        requiredKillCountByEventId[eventId] = requiredKillCount
+    }
+    for (const definition of definitions) {
+        if (requiredKillCountByEventId[String(definition.eventId)] === undefined) {
+            throw new Error(`raid reward ${definition.id} references missing event ${definition.eventId}`)
+        }
+    }
+    const catalog = deepFreeze({ definitions, requiredKillCountByEventId })
+    catalogs.set(repository, catalog)
+    return catalog
 }
 
 export function getRaidEventOverallRewardDefinitions(eventId: number): readonly RaidOverallRewardDefinition[] {
-    return parseRaidEventOverallRewardDefinitions(getRewardTable())
+    return getRaidEventRewardCatalog().definitions
         .filter(definition => definition.eventId === eventId)
-        .sort((left, right) => left.id - right.id)
+}
+
+export function getRaidEventRequiredKillCountFromContent(eventId: number): number | undefined {
+    return getRaidEventRewardCatalog().requiredKillCountByEventId[String(eventId)]
 }
 
 export function selectRaidEventOverallRewards(

@@ -1,10 +1,4 @@
-import {
-    getMissionMasterDefinitions,
-    isMissionDefinitionEnabledAt,
-    MISSION_CATEGORIES,
-    MissionMasterDefinition,
-} from "./master-data"
-
+import { MISSION_CATEGORIES, MissionMasterDefinition, getMissionCatalog, isMissionMasterDefinitionEnabledAt } from "./mission-catalog"
 const DEGREE_CLIENT_PROGRESS_PATTERN_BY_SELECTOR: Readonly<Record<string, string>> = Object.freeze({
     "40": "character_detail_zoom_illust_for_1min_count",
     "41": "character_detail_play_dot_sp_motion_count",
@@ -52,7 +46,7 @@ export function resolveClientProgressTargetsFromDefinitions(
         const progressPattern = getClientProgressPattern(definition)
         if (!matchesClientPattern(progressPattern, clientPattern)) continue
         if (definition.eventId !== undefined) continue
-        if (!isMissionDefinitionEnabledAt(definition, evaluationTime)) continue
+        if (!isMissionMasterDefinitionEnabledAt(definition, evaluationTime)) continue
         targets.push({ category: definition.category, missionId: definition.missionId })
     }
     return targets
@@ -64,7 +58,7 @@ export function resolveClientProgressTargets(
 ): ClientProgressTarget[] {
     const definitions: MissionMasterDefinition[] = []
     for (const category of MISSION_CATEGORIES) {
-        definitions.push(...getMissionMasterDefinitions(category))
+        definitions.push(...getMissionCatalog().getDefinitions(category))
     }
     return resolveClientProgressTargetsFromDefinitions(clientPattern, evaluationTime, definitions)
 }

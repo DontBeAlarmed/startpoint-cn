@@ -78,6 +78,7 @@ test("owner-focused contract fixes the required deterministic scenario set", () 
         "exchange-star-crumb",
         "gacha-exchange-character",
         "gacha-exec",
+        "gacha-crazy-select",
         "mana-item-sell",
         "mail-receive",
         "mail-receive-all",
@@ -92,8 +93,8 @@ test("owner-focused contract fixes the required deterministic scenario set", () 
     ]) {
         assert.equal(AWAKE_OWNER_FOCUSED_SCENARIO_KEYS.includes(required), true, required)
     }
-    assert.equal(AWAKE_OWNER_FOCUSED_SCENARIO_KEYS.length, 21)
-    assert.equal(Object.keys(AWAKE_OWNER_RUNTIME_EVIDENCE_REGISTRY).length, 21)
+    assert.equal(AWAKE_OWNER_FOCUSED_SCENARIO_KEYS.length, 22)
+    assert.equal(Object.keys(AWAKE_OWNER_RUNTIME_EVIDENCE_REGISTRY).length, 22)
 })
 
 test("owner runtime evidence rejects seed-incompatible sharing", () => {
@@ -412,7 +413,7 @@ test("current owner-focused evidence exactly matches the checked snapshot", asyn
     )
     assert.equal(report.scenarios["single-finish"].loaderCalls.length > 1, true)
     assert.deepEqual(report.scenarios["exchange-star-crumb"].characterSeeds, [])
-    assert.deepEqual(report.scenarios["gacha-exchange-character"].characterSeeds, [151009])
+    assert.deepEqual(report.scenarios["gacha-exchange-character"].characterSeeds, [121087])
     assert.deepEqual(report.scenarios["shop-bulk-buy"].characterSeeds, [341005, 341006])
     assert.deepEqual(report.scenarios["multi-finish"].factSeeds, [
         "collectedItems:100000", "items", "passState:3", "player",

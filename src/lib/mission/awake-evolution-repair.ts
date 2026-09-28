@@ -1,6 +1,8 @@
 import { getDb } from "../../data/db"
+import { raisePlayerCharacterEvolutionLevelSync } from "../../data/domains/character"
 import type { PlayerCharacter } from "../../data/types"
-import { getCharacterDataSync, getCharacterManaNodesSync } from "../assets"
+import { getCharacterFacts } from "../character-content"
+import { getCharacterGrowthContent } from "../character-growth-content"
 import { InvalidManaNodeSemanticsError } from "../../content/mana-node-semantics"
 import { buildCharacterEvolutionNodes, computeCharacterEvolutionLevel } from "../character-evolution"
 import type { ManaNode } from "../types"
@@ -51,8 +53,8 @@ function deriveEvolutionLevel(
     characterId: number,
     snapshot: AwakeEvolutionRepairSnapshot,
 ): number | null {
-    if (getCharacterDataSync(characterId) === null) return null
-    const boardNodes = getCharacterManaNodesSync(characterId, 1)
+    if (!getCharacterFacts().exists(characterId)) return null
+    const boardNodes = getCharacterGrowthContent().getManaBoardNodes(characterId, 1)
     if (!boardNodes || Object.keys(boardNodes).length === 0) return null
 
     const learnedNodeIds = parseNodeIds(snapshot.manaNodes[String(characterId)] ?? [])
@@ -94,11 +96,6 @@ export function reconcileAwakeEvolutionLevelsSync(
     }
 
     const db = getDb()
-    const updateEvolutionLevel = db.prepare(`
-        UPDATE players_characters
-        SET evolution_level = ?
-        WHERE player_id = ? AND id = ? AND evolution_level < ?
-    `)
     const readEvolutionLevel = db.prepare(`
         SELECT evolution_level
         FROM players_characters
@@ -108,12 +105,11 @@ export function reconcileAwakeEvolutionLevelsSync(
 
     db.transaction(() => {
         for (const repair of repairs) {
-            const changes = updateEvolutionLevel.run(
-                repair.derivedEvolutionLevel,
+            const changed = raisePlayerCharacterEvolutionLevelSync(
                 playerId,
                 repair.characterId,
                 repair.derivedEvolutionLevel,
-            ).changes
+            )
             const persistedCharacter = readEvolutionLevel.get(
                 playerId,
                 repair.characterId,
@@ -128,7 +124,7 @@ export function reconcileAwakeEvolutionLevelsSync(
                 ...snapshot.characters[String(repair.characterId)],
                 evolutionLevel: persistedCharacter.evolution_level,
             }
-            if (changes === 1) repairedCharacterIds.push(repair.characterId)
+            if (changed) repairedCharacterIds.push(repair.characterId)
         }
     })()
 

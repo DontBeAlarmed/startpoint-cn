@@ -74,10 +74,15 @@ export const PLAYER_SAVE_TABLES: readonly PlayerSaveTableDefinition[] = [
 
     table("players_gacha_info", "economy"),
     table("players_gacha_campaigns", "economy"),
+    table("players_gacha_details", "economy", 25),
+    table("players_stars_gacha_campaigns", "economy", 25),
+    table("players_gacha_crazy_results", "economy", 26),
+    table("players_gacha_conversions", "economy", 26),
     table("players_periodic_reward_points", "economy"),
     table("players_shop_purchases", "economy", 3),
     table("players_shop_purchase_counters", "economy", 11),
     table("players_shop_campaign_lineups", "economy", 12),
+    table("players_bond_token_exchanges", "economy", 27),
     table("players_receive_history", "economy", 2, ["id"]),
 
     table("players_mails", "mailbox", 2, ["id"]),
@@ -86,6 +91,7 @@ export const PLAYER_SAVE_TABLES: readonly PlayerSaveTableDefinition[] = [
 export const PLAYER_SAVE_EXCLUDED_TABLES: readonly PlayerSaveExcludedTableDefinition[] = [
     { name: "players_active_quests", reason: "activeQuest" },
     { name: "players_gift_redemptions", reason: "serverOperation" },
+    { name: "players_follows", reason: "serverOperation" },
     { name: "players_scheduled_resource_state", reason: "serverConfig" },
     { name: "scheduled_resource_rules", reason: "serverConfig" },
 ]

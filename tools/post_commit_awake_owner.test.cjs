@@ -35,7 +35,10 @@ const {
     getPlayerCharacterAwakeUnlocksSync,
 } = require("../src/data/domains/character_awake")
 const { givePlayerCharacterSync } = require("../src/lib/character")
-const { getCharacterDataSync, getCharacterManaNodesSync } = require("../src/lib/assets")
+const { getCharacterFacts } = require("../src/lib/character-content")
+const { getCharacterGrowthContent } = require("../src/lib/character-growth-content")
+const getCharacterDataSync = characterId => getCharacterFacts().get(characterId)
+const getCharacterManaNodesSync = (characterId, level) => getCharacterGrowthContent().getManaBoardNodes(characterId, level)
 const { characterExpCaps } = require("../src/lib/character")
 const { publishAwakeCharacterListBestEffort } = require("../src/lib/mission/awake-best-effort-context")
 
@@ -43,12 +46,14 @@ const POST_COMMIT_35_3_OWNER_INVENTORY = Object.freeze({
     "src/routes/api/boxGacha.ts": ["drawn-reward-characters"],
     "src/routes/api/character.ts": ["town-granted-character"],
     "src/routes/api/exchange.ts": ["exchange-reward-characters"],
-    "src/routes/api/gacha.ts": ["exchanged-character", "drawn-characters"],
+    "src/routes/api/gacha.ts": ["gacha-post-commit-characters"],
+    "src/routes/api/gacha/crazy-routes.ts": ["selected-crazy-characters"],
+    "src/routes/api/gacha/exchange-routes.ts": ["exchanged-character"],
     "src/routes/api/item.ts": ["mana-item-fact"],
     "src/routes/api/mission.ts": ["category9-delta-missions"],
     "src/routes/api/passCard.ts": ["pass-card-reward-facts"],
     "src/routes/api/raidEvent.ts": ["raid-summary-reward-facts"],
-    "src/routes/api/shop.ts": ["shop-reward-characters", "shop-reward-characters"],
+    "src/routes/api/shop/purchase-routes.ts": ["shop-reward-characters", "shop-reward-characters"],
 })
 
 const TRANSACTION_INTERNAL_35_2_OWNER_INVENTORY = Object.freeze({
@@ -61,7 +66,14 @@ const TRANSACTION_INTERNAL_35_2_OWNER_INVENTORY = Object.freeze({
     active: ["src/routes/api/activeMission.ts"],
     "tutorial/update_step:15": ["src/routes/api/tutorial.ts"],
     "tutorial/update_step:16": ["src/routes/api/tutorial.ts"],
+    "mission/get_mission_progress:category9-page": ["src/routes/api/mission.ts"],
 })
+
+// src/routes/api/mission.ts is the one sanctioned dual-publication file: the
+// category 9 page publishes the unlock inside the get_mission_progress
+// transaction (35.2) while update_mission_progress keeps its post-commit
+// delta-missions publication (35.3).
+const DUAL_PUBLICATION_FILES = Object.freeze(new Set(["src/routes/api/mission.ts"]))
 
 let database
 let sqlStatements = null
@@ -209,28 +221,38 @@ test("Mana item sell publishes the invalidated player fact without a character h
     assert.doesNotMatch(publicationCall, /263002|characterId|character_id/)
 })
 
-test("post-commit inventory covers the eleven Character Growth owner expressions", () => {
+test("post-commit inventory covers the twelve Character Growth owner expressions", () => {
     const postCommitFiles = new Set(Object.keys(POST_COMMIT_35_3_OWNER_INVENTORY))
     const transactionFiles = new Set(Object.values(TRANSACTION_INTERNAL_35_2_OWNER_INVENTORY).flat())
     assert.equal(
         Object.values(POST_COMMIT_35_3_OWNER_INVENTORY).flat().length,
-        11,
+        12,
         "post-commit Character Growth owner expressions",
     )
     assert.equal(
         Object.keys(TRANSACTION_INTERNAL_35_2_OWNER_INVENTORY).length,
-        9,
+        10,
         "35.2 transaction-internal owner expressions",
     )
-    assert.equal(
-        [...postCommitFiles].some(relativeFile => transactionFiles.has(relativeFile)),
-        false,
-        "35.2 and 35.3 owner inventories must remain disjoint",
+    assert.deepEqual(
+        [...postCommitFiles].filter(relativeFile => transactionFiles.has(relativeFile)),
+        [...DUAL_PUBLICATION_FILES],
+        "35.2 and 35.3 owner inventories only overlap on sanctioned dual-publication files",
     )
 
+    const transactionCounts = new Map()
+    for (const files of Object.values(TRANSACTION_INTERNAL_35_2_OWNER_INVENTORY)) {
+        for (const relativeFile of files) {
+            transactionCounts.set(relativeFile, (transactionCounts.get(relativeFile) ?? 0) + 1)
+        }
+    }
     for (const [relativeFile, sources] of Object.entries(POST_COMMIT_35_3_OWNER_INVENTORY)) {
         const source = fs.readFileSync(path.join(__dirname, "..", relativeFile), "utf8")
-        assert.equal((source.match(/publishCharacterGrowthOwnerStateBestEffort\(/g) ?? []).length, sources.length, relativeFile)
+        assert.equal(
+            (source.match(/publishCharacterGrowthOwnerStateBestEffort\(/g) ?? []).length,
+            sources.length + (transactionCounts.get(relativeFile) ?? 0),
+            relativeFile,
+        )
         assert.doesNotMatch(source, /reconcileAwakeUnlockCharacterList\(/, relativeFile)
     }
 })
@@ -239,6 +261,10 @@ test("35.2 transaction-internal inventory remains separate from post-commit inve
     const postCommitOwners = new Set(Object.keys(POST_COMMIT_35_3_OWNER_INVENTORY))
     for (const [owner, files] of Object.entries(TRANSACTION_INTERNAL_35_2_OWNER_INVENTORY)) {
         assert.equal(files.length, 1, owner)
-        assert.equal(postCommitOwners.has(files[0]), false, `${owner} must not be counted as 35.3`)
+        assert.equal(
+            DUAL_PUBLICATION_FILES.has(files[0]) || !postCommitOwners.has(files[0]),
+            true,
+            `${owner} must not be counted as 35.3 unless sanctioned as dual publication`,
+        )
     }
 })

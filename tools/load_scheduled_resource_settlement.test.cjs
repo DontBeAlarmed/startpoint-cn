@@ -15,7 +15,7 @@ test("CN load settles scheduled resources from the captured real-time context", 
         source,
         /import \{ settleScheduledResourcesSync \} from ["']\.\.\/\.\.\/lib\/scheduled-resource-settlement["']/,
     )
-    assert.match(source, /const scheduledResourceSettlement = settleScheduledResourcesSync\(\{[\s\S]*?player,[\s\S]*?realNow: gameTime\.realNow,[\s\S]*?dailyResetHour: options\.dailyResetHour \?\? 5,[\s\S]*?itemMaxCounts:[\s\S]*?maxFreeVmoney:[\s\S]*?\}\)/)
+    assert.match(source, /const scheduledResourceSettlement = settleScheduledResourcesSync\(\{[\s\S]*?player,[\s\S]*?realNow: gameTime\.realNow,[\s\S]*?dailyResetHour: options\.dailyResetHour \?\? 5,[\s\S]*?itemMaxCount:[\s\S]*?maxFreeVmoney:[\s\S]*?\}\)/)
 
     const loginBonusPosition = source.indexOf("const loginBonusSettlement")
     const scheduledPosition = source.indexOf("const scheduledResourceSettlement")

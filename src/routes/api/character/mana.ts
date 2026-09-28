@@ -70,6 +70,7 @@ const routes = async (fastify: FastifyInstance) => {
             },
             item_list: mapToRecord(resourceState.items),
             evolution: result.evolution,
+            active_mission_list: result.activeMissionList,
             mail_arrived: getMailArrivedSync(session.playerId),
         })
     })

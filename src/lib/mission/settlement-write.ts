@@ -3,9 +3,7 @@ import {
     updatePlayerCategoryMissionsSync,
 } from "../../data/domains/mission"
 import { MissionRewardGranter, type MissionRewardGrantContext } from "./grants"
-import { getMissionMasterDefinition } from "./master-data"
 import { getCategoryMissionRewardStageDefinition } from "./rewards"
-import { getCompletedStageNumbers } from "./stages"
 import type { FactKey } from "./facts/fact-key"
 import type {
     MissionEvaluationResult,
@@ -14,6 +12,7 @@ import type {
     MissionSettlementResult,
 } from "./settlement"
 import type { ProductionMissionFactSeeds } from "./production-fact-loaders"
+import { getCompletedStageNumbers, getMissionCatalog } from "./mission-catalog"
 
 export function settleMissionEvaluation(
     evaluation: MissionEvaluationResult,
@@ -93,7 +92,7 @@ export function settleMissionEvaluationWithInvalidations(
     for (const stage of stageUpdates) {
         const { category, missionId, definition } = stage
         const passCardEventId = category >= 6 && category <= 8
-            ? getMissionMasterDefinition(category, missionId)?.eventId
+            ? getMissionCatalog().getDefinition(category, missionId)?.eventId
             : undefined
         granter.grant(definition.rewards, {
             passCardEventId,

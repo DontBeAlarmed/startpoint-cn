@@ -4,6 +4,11 @@ import {
     parseTextOrderedMap,
     type OrderedMapTextRow,
 } from "../sync/ordered-map"
+import {
+    resolveContentConverterContext,
+    type ContentConverterContext,
+} from "./context"
+import type { GameCalendarPolicy } from "../../time/game-calendar"
 import { parseCsvLine } from "./csv"
 
 const BOX_GACHA_PATH = "master/box_gacha/box_gacha.orderedmap"
@@ -57,30 +62,21 @@ function parseOptionalInteger(value: string, subject: string): number | null {
     return value === "" || value === "(None)" ? null : parseInteger(value, subject)
 }
 
-function parseDate(value: string, subject: string): string {
-    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value)
-    if (match === null) invalidBoxGacha(`${subject} must be a CN date-time: ${value}`)
-    const parts = match.slice(1).map(Number)
-    const [year, month, day, hour, minute, second] = parts
-    const date = new Date(0)
-    date.setUTCFullYear(year, month - 1, day)
-    date.setUTCHours(hour, minute, second, 0)
-    const normalized = [
-        date.getUTCFullYear(),
-        date.getUTCMonth() + 1,
-        date.getUTCDate(),
-        date.getUTCHours(),
-        date.getUTCMinutes(),
-        date.getUTCSeconds(),
-    ]
-    if (parts.some((part, index) => part !== normalized[index])) {
+function parseDate(value: string, subject: string, calendar: GameCalendarPolicy): string {
+    try {
+        calendar.parseMasterTimestamp(value)
+    } catch {
         invalidBoxGacha(`${subject} must be a valid CN date-time: ${value}`)
     }
     return value
 }
 
-function parseOptionalDate(value: string, subject: string): string | null {
-    return value === "" || value === "(None)" ? null : parseDate(value, subject)
+function parseOptionalDate(
+    value: string,
+    subject: string,
+    calendar: GameCalendarPolicy,
+): string | null {
+    return value === "" || value === "(None)" ? null : parseDate(value, subject, calendar)
 }
 
 function parseFields(
@@ -168,7 +164,10 @@ function parseRewards(raw: Buffer): {
     return { rewards, availableCounts }
 }
 
-function parseSettings(raw: Buffer): Record<string, Record<string, unknown>> {
+function parseSettings(
+    raw: Buffer,
+    calendar: GameCalendarPolicy,
+): Record<string, Record<string, unknown>> {
     const output: Record<string, Record<string, unknown>> = {}
     const gachas = [...parseNestedOrderedMapRows(raw)]
         .sort((left, right) => compareIds(left.key, right.key))
@@ -203,10 +202,12 @@ function parseSettings(raw: Buffer): Record<string, Record<string, unknown>> {
                 availableFrom: parseDate(
                     fields[13],
                     `box settings[${gachaId}][${boxId}].availableFrom`,
+                    calendar,
                 ),
                 availableUntil: parseOptionalDate(
                     fields[14],
                     `box settings[${gachaId}][${boxId}].availableUntil`,
+                    calendar,
                 ),
                 closeKind,
             }
@@ -227,14 +228,16 @@ function requireSameKeys(left: object, right: object, subject: string): void {
 
 export async function convertBoxGachaTables(
     reader: BoxGachaSourceReader,
+    context?: ContentConverterContext,
 ): Promise<BoxGachaConversionOutput> {
+    const { gameCalendar } = resolveContentConverterContext(context)
     const [gachaRows, rewardRaw, settingsRaw] = await Promise.all([
         reader.read(BOX_GACHA_PATH),
         reader.readBytes(BOX_REWARD_PATH),
         reader.readBytes(BOX_SETTINGS_PATH),
     ])
     const { rewards, availableCounts } = parseRewards(rewardRaw)
-    const settings = parseSettings(settingsRaw)
+    const settings = parseSettings(settingsRaw, gameCalendar)
     const gachas: Record<string, unknown> = {}
     for (const row of sortedTextRows(gachaRows)) {
         const gachaId = requireId(row.key, "box_gacha key")

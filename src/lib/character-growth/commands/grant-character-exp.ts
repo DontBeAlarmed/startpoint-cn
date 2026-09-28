@@ -10,10 +10,12 @@ import type {
     RewardPlayerCharacterExpResult,
 } from "../../types"
 import { createCharacterGrowthBatchContext } from "../batch-context"
+import { convergeBondTokenForExpWithinTransaction } from "../bond-token-qualification"
 import { calculateCharacterExpAfter } from "../exp-calculation"
 import { growthError } from "../errors"
 import { projectSortedBondTokens, validateBondTokenStatus } from "../invariants"
 import type { BondTokenStatus, CharacterGrowthStoredCore } from "../model"
+import { mutationContent } from "../node-command-support"
 import {
     addSafeInteger,
     assertInsideTransaction,
@@ -164,6 +166,43 @@ export function grantCharacterExpWithinTransactionSync(
         updateTime = updateCharacterGrowthRowsSync(command.playerId, updates)
         if (overflowTotal > 0) {
             updatePlayerSync({ id: command.playerId, expPool: afterPool })
+        }
+    }
+
+    // Client recomputes bond qualification after battle EXP
+    // (CommonBattleFinishDummyRemote); converge board 1 in the same
+    // transaction for any character that just crossed its base cap.
+    for (const characterId of ids) {
+        if (command.ignoreUpdate) continue
+        const tokens = context.bondTokens(characterId)
+        const afterExp = plannedAfterExp.get(characterId)
+        const characterFact = context.character(characterId)
+        if (afterExp === undefined || characterFact === null) continue
+        const rarity = characterFact.rarity
+        const convergence = convergeBondTokenForExpWithinTransaction(
+            command.playerId,
+            characterId,
+            tokens,
+            {
+                rarity,
+                beforeExp: characterFact.exp,
+                exp: afterExp,
+                loadBoardFacts: () => {
+                    const boardOneContent = mutationContent(characterId, 1)
+                    return {
+                        requiredNodeIds: [...Object.keys(boardOneContent.nodes).map(Number)],
+                        learnedNodeIds: new Set(context.normalManaNodes(characterId).keys()),
+                    }
+                },
+            },
+        )
+        if (convergence.granted) {
+            const afterTokens = new Map(tokens)
+            afterTokens.set(1, 1)
+            bondTokenStatusList[characterId] = {
+                before: bondTokenStatusList[characterId].before,
+                after: projectSortedBondTokens(afterTokens),
+            }
         }
     }
 

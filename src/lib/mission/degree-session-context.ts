@@ -6,10 +6,12 @@ import {
 } from "./degree-rule-catalog"
 import { deriveDegreeStats, type DegreeLoadedFacts } from "./degree-state-derivation"
 import { cloneAndFreeze } from "./degree-immutable"
+import { parsePlayerRankContent } from "../player-rank-content"
 import type { MissionEvaluationSession } from "./evaluation-session"
 import { getFactKeyId } from "./facts/fact-key"
 import type { MissionFactRequirement } from "./requirements/types"
 import type { CategoryContext } from "./types"
+import { getMissionCatalogContentTable } from "./mission-catalog"
 
 function projectPlayer(player: Player): Player {
     return {
@@ -133,6 +135,12 @@ export function buildDegreeCategoryContextFromSession(
     })
     const player = cloneAndFreeze(projectPlayer(session.getFact({ kind: "player" })))
     const degreeStats = deriveDegreeStats(facts, catalog.rules, catalog.tables)
+    const needsPlayerRank = [...catalog.rules.values()].some(rule => rule.kind === "playerRank")
+    const playerRankDegree = needsPlayerRank
+        ? parsePlayerRankContent(
+            getMissionCatalogContentTable(session.catalog, "cdndata/player_rank_full.json"),
+        ).getRankDegree(player.rankPoint)
+        : undefined
 
     return Object.freeze({
         category: 5,
@@ -142,6 +150,7 @@ export function buildDegreeCategoryContextFromSession(
         totalQuestClears: 0,
         totalStories: 0,
         rankCounts: Object.freeze({}),
+        ...(playerRankDegree === undefined ? {} : { playerRankDegree }),
         ...(battleKey ? { battleCounters: facts.missionBattleCounters } : {}),
         degreeRules: catalog.rules,
         degreeStats,

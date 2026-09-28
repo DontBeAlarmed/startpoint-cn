@@ -63,9 +63,10 @@ stubModule("../src/multi/player-context", {
 stubModule("../src/data/domains/session", {
     getSession: async viewerId => players.has(Number(viewerId)) ? { accountId: Number(viewerId) } : null,
 })
-stubModule("../src/lib/assets", {
-    getQuestFromCategorySync: () => ({}),
-})
+// Quest lookups moved to quest-content; assets only re-exports them.
+const questContentStub = { ...require("../src/lib/quest-content") }
+questContentStub.getQuestFromCategorySync = () => ({})
+stubModule("../src/lib/quest-content", questContentStub)
 stubModule("../src/multi/npc/builder", {
     buildNpcMates: () => ({ mate1: null, mate2: null }),
 })

@@ -46,6 +46,20 @@ export interface RewardGrantItemOverflowPolicy {
 
 export interface RewardGrantExecutionOptions {
     readonly itemOverflow?: RewardGrantItemOverflowPolicy
+    readonly assetAcquisition?: RewardGrantAssetAcquisition
+}
+
+export interface RewardGrantAssetAcquisition {
+    grantCharacter(
+        characterId: number,
+        grantCompensation: (itemId: number, amount: number) => void,
+    ): {
+        readonly isNew: boolean
+        readonly character: RewardGrantObjectSnapshot
+        readonly item?: { readonly id: number, readonly count: number }
+    } | null
+    grantEquipment(equipmentId: number, amount: number): RewardGrantObjectSnapshot
+    persistFinalStates(): void
 }
 
 export interface RewardGrantKnownPlayerState {

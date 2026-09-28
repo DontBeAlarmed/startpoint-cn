@@ -7,6 +7,11 @@ const path = require("node:path")
 const Fastify = require("fastify")
 const { pack, unpack } = require("msgpackr")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot({
+        additionalTableNames: ["raid_event_overall_reward.json"],
+    })
+const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "raid-event-summary-route-db-"))
 const previousDataDirectory = process.env.DATA_DIR
 process.env.DATA_DIR = databaseDirectory
@@ -118,6 +123,62 @@ async function main() {
             0,
             "无效主数据必须在写入领奖游标前拒绝",
         )
+
+        const malformedRewards = structuredClone(require("../assets/raid_event_overall_reward.json"))
+        malformedRewards["1"][0][2] = "1"
+        malformedRewards["1"][0][3] = true
+        malformedRewards["1"][0][4] = "1"
+        const restoreMalformedContent = installBundledGameplaySnapshot({
+            additionalTableNames: ["raid_event_overall_reward.json"],
+            tableOverrides: { "raid_event_overall_reward.json": malformedRewards },
+        })
+        try {
+            const rushStateBefore = getDb().prepare(
+                "SELECT COUNT(*) AS count FROM players_rush_events WHERE player_id = ? AND event_id = 4",
+            ).get(playerId).count
+            const malformedResponse = await fastify.inject({
+                method: "POST",
+                url: "/summary",
+                payload: { viewer_id: 123, event_id: 4, api_count: 5 },
+            })
+            assert.equal(malformedResponse.statusCode, 500)
+            assert.equal(
+                getDb().prepare(
+                    "SELECT COUNT(*) AS count FROM players_rush_events WHERE player_id = ? AND event_id = 4",
+                ).get(playerId).count,
+                rushStateBefore,
+                "malformed reward catalog must not create default Rush state",
+            )
+
+            const freshAccount = insertAccountSync({
+                appId: "wf_cn",
+                idpAlias: "",
+                idpCode: "test",
+                idpId: "raid-event-summary-route-fresh",
+                status: "normal",
+            })
+            const freshPlayerId = insertDefaultPlayerSync(freshAccount.id).id
+            getDb().prepare("INSERT INTO sessions (token, account_id, expires, type) VALUES (?, ?, ?, ?)")
+                .run("456", freshAccount.id, "2999-01-01T00:00:00.000Z", 2)
+            const freshRushStateBefore = getDb().prepare(
+                "SELECT COUNT(*) AS count FROM players_rush_events WHERE player_id = ? AND event_id = 4",
+            ).get(freshPlayerId).count
+            const freshMalformedResponse = await fastify.inject({
+                method: "POST",
+                url: "/summary",
+                payload: { viewer_id: 456, event_id: 4, api_count: 6 },
+            })
+            assert.equal(freshMalformedResponse.statusCode, 500)
+            assert.equal(
+                getDb().prepare(
+                    "SELECT COUNT(*) AS count FROM players_rush_events WHERE player_id = ? AND event_id = 4",
+                ).get(freshPlayerId).count,
+                freshRushStateBefore,
+                "a fresh player must not receive default Rush state before malformed catalog rejection",
+            )
+        } finally {
+            restoreMalformedContent()
+        }
     } finally {
         await fastify.close()
     }
@@ -130,6 +191,7 @@ main().then(
         process.exitCode = 1
     },
 ).finally(() => {
+    restoreContentSnapshot()
     closeDatabase()
     fs.rmSync(databaseDirectory, { recursive: true, force: true })
     if (previousDataDirectory === undefined) delete process.env.DATA_DIR

@@ -13,9 +13,14 @@ import {
 } from "../../lib/mission/index";
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { MissionRewardGranter } from "../../lib/mission/grants";
-import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time";
-import { projectItemOverflowCommonResponse } from "../../lib/item-overflow";
+import {
+    projectCharacterPatch,
+    projectEquipmentEntity,
+} from "../../lib/common-response/entities";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
+import type { CommonResponseFragment } from "../../lib/common-response/model";
+import { projectItemOverflowCommonResponse } from "../../lib/item-overflow/common-response";
 
 const routes = async (fastify: FastifyInstance) => {
     fastify.post("/receive", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -52,7 +57,6 @@ const routes = async (fastify: FastifyInstance) => {
                 getPlayerActiveMissionsSync(playerId),
                 requestList,
                 {
-                    repository: getContentSnapshot().repository,
                     now: evaluationTime,
                     questProgress: getPlayerQuestProgressSync(playerId),
                 },
@@ -107,24 +111,30 @@ const routes = async (fastify: FastifyInstance) => {
             "message": settlement.message,
         })
 
-        console.log(`[ACTIVE_MISSION] receive viewer=${viewerId} missions=${requestList.length} items=${Object.keys(settlement.itemList).length}`)
         const overMax = projectItemOverflowCommonResponse(settlement.itemOverflowDispositions)
+        const fragment: CommonResponseFragment = {
+            "user_info": {
+                ...settlement.userInfo,
+                "exp_pooled_time": expPoolRealDateToClientTimestamp(settlement.player.expPooledTime)
+            },
+            "character_list": settlement.characterList.map(
+                character => projectCharacterPatch(character),
+            ),
+            "equipment_list": settlement.equipmentList.map(
+                equipment => projectEquipmentEntity(equipment),
+            ),
+            "item_list": settlement.itemList,
+            "mail_arrived": getPlayerMailCountSync(playerId, true) > 0,
+            ...(overMax.length > 0 ? { "over_max": overMax } : {}),
+        }
 
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": {
                 "active_mission_list": settlement.resultList,
-                "user_info": {
-                    ...settlement.userInfo,
-                    "exp_pooled_time": expPoolRealDateToClientTimestamp(settlement.player.expPooledTime)
-                },
-                "character_list": settlement.characterList,
-                "equipment_list": settlement.equipmentList,
-                "item_list": settlement.itemList,
+                ...mergeCommonResponseFragments([fragment]),
                 "degree_list": settlement.degreeList.map(degreeId => ({ viewer_id: viewerId, degree_id: degreeId })),
-                "mail_arrived": getPlayerMailCountSync(playerId, true) > 0,
-                ...(overMax.length > 0 ? { "over_max": overMax } : {})
             }
         })
     })

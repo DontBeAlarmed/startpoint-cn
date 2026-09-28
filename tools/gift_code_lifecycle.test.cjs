@@ -35,9 +35,12 @@ const {
 const { insertAccountSync } = require("../src/data/domains/account")
 const { insertDefaultPlayerSync } = require("../src/data/domains/player")
 const { RewardType } = require("../src/lib/types/rewards")
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
 
 test.after(() => {
     data.closeDatabase()
+    restoreContentSnapshot()
     fs.rmSync(dataDirectory, { recursive: true, force: true })
     if (previousDataDirectory === undefined) delete process.env.DATA_DIR
     else process.env.DATA_DIR = previousDataDirectory

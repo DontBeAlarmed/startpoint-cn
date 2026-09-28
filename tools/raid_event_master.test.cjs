@@ -1,5 +1,10 @@
 require("ts-node/register/transpile-only")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
+
+
 const assert = require("node:assert/strict")
 const { getRaidEventRequiredKillCount } = require("../src/lib/raid-event-master")
 

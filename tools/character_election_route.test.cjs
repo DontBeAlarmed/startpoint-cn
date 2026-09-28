@@ -10,6 +10,8 @@ const { unpack } = require("msgpackr")
 
 require("ts-node/register/transpile-only")
 
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
 const databaseDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "character-election-route-"))
 const previousDataDirectory = process.env.DATA_DIR
 const previousDatabaseDirectory = process.env.WDFP_DATABASE_DIR
@@ -18,6 +20,7 @@ delete process.env.WDFP_DATABASE_DIR
 
 let db
 function cleanup() {
+    restoreContentSnapshot()
     if (db?.open) db.close()
     fs.rmSync(databaseDirectory, { recursive: true, force: true })
     if (previousDataDirectory === undefined) delete process.env.DATA_DIR
@@ -62,6 +65,13 @@ const TABLE = Object.freeze({
         keywordIds: Object.freeze([1000001, 1000010]),
     }),
 })
+const CATALOG = require("../src/lib/character-election").buildCharacterElectionCatalog({
+    info: () => ({ source: "test" }),
+    table: tableName => {
+        if (tableName !== "character_election.json") throw new Error(`unexpected table ${tableName}`)
+        return TABLE
+    },
+})
 
 function decode(response) {
     return unpack(Buffer.from(response.body, "base64"))
@@ -74,7 +84,7 @@ async function main() {
     const app = Fastify()
     registerCnMsgpackOnSend(app)
     await app.register(characterElectionRoutes, {
-        getTable: () => TABLE,
+        getCatalog: () => CATALOG,
         now: () => now,
     })
     await app.ready()

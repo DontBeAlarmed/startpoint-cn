@@ -1,0 +1,573 @@
+{
+  "1": {
+    "campaignId": 1,
+    "stringId": "gacha_campaign_01",
+    "title": "半周年纪念！1天1次免费10连抽取活动",
+    "kind": 2,
+    "availableFrom": "2020-05-27 12:00:00",
+    "availableUntil": "2020-06-12 11:59:59",
+    "gachaIds": [
+      28,
+      29,
+      30
+    ]
+  },
+  "2": {
+    "campaignId": 2,
+    "stringId": "gacha_campaign_02",
+    "title": "周年倒计时！1天1次免费扭蛋抽取活动",
+    "kind": 1,
+    "availableFrom": "2020-10-31 05:00:00",
+    "availableUntil": "2020-11-27 04:59:59",
+    "gachaIds": [
+      46,
+      47,
+      48,
+      49
+    ]
+  },
+  "3": {
+    "campaignId": 3,
+    "stringId": "gacha_campaign_03",
+    "title": "1st周年庆典！1天1次角色免费10连抽取活动",
+    "kind": 2,
+    "availableFrom": "2020-11-27 05:00:00",
+    "availableUntil": "2020-12-20 04:59:59",
+    "gachaIds": [
+      49,
+      50,
+      51,
+      52,
+      53,
+      54
+    ]
+  },
+  "4": {
+    "campaignId": 4,
+    "stringId": "gacha_campaign_04",
+    "title": "正月纪念！1天1次免费扭蛋抽取活动",
+    "kind": 1,
+    "availableFrom": "2020-12-31 05:00:00",
+    "availableUntil": "2021-01-09 04:59:59",
+    "gachaIds": [
+      55,
+      56,
+      58
+    ]
+  },
+  "5": {
+    "campaignId": 5,
+    "stringId": "gacha_campaign_05",
+    "title": "半周年庆典！1天1次免费角色10连抽取活动",
+    "kind": 2,
+    "availableFrom": "2022-04-19 12:00:00",
+    "availableUntil": "2022-05-05 23:59:59",
+    "gachaIds": [
+      1501,
+      1503,
+      1504
+    ]
+  },
+  "6": {
+    "campaignId": 6,
+    "stringId": "gacha_campaign_06",
+    "title": "碧蓝幻想角色登场纪念！1天1次免费扭蛋抽取活动",
+    "kind": 1,
+    "availableFrom": "2021-05-12 05:00:00",
+    "availableUntil": "2021-05-21 04:59:59",
+    "gachaIds": [
+      10073,
+      10074
+    ]
+  },
+  "7": {
+    "campaignId": 7,
+    "stringId": "gacha_campaign_07",
+    "title": "1.5周年庆典！1天1次的角色免费10连抽取活动",
+    "kind": 2,
+    "availableFrom": "2021-05-27 05:00:00",
+    "availableUntil": "2021-06-14 04:59:59",
+    "gachaIds": [
+      10075,
+      10076,
+      10077
+    ]
+  },
+  "8": {
+    "campaignId": 8,
+    "stringId": "gacha_campaign_08",
+    "title": "夏日假期1天1次免费扭蛋抽取活动",
+    "kind": 1,
+    "availableFrom": "2021-06-30 05:00:00",
+    "availableUntil": "2021-07-26 04:59:59",
+    "gachaIds": [
+      10081,
+      10082,
+      10083,
+      10084
+    ]
+  },
+  "9": {
+    "campaignId": 9,
+    "stringId": "gacha_campaign_09",
+    "title": "《凉宫春日的忧郁》联动纪念！1天1次的角色免费抽取活动",
+    "kind": 1,
+    "availableFrom": "2023-07-10 12:00:00",
+    "availableUntil": "2023-07-26 04:59:59",
+    "gachaIds": [
+      1574
+    ]
+  },
+  "10": {
+    "campaignId": 10,
+    "stringId": "gacha_campaign_10",
+    "title": "主线关卡第十章完结纪念！1天1次免费扭蛋抽取活动",
+    "kind": 1,
+    "availableFrom": "2021-10-31 12:00:00",
+    "availableUntil": "2021-11-12 04:59:59",
+    "gachaIds": [
+      98,
+      99
+    ]
+  },
+  "11": {
+    "campaignId": 11,
+    "stringId": "gacha_campaign_11",
+    "title": "2周年周年倒计时！1天1次免费扭蛋抽取活动",
+    "kind": 1,
+    "availableFrom": "2021-11-17 12:00:00",
+    "availableUntil": "2021-11-27 04:59:59",
+    "gachaIds": [
+      99,
+      100100
+    ]
+  },
+  "12": {
+    "campaignId": 12,
+    "stringId": "gacha_campaign_12",
+    "title": "2周年庆典！1天1次的角色免费10连抽取活动",
+    "kind": 2,
+    "availableFrom": "2023-08-31 12:00:00",
+    "availableUntil": "2023-09-23 04:59:59",
+    "gachaIds": [
+      1580,
+      1581,
+      1582,
+      1584,
+      1583,
+      80000
+    ]
+  },
+  "13": {
+    "campaignId": 13,
+    "stringId": "gacha_campaign_13",
+    "title": "三日免费10连扭蛋特别活动",
+    "kind": 2,
+    "availableFrom": "2023-10-05 12:00:00",
+    "availableUntil": "2023-10-08 04:59:59",
+    "gachaIds": [
+      1587,
+      1588
+    ]
+  },
+  "14": {
+    "campaignId": 14,
+    "stringId": "gacha_campaign_14",
+    "title": "春满花开免费10连扭蛋特别活动",
+    "kind": 2,
+    "availableFrom": "2023-12-28 12:00:00",
+    "availableUntil": "2023-12-31 04:59:59",
+    "gachaIds": [
+      1597,
+      1596,
+      80001
+    ]
+  },
+  "15": {
+    "campaignId": 15,
+    "stringId": "gacha_campaign_15",
+    "title": "2022年黄金周1天1次免费扭蛋抽取活动",
+    "kind": 1,
+    "availableFrom": "2022-04-29 12:00:00",
+    "availableUntil": "2022-05-09 04:59:59",
+    "gachaIds": [
+      118,
+      119
+    ]
+  },
+  "16": {
+    "campaignId": 16,
+    "stringId": "gacha_campaign_16",
+    "title": "2.5周年庆典！1天1次的角色免费10连抽取活动",
+    "kind": 2,
+    "availableFrom": "2022-05-31 12:00:00",
+    "availableUntil": "2022-06-15 04:59:59",
+    "gachaIds": [
+      123,
+      124
+    ]
+  },
+  "17": {
+    "campaignId": 17,
+    "stringId": "gacha_campaign_17",
+    "title": "2022年夏日假期1天1次免费扭蛋抽取活动",
+    "kind": 1,
+    "availableFrom": "2022-07-15 12:00:00",
+    "availableUntil": "2022-08-15 04:59:59",
+    "gachaIds": [
+      129,
+      130,
+      131,
+      132
+    ]
+  },
+  "18": {
+    "campaignId": 18,
+    "stringId": "gacha_campaign_18",
+    "title": "3周年庆典！1天1次的角色免费10连抽取活动",
+    "kind": 2,
+    "availableFrom": "2022-11-28 12:00:00",
+    "availableUntil": "2022-12-23 04:59:59",
+    "gachaIds": [
+      147,
+      148,
+      149
+    ]
+  },
+  "19": {
+    "campaignId": 19,
+    "stringId": "gacha_campaign_19",
+    "title": "春满花开免费10连扭蛋特别活动",
+    "kind": 2,
+    "availableFrom": "2023-03-31 12:00:00",
+    "availableUntil": "2023-04-03 04:59:59",
+    "gachaIds": [
+      167,
+      700004
+    ]
+  },
+  "20": {
+    "campaignId": 20,
+    "stringId": "gacha_campaign_20",
+    "title": "3.5周年庆典！1天1次的角色免费10连抽取活动",
+    "kind": 2,
+    "availableFrom": "2023-05-31 12:00:00",
+    "availableUntil": "2023-06-15 04:59:59",
+    "gachaIds": [
+      179,
+      700004,
+      180
+    ]
+  },
+  "21": {
+    "campaignId": 21,
+    "stringId": "gacha_campaign_21",
+    "title": "夏日假期 1天1次免费扭蛋单抽活动",
+    "kind": 1,
+    "availableFrom": "2023-07-14 12:00:00",
+    "availableUntil": "2023-08-14 04:59:59",
+    "gachaIds": [
+      187,
+      188,
+      189,
+      190,
+      191,
+      192,
+      700004
+    ]
+  },
+  "22": {
+    "campaignId": 22,
+    "stringId": "gacha_campaign_22",
+    "title": "4周年庆典！1天1次的角色免费10连抽取活动",
+    "kind": 2,
+    "availableFrom": "2023-11-30 12:00:00",
+    "availableUntil": "2023-12-25 04:59:59",
+    "gachaIds": [
+      212,
+      700004,
+      213,
+      214,
+      215,
+      216,
+      217,
+      218,
+      219
+    ]
+  },
+  "1000": {
+    "campaignId": 1000,
+    "stringId": "gacha_campaign_1000",
+    "title": "周年纪念日即将到来！每日1回角色免费抽取活动",
+    "kind": 1,
+    "availableFrom": "2022-09-16 12:00:00",
+    "availableUntil": "2022-10-13 04:59:59",
+    "gachaIds": [
+      1520,
+      1519,
+      1521
+    ]
+  },
+  "1001": {
+    "campaignId": 1001,
+    "stringId": "gacha_campaign_1001",
+    "title": "一周年庆典！1天1次的角色免费10连抽取活动",
+    "kind": 2,
+    "availableFrom": "2022-10-13 12:00:00",
+    "availableUntil": "2022-11-04 23:59:59",
+    "gachaIds": [
+      1522,
+      1523,
+      1524,
+      1525,
+      1526,
+      1527
+    ]
+  },
+  "1002": {
+    "campaignId": 1002,
+    "stringId": "gacha_campaign_1002",
+    "title": "庆贺新年！每日1回角色免费抽取活动",
+    "kind": 1,
+    "availableFrom": "2022-11-17 12:00:00",
+    "availableUntil": "2022-11-26 04:59:59",
+    "gachaIds": [
+      1529,
+      1530
+    ]
+  },
+  "1005": {
+    "campaignId": 1005,
+    "stringId": "gacha_campaign_1005",
+    "title": "黄金周纪念！1天1次免费扭蛋抽取活动",
+    "kind": 1,
+    "availableFrom": "2021-04-30 05:00:00",
+    "availableUntil": "2021-05-12 04:59:59",
+    "gachaIds": [
+      10073,
+      59
+    ]
+  },
+  "1006": {
+    "campaignId": 1006,
+    "stringId": "gacha_campaign_1006",
+    "title": "每日1回角色免费抽取活动",
+    "kind": 1,
+    "availableFrom": "2023-01-19 12:00:00",
+    "availableUntil": "2023-01-26 04:59:59",
+    "gachaIds": [
+      1537,
+      1540
+    ]
+  },
+  "1007": {
+    "campaignId": 1007,
+    "stringId": "gacha_campaign_1007",
+    "title": "每日1回角色免费抽取活动",
+    "kind": 1,
+    "availableFrom": "2023-02-16 12:00:00",
+    "availableUntil": "2023-02-21 04:59:59",
+    "gachaIds": [
+      1546,
+      1545
+    ]
+  },
+  "1008": {
+    "campaignId": 1008,
+    "stringId": "gacha_campaign_1008",
+    "title": "每日1回角色免费抽取活动",
+    "kind": 1,
+    "availableFrom": "2023-02-22 12:00:00",
+    "availableUntil": "2023-03-03 04:59:59",
+    "gachaIds": [
+      1547,
+      1546
+    ]
+  },
+  "1009": {
+    "campaignId": 1009,
+    "stringId": "gacha_campaign_1009",
+    "title": "1.5周年庆典！1天1次的角色免费10连抽取活动",
+    "kind": 2,
+    "availableFrom": "2023-03-06 12:00:00",
+    "availableUntil": "2023-03-23 23:59:59",
+    "gachaIds": [
+      1549,
+      1550,
+      1551,
+      1548
+    ]
+  },
+  "1010": {
+    "campaignId": 1010,
+    "stringId": "gacha_campaign_1010",
+    "title": "每日1回角色免费抽取活动",
+    "kind": 1,
+    "availableFrom": "2023-04-20 12:00:00",
+    "availableUntil": "2023-05-15 23:59:59",
+    "gachaIds": [
+      1559,
+      1558,
+      1560,
+      1562,
+      1563,
+      1564
+    ]
+  },
+  "1011": {
+    "campaignId": 1011,
+    "stringId": "gacha_campaign_1011",
+    "title": "主线关卡第十章完结纪念！1天1次的角色免费抽取活动",
+    "kind": 1,
+    "availableFrom": "2023-08-09 12:00:00",
+    "availableUntil": "2023-08-21 04:59:59",
+    "gachaIds": [
+      1577,
+      1579
+    ]
+  },
+  "1012": {
+    "campaignId": 1012,
+    "stringId": "gacha_campaign_1012",
+    "title": "2周年纪念日即将到来！1日每日1回角色免费抽取活动",
+    "kind": 1,
+    "availableFrom": "2023-08-21 05:00:00",
+    "availableUntil": "2023-08-31 04:59:59",
+    "gachaIds": [
+      1578,
+      1579,
+      1577
+    ]
+  },
+  "1013": {
+    "campaignId": 1013,
+    "stringId": "gacha_campaign_1013",
+    "title": "庆贺寒假！每日1回角色免费抽取活动",
+    "kind": 1,
+    "availableFrom": "2024-01-25 12:00:00",
+    "availableUntil": "2024-02-04 04:59:59",
+    "gachaIds": [
+      1603,
+      1601,
+      1602,
+      1604,
+      1605,
+      80001
+    ]
+  },
+  "1014": {
+    "campaignId": 1014,
+    "stringId": "gacha_campaign_1014",
+    "title": "2.5周年庆典！1天1次的角色免费10连抽取活动",
+    "kind": 2,
+    "availableFrom": "2024-02-22 12:00:00",
+    "availableUntil": "2024-03-08 04:59:59",
+    "gachaIds": [
+      1607,
+      1608,
+      1609,
+      1610,
+      1611,
+      80001,
+      80002
+    ]
+  },
+  "1015": {
+    "campaignId": 1015,
+    "stringId": "gacha_campaign_1015",
+    "title": "每日1回角色免费抽取活动",
+    "kind": 1,
+    "availableFrom": "2024-03-28 12:00:00",
+    "availableUntil": "2024-04-28 04:59:59",
+    "gachaIds": [
+      1615,
+      1617,
+      1618,
+      1619,
+      1620,
+      1621,
+      80002
+    ]
+  },
+  "1016": {
+    "campaignId": 1016,
+    "stringId": "gacha_campaign_1016",
+    "title": "3周年庆典！1天1次的角色免费10连抽取活动",
+    "kind": 2,
+    "availableFrom": "2024-07-11 12:00:00",
+    "availableUntil": "2024-08-05 04:59:59",
+    "gachaIds": [
+      1635,
+      1636,
+      1637,
+      80003,
+      80004
+    ]
+  },
+  "1017": {
+    "campaignId": 1017,
+    "stringId": "gacha_campaign_1017",
+    "title": "春满花开免费10连扭蛋特别活动",
+    "kind": 2,
+    "availableFrom": "2024-11-07 12:00:00",
+    "availableUntil": "2024-11-10 04:59:59",
+    "gachaIds": [
+      1656,
+      1657,
+      80004
+    ]
+  },
+  "1018": {
+    "campaignId": 1018,
+    "stringId": "gacha_campaign_1018",
+    "title": "3.5周年庆典！1天1次的角色免费10连抽取活动",
+    "kind": 2,
+    "availableFrom": "2025-01-02 12:00:00",
+    "availableUntil": "2025-01-17 04:59:59",
+    "gachaIds": [
+      1668,
+      1669,
+      1670,
+      1671,
+      700004
+    ]
+  },
+  "1019": {
+    "campaignId": 1019,
+    "stringId": "gacha_campaign_1019",
+    "title": "夏日假期 1天1次免费扭蛋单抽活动",
+    "kind": 1,
+    "availableFrom": "2025-02-13 12:00:00",
+    "availableUntil": "2025-03-16 04:59:59",
+    "gachaIds": [
+      1677,
+      1678,
+      1679,
+      1680,
+      1681,
+      1682,
+      1683,
+      1684,
+      700004
+    ]
+  },
+  "1020": {
+    "campaignId": 1020,
+    "stringId": "gacha_campaign_1020",
+    "title": "4周年庆典！1天1次的角色免费10连抽取活动",
+    "kind": 2,
+    "availableFrom": "2025-06-19 12:00:00",
+    "availableUntil": "2025-07-14 04:59:59",
+    "gachaIds": [
+      1703,
+      700004,
+      1704,
+      1705,
+      1706,
+      1707,
+      1708,
+      1709,
+      1710
+    ]
+  }
+}

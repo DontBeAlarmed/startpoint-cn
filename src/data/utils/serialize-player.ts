@@ -16,7 +16,7 @@ import { getRealNow } from "../../runtime/time/game-time"
 import { createCharacterGrowthBatchContext } from "../../lib/character-growth/batch-context"
 import { projectCharacterGrowthLoad } from "../../lib/character-growth/load-projector"
 import type { BondTokenStatus, CharacterGrowthStoredCore } from "../../lib/character-growth/model"
-import { getCharacterDataSync } from "../../lib/assets"
+import { getCharacterFacts } from "../../lib/character-content"
 
 export interface SerializePlayerDataOptions {
     viewerId?: number
@@ -106,11 +106,11 @@ function projectSerializedCharacterGrowth(toSerialize: MergedPlayerData) {
         ]))
 
         const nodeIds = toSerialize.characterManaNodeList[key] ?? []
-        if (new Set(nodeIds).size !== nodeIds.length) {
+        const nodeIdSet = new Set(nodeIds)
+        if (nodeIdSet.size !== nodeIds.length) {
             throw new Error(`characterManaNodeList contains duplicate nodes for character ${characterId}`)
         }
         const awakeLevels = toSerialize.characterManaNodeAwakeLevels?.[key] ?? {}
-        const nodeIdSet = new Set(nodeIds)
         for (const rawNodeId of Object.keys(awakeLevels)) {
             if (!nodeIdSet.has(Number(rawNodeId))) {
                 throw new Error(`characterManaNodeAwakeLevels contains unknown node ${characterId}/${rawNodeId}`)
@@ -130,7 +130,7 @@ function projectSerializedCharacterGrowth(toSerialize: MergedPlayerData) {
             characterId,
             getCharacterVisibleManaBoardIndex(character.manaBoardIndex, characterId),
         )
-        rarityByCharacter.set(characterId, getCharacterDataSync(characterId)?.rarity ?? null)
+        rarityByCharacter.set(characterId, getCharacterFacts().get(characterId)?.rarity ?? null)
     }
 
     const batch = createCharacterGrowthBatchContext({
@@ -161,6 +161,12 @@ export function serializePlayerData(
     options?: SerializePlayerDataOptions
 ): ClientPlayerData {
     const growthLoadProjection = projectSerializedCharacterGrowth(toSerialize)
+    const gachaDetailsById = new Map(
+        (toSerialize.gachaDetailList ?? []).map(detail => [detail.gachaId, detail]),
+    )
+    const starsGachaById = new Map(
+        (toSerialize.starsGachaCampaignList ?? []).map(campaign => [campaign.gachaId, campaign]),
+    )
 
     // convert parties
     const userPartyGroupList: Record<string, UserPartyGroup> = serializePartyGroupList(toSerialize.partyGroupList)
@@ -282,13 +288,40 @@ export function serializePlayerData(
         "quest_progress": userQuestProgress,
         "last_main_quest_id": null,
         "gacha_info_list": toSerialize.gachaInfoList.map(gachaInfo => {
+            const detail = gachaDetailsById.get(gachaInfo.gachaId)
+            const stars = starsGachaById.get(gachaInfo.gachaId)
             return {
                 "gacha_id": gachaInfo.gachaId,
                 "is_daily_first": gachaInfo.isDailyFirst,
                 "is_account_first": gachaInfo.isAccountFirst,
-                "gacha_exchange_point": gachaInfo.gachaExchangePoint
+                "gacha_exchange_point": gachaInfo.gachaExchangePoint,
+                ...(gachaInfo.crazyDrawCount === null
+                    || gachaInfo.crazyDrawCount === undefined
+                    ? {}
+                    : { "crazy_draw_count": gachaInfo.crazyDrawCount }),
+                ...(detail?.dailyOneCount === null || detail?.dailyOneCount === undefined
+                    ? {} : { "daily_one_count": detail.dailyOneCount }),
+                ...(detail?.dailyTenCount === null || detail?.dailyTenCount === undefined
+                    ? {} : { "daily_ten_count": detail.dailyTenCount }),
+                ...(detail?.comebackPeriodStartTime === null
+                    || detail?.comebackPeriodStartTime === undefined
+                    || detail.comebackPeriodEndTime === null
+                    ? {}
+                    : { "comeback_campaign": {
+                        "period_start_time": detail.comebackPeriodStartTime,
+                        "period_end_time": detail.comebackPeriodEndTime,
+                    } }),
+                ...(stars === undefined ? {} : { "stars_campaign": {
+                    "period_start_time": stars.periodStartTime,
+                    "period_end_time": stars.periodEndTime,
+                } }),
             }
         }),
+        "stars_gacha_campaign_list": (toSerialize.starsGachaCampaignList ?? []).map(campaign => ({
+            "campaign_id": campaign.campaignId,
+            "free_one_times": campaign.freeOneTimes,
+            "free_ten_times": campaign.freeTenTimes,
+        })),
         "available_asset_version": resolveSerializedAssetVersion(options?.availableAssetVersion),
         "should_prompt_takeover_registration": false,
         "has_unread_news_item": false,

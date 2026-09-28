@@ -17,14 +17,14 @@ import {
     getPlayerSync,
     updatePlayerSync,
 } from "../../data/domains/player";
-import { getQuestConfigurationErrorResponse, getQuestFromCategorySync } from "../../lib/assets";
+import { getQuestConfigurationErrorResponse, getQuestFromCategorySync } from "../../lib/quest-content";
 import { getServerGameplaySettingsSync } from "../../data/domains/server-settings";
 import { computeRealTimeStamina } from "../../lib/stamina";
-import { getStaminaCost } from "../../lib/stamina-cost";
+import { getLocalGuestStaminaCost, getStaminaCost } from "../../lib/stamina-cost";
+import { resolveMultiPlayerContext } from "../player-context";
 import { BattleQuest } from "../../lib/types";
 import { getDb } from "../../data/db";
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
-import bundledQuestEntryCosts from "../../../assets/quest_entry_costs.json";
+import { getQuestEntryCostByKey } from "../../lib/quest-entry-content";
 import {
     ActiveQuestAlreadyExistsError,
     buildStartEntryItemList,
@@ -32,7 +32,6 @@ import {
     InsufficientStaminaError,
     PlayerNotFoundError,
     runStartEntryTransaction,
-    type StartEntryCost,
 } from "../../lib/quest/start-entry";
 import {
     validateMultiStartRequest,
@@ -47,6 +46,11 @@ import {
     runMultiplayerSettlementOrchestration,
 } from "../settlement/orchestrator";
 import { projectMultiplayerFinishResponse } from "../settlement/response";
+import { buildFinishFollowInfo } from "../../lib/quest/finish/follow-info";
+import { resolveRoomEstablisherFollowStateSync } from "../follow-policy";
+import { getLocalFollowRelationSync } from "../../data/domains/follow";
+import { getPlayerMailCountSync } from "../../data/domains/mail";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
 import { resolveLocalRescueFragmentEligibility } from "../rescue-fragment-reward";
 import { withEntryItemInventoryWithinTransactionSync } from "../../lib/quest/entry-item-inventory";
 
@@ -189,14 +193,27 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             room.value.host.nodeSessionId,
             room.value.host.viewerId,
         ) === identityKey;
+        // F4：房主全额；guest 按 follow 关系（同服真实 state / 可信跨服投影 1）
+        // 计费——互关与跨服 0，其余先折半再 Campaign。关系解析在最后一个异步
+        // Coordinator 校验后完成，随后同步进入开战事务。
+        const hostContext = isRoomHost
+            ? null
+            : await context.resolvePlayerContext(room.value.host.viewerId);
+        const guestFollowState = isRoomHost
+            ? 0
+            : resolveRoomEstablisherFollowStateSync({
+                requester: participant,
+                host: room.value.host,
+                requesterPlayerId: ctx.playerId,
+                hostPlayerId: hostContext?.playerId ?? null,
+            });
         const questKey = `${category}_${quest_id}`;
         const entryCost = isRoomHost
-            ? getRuntimeContentTableSync(
-                "quest_entry_costs.json",
-                bundledQuestEntryCosts as Record<string, StartEntryCost>,
-            )[questKey]
+            ? getQuestEntryCostByKey(questKey)
             : undefined;
-        const staminaCost = isRoomHost ? getStaminaCost(questKey).cost : 0;
+        const staminaCost = isRoomHost
+            ? getStaminaCost(questKey).cost
+            : getLocalGuestStaminaCost(questKey, guestFollowState);
         const coordinatorOrigin = await context.resolveCoordinatorOrigin({
             participant,
             roomNumber: battle.value.roomNumber,
@@ -263,11 +280,13 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             "data": {
                 "is_multi": "multi",
                 "play_id": play_id,
-                "user_info": {
-                    "stamina": startResult.afterStamina,
-                    "stamina_heal_time": realToVirtual(startTime),
-                },
-                "item_list": buildStartEntryItemList(startResult),
+                ...mergeCommonResponseFragments([{
+                    "user_info": {
+                        "stamina": startResult.afterStamina,
+                        "stamina_heal_time": realToVirtual(startTime),
+                    },
+                    "item_list": buildStartEntryItemList(startResult),
+                }]),
             }
         });
     });
@@ -312,12 +331,30 @@ export function registerBattleRoutes(fastify: FastifyInstance, context: MultiHtt
             }
             throw error;
         }
+        const participant = context.snapshotProvider.getParticipant(viewerId);
         const response = await projectMultiplayerFinishResponse({
             activeQuest: preparation.value.activeQuest,
             body,
             playerId,
             settlement: settlementResult,
             viewerId,
+            mailArrived: getPlayerMailCountSync(playerId, true) > 0,
+            followInfo: await buildFinishFollowInfo(
+                viewerId,
+                ((body as any).mate_player_result || []) as Array<{ viewer_id?: number }>,
+                preparation.value.activeQuest.matePlayerIds || [],
+                resolveMultiPlayerContext,
+                console.warn,
+                {
+                    requesterPlayerId: playerId,
+                    getRelation: getLocalFollowRelationSync,
+                    allowedParticipantViewerIds: new Set(
+                        preparation.value.authoritativeParticipants
+                            .filter(member => member.nodeSessionId === participant.nodeSessionId)
+                            .map(member => member.viewerId),
+                    ),
+                },
+            ),
         });
         reply.header("content-type", "application/x-msgpack");
         return reply.status(200).send(response);

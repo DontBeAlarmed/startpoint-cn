@@ -27,7 +27,8 @@ function insertMissingPartySync(
     db.prepare(`
     INSERT OR IGNORE INTO players_parties (slot, name, character_id_1, character_id_2, character_id_3,
         unison_character_1, unison_character_2, unison_character_3, equipment_1, equipment_2,
-        equipment_3, ability_soul_1, ability_soul_2, ability_soul_3, edited, player_id, group_id, category,
+        equipment_3, ability_soul_1, ability_soul_2, ability_soul_3, edited,
+        allow_other_players_to_heal_me, player_id, group_id, category,
         current_battle_power, before_battle_power)
     VALUES (${PARTY_WRITE_VALUES})
     `).run(buildPartyWriteParameters(playerId, groupId, slot, party))

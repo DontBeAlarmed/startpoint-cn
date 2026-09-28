@@ -444,13 +444,13 @@ function inspectFeatureContent(feature, expectedGachaIds) {
 function validateGachas({
     bundledRaw,
     releaseRaw,
-    bundledCampaigns,
-    releaseCampaigns,
+    bundledCampaignDefinitions,
+    releaseCampaignDefinitions,
     bundledRuntime,
     releaseRuntime,
     releaseFeature,
     expectedGachaCount,
-    expectedCampaignCount,
+    expectedCampaignDefinitions,
     expectedFeature,
     releaseFeatureDigest,
     expectedFeatureDigest,
@@ -460,9 +460,9 @@ function validateGachas({
         || !isDeepStrictEqual(releaseRaw, bundledRaw)) {
         fail("卡池 cdndata 原始行不一致")
     }
-    if (Object.keys(releaseCampaigns).length !== expectedCampaignCount
-        || !isDeepStrictEqual(releaseCampaigns, bundledCampaigns)) {
-        fail("卡池 campaign 映射不一致")
+    if (Object.keys(releaseCampaignDefinitions).length !== expectedCampaignDefinitions
+        || !isDeepStrictEqual(releaseCampaignDefinitions, bundledCampaignDefinitions)) {
+        fail("卡池 campaign 定义不一致")
     }
     const bundledDrawable = drawableSignature(bundledRuntime)
     const releaseDrawable = drawableSignature(releaseRuntime)
@@ -482,7 +482,7 @@ function validateGachas({
     ), 0)
     return {
         gachas: expectedGachaCount,
-        campaigns: expectedCampaignCount,
+        campaigns: expectedCampaignDefinitions,
         featureEntries: featureStats.entries,
         drawableEntries,
     }
@@ -1508,13 +1508,13 @@ async function validateSynchronizedContent({ paths, syncResult }) {
     const gachaStats = validateGachas({
         bundledRaw: readJson(paths.projectRoot, "assets/cdndata/gacha.json"),
         releaseRaw: repository.table("cdndata/gacha.json"),
-        bundledCampaigns: readJson(paths.projectRoot, "assets/gacha_campaign.json"),
-        releaseCampaigns: repository.table("gacha_campaign.json"),
+        bundledCampaignDefinitions: readJson(paths.projectRoot, "assets/gacha_campaign_definitions.json"),
+        releaseCampaignDefinitions: repository.table("gacha_campaign_definitions.json"),
         bundledRuntime: readJson(paths.projectRoot, "assets/gacha.json"),
         releaseRuntime: repository.table("gacha.json"),
         releaseFeature,
         expectedGachaCount: 584,
-        expectedCampaignCount: 145,
+        expectedCampaignDefinitions: 41,
         expectedFeature: EXPECTED_FEATURE_COUNTS,
         releaseFeatureDigest,
         expectedFeatureDigest: EXPECTED_FEATURE_DIGEST,
@@ -1567,7 +1567,7 @@ function formatSuccessSummary(stats, archiveCount) {
         `商店记录 ${stats.shops}`,
         `skill_count 3->6 ${stats.skillCountUpgrades ?? 45}`,
         `skill_count=2 ${stats.twoSkillCharacters ?? 12}`,
-        `campaign ${stats.campaigns ?? 145}`,
+        `campaign ${stats.campaigns ?? 41}`,
         `feature ${stats.featureEntries ?? 2866}`,
         ...(archiveCount === undefined ? [] : [`归档元数据 ${archiveCount}`]),
         "来源未变",

@@ -1,8 +1,6 @@
-import bundledPlayerHistories from "../../assets/player_history.json"
-import bundledPlayerHistoryBackgrounds from "../../assets/player_history_card_background.json"
-import bundledPlayerHistoryTopics from "../../assets/player_history_topic.json"
-
-import { getRuntimeContentTableSync } from "../content/runtime/table-access"
+import { getContentSnapshot } from "../content/runtime/content-snapshot"
+import { GameCalendarError, type GameCalendarPolicy } from "../time/game-calendar"
+import { getGameCalendar } from "../time/game-calendar-provider"
 
 type RawFlatTable = Record<string, unknown>
 type RawNestedTable = Record<string, unknown>
@@ -31,8 +29,6 @@ export interface PlayerHistoryCatalog {
     readonly topics: readonly PlayerHistoryTopicDefinition[]
 }
 
-const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/
-const JST_OFFSET_HOURS = 9
 const EMPTY_FIELDS: PlayerHistoryTopicValueList = Object.freeze({
     int_values: null,
     string_values: null,
@@ -74,42 +70,25 @@ function parseSingleRow(value: unknown, length: number, subject: string): readon
     return value[0] as string[]
 }
 
-function parseJstDate(value: string, subject: string): number {
-    const match = DATE_PATTERN.exec(value)
-    if (!match) malformed(subject)
-    const [, yearText, monthText, dayText, hourText, minuteText, secondText] = match
-    const year = Number(yearText)
-    const month = Number(monthText)
-    const day = Number(dayText)
-    const hour = Number(hourText)
-    const minute = Number(minuteText)
-    const second = Number(secondText)
-    const timestamp = Date.UTC(
-        year,
-        month - 1,
-        day,
-        hour - JST_OFFSET_HOURS,
-        minute,
-        second,
-    )
-    const jst = new Date(timestamp + JST_OFFSET_HOURS * 3600_000)
-    if (jst.getUTCFullYear() !== year
-        || jst.getUTCMonth() + 1 !== month
-        || jst.getUTCDate() !== day
-        || jst.getUTCHours() !== hour
-        || jst.getUTCMinutes() !== minute
-        || jst.getUTCSeconds() !== second) {
-        malformed(subject)
+function parseJstDate(value: string, subject: string, calendar: GameCalendarPolicy): number {
+    try {
+        return calendar.parseMasterTimestamp(value)
+    } catch (error) {
+        if (error instanceof GameCalendarError) malformed(subject)
+        throw error
     }
-    return timestamp
 }
 
-function parseCurrentHistoryId(table: RawFlatTable, nowMs: number): number {
+function parseCurrentHistoryId(
+    table: RawFlatTable,
+    nowMs: number,
+    calendar: GameCalendarPolicy,
+): number {
     for (const [idText, rawRows] of Object.entries(table)) {
         const id = parsePositiveInteger(idText, `history id ${idText}`)
         const row = parseSingleRow(rawRows, 4, `history ${id}`)
-        const startTime = parseJstDate(row[2], `history ${id} start_time`)
-        const endTime = parseJstDate(row[3], `history ${id} end_time`)
+        const startTime = parseJstDate(row[2], `history ${id} start_time`, calendar)
+        const endTime = parseJstDate(row[3], `history ${id} end_time`, calendar)
         if (startTime <= nowMs && nowMs <= endTime) return id
     }
     return malformed("no history period is available at the current server time")
@@ -165,20 +144,19 @@ function parseTopics(table: RawNestedTable, historyId: number): readonly PlayerH
         }))
 }
 
-export function loadPlayerHistoryCatalog(nowMs: number): PlayerHistoryCatalog {
+export function loadPlayerHistoryCatalog(
+    nowMs: number,
+    calendar: GameCalendarPolicy = getGameCalendar(),
+): PlayerHistoryCatalog {
     if (!Number.isFinite(nowMs)) malformed("current server time")
-    const histories = getRuntimeContentTableSync(
-        "player_history.json",
-        bundledPlayerHistories as RawFlatTable,
-    )
-    const historyId = parseCurrentHistoryId(histories, nowMs)
-    const backgrounds = parseBackgrounds(getRuntimeContentTableSync(
+    const repository = getContentSnapshot().repository
+    const histories = repository.table<RawFlatTable>("player_history.json")
+    const historyId = parseCurrentHistoryId(histories, nowMs, calendar)
+    const backgrounds = parseBackgrounds(repository.table<RawFlatTable>(
         "player_history_card_background.json",
-        bundledPlayerHistoryBackgrounds as RawFlatTable,
     ))
-    const topics = parseTopics(getRuntimeContentTableSync(
+    const topics = parseTopics(repository.table<RawNestedTable>(
         "player_history_topic.json",
-        bundledPlayerHistoryTopics as RawNestedTable,
     ), historyId)
     return Object.freeze({
         playerHistoryId: historyId,

@@ -238,6 +238,55 @@ test("Hub battle facts discard unfinished records when their room is released", 
     }), { ok: false, error: "ROOM_NOT_FOUND" })
 })
 
+test("an emptied battle is abandoned, not fully finalized", () => {
+    const store = new BattleFactStore({ createBattleSessionId: () => "emptied-battle" })
+    store.startBattle({ roomNumber: "123456", host, participants: [host, guest] })
+    // Every participant left through abort/node-session cleanup before any
+    // finalize: the record is empty and must not read as "everyone finished".
+    assert.equal(store.removeParticipant({ participant: host, roomNumber: "123456" }).ok, true)
+    assert.equal(store.removeParticipant({ participant: guest, roomNumber: "123456" }).ok, true)
+    assert.equal(store.hasAnyFinalized({ roomNumber: "123456", battleSessionId: "emptied-battle" }), false)
+
+    assert.equal(
+        store.isFullyFinalized({ roomNumber: "123456", battleSessionId: "emptied-battle" }),
+        false,
+        "an empty participant set is an abandoned battle, not a completed one",
+    )
+})
+
+test("removing the last guest still releases when the remaining host finalized", () => {
+    const store = new BattleFactStore({ createBattleSessionId: () => "last-guest-battle" })
+    store.startBattle({ roomNumber: "123456", host, participants: [host, guest] })
+    store.markFinalized({ participant: host, roomNumber: "123456", battleSessionId: "last-guest-battle" })
+
+    assert.equal(store.removeParticipant({
+        participant: guest,
+        roomNumber: "123456",
+    }).ok, true, "an unfinalized last guest can still leave")
+
+    assert.equal(store.isFullyFinalized({
+        roomNumber: "123456",
+        battleSessionId: "last-guest-battle",
+    }), true, "all remaining real participants finalized still releases")
+})
+
+test("removing the last finalized guest still releases with a finalized host", () => {
+    const store = new BattleFactStore({ createBattleSessionId: () => "last-done-guest-battle" })
+    store.startBattle({ roomNumber: "123456", host, participants: [host, guest] })
+    store.markFinalized({ participant: host, roomNumber: "123456", battleSessionId: "last-done-guest-battle" })
+    store.markFinalized({ participant: guest, roomNumber: "123456", battleSessionId: "last-done-guest-battle" })
+
+    assert.equal(store.removeParticipant({
+        participant: guest,
+        roomNumber: "123456",
+    }).ok, true, "a finalized last guest can still be removed")
+
+    assert.equal(store.isFullyFinalized({
+        roomNumber: "123456",
+        battleSessionId: "last-done-guest-battle",
+    }), true)
+})
+
 test("Hub battle facts reject forged participants and bound retained records", () => {
     assert.equal(typeof BattleFactStore, "function")
     let sequence = 0
@@ -505,6 +554,7 @@ const {
 } = require("../src/data/domains/item")
 const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
 const { getPlayerPeriodicRewardPointsSync } = require("../src/data/domains/campaign")
+const { givePlayerDegreeSync } = require("../src/data/domains/degree")
 const { getPlayerSync, insertDefaultPlayerSync, updatePlayerSync } = require("../src/data/domains/player")
 const {
     insertPlayerCharacterManaNodesSync,
@@ -515,9 +565,12 @@ const { updatePlayerCategoryMissionSync } = require("../src/data/domains/mission
 const { getPlayerActiveQuestSync } = require("../src/data/domains/quest_active")
 const { updateServerGameplaySettingsSync } = require("../src/data/domains/server-settings")
 const { activeQuests } = require("../src/lib/quest/active-quest-service")
-const { getCharacterDataSync, getCharacterManaNodesSync } = require("../src/lib/assets")
+const { getCharacterFacts } = require("../src/lib/character-content")
+const { getCharacterGrowthContent } = require("../src/lib/character-growth-content")
+const getCharacterDataSync = characterId => getCharacterFacts().get(characterId)
+const getCharacterManaNodesSync = (characterId, level) => getCharacterGrowthContent().getManaBoardNodes(characterId, level)
 const { characterExpCaps } = require("../src/lib/character")
-const { computeRealTimeStamina } = require("../src/lib/stamina")
+const { computeRealTimeStamina, getRankDegree } = require("../src/lib/stamina")
 const { registerBattleRoutes } = require("../src/multi/http/battle")
 const cnLoadRoutes = require("../src/routes/cn/load").default
 
@@ -969,7 +1022,7 @@ test("production /finish uses stored SQLite rescue eligibility despite memory an
     }
 })
 
-test("production multi /finish returns non-empty Awake progress rewards and unlock immediately", async () => {
+test("production multi /finish publishes the Awake unlock immediately without claiming page rewards", async () => {
     let home
     try {
         home = await openProductionHome(
@@ -1006,26 +1059,43 @@ test("production multi /finish returns non-empty Awake progress rewards and unlo
         })
         assert.equal(finished.statusCode, 200, finished.body)
         const response = JSON.parse(finished.body).data
-        assert.deepEqual(response.mission_info.filter(entry => entry.mission_category_id === 9), [
+        assert.deepEqual(
+            response.mission_info.filter(entry => entry.mission_category_id === 9),
+            [],
+            "multi finish must not claim category 9 page-owned rewards",
+        )
+        assert.deepEqual(Object.fromEntries([1, 2, 3, 4].map(itemId => [
+            itemId,
+            getPlayerItemSync(home.playerId, itemId) ?? 0,
+        ])), itemBefore, "multi finish must not grant Awake reward items")
+        assert.deepEqual(
+            response.character_list.find(entry => entry.character_id === 1)?.mana_board_awake,
+            { 1: 1 },
+            "multi finish must publish the three-board unlock in the same response",
+        )
+        assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(home.playerId).get("1"), { 1: 1 })
+
+        const { settleAwakeMissionCandidates } = require("../src/lib/mission/awake-settlement")
+        const page = settleAwakeMissionCandidates(
+            home.playerId,
+            [11, 12, 13, 14],
+            new Date("2025-01-01T12:00:00.000Z"),
+        )
+        assert.deepEqual(page.missionInfo, [
             { mission_category_id: 9, mission_id: 11, mission_reward_id: 111 },
             { mission_category_id: 9, mission_id: 12, mission_reward_id: 121 },
             { mission_category_id: 9, mission_id: 13, mission_reward_id: 131 },
             { mission_category_id: 9, mission_id: 14, mission_reward_id: 141 },
-        ])
+        ], "the category 9 page claim remains the only Awake reward owner")
         assert.deepEqual(Object.fromEntries([1, 2, 3, 4].map(itemId => [
             itemId,
-            response.item_list[itemId],
+            getPlayerItemSync(home.playerId, itemId) ?? 0,
         ])), {
             1: itemBefore[1] + 10,
             2: itemBefore[2] + 5,
             3: itemBefore[3] + 3,
             4: itemBefore[4] + 1,
         })
-        assert.deepEqual(
-            response.character_list.find(entry => entry.character_id === 1)?.mana_board_awake,
-            { 1: 1 },
-        )
-        assert.deepEqual(getPlayerCharacterAwakeUnlocksSync(home.playerId).get("1"), { 1: 1 })
     } finally {
         await closeProductionHome(home)
     }
@@ -1202,6 +1272,13 @@ for (const [label, participant, isHost] of [
                 payload: startPayload(participant.viewerId, playId),
             })
             assert.equal(started.statusCode, 200, started.body)
+            home.db.prepare(`
+                INSERT INTO players_quest_progress (
+                    section, quest_id, finished, unlocked, multi_clear_count, player_id
+                ) VALUES (?, ?, 0, 1, 0, ?)
+                ON CONFLICT (section, quest_id, player_id)
+                DO UPDATE SET multi_clear_count = 0
+            `).run(productionQuest.category, productionQuest.questId, home.playerId)
             assert.deepEqual(
                 entryItemWriteAudit(home.db),
                 isHost ? [{ afterAmount: 0 }] : [],
@@ -1250,12 +1327,100 @@ for (const [label, participant, isHost] of [
                 getPlayerCollectedItemTotalSync(home.playerId, productionQuest.ticketId),
                 collectedBefore,
             )
+            assert.equal(home.db.prepare(`
+                SELECT multi_clear_count
+                FROM players_quest_progress
+                WHERE player_id = ? AND section = ? AND quest_id = ?
+            `).get(
+                home.playerId,
+                productionQuest.category,
+                productionQuest.questId,
+            ).multi_clear_count, 0, "failed Multi finish must not increment clear count")
             assert.equal(getPlayerActiveQuestSync(home.playerId), null)
         } finally {
             await closeProductionHome(home)
         }
     })
 }
+
+test("production failed /finish grants no success-only economy writes", async () => {
+    let home
+    try {
+        home = await openProductionHome(
+            "a1-failed-no-rewards",
+            host,
+            true,
+            { verify: async () => ({ ok: true, isHost: true }) },
+        )
+        const playId = "a1-failed-no-rewards"
+        const started = await home.app.inject({
+            method: "POST",
+            url: "/start",
+            payload: startPayload(host.viewerId, playId),
+        })
+        assert.equal(started.statusCode, 200, started.body)
+        const before = getPlayerSync(home.playerId)
+
+        const finished = await home.app.inject({
+            method: "POST",
+            url: "/finish",
+            payload: finishPayload(host.viewerId, playId, {
+                is_accomplished: false,
+                add_mana: 4_321,
+            }),
+        })
+        assert.equal(finished.statusCode, 200, finished.body)
+        const after = getPlayerSync(home.playerId)
+
+        // The host prepaid entry Item is still restored exactly once.
+        assert.equal(getPlayerItemSync(home.playerId, productionQuest.ticketId), 1)
+        // Hard-multi quest 2001 carries manaReward 2790, poolExpReward 2900 and
+        // rankPointReward 1590; a failed settlement grants none of them and the
+        // client add_mana contributes nothing.
+        assert.equal(after.freeMana, before.freeMana)
+        assert.equal(after.expPool, before.expPool)
+        assert.equal(after.rankPoint, before.rankPoint)
+        assert.equal(after.totalManaObtained ?? 0, before.totalManaObtained ?? 0)
+        assert.equal(getPlayerActiveQuestSync(home.playerId), null)
+    } finally {
+        await closeProductionHome(home)
+    }
+})
+
+test("production /finish rejects client add_mana above the client int32 field", async () => {
+    let home
+    try {
+        home = await openProductionHome(
+            "a1-add-mana-int32-bound",
+            host,
+            true,
+            { verify: async () => ({ ok: true, isHost: true }) },
+        )
+        const playId = "a1-add-mana-int32-bound"
+        const started = await home.app.inject({
+            method: "POST",
+            url: "/start",
+            payload: startPayload(host.viewerId, playId),
+        })
+        assert.equal(started.statusCode, 200, started.body)
+        const before = getPlayerSync(home.playerId)
+
+        const finished = await home.app.inject({
+            method: "POST",
+            url: "/finish",
+            payload: finishPayload(host.viewerId, playId, {
+                add_mana: 2_147_483_648,
+            }),
+        })
+        assert.equal(finished.statusCode, 400, finished.body)
+        const after = getPlayerSync(home.playerId)
+        assert.equal(after.freeMana, before.freeMana)
+        assert.equal(after.rankPoint, before.rankPoint)
+        assert.notEqual(getPlayerActiveQuestSync(home.playerId), null)
+    } finally {
+        await closeProductionHome(home)
+    }
+})
 
 test("production /finish settles through a real HubClient session rotation", async t => {
     const hub = createRotatingHub(t)
@@ -1480,6 +1645,7 @@ test("production /finish consumes one SQLite settlement after both requests pass
         const settledOnce = observableSettlementState(home.db, home.playerId)
         assert.equal(settledOnce.activeQuest.length, 0)
         assert.equal(settledOnce.questHistory.length, 1)
+        assert.equal(settledOnce.questHistory[0].multi_clear_count, 1)
         assert.equal(settledOnce.missionFacts[0].multi_clear_count, 1)
         assert.ok(settledOnce.inventory.length > 0, "真实奖励必须落入库存")
 
@@ -1929,5 +2095,47 @@ test("multi finish delegates preparation, settlement writes, and response projec
     assert.match(orchestratorSource, /runMultiActiveQuestSettlementTransaction\(/)
     assert.match(orchestratorSource, /const player = getPlayerSync\(input\.playerId\)/)
     assert.match(responseSource, /export async function projectMultiplayerFinishResponse/)
-    assert.match(responseSource, /mergeMissionSettlementResponse\(/)
+    assert.match(responseSource, /composeMissionSettlementResponse\(/)
+    assert.doesNotMatch(responseSource, /getPlayerMailCountSync/)
+    assert.doesNotMatch(responseSource, /buildFinishFollowInfo/)
+})
+
+test("production /finish preserves the equipped degree when rank changes", async () => {
+    let home
+    try {
+        home = await openProductionHome(
+            "b2-degree-projection",
+            host,
+            true,
+            { verify: async () => ({ ok: true, isHost: true }) },
+        )
+        const playId = "b2-degree-projection"
+        const equippedDegreeId = 61020
+        assert.equal(givePlayerDegreeSync(home.playerId, equippedDegreeId), true)
+        updatePlayerSync({
+            id: home.playerId,
+            degreeId: equippedDegreeId,
+            rankPoint: 95,
+        })
+        const started = await home.app.inject({
+            method: "POST",
+            url: "/start",
+            payload: startPayload(host.viewerId, playId),
+        })
+        assert.equal(started.statusCode, 200, started.body)
+
+        const finished = await home.app.inject({
+            method: "POST",
+            url: "/finish",
+            payload: finishPayload(host.viewerId, playId),
+        })
+        assert.equal(finished.statusCode, 200, finished.body)
+        const userInfo = JSON.parse(finished.body).data.user_info
+        assert.notEqual(userInfo.rank_point, 95)
+        assert.notEqual(getRankDegree(userInfo.rank_point), equippedDegreeId)
+        assert.equal(userInfo.degree_id, equippedDegreeId)
+        assert.equal(getPlayerSync(home.playerId).degreeId, equippedDegreeId)
+    } finally {
+        await closeProductionHome(home)
+    }
 })

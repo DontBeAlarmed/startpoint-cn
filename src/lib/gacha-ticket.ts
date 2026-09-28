@@ -1,5 +1,5 @@
-import { Gacha } from "./types";
-import { GACHA_EXEC_TYPES, getTicketDrawKind, ticketExecMatchesGachaType } from "./gacha-rules";
+import { Gacha, GachaRuntimeBanner, GachaType } from "./types";
+import { GACHA_EXEC_TYPES, ticketExecMatchesGachaType } from "./gacha-rules";
 
 export const GACHA_TICKET_ITEM_IDS = {
     characterOnceRare4: 999008,
@@ -15,7 +15,9 @@ export interface GachaTicketCost {
     pullCount: number;
 }
 
-function getFallbackTicketItemId(gacha: Gacha | undefined, type: number): number | null {
+type GachaTicketDefinition = Gacha | GachaRuntimeBanner
+
+function getWildcardTicketItemId(gacha: GachaTicketDefinition | undefined, type: number): number | null {
     if (gacha && !gacha.wildcardTicketAvailable) return null;
 
     switch (type) {
@@ -34,24 +36,62 @@ function getFallbackTicketItemId(gacha: Gacha | undefined, type: number): number
     }
 }
 
-function getConfiguredTicketItemId(gacha: Gacha | undefined, type: number): number | null {
-    if (!gacha) return getFallbackTicketItemId(undefined, type);
-    if (!ticketExecMatchesGachaType(type, gacha)) return null;
-
-    if (type === GACHA_EXEC_TYPES.CRAZY_MULTI_TICKET) {
-        return gacha.crazyTenTicketItemId ?? null;
+/**
+ * 配置票不足时的通用票回退：仅在卡池 wildcardTicketAvailable=true 时，
+ * 把配置票 exec 映射到同类通用票（装备池 → 装备通用票）。不可用时返回 null。
+ */
+export function getConfiguredTicketWildcardFallbackCost(
+    type: number,
+    numberOfExec: number,
+    gacha: GachaTicketDefinition | undefined,
+): GachaTicketCost | null {
+    if (gacha === undefined || gacha.wildcardTicketAvailable !== true) return null;
+    const equipment = "kind" in gacha
+        ? gacha.kind === "equipment"
+        : gacha.type === GachaType.WEAPON;
+    let wildcardType: number | null = null;
+    if (type === GACHA_EXEC_TYPES.SINGLE_CONFIGURED_TICKET) {
+        wildcardType = equipment
+            ? GACHA_EXEC_TYPES.SINGLE_WEAPON_TICKET
+            : GACHA_EXEC_TYPES.SINGLE_TICKET;
+    } else if (type === GACHA_EXEC_TYPES.MULTI_CONFIGURED_TICKET) {
+        wildcardType = equipment
+            ? GACHA_EXEC_TYPES.MULTI_WEAPON_TICKET
+            : GACHA_EXEC_TYPES.MULTI_TICKET;
+    } else {
+        return null;
     }
-
-    const drawKind = getTicketDrawKind(type);
-    if (drawKind === "single" && gacha.onceTicketItemId) return gacha.onceTicketItemId;
-    if (drawKind === "multi" && gacha.tenTicketItemId) return gacha.tenTicketItemId;
-
-    return getFallbackTicketItemId(gacha, type);
+    return getGachaTicketCost(wildcardType, numberOfExec, gacha);
 }
 
-export function getGachaTicketCost(type: number, numberOfExec: number, gacha?: Gacha): GachaTicketCost | null {
-    const useTicketCount = Math.max(1, numberOfExec);
-    const itemId = getConfiguredTicketItemId(gacha, type);
+function getTicketItemId(gacha: GachaTicketDefinition | undefined, type: number): number | null {
+    if (!gacha) return getWildcardTicketItemId(undefined, type);
+    if (!ticketExecMatchesGachaType(type, gacha)) return null;
+
+    switch (type) {
+        case GACHA_EXEC_TYPES.SINGLE_CONFIGURED_TICKET:
+            return gacha.onceTicketItemId ?? null
+        case GACHA_EXEC_TYPES.MULTI_CONFIGURED_TICKET:
+            return gacha.tenTicketItemId ?? null
+        case GACHA_EXEC_TYPES.CRAZY_MULTI_TICKET:
+            return gacha.crazyTenTicketItemId ?? null
+        default:
+            return getWildcardTicketItemId(gacha, type)
+    }
+}
+
+export function getGachaTicketCost(
+    type: number,
+    numberOfExec: number,
+    gacha?: GachaTicketDefinition,
+): GachaTicketCost | null {
+    if (!Number.isSafeInteger(numberOfExec) || numberOfExec <= 0) return null;
+    const scalableSingle = type === GACHA_EXEC_TYPES.SINGLE_CONFIGURED_TICKET
+        || type === GACHA_EXEC_TYPES.SINGLE_TICKET
+        || type === GACHA_EXEC_TYPES.SINGLE_WEAPON_TICKET;
+    if (scalableSingle ? numberOfExec > 10 : numberOfExec !== 1) return null;
+    const useTicketCount = numberOfExec;
+    const itemId = getTicketItemId(gacha, type);
     if (itemId === null) return null;
 
     switch (type) {

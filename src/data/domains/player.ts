@@ -7,29 +7,18 @@ import { getAccountSync } from "./account";
 import { getPlayerQuestProgressSync } from "./quest";
 import { getBusinessDayKey, isNewDay, isNewWeek } from "../../lib/time-utils";
 import { buildPeriodicSnapshotData, getPassWeekSnapshotType, getSnapshot, initializePeriodicMissionSnapshots, takeSnapshot } from "../../lib/mission/snapshot";
-import { getMissionMasterDefinitions, isMissionDefinitionEnabledAt } from "../../lib/mission/master-data";
+
 import { ensurePlayerPassCardLoginProgressSync } from "./pass-card";
-import bundledDailyChallengePointLookup from "../../../assets/daily_challenge_point_lookup.json";
-import { getRuntimeContentTableSync } from "../../content/runtime/table-access";
+import { getDailyChallengePointDefinition, getDailyChallengePointDefinitions } from "../../lib/quest/daily-challenge";
 import { getRealNow } from "../../runtime/time/game-time";
 import { calculatePooledExpAtRealTime } from "../../lib/exp-pool-time";
 
-type DailyChallengePointLookup = Record<string, { maxPoint: number, isRecovery: boolean, name: string }>
-
 function getDailyChallengePointDefaults(): DailyChallengePointListEntry[] {
-    const lookup = getRuntimeContentTableSync(
-        "daily_challenge_point_lookup.json",
-        bundledDailyChallengePointLookup as DailyChallengePointLookup,
-    )
-    const entries: DailyChallengePointListEntry[] = []
-    for (const [idStr, data] of Object.entries(lookup)) {
-        entries.push({
-            id: Number(idStr),
-            point: data.maxPoint,
-            campaignList: []
-        })
-    }
-    return entries
+    return getDailyChallengePointDefinitions().map(definition => ({
+        id: definition.id,
+        point: definition.maxPoint,
+        campaignList: []
+    }))
 }
 
 /** Refresh only recoverable challenge points against the real-time business day. */
@@ -59,12 +48,8 @@ export function refreshPlayerDailyChallengePointsForRealDaySync(
     }
     if (previousBusinessDay >= businessDay) return false
 
-    const lookup = getRuntimeContentTableSync(
-        "daily_challenge_point_lookup.json",
-        bundledDailyChallengePointLookup as DailyChallengePointLookup,
-    )
     for (const entry of entries) {
-        const definition = lookup[String(entry.id)]
+        const definition = getDailyChallengePointDefinition(entry.id)
         if (!definition?.isRecovery) continue
         const point = definition.maxPoint + entry.campaignList.reduce(
             (total, campaign) => total + campaign.additionalPoint,
@@ -82,9 +67,9 @@ function initializeCurrentPassWeekSnapshot(
     evaluationTime: Date,
     questClears: number,
 ): void {
-    const eventId = getMissionMasterDefinitions(7).find(definition =>
+    const eventId = getMissionCatalog().getDefinitions(7).find(definition =>
         definition.eventId !== undefined
-        && isMissionDefinitionEnabledAt(definition, evaluationTime)
+        && isMissionMasterDefinitionEnabledAt(definition, evaluationTime)
     )?.eventId
     if (eventId === undefined) return
     const snapshotType = getPassWeekSnapshotType(eventId)
@@ -102,11 +87,11 @@ function recordCurrentPassLogin(
     evaluationTime: Date,
 ): void {
     const eventIds = new Set(
-        getMissionMasterDefinitions(8)
+        getMissionCatalog().getDefinitions(8)
             .filter(definition =>
                 definition.patternType === 0
                 && definition.eventId !== undefined
-                && isMissionDefinitionEnabledAt(definition, evaluationTime)
+                && isMissionMasterDefinitionEnabledAt(definition, evaluationTime)
             )
             .map(definition => definition.eventId!),
     )
@@ -124,12 +109,18 @@ import { getPartyGroupLimit } from "../../lib/special-event-parties";
 import { insertPlayerCharactersSync, insertPlayerCharactersManaNodesSync, updatePlayerCharactersManaNodeAwakeLevelsSync } from "./character";
 import { insertPlayerCharacterAwakeUnlocksSync } from "./character_awake";
 import { insertPlayerDrawnQuestsSync, insertPlayerQuestProgressListSync } from "./quest";
-import { insertPlayerGachaInfoListSync, insertPlayerGachaCampaignListSync , getPlayerGachaInfoListSync, updatePlayerGachaInfoSync, getPlayerGachaCampaignListSync, updatePlayerGachaCampaignSync } from "./gacha";
+import { insertPlayerGachaInfoListSync, insertPlayerGachaCampaignListSync } from "./gacha";
+import {
+    resetPlayerGachaDailyStateSync,
+    upsertPlayerGachaDetailSync,
+    upsertPlayerStarsGachaCampaignSync,
+} from "./gacha-state";
 import { insertPlayerBoxGachasSync } from "./boxGacha";
 import { insertPlayerRushEventListSync, insertPlayerRushEventClearedFolderListSync, insertPlayerRushEventPlayedPartyListSync } from "./rushEvent";
 import { deletePlayerCategoryMissionsSync, insertPlayerCategoryMissionListSync, insertPlayerClearedRegularMissionListSync, insertPlayerActiveMissionsSync } from "./mission";
 import { ensureActivityPeriodicRewardPointsSync, insertPlayerPeriodicRewardPointsListSync, insertPlayerStartDashExchangeCampaignsSync, insertPlayerMultiSpecialExchangeCampaignsSync, recoverActivityPeriodicRewardPointsSync } from "./campaign";
 import { insertCarnivalSaveStateSync } from "../../lib/carnival-save-state";
+import { getMissionCatalog, isMissionMasterDefinitionEnabledAt } from "../../lib/mission/mission-catalog"
 
 function assertValidExpPool(expPool: number, context: string): void {
     if (!Number.isSafeInteger(expPool) || expPool < 0) {
@@ -562,6 +553,12 @@ export function insertMergedPlayerDataSync(
     insertPlayerQuestProgressListSync(playerId, toInsert.questProgress)
     insertPlayerGachaInfoListSync(playerId, toInsert.gachaInfoList)
     insertPlayerGachaCampaignListSync(playerId, toInsert.gachaCampaignList)
+    for (const detail of toInsert.gachaDetailList ?? []) {
+        upsertPlayerGachaDetailSync({ playerId, ...detail })
+    }
+    for (const campaign of toInsert.starsGachaCampaignList ?? []) {
+        upsertPlayerStarsGachaCampaignSync({ playerId, ...campaign })
+    }
     insertPlayerDrawnQuestsSync(playerId, toInsert.drawnQuestList)
     insertPlayerPeriodicRewardPointsListSync(playerId, toInsert.periodicRewardPointList)
     insertPlayerActiveMissionsSync(playerId, toInsert.allActiveMissionList)
@@ -1280,20 +1277,7 @@ export function dailyResetPlayerDataSync(
                 loginDate,
             )
 
-            // reset gacha "isDailyFirst" values.
-            const gachaInfo = getPlayerGachaInfoListSync(playerId)
-            for (const gacha of gachaInfo) {
-                updatePlayerGachaInfoSync(playerId, {
-                    gachaId: gacha.gachaId,
-                    isDailyFirst: true
-                })
-            }
-
-            // reset campaigns
-            const gachaCampaigns = getPlayerGachaCampaignListSync(playerId)
-            for (const campaign of gachaCampaigns) {
-                updatePlayerGachaCampaignSync(playerId, campaign.gachaId, campaign.campaignId, 1)
-            }
+            resetPlayerGachaDailyStateSync(playerId)
 
             recoverActivityPeriodicRewardPointsSync(playerId)
 
@@ -1316,9 +1300,9 @@ export function dailyResetPlayerDataSync(
             deletePlayerCategoryMissionsSync(playerId, 2)
             deletePlayerCategoryMissionsSync(playerId, 6)
 
-            const activePassWeekEventId = getMissionMasterDefinitions(7).find(definition =>
+            const activePassWeekEventId = getMissionCatalog().getDefinitions(7).find(definition =>
                 definition.eventId !== undefined
-                && isMissionDefinitionEnabledAt(definition, loginDate)
+                && isMissionMasterDefinitionEnabledAt(definition, loginDate)
             )?.eventId
             if (activePassWeekEventId !== undefined) {
                 const snapshotType = getPassWeekSnapshotType(activePassWeekEventId)

@@ -1,9 +1,5 @@
 import { getDegreeClientProgressPattern } from "./client-progress"
-import {
-    getMissionMasterDefinition,
-    type MissionMasterDefinition,
-} from "./master-data"
-import type { MissionCatalog } from "./mission-catalog"
+import { MissionCatalog, MissionMasterDefinition, getMissionCatalog } from "./mission-catalog"
 import { parsePositiveSafeIntegerMasterValue } from "./master-value"
 import { getCategoryMissionRewardStageDefinition } from "./rewards"
 
@@ -58,7 +54,7 @@ const AUTHORITATIVE_CHARACTER_LEVEL_MISSIONS: ReadonlyMap<number, {
 
 export function isAuthoritativeCharacterLevelMission(
     missionId: number,
-    definition: MissionMasterDefinition | undefined = getMissionMasterDefinition(5, missionId),
+    definition: MissionMasterDefinition | undefined = getMissionCatalog().getDefinition(5, missionId),
     catalog?: MissionCatalog,
 ): boolean {
     const expected = AUTHORITATIVE_CHARACTER_LEVEL_MISSIONS.get(missionId)
@@ -76,7 +72,7 @@ export function isAuthoritativeCharacterLevelMission(
 
 export function getSpecificCharacterBondId(
     missionId: number,
-    definition: MissionMasterDefinition | undefined = getMissionMasterDefinition(5, missionId),
+    definition: MissionMasterDefinition | undefined = getMissionCatalog().getDefinition(5, missionId),
 ): number | undefined {
     if (!definition || parsePositiveSafeIntegerMasterValue(definition.row[3]) !== 44) return undefined
     return parsePositiveSafeIntegerMasterValue(definition.row[15])
@@ -84,7 +80,7 @@ export function getSpecificCharacterBondId(
 
 export function getSecondManaBoardCharacterId(
     missionId: number,
-    definition: MissionMasterDefinition | undefined = getMissionMasterDefinition(5, missionId),
+    definition: MissionMasterDefinition | undefined = getMissionCatalog().getDefinition(5, missionId),
 ): number | undefined {
     if (!definition || parsePositiveSafeIntegerMasterValue(definition.row[3]) !== 48) return undefined
     return parsePositiveSafeIntegerMasterValue(definition.row[15])
@@ -92,7 +88,7 @@ export function getSecondManaBoardCharacterId(
 
 export function isSecondManaBoardAggregateMission(
     missionId: number,
-    definition: MissionMasterDefinition | undefined = getMissionMasterDefinition(5, missionId),
+    definition: MissionMasterDefinition | undefined = getMissionCatalog().getDefinition(5, missionId),
 ): boolean {
     return Boolean(
         definition
@@ -103,7 +99,7 @@ export function isSecondManaBoardAggregateMission(
 
 export function getEpisodeChapter(
     missionId: number,
-    definition: MissionMasterDefinition | undefined = getMissionMasterDefinition(5, missionId),
+    definition: MissionMasterDefinition | undefined = getMissionCatalog().getDefinition(5, missionId),
 ): number | undefined {
     if (!definition
         || parsePositiveSafeIntegerMasterValue(definition.row[3]) !== 22
@@ -264,7 +260,7 @@ export function getDegreeContextRequirements(
     const collectedItemIds = new Set<number>()
 
     for (const missionId of new Set(missionIds)) {
-        const definition = getMissionMasterDefinition(5, missionId)
+        const definition = getMissionCatalog().getDefinition(5, missionId)
         if (!definition) continue
         const requirements = getDegreeMissionFactRequirements(definition)
         if (!requirements) continue

@@ -3,11 +3,12 @@
 // Protocol arrays follow typepacker useEnumIndex=true format (see sessionServer.ts).
 
 import * as net from "net"
-import { Result, ClientState, BattleState } from "../types"
+import { Result } from "../types"
+import { RoomState } from "../types"
 import { RoomStateMachine } from "./RoomStateMachine"
-import { ClientStateMachine } from "./ClientStateMachine"
 import {
     participantKey,
+    type BattleSessionId,
     type NodeSessionId,
     type ParticipantIdentity,
 } from "../coordinator/contracts"
@@ -61,12 +62,78 @@ export interface SessionClient {
     mates: SessionMate[]
     enterData: unknown
     yourself?: SessionMate
-    clientState: ClientStateMachine
-    battleState: BattleState
 }
 
 export interface BattleParticipant {
     participant: ParticipantIdentity
+}
+
+export interface BattleRuntimeSnapshot {
+    readonly roomNumber: string
+    readonly hasBattle: boolean
+    readonly expectedCount: number | null
+    readonly sceneGeneration: number | null
+    readonly barrierReleased: boolean
+    readonly battleSessionId: BattleSessionId | null
+    readonly hostParticipant: ParticipantIdentity | null
+    readonly participantIdentities: readonly ParticipantIdentity[]
+    readonly participantConnectionIds: readonly string[]
+    readonly battleClientConnectionIds: readonly string[]
+    readonly sceneReadyConnectionIds: readonly string[]
+    readonly finalizedParticipantKeys: readonly string[]
+    readonly battleFactParticipantIdentities: readonly ParticipantIdentity[]
+}
+
+/**
+ * Pure diagnostic over a battle runtime snapshot: returns the list of
+ * cross-map inconsistencies (empty when healthy). Test and triage only —
+ * it never repairs state.
+ */
+export function checkBattleRuntimeInvariants(
+    snapshot: BattleRuntimeSnapshot,
+): readonly string[] {
+    const violations: string[] = []
+    const identityKeys = new Set(snapshot.participantIdentities.map(participant => (
+        participantKey(participant.nodeSessionId, participant.viewerId)
+    )))
+
+    if (snapshot.hostParticipant !== null
+        && !identityKeys.has(participantKey(
+            snapshot.hostParticipant.nodeSessionId,
+            snapshot.hostParticipant.viewerId,
+        ))) {
+        violations.push("HOST_NOT_IN_PARTICIPANTS")
+    }
+    if (snapshot.expectedCount !== null && snapshot.expectedCount < 0) {
+        violations.push("NEGATIVE_EXPECTED_COUNT")
+    }
+    const registeredConnections = new Set(snapshot.battleClientConnectionIds)
+    const unregisteredReady = snapshot.sceneReadyConnectionIds
+        .filter(connectionId => !registeredConnections.has(connectionId))
+    if (unregisteredReady.length > 0 || snapshot.sceneReadyConnectionIds.length > snapshot.battleClientConnectionIds.length) {
+        violations.push("SCENE_READY_EXCEEDS_CONNECTIONS")
+    }
+    if (snapshot.hasBattle && snapshot.sceneGeneration === null) {
+        violations.push("MISSING_SCENE_GENERATION")
+    }
+
+    const factKeys = new Set(snapshot.battleFactParticipantIdentities.map(participant => (
+        participantKey(participant.nodeSessionId, participant.viewerId)
+    )))
+    if (snapshot.participantConnectionIds.length > 0 && snapshot.battleSessionId === null) {
+        violations.push("BATTLE_FACT_MISSING")
+    } else if (snapshot.participantConnectionIds.length === 0 && snapshot.battleSessionId !== null) {
+        violations.push("PARTICIPANTS_MISSING")
+    } else if (snapshot.battleSessionId !== null) {
+        for (const key of identityKeys) {
+            if (!factKeys.has(key)) { violations.push("BATTLE_FACT_PARTICIPANT_MISMATCH"); break }
+        }
+        for (const key of factKeys) {
+            if (!identityKeys.has(key)) { violations.push("BATTLE_FACT_PARTICIPANT_MISMATCH"); break }
+        }
+    }
+
+    return violations
 }
 
 export class SessionManager {
@@ -204,8 +271,6 @@ export class SessionManager {
             buffer: "",
             mates: [],
             enterData: null,
-            clientState: new ClientStateMachine(ClientState.Connecting),
-            battleState: BattleState.Initializing,
         }
     }
 
@@ -456,6 +521,10 @@ export class SessionManager {
             if (c) out.push(c)
         }
         return out
+    }
+
+    hasBattleClients(roomNumber: string): boolean {
+        return (this.battleClients.get(roomNumber)?.size ?? 0) > 0
     }
 
     hasRoomClients(roomNumber: string): boolean {
@@ -729,6 +798,61 @@ export class SessionManager {
         return (this.battleExpectedCount.get(roomNumber) ?? -1) === 0
     }
 
+    /** True once a StartBattle published this room's expected-count runtime. */
+    hasBattleExpectedCount(roomNumber: string): boolean {
+        return this.battleExpectedCount.has(roomNumber)
+    }
+
+    /**
+     * Frozen read-only view over every map that describes one room's battle
+     * runtime. Diagnostic only: no owner migration, no mutable leak — the
+     * underlying maps stay the single writers.
+     */
+    getBattleRuntimeSnapshot(roomNumber: string): BattleRuntimeSnapshot {
+        const participants = this.battleParticipants.get(roomNumber)
+        const participantEntries = [...(participants?.entries() ?? [])]
+        const host = this.battleHostParticipants.get(roomNumber)
+        return Object.freeze({
+            roomNumber,
+            hasBattle: this.battleExpectedCount.has(roomNumber),
+            expectedCount: this.battleExpectedCount.get(roomNumber) ?? null,
+            sceneGeneration: this.battleSceneGeneration.get(roomNumber) ?? null,
+            barrierReleased: this.isBattleSceneBarrierReleased(roomNumber),
+            battleSessionId: this.battleFacts.getActiveBattleSessionId(roomNumber),
+            hostParticipant: host ? Object.freeze({ ...host }) : null,
+            participantIdentities: Object.freeze(
+                participantEntries.map(([, value]) => Object.freeze({ ...value.participant })),
+            ),
+            participantConnectionIds: Object.freeze(
+                participantEntries.map(([connectionId]) => connectionId),
+            ),
+            battleClientConnectionIds: Object.freeze(
+                [...(this.battleClients.get(roomNumber) ?? [])],
+            ),
+            sceneReadyConnectionIds: Object.freeze(
+                [...(this.sceneReadyClients.get(roomNumber) ?? [])],
+            ),
+            finalizedParticipantKeys: Object.freeze(
+                [...(this.finalizedBattleParticipantKeys.get(roomNumber) ?? [])],
+            ),
+            battleFactParticipantIdentities: Object.freeze(
+                (this.battleFacts.getActiveBattleParticipants(roomNumber) ?? [])
+                    .map(participant => Object.freeze({ ...participant })),
+            ),
+        })
+    }
+
+    /**
+     * True while a started battle still occupies the room: members hold battle
+     * sockets or handshakes are still pending. Lobby mutation gates consume
+     * this together with raising_state to distinguish a running battle from a
+     * finished one whose host may legally re-enter for the rematch.
+     */
+    isRoomBattleOccupied(roomNumber: string): boolean {
+        return (this.battleClients.get(roomNumber)?.size ?? 0) > 0
+            || (this.battleExpectedCount.get(roomNumber) ?? 0) > 0
+    }
+
     activateBattleScene(roomNumber: string): boolean {
         const generation = this.battleSceneGeneration.get(roomNumber) ?? -1
         if (generation < 0
@@ -863,10 +987,6 @@ export class SessionManager {
         return true
     }
 
-    hasBattleClients(roomNumber: string): boolean {
-        return (this.battleClients.get(roomNumber)?.size ?? 0) > 0
-    }
-
     clearSceneReady(roomNumber: string): void {
         this.sceneReadyClients.delete(roomNumber)
     }
@@ -984,6 +1104,12 @@ export class SessionManager {
         return sm
     }
 
+    /** Seed a room's machine at its creation state; existing machines stay. */
+    initRoomState(roomNumber: string, initialState: RoomState): void {
+        if (this.roomStates.has(roomNumber)) return
+        this.roomStates.set(roomNumber, new RoomStateMachine(initialState))
+    }
+
     removeRoomState(roomNumber: string): void {
         this.roomStates.delete(roomNumber)
         this.roomHostParticipants.delete(roomNumber)
@@ -998,7 +1124,23 @@ export class SessionManager {
         return sendFrameReliably(socket, frame) !== "closed"
     }
 
-    broadcastToRoom(roomNumber: string, data: any, excludeClient?: SessionClient): void {
+    /**
+     * 每客户端 mates 自身份投影：接收者的自身份 mate 若缺失（清理与重连/并发离开
+     * 交错时可能出现），在该接收者的投影列表中补齐。不修改权威列表，不制造重复。
+     */
+    projectMateListForClient(
+        recipient: SessionClient,
+        mates: SessionMate[],
+    ): SessionMate[] {
+        if (mates.some(mate => mate.connectionId === recipient.connectionId)) return mates
+        return recipient.yourself ? [...mates, recipient.yourself] : mates
+    }
+
+    broadcastMateListToRoom(
+        roomNumber: string,
+        mates: SessionMate[],
+        excludeClient?: SessionClient,
+    ): void {
         const set = this.roomClients.get(roomNumber)
         if (!set) return
         const excludeAddr = excludeClient?.participant
@@ -1008,7 +1150,27 @@ export class SessionManager {
         for (const addr of set) {
             if (excludeAddr !== undefined && addr === excludeAddr) continue
             const c = this.clients.get(addr)
-            if (c) this.sendJson(c.socket, data)
+            if (!c) continue
+            const projected = this.projectMateListForClient(c, mates)
+            this.sendFrame(c.socket, JSON.stringify([1, [1, projected]]) + "\0")
+        }
+    }
+
+    broadcastToRoom(roomNumber: string, data: any, excludeClient?: SessionClient): void {
+        const set = this.roomClients.get(roomNumber)
+        if (!set) return
+        const excludeAddr = excludeClient?.participant
+            && excludeClient.roomNumber === roomNumber
+            ? this.roomClientKey(roomNumber, excludeClient.participant)
+            : undefined
+        let frame: string | undefined
+        for (const addr of set) {
+            if (excludeAddr !== undefined && addr === excludeAddr) continue
+            const c = this.clients.get(addr)
+            if (c) {
+                frame ??= JSON.stringify(data) + "\0"
+                this.sendFrame(c.socket, frame)
+            }
         }
     }
 

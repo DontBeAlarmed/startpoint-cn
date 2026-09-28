@@ -13,14 +13,23 @@ import { getPlayerSync } from "../../data/domains/player";
 import { getSession } from "../../data/domains/session";
 import { generateDataHeaders, getServerDate } from "../../utils";
 import { clientSerializeEquipment, buildFullEquipmentList, serializeFullEquipmentList } from "../../lib/equipment";
-import { getEquipmentDissolveSync, getConfigSync, getEquipmentCraftSync } from "../../lib/assets";
+import { getEquipmentCurrencyPolicySync } from "../../lib/config-content"
+import {
+    getEquipmentDissolveSync,
+    getEquipmentCraftSync,
+    getEquipmentRaritySync,
+} from "../../lib/equipment-content";
 import { AccountId, PlayerId } from "../../lib/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDb } from "../../data/db";
 import { canUseEquipmentAwakeningCrystal } from "../../lib/equipment-upgrade";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { settleMissionOperationFactsSync } from "../../lib/mission/operation-fact-settlement";
+import { publishActiveMissionOwnerStateWithinTransaction } from "../../lib/mission/active-publication-owner";
 import { mergeMissionSettlementResponse } from "../../lib/mission";
+import { projectEquipmentEntity } from "../../lib/common-response/entities";
+import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
+import type { CommonResponseFragment } from "../../lib/common-response/model";
 import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
 import { createRewardGrantItemOverflowPolicy } from "../../lib/reward-grant-item-overflow";
 import {
@@ -51,10 +60,14 @@ interface BulkUpgradeBody {
     equipment_ids: number[]
 }
 
-const wrightpieceItemId = () => getConfigSync().craft_point_item_id || 100000
+const wrightpieceItemId = () => getEquipmentCurrencyPolicySync().craftPointItemId
 
 // wrightpiece cost for each rank of weapon (awakening) — from CDN
-const getUpgradeCost = (rarity: number): number => getEquipmentCraftSync(rarity)?.awakening_craft ?? 25
+const getUpgradeCost = (rarity: number): number => {
+    const craft = getEquipmentCraftSync(rarity)
+    if (craft === null) throw new Error(`Missing equipment craft definition for rarity ${rarity}`)
+    return craft.awakening_craft
+}
 
 const routes = async (fastify: FastifyInstance) => {
 
@@ -83,14 +96,16 @@ const routes = async (fastify: FastifyInstance) => {
         if (!equipment) return reply.status(400).send({ "error": "Bad Request", "message": "Player does not own equipment." })
 
         const cdnInfo = getEquipmentDissolveSync(equipmentId)
-        const maxLevel = cdnInfo?.max_level ?? 5
+        if (cdnInfo === null) throw new Error(`Missing equipment definition ${equipmentId}`)
+        const maxLevel = cdnInfo.max_level
         const newLevel = equipment.level + upgradeCount
         if (newLevel > maxLevel) return reply.status(400).send({ "error": "Bad Request", "message": "Reached max awakening level." })
 
         const newStack = useStack ? equipment.stack - upgradeCount : equipment.stack
         if (newStack < 0) return reply.status(400).send({ "error": "Bad Request", "message": "Not enough stack." })
 
-        const equipmentRarity = Math.floor(equipmentId / 1000000)  // 1-indexed
+        const equipmentRarity = getEquipmentRaritySync(equipmentId)
+        if (equipmentRarity === null) throw new Error(`Missing equipment rarity definition ${equipmentId}`)
         if (!useStack && (itemId === undefined || !canUseEquipmentAwakeningCrystal(itemId, equipmentRarity))) {
             return reply.status(400).send({ "error": "Bad Request", "message": "Invalid awakening material for equipment rarity." })
         }
@@ -162,11 +177,17 @@ const routes = async (fastify: FastifyInstance) => {
                     returnItemList[dissolveInfo.ability_soul_id] = grant.afterAmount
                 })
             }
+            const activeMission = publishActiveMissionOwnerStateWithinTransaction({
+                playerId,
+                now: getServerDate(),
+                source: "equipment/awaken",
+            })
             return {
                 equipmentSnapshot,
                 missionSettlement,
                 itemOverflowDispositions,
                 overflowFreeManaAfter,
+                activeMissionList: activeMission.activeMissionList,
             }
         })()
 
@@ -175,24 +196,29 @@ const routes = async (fastify: FastifyInstance) => {
 
         const returnEquipmentList = serializeFullEquipmentList(operationResult.equipmentSnapshot)
 
-        console.log(`[UPGRADE] account=${accountId} player=${playerId}: eid=${equipmentId} rarity=${equipmentRarity} level ${equipment.level-upgradeCount}->${equipment.level} stack ${equipment.stack+upgradeCount}->${equipment.stack} craft -${upgradeCost*upgradeCount}`)
 
         reply.header("content-type", "application/x-msgpack")
-        const responseData: Record<string, unknown> = {
-            equipment_list: returnEquipmentList,
+        const overMax = projectItemOverflowCommonResponse(operationResult.itemOverflowDispositions)
+        const fragment: CommonResponseFragment = {
+            equipment_list: returnEquipmentList.map(
+                equipment => projectEquipmentEntity(equipment),
+            ),
             item_list: returnItemList,
             mission_info: [],
-            degree_list: [],
             mail_arrived: getMailArrivedSync(playerId),
+            ...(overMax.length > 0 ? { over_max: overMax } : {}),
+            ...(operationResult.itemOverflowDispositions.some(entry => entry.kind === "sold")
+                ? { user_info: { free_mana: operationResult.overflowFreeManaAfter } }
+                : {}),
         }
-        const overMax = projectItemOverflowCommonResponse(operationResult.itemOverflowDispositions)
-        if (overMax.length > 0) responseData.over_max = overMax
-        if (operationResult.itemOverflowDispositions.some(entry => entry.kind === "sold")) {
-            responseData.user_info = { free_mana: operationResult.overflowFreeManaAfter }
+        const responseData: Record<string, unknown> = {
+            ...mergeCommonResponseFragments([fragment]),
+            degree_list: [],
         }
         if (operationResult.missionSettlement) {
             mergeMissionSettlementResponse(responseData, operationResult.missionSettlement, viewerId)
         }
+        responseData.active_mission_list = operationResult.activeMissionList
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
             "data": responseData,
@@ -238,18 +264,20 @@ const routes = async (fastify: FastifyInstance) => {
             if (!equipment) continue
 
             const dissolveInfo = getEquipmentDissolveSync(equipmentId)
-            const maxLvl = dissolveInfo?.max_level ?? 5
+            if (dissolveInfo === null) throw new Error(`Missing equipment definition ${equipmentId}`)
+            const maxLvl = dissolveInfo.max_level
             const upgradeCount = Math.min(maxLvl - equipment.level, equipment.stack)
             if (upgradeCount <= 0) continue
 
-            const rarity = Math.floor(equipmentId / 1000000)  // 1-indexed
+            const rarity = getEquipmentRaritySync(equipmentId)
+            if (rarity === null) throw new Error(`Missing equipment rarity definition ${equipmentId}`)
             totalCraftPointCost += getUpgradeCost(rarity) * upgradeCount
             upgrades.push({
                 equipmentId,
                 upgradeCount,
                 newLevel: equipment.level + upgradeCount,
                 newStack: equipment.stack - upgradeCount,
-                abilitySoulId: dissolveInfo?.generate_ability_soul
+                abilitySoulId: dissolveInfo.generate_ability_soul
                     ? dissolveInfo.ability_soul_id
                     : null,
             })
@@ -259,7 +287,11 @@ const routes = async (fastify: FastifyInstance) => {
             reply.header("content-type", "application/x-msgpack")
             return reply.status(200).send({
                 "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-                "data": { "equipment_list": [], "item_list": {}, "mail_arrived": getMailArrivedSync(playerId) }
+                "data": mergeCommonResponseFragments([{
+                    equipment_list: [],
+                    item_list: {},
+                    mail_arrived: getMailArrivedSync(playerId),
+                }]),
             })
         }
 
@@ -320,38 +352,49 @@ const routes = async (fastify: FastifyInstance) => {
                     getServerDate(),
                     equipmentSnapshot,
                 )
+                const activeMission = publishActiveMissionOwnerStateWithinTransaction({
+                    playerId,
+                    now: getServerDate(),
+                    source: "equipment/bulk_upgrade",
+                })
                 return {
                     equipmentSnapshot,
                     missionSettlement,
                     itemOverflowDispositions: overflowSettlement.dispositions,
                     overflowFreeManaAfter: overflowSettlement.freeManaAfter,
+                    activeMissionList: activeMission.activeMissionList,
                 }
             })
         ))()
 
-        console.log(`[BULK_UPGRADE] account=${accountId} player=${playerId}: ${upgrades.length} equipment upgraded, craft points ${currentCraftPoints} -> ${returnItemList[wrightpieceItemId()]}`)
 
         const returnEquipmentList = serializeFullEquipmentList(operationResult.equipmentSnapshot)
 
         reply.header("content-type", "application/x-msgpack")
-        const responseData: Record<string, unknown> = {
-            equipment_list: returnEquipmentList,
+        const overMax = projectItemOverflowCommonResponse(operationResult.itemOverflowDispositions)
+        const bulkFragment: CommonResponseFragment = {
+            equipment_list: returnEquipmentList.map(
+                equipment => projectEquipmentEntity(equipment),
+            ),
             item_list: returnItemList,
             mission_info: [],
-            degree_list: [],
             mail_arrived: getMailArrivedSync(playerId),
+            ...(overMax.length > 0 ? { over_max: overMax } : {}),
+            ...(operationResult.itemOverflowDispositions.some(entry => entry.kind === "sold")
+                ? { user_info: { free_mana: operationResult.overflowFreeManaAfter } }
+                : {}),
         }
-        const overMax = projectItemOverflowCommonResponse(operationResult.itemOverflowDispositions)
-        if (overMax.length > 0) responseData.over_max = overMax
-        if (operationResult.itemOverflowDispositions.some(entry => entry.kind === "sold")) {
-            responseData.user_info = { free_mana: operationResult.overflowFreeManaAfter }
+        const bulkResponseData: Record<string, unknown> = {
+            ...mergeCommonResponseFragments([bulkFragment]),
+            degree_list: [],
         }
         if (operationResult.missionSettlement) {
-            mergeMissionSettlementResponse(responseData, operationResult.missionSettlement, viewerId)
+            mergeMissionSettlementResponse(bulkResponseData, operationResult.missionSettlement, viewerId)
         }
+        bulkResponseData.active_mission_list = operationResult.activeMissionList
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": responseData,
+            "data": bulkResponseData,
         })
     })
 
@@ -383,10 +426,12 @@ const routes = async (fastify: FastifyInstance) => {
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": {
-                "equipment_list": buildFullEquipmentList(playerId),
-                "mail_arrived": getMailArrivedSync(playerId),
-            }
+            "data": mergeCommonResponseFragments([{
+                equipment_list: buildFullEquipmentList(playerId).map(
+                    equipment => projectEquipmentEntity(equipment),
+                ),
+                mail_arrived: getMailArrivedSync(playerId),
+            }]),
         })
     })
 }

@@ -3,6 +3,12 @@
 本文记录 `single_battle_quest/finish` 与 `multi_battle_quest/finish` 的数据库事务边界。审计目标是避免事务提交前
 失败后重试，却因上一次请求已经写入部分奖励、进度或任务事实而形成重复领取或撕裂存档。
 
+## 战斗事实信任边界
+
+finish 的结构校验、active quest 身份复核和事务一致性不等于服务端重演战斗。当前私服会校验字段类型与范围，并拒绝不匹配的 `play_id`、关卡、模式或协力身份；但 `add_mana`、`score`、连击数及部分 `statistics` 仍来自客户端。例如单人 `add_mana` 只要求非负 int32，成功结算会把该值作为场内 Mana 纳入结算，服务端不会根据敌人和战斗帧重新计算。依赖这些字段的履历与任务事实具有相同信任边界。
+
+因此相关自动测试只能证明私服的输入约束、结算结果和回滚原子性，不能标记为官服反作弊语义已确认。若部署环境不信任客户端，需要另行设计权威战斗验证；这不属于当前结算事务 Gate 的范围。
+
 ## 单人请求身份与事务权威
 
 单人 `/start`、`/play_continue`、`/finish` 和 `/abort` 先通过 viewer session 形成只包含 `accountId`、`playerId` 的身份快照。
@@ -60,8 +66,10 @@ Player 投影；该投影覆盖 `free_mana`、`free_vmoney`、`exp_pool`、`exp_
 也不访问 Fastify；它只消费协调器成功结果和最终 Player 投影，并按既有顺序合并通用任务与角色觉醒任务的展示列表。
 mission 合并不得再覆盖权威 `user_info` 或 `item_list`。
 固定关卡 MANA/EXP 先写入 Player 并初始化 owner 后态，clear、S+ 再依次从该后态累加，后续 Score、additional、rush、
-Carnival、mission 等来源继续按实际执行顺序推进。Carnival `new_degree_ids` 只表示本次新获得的 owned degree，不能改变
-`players.degree_id` 或最终 `user_info.degree_id`；只有同时持久化当前称号并返回绝对 `userInfo.degree_id` 的来源才能推进该字段。
+Carnival、mission 等来源继续按实际执行顺序推进。Carnival `new_degree_ids` 与 Mission `degree_list` 只表示本次新获得的
+owned degree，不能改变 `players.degree_id` 或最终 `user_info.degree_id`；只有显式切换当前称号并返回绝对
+`userInfo.degree_id` 的入口才能推进该字段。多人结算的 `user_info.degree_id` 必须投影事务末尾重新读取的当前称号，
+不能用 Rank 推导值代替。
 失败响应、HTTP header、状态码和发送仍由路由负责。
 
 `item_list` 在写入层按 clear、S+、Score/Rare、additional、rush、carnival、score attack、通用 mission、awake mission 的

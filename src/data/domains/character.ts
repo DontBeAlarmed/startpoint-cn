@@ -1,7 +1,7 @@
 import { getDb } from "../db";
 import { PlayerCharacter, PlayerCharacterBondToken, PlayerCharacterExBoost, PlayerCharacterProjectionData, RawPlayerCharacter, RawPlayerCharacterBondToken, RawPlayerCharacterManaNode } from "../types";
 import { deserializeNumberList, serializeBoolean, serializeNumberList } from "../utils/primitives";
-import { getCharacterDataSync } from "../../lib/assets";
+import { getCharacterFacts } from "../../lib/character-content";
 import { getRealNow } from "../../runtime/time/game-time";
 import { growthError } from "../../lib/character-growth/errors";
 
@@ -159,6 +159,33 @@ export function deletePlayerCharacterSync(playerId: number, characterId: number)
         DELETE FROM players_characters
         WHERE player_id = ? AND id = ?
     `).run(playerId, characterId).changes > 0
+}
+
+/** Admin bulk EX Boost reset; returns the number of characters cleared. */
+export function clearPlayerCharactersExBoostSync(playerId: number): number {
+    return getDb().prepare(`
+        UPDATE players_characters
+        SET ex_boost_status_id = NULL, ex_boost_ability_id_list = NULL
+        WHERE player_id = ?
+          AND (ex_boost_status_id IS NOT NULL OR ex_boost_ability_id_list IS NOT NULL)
+    `).run(playerId).changes
+}
+
+/**
+ * Load-path compatibility repair: monotonically raises a character's
+ * evolution level toward the derived value and reports whether the row moved.
+ * Never lowers evolution_level; owned by the /load bounded repair adapter.
+ */
+export function raisePlayerCharacterEvolutionLevelSync(
+    playerId: number,
+    characterId: number,
+    derivedEvolutionLevel: number,
+): boolean {
+    return getDb().prepare(`
+        UPDATE players_characters
+        SET evolution_level = ?
+        WHERE player_id = ? AND id = ? AND evolution_level < ?
+    `).run(derivedEvolutionLevel, playerId, characterId, derivedEvolutionLevel).changes === 1
 }
 
 /**
@@ -487,8 +514,8 @@ export function insertDefaultPlayerCharacterSync(
         }
     ]
 
-    const assetData = getCharacterDataSync(characterId)
-    if (assetData && assetData.skill_count > 3) {
+    const assetData = getCharacterFacts().get(characterId)
+    if (assetData && assetData.skillCount > 3) {
         bondTokenList.push({
             manaBoardIndex: 2,
             status: 0

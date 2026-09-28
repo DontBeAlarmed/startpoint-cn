@@ -29,6 +29,14 @@
 
 TCP 心跳、Hub 会话、房间清理、发送队列背压和临时文件名使用真实流逝时间。这些时间不属于游戏业务时间，可以保留真实时钟，但应通过 `getRealNowMs()` 或依赖注入的 `now()` 获取，以便测试控制。
 
+## 游戏日历口径风险的修复状态
+
+定向审计确认 CN 客户端把无时区主数据时间按 UTC+8 解释：`boot_ffc6.as` 将 `JAPAN_STANDARD_OFFSET_MILLISECONDS` 设为 `28800000`，`ParseTools.parseDateTime()` 从 UTC 构造值中减去该偏移。修复前，服务端 `src/lib/gacha-catalog/period.ts` 固定减去 UTC+9，对同一个 `2024-08-14 20:00:00` 比客户端语义提前一小时，造成卡池、兑换和玩家周期边界整体漂移。
+
+上述发现已由[游戏业务日历策略](../architecture/game-calendar-policy.md)统一修复：`src/time/game-calendar.ts` 提供按启动配置冻结的固定偏移策略（CN 默认 `480`，即 UTC+8），`gacha-catalog/period.ts` 的 UTC+9 解析、`stamina-campaign.ts` 依赖宿主 `TZ` 的无时区解析和 `cn/load.ts` 依赖宿主 `TZ` 的 `toDateString()` 日切比较都已迁移或删除。业务模块不再自行实现日历算术，解析结果不再随进程 `TZ` 改变。
+
+该修复只改变无时区主数据字符串与业务日/周/月边界的解释。SQLite 中保存的 ISO 时间、Unix 秒/毫秒和网络 epoch 仍然表示绝对 UTC 时刻，不做日历换算；这一 UTC 存储口径与游戏日历口径的区分贯穿上文的全部时间入口。
+
 ## 可控性要求
 
 - 时间偏移由服务端时间服务统一保存和恢复，业务模块不得自行维护第二份偏移。

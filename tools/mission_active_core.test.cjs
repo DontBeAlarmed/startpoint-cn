@@ -22,9 +22,13 @@ const {
     getActiveMissionEventMasterDefinitions,
     getActiveMissionMasterDefinitions,
 } = require("../src/lib/mission/active-master-data")
-const { getMissionRewardStageDefinition } = require("../src/lib/mission/rewards")
+const {
+    getActiveMissionPlan,
+    getActiveMissionPlanRewardStages,
+} = require("../src/lib/mission/active-plan")
 const { validateMissionRewardClaims } = require("../src/lib/mission/claims")
 const { filterToActiveMissions } = require("../src/lib/mission/filter")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 
 const rewardRow = []
 rewardRow[3] = "99"
@@ -54,25 +58,27 @@ const repository = {
     }),
     table: tableName => tables[tableName],
 }
+const plan = getActiveMissionPlan(repository)
 
 assert.deepEqual(
-    getActiveMissionMasterDefinitions(repository).map(definition => definition.missionId),
+    getActiveMissionMasterDefinitions(plan).map(definition => definition.missionId),
     [99001],
-    "显式 repository 必须覆盖 bundled Active Mission 表",
+    "显式 plan 必须覆盖运行时默认 Active Mission 表",
 )
 assert.deepEqual(
-    getActiveMissionEventMasterDefinitions(repository).map(definition => definition.eventId),
+    getActiveMissionEventMasterDefinitions(plan).map(definition => definition.eventId),
     [99],
 )
 assert.equal(
-    getMissionRewardStageDefinition(99001, 1, repository)?.targetProgress,
+    getActiveMissionPlanRewardStages(getActiveMissionPlan(repository), 99001)
+        .find(stage => stage.stage === 1)?.targetProgress,
     99,
-    "显式 repository 必须覆盖 bundled Active Mission 奖励表",
+    "显式 plan 必须覆盖运行时默认 Active Mission 奖励表",
 )
 assert.deepEqual(
-    filterToActiveMissions({ 99001: { progress: 1 }, 20001: { progress: 1 } }, repository),
+    filterToActiveMissions({ 99001: { progress: 1 }, 20001: { progress: 1 } }, plan),
     { 99001: { progress: 1 } },
-    "load 白名单必须跟随当前 repository，不能保留 bundled 任务 ID",
+    "load 白名单必须跟随当前 plan，不能保留运行时默认任务 ID",
 )
 
 function missionRow({ eventId, phase, stringId, pattern = 0, need, show, start, end }) {
@@ -171,6 +177,7 @@ const releaseRepository = {
     info: repository.info,
     table: tableName => releaseTables[tableName],
 }
+const releasePlan = getActiveMissionPlan(releaseRepository)
 
 assert.equal(
     parseCnMasterDateTime("2024-08-14 21:00:00"),
@@ -178,6 +185,12 @@ assert.equal(
     "国服客户端沿用 JST 符号名，但主表日期实际按 UTC+8 转为 UTC",
 )
 assert.throws(() => parseCnMasterDateTime("2024-02-30 00:00:00"), /CN master/i)
+assert.equal(
+    parseCnMasterDateTime("2024-08-14 21:00:00", createGameCalendarPolicy(540)),
+    Date.parse("2024-08-14T12:00:00.000Z"),
+    "显式 +540 日历必须把同一主表时间解释为提前一小时的 UTC 时刻",
+)
+assert.throws(() => parseCnMasterDateTime("2024-02-30 00:00:00", createGameCalendarPolicy(540)), /CN master/i)
 
 const parsedMission = parseActiveMissionDefinition(9003, releaseTables["mission_active.json"][9003][0])
 assert.deepEqual(
@@ -202,7 +215,7 @@ assert.equal(parsedEvent.maxPhase, 2)
 
 const exactEnd = Date.parse("2024-08-14T13:00:00.000Z")
 const emptyContext = {
-    repository: releaseRepository,
+    plan: releasePlan,
     now: exactEnd,
     activeMissions: {},
     questProgress: {},
@@ -214,14 +227,14 @@ const incompletePhaseState = {
     9001: { progress: 10, stages: {} },
     9002: { progress: 5, stages: {} },
 }
-assert.equal(getActiveMissionEventReleasePhase(90, incompletePhaseState, releaseRepository), 1)
+assert.equal(getActiveMissionEventReleasePhase(90, incompletePhaseState, releasePlan), 1)
 const completePhaseState = {
     9001: { progress: 20, stages: { 1: false, 2: false } },
     9002: { progress: 5, stages: { 1: false } },
     9004: { progress: 1, stages: { 1: false } },
 }
 assert.equal(
-    getActiveMissionEventReleasePhase(90, completePhaseState, releaseRepository),
+    getActiveMissionEventReleasePhase(90, completePhaseState, releasePlan),
     2,
     "phase 完成只看当前奖励阶段阈值，不要求领取",
 )
@@ -249,7 +262,7 @@ const settled = settleActiveMissionProgress(
     9001,
     { progress: 0, stages: {} },
     10,
-    { repository: releaseRepository },
+    { plan: releasePlan },
 )
 assert.deepEqual(settled.state, { progress: 10, stages: { 1: false } })
 assert.deepEqual(settled.delta, {
@@ -258,12 +271,12 @@ assert.deepEqual(settled.delta, {
     stages: [{ stage: 1, received: false }],
 })
 assert.equal(
-    settleActiveMissionProgress(9001, settled.state, 10, { repository: releaseRepository }).delta,
+    settleActiveMissionProgress(9001, settled.state, 10, { plan: releasePlan }).delta,
     null,
     "相同 absolute progress 重复结算必须幂等",
 )
 assert.equal(
-    settleActiveMissionProgress(9001, settled.state, 5, { repository: releaseRepository }).delta,
+    settleActiveMissionProgress(9001, settled.state, 5, { plan: releasePlan }).delta,
     null,
     "权威事实短暂降低时不得让既有任务进度倒退",
 )
@@ -272,28 +285,28 @@ assert.equal(
         9001,
         { progress: 0, stages: { 1: true } },
         10,
-        { repository: releaseRepository },
+        { plan: releasePlan },
     ).state.stages[1],
     true,
     "已领取阶段不得回退为 false",
 )
 assert.deepEqual(
     settleActiveMissionProgress(9101, { progress: 0, stages: {} }, 1, {
-        repository: releaseRepository,
+        plan: releasePlan,
     }).state.stages,
     {},
     "限时任务缺少 clearSeconds 时必须 fail closed",
 )
 assert.deepEqual(
     settleActiveMissionProgress(9101, { progress: 0, stages: {} }, 1, {
-        repository: releaseRepository,
+        plan: releasePlan,
         clearSeconds: 31,
     }).state.stages,
     {},
 )
 assert.equal(
     settleActiveMissionProgress(9101, { progress: 0, stages: {} }, 1, {
-        repository: releaseRepository,
+        plan: releasePlan,
         clearSeconds: 30,
     }).state.stages[1],
     false,
@@ -308,9 +321,10 @@ const bundledRepository = {
     info: repository.info,
     table: tableName => bundledTables[tableName],
 }
+const bundledPlan = getActiveMissionPlan(bundledRepository)
 const serverNow = Date.parse("2024-08-14T12:00:00.000Z")
 const bundledContext = {
-    repository: bundledRepository,
+    plan: bundledPlan,
     now: serverNow,
     activeMissions: {},
     questProgress: {},
@@ -328,7 +342,7 @@ assert.deepEqual(
         contentsGuideClaimState,
         [{ mission_id: 20001, stages: [1] }],
         {
-            repository: bundledRepository,
+            plan: bundledPlan,
             now: serverNow,
             questProgress: {},
         },
@@ -341,7 +355,7 @@ assert.equal(
         contentsGuideClaimState,
         [{ mission_id: 20001, stages: [1] }],
         {
-            repository: bundledRepository,
+            plan: bundledPlan,
             now: serverNow,
             questProgress: { 1: [{ questId: 1008004, finished: true }] },
         },
@@ -353,7 +367,7 @@ assert.deepEqual(
         { 21010: { progress: 1, stages: { 1: false } } },
         [{ mission_id: 21010, stages: [1] }],
         {
-            repository: bundledRepository,
+            plan: bundledPlan,
             now: serverNow,
             questProgress: {},
         },
@@ -376,7 +390,7 @@ assert.equal(
         { 21010: { progress: 1, stages: { 1: false } } },
         [{ mission_id: 21010, stages: [1] }],
         {
-            repository: bundledRepository,
+            plan: bundledPlan,
             now: realIncentiveClaimTime,
             questProgress: {},
         },
@@ -390,7 +404,7 @@ assert.equal(isActiveMissionClaimable(21010, {
 }), false, "展示/事件期限结束后必须拒绝领奖")
 
 for (const eventId of [1, 150]) {
-    const definition = getActiveMissionEventMasterDefinitions(bundledRepository)
+    const definition = getActiveMissionEventMasterDefinitions(bundledPlan)
         .find(event => event.eventId === eventId)
     assert.equal(parseActiveMissionEventDefinition(eventId, definition.row).endTime, undefined)
 }

@@ -21,7 +21,8 @@ const { createCharacterGrowthBatchContext } = require("../../src/lib/character-g
 const { executeBulkOverLimit } = require("../../src/lib/character-growth/commands/bulk-over-limit")
 const { executeBulkStackToExp } = require("../../src/lib/character-growth/commands/bulk-stack-to-exp")
 const { characterMaxOverLimits } = require("../../src/lib/character-growth/limits")
-const { getCharacterDataSync } = require("../../src/lib/assets")
+const { getCharacterFacts } = require("../../src/lib/character-content")
+const getCharacterDataSync = characterId => getCharacterFacts().get(characterId)
 const restoreContentSnapshot = require("../helpers/install-bundled-gameplay-snapshot.cjs")
     .installBundledGameplaySnapshot()
 

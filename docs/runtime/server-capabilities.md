@@ -17,7 +17,7 @@
     "mode.hook.quest-start@1",
     "mode.hook.rush-finish@1",
     "mode.hook.rush-parties-serialized@1",
-    "mode.host.base-table@1",
+    "mode.host.content-query@1",
     "mode.host.transaction-server@1"
   ],
   "serverBundle": {
@@ -41,12 +41,12 @@
     "patchVersions": []
   },
   "modes": {
-    "api": 1,
+    "api": 2,
     "serverCapabilities": [
       "mode.hook.quest-start@1",
       "mode.hook.rush-finish@1",
       "mode.hook.rush-parties-serialized@1",
-      "mode.host.base-table@1",
+      "mode.host.content-query@1",
       "mode.host.transaction-server@1"
     ],
     "loaded": [],
@@ -68,7 +68,7 @@
 - `serverCapabilities`：服务端实际支持能力的去重并集，按 Unicode 码点序排列。它只能来自顶层，消费者不得从 `features` 或 `modes` 推导或补齐。
 - `serverBundle`：当前代码包版本和可选的 canonical Bundle 身份。非嵌入式源码运行可没有 `bundleId`。
 - `runtime`：独立的 Runtime API、Node 版本、Node ABI、平台和架构事实。`runtime.api`
-  与 `modes.api` 当前数值都为 `1` 只是巧合，两者属于独立契约，不能互相推导。
+  与 `modes.api` 当前分别为 `1` 和 `2`，两者属于独立契约，不能互相推导。
 - `content`：当前固定 Content Snapshot、CDN 链尾及已加载补丁边。
 - `modes`：基础 Mode seam 能力、已验证并加载的模块身份，以及包含模块文件名、名称、能力和字节摘要的 canonical 集合摘要。
 - `features`：当前固定的行为开关；不是 capability 的替代来源。
@@ -79,7 +79,7 @@ manifest 身份；它还覆盖 catalog、summary 与 manifest 元数据，因此
 两个摘要都不包含本地绝对路径。
 
 `modes.loaded` 只公开模块名、声明能力和模块字节 SHA-256，不公开模块目录或完整文件名。
-Mode API v1 对第三方模块的 `capability` 只要求非空；`modes.loaded[].capabilities` 必须如实保留
+Mode API v2 对第三方模块的 `capability` 只要求非空；`modes.loaded[].capabilities` 必须如实保留
 这些既有值，不能用本端点的 `name@version` 规则反向收紧 Mode 装载兼容性。顶层
 `serverCapabilities` 仍只包含本服务端明确声明的版本化能力。`modes.modeDigest` 仍把经 loader
 验证的文件名纳入 canonical 身份，因此文件排序或替换会改变整体摘要。
@@ -92,10 +92,10 @@ v1 当前只声明实际存在的能力：
 - `mode.hook.quest-start@1`
 - `mode.hook.rush-finish@1`
 - `mode.hook.rush-parties-serialized@1`
-- `mode.host.base-table@1`
+- `mode.host.content-query@1`
 - `mode.host.transaction-server@1`
 
-服务端当前**不声明** `mode.release-contract@1`。需要该能力的 Mode Release 必须失败关闭，不能因为 Mode API 同为 `1` 就推断支持。新增或改变能力语义时必须引入新的 capability ID，并同步服务端测试和发布工具契约。
+服务端当前**不声明** `mode.release-contract@1`。需要该能力的 Mode Release 必须失败关闭，不能因为 Mode API 为 `2` 就推断支持。新增或改变能力语义时必须引入新的 capability ID，并同步服务端测试和发布工具契约。
 
 ## 兼容性和演进
 

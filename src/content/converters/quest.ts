@@ -1,5 +1,16 @@
 import { deepFreeze } from "../deep-freeze"
 import {
+    validateDailyChallengeContent,
+    validateQuestEntryCostTable,
+    validateQuestUnlockCostTable,
+} from "../validation/quest-derived-output"
+import {
+    gameCalendarSupportedYearRange,
+    resolveContentConverterContext,
+    type ContentConverterContext,
+} from "./context"
+import type { GameCalendarPolicy } from "../../time/game-calendar"
+import {
     convertOrderedMapJson,
     type CsvOrderedMapTree,
 } from "./ordered-map-json"
@@ -32,6 +43,8 @@ export const QUEST_AUXILIARY_SOURCES = Object.freeze({
     expertSingleEvent: "master/quest/event/expert_single_event.orderedmap",
     soloTimeAttackEvent: "master/quest/event/solo_time_attack_event.orderedmap",
     practiceQuest: "master/quest/practice/practice_quest.orderedmap",
+    mainStageNode: "master/quest/main_stage_node.orderedmap",
+    exStageNode: "master/quest/ex_stage_node.orderedmap",
 } as const)
 
 export type QuestTableName = keyof typeof QUEST_TABLE_SOURCES
@@ -40,6 +53,7 @@ export type QuestDerivedTableName =
     | "event_challenge_point_map.json"
     | "quest_entry_costs.json"
     | "quest_lookup.json"
+    | "quest_prerequisites.json"
     | "quest_unlock_costs.json"
 export type QuestConversionOutput = Readonly<Record<
     QuestTableName | QuestDerivedTableName,
@@ -343,44 +357,40 @@ function parseMilliseconds(tableName: string, value: string | undefined, field: 
 }
 
 function parseCnQuestTime(
+    calendar: GameCalendarPolicy,
     tableName: QuestTableName,
     value: string | undefined,
     field: "availableFromMs" | "availableUntilMs",
 ): number | null {
     if (isMissing(value)) return null
-    const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value as string)
-    if (match === null) invalidQuest(tableName, `TimeRange ${field} must be a CN timestamp`)
-    const parts = match.slice(1).map(Number)
-    const [year, month, day, hour, minute, second] = parts
-    if (year < 1970 || year > 2200) {
+    let parsed: number
+    try {
+        parsed = calendar.parseMasterTimestamp(value as string)
+    } catch {
+        invalidQuest(tableName, `TimeRange ${field} must be a CN timestamp`)
+    }
+    const range = gameCalendarSupportedYearRange(calendar)
+    if (parsed < range.minEpochMs || parsed >= range.exclusiveMaxEpochMs) {
         invalidQuest(tableName, `TimeRange ${field} year must be between 1970 and 2200`)
     }
-    const utcWithoutOffset = Date.UTC(year, month - 1, day, hour, minute, second)
-    const normalized = new Date(utcWithoutOffset)
-    if (normalized.getUTCFullYear() !== year
-        || normalized.getUTCMonth() + 1 !== month
-        || normalized.getUTCDate() !== day
-        || normalized.getUTCHours() !== hour
-        || normalized.getUTCMinutes() !== minute
-        || normalized.getUTCSeconds() !== second) {
-        invalidQuest(tableName, `TimeRange ${field} is not a real timestamp`)
-    }
-    const parsed = utcWithoutOffset - 8 * 60 * 60 * 1000
     if (!Number.isSafeInteger(parsed)) invalidQuest(tableName, `TimeRange ${field} is out of range`)
     return parsed
 }
 
 function parseQuestTimeRange(
+    calendar: GameCalendarPolicy,
     tableName: QuestTableName,
     fields: readonly string[],
 ): { readonly availableFromMs: number | null; readonly availableUntilMs: number | null } {
     const [fromColumn, untilColumn] = QUEST_TIME_RANGE_COLUMNS[tableName]
     const availableFromMs = parseCnQuestTime(
+        calendar,
         tableName,
         fields[fromColumn],
         "availableFromMs",
     )
     const availableUntilMs = parseCnQuestTime(
+        calendar,
         tableName,
         fields[untilColumn],
         "availableUntilMs",
@@ -735,9 +745,11 @@ function specialQuest(tableName: QuestTableName, row: QuestRow): Record<string, 
 export function convertQuestTree(
     tableName: QuestTableName,
     tree: CsvOrderedMapTree,
+    context?: ContentConverterContext,
 ): Readonly<Record<string, unknown>> {
     const source = QUEST_TABLE_SOURCES[tableName]
     if (!source) return invalidQuest(tableName, "table is not registered")
+    const { gameCalendar } = resolveContentConverterContext(context)
     const layout = STANDARD_LAYOUTS[tableName]
     const output: Record<string, unknown> = {}
     for (const row of collectRows(tableName, tree, source.nestingDepth)) {
@@ -748,7 +760,7 @@ export function convertQuestTree(
         if (!/^[1-9]\d*$/.test(questId)) invalidQuest(tableName, `invalid quest id: ${questId}`)
         if (output[questId] !== undefined) invalidQuest(tableName, `duplicate quest id: ${questId}`)
         output[questId] = {
-            ...parseQuestTimeRange(tableName, row.fields),
+            ...parseQuestTimeRange(gameCalendar, tableName, row.fields),
             ...(layout
                 ? standardQuest(tableName, row, layout)
                 : specialQuest(tableName, row)),
@@ -803,7 +815,7 @@ export function buildQuestEntryCosts(
             output[key] = { itemId, itemCount, stamina }
         }
     }
-    return deepFreeze(output)
+    return validateQuestEntryCostTable(output)
 }
 
 export function buildQuestUnlockCosts(
@@ -843,7 +855,131 @@ export function buildQuestUnlockCosts(
             output[questId] = { itemIds, itemCounts }
         }
     }
+    return validateQuestUnlockCostTable(output)
+}
+
+/**
+ * Official stage-node prerequisite chains (CN 1.8.1 MainStageNodeLogic /
+ * ExStageNodeLogic / StageNodeBase.isViewable): a stage node is reachable once
+ * its need-nodes are cleared, and a node counts as cleared once every quest of
+ * that node is finished (getQuestIdsNeedToBeClearedToClear). Main nodes carry a
+ * single same-table need_stage_node pair; ex nodes carry need_main_stage_node
+ * (always resolved against the main table) plus an ex-internal need_stage_node
+ * pair, both of which must be cleared. Project that onto quests:
+ * quest_prerequisites[questId] = the union of the need-nodes' quest ids.
+ */
+export function buildQuestPrerequisites(
+    questTrees: Readonly<Partial<Record<"main_quest.json" | "ex_quest.json", CsvOrderedMapTree>>>,
+    stageNodeTrees: Readonly<Partial<Record<"main_quest.json" | "ex_quest.json", CsvOrderedMapTree>>>,
+): Readonly<Record<string, unknown>> {
+    const output: Record<string, unknown> = {}
+    // chapter:node -> quest ids, per table; ex nodes may depend on main nodes.
+    const questsByNode = new Map<string, Map<string, number[]>>()
+    for (const tableName of ["main_quest.json", "ex_quest.json"] as const) {
+        const questTree = questTrees[tableName]
+        if (!questTree) continue
+        const tableNodes = new Map<string, number[]>()
+        for (const row of collectRows(tableName, questTree, 3)) {
+            const questId = parsePositiveIntegerRowField(tableName, row.fields[0], "quest id")
+            const nodeKey = `${row.path[0]}:${row.path[1]}`
+            const bucket = tableNodes.get(nodeKey) ?? []
+            bucket.push(questId)
+            tableNodes.set(nodeKey, bucket)
+        }
+        questsByNode.set(tableName, tableNodes)
+    }
+    const mainNodes = questsByNode.get("main_quest.json")
+    if (mainNodes === undefined) {
+        invalidQuest("main_quest.json", "main quest tree is required to derive stage-node prerequisites")
+    }
+    for (const tableName of ["main_quest.json", "ex_quest.json"] as const) {
+        const questTree = questTrees[tableName]
+        const stageNodeTree = stageNodeTrees[tableName]
+        const tableNodes = questsByNode.get(tableName)
+        if (!questTree || !stageNodeTree || !tableNodes) continue
+        const isEx = tableName === "ex_quest.json"
+        for (const row of collectRows(tableName, stageNodeTree, 2)) {
+            // Official rows carry 7 (main) or 9 (ex) columns. The pairs we read
+            // are multipliedId/name plus, for main rows, the same-table
+            // need_stage_node pair (MainStageNodeValues cols 3-4); ex rows
+            // carry need_main_stage_node at cols 3-4 and their internal
+            // need_stage_node pair at cols 5-6 (ExStageNodeValues). Short rows
+            // must be rejected, not silently treated as "no prerequisites".
+            requireColumns(tableName, row.fields, isEx ? 6 : 4)
+            const [multipliedId, , firstNeedChapter, firstNeedNode, secondNeedChapter, secondNeedNode] = row.fields
+            parsePositiveIntegerRowField(tableName, multipliedId, "multiplied id")
+            // ExStageNodeLogic.isViewable resolves need_main_stage_node through
+            // MainStageNodeLogic unconditionally (the main table), then applies
+            // the ex-internal need_stage_node chain against the ex table.
+            const needPairs = isEx
+                ? [
+                    {
+                        chapter: firstNeedChapter, node: firstNeedNode,
+                        nodes: mainNodes, prerequisiteTableName: "main_quest.json" as const,
+                    },
+                    {
+                        chapter: secondNeedChapter, node: secondNeedNode,
+                        nodes: tableNodes, prerequisiteTableName: "ex_quest.json" as const,
+                    },
+                ]
+                : [
+                    {
+                        chapter: firstNeedChapter, node: firstNeedNode,
+                        nodes: mainNodes, prerequisiteTableName: "main_quest.json" as const,
+                    },
+                ]
+            const prerequisites: Array<{ category: number; questId: number }> = []
+            for (const pair of needPairs) {
+                if (isMissing(pair.chapter)) {
+                    if (!isMissing(pair.node)) {
+                        invalidQuest(tableName, "need node must also be missing when need chapter is missing")
+                    }
+                    continue
+                }
+                parsePositiveIntegerRowField(tableName, pair.chapter, "need chapter")
+                parsePositiveIntegerRowField(tableName, pair.node, "need node")
+                const needKey = `${pair.chapter}:${pair.node}`
+                const prerequisiteQuestIds = pair.nodes.get(needKey)
+                if (prerequisiteQuestIds === undefined) {
+                    invalidQuest(tableName, `need stage node ${needKey} has no quests`)
+                }
+                const category = QUEST_DERIVATION_LAYOUTS[pair.prerequisiteTableName].category
+                for (const prerequisiteId of prerequisiteQuestIds) {
+                    prerequisites.push({ category, questId: prerequisiteId })
+                }
+            }
+            if (prerequisites.length === 0) continue
+            const ownCategory = QUEST_DERIVATION_LAYOUTS[tableName].category
+            const frozenPrerequisites = Object.freeze(
+                prerequisites.map(prerequisite => Object.freeze({ ...prerequisite })),
+            )
+            const nodeKey = `${row.path[0]}:${row.path[1]}`
+            for (const questId of tableNodes.get(nodeKey) ?? []) {
+                if (frozenPrerequisites.some(prerequisite => (
+                    prerequisite.category === ownCategory && prerequisite.questId === questId
+                ))) {
+                    invalidQuest(tableName, `quest ${questId} depends on its own node`)
+                }
+                const outputKey = `${ownCategory}_${questId}`
+                if (output[outputKey] !== undefined) {
+                    invalidQuest(tableName, `duplicate prerequisite quest: ${questId}`)
+                }
+                output[outputKey] = frozenPrerequisites
+            }
+        }
+    }
     return deepFreeze(output)
+}
+
+function parsePositiveIntegerRowField(
+    tableName: QuestTableName,
+    value: string,
+    field: string,
+): number {
+    if (!/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value))) {
+        invalidQuest(tableName, `${field} must be a canonical positive integer: ${value}`)
+    }
+    return Number(value)
 }
 
 export function buildQuestLookup(
@@ -939,6 +1075,7 @@ export function buildEventChallengePointMap(
 export async function convertQuests(
     reader: QuestSourceReader,
     compatibility: QuestConversionCompatibility,
+    context?: ContentConverterContext,
 ): Promise<QuestConversionOutput> {
     const convertedSources = await Promise.all(
         (Object.entries(QUEST_TABLE_SOURCES) as Array<[
@@ -947,7 +1084,7 @@ export async function convertQuests(
         ]>).map(async ([tableName, source]) => {
             const raw = await reader.readDynamic(source.logicalPath)
             const tree = convertOrderedMapJson(raw, source.nestingDepth)
-            return [tableName, tree, convertQuestTree(tableName, tree)] as const
+            return [tableName, tree, convertQuestTree(tableName, tree, context)] as const
         }),
     )
     const questTables = Object.fromEntries(convertedSources.map(
@@ -959,22 +1096,30 @@ export async function convertQuests(
     const questTrees = Object.fromEntries(convertedSources.map(
         ([tableName, tree]) => [tableName, tree],
     )) as Record<QuestTableName, CsvOrderedMapTree>
-    const [dailyChallengePoint, expertSingleEvent, soloTimeAttackEvent, practiceQuest] = await Promise.all([
+    const [dailyChallengePoint, expertSingleEvent, soloTimeAttackEvent, practiceQuest, mainStageNode, exStageNode] = await Promise.all([
         reader.readDynamic(QUEST_AUXILIARY_SOURCES.dailyChallengePoint),
         reader.readDynamic(QUEST_AUXILIARY_SOURCES.expertSingleEvent),
         reader.readDynamic(QUEST_AUXILIARY_SOURCES.soloTimeAttackEvent),
         reader.readDynamic(QUEST_AUXILIARY_SOURCES.practiceQuest),
+        reader.readDynamic(QUEST_AUXILIARY_SOURCES.mainStageNode),
+        reader.readDynamic(QUEST_AUXILIARY_SOURCES.exStageNode),
     ])
+    const dailyChallengePointLookup = buildDailyChallengePointLookup(
+        convertOrderedMapJson(dailyChallengePoint, 1),
+    )
+    const eventChallengePointMap = buildEventChallengePointMap(
+        convertOrderedMapJson(expertSingleEvent, 1),
+        convertOrderedMapJson(soloTimeAttackEvent, 1),
+        questTrees["story_event_single_quest.json"],
+    )
+    validateDailyChallengeContent({
+        lookup: dailyChallengePointLookup,
+        eventPointMap: eventChallengePointMap,
+    })
     return deepFreeze({
         ...questTables,
-        "daily_challenge_point_lookup.json": buildDailyChallengePointLookup(
-            convertOrderedMapJson(dailyChallengePoint, 1),
-        ),
-        "event_challenge_point_map.json": buildEventChallengePointMap(
-            convertOrderedMapJson(expertSingleEvent, 1),
-            convertOrderedMapJson(soloTimeAttackEvent, 1),
-            questTrees["story_event_single_quest.json"],
-        ),
+        "daily_challenge_point_lookup.json": dailyChallengePointLookup,
+        "event_challenge_point_map.json": eventChallengePointMap,
         "quest_entry_costs.json": buildQuestEntryCosts(questTrees),
         "quest_lookup.json": buildQuestLookup(
             questTables,
@@ -982,5 +1127,15 @@ export async function convertQuests(
             compatibility.practiceQuests,
         ),
         "quest_unlock_costs.json": buildQuestUnlockCosts(questTrees),
+        "quest_prerequisites.json": buildQuestPrerequisites(
+            {
+                "main_quest.json": questTrees["main_quest.json"],
+                "ex_quest.json": questTrees["ex_quest.json"],
+            },
+            {
+                "main_quest.json": convertOrderedMapJson(mainStageNode, 2),
+                "ex_quest.json": convertOrderedMapJson(exStageNode, 2),
+            },
+        ),
     })
 }

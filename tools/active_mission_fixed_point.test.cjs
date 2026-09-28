@@ -5,6 +5,10 @@ const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
 const test = require("node:test")
+const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snapshot.cjs")
+    .installBundledGameplaySnapshot()
+process.once("exit", () => { restoreContentSnapshot() })
+const { installFrozenTestContentSnapshot } = require("./helpers/content-snapshot-fixture.cjs")
 const { getActiveMissionPlan } = require("../src/lib/mission/active-plan")
 const {
     ACTIVE_MISSION_FACT_KINDS,
@@ -52,7 +56,7 @@ function rewardRow(targetProgress) {
     return row
 }
 
-function createRepository() {
+function createMissionTables() {
     const targetIds = "90001,90002,90003,90004,90005,90006"
     const tables = {
         "mission_active.json": {
@@ -77,13 +81,7 @@ function createRepository() {
         "main_quest.json": {},
         "ex_quest.json": {},
     }
-    return {
-        info: () => ({ source: "release", assetVersion: "fixed-point-test", contentVersion: 1 }),
-        table: tableName => {
-            if (!(tableName in tables)) throw new Error(`unexpected table ${tableName}`)
-            return tables[tableName]
-        },
-    }
+    return tables
 }
 
 function subsetPlan(sourcePlan, definitions) {
@@ -138,7 +136,6 @@ test("runner loads candidate facts only after availability", () => {
 
     runActiveMissionReconciliation({
         playerId: 1,
-        repository: {},
         now: Date.parse("2024-08-14T12:00:00.000Z"),
         plan,
         session,
@@ -223,7 +220,6 @@ test("stage-only settlement does not dirty target dependency", () => {
     const writes = []
     const result = runActiveMissionReconciliation({
         playerId: 1,
-        repository: {},
         now: Date.parse("2024-08-14T12:00:00.000Z"),
         plan,
         session,
@@ -274,7 +270,6 @@ test("settlement errors escape the runner", () => {
 
     assert.throws(() => runActiveMissionReconciliation({
         playerId: 1,
-        repository: {},
         now: Date.parse("2024-08-14T12:00:00.000Z"),
         plan,
         session,
@@ -336,13 +331,20 @@ test("fixed point caches static facts and only recomputes dirty dependencies", (
                 metrics.dependencyComputes[missionId] = (metrics.dependencyComputes[missionId] ?? 0) + 1
             },
         }
-        const repository = createRepository()
-        const result = reconcileActiveMissionFactsWithResult({
-            playerId,
-            repository,
-            now: Date.parse("2024-08-14T12:00:00.000Z"),
-            observer,
+        const { restore: restoreRuntimeTables } = installFrozenTestContentSnapshot({
+            targetVersion: "fixed-point-test",
+            tables: createMissionTables(),
         })
+        let result
+        try {
+            result = reconcileActiveMissionFactsWithResult({
+                playerId,
+                now: Date.parse("2024-08-14T12:00:00.000Z"),
+                observer,
+            })
+        } finally {
+            restoreRuntimeTables()
+        }
 
         assert.equal(metrics.staticComputes[90001], 1)
         assert.equal(metrics.staticComputes[90004], 1)

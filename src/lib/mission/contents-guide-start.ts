@@ -1,11 +1,13 @@
-import type { ReadonlyContentRepository } from "../../content/runtime/content-snapshot"
 import { getDb } from "../../data/db"
+import { publishActiveMissionOwnerStateWithinTransaction } from "./active-publication-owner"
 import {
     getPlayerActiveMissionsSync,
     updatePlayerActiveMissionStageSync,
     updatePlayerActiveMissionSync,
 } from "../../data/domains/mission"
 import { getPlayerQuestProgressSync } from "../../data/domains/quest"
+import type { ActiveMissionPlan } from "./active-plan"
+import { getActiveMissionPlan } from "./active-plan"
 import {
     getActiveMissionEventMasterDefinition,
     getActiveMissionMasterDefinitions,
@@ -25,12 +27,16 @@ const CONTENTS_GUIDE_START_STRING_ID = "contents_guide_start"
 export interface StartContentsGuideMissionInput {
     readonly playerId: number
     readonly eventId: number
-    readonly repository: ReadonlyContentRepository
+    readonly plan?: ActiveMissionPlan
     readonly now: number | Date
 }
 
 export type StartContentsGuideMissionResult =
-    | { readonly ok: true, readonly delta: ActiveMissionProgressDelta | null }
+    | {
+        readonly ok: true
+        readonly delta: ActiveMissionProgressDelta | null
+        readonly deltas: readonly ActiveMissionProgressDelta[]
+    }
     | { readonly ok: false, readonly message: string }
 
 function normalizeActiveMissions(
@@ -47,15 +53,15 @@ function normalizeActiveMissions(
 
 function resolveContentsGuideStartMissionId(
     eventId: number,
-    repository: ReadonlyContentRepository,
+    plan: ActiveMissionPlan,
 ): number | null {
     try {
-        const eventMaster = getActiveMissionEventMasterDefinition(eventId, repository)
+        const eventMaster = getActiveMissionEventMasterDefinition(eventId, plan)
         if (!eventMaster) return null
         const event = parseActiveMissionEventDefinition(eventId, eventMaster.row)
         if (event.kind !== CONTENTS_GUIDE_EVENT_KIND) return null
 
-        const candidates = getActiveMissionMasterDefinitions(repository).filter(definition => (
+        const candidates = getActiveMissionMasterDefinitions(plan).filter(definition => (
             Number(definition.row[0]) === eventId
             && definition.row[3] === CONTENTS_GUIDE_START_STRING_ID
         ))
@@ -72,7 +78,8 @@ function resolveContentsGuideStartMissionId(
 export function startContentsGuideMission(
     input: StartContentsGuideMissionInput,
 ): StartContentsGuideMissionResult {
-    const missionId = resolveContentsGuideStartMissionId(input.eventId, input.repository)
+    const plan = input.plan ?? getActiveMissionPlan()
+    const missionId = resolveContentsGuideStartMissionId(input.eventId, plan)
     if (missionId === null) {
         return { ok: false, message: "Invalid contents guide event." }
     }
@@ -81,7 +88,7 @@ export function startContentsGuideMission(
         const activeMissions = normalizeActiveMissions(getPlayerActiveMissionsSync(input.playerId))
         const questProgress = getPlayerQuestProgressSync(input.playerId)
         if (!isActiveMissionAvailable(missionId, {
-            repository: input.repository,
+            plan,
             now: input.now,
             activeMissions,
             questProgress,
@@ -93,14 +100,26 @@ export function startContentsGuideMission(
             missionId,
             activeMissions[String(missionId)],
             1,
-            { repository: input.repository },
+            { plan },
         )
-        if (settlement.delta === null) return { ok: true, delta: null }
-
-        updatePlayerActiveMissionSync(input.playerId, missionId, settlement.state.progress)
-        for (const stage of settlement.delta.stages) {
-            updatePlayerActiveMissionStageSync(input.playerId, stage.stage, missionId, false)
+        if (settlement.delta !== null) {
+            updatePlayerActiveMissionSync(input.playerId, missionId, settlement.state.progress)
+            for (const stage of settlement.delta.stages) {
+                updatePlayerActiveMissionStageSync(input.playerId, stage.stage, missionId, false)
+            }
         }
-        return { ok: true, delta: settlement.delta }
+        // Publish the dependency fixed point in the same transaction so one
+        // start request returns every unlocked mission's progress.
+        const publication = publishActiveMissionOwnerStateWithinTransaction({
+            playerId: input.playerId,
+            now: input.now,
+            source: "contents_guide/start",
+        })
+        const deltas = [...publication.activeMissionList]
+        const startDelta = settlement.delta
+        if (startDelta !== null && !deltas.some(delta => delta.mission_id === startDelta.mission_id)) {
+            deltas.unshift(startDelta)
+        }
+        return { ok: true, delta: settlement.delta, deltas }
     })()
 }

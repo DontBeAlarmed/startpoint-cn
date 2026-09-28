@@ -2,6 +2,7 @@ import type { NestedOrderedMapTextRows } from "../../sync/ordered-map"
 import type {
     ShopCostItemScheduleRows,
 } from "../../../lib/types/shop"
+import type { ContentConverterContext } from "../context"
 import {
     invalidShop,
     parseOptionalShopDate,
@@ -15,6 +16,7 @@ const SCHEDULE_ID_PATTERN = /^[A-Za-z0-9_]+$/
 
 export function convertShopCostItemSchedules(
     groups: readonly NestedOrderedMapTextRows[],
+    context?: ContentConverterContext,
 ): ShopCostItemScheduleRows {
     const output: ShopCostItemScheduleRows = {}
     for (const group of [...groups].sort((left, right) => left.key.localeCompare(right.key))) {
@@ -34,8 +36,8 @@ export function convertShopCostItemSchedules(
             const costs = parseShopCosts(fields, [3, 5, 7, 9], subject)
             if (costs.length === 0) invalidShop(`${subject}.costs must not be empty`)
             return {
-                availableFrom: parseShopDate(fields[0], `${subject}.availableFrom`),
-                availableUntil: parseOptionalShopDate(fields[1], `${subject}.availableUntil`),
+                availableFrom: parseShopDate(fields[0], `${subject}.availableFrom`, context),
+                availableUntil: parseOptionalShopDate(fields[1], `${subject}.availableUntil`, context),
                 month,
                 costs,
             }

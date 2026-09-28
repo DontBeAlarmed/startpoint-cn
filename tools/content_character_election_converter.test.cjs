@@ -7,8 +7,9 @@ const {
     convertCharacterElections,
 } = require("../src/content/converters/character-election")
 const {
-    getValidatedCharacterElectionRule,
+    buildCharacterElectionCatalog,
 } = require("../src/lib/character-election")
+const { createGameCalendarPolicy } = require("../src/time/game-calendar")
 
 function csvRow(overrides = {}) {
     const fields = Array(37).fill("")
@@ -88,6 +89,42 @@ test("character election converter reproduces the CN client candidate filter", (
     assert.equal(Object.isFrozen(result["character_election.json"]["1"].keywordIds), true)
 })
 
+test("character election converter validates periods through the injected game calendar", () => {
+    const parsed = []
+    const real = createGameCalendarPolicy(480)
+    const gameCalendar = {
+        utcOffsetMinutes: 480,
+        parseMasterTimestamp: value => {
+            parsed.push(value)
+            return real.parseMasterTimestamp(value)
+        },
+    }
+    const result = convertCharacterElections(fixture(), { gameCalendar })
+
+    assert.ok(parsed.includes("2022-05-02 12:00:00"), "startTime must reach the policy parser")
+    assert.ok(parsed.includes("2022-05-13 23:59:59"), "endTime must reach the policy parser")
+    assert.deepEqual(result, {
+        "character_election.json": {
+            "1": {
+                stringId: "chara_election_01",
+                startTime: "2022-05-02 12:00:00",
+                endTime: "2022-05-13 23:59:59",
+                keywordIds: [1000001, 1000003, 2000001],
+            },
+        },
+    })
+})
+
+test("character election canonical strings stay stable across calendar offsets", () => {
+    const base = convertCharacterElections(fixture(), {
+        gameCalendar: createGameCalendarPolicy(480),
+    })
+    const shifted = convertCharacterElections(fixture(), {
+        gameCalendar: createGameCalendarPolicy(540),
+    })
+    assert.deepEqual(shifted, base)
+})
+
 test("character election converter rejects malformed authoritative sources", () => {
     const invalidDate = fixture()
     invalidDate.electionRows[0] = {
@@ -141,10 +178,17 @@ test("character election runtime rejects years outside the CN master parser rang
             keywordIds: [1000001],
         },
     }
-    assert.notEqual(getValidatedCharacterElectionRule(table, 1), null)
+    const repository = electionTable => ({
+        info: () => ({ source: "test" }),
+        table: tableName => {
+            if (tableName !== "character_election.json") throw new Error(tableName)
+            return electionTable
+        },
+    })
+    assert.notEqual(buildCharacterElectionCatalog(repository(table)).resolve(1), null)
     for (const year of ["1969", "2201"]) {
-        assert.equal(getValidatedCharacterElectionRule({
+        assert.throws(() => buildCharacterElectionCatalog(repository({
             "1": { ...table["1"], startTime: `${year}-05-02 12:00:00` },
-        }, 1), null)
+        })))
     }
 })

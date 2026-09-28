@@ -1,10 +1,9 @@
 import { incrementPlayerCategoryMissionSync } from "../../data/domains/mission"
-import { getQuestContentTableSync } from "../assets"
 import {
-    getMissionMasterDefinitions,
-    isMissionDefinitionEnabledAt,
-} from "./master-data"
-
+    getAdventEventQuestIdsForEvent,
+    getBossBattleQuestIdsForFamilyStage,
+} from "../quest-content"
+import { getMissionCatalog, isMissionMasterDefinitionEnabledAt, MissionMasterDefinition } from "./mission-catalog"
 interface DegreeBattleFactContext {
     readonly playerId: number
     readonly questCategory: number
@@ -18,13 +17,13 @@ interface ExactDegreeQuestClearRule {
     readonly missionId: number
     readonly category: number
     readonly questIds: ReadonlySet<number>
-    readonly definition: ReturnType<typeof getMissionMasterDefinitions>[number]
+    readonly definition: MissionMasterDefinition
 }
 
 const DEGREE_MVP_MISSION_IDS = [26000, 26010, 26020] as const
 
 function isDegreeMvpDefinitionSupported(missionId: number): boolean {
-    return getMissionMasterDefinitions(5).some(definition => (
+    return getMissionCatalog().getDefinitions(5).some(definition => (
         definition.missionId === missionId
         && definition.pattern === `degree_mvp_get_${missionId === 26000 ? 1 : missionId === 26010 ? 2 : 3}`
         && Number(definition.row[3]) === 19
@@ -37,9 +36,7 @@ export function getDegreeMvpMissionIds(): readonly number[] {
 
 function buildExactDegreeQuestClearRules(): readonly ExactDegreeQuestClearRule[] {
     const rules: ExactDegreeQuestClearRule[] = []
-    const bossBattleQuests = getQuestContentTableSync("boss_battle_quest.json")
-    const adventEventQuests = getQuestContentTableSync("advent_event_quest.json")
-    for (const definition of getMissionMasterDefinitions(5)) {
+    for (const definition of getMissionCatalog().getDefinitions(5)) {
         if (Number(definition.row[3]) !== 23
             || definition.row[11] !== ""
             || definition.row[12] !== "(None)") continue
@@ -50,10 +47,7 @@ function buildExactDegreeQuestClearRules(): readonly ExactDegreeQuestClearRule[]
             const stageGroup = Number(definition.row[10])
             if (!Number.isSafeInteger(family) || family <= 0
                 || !Number.isSafeInteger(stageGroup) || stageGroup <= 0) continue
-            const questIds = Object.keys(bossBattleQuests).map(Number).filter(questId => (
-                Math.floor(questId / 1_000_000) === family
-                && Math.floor(questId / 1_000) % 1_000 === stageGroup
-            ))
+            const questIds = getBossBattleQuestIdsForFamilyStage(family, stageGroup)
             if (questIds.length === 0) continue
             rules.push({
                 missionId: definition.missionId,
@@ -67,8 +61,7 @@ function buildExactDegreeQuestClearRules(): readonly ExactDegreeQuestClearRule[]
         if (rangeKind !== 5 || definition.row[10] !== "") continue
         const eventId = Number(definition.row[9])
         if (!Number.isSafeInteger(eventId) || eventId <= 0) continue
-        const questIds = Object.keys(adventEventQuests).map(Number)
-            .filter(questId => Math.floor(questId / 1_000) === eventId)
+        const questIds = getAdventEventQuestIdsForEvent(eventId)
         if (questIds.length === 0) continue
         rules.push({
             missionId: definition.missionId,
@@ -97,10 +90,10 @@ export function recordDegreeMissionBattleFacts(
     if (context.isMulti === true
         && context.isMvp === true) {
         for (const missionId of getDegreeMvpMissionIds()) {
-            const definition = getMissionMasterDefinitions(5)
+            const definition = getMissionCatalog().getDefinitions(5)
                 .find(entry => entry.missionId === missionId)
             if (definition?.pattern === `degree_mvp_get_${missionId === 26000 ? 1 : missionId === 26010 ? 2 : 3}`
-                && isMissionDefinitionEnabledAt(definition, evaluationTime)) {
+                && isMissionMasterDefinitionEnabledAt(definition, evaluationTime)) {
                 incrementPlayerCategoryMissionSync(context.playerId, 5, missionId, 1)
                 matchedMissionIds.push(missionId)
             }
@@ -108,7 +101,7 @@ export function recordDegreeMissionBattleFacts(
     }
     for (const rule of buildExactDegreeQuestClearRules()) {
         if (rule.category !== context.questCategory || !rule.questIds.has(context.questId)) continue
-        if (!isMissionDefinitionEnabledAt(rule.definition, evaluationTime)) continue
+        if (!isMissionMasterDefinitionEnabledAt(rule.definition, evaluationTime)) continue
         incrementPlayerCategoryMissionSync(context.playerId, 5, rule.missionId, 1)
         matchedMissionIds.push(rule.missionId)
     }
