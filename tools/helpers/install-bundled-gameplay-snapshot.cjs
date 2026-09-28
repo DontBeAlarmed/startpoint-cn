@@ -41,6 +41,7 @@ const REWARD_TABLE_NAMES = [
     "rare_score_reward.json",
     "rush_event_quest_folder.json",
     "score_attack_border_reward.json",
+    "ranking_event_ranking_reward.json",
     "rush_event_ranking_reward.json",
 ]
 const QUEST_TABLE_NAMES = [

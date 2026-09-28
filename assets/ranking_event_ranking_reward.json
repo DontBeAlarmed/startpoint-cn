@@ -1,0 +1,978 @@
+{
+    "1": [
+        {
+            "multipliedId": 101,
+            "rank": 1,
+            "rankBorder": 0.03,
+            "reasonId": 10001,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 54040,
+                    "kind": 7
+                },
+                {
+                    "amount": 50,
+                    "id": 49100,
+                    "kind": 0
+                },
+                {
+                    "amount": 1500,
+                    "kind": 2
+                },
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                },
+                {
+                    "amount": 1,
+                    "id": 999004,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 102,
+            "rank": 2,
+            "rankBorder": 0.05,
+            "reasonId": 10002,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 54030,
+                    "kind": 7
+                },
+                {
+                    "amount": 40,
+                    "id": 49100,
+                    "kind": 0
+                },
+                {
+                    "amount": 1500,
+                    "kind": 2
+                },
+                {
+                    "amount": 7,
+                    "id": 13001,
+                    "kind": 0
+                },
+                {
+                    "amount": 1,
+                    "id": 999004,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 103,
+            "rank": 3,
+            "rankBorder": 0.1,
+            "reasonId": 10003,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 54030,
+                    "kind": 7
+                },
+                {
+                    "amount": 40,
+                    "id": 49100,
+                    "kind": 0
+                },
+                {
+                    "amount": 1500,
+                    "kind": 2
+                },
+                {
+                    "amount": 5,
+                    "id": 13001,
+                    "kind": 0
+                },
+                {
+                    "amount": 7,
+                    "id": 999005,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 104,
+            "rank": 4,
+            "rankBorder": 0.2,
+            "reasonId": 10004,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 54020,
+                    "kind": 7
+                },
+                {
+                    "amount": 30,
+                    "id": 49100,
+                    "kind": 0
+                },
+                {
+                    "amount": 1000,
+                    "kind": 2
+                },
+                {
+                    "amount": 5,
+                    "id": 13001,
+                    "kind": 0
+                },
+                {
+                    "amount": 7,
+                    "id": 999005,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 105,
+            "rank": 5,
+            "rankBorder": 0.3,
+            "reasonId": 10005,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 54020,
+                    "kind": 7
+                },
+                {
+                    "amount": 30,
+                    "id": 49100,
+                    "kind": 0
+                },
+                {
+                    "amount": 1000,
+                    "kind": 2
+                },
+                {
+                    "amount": 3,
+                    "id": 13001,
+                    "kind": 0
+                },
+                {
+                    "amount": 5,
+                    "id": 999005,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 106,
+            "rank": 6,
+            "rankBorder": 0.4,
+            "reasonId": 10006,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 54010,
+                    "kind": 7
+                },
+                {
+                    "amount": 20,
+                    "id": 49100,
+                    "kind": 0
+                },
+                {
+                    "amount": 500,
+                    "kind": 2
+                },
+                {
+                    "amount": 3,
+                    "id": 13001,
+                    "kind": 0
+                },
+                {
+                    "amount": 3,
+                    "id": 999005,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 107,
+            "rank": 7,
+            "rankBorder": 0.5,
+            "reasonId": 10007,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 54010,
+                    "kind": 7
+                },
+                {
+                    "amount": 20,
+                    "id": 49100,
+                    "kind": 0
+                },
+                {
+                    "amount": 500,
+                    "kind": 2
+                },
+                {
+                    "amount": 1,
+                    "id": 13001,
+                    "kind": 0
+                },
+                {
+                    "amount": 3,
+                    "id": 999005,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 108,
+            "rank": 8,
+            "rankBorder": 0.7,
+            "reasonId": 10008,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 54000,
+                    "kind": 7
+                },
+                {
+                    "amount": 10,
+                    "id": 49100,
+                    "kind": 0
+                },
+                {
+                    "amount": 300,
+                    "kind": 2
+                },
+                {
+                    "amount": 1,
+                    "id": 13001,
+                    "kind": 0
+                },
+                {
+                    "amount": 1,
+                    "id": 999005,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 109,
+            "rank": 9,
+            "rankBorder": 1,
+            "reasonId": 10009,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 54000,
+                    "kind": 7
+                },
+                {
+                    "amount": 5,
+                    "id": 49100,
+                    "kind": 0
+                },
+                {
+                    "amount": 150,
+                    "kind": 2
+                }
+            ]
+        }
+    ],
+    "1000": [
+        {
+            "multipliedId": 100001,
+            "rank": 1,
+            "rankBorder": 0.03,
+            "reasonId": 10001,
+            "rewards": [
+                {
+                    "amount": 20000,
+                    "kind": 3
+                }
+            ]
+        },
+        {
+            "multipliedId": 100002,
+            "rank": 2,
+            "rankBorder": 0.05,
+            "reasonId": 10002,
+            "rewards": [
+                {
+                    "amount": 20000,
+                    "kind": 3
+                }
+            ]
+        },
+        {
+            "multipliedId": 100003,
+            "rank": 3,
+            "rankBorder": 0.1,
+            "reasonId": 10003,
+            "rewards": [
+                {
+                    "amount": 20000,
+                    "kind": 3
+                }
+            ]
+        },
+        {
+            "multipliedId": 100004,
+            "rank": 4,
+            "rankBorder": 0.2,
+            "reasonId": 10004,
+            "rewards": [
+                {
+                    "amount": 20000,
+                    "kind": 3
+                }
+            ]
+        },
+        {
+            "multipliedId": 100005,
+            "rank": 5,
+            "rankBorder": 0.3,
+            "reasonId": 10005,
+            "rewards": [
+                {
+                    "amount": 20000,
+                    "kind": 3
+                }
+            ]
+        },
+        {
+            "multipliedId": 100006,
+            "rank": 6,
+            "rankBorder": 0.4,
+            "reasonId": 10006,
+            "rewards": [
+                {
+                    "amount": 20000,
+                    "kind": 3
+                }
+            ]
+        },
+        {
+            "multipliedId": 100007,
+            "rank": 7,
+            "rankBorder": 0.5,
+            "reasonId": 10007,
+            "rewards": [
+                {
+                    "amount": 20000,
+                    "kind": 3
+                }
+            ]
+        },
+        {
+            "multipliedId": 100008,
+            "rank": 8,
+            "rankBorder": 0.7,
+            "reasonId": 10008,
+            "rewards": [
+                {
+                    "amount": 20000,
+                    "kind": 3
+                }
+            ]
+        },
+        {
+            "multipliedId": 100009,
+            "rank": 9,
+            "rankBorder": 1,
+            "reasonId": 10009,
+            "rewards": [
+                {
+                    "amount": 20000,
+                    "kind": 3
+                }
+            ]
+        }
+    ],
+    "1001": [
+        {
+            "multipliedId": 100101,
+            "rank": 1,
+            "rankBorder": 0.03,
+            "reasonId": 10001,
+            "rewards": [
+                {
+                    "amount": 20000,
+                    "kind": 3
+                }
+            ]
+        },
+        {
+            "multipliedId": 100102,
+            "rank": 2,
+            "rankBorder": 0.05,
+            "reasonId": 10002,
+            "rewards": [
+                {
+                    "amount": 20000,
+                    "kind": 3
+                }
+            ]
+        },
+        {
+            "multipliedId": 100103,
+            "rank": 3,
+            "rankBorder": 0.1,
+            "reasonId": 10003,
+            "rewards": [
+                {
+                    "amount": 20000,
+                    "kind": 3
+                }
+            ]
+        },
+        {
+            "multipliedId": 100104,
+            "rank": 4,
+            "rankBorder": 0.2,
+            "reasonId": 10004,
+            "rewards": [
+                {
+                    "amount": 20000,
+                    "kind": 3
+                }
+            ]
+        },
+        {
+            "multipliedId": 100105,
+            "rank": 5,
+            "rankBorder": 0.3,
+            "reasonId": 10005,
+            "rewards": [
+                {
+                    "amount": 20000,
+                    "kind": 3
+                }
+            ]
+        },
+        {
+            "multipliedId": 100106,
+            "rank": 6,
+            "rankBorder": 0.4,
+            "reasonId": 10006,
+            "rewards": [
+                {
+                    "amount": 20000,
+                    "kind": 3
+                }
+            ]
+        },
+        {
+            "multipliedId": 100107,
+            "rank": 7,
+            "rankBorder": 0.5,
+            "reasonId": 10007,
+            "rewards": [
+                {
+                    "amount": 20000,
+                    "kind": 3
+                }
+            ]
+        },
+        {
+            "multipliedId": 100108,
+            "rank": 8,
+            "rankBorder": 0.7,
+            "reasonId": 10008,
+            "rewards": [
+                {
+                    "amount": 20000,
+                    "kind": 3
+                }
+            ]
+        },
+        {
+            "multipliedId": 100109,
+            "rank": 9,
+            "rankBorder": 1,
+            "reasonId": 10009,
+            "rewards": [
+                {
+                    "amount": 20000,
+                    "kind": 3
+                }
+            ]
+        }
+    ],
+    "2": [
+        {
+            "multipliedId": 201,
+            "rank": 1,
+            "rankBorder": 0.03,
+            "reasonId": 10011,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 202,
+            "rank": 2,
+            "rankBorder": 0.06,
+            "reasonId": 10012,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 203,
+            "rank": 3,
+            "rankBorder": 0.1,
+            "reasonId": 10013,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 204,
+            "rank": 4,
+            "rankBorder": 0.2,
+            "reasonId": 10014,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 205,
+            "rank": 5,
+            "rankBorder": 0.3,
+            "reasonId": 10015,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 206,
+            "rank": 6,
+            "rankBorder": 0.4,
+            "reasonId": 10016,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 207,
+            "rank": 7,
+            "rankBorder": 0.6,
+            "reasonId": 10017,
+            "rewards": [
+                {
+                    "amount": 7,
+                    "id": 13001,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 208,
+            "rank": 8,
+            "rankBorder": 0.8,
+            "reasonId": 10018,
+            "rewards": [
+                {
+                    "amount": 7,
+                    "id": 13001,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 209,
+            "rank": 9,
+            "rankBorder": 1,
+            "reasonId": 10019,
+            "rewards": [
+                {
+                    "amount": 5,
+                    "id": 13001,
+                    "kind": 0
+                }
+            ]
+        }
+    ],
+    "3": [
+        {
+            "multipliedId": 301,
+            "rank": 1,
+            "rankBorder": 0.03,
+            "reasonId": 10020,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 302,
+            "rank": 2,
+            "rankBorder": 0.06,
+            "reasonId": 10021,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 303,
+            "rank": 3,
+            "rankBorder": 0.1,
+            "reasonId": 10022,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 304,
+            "rank": 4,
+            "rankBorder": 0.2,
+            "reasonId": 10023,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 305,
+            "rank": 5,
+            "rankBorder": 0.3,
+            "reasonId": 10024,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 306,
+            "rank": 6,
+            "rankBorder": 0.4,
+            "reasonId": 10025,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 307,
+            "rank": 7,
+            "rankBorder": 0.6,
+            "reasonId": 10026,
+            "rewards": [
+                {
+                    "amount": 7,
+                    "id": 13001,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 308,
+            "rank": 8,
+            "rankBorder": 0.8,
+            "reasonId": 10027,
+            "rewards": [
+                {
+                    "amount": 7,
+                    "id": 13001,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 309,
+            "rank": 9,
+            "rankBorder": 1,
+            "reasonId": 10028,
+            "rewards": [
+                {
+                    "amount": 5,
+                    "id": 13001,
+                    "kind": 0
+                }
+            ]
+        }
+    ],
+    "4": [
+        {
+            "multipliedId": 401,
+            "rank": 1,
+            "rankBorder": 0.03,
+            "reasonId": 10029,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 402,
+            "rank": 2,
+            "rankBorder": 0.06,
+            "reasonId": 10030,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 403,
+            "rank": 3,
+            "rankBorder": 0.1,
+            "reasonId": 10031,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 404,
+            "rank": 4,
+            "rankBorder": 0.2,
+            "reasonId": 10032,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 405,
+            "rank": 5,
+            "rankBorder": 0.3,
+            "reasonId": 10033,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 406,
+            "rank": 6,
+            "rankBorder": 0.4,
+            "reasonId": 10034,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 407,
+            "rank": 7,
+            "rankBorder": 0.6,
+            "reasonId": 10035,
+            "rewards": [
+                {
+                    "amount": 7,
+                    "id": 13001,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 408,
+            "rank": 8,
+            "rankBorder": 0.8,
+            "reasonId": 10036,
+            "rewards": [
+                {
+                    "amount": 7,
+                    "id": 13001,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 409,
+            "rank": 9,
+            "rankBorder": 1,
+            "reasonId": 10037,
+            "rewards": [
+                {
+                    "amount": 5,
+                    "id": 13001,
+                    "kind": 0
+                }
+            ]
+        }
+    ],
+    "5": [
+        {
+            "multipliedId": 501,
+            "rank": 1,
+            "rankBorder": 0.03,
+            "reasonId": 10038,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 502,
+            "rank": 2,
+            "rankBorder": 0.06,
+            "reasonId": 10039,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 503,
+            "rank": 3,
+            "rankBorder": 0.1,
+            "reasonId": 10040,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 504,
+            "rank": 4,
+            "rankBorder": 0.2,
+            "reasonId": 10041,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 505,
+            "rank": 5,
+            "rankBorder": 0.3,
+            "reasonId": 10042,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 506,
+            "rank": 6,
+            "rankBorder": 0.4,
+            "reasonId": 10043,
+            "rewards": [
+                {
+                    "amount": 1,
+                    "id": 12002,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 507,
+            "rank": 7,
+            "rankBorder": 0.6,
+            "reasonId": 10044,
+            "rewards": [
+                {
+                    "amount": 7,
+                    "id": 13001,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 508,
+            "rank": 8,
+            "rankBorder": 0.8,
+            "reasonId": 10045,
+            "rewards": [
+                {
+                    "amount": 7,
+                    "id": 13001,
+                    "kind": 0
+                }
+            ]
+        },
+        {
+            "multipliedId": 509,
+            "rank": 9,
+            "rankBorder": 1,
+            "reasonId": 10046,
+            "rewards": [
+                {
+                    "amount": 5,
+                    "id": 13001,
+                    "kind": 0
+                }
+            ]
+        }
+    ]
+}

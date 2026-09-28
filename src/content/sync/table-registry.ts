@@ -123,6 +123,7 @@ const REWARD_TABLES = [
     ["score_reward.json", "master/reward/score_reward.orderedmap"],
     ["rare_score_reward.json", "master/reward/rare_score_reward.orderedmap"],
     ["score_attack_border_reward.json", "master/quest/event/score_attack_border_reward.orderedmap"],
+    ["ranking_event_ranking_reward.json", "master/quest/event/ranking_event_ranking_reward.orderedmap"],
     ["rush_event_quest_folder.json", "master/quest/event/rush_event_quest_folder.orderedmap"],
     ["rush_event_ranking_reward.json", "master/quest/event/rush_event_ranking_reward.orderedmap"],
 ] as const
