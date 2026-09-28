@@ -59,6 +59,11 @@ export interface RankingPlacement {
     leaderCharacterId: number
     leaderEvolutionLevel: number
     rankPercentage: number
+    rankBorderTop: {
+        elapsed_time_ms: number
+        is_accomplished: boolean
+        score: number
+    } | null
 }
 
 /**
@@ -89,6 +94,37 @@ export function getRankingPlacement(
         leaderCharacterId: leaderCharacterId!,
         leaderEvolutionLevel: leaderCharacter.evolutionLevel,
         rankPercentage,
+        rankBorderTop: getRankingTopRecord(questId),
+    }
+}
+
+/**
+ * 榜首参考线(rank_border_top):本服当前真实的第一名记录,排序口径与百分位
+ * 一致(有完成耗时者优先按耗时升序,未完成排后按分数降序)。客户端的排名表
+ * 与结果弹窗按该字段绘制榜首标记,官方系实现(含客户端离线 dummy)恒以
+ * 非空对象下发;单人时即玩家自己的成绩(自己就是第一名,语义自洽)。
+ */
+function getRankingTopRecord(questId: number): RankingPlacement["rankBorderTop"] {
+    const top = getDb().prepare(`
+        SELECT best_elapsed_time_ms, high_score
+        FROM players_quest_progress
+        WHERE section = ? AND quest_id = ?
+            AND (best_elapsed_time_ms IS NOT NULL OR high_score IS NOT NULL)
+        ORDER BY
+            CASE WHEN best_elapsed_time_ms IS NULL THEN 1 ELSE 0 END,
+            best_elapsed_time_ms ASC,
+            high_score DESC
+        LIMIT 1
+    `).get(QuestCategory.RANKING_EVENT_SINGLE, questId) as {
+        best_elapsed_time_ms: number | null
+        high_score: number | null
+    } | undefined
+    if (top === undefined) return null
+    const isAccomplished = top.best_elapsed_time_ms !== null
+    return {
+        elapsed_time_ms: isAccomplished ? top.best_elapsed_time_ms! : 0,
+        is_accomplished: isAccomplished,
+        score: top.high_score ?? 0,
     }
 }
 
@@ -127,7 +163,7 @@ function buildRankingSummaryPayload(placement: RankingPlacement): Record<string,
         },
         "leader_character_evolution_img_level": placement.leaderEvolutionLevel,
         "leader_character_id": placement.leaderCharacterId,
-        "rank_border_top": null,
+        "rank_border_top": placement.rankBorderTop,
         "rank_percentage": placement.rankPercentage,
     }
 }
