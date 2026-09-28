@@ -8,6 +8,8 @@ export interface PlayerBrief {
     accountId: number
     name: string
     rank: number
+    characterCount: number
+    lastLoginTime: string
     isDefault: boolean
     isActive: boolean
 }

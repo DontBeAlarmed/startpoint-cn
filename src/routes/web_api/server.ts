@@ -254,6 +254,8 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
                         name: player.name,
                         degreeId: player.degreeId,
                         rank: getRankDegree(player.rankPoint),
+                        characterCount: player.characterCount,
+                        lastLoginTime: player.lastLoginTime.toISOString(),
                         isDefault: defaultPid === player.id,
                         isActive: activePlayerId === player.id,
                     }
