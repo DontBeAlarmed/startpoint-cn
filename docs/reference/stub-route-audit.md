@@ -80,7 +80,7 @@
 |---|---|---|
 | `/attention/action` | 只返回零分，没有真人匹配队列 | 低；依赖真人联机阶段，不影响 NPC 联机 |
 | `/attention/logger` | 丢弃客户端 attention 日志 | 低；只有实现真人匹配诊断时才需要持久化 |
-| `/ranking_event/receive_reward` | 已移除无发奖的 `status=1` 假成功，当前 H404 | 中；依赖周期表、冻结排名、静态奖励、唯一领取状态和事务发奖 |
+| `/ranking_event/receive_reward` | 已注册，恒定返回官方 `status=3`（无可领奖励）；不发奖、无领取状态 | 关闭能力；真实发放需奖励来源、领取状态记录与事务（见[排名活动](../systems/ranking-event.md)） |
 CN 1.8.1 没有 Rush 排名 Remote，也没有 Raid 的选择文件夹、重置或排名 Remote；旧服务端多出的 7 个路由已删除，
 不再把客户端不可达接口列为待补功能。Ranking Event 的只读本服摘要与奖励边界见[排名活动](../systems/ranking-event.md)。
 
