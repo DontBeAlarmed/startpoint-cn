@@ -1313,6 +1313,256 @@ html[data-theme="dark"] .admin-feat-icon {
   line-height: 1.4;
 }
 
+/* player detail: 存档身份 hero (approved mockup player-v2) — identity block left
+   (label / big name / one info row), stacked import/export ops right. Mobile-first:
+   the info row wraps freely below 768px and joins one non-breaking row above. */
+.admin-hero-id {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 420px;
+  min-width: 0;
+}
+
+.admin-hero-id-label {
+  color: var(--ink-soft);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+}
+
+.admin-hero-id-name {
+  color: var(--ink);
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.admin-hero-id-pid {
+  color: var(--ink-soft);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-hero-id-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-top: 6px;
+  min-width: 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* each badge/信息段 is an unbreakable unit; the row itself wraps as whole units */
+.admin-hero-id-info > span {
+  white-space: nowrap;
+}
+
+.admin-hero-ops {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  flex: none;
+}
+
+.admin-hero-ops .ant-btn {
+  justify-content: center;
+}
+
+@media (min-width: 768px) {
+  .admin-hero-id-name {
+    font-size: 30px;
+  }
+
+  .admin-hero-id-pid {
+    font-size: 16px;
+  }
+
+  .admin-hero-id-info {
+    flex-wrap: nowrap;
+  }
+}
+
+/* player detail: 资源编辑 left-right icon input tiles (approved mockup player-v2) —
+   fixed 52px icon+label column on the left, centered numeric input + per-field save
+   affordance on the right. Mobile-first: one tile per row below 768px, two above. */
+.admin-res-card .ant-card-head-wrapper {
+  flex-wrap: wrap;
+}
+
+.admin-res-card .ant-card-extra {
+  flex-basis: 100%;
+  margin-left: 0;
+}
+
+.admin-card-note {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.admin-res-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 9px;
+  min-width: 0;
+}
+
+.admin-res-tile {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  padding: 10px 13px;
+  background: var(--stat-bg);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+}
+
+.admin-res-ic {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  width: 52px;
+}
+
+.admin-res-icon {
+  display: block;
+  width: 19px;
+  height: 19px;
+  stroke: var(--star-deep);
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+html[data-theme="dark"] .admin-res-icon {
+  stroke: var(--star);
+}
+
+.admin-res-lv {
+  color: var(--thunder);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+html[data-theme="dark"] .admin-res-lv {
+  color: var(--star);
+}
+
+.admin-res-label {
+  color: var(--ink-soft);
+  font-size: 10.5px;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.admin-res-control {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.admin-res-control .ant-input-number {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.admin-res-control .ant-input-number-input {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+@media (min-width: 768px) {
+  .admin-res-card .ant-card-head-wrapper {
+    flex-wrap: nowrap;
+  }
+
+  .admin-res-card .ant-card-extra {
+    flex-basis: auto;
+    margin-left: auto;
+  }
+
+  .admin-res-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* player detail: 账号设置 setting rows (approved mockup .setrow) — label+desc left,
+   control right, hairline between rows */
+.admin-setrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  min-width: 0;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-setrow:last-child {
+  border-bottom: 0;
+}
+
+.admin-setrow-copy {
+  min-width: 0;
+}
+
+.admin-setrow-label {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.admin-setrow-desc {
+  margin-top: 2px;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+
+.admin-setrow-control {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+
+.admin-setrow-control .ant-input-number {
+  width: 90px;
+}
+
+/* player detail: 危险操作 toolbar parked at the page bottom (approved mockup player-v2
+   maintainer correction) — strong-bordered panel strip shared with .toolbar voice */
+.admin-danger-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 11px 14px;
+  background: var(--panel);
+  border: 2px solid var(--line-strong);
+  border-radius: 14px;
+}
+
+.admin-danger-bar-label {
+  flex: none;
+  margin-right: 2px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
 /* forms: sections are flat 「标题行 + 内容区」 groups — the same voice as .admin-dash-section,
    the card/modal border is the only strong separator, sections rely on whitespace alone */
 .admin-form-section {

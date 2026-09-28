@@ -1,5 +1,6 @@
 import { useState } from "react"
-import { Card, Col, Descriptions, Row, Table, Button, Space, InputNumber, Popconfirm, message, Tag, Tabs, Spin, Typography, Switch, Input, Upload } from "antd"
+import type { ReactNode } from "react"
+import { Card, Table, Button, Space, InputNumber, Popconfirm, message, Tag, Tabs, Spin, Typography, Switch, Input, Upload } from "antd"
 import { SaveOutlined, DeleteOutlined, PlusOutlined, DownloadOutlined, UploadOutlined, UndoOutlined, SearchOutlined } from "@ant-design/icons"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
@@ -15,6 +16,11 @@ interface PlayerInfo {
     rankPoint: number; starCrumb: number; bondToken: number
     expPool: number; degreeId: number; leaderCharacterId: number
     birth: number; enableAuto3x: boolean; tutorialStep: number | null
+    lastLoginTime: string
+}
+
+interface AccountBrief {
+    players: { id: number; isDefault: boolean; isActive: boolean }[]
 }
 
 interface CharRow { code: number; joinTime: string; entryCount: number; evolutionLevel: number; overLimitStep: number; exp: number; stack: number; manaBoardIndex: number }
@@ -39,18 +45,24 @@ interface Lookups {
     quests: Record<string, string>
 }
 
-const resourceFields: { key: string; label: string }[] = [
-    { key: "expPool", label: "经验池" },
-    { key: "freeVmoney", label: "星导石(免费)" },
-    { key: "vmoney", label: "星导石(付费)" },
-    { key: "freeMana", label: "Mana(免费)" },
-    { key: "paidMana", label: "Mana(付费)" },
-    { key: "stamina", label: "体力" },
-    { key: "rankPoint", label: "Rank" },
-    { key: "starCrumb", label: "星屑" },
-    { key: "bondToken", label: "羁绊证" },
-    { key: "bossBoostPoint", label: "Boss Boost" },
-    { key: "boostPoint", label: "Boost" },
+// 资源编辑 8 项（approved mockup player-v2，Rank 居首）：左侧图标列 + 右侧居中输入，逐项保存
+const resourceFields: { key: string; label: string; icon?: ReactNode; lvBadge?: boolean }[] = [
+    { key: "rankPoint", label: "Rank", lvBadge: true },
+    { key: "expPool", label: "经验池", icon: <path d="M12 3c3.5 4.5 7 8.2 7 11.2a7 7 0 0 1-14 0c0-3 3.5-6.7 7-11.2z" /> },
+    { key: "freeVmoney", label: "星导石(免费)", icon: <circle cx="12" cy="12" r="8.5" /> },
+    { key: "vmoney", label: "星导石(付费)", icon: <circle cx="12" cy="12" r="8.5" /> },
+    { key: "freeMana", label: "Mana(免费)", icon: <path d="M3 12l4.5-7.5h9L21 12l-4.5 7.5h-9z" /> },
+    { key: "paidMana", label: "Mana(付费)", icon: <path d="M3 12l4.5-7.5h9L21 12l-4.5 7.5h-9z" /> },
+    {
+        key: "stamina", label: "体力", icon: (
+            <>
+                <path d="M10 2v6.2L4.6 18.8A1.4 1.4 0 0 0 5.9 21h12.2a1.4 1.4 0 0 0 1.3-2.2L14 8.2V2" />
+                <path d="M8.5 2h7" />
+                <path d="M7.5 15h9" />
+            </>
+        ),
+    },
+    { key: "starCrumb", label: "星屑", icon: <path d="M13.5 2.5l5.5 7.5-2.5 11.5-7.5-3.5.5-8.5z" /> },
 ]
 
 export default function PlayerDetail() {
@@ -71,6 +83,12 @@ export default function PlayerDetail() {
         queryKey: ["playerDetail", pid],
         queryFn: () => apiGet<DetailData>(`/api/player/${pid}/detail`),
         enabled: !isNaN(pid),
+    })
+
+    // 存档身份徽章（默认存档 / 当前活动）复用账号列表接口，与 Dashboard 共享缓存
+    const { data: accounts } = useQuery({
+        queryKey: ["accounts"],
+        queryFn: () => apiGet<AccountBrief[]>("/api/server/accounts"),
     })
 
     const { data: lookups } = useQuery({
@@ -196,36 +214,43 @@ export default function PlayerDetail() {
     if (isError || !data) return <Card><Text type="danger">加载失败</Text></Card>
 
     const { player, characters, items, equipment, questProgress, drawnQuests } = data
+    const saveBrief = accounts?.flatMap(account => account.players).find(p => p.id === pid)
 
-    // 内联可编辑数字字段（复用于资源/账号字段），渲染为响应式网格中的带标签输入单元
-    const numField = (key: string, label: string, opts: { min?: number; allowNull?: boolean } = {}) => {
+    // 逐字段保存输入控件（沿用原逐项保存模式）：改动后出现保存按钮，点击即落库
+    const fieldControl = (key: string, opts: { min?: number; allowNull?: boolean } = {}, compactClassName?: string) => {
         const has = key in editValues
         const current = (player as any)[key]
         const shown = has ? editValues[key] : current
         const changed = has && editValues[key] !== current
         return (
-            <Col key={key} xs={24} sm={12} md={8} lg={6}>
-                <div className="admin-edit-grid-cell">
-                    <span className="admin-edit-grid-label">{label}</span>
-                    <Space.Compact style={{ width: "100%" }}>
-                        <InputNumber
-                            style={{ width: "100%" }}
-                            size="small"
-                            value={shown}
-                            min={opts.min}
-                            onChange={v => setEditValues(prev => ({ ...prev, [key]: v ?? (opts.allowNull ? null : (opts.min ?? 0)) }))}
-                        />
-                        {changed && (
-                            <Button size="small" type="primary" icon={<SaveOutlined />}
-                                loading={editField.isPending}
-                                onClick={() => editField.mutate({ field: key, value: editValues[key] })}
-                            />
-                        )}
-                    </Space.Compact>
-                </div>
-            </Col>
+            <Space.Compact className={compactClassName}>
+                <InputNumber
+                    value={shown}
+                    min={opts.min}
+                    onChange={v => setEditValues(prev => ({ ...prev, [key]: v ?? (opts.allowNull ? null : (opts.min ?? 0)) }))}
+                />
+                {changed && (
+                    <Button type="primary" icon={<SaveOutlined />}
+                        loading={editField.isPending}
+                        onClick={() => editField.mutate({ field: key, value: editValues[key] })}
+                    />
+                )}
+            </Space.Compact>
         )
     }
+
+    // 资源编辑砖（approved mockup player-v2）：固定 52px 图标列（图标 + 标签）+ 输入 + 保存
+    const resTile = (f: (typeof resourceFields)[number]) => (
+        <div className="admin-res-tile" key={f.key}>
+            <div className="admin-res-ic">
+                {f.lvBadge
+                    ? <span className="admin-res-lv">Lv</span>
+                    : <svg className="admin-res-icon" viewBox="0 0 24 24" aria-hidden="true">{f.icon}</svg>}
+                <div className="admin-res-label">{f.label}</div>
+            </div>
+            {fieldControl(f.key, { min: 0 }, "admin-res-control")}
+        </div>
+    )
 
     const searchBox = (value: string, setValue: (s: string) => void) => (
         <Input allowClear size="small" prefix={<SearchOutlined />} placeholder="搜索名称或 ID"
@@ -408,13 +433,96 @@ export default function PlayerDetail() {
     return (
         <AdminPage
             eyebrow="PLAYER"
-            title={`${player.name} (#${player.id})`}
-            description={`账号 #${player.accountId} 的存档。角色获取入口仅保留邮件发送，避免绕过客户端领取校验。`}
+            title="玩家详情 · 存档编辑"
+            description="角色获取入口仅保留邮件发送，避免绕过客户端领取校验。"
             actions={<Button onClick={() => navigate("/accounts")}>返回账号 / 存档</Button>}
         >
         <Space direction="vertical" size="large" className="admin-stack">
-            <div className="admin-action-row">
-                <Text type="secondary">工具操作</Text>
+            <div className="admin-hero">
+                <div className="admin-hero-in">
+                    <div className="admin-hero-id">
+                        <span className="admin-hero-id-label">存档身份</span>
+                        <div className="admin-hero-id-name">
+                            {player.name} <span className="admin-hero-id-pid">#{player.id}</span>
+                        </div>
+                        <div className="admin-hero-id-info">
+                            {saveBrief?.isDefault && <span className="admin-badge-info">默认存档</span>}
+                            {saveBrief?.isActive && <span className="admin-badge-ok">当前活动</span>}
+                            <span>账号 <b className="admin-mono">#{player.accountId}</b></span>
+                            <span>上次更新 <b className="admin-mono">{player.lastLoginTime.replace("T", " ").substring(0, 16)}</b></span>
+                        </div>
+                    </div>
+                    <div className="admin-hero-ops">
+                        <Upload accept=".json,application/json" showUploadList={false} maxCount={1}
+                            beforeUpload={file => { importSave.mutate(file); return false }}>
+                            <Button type="primary" icon={<DownloadOutlined />} loading={importSave.isPending}>导入存档(覆盖)</Button>
+                        </Upload>
+                        <Button icon={<UploadOutlined />} loading={exportSave.isPending}
+                            onClick={() => exportSave.mutate()}>导出存档</Button>
+                    </div>
+                </div>
+            </div>
+
+            <Card title="资源编辑" className="admin-dash-card admin-res-card"
+                extra={<span className="admin-card-note">每项修改后点字段右侧 ⟳ 保存，逐项生效</span>}>
+                <div className="admin-res-grid">
+                    {resourceFields.map(f => resTile(f))}
+                </div>
+            </Card>
+
+            <Card title="账号设置" className="admin-dash-card">
+                <div className="admin-setrow">
+                    <div className="admin-setrow-copy">
+                        <div className="admin-setrow-label">3x加速</div>
+                    </div>
+                    <Switch checked={player.enableAuto3x} loading={editField.isPending}
+                        onChange={v => editField.mutate({ field: "enableAuto3x", value: v })} />
+                </div>
+                <div className="admin-setrow">
+                    <div className="admin-setrow-copy">
+                        <div className="admin-setrow-label">教程步骤</div>
+                        <div className="admin-setrow-desc">空 = null</div>
+                    </div>
+                    <div className="admin-setrow-control">
+                        {fieldControl("tutorialStep", { min: 0, allowNull: true })}
+                    </div>
+                </div>
+            </Card>
+
+            <Card className="admin-table-card">
+                <Tabs items={tabItems} />
+            </Card>
+
+            <details className="admin-details">
+                <summary className="admin-details-summary">
+                    <span className="admin-details-arrow" aria-hidden="true">▶</span>
+                    <span className="admin-details-star" aria-hidden="true" />
+                    详细信息
+                    <span className="admin-details-hint">存档名 · 存档 ID · 账号 ID</span>
+                </summary>
+                <div className="admin-details-body">
+                    <div className="admin-details-section">
+                        <div className="admin-details-section-title">存档标识</div>
+                        <div className="admin-details-row">
+                            <div className="admin-details-item">
+                                <span className="admin-details-item-key">存档名</span>
+                                <span className="admin-details-item-value">{player.name}</span>
+                            </div>
+                            <div className="admin-details-item">
+                                <span className="admin-details-item-key">存档 ID</span>
+                                <span className="admin-details-item-value admin-mono">{player.id}</span>
+                            </div>
+                            <div className="admin-details-item">
+                                <span className="admin-details-item-key">账号 ID</span>
+                                <span className="admin-details-item-value admin-mono">{player.accountId}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <div className="admin-danger-bar">
+                <span className="admin-danger-bar-label">危险操作 · 均需二次确认</span>
                 <Popconfirm title="清除全部 EX Boost？" onConfirm={() => clearExBoost.mutate()} okText="确认" cancelText="取消">
                     <Button size="small" danger loading={clearExBoost.isPending}>清除 EX Boost</Button>
                 </Popconfirm>
@@ -430,47 +538,7 @@ export default function PlayerDetail() {
                 <Popconfirm title="清除接收历史（一次性道具的领取记录）？" onConfirm={() => clearReceiveHistory.mutate()} okText="确认" cancelText="取消">
                     <Button size="small" danger loading={clearReceiveHistory.isPending}>清除接收历史</Button>
                 </Popconfirm>
-                <Button size="small" icon={<DownloadOutlined />} loading={exportSave.isPending}
-                    onClick={() => exportSave.mutate()}>导出存档</Button>
-                <Upload accept=".json,application/json" showUploadList={false} maxCount={1}
-                    beforeUpload={file => { importSave.mutate(file); return false }}>
-                    <Button size="small" icon={<UploadOutlined />} danger loading={importSave.isPending}>导入存档(覆盖)</Button>
-                </Upload>
             </div>
-
-            <Card title="存档标识">
-                    <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 3 }} className="admin-detail-descriptions">
-                        <Descriptions.Item label="存档名">{player.name}</Descriptions.Item>
-                        <Descriptions.Item label="存档 ID"><span className="admin-mono">{player.id}</span></Descriptions.Item>
-                        <Descriptions.Item label="账号 ID"><span className="admin-mono">{player.accountId}</span></Descriptions.Item>
-                    </Descriptions>
-            </Card>
-
-            <Card title="资源编辑" size="small">
-                <Row gutter={[12, 12]}>
-                    {resourceFields.map(f => numField(f.key, f.label, { min: 0 }))}
-                </Row>
-            </Card>
-
-            <Card title="账号设置" size="small">
-                <Row gutter={[12, 12]}>
-                    <Col key="enableAuto3x" xs={24} sm={12} md={8} lg={6}>
-                        <div className="admin-edit-grid-cell">
-                            <span className="admin-edit-grid-label">3x加速</span>
-                            <Switch checked={player.enableAuto3x} loading={editField.isPending}
-                                onChange={v => editField.mutate({ field: "enableAuto3x", value: v })} />
-                        </div>
-                    </Col>
-                    {numField("degreeId", "等级(称号ID)", { min: 0 })}
-                    {numField("leaderCharacterId", "队长角色ID", { min: 0 })}
-                    {numField("birth", "生日(birth)", { min: 0 })}
-                    {numField("tutorialStep", "教程步骤(空=null)", { min: 0, allowNull: true })}
-                </Row>
-            </Card>
-
-            <Card className="admin-table-card">
-                <Tabs items={tabItems} />
-            </Card>
         </Space>
         </AdminPage>
     )
