@@ -1563,6 +1563,14 @@ html[data-theme="dark"] .admin-res-lv {
   letter-spacing: 0.05em;
 }
 
+/* player detail: tab tables read fully centered (approved mockup player-v2 全页签拟真:
+   th/td text-align center). Scoped to this page's tabs card only — every other admin
+   table keeps its left-align reading semantics. */
+.admin-player-tabs .ant-table th,
+.admin-player-tabs .ant-table td {
+  text-align: center;
+}
+
 /* forms: sections are flat 「标题行 + 内容区」 groups — the same voice as .admin-dash-section,
    the card/modal border is the only strong separator, sections rely on whitespace alone */
 .admin-form-section {

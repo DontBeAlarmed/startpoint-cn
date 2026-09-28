@@ -509,7 +509,7 @@ export default function PlayerDetail() {
                 </div>
             </Card>
 
-            <Card className="admin-table-card">
+            <Card className="admin-table-card admin-player-tabs">
                 <Tabs items={tabItems} />
             </Card>
 
