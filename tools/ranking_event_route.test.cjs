@@ -136,7 +136,11 @@ async function main() {
             },
             leader_character_evolution_img_level: 2,
             leader_character_id: 341005,
-            rank_border_top: null,
+            rank_border_top: {
+                elapsed_time_ms: 500,
+                is_accomplished: true,
+                score: 999999,
+            },
             rank_percentage: 50,
         })
 
@@ -255,6 +259,11 @@ async function main() {
         assert.equal(championData.best_record.is_accomplished, true)
         assert.equal(championData.rank_percentage, 0)
         assert.equal(championData.leader_character_id, 341005)
+        assert.deepEqual(championData.rank_border_top, {
+            elapsed_time_ms: 300,
+            is_accomplished: true,
+            score: 777777,
+        }, "rank_border_top 必须是本服真实榜首记录(此处即冠军本人)")
         assert.equal(captureClaimState(championId).claimed, 1, "首领成功必须写入领取记录")
         const championTier = selectTier(1, 0)
         const championGrants = expectedGrantsFromTier(championTier)
