@@ -705,6 +705,22 @@ body {
     font-size: 21px !important;
   }
 
+  /* hero card: keep the banner readable at phone width */
+  .admin-hero {
+    padding: 18px 16px;
+  }
+
+  /* details summary: hint drops to its own line instead of crowding the title */
+  .admin-details-summary {
+    flex-wrap: wrap;
+  }
+
+  .admin-details-hint {
+    flex-basis: 100%;
+    margin-left: 0;
+    text-align: left;
+  }
+
   .multi-compatibility-difference {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -839,17 +855,45 @@ html[data-theme="dark"] {
 .admin-badge-info { color: var(--water); border: 1.5px solid var(--water); background: var(--info-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; }
 .admin-badge-warn { color: var(--thunder); border: 1.5px solid var(--thunder); background: var(--warn-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; }
 
-/* dashboard hero: flat 「游戏主界面」 strip at the top of the overview page —
-   virtual clock left, status chips middle, five relocated band metrics right.
-   No boxes: the strip is whitespace rhythm only, same flat language as .admin-page-note.
-   Mobile-first: zones wrap as whole blocks (never clipped) — on wide desktops all three
-   share one row, on narrower widths the band drops to its own full-width line. */
+/* dashboard hero: card 「游戏主界面」 banner at the top of the overview page —
+   2px strong border + star/sky tinted gradient wash + 右上角星黄光晕 (approved review
+   draft v3). Inside, one wrapping flex row: virtual clock left, status chip middle,
+   five relocated band metrics right; the 唯一内置管理后台 note sits below as
+   .admin-hero-note. Mobile-first: zones wrap as whole blocks (never clipped). */
 .admin-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 26px 30px;
+  border: 2px solid var(--line-strong);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 211, 53, 0.08) 0%, rgba(79, 168, 232, 0.06) 55%, transparent 100%),
+    var(--panel);
+}
+
+/* 背景光: 右上角星黄光晕 — decorative star tint from the approved mockup */
+.admin-hero::after {
+  content: "";
+  position: absolute;
+  right: -60px;
+  top: -80px;
+  width: 280px;
+  height: 280px;
+  background: radial-gradient(circle, rgba(255, 211, 53, 0.10), transparent 65%);
+  pointer-events: none;
+}
+
+.admin-hero-in {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 16px 32px;
+  gap: 16px 34px;
   min-width: 0;
+}
+
+.admin-hero-note {
+  margin-top: 16px;
 }
 
 .admin-hero-clock {
@@ -979,80 +1023,11 @@ html[data-theme="dark"] {
   letter-spacing: 0.04em;
 }
 
-/* dashboard: wide cards split their sections into two quiet columns (no inner boxes).
-   Mobile-first: single column in DOM order; two columns + explicit placement from 768px up.
-   align-content: start keeps both columns top-aligned instead of stretching tracks. */
-.admin-dash-cols {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  row-gap: 20px;
-  align-content: start;
-  min-width: 0;
-}
-
-@media (min-width: 768px) {
-  .admin-dash-cols {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 32px;
-  }
-
-  /* explicit placement: left column Snapshot 中已声明补丁, right column 内容摘要 */
-  .admin-dash-cols > .admin-dash-section:nth-child(1) { grid-area: 1 / 1; }
-  .admin-dash-cols > .admin-dash-section:nth-child(2) { grid-area: 1 / 2; }
-}
-
 .admin-dash-section-body {
   display: flex;
   flex-direction: column;
   gap: 10px;
   min-width: 0;
-}
-
-/* dashboard: compact key-value grid for facts that are not statistics.
-   Mobile-first: single-column stack; two columns from 768px up. */
-.admin-dash-kv {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 10px 18px;
-  min-width: 0;
-}
-
-@media (min-width: 768px) {
-  .admin-dash-kv {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-.admin-dash-kv-item {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: 8px;
-  min-width: 0;
-}
-
-.admin-dash-kv-label {
-  flex: 0 0 auto;
-  color: var(--ink-soft);
-  font-size: 12.5px;
-  font-weight: 600;
-}
-
-.admin-dash-kv-value {
-  min-width: 0;
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-
-/* dashboard: long identifiers (CDN/TCP 地址、Release 与 sha256 摘要) read as quiet
-   mono data that may break anywhere instead of overflowing the row */
-.admin-dash-kv-value .admin-mono,
-.admin-dash-digest-row .admin-mono {
-  font-size: 12px;
-  overflow-wrap: anywhere;
 }
 
 /* dashboard: card titles and inline statistics join the type ladder —
@@ -1067,20 +1042,110 @@ html[data-theme="dark"] {
   font-weight: 700;
 }
 
-/* dashboard: digest rows keep sha256 chips aligned on one quiet mono line */
-.admin-dash-digest {
-  display: grid;
+/* dashboard: 「详细信息」 collapsible — information-type fields (联机地址, 内容摘要,
+   来源与存储, Snapshot 中已声明补丁) live here, collapsed by default, per approved
+   review draft v3. Summary is one quiet row; the body stacks four titled sections,
+   each a single horizontal wrapping row of label+value items. */
+.admin-details {
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.admin-details-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.admin-details-summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-details-arrow {
+  font-size: 11px;
+  transition: transform 0.15s;
+}
+
+.admin-details[open] > .admin-details-summary .admin-details-arrow {
+  transform: rotate(90deg);
+}
+
+.admin-details-star {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  background: var(--star);
+  clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+}
+
+.admin-details-hint {
+  margin-left: auto;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 400;
+  text-align: right;
+}
+
+.admin-details-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 14px 16px;
+}
+
+.admin-details-section {
+  min-width: 0;
+}
+
+.admin-details-section-title {
+  margin-bottom: 8px;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.admin-details-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 34px;
+  align-items: baseline;
+  min-width: 0;
+  font-size: 12.5px;
+}
+
+.admin-details-item {
+  display: flex;
+  align-items: baseline;
   gap: 8px;
   min-width: 0;
 }
 
-.admin-dash-digest-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  column-gap: 8px;
-  row-gap: 2px;
+.admin-details-item-key {
+  flex: none;
+  color: var(--ink-soft);
+}
+
+.admin-details-item-value {
   min-width: 0;
+  font-weight: 600;
+  word-break: break-all;
+  font-variant-numeric: tabular-nums;
+}
+
+/* details rows: long identifiers (地址、sha256 摘要、ZIP 计数) read as quiet mono
+   data that may break anywhere instead of overflowing the row */
+.admin-details-item .admin-mono {
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 /* dashboard: C 图标卡格 icon feature tiles — each fact reads as one small elevated tile:

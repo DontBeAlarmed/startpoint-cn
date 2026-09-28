@@ -234,70 +234,60 @@ export default function Dashboard() {
         >
             <Space direction="vertical" size="large" className="admin-stack">
                 <div className="admin-hero">
-                    <div className="admin-hero-clock">
-                        <span className="admin-hero-clock-label">服务器虚拟时间</span>
-                        <span className="admin-hero-clock-value">{heroClockText}</span>
-                        <div className="admin-hero-clock-sub">
-                            {serverTime && (
-                                <span className={serverTime.isCustom ? "admin-badge-warn" : "admin-badge-info"}>
-                                    {serverTime.isCustom ? "自定义模拟" : "跟随系统"}
-                                </span>
-                            )}
-                            {serverTime && <span>UTC：{serverTime.date.replace("T", " ")}</span>}
+                    <div className="admin-hero-in">
+                        <div className="admin-hero-clock">
+                            <span className="admin-hero-clock-label">服务器虚拟时间</span>
+                            <span className="admin-hero-clock-value">{heroClockText}</span>
+                            <div className="admin-hero-clock-sub">
+                                {serverTime && (
+                                    <span className={serverTime.isCustom ? "admin-badge-warn" : "admin-badge-info"}>
+                                        {serverTime.isCustom ? "自定义模拟" : "跟随系统"}
+                                    </span>
+                                )}
+                                {serverTime && <span>UTC：{serverTime.date.replace("T", " ")}</span>}
+                            </div>
                         </div>
-                    </div>
-                    <div className="admin-hero-chips">
-                        {status && <span className="admin-badge-ok">服务运行中</span>}
-                        {statusError && <span className="admin-badge-warn">状态异常</span>}
-                        {status && (
-                            <>
-                                <Tag>{multiModeLabels[status.multiplayer.mode]}</Tag>
-                                <span className={multiStateBadgeClasses[status.multiplayer.state]}>
-                                    {multiStateLabels[status.multiplayer.state]}
-                                </span>
-                                <span className={status.multiplayer.coordinator.available ? "admin-badge-ok" : "admin-badge-info"}>
-                                    {status.multiplayer.coordinator.kind === "local" ? "本地协调器" : "远程协调器"}
-                                </span>
-                            </>
+                        <div className="admin-hero-chips">
+                            {status && <span className="admin-badge-ok">● 服务运行中</span>}
+                            {statusError && <span className="admin-badge-warn">状态异常</span>}
+                        </div>
+                        {(status || !accountsError) && (
+                            <div className="admin-stat-band">
+                                {status && (
+                                    <>
+                                        <div className="admin-stat-band-item">
+                                            <span className="admin-stat-band-label">运行时间</span>
+                                            <span className="admin-stat-band-value">{formatDuration(status.server.uptimeSeconds)}</span>
+                                        </div>
+                                        <div className="admin-stat-band-item">
+                                            <span className="admin-stat-band-label">RSS 内存</span>
+                                            <span className="admin-stat-band-value">{formatBytes(status.server.memory.rss)}</span>
+                                        </div>
+                                        <div className="admin-stat-band-item">
+                                            <span className="admin-stat-band-label">活跃房间</span>
+                                            <span className="admin-stat-band-value">{status.multiplayer.activeRooms ?? "未知"}</span>
+                                        </div>
+                                    </>
+                                )}
+                                {!accountsError && (
+                                    <>
+                                        <div className="admin-stat-band-item">
+                                            <span className="admin-stat-band-label">账号总数</span>
+                                            <span className="admin-stat-band-value">{accountCount}</span>
+                                        </div>
+                                        <div className="admin-stat-band-item">
+                                            <span className="admin-stat-band-label">存档总数</span>
+                                            <span className="admin-stat-band-value">{saveCount}</span>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                         )}
                     </div>
-                    {(status || !accountsError) && (
-                        <div className="admin-stat-band">
-                            {status && (
-                                <>
-                                    <div className="admin-stat-band-item">
-                                        <span className="admin-stat-band-label">运行时间</span>
-                                        <span className="admin-stat-band-value">{formatDuration(status.server.uptimeSeconds)}</span>
-                                    </div>
-                                    <div className="admin-stat-band-item">
-                                        <span className="admin-stat-band-label">RSS 内存</span>
-                                        <span className="admin-stat-band-value">{formatBytes(status.server.memory.rss)}</span>
-                                    </div>
-                                    <div className="admin-stat-band-item">
-                                        <span className="admin-stat-band-label">活跃房间</span>
-                                        <span className="admin-stat-band-value">{status.multiplayer.activeRooms ?? "未知"}</span>
-                                    </div>
-                                </>
-                            )}
-                            {!accountsError && (
-                                <>
-                                    <div className="admin-stat-band-item">
-                                        <span className="admin-stat-band-label">账号总数</span>
-                                        <span className="admin-stat-band-value">{accountCount}</span>
-                                    </div>
-                                    <div className="admin-stat-band-item">
-                                        <span className="admin-stat-band-label">存档总数</span>
-                                        <span className="admin-stat-band-value">{saveCount}</span>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    )}
-                </div>
-
-                <div className="admin-page-note">
-                    <Typography.Text strong>唯一内置管理后台</Typography.Text>
-                    <Typography.Text type="secondary">此管理后台随服务端一同构建，用于统一查看运行状态并执行日常管理操作。</Typography.Text>
+                    <div className="admin-page-note admin-hero-note">
+                        <Typography.Text strong>唯一内置管理后台</Typography.Text>
+                        <Typography.Text type="secondary">此管理后台随服务端一同构建，用于统一查看运行状态并执行日常管理操作。</Typography.Text>
+                    </div>
                 </div>
 
                 {accountsError && (
@@ -337,12 +327,11 @@ export default function Dashboard() {
                             className="admin-dash-card"
                             extra={status ? (
                                 <Space wrap size={4}>
-                                    <Tag>{multiModeLabels[status.multiplayer.mode]}</Tag>
+                                    <span className="admin-badge-info">
+                                        {multiModeLabels[status.multiplayer.mode]} · {status.multiplayer.coordinator.kind === "local" ? "本地协调器" : "远程协调器"}
+                                    </span>
                                     <span className={multiStateBadgeClasses[status.multiplayer.state]}>
                                         {multiStateLabels[status.multiplayer.state]}
-                                    </span>
-                                    <span className={status.multiplayer.coordinator.available ? "admin-badge-ok" : "admin-badge-info"}>
-                                        {status.multiplayer.coordinator.kind === "local" ? "本地协调器" : "远程协调器"}
                                     </span>
                                 </Space>
                             ) : undefined}
@@ -384,66 +373,11 @@ export default function Dashboard() {
                                             tick
                                         />
                                     </div>
-                                    <div className="admin-page-note">
-                                        <Typography.Text type="secondary">
-                                            控制面地址 {status.multiplayer.hub?.endpoint ?? "-"} · TCP 地址 <span className="admin-mono">{status.multiplayer.tcp.endpoint ?? "-"}</span>
-                                        </Typography.Text>
-                                    </div>
                                     {(status.multiplayer.activeRooms === null
                                         || status.multiplayer.battleFacts === null) && (
                                         <Typography.Text type="secondary">
                                             权威统计暂不可用。
                                         </Typography.Text>
-                                    )}
-                                    {status.multiplayer.latestCompatibilityRejection ? (
-                                        <div className="admin-dash-section">
-                                            <div className="admin-dash-section-title">最近兼容性拒绝</div>
-                                            <div className="admin-dash-section-body">
-                                                <Typography.Text type="secondary">
-                                                    {new Date(status.multiplayer.latestCompatibilityRejection.timestamp).toLocaleString("zh-CN")}
-                                                </Typography.Text>
-                                                <div className="multi-compatibility-differences">
-                                                    {status.multiplayer.latestCompatibilityRejection.differences.length === 0 ? (
-                                                        <Tag>请求版本信息不完整</Tag>
-                                                    ) : status.multiplayer.latestCompatibilityRejection.differences.map((difference, index) => (
-                                                        <div
-                                                            key={`${difference.field}-${index}`}
-                                                            className="multi-compatibility-difference"
-                                                        >
-                                                            <span className="admin-badge-warn">
-                                                                {difference.field === "contentDigest"
-                                                                    ? "多人战斗内容（contentDigest）"
-                                                                    : difference.field}
-                                                            </span>
-                                                            <div className="multi-compatibility-values">
-                                                                {difference.required !== undefined
-                                                                    && difference.received !== undefined ? (
-                                                                    <>
-                                                                        <div className="multi-compatibility-value">
-                                                                            <Typography.Text type="secondary">期望</Typography.Text>
-                                                                            <Typography.Text code>{difference.required}</Typography.Text>
-                                                                        </div>
-                                                                        <div className="multi-compatibility-value">
-                                                                            <Typography.Text type="secondary">实际</Typography.Text>
-                                                                            <Typography.Text code>{difference.received}</Typography.Text>
-                                                                        </div>
-                                                                    </>
-                                                                ) : (
-                                                                    <Typography.Text type="secondary">
-                                                                        {difference.field === "contentDigest"
-                                                                            || difference.field === "modeDigest"
-                                                                            ? "摘要值已隐藏"
-                                                                            : "差异值未提供"}
-                                                                    </Typography.Text>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <Typography.Text type="secondary">暂无兼容性拒绝记录。</Typography.Text>
                                     )}
                                 </div>
                             )}
@@ -474,79 +408,190 @@ export default function Dashboard() {
                             ) : statusError || !status ? (
                                 <Alert type="error" showIcon message="CDN 信息加载失败" />
                             ) : (
-                                <div className="admin-dash-sections">
-                                    <div className="admin-feats">
-                                        <FeatTile icon={featIcons.shield} label="国服最终基线" value={status.cdn.baseline.cnFinalVersion} />
-                                        <FeatTile icon={featIcons.check} label="当前资源版本" value={status.cdn.extension.effectiveVersionPreview} />
-                                        <FeatTile
-                                            icon={featIcons.patch}
-                                            label="补丁版本"
-                                            value={<>{status.cdn.extension.enabledPatchCount}{status.cdn.extension.runtimeEnabled ? null : " · 无补丁"}</>}
-                                        />
-                                        <FeatTile
-                                            icon={featIcons.calendar}
-                                            label="游戏日历"
-                                            value={<>{status.cdn.gameCalendar.configuredUtcOffsetMinutes}/{status.cdn.gameCalendar.contentUtcOffsetMinutes}</>}
-                                        />
-                                    </div>
-                                    <div className="admin-page-note">
-                                        <Typography.Text type="secondary">
-                                            来源 {status.cdn.baseline.source} · Snapshot 声明归档 {status.cdn.storage.archiveCount} 个 ZIP / {formatBytes(status.cdn.storage.archiveBytes)} · 覆盖范围
+                                <div className="admin-feats">
+                                    <FeatTile icon={featIcons.shield} label="国服最终基线" value={status.cdn.baseline.cnFinalVersion} />
+                                    <FeatTile icon={featIcons.check} label="当前资源版本" value={status.cdn.extension.effectiveVersionPreview} />
+                                    <FeatTile
+                                        icon={featIcons.patch}
+                                        label="补丁版本"
+                                        value={<>{status.cdn.extension.enabledPatchCount}{status.cdn.extension.runtimeEnabled ? null : " · 无补丁"}</>}
+                                    />
+                                    <FeatTile
+                                        icon={featIcons.calendar}
+                                        label="游戏日历"
+                                        value={<>{status.cdn.gameCalendar.configuredUtcOffsetMinutes}/{status.cdn.gameCalendar.contentUtcOffsetMinutes}</>}
+                                    />
+                                </div>
+                            )}
+                        </Card>
+                    </Col>
+                </Row>
+
+                {status && (
+                    <details className="admin-details">
+                        <summary className="admin-details-summary">
+                            <span className="admin-details-arrow" aria-hidden="true">▶</span>
+                            <span className="admin-details-star" aria-hidden="true" />
+                            详细信息
+                            <span className="admin-details-hint">地址 · 兼容拒绝 · Snapshot 声明 · 内容摘要</span>
+                        </summary>
+                        <div className="admin-details-body">
+                            <div className="admin-details-section">
+                                <div className="admin-details-section-title">联机地址</div>
+                                <div className="admin-details-row">
+                                    <div className="admin-details-item">
+                                        <span className="admin-details-item-key">控制面地址</span>
+                                        <Typography.Text code className="admin-mono">
+                                            {status.multiplayer.hub?.endpoint ?? "-"}
                                         </Typography.Text>
+                                    </div>
+                                    <div className="admin-details-item">
+                                        <span className="admin-details-item-key">TCP 地址</span>
+                                        <Typography.Text code className="admin-mono">
+                                            {status.multiplayer.tcp.endpoint ?? "-"}
+                                        </Typography.Text>
+                                    </div>
+                                    <div className="admin-details-item">
+                                        <span className="admin-details-item-key">兼容拒绝记录</span>
+                                        {status.multiplayer.latestCompatibilityRejection ? (
+                                            <div className="admin-details-item-value">
+                                                <div className="admin-dash-section">
+                                                    <div className="admin-dash-section-title">最近兼容性拒绝</div>
+                                                    <div className="admin-dash-section-body">
+                                                        <Typography.Text type="secondary">
+                                                            {new Date(status.multiplayer.latestCompatibilityRejection.timestamp).toLocaleString("zh-CN")}
+                                                        </Typography.Text>
+                                                        <div className="multi-compatibility-differences">
+                                                            {status.multiplayer.latestCompatibilityRejection.differences.length === 0 ? (
+                                                                <Tag>请求版本信息不完整</Tag>
+                                                            ) : status.multiplayer.latestCompatibilityRejection.differences.map((difference, index) => (
+                                                                <div
+                                                                    key={`${difference.field}-${index}`}
+                                                                    className="multi-compatibility-difference"
+                                                                >
+                                                                    <span className="admin-badge-warn">
+                                                                        {difference.field === "contentDigest"
+                                                                            ? "多人战斗内容（contentDigest）"
+                                                                            : difference.field}
+                                                                    </span>
+                                                                    <div className="multi-compatibility-values">
+                                                                        {difference.required !== undefined
+                                                                            && difference.received !== undefined ? (
+                                                                            <>
+                                                                                <div className="multi-compatibility-value">
+                                                                                    <Typography.Text type="secondary">期望</Typography.Text>
+                                                                                    <Typography.Text code>{difference.required}</Typography.Text>
+                                                                                </div>
+                                                                                <div className="multi-compatibility-value">
+                                                                                    <Typography.Text type="secondary">实际</Typography.Text>
+                                                                                    <Typography.Text code>{difference.received}</Typography.Text>
+                                                                                </div>
+                                                                            </>
+                                                                        ) : (
+                                                                            <Typography.Text type="secondary">
+                                                                                {difference.field === "contentDigest"
+                                                                                    || difference.field === "modeDigest"
+                                                                                    ? "摘要值已隐藏"
+                                                                                    : "差异值未提供"}
+                                                                            </Typography.Text>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <Typography.Text type="secondary">暂无兼容性拒绝记录。</Typography.Text>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="admin-details-section">
+                                <div className="admin-details-section-title">内容摘要</div>
+                                <div className="admin-details-row">
+                                    <div className="admin-details-item">
+                                        <span className="admin-details-item-key">Release</span>
+                                        <Typography.Text code className="admin-mono">
+                                            {status.cdn.contentRelease.releaseDigest?.slice(0, 23) ?? "bundled"}
+                                        </Typography.Text>
+                                    </div>
+                                    <div className="admin-details-item">
+                                        <span className="admin-details-item-key">业务内容摘要</span>
+                                        <Typography.Text code className="admin-mono" copyable={{ text: status.cdn.contentRelease.contentDigest }}>
+                                            {status.cdn.contentRelease.contentDigest.slice(0, 23)}
+                                        </Typography.Text>
+                                    </div>
+                                    <div className="admin-details-item">
+                                        <span className="admin-details-item-key">多人内容摘要</span>
+                                        <Typography.Text code className="admin-mono" copyable={{ text: status.cdn.contentRelease.multiBattleContentDigest }}>
+                                            {status.cdn.contentRelease.multiBattleContentDigest.slice(0, 23)}
+                                        </Typography.Text>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="admin-details-section">
+                                <div className="admin-details-section-title">来源与存储</div>
+                                <div className="admin-details-row">
+                                    <div className="admin-details-item">
+                                        <span className="admin-details-item-key">资源模式</span>
+                                        <span className="admin-details-item-value">{status.cdn.storage.mode}</span>
+                                    </div>
+                                    <div className="admin-details-item">
+                                        <span className="admin-details-item-key">CDN 地址</span>
+                                        <Typography.Text code className="admin-mono">
+                                            {status.cdn.baseUrl ?? "-"}
+                                        </Typography.Text>
+                                    </div>
+                                    <div className="admin-details-item">
+                                        <span className="admin-details-item-key">数据来源</span>
+                                        <span className="admin-details-item-value">{status.cdn.baseline.source}</span>
+                                    </div>
+                                    <div className="admin-details-item">
+                                        <span className="admin-details-item-key">Snapshot 声明归档</span>
+                                        <Typography.Text code className="admin-mono">
+                                            {status.cdn.storage.archiveCount} 个 ZIP / {formatBytes(status.cdn.storage.archiveBytes)}
+                                        </Typography.Text>
+                                    </div>
+                                    <div className="admin-details-item">
+                                        <span className="admin-details-item-key">覆盖范围</span>
                                         <Space wrap size={4}>
                                             {status.cdn.baseline.dataScope.map(scope => (
                                                 <Tag key={scope}>{cdnScopeLabels[scope] || scope}</Tag>
                                             ))}
                                         </Space>
                                     </div>
-                                    <Typography.Text type="secondary">{status.cdn.extension.note}</Typography.Text>
-                                    <div className="admin-dash-cols">
-                                        <div className="admin-dash-section">
-                                            <div className="admin-dash-section-title">Snapshot 中已声明补丁</div>
-                                            <div className="admin-page-note">
-                                                <span className={status.cdn.extension.runtimeEnabled ? "admin-badge-ok" : "admin-badge-info"}>
-                                                    {status.cdn.extension.runtimeEnabled ? "Snapshot 含 Overlay" : "无补丁"}
-                                                </span>
-                                                <Tag>归档 {status.cdn.extension.activePatchArchiveCount}</Tag>
-                                                {status.cdn.extension.versions.map(version => (
-                                                    <Tag key={version} color="blue">{version}</Tag>
-                                                ))}
-                                                {!status.cdn.extension.runtimeEnabled && (
-                                                    <Typography.Text type="secondary">
-                                                        当前固定 Content Snapshot 未包含补丁。
-                                                    </Typography.Text>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="admin-dash-section">
-                                            <div className="admin-dash-section-title">内容摘要</div>
-                                            <div className="admin-dash-digest">
-                                                <div className="admin-dash-digest-row">
-                                                    <span className="admin-dash-kv-label">Release</span>
-                                                    <Typography.Text code className="admin-mono">
-                                                        {status.cdn.contentRelease.releaseDigest?.slice(0, 23) ?? "bundled"}
-                                                    </Typography.Text>
-                                                </div>
-                                                <div className="admin-dash-digest-row">
-                                                    <span className="admin-dash-kv-label">业务内容摘要</span>
-                                                    <Typography.Text code className="admin-mono" copyable={{ text: status.cdn.contentRelease.contentDigest }}>
-                                                        {status.cdn.contentRelease.contentDigest.slice(0, 23)}
-                                                    </Typography.Text>
-                                                </div>
-                                                <div className="admin-dash-digest-row">
-                                                    <span className="admin-dash-kv-label">多人内容摘要</span>
-                                                    <Typography.Text code className="admin-mono" copyable={{ text: status.cdn.contentRelease.multiBattleContentDigest }}>
-                                                        {status.cdn.contentRelease.multiBattleContentDigest.slice(0, 23)}
-                                                    </Typography.Text>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
-                            )}
-                        </Card>
-                    </Col>
-                </Row>
+                            </div>
+                            <div className="admin-details-section">
+                                <div className="admin-details-section-title">Snapshot 中已声明补丁</div>
+                                <div className="admin-details-row">
+                                    <div className="admin-details-item">
+                                        <span className={status.cdn.extension.runtimeEnabled ? "admin-badge-ok" : "admin-badge-info"}>
+                                            {status.cdn.extension.runtimeEnabled ? "Snapshot 含 Overlay" : "无补丁"}
+                                        </span>
+                                    </div>
+                                    <div className="admin-details-item">
+                                        <Tag>归档 {status.cdn.extension.activePatchArchiveCount}</Tag>
+                                    </div>
+                                    <div className="admin-details-item">
+                                        {status.cdn.extension.versions.map(version => (
+                                            <Tag key={version} color="blue">{version}</Tag>
+                                        ))}
+                                    </div>
+                                    {!status.cdn.extension.runtimeEnabled && (
+                                        <div className="admin-details-item">
+                                            <Typography.Text type="secondary">
+                                                当前固定 Content Snapshot 未包含补丁。
+                                            </Typography.Text>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+                )}
             </Space>
         </AdminPage>
     )
