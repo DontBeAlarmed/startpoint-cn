@@ -278,14 +278,59 @@ body {
   word-break: break-word;
 }
 
+/* clairvoyance pool rows read as game-console pool cards (approved mockup time-v2):
+   stat-bg box + wrapping top row (池名 / 上线状态徽章 / 起止时间 / 剩余天数), tags below.
+   Mobile-first: the top row wraps freely; 剩余天数 only pushes right on desktop. */
 .admin-clairvoyance-panel {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  padding: 10px 12px;
+  gap: 8px;
+  padding: 13px 15px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 11px;
   background: var(--stat-bg);
+}
+
+.admin-pool-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+}
+
+.admin-pool-name {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.admin-pool-win {
+  min-width: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.admin-pool-remaining {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+/* UP 角色搜索框: 窄屏全宽, 桌面收窄到搜索框的自然宽度 (mockup .search) */
+.admin-time-search {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (min-width: 768px) {
+  .admin-pool-remaining {
+    margin-left: auto;
+  }
+
+  .admin-time-search {
+    max-width: 420px;
+  }
 }
 
 .admin-mail-type-group {
@@ -314,116 +359,177 @@ body {
   display: none !important;
 }
 
-.admin-time-editor {
+/* time page hero: the big virtual clock IS the editor — 年/月/日/时/分/秒 digits are
+   direct inputs wearing the clock type (approved mockup time-v2). Mobile-first:
+   segments stack vertically each with its own unit character, centered; ≥768px they
+   join ONE non-wrapping line and shrink via flex so the clock never overflows. */
+.admin-hero.admin-time-hero {
+  padding: 18px 16px 16px;
+}
+
+.admin-time-hero-in {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  max-width: 100%;
-}
-
-.admin-time-readout {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 16px;
-  max-width: 100%;
-}
-
-.admin-time-value {
-  width: fit-content;
-  max-width: 100%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  cursor: pointer;
-  font: inherit;
-  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 30px;
-  font-weight: 800;
-  line-height: 1.2;
-  overflow-wrap: anywhere;
-  text-align: left;
-}
-
-.admin-time-value:hover,
-.admin-time-value:focus-visible {
-  color: var(--water);
-  outline: 2px solid color-mix(in srgb, var(--water) 28%, transparent);
-  outline-offset: 4px;
-}
-
-.admin-time-value:disabled {
-  cursor: default;
-  opacity: 0.75;
-}
-
-.admin-time-inline-edit {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-width: 100%;
-}
-
-.admin-time-segments {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 10px;
-  align-items: center;
-}
-
-/* the step/input/label cluster is a flat inline group — grouping reads through the
-   muted label, not through a nested chip box */
-.admin-time-segment-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
   min-width: 0;
 }
 
-.admin-time-segment-main {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 3px;
+.admin-time-hero-clock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 }
 
-.admin-time-segment {
-  min-width: 46px;
-  min-height: 42px;
-  padding: 4px 7px;
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  background: var(--panel);
+.admin-time-hero-head {
   color: var(--ink);
-  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+}
+
+.admin-time-hero-head-em {
+  color: var(--water);
+}
+
+.admin-time-hero-clockzone {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 4px;
+}
+
+.admin-time-hero-digits {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  color: var(--ink);
   font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 24px;
+  font-size: 36px;
   font-weight: 800;
-  line-height: 1;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-time-hero-cell {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.admin-time-hero-seg {
+  min-width: 0;
+  width: min(150px, 46vw);
+  padding: 2px 6px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.admin-time-hero-seg-year {
+  width: min(200px, 60vw);
+}
+
+.admin-time-hero-seg:hover {
+  border-color: var(--line);
+}
+
+.admin-time-hero-seg:focus {
+  outline: none;
+  border-color: var(--star);
+  background: var(--stat-bg);
+}
+
+.admin-time-hero-seg:disabled {
+  opacity: 0.6;
+}
+
+.admin-time-hero-unit {
+  color: var(--ink-soft);
+  font-size: 0.5em;
+  font-weight: 400;
+}
+
+/* 自定义模拟徽章 + UTC/Unix 副行 + 跟随系统时间按钮: 窄屏纵向堆叠居中, 互不争宽 */
+.admin-time-hero-sub {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
   text-align: center;
 }
 
-.admin-time-step {
-  width: 28px;
-  min-width: 28px;
-  height: 30px;
-  padding: 0 !important;
-  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-weight: 800;
+.admin-time-hero-sub .admin-mono {
+  overflow-wrap: anywhere;
 }
 
-.admin-time-segment:hover,
-.admin-time-segment:focus-visible {
-  border-color: var(--water);
-  color: var(--water);
-  outline: 2px solid color-mix(in srgb, var(--water) 28%, transparent);
-  outline-offset: 2px;
+.admin-time-hero-sub .ant-btn {
+  flex: 0 0 auto;
 }
 
-.admin-time-segment-label {
+.admin-time-hero-hint {
+  margin-top: 8px;
   color: var(--ink-soft);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 11px;
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .admin-hero.admin-time-hero {
+    padding: 22px 30px 18px;
+  }
+
+  /* 桌面: 时钟永远单行 — flex-shrink 让段收窄而不是撑破容器 */
+  .admin-time-hero-digits {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: center;
+    font-size: 40px;
+  }
+
+  .admin-time-hero-cell {
+    display: contents;
+  }
+
+  .admin-time-hero-seg {
+    flex: 0 1 86px;
+    width: auto;
+    padding: 0 4px;
+  }
+
+  .admin-time-hero-seg-year {
+    flex: 0 1 118px;
+    width: auto;
+  }
+
+  .admin-time-hero-unit {
+    flex: none;
+    padding: 0 3px;
+  }
+
+  .admin-time-hero-sub {
+    flex-direction: row;
+    align-items: center;
+    text-align: left;
+  }
+
+  .admin-time-hero-sub .admin-time-hero-reset {
+    margin-left: auto;
+  }
+
+  .admin-time-hero-hint {
+    margin-top: 2px;
+  }
 }
 
 .admin-table-card .ant-card-body,
@@ -745,32 +851,6 @@ body {
     gap: 6px;
   }
 
-  .admin-time-segment {
-    min-width: 40px;
-    min-height: 38px;
-    font-size: 20px;
-  }
-
-  .admin-time-segment-wrap {
-    width: 100%;
-    justify-content: space-between;
-    min-width: 0;
-  }
-
-  .admin-time-step {
-    width: 34px;
-    min-width: 34px;
-    height: 32px;
-  }
-
-  .admin-time-segment-main {
-    min-width: 0;
-  }
-
-  .admin-time-segment-label {
-    flex: 0 0 auto;
-  }
-
   .admin-mobile-list-card .ant-card-head {
     padding-inline: 14px;
   }
@@ -851,9 +931,9 @@ html[data-theme="dark"] {
     content: ""; position: absolute; right: 9px; top: 9px; width: 7px; height: 7px; background: var(--star);
     clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
 }
-.admin-badge-ok { color: var(--wind); border: 1.5px solid var(--wind); background: var(--ok-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; }
-.admin-badge-info { color: var(--water); border: 1.5px solid var(--water); background: var(--info-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; }
-.admin-badge-warn { color: var(--thunder); border: 1.5px solid var(--thunder); background: var(--warn-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; }
+.admin-badge-ok { color: var(--wind); border: 1.5px solid var(--wind); background: var(--ok-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.admin-badge-info { color: var(--water); border: 1.5px solid var(--water); background: var(--info-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.admin-badge-warn { color: var(--thunder); border: 1.5px solid var(--thunder); background: var(--warn-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 
 /* dashboard hero: card 「游戏主界面」 banner at the top of the overview page —
    2px strong border + star/sky tinted gradient wash + 右上角星黄光晕 (approved review

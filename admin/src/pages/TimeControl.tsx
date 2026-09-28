@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useRef, useState } from "react"
-import { Alert, Button, Card, Divider, Empty, Input, Space, Table, Tag, Typography, message } from "antd"
+import { Alert, Button, Card, Empty, Input, Space, Table, Tag, Typography, message } from "antd"
 import { ReloadOutlined, UndoOutlined } from "@ant-design/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import dayjs, { type Dayjs } from "dayjs"
@@ -136,6 +136,18 @@ function renderGachaStatusBadge(gacha: Pick<ClairvoyanceGacha, "startDate" | "en
     return <span className="admin-badge-info">未开始</span>
 }
 
+function renderRemainingDays(gacha: Pick<ClairvoyanceGacha, "startDate" | "endDate">, nowIso: string | undefined): string {
+    if (!nowIso) return ""
+    const now = Date.parse(nowIso)
+    const start = parseCdnInstant(gacha.startDate)
+    const end = parseCdnInstant(gacha.endDate)
+    if (!Number.isFinite(now) || !Number.isFinite(start) || !Number.isFinite(end)) return ""
+    const dayMs = 86_400_000
+    if (now < start) return `${Math.ceil((start - now) / dayMs)} 天后开始`
+    if (now > end) return `已于 ${Math.ceil((now - end) / dayMs)} 天前结束`
+    return `剩余 ${Math.ceil((end - now) / dayMs)} 天`
+}
+
 function renderRateUpCharacters(characters: ClairvoyanceCharacter[]) {
     return (
         <Space wrap size={[4, 4]}>
@@ -196,6 +208,9 @@ export default function TimeControl() {
     const [gachaSearch, setGachaSearch] = useState("")
     const segmentRefs = useRef<Array<HTMLInputElement | null>>([])
     const applyingRef = useRef(false)
+    // 大钟数字常驻为输入框：只有真正改过数值才在离开编辑区时应用，
+    // 路过焦点（tab 穿越或误点）不会触发一次"原地设置"
+    const touchedRef = useRef(false)
 
     const { data, isError, isLoading, isFetching } = useQuery({
         queryKey: ["serverTime"],
@@ -220,24 +235,17 @@ export default function TimeControl() {
             .slice(0, 20)
     }, [gachaSearch, gachaTimeline])
 
-    const timeText = isLoading
-        ? "加载中..."
-        : isError || !data
-            ? "接口不可用"
-            : new Date(data.date).toLocaleString("zh-CN")
     const isoText = data?.date ? data.date.replace("T", " ") : "-"
-    const startEditingTime = () => {
+    const shownDraft = draftSegments ?? (data ? formatDraft(dayjs(data.date)) : null)
+    const beginEditingTime = () => {
         if (!data || isLoading) return
         const next = dayjs(data.date)
         setPicked(next)
         setDraftSegments(formatDraft(next))
         setEditingTime(true)
-        requestAnimationFrame(() => {
-            segmentRefs.current[0]?.focus()
-            segmentRefs.current[0]?.select()
-        })
     }
     const applyPickedTime = () => {
+        touchedRef.current = false
         if (!picked || !draftSegments || setTime.isPending || applyingRef.current) return
         applyingRef.current = true
         const next = normalizeDraft(picked, draftSegments)
@@ -246,6 +254,7 @@ export default function TimeControl() {
         setTime.mutate(next)
     }
     const cancelEditingTime = () => {
+        touchedRef.current = false
         setEditingTime(false)
         setPicked(null)
         setDraftSegments(null)
@@ -256,12 +265,14 @@ export default function TimeControl() {
         segmentRefs.current[next]?.select()
     }
     const adjustSegment = (key: SegmentKey, amount: number) => {
+        touchedRef.current = true
         const base = normalizeDraft(picked ?? dayjs(data?.date), draftSegments ?? formatDraft(picked ?? dayjs(data?.date)))
         const next = setSegmentValue(base, key, segmentValue(base, key) + amount, true)
         setPicked(next)
         setDraftSegments(formatDraft(next))
     }
     const updateSegmentText = (key: SegmentKey, value: string) => {
+        touchedRef.current = true
         const segment = timeSegments.find(s => s.key === key)!
         const digits = value.replace(/\D/g, "").slice(0, segment.digits)
         const baseDate = picked ?? dayjs(data?.date)
@@ -328,114 +339,89 @@ export default function TimeControl() {
             }
         >
             <Space direction="vertical" size="large" className="admin-stack">
-                <Card
-                    title="服务器模拟时间"
-                    extra={
-                        <span className={data?.isCustom ? "admin-badge-warn" : "admin-badge-info"}>
-                            {data?.isCustom ? "自定义模拟" : "跟随系统"}
-                        </span>
-                    }
-                >
-                    {isError ? (
-                        <Alert type="error" showIcon message="服务器模拟时间加载失败" description="接口 /api/server/currentTime 不可用。" />
-                    ) : (
-                        <Space direction="vertical" size="large" className="admin-stack">
-                            <div className="admin-time-editor">
-                                <Typography.Text type="secondary">当前服务器模拟时间</Typography.Text>
-                                <div className="admin-time-readout">
-                                    {editingTime ? (
-                                        <div className="admin-time-inline-edit">
-                                            <div
-                                                className="admin-time-segments"
-                                                onBlur={(event) => {
-                                                    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
-                                                    applyPickedTime()
-                                                }}
-                                            >
-                                                {timeSegments.map((segment, index) => (
-                                                    <span className="admin-time-segment-wrap" key={segment.key}>
-                                                        <Button
-                                                            size="small"
-                                                            className="admin-time-step"
-                                                            aria-label={`${segment.label}减一`}
-                                                            onMouseDown={(event) => event.preventDefault()}
-                                                            onClick={() => adjustSegment(segment.key, -1)}
-                                                        >
-                                                            -
-                                                        </Button>
-                                                        <span className="admin-time-segment-main">
-                                                            <input
-                                                                ref={(node) => { segmentRefs.current[index] = node }}
-                                                                type="text"
-                                                                inputMode="numeric"
-                                                                aria-label={`编辑${segment.label}`}
-                                                                className="admin-time-segment"
-                                                                value={draftSegments?.[segment.key] ?? ""}
-                                                                onChange={(event) => updateSegmentText(segment.key, event.target.value)}
-                                                                onFocus={(event) => event.target.select()}
-                                                                onClick={(event) => event.currentTarget.select()}
-                                                                onKeyDown={(event) => {
-                                                                    if (event.key === "ArrowRight") {
-                                                                        event.preventDefault()
-                                                                        focusSegment(index + 1)
-                                                                    } else if (event.key === "ArrowLeft") {
-                                                                        event.preventDefault()
-                                                                        focusSegment(index - 1)
-                                                                    } else if (event.key === "ArrowUp") {
-                                                                        event.preventDefault()
-                                                                        adjustSegment(segment.key, 1)
-                                                                    } else if (event.key === "ArrowDown") {
-                                                                        event.preventDefault()
-                                                                        adjustSegment(segment.key, -1)
-                                                                    } else if (event.key === "Enter") {
-                                                                        event.preventDefault()
-                                                                        applyPickedTime()
-                                                                    } else if (event.key === "Escape") {
-                                                                        event.preventDefault()
-                                                                        cancelEditingTime()
-                                                                    }
-                                                                }}
-                                                            />
-                                                            <span className="admin-time-segment-label">{segment.label}</span>
-                                                        </span>
-                                                        <Button
-                                                            size="small"
-                                                            className="admin-time-step"
-                                                            aria-label={`${segment.label}加一`}
-                                                            onMouseDown={(event) => event.preventDefault()}
-                                                            onClick={() => adjustSegment(segment.key, 1)}
-                                                        >
-                                                            +
-                                                        </Button>
-                                                    </span>
-                                                ))}
-                                            </div>
-                                            <Typography.Text type="secondary">
-                                                ↑/↓ 调整数值，←/→ 切换单位；离开编辑区自动应用，Esc 取消。
-                                            </Typography.Text>
-                                        </div>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            className="admin-time-value admin-mono"
-                                            onClick={startEditingTime}
-                                            disabled={isLoading || !data}
-                                        >
-                                            {timeText}
-                                        </button>
-                                    )}
-                                    <div className="admin-action-row">
-                                        <Button icon={<UndoOutlined />} loading={resetTime.isPending} onClick={() => resetTime.mutate()}>
-                                            跟随系统时间
-                                        </Button>
+                {isError ? (
+                    <Alert type="error" showIcon message="服务器模拟时间加载失败" description="接口 /api/server/currentTime 不可用。" />
+                ) : (
+                    <section className="admin-hero admin-time-hero">
+                        <div className="admin-time-hero-in">
+                            <div className="admin-time-hero-clock">
+                                <div className="admin-time-hero-head">
+                                    当前服务器模拟时间 · <span className="admin-time-hero-head-em">点击数字修改</span>
+                                </div>
+                                <div className="admin-time-hero-clockzone">
+                                    <div
+                                        className="admin-time-hero-digits"
+                                        onBlur={(event) => {
+                                            if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
+                                            if (touchedRef.current) applyPickedTime()
+                                            else cancelEditingTime()
+                                        }}
+                                    >
+                                        {timeSegments.map((segment, index) => (
+                                            <span className="admin-time-hero-cell" key={segment.key}>
+                                                <input
+                                                    ref={(node) => { segmentRefs.current[index] = node }}
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    aria-label={`编辑${segment.label}`}
+                                                    className={segment.key === "year" ? "admin-time-hero-seg admin-time-hero-seg-year" : "admin-time-hero-seg"}
+                                                    value={shownDraft?.[segment.key] ?? ""}
+                                                    placeholder="--"
+                                                    disabled={isLoading || !data}
+                                                    onChange={(event) => updateSegmentText(segment.key, event.target.value)}
+                                                    onFocus={(event) => {
+                                                        if (!editingTime) beginEditingTime()
+                                                        event.target.select()
+                                                    }}
+                                                    onClick={(event) => event.currentTarget.select()}
+                                                    onKeyDown={(event) => {
+                                                        if (event.key === "ArrowRight") {
+                                                            event.preventDefault()
+                                                            focusSegment(index + 1)
+                                                        } else if (event.key === "ArrowLeft") {
+                                                            event.preventDefault()
+                                                            focusSegment(index - 1)
+                                                        } else if (event.key === "ArrowUp") {
+                                                            event.preventDefault()
+                                                            adjustSegment(segment.key, 1)
+                                                        } else if (event.key === "ArrowDown") {
+                                                            event.preventDefault()
+                                                            adjustSegment(segment.key, -1)
+                                                        } else if (event.key === "Enter") {
+                                                            event.preventDefault()
+                                                            applyPickedTime()
+                                                        } else if (event.key === "Escape") {
+                                                            event.preventDefault()
+                                                            cancelEditingTime()
+                                                        }
+                                                    }}
+                                                />
+                                                <span className="admin-time-hero-unit">{segment.label}</span>
+                                            </span>
+                                        ))}
                                     </div>
                                 </div>
-                                <Typography.Text type="secondary">UTC：{isoText}</Typography.Text>
-                                <Typography.Text type="secondary">Unix 秒：{data?.servertime ?? "-"}</Typography.Text>
+                                <div className="admin-time-hero-sub">
+                                    {data && (
+                                        <span className={data.isCustom ? "admin-badge-warn" : "admin-badge-info"}>
+                                            {data.isCustom ? "自定义模拟" : "跟随系统"}
+                                        </span>
+                                    )}
+                                    <span className="admin-mono">UTC：{isoText} · Unix 秒：{data?.servertime ?? "-"}</span>
+                                    <Button
+                                        className="admin-time-hero-reset"
+                                        icon={<UndoOutlined />}
+                                        loading={resetTime.isPending}
+                                        onClick={() => resetTime.mutate()}
+                                    >
+                                        跟随系统时间
+                                    </Button>
+                                </div>
+                                <div className="admin-time-hero-hint">↑/↓ 调整数值，←/→ 切换单位；离开编辑区自动应用，Esc 取消。</div>
                             </div>
-                        </Space>
-                    )}
-                </Card>
+                        </div>
+                    </section>
+                )}
                 <Card
                     title="千里眼：短期 UP 角色池"
                     extra={gachaTimeline && <Tag color="cyan">CDN {gachaTimeline.cdnVersion}</Tag>}
@@ -443,7 +429,7 @@ export default function TimeControl() {
                     {gachaTimelineError ? (
                         <Alert type="error" showIcon message="千里眼数据加载失败" description="接口 /api/server/clairvoyance/gacha 不可用。" />
                     ) : (
-                        <Space direction="vertical" size="large" className="admin-stack">
+                        <div className="admin-dash-sections">
                             <div className="admin-page-note">
                                 <Typography.Text strong>当前阶段只追踪短期 UP 角色池</Typography.Text>
                                 <Typography.Text type="secondary">
@@ -451,95 +437,97 @@ export default function TimeControl() {
                                 </Typography.Text>
                             </div>
 
-                            <section>
-                                <Typography.Title level={5}>当前生效卡池</Typography.Title>
-                                {gachaTimelineLoading ? (
-                                    <Typography.Text type="secondary">加载中...</Typography.Text>
-                                ) : gachaTimeline && gachaTimeline.current.length > 0 ? (
-                                    <Space direction="vertical" className="admin-stack">
-                                        {gachaTimeline.current.map(gacha => (
+                            <section className="admin-dash-section">
+                                <div className="admin-dash-section-title">当前生效卡池</div>
+                                <div className="admin-dash-section-body">
+                                    {gachaTimelineLoading ? (
+                                        <Typography.Text type="secondary">加载中...</Typography.Text>
+                                    ) : gachaTimeline && gachaTimeline.current.length > 0 ? (
+                                        gachaTimeline.current.map(gacha => (
                                             <div key={gacha.id} className="admin-clairvoyance-panel">
-                                                <Space wrap size={8} align="center">
-                                                    <Typography.Text strong>{gacha.name} #{gacha.id}</Typography.Text>
+                                                <div className="admin-pool-top">
+                                                    <span className="admin-pool-name">{gacha.name} #{gacha.id}</span>
                                                     {renderGachaStatusBadge(gacha, gachaTimeline?.currentTime)}
-                                                </Space>
-                                                <Typography.Text type="secondary">{renderGachaPeriod(gacha)}</Typography.Text>
+                                                    <span className="admin-pool-win admin-mono">{renderGachaPeriod(gacha)}</span>
+                                                    {renderRemainingDays(gacha, gachaTimeline?.currentTime) && (
+                                                        <span className="admin-pool-remaining">
+                                                            {renderRemainingDays(gacha, gachaTimeline?.currentTime)}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 {renderRateUpCharacters(gacha.rateUpCharacters)}
                                             </div>
-                                        ))}
-                                    </Space>
-                                ) : (
-                                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前服务器模拟时间没有命中的短期 UP 角色池" />
-                                )}
+                                        ))
+                                    ) : (
+                                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前服务器模拟时间没有命中的短期 UP 角色池" />
+                                    )}
+                                </div>
                             </section>
 
-                            <Divider style={{ margin: "0" }} />
-
-                            <section>
-                                <Typography.Title level={5}>UP 角色搜索</Typography.Title>
-                                <Input
-                                    allowClear
-                                    placeholder="输入角色名、称号或角色 ID"
-                                    value={gachaSearch}
-                                    onChange={event => setGachaSearch(event.target.value)}
-                                />
-                                {gachaSearch && (
-                                    <div style={{ marginTop: 12 }}>
-                                        {searchResults.length > 0 ? (
-                                            <Space direction="vertical" className="admin-stack">
-                                                {searchResults.map(row => (
-                                                    <div key={row.characterId} className="admin-clairvoyance-panel">
-                                                        <Typography.Text strong>{row.name} #{row.characterId}</Typography.Text>
-                                                        {row.title && <Typography.Text type="secondary">{row.title}</Typography.Text>}
-                                                        <Space wrap size={[4, 4]}>
-                                                            {row.gachas.map(gacha => (
-                                                                <Fragment key={gacha.id}>
-                                                                    <Tag>
-                                                                        #{gacha.id} {gacha.name} / {renderGachaPeriod(gacha)}
-                                                                    </Tag>
-                                                                    {renderGachaStatusBadge(gacha, gachaTimeline?.currentTime)}
-                                                                </Fragment>
-                                                            ))}
-                                                        </Space>
-                                                    </div>
-                                                ))}
-                                            </Space>
+                            <section className="admin-dash-section">
+                                <div className="admin-dash-section-title">UP 角色搜索</div>
+                                <div className="admin-dash-section-body">
+                                    <Input
+                                        allowClear
+                                        className="admin-time-search"
+                                        placeholder="输入角色名、称号或角色 ID"
+                                        value={gachaSearch}
+                                        onChange={event => setGachaSearch(event.target.value)}
+                                    />
+                                    {gachaSearch && (
+                                        searchResults.length > 0 ? (
+                                            searchResults.map(row => (
+                                                <div key={row.characterId} className="admin-clairvoyance-panel">
+                                                    <Typography.Text strong>{row.name} #{row.characterId}</Typography.Text>
+                                                    {row.title && <Typography.Text type="secondary">{row.title}</Typography.Text>}
+                                                    <Space wrap size={[4, 4]}>
+                                                        {row.gachas.map(gacha => (
+                                                            <Fragment key={gacha.id}>
+                                                                <Tag>
+                                                                    #{gacha.id} {gacha.name} / {renderGachaPeriod(gacha)}
+                                                                </Tag>
+                                                                {renderGachaStatusBadge(gacha, gachaTimeline?.currentTime)}
+                                                            </Fragment>
+                                                        ))}
+                                                    </Space>
+                                                </div>
+                                            ))
                                         ) : (
                                             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配的 UP 角色" />
-                                        )}
-                                    </div>
-                                )}
+                                        )
+                                    )}
+                                </div>
                             </section>
 
-                            <Divider style={{ margin: "0" }} />
-
-                            <section>
-                                <Typography.Title level={5}>时间线</Typography.Title>
-                                <Table<ClairvoyanceGacha>
-                                    rowKey="id"
-                                    size="small"
-                                    loading={gachaTimelineLoading}
-                                    dataSource={gachaTimeline?.timeline ?? []}
-                                    scroll={{ x: "max-content" }}
-                                    pagination={{ pageSize: 8, showSizeChanger: false }}
-                                    columns={[
-                                        { title: "卡池", dataIndex: "name", render: (name: string, row) => `${name} #${row.id}` },
-                                        {
-                                            title: "上线 / 下线",
-                                            render: (_: unknown, row) => (
-                                                <Space wrap size={6} align="center">
-                                                    {renderGachaPeriod(row)}
-                                                    {renderGachaStatusBadge(row, gachaTimeline?.currentTime)}
-                                                </Space>
-                                            ),
-                                            width: 360,
-                                            responsive: ["sm"] as any,
-                                        },
-                                        { title: "UP 角色", render: (_: unknown, row) => renderRateUpCharacters(row.rateUpCharacters) },
-                                    ]}
-                                />
+                            <section className="admin-dash-section">
+                                <div className="admin-dash-section-title">时间线</div>
+                                <div className="admin-dash-section-body">
+                                    <Table<ClairvoyanceGacha>
+                                        rowKey="id"
+                                        size="small"
+                                        loading={gachaTimelineLoading}
+                                        dataSource={gachaTimeline?.timeline ?? []}
+                                        scroll={{ x: "max-content" }}
+                                        pagination={{ pageSize: 8, showSizeChanger: false }}
+                                        columns={[
+                                            { title: "卡池", dataIndex: "name", render: (name: string, row) => `${name} #${row.id}` },
+                                            {
+                                                title: "上线 / 下线",
+                                                render: (_: unknown, row) => (
+                                                    <Space wrap size={6} align="center">
+                                                        {renderGachaPeriod(row)}
+                                                        {renderGachaStatusBadge(row, gachaTimeline?.currentTime)}
+                                                    </Space>
+                                                ),
+                                                width: 360,
+                                                responsive: ["sm"] as any,
+                                            },
+                                            { title: "UP 角色", render: (_: unknown, row) => renderRateUpCharacters(row.rateUpCharacters) },
+                                        ]}
+                                    />
+                                </div>
                             </section>
-                        </Space>
+                        </div>
                     )}
                 </Card>
             </Space>
