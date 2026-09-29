@@ -16,6 +16,7 @@ export interface PlayerBrief {
 
 export interface AccountRow {
     id: number
+    adminNote: string | null
     saveCount: number
     defaultPlayerId: number | null
     defaultPlayerName: string | null

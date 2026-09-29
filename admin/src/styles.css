@@ -393,6 +393,45 @@ body {
   color: var(--water);
 }
 
+/* 窄屏头部（ADD-1）：左「标题 + 点击数字修改链接」、右「跟随系统时间按钮 + 状态徽章」
+   两端对齐；细分隔线之后是小节标签「时间设置」，再进数字编辑区。≥768px 该块整体
+   还原为单行标题、右侧块并入时钟下方 F2 同行（见 .admin-time-hero-sub）。 */
+.admin-time-hero-headrow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.admin-time-hero-headblock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-time-hero-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex: none;
+}
+
+.admin-time-hero-rule {
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.admin-time-hero-section {
+  margin-top: 8px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
 .admin-time-hero-clockzone {
   display: flex;
   justify-content: center;
@@ -457,16 +496,23 @@ body {
   font-weight: 400;
 }
 
-/* 自定义模拟徽章 + UTC/Unix 副行 + 跟随系统时间按钮: 窄屏纵向堆叠居中, 互不争宽 */
+/* 窄屏 sub 行（ADD-1）：UTC/Unix 行 + ↑/↓ 提示行，纵向堆叠居中；桌面专用的
+   状态徽章+跟随系统按钮组（submode）在窄屏隐藏（窄屏它们在头部右侧块里） */
 .admin-time-hero-sub {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   color: var(--ink-soft);
   font-size: 12px;
   text-align: center;
+}
+
+.admin-time-hero-submode {
+  display: none;
+  align-items: center;
+  gap: 8px;
 }
 
 .admin-time-hero-sub .admin-mono {
@@ -478,10 +524,8 @@ body {
 }
 
 .admin-time-hero-hint {
-  margin-top: 8px;
   color: var(--ink-soft);
   font-size: 11px;
-  text-align: center;
 }
 
 @media (min-width: 768px) {
@@ -517,18 +561,39 @@ body {
     padding: 0 3px;
   }
 
+  /* 桌面还原 F2 同行方案：标题行回到「标题 · 点击数字修改」单行，右侧块/分隔线/
+     「时间设置」小节标签撤掉，徽章+按钮并入时钟下方 sub 行 */
+  .admin-time-hero-headblock {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .admin-time-hero-side,
+  .admin-time-hero-rule,
+  .admin-time-hero-section {
+    display: none;
+  }
+
   .admin-time-hero-sub {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
+    justify-content: flex-start;
+    gap: 6px 12px;
     text-align: left;
   }
 
-  .admin-time-hero-sub .admin-time-hero-reset {
-    margin-left: auto;
+  .admin-time-hero-submode {
+    display: flex;
   }
 
-  .admin-time-hero-hint {
-    margin-top: 2px;
+  .admin-time-hero-sub .admin-time-hero-hint {
+    order: 1;
+  }
+
+  .admin-time-hero-sub .admin-mono {
+    order: 2;
   }
 }
 
@@ -606,6 +671,16 @@ body {
   margin-bottom: 4px;
 }
 
+/* heading left group (F4)：账号 #N + 备注 / 当前存档徽章 + 存档名 + 当前活动 归拢在左侧，
+   右侧计数（N 个存档 / Rank N）不被挤压 */
+.admin-mobile-heading-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  min-width: 0;
+}
+
 .admin-mobile-detail-list {
   display: grid;
   gap: 5px;
@@ -622,7 +697,6 @@ body {
   color: var(--ink-soft);
 }
 
-.admin-mobile-tags,
 .admin-mobile-actions {
   margin-top: 10px;
 }
@@ -1127,6 +1201,12 @@ html[data-theme="dark"] {
   min-width: 0;
 }
 
+/* 总览窄屏（ADD-2）：运行时间独占首行，其余四项两两一行；种子页 .admin-seed-stats
+   不在 .admin-hero 内，不受影响。≥768px 五等分处回退为 auto。 */
+.admin-hero .admin-stat-band .admin-stat-band-item:first-child {
+  grid-column: 1 / -1;
+}
+
 .admin-stat-band-label {
   flex: 0 0 auto;
   color: var(--ink-soft);
@@ -1141,11 +1221,18 @@ html[data-theme="dark"] {
   font-size: 18px;
   font-weight: 700;
   line-height: 1.3;
+  /* 「7 小时 58 分钟」这类复数值在桌面五等分列内不折行（数值短，nowrap 安全） */
+  white-space: nowrap;
 }
 
 @media (min-width: 768px) {
   .admin-stat-band {
     grid-template-columns: repeat(5, 1fr);
+  }
+
+  /* desktop returns the hero band to a single five-column row (ADD-2 窄屏规则的回退) */
+  .admin-hero .admin-stat-band .admin-stat-band-item:first-child {
+    grid-column: auto;
   }
 
   /* single five-column row: a quiet hairline between neighbors reads steadier
@@ -1618,25 +1705,71 @@ html[data-theme="dark"] .admin-res-lv {
 }
 
 /* player detail: 危险操作 toolbar parked at the page bottom (approved mockup player-v2
-   maintainer correction) — strong-bordered panel strip shared with .toolbar voice */
+   maintainer correction) — strong-bordered panel strip shared with .toolbar voice.
+   Two rows: label + 兜底说明, then controls (3x加速 Switch / 教程步骤 / 5 个回退按钮). */
 .admin-danger-bar {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
   padding: 11px 14px;
   background: var(--panel);
   border: 2px solid var(--line-strong);
   border-radius: 14px;
 }
 
+.admin-danger-bar-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  min-width: 0;
+}
+
 .admin-danger-bar-label {
   flex: none;
-  margin-right: 2px;
   color: var(--ink-soft);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.05em;
+}
+
+.admin-danger-bar-desc {
+  min-width: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.admin-danger-bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-danger-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.admin-danger-control-label {
+  flex: none;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.admin-danger-control-hint {
+  flex: none;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.admin-danger-control .ant-input-number {
+  width: 90px;
 }
 
 /* player detail: tab tables read fully centered (approved mockup player-v2 全页签拟真:

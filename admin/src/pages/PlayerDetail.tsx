@@ -1,7 +1,7 @@
 import { useState } from "react"
 import type { ReactNode } from "react"
 import { Card, Table, Button, Space, InputNumber, Popconfirm, message, Tag, Tabs, Spin, Typography, Switch, Input, Upload } from "antd"
-import { SaveOutlined, DeleteOutlined, PlusOutlined, DownloadOutlined, UploadOutlined, UndoOutlined, SearchOutlined } from "@ant-design/icons"
+import { SaveOutlined, DeleteOutlined, PlusOutlined, DownloadOutlined, UploadOutlined, UndoOutlined, SearchOutlined, EditOutlined } from "@ant-design/icons"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiGet, apiPost, apiPatch, apiDelete, apiUpload, apiDownloadFile } from "../api/client"
@@ -82,6 +82,9 @@ export default function PlayerDetail() {
     const [searchEquip, setSearchEquip] = useState("")
     const [searchQuests, setSearchQuests] = useState("")
     const [searchDrawn, setSearchDrawn] = useState("")
+    // 存档重命名入口（F5：自账号页存档卡移入 hero，见 Accounts.tsx renameSave）
+    const [renamingSave, setRenamingSave] = useState(false)
+    const [renameValue, setRenameValue] = useState("")
 
     const { data, isLoading, isError } = useQuery({
         queryKey: ["playerDetail", pid],
@@ -89,7 +92,7 @@ export default function PlayerDetail() {
         enabled: !isNaN(pid),
     })
 
-    // 存档身份徽章（默认存档 / 当前活动）复用账号列表接口，与 Dashboard 共享缓存
+    // 存档身份徽章（当前存档 / 当前活动）复用账号列表接口，与 Dashboard 共享缓存
     const { data: accounts } = useQuery({
         queryKey: ["accounts"],
         queryFn: () => apiGet<AccountBrief[]>("/api/server/accounts"),
@@ -121,6 +124,18 @@ export default function PlayerDetail() {
             refresh()
         },
         onError: (e: Error) => message.error(e.message),
+    })
+
+    // 与账号页 Accounts.tsx renameSave 完全相同的 API 路径与参数；本页额外失效 playerDetail
+    const renameSave = useMutation({
+        mutationFn: (name: string) => apiPost("/api/server/renameSave", { playerId: pid, name }),
+        onSuccess: () => {
+            message.success("已改名")
+            setRenamingSave(false)
+            qc.invalidateQueries({ queryKey: ["playerDetail", pid] })
+            qc.invalidateQueries({ queryKey: ["accounts"] })
+        },
+        onError: showMutationError,
     })
 
     const delChar = useMutation({
@@ -447,10 +462,35 @@ export default function PlayerDetail() {
                     <div className="admin-hero-id">
                         <span className="admin-hero-id-label">存档身份</span>
                         <div className="admin-hero-id-name">
-                            {player.name} <span className="admin-hero-id-pid">#{player.id}</span>
+                            {renamingSave ? (
+                                <div className="admin-edit-compact">
+                                    <Input
+                                        size="small"
+                                        value={renameValue}
+                                        maxLength={64}
+                                        autoFocus
+                                        onChange={e => setRenameValue(e.target.value)}
+                                        onPressEnter={() => renameSave.mutate(renameValue)}
+                                    />
+                                    <Button size="small" type="primary" loading={renameSave.isPending}
+                                        onClick={() => renameSave.mutate(renameValue)}>确定</Button>
+                                    <Button size="small" onClick={() => setRenamingSave(false)}>取消</Button>
+                                </div>
+                            ) : (
+                                <>
+                                    {player.name} <span className="admin-hero-id-pid">#{player.id}</span>
+                                    <Button
+                                        type="text"
+                                        size="small"
+                                        title="重命名存档"
+                                        icon={<EditOutlined />}
+                                        onClick={() => { setRenamingSave(true); setRenameValue(player.name) }}
+                                    />
+                                </>
+                            )}
                         </div>
                         <div className="admin-hero-id-info">
-                            {saveBrief?.isDefault && <span className="admin-badge-info">默认存档</span>}
+                            {saveBrief?.isDefault && <span className="admin-badge-info">当前存档</span>}
                             {saveBrief?.isActive && <span className="admin-badge-ok">当前活动</span>}
                             <span>账号 <b className="admin-mono">#{player.accountId}</b></span>
                             <span>上次更新 <b className="admin-mono">{player.lastLoginTime.replace("T", " ").substring(0, 16)}</b></span>
@@ -474,41 +514,8 @@ export default function PlayerDetail() {
                 </div>
             </Card>
 
-            <Card title="账号设置" className="admin-dash-card">
-                <div className="admin-setrow">
-                    <div className="admin-setrow-copy">
-                        <div className="admin-setrow-label">3x加速</div>
-                    </div>
-                    <Switch checked={player.enableAuto3x} loading={editField.isPending}
-                        onChange={v => editField.mutate({ field: "enableAuto3x", value: v })} />
-                </div>
-                <div className="admin-setrow">
-                    <div className="admin-setrow-copy">
-                        <div className="admin-setrow-label">等级(称号ID)</div>
-                    </div>
-                    <div className="admin-setrow-control">
-                        {fieldControl("degreeId", { min: 0 })}
-                    </div>
-                </div>
-                <div className="admin-setrow">
-                    <div className="admin-setrow-copy">
-                        <div className="admin-setrow-label">队长角色ID</div>
-                    </div>
-                    <div className="admin-setrow-control">
-                        {fieldControl("leaderCharacterId", { min: 0 })}
-                    </div>
-                </div>
-                <div className="admin-setrow">
-                    <div className="admin-setrow-copy">
-                        <div className="admin-setrow-label">教程步骤</div>
-                        <div className="admin-setrow-desc">空 = null</div>
-                    </div>
-                    <div className="admin-setrow-control">
-                        {fieldControl("tutorialStep", { min: 0, allowNull: true })}
-                    </div>
-                </div>
-            </Card>
-
+            {/* 「账号设置」卡 2026-09-29 撤销：3x加速/教程步骤 并入下方危险操作条；
+                等级(称号ID)/队长角色ID 编辑项 2026-09-29 经维护者明确指示移除,勿恢复 */}
             <Card className="admin-table-card admin-player-tabs">
                 <Tabs items={tabItems} />
             </Card>
@@ -542,22 +549,39 @@ export default function PlayerDetail() {
             </details>
 
             <div className="admin-danger-bar">
-                <span className="admin-danger-bar-label">危险操作 · 均需二次确认</span>
-                <Popconfirm title="清除全部 EX Boost？" onConfirm={() => clearExBoost.mutate()} okText="确认" cancelText="取消">
-                    <Button size="small" danger loading={clearExBoost.isPending}>清除 EX Boost</Button>
-                </Popconfirm>
-                <Popconfirm title="重置编队到默认？" onConfirm={() => resetParties.mutate()} okText="确认" cancelText="取消">
-                    <Button size="small" danger icon={<UndoOutlined />}>重置编队</Button>
-                </Popconfirm>
-                <Popconfirm title="清空邮箱？" onConfirm={() => clearMail.mutate()} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
-                    <Button size="small" danger>清空邮箱</Button>
-                </Popconfirm>
-                <Popconfirm title="重置每日挑战点？" onConfirm={() => resetChallenge.mutate()} okText="确认" cancelText="取消">
-                    <Button size="small" danger icon={<UndoOutlined />}>重置每日挑战</Button>
-                </Popconfirm>
-                <Popconfirm title="清除接收历史（一次性道具的领取记录）？" onConfirm={() => clearReceiveHistory.mutate()} okText="确认" cancelText="取消">
-                    <Button size="small" danger loading={clearReceiveHistory.isPending}>清除接收历史</Button>
-                </Popconfirm>
+                <div className="admin-danger-bar-head">
+                    <span className="admin-danger-bar-label">危险操作 · 均需二次确认</span>
+                    <span className="admin-danger-bar-desc">
+                        以上均为开发期排查问题的兜底性回退工具，日常运营不建议使用；当前版本下误用大概率造成存档数据异常，请务必确认后再操作。
+                    </span>
+                </div>
+                <div className="admin-danger-bar-actions">
+                    <span className="admin-danger-control">
+                        <span className="admin-danger-control-label">3x加速</span>
+                        <Switch checked={player.enableAuto3x} loading={editField.isPending}
+                            onChange={v => editField.mutate({ field: "enableAuto3x", value: v })} />
+                    </span>
+                    <span className="admin-danger-control">
+                        <span className="admin-danger-control-label">教程步骤</span>
+                        {fieldControl("tutorialStep", { min: 0, allowNull: true })}
+                        <span className="admin-danger-control-hint">空 = null</span>
+                    </span>
+                    <Popconfirm title="清除全部 EX Boost？" onConfirm={() => clearExBoost.mutate()} okText="确认" cancelText="取消">
+                        <Button size="small" danger loading={clearExBoost.isPending}>清除 EX Boost</Button>
+                    </Popconfirm>
+                    <Popconfirm title="重置编队到默认？" onConfirm={() => resetParties.mutate()} okText="确认" cancelText="取消">
+                        <Button size="small" danger icon={<UndoOutlined />}>重置编队</Button>
+                    </Popconfirm>
+                    <Popconfirm title="清空邮箱？" onConfirm={() => clearMail.mutate()} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
+                        <Button size="small" danger>清空邮箱</Button>
+                    </Popconfirm>
+                    <Popconfirm title="重置每日挑战点？" onConfirm={() => resetChallenge.mutate()} okText="确认" cancelText="取消">
+                        <Button size="small" danger icon={<UndoOutlined />}>重置每日挑战</Button>
+                    </Popconfirm>
+                    <Popconfirm title="清除接收历史（一次性道具的领取记录）？" onConfirm={() => clearReceiveHistory.mutate()} okText="确认" cancelText="取消">
+                        <Button size="small" danger loading={clearReceiveHistory.isPending}>清除接收历史</Button>
+                    </Popconfirm>
+                </div>
             </div>
         </Space>
         </AdminPage>

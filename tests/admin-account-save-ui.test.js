@@ -33,7 +33,9 @@ assert.doesNotMatch(mobileView, /返回账号列表/)
 assert.match(mobileView, /存档列表/)
 assert.match(mobileView, /编辑存档/)
 assert.match(mobileView, /player\.rank/)
-assert.match(mobileView, /className="admin-mobile-inline-editor"[\s\S]*?onKeyDown=\{event => event\.stopPropagation\(\)\}/)
+// 存档卡重命名内联编辑器已移除（重命名入口移到玩家详情 hero），移动端仅剩设备名内联编辑器；
+// 设备行不在可点击存档行内，不再需要 stopPropagation 守卫
+assert.match(mobileView, /className="admin-mobile-inline-editor"/)
 assert.doesNotMatch(mobileView, /role="button"/)
 assert.doesNotMatch(accounts, /row\.degreeId \|\| 1/)
 

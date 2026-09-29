@@ -121,7 +121,7 @@ export default function Accounts() {
         },
         { title: "存档数", dataIndex: "saveCount", width: "10%", align: "center" as const },
         {
-            title: "默认存档", width: "32%", align: "center" as const,
+            title: "当前存档", width: "32%", align: "center" as const,
             render: (_: unknown, row: AccountRow) => {
                 if (!row.defaultPlayerId) return <Tag>无</Tag>
                 return <span>{row.defaultPlayerName ?? `#${row.defaultPlayerId}`}</span>
@@ -255,7 +255,7 @@ export default function Accounts() {
         <AdminPage
             eyebrow="SAVES"
             title="账号 / 存档"
-            description="查看账号与默认存档关系。账号默认存档决定该账号登录时选用哪个存档；当前活动存档只是管理端最近切换的全局状态。"
+            description="查看账号与当前存档关系。账号当前存档决定该账号登录时选用哪个存档；当前活动存档只是管理端最近切换的全局状态。"
             actions={
                 <Button icon={<ReloadOutlined />} loading={isFetching} onClick={refresh}>
                     刷新
@@ -266,7 +266,7 @@ export default function Accounts() {
             <div className="admin-page-note">
                 <Typography.Text strong>选档状态说明</Typography.Text>
                 <Typography.Text type="secondary">
-                    新建和复制存档会设为该账号默认并切换为当前活动；删除默认存档后，服务端会在该账号剩余存档中回退到第一个可用存档。删除最后一个存档会同时删除账号。
+                    新建和复制存档会设为该账号当前存档并切换为当前活动；删除当前存档后，服务端会在该账号剩余存档中回退到第一个可用存档。删除最后一个存档会同时删除账号。
                 </Typography.Text>
             </div>
             {isMobile && (
@@ -275,7 +275,7 @@ export default function Accounts() {
                         accounts={accounts}
                         selectedAccount={selectedAccount}
                         loading={isLoading}
-                        renamePending={renameSave.isPending || renameDevice.isPending}
+                        renamePending={renameDevice.isPending}
                         onSelectAccount={toggleSavePanel}
                         onOpenPlayer={playerId => navigate(`/players/${playerId}`)}
                         onNewSave={accountId => newSave.mutateAsync(accountId)}
@@ -283,7 +283,6 @@ export default function Accounts() {
                         onActivateSave={playerId => activateSave.mutateAsync(playerId)}
                         onCloneSave={(playerId, accountId) => cloneSave.mutateAsync({ playerId, accountId })}
                         onDeleteSave={playerId => deleteSave.mutateAsync(playerId)}
-                        onRenameSave={(playerId, name) => renameSave.mutateAsync({ playerId, name })}
                         onRenameDevice={(deviceId, name) => renameDevice.mutateAsync({ deviceId, name })}
                     />
                 </Card>

@@ -345,9 +345,29 @@ export default function TimeControl() {
                     <section className="admin-hero admin-time-hero">
                         <div className="admin-time-hero-in">
                             <div className="admin-time-hero-clock">
-                                <div className="admin-time-hero-head">
-                                    当前服务器模拟时间 · <span className="admin-time-hero-head-em">点击数字修改</span>
+                                <div className="admin-time-hero-headrow">
+                                    <div className="admin-time-hero-headblock">
+                                        <div className="admin-time-hero-head">当前服务器模拟时间</div>
+                                        <span className="admin-time-hero-head-em">点击数字修改</span>
+                                    </div>
+                                    <div className="admin-time-hero-side">
+                                        <Button
+                                            className="admin-time-hero-reset"
+                                            icon={<UndoOutlined />}
+                                            loading={resetTime.isPending}
+                                            onClick={() => resetTime.mutate()}
+                                        >
+                                            跟随系统时间
+                                        </Button>
+                                        {data && (
+                                            <span className={data.isCustom ? "admin-badge-warn" : "admin-badge-info"}>
+                                                {data.isCustom ? "自定义模拟" : "跟随系统"}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
+                                <div className="admin-time-hero-rule" aria-hidden="true" />
+                                <div className="admin-time-hero-section">时间设置</div>
                                 <div className="admin-time-hero-clockzone">
                                     <div
                                         className="admin-time-hero-digits"
@@ -401,13 +421,15 @@ export default function TimeControl() {
                                         ))}
                                     </div>
                                 </div>
-                                <div className="admin-time-hero-sub">
+                            </div>
+                            <div className="admin-time-hero-sub">
+                                {/* 桌面 ≥768px 专用：状态徽章 + 跟随系统按钮回到时钟下方单行（F2 同行方案） */}
+                                <span className="admin-time-hero-submode">
                                     {data && (
                                         <span className={data.isCustom ? "admin-badge-warn" : "admin-badge-info"}>
                                             {data.isCustom ? "自定义模拟" : "跟随系统"}
                                         </span>
                                     )}
-                                    <span className="admin-mono">UTC：{isoText} · Unix 秒：{data?.servertime ?? "-"}</span>
                                     <Button
                                         className="admin-time-hero-reset"
                                         icon={<UndoOutlined />}
@@ -416,8 +438,9 @@ export default function TimeControl() {
                                     >
                                         跟随系统时间
                                     </Button>
-                                </div>
-                                <div className="admin-time-hero-hint">↑/↓ 调整数值，←/→ 切换单位；离开编辑区自动应用，Esc 取消。</div>
+                                </span>
+                                <span className="admin-mono">UTC：{isoText} · Unix 秒：{data?.servertime ?? "-"}</span>
+                                <span className="admin-time-hero-hint">↑/↓ 调整数值，←/→ 切换单位；离开编辑区自动应用，Esc 取消。</span>
                             </div>
                         </div>
                     </section>

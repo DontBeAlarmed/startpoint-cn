@@ -38,13 +38,13 @@ export default function GameplaySettings() {
 
     const uploadDefault = useMutation({
         mutationFn: (file: File) => apiUpload("/api/server/defaultSave", file),
-        onSuccess: () => { message.success("默认存档已设置"); queryClient.invalidateQueries({ queryKey: ["defaultSave"] }) },
+        onSuccess: () => { message.success("当前存档已设置"); queryClient.invalidateQueries({ queryKey: ["defaultSave"] }) },
         onError: (e: Error) => message.error(e.message),
     })
 
     const clearDefault = useMutation({
         mutationFn: () => apiDelete("/api/server/defaultSave"),
-        onSuccess: () => { message.success("默认存档已清除"); queryClient.invalidateQueries({ queryKey: ["defaultSave"] }) },
+        onSuccess: () => { message.success("当前存档已清除"); queryClient.invalidateQueries({ queryKey: ["defaultSave"] }) },
         onError: (e: Error) => message.error(e.message),
     })
 
@@ -281,7 +281,7 @@ export default function GameplaySettings() {
                         </Space>
                     </Card>
                     <Card
-                        title="当前默认存档"
+                        title="当前存档"
                         extra={defSave?.exists
                             ? <span className="admin-badge-ok">已设置</span>
                             : <span className="admin-badge-info">未设置（新建存档为空档）</span>}
@@ -309,12 +309,12 @@ export default function GameplaySettings() {
                                     beforeUpload={(file) => { uploadDefault.mutate(file as File); return false }}
                                 >
                                     <Button icon={<UploadOutlined />} loading={uploadDefault.isPending}>
-                                        {defSave?.exists ? "替换默认存档" : "上传默认存档"}
+                                        {defSave?.exists ? "替换当前存档" : "上传当前存档"}
                                     </Button>
                                 </Upload>
                                 {defSave?.exists && (
                                     <Popconfirm
-                                        title="清除默认存档？之后新建存档将为空档。"
+                                        title="清除当前存档？之后新建存档将为空档。"
                                         onConfirm={() => clearDefault.mutate()}
                                         okText="确认" cancelText="取消" okButtonProps={{ danger: true }}
                                     >

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import {
     Button,
-    Dropdown,
     Empty,
     Input,
     List,
@@ -10,7 +9,7 @@ import {
     Space,
     Typography,
 } from "antd"
-import { Ellipsis, Pencil, Plus, Trash2 } from "lucide-react"
+import { FolderOpen, Pencil, Plus, Trash2 } from "lucide-react"
 
 import type { AccountRow, PlayerBrief } from "./types"
 
@@ -26,7 +25,6 @@ interface AccountsMobileViewProps {
     onActivateSave: (playerId: number) => Promise<unknown>
     onCloneSave: (playerId: number, accountId: number) => Promise<unknown>
     onDeleteSave: (playerId: number) => Promise<unknown>
-    onRenameSave: (playerId: number, name: string) => Promise<unknown>
     onRenameDevice: (deviceId: number, name: string) => Promise<unknown>
 }
 
@@ -42,11 +40,8 @@ export function AccountsMobileView({
     onActivateSave,
     onCloneSave,
     onDeleteSave,
-    onRenameSave,
     onRenameDevice,
 }: AccountsMobileViewProps) {
-    const [renamingSaveId, setRenamingSaveId] = useState<number | null>(null)
-    const [saveName, setSaveName] = useState("")
     const [renamingDeviceId, setRenamingDeviceId] = useState<number | null>(null)
     const [deviceName, setDeviceName] = useState("")
     const savePanelRef = useRef<HTMLDivElement | null>(null)
@@ -57,10 +52,6 @@ export function AccountsMobileView({
         if (selectedAccountId !== null) savePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
     }, [selectedAccountId])
 
-    const submitSaveName = async (playerId: number) => {
-        await onRenameSave(playerId, saveName)
-        setRenamingSaveId(null)
-    }
     const submitDeviceName = async (deviceId: number) => {
         await onRenameDevice(deviceId, deviceName)
         setRenamingDeviceId(null)
@@ -86,11 +77,16 @@ export function AccountsMobileView({
                     <List.Item className="admin-mobile-list-item">
                         <div className="admin-mobile-list-content">
                             <div className="admin-mobile-list-heading">
-                                <Typography.Text strong>账号 #{account.id}</Typography.Text>
+                                <span className="admin-mobile-heading-main">
+                                    <Typography.Text strong>账号 #{account.id}</Typography.Text>
+                                    {account.adminNote && (
+                                        <Typography.Text type="secondary">{account.adminNote}</Typography.Text>
+                                    )}
+                                </span>
                                 <Typography.Text>{account.saveCount} 个存档</Typography.Text>
                             </div>
                             <div className="admin-mobile-detail-list">
-                                <div><span>默认存档</span><strong>{account.defaultPlayerName ?? "无"}</strong></div>
+                                <div><span>当前存档</span><strong>{account.defaultPlayerName ?? "无"}</strong></div>
                                 <div><span>绑定设备</span><strong>{account.devices.length || "无"}</strong></div>
                             </div>
                             {account.devices.length > 0 && (
@@ -125,7 +121,7 @@ export function AccountsMobileView({
                                 </Space>
                             )}
                             <div className="admin-mobile-actions">
-                                <Button type="primary" onClick={() => onSelectAccount(account.id)}>存档列表</Button>
+                                <Button type="primary" icon={<FolderOpen size={15} />} onClick={() => onSelectAccount(account.id)}>存档列表</Button>
                                 <Button icon={<Plus size={15} />} onClick={() => onNewSave(account.id)}>新建存档</Button>
                                 <Popconfirm
                                     title={`删除账号 ${account.id} 及所有存档？`}
@@ -158,62 +154,25 @@ export function AccountsMobileView({
                                     onClick={() => onOpenPlayer(player.id)}
                                 >
                                     <div className="admin-mobile-list-content">
-                                        {renamingSaveId === player.id ? (
-                                            <div
-                                                className="admin-mobile-inline-editor"
-                                                onClick={event => event.stopPropagation()}
-                                                onKeyDown={event => event.stopPropagation()}
-                                            >
-                                                <Input
-                                                    value={saveName}
-                                                    maxLength={64}
-                                                    onChange={event => setSaveName(event.target.value)}
-                                                    onPressEnter={() => submitSaveName(player.id)}
-                                                />
-                                                <Button type="primary" loading={renamePending} onClick={() => submitSaveName(player.id)}>确定</Button>
-                                                <Button onClick={() => setRenamingSaveId(null)}>取消</Button>
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <div className="admin-mobile-list-heading">
-                                                    <Typography.Text strong>{player.name}</Typography.Text>
-                                                    <Typography.Text>Rank {player.rank}</Typography.Text>
-                                                </div>
-                                                <Typography.Text type="secondary">存档 #{player.id}</Typography.Text>
-                                                <div className="admin-mobile-tags">
-                                                    {player.isDefault && <span className="admin-badge-info">账号默认</span>}
-                                                    {player.isActive && <span className="admin-badge-ok">当前活动</span>}
-                                                </div>
-                                                <div className="admin-mobile-actions" onClick={event => event.stopPropagation()}>
-                                                    <Button type="primary" icon={<Pencil size={15} />} onClick={() => onOpenPlayer(player.id)}>
-                                                        编辑存档
-                                                    </Button>
-                                                    <Dropdown
-                                                        trigger={["click"]}
-                                                        menu={{
-                                                            items: [
-                                                                { key: "activate", label: "设为默认并切换", disabled: player.isDefault && player.isActive },
-                                                                { key: "rename", label: "重命名" },
-                                                                { key: "clone", label: "复制" },
-                                                                { key: "delete", label: "删除", danger: true },
-                                                            ],
-                                                            onClick: ({ key, domEvent }) => {
-                                                                domEvent.stopPropagation()
-                                                                if (key === "activate") void onActivateSave(player.id)
-                                                                if (key === "rename") {
-                                                                    setRenamingSaveId(player.id)
-                                                                    setSaveName(player.name)
-                                                                }
-                                                                if (key === "clone") void onCloneSave(player.id, selectedAccount.id)
-                                                                if (key === "delete") confirmDeleteSave(player)
-                                                            },
-                                                        }}
-                                                    >
-                                                        <Button icon={<Ellipsis size={16} />} aria-label={`存档 ${player.name} 的更多操作`} />
-                                                    </Dropdown>
-                                                </div>
-                                            </>
-                                        )}
+                                        <div className="admin-mobile-list-heading">
+                                            <span className="admin-mobile-heading-main">
+                                                {player.isDefault && <span className="admin-badge-info">当前存档</span>}
+                                                <Typography.Text strong>{player.name}</Typography.Text>
+                                                {player.isActive && <span className="admin-badge-ok">当前活动</span>}
+                                            </span>
+                                            <Typography.Text>Rank {player.rank}</Typography.Text>
+                                        </div>
+                                        <Typography.Text type="secondary">存档 #{player.id}</Typography.Text>
+                                        <div className="admin-mobile-actions" onClick={event => event.stopPropagation()}>
+                                            <Button type="primary" icon={<Pencil size={15} />} onClick={() => onOpenPlayer(player.id)}>
+                                                编辑存档
+                                            </Button>
+                                            <Button disabled={player.isDefault && player.isActive} onClick={() => onActivateSave(player.id)}>
+                                                切换存档
+                                            </Button>
+                                            <Button onClick={() => onCloneSave(player.id, selectedAccount.id)}>复制</Button>
+                                            <Button danger type="text" onClick={() => confirmDeleteSave(player)}>删除</Button>
+                                        </div>
                                     </div>
                                 </List.Item>
                             )}
