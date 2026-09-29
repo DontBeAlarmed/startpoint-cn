@@ -34,13 +34,3 @@
     padding-inline: 16px;
   }
 }
-
-/* 窄屏: scroll.x 横滚表强制 fixed 布局 — auto 布局会按容器重新分配列宽,
-   把前方列压成碎条 (维护者 2026-09-30 反馈"前方内容被挤压"的根因);
-   fixed 下列宽定义即法律, 超出部分横向滑动 */
-@media (max-width: 767px) {
-  .admin-table-card .ant-table table,
-  .admin-table-wrap .ant-table table {
-    table-layout: fixed;
-  }
-}

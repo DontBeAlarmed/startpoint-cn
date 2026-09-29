@@ -164,6 +164,7 @@ export default function Gifts() {
                         loading={gifts.isLoading}
                         dataSource={gifts.data?.rows ?? []}
                         scroll={{ x: "max-content" }}
+                        tableLayout="fixed"
                         locale={{ emptyText: "暂无礼包" }}
                         pagination={{
                             current: page,

@@ -140,6 +140,7 @@ export default function News() {
                         loading={news.isLoading}
                         dataSource={news.data?.rows ?? []}
                         scroll={{ x: "max-content" }}
+                        tableLayout="fixed"
                         locale={{ emptyText: "暂无公告" }}
                         pagination={{
                             current: page,
