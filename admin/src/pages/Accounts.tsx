@@ -87,6 +87,14 @@ export default function Accounts() {
         onError: showMutationError,
     })
 
+    // 移动端账号卡行内备注编辑：复用账号清理接口的备注位（note 空串由服务端归一为 null）
+    const updateNote = useMutation({
+        mutationFn: ({ accountId, note }: { accountId: number; note: string }) =>
+            apiPost("/api/server/accountCleanup/account", { accountId, note }),
+        onSuccess: () => { message.success("备注已更新"); refresh() },
+        onError: showMutationError,
+    })
+
     const renameDevice = useMutation({
         mutationFn: ({ deviceId, name }: { deviceId: number; name: string }) =>
             apiPost<{ ok: boolean; deviceId: number; name: string | null }>(
@@ -233,7 +241,8 @@ export default function Accounts() {
                     <Button size="small" icon={<EditOutlined />} onClick={() => navigate(`/players/${row.id}`)}>
                         编辑
                     </Button>
-                    <Button size="small" disabled={row.isDefault && row.isActive} onClick={() => activateSave.mutate(row.id)}>
+                    {/* activateSave 服务端同时设置账号默认存档与全局活动存档，故仅 isDefault 时禁用 */}
+                    <Button size="small" disabled={row.isDefault} onClick={() => activateSave.mutate(row.id)}>
                         切换
                     </Button>
                     <Button
@@ -284,6 +293,8 @@ export default function Accounts() {
                         onCloneSave={(playerId, accountId) => cloneSave.mutateAsync({ playerId, accountId })}
                         onDeleteSave={playerId => deleteSave.mutateAsync(playerId)}
                         onRenameDevice={(deviceId, name) => renameDevice.mutateAsync({ deviceId, name })}
+                        notePending={updateNote.isPending}
+                        onUpdateNote={(accountId, note) => updateNote.mutateAsync({ accountId, note })}
                     />
                 </Card>
             )}

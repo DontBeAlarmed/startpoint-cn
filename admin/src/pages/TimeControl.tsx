@@ -359,15 +359,17 @@ export default function TimeControl() {
                                         >
                                             跟随系统时间
                                         </Button>
-                                        {data && (
-                                            <span className={data.isCustom ? "admin-badge-warn" : "admin-badge-info"}>
-                                                {data.isCustom ? "自定义模拟" : "跟随系统"}
-                                            </span>
-                                        )}
                                     </div>
                                 </div>
                                 <div className="admin-time-hero-rule" aria-hidden="true" />
-                                <div className="admin-time-hero-section">时间设置</div>
+                                <div className="admin-time-hero-section">
+                                    <span>时间设置</span>
+                                    {data && (
+                                        <span className={data.isCustom ? "admin-badge-warn" : "admin-badge-info"}>
+                                            {data.isCustom ? "自定义模拟" : "跟随系统"}
+                                        </span>
+                                    )}
+                                </div>
                                 <div className="admin-time-hero-clockzone">
                                     <div
                                         className="admin-time-hero-digits"

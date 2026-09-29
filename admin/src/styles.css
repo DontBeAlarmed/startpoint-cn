@@ -393,9 +393,9 @@ body {
   color: var(--water);
 }
 
-/* 窄屏头部（ADD-1）：左「标题 + 点击数字修改链接」、右「跟随系统时间按钮 + 状态徽章」
-   两端对齐；细分隔线之后是小节标签「时间设置」，再进数字编辑区。≥768px 该块整体
-   还原为单行标题、右侧块并入时钟下方 F2 同行（见 .admin-time-hero-sub）。 */
+/* 窄屏头部（ADD-1/G3）：左「标题 + 点击数字修改链接」、右「跟随系统时间按钮」两端对齐；
+   细分隔线之后是「时间设置」小节行（左标签、右状态徽章），再进数字编辑区。≥768px 该块
+   整体还原为单行标题、右侧块并入时钟下方 F2 同行（见 .admin-time-hero-sub）。 */
 .admin-time-hero-headrow {
   display: flex;
   align-items: flex-start;
@@ -424,8 +424,14 @@ body {
   border-top: 1px solid var(--line);
 }
 
+/* 「时间设置」小节行（G3，维护者 2026-09-29 指定）：flex 两端对齐 — 左标签、右
+   「自定义模拟/跟随系统」状态徽章；整行在 ≥768px 随桌面还原一起隐藏（桌面徽章在 sub 行） */
 .admin-time-hero-section {
   margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   color: var(--ink-soft);
   font-size: 12px;
   font-weight: 800;
@@ -497,7 +503,7 @@ body {
 }
 
 /* 窄屏 sub 行（ADD-1）：UTC/Unix 行 + ↑/↓ 提示行，纵向堆叠居中；桌面专用的
-   状态徽章+跟随系统按钮组（submode）在窄屏隐藏（窄屏它们在头部右侧块里） */
+   状态徽章+跟随系统按钮组（submode）在窄屏隐藏（窄屏徽章在「时间设置」小节行） */
 .admin-time-hero-sub {
   display: flex;
   flex-direction: column;
@@ -671,10 +677,47 @@ body {
   margin-bottom: 4px;
 }
 
-/* heading left group (F4)：账号 #N + 备注 / 当前存档徽章 + 存档名 + 当前活动 归拢在左侧，
+/* heading left group (F4)：账号 #N + 备注区域 / 当前存档徽章 + 存档名 归拢在左侧，
    右侧计数（N 个存档 / Rank N）不被挤压 */
 .admin-mobile-heading-main {
   display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  min-width: 0;
+}
+
+/* 账号卡备注区域（G4，维护者 2026-09-29 指定）：紧跟账号编号的可点击区域，
+   单击进入行内编辑；无备注时灰字占位「备注」，带小铅笔 icon */
+.admin-mobile-note-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-mobile-note-edit svg {
+  flex: none;
+  color: var(--ink-soft);
+}
+
+.admin-mobile-note-placeholder {
+  color: var(--ink-soft);
+  opacity: 0.65;
+}
+
+/* 存档面板头（ADD-3）：账号编号 + 备注名 + 「· 存档列表」归拢为左侧一组，
+   右侧新建存档按钮不被挤压 */
+.admin-mobile-toolbar-main {
+  display: inline-flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 2px 8px;
