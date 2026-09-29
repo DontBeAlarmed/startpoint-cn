@@ -117,11 +117,11 @@ export default function Accounts() {
                     </Tooltip>
                 </Space>
             ),
-            dataIndex: "id", width: "8%",
+            dataIndex: "id", width: "8%", align: "center" as const,
         },
-        { title: "存档数", dataIndex: "saveCount", width: "10%" },
+        { title: "存档数", dataIndex: "saveCount", width: "10%", align: "center" as const },
         {
-            title: "默认存档", width: "32%",
+            title: "默认存档", width: "32%", align: "center" as const,
             render: (_: unknown, row: AccountRow) => {
                 if (!row.defaultPlayerId) return <Tag>无</Tag>
                 return <span>{row.defaultPlayerName ?? `#${row.defaultPlayerId}`}</span>
@@ -136,7 +136,7 @@ export default function Accounts() {
                     </Tooltip>
                 </Space>
             ),
-            width: "26%",
+            width: "26%", align: "center" as const,
             render: (_: unknown, row: AccountRow) => row.devices.length === 0 ? <Tag>无</Tag> : (
                 <Space direction="vertical" size={4}>
                     {row.devices.map(device => renameDeviceId === device.deviceId ? (
@@ -183,7 +183,7 @@ export default function Accounts() {
             ),
         },
         {
-            title: "操作", width: "24%",
+            title: "操作", width: "24%", align: "center" as const,
             render: (_: unknown, row: AccountRow) => (
                 <div className="admin-action-row">
                     <Button size="small" type="primary" onClick={() => toggleSavePanel(row.id)}>存档列表</Button>
@@ -196,9 +196,9 @@ export default function Accounts() {
     ]
 
     const saveColumns = [
-        { title: "存档 ID", dataIndex: "id", width: "8%" },
+        { title: "存档 ID", dataIndex: "id", width: "8%", align: "center" as const },
         {
-            title: "存档名", width: "30%",
+            title: "存档名", width: "30%", align: "center" as const,
             render: (_: unknown, row: PlayerBrief) => renameId === row.id ? (
                 <div
                     className="admin-edit-compact"
@@ -223,11 +223,11 @@ export default function Accounts() {
                 </Space>
             ),
         },
-        { title: "等级", width: "8%", render: (_: unknown, row: PlayerBrief) => row.rank },
-        { title: "角色数", width: "10%", render: (_: unknown, row: PlayerBrief) => row.characterCount ?? "—" },
-        { title: "最后登录", width: "22%", render: (_: unknown, row: PlayerBrief) => row.lastLoginTime ? row.lastLoginTime.replace("T", " ").slice(0, 16) : "—" },
+        { title: "等级", width: "8%", align: "center" as const, render: (_: unknown, row: PlayerBrief) => row.rank },
+        { title: "角色数", width: "10%", align: "center" as const, render: (_: unknown, row: PlayerBrief) => row.characterCount ?? "—" },
+        { title: "最后登录", width: "22%", align: "center" as const, render: (_: unknown, row: PlayerBrief) => row.lastLoginTime ? row.lastLoginTime.replace("T", " ").slice(0, 16) : "—" },
         {
-            title: "操作", width: "22%",
+            title: "操作", width: "22%", align: "center" as const,
             render: (_: unknown, row: PlayerBrief) => (
                 <div className="admin-action-row" onClick={event => event.stopPropagation()}>
                     <Button size="small" icon={<EditOutlined />} onClick={() => navigate(`/players/${row.id}`)}>
