@@ -677,41 +677,14 @@ body {
   margin-bottom: 4px;
 }
 
-/* heading left group (F4)：账号 #N + 备注区域 / 当前存档徽章 + 存档名 归拢在左侧，
-   右侧计数（N 个存档 / Rank N）不被挤压 */
+/* heading left group (F4)：账号 #N + 设备名 pill（单设备账号上移，维护者 2026-09-29 指定）/
+   当前存档徽章 + 存档名 归拢在左侧，右侧计数（N 个存档 / Rank N）不被挤压 */
 .admin-mobile-heading-main {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 2px 8px;
   min-width: 0;
-}
-
-/* 账号卡备注区域（G4，维护者 2026-09-29 指定）：紧跟账号编号的可点击区域，
-   单击进入行内编辑；无备注时灰字占位「备注」，带小铅笔 icon */
-.admin-mobile-note-edit {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--ink-soft);
-  font-size: 13px;
-  line-height: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.admin-mobile-note-edit svg {
-  flex: none;
-  color: var(--ink-soft);
-}
-
-.admin-mobile-note-placeholder {
-  color: var(--ink-soft);
-  opacity: 0.65;
 }
 
 /* 存档面板头（ADD-3）：账号编号 + 备注名 + 「· 存档列表」归拢为左侧一组，
@@ -802,8 +775,9 @@ body {
 }
 
 /* accounts: merged device pill — 设备识别名 + ✎ live in ONE elevated chip (mockup .dev-edit);
-   shared by the desktop 绑定设备 cell and the mobile device list. Mobile-first: the pill is
-   a compact unbreakable chip at every width and never stretches the table cell. */
+   shared by the desktop 绑定设备 cell, the mobile title row (single-device accounts) and the
+   mobile multi-device list. Mobile-first: the pill is a compact unbreakable chip at every
+   width and never stretches its container. */
 .admin-dev-edit {
   display: inline-flex;
   max-width: 100%;

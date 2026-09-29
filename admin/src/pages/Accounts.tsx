@@ -87,13 +87,16 @@ export default function Accounts() {
         onError: showMutationError,
     })
 
-    // 移动端账号卡行内备注编辑：复用账号清理接口的备注位（note 空串由服务端归一为 null）
+    // 移动端备注区域 2026-09-29 经维护者指示移除（H2，与设备名 pill 功能重叠）；
+    // updateNote mutation 原样保留（复用账号清理接口的备注位，note 空串由服务端归一为 null），桌面未来可接 UI
     const updateNote = useMutation({
         mutationFn: ({ accountId, note }: { accountId: number; note: string }) =>
             apiPost("/api/server/accountCleanup/account", { accountId, note }),
         onSuccess: () => { message.success("备注已更新"); refresh() },
         onError: showMutationError,
     })
+    // 保留读取以满足 noUnusedLocals：备注 UI 已移除但 mutation 需留存（见上注释）
+    void updateNote
 
     const renameDevice = useMutation({
         mutationFn: ({ deviceId, name }: { deviceId: number; name: string }) =>
@@ -293,8 +296,6 @@ export default function Accounts() {
                         onCloneSave={(playerId, accountId) => cloneSave.mutateAsync({ playerId, accountId })}
                         onDeleteSave={playerId => deleteSave.mutateAsync(playerId)}
                         onRenameDevice={(deviceId, name) => renameDevice.mutateAsync({ deviceId, name })}
-                        notePending={updateNote.isPending}
-                        onUpdateNote={(accountId, note) => updateNote.mutateAsync({ accountId, note })}
                     />
                 </Card>
             )}
