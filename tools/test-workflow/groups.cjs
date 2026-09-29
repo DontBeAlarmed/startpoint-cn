@@ -437,6 +437,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/mail_receive_transaction.test.cjs",
             "tools/mission_category_batch_read.test.cjs",
             "tools/player_history_profile_route.test.cjs",
+            "tools/player_save_schema_guard.test.cjs",
             "tools/player_save_v2.test.cjs",
             "tools/gacha_save_validation.test.cjs",
             "tools/character_growth_save_validation.test.cjs",
