@@ -180,3 +180,34 @@
 .news-toolbar-swatch:hover {
   border-color: var(--ink);
 }
+
+/* news editor: 写法速查 — preview 列空位处的轻量教程卡 (维护者 2026-09-30) */
+.news-editor-guide {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--th-bg);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--ink-soft);
+}
+
+.news-editor-guide-title {
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.news-editor-guide-row b {
+  color: var(--ink);
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
+}
+
+.news-editor-guide-note {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+  font-size: 11.5px;
+}

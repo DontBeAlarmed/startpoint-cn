@@ -52,7 +52,7 @@ function toDraft(news: AdminNewsRow | null): NewsDraft {
         category: news?.category ?? 1,
         title: news?.title ?? "",
         publishedAtReal: news?.publishedAtReal ?? new Date().toISOString(),
-        bodyRichText: news?.bodyRichText ?? "<p></p>",
+        bodyRichText: news?.bodyRichText ?? "",
         label: news?.label ?? 1,
         thumbnail: news?.thumbnail ?? 1,
         enabled: news?.enabled ?? false,
@@ -124,6 +124,10 @@ export default function NewsEditor({ news, open, onClose, onSaved }: NewsEditorP
             onOk={() => {
                 if (!draft.title.trim()) {
                     message.error("请输入公告标题")
+                    return
+                }
+                if (!draft.bodyRichText.trim()) {
+                    message.error("请输入公告内容")
                     return
                 }
                 save.mutate()
@@ -216,7 +220,7 @@ export default function NewsEditor({ news, open, onClose, onSaved }: NewsEditorP
                                             onMouseDown={event => event.preventDefault()}
                                             onClick={() => setColorPaletteOpen(current => !current)}
                                         >
-                                            A
+                                            颜色
                                         </button>
                                         {colorPaletteOpen && (
                                             <span className="news-toolbar-palette">
@@ -260,6 +264,16 @@ export default function NewsEditor({ news, open, onClose, onSaved }: NewsEditorP
                         <div className="news-phone-foot">
                             {previewDateText} · 官方公告{draft.enabled ? "" : " · 未启用"}
                         </div>
+                    </div>
+                    <div className="news-editor-guide">
+                        <div className="news-editor-guide-title">写法速查</div>
+                        <div className="news-editor-guide-row">直接打字与换行即可，无需任何标签</div>
+                        <div className="news-editor-guide-row"><b>[b]加粗[/b]</b> 或点上方「加粗」</div>
+                        <div className="news-editor-guide-row"><b>[color=ffd335]颜色[/color]</b> 或点「颜色」选色</div>
+                        <div className="news-editor-guide-row"><b>&lt;p&gt;段落&lt;/p&gt;</b>、<b>&lt;h2&gt;标题&lt;/h2&gt;</b></div>
+                        <div className="news-editor-guide-row">列表：<b>&lt;ul&gt;&lt;li&gt;项&lt;/li&gt;&lt;/ul&gt;</b></div>
+                        <div className="news-editor-guide-row"><b>&lt;br/&gt;</b> 换行、<b>&lt;hr/&gt;</b> 分隔线</div>
+                        <div className="news-editor-guide-note">只支持以上标签（禁外链与属性）；不确定就用上方按钮插入。</div>
                     </div>
                     {/* 原始内容无障碍回退：手机拟真预览用纯前端字符串渲染 RichText，
                         这份 sandbox iframe 保留原始正文的等价文本镜像（屏幕阅读器可用）。 */}

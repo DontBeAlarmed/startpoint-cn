@@ -37,7 +37,7 @@ export const NEWS_COLOR_PALETTE: readonly NewsColorOption[] = [
 ]
 
 export const NEWS_TOOLBAR_ACTIONS: readonly NewsToolbarAction[] = [
-    { key: "bold", label: "B", title: "加粗 [b]…[/b]", open: "[b]", close: "[/b]", placeholder: "加粗文本" },
+    { key: "bold", label: "加粗", title: "加粗 [b]…[/b]", open: "[b]", close: "[/b]", placeholder: "加粗文本" },
     { key: "paragraph", label: "P", title: "段落 <p>…</p>", open: "<p>", close: "</p>", placeholder: "段落内容" },
     { key: "heading", label: "H2", title: "标题 <h2>…</h2>", open: "<h2>", close: "</h2>", placeholder: "标题内容" },
     { key: "list", label: "列表", title: "列表 <ul><li>…</li></ul>", open: "<ul><li>", close: "</li></ul>", placeholder: "列表项" },
