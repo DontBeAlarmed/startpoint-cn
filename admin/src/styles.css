@@ -715,6 +715,15 @@ body {
 
 .admin-mobile-actions {
   margin-top: 10px;
+  /* 维护者 2026-09-29: 操作键自适应等分铺满一排, 不折行 (覆盖共享规则的 wrap) */
+  flex-wrap: nowrap;
+}
+
+.admin-mobile-actions .ant-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
+  justify-content: center;
 }
 
 .admin-mobile-device-list {
