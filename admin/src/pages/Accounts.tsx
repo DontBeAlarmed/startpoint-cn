@@ -244,7 +244,7 @@ export default function Accounts() {
                     <Button size="small" icon={<EditOutlined />} onClick={() => navigate(`/players/${row.id}`)}>
                         编辑
                     </Button>
-                    {/* activateSave 服务端同时设置账号默认存档与全局活动存档，故仅 isDefault 时禁用 */}
+                    {/* activateSave 服务端同时把该存档设为账号的当前存档与全局活动存档，故仅 isDefault 时禁用 */}
                     <Button size="small" disabled={row.isDefault} onClick={() => activateSave.mutate(row.id)}>
                         切换
                     </Button>
@@ -308,6 +308,7 @@ export default function Accounts() {
                         pagination={false}
                         size="small"
                         scroll={{ x: 900 }}
+                        tableLayout="fixed"
                         className="admin-accounts-table"
                     />
                 </Card>
@@ -331,6 +332,7 @@ export default function Accounts() {
                             pagination={false}
                             size="small"
                             scroll={{ x: 860 }}
+                            tableLayout="fixed"
                             className="admin-accounts-table"
                             locale={{ emptyText: "暂无存档" }}
                             onRow={row => ({

@@ -37,10 +37,12 @@ const MOVIE_LABELS: Record<string, string> = {
 }
 
 // 构成占比条：3★/4★/5★ 三色堆叠（审查稿 #p-seeds：水蓝/星黄/火红）。
+// 颜色全部走 base.css token（--water-soft 为 #9cc3ec 的亮/暗双主题化 token），
+// 内联消费于 flex 占比 span 的 background。
 const RARITY_RATIO_COLORS: Array<{ rarity: "3" | "4" | "5"; color: string }> = [
-    { rarity: "3", color: "#9cc3ec" },
-    { rarity: "4", color: "#FFD335" },
-    { rarity: "5", color: "#E8544A" },
+    { rarity: "3", color: "var(--water-soft)" },
+    { rarity: "4", color: "var(--star)" },
+    { rarity: "5", color: "var(--fire)" },
 ]
 
 function formatClock(timestamp: number): string {
@@ -194,7 +196,8 @@ export default function Seeds() {
                             <Table
                                 size="small"
                                 pagination={false}
-                                scroll={{ x: 680 }}
+                                scroll={{ x: 870 }}
+                                tableLayout="fixed"
                                 dataSource={rows}
                                 columns={[
                                     {

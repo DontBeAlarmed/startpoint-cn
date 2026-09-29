@@ -150,7 +150,8 @@ const multiStateLabels = {
 const multiStateBadgeClasses = {
     ready: "admin-badge-ok",
     degraded: "admin-badge-warn",
-    unavailable: "admin-badge-info",
+    // B1：未启动属 停用/未设置 族，用 muted（灰），非信息蓝
+    unavailable: "admin-badge-muted",
 } as const
 
 /* dashboard: C 图标卡格 — each fact reads as one small elevated tile: centered star-stroke
@@ -330,9 +331,13 @@ export default function Dashboard() {
                                     <span className="admin-badge-info">
                                         {multiModeLabels[status.multiplayer.mode]} · {status.multiplayer.coordinator.kind === "local" ? "本地协调器" : "远程协调器"}
                                     </span>
-                                    <span className={multiStateBadgeClasses[status.multiplayer.state]}>
-                                        {multiStateLabels[status.multiplayer.state]}
-                                    </span>
+                                    {/* B2：正常态与卡内 5 砖可用状态重复，标题区不再常驻状态徽章；
+                                        仅降级/未启动时示警（未启动=muted，见 multiStateBadgeClasses） */}
+                                    {status.multiplayer.state !== "ready" && (
+                                        <span className={multiStateBadgeClasses[status.multiplayer.state]}>
+                                            {multiStateLabels[status.multiplayer.state]}
+                                        </span>
+                                    )}
                                 </Space>
                             ) : undefined}
                         >

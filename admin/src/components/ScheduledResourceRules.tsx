@@ -218,15 +218,17 @@ export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps)
                     dataSource={rules.data ?? []}
                     pagination={{ pageSize: 10, hideOnSinglePage: true }}
                     scroll={{ x: "max-content" }}
+                    tableLayout="fixed"
                     locale={{ emptyText: "暂无定时补充规则" }}
                     columns={[
-                        { title: "范围", render: (_, rule) => rule.scope === "global" ? "全局规则" : `指定存档 #${rule.playerId}` },
-                        { title: "资源", dataIndex: "rewardName" },
-                        { title: "发放数量", dataIndex: "grantAmount" },
-                        { title: "触发下限", dataIndex: "triggerThreshold" },
-                        { title: "持有上限", render: (_, rule) => `${rule.inventoryCap} / ${rule.officialMaxCount}` },
+                        { title: "范围", width: 150, render: (_, rule) => rule.scope === "global" ? "全局规则" : `指定存档 #${rule.playerId}` },
+                        { title: "资源", dataIndex: "rewardName", width: 120 },
+                        { title: "发放数量", dataIndex: "grantAmount", width: 90 },
+                        { title: "触发下限", dataIndex: "triggerThreshold", width: 90 },
+                        { title: "持有上限", width: 110, render: (_, rule) => `${rule.inventoryCap} / ${rule.officialMaxCount}` },
                         {
                             title: "状态",
+                            width: 90,
                             render: (_, rule) => (
                                 <Switch
                                     checked={rule.enabled}
@@ -239,6 +241,7 @@ export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps)
                         },
                         {
                             title: "启用区间",
+                            width: 300,
                             render: (_, rule) => (
                                 <Typography.Text>
                                     {rule.startsAtReal ? dayjs(rule.startsAtReal).format("YYYY-MM-DD HH:mm") : "不限"}
@@ -250,6 +253,7 @@ export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps)
                         { title: "备注", dataIndex: "description", render: value => value || "-" },
                         {
                             title: "操作",
+                            width: 140,
                             fixed: "right",
                             render: (_, rule) => (
                                 <div className="admin-action-row">

@@ -1,9 +1,81 @@
-/* 定时资源弹框：高度交还内容自然流动，超出视口由 AntD wrap 层负责滚动，
+/* 定时资源弹框（task-33 E3 #30 移动优先重构）：
+   窄屏收敛值为默认（自 shared-patterns 的 @media (max-width: 767px) 段迁入，
+   与本文件原桌面护栏同址共置）；≥768px 桌面值在下方 min-width 块回升。
+   桌面护栏：高度交还内容自然流动，超出视口由 AntD wrap 层负责滚动，
    dvh 仅用于视口越高弹框落点越低的定位护栏，不再裁切 modal body */
 .scheduled-resource-modal {
-  max-width: calc(100vw - 32px);
-  top: clamp(24px, calc(100dvh - 820px), 96px);
-  padding-bottom: 24px;
+  width: calc(100vw - 24px) !important;
+  max-width: calc(100vw - 24px);
+  top: 12px;
+  margin: 0 auto;
+  padding-bottom: 12px;
+}
+
+.scheduled-resource-modal .ant-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.scheduled-resource-modal .ant-radio-button-wrapper {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 38px;
+  padding-block: 6px;
+  text-align: center;
+  white-space: normal;
+}
+
+.scheduled-resource-modal .ant-modal-footer {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.scheduled-resource-modal .ant-modal-footer .ant-btn {
+  width: 100%;
+  margin-inline-start: 0;
+}
+
+/* 桌面回升：width 对齐 Modal 组件 width={720}（内联样式外的防覆盖护栏），
+   top/max-width/padding-bottom 回到本文件原桌面护栏值，radio 组与 footer
+   回到 AntD 行内默认（footer 相邻按钮 8px 间距同 AntD marginXS）。 */
+@media (min-width: 768px) {
+  .scheduled-resource-modal {
+    width: 720px !important;
+    max-width: calc(100vw - 32px);
+    top: clamp(24px, calc(100dvh - 820px), 96px);
+    margin: 0 auto;
+    padding-bottom: 24px;
+  }
+
+  .scheduled-resource-modal .ant-radio-group {
+    display: inline-block;
+    flex-wrap: nowrap;
+    width: auto;
+  }
+
+  .scheduled-resource-modal .ant-radio-button-wrapper {
+    flex: 0 1 auto;
+    height: 32px;
+    min-height: 0;
+    padding-block: 0;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .scheduled-resource-modal .ant-modal-footer {
+    display: block;
+  }
+
+  .scheduled-resource-modal .ant-modal-footer .ant-btn {
+    width: auto;
+    margin-inline-start: 0;
+  }
+
+  .scheduled-resource-modal .ant-modal-footer .ant-btn + .ant-btn {
+    margin-inline-start: 8px;
+  }
 }
 
 .scheduled-resource-number-grid,
@@ -19,12 +91,10 @@
   margin-bottom: 0;
 }
 
-.scheduled-resource-number-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
+/* 移动优先（task-33 E3 #30）：窄屏单列为默认，桌面 3/2 列在 min-width 块回升 */
+.scheduled-resource-number-grid,
 .scheduled-resource-date-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .scheduled-resource-number-grid .ant-input-number,
@@ -40,10 +110,25 @@
   line-height: 1.5;
 }
 
+/* 移动优先（task-33 E3 #30）：窄屏单列纵排为默认，桌面三列在 min-width 块回升 */
 .admin-edit-compact {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) auto auto;
+  grid-template-columns: 1fr;
   gap: 6px;
+}
+
+@media (min-width: 768px) {
+  .scheduled-resource-number-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .scheduled-resource-date-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-edit-compact {
+    grid-template-columns: minmax(120px, 1fr) auto auto;
+  }
 }
 
 /* ── mobile card view (<768px, ADD-3) ───────────────────────────────────────

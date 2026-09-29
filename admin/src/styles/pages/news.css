@@ -1,8 +1,10 @@
 /* ── news deep polish ───────────────────────────────────────────────────────
    editor modal: left form / right client-like phone preview. Mobile-first:
-   single column with the preview hidden below 768px (审查稿 five-pages-review
-   #p-news: <768px 时预览区隐藏). The preview column keeps a visually-hidden
-   sandbox iframe as the raw-content mirror (anchor: 空 sandbox 预览不变). */
+   the preview column is hidden by default and restored at ≥768px
+   (审查稿 five-pages-review #p-news: <768px 时预览区隐藏; task-33 E3 #31 将
+   原 @media (max-width: 767px) 段重构为「默认隐藏 + min-width 恢复」).
+   The preview column keeps a visually-hidden sandbox iframe as the
+   raw-content mirror (anchor: 空 sandbox 预览不变). */
 .news-editor-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -16,6 +18,7 @@
 
 .news-editor-preview-col {
   min-width: 0;
+  display: none;
 }
 
 .news-editor-raw-frame {
@@ -35,11 +38,9 @@
     grid-template-columns: minmax(0, 1fr) 300px;
     align-items: start;
   }
-}
 
-@media (max-width: 767px) {
   .news-editor-preview-col {
-    display: none;
+    display: block;
   }
 }
 

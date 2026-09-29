@@ -35,105 +35,10 @@
   background: var(--hover);
 }
 
-@media (max-width: 767px) {
-  .admin-topbar {
-    min-height: 52px;
-    padding-inline: 12px;
-  }
+/* 定时资源补充弹窗的移动优先收敛规则（task-33 E3 #30）已整体迁往
+   styles/pages/scheduled-resource.css（与该弹窗的桌面护栏规则同址共置，
+   避免同特异性跨文件相互覆盖）。 */
 
-  .admin-content {
-    padding: 14px 12px 20px;
-  }
-
-  .admin-page-header {
-    grid-template-columns: 1fr;
-    align-items: start;
-  }
-
-  .admin-page-actions {
-    justify-content: flex-start;
-  }
-
-  .admin-page-title {
-    font-size: 21px !important;
-  }
-
-  .multi-compatibility-difference {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .multi-compatibility-value {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .admin-toolbar {
-    align-items: stretch;
-  }
-
-  .admin-toolbar > *,
-  .admin-toolbar .ant-segmented,
-  .admin-toolbar .ant-btn,
-  .admin-toolbar .ant-input-affix-wrapper {
-    max-width: 100%;
-  }
-
-  .admin-edit-compact {
-    grid-template-columns: 1fr;
-    gap: 6px;
-  }
-
-  .admin-mobile-list-card .ant-card-head {
-    padding-inline: 14px;
-  }
-
-  .admin-mobile-list-card .ant-card-body {
-    padding: 12px;
-  }
-
-  .admin-mobile-actions .ant-btn {
-    min-height: 36px;
-  }
-
-  .scheduled-resource-modal {
-    width: calc(100vw - 24px) !important;
-    max-width: calc(100vw - 24px);
-    top: 12px;
-    margin: 0 auto;
-    padding-bottom: 12px;
-  }
-
-  .scheduled-resource-modal .ant-radio-group {
-    display: flex;
-    flex-wrap: wrap;
-    width: 100%;
-  }
-
-  .scheduled-resource-modal .ant-radio-button-wrapper {
-    flex: 1 1 auto;
-    height: auto;
-    min-height: 38px;
-    padding-block: 6px;
-    text-align: center;
-    white-space: normal;
-  }
-
-  .scheduled-resource-number-grid,
-  .scheduled-resource-date-grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
-  }
-
-  .scheduled-resource-modal .ant-modal-footer {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .scheduled-resource-modal .ant-modal-footer .ant-btn {
-    width: 100%;
-    margin-inline-start: 0;
-  }
-}
 
 .admin-theme-toggle {
   padding: 4px 11px;
@@ -179,7 +84,7 @@ html[data-theme="dark"] {
   border: 2px solid var(--line-strong);
   border-radius: 16px;
   background:
-    linear-gradient(135deg, rgba(255, 211, 53, 0.08) 0%, rgba(79, 168, 232, 0.06) 55%, transparent 100%),
+    linear-gradient(135deg, color-mix(in srgb, var(--star) 8%, transparent) 0%, color-mix(in srgb, var(--sky) 6%, transparent) 55%, transparent 100%),
     var(--panel);
 }
 
@@ -191,7 +96,7 @@ html[data-theme="dark"] {
   top: -80px;
   width: 280px;
   height: 280px;
-  background: radial-gradient(circle, rgba(255, 211, 53, 0.10), transparent 65%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--star) 10%, transparent), transparent 65%);
   pointer-events: none;
 }
 

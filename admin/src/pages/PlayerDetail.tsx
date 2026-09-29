@@ -1,7 +1,7 @@
 import { useState } from "react"
 import type { ReactNode } from "react"
 import { Card, Table, Button, Space, InputNumber, Popconfirm, message, Tag, Tabs, Spin, Typography, Switch, Input, Upload } from "antd"
-import { SaveOutlined, DeleteOutlined, PlusOutlined, DownloadOutlined, UploadOutlined, UndoOutlined, SearchOutlined, EditOutlined } from "@ant-design/icons"
+import { SaveOutlined, PlusOutlined, DownloadOutlined, UploadOutlined, UndoOutlined, SearchOutlined, EditOutlined, ReloadOutlined } from "@ant-design/icons"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiGet, apiPost, apiPatch, apiDelete, apiUpload, apiDownloadFile } from "../api/client"
@@ -86,7 +86,7 @@ export default function PlayerDetail() {
     const [renamingSave, setRenamingSave] = useState(false)
     const [renameValue, setRenameValue] = useState("")
 
-    const { data, isLoading, isError } = useQuery({
+    const { data, isLoading, isFetching, isError } = useQuery({
         queryKey: ["playerDetail", pid],
         queryFn: () => apiGet<DetailData>(`/api/player/${pid}/detail`),
         enabled: !isNaN(pid),
@@ -113,6 +113,12 @@ export default function PlayerDetail() {
     })
 
     const refresh = () => qc.invalidateQueries({ queryKey: ["playerDetail", pid] })
+    // 页头刷新：详情 + 存档身份徽章 + 查表缓存（照既有写操作 invalidation 集合）
+    const refreshPage = () => {
+        qc.invalidateQueries({ queryKey: ["playerDetail", pid] })
+        qc.invalidateQueries({ queryKey: ["accounts"] })
+        qc.invalidateQueries({ queryKey: ["lookups"] })
+    }
     const showMutationError = (error: Error) => message.error(error.message)
 
     const editField = useMutation({
@@ -311,6 +317,7 @@ export default function PlayerDetail() {
                     </div>
                     <Table rowKey="code" dataSource={fChars} size="small" pagination={{ pageSize: 50 }}
                         scroll={{ x: "max-content" }}
+                        tableLayout="fixed"
                         columns={[
                             { title: "名字", render: (_, r: CharRow) => lookups?.characters[r.code]?.name ?? "?" },
                             { title: "称号", render: (_, r: CharRow) => lookups?.characters[r.code]?.title ?? "-", responsive: ["lg"] as any },
@@ -318,10 +325,10 @@ export default function PlayerDetail() {
                             { title: "稀有度", render: (_, r: CharRow) => lookups?.characters[r.code] ? `${lookups.characters[r.code].rarity} ${lookups.characters[r.code].element}` : "-", width: 100 },
                             { title: "入手时间", dataIndex: "joinTime", render: (t: string) => t.replace("T", " ").substring(0, 19), responsive: ["md"] as any },
                             {
-                                title: "", width: 60,
+                                title: "", width: 80,
                                 render: (_, r: CharRow) => r.code === 1 ? <Tag>Alk</Tag> : (
-                                    <Popconfirm title="删除此角色？" onConfirm={() => delChar.mutate(r.code)} okText="确认" cancelText="取消">
-                                        <Button size="small" danger icon={<DeleteOutlined />} />
+                                    <Popconfirm title="删除此角色？" onConfirm={() => delChar.mutate(r.code)} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
+                                        <Button size="small" type="text" danger>删除</Button>
                                     </Popconfirm>
                                 ),
                             },
@@ -343,15 +350,16 @@ export default function PlayerDetail() {
                     </div>
                     <Table rowKey="id" dataSource={fItems} size="small" pagination={{ pageSize: 50 }}
                         scroll={{ x: "max-content" }}
+                        tableLayout="fixed"
                         columns={[
                             { title: "名字", render: (_, r: ItemRow) => (lookups?.items as any)?.[r.id] ?? "-" },
                             { title: "ID", dataIndex: "id", width: 80 },
                             { title: "数量", dataIndex: "count", width: 100 },
                             {
-                                title: "", width: 60,
+                                title: "", width: 80,
                                 render: (_, r: ItemRow) => (
-                                    <Popconfirm title="删除此道具？" onConfirm={() => delItem.mutate(r.id)} okText="确认" cancelText="取消">
-                                        <Button size="small" danger icon={<DeleteOutlined />} />
+                                    <Popconfirm title="删除此道具？" onConfirm={() => delItem.mutate(r.id)} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
+                                        <Button size="small" type="text" danger>删除</Button>
                                     </Popconfirm>
                                 ),
                             },
@@ -370,6 +378,7 @@ export default function PlayerDetail() {
                     </div>
                     <Table rowKey="id" dataSource={fEquip} size="small" pagination={{ pageSize: 50 }}
                         scroll={{ x: "max-content" }}
+                        tableLayout="fixed"
                         columns={[
                             { title: "名字", render: (_, r: EquipRow) => (lookups?.equipment as any)?.[r.id]?.name ?? "-" },
                             { title: "ID", dataIndex: "id", width: 80 },
@@ -389,12 +398,13 @@ export default function PlayerDetail() {
                 <Space direction="vertical" style={{ width: "100%" }}>
                     <div className="admin-toolbar">
                         <Popconfirm title="清除全部关卡进度？" onConfirm={() => clearAllQuestProgress.mutate()} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
-                            <Button danger size="small" icon={<DeleteOutlined />}>清除全部</Button>
+                            <Button danger size="small">清除全部</Button>
                         </Popconfirm>
                         {searchBox(searchQuests, setSearchQuests)}
                     </div>
                     <Table rowKey={(r: QuestRow) => `${r.section}_${r.questId}`} dataSource={fQuests} size="small" pagination={{ pageSize: 50 }}
                         scroll={{ x: "max-content" }}
+                        tableLayout="fixed"
                         columns={[
                             { title: "名字", render: (_, r: QuestRow) => (lookups?.quests as any)?.[`${r.section}_${r.questId}`] ?? "-" },
                             { title: "Section", dataIndex: "section", width: 80 },
@@ -404,10 +414,10 @@ export default function PlayerDetail() {
                             { title: "评价", dataIndex: "clearRank", render: (v: number | null) => v ?? <span className="admin-muted">—</span>, width: 60 },
                             { title: "最佳时间", dataIndex: "bestElapsedTimeMs", render: (v: number | null) => v ?? <span className="admin-muted">—</span>, width: 100 },
                             {
-                                title: "", width: 60,
+                                title: "", width: 80,
                                 render: (_, r: QuestRow) => (
-                                    <Popconfirm title="删除此记录？" onConfirm={() => delQuestProgress.mutate({ section: r.section, questId: r.questId })} okText="确认" cancelText="取消">
-                                        <Button size="small" danger icon={<DeleteOutlined />} />
+                                    <Popconfirm title="删除此记录？" onConfirm={() => delQuestProgress.mutate({ section: r.section, questId: r.questId })} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
+                                        <Button size="small" type="text" danger>删除</Button>
                                     </Popconfirm>
                                 ),
                             },
@@ -423,22 +433,23 @@ export default function PlayerDetail() {
                 <Space direction="vertical" style={{ width: "100%" }}>
                     <div className="admin-toolbar">
                         <Popconfirm title="清除全部抽选记录？" onConfirm={() => clearAllDrawnQuests.mutate()} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
-                            <Button danger size="small" icon={<DeleteOutlined />}>清除全部</Button>
+                            <Button danger size="small">清除全部</Button>
                         </Popconfirm>
                         {searchBox(searchDrawn, setSearchDrawn)}
                     </div>
                     <Table rowKey={(r: DrawnQuestRow) => `${r.categoryId}_${r.questId}`} dataSource={fDrawn} size="small" pagination={{ pageSize: 50 }}
                         scroll={{ x: "max-content" }}
+                        tableLayout="fixed"
                         columns={[
                             { title: "名字", render: (_, r: DrawnQuestRow) => (lookups?.quests as any)?.[`${r.categoryId}_${r.questId}`] ?? "-" },
                             { title: "Category", dataIndex: "categoryId", width: 80 },
                             { title: "Quest", dataIndex: "questId", width: 80 },
                             { title: "Odds", dataIndex: "oddsId", width: 80 },
                             {
-                                title: "", width: 60,
+                                title: "", width: 80,
                                 render: (_, r: DrawnQuestRow) => (
-                                    <Popconfirm title="删除此记录？" onConfirm={() => delDrawnQuest.mutate({ category: r.categoryId, questId: r.questId })} okText="确认" cancelText="取消">
-                                        <Button size="small" danger icon={<DeleteOutlined />} />
+                                    <Popconfirm title="删除此记录？" onConfirm={() => delDrawnQuest.mutate({ category: r.categoryId, questId: r.questId })} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
+                                        <Button size="small" type="text" danger>删除</Button>
                                     </Popconfirm>
                                 ),
                             },
@@ -454,7 +465,12 @@ export default function PlayerDetail() {
             eyebrow="PLAYER"
             title="玩家详情 · 存档编辑"
             description="角色获取入口仅保留邮件发送，避免绕过客户端领取校验。"
-            actions={<Button onClick={() => navigate("/accounts")}>返回账号 / 存档</Button>}
+            actions={
+                <Space wrap size="small">
+                    <Button icon={<ReloadOutlined />} loading={isFetching} onClick={refreshPage}>刷新</Button>
+                    <Button onClick={() => navigate("/accounts")}>返回账号 / 存档</Button>
+                </Space>
+            }
         >
         <Space direction="vertical" size="large" className="admin-stack">
             <div className="admin-hero">
@@ -566,7 +582,7 @@ export default function PlayerDetail() {
                         {fieldControl("tutorialStep", { min: 0, allowNull: true })}
                         <span className="admin-danger-control-hint">空 = null</span>
                     </span>
-                    <Popconfirm title="清除全部 EX Boost？" onConfirm={() => clearExBoost.mutate()} okText="确认" cancelText="取消">
+                    <Popconfirm title="清除全部 EX Boost？" onConfirm={() => clearExBoost.mutate()} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
                         <Button size="small" danger loading={clearExBoost.isPending}>清除 EX Boost</Button>
                     </Popconfirm>
                     <Popconfirm title="重置编队到默认？" onConfirm={() => resetParties.mutate()} okText="确认" cancelText="取消">
@@ -578,7 +594,7 @@ export default function PlayerDetail() {
                     <Popconfirm title="重置每日挑战点？" onConfirm={() => resetChallenge.mutate()} okText="确认" cancelText="取消">
                         <Button size="small" danger icon={<UndoOutlined />}>重置每日挑战</Button>
                     </Popconfirm>
-                    <Popconfirm title="清除接收历史（一次性道具的领取记录）？" onConfirm={() => clearReceiveHistory.mutate()} okText="确认" cancelText="取消">
+                    <Popconfirm title="清除接收历史（一次性道具的领取记录）？" onConfirm={() => clearReceiveHistory.mutate()} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
                         <Button size="small" danger loading={clearReceiveHistory.isPending}>清除接收历史</Button>
                     </Popconfirm>
                 </div>

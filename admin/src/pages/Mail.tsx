@@ -443,6 +443,7 @@ export default function Mail() {
                             dataSource={history.map((h, i) => ({ ...h, key: i }))}
                             locale={{ emptyText: "暂无记录" }}
                             scroll={{ x: "max-content" }}
+                            tableLayout="fixed"
                             expandable={{
                                 expandedRowRender: r => (
                                     <div className="admin-mail-history-detail">

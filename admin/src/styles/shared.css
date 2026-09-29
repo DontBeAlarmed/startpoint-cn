@@ -96,8 +96,9 @@
   z-index: 10;
   display: flex;
   align-items: center;
-  min-height: 56px;
-  padding: 0 18px;
+  /* 移动优先（task-33 E3 #30）：窄屏为默认，桌面值在文件尾 min-width 块回升 */
+  min-height: 52px;
+  padding: 0 12px;
   gap: 10px;
   background: color-mix(in srgb, var(--panel) 88%, transparent) !important;
   border-bottom: 1px solid var(--line);
@@ -118,7 +119,8 @@
   width: 100%;
   max-width: 1480px;
   margin: 0 auto;
-  padding: 22px;
+  /* 移动优先（task-33 E3 #30）：窄屏为默认，桌面值在文件尾 min-width 块回升 */
+  padding: 14px 12px 20px;
 }
 
 .admin-page {
@@ -129,9 +131,10 @@
 
 .admin-page-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  /* 移动优先（task-33 E3 #30）：窄屏单列、顶对齐；桌面双列在文件尾 min-width 块回升 */
+  grid-template-columns: 1fr;
   gap: 12px;
-  align-items: end;
+  align-items: start;
   padding-block: 2px 4px;
 }
 
@@ -155,7 +158,8 @@
 .admin-page-title {
   margin: 0 !important;
   color: var(--ink) !important;
-  font-size: 24px !important;
+  /* 移动优先（task-33 E3 #30）：窄屏 21px；桌面 24px 在文件尾 min-width 块回升 */
+  font-size: 21px !important;
   line-height: 1.2 !important;
 }
 
@@ -169,7 +173,8 @@
 .admin-page-actions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  /* 移动优先（task-33 E3 #30）：窄屏左对齐；桌面右对齐在文件尾 min-width 块回升 */
+  justify-content: flex-start;
   gap: 8px;
 }
 
@@ -191,7 +196,17 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  align-items: center;
+  /* 移动优先（task-33 E3 #30）：窄屏拉伸对齐；桌面 center 在文件尾 min-width 块回升 */
+  align-items: stretch;
+}
+
+/* 窄屏工具行控件不超出容器（task-33 E3 #30 自 max-width 媒体查询整条迁入，
+   桌面 flex-wrap 布局下无行为差异）；桌面值无需回升 */
+.admin-toolbar > *,
+.admin-toolbar .ant-segmented,
+.admin-toolbar .ant-btn,
+.admin-toolbar .ant-input-affix-wrapper {
+  max-width: 100%;
 }
 
 .admin-toolbar .ant-input-affix-wrapper,
@@ -209,7 +224,8 @@
 
 .multi-compatibility-difference {
   display: grid;
-  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  /* 移动优先（task-33 E3 #30）：窄屏单列；桌面两列在文件尾 min-width 块回升 */
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   align-items: start;
   width: 100%;
@@ -227,11 +243,60 @@
 
 .multi-compatibility-value {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
+  /* 移动优先（task-33 E3 #30）：窄屏标签/值堆叠；桌面 36px 标签列在文件尾 min-width 块回升 */
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 6px;
   min-width: 0;
   max-width: 100%;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+/* ── 桌面回升（task-33 E3 #30）：原 @media (max-width: 767px) 段内规则的
+   桌面值改写至此；窄屏默认值已并入上方各 base 规则，两侧渲染等价 ── */
+@media (min-width: 768px) {
+  .admin-topbar {
+    min-height: 56px;
+    padding: 0 18px;
+  }
+
+  .admin-content {
+    padding: 22px;
+  }
+
+  .admin-page-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+
+  .admin-page-actions {
+    justify-content: flex-end;
+  }
+
+  .admin-page-title {
+    font-size: 24px !important;
+  }
+
+  .admin-toolbar {
+    align-items: center;
+  }
+
+  .multi-compatibility-difference {
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  }
+
+  .multi-compatibility-value {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+}
+
+/* 移动卡片列表卡（<768 断点分支专用组件，规则为纯 base，无需桌面回升；
+   task-33 E3 #30 自 max-width 媒体查询迁入） */
+.admin-mobile-list-card .ant-card-head {
+  padding-inline: 14px;
+}
+
+.admin-mobile-list-card .ant-card-body {
+  padding: 12px;
 }
 

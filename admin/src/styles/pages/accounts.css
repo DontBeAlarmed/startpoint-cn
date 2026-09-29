@@ -108,6 +108,9 @@
   min-width: 0;
   white-space: nowrap;
   justify-content: center;
+  /* task-33 E3 #30：自 shared-patterns max-width 媒体查询整条迁入
+     （.admin-mobile-actions 仅 <768 断点分支渲染，纯 base 无需桌面回升） */
+  min-height: 36px;
 }
 
 .admin-mobile-device-list {

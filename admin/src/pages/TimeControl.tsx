@@ -541,6 +541,7 @@ export default function TimeControl() {
                                         loading={gachaTimelineLoading}
                                         dataSource={gachaTimeline?.timeline ?? []}
                                         scroll={{ x: "max-content" }}
+                                        tableLayout="fixed"
                                         pagination={{ pageSize: 8, showSizeChanger: false }}
                                         columns={[
                                             { title: "卡池", dataIndex: "name", render: (name: string, row) => `${name} #${row.id}` },

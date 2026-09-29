@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { Alert, Button, Card, InputNumber, Popconfirm, Skeleton, Space, Switch, Typography, Upload, message } from "antd"
-import { SaveOutlined, UploadOutlined } from "@ant-design/icons"
+import { ReloadOutlined, SaveOutlined, UploadOutlined } from "@ant-design/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { apiDelete, apiGet, apiPatch, apiUpload } from "../api/client"
@@ -144,11 +144,22 @@ export default function GameplaySettings() {
         </span>
     )
 
+    // 页头刷新：设置值 + 当前存档模板一并失效重取
+    const refreshSettings = () => {
+        queryClient.invalidateQueries({ queryKey: ["serverGameplaySettings"] })
+        queryClient.invalidateQueries({ queryKey: ["defaultSave"] })
+    }
+
     return (
         <AdminPage
             eyebrow="SETTINGS"
             title="游戏设置"
             description="调整服务端运行时游戏规则，保存后无需重启。"
+            actions={
+                <Button icon={<ReloadOutlined />} loading={settings.isFetching} onClick={refreshSettings}>
+                    刷新
+                </Button>
+            }
         >
             <div className="admin-page-note">
                 <Typography.Text strong>保存方式说明</Typography.Text>
@@ -289,11 +300,14 @@ export default function GameplaySettings() {
                     </Card>
                     <Card
                         title="当前存档"
-                        extra={defSave?.exists
-                            ? <span className="admin-badge-ok">已设置</span>
-                            : <span className="admin-badge-info">未设置（新建存档为空档）</span>}
                     >
                         <Space direction="vertical" size="middle" className="admin-stack">
+                            {/* B1/B2：状态徽章在卡体首行（标题区不放状态）；未设置=muted、已设置=ok */}
+                            <Space wrap size={4}>
+                                {defSave?.exists
+                                    ? <span className="admin-badge-ok">已设置</span>
+                                    : <span className="admin-badge-muted">未设置（新建存档为空档）</span>}
+                            </Space>
                             <div className="admin-page-note">
                                 <Typography.Text type="secondary">
                                     上传玩家详情页「导出存档」得到的 JSON。之后任意账户「新建存档」时，将用它替换空存档。

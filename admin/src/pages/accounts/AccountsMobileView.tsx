@@ -135,7 +135,7 @@ export function AccountsMobileView({
                                 <Button icon={<Plus size={15} />} onClick={() => onNewSave(account.id)}>新建存档</Button>
                                 <Popconfirm
                                     title={`删除账号 ${account.id} 及所有存档？`}
-                                    okText="删除"
+                                    okText="确认"
                                     cancelText="取消"
                                     okButtonProps={{ danger: true }}
                                     onConfirm={() => onDeleteAccount(account.id)}
@@ -180,7 +180,7 @@ export function AccountsMobileView({
                                         <div className="admin-mobile-actions" onClick={event => event.stopPropagation()}>
                                             {/* 移动端存档卡操作行 icon+文字（维护者 2026-09-29 第五轮指定）；桌面仍为纯文字按钮 */}
                                             <Button icon={<Pencil size={15} />} aria-label="编辑存档" onClick={() => onOpenPlayer(player.id)}>编辑</Button>
-                                            {/* activateSave 服务端同时设置账号默认存档与全局活动存档，故仅 isDefault 时禁用 */}
+                                            {/* activateSave 服务端同时把该存档设为账号的当前存档与全局活动存档，故仅 isDefault 时禁用 */}
                                             <Button
                                                 icon={<ArrowLeftRight size={15} />}
                                                 aria-label="切换存档"
@@ -190,8 +190,7 @@ export function AccountsMobileView({
                                             <Button icon={<Copy size={15} />} aria-label="复制存档" onClick={() => onCloneSave(player.id, selectedAccount.id)}>复制</Button>
                                             <Popconfirm
                                                 title={`删除存档 ${player.id}？`}
-                                                description="删除后无法恢复。"
-                                                okText="删除"
+                                                okText="确认"
                                                 cancelText="取消"
                                                 okButtonProps={{ danger: true }}
                                                 onConfirm={() => onDeleteSave(player.id)}
