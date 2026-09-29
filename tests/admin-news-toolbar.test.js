@@ -175,7 +175,9 @@ assert.match(editor, /area\.selectionStart/, "插入点应来自原生 selection
 assert.match(editor, /area\.selectionEnd/, "插入点应来自原生 selectionEnd")
 assert.match(editor, /insertAround\(/, "应调用 insertAround 计算插入")
 assert.match(editor, /update\("bodyRichText", result\.text\)/, "新文本必须走既有 onChange 通道写回")
-assert.match(editor, /requestAnimationFrame/, "React 提交后恢复选区")
+// 原生 setter 同步写回 + input 事件走受控 onChange（避免受控重渲染光标竞态）
+assert.match(editor, /nativeValueSetter\.call\(area, result\.text\)/, "原生 setter 同步写回")
+assert.match(editor, /dispatchEvent\(new Event\("input", \{ bubbles: true \}\)\)/, "input 事件走受控通道")
 assert.match(editor, /area\.focus\(\)/, "点击后焦点返回 textarea")
 assert.match(editor, /area\.setSelectionRange\(result\.selStart, result\.selEnd\)/, "必须恢复选区")
 assert.match(editor, /onMouseDown=\{event => event\.preventDefault\(\)\}/, "mousedown preventDefault 保持 textarea 焦点与选区")

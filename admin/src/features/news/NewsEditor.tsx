@@ -88,8 +88,9 @@ export default function NewsEditor({ news, open, onClose, onSaved }: NewsEditorP
         setDraft(current => ({ ...current, [key]: value }))
     }
 
-    // 工具栏插入：读取原生 textarea 选区 → 纯函数计算新文本 → 走既有 onChange 通道写回。
-    // 受控重渲染会把光标甩到末尾，等 React 提交后再恢复焦点与选区（placeholder 保持选中）。
+    // 工具栏插入：读取原生 textarea 选区 → 纯函数计算新文本。
+    // 经原生 value setter + input 事件走受控 onChange 写回（React 收到相同值不会重置光标），
+    // 随后同步设置选区——rAF 异步恢复在连续键入下存在竞态（维护者 2026-09-30 反馈"不好用"的根因）。
     const insertFragment = (fragment: RichTextFragment) => {
         const area = bodyAreaRef.current
         if (!area) return
@@ -101,11 +102,17 @@ export default function NewsEditor({ news, open, onClose, onSaved }: NewsEditorP
             fragment.close,
             fragment.placeholder,
         )
-        update("bodyRichText", result.text)
-        requestAnimationFrame(() => {
-            area.focus()
-            area.setSelectionRange(result.selStart, result.selEnd)
-        })
+        area.focus()
+        const nativeValueSetter = Object.getOwnPropertyDescriptor(
+            window.HTMLTextAreaElement.prototype, "value",
+        )?.set
+        if (nativeValueSetter) {
+            nativeValueSetter.call(area, result.text)
+            area.dispatchEvent(new Event("input", { bubbles: true }))
+        } else {
+            update("bodyRichText", result.text)
+        }
+        area.setSelectionRange(result.selStart, result.selEnd)
     }
 
     const previewDate = new Date(draft.publishedAtReal)
