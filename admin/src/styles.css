@@ -452,25 +452,36 @@ body {
   min-width: 0;
   color: var(--ink);
   font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 36px;
+  /* 与总览页时钟同款: 视宽自适应 + 永不折行 (维护者 2026-09-29 风格统一) */
+  font-size: clamp(18px, 7.4vw, 32px);
   font-weight: 800;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
 }
 
+/* 日期一行 + 时间一行, 居中排布 */
+.admin-time-hero-digits-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0 10px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
 .admin-time-hero-cell {
   display: inline-flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 3px;
   min-width: 0;
 }
 
 .admin-time-hero-seg {
   min-width: 0;
-  width: min(150px, 46vw);
-  padding: 2px 6px;
+  width: 2.6ch;
+  padding: 0 3px;
   border: 2px solid transparent;
-  border-radius: 12px;
+  border-radius: 8px;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -479,7 +490,7 @@ body {
 }
 
 .admin-time-hero-seg-year {
-  width: min(200px, 60vw);
+  width: 4.8ch;
 }
 
 .admin-time-hero-seg:hover {
@@ -539,12 +550,17 @@ body {
     padding: 22px 30px 18px;
   }
 
-  /* 桌面: 时钟永远单行 — flex-shrink 让段收窄而不是撑破容器 */
+  /* 桌面: 时钟永远单行 — flex-shrink 让段收窄而不是撑破容器; 行容器摊平, 字号与总览页时钟一致 */
   .admin-time-hero-digits {
     flex-direction: row;
     flex-wrap: nowrap;
     justify-content: center;
-    font-size: 40px;
+    gap: 0;
+    font-size: 38px;
+  }
+
+  .admin-time-hero-digits-row {
+    display: contents;
   }
 
   .admin-time-hero-cell {

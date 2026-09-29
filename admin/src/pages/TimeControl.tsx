@@ -379,7 +379,12 @@ export default function TimeControl() {
                                             else cancelEditingTime()
                                         }}
                                     >
-                                        {timeSegments.map((segment, index) => (
+                                        {/* 日期一行 + 时间一行, 与总览页时钟同款排版 (维护者 2026-09-29) */}
+                                        {[timeSegments.slice(0, 3), timeSegments.slice(3)].map((group, groupIndex) => (
+                                            <div className="admin-time-hero-digits-row" key={groupIndex}>
+                                                {group.map((segment, groupOffset) => {
+                                                    const index = groupIndex * 3 + groupOffset
+                                                    return (
                                             <span className="admin-time-hero-cell" key={segment.key}>
                                                 <input
                                                     ref={(node) => { segmentRefs.current[index] = node }}
@@ -420,6 +425,9 @@ export default function TimeControl() {
                                                 />
                                                 <span className="admin-time-hero-unit">{segment.label}</span>
                                             </span>
+                                                )
+                                            })}
+                                            </div>
                                         ))}
                                     </div>
                                 </div>
