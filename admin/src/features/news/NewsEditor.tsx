@@ -3,6 +3,7 @@ import { Form, Input, Modal, Select, Switch, message } from "antd"
 import { useMutation } from "@tanstack/react-query"
 
 import { apiPatch, apiPost } from "../../api/client"
+import { NewsThumb, renderNewsRichText } from "./newsPreview"
 import type { AdminNewsRow, NewsDraft } from "./types"
 
 const { TextArea } = Input
@@ -12,6 +13,13 @@ const CATEGORY_OPTIONS = [
     { value: 2, label: "活动公告" },
     { value: 3, label: "问题公告" },
 ]
+
+// 分类语义色（审查稿 #p-news：主题=水蓝 / 活动=风绿 / 问题=雷黄），列表与编辑器同源。
+const CATEGORY_BADGE_CLASS: Record<number, string> = {
+    1: "admin-badge-info",
+    2: "admin-badge-ok",
+    3: "admin-badge-warn",
+}
 
 const LABEL_OPTIONS = Array.from({ length: 8 }, (_, index) => ({
     value: index + 1,
@@ -75,6 +83,11 @@ export default function NewsEditor({ news, open, onClose, onSaved }: NewsEditorP
         setDraft(current => ({ ...current, [key]: value }))
     }
 
+    const previewDate = new Date(draft.publishedAtReal)
+    const previewDateText = Number.isNaN(previewDate.getTime())
+        ? ""
+        : `${previewDate.getFullYear()}-${String(previewDate.getMonth() + 1).padStart(2, "0")}-${String(previewDate.getDate()).padStart(2, "0")}`
+
     return (
         <Modal
             open={open}
@@ -90,78 +103,106 @@ export default function NewsEditor({ news, open, onClose, onSaved }: NewsEditorP
                 }
                 save.mutate()
             }}
-            width="min(92vw, 860px)"
+            width="min(94vw, 1080px)"
             destroyOnClose
         >
-            <Form layout="vertical" preserve={false}>
-                <div className="admin-form-section">
-                    <div className="admin-form-section-title">基本信息</div>
-                    <Form.Item label="标题" required>
-                        <Input
-                            value={draft.title}
-                            maxLength={128}
-                            onChange={event => update("title", event.target.value)}
-                        />
-                    </Form.Item>
-                    <Form.Item label="发布时间" required>
-                        <Input
-                            type="datetime-local"
-                            value={toLocalInputValue(draft.publishedAtReal)}
-                            onChange={event => {
-                                const parsed = new Date(event.target.value)
-                                if (!Number.isNaN(parsed.getTime())) {
-                                    update("publishedAtReal", parsed.toISOString())
-                                }
-                            }}
-                        />
-                    </Form.Item>
-                    <Form.Item label="分类" required>
-                        <Select
-                            options={CATEGORY_OPTIONS}
-                            value={draft.category}
-                            onChange={value => update("category", value)}
-                        />
-                    </Form.Item>
-                    <Form.Item label="标签" required>
-                        <Select
-                            options={LABEL_OPTIONS}
-                            value={draft.label}
-                            onChange={value => update("label", value)}
-                        />
-                    </Form.Item>
-                    <Form.Item label="缩略图" required>
-                        <Select
-                            options={THUMBNAIL_OPTIONS}
-                            value={draft.thumbnail}
-                            onChange={value => update("thumbnail", value)}
-                        />
-                    </Form.Item>
-                    <Form.Item label="启用状态">
-                        <Switch
-                            checked={draft.enabled}
-                            checkedChildren="启用"
-                            unCheckedChildren="停用"
-                            onChange={value => update("enabled", value)}
-                        />
-                    </Form.Item>
+            <div className="news-editor-grid">
+                <div className="news-editor-form-col">
+                    <Form layout="vertical" preserve={false}>
+                        <div className="admin-form-section">
+                            <div className="admin-form-section-title">基础信息</div>
+                            <Form.Item label="标题" required>
+                                <Input
+                                    value={draft.title}
+                                    maxLength={128}
+                                    onChange={event => update("title", event.target.value)}
+                                />
+                            </Form.Item>
+                            <Form.Item label="分类" required>
+                                <Select
+                                    options={CATEGORY_OPTIONS}
+                                    value={draft.category}
+                                    onChange={value => update("category", value)}
+                                    labelRender={({ label }) => (
+                                        <span className={CATEGORY_BADGE_CLASS[draft.category]}>{label}</span>
+                                    )}
+                                    optionRender={option => (
+                                        <span className={CATEGORY_BADGE_CLASS[option.value as number]}>{option.label}</span>
+                                    )}
+                                />
+                            </Form.Item>
+                            <Form.Item label="标签" required>
+                                <Select
+                                    options={LABEL_OPTIONS}
+                                    value={draft.label}
+                                    onChange={value => update("label", value)}
+                                />
+                            </Form.Item>
+                            <Form.Item label="缩略图" required>
+                                <Select
+                                    options={THUMBNAIL_OPTIONS}
+                                    value={draft.thumbnail}
+                                    onChange={value => update("thumbnail", value)}
+                                />
+                            </Form.Item>
+                        </div>
+                        <div className="admin-form-section">
+                            <div className="admin-form-section-title">排期与状态</div>
+                            <Form.Item label="发布时间" required>
+                                <Input
+                                    type="datetime-local"
+                                    value={toLocalInputValue(draft.publishedAtReal)}
+                                    onChange={event => {
+                                        const parsed = new Date(event.target.value)
+                                        if (!Number.isNaN(parsed.getTime())) {
+                                            update("publishedAtReal", parsed.toISOString())
+                                        }
+                                    }}
+                                />
+                            </Form.Item>
+                            <Form.Item label="启用状态">
+                                <Switch
+                                    checked={draft.enabled}
+                                    checkedChildren="启用"
+                                    unCheckedChildren="停用"
+                                    onChange={value => update("enabled", value)}
+                                />
+                            </Form.Item>
+                        </div>
+                        <div className="admin-form-section">
+                            <div className="admin-form-section-title">正文</div>
+                            <Form.Item label="公告内容" required extra="使用客户端 RichText 标签，不支持属性和外部链接。">
+                                <TextArea
+                                    rows={10}
+                                    value={draft.bodyRichText}
+                                    onChange={event => update("bodyRichText", event.target.value)}
+                                />
+                            </Form.Item>
+                        </div>
+                    </Form>
                 </div>
-                <div className="admin-form-section">
-                    <div className="admin-form-section-title">内容</div>
-                    <Form.Item label="公告内容" required extra="使用客户端 RichText 标签，不支持属性和外部链接。">
-                        <TextArea
-                            rows={10}
-                            value={draft.bodyRichText}
-                            onChange={event => update("bodyRichText", event.target.value)}
+                <div className="news-editor-preview-col">
+                    <div className="news-phone">
+                        <div className="news-phone-title">{draft.title.trim() !== "" ? draft.title : "（无标题）"}</div>
+                        <NewsThumb thumbnail={draft.thumbnail} className="news-phone-thumb" />
+                        <div className="news-phone-body">
+                            {renderNewsRichText(draft.bodyRichText)}
+                        </div>
+                        <div className="news-phone-sep" />
+                        <div className="news-phone-foot">
+                            {previewDateText} · 官方公告{draft.enabled ? "" : " · 未启用"}
+                        </div>
+                    </div>
+                    {/* 原始内容无障碍回退：手机拟真预览用纯前端字符串渲染 RichText，
+                        这份 sandbox iframe 保留原始正文的等价文本镜像（屏幕阅读器可用）。 */}
+                    <div className="news-editor-raw-frame">
+                        <iframe
+                            title="公告预览"
+                            sandbox=""
+                            srcDoc={draft.bodyRichText}
                         />
-                    </Form.Item>
+                    </div>
                 </div>
-            </Form>
-            <div className="news-editor-preview">
-                <iframe
-                    title="公告预览"
-                    sandbox=""
-                    srcDoc={draft.bodyRichText}
-                />
             </div>
         </Modal>
     )

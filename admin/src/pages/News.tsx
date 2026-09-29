@@ -17,12 +17,20 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { ApiError, apiDelete, apiGet, apiPatch } from "../api/client"
 import { AdminPage } from "../components/AdminPage"
 import NewsEditor from "../features/news/NewsEditor"
+import { NewsThumb } from "../features/news/newsPreview"
 import type { AdminNewsRow, NewsPage } from "../features/news/types"
 
 const CATEGORY_LABELS: Record<AdminNewsRow["category"], string> = {
     1: "主题",
     2: "活动",
     3: "问题",
+}
+
+// 分类语义色（审查稿 #p-news：主题=水蓝 / 活动=风绿 / 问题=雷黄）。
+const CATEGORY_BADGE_CLASS: Record<AdminNewsRow["category"], string> = {
+    1: "admin-badge-info",
+    2: "admin-badge-ok",
+    3: "admin-badge-warn",
 }
 
 function invalidateNews(queryClient: ReturnType<typeof useQueryClient>, id?: number) {
@@ -144,6 +152,13 @@ export default function News() {
                             },
                         }}
                         columns={[
+                            {
+                                title: "缩略图",
+                                dataIndex: "thumbnail",
+                                width: 90,
+                                align: "center",
+                                render: (_: unknown, row) => <NewsThumb thumbnail={row.thumbnail} />,
+                            },
                             { title: "标题", dataIndex: "title", width: 260 },
                             {
                                 title: "分类",
@@ -151,7 +166,7 @@ export default function News() {
                                 width: 100,
                                 responsive: ["sm"] as any,
                                 render: (category: AdminNewsRow["category"]) => (
-                                    <span className="admin-badge-info">{CATEGORY_LABELS[category]}</span>
+                                    <span className={CATEGORY_BADGE_CLASS[category]}>{CATEGORY_LABELS[category]}</span>
                                 ),
                             },
                             {
@@ -162,7 +177,6 @@ export default function News() {
                                 render: value => new Date(value).toLocaleString("zh-CN"),
                             },
                             { title: "标签", dataIndex: "label", width: 80, align: "right", responsive: ["sm"] as any },
-                            { title: "缩略图", dataIndex: "thumbnail", width: 90, align: "right", responsive: ["sm"] as any },
                             {
                                 title: "状态",
                                 width: 110,
