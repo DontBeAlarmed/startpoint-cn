@@ -5,9 +5,17 @@
  */
 import * as fs from "fs";
 import { prepareDataVolume } from "../runtime/data-paths";
+import { getPlayerRankLevel } from "../lib/player-rank-content";
 import { LegacyPlayerSaveV1Snapshot, PlayerSaveV2Snapshot } from "./player-save/types";
 
 export type DefaultSaveSnapshot = LegacyPlayerSaveV1Snapshot | PlayerSaveV2Snapshot;
+
+/** 模板存档自身统计（只读解析自快照 JSON；等级由 rank_point 经 Rank 内容表换算）。 */
+export interface DefaultSaveStats {
+    rank?: number;
+    characterCount?: number;
+    equipmentCount?: number;
+}
 
 export interface DefaultSaveMeta {
     exists: boolean;
@@ -16,6 +24,7 @@ export interface DefaultSaveMeta {
     sourcePlayerId?: number | null;
     formatVersion?: number;
     legacyPartial?: boolean;
+    stats?: DefaultSaveStats;
 }
 
 export function saveDefaultSaveTemplate(snapshot: DefaultSaveSnapshot): void {
@@ -41,6 +50,38 @@ export function clearDefaultSaveTemplate(): boolean {
     return false;
 }
 
+/**
+ * 只读解析模板存档 JSON 的自身统计：角色数（players_characters 行数）、
+ * 装备数（players_equipment 行数）、等级（players.rank_point 经
+ * getPlayerRankLevel 按 Rank 内容表换算）。零写入；任何字段不可解析时
+ * 降级为仅返回可获得的子集。legacy v1 快照没有 domains 结构，返回空统计。
+ */
+function getTemplateStats(snapshot: DefaultSaveSnapshot): DefaultSaveStats {
+    const formatVersion = "formatVersion" in snapshot ? snapshot.formatVersion : snapshot.version;
+    if (formatVersion !== 2) return {};
+    const tables = (snapshot as PlayerSaveV2Snapshot).domains?.core?.tables;
+    if (!tables) return {};
+    const stats: DefaultSaveStats = {};
+    if (Array.isArray(tables.players_characters)) {
+        stats.characterCount = tables.players_characters.length;
+    }
+    if (Array.isArray(tables.players_equipment)) {
+        stats.equipmentCount = tables.players_equipment.length;
+    }
+    const player = Array.isArray(tables.players) ? tables.players[0] : undefined;
+    const rankPoint = player !== undefined && typeof player.rank_point === "number"
+        ? player.rank_point
+        : Number.NaN;
+    if (Number.isSafeInteger(rankPoint) && rankPoint >= 0) {
+        try {
+            stats.rank = getPlayerRankLevel(rankPoint);
+        } catch {
+            // Rank 内容表不可用时降级：不展示等级
+        }
+    }
+    return stats;
+}
+
 export function getDefaultSaveMeta(): DefaultSaveMeta {
     const t = loadDefaultSaveTemplate();
     if (!t) return { exists: false };
@@ -55,5 +96,6 @@ export function getDefaultSaveMeta(): DefaultSaveMeta {
         sourcePlayerId: t.playerId ?? null,
         formatVersion,
         legacyPartial: formatVersion === 1,
+        stats: getTemplateStats(t),
     };
 }

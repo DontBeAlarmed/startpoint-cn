@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Alert, Button, Card, InputNumber, Popconfirm, Skeleton, Space, Switch, Typography, Upload, message } from "antd"
 import { SaveOutlined, UploadOutlined } from "@ant-design/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -14,18 +14,36 @@ interface GameplaySettings {
     updatedAt: string
 }
 
+interface DefaultSaveStats {
+    rank?: number
+    characterCount?: number
+    equipmentCount?: number
+}
+
 interface DefaultSaveMeta {
     exists: boolean
     playerName?: string | null
     exportedAt?: string | null
     sourcePlayerId?: number | null
+    stats?: DefaultSaveStats
 }
+
 export default function GameplaySettings() {
     const queryClient = useQueryClient()
     const [draftMultiplier, setDraftMultiplier] = useState<number | null>(null)
     const [draftRescueEnabled, setDraftRescueEnabled] = useState<boolean | null>(null)
     const [draftHostRescueEnabled, setDraftHostRescueEnabled] = useState<boolean | null>(null)
     const [draftRushCompatibilityEnabled, setDraftRushCompatibilityEnabled] = useState<boolean | null>(null)
+    // 保存成功反馈：卡片标题旁「已保存 ✓」2 秒（纯前端状态）
+    const [savedFlash, setSavedFlash] = useState<string | null>(null)
+    const flashTimers = useRef<Record<string, number>>({})
+    const flashSaved = (key: string) => {
+        setSavedFlash(key)
+        window.clearTimeout(flashTimers.current[key])
+        flashTimers.current[key] = window.setTimeout(() => {
+            setSavedFlash(current => current === key ? null : current)
+        }, 2000)
+    }
     const settings = useQuery({
         queryKey: ["serverGameplaySettings"],
         queryFn: () => apiGet<GameplaySettings>("/api/server/settings/gameplay"),
@@ -56,6 +74,7 @@ export default function GameplaySettings() {
         onSuccess: value => {
             queryClient.setQueryData(["serverGameplaySettings"], value)
             setDraftMultiplier(value.dropMultiplier)
+            flashSaved("multiplier")
             message.success("游戏设置已保存")
         },
         onError: (error: Error) => message.error(error.message),
@@ -68,6 +87,7 @@ export default function GameplaySettings() {
         onSuccess: value => {
             queryClient.setQueryData(["serverGameplaySettings"], value)
             setDraftRescueEnabled(value.multiRescueFragmentRewardsEnabled)
+            flashSaved("rescue")
             message.success("游戏设置已保存")
         },
         onError: (error: Error) => message.error(error.message),
@@ -80,6 +100,7 @@ export default function GameplaySettings() {
         onSuccess: value => {
             queryClient.setQueryData(["serverGameplaySettings"], value)
             setDraftHostRescueEnabled(value.multiRescueHostRewardsEnabled)
+            flashSaved("hostRescue")
             message.success("游戏设置已保存")
         },
         onError: (error: Error) => message.error(error.message),
@@ -92,6 +113,7 @@ export default function GameplaySettings() {
         onSuccess: value => {
             queryClient.setQueryData(["serverGameplaySettings"], value)
             setDraftRushCompatibilityEnabled(value.rush700011To700017CompatibilityEnabled)
+            flashSaved("rushCompatibility")
             message.success("游戏设置已保存")
         },
         onError: (error: Error) => message.error(error.message),
@@ -112,6 +134,15 @@ export default function GameplaySettings() {
         || draftHostRescueEnabled === settings.data?.multiRescueHostRewardsEnabled
     const rushCompatibilityUnchanged = draftRushCompatibilityEnabled === null
         || draftRushCompatibilityEnabled === settings.data?.rush700011To700017CompatibilityEnabled
+
+    // 卡片标题：未保存圆点（有改动未保存）+ 保存成功后的 2 秒「已保存 ✓」反馈
+    const cardTitle = (title: string, dirty: boolean, flashKey: string) => (
+        <span className="admin-settings-card-title">
+            {title}
+            {dirty && <span className="admin-dirty-dot" role="img" aria-label="有未保存修改" title="有未保存修改" />}
+            {savedFlash === flashKey && <span className="admin-saved-flash">已保存 ✓</span>}
+        </span>
+    )
 
     return (
         <AdminPage
@@ -139,7 +170,7 @@ export default function GameplaySettings() {
             ) : (
                 <Space direction="vertical" size="large" className="admin-stack">
                     <Card
-                        title="关卡固定掉落倍率"
+                        title={cardTitle("关卡固定掉落倍率", !unchanged, "multiplier")}
                         extra={currentMultiplier !== undefined
                             && <span className="admin-badge-ok">当前 {currentMultiplier} 倍</span>}
                     >
@@ -173,7 +204,7 @@ export default function GameplaySettings() {
                         </Space>
                     </Card>
                     <Card
-                        title="本服玩家：所有多人房间救援资格"
+                        title={cardTitle("本服玩家：所有多人房间救援资格", !rescueUnchanged, "rescue")}
                         extra={(
                             <span className={settings.data?.multiRescueFragmentRewardsEnabled
                                 ? "admin-badge-ok"
@@ -209,7 +240,7 @@ export default function GameplaySettings() {
                         </Space>
                     </Card>
                     <Card
-                        title="本服玩家：房主救援身份"
+                        title={cardTitle("本服玩家：房主救援身份", !hostRescueUnchanged, "hostRescue")}
                         extra={(
                             <span className={settings.data?.multiRescueHostRewardsEnabled
                                 ? "admin-badge-ok"
@@ -245,7 +276,7 @@ export default function GameplaySettings() {
                         </Space>
                     </Card>
                     <Card
-                        title="Rush 私服兼容"
+                        title={cardTitle("Rush 私服兼容", !rushCompatibilityUnchanged, "rushCompatibility")}
                         extra={(
                             <span className={settings.data?.rush700011To700017CompatibilityEnabled
                                 ? "admin-badge-ok"
@@ -301,6 +332,26 @@ export default function GameplaySettings() {
                                         </Typography.Text>
                                     )}
                                 </Space>
+                            )}
+                            {defSave?.exists && (
+                                <div className="admin-default-save-stats">
+                                    <div className="admin-default-save-stat">
+                                        <span className="admin-default-save-stat-label">等级</span>
+                                        <span className="admin-default-save-stat-value">{defSave.stats?.rank ?? "-"}</span>
+                                    </div>
+                                    <div className="admin-default-save-stat">
+                                        <span className="admin-default-save-stat-label">角色数</span>
+                                        <span className="admin-default-save-stat-value">
+                                            {defSave.stats?.characterCount?.toLocaleString("zh-CN") ?? "-"}
+                                        </span>
+                                    </div>
+                                    <div className="admin-default-save-stat">
+                                        <span className="admin-default-save-stat-label">装备数</span>
+                                        <span className="admin-default-save-stat-value">
+                                            {defSave.stats?.equipmentCount?.toLocaleString("zh-CN") ?? "-"}
+                                        </span>
+                                    </div>
+                                </div>
                             )}
                             <Space wrap>
                                 <Upload
