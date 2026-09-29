@@ -1176,8 +1176,10 @@ html[data-theme="dark"] {
 .admin-hero-clock {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  text-align: center;
   gap: 6px;
-  /* 窄屏: 时钟整行独占, 不与徽章区并排 (维护者 2026-09-29 溢出修复) */
+  /* 窄屏: 时钟整行独占, 内容在父盒内水平居中 (维护者 2026-09-29) */
   flex: 1 1 100%;
   min-width: 0;
 }
@@ -1205,6 +1207,7 @@ html[data-theme="dark"] {
 .admin-hero-clock-sub {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 4px 10px;
   align-items: center;
   min-width: 0;
@@ -1221,6 +1224,7 @@ html[data-theme="dark"] {
 .admin-hero-chips {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
   align-items: center;
   flex: 1 1 100%;
@@ -1237,13 +1241,20 @@ html[data-theme="dark"] {
     font-size: 38px;
   }
 
-  /* 桌面恢复时钟/徽章区并排 (窄屏为整行堆叠) */
+  /* 桌面恢复时钟/徽章区并排且左对齐 (窄屏为居中堆叠) */
   .admin-hero-clock {
     flex: 1 0 auto;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .admin-hero-clock-sub {
+    justify-content: flex-start;
   }
 
   .admin-hero-chips {
     flex: 1 1 260px;
+    justify-content: flex-start;
   }
 }
 
