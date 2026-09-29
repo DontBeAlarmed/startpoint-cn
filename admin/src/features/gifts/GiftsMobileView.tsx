@@ -85,27 +85,34 @@ export function GiftsMobileView({
                                 已领取 {row.redemptionCount} · 更新时间 {new Date(row.updatedAt).toLocaleString("zh-CN")}
                             </Typography.Text>
                             <div className="admin-mobile-actions">
-                                {active ? (
-                                    <>
-                                        <Button icon={<CircleStop size={15} />} aria-label="停止礼包" onClick={() => onStop(row)}>
-                                            停止
-                                        </Button>
-                                        <Button icon={<Eye size={15} />} aria-label="领取记录" onClick={() => onOpenRedemptions(row)}>
-                                            记录
-                                        </Button>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Button icon={<Pencil size={15} />} aria-label="编辑礼包" onClick={() => onEdit(row)}>
-                                            编辑
-                                        </Button>
-                                        <Button icon={<Play size={15} />} aria-label="启动礼包" onClick={() => onStart(row)}>
-                                            启动
-                                        </Button>
-                                        <Button icon={<Eye size={15} />} aria-label="领取记录" onClick={() => onOpenRedemptions(row)}>
-                                            记录
-                                        </Button>
-                                    </>
+                                {/* 启停按钮恒在原位重标记 (与定时资源卡 停用/启用 同模式, 维护者 2026-09-30:
+                                   点击后按钮消失的 UX 不统一); 编辑仅 stopped 提供, 恒排末位不挤动其他按钮 */}
+                                <Button
+                                    icon={active ? <CircleStop size={15} /> : <Play size={15} />}
+                                    aria-label={active ? "停止礼包" : "启动礼包"}
+                                    onClick={() => (active ? onStop(row) : onStart(row))}
+                                >
+                                    {active ? "停止" : "启动"}
+                                </Button>
+                                <Button icon={<Eye size={15} />} aria-label="领取记录" onClick={() => onOpenRedemptions(row)}>
+                                    记录
+                                </Button>
+                                <Popconfirm
+                                    title="删除这个礼包？"
+                                    description="此操作不可恢复，将清除全部领取记录，同 code 重建后可重新领取。"
+                                    okText="删除"
+                                    cancelText="取消"
+                                    okButtonProps={{ danger: true }}
+                                    onConfirm={() => onDelete(row)}
+                                >
+                                    <Button danger icon={<Trash2 size={15} />} aria-label="删除礼包">
+                                        删除
+                                    </Button>
+                                </Popconfirm>
+                                {!active && (
+                                    <Button icon={<Pencil size={15} />} aria-label="编辑礼包" onClick={() => onEdit(row)}>
+                                        编辑
+                                    </Button>
                                 )}
                                 <Popconfirm
                                     title="删除这个礼包？"

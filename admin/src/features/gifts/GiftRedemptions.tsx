@@ -80,6 +80,7 @@ export default function GiftRedemptions({ gift, gifts, onGiftChange, onClose }: 
                     loading={redemptions.isLoading}
                     dataSource={redemptions.data?.rows ?? []}
                     scroll={{ x: "max-content" }}
+                    tableLayout="fixed"
                     locale={{ emptyText: "暂无领取记录" }}
                     pagination={{
                         current: page,
