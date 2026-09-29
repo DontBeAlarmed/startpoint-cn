@@ -125,3 +125,9 @@
     flex-wrap: nowrap;
   }
 }
+
+/* 礼包 code 单元格: 窄屏允许换行完整显示, 不被列宽截断 */
+.gift-code-cell {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}

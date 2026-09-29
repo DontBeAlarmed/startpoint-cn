@@ -176,7 +176,7 @@ export default function Gifts() {
                             },
                         }}
                         columns={[
-                            { title: "Code", dataIndex: "code", width: 180 },
+                            { title: "Code", dataIndex: "code", width: 150, render: (_: unknown, row) => <span className="gift-code-cell">{row.code}</span> },
                             {
                                 title: "状态",
                                 dataIndex: "status",
