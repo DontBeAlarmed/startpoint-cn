@@ -64,22 +64,16 @@
   font-size: 12px;
 }
 
+/* 维护者 2026-09-30: 群发记录不与发送表单并列, 保持上下结构 (仅保留纵向 stack) */
 .admin-mail-grid {
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
   min-width: 0;
 }
 
 .admin-mail-grid-col {
   min-width: 0;
-}
-
-@media (min-width: 768px) {
-  .admin-mail-grid {
-    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-    align-items: start;
-  }
 }
 
 /* mail history expanded row: quiet snapshot panel + 复制重发 (prefill only,
