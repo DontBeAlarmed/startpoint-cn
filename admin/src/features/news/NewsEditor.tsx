@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Form, Input, Modal, Select, Switch, message } from "antd"
 import { useMutation } from "@tanstack/react-query"
 
 import { apiPatch, apiPost } from "../../api/client"
 import { NewsThumb, renderNewsRichText } from "./newsPreview"
+import { NEWS_COLOR_PALETTE, NEWS_TOOLBAR_ACTIONS, colorFragment, insertAround } from "./richTextToolbar"
 import type { AdminNewsRow, NewsDraft } from "./types"
+import type { RichTextFragment } from "./richTextToolbar"
 
 const { TextArea } = Input
 
@@ -59,6 +61,9 @@ function toDraft(news: AdminNewsRow | null): NewsDraft {
 
 export default function NewsEditor({ news, open, onClose, onSaved }: NewsEditorProps) {
     const [draft, setDraft] = useState<NewsDraft>(() => toDraft(news))
+    // 工具栏插入点依赖原生 textarea 的 selectionStart/End（antd TextAreaRef 转手交出原生节点）
+    const bodyAreaRef = useRef<HTMLTextAreaElement | null>(null)
+    const [colorPaletteOpen, setColorPaletteOpen] = useState(false)
 
     useEffect(() => {
         if (open) setDraft(toDraft(news))
@@ -81,6 +86,26 @@ export default function NewsEditor({ news, open, onClose, onSaved }: NewsEditorP
 
     const update = <K extends keyof NewsDraft>(key: K, value: NewsDraft[K]) => {
         setDraft(current => ({ ...current, [key]: value }))
+    }
+
+    // 工具栏插入：读取原生 textarea 选区 → 纯函数计算新文本 → 走既有 onChange 通道写回。
+    // 受控重渲染会把光标甩到末尾，等 React 提交后再恢复焦点与选区（placeholder 保持选中）。
+    const insertFragment = (fragment: RichTextFragment) => {
+        const area = bodyAreaRef.current
+        if (!area) return
+        const result = insertAround(
+            area.value,
+            area.selectionStart ?? area.value.length,
+            area.selectionEnd ?? area.value.length,
+            fragment.open,
+            fragment.close,
+            fragment.placeholder,
+        )
+        update("bodyRichText", result.text)
+        requestAnimationFrame(() => {
+            area.focus()
+            area.setSelectionRange(result.selStart, result.selEnd)
+        })
     }
 
     const previewDate = new Date(draft.publishedAtReal)
@@ -172,10 +197,53 @@ export default function NewsEditor({ news, open, onClose, onSaved }: NewsEditorP
                         <div className="admin-form-section">
                             <div className="admin-form-section-title">正文</div>
                             <Form.Item label="公告内容" required extra="使用客户端 RichText 标签，不支持属性和外部链接。">
+                                <div className="news-toolbar" role="toolbar" aria-label="公告 RichText 插入">
+                                    {NEWS_TOOLBAR_ACTIONS.map(action => (
+                                        <button type="button" key={action.key}
+                                            className="news-toolbar-btn"
+                                            title={action.title}
+                                            onMouseDown={event => event.preventDefault()}
+                                            onClick={() => insertFragment(action)}
+                                        >
+                                            {action.label}
+                                        </button>
+                                    ))}
+                                    <span className="news-toolbar-color-wrap">
+                                        <button type="button"
+                                            className={colorPaletteOpen ? "news-toolbar-btn news-toolbar-btn-active" : "news-toolbar-btn"}
+                                            title="颜色 [color=xxxxxx]…[/color]"
+                                            aria-expanded={colorPaletteOpen}
+                                            onMouseDown={event => event.preventDefault()}
+                                            onClick={() => setColorPaletteOpen(current => !current)}
+                                        >
+                                            A
+                                        </button>
+                                        {colorPaletteOpen && (
+                                            <span className="news-toolbar-palette">
+                                                {NEWS_COLOR_PALETTE.map(color => (
+                                                    <button type="button" key={color.hex}
+                                                        className="news-toolbar-swatch"
+                                                        style={{ background: `#${color.hex}` }}
+                                                        title={`${color.label} #${color.hex}`}
+                                                        aria-label={`插入 ${color.label}（#${color.hex}）`}
+                                                        onMouseDown={event => event.preventDefault()}
+                                                        onClick={() => {
+                                                            insertFragment(colorFragment(color.hex))
+                                                            setColorPaletteOpen(false)
+                                                        }}
+                                                    />
+                                                ))}
+                                            </span>
+                                        )}
+                                    </span>
+                                </div>
                                 <TextArea
                                     rows={10}
                                     value={draft.bodyRichText}
                                     onChange={event => update("bodyRichText", event.target.value)}
+                                    ref={instance => {
+                                        bodyAreaRef.current = instance?.resizableTextArea?.textArea ?? null
+                                    }}
                                 />
                             </Form.Item>
                         </div>

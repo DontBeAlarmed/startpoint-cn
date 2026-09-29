@@ -117,3 +117,66 @@
 .admin-news-thumb:not(img) {
   border: 1px solid var(--line);
 }
+
+/* ── news body toolbar: 光标处插入白名单 RichText 片段 ──────────────────────
+   textarea 仍是唯一事实源；按钮只写入文本，不引入编辑器库。mousedown
+   preventDefault 保持 textarea 焦点与选区可见。 */
+.news-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.news-toolbar-btn {
+  min-width: 28px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 24px;
+  cursor: pointer;
+}
+
+.news-toolbar-btn:hover,
+.news-toolbar-btn-active {
+  border-color: var(--line-strong);
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.news-toolbar-color-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.news-toolbar-palette {
+  position: absolute;
+  top: 30px;
+  left: 0;
+  z-index: 20;
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 3px 3px 0 var(--line);
+}
+
+.news-toolbar-swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.news-toolbar-swatch:hover {
+  border-color: var(--ink);
+}

@@ -718,6 +718,7 @@ const TEST_GROUPS = Object.freeze({
             "tests/admin-mail-rules.test.js",
             "tests/admin-mail-ui-source.test.js",
             "tests/admin-news-ui-source.test.js",
+            "tests/admin-news-toolbar.test.js",
             "tests/admin-scheduled-resource-ui-source.test.js",
             "tests/admin-theme-ui-source.test.js",
             "tests/admin-time-clairvoyance-ui-source.test.js",
