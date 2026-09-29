@@ -1,0 +1,434 @@
+/* shared AntD overrides, mobile breakpoints, theme toggle, badges, hero, stat-band (+ parked legacy seed-grid / chip-button, currently unreferenced) */
+.admin-seed-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 14px;
+}
+
+.admin-seed-column {
+  min-width: 0;
+}
+
+.admin-seed-column-title {
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.admin-seed-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+
+.admin-seed-id {
+  width: 66px;
+  color: var(--water);
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.admin-chip-button {
+  min-height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.admin-chip-button:hover,
+.admin-chip-button:focus-visible {
+  border-color: var(--water);
+  outline: 2px solid color-mix(in srgb, var(--water) 25%, transparent);
+  outline-offset: 1px;
+}
+
+.admin-chip-button.is-active {
+  border-color: var(--chip-color, var(--water));
+  background: var(--chip-color, var(--water));
+  color: #fff;
+}
+
+.admin-chip-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.admin-muted {
+  color: var(--ink-soft);
+}
+
+.ant-card {
+  border: 2px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.ant-card-head {
+  min-height: 44px !important;
+  border-bottom-color: var(--line) !important;
+}
+
+.ant-statistic-content-value, .ant-table-cell, .admin-mono, .admin-stat-band-value { font-variant-numeric: tabular-nums; }
+
+.ant-table-cell {
+  overflow-wrap: anywhere;
+}
+
+.ant-table-thead > tr > th {
+  white-space: nowrap;
+}
+
+.admin-app .ant-table-wrapper .ant-table-thead > tr > th,
+.admin-app .ant-table-wrapper .ant-table-thead > tr > th.ant-table-cell-fix-left,
+.admin-app .ant-table-wrapper .ant-table-thead > tr > th.ant-table-cell-fix-right {
+  background: var(--th-bg);
+}
+
+.admin-app .ant-table-wrapper .ant-table-tbody > tr.ant-table-row:hover > td,
+.admin-app .ant-table-wrapper .ant-table-tbody > tr > td.ant-table-cell-row-hover {
+  background: var(--hover);
+}
+
+@media (max-width: 767px) {
+  .admin-topbar {
+    min-height: 52px;
+    padding-inline: 12px;
+  }
+
+  .admin-content {
+    padding: 14px 12px 20px;
+  }
+
+  .admin-page-header {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .admin-page-actions {
+    justify-content: flex-start;
+  }
+
+  .admin-page-title {
+    font-size: 21px !important;
+  }
+
+  /* hero card: keep the banner readable at phone width */
+  .admin-hero {
+    padding: 18px 16px;
+  }
+
+  /* details summary: hint drops to its own line instead of crowding the title */
+  .admin-details-summary {
+    flex-wrap: wrap;
+  }
+
+  .admin-details-hint {
+    flex-basis: 100%;
+    margin-left: 0;
+    text-align: left;
+  }
+
+  .multi-compatibility-difference {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .multi-compatibility-value {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .admin-toolbar {
+    align-items: stretch;
+  }
+
+  .admin-toolbar > *,
+  .admin-toolbar .ant-segmented,
+  .admin-toolbar .ant-btn,
+  .admin-toolbar .ant-input-affix-wrapper {
+    max-width: 100%;
+  }
+
+  .admin-edit-compact {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .admin-mobile-list-card .ant-card-head {
+    padding-inline: 14px;
+  }
+
+  .admin-mobile-list-card .ant-card-body {
+    padding: 12px;
+  }
+
+  .admin-mobile-actions .ant-btn {
+    min-height: 36px;
+  }
+
+  .scheduled-resource-modal {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px);
+    top: 12px;
+    margin: 0 auto;
+    padding-bottom: 12px;
+  }
+
+  .scheduled-resource-modal .ant-radio-group {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .scheduled-resource-modal .ant-radio-button-wrapper {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 38px;
+    padding-block: 6px;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .scheduled-resource-number-grid,
+  .scheduled-resource-date-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .scheduled-resource-modal .ant-modal-footer {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .scheduled-resource-modal .ant-modal-footer .ant-btn {
+    width: 100%;
+    margin-inline-start: 0;
+  }
+}
+
+.admin-theme-toggle {
+  padding: 4px 11px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-theme-toggle:hover,
+.admin-theme-toggle:focus-visible {
+  color: var(--ink);
+  border-color: var(--star-deep);
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+.admin-stat-tick { position: relative; }
+.admin-stat-tick::after {
+    content: ""; position: absolute; right: 9px; top: 9px; width: 7px; height: 7px; background: var(--star);
+    clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+}
+.admin-badge-ok { color: var(--wind); border: 1.5px solid var(--wind); background: var(--ok-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.admin-badge-info { color: var(--water); border: 1.5px solid var(--water); background: var(--info-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.admin-badge-warn { color: var(--thunder); border: 1.5px solid var(--thunder); background: var(--warn-bg); border-radius: 6px; padding: 2px 9px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.admin-badge-muted { color: var(--ink-soft); border: 1.5px solid var(--ink-soft); background: var(--th-bg); border-radius: 6px; padding: 3px 9px; font-size: 12px; font-weight: 600; line-height: 1; white-space: nowrap; }
+
+/* dashboard hero: card 「游戏主界面」 banner at the top of the overview page —
+   2px strong border + star/sky tinted gradient wash + 右上角星黄光晕 (approved review
+   draft v3). Inside, one wrapping flex row: virtual clock left, status chip middle,
+   five relocated band metrics right; the 唯一内置管理后台 note sits below as
+   .admin-hero-note. Mobile-first: zones wrap as whole blocks (never clipped). */
+.admin-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 26px 30px;
+  border: 2px solid var(--line-strong);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 211, 53, 0.08) 0%, rgba(79, 168, 232, 0.06) 55%, transparent 100%),
+    var(--panel);
+}
+
+/* 背景光: 右上角星黄光晕 — decorative star tint from the approved mockup */
+.admin-hero::after {
+  content: "";
+  position: absolute;
+  right: -60px;
+  top: -80px;
+  width: 280px;
+  height: 280px;
+  background: radial-gradient(circle, rgba(255, 211, 53, 0.10), transparent 65%);
+  pointer-events: none;
+}
+
+.admin-hero-in {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 34px;
+  min-width: 0;
+}
+
+.admin-hero-note {
+  margin-top: 16px;
+}
+
+.admin-hero-clock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  /* 窄屏: 时钟整行独占, 内容在父盒内水平居中 (维护者 2026-09-29) */
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.admin-hero-clock-label {
+  flex: 0 0 auto;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.admin-hero-clock-value {
+  min-width: 0;
+  color: var(--ink);
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* 时钟随视宽自适应缩放, 永不折行 (维护者 2026-09-29: 窄屏溢出修复) */
+  font-size: clamp(18px, 7.4vw, 32px);
+  font-weight: 800;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.admin-hero-clock-sub {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 10px;
+  align-items: center;
+  min-width: 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* 徽章/UTC 各自为整体换行单元, 日期不在中间断开 (维护者 2026-09-29) */
+.admin-hero-clock-sub > span {
+  white-space: nowrap;
+}
+
+.admin-hero-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  align-items: center;
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.admin-hero .admin-stat-band {
+  flex: 1 1 560px;
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .admin-hero-clock-value {
+    font-size: 38px;
+  }
+
+  /* 桌面恢复时钟/徽章区并排且左对齐 (窄屏为居中堆叠) */
+  .admin-hero-clock {
+    flex: 1 0 auto;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .admin-hero-clock-sub {
+    justify-content: flex-start;
+  }
+
+  .admin-hero-chips {
+    flex: 1 1 260px;
+    justify-content: flex-start;
+  }
+}
+
+/* dashboard: flat stat band living inside the hero — five metrics stacked label-over-value
+   on equal columns, no boxes (same flat language as .admin-page-note).
+   Mobile-first: 2-up wrap below 768px; five equal columns above. */
+.admin-stat-band {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 24px;
+  min-width: 0;
+}
+
+.admin-stat-band-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+/* 总览窄屏（ADD-2）：运行时间独占首行，其余四项两两一行；种子页 .admin-seed-stats
+   不在 .admin-hero 内，不受影响。≥768px 五等分处回退为 auto。 */
+.admin-hero .admin-stat-band .admin-stat-band-item:first-child {
+  grid-column: 1 / -1;
+}
+
+.admin-stat-band-label {
+  flex: 0 0 auto;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.admin-stat-band-value {
+  min-width: 0;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
+  /* 「7 小时 58 分钟」这类复数值在桌面五等分列内不折行（数值短，nowrap 安全） */
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .admin-stat-band {
+    grid-template-columns: repeat(5, 1fr);
+  }
+
+  /* desktop returns the hero band to a single five-column row (ADD-2 窄屏规则的回退) */
+  .admin-hero .admin-stat-band .admin-stat-band-item:first-child {
+    grid-column: auto;
+  }
+
+  /* single five-column row: a quiet hairline between neighbors reads steadier
+     than whitespace alone at this width */
+  .admin-stat-band-item + .admin-stat-band-item {
+    border-left: 1px solid var(--line);
+    padding-left: 18px;
+  }
+}

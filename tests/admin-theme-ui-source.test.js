@@ -2,7 +2,11 @@
 const assert = require("node:assert/strict")
 const fs = require("node:fs")
 const path = require("node:path")
-const css = fs.readFileSync(path.join(__dirname, "../admin/src/styles.css"), "utf8")
+// styles.css is an @import entry; read entry + all parts in import order
+const adminSrcDir = path.join(__dirname, "../admin/src")
+const css = [...fs.readFileSync(path.join(adminSrcDir, "styles.css"), "utf8").matchAll(/@import\s+"([^"]+)";/g)]
+    .map(match => fs.readFileSync(path.join(adminSrcDir, match[1]), "utf8"))
+    .join("\n")
 for (const v of ["--bg:#F3F7FC", "--panel:#FFFFFF", "--star:#FFD335", "--ink:#1F2D4D", "--water:#2E7FD6", "--wind:#2FA85C", "--thunder:#D99A00", "--fire:#E8544A"]) {
     assert.ok(css.includes(v), `缺少明色 token ${v}`)
 }

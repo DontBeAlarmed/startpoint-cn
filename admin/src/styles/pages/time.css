@@ -1,0 +1,54 @@
+/* clairvoyance pool rows read as game-console pool cards (approved mockup time-v2):
+   stat-bg box + wrapping top row (池名 / 上线状态徽章 / 起止时间 / 剩余天数), tags below.
+   Mobile-first: the top row wraps freely; 剩余天数 only pushes right on desktop. */
+.admin-clairvoyance-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--stat-bg);
+}
+
+.admin-pool-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 0;
+}
+
+.admin-pool-name {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.admin-pool-win {
+  min-width: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.admin-pool-remaining {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+/* UP 角色搜索框: 窄屏全宽, 桌面收窄到搜索框的自然宽度 (mockup .search) */
+.admin-time-search {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (min-width: 768px) {
+  .admin-pool-remaining {
+    margin-left: auto;
+  }
+
+  .admin-time-search {
+    max-width: 420px;
+  }
+}

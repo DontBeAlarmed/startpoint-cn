@@ -1,0 +1,47 @@
+/* 定时资源弹框：高度交还内容自然流动，超出视口由 AntD wrap 层负责滚动，
+   dvh 仅用于视口越高弹框落点越低的定位护栏，不再裁切 modal body */
+.scheduled-resource-modal {
+  max-width: calc(100vw - 32px);
+  top: clamp(24px, calc(100dvh - 820px), 96px);
+  padding-bottom: 24px;
+}
+
+.scheduled-resource-number-grid,
+.scheduled-resource-date-grid {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+
+/* 网格内表单项的纵向节奏交给 grid gap，去掉 AntD 默认 item 底边距 */
+.scheduled-resource-number-grid > .ant-form-item,
+.scheduled-resource-date-grid > .ant-form-item {
+  margin-bottom: 0;
+}
+
+.scheduled-resource-number-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.scheduled-resource-date-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.scheduled-resource-number-grid .ant-input-number,
+.scheduled-resource-date-grid .ant-picker {
+  width: 100%;
+}
+
+.scheduled-resource-reset-note {
+  max-width: 100%;
+  height: auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.admin-edit-compact {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto auto;
+  gap: 6px;
+}

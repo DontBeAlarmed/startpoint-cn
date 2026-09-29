@@ -8,7 +8,11 @@ const componentPath = path.join(__dirname, "../admin/src/components/ScheduledRes
 assert.equal(fs.existsSync(componentPath), true, "应将定时资源补充拆成独立后台组件")
 const source = fs.readFileSync(componentPath, "utf8")
 const mailSource = fs.readFileSync(path.join(__dirname, "../admin/src/pages/Mail.tsx"), "utf8")
-const styles = fs.readFileSync(path.join(__dirname, "../admin/src/styles.css"), "utf8")
+// styles.css is an @import entry; read entry + all parts in import order
+const adminSrcDir = path.join(__dirname, "../admin/src")
+const styles = [...fs.readFileSync(path.join(adminSrcDir, "styles.css"), "utf8").matchAll(/@import\s+"([^"]+)";/g)]
+    .map(match => fs.readFileSync(path.join(adminSrcDir, match[1]), "utf8"))
+    .join("\n")
 
 for (const text of [
     "定时资源补充",

@@ -1,0 +1,243 @@
+/* shared app shell & page primitives (sider, brand, topbar, page header, toolbar) */
+.admin-app {
+  min-height: 100vh;
+  background: transparent;
+}
+
+.admin-sider {
+  background: var(--panel) !important;
+  border-inline-end: 1px solid var(--line);
+}
+
+.admin-brand {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 72px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-brand-copy {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.admin-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 2px solid var(--star);
+  background: var(--brand-chip);
+  box-shadow: 3px 3px 0 var(--water);
+}
+
+.admin-brand-mark img {
+  width: 24px;
+  height: 24px;
+  image-rendering: pixelated;
+}
+
+.admin-brand-title {
+  display: block;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-brand-subtitle {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ant-layout-sider-collapsed .admin-brand {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.ant-layout-sider-collapsed .admin-brand-copy {
+  display: none;
+}
+
+.admin-menu {
+  padding: 10px 8px;
+  background: transparent;
+  border-inline-end: 0 !important;
+}
+
+.admin-menu .ant-menu-item {
+  height: 40px;
+  margin-inline: 0;
+  border-radius: 6px;
+}
+
+.admin-menu .ant-menu-item-selected, .admin-sider .ant-menu-light .ant-menu-item-selected { color: var(--ink); background: linear-gradient(90deg, rgba(255, 211, 53, 0.16), rgba(255, 211, 53, 0.04)); font-weight: 700; }
+
+.admin-sider .ant-menu-item-selected::before {
+    content: ""; position: absolute; left: -14px; top: 5px; bottom: 5px; width: 5px;
+    background: var(--star); border: 1.5px solid var(--ink); border-radius: 4px;
+}
+
+.admin-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+  padding: 0 18px;
+  gap: 10px;
+  background: color-mix(in srgb, var(--panel) 88%, transparent) !important;
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(12px);
+}
+
+.admin-topbar-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-content {
+  width: 100%;
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 22px;
+}
+
+.admin-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-page-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  padding-block: 2px 4px;
+}
+
+.admin-page-eyebrow {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  margin-bottom: 7px;
+  padding: 2px 6px;
+  border: 1px solid var(--line-strong);
+  color: var(--thunder);
+  background: var(--warn-bg);
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.admin-page-title {
+  margin: 0 !important;
+  color: var(--ink) !important;
+  font-size: 24px !important;
+  line-height: 1.2 !important;
+}
+
+.admin-page-description {
+  max-width: 760px;
+  margin-top: 7px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+
+.admin-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.admin-page-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  align-items: baseline;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.admin-stack {
+  width: 100%;
+}
+
+.admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-toolbar .ant-input-affix-wrapper,
+.admin-toolbar .ant-input-number,
+.admin-toolbar .ant-picker {
+  max-width: 100%;
+}
+
+.admin-metric-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px;
+}
+
+.multi-compatibility-differences {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.multi-compatibility-difference {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.multi-compatibility-values {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.multi-compatibility-value {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+

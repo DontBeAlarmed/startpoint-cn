@@ -638,7 +638,11 @@ test("admin server status locally degrades multiplayer diagnostics errors", asyn
 
 test("Dashboard presents multiplayer diagnostics in Chinese without configuration controls", () => {
     const source = fs.readFileSync(path.join(repositoryRoot, "admin/src/pages/Dashboard.tsx"), "utf8")
-    const styles = fs.readFileSync(path.join(repositoryRoot, "admin/src/styles.css"), "utf8")
+    // styles.css is an @import entry; read entry + all parts in import order
+    const adminSrcDir = path.join(repositoryRoot, "admin/src")
+    const styles = [...fs.readFileSync(path.join(adminSrcDir, "styles.css"), "utf8").matchAll(/@import\s+"([^"]+)";/g)]
+        .map(match => fs.readFileSync(path.join(adminSrcDir, match[1]), "utf8"))
+        .join("\n")
     assert.match(source, /多人联机状态/)
     assert.match(source, /正在加载服务端状态/)
     assert.match(source, /正在加载多人联机状态/)

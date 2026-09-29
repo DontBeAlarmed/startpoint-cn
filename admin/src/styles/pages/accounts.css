@@ -1,0 +1,210 @@
+/* accounts page (approved mockup accounts-v2) + accounts mobile view */
+.admin-account-mobile-list,
+.admin-mobile-list-content,
+.admin-mobile-device-list {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-mobile-view-toolbar,
+.admin-mobile-list-heading,
+.admin-mobile-actions,
+.admin-mobile-inline-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-mobile-view-toolbar {
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+/* mobile account list reads like a table: full-bleed rows separated by hairlines,
+   no framing box between the list and its card */
+.admin-account-mobile-list .admin-mobile-list-item {
+  display: block;
+  padding: 14px;
+  border-block-end: 1px solid var(--line);
+}
+
+.admin-account-mobile-list .admin-mobile-list-item:last-child {
+  border-block-end: 0;
+}
+
+.admin-mobile-list-item-clickable {
+  cursor: pointer;
+}
+
+.admin-mobile-list-item-clickable:hover,
+.admin-mobile-list-item-clickable:focus-visible {
+  background: var(--hover);
+  outline: 2px solid var(--water);
+  outline-offset: -2px;
+}
+
+.admin-mobile-list-heading {
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+/* heading left group (F4)：账号 #N + 设备名 pill（单设备账号上移，维护者 2026-09-29 指定）/
+   当前存档徽章 + 存档名 归拢在左侧，右侧计数（N 个存档 / Rank N）不被挤压 */
+.admin-mobile-heading-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  min-width: 0;
+}
+
+/* 存档面板头（ADD-3）：账号编号 + 备注名归拢为左侧一组（维护者 2026-09-29 去掉「· 存档列表」），
+   右侧新建存档按钮不被挤压; 备注过长省略号截断, 整行不折行 */
+.admin-mobile-view-toolbar {
+  flex-wrap: nowrap;
+}
+
+.admin-mobile-toolbar-main {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.admin-mobile-toolbar-main .ant-typography-secondary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-mobile-detail-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.admin-mobile-detail-list > div {
+  display: grid;
+  grid-template-columns: minmax(84px, auto) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.admin-mobile-detail-list span {
+  color: var(--ink-soft);
+}
+
+.admin-mobile-actions {
+  margin-top: 10px;
+  /* 维护者 2026-09-29: 操作键自适应等分铺满一排, 不折行 (覆盖共享规则的 wrap) */
+  flex-wrap: nowrap;
+}
+
+.admin-mobile-actions .ant-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
+  justify-content: center;
+}
+
+.admin-mobile-device-list {
+  margin-top: 10px;
+}
+
+.admin-mobile-inline-editor .ant-input {
+  min-width: min(100%, 180px);
+  flex: 1 1 180px;
+}
+
+/* mobile inline save section: expands below the always-visible account list
+   (same semantics as the desktop inline panel — no drill-in, no back button) */
+.admin-mobile-save-panel {
+  padding: 14px;
+  border-block-start: 1px solid var(--line);
+}
+
+/* accounts page (approved mockup accounts-v2): panel-head star tick — the 账号管理 card
+   and the per-account 存档列表 card both read as game-console panels */
+.admin-accounts-card .ant-card-head-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-accounts-card .ant-card-head-title::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  background: var(--star);
+  clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+}
+
+/* accounts tables read fully centered (mockup .tl-table th/td) — same scoped pattern as
+   .admin-player-tabs; every other admin table keeps its left-align reading semantics */
+.admin-accounts-table .ant-table th,
+.admin-accounts-table .ant-table td {
+  text-align: center;
+}
+
+/* accounts op cells: center the row actions (mockup .row-actions is justify-content:center) —
+   scoped so the shared .admin-action-row on Mail/News/Gifts keeps its own layout; nowrap also
+   keeps the 导出 loading state from wrapping onto a second line */
+.admin-accounts-table .admin-action-row {
+  justify-content: center;
+  flex-wrap: nowrap;
+}
+
+/* accounts: 存档名 links into 玩家详情 with the water data-link voice (mockup .save-link) */
+.admin-save-link {
+  color: var(--water);
+}
+
+.admin-save-link:hover {
+  text-decoration: underline;
+}
+
+/* accounts: merged device pill — 设备识别名 + ✎ live in ONE elevated chip (mockup .dev-edit);
+   shared by the desktop 绑定设备 cell, the mobile title row (single-device accounts) and the
+   mobile multi-device list. Mobile-first: the pill is a compact unbreakable chip at every
+   width and never stretches its container. */
+.admin-dev-edit {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 3px 1px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--th-bg);
+  font-size: 12px;
+}
+
+.admin-dev-edit-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-dev-edit .ant-btn {
+  flex: none;
+  color: var(--ink-soft);
+}
+
+/* 编辑态就在 pill 原结构内变形: 输入框贴进同一枚 pill (失焦保存, 无确定/取消按钮, 维护者 2026-09-29) */
+.admin-dev-edit-editing {
+  padding: 0 4px 0 5px;
+}
+
+.admin-dev-edit-editing .ant-input {
+  width: 150px;
+  padding: 0 2px;
+  font-size: 12px;
+}
+
+.admin-dev-edit .ant-btn:hover,
+.admin-dev-edit .ant-btn:focus-visible {
+  color: var(--ink);
+}

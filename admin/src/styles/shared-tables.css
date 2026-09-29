@@ -1,0 +1,24 @@
+/* shared table card / action row patterns */
+.admin-table-card .ant-card-body,
+.admin-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-table-wrap .ant-table-wrapper {
+  min-width: 100%;
+}
+
+.admin-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.admin-action-row .ant-btn {
+  flex: 0 0 auto;
+}
+
+.admin-clickable-table-row {
+  cursor: pointer;
+}
