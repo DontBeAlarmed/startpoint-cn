@@ -1177,7 +1177,8 @@ html[data-theme="dark"] {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  flex: 1 0 auto;
+  /* 窄屏: 时钟整行独占, 不与徽章区并排 (维护者 2026-09-29 溢出修复) */
+  flex: 1 1 100%;
   min-width: 0;
 }
 
@@ -1193,11 +1194,12 @@ html[data-theme="dark"] {
   min-width: 0;
   color: var(--ink);
   font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 32px;
+  /* 时钟随视宽自适应缩放, 永不折行 (维护者 2026-09-29: 窄屏溢出修复) */
+  font-size: clamp(18px, 7.4vw, 32px);
   font-weight: 800;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .admin-hero-clock-sub {
@@ -1211,12 +1213,17 @@ html[data-theme="dark"] {
   line-height: 1.5;
 }
 
+/* 徽章/UTC 各自为整体换行单元, 日期不在中间断开 (维护者 2026-09-29) */
+.admin-hero-clock-sub > span {
+  white-space: nowrap;
+}
+
 .admin-hero-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  flex: 1 1 260px;
+  flex: 1 1 100%;
   min-width: 0;
 }
 
@@ -1228,6 +1235,15 @@ html[data-theme="dark"] {
 @media (min-width: 768px) {
   .admin-hero-clock-value {
     font-size: 38px;
+  }
+
+  /* 桌面恢复时钟/徽章区并排 (窄屏为整行堆叠) */
+  .admin-hero-clock {
+    flex: 1 0 auto;
+  }
+
+  .admin-hero-chips {
+    flex: 1 1 260px;
   }
 }
 
