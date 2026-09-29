@@ -97,18 +97,6 @@ export function GiftsMobileView({
                                 <Button icon={<Eye size={15} />} aria-label="领取记录" onClick={() => onOpenRedemptions(row)}>
                                     记录
                                 </Button>
-                                <Popconfirm
-                                    title="删除这个礼包？"
-                                    description="此操作不可恢复，将清除全部领取记录，同 code 重建后可重新领取。"
-                                    okText="删除"
-                                    cancelText="取消"
-                                    okButtonProps={{ danger: true }}
-                                    onConfirm={() => onDelete(row)}
-                                >
-                                    <Button danger icon={<Trash2 size={15} />} aria-label="删除礼包">
-                                        删除
-                                    </Button>
-                                </Popconfirm>
                                 {!active && (
                                     <Button icon={<Pencil size={15} />} aria-label="编辑礼包" onClick={() => onEdit(row)}>
                                         编辑

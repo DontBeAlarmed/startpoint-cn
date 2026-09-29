@@ -32,22 +32,14 @@ assert.match(giftsPage, /<GiftsMobileView/, "礼包页移动分支应渲染 Gift
 assert.match(giftsPage, /<Table<AdminGiftRow>/, "礼包页桌面分支应保留 Table")
 assert.match(giftsPage, /rewardLookups=\{rewardLookups\}/, "奖励名称 lookup 应作为 props 下传")
 
-// ── 移动卡片：active 无编辑入口 + 状态分流 + 确认文案 ──────────────────────
-const ternaryStart = giftsMobile.indexOf("{active ? (")
-const ternarySep = giftsMobile.indexOf(") : (", ternaryStart)
-const ternaryEndMatch = giftsMobile.slice(ternarySep).match(/\)\}\s*<Popconfirm/)
-assert.notEqual(ternaryStart, -1, "礼包移动操作行应存在 active 分流")
-assert.notEqual(ternarySep, -1, "礼包移动操作行应存在 stopped 分流")
-assert.notEqual(ternaryEndMatch, null, "礼包移动操作行分流应终止于共享删除确认")
-const activeBranch = giftsMobile.slice(ternaryStart, ternarySep)
-const stoppedBranch = giftsMobile.slice(ternarySep, ternarySep + ternaryEndMatch.index)
-
-assert.equal(activeBranch.includes("编辑"), false, "active 礼包移动卡片不能提供编辑（先停止再修改）")
-assert.match(activeBranch, /停止/, "active 礼包移动卡片应有停止入口")
-assert.match(activeBranch, /记录/, "active 礼包移动卡片应有领取记录入口")
-assert.match(stoppedBranch, /编辑/, "stopped 礼包移动卡片应有编辑入口")
-assert.match(stoppedBranch, /启动/, "stopped 礼包移动卡片应有启动入口")
-assert.match(stoppedBranch, /记录/, "stopped 礼包移动卡片应有领取记录入口")
+// ── 移动卡片：启停恒位重标记（不消失）+ 编辑仅 stopped（恒排末位）+ 确认文案 ──
+// (维护者 2026-09-30: 点击启动后按钮消失的 UX 不统一 → 与定时资源卡 停用/启用 同模式)
+assert.match(giftsMobile, /\{active \? "停止" : "启动"\}/, "启停按钮应恒在原位重标记（不消失）")
+assert.match(giftsMobile, /active \? <CircleStop size=\{15\} \/> : <Play size=\{15\} \/>/, "启停图标随状态切换")
+assert.match(giftsMobile, /\{!active && \(\n\s*<Button icon=\{<Pencil size=\{15\} \/>\} aria-label="编辑礼包"/, "编辑仅 stopped 提供且恒排末位")
+assert.equal(giftsMobile.split('aria-label="删除礼包"').length - 1, 1, "删除入口唯一")
+assert.match(giftsMobile, /aria-label="领取记录"/, "应有领取记录入口")
+assert.match(giftsMobile, /title="删除这个礼包？"/, "删除确认标题与桌面逐字一致")
 
 assert.match(giftsMobile, /active \? "admin-badge-ok" : "admin-badge-muted"/, "礼包状态应为 ok/muted 徽章")
 assert.match(giftsMobile, /启用/, "礼包启用徽章文案存在")
