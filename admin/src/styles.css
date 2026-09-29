@@ -687,14 +687,26 @@ body {
   min-width: 0;
 }
 
-/* 存档面板头（ADD-3）：账号编号 + 备注名 + 「· 存档列表」归拢为左侧一组，
-   右侧新建存档按钮不被挤压 */
+/* 存档面板头（ADD-3）：账号编号 + 备注名归拢为左侧一组（维护者 2026-09-29 去掉「· 存档列表」），
+   右侧新建存档按钮不被挤压; 备注过长省略号截断, 整行不折行 */
+.admin-mobile-view-toolbar {
+  flex-wrap: nowrap;
+}
+
 .admin-mobile-toolbar-main {
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: baseline;
   gap: 2px 8px;
   min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.admin-mobile-toolbar-main .ant-typography-secondary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-mobile-detail-list {
@@ -807,6 +819,23 @@ body {
 .admin-dev-edit .ant-btn {
   flex: none;
   color: var(--ink-soft);
+}
+
+/* 编辑态就在 pill 原结构内变形: 输入框贴进同一枚 pill, 规格与展示态一致 (维护者 2026-09-29) */
+.admin-dev-edit-editing {
+  padding: 0 4px 0 5px;
+}
+
+.admin-dev-edit-editing .ant-input {
+  width: 120px;
+  padding: 0 2px;
+  font-size: 12px;
+}
+
+.admin-dev-edit-editing .ant-btn {
+  height: 22px;
+  padding: 0 5px;
+  font-size: 12px;
 }
 
 .admin-dev-edit .ant-btn:hover,

@@ -60,16 +60,20 @@ export function AccountsMobileView({
     // renameDevice 流程（API/payload/失效）与桌面保持一致
     const renderDevicePill = (device: DeviceBinding) =>
         renamingDeviceId === device.deviceId ? (
-            <div className="admin-mobile-inline-editor" key={device.deviceId}>
+            <div className="admin-dev-edit admin-dev-edit-editing" key={device.deviceId}>
                 <Input
+                    size="small"
+                    variant="borderless"
+                    autoFocus
                     value={deviceName}
                     maxLength={64}
                     placeholder={`设备 ${device.deviceId}`}
                     onChange={event => setDeviceName(event.target.value)}
                     onPressEnter={() => submitDeviceName(device.deviceId)}
+                    onKeyDown={event => { if (event.key === "Escape") setRenamingDeviceId(null) }}
                 />
-                <Button type="primary" loading={renamePending} onClick={() => submitDeviceName(device.deviceId)}>确定</Button>
-                <Button onClick={() => setRenamingDeviceId(null)}>取消</Button>
+                <Button type="text" size="small" loading={renamePending} onClick={() => submitDeviceName(device.deviceId)}>确定</Button>
+                <Button type="text" size="small" onClick={() => setRenamingDeviceId(null)}>取消</Button>
             </div>
         ) : (
             <div className="admin-dev-edit" key={device.deviceId}>
@@ -139,7 +143,6 @@ export function AccountsMobileView({
                             {selectedAccount.adminNote && (
                                 <Typography.Text type="secondary">{selectedAccount.adminNote}</Typography.Text>
                             )}
-                            <Typography.Text>· 存档列表</Typography.Text>
                         </span>
                         <Button type="primary" icon={<Plus size={16} />} onClick={() => onNewSave(selectedAccount.id)}>
                             新建存档
