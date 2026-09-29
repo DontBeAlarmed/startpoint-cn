@@ -1,67 +1,4 @@
-/* shared AntD overrides, mobile breakpoints, theme toggle, badges, hero, stat-band (+ parked legacy seed-grid / chip-button, currently unreferenced) */
-.admin-seed-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
-  gap: 14px;
-}
-
-.admin-seed-column {
-  min-width: 0;
-}
-
-.admin-seed-column-title {
-  margin-bottom: 6px;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.admin-seed-line {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  align-items: center;
-  padding: 4px 0;
-  border-bottom: 1px solid var(--line);
-  font-size: 12px;
-}
-
-.admin-seed-id {
-  width: 66px;
-  color: var(--water);
-  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.admin-chip-button {
-  min-height: 22px;
-  padding: 0 6px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel);
-  color: var(--ink);
-  cursor: pointer;
-  font: inherit;
-  font-size: 11px;
-  line-height: 18px;
-}
-
-.admin-chip-button:hover,
-.admin-chip-button:focus-visible {
-  border-color: var(--water);
-  outline: 2px solid color-mix(in srgb, var(--water) 25%, transparent);
-  outline-offset: 1px;
-}
-
-.admin-chip-button.is-active {
-  border-color: var(--chip-color, var(--water));
-  background: var(--chip-color, var(--water));
-  color: #fff;
-}
-
-.admin-chip-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
+/* shared AntD overrides, mobile breakpoints, theme toggle, badges, hero, stat-band */
 .admin-muted {
   color: var(--ink-soft);
 }
@@ -119,22 +56,6 @@
 
   .admin-page-title {
     font-size: 21px !important;
-  }
-
-  /* hero card: keep the banner readable at phone width */
-  .admin-hero {
-    padding: 18px 16px;
-  }
-
-  /* details summary: hint drops to its own line instead of crowding the title */
-  .admin-details-summary {
-    flex-wrap: wrap;
-  }
-
-  .admin-details-hint {
-    flex-basis: 100%;
-    margin-left: 0;
-    text-align: left;
   }
 
   .multi-compatibility-difference {
@@ -254,7 +175,7 @@ html[data-theme="dark"] {
 .admin-hero {
   position: relative;
   overflow: hidden;
-  padding: 26px 30px;
+  padding: 18px 16px;
   border: 2px solid var(--line-strong);
   border-radius: 16px;
   background:
@@ -351,6 +272,10 @@ html[data-theme="dark"] {
 }
 
 @media (min-width: 768px) {
+  .admin-hero {
+    padding: 26px 30px;
+  }
+
   .admin-hero-clock-value {
     font-size: 38px;
   }

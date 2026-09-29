@@ -200,12 +200,6 @@
   max-width: 100%;
 }
 
-.admin-metric-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 14px;
-}
-
 .multi-compatibility-differences {
   display: grid;
   gap: 8px;

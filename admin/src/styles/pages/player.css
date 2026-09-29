@@ -203,48 +203,6 @@ html[data-theme="dark"] .admin-res-lv {
   }
 }
 
-/* player detail: 账号设置 setting rows (approved mockup .setrow) — label+desc left,
-   control right, hairline between rows */
-.admin-setrow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 14px;
-  min-width: 0;
-  padding: 10px 2px;
-  border-bottom: 1px solid var(--line);
-}
-
-.admin-setrow:last-child {
-  border-bottom: 0;
-}
-
-.admin-setrow-copy {
-  min-width: 0;
-}
-
-.admin-setrow-label {
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.admin-setrow-desc {
-  margin-top: 2px;
-  color: var(--ink-soft);
-  font-size: 11.5px;
-}
-
-.admin-setrow-control {
-  display: flex;
-  align-items: center;
-  flex: none;
-}
-
-.admin-setrow-control .ant-input-number {
-  width: 90px;
-}
 
 /* player detail: 危险操作 toolbar parked at the page bottom (approved mockup player-v2
    maintainer correction) — strong-bordered panel strip shared with .toolbar voice.
