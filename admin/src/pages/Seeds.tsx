@@ -1,4 +1,5 @@
-import { Alert, Button, Card, Empty, Space, Spin, Table, Tag, Typography } from "antd"
+import { useMemo, useState } from "react"
+import { Alert, Button, Card, Empty, Modal, Space, Spin, Table, Tag, Typography } from "antd"
 import { ReloadOutlined } from "@ant-design/icons"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 
@@ -35,9 +36,24 @@ const MOVIE_LABELS: Record<string, string> = {
     fes_guarantee: "流星祭保底",
 }
 
+// 构成占比条：3★/4★/5★ 三色堆叠（审查稿 #p-seeds：水蓝/星黄/火红）。
+const RARITY_RATIO_COLORS: Array<{ rarity: "3" | "4" | "5"; color: string }> = [
+    { rarity: "3", color: "#9cc3ec" },
+    { rarity: "4", color: "#FFD335" },
+    { rarity: "5", color: "#E8544A" },
+]
+
+function formatClock(timestamp: number): string {
+    if (timestamp <= 0) return "--:--:--"
+    const d = new Date(timestamp)
+    const pad = (n: number) => String(n).padStart(2, "0")
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
 export default function Seeds() {
     const queryClient = useQueryClient()
-    const { data, isLoading, isError, isFetching, refetch } = useQuery({
+    const [quarantineView, setQuarantineView] = useState<{ movieId: string; seeds: number[] } | null>(null)
+    const { data, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useQuery({
         queryKey: ["gacha-seed-status"],
         queryFn: () => apiGet<SeedStatus>("/api/seeds/status"),
         refetchInterval: 30_000,
@@ -55,12 +71,12 @@ export default function Seeds() {
             quarantined: data.quarantine.movies[movie.movieId] ?? 0,
         }))
         : []
-    const quarantineRows = data
+    const quarantineRows = useMemo(() => (data
         ? Object.entries(data.quarantine.samples).map(([movieId, seeds]) => ({
             movieId,
             seeds,
         }))
-        : []
+        : []), [data])
 
     return (
         <AdminPage
@@ -68,9 +84,17 @@ export default function Seeds() {
             title="动画种子"
             description="Faithful Catalog 运行状态"
             actions={
-                <Button icon={<ReloadOutlined />} loading={isFetching} onClick={refresh}>
-                    刷新
-                </Button>
+                <Space wrap size="small">
+                    {dataUpdatedAt > 0 && (
+                        <span className="admin-seed-refresh">
+                            最后刷新 {formatClock(dataUpdatedAt)}
+                            <span className="admin-badge-ok">30s 自动</span>
+                        </span>
+                    )}
+                    <Button icon={<ReloadOutlined />} loading={isFetching} onClick={refresh}>
+                        刷新
+                    </Button>
+                </Space>
             }
         >
             <Space direction="vertical" size="large" className="admin-stack">
@@ -136,6 +160,35 @@ export default function Seeds() {
                                     { title: "★3", dataIndex: ["rarityCounts", "3"], align: "right", width: 100 },
                                     { title: "★4", dataIndex: ["rarityCounts", "4"], align: "right", width: 100 },
                                     { title: "★5", dataIndex: ["rarityCounts", "5"], align: "right", width: 100 },
+                                    {
+                                        title: "构成占比",
+                                        key: "ratio",
+                                        width: 190,
+                                        render: (_, row) => {
+                                            const total = row.total
+                                            if (total <= 0) return <span className="admin-muted">-</span>
+                                            return (
+                                                <div className="admin-seed-ratio">
+                                                    <div className="admin-seed-ratio-bar" aria-hidden>
+                                                        {RARITY_RATIO_COLORS.map(({ rarity, color }) => (
+                                                            <span
+                                                                key={rarity}
+                                                                style={{ flex: row.rarityCounts[rarity], background: color }}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                    <span className="admin-seed-ratio-text admin-mono">
+                                                        {RARITY_RATIO_COLORS.map(({ rarity }) => (
+                                                            <span key={rarity}>
+                                                                {rarity}★ {Math.round(row.rarityCounts[rarity] * 100 / total)}
+                                                                {rarity === "5" ? "" : " · "}
+                                                            </span>
+                                                        ))}
+                                                    </span>
+                                                </div>
+                                            )
+                                        },
+                                    },
                                     { title: "合计", dataIndex: "total", align: "right", width: 110 },
                                     {
                                         title: "隔离",
@@ -183,10 +236,55 @@ export default function Seeds() {
                                                 </Space>
                                             ),
                                         },
+                                        {
+                                            title: "操作",
+                                            key: "view",
+                                            width: 90,
+                                            render: (_, row) => (
+                                                <Button size="small" onClick={() => setQuarantineView(row)}>
+                                                    查看
+                                                </Button>
+                                            ),
+                                        },
                                     ]}
                                 />
                             )}
                         </Card>
+
+                        <Modal
+                            open={quarantineView !== null}
+                            title={quarantineView
+                                ? `隔离详情 · ${MOVIE_LABELS[quarantineView.movieId] ?? quarantineView.movieId}`
+                                : "隔离详情"}
+                            footer={null}
+                            width="min(92vw, 560px)"
+                            onCancel={() => setQuarantineView(null)}
+                        >
+                            {quarantineView && (
+                                <Space direction="vertical" size="middle" className="admin-stack">
+                                    <div className="admin-page-note">
+                                        <Typography.Text strong>{quarantineView.movieId}</Typography.Text>
+                                        <Typography.Text type="secondary">
+                                            命中 {quarantineView.seeds.length} 个种子
+                                        </Typography.Text>
+                                    </div>
+                                    <div>
+                                        <Typography.Text type="secondary">Catalog 种子区间</Typography.Text>
+                                        <div className="admin-mono">
+                                            Seed {data.catalog.seedRange.start.toLocaleString()} - {data.catalog.seedRange.end.toLocaleString()}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <Typography.Text type="secondary">命中记录</Typography.Text>
+                                        <div>
+                                            <Space wrap size={[6, 6]} className="admin-seed-quarantine-tags">
+                                                {quarantineView.seeds.map(seed => <Tag key={seed}>{seed}</Tag>)}
+                                            </Space>
+                                        </div>
+                                    </div>
+                                </Space>
+                            )}
+                        </Modal>
                     </>
                 )}
             </Space>
