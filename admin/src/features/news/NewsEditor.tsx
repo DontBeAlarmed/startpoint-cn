@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query"
 
 import { apiPatch, apiPost } from "../../api/client"
 import { NewsThumb, renderNewsRichText } from "./newsPreview"
+import { validateRichTextClient } from "./validateRichTextClient"
 import { NEWS_COLOR_PALETTE, NEWS_TOOLBAR_ACTIONS, colorFragment, insertAround } from "./richTextToolbar"
 import type { AdminNewsRow, NewsDraft } from "./types"
 import type { RichTextFragment } from "./richTextToolbar"
@@ -135,6 +136,11 @@ export default function NewsEditor({ news, open, onClose, onSaved }: NewsEditorP
                 }
                 if (!draft.bodyRichText.trim()) {
                     message.error("请输入公告内容")
+                    return
+                }
+                const richCheck = validateRichTextClient(draft.bodyRichText)
+                if (!richCheck.ok) {
+                    message.error(richCheck.reason)
                     return
                 }
                 save.mutate()

@@ -199,3 +199,21 @@ assert.match(editor, /news-toolbar-swatch/)
 assert.match(editor, /background: `#\$\{color\.hex\}`/)
 
 console.log("admin news toolbar tests passed")
+
+
+// ── 客户端 RichText 预校验 (validateRichTextClient): 与服务端同构的精确报错 ──
+const { execSync } = require("node:child_process")
+const os = require("node:os")
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "news-validate-"))
+const outFile = path.join(tmp, "validate.cjs")
+execSync(`npx esbuild ${JSON.stringify(path.join(__dirname, "../admin/src/features/news/validateRichTextClient.ts"))} --bundle --format=cjs --outfile=${JSON.stringify(outFile)} --log-level=error`, { cwd: path.join(__dirname, "..") })
+const { validateRichTextClient } = require(outFile)
+
+assert.deepStrictEqual(validateRichTextClient("[b]测试[/b]修复若干问题\n<p>好</p>"), { ok: true }, "用户实测正文应通过")
+assert.equal(validateRichTextClient("<p>好").ok, false, "未闭合应拒绝")
+assert.match(validateRichTextClient("<p>好").reason, /未闭合/)
+assert.match(validateRichTextClient('<p class="x">好</p>').reason, /带有属性或非法字符/)
+assert.match(validateRichTextClient("<script>好</script>").reason, /不受客户端支持/)
+assert.match(validateRichTextClient("看 https://example.com").reason, /不支持链接与外部引用/)
+assert.equal(validateRichTextClient("纯文本无标签").ok, true, "纯文本应通过")
+console.log("admin news client rich-text validation tests passed")
