@@ -33,9 +33,9 @@ assert.doesNotMatch(mobileView, /返回账号列表/)
 assert.match(mobileView, /存档列表/)
 assert.match(mobileView, /编辑存档/)
 assert.match(mobileView, /player\.rank/)
-// 存档卡重命名内联编辑器已移除（重命名入口移到玩家详情 hero），移动端仅剩设备名内联编辑器；
-// 设备行不在可点击存档行内，不再需要 stopPropagation 守卫
-assert.match(mobileView, /className="admin-mobile-inline-editor"/)
+// 存档卡重命名内联编辑器已移除（重命名入口移到玩家详情 hero），移动端仅剩设备名 pill 编辑器；
+// 编辑态在 pill 原结构内变形（失焦保存, 无确定/取消按钮），设备行不在可点击存档行内
+assert.match(mobileView, /className="admin-dev-edit admin-dev-edit-editing"/)
 assert.doesNotMatch(mobileView, /role="button"/)
 assert.doesNotMatch(accounts, /row\.degreeId \|\| 1/)
 

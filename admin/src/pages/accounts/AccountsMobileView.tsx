@@ -16,7 +16,6 @@ interface AccountsMobileViewProps {
     accounts: readonly AccountRow[]
     selectedAccount: AccountRow | undefined
     loading: boolean
-    renamePending: boolean
     onSelectAccount: (accountId: number) => void
     onOpenPlayer: (playerId: number) => void
     onNewSave: (accountId: number) => Promise<unknown>
@@ -31,7 +30,6 @@ export function AccountsMobileView({
     accounts,
     selectedAccount,
     loading,
-    renamePending,
     onSelectAccount,
     onOpenPlayer,
     onNewSave,
@@ -44,6 +42,8 @@ export function AccountsMobileView({
     const [renamingDeviceId, setRenamingDeviceId] = useState<number | null>(null)
     const [deviceName, setDeviceName] = useState("")
     const savePanelRef = useRef<HTMLDivElement | null>(null)
+    // Esc 取消时置位, 让随后的失焦跳过保存
+    const deviceEditCancelledRef = useRef(false)
     const selectedAccountId = selectedAccount?.id ?? null
 
     // same inline-panel semantics as desktop: open/switch scrolls the save section into view
@@ -52,12 +52,14 @@ export function AccountsMobileView({
     }, [selectedAccountId])
 
     const submitDeviceName = async (deviceId: number) => {
+        if (renamingDeviceId !== deviceId) return
         await onRenameDevice(deviceId, deviceName)
         setRenamingDeviceId(null)
     }
 
     // 设备名 pill（含行内改名编辑器）：单设备账号渲染在标题行，多设备账号在下方设备区列出，
-    // renameDevice 流程（API/payload/失效）与桌面保持一致
+    // renameDevice 流程（API/payload/失效）与桌面保持一致。
+    // 编辑态保持 pill 原结构（维护者 2026-09-29）：单击进入, 失焦/回车保存, Esc 取消, 无确定/取消按钮
     const renderDevicePill = (device: DeviceBinding) =>
         renamingDeviceId === device.deviceId ? (
             <div className="admin-dev-edit admin-dev-edit-editing" key={device.deviceId}>
@@ -70,10 +72,20 @@ export function AccountsMobileView({
                     placeholder={`设备 ${device.deviceId}`}
                     onChange={event => setDeviceName(event.target.value)}
                     onPressEnter={() => submitDeviceName(device.deviceId)}
-                    onKeyDown={event => { if (event.key === "Escape") setRenamingDeviceId(null) }}
+                    onBlur={() => {
+                        if (deviceEditCancelledRef.current) {
+                            deviceEditCancelledRef.current = false
+                            return
+                        }
+                        void submitDeviceName(device.deviceId)
+                    }}
+                    onKeyDown={event => {
+                        if (event.key === "Escape") {
+                            deviceEditCancelledRef.current = true
+                            setRenamingDeviceId(null)
+                        }
+                    }}
                 />
-                <Button type="text" size="small" loading={renamePending} onClick={() => submitDeviceName(device.deviceId)}>确定</Button>
-                <Button type="text" size="small" onClick={() => setRenamingDeviceId(null)}>取消</Button>
             </div>
         ) : (
             <div className="admin-dev-edit" key={device.deviceId}>

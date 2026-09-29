@@ -287,7 +287,6 @@ export default function Accounts() {
                         accounts={accounts}
                         selectedAccount={selectedAccount}
                         loading={isLoading}
-                        renamePending={renameDevice.isPending}
                         onSelectAccount={toggleSavePanel}
                         onOpenPlayer={playerId => navigate(`/players/${playerId}`)}
                         onNewSave={accountId => newSave.mutateAsync(accountId)}

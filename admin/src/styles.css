@@ -821,20 +821,14 @@ body {
   color: var(--ink-soft);
 }
 
-/* 编辑态就在 pill 原结构内变形: 输入框贴进同一枚 pill, 规格与展示态一致 (维护者 2026-09-29) */
+/* 编辑态就在 pill 原结构内变形: 输入框贴进同一枚 pill (失焦保存, 无确定/取消按钮, 维护者 2026-09-29) */
 .admin-dev-edit-editing {
   padding: 0 4px 0 5px;
 }
 
 .admin-dev-edit-editing .ant-input {
-  width: 120px;
+  width: 150px;
   padding: 0 2px;
-  font-size: 12px;
-}
-
-.admin-dev-edit-editing .ant-btn {
-  height: 22px;
-  padding: 0 5px;
   font-size: 12px;
 }
 
