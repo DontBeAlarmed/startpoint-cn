@@ -139,6 +139,7 @@ export default function Mail() {
     const [form] = Form.useForm()
     const type = Form.useWatch("type", form)
     const typeId = Form.useWatch("type_id", form)
+    const number = Form.useWatch("number", form)
     const targetMode: TargetMode = Form.useWatch("targetMode", form) ?? "all"
     const needsId = requiresTypeId(type)
     const attachmentEndpoint = lookupEndpoint(type)
@@ -168,6 +169,24 @@ export default function Mail() {
     )
 
     const totalSaves = accounts.reduce((n, a) => n + a.saveCount, 0)
+
+    // 附件摘要：发送前所见即所发（类型 + 对象名 + 数量）
+    const attachmentSummary = type == null
+        ? null
+        : `${TYPE_LABEL[type] ?? type} · ${attachmentTitle(type, typeId, attachmentLookup) || "未选对象"} × ${number ?? 1}`
+
+    // 复制重发：按历史记录预填当前表单，不自动发送
+    const prefillFromHistory = (record: MailRecord) => {
+        form.setFieldsValue({
+            type: record.type,
+            type_id: requiresTypeId(record.type) ? record.typeId ?? undefined : undefined,
+            number: record.number,
+            subject: record.subject ?? undefined,
+            expirationDays: record.expirationDays ?? 31,
+        })
+        form.validateFields(["type", "type_id", "number", "subject", "expirationDays"]).catch(() => {})
+        message.info("已按该条记录预填表单，请确认后手动发送")
+    }
 
     const refresh = () => {
         qc.invalidateQueries({ queryKey: ["accounts"] })
@@ -243,13 +262,24 @@ export default function Mail() {
                     发送成功后会保留发送对象设置并清空附件与文案；邮件一旦送达无法撤回，群发前请在确认弹窗中核对目标和附件摘要。
                 </Text>
             </div>
-            <Card title="发送邮件">
+            <div className="admin-mail-grid">
+                <div className="admin-mail-grid-col">
+                    <Card title="发送邮件">
                 <Alert type={targetMode === "all" ? "warning" : "info"} showIcon style={{ marginBottom: 16 }}
                     message={
                         targetMode === "all" ? `将向全体 ${totalSaves} 个存档发送同一封邮件`
                             : targetMode === "account" ? "将向所选账号下的所有存档发送邮件"
                                 : "将向所选的单个存档发送邮件"
                     } />
+                {attachmentSummary && (
+                    <div className="admin-attach-summary">
+                        <span className="admin-attach-chip">
+                            <span className="admin-attach-chip-dot" />
+                            附件摘要：{attachmentSummary}
+                        </span>
+                        <Text type="secondary" className="admin-attach-summary-hint">所见即所发</Text>
+                    </div>
+                )}
                 <Form form={form} layout="vertical" onFinish={openConfirm} initialValues={{ number: 1, expirationDays: 31, targetMode: "all" }}>
                     <div className="admin-form-section">
                         <div className="admin-form-section-title">收件人</div>
@@ -330,7 +360,7 @@ export default function Mail() {
                                 <Select
                                     showSearch
                                     allowClear
-                                    placeholder="输入 ID 或名称搜索附件"
+                                    placeholder={`搜索${TYPE_LABEL[type] ?? ""}名称或 ID…`}
                                     loading={attachmentLoading}
                                     disabled={attachmentError}
                                     options={attachmentOptions}
@@ -402,30 +432,49 @@ export default function Mail() {
                         </div>
                     </Form.Item>
                 </Form>
-            </Card>
+                    </Card>
+                </div>
+                <div className="admin-mail-grid-col">
+                    <Card title="最近群发记录" className="admin-table-card">
+                        <Table<MailRecord & { key: number }>
+                            rowKey="key"
+                            size="small"
+                            pagination={false}
+                            dataSource={history.map((h, i) => ({ ...h, key: i }))}
+                            locale={{ emptyText: "暂无记录" }}
+                            scroll={{ x: "max-content" }}
+                            expandable={{
+                                expandedRowRender: r => (
+                                    <div className="admin-mail-history-detail">
+                                        <Descriptions column={1} size="small">
+                                            <Descriptions.Item label="目标摘要">{r.target}</Descriptions.Item>
+                                            <Descriptions.Item label="附件快照">
+                                                {`${TYPE_LABEL[r.type] ?? r.type}${r.typeId ? ` #${r.typeId}` : ""} × ${r.number}`}
+                                            </Descriptions.Item>
+                                            {r.subject && <Descriptions.Item label="标题">{r.subject}</Descriptions.Item>}
+                                            <Descriptions.Item label="发送数">{r.sent}</Descriptions.Item>
+                                            <Descriptions.Item label="有效期">{String(r.expirationDays ?? 31)} 天</Descriptions.Item>
+                                        </Descriptions>
+                                        <Button size="small" onClick={() => prefillFromHistory(r)}>复制重发</Button>
+                                    </div>
+                                ),
+                            }}
+                            columns={[
+                                { title: "时间", dataIndex: "time", width: 160, responsive: ["sm"] as any },
+                                { title: "对象", dataIndex: "target" },
+                                {
+                                    title: "附件", key: "attach",
+                                    render: (_: unknown, r) => `${TYPE_LABEL[r.type] ?? r.type}${r.typeId ? ` #${r.typeId}` : ""} × ${r.number}`,
+                                },
+                                { title: "发送数", dataIndex: "sent", width: 80, responsive: ["sm"] as any, render: (n: number) => <span className="admin-badge-info">{n}</span> },
+                                { title: "有效期", dataIndex: "expirationDays", width: 90, responsive: ["sm"] as any, render: (n: number) => String(n ?? 31) + " 天" },
+                            ]}
+                        />
+                    </Card>
+                </div>
+            </div>
 
             <ScheduledResourceRules players={players} />
-
-            <Card title="最近群发记录" className="admin-table-card">
-                <Table<MailRecord & { key: number }>
-                    rowKey="key"
-                    size="small"
-                    pagination={false}
-                    dataSource={history.map((h, i) => ({ ...h, key: i }))}
-                    locale={{ emptyText: "暂无记录" }}
-                    scroll={{ x: "max-content" }}
-                    columns={[
-                        { title: "时间", dataIndex: "time", width: 160, responsive: ["sm"] as any },
-                        { title: "对象", dataIndex: "target" },
-                        {
-                            title: "附件", key: "attach",
-                            render: (_: unknown, r) => `${TYPE_LABEL[r.type] ?? r.type}${r.typeId ? ` #${r.typeId}` : ""} × ${r.number}`,
-                        },
-                        { title: "发送数", dataIndex: "sent", width: 80, responsive: ["sm"] as any, render: (n: number) => <span className="admin-badge-info">{n}</span> },
-                        { title: "有效期", dataIndex: "expirationDays", width: 90, responsive: ["sm"] as any, render: (n: number) => String(n ?? 31) + " 天" },
-                    ]}
-                />
-            </Card>
         </Space>
 
             <Modal
