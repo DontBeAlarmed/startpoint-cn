@@ -3,6 +3,7 @@ import {
     Alert,
     Button,
     Card,
+    Grid,
     Popconfirm,
     Space,
     Table,
@@ -17,6 +18,7 @@ import { ApiError, apiDelete, apiGet, apiPost } from "../api/client"
 import { AdminPage } from "../components/AdminPage"
 import GiftEditor from "../features/gifts/GiftEditor"
 import GiftRedemptions from "../features/gifts/GiftRedemptions"
+import { GiftsMobileView } from "../features/gifts/GiftsMobileView"
 import { giftRewardChipTexts } from "../features/gifts/rewardDisplay"
 import type { AdminGiftRow, GiftPage } from "../features/gifts/types"
 
@@ -39,8 +41,12 @@ interface EquipmentLookupRow {
 type CharacterLookup = Record<string, CharacterLookupRow>
 type EquipmentLookup = Record<string, EquipmentLookupRow>
 
+const { useBreakpoint } = Grid
+
 export default function Gifts() {
     const queryClient = useQueryClient()
+    const screens = useBreakpoint()
+    const isMobile = !screens.md
     const [page, setPage] = useState(1)
     const [pageSize, setPageSize] = useState(20)
     const [editorGift, setEditorGift] = useState<AdminGiftRow | null>(null)
@@ -157,140 +163,167 @@ export default function Gifts() {
                         action={<Button onClick={() => gifts.refetch()}>重试</Button>}
                     />
                 )}
-                <Card title="公共礼包" className="admin-table-card">
-                    <Table<AdminGiftRow>
-                        rowKey="id"
-                        className="admin-ops-table"
-                        loading={gifts.isLoading}
-                        dataSource={gifts.data?.rows ?? []}
-                        scroll={{ x: "max-content" }}
-                        tableLayout="fixed"
-                        locale={{ emptyText: "暂无礼包" }}
-                        pagination={{
-                            current: page,
-                            pageSize,
-                            total: gifts.data?.totalCount ?? 0,
-                            showSizeChanger: true,
-                            onChange: (nextPage, nextPageSize) => {
+                {/* <768px 走账号页已验证的移动卡片视图；>=768px 桌面表格一字不动 */}
+                {isMobile && (
+                    <Card title="公共礼包" className="admin-mobile-list-card">
+                        <GiftsMobileView
+                            rows={gifts.data?.rows ?? []}
+                            loading={gifts.isLoading}
+                            page={page}
+                            pageSize={pageSize}
+                            totalCount={gifts.data?.totalCount ?? 0}
+                            rewardLookups={rewardLookups}
+                            onPageChange={(nextPage, nextPageSize) => {
                                 setPage(nextPage)
                                 setPageSize(nextPageSize)
-                            },
-                        }}
-                        columns={[
-                            { title: "Code", dataIndex: "code", width: 150, render: (_: unknown, row) => <span className="gift-code-cell">{row.code}</span> },
-                            {
-                                title: "状态",
-                                dataIndex: "status",
-                                width: 90,
-                                responsive: ["sm"] as any,
-                                render: (_, row) => (
-                                    <span className={row.status === "active" ? "admin-badge-ok" : "admin-badge-muted"}>
-                                        {row.status === "active" ? "启用" : "停止"}
-                                    </span>
-                                ),
-                            },
-                            {
-                                title: "奖励",
-                                dataIndex: "rewards",
-                                width: 280,
-                                responsive: ["sm"] as any,
-                                render: (_, row) => {
-                                    const chips = giftRewardChipTexts(row.rewards, rewardLookups)
-                                    return (
-                                        <span className="gift-reward-chips">
-                                            {chips.slice(0, 2).map((text, index) => (
-                                                <span key={index} className="gift-reward-chip">{text}</span>
-                                            ))}
-                                            {chips.length > 2 && (
-                                                <span
-                                                    className="gift-reward-chip gift-reward-chip-more"
-                                                    title={chips.join("\n")}
-                                                >
-                                                    +{chips.length - 2}
-                                                </span>
-                                            )}
+                            }}
+                            onStart={row => start.mutateAsync(row)}
+                            onStop={row => stop.mutateAsync(row)}
+                            onEdit={row => {
+                                setEditorGift(row)
+                                setEditorOpen(true)
+                            }}
+                            onDelete={row => remove.mutateAsync(row)}
+                            onOpenRedemptions={setRedemptionGift}
+                        />
+                    </Card>
+                )}
+                {!isMobile && (
+                    <Card title="公共礼包" className="admin-table-card">
+                        <Table<AdminGiftRow>
+                            rowKey="id"
+                            className="admin-ops-table"
+                            loading={gifts.isLoading}
+                            dataSource={gifts.data?.rows ?? []}
+                            scroll={{ x: "max-content" }}
+                            tableLayout="fixed"
+                            locale={{ emptyText: "暂无礼包" }}
+                            pagination={{
+                                current: page,
+                                pageSize,
+                                total: gifts.data?.totalCount ?? 0,
+                                showSizeChanger: true,
+                                onChange: (nextPage, nextPageSize) => {
+                                    setPage(nextPage)
+                                    setPageSize(nextPageSize)
+                                },
+                            }}
+                            columns={[
+                                { title: "Code", dataIndex: "code", width: 150, render: (_: unknown, row) => <span className="gift-code-cell">{row.code}</span> },
+                                {
+                                    title: "状态",
+                                    dataIndex: "status",
+                                    width: 90,
+                                    responsive: ["sm"] as any,
+                                    render: (_, row) => (
+                                        <span className={row.status === "active" ? "admin-badge-ok" : "admin-badge-muted"}>
+                                            {row.status === "active" ? "启用" : "停止"}
                                         </span>
-                                    )
+                                    ),
                                 },
-                            },
-                            { title: "奖励版本", dataIndex: "rewardRevision", width: 100, responsive: ["sm"] as any },
-                            { title: "版本", dataIndex: "revision", width: 80, responsive: ["sm"] as any },
-                            { title: "已领取", dataIndex: "redemptionCount", width: 90, responsive: ["sm"] as any },
-                            {
-                                title: "更新时间",
-                                dataIndex: "updatedAt",
-                                width: 190,
-                                responsive: ["sm"] as any,
-                                render: value => new Date(value).toLocaleString("zh-CN"),
-                            },
-                            {
-                                title: "操作",
-                                fixed: "right",
-                                width: 250,
-                                render: (_, row) => {
-                                    if (row.status === "stopped") return (
-                                        <Space className="admin-action-row">
-                                            <Button
-                                                size="small"
-                                                loading={start.isPending && start.variables?.id === row.id}
-                                                onClick={() => start.mutate(row)}
-                                            >
-                                                启动
-                                            </Button>
-                                            <Button
-                                                size="small"
-                                                icon={<Pencil size={15} />}
-                                                onClick={() => {
-                                                    setEditorGift(row)
-                                                    setEditorOpen(true)
-                                                }}
-                                            >
-                                                编辑
-                                            </Button>
-                                            <Popconfirm
-                                                title="删除这个礼包？"
-                                                description="此操作不可恢复，将清除全部领取记录，同 code 重建后可重新领取。"
-                                                okText="删除"
-                                                cancelText="取消"
-                                                okButtonProps={{ danger: true }}
-                                                onConfirm={() => remove.mutate(row)}
-                                            >
-                                                <Button size="small" type="text" danger>
-                                                    删除
+                                {
+                                    title: "奖励",
+                                    dataIndex: "rewards",
+                                    width: 280,
+                                    responsive: ["sm"] as any,
+                                    render: (_, row) => {
+                                        const chips = giftRewardChipTexts(row.rewards, rewardLookups)
+                                        return (
+                                            <span className="gift-reward-chips">
+                                                {chips.slice(0, 2).map((text, index) => (
+                                                    <span key={index} className="gift-reward-chip">{text}</span>
+                                                ))}
+                                                {chips.length > 2 && (
+                                                    <span
+                                                        className="gift-reward-chip gift-reward-chip-more"
+                                                        title={chips.join("\n")}
+                                                    >
+                                                        +{chips.length - 2}
+                                                    </span>
+                                                )}
+                                            </span>
+                                        )
+                                    },
+                                },
+                                { title: "奖励版本", dataIndex: "rewardRevision", width: 100, responsive: ["sm"] as any },
+                                { title: "版本", dataIndex: "revision", width: 80, responsive: ["sm"] as any },
+                                { title: "已领取", dataIndex: "redemptionCount", width: 90, responsive: ["sm"] as any },
+                                {
+                                    title: "更新时间",
+                                    dataIndex: "updatedAt",
+                                    width: 190,
+                                    responsive: ["sm"] as any,
+                                    render: value => new Date(value).toLocaleString("zh-CN"),
+                                },
+                                {
+                                    title: "操作",
+                                    fixed: "right",
+                                    width: 250,
+                                    render: (_, row) => {
+                                        if (row.status === "stopped") return (
+                                            <Space className="admin-action-row">
+                                                <Button
+                                                    size="small"
+                                                    loading={start.isPending && start.variables?.id === row.id}
+                                                    onClick={() => start.mutate(row)}
+                                                >
+                                                    启动
                                                 </Button>
-                                            </Popconfirm>
-                                            <Button
-                                                size="small"
-                                                icon={<Eye size={15} />}
-                                                onClick={() => setRedemptionGift(row)}
-                                            >
-                                                记录
-                                            </Button>
-                                        </Space>
-                                    )
-                                    return (
-                                        <Space className="admin-action-row">
-                                            <Button
-                                                size="small"
-                                                loading={stop.isPending && stop.variables?.id === row.id}
-                                                onClick={() => stop.mutate(row)}
-                                            >
-                                                {row.status === "active" ? "停止" : "启动"}
-                                            </Button>
-                                            <Button
-                                                size="small"
-                                                icon={<Eye size={15} />}
-                                                onClick={() => setRedemptionGift(row)}
-                                            >
-                                                记录
-                                            </Button>
-                                        </Space>
-                                    )
+                                                <Button
+                                                    size="small"
+                                                    icon={<Pencil size={15} />}
+                                                    onClick={() => {
+                                                        setEditorGift(row)
+                                                        setEditorOpen(true)
+                                                    }}
+                                                >
+                                                    编辑
+                                                </Button>
+                                                <Popconfirm
+                                                    title="删除这个礼包？"
+                                                    description="此操作不可恢复，将清除全部领取记录，同 code 重建后可重新领取。"
+                                                    okText="删除"
+                                                    cancelText="取消"
+                                                    okButtonProps={{ danger: true }}
+                                                    onConfirm={() => remove.mutate(row)}
+                                                >
+                                                    <Button size="small" type="text" danger>
+                                                        删除
+                                                    </Button>
+                                                </Popconfirm>
+                                                <Button
+                                                    size="small"
+                                                    icon={<Eye size={15} />}
+                                                    onClick={() => setRedemptionGift(row)}
+                                                >
+                                                    记录
+                                                </Button>
+                                            </Space>
+                                        )
+                                        return (
+                                            <Space className="admin-action-row">
+                                                <Button
+                                                    size="small"
+                                                    loading={stop.isPending && stop.variables?.id === row.id}
+                                                    onClick={() => stop.mutate(row)}
+                                                >
+                                                    {row.status === "active" ? "停止" : "启动"}
+                                                </Button>
+                                                <Button
+                                                    size="small"
+                                                    icon={<Eye size={15} />}
+                                                    onClick={() => setRedemptionGift(row)}
+                                                >
+                                                    记录
+                                                </Button>
+                                            </Space>
+                                        )
+                                    },
                                 },
-                            },
-                        ]}
-                    />
-                </Card>
+                            ]}
+                        />
+                    </Card>
+                )}
                 {redemptionGift && (
                     <GiftRedemptions
                         gift={redemptionGift}

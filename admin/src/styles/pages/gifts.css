@@ -131,3 +131,21 @@
   overflow-wrap: anywhere;
   word-break: break-all;
 }
+
+/* ── gifts mobile card view (<768px) ────────────────────────────────────────
+   断点切换与卡片骨架复用账号页已验证的 .admin-mobile-* 共享类（AccountsMobileView
+   模式），奖励 chips 直接复用 .gift-reward-chip；这里只补页面私有件：code 的 mono
+   标题与 chips/meta 行的纵向节奏。桌面表格零改动。 */
+.gift-mobile-code {
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+}
+
+.gift-mobile-chips {
+  margin-top: 8px;
+}
+
+.gift-mobile-meta {
+  display: block;
+  margin-top: 8px;
+}
