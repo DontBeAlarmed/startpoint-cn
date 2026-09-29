@@ -441,14 +441,15 @@ body {
 .admin-time-hero-clockzone {
   display: flex;
   justify-content: center;
-  padding: 10px 0 4px;
+  /* 底部留白加大, 让时间设置区与下方说明拉开突出层级 (维护者 2026-09-29) */
+  padding: 12px 0 18px;
 }
 
 .admin-time-hero-digits {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 10px;
   min-width: 0;
   color: var(--ink);
   font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -464,7 +465,7 @@ body {
   display: flex;
   align-items: baseline;
   justify-content: center;
-  gap: 0 10px;
+  gap: 0 16px;
   min-width: 0;
   white-space: nowrap;
 }
@@ -472,7 +473,7 @@ body {
 .admin-time-hero-cell {
   display: inline-flex;
   align-items: baseline;
-  gap: 3px;
+  gap: 5px;
   min-width: 0;
 }
 
