@@ -1913,6 +1913,17 @@ html[data-theme="dark"] .admin-res-lv {
   background: var(--panel);
 }
 
+/* gifts editor reward rows (Form.List): controls must wrap as whole units on narrow
+   screens — with a 奖励对象 select (240px) in the row, nowrap overflows the modal edge
+   (实测 390px: row 584px / right 626px). Mobile-first base wrap; desktop modal
+   (min(92vw, 880px)) fits one line so the wrap never triggers there. row-gap 0 keeps
+   the vertical rhythm on form-item margins. */
+.gift-reward-row {
+  flex-wrap: wrap;
+  column-gap: 8px;
+  row-gap: 0;
+}
+
 /* gifts: reward text and redemption snapshots read as quiet mono data */
 .gift-reward-summary {
   color: var(--ink-soft);
