@@ -4,6 +4,7 @@ import { Plus } from "lucide-react"
 import { useMutation, useQuery } from "@tanstack/react-query"
 
 import { apiGet, apiPatch, apiPost } from "../../api/client"
+import { giftRewardChipText } from "./rewardDisplay"
 import {
     GIFT_REWARD_TYPES,
     type AdminGiftRow,
@@ -170,8 +171,27 @@ export default function GiftEditor({ gift, open, onClose, onSaved }: GiftEditorP
                                     const reward = rewards?.[field.name]
                                     const type = reward?.type
                                     const showTypeId = requiresTypeId(type)
+                                    const chipText = reward
+                                        ? giftRewardChipText(
+                                            { type: reward.type, typeId: reward.typeId ?? null, number: reward.number },
+                                            { items: itemLookup, characters: characterLookup, equipment: equipmentLookup },
+                                        )
+                                        : "-"
                                     return (
-                                        <Space key={field.key} align="baseline" className="gift-reward-row">
+                                        <div key={field.key} className="gift-chip-row">
+                                            <div className="gift-chip-head">
+                                                <span className="gift-chip-text">{chipText}</span>
+                                                <Button
+                                                    type="text"
+                                                    danger
+                                                    size="small"
+                                                    disabled={fields.length <= 1}
+                                                    onClick={() => remove(field.name)}
+                                                >
+                                                    ✕ 移除
+                                                </Button>
+                                            </div>
+                                            <Space align="baseline" className="gift-reward-row">
                                             <Form.Item
                                                 name={[field.name, "type"]}
                                                 label="奖励类型"
@@ -223,20 +243,14 @@ export default function GiftEditor({ gift, open, onClose, onSaved }: GiftEditorP
                                                     style={{ width: 110 }}
                                                 />
                                             </Form.Item>
-                                            <Button
-                                                type="text"
-                                                danger
-                                                disabled={fields.length <= 1}
-                                                onClick={() => remove(field.name)}
-                                            >
-                                                移除
-                                            </Button>
-                                        </Space>
+                                            </Space>
+                                        </div>
                                     )
                                 })}
                                 <Form.ErrorList errors={errors} />
                                 <Button
                                     icon={<Plus size={15} />}
+                                    className="gift-add-reward"
                                     disabled={fields.length >= 20}
                                     onClick={() => add({ type: 8, typeId: null, number: 100 })}
                                 >

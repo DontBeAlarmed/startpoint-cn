@@ -2112,6 +2112,100 @@ html[data-theme="dark"] .admin-res-lv {
   font-size: 12px;
 }
 
+/* ── gifts deep polish ──────────────────────────────────────────────────────
+   reward chips (列表「奖励」列 + 编辑器奖励行头部): the quiet chip voice from
+   the approved review mockup (#p-gifts) — star tile + 类型·对象名 ×数量;
+   list shows at most two chips then a quiet +N counter. */
+.gift-reward-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.gift-reward-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--th-bg);
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.gift-reward-chip::before {
+  content: "";
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--star);
+  opacity: .85;
+}
+
+.gift-reward-chip-more {
+  color: var(--ink-soft);
+}
+
+.gift-reward-chip-more::before {
+  display: none;
+}
+
+/* editor reward rows: each Form.List entry reads as a chip card — resolved
+   名称 headline (所见即所存) above the same in-place type/object/number
+   controls; Form.List 结构与锚点不动，仅视觉重组 */
+.gift-chip-row {
+  min-width: 0;
+  padding: 8px 10px 2px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--stat-bg);
+}
+
+.gift-chip-row + .gift-chip-row {
+  margin-top: 8px;
+}
+
+.gift-chip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.gift-chip-text {
+  min-width: 0;
+  color: var(--ink-soft);
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.gift-chip-head .ant-btn {
+  flex: none;
+  padding-inline: 4px;
+}
+
+.gift-add-reward.ant-btn {
+  border-style: dashed;
+  color: var(--ink-soft);
+}
+
+.gift-redemption-filters {
+  width: 100%;
+}
+
+.gift-redemption-filters .ant-select,
+.gift-redemption-filters .ant-input {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
 .gift-redemption-snapshot {
   margin: 0;
   font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;

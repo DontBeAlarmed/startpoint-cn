@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Alert, Button, Card, Input, Space, Table } from "antd"
+import { Alert, Button, Card, Input, Select, Space, Table } from "antd"
 import { useQuery } from "@tanstack/react-query"
 
 import { apiGet } from "../../api/client"
@@ -7,10 +7,13 @@ import type { AdminGiftRow, GiftRedemptionPage, GiftRedemptionRow } from "./type
 
 interface GiftRedemptionsProps {
     gift: AdminGiftRow
+    /** 页面已加载的礼包行（含 code），供面板内按 code 切换查看；数据逻辑不动。 */
+    gifts?: readonly AdminGiftRow[]
+    onGiftChange?: (gift: AdminGiftRow) => void
     onClose: () => void
 }
 
-export default function GiftRedemptions({ gift, onClose }: GiftRedemptionsProps) {
+export default function GiftRedemptions({ gift, gifts, onGiftChange, onClose }: GiftRedemptionsProps) {
     const [page, setPage] = useState(1)
     const [pageSize, setPageSize] = useState(20)
     const [search, setSearch] = useState("")
@@ -23,7 +26,14 @@ export default function GiftRedemptions({ gift, onClose }: GiftRedemptionsProps)
     return (
         <Card
             title={`领取记录 · ${gift.code}`}
-            extra={<Button onClick={onClose}>关闭</Button>}
+            extra={(
+                <Space>
+                    <span className={gift.redemptionCount > 0 ? "admin-badge-info" : "admin-badge-muted"}>
+                        已领取 {gift.redemptionCount}
+                    </span>
+                    <Button onClick={onClose}>关闭</Button>
+                </Space>
+            )}
             className="admin-table-card"
         >
             <Space direction="vertical" size="large" className="admin-stack">
@@ -35,12 +45,36 @@ export default function GiftRedemptions({ gift, onClose }: GiftRedemptionsProps)
                         action={<Button onClick={() => redemptions.refetch()}>重试</Button>}
                     />
                 )}
-                <Input
-                    value={search}
-                    placeholder="搜索玩家名或精确 Player/Account ID"
-                    onChange={event => setSearch(event.target.value)}
-                    allowClear
-                />
+                <Space wrap size="small" className="gift-redemption-filters">
+                    {gifts !== undefined && gifts.length > 0 && onGiftChange !== undefined && (
+                        <Select
+                            value={gift.id}
+                            showSearch
+                            optionFilterProp="label"
+                            placeholder="按 code 筛选"
+                            style={{ minWidth: 200 }}
+                            onChange={nextId => {
+                                const next = gifts.find(g => g.id === nextId)
+                                if (next !== undefined) {
+                                    setPage(1)
+                                    setSearch("")
+                                    onGiftChange(next)
+                                }
+                            }}
+                            options={gifts.map(g => ({
+                                value: g.id,
+                                label: `${g.code}（已领取 ${g.redemptionCount}）`,
+                            }))}
+                        />
+                    )}
+                    <Input
+                        value={search}
+                        placeholder="搜索玩家名或精确 Player/Account ID"
+                        onChange={event => setSearch(event.target.value)}
+                        allowClear
+                        style={{ minWidth: 220 }}
+                    />
+                </Space>
                 <Table<GiftRedemptionRow>
                     rowKey="playerId"
                     loading={redemptions.isLoading}
