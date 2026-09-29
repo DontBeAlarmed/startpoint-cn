@@ -157,9 +157,10 @@ export default function News() {
                                 dataIndex: "thumbnail",
                                 width: 90,
                                 align: "center",
+                                responsive: ["md"] as any,
                                 render: (_: unknown, row) => <NewsThumb thumbnail={row.thumbnail} />,
                             },
-                            { title: "标题", dataIndex: "title", width: 260 },
+                            { title: "标题", dataIndex: "title", width: 260, render: (_: unknown, row) => <span className="news-title-cell">{row.title}</span> },
                             {
                                 title: "分类",
                                 dataIndex: "category",
@@ -180,6 +181,7 @@ export default function News() {
                             {
                                 title: "状态",
                                 width: 110,
+                                responsive: ["md"] as any,
                                 render: (_, row) => (
                                     <Switch
                                         checked={row.enabled}
