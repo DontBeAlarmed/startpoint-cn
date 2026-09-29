@@ -45,3 +45,23 @@
   grid-template-columns: minmax(120px, 1fr) auto auto;
   gap: 6px;
 }
+
+/* ── mobile card view (<768px, ADD-3) ───────────────────────────────────────
+   断点切换与卡片骨架复用账号页已验证的 .admin-mobile-* 共享类（AccountsMobileView
+   模式）；这里只补页面私有件：尾部行（启停 Switch + 操作行）与详情行节奏。
+   桌面表格与三个锚点类（modal/number-grid/date-grid）零改动。 */
+.scheduled-resource-mobile-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.scheduled-resource-mobile-foot .admin-mobile-actions {
+  flex: 1 1 auto;
+  margin-top: 0;
+}
+
+.scheduled-resource-mobile-detail strong {
+  font-weight: 500;
+}

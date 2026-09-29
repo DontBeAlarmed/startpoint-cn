@@ -4,6 +4,7 @@ import {
     Card,
     DatePicker,
     Form,
+    Grid,
     Input,
     InputNumber,
     Modal,
@@ -20,13 +21,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import dayjs, { type Dayjs } from "dayjs"
 
 import { apiDelete, apiGet, apiPatch, apiPost } from "../api/client"
+import { ScheduledResourceMobileView } from "./ScheduledResourceMobileView"
 
 interface PlayerBrief {
     id: number
     name: string
 }
 
-interface ScheduledResourceRule {
+export interface ScheduledResourceRule {
     id: number
     scope: "global" | "player"
     playerId: number | null
@@ -61,6 +63,8 @@ interface ScheduledResourceRulesProps {
     players: readonly PlayerBrief[]
 }
 
+const { useBreakpoint } = Grid
+
 function toRequest(values: RuleFormValues) {
     return {
         scope: values.scope,
@@ -79,6 +83,8 @@ function toRequest(values: RuleFormValues) {
 
 export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps) {
     const queryClient = useQueryClient()
+    const screens = useBreakpoint()
+    const isMobile = !screens.md
     const [form] = Form.useForm<RuleFormValues>()
     const [editingRule, setEditingRule] = useState<ScheduledResourceRule | null>(null)
     const [modalOpen, setModalOpen] = useState(false)
@@ -192,8 +198,19 @@ export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps)
                         新建规则
                     </Button>
                 )}
-                className="admin-table-card"
+                className={isMobile ? "admin-mobile-list-card" : "admin-table-card"}
             >
+                {/* ADD-3: <768px 走账号页已验证的移动卡片视图；>=768px 桌面表格一字不动 */}
+                {isMobile ? (
+                    <ScheduledResourceMobileView
+                        rules={rules.data ?? []}
+                        loading={rules.isLoading}
+                        toggling={toggle.isPending}
+                        onToggle={rule => toggle.mutate(rule)}
+                        onEdit={openEdit}
+                        onDelete={ruleId => remove.mutate(ruleId)}
+                    />
+                ) : (
                 <Table<ScheduledResourceRule>
                     rowKey="id"
                     className="admin-ops-table"
@@ -251,6 +268,7 @@ export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps)
                         },
                     ]}
                 />
+                )}
             </Card>
 
             <Modal
