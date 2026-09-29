@@ -52,3 +52,21 @@
 .admin-seed-quarantine-tags {
   margin-top: 4px;
 }
+
+/* seeds: Catalog 移动卡片 (<768 卡片视图, 桌面表格) */
+.admin-seed-catalog-cards {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-seed-catalog-card {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--th-bg);
+}
+
+.admin-seed-catalog-card .admin-seed-ratio {
+  margin: 8px 0;
+}

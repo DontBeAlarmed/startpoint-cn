@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { Alert, Button, Card, Empty, Modal, Space, Spin, Table, Tag, Typography } from "antd"
+import { Alert, Button, Card, Empty, Grid, Modal, Space, Spin, Table, Tag, Typography } from "antd"
 import { ReloadOutlined } from "@ant-design/icons"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 
@@ -53,6 +53,9 @@ function formatClock(timestamp: number): string {
 export default function Seeds() {
     const queryClient = useQueryClient()
     const [quarantineView, setQuarantineView] = useState<{ movieId: string; seeds: number[] } | null>(null)
+    // <768 用卡片视图: Catalog 宽表格在窄屏按容器重新分配列宽, 前方列被挤压 (维护者 2026-09-30)
+    const screens = Grid.useBreakpoint()
+    const catalogAsCards = !screens.md
     const { data, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useQuery({
         queryKey: ["gacha-seed-status"],
         queryFn: () => apiGet<SeedStatus>("/api/seeds/status"),
@@ -140,6 +143,54 @@ export default function Seeds() {
                         </div>
 
                         <Card title="Catalog 分布" className="admin-table-card">
+                            {catalogAsCards && (
+                                <div className="admin-seed-catalog-cards">
+                                    {rows.map(row => (
+                                        <div className="admin-seed-catalog-card" key={row.movieId}>
+                                            <div className="admin-mobile-list-heading">
+                                                <span className="admin-mobile-heading-main">
+                                                    <Typography.Text strong>{MOVIE_LABELS[row.movieId] ?? row.movieId}</Typography.Text>
+                                                    <Typography.Text type="secondary">{row.movieId}</Typography.Text>
+                                                </span>
+                                                <Typography.Text>合计 {row.total}</Typography.Text>
+                                            </div>
+                                            {row.total > 0 && (
+                                                <div className="admin-seed-ratio">
+                                                    <div className="admin-seed-ratio-bar" aria-hidden>
+                                                        {RARITY_RATIO_COLORS.map(({ rarity, color }) => (
+                                                            <span
+                                                                key={rarity}
+                                                                style={{ flex: row.rarityCounts[rarity], background: color }}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                    <span className="admin-seed-ratio-text admin-mono">
+                                                        {RARITY_RATIO_COLORS.map(({ rarity }) => (
+                                                            <span key={rarity}>
+                                                                {rarity}★ {Math.round(row.rarityCounts[rarity] * 100 / row.total)}
+                                                                {rarity === "5" ? "" : " · "}
+                                                            </span>
+                                                        ))}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            <div className="admin-mobile-detail-list">
+                                                <div><span>★3</span><strong>{row.rarityCounts["3"]}</strong></div>
+                                                <div><span>★4</span><strong>{row.rarityCounts["4"]}</strong></div>
+                                                <div><span>★5</span><strong>{row.rarityCounts["5"]}</strong></div>
+                                                <div>
+                                                    <span>隔离</span>
+                                                    <strong>{row.quarantined > 0
+                                                        ? <span className="admin-badge-warn">{row.quarantined}</span>
+                                                        : <span className="admin-muted">0</span>}
+                                                    </strong>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {!catalogAsCards && ( <>
                             <Table
                                 size="small"
                                 pagination={false}
@@ -204,6 +255,7 @@ export default function Seeds() {
                             <Text type="secondary">
                                 Seed {data.catalog.seedRange.start.toLocaleString()} - {data.catalog.seedRange.end.toLocaleString()}
                             </Text>
+                            </> )}
                         </Card>
 
                         <Card title="Quarantine" className="admin-table-card">

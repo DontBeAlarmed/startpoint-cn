@@ -1,6 +1,6 @@
-import { Button, List, Popconfirm, Switch, Typography } from "antd"
+import { Button, List, Popconfirm, Typography } from "antd"
 import dayjs from "dayjs"
-import { Pencil, Trash2 } from "lucide-react"
+import { CircleStop, Pencil, Play, Trash2 } from "lucide-react"
 
 import type { ScheduledResourceRule } from "./ScheduledResourceRules"
 
@@ -42,6 +42,9 @@ export function ScheduledResourceMobileView({
                                 {rule.scope === "global"
                                     ? <span className="admin-badge-info">全局规则</span>
                                     : <span className="admin-badge-muted">指定存档 #{rule.playerId}</span>}
+                                {rule.enabled
+                                    ? <span className="admin-badge-ok">启用</span>
+                                    : <span className="admin-badge-muted">停用</span>}
                             </span>
                         </div>
                         <div className="admin-mobile-detail-list scheduled-resource-mobile-detail">
@@ -59,14 +62,14 @@ export function ScheduledResourceMobileView({
                             {rule.description && <div><span>备注</span><strong>{rule.description}</strong></div>}
                         </div>
                         <div className="scheduled-resource-mobile-foot">
-                            <Switch
-                                checked={rule.enabled}
-                                checkedChildren="启用"
-                                unCheckedChildren="停用"
-                                loading={toggling}
-                                onChange={() => onToggle(rule)}
-                            />
                             <div className="admin-mobile-actions">
+                                <Button
+                                    icon={rule.enabled ? <CircleStop size={15} /> : <Play size={15} />}
+                                    loading={toggling}
+                                    onClick={() => onToggle(rule)}
+                                >
+                                    {rule.enabled ? "停用" : "启用"}
+                                </Button>
                                 <Button icon={<Pencil size={15} />} aria-label="编辑规则" onClick={() => onEdit(rule)}>
                                     编辑
                                 </Button>
