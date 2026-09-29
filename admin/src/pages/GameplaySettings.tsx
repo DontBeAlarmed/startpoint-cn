@@ -205,14 +205,6 @@ export default function GameplaySettings() {
                     </Card>
                     <Card
                         title={cardTitle("本服玩家：所有多人房间救援资格", !rescueUnchanged, "rescue")}
-                        extra={(
-                            <span className={settings.data?.multiRescueFragmentRewardsEnabled
-                                ? "admin-badge-ok"
-                                : "admin-badge-info"}
-                            >
-                                {settings.data?.multiRescueFragmentRewardsEnabled ? "已开启" : "已关闭"}
-                            </span>
-                        )}
                     >
                         <Space direction="vertical" size="middle" className="admin-stack">
                             <Space wrap align="center">
@@ -241,14 +233,6 @@ export default function GameplaySettings() {
                     </Card>
                     <Card
                         title={cardTitle("本服玩家：房主救援身份", !hostRescueUnchanged, "hostRescue")}
-                        extra={(
-                            <span className={settings.data?.multiRescueHostRewardsEnabled
-                                ? "admin-badge-ok"
-                                : "admin-badge-info"}
-                            >
-                                {settings.data?.multiRescueHostRewardsEnabled ? "已开启" : "已关闭"}
-                            </span>
-                        )}
                     >
                         <Space direction="vertical" size="middle" className="admin-stack">
                             <Space wrap align="center">
@@ -277,14 +261,6 @@ export default function GameplaySettings() {
                     </Card>
                     <Card
                         title={cardTitle("Rush 私服兼容", !rushCompatibilityUnchanged, "rushCompatibility")}
-                        extra={(
-                            <span className={settings.data?.rush700011To700017CompatibilityEnabled
-                                ? "admin-badge-ok"
-                                : "admin-badge-info"}
-                            >
-                                {settings.data?.rush700011To700017CompatibilityEnabled ? "已开启" : "已关闭"}
-                            </span>
-                        )}
                     >
                         <Space direction="vertical" size="middle" className="admin-stack">
                             <Space wrap align="center">

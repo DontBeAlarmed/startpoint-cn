@@ -58,15 +58,9 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 设置卡片: 长标题(如"本服玩家:所有多人房间救援资格")在窄卡下会被 extra 状态徽章
-   遮挡 — antd 卡头默认 nowrap+ellipsis。允许卡头换行、标题折行 (维护者 2026-09-30) */
-.admin-stack .ant-card-head-wrapper {
-  flex-wrap: wrap;
-  row-gap: 2px;
-}
-
+/* 设置卡片: 标题永不换行, 超长省略号截断 (维护者 2026-09-30: 状态徽章已移出标题区) */
 .admin-stack .ant-card-head-title {
-  white-space: normal;
-  overflow: visible;
-  text-overflow: clip;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
