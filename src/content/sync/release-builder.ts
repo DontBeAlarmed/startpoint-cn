@@ -30,6 +30,11 @@ import {
     type GameplaySourceReader,
 } from "../converters/gameplay"
 import {
+    convertEventFamilies,
+    type EventFamilyConversionOutput,
+    type EventFamilySourceReader,
+} from "../converters/event-family"
+import {
     convertManaNodes,
     type ManaNodeConversionOutput,
     type ManaNodeSourceReader,
@@ -109,6 +114,7 @@ const SUPPORTED_CONVERTER_IDS = new Set([
     "box-gacha",
     "gacha",
     "gameplay",
+    "event-family",
     "item-equipment",
     "login-bonus",
     "mana-node",
@@ -166,6 +172,10 @@ export interface DefaultContentTableBuilderDependencies {
     readonly convertGameplayTables?: (
         reader: GameplaySourceReader,
     ) => GameplayConversionOutput | Promise<GameplayConversionOutput>
+    readonly convertEventFamilies?: (
+        reader: EventFamilySourceReader,
+        context: ContentConverterContext,
+    ) => EventFamilyConversionOutput | Promise<EventFamilyConversionOutput>
     readonly convertManaNodes?: (
         reader: ManaNodeSourceReader,
     ) => ManaNodeConversionOutput | Promise<ManaNodeConversionOutput>
@@ -228,6 +238,7 @@ function requireLogicalPath(logicalPath: string): string {
 }
 
 class StrictOrderedMapReader implements BoxGachaSourceReader, GachaSourceReader, GameplaySourceReader,
+    EventFamilySourceReader,
     AdditionalRewardSourceReader, CharacterManaAdmissionSourceReader,
     ItemEquipmentSourceReader, ManaNodeSourceReader,
     LoginBonusSourceReader, ShopSourceReader, RewardSourceReader,
@@ -468,6 +479,7 @@ export function createDefaultContentTableBuilder(
         ?? convertCharacterElections
     const gachaConverter = dependencies.convertGachas ?? convertGachas
     const gameplayConverter = dependencies.convertGameplayTables ?? convertGameplayTables
+    const eventFamilyConverter = dependencies.convertEventFamilies ?? convertEventFamilies
     const itemEquipmentConverter = dependencies.convertItemEquipmentTables
         ?? convertItemEquipmentTables
     const manaNodeConverter = dependencies.convertManaNodes ?? convertManaNodes
@@ -499,6 +511,7 @@ export function createDefaultContentTableBuilder(
                     || definition.converterId === "box-gacha"
                     || definition.converterId === "gacha"
                     || definition.converterId === "gameplay"
+                    || definition.converterId === "event-family"
                     || definition.converterId === "item-equipment"
                     || definition.converterId === "login-bonus"
                     || definition.converterId === "mana-node"
@@ -572,6 +585,13 @@ export function createDefaultContentTableBuilder(
             }
             if (converterIds.has("gameplay")) {
                 addConverterOutput(values, "gameplay", await gameplayConverter(reader))
+            }
+            if (converterIds.has("event-family")) {
+                addConverterOutput(
+                    values,
+                    "event-family",
+                    await eventFamilyConverter(reader, converterContext),
+                )
             }
             if (converterIds.has("item-equipment")) {
                 addConverterOutput(
