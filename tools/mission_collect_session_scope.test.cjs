@@ -209,21 +209,14 @@ test("Collect Session context enforces category and candidate boundaries", () =>
     )
 })
 
-test("all bundled unsupported Category 4 candidates load no collected items", () => {
-    const playerId = createPlayer("collect-all-unsupported")
-    const missionIds = catalog.getMissionIds(4).filter(missionId =>
+test("bundled Category 4 has no unsupported candidates left", () => {
+    // The completion work wired every collect shape (item selectors,
+    // dependency completion, battle conditions, zone statistics, mana and
+    // stamina ledgers, current-state bounds, window login, profile view);
+    // the coverage audit locks collect at 997/997/0. If a future content
+    // change reintroduces unsupported candidates, the injected-unsupported
+    // test above still pins their zero-collected-items behavior.
+    const unsupported = catalog.getMissionIds(4).filter(missionId =>
         requirementRegistry.getRequirement(4, missionId).mode === "unsupported")
-    const { reads: evidence } = capture(() => {
-        const session = createSession(
-            playerId,
-            missionIds.map(missionId => ({ category: 4, missionId })),
-        )
-        CollectComputer.buildContextFromSession(session, 4, missionIds)
-    })
-
-    assert.equal(missionIds.length, 718)
-    assert.equal(evidence.player, 1)
-    assert.equal(evidence.all, 0)
-    assert.equal(evidence.selected, 0)
-    assert.equal(evidence.sql, 0)
+    assert.deepEqual(unsupported, [])
 })

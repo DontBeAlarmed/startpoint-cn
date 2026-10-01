@@ -1,47 +1,18 @@
 import { incrementPlayerCategoryMissionSync } from "../../data/domains/mission"
 import type { FinishContext } from "../quest/finish/types"
 import { getMissionCatalog, isMissionMasterDefinitionEnabledAt } from "./mission-catalog"
-const QUEST_CATEGORY_BY_RANGE_KIND: Readonly<Record<number, number>> = Object.freeze({
-    2: 2,
-    5: 7,
-    7: 13,
-    8: 11,
-    10: 19,
-    15: 22,
-    16: 23,
-    17: 24,
-})
-
-function parseSelector(value: unknown): ReadonlySet<number> | null {
-    if (value === undefined || value === null || value === "" || value === "(None)") return null
-    const values = String(value).split(",").map(Number)
-    if (values.some(value => !Number.isSafeInteger(value))) return new Set()
-    return new Set(values)
-}
-
-function matchesSelector(selector: ReadonlySet<number> | null, value: number): boolean {
-    return selector === null || selector.has(value)
-}
-
+import {
+    translateMissionQuestRange,
+    PASS_MISSION_RANGE_LAYOUT,
+} from "./quest-range-translator"
 function matchesQuestRange(row: readonly unknown[], questCategory: number, questId: number): boolean {
-    const rangeKind = Number(row[8])
-    if (QUEST_CATEGORY_BY_RANGE_KIND[rangeKind] !== questCategory) return false
-    if (row[12] !== undefined && row[12] !== "" && row[12] !== "(None)") return false
-
-    if (rangeKind === 2) {
-        const first = Math.floor(questId / 1_000_000)
-        const remainder = questId % 1_000_000
-        const second = Math.floor(remainder / 1_000)
-        const third = remainder % 1_000
-        return matchesSelector(parseSelector(row[9]), first)
-            && matchesSelector(parseSelector(row[10]), second)
-            && matchesSelector(parseSelector(row[11]), third)
-    }
-
-    const first = Math.floor(questId / 1_000)
-    const second = questId % 1_000
-    return matchesSelector(parseSelector(row[9]), first)
-        && matchesSelector(parseSelector(row[11]), second)
+    // Shared translator: pass tables use the pass column layout, and the
+    // event-id segment of event-kind rows pins the battle to the pass
+    // period's own event. Rangeless rows (condition 85 emotion rows carry
+    // "(None)") intentionally match any quest — the master data pins no
+    // event for them.
+    const range = translateMissionQuestRange(row, PASS_MISSION_RANGE_LAYOUT)
+    return range !== null && range.matches(questCategory, questId)
 }
 
 function getSendEmotionCount(context: FinishContext): number | null {

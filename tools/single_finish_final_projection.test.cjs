@@ -44,6 +44,16 @@ const EMPTY_MISSION_OVERRIDES = Object.fromEntries([
     "mission_pass_event.json",
     "mission_active.json",
     "mission_active_event.json",
+    "mission_regular_reward.json",
+    "mission_daily_reward.json",
+    "mission_event_reward.json",
+    "mission_collect_item_reward.json",
+    "mission_degree_reward.json",
+    "mission_weekly_reward.json",
+    "mission_pass_daily_reward.json",
+    "mission_pass_week_reward.json",
+    "mission_pass_event_reward.json",
+    "mission_active_reward.json",
 ].map(tableName => [tableName, {}]))
 
 function rewardOverrides(clearReward, sPlusReward) {

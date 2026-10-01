@@ -171,9 +171,18 @@ function releaseTables(marker) {
                 [missionId]: { 1: [activeRewardRow(marker, itemId)] },
             },
             "mission_char_awake.json": awakeDefinitionTable,
-            "mission_char_awake_reward.json": {
-                [awakeMissionId]: { 1: [awakeRewardRow(rewardId, marker, itemId)] },
-            },
+            // The catalog fails closed on awake definitions without reward
+            // rows (stage 0-1), so the synthetic release must carry a stage
+            // for every bundled awake definition it ships; only the marker
+            // mission keeps its marker-specific target.
+            "mission_char_awake_reward.json": Object.fromEntries(
+                Object.keys(awakeDefinitionTable).map(id => [
+                    id,
+                    Number(id) === awakeMissionId
+                        ? { 1: [awakeRewardRow(rewardId, marker, itemId)] }
+                        : { 1: [awakeRewardRow(rewardId, 1, itemId)] },
+                ]),
+            ),
         },
     }
 }

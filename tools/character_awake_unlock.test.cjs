@@ -284,7 +284,9 @@ function testAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     assert.equal(countOccurrences(storySource, "reconcileAwakeUnlockCharacterList("), 1)
     assert.equal(storyCall > storySource.indexOf("insertPlayerQuestProgressSync("), true)
     assert.equal(storyCall > storySource.indexOf("updatePlayerQuestProgressSync("), true)
-    assert.equal(storySource.includes("return getDb().transaction(() =>"), true)
+    // The story finish wraps its writes in a transaction; dev's failure
+    // reasons refactor binds the result instead of returning it directly.
+    assert.equal(storySource.includes("getDb().transaction(() =>"), true)
     assert.equal(storySource.includes("const firstClear = questProgress?.finished !== true"), true)
     assert.equal(storySource.includes("const rewardGrant = firstClear &&"), true)
     assert.equal(storySource.includes("const rewardResult = rewardGrant?.rewardResult ?? null"), true)

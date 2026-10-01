@@ -23,7 +23,9 @@ delete process.env.WDFP_DATABASE_DIR
 
 const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 const restoreContentSnapshot = installBundledGameplaySnapshot({
-    tableOverrides: { "mission_char_awake_reward.json": awakeRewardTable() },
+    tableOverrides: {
+        "mission_char_awake_reward.json": awakeRewardTable(),
+    },
 })
 const { initializeDatabase } = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")

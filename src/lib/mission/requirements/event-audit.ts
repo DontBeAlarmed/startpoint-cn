@@ -56,7 +56,7 @@ function isSafeDefinition(
     catalog: MissionCatalog,
     visiting: Set<number>,
 ): boolean {
-    const { missionId, row, pattern } = definition
+    const { missionId, row } = definition
     if (getEventCurrentStateRule(
         definition,
         catalog.getRewardStages(3, missionId),
@@ -70,11 +70,17 @@ function isSafeDefinition(
         const itemId = Number(row[12])
         return Number.isSafeInteger(itemId) && itemId > 0
     }
-    if (patternType === 23 && pattern.startsWith("haniwa_carnival_mission_")) {
+    // Haniwa carnival quest clears: condition 23, range kind 15, with a
+    // valid event and quest selector. The retired haniwa pattern prefix is
+    // cross-checked at startup (routing-validation.ts).
+    if (patternType === 23 && Number(row[7]) === 15) {
         return Number.isSafeInteger(Number(row[8])) && Number(row[8]) > 0
             && Number.isSafeInteger(Number(row[10])) && Number(row[10]) > 0
     }
-    if (patternType === 14 && pattern.startsWith("challenge_renewal_")) {
+    // Challenge-renewal clears: condition 14 on the challenge range (7)
+    // with a valid phase selector. Historical single-clear missions were
+    // already decided above by their pinned single-target contract.
+    if (patternType === 14 && Number(row[7]) === 7) {
         return Number.isSafeInteger(Number(row[8])) && Number(row[8]) > 0
             && (String(row[10] ?? "").trim() === ""
                 || parsePositiveIntegerList(row[10]) !== null)

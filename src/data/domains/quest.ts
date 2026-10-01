@@ -310,6 +310,66 @@ export function incrementPlayerQuestMultiClearSync(
 }
 
 /**
+ * Single-player repeat-clear ledger, the multi_clear_count mirror: one
+ * increment per accomplished single finish, so future "clear N battles in
+ * a range" mission rows can recompute their floor from the quest archive.
+ */
+export function incrementPlayerQuestSingleClearSync(
+    playerId: number,
+    section: number | string,
+    questId: number | string,
+): void {
+    getDb().prepare(`
+    UPDATE players_quest_progress
+    SET single_clear_count = single_clear_count + 1
+    WHERE player_id = ? AND section = ? AND quest_id = ?
+    `).run(playerId, Number(section), Number(questId))
+}
+
+export interface PlayerQuestClearCountRow {
+    readonly section: number
+    readonly questId: number
+    readonly singleClearCount: number
+    readonly multiClearCount: number
+}
+
+/**
+ * Per-quest clear counters for the recomputable archive facts, optionally
+ * restricted to quest sections. Counters are NULL-safe and never negative.
+ */
+export function getPlayerQuestClearCountsSync(
+    playerId: number,
+    sections?: readonly number[],
+): readonly PlayerQuestClearCountRow[] {
+    const normalizedSections = sections === undefined
+        ? undefined
+        : [...new Set(sections.map(Number))]
+            .filter(section => Number.isSafeInteger(section))
+            .sort((left, right) => left - right)
+    if (normalizedSections !== undefined && normalizedSections.length === 0) return []
+    const sectionFilter = normalizedSections === undefined
+        ? ""
+        : ` AND section IN (${normalizedSections.map(() => "?").join(", ")})`
+    const raw = getDb().prepare(`
+    SELECT section, quest_id, single_clear_count, multi_clear_count
+    FROM players_quest_progress
+    WHERE player_id = ?${sectionFilter}
+    ORDER BY section, quest_id
+    `).all(playerId, ...(normalizedSections ?? [])) as {
+        section: number
+        quest_id: number
+        single_clear_count: number | null
+        multi_clear_count: number | null
+    }[]
+    return raw.map(row => ({
+        section: row.section,
+        questId: row.quest_id,
+        singleClearCount: Math.max(0, Number(row.single_clear_count) || 0),
+        multiClearCount: Math.max(0, Number(row.multi_clear_count) || 0),
+    }))
+}
+
+/**
  * Converts a RawPlayerGachaInfo object into a PlayerGachaInfo object.
  * 
  * @param rawInfo The raw object to convert.

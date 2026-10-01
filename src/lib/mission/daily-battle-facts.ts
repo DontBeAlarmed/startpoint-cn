@@ -1,97 +1,26 @@
 import { incrementPlayerCategoryMissionSync } from "../../data/domains/mission"
-import { getScoreAttackEventIdForQuest, hasAdventEventQuest } from "../quest-content"
 import type { FinishContext } from "../quest/finish/types"
 import { getMissionCatalog, isMissionMasterDefinitionEnabledAt } from "./mission-catalog"
-const ACTIVE_DAILY_BATTLE_MISSION_IDS = new Set([
-    10075,
-    800115,
-    800116,
-    800117,
-    800124,
-    800125,
-    800126,
-    800392,
-])
+import { getMissionRequirementDraft } from "./requirements/providers"
+import {
+    matchesBattleCountCondition,
+    BATTLE_COUNT_CONDITION_TYPES,
+} from "./battle-count-condition"
+import { sumCollectZoneStatistic } from "./collect-battle-facts"
+import { matchesZoneStatisticsCountCondition } from "./battle-count-condition"
 
-const WEEKEVENT_BATTLE_PATTERNS = new Set([
-    "weekevent_battle_play",
-    "weekevent_battle_play_2",
-    "weekevent_battle_play_3",
-])
-
-const ADVENT_EVENT_RANGE_KIND = 5
-const BOSS_BATTLE_RANGE_KIND = 2
-const SCORE_ATTACK_EVENT_RANGE_KIND = 20
-const SINGLE_BATTLE_CLEAR_PATTERN_TYPE = 14
-const MULTI_BATTLE_CLEAR_PATTERN_TYPE = 16
-const BATTLE_CLEAR_PATTERN_TYPE = 23
-const ANY_BATTLE_KIND = 3
-const SCORE_ATTACK_DAILY_MISSION_ID = 10075
-const ANY_BATTLE_DAILY_MISSION_ID = 800392
-const WEEKEVENT_QUEST_RANGE_KIND = 12
-const WEEKEVENT_QUEST_CATEGORIES: ReadonlySet<number> = new Set([6, 13, 14, 20])
-
-function matchesAdventEvent(
+/**
+ * Daily battle facts are routed by condition number through the shared
+ * quest-range matcher. The historical per-mission whitelist and special
+ * cases (score-attack 10075, advent 800115.., all-boss 800124..,
+ * any-battle 800392, weekevent patterns) are all subsumed by this routing.
+ */
+export function matchesDailyBattleCondition(
     row: readonly unknown[],
-    questCategory: number,
-    questId: number,
+    conditionType: number,
+    context: Parameters<typeof matchesBattleCountCondition>[2],
 ): boolean {
-    if (questCategory !== 7 || !hasAdventEventQuest(questId)) return false
-    const eventSelector = Number(row[8])
-    return Number.isSafeInteger(eventSelector)
-        && eventSelector > 0
-        && Math.trunc(questId / 1_000) === eventSelector
-}
-
-function matchesQuestRange(
-    row: readonly unknown[],
-    questCategory: number,
-    questId: number,
-): boolean {
-    const rangeKind = Number(row[7])
-    if (rangeKind === ADVENT_EVENT_RANGE_KIND) {
-        return matchesAdventEvent(row, questCategory, questId)
-    }
-    return rangeKind === BOSS_BATTLE_RANGE_KIND && questCategory === 2
-}
-
-function matchesScoreAttackDailyMission(
-    row: readonly unknown[],
-    context: FinishContext,
-): boolean {
-    if (Number(row[2]) !== SINGLE_BATTLE_CLEAR_PATTERN_TYPE
-        || Number(row[7]) !== SCORE_ATTACK_EVENT_RANGE_KIND
-        // Official mission 10075 says "any stage" but stores an empty local
-        // stage selector. Keep this exception scoped to the exact mission ID.
-        || row[10] !== ""
-        || row[11] !== "(None)"
-        || context.isMulti === true
-        || context.questCategory !== 27) return false
-
-    const eventId = Number(row[8])
-    return Number.isSafeInteger(eventId)
-        && eventId > 0
-        && getScoreAttackEventIdForQuest(context.questId) === eventId
-}
-
-function matchesAnyBattleDailyMission(
-    row: readonly unknown[],
-    context: FinishContext,
-): boolean {
-    return Number(row[2]) === BATTLE_CLEAR_PATTERN_TYPE
-        && Number(row[5]) === ANY_BATTLE_KIND
-        && row[7] === "(None)"
-        && (context.isMulti === true || context.isMulti === false || context.isMulti === undefined)
-}
-
-function matchesWeekeventDailyMission(
-    row: readonly unknown[],
-    context: FinishContext,
-): boolean {
-    return Number(row[2]) === SINGLE_BATTLE_CLEAR_PATTERN_TYPE
-        && Number(row[7]) === WEEKEVENT_QUEST_RANGE_KIND
-        && context.isMulti !== true
-        && WEEKEVENT_QUEST_CATEGORIES.has(context.questCategory)
+    return matchesBattleCountCondition(row, conditionType, context)
 }
 
 export function recordDailyMissionBattleFacts(
@@ -100,26 +29,28 @@ export function recordDailyMissionBattleFacts(
 ): number[] {
     if (!context.questAccomplished) return []
 
+    const catalog = getMissionCatalog()
     const matchedMissionIds: number[] = []
-    for (const definition of getMissionCatalog().getDefinitions(2)) {
-        const isProducerMission = ACTIVE_DAILY_BATTLE_MISSION_IDS.has(definition.missionId)
-            || WEEKEVENT_BATTLE_PATTERNS.has(definition.pattern)
-        if (!isProducerMission
-            || !isMissionMasterDefinitionEnabledAt(definition, evaluationTime)) continue
-
-        let matches = false
-        if (definition.missionId === SCORE_ATTACK_DAILY_MISSION_ID) {
-            matches = matchesScoreAttackDailyMission(definition.row, context)
-        } else if (definition.missionId === ANY_BATTLE_DAILY_MISSION_ID) {
-            matches = matchesAnyBattleDailyMission(definition.row, context)
-        } else if (WEEKEVENT_BATTLE_PATTERNS.has(definition.pattern)) {
-            matches = matchesWeekeventDailyMission(definition.row, context)
-        } else {
-            matches = context.isMulti === true
-                && Number(definition.row[2]) === MULTI_BATTLE_CLEAR_PATTERN_TYPE
-                && matchesQuestRange(definition.row, context.questCategory, context.questId)
+    for (const definition of catalog.getDefinitions(2)) {
+        const conditionType = Number(definition.row[2])
+        if (conditionType === 28) {
+            // Non-dash zone-statistics dailies (statistics code in column 3);
+            // dash rows are computed from the periodic dash total.
+            if (getMissionRequirementDraft(definition, catalog).mode !== "persisted") continue
+            if (!isMissionMasterDefinitionEnabledAt(definition, evaluationTime)) continue
+            if (!matchesZoneStatisticsCountCondition(definition.row, context)) continue
+            const amount = sumCollectZoneStatistic(context, definition.row[3])
+            if (amount === null || amount <= 0) continue
+            incrementPlayerCategoryMissionSync(context.playerId, 2, definition.missionId, amount)
+            matchedMissionIds.push(definition.missionId)
+            continue
         }
-        if (!matches) continue
+        if (!BATTLE_COUNT_CONDITION_TYPES.has(conditionType)) continue
+        // Computed shapes (core play/dash/stamina patterns) are served by the
+        // periodic computer; producers only own persisted-mode rows.
+        if (getMissionRequirementDraft(definition, catalog).mode !== "persisted") continue
+        if (!isMissionMasterDefinitionEnabledAt(definition, evaluationTime)) continue
+        if (!matchesBattleCountCondition(definition.row, conditionType, context)) continue
 
         incrementPlayerCategoryMissionSync(context.playerId, 2, definition.missionId, 1)
         matchedMissionIds.push(definition.missionId)

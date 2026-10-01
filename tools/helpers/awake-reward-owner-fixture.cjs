@@ -40,7 +40,14 @@ function awakeRewardTable({ multipleStages = false } = {}) {
             { kind: 5, amount: 11 },
         ])]
     }
-    return { [AWAKE_MISSION_ID]: stages }
+    // Start from the bundled reward table so every awake definition keeps
+    // its reward rows (the catalog fails closed on orphans), then swap in
+    // the fixture mission's stages.
+    const table = structuredClone(
+        require("../../assets/mission_char_awake_reward.json"),
+    )
+    table[String(AWAKE_MISSION_ID)] = stages
+    return table
 }
 
 module.exports = {

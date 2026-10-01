@@ -1,4 +1,5 @@
 import {
+    incrementPlayerQuestSingleClearSync,
     insertPlayerQuestProgressSync,
     updatePlayerQuestProgressSync,
     type PlayerQuestProgressWrite,
@@ -31,5 +32,9 @@ export function writeSingleQuestProgressWithinTransactionSync(
     } else {
         insertPlayerQuestProgressSync(input.playerId, input.questCategory, values)
     }
+    // The plan is "none" unless the quest was accomplished, so a written
+    // finish is exactly one archived single clear — the recomputable fact
+    // that mirrors multi_clear_count for single-player repeats.
+    incrementPlayerQuestSingleClearSync(input.playerId, input.questCategory, input.questId)
     return true
 }

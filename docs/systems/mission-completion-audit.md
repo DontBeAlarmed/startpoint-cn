@@ -1,5 +1,7 @@
 # 任务系统完成度审计
 
+> **数字更新(2026-09-26)**:本文的历史覆盖数字已被 `src/lib/mission/coverage-audit.ts`(schema v2)与 `tools/mission_coverage_audit.test.cjs` 取代:每日 656=651+5(救援)、收集 997=997+0(两条具名缺口已由闲时轮闭合)、周常 2=2+0;常驻 120=112+8、活动 2512=2485+27、称号 1288=1282+6、觉醒 144=144+0、通行证 267=248+19 维持。实施留痕随任务分支的提交历史提供(每个提交附验证物)。
+
 ## 已完成基础
 
 - 分类任务进度使用 `players_category_missions`，以 `(category, mission_id, player_id)` 唯一标识。

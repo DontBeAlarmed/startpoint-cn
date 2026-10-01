@@ -86,7 +86,7 @@ function computeLifetime(pattern: string, ctx: CategoryContext, dbProgress: numb
     return dbProgress
 }
 
-function computeDaily(pattern: string, ctx: CategoryContext, dbProgress: number): number {
+function computeDaily(missionId: number, pattern: string, ctx: CategoryContext, dbProgress: number): number {
     const snapshot = ctx.snapshot
     const counters = ctx.battleCounters!
     if (/^single_battle_play(?:_[23])?$/.test(pattern)) {
@@ -99,6 +99,20 @@ function computeDaily(pattern: string, ctx: CategoryContext, dbProgress: number)
         return Math.max(dbProgress, periodValue(ctx.player.totalDashes ?? 0, snapshot?.dashCount))
     }
     if (pattern === "daily_quest_stamina_use_2024_02") {
+        return Math.max(dbProgress, periodValue(ctx.player.totalStaminaUsed ?? 0, snapshot?.staminaUsed))
+    }
+    // Condition-number fallback for non-core shapes of the same semantics:
+    // login days, dash usage (statistics code 2 only — other codes are
+    // producer-served, mirroring the provider routing), and stamina.
+    const definition = getMissionCatalog().getDefinition(2, missionId)
+    const conditionType = definition === undefined ? undefined : Number(definition.row[2])
+    if (conditionType === 0) {
+        return Math.max(dbProgress, periodValue(ctx.player.totalLoginDays ?? 0, snapshot?.loginDays))
+    }
+    if (conditionType === 28 && Number(definition?.row[3]) === 2) {
+        return Math.max(dbProgress, periodValue(ctx.player.totalDashes ?? 0, snapshot?.dashCount))
+    }
+    if (conditionType === 39) {
         return Math.max(dbProgress, periodValue(ctx.player.totalStaminaUsed ?? 0, snapshot?.staminaUsed))
     }
     return dbProgress
@@ -141,7 +155,7 @@ export const RegularComputer: MissionComputer = {
             if (questProgress !== undefined) return Math.max(dbProgress, questProgress)
             return computeLifetime(pattern, ctx, dbProgress)
         }
-        if (ctx.category === 2) return computeDaily(pattern, ctx, dbProgress)
+        if (ctx.category === 2) return computeDaily(missionId, pattern, ctx, dbProgress)
         if (ctx.category === 10) return computeWeekly(pattern, ctx, dbProgress)
         return dbProgress
     },
