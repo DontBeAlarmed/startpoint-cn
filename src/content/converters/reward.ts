@@ -9,6 +9,7 @@ const CLEAR_REWARD_PATH = "master/reward/clear_reward.orderedmap"
 const SCORE_REWARD_PATH = "master/reward/score_reward.orderedmap"
 const RARE_SCORE_REWARD_PATH = "master/reward/rare_score_reward.orderedmap"
 const SCORE_ATTACK_BORDER_PATH = "master/quest/event/score_attack_border_reward.orderedmap"
+const RANKING_EVENT_RANKING_REWARD_PATH = "master/quest/event/ranking_event_ranking_reward.orderedmap"
 const RUSH_QUEST_FOLDER_PATH = "master/quest/event/rush_event_quest_folder.orderedmap"
 const RUSH_RANKING_REWARD_PATH = "master/quest/event/rush_event_ranking_reward.orderedmap"
 
@@ -25,6 +26,7 @@ export interface RewardConversionOutput {
     readonly "score_reward.json": Readonly<Record<string, readonly unknown[]>>
     readonly "rare_score_reward.json": Readonly<Record<string, readonly unknown[]>>
     readonly "score_attack_border_reward.json": Readonly<Record<string, readonly unknown[]>>
+    readonly "ranking_event_ranking_reward.json": Readonly<Record<string, readonly unknown[]>>
     readonly "rush_event_quest_folder.json": Readonly<Record<string, unknown>>
     readonly "rush_event_ranking_reward.json": Readonly<Record<string, unknown>>
 }
@@ -199,6 +201,56 @@ function convertBorderRewards(rows: readonly OrderedMapTextRow[]): Record<string
     return output
 }
 
+/**
+ * ranking_event_ranking_reward: 每活动 9 个档位行(事件 → 档位 key → 行)。
+ * 行结构(33 列,客户端 RankingEventRankingRewardValues):
+ * col0=multiplied_id, col1=rank_border(百分位边界), col2=reason_id,
+ * 之后 10 个奖励槽,每槽 3 列(kind, id 参数, number)。客户端保证每个
+ * (活动, 档位) 恰好一行,档位 key 即 rank 序号(1=SS 侧,9=F/G 侧)。
+ */
+function convertRankingEventRankingRewards(groups: readonly NestedOrderedMapTextRows[]): Record<string, unknown[]> {
+    const output: Record<string, Array<Record<string, unknown>>> = {}
+    for (const event of sortedGroups(groups)) {
+        requireId(event.key, "ranking_event_ranking_reward event key")
+        const tiers: Array<Record<string, unknown>> = []
+        for (const row of sortedRows(event.rows)) {
+            const fields = parseRow(row, `ranking_event_ranking_reward[${event.key}][${row.key}]`, 33)
+            const rewards: Array<Record<string, unknown>> = []
+            for (let slot = 0; slot < 10; slot += 1) {
+                const offset = 3 + slot * 3
+                const kind = parseOptionalInteger(
+                    fields[offset],
+                    `ranking_event_ranking_reward[${event.key}][${row.key}].rewards[${slot}].kind`,
+                )
+                if (kind === undefined) continue
+                const reward: Record<string, unknown> = {
+                    kind,
+                    amount: parseInteger(
+                        fields[offset + 2],
+                        `ranking_event_ranking_reward[${event.key}][${row.key}].rewards[${slot}].amount`,
+                    ),
+                }
+                const id = parseOptionalInteger(
+                    fields[offset + 1],
+                    `ranking_event_ranking_reward[${event.key}][${row.key}].rewards[${slot}].id`,
+                )
+                if (id !== undefined) reward.id = id
+                rewards.push(reward)
+            }
+            tiers.push({
+                rank: parsePositiveInteger(row.key, "ranking event ranking reward rank key"),
+                multipliedId: parseInteger(fields[0], `ranking_event_ranking_reward[${event.key}][${row.key}].multipliedId`),
+                rankBorder: parseFiniteNumber(fields[1], `ranking_event_ranking_reward[${event.key}][${row.key}].rankBorder`),
+                reasonId: parseInteger(fields[2], `ranking_event_ranking_reward[${event.key}][${row.key}].reasonId`),
+                rewards,
+            })
+        }
+        tiers.sort((left, right) => Number(left.rank) - Number(right.rank))
+        output[event.key] = tiers
+    }
+    return output
+}
+
 function convertRushFolders(groups: readonly NestedOrderedMapTextRows[]): Record<string, unknown> {
     const output: Record<string, unknown> = {}
     for (const event of sortedGroups(groups)) {
@@ -246,11 +298,12 @@ function convertRushRankingRewards(groups: readonly NestedOrderedMapTextRows[]):
 }
 
 export async function convertRewards(reader: RewardSourceReader): Promise<RewardConversionOutput> {
-    const [clearRows, scoreGroups, rareGroups, borderRows, rushFolders, rushRanking] = await Promise.all([
+    const [clearRows, scoreGroups, rareGroups, borderRows, rankingGroups, rushFolders, rushRanking] = await Promise.all([
         reader.read(CLEAR_REWARD_PATH),
         reader.readNested(SCORE_REWARD_PATH),
         reader.readNested(RARE_SCORE_REWARD_PATH),
         reader.read(SCORE_ATTACK_BORDER_PATH),
+        reader.readNested(RANKING_EVENT_RANKING_REWARD_PATH),
         reader.readNested(RUSH_QUEST_FOLDER_PATH),
         reader.readNested(RUSH_RANKING_REWARD_PATH),
     ])
@@ -259,6 +312,7 @@ export async function convertRewards(reader: RewardSourceReader): Promise<Reward
         "score_reward.json": convertScoreRewards(scoreGroups),
         "rare_score_reward.json": convertRareScoreRewards(rareGroups),
         "score_attack_border_reward.json": convertBorderRewards(borderRows),
+        "ranking_event_ranking_reward.json": convertRankingEventRankingRewards(rankingGroups),
         "rush_event_quest_folder.json": convertRushFolders(rushFolders),
         "rush_event_ranking_reward.json": convertRushRankingRewards(rushRanking),
     })
