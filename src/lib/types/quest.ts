@@ -118,6 +118,8 @@ export interface BattleQuest {
     poolExpReward: number,
     fixedParty?: number,
     isBothBoss?: boolean,
+    /** NormalQuestKind(主线):0=Story 1=Battle 2=LoseBattle(允许失败,全灭即通关) */
+    questKind?: number,
     rushEventId?: number
     rushEventFolderId?: RushEventFolder
     rushEventRound?: number

@@ -177,7 +177,11 @@ export function executeSingleSettlementWrites(
             { grantRewards: rewards => grantDirectRewards(playerId, rewards) },
         )
         : { dropAdditionalRewardIds: [], rewardResult: null }
-    const missionBattleFacts = recordMissionBattleFacts(finishCtx, settlementTime)
+    const missionBattleFacts = recordMissionBattleFacts({
+        ...finishCtx,
+        // LoseBattle 败北通关时,任务战斗计数保持真实败北语义(不计通关/SS)
+        questAccomplished: finishCtx.battleFactsAccomplished ?? finishCtx.questAccomplished,
+    }, settlementTime)
     const rewardCharacterExpResult = givePlayerCharactersExpSync(
         playerId,
         partyCharacterIds,

@@ -237,6 +237,7 @@ function getQuestSync(
         poolExpReward: quest.poolExpReward ?? 0,
         fixedParty: quest.fixedParty,
         isBothBoss: quest.isBothBoss,
+        questKind: (quest as { questKind?: number }).questKind,
         rushEventId: quest.rushEventId,
         rushEventFolderId: quest.rushEventFolderId,
         rushEventRound: quest.rushEventRound

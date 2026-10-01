@@ -41,6 +41,22 @@ Boost 标记或余额非法时，均在奖励与进度写入前 fail closed。�
 失败 finish 在同一事务内释放保存的体力和门票，再走原有失败响应投影，不写消耗事实、不扣挑战点。schema 21 前的旧
 active quest 没有 `stamina_cost` 时禁止猜测体力退款；已有 `entry_item_count=NULL` 的一次性门票兼容规则保持不变。
 
+## LoseBattle(允许失败)主线关卡
+
+主线 7014002(第 7 章魔王战「不速之客」)是全主线唯一的 `NormalQuestKind.LoseBattle`(内容列 49=2)。
+官方语义"败北即通关":客户端对该类关卡的败北会照常发送 finish(`is_accomplished=false` 并携带
+`is_lose=true` 专用标记,仅 LoseBattle 关携带),收到 200 后无条件本地应用"已通关",并路由到专用的
+`LoseBattleQuestResult` 结算场景(内置 FirstRewardFlow 首通奖励演出,无评分渲染)。
+
+服务端结算(2026-10-01 定案,经四独立分析师交叉审计):**败北通关 = 等同正常 SS 通关的全部结算**——
+进度 `finished=true`、评级按用时计算(快败即 SS)、首通奖励(15 星导石)+ S+ 评级奖励(15 星导石)、
+score_reward 组 40144 的分档材料、体力 commit 扣除不返还、章节里程碑照常触发。
+**唯一例外:任务战斗计数(`players_mission_battle_counters` 的 clear/SS 计数)保持真实败北语义**——
+编排层以 `battleFactsAccomplished` 单独传参,与结算用的 accomplished 解耦。
+
+触发为双因子:客户端 `is_lose===true` 且内容标记 `questKind===2`,缺一即普通失败——不设 questKind
+兜底,客户端未按契约标记时败北保持失败语义,对齐问题必须暴露而非被掩盖。
+
 ## 单人分类覆盖
 
 `src/routes/api/singleBattleQuest.ts` 只完成请求校验、session 适配、协调器调用和 HTTP 发送。它把已校验请求、player ID 与
