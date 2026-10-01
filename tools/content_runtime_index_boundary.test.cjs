@@ -14,6 +14,7 @@ const sourceRoot = path.join(projectRoot, "src")
 const reviewedRawTableCalls = new Map([
     ["src/content/runtime/table-access.ts", ["tableName"]], // strict infrastructure accessor
     ["src/lib/additional-reward.ts", ["additional_reward_rules.json"]], // Additional Reward catalog
+    ["src/lib/admin-activity.ts", ["event_activity.json"]], // Admin activity timeline catalog
     ["src/lib/bond-token-exchange/catalog.ts", ["bond_token_exchange.json"]], // Bond exchange catalog
     ["src/lib/box-gacha-content.ts", ["box_gacha.json", "box_reward.json", "box_gacha_box_settings.json"]], // Box catalog
     ["src/lib/carnival-rewards.ts", ["carnival_event_total_score_reward.json"]], // Carnival reward adapter

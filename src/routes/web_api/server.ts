@@ -14,7 +14,8 @@ import { getPlayerCharactersSync } from "../../data/domains/character"
 import { getActivePlayerId, getAdminPlayerSelectionState, setActivePlayerId, saveAccountDefaultPlayer, getAccountDefaultPlayer } from "../../data/activeAccount";
 import { saveDefaultSaveTemplate, loadDefaultSaveTemplate, clearDefaultSaveTemplate, getDefaultSaveMeta } from "../../data/defaultSave";
 import { getEffectiveVersion } from "../../lib/version";
-import { buildShortUpCharacterGachaTimeline } from "../../lib/admin-clairvoyance";
+import { buildShortUpCharacterGachaTimeline } from "../../lib/admin-clairvoyance"
+import { buildAdminActivityTimeline } from "../../lib/admin-activity";
 import { buildAdminContentStatus } from "../../lib/admin-content-status";
 import { getRankDegree } from "../../lib/stamina";
 import { getContentSnapshot } from "../../content/runtime/content-snapshot";
@@ -207,6 +208,14 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
             cdnVersion: getEffectiveVersion(),
             baseline: "fixed-cn-final",
             ...buildShortUpCharacterGachaTimeline(getServerDate()),
+        })
+    })
+
+    fastify.get("/clairvoyance/activity", async (_request: FastifyRequest, reply: FastifyReply) => {
+        return reply.status(200).send({
+            cdnVersion: getEffectiveVersion(),
+            baseline: "fixed-cn-final",
+            ...buildAdminActivityTimeline(getServerDate()),
         })
     })
 
