@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useRef, useState } from "react"
-import { Alert, Button, Card, Empty, Input, Space, Table, Tag, Typography, message } from "antd"
+import { Alert, Button, Card, Empty, Input, Space, Table, Tabs, Tag, Typography, message } from "antd"
 import { ReloadOutlined, UndoOutlined } from "@ant-design/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import dayjs, { type Dayjs } from "dayjs"
@@ -46,6 +46,35 @@ interface ClairvoyanceGachaTimeline {
     current: ClairvoyanceGacha[]
     timeline: ClairvoyanceGacha[]
     searchIndex: ClairvoyanceSearchRow[]
+}
+
+interface AdminActivityEvent {
+    eventId: number
+    family: string
+    familyLabel: string
+    stringId: string
+    name: string
+    startTime: string
+    activeEndTime: string | null
+    closeEndTime: string | null
+}
+
+interface AdminActivitySearchRow {
+    eventId: number
+    family: string
+    familyLabel: string
+    stringId: string
+    name: string
+    aliases: string[]
+}
+
+interface ClairvoyanceActivityTimeline {
+    cdnVersion: string
+    baseline: string
+    scope: "event-quest"
+    currentTime: string
+    timeline: AdminActivityEvent[]
+    searchIndex: AdminActivitySearchRow[]
 }
 
 type SegmentKey = "year" | "month" | "day" | "hour" | "minute" | "second"
@@ -148,6 +177,139 @@ function renderRemainingDays(gacha: Pick<ClairvoyanceGacha, "startDate" | "endDa
     return `剩余 ${Math.ceil((end - now) / dayMs)} 天`
 }
 
+// ── 活动日程（千里眼第二页签）──────────────────────────────────────────────
+// 服务端输出的是游戏日历（默认 +08:00）墙钟换算后的绝对 ISO 时刻；
+// 展示回墙钟用固定时区格式化，不随宿主机时区漂移。
+const gameWallTimeFormatter = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+})
+
+function formatGameWallTime(iso: string): string {
+    return gameWallTimeFormatter.format(new Date(iso)).replace("T", " ")
+}
+
+// 卡片核心信息：绝对起止（同年省略尾端年份，「2020-01-01 12:00 ~ 01-10 11:59」）
+function renderCompactPeriod(startWall: string, endWall: string | null): string {
+    return `${startWall.slice(0, 16)} ~ ${endWall === null ? "长期" : endWall.slice(5, 16)}`
+}
+
+function renderGachaCompactPeriod(gacha: Pick<ClairvoyanceGacha, "startDate" | "endDate">): string {
+    return renderCompactPeriod(gacha.startDate, gacha.endDate)
+}
+
+function renderActivityCompactPeriod(activity: Pick<AdminActivityEvent, "startTime" | "activeEndTime">): string {
+    return renderCompactPeriod(
+        formatGameWallTime(activity.startTime),
+        activity.activeEndTime === null ? null : formatGameWallTime(activity.activeEndTime),
+    )
+}
+
+function activityKey(activity: Pick<AdminActivityEvent, "family" | "eventId">): string {
+    return `${activity.family}:${activity.eventId}`
+}
+
+function renderGachaStartCountdown(gacha: Pick<ClairvoyanceGacha, "startDate">, nowIso: string | undefined): string {
+    if (!nowIso) return ""
+    const now = Date.parse(nowIso)
+    const start = parseCdnInstant(gacha.startDate)
+    if (!Number.isFinite(now) || !Number.isFinite(start) || now >= start) return ""
+    return `${Math.ceil((start - now) / 86_400_000)} 天后开始`
+}
+
+// 近期卡池段的状态徽章：进行中=ok / 预告=info（区别于搜索/时间线的三态徽章）
+function renderPoolCardBadge(gacha: Pick<ClairvoyanceGacha, "startDate" | "endDate">, nowIso: string | undefined) {
+    if (!nowIso) return null
+    const now = Date.parse(nowIso)
+    const start = parseCdnInstant(gacha.startDate)
+    const end = parseCdnInstant(gacha.endDate)
+    if (!Number.isFinite(now) || !Number.isFinite(start) || !Number.isFinite(end)) return null
+    if (now > end) return <span className="admin-badge-warn">已结束</span>
+    if (now >= start) return <span className="admin-badge-ok">进行中</span>
+    return <span className="admin-badge-info">预告</span>
+}
+
+// 近期活动段的状态徽章：与卡池段对称（未开始只出现在数据迟到时）
+function renderActivityCardBadge(activity: Pick<AdminActivityEvent, "startTime" | "activeEndTime" | "closeEndTime">, upcoming: boolean, nowIso: string | undefined) {
+    if (upcoming) return <span className="admin-badge-info">预告</span>
+    return renderActivityStatusBadge(activity, nowIso)
+}
+
+function renderActivityPeriod(activity: Pick<AdminActivityEvent, "startTime" | "activeEndTime">): string {
+    return `${formatGameWallTime(activity.startTime)} - ${activity.activeEndTime === null ? "长期" : formatGameWallTime(activity.activeEndTime)}`
+}
+
+type ActivityLiveState = "live" | "exchanging" | "ended" | "upcoming"
+
+function activityLiveState(
+    activity: Pick<AdminActivityEvent, "startTime" | "activeEndTime" | "closeEndTime">,
+    nowIso: string,
+): ActivityLiveState {
+    const now = Date.parse(nowIso)
+    const start = Date.parse(activity.startTime)
+    const activeEnd = activity.activeEndTime === null ? null : Date.parse(activity.activeEndTime)
+    const closeEnd = activity.closeEndTime === null ? null : Date.parse(activity.closeEndTime)
+    if (!Number.isFinite(now) || !Number.isFinite(start)) return "upcoming"
+    if (now < start) return "upcoming"
+    if (activeEnd === null || now <= activeEnd) return "live"
+    if (closeEnd === null || now <= closeEnd) return "exchanging"
+    return "ended"
+}
+
+function renderActivityStatusBadge(activity: Pick<AdminActivityEvent, "startTime" | "activeEndTime" | "closeEndTime">, nowIso: string | undefined) {
+    if (!nowIso) return null
+    const state = activityLiveState(activity, nowIso)
+    if (state === "live") return <span className="admin-badge-ok">进行中</span>
+    if (state === "exchanging") return <span className="admin-badge-warn">换牌期</span>
+    if (state === "ended") return <span className="admin-badge-warn">已结束</span>
+    return <span className="admin-badge-info">未开始</span>
+}
+
+function renderActivityRemainingDays(activity: Pick<AdminActivityEvent, "startTime" | "activeEndTime">, nowIso: string | undefined): string {
+    if (!nowIso) return ""
+    const now = Date.parse(nowIso)
+    const start = Date.parse(activity.startTime)
+    if (!Number.isFinite(now) || !Number.isFinite(start)) return ""
+    const dayMs = 86_400_000
+    if (now < start) return `${Math.ceil((start - now) / dayMs)} 天后开始`
+    if (activity.activeEndTime === null) return "长期开放"
+    const end = Date.parse(activity.activeEndTime)
+    if (!Number.isFinite(end)) return ""
+    if (now > end) return `已于 ${Math.ceil((now - end) / dayMs)} 天前结束`
+    return `剩余 ${Math.ceil((end - now) / dayMs)} 天`
+}
+
+// 活动卡与卡池卡共用同一组 token（admin-clairvoyance-panel / admin-pool-*）
+function renderActivityCard(activity: AdminActivityEvent, upcoming: boolean, nowIso: string | undefined) {
+    const remaining = upcoming
+        ? (nowIso
+            ? `${Math.ceil((Date.parse(activity.startTime) - Date.parse(nowIso)) / 86_400_000)} 天后开始`
+            : "")
+        : renderActivityRemainingDays(activity, nowIso)
+    return (
+        <div key={activityKey(activity)} className="admin-clairvoyance-panel">
+            <div className="admin-pool-top">
+                <span className="admin-pool-name">{activity.name}</span>
+                <Tag color="purple">{activity.familyLabel}</Tag>
+                {renderActivityCardBadge(activity, upcoming, nowIso)}
+                <span className="admin-pool-win admin-mono">{renderActivityCompactPeriod(activity)}</span>
+                {remaining !== "" && <span className="admin-pool-remaining">{remaining}</span>}
+            </div>
+            <Space wrap size={[4, 4]}>
+                <Typography.Text type="secondary">#{activity.eventId} {activity.stringId}</Typography.Text>
+                {activity.closeEndTime !== null && (
+                    <Typography.Text type="secondary">换牌截止 {formatGameWallTime(activity.closeEndTime)}</Typography.Text>
+                )}
+            </Space>
+        </div>
+    )
+}
+
 function renderRateUpCharacters(characters: ClairvoyanceCharacter[]) {
     return (
         <Space wrap size={[4, 4]}>
@@ -206,6 +368,8 @@ export default function TimeControl() {
     const [draftSegments, setDraftSegments] = useState<DraftSegments | null>(null)
     const [editingTime, setEditingTime] = useState(false)
     const [gachaSearch, setGachaSearch] = useState("")
+    const [activitySearch, setActivitySearch] = useState("")
+    const [clairvoyanceTab, setClairvoyanceTab] = useState<"gacha" | "activity">("gacha")
     const segmentRefs = useRef<Array<HTMLInputElement | null>>([])
     const applyingRef = useRef(false)
     // 大钟数字常驻为输入框：只有真正改过数值才在离开编辑区时应用，
@@ -224,6 +388,12 @@ export default function TimeControl() {
         refetchInterval: 30_000,
     })
 
+    const { data: activityTimeline, isError: activityTimelineError, isLoading: activityTimelineLoading } = useQuery({
+        queryKey: ["clairvoyanceActivity"],
+        queryFn: () => apiGet<ClairvoyanceActivityTimeline>("/api/server/clairvoyance/activity"),
+        refetchInterval: 30_000,
+    })
+
     const searchResults = useMemo(() => {
         const query = normalizeSearch(gachaSearch)
         if (!query || !gachaTimeline) return []
@@ -234,6 +404,77 @@ export default function TimeControl() {
             })
             .slice(0, 20)
     }, [gachaSearch, gachaTimeline])
+
+    const activityTimelineByKey = useMemo(() => {
+        return new Map((activityTimeline?.timeline ?? []).map(activity => [activityKey(activity), activity]))
+    }, [activityTimeline])
+
+    // 两个页签共用同一 CDN 基线（同一 content 快照），徽章取先到者
+    const clairvoyanceCdnVersion = gachaTimeline?.cdnVersion ?? activityTimeline?.cdnVersion
+
+    // 近期卡池 = 进行中 ∪ 未来 7 天内开始；进行中按结束时间升序在前，预告按开始时间升序在后
+    const recentGachas = useMemo(() => {
+        if (!gachaTimeline) return []
+        const now = Date.parse(gachaTimeline.currentTime)
+        if (!Number.isFinite(now)) return []
+        const weekMs = 7 * 86_400_000
+        const current = [...gachaTimeline.current]
+            .sort((left, right) => parseCdnInstant(left.endDate) - parseCdnInstant(right.endDate))
+            .map(gacha => ({ gacha, upcoming: false }))
+        const upcoming = gachaTimeline.timeline
+            .filter(gacha => {
+                const start = parseCdnInstant(gacha.startDate)
+                return start > now && start <= now + weekMs
+            })
+            .sort((left, right) => parseCdnInstant(left.startDate) - parseCdnInstant(right.startDate))
+            .map(gacha => ({ gacha, upcoming: true }))
+        return [...current, ...upcoming]
+    }, [gachaTimeline])
+
+    // 近期活动 = 活跃窗口覆盖现在 ∪ 未来 7 天内开始（与近期卡池同规则、同排序）
+    const recentActivities = useMemo(() => {
+        if (!activityTimeline) return []
+        const now = Date.parse(activityTimeline.currentTime)
+        if (!Number.isFinite(now)) return []
+        const weekMs = 7 * 86_400_000
+        const endEpoch = (activity: AdminActivityEvent): number => (
+            activity.activeEndTime === null ? Number.POSITIVE_INFINITY : Date.parse(activity.activeEndTime)
+        )
+        const live = activityTimeline.timeline
+            .filter(activity => Date.parse(activity.startTime) <= now && now <= endEpoch(activity))
+            .sort((left, right) => endEpoch(left) - endEpoch(right))
+            .map(activity => ({ activity, upcoming: false }))
+        const upcoming = activityTimeline.timeline
+            .filter(activity => {
+                const start = Date.parse(activity.startTime)
+                return start > now && start <= now + weekMs
+            })
+            .sort((left, right) => Date.parse(left.startTime) - Date.parse(right.startTime))
+            .map(activity => ({ activity, upcoming: true }))
+        return [...live, ...upcoming]
+    }, [activityTimeline])
+
+    const activityResults = useMemo(() => {
+        const query = normalizeSearch(activitySearch)
+        if (!query || !activityTimeline) return []
+        return activityTimeline.searchIndex
+            .filter(row => {
+                const haystack = normalizeSearch([
+                    row.eventId,
+                    row.stringId,
+                    row.name,
+                    row.family,
+                    row.familyLabel,
+                    ...row.aliases,
+                ].join(" "))
+                return haystack.includes(query)
+            })
+            .slice(0, 20)
+            .flatMap(row => {
+                const activity = activityTimelineByKey.get(activityKey(row))
+                return activity ? [activity] : []
+            })
+    }, [activitySearch, activityTimeline, activityTimelineByKey])
 
     const isoText = data?.date ? data.date.replace("T", " ") : "-"
     const shownDraft = draftSegments ?? (data ? formatDraft(dayjs(data.date)) : null)
@@ -300,6 +541,7 @@ export default function TimeControl() {
             setDraftSegments(null)
             qc.invalidateQueries({ queryKey: ["serverTime"] })
             qc.invalidateQueries({ queryKey: ["clairvoyanceGacha"] })
+            qc.invalidateQueries({ queryKey: ["clairvoyanceActivity"] })
         },
         onError: (e: Error) => {
             applyingRef.current = false
@@ -316,6 +558,7 @@ export default function TimeControl() {
             setDraftSegments(null)
             qc.invalidateQueries({ queryKey: ["serverTime"] })
             qc.invalidateQueries({ queryKey: ["clairvoyanceGacha"] })
+            qc.invalidateQueries({ queryKey: ["clairvoyanceActivity"] })
         },
         onError: (e: Error) => message.error(e.message),
     })
@@ -324,14 +567,15 @@ export default function TimeControl() {
         <AdminPage
             eyebrow="TIME"
             title="时间 / 千里眼"
-            description="管理服务端全局模拟时间，并按固定 CDN 基线查看短期 UP 角色池时间线。"
+            description="管理服务端全局模拟时间，并按固定 CDN 基线查看短期 UP 角色池与活动日程时间线。"
             actions={
                 <Button
                     icon={<ReloadOutlined />}
-                    loading={isFetching || gachaTimelineLoading}
+                    loading={isFetching || gachaTimelineLoading || activityTimelineLoading}
                     onClick={() => {
                         qc.invalidateQueries({ queryKey: ["serverTime"] })
                         qc.invalidateQueries({ queryKey: ["clairvoyanceGacha"] })
+                        qc.invalidateQueries({ queryKey: ["clairvoyanceActivity"] })
                     }}
                 >
                     刷新
@@ -456,10 +700,17 @@ export default function TimeControl() {
                     </section>
                 )}
                 <Card
-                    title="千里眼：短期 UP 角色池"
-                    extra={gachaTimeline && <Tag color="cyan">CDN {gachaTimeline.cdnVersion}</Tag>}
+                    title={clairvoyanceTab === "gacha" ? "千里眼：短期 UP 角色池" : "千里眼：活动日程"}
+                    extra={clairvoyanceCdnVersion && <Tag color="cyan">CDN {clairvoyanceCdnVersion}</Tag>}
                 >
-                    {gachaTimelineError ? (
+                    <Tabs
+                        activeKey={clairvoyanceTab}
+                        onChange={key => setClairvoyanceTab(key as "gacha" | "activity")}
+                        items={[
+                            {
+                                key: "gacha",
+                                label: "卡池",
+                                children: gachaTimelineError ? (
                         <Alert type="error" showIcon message="千里眼数据加载失败" description="接口 /api/server/clairvoyance/gacha 不可用。" />
                     ) : (
                         <div className="admin-dash-sections">
@@ -471,28 +722,28 @@ export default function TimeControl() {
                             </div>
 
                             <section className="admin-dash-section">
-                                <div className="admin-dash-section-title">当前生效卡池</div>
+                                <div className="admin-dash-section-title">近期卡池</div>
                                 <div className="admin-dash-section-body">
                                     {gachaTimelineLoading ? (
                                         <Typography.Text type="secondary">加载中...</Typography.Text>
-                                    ) : gachaTimeline && gachaTimeline.current.length > 0 ? (
-                                        gachaTimeline.current.map(gacha => (
+                                    ) : gachaTimeline && recentGachas.length > 0 ? (
+                                        recentGachas.map(({ gacha, upcoming }) => (
                                             <div key={gacha.id} className="admin-clairvoyance-panel">
                                                 <div className="admin-pool-top">
                                                     <span className="admin-pool-name">{gacha.name} #{gacha.id}</span>
-                                                    {renderGachaStatusBadge(gacha, gachaTimeline?.currentTime)}
-                                                    <span className="admin-pool-win admin-mono">{renderGachaPeriod(gacha)}</span>
-                                                    {renderRemainingDays(gacha, gachaTimeline?.currentTime) && (
-                                                        <span className="admin-pool-remaining">
-                                                            {renderRemainingDays(gacha, gachaTimeline?.currentTime)}
-                                                        </span>
-                                                    )}
+                                                    {renderPoolCardBadge(gacha, gachaTimeline?.currentTime)}
+                                                    <span className="admin-pool-win admin-mono">{renderGachaCompactPeriod(gacha)}</span>
+                                                    <span className="admin-pool-remaining">
+                                                        {upcoming
+                                                            ? renderGachaStartCountdown(gacha, gachaTimeline?.currentTime)
+                                                            : renderRemainingDays(gacha, gachaTimeline?.currentTime)}
+                                                    </span>
                                                 </div>
                                                 {renderRateUpCharacters(gacha.rateUpCharacters)}
                                             </div>
                                         ))
                                     ) : (
-                                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前服务器模拟时间没有命中的短期 UP 角色池" />
+                                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="近七日没有进行中或预告的短期 UP 角色池" />
                                     )}
                                 </div>
                             </section>
@@ -562,7 +813,109 @@ export default function TimeControl() {
                                 </div>
                             </section>
                         </div>
-                    )}
+                                ),
+                            },
+                            {
+                                key: "activity",
+                                label: "活动",
+                                children: activityTimelineError ? (
+                                    <Alert type="error" showIcon message="活动日程加载失败" description="接口 /api/server/clairvoyance/activity 不可用。" />
+                                ) : (
+                                    <div className="admin-dash-sections">
+                                        <div className="admin-page-note">
+                                            <Typography.Text strong>范围限定为固定 CDN 基线内 13 族活动主表的日程</Typography.Text>
+                                            <Typography.Text type="secondary">
+                                                活跃截止前为进行中；活跃截止后进入换牌期，换牌截止后结束；无活跃截止的条目开始后长期开放。
+                                            </Typography.Text>
+                                        </div>
+
+                                        <section className="admin-dash-section">
+                                            <div className="admin-dash-section-title">近期活动</div>
+                                            <div className="admin-dash-section-body">
+                                                {activityTimelineLoading ? (
+                                                    <Typography.Text type="secondary">加载中...</Typography.Text>
+                                                ) : activityTimeline && recentActivities.length > 0 ? (
+                                                    recentActivities.map(({ activity, upcoming }) => (
+                                                        renderActivityCard(activity, upcoming, activityTimeline.currentTime)
+                                                    ))
+                                                ) : (
+                                                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="近七日没有进行中或预告的活动" />
+                                                )}
+                                            </div>
+                                        </section>
+
+                                        <section className="admin-dash-section">
+                                            <div className="admin-dash-section-title">活动搜索</div>
+                                            <div className="admin-dash-section-body">
+                                                <Input
+                                                    allowClear
+                                                    className="admin-time-search"
+                                                    placeholder="输入活动名、别名、stringId 或活动 ID"
+                                                    value={activitySearch}
+                                                    onChange={event => setActivitySearch(event.target.value)}
+                                                />
+                                                {activitySearch && (
+                                                    activityResults.length > 0 ? (
+                                                        activityResults.map(activity => renderActivityCard(activity, false, activityTimeline?.currentTime))
+                                                    ) : (
+                                                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配的活动" />
+                                                    )
+                                                )}
+                                            </div>
+                                        </section>
+
+                                        <section className="admin-dash-section">
+                                            <div className="admin-dash-section-title">活动时间线</div>
+                                            <div className="admin-dash-section-body">
+                                                <Table<AdminActivityEvent>
+                                                    rowKey={row => activityKey(row)}
+                                                    size="small"
+                                                    loading={activityTimelineLoading}
+                                                    dataSource={activityTimeline?.timeline ?? []}
+                                                    scroll={{ x: "max-content" }}
+                                                    tableLayout="fixed"
+                                                    pagination={{ pageSize: 8, showSizeChanger: false }}
+                                                    columns={[
+                                                        {
+                                                            title: "活动",
+                                                            render: (_: unknown, row) => (
+                                                                <Space wrap size={6} align="center">
+                                                                    <Typography.Text strong>{row.name}</Typography.Text>
+                                                                    <Tag color="purple">{row.familyLabel}</Tag>
+                                                                    <Typography.Text type="secondary">#{row.eventId}</Typography.Text>
+                                                                </Space>
+                                                            ),
+                                                        },
+                                                        {
+                                                            title: "起止 / 状态",
+                                                            render: (_: unknown, row) => (
+                                                                <Space wrap size={6} align="center">
+                                                                    <span className="admin-mono">{renderActivityPeriod(row)}</span>
+                                                                    {renderActivityStatusBadge(row, activityTimeline?.currentTime)}
+                                                                </Space>
+                                                            ),
+                                                            width: 400,
+                                                            responsive: ["sm"] as any,
+                                                        },
+                                                        {
+                                                            title: "剩余 / 换牌",
+                                                            render: (_: unknown, row) => (
+                                                                <Space wrap size={6} align="center">
+                                                                    {renderActivityRemainingDays(row, activityTimeline?.currentTime)}
+                                                                    {row.closeEndTime !== null && `换牌截止 ${formatGameWallTime(row.closeEndTime)}`}
+                                                                </Space>
+                                                            ),
+                                                            responsive: ["sm"] as any,
+                                                        },
+                                                    ]}
+                                                />
+                                            </div>
+                                        </section>
+                                    </div>
+                                ),
+                            },
+                        ]}
+                    />
                 </Card>
             </Space>
         </AdminPage>
