@@ -45,6 +45,7 @@ const reviewedRawTableCalls = new Map([
     ["src/lib/quest/score-reward-selection.ts", ["reward_element_map.json"]], // Score reward adapter
     ["src/lib/quest-content.ts", ["tableName", "quest_lookup.json", "clear_reward.json", "rare_score_reward.json", "score_reward.json"]], // finite Quest/reward queries
     ["src/lib/quest-entry-content.ts", ["quest_entry_costs.json", "quest_unlock_costs.json", "quest_prerequisites.json"]], // Entry catalog
+    ["src/lib/ranking-reward.ts", ["ranking_event_ranking_reward.json"]], // Ranking event reward claim seam
     ["src/lib/rescue-fragment-content.ts", ["tableName"]], // finite Rescue table registry
     ["src/lib/reward-campaign.ts", ["reward_campaign.json"]], // Reward Campaign catalog
     ["src/lib/rush-event-content.ts", ["rush_event_quest_folder.json", "score_attack_border_reward.json", "rush_event_ranking_reward.json"]], // Rush response adapters

@@ -25,8 +25,8 @@ const parent = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "schema28-f
 process.on("exit", () => fs.rmSync(parent, { recursive: true, force: true }))
 const paths = resolveRuntimeDataPaths({ DATA_DIR: path.join(parent, "data") })
 
-// schema 28：players_follows 进入契约版本
-assert.equal(contract.currentDataSchema, 28, "Follow 表应把 currentDataSchema 推进到 28")
+// schema 28：players_follows 进入契约版本；schema 29 起排名领奖记录登记进存档注册表
+assert.equal(contract.currentDataSchema, 29, "Follow 的 28 之后，契约已推进到 29")
 
 function freshPlayer(tag) {
     const account = insertAccountSync({
@@ -94,11 +94,11 @@ legacy.close()
 
 data.initializeDatabase({ paths })
 const migrated = getDb()
-assert.equal(migrated.pragma("user_version", { simple: true }), 28)
+assert.equal(migrated.pragma("user_version", { simple: true }), contract.currentDataSchema)
 assert.equal(
     migrated.prepare(`SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'players_follows'`).get().n,
     1,
-    "27 → 28 升级必须补建 players_follows",
+    "27 → 当前契约（29）升级必须补建 players_follows",
 )
 data.closeDatabase()
 

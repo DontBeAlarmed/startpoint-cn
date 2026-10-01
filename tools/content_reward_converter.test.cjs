@@ -75,6 +75,13 @@ function fixtureReader() {
                 }),
             }],
         }],
+        "master/quest/event/ranking_event_ranking_reward.orderedmap": [{
+            key: "100002",
+            rows: [
+                { key: "2", text: columns(33, { 0: "0", 1: "0.03", 2: "16001", 3: "0", 4: "40501", 5: "2" }) },
+                { key: "1", text: columns(33, { 0: "0", 1: "0.01", 2: "16000", 3: "4", 4: "", 5: "500" }) },
+            ],
+        }],
         "master/quest/event/rush_event_ranking_reward.orderedmap": [{
             key: "700001",
             rows: [
@@ -86,7 +93,7 @@ function fixtureReader() {
     return reader(flat, nested)
 }
 
-test("reward converter restores all six runtime reward projections", async () => {
+test("reward converter restores all seven runtime reward projections", async () => {
     const output = await convertRewards(fixtureReader())
 
     assert.deepEqual(output["clear_reward.json"], {
@@ -117,6 +124,12 @@ test("reward converter restores all six runtime reward projections", async () =>
                 { kind: 4, amount: 500 },
             ],
         }],
+    })
+    assert.deepEqual(output["ranking_event_ranking_reward.json"], {
+        100002: [
+            { rank: 1, multipliedId: 0, rankBorder: 0.01, reasonId: 16000, rewards: [{ kind: 4, amount: 500 }] },
+            { rank: 2, multipliedId: 0, rankBorder: 0.03, reasonId: 16001, rewards: [{ kind: 0, id: 40501, amount: 2 }] },
+        ],
     })
     assert.deepEqual(output["rush_event_quest_folder.json"], {
         700001: {
