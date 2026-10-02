@@ -19,7 +19,7 @@ const { randomUUID } = require("node:crypto")
 const fs = require("node:fs")
 const os = require("node:os")
 const path = require("node:path")
-const test = require("node:test")
+const { test, after } = require("node:test")
 const Fastify = require("fastify")
 const { pack, unpack } = require("msgpackr")
 
@@ -41,14 +41,11 @@ function cleanup() {
     else process.env.WDFP_DATABASE_DIR = previousDatabaseDirectory
 }
 
-process.once("exit", cleanup)
-
 const { installBundledGameplaySnapshot } = require("./helpers/install-bundled-gameplay-snapshot.cjs")
 restoreContentSnapshot = installBundledGameplaySnapshot()
 
 const { initializeDatabase } = require("../src/data")
 const {
-    getPlayerCharacterSync,
     insertPlayerCharacterManaNodesSync,
     updatePlayerCharacterSync,
 } = require("../src/data/domains/character")
@@ -62,6 +59,8 @@ const getCharacterManaNodesSync = (characterId, level) => getCharacterGrowthCont
 const { upsertPlayerCharacterAwakeUnlockSync } = require("../src/data/domains/character_awake")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
+const manaRoutes = require("../src/routes/api/character/mana").default
+const bondRoutes = require("../src/routes/api/character/bond").default
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
 
@@ -149,7 +148,7 @@ function decode(response) {
 }
 
 async function learnNodes(viewerId, characterId, nodeIds) {
-    return post("/learn_mana_node", {
+    return post("/mana/learn_mana_node", {
         viewer_id: viewerId,
         character_id: characterId,
         mana_node_multiplied_id_list: nodeIds,
@@ -158,7 +157,7 @@ async function learnNodes(viewerId, characterId, nodeIds) {
 }
 
 async function openSecondBoard(viewerId) {
-    return post("/open_mana_board", {
+    return post("/bond/open_mana_board", {
         viewer_id: viewerId,
         character_id: 1,
         mana_board_index: 2,
@@ -167,17 +166,21 @@ async function openSecondBoard(viewerId) {
 }
 
 test.before(async () => {
-    const fastify = Fastify({ logger: false })
-    fastify.addContentTypeParser(
+    routeApp = Fastify({ logger: false })
+    routeApp.addContentTypeParser(
         "application/x-www-form-urlencoded",
         { parseAs: "string" },
         (_request, body, done) => done(null, unpack(Buffer.from(body, "base64"))),
     )
-    registerCnMsgpackOnSend(fastify)
-    fastify.register(require("../src/routes/api/character/mana").default)
-    fastify.register(require("../src/routes/api/character/bond").default)
-    await fastify.ready()
-    routeApp = fastify
+    registerCnMsgpackOnSend(routeApp)
+    await routeApp.register(manaRoutes, { prefix: "/mana" })
+    await routeApp.register(bondRoutes, { prefix: "/bond" })
+    await routeApp.ready()
+})
+
+test.after(async () => {
+    if (routeApp) await routeApp.close()
+    cleanup()
 })
 
 test("强化首个节点当场结算任务37阶段1并发放30星导石", async () => {
