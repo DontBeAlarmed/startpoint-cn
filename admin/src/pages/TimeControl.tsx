@@ -6,7 +6,8 @@ import dayjs, { type Dayjs } from "dayjs"
 import { apiGet } from "../api/client"
 import { AdminPage } from "../components/AdminPage"
 
-// 触屏设备: 段输入压掉软键盘, 用 ± 按钮调整 (桌面键盘流不受影响)
+// 触屏设备: 段输入压掉软键盘, 用 ± 按钮调整 (桌面键盘流不受影响)。
+// 取舍: 模块级一次性检测, 2-in-1 设备运行中拆/接键盘不重估——双向降级均可接受(复审B 记录)
 const coarsePointer = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true
 
 interface ServerTime {
