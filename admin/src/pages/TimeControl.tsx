@@ -320,9 +320,13 @@ function renderActivityCard(activity: AdminActivityEvent, upcoming: boolean, now
 // 属性特选等元素全池的 UP 角色可达 14-21 个 — 折叠为前 8 个 + 「+N」
 const MAX_VISIBLE_RATE_UP = 8
 
-function renderRateUpCharacters(characters: ClairvoyanceCharacter[]) {
-    const visible = characters.slice(0, MAX_VISIBLE_RATE_UP)
-    const rest = characters.length - visible.length
+function renderRateUpCharacters(
+    characters: ClairvoyanceCharacter[],
+    expanded: boolean,
+    onToggleExpanded: () => void,
+) {
+    const visible = expanded ? characters : characters.slice(0, MAX_VISIBLE_RATE_UP)
+    const rest = Math.max(0, characters.length - MAX_VISIBLE_RATE_UP)
     return (
         <div className="admin-char-cards">
             {visible.map(character => (
@@ -345,10 +349,13 @@ function renderRateUpCharacters(characters: ClairvoyanceCharacter[]) {
                     </span>
                 </div>
             ))}
-            {rest > 0 && (
-                <span className="admin-char-card admin-char-more" aria-label={`另有 ${rest} 个 UP 角色`}>
-                    +{rest}
-                </span>
+            {(rest > 0 || expanded) && (
+                <button type="button" className="admin-char-card admin-char-expand"
+                    onClick={onToggleExpanded}
+                    aria-expanded={expanded}
+                    aria-label={expanded ? "收起其余 UP 角色" : `展开其余 ${rest} 个 UP 角色`}>
+                    {expanded ? "收起" : `+${rest}`}
+                </button>
             )}
         </div>
     )
@@ -400,8 +407,18 @@ export default function TimeControl() {
     const [draftSegments, setDraftSegments] = useState<DraftSegments | null>(null)
     const [editingTime, setEditingTime] = useState(false)
     const [focusedKey, setFocusedKey] = useState<SegmentKey>("year")
+    // 大池(属性特选等)UP 头像条目 >8 时可展开 (维护者 2026-09-30)
+    const [expandedPoolIds, setExpandedPoolIds] = useState<Set<number>>(new Set())
     const [gachaSearch, setGachaSearch] = useState("")
     const [activitySearch, setActivitySearch] = useState("")
+    const togglePoolExpanded = (poolId: number) => {
+        setExpandedPoolIds(current => {
+            const next = new Set(current)
+            if (next.has(poolId)) next.delete(poolId)
+            else next.add(poolId)
+            return next
+        })
+    }
     const [clairvoyanceTab, setClairvoyanceTab] = useState<"gacha" | "activity">("gacha")
     const segmentRefs = useRef<Array<HTMLInputElement | null>>([])
     const applyingRef = useRef(false)
@@ -627,7 +644,11 @@ export default function TimeControl() {
                                             : renderRemainingDays(gacha, gachaTimeline?.currentTime)}
                                     </span>
                                 </div>
-                                {renderRateUpCharacters(gacha.rateUpCharacters)}
+                                {renderRateUpCharacters(
+                                    gacha.rateUpCharacters,
+                                    expandedPoolIds.has(gacha.id),
+                                    () => togglePoolExpanded(gacha.id),
+                                )}
                             </div>
                         ))
                     ) : (
@@ -698,7 +719,7 @@ export default function TimeControl() {
                                 width: 360,
                                 responsive: ["sm"] as any,
                             },
-                            { title: "UP 角色", render: (_: unknown, row) => renderRateUpCharacters(row.rateUpCharacters) },
+                            { title: "UP 角色", render: (_: unknown, row) => renderRateUpCharacters(row.rateUpCharacters, expandedPoolIds.has(row.id), () => togglePoolExpanded(row.id)) },
                         ]}
                     />
                 </div>

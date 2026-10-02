@@ -198,15 +198,19 @@
   color: var(--ink-soft);
 }
 
-/* 属性特选等大池: UP 头像条目折叠 +N 计数 */
-.admin-char-more {
-  display: inline-grid;
-  place-items: center;
-  min-width: 40px;
-  height: 40px;
-  padding: 0 8px;
+/* 大池 UP 条目折叠/展开按钮 (维护者 2026-09-30: +N 可展开) */
+.admin-char-expand {
+  align-self: center;
+  justify-self: start;
+  padding: 0 12px;
   border: 1px dashed var(--line-strong);
   border-radius: 10px;
+  background: transparent;
   color: var(--ink-soft);
   font-weight: 700;
+}
+
+.admin-char-expand:hover {
+  color: var(--ink);
+  border-color: var(--ink-soft);
 }
