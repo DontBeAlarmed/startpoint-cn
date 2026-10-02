@@ -4,7 +4,7 @@ import { Card, Table, Button, Space, InputNumber, Popconfirm, message, Tag, Tabs
 import { SaveOutlined, PlusOutlined, DownloadOutlined, UploadOutlined, UndoOutlined, SearchOutlined, EditOutlined, ReloadOutlined } from "@ant-design/icons"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { apiGet, apiPost, apiPatch, apiDelete, apiUpload, apiDownloadFile } from "../api/client"
+import { apiGet, apiPost, apiPatch, apiDelete, apiUpload, apiDownloadFile, isAndroidWebView } from "../api/client"
 import { AdminPage, StateCard } from "../components/AdminPage"
 
 const { Text } = Typography
@@ -518,7 +518,12 @@ export default function PlayerDetail() {
                             <Button type="primary" icon={<DownloadOutlined />} loading={importSave.isPending}>导入存档(覆盖)</Button>
                         </Upload>
                         <Button icon={<UploadOutlined />} loading={exportSave.isPending}
-                            onClick={() => exportSave.mutate()}>导出存档</Button>
+                            onClick={() => {
+                                // 壳内 WebView：apiDownloadFile 内部走 iframe 导航式下载，成败由壳侧
+                                // 下载管线异步接管，mutation 会立即成功——只提示移交，不弹成功 toast。
+                                if (isAndroidWebView()) message.info("已交由系统下载")
+                                exportSave.mutate()
+                            }}>导出存档</Button>
                     </div>
                 </div>
             </div>

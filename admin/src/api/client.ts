@@ -50,9 +50,31 @@ export function apiUpload<T>(url: string, file: File, fieldName = "file"): Promi
         .then(r => handle<T>(r))
 }
 
+// Android WebView 检测：壳（launcher）内 WebView 的 UA 必含 "; wv)"（Chrome 浏览器本体不含）
+export function isAndroidWebView(): boolean {
+    return typeof navigator !== "undefined" && /;\s*wv\)/.test(navigator.userAgent)
+}
+
 // 附件下载：走与其它 /api 相同的 fetch 通道（携带部署层后台认证/凭据），
 // 错误就地抛 ApiError 供页面显示，成功后按 content-disposition 文件名触发保存。
+// 例外——壳内 Android WebView：JS 内存 Blob 下载不产生网络请求与导航，壳的
+// DownloadListener 永远不会回调（平台长期限制），因此改用隐藏 iframe 触发
+// 导航式下载（attachment 响应使 WebView 对 iframe 主框架回调 DownloadListener），
+// 下载成败由壳侧下载管线接管。
 export async function apiDownloadFile(url: string, fallbackFilename: string): Promise<void> {
+    if (isAndroidWebView()) {
+        // 用隐藏 iframe 而非 location.href，避免离开当前页面状态；
+        // URL 加缓存击穿参数，防止 WebView 缓存吞掉第二次导出。
+        // iframe 导航使用浏览器默认文档导航语义（不附加任何 JSON 请求头/参数），
+        // 服务端 /player/save 的双通道判定天然落入 attachment 通道。
+        const frame = document.createElement("iframe")
+        frame.style.display = "none"
+        frame.src = `${url}${url.includes("?") ? "&" : "?"}_=${Date.now()}`
+        document.body.appendChild(frame)
+        // attachment 响应不会渲染 iframe；错误页会渲染但被 iframe 吞掉（已接受的限制），60s 后兜底清理
+        setTimeout(() => frame.remove(), 60_000)
+        return
+    }
     const res = await fetch(url, { headers: { Accept: "application/json" } })
     if (!res.ok) {
         const text = await res.text().catch(() => "")
