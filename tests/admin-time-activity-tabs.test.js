@@ -55,7 +55,8 @@ const anchors = [
     "UP 角色搜索",
     "输入角色名、称号或角色 ID",
     "时间线",
-    "renderRateUpCharacters(row.rateUpCharacters)",
+    "renderRateUpCharacters(\n",
+    "expandedPoolIds.has(gacha.id)",
     "admin-clairvoyance-panel",
     "renderGachaStatusBadge(gacha, gachaTimeline?.currentTime)",
     "renderGachaPeriod(gacha)",
@@ -72,7 +73,7 @@ assert(
 // 卡池时间线的三元组（卡池/上线 / 下线/UP 角色）原样保留
 assert(source.includes('{ title: "卡池", dataIndex: "name"'), "卡池时间线第一列原样保留")
 assert(source.includes('title: "上线 / 下线"'), "卡池时间线第二列原样保留")
-assert(source.includes('{ title: "UP 角色", render: (_: unknown, row) => renderRateUpCharacters(row.rateUpCharacters) }'), "卡池时间线第三列原样保留")
+assert(source.includes('renderRateUpCharacters(row.rateUpCharacters, expandedPoolIds.has(row.id)'), "卡池时间线第三列展开态接线原样保留")
 
 // ── UP 角色真实头像：CDN 归档端点 + onError 首字占位回退 ─────────────────
 assert(source.includes("/api/content/character_avatar/"), "UP 角色头像应接 CDN 归档端点")
