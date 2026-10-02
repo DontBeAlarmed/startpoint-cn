@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useRef, useState } from "react"
-import { Alert, Button, Card, Empty, Input, Space, Table, Tabs, Tag, Typography, message } from "antd"
+import { Alert, Button, Card, Empty, Input, Segmented, Space, Table, Tag, Typography, message } from "antd"
 import { ReloadOutlined, UndoOutlined } from "@ant-design/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import dayjs, { type Dayjs } from "dayjs"
@@ -563,6 +563,208 @@ export default function TimeControl() {
         onError: (e: Error) => message.error(e.message),
     })
 
+    // 卡头 Segmented 的两个视图（方案 A，设计稿 clairvoyance-tab-design.html）：
+    // 标题恒为「千里眼」，卡体按视图条件渲染；数据流 / queryKey / 端点零改动，纯呈现层重排。
+    const gachaBody = gachaTimelineError ? (
+        <Alert type="error" showIcon message="千里眼数据加载失败" description="接口 /api/server/clairvoyance/gacha 不可用。" />
+    ) : (
+        <div className="admin-dash-sections">
+            <div className="admin-page-note">
+                <Typography.Text strong>当前阶段只追踪短期 UP 角色池</Typography.Text>
+                <Typography.Text type="secondary">
+                    范围限定为固定 CDN 基线内 pageKind=0、持续不超过 60 天且包含 UP 角色的角色扭蛋。
+                </Typography.Text>
+            </div>
+
+            <section className="admin-dash-section">
+                <div className="admin-dash-section-title">近期卡池</div>
+                <div className="admin-dash-section-body">
+                    {gachaTimelineLoading ? (
+                        <Typography.Text type="secondary">加载中...</Typography.Text>
+                    ) : gachaTimeline && recentGachas.length > 0 ? (
+                        recentGachas.map(({ gacha, upcoming }) => (
+                            <div key={gacha.id} className="admin-clairvoyance-panel">
+                                <div className="admin-pool-top">
+                                    <span className="admin-pool-name">{gacha.name} #{gacha.id}</span>
+                                    {renderPoolCardBadge(gacha, gachaTimeline?.currentTime)}
+                                    <span className="admin-pool-win admin-mono">{renderGachaCompactPeriod(gacha)}</span>
+                                    <span className="admin-pool-remaining">
+                                        {upcoming
+                                            ? renderGachaStartCountdown(gacha, gachaTimeline?.currentTime)
+                                            : renderRemainingDays(gacha, gachaTimeline?.currentTime)}
+                                    </span>
+                                </div>
+                                {renderRateUpCharacters(gacha.rateUpCharacters)}
+                            </div>
+                        ))
+                    ) : (
+                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="近七日没有进行中或预告的短期 UP 角色池" />
+                    )}
+                </div>
+            </section>
+
+            <section className="admin-dash-section">
+                <div className="admin-dash-section-title">UP 角色搜索</div>
+                <div className="admin-dash-section-body">
+                    <Input
+                        allowClear
+                        className="admin-time-search"
+                        placeholder="输入角色名、称号或角色 ID"
+                        value={gachaSearch}
+                        onChange={event => setGachaSearch(event.target.value)}
+                    />
+                    {gachaSearch && (
+                        searchResults.length > 0 ? (
+                            searchResults.map(row => (
+                                <div key={row.characterId} className="admin-clairvoyance-panel">
+                                    <Typography.Text strong>{row.name} #{row.characterId}</Typography.Text>
+                                    {row.title && <Typography.Text type="secondary">{row.title}</Typography.Text>}
+                                    <Space wrap size={[4, 4]}>
+                                        {row.gachas.map(gacha => (
+                                            <Fragment key={gacha.id}>
+                                                <Tag>
+                                                    #{gacha.id} {gacha.name} / {renderGachaPeriod(gacha)}
+                                                </Tag>
+                                                {renderGachaStatusBadge(gacha, gachaTimeline?.currentTime)}
+                                            </Fragment>
+                                        ))}
+                                    </Space>
+                                </div>
+                            ))
+                        ) : (
+                            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配的 UP 角色" />
+                        )
+                    )}
+                </div>
+            </section>
+
+            <section className="admin-dash-section">
+                <div className="admin-dash-section-title">时间线</div>
+                <div className="admin-dash-section-body">
+                    <Table<ClairvoyanceGacha>
+                        rowKey="id"
+                        size="small"
+                        loading={gachaTimelineLoading}
+                        dataSource={gachaTimeline?.timeline ?? []}
+                        scroll={{ x: "max-content" }}
+                        tableLayout="fixed"
+                        pagination={{ pageSize: 8, showSizeChanger: false }}
+                        columns={[
+                            { title: "卡池", dataIndex: "name", render: (name: string, row) => `${name} #${row.id}` },
+                            {
+                                title: "上线 / 下线",
+                                render: (_: unknown, row) => (
+                                    <Space wrap size={6} align="center">
+                                        {renderGachaPeriod(row)}
+                                        {renderGachaStatusBadge(row, gachaTimeline?.currentTime)}
+                                    </Space>
+                                ),
+                                width: 360,
+                                responsive: ["sm"] as any,
+                            },
+                            { title: "UP 角色", render: (_: unknown, row) => renderRateUpCharacters(row.rateUpCharacters) },
+                        ]}
+                    />
+                </div>
+            </section>
+        </div>
+    )
+
+    const activityBody = activityTimelineError ? (
+        <Alert type="error" showIcon message="活动日程加载失败" description="接口 /api/server/clairvoyance/activity 不可用。" />
+    ) : (
+        <div className="admin-dash-sections">
+            <div className="admin-page-note">
+                <Typography.Text strong>范围限定为固定 CDN 基线内 13 族活动主表的日程</Typography.Text>
+                <Typography.Text type="secondary">
+                    活跃截止前为进行中；活跃截止后进入换牌期，换牌截止后结束；无活跃截止的条目开始后长期开放。
+                </Typography.Text>
+            </div>
+
+            <section className="admin-dash-section">
+                <div className="admin-dash-section-title">近期活动</div>
+                <div className="admin-dash-section-body">
+                    {activityTimelineLoading ? (
+                        <Typography.Text type="secondary">加载中...</Typography.Text>
+                    ) : activityTimeline && recentActivities.length > 0 ? (
+                        recentActivities.map(({ activity, upcoming }) => (
+                            renderActivityCard(activity, upcoming, activityTimeline.currentTime)
+                        ))
+                    ) : (
+                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="近七日没有进行中或预告的活动" />
+                    )}
+                </div>
+            </section>
+
+            <section className="admin-dash-section">
+                <div className="admin-dash-section-title">活动搜索</div>
+                <div className="admin-dash-section-body">
+                    <Input
+                        allowClear
+                        className="admin-time-search"
+                        placeholder="输入活动名、别名、stringId 或活动 ID"
+                        value={activitySearch}
+                        onChange={event => setActivitySearch(event.target.value)}
+                    />
+                    {activitySearch && (
+                        activityResults.length > 0 ? (
+                            activityResults.map(activity => renderActivityCard(activity, false, activityTimeline?.currentTime))
+                        ) : (
+                            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配的活动" />
+                        )
+                    )}
+                </div>
+            </section>
+
+            <section className="admin-dash-section">
+                <div className="admin-dash-section-title">活动时间线</div>
+                <div className="admin-dash-section-body">
+                    <Table<AdminActivityEvent>
+                        rowKey={row => activityKey(row)}
+                        size="small"
+                        loading={activityTimelineLoading}
+                        dataSource={activityTimeline?.timeline ?? []}
+                        scroll={{ x: "max-content" }}
+                        tableLayout="fixed"
+                        pagination={{ pageSize: 8, showSizeChanger: false }}
+                        columns={[
+                            {
+                                title: "活动",
+                                render: (_: unknown, row) => (
+                                    <Space wrap size={6} align="center">
+                                        <Typography.Text strong>{row.name}</Typography.Text>
+                                        <Tag color="purple">{row.familyLabel}</Tag>
+                                        <Typography.Text type="secondary">#{row.eventId}</Typography.Text>
+                                    </Space>
+                                ),
+                            },
+                            {
+                                title: "起止 / 状态",
+                                render: (_: unknown, row) => (
+                                    <Space wrap size={6} align="center">
+                                        <span className="admin-mono">{renderActivityPeriod(row)}</span>
+                                        {renderActivityStatusBadge(row, activityTimeline?.currentTime)}
+                                    </Space>
+                                ),
+                                width: 400,
+                                responsive: ["sm"] as any,
+                            },
+                            {
+                                title: "剩余 / 换牌",
+                                render: (_: unknown, row) => (
+                                    <Space wrap size={6} align="center">
+                                        {renderActivityRemainingDays(row, activityTimeline?.currentTime)}
+                                        {row.closeEndTime !== null && `换牌截止 ${formatGameWallTime(row.closeEndTime)}`}
+                                    </Space>
+                                ),
+                                responsive: ["sm"] as any,
+                            },
+                        ]}
+                    />
+                </div>
+            </section>
+        </div>
+    )
     return (
         <AdminPage
             eyebrow="TIME"
@@ -700,222 +902,23 @@ export default function TimeControl() {
                     </section>
                 )}
                 <Card
-                    title={clairvoyanceTab === "gacha" ? "千里眼：短期 UP 角色池" : "千里眼：活动日程"}
+                    className="admin-clairvoyance-card"
+                    title={
+                        <div className="admin-clairvoyance-head" role="toolbar" aria-label="千里眼视图切换">
+                            <span className="admin-clairvoyance-head-title">千里眼</span>
+                            <Segmented
+                                options={[
+                                    { label: "卡池", value: "gacha" },
+                                    { label: "活动", value: "activity" },
+                                ]}
+                                value={clairvoyanceTab}
+                                onChange={value => setClairvoyanceTab(value as "gacha" | "activity")}
+                            />
+                        </div>
+                    }
                     extra={clairvoyanceCdnVersion && <Tag color="cyan">CDN {clairvoyanceCdnVersion}</Tag>}
                 >
-                    <Tabs
-                        activeKey={clairvoyanceTab}
-                        onChange={key => setClairvoyanceTab(key as "gacha" | "activity")}
-                        items={[
-                            {
-                                key: "gacha",
-                                label: "卡池",
-                                children: gachaTimelineError ? (
-                        <Alert type="error" showIcon message="千里眼数据加载失败" description="接口 /api/server/clairvoyance/gacha 不可用。" />
-                    ) : (
-                        <div className="admin-dash-sections">
-                            <div className="admin-page-note">
-                                <Typography.Text strong>当前阶段只追踪短期 UP 角色池</Typography.Text>
-                                <Typography.Text type="secondary">
-                                    范围限定为固定 CDN 基线内 pageKind=0、持续不超过 60 天且包含 UP 角色的角色扭蛋。
-                                </Typography.Text>
-                            </div>
-
-                            <section className="admin-dash-section">
-                                <div className="admin-dash-section-title">近期卡池</div>
-                                <div className="admin-dash-section-body">
-                                    {gachaTimelineLoading ? (
-                                        <Typography.Text type="secondary">加载中...</Typography.Text>
-                                    ) : gachaTimeline && recentGachas.length > 0 ? (
-                                        recentGachas.map(({ gacha, upcoming }) => (
-                                            <div key={gacha.id} className="admin-clairvoyance-panel">
-                                                <div className="admin-pool-top">
-                                                    <span className="admin-pool-name">{gacha.name} #{gacha.id}</span>
-                                                    {renderPoolCardBadge(gacha, gachaTimeline?.currentTime)}
-                                                    <span className="admin-pool-win admin-mono">{renderGachaCompactPeriod(gacha)}</span>
-                                                    <span className="admin-pool-remaining">
-                                                        {upcoming
-                                                            ? renderGachaStartCountdown(gacha, gachaTimeline?.currentTime)
-                                                            : renderRemainingDays(gacha, gachaTimeline?.currentTime)}
-                                                    </span>
-                                                </div>
-                                                {renderRateUpCharacters(gacha.rateUpCharacters)}
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="近七日没有进行中或预告的短期 UP 角色池" />
-                                    )}
-                                </div>
-                            </section>
-
-                            <section className="admin-dash-section">
-                                <div className="admin-dash-section-title">UP 角色搜索</div>
-                                <div className="admin-dash-section-body">
-                                    <Input
-                                        allowClear
-                                        className="admin-time-search"
-                                        placeholder="输入角色名、称号或角色 ID"
-                                        value={gachaSearch}
-                                        onChange={event => setGachaSearch(event.target.value)}
-                                    />
-                                    {gachaSearch && (
-                                        searchResults.length > 0 ? (
-                                            searchResults.map(row => (
-                                                <div key={row.characterId} className="admin-clairvoyance-panel">
-                                                    <Typography.Text strong>{row.name} #{row.characterId}</Typography.Text>
-                                                    {row.title && <Typography.Text type="secondary">{row.title}</Typography.Text>}
-                                                    <Space wrap size={[4, 4]}>
-                                                        {row.gachas.map(gacha => (
-                                                            <Fragment key={gacha.id}>
-                                                                <Tag>
-                                                                    #{gacha.id} {gacha.name} / {renderGachaPeriod(gacha)}
-                                                                </Tag>
-                                                                {renderGachaStatusBadge(gacha, gachaTimeline?.currentTime)}
-                                                            </Fragment>
-                                                        ))}
-                                                    </Space>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配的 UP 角色" />
-                                        )
-                                    )}
-                                </div>
-                            </section>
-
-                            <section className="admin-dash-section">
-                                <div className="admin-dash-section-title">时间线</div>
-                                <div className="admin-dash-section-body">
-                                    <Table<ClairvoyanceGacha>
-                                        rowKey="id"
-                                        size="small"
-                                        loading={gachaTimelineLoading}
-                                        dataSource={gachaTimeline?.timeline ?? []}
-                                        scroll={{ x: "max-content" }}
-                                        tableLayout="fixed"
-                                        pagination={{ pageSize: 8, showSizeChanger: false }}
-                                        columns={[
-                                            { title: "卡池", dataIndex: "name", render: (name: string, row) => `${name} #${row.id}` },
-                                            {
-                                                title: "上线 / 下线",
-                                                render: (_: unknown, row) => (
-                                                    <Space wrap size={6} align="center">
-                                                        {renderGachaPeriod(row)}
-                                                        {renderGachaStatusBadge(row, gachaTimeline?.currentTime)}
-                                                    </Space>
-                                                ),
-                                                width: 360,
-                                                responsive: ["sm"] as any,
-                                            },
-                                            { title: "UP 角色", render: (_: unknown, row) => renderRateUpCharacters(row.rateUpCharacters) },
-                                        ]}
-                                    />
-                                </div>
-                            </section>
-                        </div>
-                                ),
-                            },
-                            {
-                                key: "activity",
-                                label: "活动",
-                                children: activityTimelineError ? (
-                                    <Alert type="error" showIcon message="活动日程加载失败" description="接口 /api/server/clairvoyance/activity 不可用。" />
-                                ) : (
-                                    <div className="admin-dash-sections">
-                                        <div className="admin-page-note">
-                                            <Typography.Text strong>范围限定为固定 CDN 基线内 13 族活动主表的日程</Typography.Text>
-                                            <Typography.Text type="secondary">
-                                                活跃截止前为进行中；活跃截止后进入换牌期，换牌截止后结束；无活跃截止的条目开始后长期开放。
-                                            </Typography.Text>
-                                        </div>
-
-                                        <section className="admin-dash-section">
-                                            <div className="admin-dash-section-title">近期活动</div>
-                                            <div className="admin-dash-section-body">
-                                                {activityTimelineLoading ? (
-                                                    <Typography.Text type="secondary">加载中...</Typography.Text>
-                                                ) : activityTimeline && recentActivities.length > 0 ? (
-                                                    recentActivities.map(({ activity, upcoming }) => (
-                                                        renderActivityCard(activity, upcoming, activityTimeline.currentTime)
-                                                    ))
-                                                ) : (
-                                                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="近七日没有进行中或预告的活动" />
-                                                )}
-                                            </div>
-                                        </section>
-
-                                        <section className="admin-dash-section">
-                                            <div className="admin-dash-section-title">活动搜索</div>
-                                            <div className="admin-dash-section-body">
-                                                <Input
-                                                    allowClear
-                                                    className="admin-time-search"
-                                                    placeholder="输入活动名、别名、stringId 或活动 ID"
-                                                    value={activitySearch}
-                                                    onChange={event => setActivitySearch(event.target.value)}
-                                                />
-                                                {activitySearch && (
-                                                    activityResults.length > 0 ? (
-                                                        activityResults.map(activity => renderActivityCard(activity, false, activityTimeline?.currentTime))
-                                                    ) : (
-                                                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有匹配的活动" />
-                                                    )
-                                                )}
-                                            </div>
-                                        </section>
-
-                                        <section className="admin-dash-section">
-                                            <div className="admin-dash-section-title">活动时间线</div>
-                                            <div className="admin-dash-section-body">
-                                                <Table<AdminActivityEvent>
-                                                    rowKey={row => activityKey(row)}
-                                                    size="small"
-                                                    loading={activityTimelineLoading}
-                                                    dataSource={activityTimeline?.timeline ?? []}
-                                                    scroll={{ x: "max-content" }}
-                                                    tableLayout="fixed"
-                                                    pagination={{ pageSize: 8, showSizeChanger: false }}
-                                                    columns={[
-                                                        {
-                                                            title: "活动",
-                                                            render: (_: unknown, row) => (
-                                                                <Space wrap size={6} align="center">
-                                                                    <Typography.Text strong>{row.name}</Typography.Text>
-                                                                    <Tag color="purple">{row.familyLabel}</Tag>
-                                                                    <Typography.Text type="secondary">#{row.eventId}</Typography.Text>
-                                                                </Space>
-                                                            ),
-                                                        },
-                                                        {
-                                                            title: "起止 / 状态",
-                                                            render: (_: unknown, row) => (
-                                                                <Space wrap size={6} align="center">
-                                                                    <span className="admin-mono">{renderActivityPeriod(row)}</span>
-                                                                    {renderActivityStatusBadge(row, activityTimeline?.currentTime)}
-                                                                </Space>
-                                                            ),
-                                                            width: 400,
-                                                            responsive: ["sm"] as any,
-                                                        },
-                                                        {
-                                                            title: "剩余 / 换牌",
-                                                            render: (_: unknown, row) => (
-                                                                <Space wrap size={6} align="center">
-                                                                    {renderActivityRemainingDays(row, activityTimeline?.currentTime)}
-                                                                    {row.closeEndTime !== null && `换牌截止 ${formatGameWallTime(row.closeEndTime)}`}
-                                                                </Space>
-                                                            ),
-                                                            responsive: ["sm"] as any,
-                                                        },
-                                                    ]}
-                                                />
-                                            </div>
-                                        </section>
-                                    </div>
-                                ),
-                            },
-                        ]}
-                    />
+                    {clairvoyanceTab === "gacha" ? gachaBody : activityBody}
                 </Card>
             </Space>
         </AdminPage>

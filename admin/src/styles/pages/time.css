@@ -37,6 +37,25 @@
   font-size: 12px;
 }
 
+/* 方案 A 千里眼卡头（设计稿 clairvoyance-tab-design.html）：
+   标题恒为「千里眼」+ Segmented 视图切换（toolbar 语义）；CDN 徽章仍在 extra 侧。
+   Segmented 选中态（白底+微投影）走 antd 组件 token，此处只管卡头布局：
+   标题工具行可换行（390 窄屏 Segmented 落到标题下方），head title 放开裁剪保住焦点环。 */
+.admin-clairvoyance-card .ant-card-head-title {
+  overflow: visible;
+}
+
+.admin-clairvoyance-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.admin-clairvoyance-head-title {
+  font-weight: 800;
+}
+
 /* UP 角色搜索框: 窄屏全宽, 桌面收窄到搜索框的自然宽度 (mockup .search) */
 .admin-time-search {
   width: 100%;

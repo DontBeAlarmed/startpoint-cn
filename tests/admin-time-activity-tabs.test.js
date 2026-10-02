@@ -4,15 +4,18 @@ const path = require("path")
 
 const source = fs.readFileSync(path.join(__dirname, "../admin/src/pages/TimeControl.tsx"), "utf8")
 
-// ── 页签骨架：千里眼卡片区域 Tab 切换 ─────────────────────────────────────
-assert(source.includes("clairvoyanceTab"), "千里眼卡片应有页签状态")
-assert(source.includes("<Tabs"), "千里眼卡片应使用 Tabs 组件切换卡池/活动")
-assert(source.includes('key: "gacha"'), "应保留卡池页签")
-assert(source.includes('key: "activity"'), "应有活动页签")
-assert(source.includes('label: "卡池"'), "卡池页签文案")
-assert(source.includes('label: "活动"'), "活动页签文案")
-assert(source.includes('"千里眼：短期 UP 角色池"'), "卡池页签标题")
-assert(source.includes('"千里眼：活动日程"'), "活动页签标题")
+// ── 卡头骨架（方案 A）：标题恒为「千里眼」，卡头分段控件切换卡池/活动 ─────
+assert(source.includes("clairvoyanceTab"), "千里眼卡片应有视图状态")
+assert(!source.includes("<Tabs"), "卡体不应再使用 Tabs（Tab 归位卡头，层级错乱已修复）")
+assert(!source.includes("千里眼：短期 UP 角色池"), "卡头标题不应随 Tab 变化（旧动态标题已移除）")
+assert(!source.includes("千里眼：活动日程"), "卡头标题不应随 Tab 变化（旧动态标题已移除）")
+assert(source.includes('<span className="admin-clairvoyance-head-title">千里眼</span>'), "卡头标题应恒为「千里眼」")
+assert(source.includes("<Segmented"), "卡头应使用 antd Segmented 分段控件")
+assert(source.includes('label: "卡池"'), "分段控件应有卡池段")
+assert(source.includes('label: "活动"'), "分段控件应有活动段")
+assert(source.includes('value: "gacha"'), "分段控件应有卡池段值")
+assert(source.includes('value: "activity"'), "分段控件应有活动段值")
+assert(source.includes('role="toolbar"'), "卡头视图切换应具 toolbar 语义（窄屏换行仍属卡头）")
 
 // ── 活动数据面 ───────────────────────────────────────────────────────────
 assert(source.includes("/api/server/clairvoyance/activity"), "时间页应接入千里眼活动 API")
