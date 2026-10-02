@@ -118,11 +118,12 @@
   background: var(--panel);
 }
 
+/* 头像块与游戏原生 square_132_132 同为正方形 — 零裁切零遮挡 (维护者 2026-09-30) */
 .admin-char-avatar {
   position: relative;
   flex: none;
-  width: 32px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   border-radius: 8px;
   background: var(--water-soft);
   color: var(--ink);
@@ -165,4 +166,47 @@
   font-weight: 600;
   line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+/* 千里眼搜索结果: 关联池两行条目(名称+徽章 / 起止), 取代单行长 Tag */
+.admin-search-gacha-list {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+}
+
+.admin-search-gacha-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+
+.admin-search-gacha-row:first-child {
+  border-top: 0;
+}
+
+.admin-search-gacha-name {
+  font-weight: 600;
+}
+
+.admin-search-gacha-period {
+  margin-left: auto;
+  color: var(--ink-soft);
+}
+
+/* 属性特选等大池: UP 头像条目折叠 +N 计数 */
+.admin-char-more {
+  display: inline-grid;
+  place-items: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 8px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  color: var(--ink-soft);
+  font-weight: 700;
 }

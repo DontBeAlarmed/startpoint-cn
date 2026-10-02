@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { Alert, Button, Card, Empty, Input, Segmented, Space, Table, Tag, Typography, message } from "antd"
 import { ReloadOutlined, UndoOutlined } from "@ant-design/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -317,10 +317,15 @@ function renderActivityCard(activity: AdminActivityEvent, upcoming: boolean, now
 // UP 角色头像条目（维护者 2026-09-30 规格：头像块占两行 | 右上 id 灰 / 右下 角色名）。
 // 头像走服务端 CDN 归档端点（character_avatar，immutable 内容寻址，日缓存）；
 // 真实立绘覆盖缺失（助手角色等）时 onError 隐藏图片，露出底层首字占位。
+// 属性特选等元素全池的 UP 角色可达 14-21 个 — 折叠为前 8 个 + 「+N」
+const MAX_VISIBLE_RATE_UP = 8
+
 function renderRateUpCharacters(characters: ClairvoyanceCharacter[]) {
+    const visible = characters.slice(0, MAX_VISIBLE_RATE_UP)
+    const rest = characters.length - visible.length
     return (
         <div className="admin-char-cards">
-            {characters.map(character => (
+            {visible.map(character => (
                 <div key={character.id} className="admin-char-card">
                     <span className="admin-char-avatar" aria-hidden>
                         {character.name.slice(0, 1)}
@@ -340,6 +345,11 @@ function renderRateUpCharacters(characters: ClairvoyanceCharacter[]) {
                     </span>
                 </div>
             ))}
+            {rest > 0 && (
+                <span className="admin-char-card admin-char-more" aria-label={`另有 ${rest} 个 UP 角色`}>
+                    +{rest}
+                </span>
+            )}
         </div>
     )
 }
@@ -642,16 +652,19 @@ export default function TimeControl() {
                                 <div key={row.characterId} className="admin-clairvoyance-panel">
                                     <Typography.Text strong>{row.name} #{row.characterId}</Typography.Text>
                                     {row.title && <Typography.Text type="secondary">{row.title}</Typography.Text>}
-                                    <Space wrap size={[4, 4]}>
+                                    <div className="admin-search-gacha-list">
                                         {row.gachas.map(gacha => (
-                                            <Fragment key={gacha.id}>
-                                                <Tag>
-                                                    #{gacha.id} {gacha.name} / {renderGachaPeriod(gacha)}
-                                                </Tag>
+                                            <div key={gacha.id} className="admin-search-gacha-row">
+                                                <span className="admin-search-gacha-name">
+                                                    #{gacha.id} {gacha.name}
+                                                </span>
                                                 {renderGachaStatusBadge(gacha, gachaTimeline?.currentTime)}
-                                            </Fragment>
+                                                <span className="admin-search-gacha-period admin-mono">
+                                                    {renderGachaPeriod(gacha)}
+                                                </span>
+                                            </div>
                                         ))}
-                                    </Space>
+                                    </div>
                                 </div>
                             ))
                         ) : (
