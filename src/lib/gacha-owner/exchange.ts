@@ -184,6 +184,7 @@ export function executeGachaExchangeSync(
                 : { playerAfter: grant.playerAfter }),
             itemOverflowDispositions: collectRewardGrantItemOverflowDispositions(grant),
             postCommitEffects,
+            missionSettlement: grant.missionSettlement ?? null,
         }
         return command.kind === "character"
             ? deepFreeze({ ...common, kind: "character" as const, characters })

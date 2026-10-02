@@ -1,6 +1,10 @@
 import { projectCharacterPatch } from "../common-response/entities"
 import { mergeCommonResponseFragments } from "../common-response/merge"
 import type { CommonResponseFragment } from "../common-response/model"
+import {
+    composeMissionSettlementResponse,
+    projectMissionSettlementFragment,
+} from "../mission/response-fragment"
 import { projectItemOverflowCommonResponse } from "../item-overflow/common-response"
 import type {
     CrazyGachaCandidateSuccess,
@@ -70,10 +74,21 @@ export function projectCrazyGachaSelectResponse(input: {
         mail_arrived: input.result.mailArrived,
         ...(overMax.length === 0 ? {} : { over_max: overMax }),
     }
+    const responseData: Record<string, unknown> = {
+        ...mergeCommonResponseFragments([fragment]),
+    }
+    if (input.result.missionSettlement !== null) {
+        // 疯狂抽卡确定新角色跨过持有数任务/称号阶段时,完成与奖励当场发布
+        composeMissionSettlementResponse(
+            responseData,
+            projectMissionSettlementFragment(input.result.missionSettlement),
+            input.result.playerId,
+        )
+    }
     return {
         data_headers: input.dataHeaders,
         data: {
-            ...mergeCommonResponseFragments([fragment]),
+            ...responseData,
             crazy_gacha_result_list: {},
         },
     }

@@ -39,6 +39,8 @@ interface EquipmentWorkingState {
 export interface PreparedGachaAcquisitionBatch {
     readonly assetAcquisition: RewardGrantAssetAcquisition
     readonly compensationItemIds: readonly number[]
+    /** persistFinalStates 之后才有效:本次批量是否产生了新入队角色 */
+    readonly hadNewCharacter: () => boolean
 }
 
 function newCharacter(characterId: number, evaluationTime: Date): PlayerCharacter | null {
@@ -137,6 +139,7 @@ export function prepareGachaAcquisitionBatchSync(
     }
     const evaluationTime = getRealNow()
     let persisted = false
+    let grantedNewCharacter = false
     const assetAcquisition: RewardGrantAssetAcquisition = {
         grantCharacter(characterId, grantCompensation) {
             const key = String(characterId)
@@ -204,6 +207,7 @@ export function prepareGachaAcquisitionBatchSync(
                 })),
             )
             if ([...characterState.values()].some(state => !state.wasOwned)) {
+                grantedNewCharacter = true
                 recordHundredCharactersMilestoneSync(playerId, evaluationTime)
             }
             persisted = true
@@ -212,5 +216,9 @@ export function prepareGachaAcquisitionBatchSync(
     return {
         assetAcquisition,
         compensationItemIds: [...compensationItemIds].sort((left, right) => left - right),
+        hadNewCharacter: () => {
+            if (!persisted) throw new Error("Gacha acquisition batch has not been persisted yet")
+            return grantedNewCharacter
+        },
     }
 }

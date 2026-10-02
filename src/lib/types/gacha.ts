@@ -171,6 +171,7 @@ export interface RewardPlayerGachaDrawResult {
         freeVmoney: number
         expPool: number
     }>
+    missionSettlement?: import("../mission/settlement").MissionSettlementResult | null
 }
 
 

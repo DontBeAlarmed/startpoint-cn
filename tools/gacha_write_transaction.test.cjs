@@ -28,7 +28,7 @@ const restoreContentSnapshot = require("./helpers/install-bundled-gameplay-snaps
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
 const { getActiveMissionCountersSync } = require("../src/data/domains/active_mission_counters")
-const { getPlayerCharacterSync, getPlayerCharactersSync } = require("../src/data/domains/character")
+const { getPlayerCharacterSync, getPlayerCharactersSync, insertDefaultPlayerCharacterSync } = require("../src/data/domains/character")
 const { getPlayerEquipmentSync, getPlayerEquipmentListSync } = require("../src/data/domains/equipment")
 const {
     getPlayerGachaCampaignSync,
@@ -683,11 +683,13 @@ test("gacha exec rolls every persistent result back on late mission failure", as
     assert.deepEqual(markedSeeds, [])
     assert.equal(
         routeSql.statements.filter(sql => /^\s*SELECT[\s\S]*\bFROM\s+players\b/i.test(sql)).length,
-        2,
+        3,
+        "2 次既有读取 + 持有数任务结算读取一次玩家档案",
     )
     assert.equal(
         routeSql.statements.filter(sql => /^\s*(?:SAVEPOINT|RELEASE)\b/i.test(sql)).length,
-        0,
+        2,
+        "持有数任务结算以嵌套事务(savepoint)运行",
     )
 })
 
@@ -1298,7 +1300,8 @@ test("newbie ten-ticket gacha consumes the configured 70030 ticket", async () =>
     assert.equal(ticketCollectedWrites.length, 0, ticketCollectedWrites.join("\n---\n"))
     assert.equal(
         routeSql.statements.filter(sql => /^\s*(?:SAVEPOINT|RELEASE)\b/i.test(sql)).length,
-        0,
+        2,
+        "持有数任务结算以嵌套事务(savepoint)运行",
     )
 })
 
@@ -1348,7 +1351,8 @@ test("ticket gacha rolls its ticket and rewards back on a late mission failure",
     )
     assert.equal(
         routeSql.statements.filter(sql => /^\s*(?:SAVEPOINT|RELEASE)\b/i.test(sql)).length,
-        0,
+        2,
+        "持有数任务结算以嵌套事务(savepoint)运行",
     )
 })
 
@@ -1574,8 +1578,9 @@ test("Gacha acquisition SQL statement counts stay constant from one to ten uniqu
         ))
     }
     assert.deepEqual(characterMetrics, [
-        { characterReads: 1, bondReads: 0, characterWrites: 1, equipmentReads: 0, equipmentWrites: 0 },
-        { characterReads: 1, bondReads: 0, characterWrites: 1, equipmentReads: 0, equipmentWrites: 0 },
+        // bondReads 1:持有数任务结算的状态派生读取羁绊之证表
+        { characterReads: 1, bondReads: 1, characterWrites: 1, equipmentReads: 0, equipmentWrites: 0 },
+        { characterReads: 1, bondReads: 1, characterWrites: 1, equipmentReads: 0, equipmentWrites: 0 },
     ])
     assert.deepEqual(equipmentMetrics, [
         { characterReads: 0, bondReads: 0, characterWrites: 0, equipmentReads: 1, equipmentWrites: 1 },
@@ -1632,7 +1637,7 @@ test("Character acquisition batches repeated new ownership into final-state SQL"
     )).length, 1)
     assert.equal(measured.statements.filter(sql => (
         /^\s*SELECT[\s\S]*FROM\s+players_characters_bond_tokens\b/i.test(sql)
-    )).length, 0)
+    )).length, 1, "持有数任务结算的状态派生读取一次羁绊之证表")
     assert.equal(measured.statements.filter(sql => (
         /^\s*INSERT\s+INTO\s+players_characters\b/i.test(sql)
     )).length, 1)
@@ -2032,4 +2037,104 @@ test("owner path rolls a valid earlier draw back when a later character is unkno
         /RewardGrant entry 1 failed: unknown Character 999999996/,
     )
     assert.equal(getPlayerCharacterSync(playerId, 251001), null)
+})
+
+// ── 角色获得(抽卡/交换)的持有数任务当场结算 ──
+// 「让新角色成为伙伴」(mission 32, characters_count)与伙伴数称号族
+// (cat5 degree_companion_add_)是状态派生任务,新角色入队的瞬间就是
+// 事实产生时点,必须同事务结算并当场发布(2026-10-01 时点审计)。
+
+function categoryMissionProgress(playerId, category, missionId) {
+    const row = database.prepare(`
+        SELECT progress FROM players_category_missions
+        WHERE player_id = ? AND category = ? AND id = ?
+    `).get(playerId, category, missionId)
+    return row?.progress ?? 0
+}
+
+test("gacha exec settles companion count mission progress on new character", async () => {
+    const { playerId, viewerId } = await createPlayer("gacha-companion-mission")
+    updatePlayerSync({ id: playerId, freeVmoney: 1000, vmoney: 0 })
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/gacha/exec",
+        payload: {
+            viewer_id: viewerId,
+            gacha_id: ACTIVE_CHARACTER_GACHA_ID,
+            payment_type: 1,
+            number_of_exec: 1,
+            type: 1,
+            api_count: 1,
+        },
+    })
+    assert.equal(response.statusCode, 200, response.body)
+
+    // 默认角色 1 + 抽到的新角色 = 2,任务 32 当场推进(未达目标 20,无奖励)
+    assert.equal(
+        categoryMissionProgress(playerId, 1, 32),
+        2,
+        "抽到新角色后任务 32 进度必须当场推进",
+    )
+})
+
+test("character exchange crossing companion stage settles mission and degree at once", async () => {
+    const { playerId, viewerId } = await createPlayer("gacha-exchange-companion")
+    // 预置至 20 名角色,交换第 21 名新角色跨过任务 32 阶段 1(目标 20)
+    const owned = new Set([1])
+    for (const id of Object.keys(require("../assets/character.json"))) {
+        if (owned.size >= 20) break
+        const numeric = Number(id)
+        if (numeric === 1 || numeric === ACTIVE_CHARACTER_EXCHANGE_ID) continue
+        insertDefaultPlayerCharacterSync(playerId, numeric)
+        owned.add(numeric)
+    }
+    assert.equal(owned.size, 20, "测试前提:交换前已有 20 名角色")
+    insertPlayerGachaInfoSync(playerId, {
+        gachaId: ACTIVE_CHARACTER_GACHA_ID,
+        isAccountFirst: false,
+        isDailyFirst: false,
+        gachaExchangePoint: 250,
+    })
+    const stonesBefore = getPlayerSync(playerId).freeVmoney
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/gacha/exchange_character",
+        payload: {
+            viewer_id: viewerId,
+            gacha_id: ACTIVE_CHARACTER_GACHA_ID,
+            character_id: ACTIVE_CHARACTER_EXCHANGE_ID,
+            api_count: 1,
+        },
+    })
+    assert.equal(response.statusCode, 200, response.body)
+
+    // 21 名角色,跨过任务 32 阶段 1(目标 20)→ +5 星导石
+    assert.equal(
+        categoryMissionProgress(playerId, 1, 32),
+        21,
+        "交换新角色后任务 32 进度必须当场推进",
+    )
+    assert.equal(
+        getPlayerSync(playerId).freeVmoney - stonesBefore,
+        5,
+        "任务 32 阶段 1 奖励(5 星导石)必须当场发放",
+    )
+    // 伙伴数称号 2000(目标 15)当场完成并发布 degree_list
+    assert.ok(
+        categoryMissionProgress(playerId, 5, 2000) >= 15,
+        "伙伴数称号进度必须当场推进",
+    )
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
+    const missionInfo = payload.data.mission_info ?? []
+    assert.ok(
+        missionInfo.some(entry => entry.mission_category_id === 1 && entry.mission_id === 32),
+        "交换响应的 mission_info 必须包含任务 32",
+    )
+    const degreeList = payload.data.degree_list ?? []
+    assert.ok(
+        degreeList.some(entry => entry.degree_id === 2000),
+        "交换响应的 degree_list 必须包含伙伴数称号",
+    )
 })

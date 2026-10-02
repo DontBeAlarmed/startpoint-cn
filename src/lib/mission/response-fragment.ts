@@ -78,7 +78,11 @@ export function projectMissionSettlementFragment(
         common.mission_info = copyRecordList(settlement.missionInfo, "missionInfo")
     }
     if (hasOwn(settlement, "itemList")) {
-        common.item_list = copyItemList(settlement.itemList)
+        const itemList = copyItemList(settlement.itemList)
+        // 空奖励表不进 fragment:避免覆盖响应里既有的客户端形状(如交换的 [])
+        if (!isRecord(itemList) || Object.keys(itemList).length > 0) {
+            common.item_list = itemList
+        }
     }
     if (hasOwn(settlement, "characterList")) {
         common.character_list = copyCharacterList(settlement.characterList)

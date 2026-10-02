@@ -375,6 +375,7 @@ export function selectCrazyGachaCandidateSync(input: {
                 characters: characterSnapshots,
                 source: "gacha/crazy_select" as const,
             }],
+            missionSettlement: grant.missionSettlement ?? null,
         })
     }))()
 }

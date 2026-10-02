@@ -4,6 +4,10 @@ import {
 } from "../common-response/entities"
 import { mergeCommonResponseFragments } from "../common-response/merge"
 import type { CommonResponseFragment } from "../common-response/model"
+import {
+    composeMissionSettlementResponse,
+    projectMissionSettlementFragment,
+} from "../mission/response-fragment"
 import { projectItemOverflowCommonResponse } from "../item-overflow/common-response"
 import type { GachaExchangeSuccess, GachaPostCommitResult } from "./model"
 
@@ -35,11 +39,19 @@ export function projectGachaExchangeResponse(input: {
                 ),
             }),
     }
-    const common = mergeCommonResponseFragments([fragment])
+    const responseData: Record<string, unknown> = { ...mergeCommonResponseFragments([fragment]) }
+    if (result.missionSettlement !== null) {
+        // 交换获得新角色跨过持有数任务/称号阶段时,完成与奖励当场发布
+        composeMissionSettlementResponse(
+            responseData,
+            projectMissionSettlementFragment(result.missionSettlement),
+            result.playerId,
+        )
+    }
     return {
         data_headers: input.dataHeaders,
         data: {
-            ...common,
+            ...responseData,
             gacha_info_list: [{
                 gacha_id: result.gachaId,
                 is_account_first: result.isAccountFirst,

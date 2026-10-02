@@ -62,6 +62,7 @@ function characterSuccess() {
         characters: [{ character_id: 111001, stack: 0 }],
         rewardItems: {},
         itemOverflowDispositions: [],
+        missionSettlement: null,
         postCommitEffects: [
             { kind: "seedMark", movieId: "normal", seed: 101, rarity: 5 },
             { kind: "seedMark", movieId: "normal", seed: 102, rarity: 4 },
