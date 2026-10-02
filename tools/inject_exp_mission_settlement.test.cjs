@@ -141,6 +141,12 @@ async function main() {
             missionInfo.some(entry => entry.mission_category_id === 1 && entry.mission_id === 9),
             "注入响应的 mission_info 必须包含角色等级任务",
         )
+        // 跨过 Lv60 时等级称号(cat5 3000)完成,degree_list 当场发布
+        const degreeList = decode(inject).data.degree_list ?? []
+        assert.ok(
+            degreeList.some(entry => entry.degree_id === 3000),
+            "注入响应的 degree_list 必须包含 Lv60 称号",
+        )
 
         // 任务 9(角色等级)进度当场推进到 60,不依赖进关/轮询
         assert.equal(

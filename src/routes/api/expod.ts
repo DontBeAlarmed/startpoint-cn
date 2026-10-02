@@ -9,7 +9,10 @@ import { getSession } from "../../data/domains/session"
 import { resolvePlayerIdSync } from "../../data/activeAccount"
 import { getDb } from "../../data/db"
 import { expPoolRealDateToClientTimestamp } from "../../lib/exp-pool-time"
-import { projectMissionSettlementFragment } from "../../lib/mission/response-fragment"
+import {
+    composeMissionSettlementResponse,
+    projectMissionSettlementFragment,
+} from "../../lib/mission/response-fragment"
 import { getMailArrivedSync } from "../../lib/mail-notification"
 import { getRealNow } from "../../runtime/time/game-time"
 import { generateDataHeaders } from "../../utils"
@@ -216,26 +219,31 @@ const routes = async (fastify: FastifyInstance) => {
             const player = getPlayerSync(resolved.playerId)!
             const character = getPlayerCharacterSync(resolved.playerId, body.character_id)!
             reply.header("content-type", "application/x-msgpack")
+            const responseData: Record<string, unknown> = {
+                ...mergeCommonResponseFragments([{
+                    character_list: [projectCharacterPatch(characterListEntry(viewerId, {
+                        ...result.after,
+                        bondTokens: result.bondTokens,
+                    }, character, { includeBondTokens: true }))],
+                    user_info: {
+                        exp_pool: result.expPool,
+                        exp_pooled_time: expPoolRealDateToClientTimestamp(player.expPooledTime),
+                    },
+                    mail_arrived: getMailArrivedSync(resolved.playerId),
+                }]),
+            }
+            if (result.missionSettlement !== null) {
+                // 经验注入跨过等级/称号阶段时,完成与奖励(含 degree_list)在注入响应内当场发布
+                composeMissionSettlementResponse(
+                    responseData,
+                    projectMissionSettlementFragment(result.missionSettlement),
+                    viewerId,
+                )
+            }
             return reply.status(200).send({
                 data_headers: generateDataHeaders({ viewer_id: viewerId }),
                 data: {
-                    ...mergeCommonResponseFragments([
-                        {
-                            character_list: [projectCharacterPatch(characterListEntry(viewerId, {
-                                ...result.after,
-                                bondTokens: result.bondTokens,
-                            }, character, { includeBondTokens: true }))],
-                            user_info: {
-                                exp_pool: result.expPool,
-                                exp_pooled_time: expPoolRealDateToClientTimestamp(player.expPooledTime),
-                            },
-                            mail_arrived: getMailArrivedSync(resolved.playerId),
-                        },
-                        // 经验注入跨过等级阈值时,任务完成/奖励在注入响应内当场发布
-                        ...(result.missionSettlement !== null
-                            ? [projectMissionSettlementFragment(result.missionSettlement).common]
-                            : []),
-                    ]),
+                    ...responseData,
                     add_exp_list: result.addExpList,
                     active_mission_list: result.activeMissionList,
                 },

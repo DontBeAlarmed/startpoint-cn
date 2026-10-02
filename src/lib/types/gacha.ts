@@ -171,7 +171,7 @@ export interface RewardPlayerGachaDrawResult {
         freeVmoney: number
         expPool: number
     }>
-    // 抽卡链的持有数任务结算;装备链或无新角色时为 null(链路可能未结算)
+    // 抽卡获得链的持有数任务结算(新角色/新装备种类);装备链无新种类或无新角色时为 null
     missionSettlement?: import("../mission/settlement").MissionSettlementResult | null
 }
 

@@ -216,10 +216,18 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
             ...getMissionCatalog().getDefinitionsByPattern("manaboard_2nd_complete_count"),
             ...getMissionCatalog().getDefinitionsByPattern("total_obtained_bond_token_count"),
         ].map(definition => definition.missionId)
+        // cond48 的角色绑定列(row[15])为空的是全角色聚合族(55000 三条),
+        // 同样由二板完成驱动,一并纳入;其余按角色收窄避免全表评估
         const bondDegreeMissionIds = getDegreeMissionIdsForConditionTypes(
-            [44, 48],
+            [44],
             [command.characterId],
-        )
+        ).concat(getMissionCatalog().getDefinitions(5).filter(definition => {
+            const row = definition.row as readonly unknown[]
+            return String(row[3]) === "48"
+                && (row[15] === undefined || row[15] === null
+                    || row[15] === "" || row[15] === "(None)"
+                    || String(row[15]) === String(command.characterId))
+        }).map(definition => definition.missionId))
         const missionSettlement = settleMissionCategories(
             command.playerId,
             [
