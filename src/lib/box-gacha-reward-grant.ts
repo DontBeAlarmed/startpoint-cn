@@ -127,11 +127,12 @@ export function grantBoxGachaDrawInTransactionOwnerWithInventorySync(
         { itemOverflow: createRewardGrantItemOverflowPolicy(playerId) },
     )
 
-    // 新角色入队是「持有角色数」事实的产生时点,结算与发放同事务
+    // 新角色入队/新装备种类是持有数事实的产生时点,结算与发放同事务
     return {
         rewardResult: projectBoxGachaRewardResult(result),
         rewardInvalidatedFactKeys: getAwakeFactKeysFromRewardGrants(result),
         missionSettlement: result.assets.characters.some(entry => entry.joined)
+            || drawResult.equipment.size > 0
             ? settleGachaAcquisitionMissions(playerId, getRealNow())
             : null,
         playerAfter: {

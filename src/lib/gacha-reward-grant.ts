@@ -167,8 +167,8 @@ export function grantGachaRewardPlanInTransactionOwnerWithInventorySync(
             assetAcquisition: acquisition.assetAcquisition,
         },
     )
-    // 新角色入队是「持有角色数」事实的产生时点,结算与发放同事务
-    const missionSettlement = acquisition.hadNewCharacter()
+    // 新角色入队/新装备种类是持有数事实的产生时点,结算与发放同事务
+    const missionSettlement = acquisition.hadNewCharacter() || acquisition.hadNewEquipmentKind()
         ? settleGachaAcquisitionMissions(playerId, getRealNow())
         : null
     return { ...result, missionSettlement }

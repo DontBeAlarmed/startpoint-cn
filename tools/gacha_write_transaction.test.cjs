@@ -1578,13 +1578,15 @@ test("Gacha acquisition SQL statement counts stay constant from one to ten uniqu
         ))
     }
     assert.deepEqual(characterMetrics, [
-        // bondReads 1:持有数任务结算的状态派生读取羁绊之证表
-        { characterReads: 1, bondReads: 1, characterWrites: 1, equipmentReads: 0, equipmentWrites: 0 },
-        { characterReads: 1, bondReads: 1, characterWrites: 1, equipmentReads: 0, equipmentWrites: 0 },
+        // bondReads 1:持有数任务结算的状态派生读取羁绊之证表;
+        // equipmentReads 1:任务 33(获得新装备)评估读取装备表
+        { characterReads: 1, bondReads: 1, characterWrites: 1, equipmentReads: 1, equipmentWrites: 0 },
+        { characterReads: 1, bondReads: 1, characterWrites: 1, equipmentReads: 1, equipmentWrites: 0 },
     ])
     assert.deepEqual(equipmentMetrics, [
-        { characterReads: 0, bondReads: 0, characterWrites: 0, equipmentReads: 1, equipmentWrites: 1 },
-        { characterReads: 0, bondReads: 0, characterWrites: 0, equipmentReads: 1, equipmentWrites: 1 },
+        // 新装备种类触发任务 33 结算:状态派生读羁绊表(bondReads)+装备表再读(equipmentReads)
+        { characterReads: 0, bondReads: 1, characterWrites: 0, equipmentReads: 2, equipmentWrites: 1 },
+        { characterReads: 0, bondReads: 1, characterWrites: 0, equipmentReads: 2, equipmentWrites: 1 },
     ])
 })
 
@@ -1698,7 +1700,7 @@ test("Equipment acquisition batches repeated draws without overwriting non-stack
     assert.equal(getPlayerEquipmentSync(playerId, equipmentId).stack, 9)
     assert.equal(measured.statements.filter(sql => (
         /^\s*SELECT[\s\S]*FROM\s+players_equipment\b/i.test(sql)
-    )).length, 1)
+    )).length, 2, "1 次既有批量读取 + 任务 33(获得新装备)评估读取装备表")
     assert.equal(measured.statements.filter(sql => (
         /^\s*INSERT\s+INTO\s+players_equipment\b/i.test(sql)
     )).length, 1)
@@ -2136,5 +2138,48 @@ test("character exchange crossing companion stage settles mission and degree at 
     assert.ok(
         degreeList.some(entry => entry.degree_id === 2000),
         "交换响应的 degree_list 必须包含伙伴数称号",
+    )
+})
+
+test("equipment exchange settles equipment kind mission on new kind", async () => {
+    const { playerId, viewerId } = await createPlayer("gacha-equipment-kind-mission")
+    insertPlayerGachaInfoSync(playerId, {
+        gachaId: ACTIVE_EQUIPMENT_GACHA_ID,
+        isAccountFirst: true,
+        isDailyFirst: true,
+        gachaExchangePoint: 251,
+    })
+    const stonesBefore = getPlayerSync(playerId).freeVmoney
+    const stonesBeforeItem = getPlayerItemSync(playerId, 100000)
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/gacha/exchange_equipment",
+        payload: {
+            viewer_id: viewerId,
+            gacha_id: ACTIVE_EQUIPMENT_GACHA_ID,
+            equipment_id: ACTIVE_EQUIPMENT_EXCHANGE_ID,
+            api_count: 1,
+        },
+    })
+    assert.equal(response.statusCode, 200, response.body)
+
+    // 新装备种类 → 任务 33(获得新装备)进度 1,阶段 1(目标 1)当场发放
+    // 奖励:锻造石(kind 1)×300
+    assert.equal(
+        categoryMissionProgress(playerId, 1, 33),
+        1,
+        "获得新装备后任务 33 进度必须当场推进",
+    )
+    assert.equal(
+        (getPlayerItemSync(playerId, 100000) ?? 0) - (stonesBeforeItem ?? 0),
+        300,
+        "任务 33 阶段 1 奖励(锻造石×300)必须当场发放",
+    )
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
+    const missionInfo = payload.data.mission_info ?? []
+    assert.ok(
+        missionInfo.some(entry => entry.mission_category_id === 1 && entry.mission_id === 33),
+        "交换响应的 mission_info 必须包含任务 33",
     )
 })

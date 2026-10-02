@@ -456,3 +456,52 @@ for (const scenario of [
         assert.equal(getPlayerEquipmentSync(playerId, equipmentId).protection, true)
     })
 }
+
+// ── 装备升级跨 5 级的持有任务当场结算 ──
+// 「5级装备持有数」(mission 68, total_equipment_5_level_count)与 5 级装备
+// 称号(cat5 degree_equipment_lv5_get_,condition 36)是状态派生任务,升级
+// 跨过 5 级的瞬间就是事实产生时点,必须同事务当场结算(2026-10-01 时点审计)。
+
+function missionProgressAt(playerId, category, missionId) {
+    return database.prepare(`
+        SELECT progress FROM players_category_missions
+        WHERE player_id = ? AND category = ? AND id = ?
+    `).get(playerId, category, missionId)?.progress ?? 0
+}
+
+test("equipment upgrade crossing level 5 settles five-level mission and degree at once", async () => {
+    const { playerId, viewerId } = await createPlayer("equipment-five-level")
+    addEquipment(playerId, 4050030, 10)
+    setInventoryFixtureItemExactSync(playerId, 100000, 1000)
+    const stonesBefore = getPlayerSync(playerId).freeVmoney
+    const degreeMissionId = Object.entries(require("../assets/mission_degree.json"))
+        .find(([, rows]) => String(rows[0][1] ?? "").startsWith("degree_equipment_lv5_get_"))?.[0]
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/equipment/upgrade",
+        payload: {
+            viewer_id: viewerId,
+            equipment_id: 4050030,
+            upgrade_count: 4,
+            use_stack: true,
+            api_count: 1,
+        },
+    })
+    assert.equal(response.statusCode, 200, response.body)
+
+    // 觉醒 4 次:任务 67 阶段 1/2(50+10 星导石)+ 任务 68 阶段 1(30 星导石)
+    assert.equal(missionProgressAt(playerId, 1, 67), 4, "觉醒计数任务 67 必须当场推进")
+    assert.equal(missionProgressAt(playerId, 1, 68), 1, "跨过 5 级后任务 68 进度必须当场推进")
+    assert.equal(
+        getPlayerSync(playerId).freeVmoney - stonesBefore,
+        90,
+        "任务 67 阶段 1/2(50+10)+ 任务 68 阶段 1(30)= 90 星导石",
+    )
+    if (degreeMissionId) {
+        assert.ok(
+            missionProgressAt(playerId, 5, degreeMissionId) >= 1,
+            "5 级装备称号进度必须当场推进",
+        )
+    }
+})

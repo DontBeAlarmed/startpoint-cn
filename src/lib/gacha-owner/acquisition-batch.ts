@@ -41,6 +41,8 @@ export interface PreparedGachaAcquisitionBatch {
     readonly compensationItemIds: readonly number[]
     /** persistFinalStates 之后才有效:本次批量是否产生了新入队角色 */
     readonly hadNewCharacter: () => boolean
+    /** persistFinalStates 之后才有效:本次批量是否产生了新装备种类 */
+    readonly hadNewEquipmentKind: () => boolean
 }
 
 function newCharacter(characterId: number, evaluationTime: Date): PlayerCharacter | null {
@@ -140,6 +142,7 @@ export function prepareGachaAcquisitionBatchSync(
     const evaluationTime = getRealNow()
     let persisted = false
     let grantedNewCharacter = false
+    let grantedNewEquipmentKind = false
     const assetAcquisition: RewardGrantAssetAcquisition = {
         grantCharacter(characterId, grantCompensation) {
             const key = String(characterId)
@@ -175,6 +178,7 @@ export function prepareGachaAcquisitionBatchSync(
         grantEquipment(equipmentId, amount) {
             const key = String(equipmentId)
             const current = equipmentState.get(key)
+            if (current === undefined) grantedNewEquipmentKind = true
             const equipment: PlayerEquipment = current === undefined
                 ? {
                     enhancementLevel: 0,
@@ -219,6 +223,10 @@ export function prepareGachaAcquisitionBatchSync(
         hadNewCharacter: () => {
             if (!persisted) throw new Error("Gacha acquisition batch has not been persisted yet")
             return grantedNewCharacter
+        },
+        hadNewEquipmentKind: () => {
+            if (!persisted) throw new Error("Gacha acquisition batch has not been persisted yet")
+            return grantedNewEquipmentKind
         },
     }
 }
