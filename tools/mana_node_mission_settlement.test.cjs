@@ -134,6 +134,25 @@ function nodeMissionProgress(playerId, missionId) {
     return row?.progress ?? 0
 }
 
+function degreeMissionProgress(playerId, missionId) {
+    const row = db.prepare(`
+        SELECT progress FROM players_category_missions
+        WHERE player_id = ? AND category = 5 AND id = ?
+    `).get(playerId, missionId)
+    return row?.progress ?? 0
+}
+
+// 按权威匹配条件取该角色的称号任务(cat5 condition type 44=好感/48=二板完成)
+function degreeMissionIdForCharacter(characterId, conditionType) {
+    const degree = require("../assets/mission_degree.json")
+    for (const [id, rows] of Object.entries(degree)) {
+        const row = rows[0]
+        if (String(row[3]) === String(conditionType)
+            && String(row[15]) === String(characterId)) return Number(id)
+    }
+    return null
+}
+
 function post(url, payload) {
     return routeApp.inject({
         method: "POST",
@@ -254,6 +273,39 @@ test("开二板当场结算任务95与任务37(对照组:既有开板全量结�
     )
 })
 
+test("板一学满授予信赖之证:当场结算任务39与好感称号(cat5 type44)", async () => {
+    const player = await createReachablePlayer()
+    const boardOneNodes = Object.keys(getCharacterManaNodesSync(1, 1)).map(Number)
+    seedBoardNodes(player.playerId, 1, boardOneNodes.slice(0, -1))
+    const lastNode = boardOneNodes.at(-1)
+    grantNodeCost(player.playerId, 1, [lastNode])
+    const favorMissionId = degreeMissionIdForCharacter(1, 44)
+    assert.ok(favorMissionId, "测试前提:角色 1 存在好感称号任务(type 44)")
+
+    const stonesBefore = getPlayerSync(player.playerId).freeVmoney
+    const response = await learnNodes(player.viewerId, 1, [lastNode])
+    assert.equal(response.statusCode, 200, response.body)
+
+    // 板一完成 + 基础等级帽已满足(Lv100)→ 信赖证授予(status 0→1)
+    assert.equal(nodeMissionProgress(player.playerId, 39), 1, "信赖证授予后任务 39 进度必须当场推进")
+    assert.equal(
+        getPlayerSync(player.playerId).freeVmoney - stonesBefore,
+        140,
+        "任务 37 阶段 1/5/15(3×30)+ 任务 39 阶段 1(50)= 140 星导石",
+    )
+    // 好感称号(Lv100=1 + 信赖证=1 → target 2)当场完成
+    assert.equal(degreeMissionProgress(player.playerId, favorMissionId), 2, "好感称号进度必须当场推进到 2")
+    const missionInfo = decode(response).data.mission_info ?? []
+    assert.ok(
+        missionInfo.some(entry => entry.mission_category_id === 1 && entry.mission_id === 39),
+        "learn 响应的 mission_info 必须包含任务 39",
+    )
+    assert.ok(
+        missionInfo.some(entry => entry.mission_category_id === 5 && entry.mission_id === favorMissionId),
+        "learn 响应的 mission_info 必须包含好感称号任务",
+    )
+})
+
 test("二板最后一个节点强化完成当场结算任务96并发放50星导石", async () => {
     const player = await createReachablePlayer()
     seedBoardOne(player.playerId)
@@ -277,14 +329,28 @@ test("二板最后一个节点强化完成当场结算任务96并发放50星导�
         41,
         "任务 37 进度为 23+18=41(未跨新阶段,不重复发放)",
     )
+    // 板二完成触发信赖证授予(板二无等级条件)→ 任务 39 当场推进;
+    // 二板完成称号(cat5 type 48)同事务当场结算
+    assert.equal(nodeMissionProgress(player.playerId, 39), 1, "信赖证授予后任务 39 进度必须当场推进")
+    const boardTwoFavorMissionId = degreeMissionIdForCharacter(1, 48)
+    assert.ok(boardTwoFavorMissionId, "测试前提:角色 1 存在二板完成称号任务(type 48)")
+    assert.equal(
+        degreeMissionProgress(player.playerId, boardTwoFavorMissionId),
+        1,
+        "二板完成称号进度必须当场推进到 1",
+    )
     assert.equal(
         getPlayerSync(player.playerId).freeVmoney - stonesAfterOpen,
-        80,
-        "跨任务 37 阶段 4(目标 30,进度 23→41)+ 任务 96 阶段 1(50)= 80 星导石",
+        130,
+        "跨任务 37 阶段 4(目标 30,进度 23→41)+ 任务 96 阶段 1(50)+ 任务 39 阶段 1(50)= 130 星导石",
     )
     const missionInfo = decode(response).data.mission_info ?? []
     assert.ok(
         missionInfo.some(entry => entry.mission_category_id === 1 && entry.mission_id === 96),
         "learn 响应的 mission_info 必须包含任务 96",
+    )
+    assert.ok(
+        missionInfo.some(entry => entry.mission_category_id === 1 && entry.mission_id === 39),
+        "learn 响应的 mission_info 必须包含任务 39",
     )
 })

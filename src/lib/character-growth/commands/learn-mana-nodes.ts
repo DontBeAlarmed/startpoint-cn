@@ -11,6 +11,7 @@ import { getServerTime } from "../../../utils"
 import { publishActiveMissionOwnerStateWithinTransaction } from "../../mission/active-publication-owner"
 import { settleMissionCategories } from "../../mission/settlement"
 import { getMissionCatalog } from "../../mission/mission-catalog"
+import { getDegreeMissionIdsForConditionTypes } from "../../mission/degree-candidates"
 import type { MissionSettlementResult } from "../../mission/settlement"
 import { recordSecondManaBoardCompletionMilestoneSync } from "../../../lib/player-history-milestones"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
@@ -206,13 +207,26 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
         // 同事务窄域当场结算,否则奖励被推迟到下次进关/任务页
         // (2026-10-01 时点审计发现 #2:learn 显式 null)。开板数
         // (manaboard_2nd_open_count)由 open_mana_board 的全量结算负责。
+        // 板完成同时触发信赖证授予(0→1),任务 39(累计获得信赖之证)与
+        // 该角色的好感/二板完成称号(cat5 condition 44/48,战斗 finish 白名单
+        // 不含 48)由同一窄域当场结算。
         const manaNodeMissionIds = [
             ...getMissionCatalog().getDefinitionsByPattern("total_released_mana_node_count"),
             ...getMissionCatalog().getDefinitionsByPattern("manaboard_2nd_complete_count"),
+            ...getMissionCatalog().getDefinitionsByPattern("total_obtained_bond_token_count"),
         ].map(definition => definition.missionId)
+        const bondDegreeMissionIds = getDegreeMissionIdsForConditionTypes(
+            [44, 48],
+            [command.characterId],
+        )
         const missionSettlement = settleMissionCategories(
             command.playerId,
-            [{ category: 1, missionIds: manaNodeMissionIds }],
+            [
+                { category: 1, missionIds: manaNodeMissionIds },
+                ...(bondDegreeMissionIds.length > 0
+                    ? [{ category: 5, missionIds: bondDegreeMissionIds }]
+                    : []),
+            ],
             command.evaluationTime,
         )
         finalizeLearnManaAwakePublicationWrites(

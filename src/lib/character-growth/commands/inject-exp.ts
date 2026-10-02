@@ -18,6 +18,7 @@ import {
 import { calculateCharacterExpAfter } from "../exp-calculation"
 import { settleMissionCategories } from "../../mission/settlement"
 import { getMissionCatalog } from "../../mission/mission-catalog"
+import { getDegreeMissionIdsForConditionTypes } from "../../mission/degree-candidates"
 import type { MissionSettlementResult } from "../../mission/settlement"
 import { mutationContent } from "../node-command-support"
 
@@ -96,14 +97,25 @@ export function executeInjectCharacterExp(command: InjectCharacterExpCommand): I
         // 角色等级是状态派生事实(无事件),注入跨过等级阈值后必须在同事务
         // 定向结算角色等级任务(cat1)与等级称号(cat5),否则任务奖励被推迟到
         // 下次进关/任务页才补发(2026-10-01 用户实测「进关才提示完成」)。
-        const characterLevelMissionIds = getMissionCatalog()
-            .getDefinitionsByPattern("character_level")
-            .map(definition => definition.missionId)
+        // 注入还可能改变:Lv80 角色数(任务 36 族)、信赖证授予(0→1,
+        // 任务 39 族)及其好感称号(cat5 condition 44)。
+        const injectMissionIds = [
+            ...getMissionCatalog().getDefinitionsByPattern("character_level"),
+            ...getMissionCatalog().getDefinitionsByPattern("character_80_level"),
+            ...getMissionCatalog().getDefinitionsByPattern("total_obtained_bond_token_count"),
+        ].map(definition => definition.missionId)
+        const favorDegreeMissionIds = getDegreeMissionIdsForConditionTypes(
+            [44],
+            [command.characterId],
+        )
         const missionSettlement = settleMissionCategories(
             command.playerId,
             [
-                { category: 1, missionIds: characterLevelMissionIds },
-                { category: 5, missionIds: CHARACTER_LEVEL_DEGREE_IDS },
+                { category: 1, missionIds: injectMissionIds },
+                {
+                    category: 5,
+                    missionIds: [...CHARACTER_LEVEL_DEGREE_IDS, ...favorDegreeMissionIds],
+                },
             ],
             command.evaluationTime,
         )

@@ -45,7 +45,12 @@ const {
     getPlayerSync,
     updatePlayerSync,
 } = require("../src/data/domains/player")
-const { insertDefaultPlayerCharacterSync } = require("../src/data/domains/character")
+const {
+    insertDefaultPlayerCharacterSync,
+    insertPlayerCharacterManaNodesSync,
+    updatePlayerCharacterSync,
+} = require("../src/data/domains/character")
+const { getCharacterGrowthContent } = require("../src/lib/character-growth-content")
 const { insertSessionWithToken } = require("../src/data/domains/session")
 const { SessionType } = require("../src/data/types")
 
@@ -174,6 +179,48 @@ async function main() {
             getPlayerSync(playerId).freeVmoney - vmoneyAfter,
             0,
             "未跨新阶段不得重复发放阶段奖励",
+        )
+
+        // 羁绊之证场景:板一节点全部学完 + 注入跨基础等级帽(37241)且达 Lv80
+        // → 信赖证授予(status 0→1)必须在注入响应内当场结算任务 39、
+        // Lv80 角色数任务(36)与该角色好感称号(cat5 type 44)
+        const bondPlayer = await createPlayer()
+        insertDefaultPlayerCharacterSync(bondPlayer.playerId, CHARACTER_ID)
+        // 界限突破 4 档:经验帽抬到 caps[3][4]=125223,否则注入被钳回基础帽
+        updatePlayerCharacterSync(bondPlayer.playerId, CHARACTER_ID, { overLimitStep: 4 })
+        updatePlayerSync({ id: bondPlayer.playerId, expPool: 300000 })
+        const boardNodes = getCharacterGrowthContent().getManaBoardNodes(CHARACTER_ID, 1)
+        insertPlayerCharacterManaNodesSync(
+            bondPlayer.playerId,
+            CHARACTER_ID,
+            Object.keys(boardNodes).map(Number),
+        )
+        const vmoneyBondBefore = getPlayerSync(bondPlayer.playerId).freeVmoney
+        const injectBond = await post(fastify, "/api/index.php/expod/inject_exp", {
+            viewer_id: bondPlayer.viewerId,
+            character_id: CHARACTER_ID,
+            exp: 125223, // caps[3][4]:3 星角色 Lv80 阈值(基础 60 级),同时跨过基础帽 37241
+        })
+        assert.equal(injectBond.statusCode, 200, injectBond.body)
+        assert.equal(
+            missionProgress(bondPlayer.playerId, 9),
+            80,
+            "角色等级任务进度必须当场推进到 Lv80(3 星上限)",
+        )
+        assert.equal(
+            missionProgress(bondPlayer.playerId, 36),
+            1,
+            "Lv80 角色数任务(36)进度必须当场推进到 1",
+        )
+        assert.equal(
+            missionProgress(bondPlayer.playerId, 39),
+            1,
+            "信赖证授予后任务 39 进度必须当场推进到 1",
+        )
+        assert.equal(
+            getPlayerSync(bondPlayer.playerId).freeVmoney - vmoneyBondBefore,
+            200,
+            "任务 9 七档 70 + Lv80 档 50 + 任务 36 阶段 1(30)+ 任务 39 阶段 1(50)= 200 星导石",
         )
     } finally {
         await fastify.close()
