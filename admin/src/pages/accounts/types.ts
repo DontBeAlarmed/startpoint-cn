@@ -12,6 +12,8 @@ export interface PlayerBrief {
     lastLoginTime: string
     isDefault: boolean
     isActive: boolean
+    // 只读投影: 游戏内收藏编队第一个非空角色位（存档子卡喜爱角色头像）; null = 无
+    favoriteCharacterId: number | null
 }
 
 export interface AccountRow {

@@ -1,24 +1,17 @@
-/* accounts page (approved mockup accounts-v2) + accounts mobile view */
+/* accounts page: nested account/save cards (approved mockup accounts-nested-saves)
+   + accounts mobile view (same nested structure, mobile-first) */
 .admin-account-mobile-list,
-.admin-mobile-list-content,
-.admin-mobile-device-list {
+.admin-mobile-list-content {
   width: 100%;
   min-width: 0;
 }
 
-.admin-mobile-view-toolbar,
 .admin-mobile-list-heading,
-.admin-mobile-actions,
-.admin-mobile-inline-editor {
+.admin-mobile-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-}
-
-.admin-mobile-view-toolbar {
-  justify-content: space-between;
-  margin-bottom: 12px;
 }
 
 /* mobile account list reads like a table: full-bleed rows separated by hairlines,
@@ -49,36 +42,14 @@
   margin-bottom: 4px;
 }
 
-/* heading left group (F4)：账号 #N + 设备名 pill（单设备账号上移，维护者 2026-09-29 指定）/
-   当前存档徽章 + 存档名 归拢在左侧，右侧计数（N 个存档 / Rank N）不被挤压 */
+/* heading left group: 账号 #N + adminNote 备注（有则显, 灰字省略）归拢左侧,
+   右侧 存档列表▾/删除 操作不被挤压 */
 .admin-mobile-heading-main {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 2px 8px;
   min-width: 0;
-}
-
-/* 存档面板头（ADD-3）：账号编号 + 备注名归拢为左侧一组（维护者 2026-09-29 去掉「· 存档列表」），
-   右侧新建存档按钮不被挤压; 备注过长省略号截断, 整行不折行 */
-.admin-mobile-view-toolbar {
-  flex-wrap: nowrap;
-}
-
-.admin-mobile-toolbar-main {
-  display: inline-flex;
-  flex-wrap: nowrap;
-  align-items: baseline;
-  gap: 2px 8px;
-  min-width: 0;
-  flex: 1 1 auto;
-  overflow: hidden;
-}
-
-.admin-mobile-toolbar-main .ant-typography-secondary {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .admin-mobile-detail-list {
@@ -97,6 +68,20 @@
   color: var(--ink-soft);
 }
 
+/* kv 值壳（账号页嵌套稿）: 恢复正文色, 行首标签仍吃上面的软色; 徽章自带上色不受影响 */
+.admin-mobile-detail-list .acc-kv-value {
+  color: var(--ink);
+}
+
+/* kv 值: 名称/徽章 或 设备 pill 组, 可换行不撑破 */
+.acc-kv-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+}
+
 .admin-mobile-actions {
   margin-top: 10px;
   /* 维护者 2026-09-29: 操作键自适应等分铺满一排, 不折行 (覆盖共享规则的 wrap) */
@@ -113,24 +98,162 @@
   min-height: 36px;
 }
 
-.admin-mobile-device-list {
+/* ── 账号卡 + 内嵌存档子卡 (mockup accounts-nested-saves) ──────────────────── */
+
+.admin-acc-list {
+  display: grid;
+  gap: 16px;
+}
+
+/* 账号卡(父): th-bg 抬升面, 与 Card 面板区分层 */
+.acc-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  background: var(--th-bg);
+}
+
+.acc-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-bottom: 10px;
+}
+
+.acc-id {
+  font-weight: 800;
+  /* 移动 13.5 → 桌面 15 (mockup 两面板) */
+  font-size: 13.5px;
+}
+
+.acc-note {
+  color: var(--ink-soft);
+  font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.acc-actions {
+  margin-left: auto;
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+
+/* kv 行: 84px 标签列 (mockup .kv) */
+.acc-kv {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 4px 10px;
+  font-size: 12.5px;
+}
+
+.acc-k {
+  color: var(--ink-soft);
+}
+
+.acc-v {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+}
+
+.acc-kv-name {
+  font-weight: 700;
+}
+
+.acc-devices {
+  gap: 4px;
+}
+
+/* 嵌套区: 点「存档列表 ▾」在账号卡内部展开/收起 (不再是独立面板) */
+.acc-save-list {
+  display: grid;
+  gap: 10px;
   margin-top: 10px;
 }
 
-.admin-mobile-inline-editor .ant-input {
-  min-width: min(100%, 180px);
-  flex: 1 1 180px;
+.acc-save-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
 }
 
-/* mobile inline save section: expands below the always-visible account list
-   (same semantics as the desktop inline panel — no drill-in, no back button) */
-.admin-mobile-save-panel {
-  padding: 14px;
-  border-block-start: 1px solid var(--line);
+/* 存档子卡: stat-bg 凹陷面, 比账号卡再深一层 (mockup .save-sub panel-sub) */
+.save-sub {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: var(--stat-bg);
+}
+
+.save-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.save-name {
+  font-weight: 700;
+  font-size: 13.5px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.save-meta {
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+
+/* 桌面子卡操作右对齐同一行; 放不下时自然换行仍靠右 */
+.save-ops {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* 喜爱角色头像 (mockup .av-img): 首字占位打底, character_avatar 立绘铺满,
+   加载失败由 onError 加 broken 类隐藏 — 同 TimeControl admin-char-avatar 惯例。
+   移动 40×40 → 桌面 ≥768 44×44, 圆角 8px。 */
+.av-img {
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--water-soft);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.av-img-picture {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+.av-img-picture-broken {
+  display: none;
 }
 
 /* accounts page (approved mockup accounts-v2): panel-head star tick — the 账号管理 card
-   and the per-account 存档列表 card both read as game-console panels */
+   reads as a game-console panel */
 .admin-accounts-card .ant-card-head-title {
   display: flex;
   align-items: center;
@@ -146,21 +269,6 @@
   clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
 }
 
-/* accounts tables read fully centered (mockup .tl-table th/td) — same scoped pattern as
-   .admin-player-tabs; every other admin table keeps its left-align reading semantics */
-.admin-accounts-table .ant-table th,
-.admin-accounts-table .ant-table td {
-  text-align: center;
-}
-
-/* accounts op cells: center the row actions (mockup .row-actions is justify-content:center) —
-   scoped so the shared .admin-action-row on Mail/News/Gifts keeps its own layout; nowrap also
-   keeps the 导出 loading state from wrapping onto a second line */
-.admin-accounts-table .admin-action-row {
-  justify-content: center;
-  flex-wrap: nowrap;
-}
-
 /* accounts: 存档名 links into 玩家详情 with the water data-link voice (mockup .save-link) */
 .admin-save-link {
   color: var(--water);
@@ -171,9 +279,8 @@
 }
 
 /* accounts: merged device pill — 设备识别名 + ✎ live in ONE elevated chip (mockup .dev-edit);
-   shared by the desktop 绑定设备 cell, the mobile title row (single-device accounts) and the
-   mobile multi-device list. Mobile-first: the pill is a compact unbreakable chip at every
-   width and never stretches its container. */
+   shared by the desktop 账号卡 kv 行 and the mobile kv 绑定设备值. Mobile-first: the pill is a
+   compact unbreakable chip at every width and never stretches its container. */
 .admin-dev-edit {
   display: inline-flex;
   max-width: 100%;
@@ -210,4 +317,20 @@
 .admin-dev-edit .ant-btn:hover,
 .admin-dev-edit .ant-btn:focus-visible {
   color: var(--ink);
+}
+
+/* 桌面 ≥768 微调: 账号卡/头像升到 mockup 桌面尺寸, 卡距略收 */
+@media (min-width: 768px) {
+  .acc-card {
+    padding: 14px;
+  }
+
+  .acc-id {
+    font-size: 15px;
+  }
+
+  .av-img {
+    width: 44px;
+    height: 44px;
+  }
 }

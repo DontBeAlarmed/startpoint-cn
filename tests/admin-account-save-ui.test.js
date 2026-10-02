@@ -8,6 +8,10 @@ const playerDetail = fs.readFileSync("admin/src/pages/PlayerDetail.tsx", "utf8")
 const serverApi = fs.readFileSync("src/routes/web_api/server.ts", "utf8")
 const adminPlayerDomain = fs.readFileSync("src/data/domains/admin-player.ts", "utf8")
 const accountTypes = fs.readFileSync("admin/src/pages/accounts/types.ts", "utf8")
+const profileFavorite = fs.readFileSync("src/lib/profileFavorite.ts", "utf8")
+const favoriteAvatarPath = path.join("admin/src/pages/accounts/FavoriteAvatar.tsx")
+assert.equal(fs.existsSync(favoriteAvatarPath), true, "存档子卡喜爱角色头像应为共享组件")
+const favoriteAvatar = fs.readFileSync(favoriteAvatarPath, "utf8")
 const mobileViewPath = path.join("admin/src/pages/accounts/AccountsMobileView.tsx")
 assert.equal(fs.existsSync(mobileViewPath), true, "移动端账号页应拆分为独立纵向列表组件")
 const mobileView = fs.readFileSync(mobileViewPath, "utf8")
@@ -39,14 +43,38 @@ assert.match(mobileView, /className="admin-dev-edit admin-dev-edit-editing"/)
 assert.doesNotMatch(mobileView, /role="button"/)
 assert.doesNotMatch(accounts, /row\.degreeId \|\| 1/)
 
-// 存档列表 is an inline panel below the always-visible account table (mockup accounts-v2-review),
-// not a whole-card view switch with a back entry
+// 存档列表 is no longer an inline panel below a table: task-38 (mockup accounts-nested-saves)
+// turns each account into an acc-card and the save list expands INSIDE it as save-sub cards
 assert.match(accounts, /存档列表/)
 assert.doesNotMatch(accounts, /管理存档/)
 assert.doesNotMatch(accounts, /返回账号列表/)
+assert.doesNotMatch(accounts, /<Table/, "桌面账号管理应废弃 Table 改为账号卡列表")
+assert.doesNotMatch(accounts, /admin-accounts-table/)
+assert.doesNotMatch(mobileView, /admin-mobile-save-panel/, "移动端独立存档面板应废弃, 存档子卡嵌在账号卡内部")
+assert.match(accounts, /className="acc-card"/)
+assert.match(accounts, /className="save-sub"/)
+assert.match(mobileView, /className="save-sub admin-mobile-list-item-clickable"/)
+assert.match(accounts, /aria-expanded=\{expanded\}/)
+assert.match(mobileView, /aria-expanded=\{expanded\}/)
 assert.match(accounts, /scrollIntoView\(\{ behavior: "smooth", block: "start" \}\)/)
 assert.match(accounts, /toggleSavePanel/)
-assert.match(accounts, /admin-badge-info">\{savePlayers\.length\} 个存档</)
+assert.match(accounts, /admin-badge-info">\{account\.players\.length\} 个存档</)
+
+// 账号卡/存档子卡删除 Popconfirm 文案原样锁（桌面 + 移动）
+assert.match(accounts, /删除账号 \$\{account\.id\} 及所有存档？/)
+assert.match(accounts, /删除存档 \$\{player\.id\}？/)
+assert.match(mobileView, /删除账号 \$\{account\.id\} 及所有存档？/)
+assert.match(mobileView, /删除存档 \$\{player\.id\}？/)
+
+// 喜爱角色头像: /api/server/accounts 只读投影 favoriteCharacterId ← 收藏编队读取器轻量 wrapper;
+// 子卡头像走既有 character_avatar 端点, onError 回退首字占位
+assert.match(accountTypes, /favoriteCharacterId: number \| null/)
+assert.match(profileFavorite, /export function getFavoriteCharacterIdSync/)
+assert.match(serverApi, /favoriteCharacterId: getFavoriteCharacterIdSync\(player\.id\)/)
+assert.match(accounts, /FavoriteAvatar/)
+assert.match(mobileView, /FavoriteAvatar/)
+assert.match(favoriteAvatar, /\/api\/content\/character_avatar\/\$\{characterId\}/)
+assert.match(favoriteAvatar, /av-img-picture-broken/)
 
 const accountMutationCount = (accounts.match(/= useMutation\(\{/g) || []).length
 const accountMutationErrorCount = (accounts.match(/onError:/g) || []).length

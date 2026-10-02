@@ -76,6 +76,14 @@ export function getFavoritePartySelectionSync(
     }
 }
 
+// 管理端只读投影（task-38 账号卡内嵌存档子卡）: 存档喜爱角色 = 收藏编队第一个非空角色位。
+// 零写路径; fallbackLeaderCharacterId 传 playerId（仅兜底占位, 非真实角色 id —
+// 管理端头像 404 时由前端回退首字占位）。
+export function getFavoriteCharacterIdSync(playerId: number): number | null {
+    const selection = getFavoritePartySelectionSync(playerId, playerId)
+    return selection.characterIds.find(id => id !== null) ?? null
+}
+
 export function getFavoritePartyGroupListSync(
     playerId: number,
     fallbackLeaderCharacterId: number,

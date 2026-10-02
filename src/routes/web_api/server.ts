@@ -18,6 +18,7 @@ import { buildShortUpCharacterGachaTimeline } from "../../lib/admin-clairvoyance
 import { buildAdminActivityTimeline } from "../../lib/admin-activity";
 import { buildAdminContentStatus } from "../../lib/admin-content-status";
 import { getRankDegree } from "../../lib/stamina";
+import { getFavoriteCharacterIdSync } from "../../lib/profileFavorite";
 import { getContentSnapshot } from "../../content/runtime/content-snapshot";
 import type { CnRuntimeConfig } from "../../runtime/config";
 import { DEFAULT_SERVER_PORTS } from "../../runtime/release-contract";
@@ -267,6 +268,8 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
                         lastLoginTime: player.lastLoginTime.toISOString(),
                         isDefault: defaultPid === player.id,
                         isActive: activePlayerId === player.id,
+                        // 只读投影: 游戏内收藏编队主角色（存档子卡头像, task-38）
+                        favoriteCharacterId: getFavoriteCharacterIdSync(player.id),
                     }
                 }),
                 playerIds
