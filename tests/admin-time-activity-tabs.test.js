@@ -74,4 +74,13 @@ assert(source.includes('{ title: "卡池", dataIndex: "name"'), "卡池时间线
 assert(source.includes('title: "上线 / 下线"'), "卡池时间线第二列原样保留")
 assert(source.includes('{ title: "UP 角色", render: (_: unknown, row) => renderRateUpCharacters(row.rateUpCharacters) }'), "卡池时间线第三列原样保留")
 
+// ── UP 角色真实头像：CDN 归档端点 + onError 首字占位回退 ─────────────────
+assert(source.includes("/api/content/character_avatar/"), "UP 角色头像应接 CDN 归档端点")
+assert(source.includes('loading="lazy"'), "头像图应懒加载")
+assert(source.includes("admin-char-avatar-image"), "头像图应使用独立类名（铺满头像块）")
+assert(source.includes("admin-char-avatar-image-broken"), "头像加载失败应加 broken 类隐藏图片")
+assert(source.includes("onError="), "头像图应有 onError 回退")
+assert(source.includes("character.name.slice(0, 1)"), "首字占位应保留为加载失败回退层")
+assert(!/max-width: \d/.test(source), "头像改造不得引入 max-width 魔法值")
+
 console.log("admin-time-activity-tabs tests passed")

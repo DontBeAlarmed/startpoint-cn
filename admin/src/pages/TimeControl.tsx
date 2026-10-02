@@ -314,8 +314,8 @@ function renderActivityCard(activity: AdminActivityEvent, upcoming: boolean, now
 }
 
 // UP 角色头像条目（维护者 2026-09-30 规格：头像块占两行 | 右上 id 灰 / 右下 角色名）。
-// master 数据无头像图源（character.json 无 icon 字段，角色图在游戏资产包）——
-// 本期用角色名首字占位（水色系），真实头像属游戏资产提取专项。
+// 头像走服务端 CDN 归档端点（character_avatar，immutable 内容寻址，日缓存）；
+// 真实立绘覆盖缺失（助手角色等）时 onError 隐藏图片，露出底层首字占位。
 function renderRateUpCharacters(characters: ClairvoyanceCharacter[]) {
     return (
         <div className="admin-char-cards">
@@ -323,6 +323,15 @@ function renderRateUpCharacters(characters: ClairvoyanceCharacter[]) {
                 <div key={character.id} className="admin-char-card">
                     <span className="admin-char-avatar" aria-hidden>
                         {character.name.slice(0, 1)}
+                        <img
+                            className="admin-char-avatar-image"
+                            src={`/api/content/character_avatar/${character.id}`}
+                            alt=""
+                            loading="lazy"
+                            onError={event => {
+                                event.currentTarget.classList.add("admin-char-avatar-image-broken")
+                            }}
+                        />
                     </span>
                     <span className="admin-char-meta">
                         <span className="admin-char-id">#{character.id}</span>
