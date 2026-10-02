@@ -12,6 +12,8 @@ import {
     validateEvaluationTime,
     validateGrowthPlayerId,
 } from "../mutation-support"
+import type { MissionSettlementResult } from "../../mission/settlement"
+import { settleOverLimitMissions } from "./over-limit"
 
 export interface BulkOverLimitCommand {
     readonly playerId: number
@@ -22,6 +24,7 @@ export interface BulkOverLimitResult {
     readonly command: "bulk_over_limit"
     readonly characters: readonly ReturnType<typeof observedCore>[]
     readonly projectionCharacters: Readonly<Record<string, PlayerCharacterProjectionData>>
+    readonly missionSettlement: MissionSettlementResult | null
     readonly replayed: false
 }
 
@@ -54,6 +57,10 @@ export function executeBulkOverLimit(command: BulkOverLimitCommand): BulkOverLim
             })
         }
         const updateTime = updateCharacterGrowthRowsSync(command.playerId, updates)
+        // 有实际突破才结算:无写入时事实未变化,零候选空转无意义
+        const missionSettlement = updates.length > 0
+            ? settleOverLimitMissions(command.playerId, command.evaluationTime)
+            : null
         const characters = updates.map(update => observedCore(
             context.character(update.characterId)!,
             { overLimitStep: update.overLimitStep, stack: update.stack },
@@ -68,6 +75,7 @@ export function executeBulkOverLimit(command: BulkOverLimitCommand): BulkOverLim
                 }
                 return [String(character.characterId), { ...projection, updateTime }]
             })),
+            missionSettlement,
             replayed: false,
         } as BulkOverLimitResult
     })()
