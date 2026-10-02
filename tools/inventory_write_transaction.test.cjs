@@ -507,3 +507,34 @@ test("equipment upgrade crossing level 5 settles five-level mission and degree a
         )
     }
 })
+
+test("item sale crossing mana addition stage settles mission 40 at once", async () => {
+    const { playerId, viewerId } = await createPlayer("item-sale-mana-mission")
+    // 物品 4 单价 150:卖 70 个 = 10500 玛纳,跨过任务 40 阶段 1(目标 10000)
+    setInventoryFixtureItemExactSync(playerId, 4, 70)
+    const stonesBefore = getPlayerSync(playerId).freeVmoney
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/item/sell",
+        payload: { viewer_id: viewerId, item_id: 4, sell_number: 70 },
+    })
+    assert.equal(response.statusCode, 200, response.body)
+
+    assert.equal(
+        missionProgressAt(playerId, 1, 40),
+        10500,
+        "卖出道具后任务 40(累计获得玛纳)进度必须当场推进",
+    )
+    assert.equal(
+        getPlayerSync(playerId).freeVmoney - stonesBefore,
+        5,
+        "任务 40 阶段 1 奖励(5 星导石)必须当场发放",
+    )
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
+    const missionInfo = payload.data.mission_info ?? []
+    assert.ok(
+        missionInfo.some(entry => entry.mission_category_id === 1 && entry.mission_id === 40),
+        "卖出响应的 mission_info 必须包含任务 40",
+    )
+})
