@@ -208,9 +208,10 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
         // (2026-10-01 时点审计发现 #2:learn 显式 null)。开板数
         // (manaboard_2nd_open_count)由 open_mana_board 的全量结算负责。
         // 板完成同时触发信赖证授予(0→1),任务 39(累计获得信赖之证)与
-        // 该角色的好感/二板完成称号(cat5 condition 44/48,战斗 finish 白名单
-        // 不含 48)由同一窄域当场结算。
-        const manaNodeMissionIds = [
+        // 该角色的好感/二板完成称号(cat5 condition 44/48)随之推进——44 虽在
+        // 战斗 finish 白名单内但只覆盖参战角色,48 完全不在白名单,授予动作
+        // 又都发生在战斗外,必须在此当场结算。
+        const learnMissionIds = [
             ...getMissionCatalog().getDefinitionsByPattern("total_released_mana_node_count"),
             ...getMissionCatalog().getDefinitionsByPattern("manaboard_2nd_complete_count"),
             ...getMissionCatalog().getDefinitionsByPattern("total_obtained_bond_token_count"),
@@ -222,7 +223,7 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
         const missionSettlement = settleMissionCategories(
             command.playerId,
             [
-                { category: 1, missionIds: manaNodeMissionIds },
+                { category: 1, missionIds: learnMissionIds },
                 ...(bondDegreeMissionIds.length > 0
                     ? [{ category: 5, missionIds: bondDegreeMissionIds }]
                     : []),

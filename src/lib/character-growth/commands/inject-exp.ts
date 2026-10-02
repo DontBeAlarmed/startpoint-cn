@@ -98,7 +98,8 @@ export function executeInjectCharacterExp(command: InjectCharacterExpCommand): I
         // 定向结算角色等级任务(cat1)与等级称号(cat5),否则任务奖励被推迟到
         // 下次进关/任务页才补发(2026-10-01 用户实测「进关才提示完成」)。
         // 注入还可能改变:Lv80 角色数(任务 36 族)、信赖证授予(0→1,
-        // 任务 39 族)及其好感称号(cat5 condition 44)。
+        // 任务 39 族)及其好感称号(cat5 condition 44 的信赖证分量与 Lv100
+        // 分量都可能在注入中跨越)。
         const injectMissionIds = [
             ...getMissionCatalog().getDefinitionsByPattern("character_level"),
             ...getMissionCatalog().getDefinitionsByPattern("character_80_level"),

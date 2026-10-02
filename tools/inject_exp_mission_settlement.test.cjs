@@ -222,6 +222,16 @@ async function main() {
             200,
             "任务 9 七档 70 + Lv80 档 50 + 任务 36 阶段 1(30)+ 任务 39 阶段 1(50)= 200 星导石",
         )
+        // 注入响应当场携带完成信息(mission_info),不依赖进关/轮询
+        const bondMissionInfo = decode(injectBond).data.mission_info ?? []
+        assert.ok(
+            bondMissionInfo.some(entry => entry.mission_category_id === 1 && entry.mission_id === 36),
+            "注入响应的 mission_info 必须包含 Lv80 角色数任务",
+        )
+        assert.ok(
+            bondMissionInfo.some(entry => entry.mission_category_id === 1 && entry.mission_id === 39),
+            "注入响应的 mission_info 必须包含任务 39",
+        )
     } finally {
         await fastify.close()
         cleanup()

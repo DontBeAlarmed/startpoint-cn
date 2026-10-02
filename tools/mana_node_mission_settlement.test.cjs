@@ -63,6 +63,7 @@ const manaRoutes = require("../src/routes/api/character/mana").default
 const bondRoutes = require("../src/routes/api/character/bond").default
 const { registerCnMsgpackOnSend } = require("../src/routes/cn/msgpack")
 const { setInventoryFixtureItemExactSync } = require("./helpers/inventory-fixture.cjs")
+const bundledDegreeTable = require("../assets/mission_degree.json")
 
 initializeDatabase()
 db = getDb()
@@ -142,10 +143,11 @@ function degreeMissionProgress(playerId, missionId) {
     return row?.progress ?? 0
 }
 
-// 按权威匹配条件取该角色的称号任务(cat5 condition type 44=好感/48=二板完成)
+// 按权威匹配条件取该角色的称号任务(cat5 condition type 44=好感/48=二板完成,
+// 与 degree-context-requirements 的 getSpecificCharacterBondId /
+// getSecondManaBoardCharacterId 同列同义)
 function degreeMissionIdForCharacter(characterId, conditionType) {
-    const degree = require("../assets/mission_degree.json")
-    for (const [id, rows] of Object.entries(degree)) {
+    for (const [id, rows] of Object.entries(bundledDegreeTable)) {
         const row = rows[0]
         if (String(row[3]) === String(conditionType)
             && String(row[15]) === String(characterId)) return Number(id)
@@ -303,6 +305,14 @@ test("板一学满授予信赖之证:当场结算任务39与好感称号(cat5 ty
     assert.ok(
         missionInfo.some(entry => entry.mission_category_id === 5 && entry.mission_id === favorMissionId),
         "learn 响应的 mission_info 必须包含好感称号任务",
+    )
+    // 窄域契约:板二相关事实未变化,不得被板一的 learn 代结算
+    assert.equal(nodeMissionProgress(player.playerId, 96), 0, "板二未动,任务 96 进度必须保持 0")
+    const boardTwoFavorMissionId = degreeMissionIdForCharacter(1, 48)
+    assert.equal(
+        degreeMissionProgress(player.playerId, boardTwoFavorMissionId),
+        0,
+        "板二未动,二板完成称号进度必须保持 0",
     )
 })
 
