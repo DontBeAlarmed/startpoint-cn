@@ -13,7 +13,7 @@ import {
     validateGrowthPlayerId,
 } from "../mutation-support"
 import type { MissionSettlementResult } from "../../mission/settlement"
-import { settleOverLimitMissions } from "./over-limit"
+import { settleOverLimitMissions } from "../over-limit-mission-settlement"
 
 export interface BulkOverLimitCommand {
     readonly playerId: number
@@ -57,7 +57,7 @@ export function executeBulkOverLimit(command: BulkOverLimitCommand): BulkOverLim
             })
         }
         const updateTime = updateCharacterGrowthRowsSync(command.playerId, updates)
-        // 有实际突破才结算:无写入时事实未变化,零候选空转无意义
+        // 有实际突破才结算:无写入时事实不可能变化,评估必然无变化
         const missionSettlement = updates.length > 0
             ? settleOverLimitMissions(command.playerId, command.evaluationTime)
             : null

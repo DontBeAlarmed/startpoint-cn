@@ -4,7 +4,7 @@
 // 任务(各角色 overLimitStep 求和现算),突破的瞬间就是事实产生时点——
 // over_limit 命令必须在同事务内窄域结算,否则奖励被推迟到下次进关/任务页。
 // 称号族(cat5 degree_overlimit_growth_,4000/4010/4020,目标 10/350/1000)
-// 同一事实时点,一并当场结算;战斗 finish 的 degree 白名单不含状态族。
+// 同一事实时点;condition 9 不在战斗 finish 的 degree 结算白名单内。
 
 "use strict"
 
@@ -207,6 +207,12 @@ test("批量界限突破当场结算任务38多阶段与突破称号族(cat5)", 
     assert.ok(
         missionInfo.some(entry => entry.mission_category_id === 5 && entry.mission_id === degreeSmall),
         "bulk_over_limit 响应的 mission_info 必须包含突破称号",
+    )
+    // 跨过称号阶段时,响应当场携带 degree_list(称号发布),不依赖任务页
+    const degreeList = decode(response).data.degree_list ?? []
+    assert.ok(
+        degreeList.some(entry => entry.degree_id === degreeSmall),
+        "bulk_over_limit 响应的 degree_list 必须包含突破称号",
     )
 })
 

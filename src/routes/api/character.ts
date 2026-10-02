@@ -20,7 +20,7 @@ import { getMailArrivedSync } from "../../lib/mail-notification";
 import { canClaimTownStoryCharacter } from "../../lib/story-join-character";
 import { getRealNow } from "../../runtime/time/game-time";
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
-import { projectMissionSettlementFragment } from "../../lib/mission/response-fragment"
+import { composeMissionSettlementResponse, projectMissionSettlementFragment } from "../../lib/mission/response-fragment"
 import { projectCharacterPatch } from "../../lib/common-response/entities";
 import {
     FULL_CHARACTER_GROWTH_FIELDS,
@@ -194,27 +194,32 @@ const routes = async (fastify: FastifyInstance) => {
             })
             const character = getPlayerCharacterSync(playerId, body.character_id)!
             reply.header("content-type", "application/x-msgpack")
+            const responseData: Record<string, unknown> = {
+                ...mergeCommonResponseFragments([{
+                    character_list: [...projectCharacterGrowthIncrement({
+                        after: result.after,
+                        changedNodeIds: [],
+                    }, {
+                        character,
+                        fields: OVER_LIMIT_CHARACTER_GROWTH_FIELDS,
+                    }).character_list].map(entry => projectCharacterPatch(entry)),
+                    item_list: (result.itemId === undefined
+                        ? {}
+                        : { [result.itemId]: result.itemCount }) as Record<string, number>,
+                    mail_arrived: getMailArrivedSync(playerId),
+                }]),
+            }
+            if (result.missionSettlement !== null) {
+                // 突破跨过任务/称号阶段时,完成与奖励在 over_limit 响应内当场发布
+                composeMissionSettlementResponse(
+                    responseData,
+                    projectMissionSettlementFragment(result.missionSettlement),
+                    viewerId,
+                )
+            }
             return reply.status(200).send({
                 data_headers: generateDataHeaders({ viewer_id: viewerId }),
-                data: mergeCommonResponseFragments([
-                    {
-                        character_list: [...projectCharacterGrowthIncrement({
-                            after: result.after,
-                            changedNodeIds: [],
-                        }, {
-                            character,
-                            fields: OVER_LIMIT_CHARACTER_GROWTH_FIELDS,
-                        }).character_list].map(entry => projectCharacterPatch(entry)),
-                        item_list: (result.itemId === undefined
-                            ? {}
-                            : { [result.itemId]: result.itemCount }) as Record<string, number>,
-                        mail_arrived: getMailArrivedSync(playerId),
-                    },
-                    // 突破跨过任务阶段时,完成/奖励在 over_limit 响应内当场发布
-                    ...(result.missionSettlement !== null
-                        ? [projectMissionSettlementFragment(result.missionSettlement).common]
-                        : []),
-                ]),
+                data: responseData,
             })
         } catch (error) {
             return growthFailure(reply, error)
@@ -251,18 +256,23 @@ const routes = async (fastify: FastifyInstance) => {
             })
 
             reply.header("content-type", "application/x-msgpack")
+            const responseData: Record<string, unknown> = {
+                ...mergeCommonResponseFragments([{
+                    character_list: characterList.map(entry => projectCharacterPatch(entry)),
+                    mail_arrived: getMailArrivedSync(playerId),
+                }]),
+            }
+            if (result.missionSettlement !== null) {
+                // 突破跨过任务/称号阶段时,完成与奖励在 bulk_over_limit 响应内当场发布
+                composeMissionSettlementResponse(
+                    responseData,
+                    projectMissionSettlementFragment(result.missionSettlement),
+                    viewerId,
+                )
+            }
             return reply.status(200).send({
                 data_headers: generateDataHeaders({ viewer_id: viewerId }),
-                data: mergeCommonResponseFragments([
-                    {
-                        character_list: characterList.map(entry => projectCharacterPatch(entry)),
-                        mail_arrived: getMailArrivedSync(playerId),
-                    },
-                    // 批量突破跨过任务阶段时,完成/奖励在响应内当场发布
-                    ...(result.missionSettlement !== null
-                        ? [projectMissionSettlementFragment(result.missionSettlement).common]
-                        : []),
-                ]),
+                data: responseData,
             })
         } catch (error) {
             return growthFailure(reply, error)
