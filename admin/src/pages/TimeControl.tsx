@@ -6,6 +6,9 @@ import dayjs, { type Dayjs } from "dayjs"
 import { apiGet } from "../api/client"
 import { AdminPage } from "../components/AdminPage"
 
+// 触屏设备: 段输入压掉软键盘, 用 ± 按钮调整 (桌面键盘流不受影响)
+const coarsePointer = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true
+
 interface ServerTime {
     servertime: number
     date: string
@@ -310,15 +313,24 @@ function renderActivityCard(activity: AdminActivityEvent, upcoming: boolean, now
     )
 }
 
+// UP 角色头像条目（维护者 2026-09-30 规格：头像块占两行 | 右上 id 灰 / 右下 角色名）。
+// master 数据无头像图源（character.json 无 icon 字段，角色图在游戏资产包）——
+// 本期用角色名首字占位（水色系），真实头像属游戏资产提取专项。
 function renderRateUpCharacters(characters: ClairvoyanceCharacter[]) {
     return (
-        <Space wrap size={[4, 4]}>
+        <div className="admin-char-cards">
             {characters.map(character => (
-                <Tag key={character.id} color={character.rarity === 5 ? "gold" : character.rarity === 4 ? "purple" : "blue"}>
-                    {character.name} #{character.id}
-                </Tag>
+                <div key={character.id} className="admin-char-card">
+                    <span className="admin-char-avatar" aria-hidden>
+                        {character.name.slice(0, 1)}
+                    </span>
+                    <span className="admin-char-meta">
+                        <span className="admin-char-id">#{character.id}</span>
+                        <span className="admin-char-name">{character.name}</span>
+                    </span>
+                </div>
             ))}
-        </Space>
+        </div>
     )
 }
 
@@ -367,6 +379,7 @@ export default function TimeControl() {
     const [picked, setPicked] = useState<Dayjs | null>(null)
     const [draftSegments, setDraftSegments] = useState<DraftSegments | null>(null)
     const [editingTime, setEditingTime] = useState(false)
+    const [focusedKey, setFocusedKey] = useState<SegmentKey>("year")
     const [gachaSearch, setGachaSearch] = useState("")
     const [activitySearch, setActivitySearch] = useState("")
     const [clairvoyanceTab, setClairvoyanceTab] = useState<"gacha" | "activity">("gacha")
@@ -835,7 +848,7 @@ export default function TimeControl() {
                                                 <input
                                                     ref={(node) => { segmentRefs.current[index] = node }}
                                                     type="text"
-                                                    inputMode="numeric"
+                                                    inputMode={coarsePointer ? "none" : "numeric"}
                                                     aria-label={`编辑${segment.label}`}
                                                     className={segment.key === "year" ? "admin-time-hero-seg admin-time-hero-seg-year" : "admin-time-hero-seg"}
                                                     value={shownDraft?.[segment.key] ?? ""}
@@ -844,9 +857,13 @@ export default function TimeControl() {
                                                     onChange={(event) => updateSegmentText(segment.key, event.target.value)}
                                                     onFocus={(event) => {
                                                         if (!editingTime) beginEditingTime()
+                                                        setFocusedKey(segment.key)
                                                         event.target.select()
                                                     }}
-                                                    onClick={(event) => event.currentTarget.select()}
+                                                    onClick={(event) => {
+                                                        event.currentTarget.select()
+                                                        setFocusedKey(segment.key)
+                                                    }}
                                                     onKeyDown={(event) => {
                                                         if (event.key === "ArrowRight") {
                                                             event.preventDefault()
@@ -878,6 +895,21 @@ export default function TimeControl() {
                                     </div>
                                 </div>
                             </div>
+                            {coarsePointer && editingTime && (
+                                <div className="admin-time-stepper" role="group" aria-label="调整选中字段">
+                                    <button type="button" className="admin-time-stepper-btn"
+                                        onMouseDown={event => event.preventDefault()}
+                                        onClick={() => adjustSegment(focusedKey, -1)}
+                                        aria-label="减小">−</button>
+                                    <span className="admin-time-stepper-label">
+                                        {timeSegments.find(seg => seg.key === focusedKey)?.label ?? ""}
+                                    </span>
+                                    <button type="button" className="admin-time-stepper-btn"
+                                        onMouseDown={event => event.preventDefault()}
+                                        onClick={() => adjustSegment(focusedKey, 1)}
+                                        aria-label="增大">＋</button>
+                                </div>
+                            )}
                             <div className="admin-time-hero-sub">
                                 {/* 桌面 ≥768px 专用：状态徽章 + 跟随系统按钮回到时钟下方单行（F2 同行方案） */}
                                 <span className="admin-time-hero-submode">
@@ -896,7 +928,7 @@ export default function TimeControl() {
                                     </Button>
                                 </span>
                                 <span className="admin-mono">UTC：{isoText} · Unix 秒：{data?.servertime ?? "-"}</span>
-                                <span className="admin-time-hero-hint">↑/↓ 调整数值，←/→ 切换单位；离开编辑区自动应用，Esc 取消。</span>
+                                <span className="admin-time-hero-hint">{coarsePointer ? "点选字段后用上方 ＋/− 调整数值。" : "↑/↓ 调整数值，←/→ 切换单位；离开编辑区自动应用，Esc 取消。"}</span>
                             </div>
                         </div>
                     </section>

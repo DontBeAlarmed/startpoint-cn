@@ -71,3 +71,81 @@
     max-width: 420px;
   }
 }
+
+/* 触屏 ± 步进器 (粗指针设备的时间编辑, 桌面隐藏) */
+.admin-time-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 6px 0 2px;
+}
+
+.admin-time-stepper-btn {
+  min-width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.admin-time-stepper-label {
+  min-width: 3em;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  text-align: center;
+}
+
+/* 千里眼 UP 角色头像条目 (头像块占两行 | 右上 id 灰 / 右下 角色名) */
+.admin-char-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-char-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 12px 4px 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.admin-char-avatar {
+  flex: none;
+  width: 32px;
+  height: 44px;
+  border-radius: 8px;
+  background: var(--water-soft);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.admin-char-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.admin-char-id {
+  color: var(--ink-soft);
+  font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  line-height: 1.3;
+}
+
+.admin-char-name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
