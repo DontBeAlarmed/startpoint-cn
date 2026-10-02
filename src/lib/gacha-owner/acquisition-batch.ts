@@ -178,18 +178,21 @@ export function prepareGachaAcquisitionBatchSync(
         grantEquipment(equipmentId, amount) {
             const key = String(equipmentId)
             const current = equipmentState.get(key)
-            if (current === undefined) grantedNewEquipmentKind = true
-            const equipment: PlayerEquipment = current === undefined
-                ? {
+            if (current === undefined) {
+                grantedNewEquipmentKind = true
+                const equipment: PlayerEquipment = {
                     enhancementLevel: 0,
                     level: 1,
                     protection: false,
                     stack: amount - 1,
                 }
-                : {
-                    ...current.equipment,
-                    stack: addSafeInteger(current.equipment.stack, amount, "equipment.stack"),
-                }
+                equipmentState.set(key, { equipment })
+                return clientSerializeEquipment(equipmentId, equipment) as RewardGrantObjectSnapshot
+            }
+            const equipment: PlayerEquipment = {
+                ...current.equipment,
+                stack: addSafeInteger(current.equipment.stack, amount, "equipment.stack"),
+            }
             equipmentState.set(key, { equipment })
             return clientSerializeEquipment(equipmentId, equipment) as RewardGrantObjectSnapshot
         },

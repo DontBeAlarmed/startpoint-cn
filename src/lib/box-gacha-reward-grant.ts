@@ -127,7 +127,8 @@ export function grantBoxGachaDrawInTransactionOwnerWithInventorySync(
         { itemOverflow: createRewardGrantItemOverflowPolicy(playerId) },
     )
 
-    // 新角色入队/新装备种类是持有数事实的产生时点,结算与发放同事务
+    // 新角色入队/新装备种类是持有数事实的产生时点,结算与发放同事务。
+    // 装备资产暂无 joined 标志,重复种类也结算(幂等,max 单调不重复发奖)
     return {
         rewardResult: projectBoxGachaRewardResult(result),
         rewardInvalidatedFactKeys: getAwakeFactKeysFromRewardGrants(result),

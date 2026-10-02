@@ -2149,7 +2149,6 @@ test("equipment exchange settles equipment kind mission on new kind", async () =
         isDailyFirst: true,
         gachaExchangePoint: 251,
     })
-    const stonesBefore = getPlayerSync(playerId).freeVmoney
     const stonesBeforeItem = getPlayerItemSync(playerId, 100000)
 
     const response = await app.inject({

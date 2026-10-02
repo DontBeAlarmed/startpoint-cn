@@ -69,7 +69,8 @@ const wrightpieceItemId = () => getEquipmentCurrencyPolicySync().craftPointItemI
 // 装备升级跨过 5 级是「5级装备持有数」状态事实的产生时点:任务 68 族
 // (total_equipment_5_level_count)与 5 级装备称号(cat5 condition 36)必须
 // 同事务窄域当场结算,否则奖励被推迟到下次进关/任务页(2026-10-01 时点审计;
-// condition 36 虽在战斗 finish 白名单内,但升级动作发生在战斗外)。
+// condition 36 本就不在战斗 finish 的 degree 结算白名单,升级动作又发生在
+// 战斗外,此前无任何运行时结算点)。
 function settleEquipmentLevelMissions(
     playerId: number,
     equipment: Record<string, PlayerEquipment>,

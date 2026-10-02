@@ -474,8 +474,10 @@ test("equipment upgrade crossing level 5 settles five-level mission and degree a
     addEquipment(playerId, 4050030, 10)
     setInventoryFixtureItemExactSync(playerId, 100000, 1000)
     const stonesBefore = getPlayerSync(playerId).freeVmoney
-    const degreeMissionId = Object.entries(require("../assets/mission_degree.json"))
-        .find(([, rows]) => String(rows[0][1] ?? "").startsWith("degree_equipment_lv5_get_"))?.[0]
+    // 与生产判据同列:condition type(row[3])=36
+    const degreeMissionId = Number(Object.entries(require("../assets/mission_degree.json"))
+        .find(([, rows]) => String(rows[0][3]) === "36")?.[0])
+    assert.ok(degreeMissionId, "测试前提:存在 5 级装备称号任务(condition 36)")
 
     const response = await app.inject({
         method: "POST",
