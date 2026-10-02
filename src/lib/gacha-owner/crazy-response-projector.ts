@@ -88,6 +88,7 @@ export function projectCrazyGachaSelectResponse(input: {
         data_headers: input.dataHeaders,
         data: {
             ...responseData,
+            active_mission_list: input.result.activeMissionList,
             crazy_gacha_result_list: {},
         },
     }

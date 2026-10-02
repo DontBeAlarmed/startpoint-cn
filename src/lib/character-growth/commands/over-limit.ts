@@ -12,6 +12,7 @@ import {
     validatePositiveAmount,
 } from "../mutation-support"
 import type { MissionSettlementResult } from "../../mission/settlement"
+import { publishActiveMissionOwnerStateWithinTransaction } from "../../mission/active-publication-owner"
 import { settleOverLimitMissions } from "../over-limit-mission-settlement"
 
 export interface OverLimitCommand {
@@ -30,6 +31,7 @@ export interface OverLimitResult {
     readonly itemId?: number
     readonly itemCount?: number
     readonly missionSettlement: MissionSettlementResult | null
+    readonly activeMissionList: readonly unknown[]
     readonly replayed: false
 }
 
@@ -81,6 +83,11 @@ export function executeOverLimit(command: OverLimitCommand): OverLimitResult {
                     stack: before.stack - command.overLimitCount,
                 }),
                 missionSettlement: settleOverLimitMissions(command.playerId, command.evaluationTime),
+                activeMissionList: publishActiveMissionOwnerStateWithinTransaction({
+                    playerId: command.playerId,
+                    now: command.evaluationTime,
+                    source: "character-growth/over-limit",
+                }).activeMissionList,
                 replayed: false,
             } as OverLimitResult
         }
@@ -106,6 +113,11 @@ export function executeOverLimit(command: OverLimitCommand): OverLimitResult {
                 itemId,
                 itemCount: itemResult.afterAmount,
                 missionSettlement: settleOverLimitMissions(command.playerId, command.evaluationTime),
+                activeMissionList: publishActiveMissionOwnerStateWithinTransaction({
+                    playerId: command.playerId,
+                    now: command.evaluationTime,
+                    source: "character-growth/over-limit",
+                }).activeMissionList,
                 replayed: false,
             } as OverLimitResult
         })

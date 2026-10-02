@@ -53,6 +53,7 @@ export function projectGachaExchangeResponse(input: {
         data_headers: input.dataHeaders,
         data: {
             ...responseData,
+            active_mission_list: result.activeMissionList,
             gacha_info_list: [{
                 gacha_id: result.gachaId,
                 is_account_first: result.isAccountFirst,

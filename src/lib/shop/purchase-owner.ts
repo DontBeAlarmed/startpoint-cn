@@ -12,6 +12,8 @@ import { getDb } from "../../data/db"
 import { deepFreeze } from "../../content/deep-freeze"
 import { withDeferredInventoryBatchContextWithinTransactionSync } from "../inventory"
 import { settleMissionOperationFactsSync } from "../mission/operation-fact-settlement"
+import { settleMissionCategories } from "../mission/settlement"
+import { getDegreeMissionIdsForConditionTypes } from "../mission/degree-candidates"
 import { grantShopRewardsTypedInTransactionOwnerWithInventorySync } from "../shop-reward-grant"
 import { ShopType } from "../types/shop"
 import {
@@ -187,6 +189,7 @@ export function executeShopPurchaseSync(
             })
 
             let missionSettlement = null
+            let purchaseCountSettlement = null
             if (plan.manaSpent > 0) {
                 incrementActiveMissionUsedManaCountSync(input.playerId, plan.manaSpent)
                 recordCollectMissionManaSpend(input.playerId, plan.manaSpent, new Date(getServerTime() * 1000))
@@ -197,12 +200,19 @@ export function executeShopPurchaseSync(
                         plan.manaSpent,
                         virtualNow,
                     )
+                    // 宝石店购买次数是购买计数称号(cat5 condition 45)的事实时点,
+                    // 该族不在战斗 finish 白名单,与消耗任务同事务当场结算
+                    purchaseCountSettlement = settleMissionCategories(
+                        input.playerId,
+                        [{ category: 5, missionIds: getDegreeMissionIdsForConditionTypes([45]) }],
+                        virtualNow,
+                    )
                     if (missionSettlement !== null) {
                         Object.assign(itemList, missionSettlement.itemList)
                     }
                 }
             }
-            const missionUser = missionSettlement?.userInfo
+            const missionUser = missionSettlement?.userInfo ?? purchaseCountSettlement?.userInfo
             const activeMission = publishActiveMissionOwnerStateWithinTransaction({
                 playerId: input.playerId,
                 now: virtualNow,
@@ -211,6 +221,7 @@ export function executeShopPurchaseSync(
             return deepFreeze({
                 playerId: input.playerId,
                 shopType: input.shopType,
+                purchaseCountSettlement,
                 playerAfter: {
                     ...plan.playerAfterPayment,
                     freeMana: reward.execution.playerAfter.freeMana,

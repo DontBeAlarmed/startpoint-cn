@@ -114,6 +114,7 @@ interface GachaExchangeSuccessBase {
     readonly itemOverflowDispositions: readonly PlannedItemOverflowDisposition[]
     readonly postCommitEffects: readonly GachaPostCommitEffect[]
     readonly missionSettlement: MissionSettlementResult | null
+    readonly activeMissionList: readonly unknown[]
 }
 
 export interface CharacterGachaExchangeSuccess extends GachaExchangeSuccessBase {
@@ -171,6 +172,7 @@ export interface CrazyGachaSelectSuccess {
     readonly mailArrived: boolean
     readonly postCommitEffects: readonly GachaPostCommitEffect[]
     readonly missionSettlement: MissionSettlementResult | null
+    readonly activeMissionList: readonly unknown[]
 }
 
 export type CrazyGachaCandidateResult = CrazyGachaCandidateSuccess

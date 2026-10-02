@@ -16,6 +16,7 @@ import { BoxGachaInvalidPeriodError, BoxGachaResetError, resetBoxGachaSync, vali
 import { grantBoxGachaDrawInTransactionOwnerWithInventorySync } from "../../lib/box-gacha-reward-grant";
 import { drawBoxGachaSync } from "../../lib/gacha";
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
+import { publishActiveMissionOwnerStateWithinTransaction } from "../../lib/mission/active-publication-owner";
 import { withDeferredInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
 import { BoxGachaBoxes, PlayerRewardResult } from "../../lib/types";
 import { getMailArrivedSync } from "../../lib/mail-notification";
@@ -321,6 +322,7 @@ const routes = async (fastify: FastifyInstance) => {
             rewardResult: PlayerRewardResult
             rewardInvalidatedFactKeys: readonly FactKey[]
             missionSettlement: import("../../lib/mission/settlement").MissionSettlementResult | null
+            activeMissionList: readonly unknown[]
             newPullCurrency: number
             remainingDrawsNumber: number
             shouldClose: boolean
@@ -425,6 +427,11 @@ const routes = async (fastify: FastifyInstance) => {
                             )
                         }
                     }
+                    const activeMission = publishActiveMissionOwnerStateWithinTransaction({
+                        playerId,
+                        now: new Date(),
+                        source: "box-gacha/exec",
+                    })
                     return {
                         player,
                         playerBoxData,
@@ -432,6 +439,7 @@ const routes = async (fastify: FastifyInstance) => {
                         rewardResult,
                         rewardInvalidatedFactKeys,
                         missionSettlement,
+                        activeMissionList: activeMission.activeMissionList,
                         newPullCurrency,
                         remainingDrawsNumber,
                         shouldClose,
@@ -497,6 +505,7 @@ const routes = async (fastify: FastifyInstance) => {
                 ...(overMax.length > 0 ? { "over_max": overMax } : {})
             }]),
         }
+        responseData.active_mission_list = settlement.activeMissionList
         if (settlement.missionSettlement !== null) {
             // 抽到新角色跨过持有数任务/称号阶段时,完成与奖励在 box gacha 响应内当场发布
             composeMissionSettlementResponse(

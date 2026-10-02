@@ -40,6 +40,8 @@ export interface ShopPurchaseOwnerResult {
     readonly rewardInvalidatedFactKeys: readonly FactKey[]
     readonly activeMissionList: readonly unknown[]
     readonly missionSettlement: MissionSettlementResult | null
+    /** 宝石店购买次数称号(cat5 condition 45)的窄域结算,仅 TREASURE 购买非 null */
+    readonly purchaseCountSettlement: MissionSettlementResult | null
 }
 
 export type ShopEquipmentAbsoluteState = Readonly<PlayerEquipment>

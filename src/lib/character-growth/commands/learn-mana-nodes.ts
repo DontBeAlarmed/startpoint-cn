@@ -12,6 +12,7 @@ import { publishActiveMissionOwnerStateWithinTransaction } from "../../mission/a
 import { settleMissionCategories } from "../../mission/settlement"
 import { getMissionCatalog } from "../../mission/mission-catalog"
 import { getDegreeMissionIdsForConditionTypes } from "../../mission/degree-candidates"
+import { DEGREE_SUPPORTED_FAMILIES } from "../../mission/degree-context-requirements"
 import type { MissionSettlementResult } from "../../mission/settlement"
 import { recordSecondManaBoardCompletionMilestoneSync } from "../../../lib/player-history-milestones"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
@@ -217,16 +218,21 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
             ...getMissionCatalog().getDefinitionsByPattern("total_obtained_bond_token_count"),
         ].map(definition => definition.missionId)
         // cond48 的角色绑定列(row[15])为空的是全角色聚合族(55000 三条),
-        // 同样由二板完成驱动,一并纳入;其余按角色收窄避免全表评估
+        // 同样由二板完成驱动,一并纳入;其余按角色收窄避免全表评估。
+        // cond8(degree_proof_of_bond_get_,信赖证累计)与 cond7
+        // (degree_manaboard_growth_,板强化总数)同样以学节点/信赖证授予为
+        // 唯一事实时点且不在战斗 finish 白名单,一并窄域结算
+        // (2026-10-03 全量审计:cat5 三个残留族之二)。
         const bondDegreeMissionIds = getDegreeMissionIdsForConditionTypes(
-            [44],
+            [8, 44],
             [command.characterId],
         ).concat(getMissionCatalog().getDefinitions(5).filter(definition => {
             const row = definition.row as readonly unknown[]
-            return String(row[3]) === "48"
-                && (row[15] === undefined || row[15] === null
-                    || row[15] === "" || row[15] === "(None)"
-                    || String(row[15]) === String(command.characterId))
+            return (String(row[3]) === "48"
+                    && (row[15] === undefined || row[15] === null
+                        || row[15] === "" || row[15] === "(None)"
+                        || String(row[15]) === String(command.characterId)))
+                || definition.pattern.startsWith(DEGREE_SUPPORTED_FAMILIES.manaBoardCount)
         }).map(definition => definition.missionId))
         const missionSettlement = settleMissionCategories(
             command.playerId,

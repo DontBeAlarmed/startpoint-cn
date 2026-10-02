@@ -74,5 +74,12 @@ export function projectShopPurchaseResponse(
             viewerId,
         )
     }
+    if (result.purchaseCountSettlement !== null) {
+        composeMissionSettlementResponse(
+            data,
+            projectMissionSettlementFragment(result.purchaseCountSettlement),
+            viewerId,
+        )
+    }
     return data
 }
