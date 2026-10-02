@@ -720,9 +720,6 @@ const TEST_GROUPS = Object.freeze({
     },
     admin: {
         execution: "parallel",
-        // 服务器自起型集成套件(内部拉起 cn-server 绑 8002/8103/8403)在机器负载下
-        // 会超过 parallel 默认 30s 阀 — 逐套件放宽到 120s (与其他集成组惯例一致)
-        timeoutMs: 120_000,
         tests: [
             "tests/admin-account-save-ui.test.js",
             "tests/admin-cdn-status-source.test.js",
