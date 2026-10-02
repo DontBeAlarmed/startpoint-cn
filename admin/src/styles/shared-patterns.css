@@ -136,8 +136,10 @@ html[data-theme="dark"] {
   min-width: 0;
   color: var(--ink);
   font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
-  /* 时钟随视宽自适应缩放, 永不折行 (维护者 2026-09-29: 窄屏溢出修复) */
-  font-size: clamp(18px, 7.4vw, 32px);
+  /* 时钟随视宽自适应缩放, 永不折行 (维护者 2026-09-29: 窄屏溢出修复;
+     2026-09-30 壳内 390 实测仍裁切 — 系数 7.4vw 算出 28.9px 时文本 422px > 330px 容器,
+     按 19 字形 ×0.62em 反推: 字号须 ≤ 可用宽/11.8, 收窄系数并下调下限) */
+  font-size: clamp(15px, 6.2vw, 32px);
   font-weight: 800;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
