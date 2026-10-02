@@ -155,6 +155,20 @@
   text-transform: uppercase;
 }
 
+.admin-page-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.admin-page-title-row .admin-page-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .admin-page-title {
   margin: 0 !important;
   color: var(--ink) !important;
@@ -172,9 +186,9 @@
 
 .admin-page-actions {
   display: flex;
-  flex-wrap: wrap;
-  /* 移动优先（task-33 E3 #30）：窄屏左对齐；桌面右对齐在文件尾 min-width 块回升 */
-  justify-content: flex-start;
+  /* 移动优先（task-33 E3 #30 修订 2026-09-30）：动作内联到标题行右侧, 不折行 */
+  justify-content: flex-end;
+  flex-wrap: nowrap;
   gap: 8px;
 }
 
@@ -265,12 +279,7 @@
   }
 
   .admin-page-header {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: end;
-  }
-
-  .admin-page-actions {
-    justify-content: flex-end;
+    align-items: start;
   }
 
   .admin-page-title {

@@ -13,14 +13,18 @@ export function AdminPage({ eyebrow, title, description, actions, children }: Ad
     return (
         <section className="admin-page">
             <header className="admin-page-header">
-                <div>
-                    <span className="admin-page-eyebrow">{eyebrow}</span>
-                    <Typography.Title level={1} className="admin-page-title">
-                        {title}
-                    </Typography.Title>
+                <div className="admin-page-header-top">
+                    <div className="admin-page-heading">
+                        <span className="admin-page-eyebrow">{eyebrow}</span>
+                        <div className="admin-page-title-row">
+                            <Typography.Title level={1} className="admin-page-title">
+                                {title}
+                            </Typography.Title>
+                            {actions && <div className="admin-page-actions">{actions}</div>}
+                        </div>
+                    </div>
                     {description && <div className="admin-page-description">{description}</div>}
                 </div>
-                {actions && <div className="admin-page-actions">{actions}</div>}
             </header>
             {children}
         </section>
