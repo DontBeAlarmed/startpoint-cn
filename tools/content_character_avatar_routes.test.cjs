@@ -191,6 +191,7 @@ async function buildApp({ cdnRoot, tables = CHARACTER_TABLES }) {
         prefix: "/content",
         getCdnRoot: cdnRoot === null ? () => null : () => cdnRoot,
         getRepository: () => characterTableRepository(tables),
+        assetProviderDir: fs.mkdtempSync(path.join(os.tmpdir(), "avatar-assets-")),
     })
     return fastify
 }

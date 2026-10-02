@@ -1,3 +1,4 @@
+import fs from "node:fs"
 import path from "node:path"
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
@@ -17,6 +18,8 @@ export interface ContentRoutesOptions {
     /** Resolved `<CDN_DIR>/cn` root; null disables archive lookups. */
     readonly getCdnRoot?: () => string | null
     readonly getRepository?: () => ReadonlyContentRepository
+    /** 资产物化目录(<DATA_DIR>/asset-provider);首次取出的立绘落盘,之后静态直出。 */
+    readonly assetProviderDir?: string
 }
 
 function defaultGetCdnRoot(): string | null {
@@ -82,6 +85,19 @@ const routes = async (fastify: FastifyInstance, options: ContentRoutesOptions = 
             return reply.status(404).send({ error: "avatar unavailable" })
         }
 
+        // 物化缓存: 首次从归档取出后落盘 <DATA_DIR>/asset-provider/character-avatar,
+        // 之后静态直出零解压 (维护者 2026-09-30 定稿的管线物化轻量形态)。
+        const cachePath = path.join(
+            options.assetProviderDir
+                ?? resolveRuntimeDataPaths().assetProviderDir,
+            "character-avatar",
+            `${stringId}_${evolve}.png`,
+        )
+        if (fs.existsSync(cachePath)) {
+            reply.header("cache-control", "public, max-age=86400")
+            return reply.type("image/png").send(fs.createReadStream(cachePath))
+        }
+
         // Hash the logical path *with* its ".png" suffix, then shard: the
         // stored medium payload sits at production/medium_upload/<xx>/<hash>.
         // 首选 132×132 方形头像(~20KB); 部分角色缺失时回退 full_shot 立绘(大图由前端 object-fit 收成头像)
@@ -94,6 +110,12 @@ const routes = async (fastify: FastifyInstance, options: ContentRoutesOptions = 
         }
         if (payload === null) {
             return reply.status(404).send({ error: "avatar unavailable" })
+        }
+        try {
+            fs.mkdirSync(path.dirname(cachePath), { recursive: true })
+            fs.writeFileSync(cachePath, payload)
+        } catch {
+            // 落盘失败不阻塞响应(下次请求重试物化)
         }
 
         // Content-addressed payload: immutable under the game's asset model.
