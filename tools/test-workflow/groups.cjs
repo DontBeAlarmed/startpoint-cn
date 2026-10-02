@@ -743,6 +743,7 @@ const TEST_GROUPS = Object.freeze({
             "tools/admin_gift_routes.test.cjs",
             "tools/admin_news_routes.test.cjs",
             "tools/admin_mail_type_policy.test.cjs",
+            "tools/content_character_avatar_routes.test.cjs",
         ],
     },
     generator: {
