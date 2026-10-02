@@ -13,6 +13,7 @@ import {
     type ReadonlyContentRepository,
 } from "../../content/runtime/content-snapshot"
 import { resolveCnCdnRoot } from "../../content/paths"
+import { resolveRuntimeDataPaths } from "../../runtime/data-paths"
 
 export interface ContentRoutesOptions {
     /** Resolved `<CDN_DIR>/cn` root; null disables archive lookups. */
@@ -76,7 +77,7 @@ const routes = async (fastify: FastifyInstance, options: ContentRoutesOptions = 
         }
 
         const stringId = readCharacterStringId(getRepository(), characterId)
-        if (stringId === null) {
+        if (stringId === null || !/^[A-Za-z0-9_]+$/.test(stringId)) {
             return reply.status(404).send({ error: "character not found" })
         }
 
@@ -111,16 +112,19 @@ const routes = async (fastify: FastifyInstance, options: ContentRoutesOptions = 
         if (payload === null) {
             return reply.status(404).send({ error: "avatar unavailable" })
         }
+        const browserPng = toBrowserPng(payload)
         try {
+            // temp + rename 原子落盘: 避免半写文件被永久缓存 (复审A [低])
             fs.mkdirSync(path.dirname(cachePath), { recursive: true })
-            fs.writeFileSync(cachePath, payload)
+            const tempPath = `${cachePath}.${process.pid}.tmp`
+            fs.writeFileSync(tempPath, browserPng)
+            fs.renameSync(tempPath, cachePath)
         } catch {
             // 落盘失败不阻塞响应(下次请求重试物化)
         }
-
-        // Content-addressed payload: immutable under the game's asset model.
         reply.header("cache-control", "public, max-age=86400")
-        return reply.type("image/png").send(toBrowserPng(payload))
+        return reply.type("image/png").send(browserPng)
+
     })
 }
 

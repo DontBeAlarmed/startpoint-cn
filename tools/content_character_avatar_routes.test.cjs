@@ -219,6 +219,11 @@ test("character_avatar serves archive PNG with a patched signature and day cache
             })
             assert.equal(evolveOne.statusCode, 200)
             assert.equal(evolveOne.headers["content-type"], "image/png")
+
+            // 复审A 高-2 回归: 缓存命中(第二次请求)字节必须与首次一致 (修补后签名, 不回落原始字节)
+            const repeat = await app.inject({ method: "GET", url: "/content/character_avatar/1" })
+            assert.equal(repeat.statusCode, 200)
+            assert.deepEqual(repeat.rawPayload, response.rawPayload, "缓存命中与首次响应字节一致")
         } finally {
             await app.close()
         }
