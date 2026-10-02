@@ -21,10 +21,16 @@ export function hashedAssetPath(logicalPath: string): string {
 }
 
 /**
- * Character portrait logical path (medium/scaled asset bucket):
- * `character/<string_id>/ui/full_shot_1440_1920_<evolve>.png`, evolve 0|1.
+ * Character avatar logical path (medium/scaled asset bucket):
+ * `character/<string_id>/ui/square_132_132_<evolve>.png`, evolve 0|1 —
+ * 游戏自带的 132×132 方形头像(~20KB), 覆盖 489/505 角色;
+ * full_shot 立绘(0.7–1.6MB)作为大图备用, 走 characterFullShotPath。
  * Note the client hashes the logical path *with* the ".png" suffix included.
  */
+export function characterAvatarPath(stringId: string, evolve: 0 | 1): string {
+    return `character/${stringId}/ui/square_132_132_${evolve}.png`
+}
+
 export function characterFullShotPath(stringId: string, evolve: 0 | 1): string {
     return `character/${stringId}/ui/full_shot_1440_1920_${evolve}.png`
 }

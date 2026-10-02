@@ -2,7 +2,7 @@ import path from "node:path"
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 
-import { characterFullShotPath, hashedAssetPath } from "../../content/cdn/asset-path-hash"
+import { characterAvatarPath, characterFullShotPath, hashedAssetPath } from "../../content/cdn/asset-path-hash"
 import {
     getMediumArchiveIndex,
     toBrowserPng,
@@ -84,11 +84,14 @@ const routes = async (fastify: FastifyInstance, options: ContentRoutesOptions = 
 
         // Hash the logical path *with* its ".png" suffix, then shard: the
         // stored medium payload sits at production/medium_upload/<xx>/<hash>.
-        const logicalPath = characterFullShotPath(stringId, evolve)
-        const physicalPath = `production/medium_upload/${hashedAssetPath(logicalPath)}`
-        const payload = await getMediumArchiveIndex(
-            path.join(cdnRoot, "archive-medium-full"),
-        ).read(physicalPath)
+        // 首选 132×132 方形头像(~20KB); 部分角色缺失时回退 full_shot 立绘(大图由前端 object-fit 收成头像)
+        const index = getMediumArchiveIndex(path.join(cdnRoot, "archive-medium-full"))
+        const primary = characterAvatarPath(stringId, evolve)
+        const fallback = characterFullShotPath(stringId, evolve)
+        let payload = await index.read(`production/medium_upload/${hashedAssetPath(primary)}`)
+        if (payload === null) {
+            payload = await index.read(`production/medium_upload/${hashedAssetPath(fallback)}`)
+        }
         if (payload === null) {
             return reply.status(404).send({ error: "avatar unavailable" })
         }
