@@ -56,6 +56,7 @@ export function projectCrazyGachaSaveResponse(input: {
 
 export function projectCrazyGachaSelectResponse(input: {
     readonly dataHeaders: Readonly<Record<string, unknown>>
+    readonly viewerId: number
     readonly result: CrazyGachaSelectSuccess
     readonly postCommit: GachaPostCommitResult
 }): Record<string, unknown> {
@@ -74,15 +75,13 @@ export function projectCrazyGachaSelectResponse(input: {
         mail_arrived: input.result.mailArrived,
         ...(overMax.length === 0 ? {} : { over_max: overMax }),
     }
-    const responseData: Record<string, unknown> = {
-        ...mergeCommonResponseFragments([fragment]),
-    }
+    const responseData: Record<string, unknown> = { ...mergeCommonResponseFragments([fragment]) }
     if (input.result.missionSettlement !== null) {
-        // 疯狂抽卡确定新角色跨过持有数任务/称号阶段时,完成与奖励当场发布
+        // 疯狂抽卡确定新角色跨过持有数任务/称号阶段时,完成与奖励在 crazy select 响应内当场发布
         composeMissionSettlementResponse(
             responseData,
             projectMissionSettlementFragment(input.result.missionSettlement),
-            input.result.playerId,
+            input.viewerId,
         )
     }
     return {

@@ -15,7 +15,10 @@ import type {
 import { RewardType } from "./types"
 import { getAwakeFactKeysFromRewardGrants } from "./mission/awake-reward-facts"
 import type { FactKey } from "./mission/facts/fact-key"
+import type { MissionSettlementResult } from "./mission/settlement"
 import { createRewardGrantItemOverflowPolicy } from "./reward-grant-item-overflow"
+import { settleGachaAcquisitionMissions } from "./gacha-acquisition-mission-settlement"
+import { getRealNow } from "../runtime/time/game-time"
 
 export interface BoxGachaRewardKnownPlayerState {
     readonly id: number
@@ -28,6 +31,7 @@ export interface BoxGachaRewardGrantResult {
     readonly rewardResult: PlayerRewardResult
     readonly playerAfter: Omit<BoxGachaRewardKnownPlayerState, "id">
     readonly rewardInvalidatedFactKeys: readonly FactKey[]
+    readonly missionSettlement: MissionSettlementResult | null
 }
 
 function createBoxGachaRewardPlan(
@@ -123,9 +127,13 @@ export function grantBoxGachaDrawInTransactionOwnerWithInventorySync(
         { itemOverflow: createRewardGrantItemOverflowPolicy(playerId) },
     )
 
+    // 新角色入队是「持有角色数」事实的产生时点,结算与发放同事务
     return {
         rewardResult: projectBoxGachaRewardResult(result),
         rewardInvalidatedFactKeys: getAwakeFactKeysFromRewardGrants(result),
+        missionSettlement: result.assets.characters.some(entry => entry.joined)
+            ? settleGachaAcquisitionMissions(playerId, getRealNow())
+            : null,
         playerAfter: {
             freeMana: result.playerAfter.freeMana,
             freeVmoney: result.playerAfter.freeVmoney,

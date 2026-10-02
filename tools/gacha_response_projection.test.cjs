@@ -34,6 +34,8 @@ function execCharacterSuccess(overrides = {}) {
         rewardItems: {},
         itemOverflowDispositions: [],
         postCommitEffects: [],
+        activeMissionList: [],
+        missionSettlement: null,
         ...overrides,
     }
 }
@@ -112,6 +114,7 @@ function exchangeSuccess(overrides = {}) {
         rewardItems: {},
         itemOverflowDispositions: [],
         postCommitEffects: [],
+        missionSettlement: null,
         ...overrides,
     }
 }
@@ -173,6 +176,7 @@ function crazySelectSuccess(overrides = {}) {
         rewardItems: { 49001: 1 },
         itemOverflowDispositions: [],
         postCommitEffects: [],
+        missionSettlement: null,
         ...overrides,
     }
 }

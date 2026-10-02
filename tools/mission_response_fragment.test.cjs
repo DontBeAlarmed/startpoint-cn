@@ -102,7 +102,8 @@ test("Mission fragment preserves empty, null, zero/false, missing, and no-overfl
         itemOverflowDispositions: [],
     }))
     assert.deepEqual(empty.common.mission_info, [])
-    assert.deepEqual(empty.common.item_list, {})
+    // 空 itemList 不进 fragment:避免覆盖响应里既有的客户端形状(如交换的 [])
+    assert.equal("item_list" in empty.common, false)
     assert.deepEqual(empty.common.character_list, [])
     assert.deepEqual(empty.common.equipment_list, [])
     assert.deepEqual(empty.common.user_info, { free_mana: 0, is_newbie: false })

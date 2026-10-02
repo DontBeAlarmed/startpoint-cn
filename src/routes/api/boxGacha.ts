@@ -27,6 +27,10 @@ import {
     projectEquipmentEntity,
 } from "../../lib/common-response/entities";
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
+import {
+    composeMissionSettlementResponse,
+    projectMissionSettlementFragment,
+} from "../../lib/mission/response-fragment"
 
 interface GetBoxListBody {
     box_gacha_id: number
@@ -316,6 +320,7 @@ const routes = async (fastify: FastifyInstance) => {
             drawnRewards: ReturnType<typeof drawBoxGachaSync>["rewards"]
             rewardResult: PlayerRewardResult
             rewardInvalidatedFactKeys: readonly FactKey[]
+            missionSettlement: import("../../lib/mission/settlement").MissionSettlementResult | null
             newPullCurrency: number
             remainingDrawsNumber: number
             shouldClose: boolean
@@ -376,7 +381,7 @@ const routes = async (fastify: FastifyInstance) => {
                         pullCurrencyId,
                         actualDrawCount * boxGachaData.redeemItemCount,
                     ).afterAmount
-                    const { rewardResult, rewardInvalidatedFactKeys } = grantBoxGachaDrawInTransactionOwnerWithInventorySync(
+                    const { rewardResult, rewardInvalidatedFactKeys, missionSettlement } = grantBoxGachaDrawInTransactionOwnerWithInventorySync(
                         playerId,
                         drawResult,
                         player,
@@ -426,6 +431,7 @@ const routes = async (fastify: FastifyInstance) => {
                         drawnRewards,
                         rewardResult,
                         rewardInvalidatedFactKeys,
+                        missionSettlement,
                         newPullCurrency,
                         remainingDrawsNumber,
                         shouldClose,
@@ -470,30 +476,41 @@ const routes = async (fastify: FastifyInstance) => {
         )
 
         reply.header("content-type", "application/x-msgpack")
+        const responseData: Record<string, unknown> = {
+            ...mergeCommonResponseFragments([{
+                "user_info": {
+                    "free_mana": settlement.player.freeMana + (settlement.rewardResult?.user_info.free_mana ?? 0),
+                    "exp_pool": settlement.player.expPool + (settlement.rewardResult?.user_info.exp_pool ?? 0),
+                    "exp_pooled_time": expPoolRealDateToClientTimestamp(settlement.player.expPooledTime),
+                },
+                "character_list": characterList.map(
+                    character => projectCharacterPatch(character),
+                ),
+                "equipment_list": (settlement.rewardResult?.equipment_list ?? []).map(
+                    equipment => projectEquipmentEntity(equipment),
+                ),
+                "item_list": {
+                    [pullCurrencyId]: settlement.newPullCurrency,
+                    ...(settlement.rewardResult?.items ?? {})
+                },
+                "mail_arrived": getMailArrivedSync(playerId),
+                ...(overMax.length > 0 ? { "over_max": overMax } : {})
+            }]),
+        }
+        if (settlement.missionSettlement !== null) {
+            // 抽到新角色跨过持有数任务/称号阶段时,完成与奖励在 box gacha 响应内当场发布
+            composeMissionSettlementResponse(
+                responseData,
+                projectMissionSettlementFragment(settlement.missionSettlement),
+                viewerId,
+            )
+        }
         return reply.status(200).send({
             "data_headers": generateDataHeaders({
                 viewer_id: viewerId
             }),
             "data": {
-                ...mergeCommonResponseFragments([{
-                    "user_info": {
-                        "free_mana": settlement.player.freeMana + (settlement.rewardResult?.user_info.free_mana ?? 0),
-                        "exp_pool": settlement.player.expPool + (settlement.rewardResult?.user_info.exp_pool ?? 0),
-                        "exp_pooled_time": expPoolRealDateToClientTimestamp(settlement.player.expPooledTime),
-                    },
-                    "character_list": characterList.map(
-                        character => projectCharacterPatch(character),
-                    ),
-                    "equipment_list": (settlement.rewardResult?.equipment_list ?? []).map(
-                        equipment => projectEquipmentEntity(equipment),
-                    ),
-                    "item_list": {
-                        [pullCurrencyId]: settlement.newPullCurrency,
-                        ...(settlement.rewardResult?.items ?? {})
-                    },
-                    "mail_arrived": getMailArrivedSync(playerId),
-                    ...(overMax.length > 0 ? { "over_max": overMax } : {})
-                }]),
+                ...responseData,
                 "drawn_reward_list": settlement.drawnRewards.map(reward => {
                     return {
                         "reward_id": reward.id,

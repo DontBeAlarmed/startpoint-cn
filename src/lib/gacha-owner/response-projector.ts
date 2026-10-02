@@ -13,6 +13,7 @@ import type { GachaExecSuccess, GachaPostCommitResult } from "./model"
 
 export function projectGachaExecResponse(input: {
     readonly dataHeaders: Readonly<Record<string, unknown>>
+    readonly viewerId: number
     readonly result: GachaExecSuccess
     readonly postCommit: GachaPostCommitResult
 }): Record<string, unknown> {
@@ -52,11 +53,11 @@ export function projectGachaExecResponse(input: {
     }
     const responseData: Record<string, unknown> = { ...mergeCommonResponseFragments([fragment]) }
     if (result.missionSettlement !== null) {
-        // 抽到新角色跨过持有数任务/称号阶段时,完成与奖励当场发布
+        // 抽到新角色跨过持有数任务/称号阶段时,完成与奖励在 exec 响应内当场发布
         composeMissionSettlementResponse(
             responseData,
             projectMissionSettlementFragment(result.missionSettlement),
-            result.playerId,
+            input.viewerId,
         )
     }
     return {

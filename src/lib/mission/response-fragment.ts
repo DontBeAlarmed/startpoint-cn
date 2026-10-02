@@ -79,7 +79,8 @@ export function projectMissionSettlementFragment(
     }
     if (hasOwn(settlement, "itemList")) {
         const itemList = copyItemList(settlement.itemList)
-        // 空奖励表不进 fragment:避免覆盖响应里既有的客户端形状(如交换的 [])
+        // 空对象不进 fragment,避免覆盖响应里既有的客户端形状(如交换的 []);
+        // null 与 legacy 数组分支维持原样透传
         if (!isRecord(itemList) || Object.keys(itemList).length > 0) {
             common.item_list = itemList
         }
