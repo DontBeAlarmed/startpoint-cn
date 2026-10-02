@@ -9,6 +9,9 @@ import { incrementActiveMissionUsedManaCountSync } from "../../../data/domains/a
 import { recordCollectMissionManaSpend } from "../../mission/collect-battle-facts"
 import { getServerTime } from "../../../utils"
 import { publishActiveMissionOwnerStateWithinTransaction } from "../../mission/active-publication-owner"
+import { settleMissionCategories } from "../../mission/settlement"
+import { getMissionCatalog } from "../../mission/mission-catalog"
+import type { MissionSettlementResult } from "../../mission/settlement"
 import { recordSecondManaBoardCompletionMilestoneSync } from "../../../lib/player-history-milestones"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
 import { isCharacterSecondManaBoardAvailable } from "../../mana-board-availability"
@@ -58,6 +61,7 @@ export interface LearnManaNodesResult extends CharacterGrowthCommandResult {
     readonly evolution: Object
     readonly missionFacts: Readonly<{ readonly usedMana: number }>
     readonly activeMissionList: readonly unknown[]
+    readonly missionSettlement: MissionSettlementResult | null
     readonly resourceState: Readonly<{
         mana: number
         freeMana: number
@@ -196,6 +200,21 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
         if (boardId === 2 && isBoardComplete) {
             recordSecondManaBoardCompletionMilestoneSync(command.playerId, command.characterId)
         }
+        // 学节点是「已学节点集合」事实的产生时点:玛纳板累计强化数
+        // (total_released_mana_node_count,任务 37 族)与二板全部强化完成
+        // (manaboard_2nd_complete_count,任务 96 族)是状态派生任务,必须在
+        // 同事务窄域当场结算,否则奖励被推迟到下次进关/任务页
+        // (2026-10-01 时点审计发现 #2:learn 显式 null)。开板数
+        // (manaboard_2nd_open_count)由 open_mana_board 的全量结算负责。
+        const manaNodeMissionIds = [
+            ...getMissionCatalog().getDefinitionsByPattern("total_released_mana_node_count"),
+            ...getMissionCatalog().getDefinitionsByPattern("manaboard_2nd_complete_count"),
+        ].map(definition => definition.missionId)
+        const missionSettlement = settleMissionCategories(
+            command.playerId,
+            [{ category: 1, missionIds: manaNodeMissionIds }],
+            command.evaluationTime,
+        )
         finalizeLearnManaAwakePublicationWrites(
             command.playerId,
             command.characterId,
@@ -256,7 +275,7 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
                 paidMana: resources.paidManaAfter,
                 items: resources.itemsAfter,
             },
-            missionSettlement: null,
+            missionSettlement,
             missionFacts: { usedMana: resources.totalManaCost },
             activeMissionList: activeMission.activeMissionList,
             replayed: false,
