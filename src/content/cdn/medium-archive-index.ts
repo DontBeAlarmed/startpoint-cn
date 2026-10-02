@@ -16,11 +16,8 @@ export interface MediumArchiveLocation {
 
 export interface MediumArchiveIndexDependencies {
     readonly listArchives?: (directory: string) => Promise<readonly string[]>
-    readonly openArchive?: (zipPath: string) => Promise<{ readonly files: ReadonlyArray<{
-        readonly path: string
-        readonly type: string
-    }> }>
-    readonly readEntry?: (zipPath: string, entryName: string) => Promise<Buffer>
+    readonly openArchive?: (zipPath: string) => Promise<UnzippedFileLike>
+    readonly readEntry?: ((zipPath: string, entryName: string) => Promise<Buffer>) | undefined
 }
 
 function defaultListArchives(directory: string): Promise<readonly string[]> {
@@ -42,8 +39,8 @@ interface UnzippedFileLike {
     }>
 }
 
-async function defaultReadEntry(zipPath: string, entryName: string): Promise<Buffer> {
-    const opened = await defaultOpenArchive(zipPath) as UnzippedFileLike
+async function defaultReadEntry(zipPath: string, entryName: string, openArchive = defaultOpenArchive): Promise<Buffer> {
+    const opened = await openArchive(zipPath)
     const entry = opened.files.find(file => file.type === "File" && file.path === entryName)
     if (!entry?.buffer) {
         throw new Error(`ZIP entry not found: ${entryName} in ${path.basename(zipPath)}`)
@@ -76,10 +73,6 @@ export class MediumArchiveIndex {
         this.#dependencies = dependencies
     }
 
-    get directory(): string {
-        return this.#directory
-    }
-
     /** Built-entry count, forcing construction. 0 also covers a missing directory. */
     async size(): Promise<number> {
         return (await this.#ensureIndex()).size
@@ -96,7 +89,9 @@ export class MediumArchiveIndex {
         const location = await this.locate(physicalPath)
         if (location === null) return null
         try {
-            const readEntry = this.#dependencies.readEntry ?? defaultReadEntry
+            const openArchive = this.#dependencies.openArchive ?? defaultOpenArchive
+            const readEntry = this.#dependencies.readEntry
+                ?? ((zipPath: string, entryName: string) => defaultReadEntry(zipPath, entryName, openArchive))
             return await readEntry(location.zipPath, location.entryName)
         } catch {
             return null
@@ -136,7 +131,7 @@ export class MediumArchiveIndex {
         for (const zipPath of archivePaths) {
             let opened: UnzippedFileLike
             try {
-                opened = await openArchive(zipPath) as UnzippedFileLike
+                opened = await openArchive(zipPath)
             } catch {
                 continue
             }

@@ -1,4 +1,5 @@
 import { deepFreeze } from "../content/deep-freeze"
+import { OffsetKeyedStaticTimelineCache } from "./timeline-cache"
 import {
     getContentSnapshot,
     type ReadonlyContentRepository,
@@ -71,15 +72,11 @@ interface StaticActivityTimeline {
     readonly searchIndex: AdminActivitySearchRow[]
 }
 
-// Cached static timelines are keyed by repository identity and by the
-// calendar offset they were rendered under, so a timeline built under one
-// offset can never be served for another (same contract as the gacha
-// clairvoyance timeline).
-const staticTimelineByRepository = new WeakMap<ReadonlyContentRepository, Map<number, StaticActivityTimeline>>()
-
 function toIso(masterWallTime: string, calendar: GameCalendarPolicy): string {
     return new Date(calendar.parseMasterTimestamp(masterWallTime)).toISOString()
 }
+
+const staticTimelineCache = new OffsetKeyedStaticTimelineCache<StaticActivityTimeline>(buildStaticTimeline)
 
 function toActivityEvent(row: ActivityEventRow, calendar: GameCalendarPolicy): AdminActivityEvent {
     return {
@@ -132,28 +129,12 @@ function buildStaticTimeline(
     return deepFreeze({ timeline, searchIndex })
 }
 
-function getStaticTimeline(
-    repository: ReadonlyContentRepository,
-    calendar: GameCalendarPolicy,
-): StaticActivityTimeline {
-    let byOffset = staticTimelineByRepository.get(repository)
-    if (byOffset === undefined) {
-        byOffset = new Map<number, StaticActivityTimeline>()
-        staticTimelineByRepository.set(repository, byOffset)
-    }
-    const cached = byOffset.get(calendar.utcOffsetMinutes)
-    if (cached !== undefined) return cached
-    const built = buildStaticTimeline(repository, calendar)
-    byOffset.set(calendar.utcOffsetMinutes, built)
-    return built
-}
-
 export function buildAdminActivityTimeline(
     now: Date = getVirtualNow(),
     calendar: GameCalendarPolicy = getGameCalendar(),
 ): AdminActivityTimeline {
     const repository = getContentSnapshot().repository
-    const staticTimeline = getStaticTimeline(repository, calendar)
+    const staticTimeline = staticTimelineCache.get(repository, calendar)
     return {
         scope: "event-quest",
         currentTime: now.toISOString(),
