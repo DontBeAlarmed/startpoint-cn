@@ -490,7 +490,7 @@ export default function PlayerDetail() {
             onRefresh={refreshPage}
             refreshing={isFetching}
             actions={
-                <Button onClick={() => navigate("/accounts")}>返回账号 / 存档</Button>
+                <Button onClick={() => navigate("/accounts")}>←返回</Button>
             }
         >
         <Space direction="vertical" size="large" className="admin-stack">
