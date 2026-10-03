@@ -261,10 +261,37 @@
   line-height: 1.5;
 }
 
-.news-card .acc-titlebar .admin-news-thumb {
-  flex: none;
-  width: 64px;
-  height: 36px;
+/* 配图作卡片背景: 只占右半边, 左缘渐隐融入卡底(维护者指定) */
+.news-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.news-card-bg {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 50%;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.news-card-bg .admin-news-thumb {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 0;
+  object-fit: cover;
+  opacity: 0.4;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 55%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 55%);
+}
+
+/* 卡片内容浮于背景层之上 */
+.news-card .acc-titlebar {
+  position: relative;
+  z-index: 1;
 }
 
 /* 三钮(启停/编辑/删除)位置: 移动端独占最下一排, 桌面端右侧一簇(维护者指定) */

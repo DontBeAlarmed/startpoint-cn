@@ -44,8 +44,8 @@ export class NewsRevisionConflictError extends Error {
 }
 
 export class NewsValidationError extends TypeError {
-    constructor() {
-        super("News validation failed")
+    constructor(message = "News validation failed") {
+        super(message)
         this.name = "NewsValidationError"
     }
 }
@@ -145,7 +145,9 @@ export function validateNewsDraft(input: unknown): ValidatedNewsDraft {
     try {
         return validateDraftRecord(input)
     } catch (error) {
-        if (error instanceof TypeError) throw new NewsValidationError()
+        // 透传具体字段原因(如 "News thumbnail must be an integer from 1 through 13"),
+        // 管理路由据此给出含原因的 400 文案, 不再只报笼统的"公告内容无效"
+        if (error instanceof TypeError) throw new NewsValidationError(error.message)
         throw error
     }
 }

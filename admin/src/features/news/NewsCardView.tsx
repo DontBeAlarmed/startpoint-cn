@@ -47,8 +47,12 @@ export function NewsCardView({
                 )}
                 {rows.map(row => (
                     <div key={row.id} className="acc-card news-card">
+                        {/* 配图作卡片背景: 只占右半边, 左缘渐隐融入卡底(维护者指定);
+                            NewsThumb 自带加载失败回退渐变块, 背景层同样适用 */}
+                        <div className="news-card-bg" aria-hidden="true">
+                            <NewsThumb thumbnail={row.thumbnail} className="news-card-bg-img" />
+                        </div>
                         <div className="acc-titlebar">
-                            <NewsThumb thumbnail={row.thumbnail} className="news-card-thumb" />
                             <div className="news-card-heading">
                                 <div className="news-card-headline">
                                     <span className={categoryBadgeClass[row.category]}>

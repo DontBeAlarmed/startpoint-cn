@@ -31,14 +31,27 @@ const LABEL_OPTIONS = Array.from({ length: 8 }, (_, index) => ({
 
 const THUMBNAIL_OPTIONS = Array.from({ length: 13 }, (_, index) => ({
     value: index + 1,
-    label: `缩略图 ${index + 1}`,
+    label: `配图 ${index + 1}`,
 }))
 
-interface NewsEditorProps {
-    news: AdminNewsRow | null
-    open: boolean
-    onClose: () => void
-    onSaved: (row: AdminNewsRow) => void
+// 种子数据的发布时间可能是无时区的旧格式(如 "2023-01-02 00:00:00"); 不改动时间字段
+// 直接保存时会原样回传, 被服务端时区校验拒绝("公告内容无效"不告知原因的根因)。
+// 载入草稿即统一规范化为 ISO, 未改动也能安全回传。
+function toIsoTime(value: string): string {
+    const parsed = new Date(value)
+    return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString()
+}
+
+function toDraft(news: AdminNewsRow | null): NewsDraft {
+    return {
+        category: news?.category ?? 1,
+        title: news?.title ?? "",
+        publishedAtReal: news ? toIsoTime(news.publishedAtReal) : new Date().toISOString(),
+        bodyRichText: news?.bodyRichText ?? "",
+        label: news?.label ?? 1,
+        thumbnail: news?.thumbnail ?? 1,
+        enabled: news?.enabled ?? false,
+    }
 }
 
 function toLocalInputValue(value: string): string {
@@ -48,16 +61,11 @@ function toLocalInputValue(value: string): string {
     return new Date(parsed.getTime() - offset).toISOString().slice(0, 16)
 }
 
-function toDraft(news: AdminNewsRow | null): NewsDraft {
-    return {
-        category: news?.category ?? 1,
-        title: news?.title ?? "",
-        publishedAtReal: news?.publishedAtReal ?? new Date().toISOString(),
-        bodyRichText: news?.bodyRichText ?? "",
-        label: news?.label ?? 1,
-        thumbnail: news?.thumbnail ?? 1,
-        enabled: news?.enabled ?? false,
-    }
+interface NewsEditorProps {
+    news: AdminNewsRow | null
+    open: boolean
+    onClose: () => void
+    onSaved: (row: AdminNewsRow) => void
 }
 
 export default function NewsEditor({ news, open, onClose, onSaved }: NewsEditorProps) {
@@ -180,7 +188,7 @@ export default function NewsEditor({ news, open, onClose, onSaved }: NewsEditorP
                                     onChange={value => update("label", value)}
                                 />
                             </Form.Item>
-                            <Form.Item label="缩略图" required>
+                            <Form.Item label="配图" required extra="客户端内置素材(编号 1-13), 卡片右半边作渐隐背景展示">
                                 <Select
                                     options={THUMBNAIL_OPTIONS}
                                     value={draft.thumbnail}

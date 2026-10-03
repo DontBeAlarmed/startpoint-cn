@@ -63,7 +63,21 @@ function sendRouteError(
         return reply.status(409).send({ error: "公告已被其他操作修改，请刷新" })
     }
     if (error instanceof NewsValidationError || error instanceof NewsRequestValidationError) {
-        return reply.status(400).send({ error: "公告内容无效" })
+        const reason = error.message
+            .replace("News publication time", "发布时间")
+            .replace("News thumbnail", "配图")
+            .replace("News label", "标签")
+            .replace("News title", "标题")
+            .replace("News RichText", "公告内容")
+            .replace("News category", "分类")
+            .replace("News revision", "版本")
+            .replace(" must include a timezone offset", " 缺少时区信息")
+            .replace(" must be a valid date and time", " 不是有效的时间格式")
+            .replace(/must be an integer from (\d+) through (\d+)/, "必须是 $1 到 $2 的整数")
+            .replace(" must be a string", " 格式无效")
+            .replace(/\s+/g, " ")
+            .trim()
+        return reply.status(400).send({ error: `公告内容无效：${reason}` })
     }
     request.log.error({ code: "ADMIN_NEWS_OPERATION_FAILED" }, "Admin news operation failed")
     return reply.status(500).send({ error: "公告操作失败" })

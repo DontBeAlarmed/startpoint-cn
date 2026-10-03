@@ -37,9 +37,11 @@ assert.match(newsPage, /categoryLabels=\{CATEGORY_LABELS\}/, "分类文案应作
 assert.match(newsPage, /categoryBadgeClass=\{CATEGORY_BADGE_CLASS\}/, "分类语义色映射应作为 props 下传")
 assert.match(newsPage, /onToggle=\{row => toggle\.mutateAsync\(row\)\}/, "启停复用页面 toggle mutation(与原桌面 Switch 同通道)")
 
-// ── 卡片结构: 缩略图 + 两行标题块 + 启停收敛 ────────────────────────────────
+// ── 卡片结构: 配图背景层 + 两行标题块 + 启停收敛 ────────────────────────────
 assert.match(cardView, /className="acc-card news-card"/, "卡片外壳复用账号页 acc-card")
-assert.match(cardView, /<NewsThumb thumbnail=\{row\.thumbnail\} className="news-card-thumb" \/>/, "缩略图保留在标题行")
+// 2026-10-04: 配图改为卡片背景 —— 右半边渐隐层(维护者指定), 标题行不再放缩略图
+assert.match(cardView, /<div className="news-card-bg" aria-hidden="true">/, "配图背景层应存在")
+assert.match(cardView, /<NewsThumb thumbnail=\{row\.thumbnail\} className="news-card-bg-img" \/>/, "背景层复用 NewsThumb(含失败回退)")
 assert.match(cardView, /news-card-headline/, "第一行=分类徽章+标题")
 assert.match(cardView, /className=\{categoryBadgeClass\[row\.category\]\}/, "分类徽章沿用页面语义色映射")
 assert.match(cardView, /news-card-title/, "标题走两行截断样式")
@@ -69,6 +71,10 @@ assert.match(cardView, /暂无公告/, "空态文案与原桌面一致")
 // ── CSS: 私有件进页面 css ──────────────────────────────────────────────────
 assert.match(newsCss, /\.news-card-heading \{[^}]*flex-direction: column/, "两行标题块样式应存在")
 assert.match(newsCss, /\.news-card-title \{[^}]*-webkit-line-clamp: 2/, "标题应两行截断")
+// 配图背景层: 右半边 + 渐隐 + 裁剪
+assert.match(newsCss, /\.news-card \{[^}]*overflow: hidden/, "卡片背景层应被圆角裁剪")
+assert.match(newsCss, /\.news-card-bg \{[^}]*width: 50%/, "配图背景只占右半边")
+assert.match(newsCss, /mask-image: linear-gradient/, "背景应左缘渐隐")
 // 2026-10-04 二次调整: 三钮(启停/编辑/删除)合并一处 —— 桌面右侧一簇, 移动端最下一排
 assert.match(cardView, /acc-actions news-card-actions/, "三钮应合并进标题行 actions 簇")
 assert.doesNotMatch(cardView, /acc-bottom-row/, "独立底行应移除")
