@@ -140,9 +140,10 @@
 
 /* 页头两端布局（维护者指定）: 左=eyebrow+标题(+其余操作), 右上角=刷新 icon */
 .admin-page-header-top {
+  /* 刷新 icon 绝对定位悬于右上角, 标题行占满整行——操作钮右缘与刷新右缘对齐（维护者指定） */
+  position: relative;
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
   gap: 8px 10px;
   min-width: 0;
 }
@@ -156,6 +157,9 @@
 }
 
 .admin-page-refresh {
+  position: absolute;
+  top: -3px;
+  right: 0;
   flex: none;
   color: var(--ink-soft);
   font-size: 16px;
