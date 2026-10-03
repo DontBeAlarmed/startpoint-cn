@@ -236,13 +236,13 @@ export default function Accounts() {
                         ) : "无"}
                     </span>
                     <span className="acc-k">绑定设备</span>
-                    {/* 存档数切换钮挂最下一排行尾（维护者指定）: 卡头长备注折行不再挤压它 */}
-                    <span className="acc-v acc-devices">
-                        {renderDevices(account.devices)}
-                        <Button className="acc-save-toggle" aria-expanded={expanded} onClick={() => toggleSavePanel(account.id)}>
+                    <span className="acc-v acc-devices">{renderDevices(account.devices)}</span>
+                    {/* 存档数切换钮独立整行左右撑满（维护者指定）, 不与设备码/备注争宽度 */}
+                    <div className="acc-save-row">
+                        <Button block className="acc-save-toggle" aria-expanded={expanded} onClick={() => toggleSavePanel(account.id)}>
                             存档数 {account.players.length} {expanded ? "▴" : "▾"}
                         </Button>
-                    </span>
+                    </div>
                 </div>
                 {expanded && (
                     <div className="acc-save-list">

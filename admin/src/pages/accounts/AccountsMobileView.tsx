@@ -184,17 +184,19 @@ export function AccountsMobileView({
                                     </div>
                                     <div>
                                         <span>绑定设备</span>
-                                        {/* 存档数切换钮挂最下一排行尾（与桌面同构） */}
                                         <span className="acc-kv-value acc-devices">
                                             {account.devices.length === 0
                                                 ? "无"
                                                 : account.devices.map(device => (
                                                     <span className="acc-dev-code" key={device.deviceId}>{device.deviceId}</span>
                                                 ))}
-                                            <Button className="acc-save-toggle" aria-expanded={expanded} onClick={() => onSelectAccount(account.id)}>
-                                                存档数 {account.players.length} {expanded ? "▴" : "▾"}
-                                            </Button>
                                         </span>
+                                    </div>
+                                    {/* 存档数切换钮独立整行左右撑满（与桌面同构） */}
+                                    <div className="acc-save-row">
+                                        <Button block className="acc-save-toggle" aria-expanded={expanded} onClick={() => onSelectAccount(account.id)}>
+                                            存档数 {account.players.length} {expanded ? "▴" : "▾"}
+                                        </Button>
                                     </div>
                                 </div>
                                 {expanded && (

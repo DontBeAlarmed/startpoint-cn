@@ -188,10 +188,11 @@
   display: flex;
 }
 
-/* 存档数切换钮: 绑定设备行行尾右置（维护者指定, 避开卡头长备注折行） */
-.acc-save-toggle {
-  margin-left: auto;
-  flex: none;
+/* 存档数切换钮: 独立整行左右撑满（维护者指定, 跨 kv 两列; 移动 detail-list 同构） */
+.admin-mobile-detail-list > .acc-save-row,
+.acc-kv > .acc-save-row {
+  grid-column: 1 / -1;
+  display: flex;
 }
 
 /* 存档子卡: stat-bg 凹陷面, 比账号卡再深一层 (mockup .save-sub panel-sub) */
