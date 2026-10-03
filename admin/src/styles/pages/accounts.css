@@ -381,6 +381,18 @@
   cursor: default;
 }
 
+/* antd 的 default 按钮状态规则特异性(0,4,0)高于单类名, hover/active 会把上面的绿
+   刷回白底黑字(主题令牌只管 antd 自身配色, 够不到自定义绿)。镜像 antd 的选择器
+   结构钉回同组绿值, 静止/hover/active 视觉恒定 —— 与 theme.tsx 钉 default 钮
+   hover 不变色的机制一致; 恒色也顺带免疫触摸屏的粘滞 :hover */
+.save-current-btn:not(:disabled):not(.ant-btn-disabled):hover,
+.save-current-btn:not(:disabled):not(.ant-btn-disabled):active,
+.save-current-btn:not(:disabled):not(.ant-btn-disabled):focus-visible {
+  color: var(--wind);
+  border-color: var(--wind);
+  background: var(--ok-bg);
+}
+
 
 
 /* accounts page (approved mockup accounts-v2): panel-head star tick — the 账号管理 card
