@@ -119,6 +119,15 @@
   border-radius: 14px;
   padding: 12px;
   background: var(--th-bg);
+  /* 点空白展开存档列表（维护者指定） */
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.acc-card:hover,
+.acc-card:focus-visible {
+  background: var(--hover);
+  border-color: var(--line-strong);
 }
 
 .acc-id {
@@ -197,6 +206,15 @@
   border-radius: 10px;
   padding: 10px;
   background: var(--stat-bg);
+  /* 点空白进入玩家详情（维护者指定） */
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.save-sub:hover,
+.save-sub:focus-visible {
+  background: var(--th-bg);
+  border-color: var(--line-strong);
 }
 
 .save-head {

@@ -162,7 +162,11 @@ export default function Accounts() {
     // 存档子卡: 单行布局 — 头像+名字+#存档id+meta, 右端 当前/切换合体标识 + 编辑 + […]
     // (维护者指定: 行内重命名 pencil 移除, 重命名统一走玩家详情; 复制/导出/删除收进 […] 菜单)
     const renderSaveSub = (account: AccountRow, player: PlayerBrief) => (
-        <div className="save-sub" key={player.id}>
+        <div
+            className="save-sub"
+            key={player.id}
+            onClick={event => { event.stopPropagation(); navigate(`/players/${player.id}`) }}
+        >
             <div className="save-head">
                 <FavoriteAvatar characterId={player.favoriteCharacterId} name={player.name} />
                 <span className="save-info">
@@ -174,11 +178,11 @@ export default function Accounts() {
                 </span>
                 {/* 当前存档标识与切换合体: 绿色「当前」常驻标识 / 非当前「切换」按钮 (activateSave 同置账号当前存档与全局活动) */}
                 {player.isDefault
-                    ? <span className="admin-badge-ok save-current-chip">当前</span>
-                    : <Button size="small" onClick={() => activateSave.mutate(player.id)}>切换</Button>}
-                <Button size="small" onClick={() => navigate(`/players/${player.id}`)}>编辑</Button>
+                    ? <Button size="small" type="primary" disabled>当前</Button>
+                    : <Button size="small" type="primary" onClick={() => activateSave.mutate(player.id)}>切换</Button>}
+                <Button size="small" type="primary" onClick={() => navigate(`/players/${player.id}`)}>编辑</Button>
                 <Dropdown menu={saveMoreMenu(account, player)} trigger={["click"]} placement="bottomRight">
-                    <Button size="small" className="admin-more-btn" aria-label="更多操作">…</Button>
+                    <Button size="small" type="primary" className="admin-more-btn" aria-label="更多操作">…</Button>
                 </Dropdown>
             </div>
         </div>
@@ -188,8 +192,8 @@ export default function Accounts() {
     const renderAccountCard = (account: AccountRow) => {
         const expanded = selectedAccountId === account.id
         return (
-            <div className="acc-card" key={account.id}>
-                <div className="acc-titlebar">
+            <div className="acc-card" key={account.id} onClick={() => toggleSavePanel(account.id)}>
+                <div className="acc-titlebar" onClick={event => event.stopPropagation()}>
                     <span className="acc-id-chip admin-mono">账号 #{account.id}</span>
                     <span className="acc-title-name">{account.defaultPlayerName ?? "无存档"}</span>
                     {renderNote(account)}
@@ -209,11 +213,23 @@ export default function Accounts() {
                             绑定设备 {account.devices.length === 0 ? "无" : account.devices.map(device => device.deviceId).join(", ")}
                         </span>
                     </span>
-                    <Button size="small" className="acc-count-toggle" aria-expanded={expanded} onClick={() => toggleSavePanel(account.id)}>
+                    <Button
+                        size="small"
+                        type="primary"
+                        className="acc-count-toggle"
+                        aria-expanded={expanded}
+                        onClick={event => { event.stopPropagation(); toggleSavePanel(account.id) }}
+                    >
                         存档数 {account.players.length} {expanded ? "▴" : "▾"}
                     </Button>
                     <Dropdown menu={moreActionsMenu(account.id)} trigger={["click"]} placement="bottomRight">
-                        <Button size="small" className="admin-more-btn" aria-label="更多操作">…</Button>
+                        <Button
+                            size="small"
+                            type="primary"
+                            className="admin-more-btn"
+                            aria-label="更多操作"
+                            onClick={event => event.stopPropagation()}
+                        >…</Button>
                     </Dropdown>
                 </div>
                 {expanded && (

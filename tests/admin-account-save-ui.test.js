@@ -50,7 +50,6 @@ assert.doesNotMatch(accounts, /device\/rename/)
 assert.doesNotMatch(accounts, /renameDevice/)
 assert.doesNotMatch(mobileView, /onRenameDevice/)
 assert.match(accounts, /绑定设备/)
-assert.match(mobileView, /acc-dev-code/)
 
 // ── 备注行内编辑 ──────────────────────────────────────────────────────────
 assert.match(accounts, /acc-note acc-note-edit/)
@@ -62,10 +61,21 @@ assert.match(mobileView, /acc-note acc-note-edit/)
 assert.match(accounts, /className="save-sub"/)
 assert.match(accounts, /save-id admin-mono">#存档 \{player\.id\}<\/span>/)
 assert.match(mobileView, /save-id admin-mono">#存档 \{player\.id\}<\/span>/)
-// 合体标识: 当前(绿色常驻, 2 字与「切换」等长)/切换, 仅存档子卡出现
-assert.equal((accounts.match(/admin-badge-ok save-current-chip">当前<\/span>/g) ?? []).length, 1, "当前标识应仅在存档子卡出现一次")
-assert.equal((mobileView.match(/admin-badge-ok save-current-chip">当前<\/span>/g) ?? []).length, 1, "移动当前标识应仅在存档子卡出现一次")
-assert.match(accounts, />切换<\/Button>/)
+// 合体标识: 当前(主按钮禁用态)/切换, 仅存档子卡出现; 按钮统一主按钮风格(新建存档风格)
+assert.equal((accounts.match(/<Button size="small" type="primary" disabled>当前<\/Button>/g) ?? []).length, 1, "当前标识应仅在存档子卡出现一次")
+assert.equal((mobileView.match(/<Button size="small" type="primary" disabled>当前<\/Button>/g) ?? []).length, 1, "移动当前标识应仅在存档子卡出现一次")
+assert.match(accounts, /type="primary" onClick=\{\(\) => activateSave\.mutate\(player\.id\)\}>切换<\/Button>/)
+assert.match(accounts, /type="primary" onClick=\{\(\) => navigate\(`\/players\/\$\{player\.id\}`\)\}>编辑<\/Button>/)
+assert.match(accounts, /type="primary" className="admin-more-btn"/)
+assert.match(mobileView, /type="primary" className="admin-more-btn"/)
+assert.match(mobileView, /type="primary" icon=\{<Pencil size=\{15\} \/>/)
+// 点空白交互(维护者指定): 账号卡空白=展开存档列表, 存档卡空白=进玩家详情
+assert.match(accounts, /className="acc-card" key=\{account\.id\} onClick=\{\(\) => toggleSavePanel\(account\.id\)\}/)
+assert.match(mobileView, /className="acc-card" key=\{account\.id\} onClick=\{\(\) => onSelectAccount\(account\.id\)\}/)
+assert.match(accounts, /event\.stopPropagation\(\); navigate\(`\/players\/\$\{player\.id\}`\)/)
+assert.match(mobileView, /acc-identity-meta/)
+assert.match(mobileView, /#存档 \{account\.defaultPlayerId\}/)
+assert.doesNotMatch(mobileView, /acc-kv/)
 assert.doesNotMatch(accounts, /重命名存档/)
 assert.doesNotMatch(accounts, /renameSave/)
 // 复制/导出/删除 收进存档「…」菜单(维护者指定)
@@ -95,13 +105,13 @@ assert.match(mobileView, /player\.rank/)
 assert.doesNotMatch(mobileView, /role="button"/)
 
 // 操作钮尺寸: 仅行内编辑器紧凑组保留 small
-// 桌面 8 = 备注编辑器3 + 存档子卡 切换/编辑/…3 + 身份行 存档数/…2;
-// 移动 7 = 备注编辑器3 + 新建存档1 + 存档数1 + …1 + 子卡切换1
+// 桌面 10 = 备注编辑器3 + 存档子卡 当前/切换/编辑/…4 + 身份行 存档数/…2 + 卡头新建存档1(默认尺寸);
+// 移动 9 = 备注编辑器3 + 新建存档1 + 存档数1 + …1 + 子卡 当前/切换/编辑/…4 - 1(编辑无 small) → 3+1+1+1+1+1+1=9
 {
     const smallCount = (accounts.match(/size="small"/g) ?? []).length
-    assert.equal(smallCount, 8, "桌面 small 实际 " + smallCount + " 处")
+    assert.equal(smallCount, 9, "桌面 small 实际 " + smallCount + " 处")
     const mobileSmall = (mobileView.match(/size="small"/g) ?? []).length
-    assert.equal(mobileSmall, 7, "移动 small 实际 " + mobileSmall + " 处")
+    assert.equal(mobileSmall, 8, "移动 small 实际 " + mobileSmall + " 处")
 }
 
 // 喜爱角色头像: /api/server/accounts 只读投影 favoriteCharacterId ← 收藏编队读取器轻量 wrapper;
