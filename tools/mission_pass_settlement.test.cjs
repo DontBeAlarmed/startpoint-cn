@@ -116,9 +116,13 @@ const resetPlayerId = insertDefaultPlayerSync(resetAccount.id).id
 updatePlayerCategoryMissionSync(resetPlayerId, 6, 9, 1)
 updatePlayerCategoryMissionSync(resetPlayerId, 7, 9, 40)
 updatePlayerSync({ id: resetPlayerId, lastLoginTime: new Date("2024-08-13T12:00:00.000Z") })
+// 真实业务日标记预置为前一日:使 08-14 的调用构成一次真实跨天
+getDb().prepare("UPDATE players SET last_daily_reset_real_business_day = ? WHERE id = ?")
+    .run("2024-08-13", resetPlayerId)
 assert.equal(
     dailyResetPlayerDataSync(
         getPlayerSync(resetPlayerId),
+        new Date("2024-08-14T12:00:00.000Z"),
         new Date("2024-08-14T12:00:00.000Z"),
     ),
     true,
@@ -130,6 +134,7 @@ updatePlayerCategoryMissionSync(resetPlayerId, 6, 9, 1)
 assert.equal(
     dailyResetPlayerDataSync(
         getPlayerSync(resetPlayerId),
+        new Date("2024-08-19T12:00:00.000Z"),
         new Date("2024-08-19T12:00:00.000Z"),
     ),
     true,
@@ -153,6 +158,9 @@ updatePlayerSync({
     bossBoostPoint: 1,
     boostPoint: 1,
 })
+// 真实业务日标记预置为前一日:使 08-14 的调用构成一次真实跨天(回滚后可重试)
+getDb().prepare("UPDATE players SET last_daily_reset_real_business_day = ? WHERE id = ?")
+    .run("2024-08-13", rollbackPlayerId)
 updatePlayerCategoryMissionSync(rollbackPlayerId, 6, 9, 1)
 const rollbackBefore = getPlayerSync(rollbackPlayerId)
 db.exec(`
@@ -164,7 +172,7 @@ db.exec(`
     END
 `)
 assert.throws(
-    () => dailyResetPlayerDataSync(getPlayerSync(rollbackPlayerId), rollbackLogin),
+    () => dailyResetPlayerDataSync(getPlayerSync(rollbackPlayerId), rollbackLogin, rollbackLogin),
     /injected pass login failure/,
 )
 db.exec("DROP TRIGGER reject_pass_login_after_player_update")
@@ -175,7 +183,7 @@ assert.equal(rollbackAfterFailure.bossBoostPoint, rollbackBefore.bossBoostPoint)
 assert.equal(rollbackAfterFailure.boostPoint, rollbackBefore.boostPoint)
 assert.equal(getPlayerCategoryMissionsSync(rollbackPlayerId, 6)[9].progress, 1)
 assert.equal(
-    dailyResetPlayerDataSync(getPlayerSync(rollbackPlayerId), rollbackLogin),
+    dailyResetPlayerDataSync(getPlayerSync(rollbackPlayerId), rollbackLogin, rollbackLogin),
     true,
     "失败回滚后同一次跨日登录必须仍可重试",
 )
@@ -201,6 +209,9 @@ updatePlayerSync({
 })
 updatePlayerCategoryMissionSync(lateRollbackPlayerId, 6, 9, 1)
 updatePlayerCategoryMissionSync(lateRollbackPlayerId, 7, 9, 40)
+// 真实业务日标记预置为前一日(真实周边界场景)
+getDb().prepare("UPDATE players SET last_daily_reset_real_business_day = ? WHERE id = ?")
+    .run("2024-08-18", lateRollbackPlayerId)
 const lateRollbackBefore = getPlayerSync(lateRollbackPlayerId)
 db.exec(`
     CREATE TRIGGER reject_weekly_pass_reset
@@ -211,7 +222,7 @@ db.exec(`
     END
 `)
 assert.throws(
-    () => dailyResetPlayerDataSync(getPlayerSync(lateRollbackPlayerId), lateRollbackLogin),
+    () => dailyResetPlayerDataSync(getPlayerSync(lateRollbackPlayerId), lateRollbackLogin, lateRollbackLogin),
     /injected late pass reset failure/,
 )
 db.exec("DROP TRIGGER reject_weekly_pass_reset")
@@ -223,7 +234,7 @@ assert.equal(lateRollbackAfter.boostPoint, lateRollbackBefore.boostPoint)
 assert.equal(getPlayerCategoryMissionsSync(lateRollbackPlayerId, 6)[9].progress, 1)
 assert.equal(getPlayerCategoryMissionsSync(lateRollbackPlayerId, 7)[9].progress, 40)
 assert.equal(
-    dailyResetPlayerDataSync(getPlayerSync(lateRollbackPlayerId), lateRollbackLogin),
+    dailyResetPlayerDataSync(getPlayerSync(lateRollbackPlayerId), lateRollbackLogin, lateRollbackLogin),
     true,
     "嵌套日常删除完成后的失败也必须允许同一次跨周登录重试",
 )
@@ -239,9 +250,13 @@ const loginAccount = insertAccountSync({
     status: "normal",
 })
 const loginPlayerId = insertDefaultPlayerSync(loginAccount.id).id
+// 真实业务日标记预置为前一日:循环的每个真实日各推进一天
+getDb().prepare("UPDATE players SET last_daily_reset_real_business_day = ? WHERE id = ?")
+    .run("2025-09-01", loginPlayerId)
 for (const day of [2, 3, 4, 5]) {
     dailyResetPlayerDataSync(
         getPlayerSync(loginPlayerId),
+        new Date(`2025-09-0${day}T04:00:00.000Z`),
         new Date(`2025-09-0${day}T04:00:00.000Z`),
     )
 }

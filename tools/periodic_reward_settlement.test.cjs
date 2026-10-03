@@ -136,13 +136,16 @@ db.prepare(`UPDATE players SET last_login_time = ? WHERE id = ?`)
     .run(previousLogin.toISOString(), playerId)
 
 const resetTime = new Date("2025-06-20T00:00:00.000Z")
-assert.equal(dailyResetPlayerDataSync(getPlayerSync(playerId), resetTime), true)
+// 真实业务日标记预置为前一日:使 06-20 的调用构成一次真实跨天
+getDb().prepare("UPDATE players SET last_daily_reset_real_business_day = ? WHERE id = ?")
+    .run("2025-06-19", playerId)
+assert.equal(dailyResetPlayerDataSync(getPlayerSync(playerId), resetTime, resetTime), true)
 assert.equal(points(playerId)[1], 99, "恢复后不得超过 CDN 上限")
 assert.equal(points(playerId)[2], 3, "每日恢复应增加 CDN recoveryPoint")
 assert.equal(points(playerId)[3], 2, "跨日首次补齐不得额外叠加恢复")
 assert.equal(points(playerId)[90000001], 1, "非每日周期不得在每日重置时恢复")
 assert.equal(
-    dailyResetPlayerDataSync(getPlayerSync(playerId), new Date("2025-06-20T01:00:00.000Z")),
+    dailyResetPlayerDataSync(getPlayerSync(playerId), new Date("2025-06-20T01:00:00.000Z"), new Date("2025-06-20T01:00:00.000Z")),
     false,
 )
 assert.equal(points(playerId)[2], 3, "同一服务器日不得重复恢复")

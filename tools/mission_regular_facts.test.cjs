@@ -288,15 +288,15 @@ for (let index = 0; index < 2; index++) {
     })
 }
 
-// 真实日标记迁移一次性跨发(无标记玩家首次日切必重置),再验边界精度
+// 首次标记写入只落标记不触发日切(新玩家/导入档/迁移同语义),再验边界精度
 assert.equal(
     dailyResetPlayerDataSync(
         getPlayerSync(boundaryPlayerId),
         new Date("2024-08-18T12:00:00.000Z"),
         new Date("2024-08-18T12:00:00.000Z"),
     ),
-    true,
-    "迁移一次性跨发(写入真实业务日标记)",
+    false,
+    "首次标记写入不得触发日切",
 )
 assert.equal(
     dailyResetPlayerDataSync(

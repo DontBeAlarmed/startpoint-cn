@@ -5,7 +5,7 @@ import { getDefaultPlayerData } from "../utils/default-player";
 import { deserializeBoolean, serializeBoolean } from "../utils/primitives";
 import { getAccountSync } from "./account";
 import { getPlayerQuestProgressSync } from "./quest";
-import { getBusinessDayKey, isNewDay, isNewWeek } from "../../lib/time-utils";
+import { getBusinessDayKey, isNewWeek } from "../../lib/time-utils";
 import { buildPeriodicSnapshotData, getPassWeekSnapshotType, getSnapshot, initializePeriodicMissionSnapshots, takeSnapshot } from "../../lib/mission/snapshot";
 
 import { ensurePlayerPassCardLoginProgressSync } from "./pass-card";
@@ -1268,13 +1268,21 @@ export function dailyResetPlayerDataSync(
     // 与 lastLoginTime(虚拟语义,含客户端存档展示)解耦。
     const realBusinessDay = getBusinessDayKey(realNow, resetHour)
     const storedRealBusinessDay = getPlayerDailyResetRealBusinessDaySync(playerId)
-    const lastRealBusinessDayDate = storedRealBusinessDay === null
-        ? null
-        : new Date(`${storedRealBusinessDay}T00:00:00Z`)
-    const crossedDay = storedRealBusinessDay === null
-        || realBusinessDay > storedRealBusinessDay
-    const crossedWeek = lastRealBusinessDayDate !== null
-        && isNewWeek(realNow, lastRealBusinessDayDate, resetHour)
+    // 首次标记写入(新玩家/导入档/迁移)只落标记不触发日切:避免同真实日
+    // 双计登录天与意外的周常清空;周期从下一个真实业务日开始。
+    // 该标记是服务端内部态,刻意不进 Player 类型与存档格式(与
+    // lastLoginTime 的客户端可见语义解耦)。
+    if (storedRealBusinessDay === null) {
+        getDb().prepare(`
+            UPDATE players SET last_daily_reset_real_business_day = ? WHERE id = ?
+        `).run(realBusinessDay, playerId)
+        updatePlayerSync({ id: playerId, lastLoginTime: virtualNow })
+        player.lastLoginTime = virtualNow
+        return false
+    }
+    const lastRealBusinessDayDate = new Date(`${storedRealBusinessDay}T00:00:00Z`)
+    const crossedDay = realBusinessDay > storedRealBusinessDay
+    const crossedWeek = isNewWeek(realNow, lastRealBusinessDayDate, resetHour)
 
     if (crossedDay) {
         const resetPerformed = getDb().transaction(() => {
@@ -1360,18 +1368,3 @@ function getPlayerDailyResetRealBusinessDaySync(playerId: number): string | null
     return row?.last_daily_reset_real_business_day ?? null
 }
 
-/**
- * Performs a daily reset for a player
- * 
- * @param playerId The ID of the player to perform the daily reset for.
- * @returns A boolean; whether the daily reset was performed
- */
-export function dailyResetPlayerSync(
-    playerId: number,
-    resetHour = 5,
-): boolean {
-    const playerData = getPlayerSync(playerId)
-    if (!playerData) return false;
-
-    return dailyResetPlayerDataSync(playerData, getRealNow(), getRealNow(), resetHour)
-}

@@ -15,6 +15,8 @@ import {
 } from "../../lib/mission/response-fragment"
 import { getMailArrivedSync } from "../../lib/mail-notification"
 import { getRealNow } from "../../runtime/time/game-time"
+// 时钟口径:结算任务的 evaluationTime 走服务器虚拟时间(getServerDate,
+// 与任务窗口判定同钟);经验池相关端点保持真实钟(真实经过时间资源)。
 import { generateDataHeaders, getServerDate } from "../../utils"
 import { executeInjectCharacterExp } from "../../lib/character-growth/commands/inject-exp"
 import { CharacterGrowthError } from "../../lib/character-growth/errors"

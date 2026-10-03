@@ -225,6 +225,9 @@ test("load settles cumulative login missions immediately without duplicate rewar
         totalLoginDays: 1,
         lastLoginTime: new Date(targetVirtualMs - 86_400_000),
     })
+    // 真实业务日标记预置为昨日:使本次 /load 构成一次真实跨天(推进登录天数)
+    getDb().prepare("UPDATE players SET last_daily_reset_real_business_day = ? WHERE id = ?")
+        .run(getBusinessDayKey(new Date(Date.now() - 86_400_000), 5), loginMissionPlayerId)
 
     const targetApp = await buildLoadApp()
     t.after(async () => targetApp.close())
@@ -283,6 +286,9 @@ test("load settles every reached special cumulative login stage in one request",
         totalLoginDays: 299,
         lastLoginTime: new Date(targetVirtualMs - 86_400_000),
     })
+    // 真实业务日标记预置为昨日:使本次 /load 构成一次真实跨天(推进登录天数)
+    getDb().prepare("UPDATE players SET last_daily_reset_real_business_day = ? WHERE id = ?")
+        .run(getBusinessDayKey(new Date(Date.now() - 86_400_000), 5), historicalPlayerId)
 
     const targetApp = await buildLoadApp()
     t.after(async () => targetApp.close())
@@ -311,6 +317,9 @@ test("load settles cumulative login degree missions at the login fact boundary",
         totalLoginDays: 6,
         lastLoginTime: new Date(targetVirtualMs - 86_400_000),
     })
+    // 真实业务日标记预置为昨日:使本次 /load 构成一次真实跨天(推进登录天数)
+    getDb().prepare("UPDATE players SET last_daily_reset_real_business_day = ? WHERE id = ?")
+        .run(getBusinessDayKey(new Date(Date.now() - 86_400_000), 5), loginDegreePlayerId)
 
     const targetApp = await buildLoadApp()
     t.after(async () => targetApp.close())
@@ -339,6 +348,9 @@ test("load settles the active pass login mission but leaves level rewards claima
         totalLoginDays: 1,
         lastLoginTime: new Date(targetVirtualMs - 86_400_000),
     })
+    // 真实业务日标记预置为昨日:使本次 /load 构成一次真实跨天(推进登录天数)
+    getDb().prepare("UPDATE players SET last_daily_reset_real_business_day = ? WHERE id = ?")
+        .run(getBusinessDayKey(new Date(Date.now() - 86_400_000), 5), passLoginPlayerId)
 
     const targetApp = await buildLoadApp()
     t.after(async () => targetApp.close())
@@ -371,10 +383,8 @@ test("bonus shown rejects an unknown viewer without changing progress", async ()
 test("load encoding failure preserves one pending batch without duplicate rewards", async t => {
     const viewerId = VIEWER_ID + 1
     const interruptedPlayerId = await createViewer(viewerId, "encoding-failure")
-    // 预置真实业务日标记为今日:本测试只验证红利批次的保留与重试,不触发主日切
-    getDb().prepare(`
-        UPDATE players SET last_daily_reset_real_business_day = ? WHERE id = ?
-    `).run(getBusinessDayKey(new Date(), 5), interruptedPlayerId)
+    // 真实业务日标记为空(新玩家):两次 /load 均只落标记不触发日切,
+    // totalLoginDays 保持夹具值;红利批次语义不受影响
     const before = getPlayerSync(interruptedPlayerId)
     const failingApp = await buildLoadApp(() => {
         throw new Error("forced login bonus encoding failure")
@@ -407,6 +417,9 @@ test("load encoding failure rolls back ordinary login mission settlement for ret
         totalLoginDays: 1,
         lastLoginTime: new Date(targetVirtualMs - 86_400_000),
     })
+    // 真实业务日标记预置为昨日:使本次 /load 构成一次真实跨天(推进登录天数)
+    getDb().prepare("UPDATE players SET last_daily_reset_real_business_day = ? WHERE id = ?")
+        .run(getBusinessDayKey(new Date(Date.now() - 86_400_000), 5), missionPlayerId)
 
     const failingApp = await buildLoadApp(() => {
         throw new Error("forced ordinary login mission encoding failure")

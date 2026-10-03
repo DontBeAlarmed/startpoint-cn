@@ -40,9 +40,8 @@ restoreContentSnapshot = installBundledGameplaySnapshot()
 
 const { initializeDatabase } = require("../src/data")
 const { getDb } = require("../src/data/db")
-const { dailyResetPlayerDataSync, getPlayerSync } = require("../src/data/domains/player")
 const { insertAccountSync } = require("../src/data/domains/account")
-const { insertDefaultPlayerSync } = require("../src/data/domains/player")
+const { dailyResetPlayerDataSync, getPlayerSync, insertDefaultPlayerSync } = require("../src/data/domains/player")
 
 initializeDatabase()
 db = getDb()
@@ -69,17 +68,16 @@ function realBusinessDayMarker(playerId) {
     `).get(playerId)?.last_daily_reset_real_business_day ?? null
 }
 
-// 2024-08-14(周三)= 全局冻结基准日附近,便于构造真实日/周边界
-const DAY = 24 * 60 * 60 * 1000
-
 test("同真实天跳转虚拟时间不得重复日切", () => {
     const playerId = createPlayer("same-real-day-jump")
-    // 迁移一次性跨发(无标记玩家首次日切必重置)
+    // 首次标记写入(新玩家/导入档/迁移)只落标记不触发日切:
+    // 避免同真实日双计登录天;周期从下一个真实业务日开始
     assert.equal(dailyResetPlayerDataSync(
         getPlayerSync(playerId),
         new Date("2024-08-14T12:00:00.000Z"),
         new Date("2024-08-14T12:00:00.000Z"),
-    ), true)
+    ), false, "首次标记写入不得触发日切")
+    assert.equal(realBusinessDayMarker(playerId), "2024-08-14", "标记必须写入当前真实业务日")
     const afterFirst = totalLoginDays(playerId)
 
     // 同一真实天内,虚拟时间向前跳 3 天:不重置、天数不涨
@@ -109,7 +107,7 @@ test("真实日 +1 恰好单次重置,重复 load 不再加", () => {
         getPlayerSync(playerId),
         new Date("2024-08-14T12:00:00.000Z"),
         new Date("2024-08-14T12:00:00.000Z"),
-    ), true)
+    ), false, "首次标记写入不触发日切")
     const afterFirst = totalLoginDays(playerId)
 
     assert.equal(dailyResetPlayerDataSync(
@@ -133,7 +131,7 @@ test("真实日缺口 3 天钳制为 1 次(不补计缺席天数)", () => {
         getPlayerSync(playerId),
         new Date("2024-08-14T12:00:00.000Z"),
         new Date("2024-08-14T12:00:00.000Z"),
-    ), true)
+    ), false, "首次标记写入不触发日切")
     const afterFirst = totalLoginDays(playerId)
     assert.equal(realBusinessDayMarker(playerId), "2024-08-14")
 
@@ -148,12 +146,12 @@ test("真实日缺口 3 天钳制为 1 次(不补计缺席天数)", () => {
 
 test("真实周边界重置周常", () => {
     const playerId = createPlayer("real-week-cross")
-    // 2024-08-18(周日)迁移跨发;2024-08-19(周一)05:00+8 为真实周边界
+    // 2024-08-18(周日)首次标记写入;2024-08-19(周一)05:00+8 为真实周边界
     assert.equal(dailyResetPlayerDataSync(
         getPlayerSync(playerId),
         new Date("2024-08-18T12:00:00.000Z"),
         new Date("2024-08-18T12:00:00.000Z"),
-    ), true)
+    ), false, "首次标记写入不触发日切")
     assert.equal(dailyResetPlayerDataSync(
         getPlayerSync(playerId),
         new Date("2024-08-18T20:00:00.000Z"),
