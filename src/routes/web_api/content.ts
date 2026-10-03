@@ -6,6 +6,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 import { characterAvatarPath, characterFullShotPath, hashedAssetPath } from "../../content/cdn/asset-path-hash"
 import {
     getMediumArchiveIndex,
+    normalizePngZlibStream,
     toBrowserPng,
 } from "../../content/cdn/medium-archive-index"
 import {
@@ -112,7 +113,8 @@ const routes = async (fastify: FastifyInstance, options: ContentRoutesOptions = 
         if (payload === null) {
             return reply.status(404).send({ error: "avatar unavailable" })
         }
-        const browserPng = toBrowserPng(payload)
+        // IDAT 重压缩归一化: 部分归档 PNG 的 zlib 流被浏览器拒绝(实测 alk), 见 normalizePngZlibStream
+        const browserPng = normalizePngZlibStream(toBrowserPng(payload))
         try {
             // temp + rename 原子落盘: 避免半写文件被永久缓存 (复审A [低])
             fs.mkdirSync(path.dirname(cachePath), { recursive: true })
