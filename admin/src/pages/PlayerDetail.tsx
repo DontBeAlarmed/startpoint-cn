@@ -567,33 +567,8 @@ export default function PlayerDetail() {
                 <Tabs items={tabItems} />
             </Card>
 
-            <details className="admin-details">
-                <summary className="admin-details-summary">
-                    <span className="admin-details-arrow" aria-hidden="true">▶</span>
-                    <span className="admin-details-star" aria-hidden="true" />
-                    详细信息
-                    <span className="admin-details-hint">存档名 · 存档 ID · 账号 ID</span>
-                </summary>
-                <div className="admin-details-body">
-                    <div className="admin-details-section">
-                        <div className="admin-details-section-title">存档标识</div>
-                        <div className="admin-details-row">
-                            <div className="admin-details-item">
-                                <span className="admin-details-item-key">存档名</span>
-                                <span className="admin-details-item-value">{player.name}</span>
-                            </div>
-                            <div className="admin-details-item">
-                                <span className="admin-details-item-key">存档 ID</span>
-                                <span className="admin-details-item-value admin-mono">{player.id}</span>
-                            </div>
-                            <div className="admin-details-item">
-                                <span className="admin-details-item-key">账号 ID</span>
-                                <span className="admin-details-item-value admin-mono">{player.accountId}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </details>
+            {/* 「详细信息」折叠卡 2026-10-04 移除: 存档名/存档 ID/账号 ID 均已在 hero 展示,
+                完全重复(维护者指定) */}
 
             {/* 危险操作默认收起(维护者指定): 复用 admin-details 折叠模式, 红条本体整体藏进 details */}
             <details className="admin-details admin-danger-details">

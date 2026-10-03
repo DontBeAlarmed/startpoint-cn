@@ -197,6 +197,8 @@ assert.doesNotMatch(playerDetail, /admin-edit-compact/)
 // 危险操作默认收起(details 无 open 属性)
 assert.match(playerDetail, /<details className="admin-details admin-danger-details">/)
 assert.doesNotMatch(playerDetail, /admin-danger-details[^>]*\bopen\b/)
+// 「详细信息」折叠卡已移除(存档名/存档 ID/账号 ID 均在 hero 展示, 完全重复)
+assert.doesNotMatch(playerDetail, /详细信息/)
 // 导入/导出并排: hero-ops 行向
 {
     const playerCss = fs.readFileSync("admin/src/styles/pages/player.css", "utf8")
