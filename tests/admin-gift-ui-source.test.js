@@ -35,18 +35,13 @@ test("admin gift UI keeps exact codes, state actions, and read-only redemptions"
     assert.match(page, /apiDelete<\{ ok: boolean \}>\(`\/api\/gifts\/\$\{row\.id\}\?revision=\$\{row\.revision\}`\)/)
     assert.match(page, /清除全部领取记录，同 code 重建后可重新领取/)
 
-    // 2026-10-04 卡片化: 操作语义位于 GiftsCardView —— 启停恒位重标记;
-    // 编辑/删除仅 stopped 提供(active 先停止再修改, 删除同理), 删除为垃圾桶 icon-only
+    // 2026-10-04 卡片化 + 二次调整: 操作语义位于 GiftsCardView —— 状态钮恒位重标记;
+    // 编辑/删除常驻(布局不变), 生效中置灰锁定并提示需先停用, 删除为垃圾桶 icon-only
     assert.match(cardView, /\{active \? "生效中" : "已停用"\}/)
-    const stoppedStart = cardView.indexOf("{!active && (")
-    const recordsStart = cardView.indexOf("gift-card-records")
-    assert.ok(stoppedStart !== -1 && recordsStart > stoppedStart, "!active 编辑/删除块应在记录展开区之前")
-    const stoppedBlock = cardView.slice(stoppedStart, recordsStart)
-    assert.match(stoppedBlock, /编辑礼包/, "stopped 才提供编辑")
-    assert.match(stoppedBlock, /删除礼包/, "stopped 才提供删除")
-    const actionsArea = cardView.match(/acc-actions[\s\S]*?gift-card-meta/)?.[0] ?? ""
-    assert.ok(actionsArea.length > 0, "启停按钮应在标题行 actions 区")
-    assert.doesNotMatch(actionsArea, /编辑礼包|删除礼包/, "active 礼包不能提供编辑/删除")
+    assert.match(cardView, /需停用后编辑礼包/, "生效中点编辑应有提醒")
+    assert.match(cardView, /需停用后删除礼包/, "生效中点删除应有提醒")
+    assert.match(cardView, /disabled=\{active\}/, "生效中删除 Popconfirm 应禁用(走提醒)")
+    assert.doesNotMatch(cardView, /\{!active && \(/, "编辑/删除不再按状态隐藏")
 
     assert.match(redemptions, /apiGet<GiftRedemptionPage>\(`\/api\/gifts\/\$\{gift\.id\}\/redemptions\?page=\$\{page\}&pageSize=\$\{pageSize\}&q=\$\{encodeURIComponent\(search\)\}`\)/)
     for (const field of [

@@ -1,4 +1,4 @@
-import { Button, Pagination, Popconfirm, Spin } from "antd"
+import { Button, Pagination, Popconfirm, Spin, message } from "antd"
 import { Pencil, Trash2 } from "lucide-react"
 
 import GiftRedemptions from "./GiftRedemptions"
@@ -106,28 +106,32 @@ export function GiftsCardView({
                                 >
                                     领取记录 {row.redemptionCount} {expanded ? "▴" : "▾"}
                                 </Button>
-                                {/* 编辑/删除仅 stopped 提供(原桌面语义: active 先停止再修改,
-                                    删除同理; 原移动端 active 可删的不一致语义统一到严格侧) */}
-                                {!active && (
-                                    <>
-                                        <Button
-                                            icon={<Pencil size={15} />}
-                                            aria-label="编辑礼包"
-                                            onClick={() => onEdit(row)}
-                                        />
-                                        <Popconfirm
-                                            title="删除这个礼包？"
-                                            description="此操作不可恢复，将清除全部领取记录，同 code 重建后可重新领取。"
-                                            okText="删除"
-                                            cancelText="取消"
-                                            okButtonProps={{ danger: true }}
-                                            onConfirm={() => void onDelete(row)}
-                                        >
-                                            {/* 删除按钮全站统一 icon-only(维护者 2026-10-04) */}
-                                            <Button danger icon={<Trash2 size={15} />} aria-label="删除礼包" />
-                                        </Popconfirm>
-                                    </>
-                                )}
+                                {/* 编辑/删除常驻(布局不变); 生效中置灰锁定, 点击提示需先停用
+                                    (维护者 2026-10-04: 不再隐藏按钮) */}
+                                <Button
+                                    className={active ? "gift-card-btn-locked" : undefined}
+                                    icon={<Pencil size={15} />}
+                                    aria-label="编辑礼包"
+                                    onClick={() => (active ? message.info("需停用后编辑礼包") : onEdit(row))}
+                                />
+                                <Popconfirm
+                                    title="删除这个礼包？"
+                                    description="此操作不可恢复，将清除全部领取记录，同 code 重建后可重新领取。"
+                                    okText="删除"
+                                    cancelText="取消"
+                                    okButtonProps={{ danger: true }}
+                                    disabled={active}
+                                    onConfirm={() => void onDelete(row)}
+                                >
+                                    {/* 删除按钮全站统一 icon-only(维护者 2026-10-04) */}
+                                    <Button
+                                        danger
+                                        className={active ? "gift-card-btn-locked" : undefined}
+                                        icon={<Trash2 size={15} />}
+                                        aria-label="删除礼包"
+                                        onClick={() => { if (active) message.info("需停用后删除礼包") }}
+                                    />
+                                </Popconfirm>
                             </div>
                         </div>
                         {expanded && (

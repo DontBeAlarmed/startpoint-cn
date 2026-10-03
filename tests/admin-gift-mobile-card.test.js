@@ -49,23 +49,25 @@ assert.match(cardView, /acc-bottom-row/, "底行复用账号页结构")
 assert.match(cardView, /gift-card-records/, "记录内嵌展开区应存在")
 assert.match(cardView, /<GiftRedemptions gift=\{row\} \/>/, "展开区应渲染内嵌记录面板")
 
-// ── 启停恒位重标记 + 编辑仅 stopped + 垃圾桶 icon-only 删除 ─────────────────
+// ── 启停恒位重标记 + 编辑/删除常驻(生效中锁定) + 垃圾桶 icon-only 删除 ────────
 assert.match(cardView, /\{active \? "生效中" : "已停用"\}/, "状态钮显示当前状态(恒位重标记, 不消失)")
-// 2026-10-04: 状态色钮(绿=可启动/红=可停止), 停止钮不带图标
+// 2026-10-04: 状态色钮(绿=生效中/红=已停用), 状态钮一律不带图标
 assert.match(cardView, /className=\{active \? "admin-state-active" : "admin-state-stopped"\}/, "启停钮应带状态色类(绿=生效中/红=已停用)")
 assert.doesNotMatch(cardView, /aria-label="停止礼包"[^/]*icon=/, "状态钮一律不带图标(维护者 2026-10-04)")
 assert.doesNotMatch(cardView, /CircleStop/, "停止钮不应再有 CircleStop 图标")
-assert.match(cardView, /\{!active && \(/, "编辑仅 stopped 提供")
+// 2026-10-04 二次调整: 编辑/删除常驻(布局不变); 生效中置灰锁定, 点击提示需先停用
+assert.doesNotMatch(cardView, /\{!active && \(/, "编辑/删除不再按状态隐藏")
+assert.match(cardView, /gift-card-btn-locked/, "锁定态样式类应存在")
+assert.match(cardView, /需停用后编辑礼包/, "生效中点编辑应有提醒")
+assert.match(cardView, /需停用后删除礼包/, "生效中点删除应有提醒")
+assert.match(cardView, /disabled=\{active\}/, "生效中删除应禁用 Popconfirm(走提醒)")
 {
-    // 编辑+删除同在 stopped 分支内(原桌面严格语义: active 先停止再修改/删除)
-    const stoppedStart = cardView.indexOf("{!active && (")
-    const recordsStart = cardView.indexOf("gift-card-records")
-    const stoppedBlock = cardView.slice(stoppedStart, recordsStart)
-    assert.match(stoppedBlock, /aria-label="编辑礼包"/)
-    assert.match(stoppedBlock, /aria-label="删除礼包"/)
+    const block = cardView.slice(cardView.indexOf("acc-actions"), cardView.indexOf("gift-card-records"))
+    assert.match(block, /aria-label="编辑礼包"/, "编辑钮常驻")
+    assert.match(block, /aria-label="删除礼包"/, "删除钮常驻")
 }
 assert.equal(cardView.split('aria-label="删除礼包"').length - 1, 1, "删除入口唯一")
-assert.match(cardView, /<Button danger icon=\{<Trash2 size=\{15\} \/>\} aria-label="删除礼包" \/>/, "删除按钮应为垃圾桶 icon-only(A2')")
+assert.match(cardView, /<Button\s+danger\s+className=\{active \? "gift-card-btn-locked" : undefined\}\s+icon=\{<Trash2 size=\{15\} \/>\}\s+aria-label="删除礼包"/, "删除按钮应为垃圾桶 icon-only(A2', 生效中带锁定类)")
 assert.doesNotMatch(cardView, />删除<\/Button>/, "删除按钮不得带文字(A2')")
 assert.match(cardView, /title="删除这个礼包？"/, "删除确认标题与原桌面逐字一致")
 assert.match(cardView, /description="此操作不可恢复，将清除全部领取记录，同 code 重建后可重新领取。"/, "删除确认说明逐字一致")
