@@ -115,6 +115,10 @@ assert.match(mobileView, /编辑存档/)
 assert.match(mobileView, /player\.rank/)
 assert.doesNotMatch(mobileView, /role="button"/)
 
+// 三类可点卡必须关闭安卓合成器点按高亮(Edge 安卓真机: 高亮 overlay 盖整卡连
+// 内容一起染色, 非 CSS :hover, hover 闸门管不着 — accounts.css tap-highlight 块)
+assert.match(accountsCss, /-webkit-tap-highlight-color:\s*transparent/)
+
 // 操作钮尺寸统一为默认(与新建存档同高, 维护者指定: 统一的是尺寸而非颜色);
 // 仅行内编辑器紧凑组保留 small(两端各 = 备注编辑器 Input+确定+取消 3 处)
 {

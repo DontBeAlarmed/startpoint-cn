@@ -24,6 +24,15 @@
   cursor: pointer;
 }
 
+/* 关闭安卓浏览器的合成器级点按高亮层(维护者 Edge 安卓真机证实): 高亮是半透明
+   overlay, 盖住整卡连内部子卡/按钮一起染色, 非 CSS :hover, hover 闸门管不着,
+   必须在元素上显式置透明。桌面无此概念, 零影响 */
+.acc-card,
+.save-sub,
+.admin-mobile-list-item-clickable {
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* hover 仅限真实鼠标设备（维护者指定）: 触摸屏点按会粘滞 :hover 导致整卡变色。
    双层闸门: (hover: hover) 媒体查询 + html:not(.has-touch) —— 部分触屏浏览器
    (维护者 iQOO) 会把媒体查询判真, main.tsx 在首次 touchstart 挂的 has-touch
