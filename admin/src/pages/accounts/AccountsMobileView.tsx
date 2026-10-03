@@ -115,8 +115,11 @@ export function AccountsMobileView({
         >
             <div className="save-head">
                 <FavoriteAvatar characterId={player.favoriteCharacterId} name={player.name} />
-                <span className="save-name">{player.name}</span>
-                {player.isDefault && <span className="admin-badge-ok">当前存档</span>}
+                {/* 徽标与名字上下排列（与桌面同构）: 横排会在窄屏与「切换」争宽度导致换行 */}
+                <span className="save-name-col">
+                    {player.isDefault && <span className="admin-badge-ok">当前存档</span>}
+                    <span className="save-name">{player.name}</span>
+                </span>
                 <span className="save-ops">
                     {/* activateSave 服务端同时把该存档设为账号的当前存档与全局活动存档，故仅 isDefault 时禁用 */}
                     <Button

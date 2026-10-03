@@ -133,7 +133,15 @@ assert.match(favoriteAvatar, /defaultPlayerAvatarId/)
 }
 assert.doesNotMatch(mobileView, /admin-badge-ok">当前</)
 
-// 存档子卡两行布局（mockup 规格 3/4 条）: 行1末尾仅「切换」; 行2 编辑·复制·导出·删除 左对齐
+// 存档子卡两行布局（mockup 规格 3/4 条）: 行1末尾仅「切换」; 行2 编辑·复制·导出·删除 左对齐;
+// 当前存档徽标叠在名字上方（维护者指定, 上下排列防窄屏换行）
+assert.match(accounts, /save-name-col/)
+assert.match(mobileView, /save-name-col/)
+{
+    const badgeIdx = accounts.indexOf('className="save-name-col"')
+    const badgeInCol = accounts.slice(badgeIdx).indexOf('admin-badge-ok">当前存档</span>')
+    assert.ok(badgeIdx !== -1 && badgeInCol > -1 && badgeInCol < 200, "当前存档徽标应位于 save-name-col 内名字上方")
+}
 assert.match(accounts, /className="save-ops2"/)
 {
     const head = accounts.match(/className="save-head"[\s\S]*?<\/div>\s*<div className="save-ops2"/)

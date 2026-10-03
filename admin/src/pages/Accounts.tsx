@@ -153,35 +153,38 @@ export default function Accounts() {
             ? "无"
             : devices.map(device => <span className="acc-dev-code" key={device.deviceId}>{device.deviceId}</span>)
 
-    // 存档子卡（mockup .save-sub）: 第一行 头像+名字+当前存档徽标+meta+右端「切换」,
+    // 存档子卡（mockup .save-sub）: 第一行 头像+名字列(当前存档徽标在名字上方)+meta+右端「切换」,
     // 第二行 编辑·复制·导出·删除（左对齐; mockup .save-ops2）
     const renderSaveSub = (account: AccountRow, player: PlayerBrief) => (
         <div className="save-sub" key={player.id}>
             <div className="save-head">
                 <FavoriteAvatar characterId={player.favoriteCharacterId} name={player.name} />
-                {renameId === player.id ? (
-                    <div
-                        className="admin-edit-compact"
-                        onClick={event => event.stopPropagation()}
-                        onKeyDown={event => event.stopPropagation()}
-                    >
-                        <Input size="small" value={renameName} onChange={e => setRenameName(e.target.value)} onPressEnter={() => renameSave.mutate({ playerId: player.id, name: renameName })} style={{ width: 100 }} />
-                        <Button size="small" type="primary" onClick={() => renameSave.mutate({ playerId: player.id, name: renameName })}>确定</Button>
-                        <Button size="small" onClick={() => setRenameId(null)}>取消</Button>
-                    </div>
-                ) : (
-                    <>
-                        <a className="admin-save-link save-name" title="进入玩家详情(存档页)" onClick={() => navigate(`/players/${player.id}`)}>{player.name}</a>
-                        <Button
-                            type="text"
-                            size="small"
-                            title="重命名存档"
-                            icon={<EditOutlined />}
-                            onClick={() => { setRenameId(player.id); setRenameName(player.name) }}
-                        />
-                    </>
-                )}
-                {player.isDefault && <span className="admin-badge-ok">当前存档</span>}
+                {/* 徽标与名字上下排列（维护者指定）: 横排会在窄屏与「切换」争宽度导致换行 */}
+                <span className="save-name-col">
+                    {player.isDefault && <span className="admin-badge-ok">当前存档</span>}
+                    {renameId === player.id ? (
+                        <div
+                            className="admin-edit-compact"
+                            onClick={event => event.stopPropagation()}
+                            onKeyDown={event => event.stopPropagation()}
+                        >
+                            <Input size="small" value={renameName} onChange={e => setRenameName(e.target.value)} onPressEnter={() => renameSave.mutate({ playerId: player.id, name: renameName })} style={{ width: 100 }} />
+                            <Button size="small" type="primary" onClick={() => renameSave.mutate({ playerId: player.id, name: renameName })}>确定</Button>
+                            <Button size="small" onClick={() => setRenameId(null)}>取消</Button>
+                        </div>
+                    ) : (
+                        <span className="save-name-line">
+                            <a className="admin-save-link save-name" title="进入玩家详情(存档页)" onClick={() => navigate(`/players/${player.id}`)}>{player.name}</a>
+                            <Button
+                                type="text"
+                                size="small"
+                                title="重命名存档"
+                                icon={<EditOutlined />}
+                                onClick={() => { setRenameId(player.id); setRenameName(player.name) }}
+                            />
+                        </span>
+                    )}
+                </span>
                 <span className="save-meta">Lv {player.rank} · {player.characterCount} 角色</span>
                 <span className="save-ops">
                     {/* activateSave 服务端同时把该存档设为账号的当前存档与全局活动存档，故仅 isDefault 时禁用 */}

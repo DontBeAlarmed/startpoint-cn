@@ -243,6 +243,22 @@
   overflow-wrap: anywhere;
 }
 
+/* 名字列: 当前存档徽标叠在名字上方（维护者指定, 横排会与「切换」争宽度导致换行） */
+.save-name-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.save-name-line {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
 .save-meta {
   color: var(--ink-soft);
   font-size: 11.5px;
