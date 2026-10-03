@@ -92,11 +92,14 @@ assert.match(accounts, /toggleSavePanel/)
         assert.ok(devicesIdx !== -1 && toggleIdx > devicesIdx, "存档数切换钮应位于绑定设备行")
         assert.ok(mapIdx !== -1 && newIdx > mapIdx, "新建存档应位于存档子卡列表之后")
     }
-    // 展开区独立面板底色与账号信息区分层（维护者指定）; 切换钮跨列规则存在
+    // 展开区独立面板底色与账号信息区分层（维护者指定）; 切换钮跨列规则存在;
+    // 方案A: 面板子项去自动最小尺寸 + <375 操作行折行(≥375 恢复 nowrap)
     const accountsCss = fs.readFileSync("admin/src/styles/pages/accounts.css", "utf8")
     assert.match(accountsCss, /\.acc-save-list \{[^}]*background: var\(--hover\)/)
+    assert.match(accountsCss, /\.acc-save-list > \* \{[^}]*min-width: 0/)
     assert.match(accountsCss, /\.acc-save-row \{[^}]*grid-column: 1 \/ -1/)
-}
+    assert.match(accountsCss, /@media \(min-width: 375px\) \{[\s\S]*?\.admin-mobile-actions \{[^}]*flex-wrap: nowrap/)
+  }
 
 // 卡片操作按钮与后台统一默认尺寸（维护者指定: 小尺寸 bordered 像 badge 标识风格）;
 // 保留 small 的仅限: 行内编辑器紧凑输入组（备注/改名各 Input+确定+取消 = 6）
