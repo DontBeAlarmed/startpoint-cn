@@ -1249,32 +1249,49 @@ export function collectPlayerPooledExpSync(
  * Performs a daily reset for a a player data object.
  * 
  * @param player The player data to perform the daily reset for
- * @param loginDate 
+ * @param virtualNow 服务器虚拟业务时间(lastLoginTime 与窗口判定)
+ * @param realNow 真实墙钟(跨天桶基准)
  * @returns A boolean; whether the daily reset was performed
  */
 export function dailyResetPlayerDataSync(
     player: Player,
-    loginDate: Date = getRealNow(),
+    virtualNow: Date,
+    realNow: Date,
     resetHour = 5,
 ): boolean {
     const lastLoginTime = player.lastLoginTime
     const playerId = player.id
-    const crossedDay = isNewDay(loginDate, lastLoginTime, resetHour)
-    const crossedWeek = isNewWeek(loginDate, lastLoginTime, resetHour)
+    // 跨天口径:周期刷新桶走【真实业务日】——时间可调服务的防加速钳制,
+    // 跳转服务器时间不推进日常周期,真实日缺口超过一天也只按一天计
+    // (identity-time-and-load.md 双时钟约定;开放/领取窗口仍走虚拟时间)。
+    // 真实业务日标记持久化在 players.last_daily_reset_real_business_day,
+    // 与 lastLoginTime(虚拟语义,含客户端存档展示)解耦。
+    const realBusinessDay = getBusinessDayKey(realNow, resetHour)
+    const storedRealBusinessDay = getPlayerDailyResetRealBusinessDaySync(playerId)
+    const lastRealBusinessDayDate = storedRealBusinessDay === null
+        ? null
+        : new Date(`${storedRealBusinessDay}T00:00:00Z`)
+    const crossedDay = storedRealBusinessDay === null
+        || realBusinessDay > storedRealBusinessDay
+    const crossedWeek = lastRealBusinessDayDate !== null
+        && isNewWeek(realNow, lastRealBusinessDayDate, resetHour)
 
     if (crossedDay) {
         const resetPerformed = getDb().transaction(() => {
             updatePlayerSync({
                 id: playerId,
-                lastLoginTime: loginDate,
+                lastLoginTime: virtualNow,
                 bossBoostPoint: 3,
                 boostPoint: 3,
                 totalLoginDays: (player.totalLoginDays ?? 0) + 1
             })
+            getDb().prepare(`
+                UPDATE players SET last_daily_reset_real_business_day = ? WHERE id = ?
+            `).run(realBusinessDay, playerId)
             recordCurrentPassLogin(
                 playerId,
                 (player.totalLoginDays ?? 0) + 1,
-                loginDate,
+                virtualNow,
             )
 
             resetPlayerGachaDailyStateSync(playerId)
@@ -1302,7 +1319,7 @@ export function dailyResetPlayerDataSync(
 
             const activePassWeekEventId = getMissionCatalog().getDefinitions(7).find(definition =>
                 definition.eventId !== undefined
-                && isMissionMasterDefinitionEnabledAt(definition, loginDate)
+                && isMissionMasterDefinitionEnabledAt(definition, virtualNow)
             )?.eventId
             if (activePassWeekEventId !== undefined) {
                 const snapshotType = getPassWeekSnapshotType(activePassWeekEventId)
@@ -1320,7 +1337,7 @@ export function dailyResetPlayerDataSync(
 
             return true
         })()
-        player.lastLoginTime = loginDate
+        player.lastLoginTime = virtualNow
         player.bossBoostPoint = 3
         player.boostPoint = 3
         player.totalLoginDays = (player.totalLoginDays ?? 0) + 1
@@ -1328,11 +1345,19 @@ export function dailyResetPlayerDataSync(
     } else {
         updatePlayerSync({
             id: playerId,
-            lastLoginTime: loginDate,
+            lastLoginTime: virtualNow,
         })
-        player.lastLoginTime = loginDate
+        player.lastLoginTime = virtualNow
         return false
     }
+}
+
+function getPlayerDailyResetRealBusinessDaySync(playerId: number): string | null {
+    const row = getDb().prepare(`
+        SELECT last_daily_reset_real_business_day
+        FROM players WHERE id = ?
+    `).get(playerId) as { last_daily_reset_real_business_day: string | null } | undefined
+    return row?.last_daily_reset_real_business_day ?? null
 }
 
 /**
@@ -1348,5 +1373,5 @@ export function dailyResetPlayerSync(
     const playerData = getPlayerSync(playerId)
     if (!playerData) return false;
 
-    return dailyResetPlayerDataSync(playerData, getRealNow(), resetHour)
+    return dailyResetPlayerDataSync(playerData, getRealNow(), getRealNow(), resetHour)
 }

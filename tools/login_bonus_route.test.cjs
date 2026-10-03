@@ -22,6 +22,8 @@ const restoreContentSnapshot = installBundledGameplaySnapshot({
 })
 const data = require("../src/data")
 const { insertAccountSync } = require("../src/data/domains/account")
+const { getDb } = require("../src/data/db")
+const { getBusinessDayKey } = require("../src/lib/time-utils")
 const { getPlayerDegreeIdsSync } = require("../src/data/domains/degree")
 const { getPlayerCategoryMissionsSync } = require("../src/data/domains/mission")
 const { getPlayerPassCardStateSync } = require("../src/data/domains/pass-card")
@@ -114,6 +116,10 @@ test.before(async () => {
         status: "normal",
     })
     playerId = insertDefaultPlayerSync(account.id).id
+    // 预置真实业务日标记为今日:本测试只验证登录红利发放,不触发主日切
+    getDb().prepare(`
+        UPDATE players SET last_daily_reset_real_business_day = ? WHERE id = ?
+    `).run(getBusinessDayKey(new Date(), 5), playerId)
     await insertSessionWithToken({
         token: String(VIEWER_ID),
         accountId: account.id,
@@ -365,6 +371,10 @@ test("bonus shown rejects an unknown viewer without changing progress", async ()
 test("load encoding failure preserves one pending batch without duplicate rewards", async t => {
     const viewerId = VIEWER_ID + 1
     const interruptedPlayerId = await createViewer(viewerId, "encoding-failure")
+    // 预置真实业务日标记为今日:本测试只验证红利批次的保留与重试,不触发主日切
+    getDb().prepare(`
+        UPDATE players SET last_daily_reset_real_business_day = ? WHERE id = ?
+    `).run(getBusinessDayKey(new Date(), 5), interruptedPlayerId)
     const before = getPlayerSync(interruptedPlayerId)
     const failingApp = await buildLoadApp(() => {
         throw new Error("forced login bonus encoding failure")

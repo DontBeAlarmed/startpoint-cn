@@ -61,6 +61,11 @@ const schemaColumns = {
         column: "last_daily_challenge_real_business_day",
         definition: "TEXT DEFAULT NULL",
     },
+    "players.last_daily_reset_real_business_day": {
+        table: "players",
+        column: "last_daily_reset_real_business_day",
+        definition: "TEXT DEFAULT NULL",
+    },
     "players_character_quest_clears.leader_clear_count": {
         table: "players_character_quest_clears",
         column: "leader_clear_count",

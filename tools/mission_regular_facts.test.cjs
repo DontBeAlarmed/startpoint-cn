@@ -288,9 +288,20 @@ for (let index = 0; index < 2; index++) {
     })
 }
 
+// 真实日标记迁移一次性跨发(无标记玩家首次日切必重置),再验边界精度
 assert.equal(
     dailyResetPlayerDataSync(
         getPlayerSync(boundaryPlayerId),
+        new Date("2024-08-18T12:00:00.000Z"),
+        new Date("2024-08-18T12:00:00.000Z"),
+    ),
+    true,
+    "迁移一次性跨发(写入真实业务日标记)",
+)
+assert.equal(
+    dailyResetPlayerDataSync(
+        getPlayerSync(boundaryPlayerId),
+        new Date("2024-08-18T20:59:59.999Z"),
         new Date("2024-08-18T20:59:59.999Z"),
     ),
     false,
@@ -300,6 +311,7 @@ assert.equal(getSnapshot(boundaryPlayerId, "weekly").multiClearCount, 0)
 assert.equal(
     dailyResetPlayerDataSync(
         getPlayerSync(boundaryPlayerId),
+        new Date("2024-08-18T21:00:00.000Z"),
         new Date("2024-08-18T21:00:00.000Z"),
     ),
     true,
@@ -319,6 +331,7 @@ assert.equal(getComputer(10).compute(2, boundaryWeeklyContext, 0), 3)
 assert.equal(
     dailyResetPlayerDataSync(
         getPlayerSync(boundaryPlayerId),
+        new Date("2024-08-18T21:00:01.000Z"),
         new Date("2024-08-18T21:00:01.000Z"),
     ),
     false,
