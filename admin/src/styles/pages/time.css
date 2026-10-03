@@ -334,23 +334,10 @@
   overflow-wrap: anywhere;
 }
 
-.admin-tl-expand {
-  display: block;
-  width: 100%;
+.admin-tl-pagination {
   margin-top: 10px;
-  padding: 8px 0;
-  border: 1px dashed var(--line-strong);
-  border-radius: 10px;
-  background: transparent;
-  color: var(--ink-soft);
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-.admin-tl-expand:hover,
-.admin-tl-expand:focus-visible {
-  color: var(--ink);
-  border-color: var(--ink-soft);
+  display: flex;
+  justify-content: center;
 }
 
 /* 活动类型徽章: 每族一色(故事=紫 讨伐=红 大型=星黄 通关/累计/登录=绿 未识别=info蓝) */

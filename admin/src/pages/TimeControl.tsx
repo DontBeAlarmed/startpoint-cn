@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react"
-import { Alert, Button, Card, Empty, Input, Segmented, Space, Tag, Typography, message } from "antd"
+import { Alert, Button, Card, Empty, Input, Pagination, Segmented, Space, Tag, Typography, message } from "antd"
 import { UndoOutlined } from "@ant-design/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import dayjs, { type Dayjs } from "dayjs"
@@ -240,7 +240,8 @@ function renderPoolCardBadge(gacha: Pick<ClairvoyanceGacha, "startDate" | "endDa
 
 // ── 时间线统一单列条目（维护者指定 timeline-unified-list.html）────────────────
 // 行1 标题|#id(|活动类型徽章) · 行2 时间+状态 · 行3 内容(仅卡池: UP 角色芯片行, 不再 +N 折叠)
-const TIMELINE_VISIBLE_COUNT = 4
+// 分页浏览（维护者指定: 展开按钮改为分页）, 每页 4 项
+const TIMELINE_PAGE_SIZE = 4
 
 function renderUpCharacterChips(characters: ClairvoyanceCharacter[]) {
     return (
@@ -447,9 +448,9 @@ export default function TimeControl() {
     const [expandedPoolIds, setExpandedPoolIds] = useState<Set<number>>(new Set())
     const [gachaSearch, setGachaSearch] = useState("")
     const [activitySearch, setActivitySearch] = useState("")
-    // 时间线单列列表展开态（两线各自独立, 维护者指定 timeline-unified-list.html）
-    const [gachaListExpanded, setGachaListExpanded] = useState(false)
-    const [activityListExpanded, setActivityListExpanded] = useState(false)
+    // 时间线分页页码（两线各自独立, 维护者指定: 展开改为分页）
+    const [gachaPage, setGachaPage] = useState(1)
+    const [activityPage, setActivityPage] = useState(1)
     const togglePoolExpanded = (poolId: number) => {
         setExpandedPoolIds(current => {
             const next = new Set(current)
@@ -578,7 +579,9 @@ export default function TimeControl() {
                 normalizeSearch(character.title).includes(query) ||
                 String(character.id).includes(query)))
     }, [gachaSearch, gachaTimeline])
-    const visibleTimelineGachas = gachaListExpanded ? timelineGachas : timelineGachas.slice(0, TIMELINE_VISIBLE_COUNT)
+    const gachaPageCount = Math.max(1, Math.ceil(timelineGachas.length / TIMELINE_PAGE_SIZE))
+    const safeGachaPage = Math.min(gachaPage, gachaPageCount)
+    const visibleTimelineGachas = timelineGachas.slice((safeGachaPage - 1) * TIMELINE_PAGE_SIZE, safeGachaPage * TIMELINE_PAGE_SIZE)
 
     // 活动时间线同构: 搜索即过滤(活动名/族标签/stringId/eventId)
     const timelineActivities = useMemo(() => {
@@ -591,7 +594,9 @@ export default function TimeControl() {
             normalizeSearch(activity.stringId).includes(query) ||
             String(activity.eventId).includes(query))
     }, [activitySearch, activityTimeline])
-    const visibleTimelineActivities = activityListExpanded ? timelineActivities : timelineActivities.slice(0, TIMELINE_VISIBLE_COUNT)
+    const activityPageCount = Math.max(1, Math.ceil(timelineActivities.length / TIMELINE_PAGE_SIZE))
+    const safeActivityPage = Math.min(activityPage, activityPageCount)
+    const visibleTimelineActivities = timelineActivities.slice((safeActivityPage - 1) * TIMELINE_PAGE_SIZE, safeActivityPage * TIMELINE_PAGE_SIZE)
 
     const isoText = data?.date ? data.date.replace("T", " ") : "-"
     const shownDraft = draftSegments ?? (data ? formatDraft(dayjs(data.date)) : null)
@@ -789,17 +794,16 @@ export default function TimeControl() {
                                     </div>
                                 ))}
                             </div>
-                            {(timelineGachas.length > TIMELINE_VISIBLE_COUNT || gachaListExpanded) && (
-                                <button
-                                    type="button"
-                                    className="admin-tl-expand"
-                                    aria-expanded={gachaListExpanded}
-                                    onClick={() => setGachaListExpanded(value => !value)}
-                                >
-                                    {gachaListExpanded
-                                        ? "收起 ▴"
-                                        : `展开其余 ${timelineGachas.length - TIMELINE_VISIBLE_COUNT} 个卡池 ▾`}
-                                </button>
+                            {timelineGachas.length > TIMELINE_PAGE_SIZE && (
+                                <Pagination
+                                    size="small"
+                                    className="admin-tl-pagination"
+                                    current={safeGachaPage}
+                                    pageSize={TIMELINE_PAGE_SIZE}
+                                    total={timelineGachas.length}
+                                    showSizeChanger={false}
+                                    onChange={setGachaPage}
+                                />
                             )}
                         </>
                     )}
@@ -882,17 +886,16 @@ export default function TimeControl() {
                                     </div>
                                 ))}
                             </div>
-                            {(timelineActivities.length > TIMELINE_VISIBLE_COUNT || activityListExpanded) && (
-                                <button
-                                    type="button"
-                                    className="admin-tl-expand"
-                                    aria-expanded={activityListExpanded}
-                                    onClick={() => setActivityListExpanded(value => !value)}
-                                >
-                                    {activityListExpanded
-                                        ? "收起 ▴"
-                                        : `展开其余 ${timelineActivities.length - TIMELINE_VISIBLE_COUNT} 个活动 ▾`}
-                                </button>
+                            {timelineActivities.length > TIMELINE_PAGE_SIZE && (
+                                <Pagination
+                                    size="small"
+                                    className="admin-tl-pagination"
+                                    current={safeActivityPage}
+                                    pageSize={TIMELINE_PAGE_SIZE}
+                                    total={timelineActivities.length}
+                                    showSizeChanger={false}
+                                    onChange={setActivityPage}
+                                />
                             )}
                         </>
                     )}

@@ -73,9 +73,9 @@ assert(
 // 卡池时间线改为统一单列列表（维护者指定 timeline-unified-list.html, 两线同构）
 assert(source.includes("admin-tl-list"), "时间线应为统一单列列表")
 assert(source.includes("renderUpCharacterChips"), "UP 角色应为芯片行(折叠上移到卡池条目层)")
-assert(source.includes("TIMELINE_VISIBLE_COUNT = 4"), "时间线默认应显示 4 项")
-assert(source.includes("展开其余"), "超出应有向下展开按钮")
-assert(source.includes("收起 ▴"), "展开后应收起")
+assert(source.includes("TIMELINE_PAGE_SIZE = 4"), "时间线每页应显示 4 项(展开已改为分页)")
+assert(source.includes("<Pagination"), "时间线应使用分页而非展开按钮")
+assert(!source.includes("admin-tl-expand"), "展开按钮不应残留")
 assert(source.includes("activityFamilyBadgeClass"), "活动类型应按族配色")
 assert(source.includes("没有匹配的卡池"), "搜索过滤空态")
 assert(source.includes("visibleTimelineActivities"), "活动时间线应与卡池同构")
