@@ -179,6 +179,9 @@ assert.doesNotMatch(playerDetail, /时间设置/)
 assert.doesNotMatch(playerDetail, /添加角色/)
 assert.doesNotMatch(playerDetail, /timeOffset/)
 assert.match(playerDetail, /clearedCharacters/)
+// 角色预览表头像列: code 即角色 id, 复用 character_avatar 端点, onError 隐藏
+assert.match(playerDetail, /title: "头像", width: 56,/)
+assert.match(playerDetail, /admin-char-avatar-cell/)
 
 const playerMutationCount = (playerDetail.match(/= useMutation\(\{/g) || []).length
 const playerMutationErrorCount = (playerDetail.match(/onError:/g) || []).length

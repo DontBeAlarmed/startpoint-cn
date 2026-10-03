@@ -319,6 +319,19 @@ export default function PlayerDetail() {
                         scroll={{ x: "max-content" }}
                         tableLayout="fixed"
                         columns={[
+                            {
+                                // 头像列: code 即角色 id, 与账号页喜爱角色头像同一 CDN 归档端点
+                                title: "头像", width: 56,
+                                render: (_, r: CharRow) => (
+                                    <img
+                                        className="admin-char-avatar-cell"
+                                        src={`/api/content/character_avatar/${r.code}`}
+                                        alt=""
+                                        loading="lazy"
+                                        onError={event => { event.currentTarget.classList.add("admin-char-avatar-cell-broken") }}
+                                    />
+                                ),
+                            },
                             { title: "名字", render: (_, r: CharRow) => lookups?.characters[r.code]?.name ?? "?" },
                             { title: "称号", render: (_, r: CharRow) => lookups?.characters[r.code]?.title ?? "-", responsive: ["lg"] as any },
                             { title: "Code", dataIndex: "code", width: 80 },

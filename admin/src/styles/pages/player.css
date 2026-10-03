@@ -279,3 +279,18 @@ html[data-theme="dark"] .admin-res-lv {
 .admin-player-tabs .ant-table td {
   text-align: center;
 }
+
+/* player detail: 角色预览表头像列 — 复用 character_avatar 端点(immutable 内容寻址),
+   onError 加 broken 类隐藏, 单元格留空 */
+.admin-char-avatar-cell {
+  display: block;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
+  object-position: top;
+}
+
+.admin-char-avatar-cell-broken {
+  display: none;
+}
