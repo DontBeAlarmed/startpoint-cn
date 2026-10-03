@@ -74,36 +74,19 @@
 }
 
 .admin-mobile-actions .ant-btn {
-  flex: 1 1 auto;
+  flex: none;
   min-width: 0;
   white-space: nowrap;
   justify-content: center;
-  /* task-33 E3 #30：自 shared-patterns max-width 媒体查询整条迁入
-     （.admin-mobile-actions 仅 <768 断点分支渲染，纯 base 无需桌面回升） */
-  min-height: 36px;
 }
 
-/* 账号页操作行: 编辑占主(grow), […] 恒定紧凑 */
+/* 账号页操作行: 编辑占主(grow), 当前/切换与[…] 恒定紧凑 — 两平台同形态 */
 .admin-account-actions .act-edit {
   flex: 1 1 auto;
 }
 
 .admin-account-actions .ant-btn:not(.act-edit) {
   flex: none;
-}
-
-@media (min-width: 375px) {
-  .admin-mobile-actions {
-    flex-wrap: nowrap;
-  }
-
-  .admin-mobile-actions .ant-btn {
-    flex: 1 1 0;
-  }
-
-  .admin-account-actions .ant-btn:first-child {
-    flex: 1 1 auto;
-  }
 }
 
 /* ── 账号卡 + 内嵌存档子卡 (mockup accounts-nested-saves) ──────────────────── */
@@ -383,15 +366,9 @@
   font-size: 11px;
 }
 
-/* 当前标识: 按钮同高(32px)的绿徽章元素, 与 切换/编辑/[…] 尺寸统一 */
+/* 当前标识: 与同排按钮同族形态(antd 禁用钮), 仅文字用绿色作状态提示 */
 .save-current-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 32px;
-  padding: 0 15px;
-  font-size: 14px;
-  cursor: default;
+  color: var(--wind);
 }
 
 /* accounts page (approved mockup accounts-v2): panel-head star tick — the 账号管理 card

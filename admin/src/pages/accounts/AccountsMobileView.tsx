@@ -126,7 +126,11 @@ export function AccountsMobileView({
         <div
             className="save-sub admin-mobile-list-item-clickable"
             key={player.id}
-            onClick={() => onOpenPlayer(player.id)}
+            onClick={event => {
+                // 仅点卡片本体(空白)进详情
+                if (event.target !== event.currentTarget) return
+                onOpenPlayer(player.id)
+            }}
         >
             <div className="save-head">
                 <FavoriteAvatar characterId={player.favoriteCharacterId} name={player.name} />
@@ -141,14 +145,11 @@ export function AccountsMobileView({
             <div className="admin-mobile-actions admin-account-actions" onClick={event => event.stopPropagation()}>
                 {/* 当前/切换合体标识在编辑按钮前(维护者指定); 当前=按钮同高的绿徽章 */}
                 {player.isDefault
-                    ? <button type="button" disabled className="admin-badge-ok save-current-btn">当前</button>
+                    ? <Button disabled className="save-current-btn">当前</Button>
                     : (
                         <Button
                             aria-label="切换存档"
-                            onClick={event => {
-                                event.stopPropagation()
-                                void onActivateSave(player.id)
-                            }}
+                            onClick={() => void onActivateSave(player.id)}
                         >切换</Button>
                     )}
                 <Button className="act-edit" icon={<Pencil size={15} />} aria-label="编辑存档" onClick={() => onOpenPlayer(player.id)}>编辑</Button>
@@ -171,8 +172,16 @@ export function AccountsMobileView({
                 accounts.map(account => {
                     const expanded = selectedAccountId === account.id
                     return (
-                        <div className="acc-card" key={account.id} onClick={() => onSelectAccount(account.id)}>
-                            <div className="acc-titlebar" onClick={event => event.stopPropagation()}>
+                        <div
+                            className="acc-card"
+                            key={account.id}
+                            onClick={event => {
+                                // 仅点卡片本体(空白)展开存档列表
+                                if (event.target !== event.currentTarget) return
+                                onSelectAccount(account.id)
+                            }}
+                        >
+                            <div className="acc-titlebar">
                                 <span className="acc-id-chip admin-mono">账号 #{account.id}</span>
                                 <span className="acc-title-name">{account.defaultPlayerName ?? "无存档"}</span>
                                 {renderNote(account)}
@@ -197,16 +206,12 @@ export function AccountsMobileView({
                                 <Button
                                     className="acc-count-toggle"
                                     aria-expanded={expanded}
-                                    onClick={event => { event.stopPropagation(); onSelectAccount(account.id) }}
+                                    onClick={() => onSelectAccount(account.id)}
                                 >
                                     存档数 {account.players.length} {expanded ? "▴" : "▾"}
                                 </Button>
                                 <Dropdown menu={moreActionsMenu(account.id)} trigger={["click"]} placement="bottomRight">
-                                    <Button
-                                        className="admin-more-btn"
-                                        aria-label="更多操作"
-                                        onClick={event => event.stopPropagation()}
-                                    >…</Button>
+                                    <Button className="admin-more-btn" aria-label="更多操作">…</Button>
                                 </Dropdown>
                             </div>
                             {expanded && (
