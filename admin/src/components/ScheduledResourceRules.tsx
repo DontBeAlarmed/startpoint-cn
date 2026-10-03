@@ -4,24 +4,21 @@ import {
     Card,
     DatePicker,
     Form,
-    Grid,
     Input,
     InputNumber,
     Modal,
-    Popconfirm,
     Radio,
     Select,
     Switch,
-    Table,
     Typography,
     message,
 } from "antd"
-import { Pencil, Plus, Trash2 } from "lucide-react"
+import { Plus } from "lucide-react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import dayjs, { type Dayjs } from "dayjs"
 
 import { apiDelete, apiGet, apiPatch, apiPost } from "../api/client"
-import { ScheduledResourceMobileView } from "./ScheduledResourceMobileView"
+import { ScheduledResourceCardView } from "./ScheduledResourceCardView"
 
 interface PlayerBrief {
     id: number
@@ -63,8 +60,6 @@ interface ScheduledResourceRulesProps {
     players: readonly PlayerBrief[]
 }
 
-const { useBreakpoint } = Grid
-
 function toRequest(values: RuleFormValues) {
     return {
         scope: values.scope,
@@ -83,8 +78,6 @@ function toRequest(values: RuleFormValues) {
 
 export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps) {
     const queryClient = useQueryClient()
-    const screens = useBreakpoint()
-    const isMobile = !screens.md
     const [form] = Form.useForm<RuleFormValues>()
     const [editingRule, setEditingRule] = useState<ScheduledResourceRule | null>(null)
     const [modalOpen, setModalOpen] = useState(false)
@@ -191,6 +184,8 @@ export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps)
 
     return (
         <>
+            {/* 2026-10-04 卡片化改造: 双视口统一卡片(同礼包/公告页 acc-card 结构),
+                状态钮显示当前状态(绿=生效中/红=已停用); 原桌面表格/移动 List 撤销 */}
             <Card
                 title="定时资源补充"
                 extra={(
@@ -198,81 +193,16 @@ export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps)
                         新建规则
                     </Button>
                 )}
-                className={isMobile ? "admin-mobile-list-card" : "admin-table-card"}
+                className="admin-mobile-list-card"
             >
-                {/* ADD-3: <768px 走账号页已验证的移动卡片视图；>=768px 桌面表格一字不动 */}
-                {isMobile ? (
-                    <ScheduledResourceMobileView
-                        rules={rules.data ?? []}
-                        loading={rules.isLoading}
-                        toggling={toggle.isPending}
-                        onToggle={rule => toggle.mutate(rule)}
-                        onEdit={openEdit}
-                        onDelete={ruleId => remove.mutate(ruleId)}
-                    />
-                ) : (
-                <Table<ScheduledResourceRule>
-                    rowKey="id"
-                    className="admin-ops-table"
+                <ScheduledResourceCardView
+                    rules={rules.data ?? []}
                     loading={rules.isLoading}
-                    dataSource={rules.data ?? []}
-                    pagination={{ pageSize: 10, hideOnSinglePage: true }}
-                    scroll={{ x: "max-content" }}
-                    tableLayout="fixed"
-                    locale={{ emptyText: "暂无定时补充规则" }}
-                    columns={[
-                        { title: "范围", width: 150, render: (_, rule) => rule.scope === "global" ? "全局规则" : `指定存档 #${rule.playerId}` },
-                        { title: "资源", dataIndex: "rewardName", width: 120 },
-                        { title: "发放数量", dataIndex: "grantAmount", width: 90 },
-                        { title: "触发下限", dataIndex: "triggerThreshold", width: 90 },
-                        { title: "持有上限", width: 110, render: (_, rule) => `${rule.inventoryCap} / ${rule.officialMaxCount}` },
-                        {
-                            title: "状态",
-                            width: 90,
-                            render: (_, rule) => (
-                                <Switch
-                                    checked={rule.enabled}
-                                    checkedChildren="启用"
-                                    unCheckedChildren="停用"
-                                    loading={toggle.isPending}
-                                    onChange={() => toggle.mutate(rule)}
-                                />
-                            ),
-                        },
-                        {
-                            title: "启用区间",
-                            width: 300,
-                            render: (_, rule) => (
-                                <Typography.Text>
-                                    {rule.startsAtReal ? dayjs(rule.startsAtReal).format("YYYY-MM-DD HH:mm") : "不限"}
-                                    {" 至 "}
-                                    {rule.endsAtReal ? dayjs(rule.endsAtReal).format("YYYY-MM-DD HH:mm") : "不限"}
-                                </Typography.Text>
-                            ),
-                        },
-                        { title: "备注", dataIndex: "description", render: value => value || "-" },
-                        {
-                            title: "操作",
-                            width: 140,
-                            fixed: "right",
-                            render: (_, rule) => (
-                                <div className="admin-action-row">
-                                    <Button size="small" icon={<Pencil size={15} />} onClick={() => openEdit(rule)}>编辑</Button>
-                                    <Popconfirm
-                                        title="删除这条定时补充规则？"
-                                        okText="删除"
-                                        cancelText="取消"
-                                        okButtonProps={{ danger: true }}
-                                        onConfirm={() => remove.mutate(rule.id)}
-                                    >
-                                        <Button size="small" type="text" danger icon={<Trash2 size={15} />} aria-label="删除规则" />
-                                    </Popconfirm>
-                                </div>
-                            ),
-                        },
-                    ]}
+                    toggling={toggle.isPending}
+                    onToggle={rule => toggle.mutate(rule)}
+                    onEdit={openEdit}
+                    onDelete={ruleId => remove.mutate(ruleId)}
                 />
-                )}
             </Card>
 
             <Modal
@@ -347,7 +277,7 @@ export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps)
                                 <InputNumber min={1} max={officialMax} precision={0} />
                             </Form.Item>
                         </div>
-                        <Form.Item name="enabled" label="启用" valuePropName="checked">
+                        <Form.Item name="enabled" label="状态" valuePropName="checked">
                             <Switch />
                         </Form.Item>
                     </div>

@@ -1,5 +1,5 @@
 import { Button, Pagination, Popconfirm, Spin } from "antd"
-import { Pencil, Play, Trash2 } from "lucide-react"
+import { Pencil, Trash2 } from "lucide-react"
 
 import GiftRedemptions from "./GiftRedemptions"
 import { giftRewardChipTexts, type GiftRewardLookups } from "./rewardDisplay"
@@ -70,15 +70,14 @@ export function GiftsCardView({
                             <span className="acc-actions">
                                 {/* 启停按钮恒在原位重标记 (与定时资源卡 停用/启用 同模式, 维护者 2026-09-30:
                                    点击后按钮消失的 UX 不统一); active 无编辑入口的现状语义保留(先停止再修改) */}
-                                {/* 状态色钮(绿=可启动/红=可停止, 维护者 2026-10-04);
-                                    停止钮不带图标 */}
+                                {/* 状态钮显示当前状态(绿=生效中/红=已停用, 维护者 2026-10-04),
+                                    点击切换; 无图标 */}
                                 <Button
-                                    className={active ? "admin-run-btn-stop" : "admin-run-btn-start"}
-                                    icon={active ? undefined : <Play size={15} />}
-                                    aria-label={active ? "停止礼包" : "启动礼包"}
+                                    className={active ? "admin-state-active" : "admin-state-stopped"}
+                                    aria-label={active ? "点击停止礼包" : "点击启动礼包"}
                                     onClick={() => (active ? void onStop(row) : void onStart(row))}
                                 >
-                                    {active ? "停止" : "启动"}
+                                    {active ? "生效中" : "已停用"}
                                 </Button>
                             </span>
                         </div>

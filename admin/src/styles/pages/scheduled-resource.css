@@ -131,22 +131,52 @@
   }
 }
 
-/* ── mobile card view (<768px, ADD-3) ───────────────────────────────────────
-   断点切换与卡片骨架复用账号页已验证的 .admin-mobile-* 共享类（AccountsMobileView
-   模式）；这里只补页面私有件：尾部行（启停 Switch + 操作行）与详情行节奏。
-   桌面表格与三个锚点类（modal/number-grid/date-grid）零改动。 */
-.scheduled-resource-mobile-foot {
+/* ── scheduled resource card view (2026-10-04 卡片化, 同礼包/公告页 acc-card) ──
+   标题行 = 资源名+范围徽章 / 启用区间 + 状态钮(绿=生效中/红=已停用)+编辑+删除 */
+.sched-card {
+  min-width: 0;
+}
+
+.sched-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.sched-headline {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 10px;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
 }
 
-.scheduled-resource-mobile-foot .admin-mobile-actions {
-  flex: 1 1 auto;
-  margin-top: 0;
+.sched-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.scheduled-resource-mobile-detail strong {
-  font-weight: 500;
+.sched-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  min-width: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.sched-meta > span {
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.sched-card .sched-meta b {
+  color: var(--ink);
+  font-weight: 600;
 }

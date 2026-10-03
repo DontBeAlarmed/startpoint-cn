@@ -50,10 +50,10 @@ assert.match(cardView, /gift-card-records/, "记录内嵌展开区应存在")
 assert.match(cardView, /<GiftRedemptions gift=\{row\} \/>/, "展开区应渲染内嵌记录面板")
 
 // ── 启停恒位重标记 + 编辑仅 stopped + 垃圾桶 icon-only 删除 ─────────────────
-assert.match(cardView, /\{active \? "停止" : "启动"\}/, "启停按钮应恒在原位重标记（不消失）")
+assert.match(cardView, /\{active \? "生效中" : "已停用"\}/, "状态钮显示当前状态(恒位重标记, 不消失)")
 // 2026-10-04: 状态色钮(绿=可启动/红=可停止), 停止钮不带图标
-assert.match(cardView, /className=\{active \? "admin-run-btn-stop" : "admin-run-btn-start"\}/, "启停钮应带状态色类")
-assert.match(cardView, /icon=\{active \? undefined : <Play size=\{15\} \/>\}/, "启动钮保留图标, 停止钮无图标")
+assert.match(cardView, /className=\{active \? "admin-state-active" : "admin-state-stopped"\}/, "启停钮应带状态色类(绿=生效中/红=已停用)")
+assert.doesNotMatch(cardView, /aria-label="停止礼包"[^/]*icon=/, "状态钮一律不带图标(维护者 2026-10-04)")
 assert.doesNotMatch(cardView, /CircleStop/, "停止钮不应再有 CircleStop 图标")
 assert.match(cardView, /\{!active && \(/, "编辑仅 stopped 提供")
 {

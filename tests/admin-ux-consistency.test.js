@@ -110,8 +110,8 @@ for (const file of tsxFiles) {
 
 // ── A1：移动卡片视图禁 Switch 式启停 ────────────────────────────────────────
 {
-    const src = fs.readFileSync(path.join(adminSrc, "components/ScheduledResourceMobileView.tsx"), "utf8")
-    assert.doesNotMatch(src, /checkedChildren/, "admin/src/components/ScheduledResourceMobileView.tsx 使用 checkedChildren（A1：移动卡片启停为恒位重标记按钮制，非 Switch）")
+    const src = fs.readFileSync(path.join(adminSrc, "components/ScheduledResourceCardView.tsx"), "utf8")
+    assert.doesNotMatch(src, /checkedChildren/, "admin/src/components/ScheduledResourceCardView.tsx 使用 checkedChildren（A1：卡片启停为状态钮制，非 Switch）")
 }
 
 // ── F1'：全仓 tsx 禁 DeleteOutlined（删除类统一 lucide Trash2） ─────────────

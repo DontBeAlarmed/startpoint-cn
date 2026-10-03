@@ -37,7 +37,7 @@ test("admin gift UI keeps exact codes, state actions, and read-only redemptions"
 
     // 2026-10-04 卡片化: 操作语义位于 GiftsCardView —— 启停恒位重标记;
     // 编辑/删除仅 stopped 提供(active 先停止再修改, 删除同理), 删除为垃圾桶 icon-only
-    assert.match(cardView, /\{active \? "停止" : "启动"\}/)
+    assert.match(cardView, /\{active \? "生效中" : "已停用"\}/)
     const stoppedStart = cardView.indexOf("{!active && (")
     const recordsStart = cardView.indexOf("gift-card-records")
     assert.ok(stoppedStart !== -1 && recordsStart > stoppedStart, "!active 编辑/删除块应在记录展开区之前")

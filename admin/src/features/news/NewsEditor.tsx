@@ -213,8 +213,8 @@ export default function NewsEditor({ news, open, onClose, onSaved }: NewsEditorP
                             <Form.Item label="启用状态">
                                 <Switch
                                     checked={draft.enabled}
-                                    checkedChildren="启用"
-                                    unCheckedChildren="停用"
+                                    checkedChildren="生效中"
+                                    unCheckedChildren="已停用"
                                     onChange={value => update("enabled", value)}
                                 />
                             </Form.Item>

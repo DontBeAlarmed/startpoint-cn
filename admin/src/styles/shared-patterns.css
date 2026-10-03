@@ -265,22 +265,22 @@ html[data-theme="dark"] {
   }
 }
 
-/* ── 状态启停钮 (礼包/公告, 维护者 2026-10-04): 绿=已停可启动, 红=运行中可停止 ──
-   配色同账号页「当前」钮家族(描边+浅底); antd 状态规则特异性(0,4,0)更高,
-   镜像其选择器结构把 hover/active/focus 三态钉回同组色, 视觉恒定 */
-.admin-run-btn-start,
-.admin-run-btn-start:not(:disabled):not(.ant-btn-disabled):hover,
-.admin-run-btn-start:not(:disabled):not(.ant-btn-disabled):active,
-.admin-run-btn-start:not(:disabled):not(.ant-btn-disabled):focus-visible {
+/* ── 状态启停钮 (礼包/公告/定时资源, 维护者 2026-10-04): 按钮显示当前状态 ——
+   绿=生效中, 红=已停用(状态语义反转后的定稿); 配色同账号页「当前」钮家族;
+   antd 状态规则特异性(0,4,0)更高, 镜像其选择器结构把三态钉回同组色, 视觉恒定 */
+.admin-state-active,
+.admin-state-active:not(:disabled):not(.ant-btn-disabled):hover,
+.admin-state-active:not(:disabled):not(.ant-btn-disabled):active,
+.admin-state-active:not(:disabled):not(.ant-btn-disabled):focus-visible {
   color: var(--wind);
   border-color: var(--wind);
   background: var(--ok-bg);
 }
 
-.admin-run-btn-stop,
-.admin-run-btn-stop:not(:disabled):not(.ant-btn-disabled):hover,
-.admin-run-btn-stop:not(:disabled):not(.ant-btn-disabled):active,
-.admin-run-btn-stop:not(:disabled):not(.ant-btn-disabled):focus-visible {
+.admin-state-stopped,
+.admin-state-stopped:not(:disabled):not(.ant-btn-disabled):hover,
+.admin-state-stopped:not(:disabled):not(.ant-btn-disabled):active,
+.admin-state-stopped:not(:disabled):not(.ant-btn-disabled):focus-visible {
   color: var(--fire);
   border-color: var(--fire);
   background: var(--fire-bg);

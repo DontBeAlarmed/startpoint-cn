@@ -1,5 +1,5 @@
 import { Button, Pagination, Popconfirm, Spin } from "antd"
-import { Pencil, Play, Trash2 } from "lucide-react"
+import { Pencil, Trash2 } from "lucide-react"
 
 import { NewsThumb } from "./newsPreview"
 import type { AdminNewsRow } from "./types"
@@ -69,16 +69,15 @@ export function NewsCardView({
                                 {/* 启停按钮恒在原位重标记(维护者 2026-10-04: 启动标识收敛,
                                    徽章/Switch 两套表达移除), 直呼 toggle 与原桌面 Switch 同通道。
                                    三钮位置: 桌面右侧一簇 / 移动端最下一排(CSS 分流, 维护者指定) */}
-                                {/* 状态色钮(绿=可启用/红=可停用, 维护者 2026-10-04);
-                                    停用钮不带图标 */}
+                                {/* 状态钮显示当前状态(绿=生效中/红=已停用, 维护者 2026-10-04),
+                                    点击切换; 无图标 */}
                                 <Button
-                                    className={row.enabled ? "admin-run-btn-stop" : "admin-run-btn-start"}
-                                    icon={row.enabled ? undefined : <Play size={15} />}
-                                    aria-label={row.enabled ? "停用公告" : "启用公告"}
+                                    className={row.enabled ? "admin-state-active" : "admin-state-stopped"}
+                                    aria-label={row.enabled ? "点击停用公告" : "点击启用公告"}
                                     loading={togglingId === row.id}
                                     onClick={() => void onToggle(row)}
                                 >
-                                    {row.enabled ? "停用" : "启用"}
+                                    {row.enabled ? "生效中" : "已停用"}
                                 </Button>
                                 <Button icon={<Pencil size={15} />} aria-label="编辑公告" onClick={() => onEdit(row)}>
                                     编辑
