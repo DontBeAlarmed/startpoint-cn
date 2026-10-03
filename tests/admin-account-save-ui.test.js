@@ -32,10 +32,12 @@ assert.doesNotMatch(accounts, /role: "button"/)
 assert.match(accounts, /toggleSavePanel/)
 
 // ── 账号卡 v2 双层结构（mockup accounts-two-layouts）────────────────────────
-// 标题栏 = 账号#id + 当前存档名 + 备注(可编辑) + 新建存档(右)
+// 标题栏 = 账号#id + 备注(可编辑) + 新建存档(右); 当前存档名不进标题栏(名字在身份行
+// 已展示, 三处重复过于冗余 — 维护者指定)
 assert.match(accounts, /acc-titlebar/)
 assert.match(accounts, /acc-id-chip admin-mono">账号 #\{account\.id\}/)
-assert.match(accounts, /acc-title-name">\{account\.defaultPlayerName \?\? "无存档"\}/)
+assert.doesNotMatch(accounts, /acc-title-name/)
+assert.doesNotMatch(mobileView, /acc-title-name/)
 assert.match(accounts, /label: "删除账号"/)
 // 身份行 = 头像 + 名称 + 存档id + 绑定设备 + 存档数 + […]
 assert.match(accounts, /acc-identity/)

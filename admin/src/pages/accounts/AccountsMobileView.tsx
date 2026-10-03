@@ -160,7 +160,7 @@ export function AccountsMobileView({
         </div>
     )
 
-    // 账号卡（每账号一张真卡片）: 标题行=账号#id+当前存档名+备注+新建存档(右);
+    // 账号卡（每账号一张真卡片）: 标题行=账号#id+备注+新建存档(右);
     // 内部=当前存档(头像+名) / 绑定设备 / 存档数N+[…]; 展开平铺存档子卡
     return (
         <div className="admin-account-mobile-list">
@@ -183,7 +183,6 @@ export function AccountsMobileView({
                         >
                             <div className="acc-titlebar">
                                 <span className="acc-id-chip admin-mono">账号 #{account.id}</span>
-                                <span className="acc-title-name">{account.defaultPlayerName ?? "无存档"}</span>
                                 {renderNote(account)}
                                 <span className="acc-actions">
                                     <Button type="primary" icon={<Plus size={14} />} onClick={() => void onNewSave(account.id)}>新建存档</Button>

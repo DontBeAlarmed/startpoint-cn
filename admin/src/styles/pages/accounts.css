@@ -276,7 +276,7 @@
 }
 
 /* ── 账号卡两套布局 v2 (mockup accounts-two-layouts) ─────────────────────────
-   标题栏=账号#id+当前存档名+备注+新建存档(右); 身份行=头像+名称+存档id+设备(+存档数+…);
+   标题栏=账号#id+备注+新建存档(右); 身份行=头像+名称+存档id+设备(+存档数+…);
    存档子卡单行=头像+名字+#存档id+meta + 当前/切换合体 + 编辑 + […] */
 .acc-titlebar {
   display: flex;
@@ -291,14 +291,6 @@
   flex: none;
   color: var(--ink-soft);
   font-size: 11.5px;
-}
-
-.acc-title-name {
-  font-weight: 800;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .acc-titlebar .acc-actions {

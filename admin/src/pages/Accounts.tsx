@@ -192,7 +192,8 @@ export default function Accounts() {
         </div>
     )
 
-    // 账号卡: 双层结构 — 标题栏(账号#id+当前存档名+备注+新建存档居右) / 身份行(头像+名称+存档id+设备+存档数+…) / 内嵌存档子卡
+    // 账号卡: 双层结构 — 标题栏(账号#id+备注+新建存档居右) / 身份行(头像+名称+存档id+设备+存档数+…) / 内嵌存档子卡
+    // (标题栏不放当前存档名: 名字在身份行已展示, 三处重复过于冗余 — 维护者指定)
     const renderAccountCard = (account: AccountRow) => {
         const expanded = selectedAccountId === account.id
         return (
@@ -207,7 +208,6 @@ export default function Accounts() {
             >
                 <div className="acc-titlebar">
                     <span className="acc-id-chip admin-mono">账号 #{account.id}</span>
-                    <span className="acc-title-name">{account.defaultPlayerName ?? "无存档"}</span>
                     {renderNote(account)}
                     <span className="acc-actions">
                         <Button type="primary" icon={<PlusOutlined />} onClick={() => newSave.mutate(account.id)}>新建存档</Button>
