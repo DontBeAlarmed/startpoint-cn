@@ -36,10 +36,12 @@ assert.match(component, /className="admin-mobile-list-card"/, "列表仍挂在�
 
 // ── 卡片结构: 资源名+范围徽章 / 启用区间 / 状态钮 / 编辑 / 删除 ─────────────
 assert.match(cardView, /className="acc-card sched-card"/, "卡片外壳复用账号页 acc-card")
-assert.match(cardView, /sched-headline/, "第一行=资源名+范围徽章")
+// 2026-10-04 二次调整: 徽章在名称前(移动端独占左上/桌面同行), 启用区间并入信息行
+assert.doesNotMatch(cardView, /sched-headline/, "多余的标题嵌套层应移除(层级简单)")
+assert.match(cardView, /admin-badge-info">全局规则<\/span>[\s\S]*?sched-title/, "范围徽章应位于资源名之前(移动端即左上)")
 assert.match(cardView, /rule\.scope === "global"\n?\s*\? <span className="admin-badge-info">全局规则<\/span>/, "全局规则应为 info 徽章")
 assert.match(cardView, /admin-badge-muted">指定存档 #\{rule\.playerId\}/, "指定存档应为 muted 徽章")
-assert.match(cardView, /news-card-time/, "第二行=启用区间(复用时间样式)")
+assert.match(cardView, /启用区间\{" "\}/, "启用区间应并入信息行")
 assert.match(cardView, /发放数量/, "meta 行应含发放数量")
 assert.match(cardView, /触发下限/, "meta 行应含触发下限")
 assert.match(cardView, /持有上限/, "meta 行应含持有上限")
@@ -62,7 +64,11 @@ assert.match(cardView, /暂无定时补充规则/, "空态文案与原桌面一�
 
 // ── CSS: 私有件进页面 css ──────────────────────────────────────────────────
 assert.match(css, /\.sched-card \{[^}]*min-width: 0/, "卡片收缩样式应存在")
-assert.match(css, /\.sched-heading \{[^}]*flex-direction: column/, "两行标题块样式应存在")
+assert.match(css, /\.sched-heading \{[^}]*flex-direction: column/, "移动端徽章/名称应上下排列")
+// 区块摆放(grid areas): 移动端单列三钮最下一排, 桌面端标题+三钮同排、信息行横贯
+assert.match(css, /\.sched-card \{[^}]*grid-template-areas:[\s\S]*?"head"\s*"meta"\s*"actions"/, "移动端三钮应独占最下一排(grid 区块)")
+assert.match(css, /@media \(min-width: 768px\) \{[\s\S]*?grid-template-areas:[\s\S]*?"head actions"\s*"meta meta"/, "桌面端标题+三钮同排(grid 区块)")
+assert.match(css, /@media \(min-width: 768px\) \{[\s\S]*?\.sched-heading \{[^}]*flex-direction: row/, "桌面端徽章与名称应同行")
 assert.doesNotMatch(css, /scheduled-resource-mobile-/, "旧移动视图私有类应清除")
 
 console.log("admin scheduled resource mobile card tests passed")

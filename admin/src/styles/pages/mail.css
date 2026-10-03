@@ -1,7 +1,8 @@
 /* mail page: type group + deep polish (审查稿 five-pages-review #p-mail) */
 .admin-mail-type-group {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  /* min(120px, 100%) 防止单列下 radio 组溢出视口(360px 实测) */
+  grid-template-columns: repeat(auto-fit, minmax(min(120px, 100%), 1fr));
   gap: 8px;
   width: 100%;
 }

@@ -137,21 +137,36 @@
   min-width: 0;
 }
 
+.sched-card {
+  min-width: 0;
+  /* 区块摆放: 移动端单列 —— 徽章左上/名称 → 信息行 → 三钮最下一排(维护者指定) */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "head"
+    "meta"
+    "actions";
+  gap: 6px 8px;
+  align-items: center;
+}
+
 .sched-heading {
+  grid-area: head;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
   min-width: 0;
-  flex: 1 1 auto;
 }
 
-.sched-headline {
+.sched-actions {
+  grid-area: actions;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  max-width: 100%;
+  justify-content: flex-start;
+}
+
+.sched-meta {
+  grid-area: meta;
 }
 
 .sched-title {
@@ -159,6 +174,29 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  /* 桌面: 标题块转横排(名称在徽章前), 标题+三钮同排, 信息行横贯下方 */
+  .sched-heading {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .sched-card {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "head actions"
+      "meta meta";
+  }
+
+  .sched-title {
+    order: -1;
+  }
+
+  .sched-actions {
+    justify-content: flex-end;
+  }
 }
 
 .sched-meta {
@@ -170,6 +208,7 @@
   font-size: 12px;
   line-height: 1.6;
 }
+
 
 .sched-meta > span {
   white-space: nowrap;

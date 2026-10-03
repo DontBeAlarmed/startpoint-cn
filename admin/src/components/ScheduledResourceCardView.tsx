@@ -38,45 +38,44 @@ export function ScheduledResourceCardView({
                 )}
                 {pageRules.map(rule => (
                     <div key={rule.id} className="acc-card sched-card">
-                        <div className="acc-titlebar">
-                            <div className="sched-heading">
-                                <div className="sched-headline">
-                                    <Typography.Text strong className="sched-title">{rule.rewardName}</Typography.Text>
-                                    {rule.scope === "global"
-                                        ? <span className="admin-badge-info">全局规则</span>
-                                        : <span className="admin-badge-muted">指定存档 #{rule.playerId}</span>}
-                                </div>
-                                <span className="news-card-time">
-                                    {rule.startsAtReal ? dayjs(rule.startsAtReal).format("YYYY-MM-DD HH:mm") : "不限"}
-                                    {" 至 "}
-                                    {rule.endsAtReal ? dayjs(rule.endsAtReal).format("YYYY-MM-DD HH:mm") : "不限"}
-                                </span>
-                            </div>
-                            <span className="acc-actions sched-actions">
-                                {/* 状态钮显示当前状态(绿=生效中/红=已停用), 点击切换 */}
-                                <Button
-                                    className={rule.enabled ? "admin-state-active" : "admin-state-stopped"}
-                                    aria-label={rule.enabled ? "点击停用规则" : "点击启用规则"}
-                                    loading={toggling}
-                                    onClick={() => onToggle(rule)}
-                                >
-                                    {rule.enabled ? "生效中" : "已停用"}
-                                </Button>
-                                <Button icon={<Pencil size={15} />} aria-label="编辑规则" onClick={() => onEdit(rule)}>
-                                    编辑
-                                </Button>
-                                <Popconfirm
-                                    title="删除这条定时补充规则？"
-                                    okText="删除"
-                                    cancelText="取消"
-                                    okButtonProps={{ danger: true }}
-                                    onConfirm={() => onDelete(rule.id)}
-                                >
-                                    <Button danger icon={<Trash2 size={15} />} aria-label="删除规则" />
-                                </Popconfirm>
-                            </span>
+                        {/* 维护者 2026-10-04: 移动端范围徽章独占左上(标题上方), 桌面与名称同行;
+                            三钮移动端独占最下一排, 桌面右侧一簇 —— grid 区块摆放 */}
+                        <div className="sched-heading">
+                            {rule.scope === "global"
+                                ? <span className="admin-badge-info">全局规则</span>
+                                : <span className="admin-badge-muted">指定存档 #{rule.playerId}</span>}
+                            <Typography.Text strong className="sched-title">{rule.rewardName}</Typography.Text>
                         </div>
+                        <span className="acc-actions sched-actions">
+                            <Button
+                                className={rule.enabled ? "admin-state-active" : "admin-state-stopped"}
+                                aria-label={rule.enabled ? "点击停用规则" : "点击启用规则"}
+                                loading={toggling}
+                                onClick={() => onToggle(rule)}
+                            >
+                                {rule.enabled ? "生效中" : "已停用"}
+                            </Button>
+                            <Button icon={<Pencil size={15} />} aria-label="编辑规则" onClick={() => onEdit(rule)}>
+                                编辑
+                            </Button>
+                            <Popconfirm
+                                title="删除这条定时补充规则？"
+                                okText="删除"
+                                cancelText="取消"
+                                okButtonProps={{ danger: true }}
+                                onConfirm={() => onDelete(rule.id)}
+                            >
+                                <Button danger icon={<Trash2 size={15} />} aria-label="删除规则" />
+                            </Popconfirm>
+                        </span>
+                        {/* 维护者 2026-10-04: 启用区间并入信息行(桌面同排; 移动端随行换行) */}
                         <div className="sched-meta">
+                            <span>
+                                启用区间{" "}
+                                {rule.startsAtReal ? dayjs(rule.startsAtReal).format("YYYY-MM-DD HH:mm") : "不限"}
+                                {" 至 "}
+                                {rule.endsAtReal ? dayjs(rule.endsAtReal).format("YYYY-MM-DD HH:mm") : "不限"}
+                            </span>
                             <span>发放数量 <b className="admin-mono">{rule.grantAmount}</b></span>
                             <span>触发下限 <b className="admin-mono">{rule.triggerThreshold}</b></span>
                             <span>持有上限 <b className="admin-mono">{rule.inventoryCap} / {rule.officialMaxCount}</b></span>
