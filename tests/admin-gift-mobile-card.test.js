@@ -51,7 +51,10 @@ assert.match(cardView, /<GiftRedemptions gift=\{row\} \/>/, "展开区应渲染�
 
 // ── 启停恒位重标记 + 编辑仅 stopped + 垃圾桶 icon-only 删除 ─────────────────
 assert.match(cardView, /\{active \? "停止" : "启动"\}/, "启停按钮应恒在原位重标记（不消失）")
-assert.match(cardView, /active \? <CircleStop size=\{15\} \/> : <Play size=\{15\} \/>/, "启停图标随状态切换")
+// 2026-10-04: 状态色钮(绿=可启动/红=可停止), 停止钮不带图标
+assert.match(cardView, /className=\{active \? "admin-run-btn-stop" : "admin-run-btn-start"\}/, "启停钮应带状态色类")
+assert.match(cardView, /icon=\{active \? undefined : <Play size=\{15\} \/>\}/, "启动钮保留图标, 停止钮无图标")
+assert.doesNotMatch(cardView, /CircleStop/, "停止钮不应再有 CircleStop 图标")
 assert.match(cardView, /\{!active && \(/, "编辑仅 stopped 提供")
 {
     // 编辑+删除同在 stopped 分支内(原桌面严格语义: active 先停止再修改/删除)
@@ -78,7 +81,7 @@ assert.match(cardView, /giftRewardChipTexts\(row\.rewards, rewardLookups\)/, "�
 // +N 折叠机制整体移除(触屏无 tooltip 打不开, 桌面同改滚动)
 assert.doesNotMatch(cardView, /gift-reward-chip-more|gift-reward-chip-extra/, "chips 折叠机制(+N/extra)应整体移除")
 assert.match(cardView, /chips\.map\(/, "奖励 chips 应全量渲染")
-assert.match(cardView, /记录 \{row\.redemptionCount\}/, "底行折叠钮应展示已领取数")
+assert.match(cardView, /领取记录 \{row\.redemptionCount\}/, "折叠钮应展示「领取记录 N」(维护者 2026-10-04)")
 assert.match(cardView, /奖励版本 <b className="admin-mono">\{row\.rewardRevision\}<\/b>/, "奖励版本取自 rewardRevision")
 assert.match(cardView, /版本 <b className="admin-mono">\{row\.revision\}<\/b>/, "版本取自 revision")
 assert.match(cardView, /<Pagination/, "卡片视图应保留分页器")

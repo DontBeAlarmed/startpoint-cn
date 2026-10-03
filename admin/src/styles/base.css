@@ -10,7 +10,7 @@
     --star:#FFD335; --star-deep:#EAB308; --sky:#4FA8E8; --water:#2E7FD6;
     --water-soft:#9cc3ec;
     --fire:#E8544A; --wind:#2FA85C; --thunder:#D99A00;
-    --ok-bg:#EAF8F0; --info-bg:#EAF3FC; --warn-bg:#FFF8E4;
+    --ok-bg:#EAF8F0; --info-bg:#EAF3FC; --warn-bg:#FFF8E4; --fire-bg:#FBEDEB;
     --hover:#EDF3FB; --stat-bg:#FBFDFF; --th-bg:#F0F5FB;
     --brand-chip: #1F2D4D;
     --radius: 12px;
@@ -23,7 +23,7 @@ html[data-theme="dark"] {
     --star:#FFD335; --star-deep:#8A6D00;
     --water:#5AA7E8; --water-soft:#2E5F8F; --wind:#4ED47E; --thunder:#FFC53D; --fire:#FF8577;
     --ok-bg: rgba(78, 212, 126, 0.12); --info-bg: rgba(90, 167, 232, 0.12);
-    --warn-bg: rgba(255, 197, 61, 0.1);
+    --warn-bg: rgba(255, 197, 61, 0.1); --fire-bg: rgba(232, 84, 74, 0.14);
     --hover:#1F262E; --stat-bg:#10151C; --th-bg:#21262D;
 }
 

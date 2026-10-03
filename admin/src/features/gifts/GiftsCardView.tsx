@@ -1,5 +1,5 @@
 import { Button, Pagination, Popconfirm, Spin } from "antd"
-import { CircleStop, Pencil, Play, Trash2 } from "lucide-react"
+import { Pencil, Play, Trash2 } from "lucide-react"
 
 import GiftRedemptions from "./GiftRedemptions"
 import { giftRewardChipTexts, type GiftRewardLookups } from "./rewardDisplay"
@@ -70,8 +70,11 @@ export function GiftsCardView({
                             <span className="acc-actions">
                                 {/* 启停按钮恒在原位重标记 (与定时资源卡 停用/启用 同模式, 维护者 2026-09-30:
                                    点击后按钮消失的 UX 不统一); active 无编辑入口的现状语义保留(先停止再修改) */}
+                                {/* 状态色钮(绿=可启动/红=可停止, 维护者 2026-10-04);
+                                    停止钮不带图标 */}
                                 <Button
-                                    icon={active ? <CircleStop size={15} /> : <Play size={15} />}
+                                    className={active ? "admin-run-btn-stop" : "admin-run-btn-start"}
+                                    icon={active ? undefined : <Play size={15} />}
                                     aria-label={active ? "停止礼包" : "启动礼包"}
                                     onClick={() => (active ? void onStop(row) : void onStart(row))}
                                 >
@@ -102,7 +105,7 @@ export function GiftsCardView({
                                     aria-expanded={expanded}
                                     onClick={() => onToggleExpand(row.id)}
                                 >
-                                    记录 {row.redemptionCount} {expanded ? "▴" : "▾"}
+                                    领取记录 {row.redemptionCount} {expanded ? "▴" : "▾"}
                                 </Button>
                                 {/* 编辑/删除仅 stopped 提供(原桌面语义: active 先停止再修改,
                                     删除同理; 原移动端 active 可删的不一致语义统一到严格侧) */}

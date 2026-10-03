@@ -54,7 +54,10 @@ assert.doesNotMatch(cardView, /admin-badge-ok" : "admin-badge-muted/, "启用状
 assert.doesNotMatch(cardView, /停用这条公告|启用这条公告/, "启停不再走 Popconfirm 确认(与原桌面 Switch 一致, 直接切换; Popconfirm 仅删除使用)")
 assert.match(cardView, /\{row\.enabled \? "停用" : "启用"\}/, "状态由启停按钮文字表达(恒位重标记)")
 assert.match(cardView, /aria-label=\{row\.enabled \? "停用公告" : "启用公告"\}/, "启停按钮应有无障碍名")
-assert.match(cardView, /active \? <CircleStop|row\.enabled \? <CircleStop/, "启停图标随状态切换")
+// 2026-10-04: 状态色钮(绿=可启用/红=可停用), 停用钮不带图标
+assert.match(cardView, /className=\{row\.enabled \? "admin-run-btn-stop" : "admin-run-btn-start"\}/, "启停钮应带状态色类")
+assert.match(cardView, /icon=\{row\.enabled \? undefined : <Play size=\{15\} \/>\}/, "启用钮保留图标, 停用钮无图标")
+assert.doesNotMatch(cardView, /CircleStop/, "停用钮不应再有 CircleStop 图标")
 assert.match(cardView, /togglingId === row\.id/, "启停进行中应有 loading 反馈")
 
 // ── 底行操作: 编辑 + 垃圾桶 icon-only 删除 ─────────────────────────────────
