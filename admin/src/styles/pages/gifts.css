@@ -51,14 +51,6 @@
   opacity: .85;
 }
 
-.gift-reward-chip-more {
-  color: var(--ink-soft);
-}
-
-.gift-reward-chip-more::before {
-  display: none;
-}
-
 /* editor reward rows: each Form.List entry reads as a chip card — resolved
    名称 headline (所见即所存) above the same in-place type/object/number
    controls; Form.List 结构与锚点不动，仅视觉重组 */
@@ -149,37 +141,21 @@
 
 .gift-card-chips {
   margin-top: 2px;
-  /* 移动端: 奖励 chips 不折叠 —— 单行左右滚动查看(触屏无 tooltip, +N 折叠打不开,
-     维护者指定改为滚动); 全量平铺, +N 计数仅桌面显示。
-     必须覆盖基类的 inline-flex: inline-flex 按内容收缩宽度, 永远不会触发自身滚动 */
+  /* 奖励 chips 全量平铺单行, 超出左右滚动(维护者 2026-10-04: 双端统一滚动形式,
+     不再用 +N 折叠); 滚动条隐藏 —— 触屏滑动/触控板横滚, 视觉上无轨 */
   display: flex;
   flex-wrap: nowrap;
   overflow-x: auto;
   max-width: 100%;
+  scrollbar-width: none;
+}
+
+.gift-card-chips::-webkit-scrollbar {
+  display: none;
 }
 
 .gift-card-chips .gift-reward-chip {
   flex: none;
-}
-
-.gift-card-chips .gift-reward-chip-more {
-  display: none;
-}
-
-@media (min-width: 768px) {
-  /* 桌面: 保留原 ≤2 + +N 折叠语义(悬停 tooltip 可见全量) */
-  .gift-card-chips {
-    flex-wrap: wrap;
-    overflow-x: visible;
-  }
-
-  .gift-card-chips .gift-reward-chip-extra {
-    display: none;
-  }
-
-  .gift-card-chips .gift-reward-chip-more {
-    display: inline-flex;
-  }
 }
 
 /* 2026-10-04 专项整理: 标题两行 — 第一行 code, 第二行更新时间; 右侧启停按钮 */

@@ -81,24 +81,12 @@ export function GiftsCardView({
                         </div>
                         {chips.length > 0 && (
                             <div className="gift-reward-chips gift-card-chips">
-                                {/* 全量渲染: 移动端平铺单行左右滚动(触屏无 tooltip, +N 折叠不可
-                                    展开 — 维护者指定); 桌面端由 CSS 隐藏 extra 只留 ≤2 + +N 计数 */}
+                                {/* 全量平铺单行, 超出左右滚动(无滚动条, 触屏滑动/触控板横滚;
+                                    维护者 2026-10-04: 双端都不再用 +N 折叠 —— 触屏无 tooltip
+                                    打不开, 桌面同样改滚动) */}
                                 {chips.map((text, index) => (
-                                    <span
-                                        key={index}
-                                        className={index < 2 ? "gift-reward-chip" : "gift-reward-chip gift-reward-chip-extra"}
-                                    >
-                                        {text}
-                                    </span>
+                                    <span key={index} className="gift-reward-chip">{text}</span>
                                 ))}
-                                {chips.length > 2 && (
-                                    <span
-                                        className="gift-reward-chip gift-reward-chip-more"
-                                        title={chips.join("\n")}
-                                    >
-                                        +{chips.length - 2}
-                                    </span>
-                                )}
                             </div>
                         )}
                         {/* meta + 记录/编辑/删除: 移动端上下两行, 桌面端并排一行(维护者指定:
