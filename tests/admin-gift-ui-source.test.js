@@ -11,9 +11,10 @@ const pagePath = path.join(projectRoot, "admin/src/pages/Gifts.tsx")
 const typesPath = path.join(projectRoot, "admin/src/features/gifts/types.ts")
 const editorPath = path.join(projectRoot, "admin/src/features/gifts/GiftEditor.tsx")
 const redemptionsPath = path.join(projectRoot, "admin/src/features/gifts/GiftRedemptions.tsx")
+const cardViewPath = path.join(projectRoot, "admin/src/features/gifts/GiftsCardView.tsx")
 
 test("admin gift UI keeps exact codes, state actions, and read-only redemptions", () => {
-    for (const filePath of [pagePath, typesPath, editorPath, redemptionsPath]) {
+    for (const filePath of [pagePath, typesPath, editorPath, redemptionsPath, cardViewPath]) {
         assert.equal(fs.existsSync(filePath), true, `缺少礼包后台文件：${filePath}`)
     }
 
@@ -22,6 +23,7 @@ test("admin gift UI keeps exact codes, state actions, and read-only redemptions"
     const types = fs.readFileSync(typesPath, "utf8")
     const editor = fs.readFileSync(editorPath, "utf8")
     const redemptions = fs.readFileSync(redemptionsPath, "utf8")
+    const cardView = fs.readFileSync(cardViewPath, "utf8")
 
     assert.match(app, /key: "\/gifts"/)
     assert.match(app, /label: "礼包"/)
@@ -31,16 +33,20 @@ test("admin gift UI keeps exact codes, state actions, and read-only redemptions"
     assert.match(page, /apiPost<AdminGiftRow>\(`\/api\/gifts\/\$\{row\.id\}\/start`/)
     assert.match(page, /apiPost<AdminGiftRow>\(`\/api\/gifts\/\$\{row\.id\}\/stop`/)
     assert.match(page, /apiDelete<\{ ok: boolean \}>\(`\/api\/gifts\/\$\{row\.id\}\?revision=\$\{row\.revision\}`\)/)
-    assert.match(page, /row\.status === "active" \? "停止" : "启动"/)
     assert.match(page, /清除全部领取记录，同 code 重建后可重新领取/)
 
-    const actionSource = page.match(/title: "操作"[\s\S]+/)?.[0] ?? ""
-    const activeAction = actionSource.match(/row\.status === "active"[\s\S]*?<\/Space>/)?.[0] ?? ""
-    assert.equal(activeAction.includes("编辑"), false, "active 礼包不能提供编辑")
-    assert.equal(activeAction.includes("删除"), false, "active 礼包不能提供删除")
-    const stoppedAction = actionSource.match(/row\.status === "stopped"[\s\S]*?<\/Space>/)?.[0] ?? ""
-    assert.match(stoppedAction, /编辑/)
-    assert.match(stoppedAction, /删除/)
+    // 2026-10-04 卡片化: 操作语义位于 GiftsCardView —— 启停恒位重标记;
+    // 编辑/删除仅 stopped 提供(active 先停止再修改, 删除同理), 删除为垃圾桶 icon-only
+    assert.match(cardView, /\{active \? "停止" : "启动"\}/)
+    const stoppedStart = cardView.indexOf("{!active && (")
+    const recordsStart = cardView.indexOf("gift-card-records")
+    assert.ok(stoppedStart !== -1 && recordsStart > stoppedStart, "!active 编辑/删除块应在记录展开区之前")
+    const stoppedBlock = cardView.slice(stoppedStart, recordsStart)
+    assert.match(stoppedBlock, /编辑礼包/, "stopped 才提供编辑")
+    assert.match(stoppedBlock, /删除礼包/, "stopped 才提供删除")
+    const actionsArea = cardView.match(/acc-actions[\s\S]*?gift-card-meta/)?.[0] ?? ""
+    assert.ok(actionsArea.length > 0, "启停按钮应在标题行 actions 区")
+    assert.doesNotMatch(actionsArea, /编辑礼包|删除礼包/, "active 礼包不能提供编辑/删除")
 
     assert.match(redemptions, /apiGet<GiftRedemptionPage>\(`\/api\/gifts\/\$\{gift\.id\}\/redemptions\?page=\$\{page\}&pageSize=\$\{pageSize\}&q=\$\{encodeURIComponent\(search\)\}`\)/)
     for (const field of [

@@ -1,6 +1,7 @@
 import { useState } from "react"
 import type { ReactNode } from "react"
 import { Card, Table, Button, Space, InputNumber, Popconfirm, message, Tag, Tabs, Spin, Typography, Switch, Input, Upload } from "antd"
+import { Trash2 } from "lucide-react"
 import { SaveOutlined, PlusOutlined, DownloadOutlined, UploadOutlined, UndoOutlined, SearchOutlined, EditOutlined } from "@ant-design/icons"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
@@ -350,7 +351,7 @@ export default function PlayerDetail() {
                                 title: "", width: 80,
                                 render: (_, r: CharRow) => r.code === 1 ? <Tag>Alk</Tag> : (
                                     <Popconfirm title="删除此角色？" onConfirm={() => delChar.mutate(r.code)} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
-                                        <Button size="small" type="text" danger>删除</Button>
+                                        <Button size="small" type="text" danger icon={<Trash2 size={15} />} aria-label="删除角色" />
                                     </Popconfirm>
                                 ),
                             },
@@ -381,7 +382,7 @@ export default function PlayerDetail() {
                                 title: "", width: 80,
                                 render: (_, r: ItemRow) => (
                                     <Popconfirm title="删除此道具？" onConfirm={() => delItem.mutate(r.id)} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
-                                        <Button size="small" type="text" danger>删除</Button>
+                                        <Button size="small" type="text" danger icon={<Trash2 size={15} />} aria-label="删除道具" />
                                     </Popconfirm>
                                 ),
                             },
@@ -439,7 +440,7 @@ export default function PlayerDetail() {
                                 title: "", width: 80,
                                 render: (_, r: QuestRow) => (
                                     <Popconfirm title="删除此记录？" onConfirm={() => delQuestProgress.mutate({ section: r.section, questId: r.questId })} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
-                                        <Button size="small" type="text" danger>删除</Button>
+                                        <Button size="small" type="text" danger icon={<Trash2 size={15} />} aria-label="删除关卡记录" />
                                     </Popconfirm>
                                 ),
                             },
@@ -471,7 +472,7 @@ export default function PlayerDetail() {
                                 title: "", width: 80,
                                 render: (_, r: DrawnQuestRow) => (
                                     <Popconfirm title="删除此记录？" onConfirm={() => delDrawnQuest.mutate({ category: r.categoryId, questId: r.questId })} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
-                                        <Button size="small" type="text" danger>删除</Button>
+                                        <Button size="small" type="text" danger icon={<Trash2 size={15} />} aria-label="删除抽选记录" />
                                     </Popconfirm>
                                 ),
                             },

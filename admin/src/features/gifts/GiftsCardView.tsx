@@ -1,0 +1,150 @@
+import { Button, Pagination, Popconfirm, Spin } from "antd"
+import { CircleStop, Pencil, Play, Trash2 } from "lucide-react"
+
+import GiftRedemptions from "./GiftRedemptions"
+import { giftRewardChipTexts, type GiftRewardLookups } from "./rewardDisplay"
+import type { AdminGiftRow } from "./types"
+
+interface GiftsCardViewProps {
+    rows: readonly AdminGiftRow[]
+    loading: boolean
+    page: number
+    pageSize: number
+    totalCount: number
+    rewardLookups: GiftRewardLookups
+    expandedGiftId: number | null
+    onToggleExpand: (giftId: number) => void
+    onPageChange: (page: number, pageSize: number) => void
+    onStart: (row: AdminGiftRow) => Promise<unknown>
+    onStop: (row: AdminGiftRow) => Promise<unknown>
+    onEdit: (row: AdminGiftRow) => void
+    onDelete: (row: AdminGiftRow) => Promise<unknown>
+}
+
+// 礼包卡片视图（2026-10-04 卡片化改造, 双视口同构, 结构照账号页 acc-card 已验证模式）：
+// 标题行 = code chip + 状态徽章 + 启停(恒位重标记); 中部 = 奖励 chips(≤2 全显 + +N) + meta;
+// 底行 = 记录 N 折叠(flex1, 领取记录内嵌进本卡) + 编辑(仅 stopped) + 垃圾桶删除(icon-only)。
+// 空白点按切换记录展开(target 判定防点击穿透, 同账号卡)。数据/变更全部经 props 下传——
+// queryKey、API 与原表格/移动卡零差异。
+export function GiftsCardView({
+    rows,
+    loading,
+    page,
+    pageSize,
+    totalCount,
+    rewardLookups,
+    expandedGiftId,
+    onToggleExpand,
+    onPageChange,
+    onStart,
+    onStop,
+    onEdit,
+    onDelete,
+}: GiftsCardViewProps) {
+    return (
+        <Spin spinning={loading}>
+            <div className="admin-acc-list">
+                {rows.length === 0 && !loading && (
+                    <span className="gift-card-empty">暂无礼包</span>
+                )}
+            {rows.map(row => {
+                const chips = giftRewardChipTexts(row.rewards, rewardLookups)
+                const active = row.status === "active"
+                const expanded = expandedGiftId === row.id
+                return (
+                    <div
+                        key={row.id}
+                        className="acc-card gift-card"
+                        onClick={event => {
+                            // 仅点卡片本体(空白)切换领取记录展开
+                            if (event.target !== event.currentTarget) return
+                            onToggleExpand(row.id)
+                        }}
+                    >
+                        <div className="acc-titlebar">
+                            <span className="acc-id-chip admin-mono gift-card-code">{row.code}</span>
+                            <span className={active ? "admin-badge-ok" : "admin-badge-muted"}>
+                                {active ? "启用" : "停止"}
+                            </span>
+                            <span className="acc-actions">
+                                {/* 启停按钮恒在原位重标记 (与定时资源卡 停用/启用 同模式, 维护者 2026-09-30:
+                                   点击后按钮消失的 UX 不统一); active 无编辑入口的现状语义保留(先停止再修改) */}
+                                <Button
+                                    icon={active ? <CircleStop size={15} /> : <Play size={15} />}
+                                    aria-label={active ? "停止礼包" : "启动礼包"}
+                                    onClick={() => (active ? void onStop(row) : void onStart(row))}
+                                >
+                                    {active ? "停止" : "启动"}
+                                </Button>
+                            </span>
+                        </div>
+                        {chips.length > 0 && (
+                            <div className="gift-reward-chips gift-card-chips">
+                                {chips.slice(0, 2).map((text, index) => (
+                                    <span key={index} className="gift-reward-chip">{text}</span>
+                                ))}
+                                {chips.length > 2 && (
+                                    <span
+                                        className="gift-reward-chip gift-reward-chip-more"
+                                        title={chips.join("\n")}
+                                    >
+                                        +{chips.length - 2}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+                        <div className="gift-card-meta">
+                            <span>奖励版本 <b className="admin-mono">{row.rewardRevision}</b></span>
+                            <span>版本 <b className="admin-mono">{row.revision}</b></span>
+                            <span>更新时间 {new Date(row.updatedAt).toLocaleString("zh-CN")}</span>
+                        </div>
+                        <div className="acc-bottom-row">
+                            <Button
+                                className="acc-count-toggle"
+                                aria-expanded={expanded}
+                                onClick={() => onToggleExpand(row.id)}
+                            >
+                                记录 {row.redemptionCount} {expanded ? "▴" : "▾"}
+                            </Button>
+                            {/* 编辑/删除仅 stopped 提供(原桌面语义: active 先停止再修改,
+                                删除同理; 原移动端 active 可删的不一致语义统一到严格侧) */}
+                            {!active && (
+                                <>
+                                    <Button
+                                        icon={<Pencil size={15} />}
+                                        aria-label="编辑礼包"
+                                        onClick={() => onEdit(row)}
+                                    />
+                                    <Popconfirm
+                                        title="删除这个礼包？"
+                                        description="此操作不可恢复，将清除全部领取记录，同 code 重建后可重新领取。"
+                                        okText="删除"
+                                        cancelText="取消"
+                                        okButtonProps={{ danger: true }}
+                                        onConfirm={() => void onDelete(row)}
+                                    >
+                                        {/* 删除按钮全站统一 icon-only(维护者 2026-10-04) */}
+                                        <Button danger icon={<Trash2 size={15} />} aria-label="删除礼包" />
+                                    </Popconfirm>
+                                </>
+                            )}
+                        </div>
+                        {expanded && (
+                            <div className="gift-card-records">
+                                <GiftRedemptions gift={row} />
+                            </div>
+                        )}
+                    </div>
+                )
+            })}
+            <Pagination
+                current={page}
+                pageSize={pageSize}
+                total={totalCount}
+                showSizeChanger
+                onChange={onPageChange}
+            />
+            </div>
+        </Spin>
+    )
+}

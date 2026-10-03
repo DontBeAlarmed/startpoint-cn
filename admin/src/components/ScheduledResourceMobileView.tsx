@@ -80,9 +80,7 @@ export function ScheduledResourceMobileView({
                                     okButtonProps={{ danger: true }}
                                     onConfirm={() => onDelete(rule.id)}
                                 >
-                                    <Button danger icon={<Trash2 size={15} />} aria-label="删除规则">
-                                        删除
-                                    </Button>
+                                    <Button danger icon={<Trash2 size={15} />} aria-label="删除规则" />
                                 </Popconfirm>
                             </div>
                         </div>

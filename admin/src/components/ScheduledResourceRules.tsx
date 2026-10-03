@@ -16,7 +16,7 @@ import {
     Typography,
     message,
 } from "antd"
-import { Pencil, Plus } from "lucide-react"
+import { Pencil, Plus, Trash2 } from "lucide-react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import dayjs, { type Dayjs } from "dayjs"
 
@@ -265,7 +265,7 @@ export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps)
                                         okButtonProps={{ danger: true }}
                                         onConfirm={() => remove.mutate(rule.id)}
                                     >
-                                        <Button size="small" type="text" danger>删除</Button>
+                                        <Button size="small" type="text" danger icon={<Trash2 size={15} />} aria-label="删除规则" />
                                     </Popconfirm>
                                 </div>
                             ),

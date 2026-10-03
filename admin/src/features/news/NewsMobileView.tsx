@@ -96,9 +96,7 @@ export function NewsMobileView({
                                 okButtonProps={{ danger: true }}
                                 onConfirm={() => void onDelete(row)}
                             >
-                                <Button danger icon={<Trash2 size={15} />} aria-label="删除公告">
-                                    删除
-                                </Button>
+                                <Button danger icon={<Trash2 size={15} />} aria-label="删除公告" />
                             </Popconfirm>
                         </div>
                     </div>

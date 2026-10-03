@@ -5,18 +5,15 @@
 //   E3a — tsx 内联代码禁 6 位 hex 色值；styles/ 禁 @media (max-width（移动优先约定）
 //   B3  — UI 与注释均禁「默认存档」「账号默认」（术语统一为「当前存档」）
 //   B2  — GameplaySettings 禁「已开启」「已关闭」（开关状态由 Switch 本体表达，不设文字徽章）
-//   A2  — PlayerDetail 删除按钮禁 icon（纯文字红按钮 + Popconfirm 红确认键）
-//   A1  — 移动卡片视图（礼包/定时资源）禁 Switch 式 checkedChildren（启停恒位重标记按钮制）
-//   F1  — 全仓 tsx 禁 icon={<DeleteOutlined（桌面删除类禁 icon）
+//   A2' — 删除按钮全站统一垃圾桶 icon-only（维护者 2026-10-04: 只留垃圾桶 icon 不留
+//         「删除」文字; 原「桌面删除纯文字」规则作废）
+//   A1  — 移动卡片视图（定时资源）禁 Switch 式 checkedChildren（启停恒位重标记按钮制）
+//   F1' — 全仓 tsx 禁 icon={<DeleteOutlined（删除类统一 lucide Trash2）
 //
 // hex 色值白名单（文件级豁免，内联于本头注释）：
 //   - admin/src/theme.tsx                    antd ThemeConfig 令牌（主题 API 值，非内联样式）
 //   - admin/src/features/news/newsPreview.tsx  公告手机预览的客户端拟真渐变调色板数据
 //     （模拟客户端渲染素材，非管理端 UI 主题色；暗色主题不随之切换属预期）
-// F1 移动视图豁免清单（移动操作行允许 lucide Trash2 图标，A3 规格）：
-//   - admin/src/features/gifts/GiftsMobileView.tsx
-//   - admin/src/pages/accounts/AccountsMobileView.tsx
-//   - admin/src/components/ScheduledResourceMobileView.tsx
 
 const assert = require("node:assert/strict")
 const fs = require("node:fs")
@@ -101,28 +98,26 @@ for (const file of tsxFiles) {
     assert.doesNotMatch(src, /已开启|已关闭/, "GameplaySettings.tsx 出现「已开启/已关闭」（B2：开关状态由 Switch 本体表达，不得文字徽章化）")
 }
 
-// ── A2：PlayerDetail 删除按钮禁 icon ────────────────────────────────────────
-{
-    const src = fs.readFileSync(path.join(adminSrc, "pages/PlayerDetail.tsx"), "utf8")
-    assert.doesNotMatch(src, /icon=\{<DeleteOutlined/, "PlayerDetail.tsx 删除按钮带 icon（A2：删除类统一纯文字红按钮 + Popconfirm）")
+// ── A2'：删除按钮全站垃圾桶 icon-only（无「删除」文字；维护者 2026-10-04 指定） ──
+for (const file of tsxFiles) {
+    const src = stripComments(fs.readFileSync(file, "utf8"), false)
+    assert.doesNotMatch(
+        src,
+        />删除<\/Button>/,
+        `${rel(file)} 删除按钮带「删除」文字（A2'：维护者 2026-10-04 全站统一垃圾桶 icon-only，原「桌面删除纯文字」规则作废）`,
+    )
 }
 
 // ── A1：移动卡片视图禁 Switch 式启停 ────────────────────────────────────────
-for (const name of ["features/gifts/GiftsMobileView.tsx", "components/ScheduledResourceMobileView.tsx"]) {
-    const src = fs.readFileSync(path.join(adminSrc, name), "utf8")
-    assert.doesNotMatch(src, /checkedChildren/, `admin/src/${name} 使用 checkedChildren（A1：移动卡片启停为恒位重标记按钮制，非 Switch）`)
+{
+    const src = fs.readFileSync(path.join(adminSrc, "components/ScheduledResourceMobileView.tsx"), "utf8")
+    assert.doesNotMatch(src, /checkedChildren/, "admin/src/components/ScheduledResourceMobileView.tsx 使用 checkedChildren（A1：移动卡片启停为恒位重标记按钮制，非 Switch）")
 }
 
-// ── F1：全仓 tsx 禁删除 icon 按钮（移动视图豁免清单见头注释） ───────────────
-const f1Whitelist = new Set([
-    rel(path.join(adminSrc, "features/gifts/GiftsMobileView.tsx")),
-    rel(path.join(adminSrc, "pages/accounts/AccountsMobileView.tsx")),
-    rel(path.join(adminSrc, "components/ScheduledResourceMobileView.tsx")),
-])
+// ── F1'：全仓 tsx 禁 DeleteOutlined（删除类统一 lucide Trash2） ─────────────
 for (const file of tsxFiles) {
-    if (f1Whitelist.has(rel(file))) continue
     const src = fs.readFileSync(file, "utf8")
-    assert.doesNotMatch(src, /icon=\{<DeleteOutlined/, `${rel(file)} 删除按钮带 DeleteOutlined icon（F1：桌面删除类禁 icon，纯文字红）`)
+    assert.doesNotMatch(src, /icon=\{<DeleteOutlined/, `${rel(file)} 删除按钮带 DeleteOutlined icon（F1'：删除类统一 lucide Trash2）`)
 }
 
 console.log(`admin ux consistency tests passed (scroll.x tables checked: ${scrollXCount})`)
