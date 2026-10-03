@@ -566,34 +566,14 @@ export default function TimeControl() {
             })
     }, [activitySearch, activityTimeline, activityTimelineByKey])
 
-    // 时间线统一单列列表（维护者指定）: 搜索即过滤(池名/池id/角色名/称号/角色id), 默认 4 项向下展开
-    const timelineGachas = useMemo(() => {
-        const rows = gachaTimeline?.timeline ?? []
-        const query = normalizeSearch(gachaSearch)
-        if (!query) return rows
-        return rows.filter(gacha =>
-            normalizeSearch(gacha.name).includes(query) ||
-            String(gacha.id).includes(query) ||
-            gacha.rateUpCharacters.some(character =>
-                normalizeSearch(character.name).includes(query) ||
-                normalizeSearch(character.title).includes(query) ||
-                String(character.id).includes(query)))
-    }, [gachaSearch, gachaTimeline])
+    // 时间线统一单列列表（维护者指定）: 恒为完整时间线, 与上方搜索区互不影响
+    const timelineGachas = useMemo(() => gachaTimeline?.timeline ?? [], [gachaTimeline])
     const gachaPageCount = Math.max(1, Math.ceil(timelineGachas.length / TIMELINE_PAGE_SIZE))
     const safeGachaPage = Math.min(gachaPage, gachaPageCount)
     const visibleTimelineGachas = timelineGachas.slice((safeGachaPage - 1) * TIMELINE_PAGE_SIZE, safeGachaPage * TIMELINE_PAGE_SIZE)
 
-    // 活动时间线同构: 搜索即过滤(活动名/族标签/stringId/eventId)
-    const timelineActivities = useMemo(() => {
-        const rows = activityTimeline?.timeline ?? []
-        const query = normalizeSearch(activitySearch)
-        if (!query) return rows
-        return rows.filter(activity =>
-            normalizeSearch(activity.name).includes(query) ||
-            normalizeSearch(activity.familyLabel).includes(query) ||
-            normalizeSearch(activity.stringId).includes(query) ||
-            String(activity.eventId).includes(query))
-    }, [activitySearch, activityTimeline])
+    // 活动时间线同构: 恒为完整时间线, 与活动搜索区互不影响
+    const timelineActivities = useMemo(() => activityTimeline?.timeline ?? [], [activityTimeline])
     const activityPageCount = Math.max(1, Math.ceil(timelineActivities.length / TIMELINE_PAGE_SIZE))
     const safeActivityPage = Math.min(activityPage, activityPageCount)
     const visibleTimelineActivities = timelineActivities.slice((safeActivityPage - 1) * TIMELINE_PAGE_SIZE, safeActivityPage * TIMELINE_PAGE_SIZE)
@@ -773,7 +753,7 @@ export default function TimeControl() {
                     {gachaTimelineLoading ? (
                         <Typography.Text type="secondary">加载中...</Typography.Text>
                     ) : visibleTimelineGachas.length === 0 ? (
-                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={gachaSearch ? "没有匹配的卡池" : "暂无卡池时间线"} />
+                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无卡池时间线" />
                     ) : (
                         <>
                             <div className="admin-tl-list">
@@ -864,7 +844,7 @@ export default function TimeControl() {
                     {activityTimelineLoading ? (
                         <Typography.Text type="secondary">加载中...</Typography.Text>
                     ) : visibleTimelineActivities.length === 0 ? (
-                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={activitySearch ? "没有匹配的活动" : "暂无活动时间线"} />
+                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无活动时间线" />
                     ) : (
                         <>
                             <div className="admin-tl-list">
