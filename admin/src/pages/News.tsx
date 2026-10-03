@@ -110,11 +110,6 @@ export default function News() {
             description="维护客户端的主题公告、活动通知和问题公告；系统类别暂缓。"
             onRefresh={refresh}
             refreshing={news.isFetching}
-            actions={(
-                <Button type="primary" icon={<Plus size={16} />} onClick={openCreate}>
-                    新建公告
-                </Button>
-            )}
         >
             <Space direction="vertical" size="large" className="admin-stack">
                 <div className="admin-page-note">
@@ -133,7 +128,15 @@ export default function News() {
                 )}
                 {/* <768px 走账号页已验证的移动卡片视图；>=768px 桌面表格一字不动 */}
                 {isMobile && (
-                    <Card title="普通公告" className="admin-mobile-list-card">
+                    <Card
+                        title="普通公告"
+                        className="admin-mobile-list-card"
+                        extra={(
+                            <Button type="primary" size="small" icon={<Plus size={14} />} onClick={openCreate}>
+                                新建公告
+                            </Button>
+                        )}
+                    >
                         <NewsMobileView
                             rows={news.data?.rows ?? []}
                             loading={news.isLoading}
@@ -154,7 +157,15 @@ export default function News() {
                     </Card>
                 )}
                 {!isMobile && (
-                    <Card title="普通公告" className="admin-table-card">
+                    <Card
+                        title="普通公告"
+                        className="admin-table-card"
+                        extra={(
+                            <Button type="primary" size="small" icon={<Plus size={14} />} onClick={openCreate}>
+                                新建公告
+                            </Button>
+                        )}
+                    >
                         <Table<AdminNewsRow>
                             rowKey="id"
                             className="admin-ops-table"

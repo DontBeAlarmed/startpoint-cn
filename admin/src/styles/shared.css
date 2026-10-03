@@ -138,10 +138,8 @@
   padding-block: 2px 4px;
 }
 
-/* 页头两端布局（维护者指定）: 左=eyebrow+标题(+其余操作), 右上角=刷新 icon */
+/* 页头: eyebrow + [标题|刷新icon|其余操作] 一行（维护者指定: 刷新紧跟标题） */
 .admin-page-header-top {
-  /* 刷新 icon 绝对定位悬于右上角, 标题行占满整行——操作钮右缘与刷新右缘对齐（维护者指定） */
-  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 8px 10px;
@@ -157,12 +155,13 @@
 }
 
 .admin-page-refresh {
-  position: absolute;
-  top: -3px;
-  right: 0;
   flex: none;
+  /* 紧跟标题: 抵消 antd Title 右侧字距, 缩小尺寸贴近文字 */
+  margin-left: -8px;
+  height: 28px;
+  width: 28px;
   color: var(--ink-soft);
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .admin-page-refresh:hover,

@@ -127,18 +127,6 @@ export default function Gifts() {
             description="维护公共兑换 code 和奖励定义；领取记录只用于运营查看。"
             onRefresh={refresh}
             refreshing={gifts.isFetching}
-            actions={(
-                <Button
-                    type="primary"
-                    icon={<Plus size={16} />}
-                    onClick={() => {
-                        setEditorGift(null)
-                        setEditorOpen(true)
-                    }}
-                >
-                    新建礼包
-                </Button>
-            )}
         >
             <Space direction="vertical" size="large" className="admin-stack">
                 <div className="admin-page-note">
@@ -157,7 +145,23 @@ export default function Gifts() {
                 )}
                 {/* <768px 走账号页已验证的移动卡片视图；>=768px 桌面表格一字不动 */}
                 {isMobile && (
-                    <Card title="公共礼包" className="admin-mobile-list-card">
+                    <Card
+                        title="公共礼包"
+                        className="admin-mobile-list-card"
+                        extra={(
+                            <Button
+                                type="primary"
+                                size="small"
+                                icon={<Plus size={14} />}
+                                onClick={() => {
+                                    setEditorGift(null)
+                                    setEditorOpen(true)
+                                }}
+                            >
+                                新建礼包
+                            </Button>
+                        )}
+                    >
                         <GiftsMobileView
                             rows={gifts.data?.rows ?? []}
                             loading={gifts.isLoading}
@@ -181,7 +185,23 @@ export default function Gifts() {
                     </Card>
                 )}
                 {!isMobile && (
-                    <Card title="公共礼包" className="admin-table-card">
+                    <Card
+                        title="公共礼包"
+                        className="admin-table-card"
+                        extra={(
+                            <Button
+                                type="primary"
+                                size="small"
+                                icon={<Plus size={14} />}
+                                onClick={() => {
+                                    setEditorGift(null)
+                                    setEditorOpen(true)
+                                }}
+                            >
+                                新建礼包
+                            </Button>
+                        )}
+                    >
                         <Table<AdminGiftRow>
                             rowKey="id"
                             className="admin-ops-table"
