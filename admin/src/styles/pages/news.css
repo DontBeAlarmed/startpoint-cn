@@ -213,53 +213,68 @@
   font-size: 11.5px;
 }
 
-/* news 标题单元格: 两行截断, 避免窄屏下被列宽挤成竖排碎字 */
-.news-title-cell {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-}
 
-/* ── news mobile card view (<768px) ─────────────────────────────────────────
-   断点切换与卡片骨架复用账号页已验证的 .admin-mobile-* 共享类（AccountsMobileView
-   模式）；这里只补页面私有件：标题两行截断（同 .news-title-cell 的 clamp 语义）与
-   缩略图+发布时间 meta 行。桌面表格零改动。 */
-/* 状态徽章即可点击启停（恒位重标记按钮制）: 复位按钮默认样式, 视觉走 admin-badge-* */
-.news-status-toggle {
-  cursor: pointer;
-  font: inherit;
-}
 
-.news-status-toggle:hover {
-  filter: brightness(1.08);
-}
-
-.news-status-toggle:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.news-mobile-title {
-  margin-top: 6px;
+/* ── news card view (2026-10-04 卡片化改造, 双视口统一, 同礼包/账号页 acc-card) ──
+   标题行 = 缩略图 + 两行标题块(分类徽章+标题 / 发布时间[+标签]) + 启停按钮;
+   启用标识收敛到启停按钮文字(维护者指定), 徽章/Switch 两套表达移除 */
+/* grid 项 min-width:auto 会让两行标题块的 nowrap 时间串撑爆 360px 视口(礼包页同款) */
+.news-card {
   min-width: 0;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  overflow-wrap: anywhere;
 }
 
-.news-mobile-meta {
+.news-card-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.news-card-headline {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
-  margin-top: 8px;
+  max-width: 100%;
 }
 
-/* 缩略图|时间 两端: 时间灰字钉行尾 */
-.news-mobile-meta > :last-child {
-  margin-left: auto;
+.news-card-title {
+  min-width: 0;
+  color: var(--ink);
+  font-weight: 700;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.news-card-time {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.news-card .acc-titlebar .admin-news-thumb {
+  flex: none;
+  width: 64px;
+  height: 36px;
+}
+
+.news-card-actions {
+  justify-content: flex-end;
+}
+
+.news-card-empty {
+  display: block;
+  padding: 24px 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  text-align: center;
 }
