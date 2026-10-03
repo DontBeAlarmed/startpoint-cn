@@ -470,6 +470,44 @@ function missionProgressAt(playerId, category, missionId) {
     `).get(playerId, category, missionId)?.progress ?? 0
 }
 
+test("equipment dissolve settles craft point mission and degree at once", async () => {
+    const { playerId, viewerId } = await createPlayer("equipment-dissolve-mission")
+    addEquipment(playerId, 4050030, 26)
+    const stonesBefore = getPlayerSync(playerId).freeVmoney
+    const degreeMissionId = Number(Object.entries(require("../assets/mission_degree.json"))
+        .find(([, rows]) => String(rows[0][1] ?? "").startsWith("degree_craft_point_get_"))?.[0])
+    assert.ok(degreeMissionId, "测试前提:存在锻造石称号任务(cond 37)")
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/equipment/sell_stack",
+        payload: {
+            viewer_id: viewerId,
+            equipment_list: [{ equipment_id: 4050030, number: 26 }],
+            api_count: 1,
+        },
+    })
+    assert.equal(response.statusCode, 200, response.body)
+
+    // 4★ 锻块 4/个 × 26 = 104:任务 66 阶段 1(目标 100)当场发放 5 星导石
+    assert.equal(missionProgressAt(playerId, 1, 66), 104, "溶解后任务 66 进度必须当场推进")
+    assert.equal(
+        getPlayerSync(playerId).freeVmoney - stonesBefore,
+        5,
+        "任务 66 阶段 1 奖励(5 星导石)必须当场发放",
+    )
+    assert.ok(
+        missionProgressAt(playerId, 5, degreeMissionId) >= 104,
+        "锻造石称号进度必须当场推进",
+    )
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
+    const missionInfo = payload.data.mission_info ?? []
+    assert.ok(
+        missionInfo.some(entry => entry.mission_category_id === 1 && entry.mission_id === 66),
+        "溶解响应的 mission_info 必须包含任务 66",
+    )
+})
+
 test("equipment upgrade crossing level 5 settles five-level mission and degree at once", async () => {
     const { playerId, viewerId } = await createPlayer("equipment-five-level")
     addEquipment(playerId, 4050030, 10)
