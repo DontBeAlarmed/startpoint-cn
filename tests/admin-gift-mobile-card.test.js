@@ -95,6 +95,7 @@ assert.match(giftsCss, /\.gift-card \.acc-bottom-row \.ant-btn:not\(\.acc-count-
 // 2026-10-04 专项整理: meta+操作行移动端上下两行, 桌面端并排一行
 assert.match(giftsCss, /\.gift-card-infoline \{[^}]*flex-direction: column/, "移动端 meta+操作上下排列")
 assert.match(giftsCss, /@media \(min-width: 768px\) \{[\s\S]*?\.gift-card-infoline \{[^}]*flex-direction: row/, "桌面端 meta+操作并排一行")
+assert.match(giftsCss, /\.gift-card-heading \{[^}]*flex-direction: column/, "标题两行结构样式应存在")
 assert.match(giftsCss, /\.gift-card-time \{/, "更新时间行内样式应存在")
 assert.equal(giftsCss.match(/\.admin-ops-table/g)?.length, 1, "gifts css 不应新增桌面表格规则")
 assert.doesNotMatch(giftsCss, /gift-mobile-/, "旧移动视图私有类应清除")

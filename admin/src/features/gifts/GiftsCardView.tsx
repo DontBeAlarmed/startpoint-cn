@@ -62,10 +62,11 @@ export function GiftsCardView({
                         }}
                     >
                         <div className="acc-titlebar">
-                            <span className="acc-id-chip admin-mono gift-card-code">{row.code}</span>
-                            {/* 2026-10-04 专项整理: 启用/停止徽章移除, 状态收敛到启停按钮文字;
-                                更新时间跟在 code 后(维护者指定) */}
-                            <span className="gift-card-time">更新时间 {new Date(row.updatedAt).toLocaleString("zh-CN")}</span>
+                            {/* 维护者 2026-10-04: 标题两行 — 第一行 code, 第二行时间; 右侧启停 */}
+                            <div className="gift-card-heading">
+                                <span className="acc-id-chip admin-mono gift-card-code">{row.code}</span>
+                                <span className="gift-card-time">更新时间 {new Date(row.updatedAt).toLocaleString("zh-CN")}</span>
+                            </div>
                             <span className="acc-actions">
                                 {/* 启停按钮恒在原位重标记 (与定时资源卡 停用/启用 同模式, 维护者 2026-09-30:
                                    点击后按钮消失的 UX 不统一); active 无编辑入口的现状语义保留(先停止再修改) */}

@@ -145,10 +145,18 @@
   margin-top: 2px;
 }
 
-/* 2026-10-04 专项整理: 更新时间跟在 code 后(截断防长串); 状态徽章已移除,
-   状态收敛到启停按钮文字 */
-.gift-card-time {
+/* 2026-10-04 专项整理: 标题两行 — 第一行 code, 第二行更新时间; 右侧启停按钮 */
+.gift-card-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
   min-width: 0;
+  flex: 1 1 auto;
+}
+
+.gift-card-time {
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
