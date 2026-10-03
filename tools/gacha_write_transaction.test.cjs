@@ -684,12 +684,12 @@ test("gacha exec rolls every persistent result back on late mission failure", as
     assert.equal(
         routeSql.statements.filter(sql => /^\s*SELECT[\s\S]*\bFROM\s+players\b/i.test(sql)).length,
         3,
-        "2 次既有读取 + 持有数任务结算读取一次玩家档案",
+        "2 次既有读取 + 持有数结算(初轮,未跨阶段无连锁)读取一次玩家档案",
     )
     assert.equal(
         routeSql.statements.filter(sql => /^\s*(?:SAVEPOINT|RELEASE)\b/i.test(sql)).length,
         2,
-        "持有数任务结算以嵌套事务(savepoint)运行",
+        "持有数结算以嵌套事务(savepoint)运行(未跨阶段无连锁轮)",
     )
 })
 
@@ -1301,7 +1301,7 @@ test("newbie ten-ticket gacha consumes the configured 70030 ticket", async () =>
     assert.equal(
         routeSql.statements.filter(sql => /^\s*(?:SAVEPOINT|RELEASE)\b/i.test(sql)).length,
         2,
-        "持有数任务结算以嵌套事务(savepoint)运行",
+        "持有数结算以嵌套事务(savepoint)运行(未跨阶段无连锁轮)",
     )
 })
 
@@ -1352,7 +1352,7 @@ test("ticket gacha rolls its ticket and rewards back on a late mission failure",
     assert.equal(
         routeSql.statements.filter(sql => /^\s*(?:SAVEPOINT|RELEASE)\b/i.test(sql)).length,
         2,
-        "持有数任务结算以嵌套事务(savepoint)运行",
+        "持有数结算以嵌套事务(savepoint)运行(未跨阶段无连锁轮)",
     )
 })
 
@@ -2150,6 +2150,7 @@ test("equipment exchange settles equipment kind mission on new kind", async () =
         gachaExchangePoint: 251,
     })
     const stonesBeforeItem = getPlayerItemSync(playerId, 100000)
+    const stonesBeforeMoney = getPlayerSync(playerId).freeVmoney
 
     const response = await app.inject({
         method: "POST",
@@ -2164,7 +2165,8 @@ test("equipment exchange settles equipment kind mission on new kind", async () =
     assert.equal(response.statusCode, 200, response.body)
 
     // 新装备种类 → 任务 33(获得新装备)进度 1,阶段 1(目标 1)当场发放
-    // 奖励:锻造石(kind 1)×300
+    // 奖励:锻造石(kind 1)×300;锻块入账使任务 66(累计获得锻造石,
+    // 目标 100)连锁当场结算,再发 5 星导石(官方依次结算语义)
     assert.equal(
         categoryMissionProgress(playerId, 1, 33),
         1,
@@ -2175,10 +2177,24 @@ test("equipment exchange settles equipment kind mission on new kind", async () =
         300,
         "任务 33 阶段 1 奖励(锻造石×300)必须当场发放",
     )
+    assert.equal(
+        categoryMissionProgress(playerId, 1, 66),
+        300,
+        "锻块入账后任务 66 必须在同请求内连锁结算",
+    )
+    assert.equal(
+        getPlayerSync(playerId).freeVmoney - stonesBeforeMoney,
+        10,
+        "任务 66 进度 300 跨阶段 1/2(5+5 星导石)连锁当场发放",
+    )
     const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
     const missionInfo = payload.data.mission_info ?? []
     assert.ok(
         missionInfo.some(entry => entry.mission_category_id === 1 && entry.mission_id === 33),
         "交换响应的 mission_info 必须包含任务 33",
+    )
+    assert.ok(
+        missionInfo.some(entry => entry.mission_category_id === 1 && entry.mission_id === 66),
+        "交换响应的 mission_info 必须包含连锁的任务 66",
     )
 })
