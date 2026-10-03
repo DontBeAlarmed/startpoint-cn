@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react"
-import { Card, Button, Space, Popconfirm, Input, message, Grid, Typography } from "antd"
+import { Card, Button, Space, Popconfirm, Input, Dropdown, Modal, message, Grid, Typography } from "antd"
 import { PlusOutlined, EditOutlined, ReloadOutlined } from "@ant-design/icons"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import { apiGet, apiPost, apiDownloadFile } from "../api/client"
 import { AdminPage } from "../components/AdminPage"
 import { AccountsMobileView } from "./accounts/AccountsMobileView"
-import { FavoriteAvatar } from "./accounts/FavoriteAvatar"
+import { FavoriteAvatar, defaultPlayerAvatarId } from "./accounts/FavoriteAvatar"
 import type { AccountRow, DeviceBinding, PlayerBrief } from "./accounts/types"
 
 const { useBreakpoint } = Grid
@@ -19,8 +19,8 @@ export default function Accounts() {
     const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null)
     const [renameId, setRenameId] = useState<number | null>(null)
     const [renameName, setRenameName] = useState("")
-    const [renameDeviceId, setRenameDeviceId] = useState<number | null>(null)
-    const [renameDeviceName, setRenameDeviceName] = useState("")
+    const [noteEditId, setNoteEditId] = useState<number | null>(null)
+    const [noteDraft, setNoteDraft] = useState("")
     const savePanelRef = useRef<HTMLDivElement | null>(null)
 
     // 存档子卡嵌在账号卡内部展开（mockup accounts-nested-saves）: 展开/切换滚动嵌套区到位, 收起不动
@@ -70,6 +70,24 @@ export default function Accounts() {
         onError: showMutationError,
     })
 
+    // 「…」更多操作菜单（mockup .more-btn）: 删除收进菜单, 点选仍弹原样确认
+    const confirmDeleteAccount = (accountId: number) => {
+        Modal.confirm({
+            title: `删除账号 ${accountId} 及所有存档？`,
+            okText: "确认",
+            cancelText: "取消",
+            okButtonProps: { danger: true },
+            onOk: () => deleteAccount.mutateAsync(accountId),
+        })
+    }
+
+    const moreActionsMenu = (accountId: number) => ({
+        items: [{ key: "delete-account", danger: true, label: "删除账号" }],
+        onClick: ({ key }: { key: string }) => {
+            if (key === "delete-account") confirmDeleteAccount(accountId)
+        },
+    })
+
     const renameSave = useMutation({
         mutationFn: ({ playerId, name }: { playerId: number; name: string }) =>
             apiPost("/api/server/renameSave", { playerId, name }),
@@ -84,28 +102,12 @@ export default function Accounts() {
         onError: showMutationError,
     })
 
-    // 移动端备注区域 2026-09-29 经维护者指示移除（H2，与设备名 pill 功能重叠）；
-    // updateNote mutation 原样保留（复用账号清理接口的备注位，note 空串由服务端归一为 null），桌面未来可接 UI
+    // 账号备注行内编辑（mockup 卡头「点击可修改」）: 复用账号清理接口的备注位,
+    // note 空串由服务端归一为 null
     const updateNote = useMutation({
         mutationFn: ({ accountId, note }: { accountId: number; note: string }) =>
             apiPost("/api/server/accountCleanup/account", { accountId, note }),
-        onSuccess: () => { message.success("备注已更新"); refresh() },
-        onError: showMutationError,
-    })
-    // 保留读取以满足 noUnusedLocals：备注 UI 已移除但 mutation 需留存（见上注释）
-    void updateNote
-
-    const renameDevice = useMutation({
-        mutationFn: ({ deviceId, name }: { deviceId: number; name: string }) =>
-            apiPost<{ ok: boolean; deviceId: number; name: string | null }>(
-                "/api/server/device/rename",
-                { deviceId, name },
-            ),
-        onSuccess: ({ name }) => {
-            message.success(name === null ? "设备名称已清除" : "设备名称已更新")
-            setRenameDeviceId(null)
-            refresh()
-        },
+        onSuccess: () => { message.success("备注已更新"); setNoteEditId(null); refresh() },
         onError: showMutationError,
     })
 
@@ -115,51 +117,50 @@ export default function Accounts() {
         onError: showMutationError,
     })
 
-    // 绑定设备 pill（含行内改名编辑器）：桌面在账号卡 kv 行内联展开，流程与移动端一致
-    const renderDeviceEditor = (device: DeviceBinding) =>
-        renameDeviceId === device.deviceId ? (
-            <div className="admin-edit-compact" key={device.deviceId}>
+    // 账号备注（mockup 卡头灰字, 点击行内修改; 设备码不可修改, 与备注是两个概念）
+    const renderNote = (account: AccountRow) =>
+        noteEditId === account.id ? (
+            <div
+                className="admin-edit-compact"
+                onClick={event => event.stopPropagation()}
+                onKeyDown={event => event.stopPropagation()}
+            >
                 <Input
                     size="small"
-                    value={renameDeviceName}
+                    value={noteDraft}
                     maxLength={64}
-                    placeholder={`设备 ${device.deviceId}`}
-                    onChange={event => setRenameDeviceName(event.target.value)}
-                    onPressEnter={() => renameDevice.mutate({
-                        deviceId: device.deviceId,
-                        name: renameDeviceName,
-                    })}
+                    placeholder="账号备注"
+                    onChange={event => setNoteDraft(event.target.value)}
+                    onPressEnter={() => updateNote.mutate({ accountId: account.id, note: noteDraft })}
                     style={{ width: 120 }}
                 />
                 <Button
                     size="small"
                     type="primary"
-                    loading={renameDevice.isPending}
-                    onClick={() => renameDevice.mutate({
-                        deviceId: device.deviceId,
-                        name: renameDeviceName,
-                    })}
+                    loading={updateNote.isPending}
+                    onClick={() => updateNote.mutate({ accountId: account.id, note: noteDraft })}
                 >确定</Button>
-                <Button size="small" onClick={() => setRenameDeviceId(null)}>取消</Button>
+                <Button size="small" onClick={() => setNoteEditId(null)}>取消</Button>
             </div>
         ) : (
-            <span className="admin-dev-edit" key={device.deviceId}>
-                <span className="admin-dev-edit-name">{device.name ?? `设备 ${device.deviceId}`}</span>
-                <Button
-                    type="text"
-                    size="small"
-                    title="修改设备名称"
-                    icon={<EditOutlined />}
-                    onClick={() => {
-                        setRenameDeviceId(device.deviceId)
-                        setRenameDeviceName(device.name ?? "")
-                    }}
-                />
-            </span>
+            <a
+                className="acc-note acc-note-edit"
+                title="修改账号备注"
+                onClick={() => { setNoteEditId(account.id); setNoteDraft(account.adminNote ?? "") }}
+            >
+                {account.adminNote ?? "添加备注"}
+            </a>
         )
 
-    // 存档子卡（mockup .save-sub）: 喜爱角色头像 + 存档名 + 当前存档徽章 + Lv/角色数 + 右侧操作
-    const renderSaveSub = (player: PlayerBrief) => (
+    // 绑定设备: 真实设备码 mono 只读展示（mockup 规格: 不可修改, 与账号备注是两个概念）
+    const renderDevices = (devices: DeviceBinding[]) =>
+        devices.length === 0
+            ? "无"
+            : devices.map(device => <span className="acc-dev-code" key={device.deviceId}>{device.deviceId}</span>)
+
+    // 存档子卡（mockup .save-sub）: 第一行 头像+名字+当前存档徽标+meta+右端「切换」,
+    // 第二行 编辑·复制·导出·删除（左对齐; mockup .save-ops2）
+    const renderSaveSub = (account: AccountRow, player: PlayerBrief) => (
         <div className="save-sub" key={player.id}>
             <div className="save-head">
                 <FavoriteAvatar characterId={player.favoriteCharacterId} name={player.name} />
@@ -192,55 +193,59 @@ export default function Accounts() {
                     <Button size="small" disabled={player.isDefault} onClick={() => activateSave.mutate(player.id)}>
                         切换
                     </Button>
-                    <Button size="small" icon={<EditOutlined />} onClick={() => navigate(`/players/${player.id}`)}>
-                        编辑
-                    </Button>
-                    <Button
-                        size="small"
-                        loading={exportSave.isPending && exportSave.variables === player.id}
-                        onClick={() => exportSave.mutate(player.id)}
-                    >
-                        导出
-                    </Button>
-                    <Popconfirm title={`删除存档 ${player.id}？`} onConfirm={() => deleteSave.mutate(player.id)} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
-                        <Button size="small" type="text" danger>删除</Button>
-                    </Popconfirm>
                 </span>
+            </div>
+            <div className="save-ops2">
+                <Button size="small" icon={<EditOutlined />} onClick={() => navigate(`/players/${player.id}`)}>
+                    编辑
+                </Button>
+                <Button size="small" onClick={() => cloneSave.mutate({ playerId: player.id, accountId: account.id })}>
+                    复制
+                </Button>
+                <Button
+                    size="small"
+                    loading={exportSave.isPending && exportSave.variables === player.id}
+                    onClick={() => exportSave.mutate(player.id)}
+                >
+                    导出
+                </Button>
+                <Popconfirm title={`删除存档 ${player.id}？`} onConfirm={() => deleteSave.mutate(player.id)} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
+                    <Button size="small" type="text" danger>删除</Button>
+                </Popconfirm>
             </div>
         </div>
     )
 
-    // 账号卡（mockup .acc-card）: 卡头 + kv 行 + 内嵌存档子卡区
+    // 账号卡（mockup .acc-card）: 卡头(头像+存档名作卡名+备注+存档列表▾/…)+ kv 行 + 内嵌存档子卡区
     const renderAccountCard = (account: AccountRow) => {
         const expanded = selectedAccountId === account.id
         return (
             <div className="acc-card" key={account.id}>
                 <div className="acc-top">
-                    <span className="acc-id">账号 #{account.id}</span>
-                    {account.adminNote && <span className="acc-note">{account.adminNote}</span>}
+                    <FavoriteAvatar
+                        characterId={defaultPlayerAvatarId(account)}
+                        name={account.defaultPlayerName ?? `#${account.id}`}
+                    />
+                    <span className="acc-id">{account.defaultPlayerName ?? `账号 #${account.id}`}</span>
+                    {renderNote(account)}
                     <span className="acc-actions">
                         <Button size="small" aria-expanded={expanded} onClick={() => toggleSavePanel(account.id)}>
-                            存档列表 {expanded ? "▴" : "▾"}
+                            存档列表 · {account.players.length} {expanded ? "▴" : "▾"}
                         </Button>
-                        <Popconfirm title={`删除账号 ${account.id} 及所有存档？`} onConfirm={() => deleteAccount.mutate(account.id)} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
-                            <Button size="small" type="text" danger>删除</Button>
-                        </Popconfirm>
+                        <Dropdown menu={moreActionsMenu(account.id)} trigger={["click"]} placement="bottomRight">
+                            <Button size="small" className="admin-more-btn" aria-label="更多操作">…</Button>
+                        </Dropdown>
                     </span>
                 </div>
                 <div className="acc-kv">
                     <span className="acc-k">当前存档</span>
                     <span className="acc-v">
                         {account.defaultPlayerId ? (
-                            <>
-                                <span className="acc-kv-name">{account.defaultPlayerName ?? `#${account.defaultPlayerId}`}</span>
-                                <span className="admin-badge-ok">当前存档</span>
-                            </>
+                            <span className="acc-kv-name">{account.defaultPlayerName ?? `#${account.defaultPlayerId}`}</span>
                         ) : "无"}
                     </span>
                     <span className="acc-k">绑定设备</span>
-                    <span className="acc-v acc-devices">
-                        {account.devices.length === 0 ? "无" : account.devices.map(renderDeviceEditor)}
-                    </span>
+                    <span className="acc-v acc-devices">{renderDevices(account.devices)}</span>
                 </div>
                 {expanded && (
                     <div className="acc-save-list" ref={savePanelRef}>
@@ -250,7 +255,7 @@ export default function Accounts() {
                         </div>
                         {account.players.length === 0
                             ? <Typography.Text type="secondary">暂无存档</Typography.Text>
-                            : account.players.map(renderSaveSub)}
+                            : account.players.map(player => renderSaveSub(account, player))}
                     </div>
                 )}
             </div>
@@ -288,7 +293,7 @@ export default function Accounts() {
                         onActivateSave={playerId => activateSave.mutateAsync(playerId)}
                         onCloneSave={(playerId, accountId) => cloneSave.mutateAsync({ playerId, accountId })}
                         onDeleteSave={playerId => deleteSave.mutateAsync(playerId)}
-                        onRenameDevice={(deviceId, name) => renameDevice.mutateAsync({ deviceId, name })}
+                        onUpdateNote={(accountId, note) => updateNote.mutateAsync({ accountId, note })}
                     />
                 </Card>
             ) : (

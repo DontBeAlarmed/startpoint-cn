@@ -24,7 +24,12 @@ assert.match(accounts, /title="账号管理"/)
 assert.doesNotMatch(accounts, /全部玩家/)
 assert.match(accounts, /title="账号 \/ 存档"/)
 assert.match(accountTypes, /devices: DeviceBinding\[\]/)
-assert.match(accounts, /\/api\/server\/device\/rename/)
+// 绑定设备为 mono 只读设备码（mockup 规格: 不可修改, 与账号备注是两个概念）, 设备改名 UI 已移除
+assert.doesNotMatch(accounts, /device\/rename/)
+assert.doesNotMatch(accounts, /renameDevice/)
+assert.doesNotMatch(mobileView, /onRenameDevice/)
+assert.match(accounts, /acc-dev-code/)
+assert.match(mobileView, /acc-dev-code/)
 assert.match(accounts, /绑定设备/)
 assert.match(accounts, /Grid/)
 assert.match(accounts, /useBreakpoint/)
@@ -37,10 +42,18 @@ assert.doesNotMatch(mobileView, /返回账号列表/)
 assert.match(mobileView, /存档列表/)
 assert.match(mobileView, /编辑存档/)
 assert.match(mobileView, /player\.rank/)
-// 存档卡重命名内联编辑器已移除（重命名入口移到玩家详情 hero），移动端仅剩设备名 pill 编辑器；
-// 编辑态在 pill 原结构内变形（失焦保存, 无确定/取消按钮），设备行不在可点击存档行内
-assert.match(mobileView, /className="admin-dev-edit admin-dev-edit-editing"/)
-assert.doesNotMatch(mobileView, /role="button"/)
+// 账号备注行内编辑（卡头灰字点击修改, 复用 updateNote → accountCleanup 备注位）;
+// 编辑态为紧凑输入+确定/取消, 两端同构
+assert.match(accounts, /acc-note acc-note-edit/)
+assert.match(accounts, /accountCleanup\/account/)
+assert.doesNotMatch(accounts, /void updateNote/)
+assert.match(mobileView, /acc-note acc-note-edit/)
+// 账号删除收进「…」更多操作菜单（mockup 规格: 删除收进菜单, 点选仍弹原样确认）
+assert.match(accounts, /admin-more-btn/)
+assert.match(accounts, /删除账号 \$\{accountId\} 及所有存档？/)
+assert.match(mobileView, /admin-more-btn/)
+assert.match(mobileView, /删除账号 \$\{accountId\} 及所有存档？/)
+assert.doesNotMatch(mobileView, /删除<\/Button>\s*<\/Popconfirm>[\s\S]{0,80}账号/)
 assert.doesNotMatch(accounts, /row\.degreeId \|\| 1/)
 
 // 存档列表 is no longer an inline panel below a table: task-38 (mockup accounts-nested-saves)
@@ -60,10 +73,31 @@ assert.match(accounts, /scrollIntoView\(\{ behavior: "smooth", block: "start" \}
 assert.match(accounts, /toggleSavePanel/)
 assert.match(accounts, /admin-badge-info">\{account\.players\.length\} 个存档</)
 
+// 账号卡卡头 = 头像(当前存档喜爱角色) + 存档名作卡名 + 备注(点击修改)（mockup 规格第 1 条）
+assert.match(accounts, /acc-top[\s\S]*?FavoriteAvatar[\s\S]*?defaultPlayerAvatarId/)
+assert.match(mobileView, /admin-mobile-heading-main[\s\S]*?FavoriteAvatar[\s\S]*?defaultPlayerAvatarId/)
+assert.match(favoriteAvatar, /defaultPlayerAvatarId/)
+
+// 「当前存档」徽标仅出现在存档子卡第一行（mockup 规格）; 账号 kv 行只留 名称, 不再重复徽标
+{
+    const badgeCount = (accounts.match(/admin-badge-ok">当前存档<\/span>/g) ?? []).length
+    assert.equal(badgeCount, 1, `「当前存档」徽标应仅在存档子卡出现一次, 实际 ${badgeCount} 次`)
+}
+assert.doesNotMatch(mobileView, /admin-badge-ok">当前</)
+
+// 存档子卡两行布局（mockup 规格 3/4 条）: 行1末尾仅「切换」; 行2 编辑·复制·导出·删除 左对齐
+assert.match(accounts, /className="save-ops2"/)
+{
+    const head = accounts.match(/className="save-head"[\s\S]*?<\/div>\s*<div className="save-ops2"/)
+    assert(head, "存档子卡应有 save-head + save-ops2 两行结构")
+    assert.match(head[0], /切换\s*<\/Button>\s*<\/span>/, "子卡第一行末尾应仅是「切换」按钮")
+}
+assert.match(accounts, /复制\s*<\/Button>/, "桌面存档子卡第二行应有「复制」")
+assert.match(accounts, /导出\s*<\/Button>/, "桌面存档子卡第二行应有「导出」")
+assert.match(mobileView, /className="save-ops"/, "移动子卡第一行右端也应是「切换」")
+
 // 账号卡/存档子卡删除 Popconfirm 文案原样锁（桌面 + 移动）
-assert.match(accounts, /删除账号 \$\{account\.id\} 及所有存档？/)
 assert.match(accounts, /删除存档 \$\{player\.id\}？/)
-assert.match(mobileView, /删除账号 \$\{account\.id\} 及所有存档？/)
 assert.match(mobileView, /删除存档 \$\{player\.id\}？/)
 
 // 喜爱角色头像: /api/server/accounts 只读投影 favoriteCharacterId ← 收藏编队读取器轻量 wrapper;

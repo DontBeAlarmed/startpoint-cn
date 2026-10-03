@@ -42,12 +42,12 @@
   margin-bottom: 4px;
 }
 
-/* heading left group: 账号 #N + adminNote 备注（有则显, 灰字省略）归拢左侧,
-   右侧 存档列表▾/删除 操作不被挤压 */
+/* heading left group: 头像 + 存档名卡名 + adminNote 备注（有则显, 灰字省略）归拢左侧,
+   右侧 存档列表▾/… 操作不被挤压 */
 .admin-mobile-heading-main {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   gap: 2px 8px;
   min-width: 0;
 }
@@ -213,7 +213,8 @@
   font-size: 11.5px;
 }
 
-/* 桌面子卡操作右对齐同一行; 放不下时自然换行仍靠右 */
+/* 存档子卡第一行右端单键「切换」 (mockup 规格: 行1末尾仅切换, 当前存档禁用);
+   放不下时自然换行仍靠右 */
 .save-ops {
   margin-left: auto;
   display: flex;
@@ -278,45 +279,46 @@
   text-decoration: underline;
 }
 
-/* accounts: merged device pill — 设备识别名 + ✎ live in ONE elevated chip (mockup .dev-edit);
-   shared by the desktop 账号卡 kv 行 and the mobile kv 绑定设备值. Mobile-first: the pill is a
-   compact unbreakable chip at every width and never stretches its container. */
-.admin-dev-edit {
-  display: inline-flex;
-  max-width: 100%;
-  align-items: center;
-  gap: 2px;
-  padding: 1px 3px 1px 9px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--th-bg);
-  font-size: 12px;
-}
-
-.admin-dev-edit-name {
-  min-width: 0;
+/* 绑定设备: 真实设备码 mono 只读 (mockup 规格 — 不可修改, 与账号备注是两个概念) */
+.acc-dev-code {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11.5px;
   overflow-wrap: anywhere;
 }
 
-.admin-dev-edit .ant-btn {
-  flex: none;
+/* 卡头账号备注 (mockup .acc-note 点击可修改): 灰字 + 虚线下划线提示可点,
+   与可交互的 admin-save-link 区分 */
+.acc-note-edit {
   color: var(--ink-soft);
+  text-decoration: underline dashed var(--line-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
-/* 编辑态就在 pill 原结构内变形: 输入框贴进同一枚 pill (失焦保存, 无确定/取消按钮, 维护者 2026-09-29) */
-.admin-dev-edit-editing {
-  padding: 0 4px 0 5px;
-}
-
-.admin-dev-edit-editing .ant-input {
-  width: 150px;
-  padding: 0 2px;
-  font-size: 12px;
-}
-
-.admin-dev-edit .ant-btn:hover,
-.admin-dev-edit .ant-btn:focus-visible {
+.acc-note-edit:hover,
+.acc-note-edit:focus-visible {
   color: var(--ink);
+}
+
+/* 卡头「…」更多操作按钮 (mockup .more-btn): 删除账号收进菜单 */
+.admin-more-btn {
+  color: var(--ink-soft);
+  letter-spacing: 2px;
+}
+
+/* 存档子卡第二行操作 (mockup .save-ops2): 编辑·复制·导出·删除 左对齐 */
+.save-ops2 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* 卡头头像 (账号卡=当前存档喜爱角色): 移动 36, 桌面随 ≥768 媒体查询升 44 */
+.acc-top .av-img {
+  width: 36px;
+  height: 36px;
+  font-size: 14px;
 }
 
 /* 桌面 ≥768 微调: 账号卡/头像升到 mockup 桌面尺寸, 卡距略收 */
