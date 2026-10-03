@@ -14,7 +14,8 @@ export function FavoriteAvatar({ characterId, name }: { characterId: number | nu
             {name.slice(0, 1)}
             <img
                 className="av-img-picture"
-                src={`/api/content/character_avatar/${characterId ?? DEFAULT_AVATAR_CHARACTER_ID}`}
+                // ?v=2: 一次性击穿浏览器缓存的旧坏响应(源归档 zlib 流修复前的 max-age=86400 缓存)
+                        src={`/api/content/character_avatar/${characterId ?? DEFAULT_AVATAR_CHARACTER_ID}?v=2`}
                 alt=""
                 loading="lazy"
                 onError={event => {
