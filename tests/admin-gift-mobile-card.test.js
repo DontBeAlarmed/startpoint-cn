@@ -74,7 +74,11 @@ assert.doesNotMatch(cardView, /admin-badge-ok|admin-badge-muted/, "卡片本体�
 assert.match(cardView, /gift-card-time/, "更新时间应跟在 code 后(专项整理)")
 assert.match(cardView, /更新时间 \{new Date\(row\.updatedAt\)\.toLocaleString\("zh-CN"\)\}/, "更新时间取自 updatedAt")
 assert.match(cardView, /giftRewardChipTexts\(row\.rewards, rewardLookups\)/, "奖励 chips 应复用 rewardDisplay")
-assert.match(cardView, /gift-reward-chip-more/, "奖励 chips 应保留 ≤2+N 折叠")
+// 2026-10-04: chips 全量渲染 — 移动端平铺单行左右滚动(触屏无 tooltip, 折叠打不开),
+// 桌面端 CSS 隐藏 extra 保留 ≤2 + +N 悬停折叠
+assert.match(cardView, /gift-reward-chip-extra/, "超出 2 个的奖励 chip 应带 extra 类(桌面隐藏/移动平铺)")
+assert.match(cardView, /chips\.map\(/, "奖励 chips 应全量渲染(移动端滚动查看)")
+assert.match(cardView, /gift-reward-chip-more/, "桌面保留 +N 计数")
 assert.match(cardView, /记录 \{row\.redemptionCount\}/, "底行折叠钮应展示已领取数")
 assert.match(cardView, /奖励版本 <b className="admin-mono">\{row\.rewardRevision\}<\/b>/, "奖励版本取自 rewardRevision")
 assert.match(cardView, /版本 <b className="admin-mono">\{row\.revision\}<\/b>/, "版本取自 revision")
@@ -97,6 +101,10 @@ assert.match(giftsCss, /\.gift-card-infoline \{[^}]*flex-direction: column/, "�
 assert.match(giftsCss, /@media \(min-width: 768px\) \{[\s\S]*?\.gift-card-infoline \{[^}]*flex-direction: row/, "桌面端 meta+操作并排一行")
 assert.match(giftsCss, /\.gift-card-heading \{[^}]*flex-direction: column/, "标题两行结构样式应存在")
 assert.match(giftsCss, /\.gift-card-time \{/, "更新时间行内样式应存在")
+// 奖励 chips: 移动单行滚动, 桌面 ≤2+N 折叠
+assert.match(giftsCss, /\.gift-card-chips \{[^}]*flex-wrap: nowrap/, "移动端 chips 应单行不换行")
+assert.match(giftsCss, /\.gift-card-chips \{[^}]*overflow-x: auto/, "移动端 chips 超出应可左右滚动")
+assert.match(giftsCss, /@media \(min-width: 768px\) \{[\s\S]*?\.gift-card-chips \.gift-reward-chip-extra \{[^}]*display: none/, "桌面端 extra chips 应隐藏(保留折叠)")
 // 礼包码即卡片标题(无名称字段): 标题级字重, 不是 id-chip 灰字
 assert.match(giftsCss, /\.gift-card-code \{[^}]*font-size: 15px/, "礼包码标题字号应为 15px")
 assert.match(giftsCss, /\.gift-card-code \{[^}]*font-weight: 700/, "礼包码标题应为粗体")

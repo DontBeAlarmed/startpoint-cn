@@ -81,8 +81,15 @@ export function GiftsCardView({
                         </div>
                         {chips.length > 0 && (
                             <div className="gift-reward-chips gift-card-chips">
-                                {chips.slice(0, 2).map((text, index) => (
-                                    <span key={index} className="gift-reward-chip">{text}</span>
+                                {/* 全量渲染: 移动端平铺单行左右滚动(触屏无 tooltip, +N 折叠不可
+                                    展开 — 维护者指定); 桌面端由 CSS 隐藏 extra 只留 ≤2 + +N 计数 */}
+                                {chips.map((text, index) => (
+                                    <span
+                                        key={index}
+                                        className={index < 2 ? "gift-reward-chip" : "gift-reward-chip gift-reward-chip-extra"}
+                                    >
+                                        {text}
+                                    </span>
                                 ))}
                                 {chips.length > 2 && (
                                     <span
