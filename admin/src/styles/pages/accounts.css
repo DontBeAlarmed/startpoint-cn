@@ -30,11 +30,14 @@
   cursor: pointer;
 }
 
-.admin-mobile-list-item-clickable:hover,
-.admin-mobile-list-item-clickable:focus-visible {
-  background: var(--hover);
-  outline: 2px solid var(--water);
-  outline-offset: -2px;
+/* hover 仅限真实鼠标设备（维护者指定）: 触摸屏点按会粘滞 :hover 导致整卡变色 */
+@media (hover: hover) {
+  .admin-mobile-list-item-clickable:hover,
+  .admin-mobile-list-item-clickable:focus-visible {
+    background: var(--hover);
+    outline: 2px solid var(--water);
+    outline-offset: -2px;
+  }
 }
 
 .admin-mobile-detail-list {
@@ -107,10 +110,12 @@
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-.acc-card:hover,
-.acc-card:focus-visible {
-  background: var(--hover);
-  border-color: var(--line-strong);
+@media (hover: hover) {
+  .acc-card:hover,
+  .acc-card:focus-visible {
+    background: var(--hover);
+    border-color: var(--line-strong);
+  }
 }
 
 .acc-id {
@@ -194,10 +199,12 @@
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-.save-sub:hover,
-.save-sub:focus-visible {
-  background: var(--th-bg);
-  border-color: var(--line-strong);
+@media (hover: hover) {
+  .save-sub:hover,
+  .save-sub:focus-visible {
+    background: var(--th-bg);
+    border-color: var(--line-strong);
+  }
 }
 
 .save-head {
