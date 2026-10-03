@@ -3,7 +3,6 @@ import {
     Button,
     Dropdown,
     Empty,
-    Input,
     Modal,
     Typography,
 } from "antd"
@@ -41,18 +40,26 @@ export function AccountsMobileView({
 }: AccountsMobileViewProps) {
     const [noteEditId, setNoteEditId] = useState<number | null>(null)
     const [noteDraft, setNoteDraft] = useState("")
+    const [noteOriginal, setNoteOriginal] = useState("")
     const [noteSaving, setNoteSaving] = useState(false)
     const selectedAccountId = selectedAccount?.id ?? null
 
+    // 失焦保存（维护者指定）: 与原值相同只退编辑态不发请求; 关编辑态按账号守卫,
+    // 防止保存期间用户已打开另一张卡的编辑态被误关
     const submitNote = async (accountId: number) => {
         if (noteSaving) return
         setNoteSaving(true)
         try {
             await onUpdateNote(accountId, noteDraft)
-            setNoteEditId(null)
+            setNoteEditId(current => (current === accountId ? null : current))
         } finally {
             setNoteSaving(false)
         }
+    }
+
+    const commitNote = (accountId: number) => {
+        if (noteDraft === noteOriginal) { setNoteEditId(null); return }
+        void submitNote(accountId)
     }
 
     // 账号级「…」菜单: 删除账号(原样确认)
@@ -93,33 +100,42 @@ export function AccountsMobileView({
         },
     })
 
-    // 账号备注行内编辑（卡头「点击可修改」）: 编辑态为紧凑输入+确定/取消, 流程与桌面一致
-    const renderNote = (account: AccountRow) =>
-        noteEditId === account.id ? (
-            <div className="admin-edit-compact">
-                <Input
-                    size="small"
-                    autoFocus
-                    value={noteDraft}
-                    maxLength={64}
-                    placeholder="账号备注"
-                    onChange={event => setNoteDraft(event.target.value)}
-                    onPressEnter={() => void submitNote(account.id)}
-                    style={{ width: 110 }}
-                />
-                <Button size="small" type="primary" loading={noteSaving} onClick={() => void submitNote(account.id)}>确定</Button>
-                <Button size="small" onClick={() => setNoteEditId(null)}>取消</Button>
-            </div>
-        ) : (
-            <a
-                className="acc-note acc-note-edit"
-                title="修改账号备注"
-                onClick={() => { setNoteEditId(account.id); setNoteDraft(account.adminNote ?? "") }}
-            >
-                {account.adminNote ?? "添加备注"}
-                <Pencil size={12} className="acc-note-pencil" />
-            </a>
+    // 账号备注行内编辑（卡头「点击可修改」）: 编辑态规范与桌面一致（维护者指定）—
+    // 点击进入编辑态, input 样式与静态灰字完全一致, 失焦保存(无确定/取消按钮),
+    // Enter 同保存, Escape 放弃
+    const renderNote = (account: AccountRow) => {
+        if (noteEditId !== account.id) {
+            return (
+                <a
+                    className="acc-note acc-note-edit"
+                    title="修改账号备注"
+                    onClick={() => {
+                        setNoteEditId(account.id)
+                        setNoteOriginal(account.adminNote ?? "")
+                        setNoteDraft(account.adminNote ?? "")
+                    }}
+                >
+                    {account.adminNote ?? "添加备注"}
+                    <Pencil size={12} className="acc-note-pencil" />
+                </a>
+            )
+        }
+        return (
+            <input
+                className="acc-note-input"
+                autoFocus
+                value={noteDraft}
+                maxLength={64}
+                placeholder="账号备注"
+                onChange={event => setNoteDraft(event.target.value)}
+                onBlur={() => commitNote(account.id)}
+                onKeyDown={event => {
+                    if (event.key === "Enter") commitNote(account.id)
+                    if (event.key === "Escape") setNoteEditId(null)
+                }}
+            />
         )
+    }
 
     // 存档子卡: 头像+名字+#存档id+meta + 右端 当前/切换合体标识; 编辑(占主)+[…](复制/删除)
     const renderSaveSub = (account: AccountRow, player: AccountRow["players"][number]) => (

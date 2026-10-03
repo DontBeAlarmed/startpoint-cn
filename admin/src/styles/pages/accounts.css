@@ -446,6 +446,24 @@
   font-size: 12px;
 }
 
+/* 备注编辑态 (维护者指定: input 样式不变 + 失焦保存): 原生无边框 input,
+   字号/颜色与静态灰字完全一致, 视觉上只是原位变成可输入, 不出现输入框外框与按钮 */
+.acc-note-input {
+  width: 120px;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.acc-note-input::placeholder {
+  color: var(--ink-soft);
+  opacity: 0.55;
+}
+
 /* 卡头「…」更多操作按钮 (mockup .more-btn): 删除账号收进菜单 */
 .admin-more-btn {
   color: var(--ink-soft);

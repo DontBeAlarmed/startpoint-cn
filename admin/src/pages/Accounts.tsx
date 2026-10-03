@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Card, Button, Space, Input, Dropdown, Modal, message, Grid, Typography } from "antd"
+import { Card, Button, Space, Dropdown, Modal, message, Grid, Typography } from "antd"
 import { PlusOutlined } from "@ant-design/icons"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
@@ -19,6 +19,7 @@ export default function Accounts() {
     const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null)
     const [noteEditId, setNoteEditId] = useState<number | null>(null)
     const [noteDraft, setNoteDraft] = useState("")
+    const [noteOriginal, setNoteOriginal] = useState("")
 
     const { data: accounts = [], isLoading, isFetching } = useQuery({
         queryKey: ["accounts"],
@@ -70,11 +71,12 @@ export default function Accounts() {
     })
 
     // 账号备注行内编辑（卡头「点击可修改」）: 复用账号清理接口的备注位,
-    // note 空串由服务端归一为 null
+    // note 空串由服务端归一为 null。onSuccess 只提示+刷新, 关编辑态由 commitNote
+    // 按账号守卫(防止保存期间用户已打开另一张卡的编辑态被误关)
     const updateNote = useMutation({
         mutationFn: ({ accountId, note }: { accountId: number; note: string }) =>
             apiPost("/api/server/accountCleanup/account", { accountId, note }),
-        onSuccess: () => { message.success("备注已更新"); setNoteEditId(null); refresh() },
+        onSuccess: () => { message.success("备注已更新"); refresh() },
         onError: showMutationError,
     })
 
@@ -125,39 +127,47 @@ export default function Accounts() {
     })
 
     // 账号备注（卡头灰字, 点击行内修改; 设备码不可修改, 与备注是两个概念）
-    const renderNote = (account: AccountRow) =>
-        noteEditId === account.id ? (
-            <div
-                className="admin-edit-compact"
-                onClick={event => event.stopPropagation()}
-                onKeyDown={event => event.stopPropagation()}
-            >
-                <Input
-                    size="small"
-                    value={noteDraft}
-                    maxLength={64}
-                    placeholder="账号备注"
-                    onChange={event => setNoteDraft(event.target.value)}
-                    onPressEnter={() => updateNote.mutate({ accountId: account.id, note: noteDraft })}
-                    style={{ width: 120 }}
-                />
-                <Button
-                    size="small"
-                    type="primary"
-                    loading={updateNote.isPending}
-                    onClick={() => updateNote.mutate({ accountId: account.id, note: noteDraft })}
-                >确定</Button>
-                <Button size="small" onClick={() => setNoteEditId(null)}>取消</Button>
-            </div>
-        ) : (
-            <a
-                className="acc-note acc-note-edit"
-                title="修改账号备注"
-                onClick={() => { setNoteEditId(account.id); setNoteDraft(account.adminNote ?? "") }}
-            >
-                {account.adminNote ?? "添加备注"}
-            </a>
+    // 编辑态规范（维护者指定）: 点击进入编辑态, input 样式与静态灰字完全一致,
+    // 失焦保存(无确定/取消按钮), Enter 同保存, Escape 放弃
+    const commitNote = (accountId: number) => {
+        if (noteDraft === noteOriginal) { setNoteEditId(null); return }
+        updateNote.mutate({ accountId, note: noteDraft }, {
+            onSuccess: () => setNoteEditId(current => (current === accountId ? null : current)),
+        })
+    }
+
+    const renderNote = (account: AccountRow) => {
+        if (noteEditId !== account.id) {
+            return (
+                <a
+                    className="acc-note acc-note-edit"
+                    title="修改账号备注"
+                    onClick={() => {
+                        setNoteEditId(account.id)
+                        setNoteOriginal(account.adminNote ?? "")
+                        setNoteDraft(account.adminNote ?? "")
+                    }}
+                >
+                    {account.adminNote ?? "添加备注"}
+                </a>
+            )
+        }
+        return (
+            <input
+                className="acc-note-input"
+                value={noteDraft}
+                maxLength={64}
+                placeholder="账号备注"
+                autoFocus
+                onChange={event => setNoteDraft(event.target.value)}
+                onBlur={() => commitNote(account.id)}
+                onKeyDown={event => {
+                    if (event.key === "Enter") commitNote(account.id)
+                    if (event.key === "Escape") setNoteEditId(null)
+                }}
+            />
         )
+    }
 
     // 存档子卡: 单行布局 — 头像+名字+#存档id+meta, 右端 当前/切换合体标识 + 编辑 + […]
     // (维护者指定: 行内重命名 pencil 移除, 重命名统一走玩家详情; 复制/导出/删除收进 […] 菜单)

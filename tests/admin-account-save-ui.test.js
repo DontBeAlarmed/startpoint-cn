@@ -58,6 +58,17 @@ assert.match(accounts, /acc-note acc-note-edit/)
 assert.match(accounts, /accountCleanup\/account/)
 assert.doesNotMatch(accounts, /void updateNote/)
 assert.match(mobileView, /acc-note acc-note-edit/)
+// 编辑态规范(维护者指定): 点击进入编辑态, input 样式不变, 失焦保存 —
+// 无确定/取消按钮, 无 antd 输入框外框; Enter 同保存, Escape 放弃
+assert.match(accounts, /acc-note-input/)
+assert.match(mobileView, /acc-note-input/)
+assert.match(accounts, /onBlur=\{\(\) => commitNote\(account\.id\)\}/)
+assert.match(mobileView, /onBlur=\{\(\) => commitNote\(account\.id\)\}/)
+assert.match(accountsCss, /\.acc-note-input \{[^}]*border: none/)
+assert.doesNotMatch(accounts, />确定<\/Button>/)
+assert.doesNotMatch(accounts, />取消<\/Button>/)
+assert.doesNotMatch(mobileView, />确定<\/Button>/)
+assert.doesNotMatch(mobileView, />取消<\/Button>/)
 
 // ── 存档子卡单行 ──────────────────────────────────────────────────────────
 assert.match(accounts, /className="save-sub"/)
@@ -78,8 +89,8 @@ assert.match(mobileView, /<Button className="save-current-btn" onClick=\{event =
 assert.match(accountsCss, /\.save-current-btn \{[^}]*color: var\(--wind\)/)
 assert.match(accountsCss, /\.admin-account-actions \.act-edit \{[^}]*flex: 1 1 auto/)
 assert.match(accounts, />切换<\/Button>/)
-assert.equal((accounts.match(/type="primary"/g) ?? []).length, 2, "桌面 primary 仅新建存档+备注确定")
-assert.equal((mobileView.match(/type="primary"/g) ?? []).length, 2, "移动 primary 仅新建存档+备注确定")
+assert.equal((accounts.match(/type="primary"/g) ?? []).length, 1, "桌面 primary 仅卡头新建存档(备注改失焦保存, 无确定钮)")
+assert.equal((mobileView.match(/type="primary"/g) ?? []).length, 1, "移动 primary 仅卡头新建存档(备注改失焦保存, 无确定钮)")
 // 点空白交互(维护者指定): 账号卡空白=展开存档列表, 存档卡空白=进玩家详情
 // 点击穿透修复: 仅点卡片本体(空白)触发(target !== currentTarget 直接跳过)
 assert.equal((accounts.match(/if \(event\.target !== event\.currentTarget\) return/g) ?? []).length, 2, "桌面账号卡/存档卡都应有空白判定")
@@ -120,12 +131,12 @@ assert.doesNotMatch(mobileView, /role="button"/)
 assert.match(accountsCss, /-webkit-tap-highlight-color:\s*transparent/)
 
 // 操作钮尺寸统一为默认(与新建存档同高, 维护者指定: 统一的是尺寸而非颜色);
-// 仅行内编辑器紧凑组保留 small(两端各 = 备注编辑器 Input+确定+取消 3 处)
+// 账号页不再有 small 组件(备注编辑器改原生无边框 input, 无 Input+确定+取消 紧凑组)
 {
     const smallCount = (accounts.match(/size="small"/g) ?? []).length
-    assert.equal(smallCount, 3, "桌面 small 实际 " + smallCount + " 处")
+    assert.equal(smallCount, 0, "桌面 small 实际 " + smallCount + " 处")
     const mobileSmall = (mobileView.match(/size="small"/g) ?? []).length
-    assert.equal(mobileSmall, 3, "移动 small 实际 " + mobileSmall + " 处")
+    assert.equal(mobileSmall, 0, "移动 small 实际 " + mobileSmall + " 处")
 }
 
 // 喜爱角色头像: /api/server/accounts 只读投影 favoriteCharacterId ← 收藏编队读取器轻量 wrapper;
