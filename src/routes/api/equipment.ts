@@ -30,7 +30,7 @@ import { getDegreeMissionIdsForConditionTypes } from "../../lib/mission/degree-c
 import { settleMissionCategories } from "../../lib/mission/settlement";
 import { getMissionCatalog } from "../../lib/mission/mission-catalog";
 import { publishActiveMissionOwnerStateWithinTransaction } from "../../lib/mission/active-publication-owner";
-import { mergeMissionSettlementResponse } from "../../lib/mission";
+import { composeMissionSettlementResponse, projectMissionSettlementFragment } from "../../lib/mission/response-fragment";
 import { projectEquipmentEntity } from "../../lib/common-response/entities";
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
 import type { CommonResponseFragment } from "../../lib/common-response/model";
@@ -251,10 +251,18 @@ const routes = async (fastify: FastifyInstance) => {
             degree_list: [],
         }
         if (operationResult.missionSettlement) {
-            mergeMissionSettlementResponse(responseData, operationResult.missionSettlement, viewerId)
+            composeMissionSettlementResponse(
+                responseData,
+                projectMissionSettlementFragment(operationResult.missionSettlement),
+                viewerId,
+            )
         }
         if (operationResult.levelMissionSettlement) {
-            mergeMissionSettlementResponse(responseData, operationResult.levelMissionSettlement, viewerId)
+            composeMissionSettlementResponse(
+                responseData,
+                projectMissionSettlementFragment(operationResult.levelMissionSettlement),
+                viewerId,
+            )
         }
         responseData.active_mission_list = operationResult.activeMissionList
         return reply.status(200).send({
@@ -433,10 +441,18 @@ const routes = async (fastify: FastifyInstance) => {
             degree_list: [],
         }
         if (operationResult.missionSettlement) {
-            mergeMissionSettlementResponse(bulkResponseData, operationResult.missionSettlement, viewerId)
+            composeMissionSettlementResponse(
+                bulkResponseData,
+                projectMissionSettlementFragment(operationResult.missionSettlement),
+                viewerId,
+            )
         }
         if (operationResult.levelMissionSettlement) {
-            mergeMissionSettlementResponse(bulkResponseData, operationResult.levelMissionSettlement, viewerId)
+            composeMissionSettlementResponse(
+                bulkResponseData,
+                projectMissionSettlementFragment(operationResult.levelMissionSettlement),
+                viewerId,
+            )
         }
         bulkResponseData.active_mission_list = operationResult.activeMissionList
         return reply.status(200).send({

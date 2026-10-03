@@ -280,7 +280,8 @@ test("equipment upgrade atomically deducts the client-selected crystal and craft
     )))
     assert.ok(Array.isArray(payload.data.mission_info))
     assert.ok(Array.isArray(payload.data.degree_list))
-    assert.equal("character_list" in payload.data, false)
+    // compose 统一路线:空角色列表以空数组发布(客户端 Option 解析为零长度应用,已验证无害)
+    assert.deepEqual(payload.data.character_list, [])
     assert.equal(typeof payload.data.mail_arrived, "boolean")
 })
 
