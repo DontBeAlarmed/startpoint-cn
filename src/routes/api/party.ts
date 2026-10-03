@@ -19,7 +19,10 @@ import {
 import { validatePartyLoadouts } from "../../lib/party-loadout-validation";
 import { settleAbilitySoulEquipFactsSync } from "../../lib/mission/operation-fact-settlement";
 import { settleMissionCategories, type MissionSettlementResult } from "../../lib/mission/settlement";
-import { mergeMissionSettlementResponse } from "../../lib/mission/response";
+import {
+    composeMissionSettlementResponse,
+    projectMissionSettlementFragment,
+} from "../../lib/mission/response-fragment";
 import { publishActiveMissionOwnerStateWithinTransaction } from "../../lib/mission/active-publication-owner";
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
 
@@ -627,7 +630,7 @@ const routes = async (fastify: FastifyInstance) => {
             }]),
         }
         for (const settlement of missionSettlements.settlements) {
-            mergeMissionSettlementResponse(responseData, settlement, viewerId)
+            composeMissionSettlementResponse(responseData, projectMissionSettlementFragment(settlement), viewerId)
         }
         responseData.active_mission_list = missionSettlements.activeMissionList
         return reply.status(200).send({

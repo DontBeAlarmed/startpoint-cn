@@ -60,7 +60,6 @@ stubModule("../src/lib/mission/index", {
     getCurrentStage: () => 1,
     getCharacterIdFromMission: () => "341005",
     isMissionEnabledAt: () => true,
-    mergeMissionSettlementResponse: () => {},
     reconcileAwakeUnlockCharacterList: (_playerId, list) => list,
     settleMissionCategoriesWithEvaluation: playerId => getDb().transaction(() => {
         getDb().prepare(`

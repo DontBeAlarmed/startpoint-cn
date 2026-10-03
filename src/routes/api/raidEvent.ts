@@ -68,7 +68,10 @@ import {
 } from "../../lib/mission/event-entry-facts";
 import { publishCharacterGrowthOwnerStateBestEffort } from "../../lib/character-growth/owner-publication";
 import { settleMissionCategories, type MissionSettlementResult } from "../../lib/mission/settlement";
-import { mergeMissionSettlementResponse } from "../../lib/mission/response";
+import {
+    composeMissionSettlementResponse,
+    projectMissionSettlementFragment,
+} from "../../lib/mission/response-fragment";
 
 interface EventIdBody {
     event_id: number,
@@ -243,7 +246,7 @@ const routes = async (fastify: FastifyInstance) => {
                 "endless_battle_my_ranking": getPlayerRushEventEndlessBattleRankingSync(playerId, eventId, { rushEventData }),
         }
         if (summary.missionSettlement) {
-            mergeMissionSettlementResponse(responseData, summary.missionSettlement, viewerId)
+            composeMissionSettlementResponse(responseData, projectMissionSettlementFragment(summary.missionSettlement), viewerId)
         }
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
