@@ -374,12 +374,7 @@
   cursor: default;
 }
 
-.save-current-btn:hover,
-.save-current-btn:focus-visible {
-  color: var(--wind);
-  border-color: var(--wind);
-  background: var(--ok-bg);
-}
+
 
 /* accounts page (approved mockup accounts-v2): panel-head star tick — the 账号管理 card
    reads as a game-console panel */
