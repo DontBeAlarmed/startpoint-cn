@@ -158,12 +158,6 @@ export default function GameplaySettings() {
             onRefresh={refreshSettings}
             refreshing={settings.isFetching}
         >
-            <div className="admin-page-note">
-                <Typography.Text strong>保存方式说明</Typography.Text>
-                <Typography.Text type="secondary">
-                    各设置项独立保存：修改后对应卡片内的「保存」按钮才可用，保存后立即生效。
-                </Typography.Text>
-            </div>
             {settings.isLoading ? (
                 <Card title="关卡固定掉落倍率">
                     <Skeleton active paragraph={{ rows: 2 }} />
@@ -364,6 +358,12 @@ export default function GameplaySettings() {
                     </Card>
                 </Space>
             )}
+            <div className="admin-page-note admin-page-note-footer">
+                <Typography.Text strong>保存方式说明</Typography.Text>
+                <Typography.Text type="secondary">
+                    各设置项独立保存：修改后对应卡片内的「保存」按钮才可用，保存后立即生效。
+                </Typography.Text>
+            </div>
         </AdminPage>
     )
 }

@@ -121,12 +121,6 @@ export default function Gifts() {
             refreshing={gifts.isFetching}
         >
             <Space direction="vertical" size="large" className="admin-stack">
-                <div className="admin-page-note">
-                    <Typography.Text strong>礼包维护须知</Typography.Text>
-                    <Typography.Text type="secondary">
-                        删除礼包不可恢复，会清除全部领取记录，同 code 重建后可重新领取；启动中的礼包不提供编辑入口，需先停止再修改。
-                    </Typography.Text>
-                </div>
                 {gifts.isError && (
                     <Alert
                         type="error"
@@ -176,6 +170,12 @@ export default function Gifts() {
                         onDelete={row => remove.mutateAsync(row)}
                     />
                 </Card>
+                <div className="admin-page-note admin-page-note-footer">
+                    <Typography.Text strong>礼包维护须知</Typography.Text>
+                    <Typography.Text type="secondary">
+                        删除礼包不可恢复，会清除全部领取记录，同 code 重建后可重新领取；启动中的礼包不提供编辑入口，需先停止再修改。
+                    </Typography.Text>
+                </div>
             </Space>
             <GiftEditor
                 gift={editorGift}

@@ -266,12 +266,6 @@ export default function Accounts() {
             refreshing={isFetching}
         >
         <Space direction="vertical" size="large" className="admin-stack">
-            <div className="admin-page-note">
-                <Typography.Text strong>选档状态说明</Typography.Text>
-                <Typography.Text type="secondary">
-                    新建和复制存档会设为该账号当前存档并切换为当前活动；删除当前存档后，服务端会在该账号剩余存档中回退到第一个可用存档。删除最后一个存档会同时删除账号。
-                </Typography.Text>
-            </div>
             {isMobile ? (
                 <Card title="账号管理" className="admin-mobile-list-card">
                     <AccountsMobileView
@@ -295,6 +289,12 @@ export default function Accounts() {
                     </div>
                 </Card>
             )}
+            <div className="admin-page-note admin-page-note-footer">
+                <Typography.Text strong>选档状态说明</Typography.Text>
+                <Typography.Text type="secondary">
+                    新建和复制存档会设为该账号当前存档并切换为当前活动；删除当前存档后，服务端会在该账号剩余存档中回退到第一个可用存档。删除最后一个存档会同时删除账号。
+                </Typography.Text>
+            </div>
         </Space>
         </AdminPage>
     )

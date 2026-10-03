@@ -248,12 +248,6 @@ export default function Mail() {
             refreshing={accountsFetching || playersFetching || historyFetching}
         >
         <Space direction="vertical" size="large" className="admin-stack">
-            <div className="admin-page-note">
-                <Text strong>发送须知</Text>
-                <Text type="secondary">
-                    发送成功后会保留发送对象设置并清空附件与文案；邮件一旦送达无法撤回，群发前请在确认弹窗中核对目标和附件摘要。
-                </Text>
-            </div>
             <div className="admin-mail-grid">
                 <div className="admin-mail-grid-col">
                     <Card title="发送邮件">
@@ -468,6 +462,12 @@ export default function Mail() {
             </div>
 
             <ScheduledResourceRules players={players} />
+            <div className="admin-page-note admin-page-note-footer">
+                <Text strong>发送须知</Text>
+                <Text type="secondary">
+                    发送成功后会保留发送对象设置并清空附件与文案；邮件一旦送达无法撤回，群发前请在确认弹窗中核对目标和附件摘要。
+                </Text>
+            </div>
         </Space>
 
             <Modal

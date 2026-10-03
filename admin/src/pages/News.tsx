@@ -103,12 +103,6 @@ export default function News() {
             refreshing={news.isFetching}
         >
             <Space direction="vertical" size="large" className="admin-stack">
-                <div className="admin-page-note">
-                    <Typography.Text strong>公告维护须知</Typography.Text>
-                    <Typography.Text type="secondary">
-                        删除公告为物理删除且无法恢复；公告内容使用客户端 RichText 标签，不支持属性和外部链接。
-                    </Typography.Text>
-                </div>
                 {news.isError && (
                     <Alert
                         type="error"
@@ -146,6 +140,12 @@ export default function News() {
                         togglingId={toggle.isPending ? toggle.variables?.id ?? null : null}
                     />
                 </Card>
+                <div className="admin-page-note admin-page-note-footer">
+                    <Typography.Text strong>公告维护须知</Typography.Text>
+                    <Typography.Text type="secondary">
+                        删除公告为物理删除且无法恢复；公告内容使用客户端 RichText 标签，不支持属性和外部链接。
+                    </Typography.Text>
+                </div>
             </Space>
             <NewsEditor
                 news={editorNews}

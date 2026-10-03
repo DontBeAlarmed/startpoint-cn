@@ -237,6 +237,12 @@
   line-height: 1.6;
 }
 
+/* 页脚注变体: 页面级须知统一沉底(维护者 2026-10-04), 页面顶部仅保留一句描述 */
+.admin-page-note-footer {
+  border-top: 1px dashed var(--line);
+  padding-top: 10px;
+}
+
 .admin-stack {
   width: 100%;
 }

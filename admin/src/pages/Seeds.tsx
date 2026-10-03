@@ -99,12 +99,6 @@ export default function Seeds() {
             }
         >
             <Space direction="vertical" size="large" className="admin-stack">
-                <div className="admin-page-note">
-                    <Typography.Text strong>种子状态说明</Typography.Text>
-                    <Typography.Text type="secondary">
-                        状态每 30 秒自动刷新；「Catalog 分布」为当前动画种子库的稀有度分布，「Quarantine」列出本机被隔离的种子样本。
-                    </Typography.Text>
-                </div>
                 {isLoading ? (
                     <StateCard><Spin size="large" /></StateCard>
                 ) : isError || !data ? (
@@ -338,6 +332,12 @@ export default function Seeds() {
                         </Modal>
                     </>
                 )}
+                <div className="admin-page-note admin-page-note-footer">
+                    <Typography.Text strong>种子状态说明</Typography.Text>
+                    <Typography.Text type="secondary">
+                        状态每 30 秒自动刷新；「Catalog 分布」为当前动画种子库的稀有度分布，「Quarantine」列出本机被隔离的种子样本。
+                    </Typography.Text>
+                </div>
             </Space>
         </AdminPage>
     )
