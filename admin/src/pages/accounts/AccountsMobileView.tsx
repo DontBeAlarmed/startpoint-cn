@@ -4,12 +4,10 @@ import {
     Dropdown,
     Empty,
     Input,
-    List,
     Modal,
-    Popconfirm,
     Typography,
 } from "antd"
-import { ArrowLeftRight, Copy, Pencil, Plus, Trash2 } from "lucide-react"
+import { Pencil, Plus } from "lucide-react"
 
 import type { AccountRow } from "./types"
 import { FavoriteAvatar, defaultPlayerAvatarId } from "./FavoriteAvatar"
@@ -57,7 +55,7 @@ export function AccountsMobileView({
         }
     }
 
-    // 「…」更多操作菜单（与桌面同构）: 删除收进菜单, 点选仍弹原样确认
+    // 账号级「…」菜单: 删除账号(原样确认)
     const confirmDeleteAccount = (accountId: number) => {
         Modal.confirm({
             title: `删除账号 ${accountId} 及所有存档？`,
@@ -75,8 +73,27 @@ export function AccountsMobileView({
         },
     })
 
-    // 账号备注行内编辑（mockup 卡头「点击可修改」）: 编辑态为紧凑输入+确定/取消,
-    // 流程与桌面 renderNote 一致
+    // 存档级「…」菜单: 复制/删除
+    const saveMoreMenu = (account: AccountRow, player: AccountRow["players"][number]) => ({
+        items: [
+            { key: "clone", label: "复制" },
+            { key: "delete", danger: true, label: "删除" },
+        ],
+        onClick: ({ key }: { key: string }) => {
+            if (key === "clone") void onCloneSave(player.id, account.id)
+            if (key === "delete") {
+                Modal.confirm({
+                    title: `删除存档 ${player.id}？`,
+                    okText: "确认",
+                    cancelText: "取消",
+                    okButtonProps: { danger: true },
+                    onOk: () => onDeleteSave(player.id),
+                })
+            }
+        },
+    })
+
+    // 账号备注行内编辑（卡头「点击可修改」）: 编辑态为紧凑输入+确定/取消, 流程与桌面一致
     const renderNote = (account: AccountRow) =>
         noteEditId === account.id ? (
             <div className="admin-edit-compact">
@@ -104,9 +121,7 @@ export function AccountsMobileView({
             </a>
         )
 
-    // 存档子卡（mockup .save-sub 移动形态）: 第一行 头像+名字+当前存档徽标+右端「切换」,
-    // 第二行 meta, 操作行 编辑·复制·删除（icon+文字, 维护者 2026-09-29 第五轮指定）;
-    // 整卡可点进玩家详情, 操作区 stopPropagation（照既有移动存档行惯例）
+    // 存档子卡: 头像+名字+#存档id+meta + 右端 当前/切换合体标识; 编辑(占主)+[…](复制/删除)
     const renderSaveSub = (account: AccountRow, player: AccountRow["players"][number]) => (
         <div
             className="save-sub admin-mobile-list-item-clickable"
@@ -115,109 +130,98 @@ export function AccountsMobileView({
         >
             <div className="save-head">
                 <FavoriteAvatar characterId={player.favoriteCharacterId} name={player.name} />
-                {/* 徽标与名字上下排列（与桌面同构）: 横排会在窄屏与「切换」争宽度导致换行 */}
-                <span className="save-name-col">
-                    {player.isDefault && <span className="admin-badge-ok">当前存档</span>}
-                    <span className="save-name">{player.name}</span>
+                <span className="save-info">
+                    <span className="save-name-line">
+                        <span className="save-name">{player.name}</span>
+                        <span className="save-id admin-mono">#存档 {player.id}</span>
+                    </span>
+                    <span className="save-meta">Lv {player.rank} · {player.characterCount} 角色</span>
                 </span>
-                <span className="save-ops">
-                    {/* activateSave 服务端同时把该存档设为账号的当前存档与全局活动存档，故仅 isDefault 时禁用 */}
-                    <Button
-                        icon={<ArrowLeftRight size={15} />}
-                        aria-label="切换存档"
-                        disabled={player.isDefault}
-                        onClick={event => {
-                            event.stopPropagation()
-                            void onActivateSave(player.id)
-                        }}
-                    >切换</Button>
-                </span>
+                {/* 当前存档标识与切换合体（与桌面同构） */}
+                {player.isDefault
+                    ? <span className="admin-badge-ok save-current-chip">当前</span>
+                    : (
+                        <Button
+                            size="small"
+                            aria-label="切换存档"
+                            onClick={event => {
+                                event.stopPropagation()
+                                void onActivateSave(player.id)
+                            }}
+                        >切换</Button>
+                    )}
             </div>
-            <div className="save-meta">Lv {player.rank} · {player.characterCount} 角色</div>
             <div className="admin-mobile-actions admin-account-actions" onClick={event => event.stopPropagation()}>
                 <Button icon={<Pencil size={15} />} aria-label="编辑存档" onClick={() => onOpenPlayer(player.id)}>编辑</Button>
-                <Button icon={<Copy size={15} />} aria-label="复制存档" onClick={() => void onCloneSave(player.id, account.id)}>复制</Button>
-                <Popconfirm
-                    title={`删除存档 ${player.id}？`}
-                    okText="确认"
-                    cancelText="取消"
-                    okButtonProps={{ danger: true }}
-                    onConfirm={() => void onDeleteSave(player.id)}
-                >
-                    <Button danger icon={<Trash2 size={15} />} aria-label={`删除存档 ${player.id}`}>删除</Button>
-                </Popconfirm>
+                <Dropdown menu={saveMoreMenu(account, player)} trigger={["click"]} placement="bottomRight">
+                    <Button className="admin-more-btn" aria-label="更多操作">…</Button>
+                </Dropdown>
             </div>
         </div>
     )
 
+    // 账号卡（每账号一张真卡片）: 标题行=账号#id+当前存档名+备注+新建存档(右);
+    // 内部=当前存档(头像+名) / 绑定设备 / 存档数N+[…]; 展开平铺存档子卡
     return (
         <div className="admin-account-mobile-list">
-            <List
-                loading={loading}
-                dataSource={[...accounts]}
-                locale={{ emptyText: "暂无账号" }}
-                renderItem={account => {
+            {loading ? (
+                <Typography.Text type="secondary">加载中...</Typography.Text>
+            ) : accounts.length === 0 ? (
+                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无账号" />
+            ) : (
+                accounts.map(account => {
                     const expanded = selectedAccountId === account.id
                     return (
-                        <List.Item className="admin-mobile-list-item">
-                            <div className="admin-mobile-list-content">
-                                <div className="admin-mobile-list-heading">
-                                    <span className="admin-mobile-heading-main">
-                                        <FavoriteAvatar
-                                            characterId={defaultPlayerAvatarId(account)}
-                                            name={account.defaultPlayerName ?? `#${account.id}`}
-                                        />
-                                        <Typography.Text strong className="acc-id">
-                                            {account.defaultPlayerName ?? `账号 #${account.id}`}
-                                        </Typography.Text>
-                                        {renderNote(account)}
-                                    </span>
-                                    <span className="acc-actions">
-                                        <Dropdown menu={moreActionsMenu(account.id)} trigger={["click"]} placement="bottomRight">
-                                            <Button className="admin-more-btn" aria-label="更多操作">…</Button>
-                                        </Dropdown>
-                                    </span>
-                                </div>
-                                <div className="admin-mobile-detail-list">
-                                    <div>
-                                        <span>当前存档</span>
-                                        <span className="acc-kv-value">
-                                            <strong>{account.defaultPlayerName ?? "无"}</strong>
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <span>绑定设备</span>
-                                        <span className="acc-kv-value acc-devices">
-                                            {account.devices.length === 0
-                                                ? "无"
-                                                : account.devices.map(device => (
-                                                    <span className="acc-dev-code" key={device.deviceId}>{device.deviceId}</span>
-                                                ))}
-                                        </span>
-                                    </div>
-                                    {/* 存档数切换钮独立整行左右撑满（与桌面同构） */}
-                                    <div className="acc-save-row">
-                                        <Button block className="acc-save-toggle" aria-expanded={expanded} onClick={() => onSelectAccount(account.id)}>
-                                            存档数 {account.players.length} {expanded ? "▴" : "▾"}
-                                        </Button>
-                                    </div>
-                                </div>
-                                {expanded && (
-                                    <div className="acc-save-list">
-                                        {account.players.length === 0
-                                            ? <Empty description="暂无存档" />
-                                            : account.players.map(player => renderSaveSub(account, player))}
-                                        {/* 新建存档垫在列表末尾（与桌面同构） */}
-                                        <div className="acc-save-new">
-                                            <Button type="primary" icon={<Plus size={15} />} onClick={() => void onNewSave(account.id)}>新建存档</Button>
-                                        </div>
-                                    </div>
-                                )}
+                        <div className="acc-card" key={account.id}>
+                            <div className="acc-titlebar">
+                                <span className="acc-id-chip admin-mono">账号 #{account.id}</span>
+                                <span className="acc-title-name">{account.defaultPlayerName ?? "无存档"}</span>
+                                {renderNote(account)}
+                                <span className="acc-actions">
+                                    <Button size="small" type="primary" icon={<Plus size={14} />} onClick={() => void onNewSave(account.id)}>新建存档</Button>
+                                </span>
                             </div>
-                        </List.Item>
+                            <div className="acc-identity">
+                                <FavoriteAvatar
+                                    characterId={defaultPlayerAvatarId(account)}
+                                    name={account.defaultPlayerName ?? `#${account.id}`}
+                                />
+                                <span className="acc-identity-name">{account.defaultPlayerName ?? "无存档"}</span>
+                            </div>
+                            <div className="acc-kv">
+                                <span className="acc-k">绑定设备</span>
+                                <span className="acc-v acc-devices">
+                                    {account.devices.length === 0
+                                        ? "无"
+                                        : account.devices.map(device => (
+                                            <span className="acc-dev-code" key={device.deviceId}>{device.deviceId}</span>
+                                        ))}
+                                </span>
+                            </div>
+                            <div className="acc-bottom-row">
+                                <Button
+                                    size="small"
+                                    className="acc-count-toggle"
+                                    aria-expanded={expanded}
+                                    onClick={() => onSelectAccount(account.id)}
+                                >
+                                    存档数 {account.players.length} {expanded ? "▴" : "▾"}
+                                </Button>
+                                <Dropdown menu={moreActionsMenu(account.id)} trigger={["click"]} placement="bottomRight">
+                                    <Button size="small" className="admin-more-btn" aria-label="更多操作">…</Button>
+                                </Dropdown>
+                            </div>
+                            {expanded && (
+                                <div className="acc-save-list">
+                                    {account.players.length === 0
+                                        ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无存档" />
+                                        : account.players.map(player => renderSaveSub(account, player))}
+                                </div>
+                            )}
+                        </div>
                     )
-                }}
-            />
+                })
+            )}
         </div>
     )
 }

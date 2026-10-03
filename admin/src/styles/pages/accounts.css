@@ -37,21 +37,6 @@
   outline-offset: -2px;
 }
 
-.admin-mobile-list-heading {
-  justify-content: space-between;
-  margin-bottom: 4px;
-}
-
-/* heading left group: 头像 + 存档名卡名 + adminNote 备注（有则显, 灰字省略）归拢左侧,
-   右侧 存档列表▾/… 操作不被挤压 */
-.admin-mobile-heading-main {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px 8px;
-  min-width: 0;
-}
-
 .admin-mobile-detail-list {
   display: grid;
   gap: 5px;
@@ -98,10 +83,13 @@
   min-height: 36px;
 }
 
-/* 维护者指定: 账号页操作行 <375 折行时「编辑」独占一排(占满左右), 「复制/删除」共一排;
-   ≥375 不折行, 由下方媒体查询回升为等分 */
+/* 账号页操作行: 编辑占主(grow), […] 恒定紧凑 */
 .admin-account-actions .ant-btn:first-child {
-  flex: 1 1 100%;
+  flex: 1 1 auto;
+}
+
+.admin-account-actions .ant-btn:not(:first-child) {
+  flex: none;
 }
 
 @media (min-width: 375px) {
@@ -114,7 +102,7 @@
   }
 
   .admin-account-actions .ant-btn:first-child {
-    flex: 1 1 0;
+    flex: 1 1 auto;
   }
 }
 
@@ -131,14 +119,6 @@
   border-radius: 14px;
   padding: 12px;
   background: var(--th-bg);
-}
-
-.acc-top {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-  margin-bottom: 10px;
 }
 
 .acc-id {
@@ -204,10 +184,6 @@
 }
 
 /* 新建存档垫在子卡列表末尾, 不随 grid 拉伸满宽 */
-.acc-save-new {
-  display: flex;
-}
-
 /* 维护者方案A: 面板子项不带自动最小尺寸(min-width:auto), 360 档子卡最小内容
    不再顶破 grid 轨道越出面板边线 */
 .acc-save-list > * {
@@ -215,12 +191,6 @@
 }
 
 /* 存档数切换钮: 独立整行左右撑满（维护者指定, 跨 kv 两列; 移动 detail-list 同构） */
-.admin-mobile-detail-list > .acc-save-row,
-.acc-kv > .acc-save-row {
-  grid-column: 1 / -1;
-  display: flex;
-}
-
 /* 存档子卡: stat-bg 凹陷面, 比账号卡再深一层 (mockup .save-sub panel-sub) */
 .save-sub {
   border: 1px solid var(--line);
@@ -266,13 +236,6 @@
 
 /* 存档子卡第一行右端单键「切换」 (mockup 规格: 行1末尾仅切换, 当前存档禁用);
    放不下时自然换行仍靠右 */
-.save-ops {
-  margin-left: auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
 /* 喜爱角色头像 (mockup .av-img): 首字占位打底, character_avatar 立绘铺满,
    加载失败由 onError 加 broken 类隐藏 — 同 TimeControl admin-char-avatar 惯例。
    移动 40×40 → 桌面 ≥768 44×44, 圆角 8px。背景透明（维护者指定）, 立绘未覆盖/加载前仅见首字占位。 */
@@ -302,6 +265,108 @@
 
 .av-img-picture-broken {
   display: none;
+}
+
+/* ── 账号卡两套布局 v2 (mockup accounts-two-layouts) ─────────────────────────
+   标题栏=账号#id+当前存档名+备注+新建存档(右); 身份行=头像+名称+存档id+设备(+存档数+…);
+   存档子卡单行=头像+名字+#存档id+meta + 当前/切换合体 + 编辑 + […] */
+.acc-titlebar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-bottom: 10px;
+  min-width: 0;
+}
+
+.acc-id-chip {
+  flex: none;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+
+.acc-title-name {
+  font-weight: 800;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.acc-titlebar .acc-actions {
+  margin-left: auto;
+}
+
+.acc-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  background: var(--stat-bg);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+}
+
+.acc-identity-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.acc-identity-name {
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.acc-identity-meta {
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+
+.acc-count-toggle {
+  flex: none;
+}
+
+.acc-bottom-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.acc-bottom-row .acc-count-toggle {
+  flex: 1 1 auto;
+}
+
+.acc-bottom-row .admin-more-btn {
+  flex: none;
+}
+
+/* 存档子卡信息列: 名字+#存档id 一行, meta 第二行 */
+.save-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.save-name-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.save-id {
+  flex: none;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.save-current-chip {
+  flex: none;
 }
 
 /* accounts page (approved mockup accounts-v2): panel-head star tick — the 账号管理 card
@@ -364,13 +429,6 @@
 }
 
 /* 存档子卡第二行操作 (mockup .save-ops2): 编辑·复制·导出·删除 左对齐 */
-.save-ops2 {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-
 /* 卡头头像 (账号卡=当前存档喜爱角色): 移动 36, 桌面随 ≥768 媒体查询升 44 */
 .acc-top .av-img {
   width: 36px;
@@ -382,6 +440,10 @@
 @media (min-width: 768px) {
   .acc-card {
     padding: 14px;
+  }
+
+  .acc-identity {
+    padding: 12px;
   }
 
   .acc-id {
