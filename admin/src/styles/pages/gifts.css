@@ -145,11 +145,22 @@
   margin-top: 2px;
 }
 
+/* 2026-10-04 专项整理: 更新时间跟在 code 后(截断防长串); 状态徽章已移除,
+   状态收敛到启停按钮文字 */
+.gift-card-time {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .gift-card-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 2px 12px;
-  margin-top: 6px;
   min-width: 0;
   color: var(--ink-soft);
   font-size: 12px;
@@ -160,9 +171,38 @@
   white-space: nowrap;
 }
 
+/* meta + 记录/编辑/删除: 移动端上下两行, 桌面端并排一行(维护者指定: 桌面操作
+   不单独占行上移一级) */
+.gift-card-infoline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 6px;
+}
+
 /* 底行: 记录折叠占满空余, 其余按钮(编辑/删除)不挤占 */
 .gift-card .acc-bottom-row .ant-btn:not(.acc-count-toggle) {
   flex: none;
+}
+
+@media (min-width: 768px) {
+  .gift-card-infoline {
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .gift-card-infoline .acc-bottom-row {
+    margin-left: auto;
+    margin-top: 0;
+    flex: none;
+  }
+
+  /* 桌面并排时记录折叠钮不占满空余(移动端保持占满) */
+  .gift-card .acc-bottom-row .acc-count-toggle {
+    flex: 0 0 auto;
+  }
 }
 
 .gift-card-empty {

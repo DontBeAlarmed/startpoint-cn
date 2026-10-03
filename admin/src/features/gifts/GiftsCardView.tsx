@@ -22,10 +22,10 @@ interface GiftsCardViewProps {
 }
 
 // 礼包卡片视图（2026-10-04 卡片化改造, 双视口同构, 结构照账号页 acc-card 已验证模式）：
-// 标题行 = code chip + 状态徽章 + 启停(恒位重标记); 中部 = 奖励 chips(≤2 全显 + +N) + meta;
-// 底行 = 记录 N 折叠(flex1, 领取记录内嵌进本卡) + 编辑(仅 stopped) + 垃圾桶删除(icon-only)。
-// 空白点按切换记录展开(target 判定防点击穿透, 同账号卡)。数据/变更全部经 props 下传——
-// queryKey、API 与原表格/移动卡零差异。
+// 标题行 = code chip + 更新时间 + 启停(恒位重标记, 状态收敛到按钮文字, 无徽章);
+// 中部 = 奖励 chips(≤2 全显 + +N); info 行 = meta(奖励版本/版本) + 记录折叠 + 编辑 +
+// 垃圾桶删除(移动端上下两行, 桌面并排一行 — 专项整理)。空白点按切换记录展开(target
+// 判定防点击穿透, 同账号卡)。数据/变更全部经 props 下传——queryKey、API 零差异。
 export function GiftsCardView({
     rows,
     loading,
@@ -63,9 +63,9 @@ export function GiftsCardView({
                     >
                         <div className="acc-titlebar">
                             <span className="acc-id-chip admin-mono gift-card-code">{row.code}</span>
-                            <span className={active ? "admin-badge-ok" : "admin-badge-muted"}>
-                                {active ? "启用" : "停止"}
-                            </span>
+                            {/* 2026-10-04 专项整理: 启用/停止徽章移除, 状态收敛到启停按钮文字;
+                                更新时间跟在 code 后(维护者指定) */}
+                            <span className="gift-card-time">更新时间 {new Date(row.updatedAt).toLocaleString("zh-CN")}</span>
                             <span className="acc-actions">
                                 {/* 启停按钮恒在原位重标记 (与定时资源卡 停用/启用 同模式, 维护者 2026-09-30:
                                    点击后按钮消失的 UX 不统一); active 无编辑入口的现状语义保留(先停止再修改) */}
@@ -93,41 +93,44 @@ export function GiftsCardView({
                                 )}
                             </div>
                         )}
-                        <div className="gift-card-meta">
-                            <span>奖励版本 <b className="admin-mono">{row.rewardRevision}</b></span>
-                            <span>版本 <b className="admin-mono">{row.revision}</b></span>
-                            <span>更新时间 {new Date(row.updatedAt).toLocaleString("zh-CN")}</span>
-                        </div>
-                        <div className="acc-bottom-row">
-                            <Button
-                                className="acc-count-toggle"
-                                aria-expanded={expanded}
-                                onClick={() => onToggleExpand(row.id)}
-                            >
-                                记录 {row.redemptionCount} {expanded ? "▴" : "▾"}
-                            </Button>
-                            {/* 编辑/删除仅 stopped 提供(原桌面语义: active 先停止再修改,
-                                删除同理; 原移动端 active 可删的不一致语义统一到严格侧) */}
-                            {!active && (
-                                <>
-                                    <Button
-                                        icon={<Pencil size={15} />}
-                                        aria-label="编辑礼包"
-                                        onClick={() => onEdit(row)}
-                                    />
-                                    <Popconfirm
-                                        title="删除这个礼包？"
-                                        description="此操作不可恢复，将清除全部领取记录，同 code 重建后可重新领取。"
-                                        okText="删除"
-                                        cancelText="取消"
-                                        okButtonProps={{ danger: true }}
-                                        onConfirm={() => void onDelete(row)}
-                                    >
-                                        {/* 删除按钮全站统一 icon-only(维护者 2026-10-04) */}
-                                        <Button danger icon={<Trash2 size={15} />} aria-label="删除礼包" />
-                                    </Popconfirm>
-                                </>
-                            )}
+                        {/* meta + 记录/编辑/删除: 移动端上下两行, 桌面端并排一行(维护者指定:
+                            桌面操作不单独占一行, 上移与 meta 同行) */}
+                        <div className="gift-card-infoline">
+                            <div className="gift-card-meta">
+                                <span>奖励版本 <b className="admin-mono">{row.rewardRevision}</b></span>
+                                <span>版本 <b className="admin-mono">{row.revision}</b></span>
+                            </div>
+                            <div className="acc-bottom-row gift-card-actions">
+                                <Button
+                                    className="acc-count-toggle"
+                                    aria-expanded={expanded}
+                                    onClick={() => onToggleExpand(row.id)}
+                                >
+                                    记录 {row.redemptionCount} {expanded ? "▴" : "▾"}
+                                </Button>
+                                {/* 编辑/删除仅 stopped 提供(原桌面语义: active 先停止再修改,
+                                    删除同理; 原移动端 active 可删的不一致语义统一到严格侧) */}
+                                {!active && (
+                                    <>
+                                        <Button
+                                            icon={<Pencil size={15} />}
+                                            aria-label="编辑礼包"
+                                            onClick={() => onEdit(row)}
+                                        />
+                                        <Popconfirm
+                                            title="删除这个礼包？"
+                                            description="此操作不可恢复，将清除全部领取记录，同 code 重建后可重新领取。"
+                                            okText="删除"
+                                            cancelText="取消"
+                                            okButtonProps={{ danger: true }}
+                                            onConfirm={() => void onDelete(row)}
+                                        >
+                                            {/* 删除按钮全站统一 icon-only(维护者 2026-10-04) */}
+                                            <Button danger icon={<Trash2 size={15} />} aria-label="删除礼包" />
+                                        </Popconfirm>
+                                    </>
+                                )}
+                            </div>
                         </div>
                         {expanded && (
                             <div className="gift-card-records">

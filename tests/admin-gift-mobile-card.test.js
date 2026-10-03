@@ -67,11 +67,17 @@ assert.doesNotMatch(cardView, />删除<\/Button>/, "删除按钮不得带文字(
 assert.match(cardView, /title="删除这个礼包？"/, "删除确认标题与原桌面逐字一致")
 assert.match(cardView, /description="此操作不可恢复，将清除全部领取记录，同 code 重建后可重新领取。"/, "删除确认说明逐字一致")
 
-// ── 徽章/chips/meta/分页 ────────────────────────────────────────────────────
-assert.match(cardView, /active \? "admin-badge-ok" : "admin-badge-muted"/, "礼包状态应为 ok/muted 徽章")
+// ── 状态收敛/更新时间/chips/meta/分页 ───────────────────────────────────────
+// 2026-10-04 专项整理: 启用/停止徽章移除, 状态收敛到启停按钮文字(和存档页相同);
+// 更新时间跟在 code 后
+assert.doesNotMatch(cardView, /admin-badge-ok|admin-badge-muted/, "卡片本体不得再出现状态徽章")
+assert.match(cardView, /gift-card-time/, "更新时间应跟在 code 后(专项整理)")
+assert.match(cardView, /更新时间 \{new Date\(row\.updatedAt\)\.toLocaleString\("zh-CN"\)\}/, "更新时间取自 updatedAt")
 assert.match(cardView, /giftRewardChipTexts\(row\.rewards, rewardLookups\)/, "奖励 chips 应复用 rewardDisplay")
 assert.match(cardView, /gift-reward-chip-more/, "奖励 chips 应保留 ≤2+N 折叠")
 assert.match(cardView, /记录 \{row\.redemptionCount\}/, "底行折叠钮应展示已领取数")
+assert.match(cardView, /奖励版本 <b className="admin-mono">\{row\.rewardRevision\}<\/b>/, "奖励版本取自 rewardRevision")
+assert.match(cardView, /版本 <b className="admin-mono">\{row\.revision\}<\/b>/, "版本取自 revision")
 assert.match(cardView, /<Pagination/, "卡片视图应保留分页器")
 assert.match(cardView, /showSizeChanger/, "分页应保留每页条数切换")
 assert.match(cardView, /暂无礼包/, "空态文案与原桌面一致")
@@ -86,6 +92,10 @@ assert.match(redemptions, /搜索玩家名或精确 Player\/Account ID/, "搜索
 // ── CSS: 私有件进页面 css, 不新增桌面表格规则 ──────────────────────────────
 assert.match(giftsCss, /\.gift-card-records\s*\{/, "记录展开区样式应存在")
 assert.match(giftsCss, /\.gift-card \.acc-bottom-row \.ant-btn:not\(\.acc-count-toggle\)/, "底行按钮不挤占折叠钮")
+// 2026-10-04 专项整理: meta+操作行移动端上下两行, 桌面端并排一行
+assert.match(giftsCss, /\.gift-card-infoline \{[^}]*flex-direction: column/, "移动端 meta+操作上下排列")
+assert.match(giftsCss, /@media \(min-width: 768px\) \{[\s\S]*?\.gift-card-infoline \{[^}]*flex-direction: row/, "桌面端 meta+操作并排一行")
+assert.match(giftsCss, /\.gift-card-time \{/, "更新时间行内样式应存在")
 assert.equal(giftsCss.match(/\.admin-ops-table/g)?.length, 1, "gifts css 不应新增桌面表格规则")
 assert.doesNotMatch(giftsCss, /gift-mobile-/, "旧移动视图私有类应清除")
 
