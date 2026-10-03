@@ -359,15 +359,15 @@ export default function Dashboard() {
                                             tick
                                         />
                                         <FeatTile
-                                            icon={featIcons.shieldCheck}
-                                            label="兼容拒绝"
-                                            value={status.multiplayer.latestCompatibilityRejection ? "有记录" : "暂无记录"}
-                                        />
-                                        <FeatTile
                                             icon={featIcons.done}
                                             label="已结束事实"
                                             value={status.multiplayer.battleFacts?.finalized ?? "未知"}
                                             tick
+                                        />
+                                        <FeatTile
+                                            icon={featIcons.shieldCheck}
+                                            label="兼容拒绝"
+                                            value={status.multiplayer.latestCompatibilityRejection ? "有记录" : "暂无记录"}
                                         />
                                     </div>
                                     {(status.multiplayer.activeRooms === null

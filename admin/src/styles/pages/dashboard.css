@@ -211,6 +211,11 @@ html[data-theme="dark"] .admin-feat-icon {
   overflow-wrap: anywhere;
 }
 
+/* 联机状态 5 块窄屏 2 列排布: 末块(兼容拒绝/暂无记录)横跨整行撑满底部（维护者指定） */
+.admin-feats-5 > :last-child {
+  grid-column: 1 / -1;
+}
+
 @media (min-width: 768px) {
   .admin-feats {
     grid-template-columns: repeat(4, 1fr);
@@ -218,5 +223,10 @@ html[data-theme="dark"] .admin-feat-icon {
 
   .admin-feats.admin-feats-5 {
     grid-template-columns: repeat(5, 1fr);
+  }
+
+  /* 桌面 5 列单排, 末块不跨 */
+  .admin-feats-5 > :last-child {
+    grid-column: auto;
   }
 }

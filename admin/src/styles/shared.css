@@ -149,6 +149,8 @@
 
 .admin-page-heading {
   display: flex;
+  /* flex:1 占满除刷新 icon 外的整行, 标题行内 margin-left:auto 的操作钮才能钉到右端 */
+  flex: 1 1 auto;
   flex-direction: column;
   min-width: 0;
 }
