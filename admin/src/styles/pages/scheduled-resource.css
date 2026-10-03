@@ -135,10 +135,6 @@
    标题行 = 资源名+范围徽章 / 启用区间 + 状态钮(绿=生效中/红=已停用)+编辑+删除 */
 .sched-card {
   min-width: 0;
-}
-
-.sched-card {
-  min-width: 0;
   /* 区块摆放: 移动端单列 —— 徽章左上/名称 → 信息行 → 三钮最下一排(维护者指定) */
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -200,13 +196,14 @@
 }
 
 .sched-meta {
+  grid-area: meta;
   display: flex;
   flex-wrap: wrap;
   gap: 2px 12px;
   min-width: 0;
   color: var(--ink-soft);
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 
@@ -215,7 +212,7 @@
   min-width: 0;
 }
 
-.sched-card .sched-meta b {
+.sched-meta b {
   color: var(--ink);
   font-weight: 600;
 }

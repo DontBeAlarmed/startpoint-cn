@@ -89,7 +89,7 @@ assert.doesNotMatch(cardView, /acc-bottom-row/, "独立底行应移除")
     assert.match(block, /aria-label="删除公告"/, "删除钮应在 actions 簇内")
 }
 assert.match(newsCss, /\.news-card-actions \{[^}]*flex: 0 0 100%/, "移动端三钮应独占最下一排")
-assert.match(newsCss, /@media \(min-width: 768px\) \{[\s\S]*?\.news-card \.news-card-actions \{[^}]*margin-left: auto/, "桌面端三钮应靠右成簇")
+assert.match(newsCss, /@media \(min-width: 768px\) \{[\s\S]*?\.news-card-actions \{[^}]*margin-left: auto/, "桌面端三钮应靠右成簇")
 assert.doesNotMatch(newsCss, /news-status-toggle|news-mobile-/, "旧移动视图私有类应清除")
 assert.doesNotMatch(newsCss, /news-title-cell/, "旧表格标题单元格类应清除")
 

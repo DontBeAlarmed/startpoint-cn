@@ -22,11 +22,12 @@ interface GiftsCardViewProps {
     togglingGiftId: number | null
 }
 
-// 礼包卡片视图（2026-10-04 卡片化改造, 双视口同构, 结构照账号页 acc-card 已验证模式）：
-// 标题行 = code chip + 更新时间 + 启停(恒位重标记, 状态收敛到按钮文字, 无徽章);
-// 中部 = 奖励 chips(≤2 全显 + +N); info 行 = meta(奖励版本/版本) + 记录折叠 + 编辑 +
-// 垃圾桶删除(移动端上下两行, 桌面并排一行 — 专项整理)。空白点按切换记录展开(target
-// 判定防点击穿透, 同账号卡)。数据/变更全部经 props 下传——queryKey、API 零差异。
+// 礼包卡片视图（双视口同构, 结构照账号页 acc-card 模式）：
+// 标题行 = code chip + 更新时间 + 状态钮(绿=生效中/红=已停用, 显示当前状态;
+// active 无编辑入口, 先停再改 — 编辑/删除常驻但置灰锁定);
+// 中部 = 奖励 chips 全量平铺单行(超出左右滚动, 视觉语义交给 shared-patterns 集中说明);
+// info 行 = meta(奖励版本/版本) + 记录折叠 + 编辑/删除。空白点按切换记录展开
+// (target 判定防点击穿透, 同账号卡)。数据/变更全部经 props 下传——queryKey、API 零差异。
 export function GiftsCardView({
     rows,
     loading,
@@ -46,34 +47,33 @@ export function GiftsCardView({
     return (
         <Spin spinning={loading}>
             <div className="admin-acc-list">
-                {rows.length === 0 && !loading && (
-                    <span className="gift-card-empty">暂无礼包</span>
-                )}
-            {rows.map(row => {
-                const chips = giftRewardChipTexts(row.rewards, rewardLookups)
-                const active = row.status === "active"
-                const expanded = expandedGiftId === row.id
-                return (
-                    <div
-                        key={row.id}
-                        className="acc-card gift-card"
-                        onClick={event => {
-                            // 仅点卡片本体(空白)切换领取记录展开
-                            if (event.target !== event.currentTarget) return
-                            onToggleExpand(row.id)
-                        }}
-                    >
-                        <div className="acc-titlebar">
-                            {/* 维护者 2026-10-04: 标题两行 — 第一行 code, 第二行时间; 右侧启停 */}
-                            <div className="gift-card-heading">
-                                <span className="acc-id-chip admin-mono gift-card-code">{row.code}</span>
-                                <span className="gift-card-time">更新时间 {new Date(row.updatedAt).toLocaleString("zh-CN")}</span>
-                            </div>
+                    {rows.length === 0 && !loading && (
+                        <span className="admin-card-empty">暂无礼包</span>
+                    )}
+                {rows.map(row => {
+                    const chips = giftRewardChipTexts(row.rewards, rewardLookups)
+                    const active = row.status === "active"
+                    const expanded = expandedGiftId === row.id
+                    return (
+                        <div
+                            key={row.id}
+                            className="acc-card gift-card"
+                            onClick={event => {
+                                // 仅点卡片本体(空白)切换领取记录展开
+                                if (event.target !== event.currentTarget) return
+                                onToggleExpand(row.id)
+                            }}
+                        >
+                            <div className="acc-titlebar">
+                                {/* 维护者 2026-10-04: 标题两行 — 第一行 code, 第二行时间; 右侧启停 */}
+                                <div className="gift-card-heading">
+                                    <span className="acc-id-chip admin-mono gift-card-code">{row.code}</span>
+                                    <span className="gift-card-time">更新时间 {new Date(row.updatedAt).toLocaleString("zh-CN")}</span>
+                                </div>
                             <span className="acc-actions">
                                 {/* 启停按钮恒在原位重标记 (与定时资源卡 停用/启用 同模式, 维护者 2026-09-30:
                                    点击后按钮消失的 UX 不统一); active 无编辑入口的现状语义保留(先停止再修改) */}
-                                {/* 状态钮显示当前状态(绿=生效中/红=已停用, 维护者 2026-10-04),
-                                    点击切换; 无图标 */}
+                                {/* 状态钮显示当前状态; 点击切换(视觉语义见 shared-patterns) */}
                                 <Button
                                     className={active ? "admin-state-active" : "admin-state-stopped"}
                                     aria-label={active ? "点击停止礼包" : "点击启动礼包"}

@@ -41,7 +41,6 @@ export default function GiftRedemptions({ gift }: GiftRedemptionsProps) {
                     placeholder="搜索玩家名或精确 Player/Account ID"
                     onChange={event => setSearch(event.target.value)}
                     allowClear
-                    style={{ minWidth: 200 }}
                 />
             </div>
             <Table<GiftRedemptionRow>

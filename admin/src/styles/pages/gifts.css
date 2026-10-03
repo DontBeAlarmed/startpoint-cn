@@ -17,9 +17,9 @@
 }
 
 /* ── gifts deep polish ──────────────────────────────────────────────────────
-   reward chips (列表「奖励」列 + 编辑器奖励行头部): the quiet chip voice from
+   reward chips (卡片奖励行 + 编辑器奖励行头部): the quiet chip voice from
    the approved review mockup (#p-gifts) — star tile + 类型·对象名 ×数量;
-   list shows at most two chips then a quiet +N counter. */
+   卡片视图全量平铺单行滚动(超出左右滑), 不再折叠。 */
 .gift-reward-chips {
   display: inline-flex;
   flex-wrap: wrap;
@@ -98,12 +98,6 @@
   width: 100%;
 }
 
-.gift-redemption-filters .ant-select,
-.gift-redemption-filters .ant-input {
-  flex: 1 1 200px;
-  min-width: 0;
-}
-
 .gift-redemption-snapshot {
   margin: 0;
   font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -120,9 +114,9 @@
   }
 }
 
-/* ── gifts card view (2026-10-04 卡片化改造, 同账号页 acc-card 结构) ─────────
-   双视口统一卡片: 标题行(code chip+状态徽章+启停) / 奖励 chips / meta /
-   底行(记录 N 折叠 flex1 + 编辑 + 垃圾桶删除) / 记录内嵌展开区。
+/* ── gifts card view (卡片化改造, 同账号页 acc-card 结构) ────────────────────
+   标题行(code chip + 更新时间 + 状态钮 生效中/已停用 + 编辑/删除) /
+   奖励 chips / meta(奖励版本/版本/更新时间) / 记录内嵌展开区。
    卡片外壳直接复用 accounts.css 的 .acc-card/.acc-titlebar/.acc-bottom-row。 */
 .gift-card-code {
   font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -226,14 +220,6 @@
   }
 }
 
-.gift-card-empty {
-  display: block;
-  padding: 24px 0;
-  color: var(--ink-soft);
-  font-size: 13px;
-  text-align: center;
-}
-
 /* 记录内嵌展开区: 顶部分隔线与卡内 padding 对齐; 表格横向滚动由 scroll.x 承担 */
 .gift-card-records {
   margin-top: 10px;
@@ -259,7 +245,7 @@
 
 .gift-redemption-embed .gift-redemption-filters .ant-input {
   flex: 1 1 200px;
-  min-width: 0;
+  min-width: min(200px, 100%);
 }
 
 /* 生效中的礼包: 编辑/删除常驻但锁定 —— 置灰不可用, 点击提示需先停用(维护者指定);

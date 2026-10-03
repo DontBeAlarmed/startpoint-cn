@@ -215,13 +215,10 @@
 
 
 
-/* ── news card view (2026-10-04 卡片化改造, 双视口统一, 同礼包/账号页 acc-card) ──
-   标题行 = 缩略图 + 两行标题块(分类徽章+标题 / 发布时间[+标签]) + 启停按钮;
-   启用标识收敛到启停按钮文字(维护者指定), 徽章/Switch 两套表达移除 */
-/* grid 项 min-width:auto 会让两行标题块的 nowrap 时间串撑爆 360px 视口(礼包页同款) */
-.news-card {
-  min-width: 0;
-}
+/* ── news card view (卡片化改造, 双视口统一, 同礼包/账号页 acc-card) ──────────
+   标题行 = 两行标题块(分类徽章+标题 / 发布时间[+标签]) + 状态钮(生效中/已停用);
+   配图为右半渐隐背景层(见 .news-card-bg), 缩略图不再单独出现 */
+
 
 .news-card-heading {
   display: flex;
@@ -263,6 +260,7 @@
 
 /* 配图作卡片背景: 只占右半边, 左缘渐隐融入卡底(维护者指定) */
 .news-card {
+  min-width: 0;
   position: relative;
   overflow: hidden;
 }
@@ -304,12 +302,10 @@
 }
 
 @media (min-width: 768px) {
-  .news-card .news-card-actions {
+  .news-card-actions {
     flex: none;
     margin-left: auto;
     margin-top: 0;
     justify-content: flex-end;
   }
 }
-
-
