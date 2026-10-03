@@ -16,6 +16,7 @@ import type {
     RewardPlayerGachaDrawResult,
 } from "./types"
 import { GachaType } from "./types"
+import { getServerDate } from "../utils"
 import type { GachaDrawMetadata } from "./gacha-draw"
 import {
     computeEquipmentGachaMovieEffectsForGacha,
@@ -27,7 +28,6 @@ import { sampledLog } from "./sampled-log"
 import { createRewardGrantItemOverflowPolicy } from "./reward-grant-item-overflow"
 import { prepareGachaAcquisitionBatchSync } from "./gacha-owner/acquisition-batch"
 import { settleGachaAcquisitionMissions } from "./gacha-acquisition-mission-settlement"
-import { getRealNow } from "../runtime/time/game-time"
 
 export interface PlannedCharacterGachaMovie {
     characterId: number
@@ -169,7 +169,7 @@ export function grantGachaRewardPlanInTransactionOwnerWithInventorySync(
     )
     // 新角色入队/新装备种类是持有数事实的产生时点,结算与发放同事务
     const missionSettlement = acquisition.hadNewCharacter() || acquisition.hadNewEquipmentKind()
-        ? settleGachaAcquisitionMissions(playerId, getRealNow())
+        ? settleGachaAcquisitionMissions(playerId, getServerDate())
         : null
     return { ...result, missionSettlement }
 }

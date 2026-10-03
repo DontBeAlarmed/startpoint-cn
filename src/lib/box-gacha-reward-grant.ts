@@ -18,7 +18,7 @@ import type { FactKey } from "./mission/facts/fact-key"
 import type { MissionSettlementResult } from "./mission/settlement"
 import { createRewardGrantItemOverflowPolicy } from "./reward-grant-item-overflow"
 import { settleGachaAcquisitionMissions } from "./gacha-acquisition-mission-settlement"
-import { getRealNow } from "../runtime/time/game-time"
+import { getServerDate } from "../utils"
 
 export interface BoxGachaRewardKnownPlayerState {
     readonly id: number
@@ -134,7 +134,7 @@ export function grantBoxGachaDrawInTransactionOwnerWithInventorySync(
         rewardInvalidatedFactKeys: getAwakeFactKeysFromRewardGrants(result),
         missionSettlement: result.assets.characters.some(entry => entry.joined)
             || drawResult.equipment.size > 0
-            ? settleGachaAcquisitionMissions(playerId, getRealNow())
+            ? settleGachaAcquisitionMissions(playerId, getServerDate())
             : null,
         playerAfter: {
             freeMana: result.playerAfter.freeMana,

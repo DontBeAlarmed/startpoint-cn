@@ -15,7 +15,7 @@ import {
 } from "../../lib/mission/response-fragment"
 import { getMailArrivedSync } from "../../lib/mail-notification"
 import { getRealNow } from "../../runtime/time/game-time"
-import { generateDataHeaders } from "../../utils"
+import { generateDataHeaders, getServerDate } from "../../utils"
 import { executeInjectCharacterExp } from "../../lib/character-growth/commands/inject-exp"
 import { CharacterGrowthError } from "../../lib/character-growth/errors"
 import { executeStackToExp } from "../../lib/character-growth/commands/stack-to-exp"
@@ -210,7 +210,7 @@ const routes = async (fastify: FastifyInstance) => {
                     playerId: resolved.playerId,
                     characterId: body.character_id,
                     addExp: body.exp,
-                    evaluationTime: getRealNow(),
+                    evaluationTime: getServerDate(),
                 })
                 // Keep the transport adapter's return shape in one place while
                 // the command owns all EXP/pool/counter writes.

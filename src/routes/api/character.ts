@@ -4,7 +4,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getPlayerCharacterSync } from "../../data/domains/character"
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
-import { generateDataHeaders } from "../../utils";
+import { generateDataHeaders, getServerDate } from "../../utils";
 import { givePlayerCharacterSync } from "../../lib/character";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDb } from "../../data/db";
@@ -190,7 +190,7 @@ const routes = async (fastify: FastifyInstance) => {
                 overLimitCount: body.over_limit_count,
                 useStack: body.use_stack,
                 itemId: body.item_id,
-                evaluationTime: getRealNow(),
+                evaluationTime: getServerDate(),
             })
             const character = getPlayerCharacterSync(playerId, body.character_id)!
             reply.header("content-type", "application/x-msgpack")
@@ -246,7 +246,7 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         try {
-            const result = executeBulkOverLimit({ playerId, evaluationTime: getRealNow() })
+            const result = executeBulkOverLimit({ playerId, evaluationTime: getServerDate() })
             const characterList = result.characters.map(character => {
                 const written = result.projectionCharacters[String(character.characterId)]!
                 return projectCharacterGrowthIncrement(
