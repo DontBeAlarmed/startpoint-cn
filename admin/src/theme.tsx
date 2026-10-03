@@ -47,6 +47,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
                             colorBgSpotlight: "rgba(11, 15, 20, 0.96)",
                             colorTextLightSolid: "#E6EDF3",
                         },
+                        // 默认钮 hover/active 不变色（维护者指定: antd 默认 hover 浅黄在白底不可读）。
+                        // 钉回各主题的静止色, 随明暗算法自动切换。
+                        Button: mode === "dark" ? {
+                            defaultHoverColor: "rgba(255, 255, 255, 0.85)",
+                            defaultHoverBorderColor: "#424242",
+                            defaultActiveColor: "rgba(255, 255, 255, 0.85)",
+                            defaultActiveBorderColor: "#424242",
+                        } : {
+                            defaultHoverColor: "rgba(0, 0, 0, 0.88)",
+                            defaultHoverBorderColor: "#d9d9d9",
+                            defaultActiveColor: "rgba(0, 0, 0, 0.88)",
+                            defaultActiveBorderColor: "#d9d9d9",
+                        },
                     },
                 }}
             >
