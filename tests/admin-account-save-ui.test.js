@@ -127,7 +127,9 @@ assert.match(profileFavorite, /export function getFavoriteCharacterIdSync/)
 assert.match(serverApi, /favoriteCharacterId: getFavoriteCharacterIdSync\(player\.id\)/)
 assert.match(accounts, /FavoriteAvatar/)
 assert.match(mobileView, /FavoriteAvatar/)
-assert.match(favoriteAvatar, /\/api\/content\/character_avatar\/\$\{characterId\}/)
+// 头像回退链（mockup 规格第 5 条）: 收藏编队角色 → 默认角色 alk(id 1) → onError 露首字
+assert.match(favoriteAvatar, /DEFAULT_AVATAR_CHARACTER_ID = 1/)
+assert.match(favoriteAvatar, /\/api\/content\/character_avatar\/\$\{characterId \?\? DEFAULT_AVATAR_CHARACTER_ID\}/)
 assert.match(favoriteAvatar, /av-img-picture-broken/)
 
 const accountMutationCount = (accounts.match(/= useMutation\(\{/g) || []).length
