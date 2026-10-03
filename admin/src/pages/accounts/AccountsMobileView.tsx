@@ -170,9 +170,6 @@ export function AccountsMobileView({
                                         {renderNote(account)}
                                     </span>
                                     <span className="acc-actions">
-                                        <Button aria-expanded={expanded} onClick={() => onSelectAccount(account.id)}>
-                                            存档数 {account.players.length} {expanded ? "▴" : "▾"}
-                                        </Button>
                                         <Dropdown menu={moreActionsMenu(account.id)} trigger={["click"]} placement="bottomRight">
                                             <Button className="admin-more-btn" aria-label="更多操作">…</Button>
                                         </Dropdown>
@@ -187,24 +184,28 @@ export function AccountsMobileView({
                                     </div>
                                     <div>
                                         <span>绑定设备</span>
+                                        {/* 存档数切换钮挂最下一排行尾（与桌面同构） */}
                                         <span className="acc-kv-value acc-devices">
                                             {account.devices.length === 0
                                                 ? "无"
                                                 : account.devices.map(device => (
                                                     <span className="acc-dev-code" key={device.deviceId}>{device.deviceId}</span>
                                                 ))}
+                                            <Button className="acc-save-toggle" aria-expanded={expanded} onClick={() => onSelectAccount(account.id)}>
+                                                存档数 {account.players.length} {expanded ? "▴" : "▾"}
+                                            </Button>
                                         </span>
                                     </div>
                                 </div>
                                 {expanded && (
                                     <div className="acc-save-list">
-                                        <div className="acc-save-toolbar">
-                                            <span className="admin-badge-info">{account.players.length} 个存档</span>
-                                            <Button type="primary" icon={<Plus size={15} />} onClick={() => void onNewSave(account.id)}>新建存档</Button>
-                                        </div>
                                         {account.players.length === 0
                                             ? <Empty description="暂无存档" />
                                             : account.players.map(player => renderSaveSub(account, player))}
+                                        {/* 新建存档垫在列表末尾（与桌面同构） */}
+                                        <div className="acc-save-new">
+                                            <Button type="primary" icon={<Plus size={15} />} onClick={() => void onNewSave(account.id)}>新建存档</Button>
+                                        </div>
                                     </div>
                                 )}
                             </div>

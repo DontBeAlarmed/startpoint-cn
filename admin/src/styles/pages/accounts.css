@@ -171,19 +171,27 @@
   gap: 4px;
 }
 
-/* 嵌套区: 点「存档列表 ▾」在账号卡内部展开/收起 (不再是独立面板) */
+/* 嵌套区: 点「存档数 N」在账号卡内部展开/收起。独立面板底色(--hover)与账号信息区(th-bg)
+   分层（维护者指定）, 存档子卡(stat-bg)再浮一层 */
 .acc-save-list {
   display: grid;
   gap: 10px;
   margin-top: 10px;
+  padding: 10px;
+  background: var(--hover);
+  border: 1px solid var(--line);
+  border-radius: 10px;
 }
 
-.acc-save-toolbar {
+/* 新建存档垫在子卡列表末尾, 不随 grid 拉伸满宽 */
+.acc-save-new {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px 8px;
+}
+
+/* 存档数切换钮: 绑定设备行行尾右置（维护者指定, 避开卡头长备注折行） */
+.acc-save-toggle {
+  margin-left: auto;
+  flex: none;
 }
 
 /* 存档子卡: stat-bg 凹陷面, 比账号卡再深一层 (mockup .save-sub panel-sub) */

@@ -76,7 +76,24 @@ assert.doesNotMatch(mobileView, /scrollIntoView/)
 assert.doesNotMatch(accounts, /useRef/)
 assert.doesNotMatch(mobileView, /useRef/)
 assert.match(accounts, /toggleSavePanel/)
-assert.match(accounts, /admin-badge-info">\{account\.players\.length\} 个存档</)
+
+// 「存档数 N」切换钮挂在绑定设备行行尾（维护者指定, 避开卡头长备注折行）; 「N 个存档」徽标与
+// 存档数表达重复已删; 新建存档垫在子卡列表末尾
+{
+    for (const src of [accounts, mobileView]) {
+        assert.match(src, /className="acc-save-toggle"/)
+        assert.doesNotMatch(src, /admin-badge-info">\{account\.players\.length\} 个存档</)
+        const devicesIdx = src.indexOf("绑定设备")
+        const toggleIdx = src.indexOf("存档数 {account.players.length}")
+        const mapIdx = src.indexOf(".players.map(")
+        const newIdx = src.indexOf("新建存档")
+        assert.ok(devicesIdx !== -1 && toggleIdx > devicesIdx, "存档数切换钮应位于绑定设备行")
+        assert.ok(mapIdx !== -1 && newIdx > mapIdx, "新建存档应位于存档子卡列表之后")
+    }
+    // 展开区独立面板底色与账号信息区分层（维护者指定）
+    const accountsCss = fs.readFileSync("admin/src/styles/pages/accounts.css", "utf8")
+    assert.match(accountsCss, /\.acc-save-list \{[^}]*background: var\(--hover\)/)
+}
 
 // 卡片操作按钮与后台统一默认尺寸（维护者指定: 小尺寸 bordered 像 badge 标识风格）;
 // 保留 small 的仅限: 行内编辑器紧凑输入组（备注/改名各 Input+确定+取消 = 6）

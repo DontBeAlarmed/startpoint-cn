@@ -223,9 +223,6 @@ export default function Accounts() {
                     <span className="acc-id">{account.defaultPlayerName ?? `账号 #${account.id}`}</span>
                     {renderNote(account)}
                     <span className="acc-actions">
-                        <Button aria-expanded={expanded} onClick={() => toggleSavePanel(account.id)}>
-                            存档数 {account.players.length} {expanded ? "▴" : "▾"}
-                        </Button>
                         <Dropdown menu={moreActionsMenu(account.id)} trigger={["click"]} placement="bottomRight">
                             <Button className="admin-more-btn" aria-label="更多操作">…</Button>
                         </Dropdown>
@@ -239,17 +236,23 @@ export default function Accounts() {
                         ) : "无"}
                     </span>
                     <span className="acc-k">绑定设备</span>
-                    <span className="acc-v acc-devices">{renderDevices(account.devices)}</span>
+                    {/* 存档数切换钮挂最下一排行尾（维护者指定）: 卡头长备注折行不再挤压它 */}
+                    <span className="acc-v acc-devices">
+                        {renderDevices(account.devices)}
+                        <Button className="acc-save-toggle" aria-expanded={expanded} onClick={() => toggleSavePanel(account.id)}>
+                            存档数 {account.players.length} {expanded ? "▴" : "▾"}
+                        </Button>
+                    </span>
                 </div>
                 {expanded && (
                     <div className="acc-save-list">
-                        <div className="acc-save-toolbar">
-                            <span className="admin-badge-info">{account.players.length} 个存档</span>
-                            <Button type="primary" icon={<PlusOutlined />} onClick={() => newSave.mutate(account.id)}>新建存档</Button>
-                        </div>
                         {account.players.length === 0
                             ? <Typography.Text type="secondary">暂无存档</Typography.Text>
                             : account.players.map(player => renderSaveSub(account, player))}
+                        {/* 新建存档垫在列表末尾（维护者指定）: 「N 个存档」徽标与存档数表达重复, 已删 */}
+                        <div className="acc-save-new">
+                            <Button icon={<PlusOutlined />} onClick={() => newSave.mutate(account.id)}>新建存档</Button>
+                        </div>
                     </div>
                 )}
             </div>
