@@ -98,12 +98,22 @@
   min-height: 36px;
 }
 
+/* 维护者指定: 账号页操作行 <375 折行时「编辑」独占一排(占满左右), 「复制/删除」共一排;
+   ≥375 不折行, 由下方媒体查询回升为等分 */
+.admin-account-actions .ant-btn:first-child {
+  flex: 1 1 100%;
+}
+
 @media (min-width: 375px) {
   .admin-mobile-actions {
     flex-wrap: nowrap;
   }
 
   .admin-mobile-actions .ant-btn {
+    flex: 1 1 0;
+  }
+
+  .admin-account-actions .ant-btn:first-child {
     flex: 1 1 0;
   }
 }

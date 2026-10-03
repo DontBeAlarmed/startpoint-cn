@@ -131,7 +131,7 @@ export function AccountsMobileView({
                 </span>
             </div>
             <div className="save-meta">Lv {player.rank} · {player.characterCount} 角色</div>
-            <div className="admin-mobile-actions" onClick={event => event.stopPropagation()}>
+            <div className="admin-mobile-actions admin-account-actions" onClick={event => event.stopPropagation()}>
                 <Button icon={<Pencil size={15} />} aria-label="编辑存档" onClick={() => onOpenPlayer(player.id)}>编辑</Button>
                 <Button icon={<Copy size={15} />} aria-label="复制存档" onClick={() => void onCloneSave(player.id, account.id)}>复制</Button>
                 <Popconfirm

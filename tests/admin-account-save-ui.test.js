@@ -99,6 +99,11 @@ assert.match(accounts, /toggleSavePanel/)
     assert.match(accountsCss, /\.acc-save-list > \* \{[^}]*min-width: 0/)
     assert.match(accountsCss, /\.acc-save-row \{[^}]*grid-column: 1 \/ -1/)
     assert.match(accountsCss, /@media \(min-width: 375px\) \{[\s\S]*?\.admin-mobile-actions \{[^}]*flex-wrap: nowrap/)
+    // <375 折行顺序（维护者指定）: 「编辑」独占一排, 回升规则在媒体查询内
+    assert.match(mobileView, /admin-mobile-actions admin-account-actions/)
+    const wrapIdx = accountsCss.indexOf(".admin-account-actions .ant-btn:first-child {\n  flex: 1 1 100%")
+    const riseIdx = accountsCss.indexOf(".admin-account-actions .ant-btn:first-child {\n    flex: 1 1 0;")
+    assert.ok(wrapIdx !== -1 && riseIdx > wrapIdx, "折行 100% 规则须先于 ≥375 回升规则(同优先级后者胜)")
   }
 
 // 卡片操作按钮与后台统一默认尺寸（维护者指定: 小尺寸 bordered 像 badge 标识风格）;
@@ -150,9 +155,11 @@ assert.match(profileFavorite, /export function getFavoriteCharacterIdSync/)
 assert.match(serverApi, /favoriteCharacterId: getFavoriteCharacterIdSync\(player\.id\)/)
 assert.match(accounts, /FavoriteAvatar/)
 assert.match(mobileView, /FavoriteAvatar/)
-// 头像回退链（mockup 规格第 5 条）: 收藏编队角色 → 默认角色 alk(id 1) → onError 露首字
+// 头像回退链（mockup 规格第 5 条 + 维护者补充）: 收藏编队角色 → 立绘 404 时重试默认 alk(id 1)
+// → 仍失败才 onError 露首字（非空失效角色 id 不再落回首字母）
 assert.match(favoriteAvatar, /DEFAULT_AVATAR_CHARACTER_ID = 1/)
 assert.match(favoriteAvatar, /\/api\/content\/character_avatar\/\$\{characterId \?\? DEFAULT_AVATAR_CHARACTER_ID\}/)
+assert.match(favoriteAvatar, /getAttribute\("src"\) !== fallback/)
 assert.match(favoriteAvatar, /av-img-picture-broken/)
 
 const accountMutationCount = (accounts.match(/= useMutation\(\{/g) || []).length
