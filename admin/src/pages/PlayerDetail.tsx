@@ -83,8 +83,10 @@ export default function PlayerDetail() {
     const [searchQuests, setSearchQuests] = useState("")
     const [searchDrawn, setSearchDrawn] = useState("")
     // 存档重命名入口（F5：自账号页存档卡移入 hero，见 Accounts.tsx renameSave）
+    // 编辑态规范与账号备注一致: 点击进入, 样式不变, 失焦保存, Enter 同保存, Escape 放弃
     const [renamingSave, setRenamingSave] = useState(false)
     const [renameValue, setRenameValue] = useState("")
+    const [renameOriginal, setRenameOriginal] = useState("")
 
     const { data, isLoading, isFetching, isError } = useQuery({
         queryKey: ["playerDetail", pid],
@@ -92,7 +94,7 @@ export default function PlayerDetail() {
         enabled: !isNaN(pid),
     })
 
-    // 存档身份徽章（当前存档 / 当前活动）复用账号列表接口，与 Dashboard 共享缓存
+    // 存档身份徽章（归一为「当前存档」, isDefault/isActive 合一）复用账号列表接口，与 Dashboard 共享缓存
     const { data: accounts } = useQuery({
         queryKey: ["accounts"],
         queryFn: () => apiGet<AccountBrief[]>("/api/server/accounts"),
@@ -143,6 +145,12 @@ export default function PlayerDetail() {
         },
         onError: showMutationError,
     })
+
+    // 失焦保存: 与原名相同只退编辑态不发请求
+    const commitRename = () => {
+        if (renameValue === renameOriginal) { setRenamingSave(false); return }
+        renameSave.mutate(renameValue)
+    }
 
     const delChar = useMutation({
         mutationFn: (code: number) => apiDelete(`/api/player/${pid}/character/${code}`),
@@ -320,12 +328,13 @@ export default function PlayerDetail() {
                         tableLayout="fixed"
                         columns={[
                             {
-                                // 头像列: code 即角色 id, 与账号页喜爱角色头像同一 CDN 归档端点
+                                // 头像列: code 即角色 id, 与账号页喜爱角色头像同一 CDN 归档端点;
+                                // ?v=2 击穿浏览器 24h 缓存 —— 服务端清扫修复前该 URL 可能缓存过坏字节
                                 title: "头像", width: 56,
                                 render: (_, r: CharRow) => (
                                     <img
                                         className="admin-char-avatar-cell"
-                                        src={`/api/content/character_avatar/${r.code}`}
+                                        src={`/api/content/character_avatar/${r.code}?v=2`}
                                         alt=""
                                         loading="lazy"
                                         onError={event => { event.currentTarget.classList.add("admin-char-avatar-cell-broken") }}
@@ -488,22 +497,30 @@ export default function PlayerDetail() {
             <div className="admin-hero">
                 <div className="admin-hero-in">
                     <div className="admin-hero-id">
-                        <span className="admin-hero-id-label">存档身份</span>
+                        {/* 顶行: 归一后的「当前存档」标识居左, 账号 id 居右(维护者指定);
+                            「存档身份」文字标签与卡内身份描述已移除 */}
+                        <div className="admin-hero-topline">
+                            {(saveBrief?.isDefault || saveBrief?.isActive) && (
+                                <span className="admin-badge-info">当前存档</span>
+                            )}
+                            <span className="admin-hero-account">账号 <b className="admin-mono">#{player.accountId}</b></span>
+                        </div>
                         <div className="admin-hero-id-name">
                             {renamingSave ? (
-                                <div className="admin-edit-compact">
-                                    <Input
-                                        size="small"
-                                        value={renameValue}
-                                        maxLength={64}
-                                        autoFocus
-                                        onChange={e => setRenameValue(e.target.value)}
-                                        onPressEnter={() => renameSave.mutate(renameValue)}
-                                    />
-                                    <Button size="small" type="primary" loading={renameSave.isPending}
-                                        onClick={() => renameSave.mutate(renameValue)}>确定</Button>
-                                    <Button size="small" onClick={() => setRenamingSave(false)}>取消</Button>
-                                </div>
+                                // 改名与账号备注同一行内编辑规范: 样式不变(粗体名原样),
+                                // 失焦保存, Enter 同保存, Escape 放弃, 无按钮
+                                <input
+                                    className="admin-hero-rename-input"
+                                    value={renameValue}
+                                    maxLength={64}
+                                    autoFocus
+                                    onChange={e => setRenameValue(e.target.value)}
+                                    onBlur={commitRename}
+                                    onKeyDown={e => {
+                                        if (e.key === "Enter") commitRename()
+                                        if (e.key === "Escape") setRenamingSave(false)
+                                    }}
+                                />
                             ) : (
                                 <>
                                     {player.name} <span className="admin-hero-id-pid">#{player.id}</span>
@@ -512,15 +529,12 @@ export default function PlayerDetail() {
                                         size="small"
                                         title="重命名存档"
                                         icon={<EditOutlined />}
-                                        onClick={() => { setRenamingSave(true); setRenameValue(player.name) }}
+                                        onClick={() => { setRenamingSave(true); setRenameOriginal(player.name); setRenameValue(player.name) }}
                                     />
                                 </>
                             )}
                         </div>
                         <div className="admin-hero-id-info">
-                            {saveBrief?.isDefault && <span className="admin-badge-info">当前存档</span>}
-                            {saveBrief?.isActive && <span className="admin-badge-ok">当前活动</span>}
-                            <span>账号 <b className="admin-mono">#{player.accountId}</b></span>
                             <span>上次更新 <b className="admin-mono">{player.lastLoginTime.replace("T", " ").substring(0, 16)}</b></span>
                         </div>
                     </div>
@@ -581,41 +595,50 @@ export default function PlayerDetail() {
                 </div>
             </details>
 
-            <div className="admin-danger-bar">
-                <div className="admin-danger-bar-head">
-                    <span className="admin-danger-bar-label">危险操作 · 均需二次确认</span>
-                    <span className="admin-danger-bar-desc">
-                        以上均为开发期排查问题的兜底性回退工具，日常运营不建议使用；当前版本下误用大概率造成存档数据异常，请务必确认后再操作。
-                    </span>
+            {/* 危险操作默认收起(维护者指定): 复用 admin-details 折叠模式, 红条本体整体藏进 details */}
+            <details className="admin-details admin-danger-details">
+                <summary className="admin-details-summary">
+                    <span className="admin-details-arrow" aria-hidden="true">▶</span>
+                    <span className="admin-details-star" aria-hidden="true" />
+                    危险操作
+                    <span className="admin-details-hint">均需二次确认 · 开发期兜底回退工具, 误用大概率造成存档数据异常</span>
+                </summary>
+                <div className="admin-danger-bar">
+                    <div className="admin-danger-bar-head">
+                        <span className="admin-danger-bar-label">危险操作 · 均需二次确认</span>
+                        <span className="admin-danger-bar-desc">
+                            以上均为开发期排查问题的兜底性回退工具，日常运营不建议使用；当前版本下误用大概率造成存档数据异常，请务必确认后再操作。
+                        </span>
+                    </div>
+                    <div className="admin-danger-bar-actions">
+                        <span className="admin-danger-control">
+                            <span className="admin-danger-control-label">3x加速</span>
+                            <Switch checked={player.enableAuto3x} loading={editField.isPending}
+                                onChange={v => editField.mutate({ field: "enableAuto3x", value: v })} />
+                        </span>
+                        <span className="admin-danger-control">
+                            <span className="admin-danger-control-label">教程步骤</span>
+                            {fieldControl("tutorialStep", { min: 0, allowNull: true })}
+                            <span className="admin-danger-control-hint">空 = null</span>
+                        </span>
+                        <Popconfirm title="清除全部 EX Boost？" onConfirm={() => clearExBoost.mutate()} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
+                            <Button size="small" danger loading={clearExBoost.isPending}>清除 EX Boost</Button>
+                        </Popconfirm>
+                        <Popconfirm title="重置编队到默认？" onConfirm={() => resetParties.mutate()} okText="确认" cancelText="取消">
+                            <Button size="small" danger icon={<UndoOutlined />}>重置编队</Button>
+                        </Popconfirm>
+                        <Popconfirm title="清空邮箱？" onConfirm={() => clearMail.mutate()} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
+                            <Button size="small" danger>清空邮箱</Button>
+                        </Popconfirm>
+                        <Popconfirm title="重置每日挑战点？" onConfirm={() => resetChallenge.mutate()} okText="确认" cancelText="取消">
+                            <Button size="small" danger icon={<UndoOutlined />}>重置每日挑战</Button>
+                        </Popconfirm>
+                        <Popconfirm title="清除接收历史（一次性道具的领取记录）？" onConfirm={() => clearReceiveHistory.mutate()} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
+                            <Button size="small" danger loading={clearReceiveHistory.isPending}>清除接收历史</Button>
+                        </Popconfirm>
+                    </div>
                 </div>
-                <div className="admin-danger-bar-actions">
-                    <span className="admin-danger-control">
-                        <span className="admin-danger-control-label">3x加速</span>
-                        <Switch checked={player.enableAuto3x} loading={editField.isPending}
-                            onChange={v => editField.mutate({ field: "enableAuto3x", value: v })} />
-                    </span>
-                    <span className="admin-danger-control">
-                        <span className="admin-danger-control-label">教程步骤</span>
-                        {fieldControl("tutorialStep", { min: 0, allowNull: true })}
-                        <span className="admin-danger-control-hint">空 = null</span>
-                    </span>
-                    <Popconfirm title="清除全部 EX Boost？" onConfirm={() => clearExBoost.mutate()} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
-                        <Button size="small" danger loading={clearExBoost.isPending}>清除 EX Boost</Button>
-                    </Popconfirm>
-                    <Popconfirm title="重置编队到默认？" onConfirm={() => resetParties.mutate()} okText="确认" cancelText="取消">
-                        <Button size="small" danger icon={<UndoOutlined />}>重置编队</Button>
-                    </Popconfirm>
-                    <Popconfirm title="清空邮箱？" onConfirm={() => clearMail.mutate()} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
-                        <Button size="small" danger>清空邮箱</Button>
-                    </Popconfirm>
-                    <Popconfirm title="重置每日挑战点？" onConfirm={() => resetChallenge.mutate()} okText="确认" cancelText="取消">
-                        <Button size="small" danger icon={<UndoOutlined />}>重置每日挑战</Button>
-                    </Popconfirm>
-                    <Popconfirm title="清除接收历史（一次性道具的领取记录）？" onConfirm={() => clearReceiveHistory.mutate()} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
-                        <Button size="small" danger loading={clearReceiveHistory.isPending}>清除接收历史</Button>
-                    </Popconfirm>
-                </div>
-            </div>
+            </details>
         </Space>
         </AdminPage>
     )

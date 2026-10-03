@@ -182,4 +182,27 @@ assert.match(apiClient, /Accept: "application\/json"/)
 assert.match(apiClient, /content-disposition/)
 assert.match(apiClient, /revokeObjectURL/)
 
+// ── 存档页 hero/危险操作 (维护者 2026-10-04 指定) ───────────────────────────
+// 顶行: 归一「当前存档」徽章(isDefault/isActive 合一)居左, 账号 id 居右;
+// 「存档身份」文字标签与卡内身份描述移除
+assert.match(playerDetail, /admin-hero-topline/)
+assert.match(playerDetail, /\(saveBrief\?\.isDefault \|\| saveBrief\?\.isActive\) && \(/)
+assert.doesNotMatch(playerDetail, /admin-hero-id-label/)
+assert.doesNotMatch(playerDetail, /当前活动/)
+assert.match(playerDetail, /admin-hero-account/)
+// 改名与备注同行内编辑规范: 原生无边框 input + 失焦保存 + 无按钮
+assert.match(playerDetail, /admin-hero-rename-input/)
+assert.match(playerDetail, /onBlur=\{commitRename\}/)
+assert.doesNotMatch(playerDetail, /admin-edit-compact/)
+// 危险操作默认收起(details 无 open 属性)
+assert.match(playerDetail, /<details className="admin-details admin-danger-details">/)
+assert.doesNotMatch(playerDetail, /admin-danger-details[^>]*\bopen\b/)
+// 导入/导出并排: hero-ops 行向
+{
+    const playerCss = fs.readFileSync("admin/src/styles/pages/player.css", "utf8")
+    assert.match(playerCss, /\.admin-hero-ops \{[^}]*flex-direction: row/)
+}
+// 角色表头像带版本参数(服务端清扫修复前该 URL 可能缓存过坏字节)
+assert.match(playerDetail, /character_avatar\/\$\{r\.code\}\?v=2/)
+
 console.log("admin-account-save-ui tests passed")

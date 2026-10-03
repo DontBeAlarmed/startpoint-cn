@@ -18,9 +18,8 @@
   line-height: 1.4;
 }
 
-/* player detail: 存档身份 hero (approved mockup player-v2) — identity block left
-   (label / big name / one info row), stacked import/export ops right. Mobile-first:
-   the info row wraps freely below 768px and joins one non-breaking row above. */
+/* player detail: 存档身份 hero (approved mockup player-v2) — 顶行(当前存档徽章居左 /
+   账号 id 居右) + 大名行 + 更新时间行, 导入/导出并排居右。Mobile-first。 */
 .admin-hero-id {
   display: flex;
   flex-direction: column;
@@ -29,11 +28,19 @@
   min-width: 0;
 }
 
-.admin-hero-id-label {
+/* 顶行: 归一「当前存档」徽章居左, 账号 id 居右(维护者指定); 徽章缺席时账号 id 仍居右 */
+.admin-hero-topline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-hero-account {
+  margin-left: auto;
   color: var(--ink-soft);
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  line-height: 1.4;
+  font-size: 12.5px;
+  white-space: nowrap;
 }
 
 .admin-hero-id-name {
@@ -70,9 +77,30 @@
 
 .admin-hero-ops {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   gap: 9px;
   flex: none;
+}
+
+/* 改名行内编辑(与账号备注同规范): 原生无边框 input, 视觉即原粗体存档名, 单行不换行 */
+.admin-hero-rename-input {
+  width: min(420px, 100%);
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+@media (min-width: 768px) {
+  .admin-hero-rename-input {
+    font-size: 30px;
+  }
 }
 
 .admin-hero-ops .ant-btn {

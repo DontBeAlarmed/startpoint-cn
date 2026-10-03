@@ -1,5 +1,6 @@
 import fs from "node:fs"
 import path from "node:path"
+import zlib from "node:zlib"
 
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify"
 
@@ -38,6 +39,49 @@ function defaultGetRepository(): ReadonlyContentRepository {
     return getContentSnapshot().repository
 }
 
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+
+// 物化缓存修复清扫: 修复管线(toBrowserPng 签名补丁 / normalizePngZlibStream)加入
+// 之前落盘的坏文件会被静态直出快路径永久服务(实测凉风 141027 小写 "png" 签名,
+// 浏览器拒解码)。启动时校验签名 + IDAT 可解码, 不合格文件删除, 下次请求按现行
+// 管线重新物化。一次性 O(缓存大小) 成本, 之后每轮启动为纯校验。
+function purgeBrokenMaterializedAvatars(dir: string): number {
+    let entries: string[]
+    try {
+        entries = fs.readdirSync(dir)
+    } catch {
+        return 0
+    }
+    let purged = 0
+    for (const entry of entries) {
+        if (!entry.endsWith(".png")) continue
+        const filePath = path.join(dir, entry)
+        try {
+            const fd = fs.openSync(filePath, "r")
+            const head = Buffer.alloc(8)
+            fs.readSync(fd, head, 0, 8, 0)
+            fs.closeSync(fd)
+            if (!head.equals(PNG_SIGNATURE)) throw new Error("bad signature")
+            const data = fs.readFileSync(filePath)
+            let pos = 8
+            let idat = Buffer.alloc(0)
+            while (pos + 12 <= data.length) {
+                const len = data.readUInt32BE(pos)
+                const type = data.toString("latin1", pos + 4, pos + 8)
+                if (type === "IDAT") idat = Buffer.concat([idat, data.subarray(pos + 8, pos + 8 + len)])
+                pos += 12 + len
+            }
+            zlib.inflateSync(idat)
+        } catch {
+            try {
+                fs.rmSync(filePath, { force: true })
+                purged += 1
+            } catch { /* 删除失败不阻塞启动, 坏文件仍会被下次清扫捕获 */ }
+        }
+    }
+    return purged
+}
+
 /** Character table row 0 col 0 holds the asset string_id (e.g. "alk"). */
 function readCharacterStringId(repository: ReadonlyContentRepository, characterId: string): string | null {
     let table: unknown
@@ -65,6 +109,17 @@ function parseEvolveParameter(request: FastifyRequest): 0 | 1 | null {
 const routes = async (fastify: FastifyInstance, options: ContentRoutesOptions = {}) => {
     const getCdnRoot = options.getCdnRoot ?? defaultGetCdnRoot
     const getRepository = options.getRepository ?? defaultGetRepository
+
+    // 注册期清扫一次物化缓存(坏文件删除, 请求时重物化); 目录缺失等异常静默跳过
+    try {
+        const purged = purgeBrokenMaterializedAvatars(
+            path.join(
+                options.assetProviderDir ?? resolveRuntimeDataPaths().assetProviderDir,
+                "character-avatar",
+            ),
+        )
+        if (purged > 0) fastify.log.info({ purged }, "purged broken materialized character avatars")
+    } catch { /* 清扫不阻塞路由注册 */ }
 
     fastify.get("/character_avatar/:id", async (request: FastifyRequest, reply: FastifyReply) => {
         const evolve = parseEvolveParameter(request)
