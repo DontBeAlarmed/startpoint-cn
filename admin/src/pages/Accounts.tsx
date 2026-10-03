@@ -178,11 +178,11 @@ export default function Accounts() {
                 </span>
                 {/* 当前存档标识与切换合体: 绿色「当前」常驻标识 / 非当前「切换」按钮 (activateSave 同置账号当前存档与全局活动) */}
                 {player.isDefault
-                    ? <Button size="small" type="primary" disabled>当前</Button>
-                    : <Button size="small" type="primary" onClick={() => activateSave.mutate(player.id)}>切换</Button>}
-                <Button size="small" type="primary" onClick={() => navigate(`/players/${player.id}`)}>编辑</Button>
+                    ? <span className="admin-badge-ok save-current-chip">当前</span>
+                    : <Button onClick={() => activateSave.mutate(player.id)}>切换</Button>}
+                <Button onClick={() => navigate(`/players/${player.id}`)}>编辑</Button>
                 <Dropdown menu={saveMoreMenu(account, player)} trigger={["click"]} placement="bottomRight">
-                    <Button size="small" type="primary" className="admin-more-btn" aria-label="更多操作">…</Button>
+                    <Button className="admin-more-btn" aria-label="更多操作">…</Button>
                 </Dropdown>
             </div>
         </div>
@@ -214,8 +214,6 @@ export default function Accounts() {
                         </span>
                     </span>
                     <Button
-                        size="small"
-                        type="primary"
                         className="acc-count-toggle"
                         aria-expanded={expanded}
                         onClick={event => { event.stopPropagation(); toggleSavePanel(account.id) }}
@@ -224,8 +222,6 @@ export default function Accounts() {
                     </Button>
                     <Dropdown menu={moreActionsMenu(account.id)} trigger={["click"]} placement="bottomRight">
                         <Button
-                            size="small"
-                            type="primary"
                             className="admin-more-btn"
                             aria-label="更多操作"
                             onClick={event => event.stopPropagation()}

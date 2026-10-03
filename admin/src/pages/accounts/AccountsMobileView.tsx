@@ -139,11 +139,9 @@ export function AccountsMobileView({
                 </span>
                 {/* 当前存档标识与切换合体（与桌面同构） */}
                 {player.isDefault
-                    ? <Button size="small" type="primary" disabled>当前</Button>
+                    ? <span className="admin-badge-ok save-current-chip">当前</span>
                     : (
                         <Button
-                            size="small"
-                            type="primary"
                             aria-label="切换存档"
                             onClick={event => {
                                 event.stopPropagation()
@@ -153,9 +151,9 @@ export function AccountsMobileView({
                     )}
             </div>
             <div className="admin-mobile-actions admin-account-actions" onClick={event => event.stopPropagation()}>
-                <Button type="primary" icon={<Pencil size={15} />} aria-label="编辑存档" onClick={() => onOpenPlayer(player.id)}>编辑</Button>
+                <Button icon={<Pencil size={15} />} aria-label="编辑存档" onClick={() => onOpenPlayer(player.id)}>编辑</Button>
                 <Dropdown menu={saveMoreMenu(account, player)} trigger={["click"]} placement="bottomRight">
-                    <Button type="primary" className="admin-more-btn" aria-label="更多操作">…</Button>
+                    <Button className="admin-more-btn" aria-label="更多操作">…</Button>
                 </Dropdown>
             </div>
         </div>
@@ -179,7 +177,7 @@ export function AccountsMobileView({
                                 <span className="acc-title-name">{account.defaultPlayerName ?? "无存档"}</span>
                                 {renderNote(account)}
                                 <span className="acc-actions">
-                                    <Button size="small" type="primary" icon={<Plus size={14} />} onClick={() => void onNewSave(account.id)}>新建存档</Button>
+                                    <Button type="primary" icon={<Plus size={14} />} onClick={() => void onNewSave(account.id)}>新建存档</Button>
                                 </span>
                             </div>
                             <div className="acc-identity">
@@ -197,8 +195,6 @@ export function AccountsMobileView({
                             </div>
                             <div className="acc-bottom-row">
                                 <Button
-                                    size="small"
-                                    type="primary"
                                     className="acc-count-toggle"
                                     aria-expanded={expanded}
                                     onClick={event => { event.stopPropagation(); onSelectAccount(account.id) }}
@@ -207,8 +203,6 @@ export function AccountsMobileView({
                                 </Button>
                                 <Dropdown menu={moreActionsMenu(account.id)} trigger={["click"]} placement="bottomRight">
                                     <Button
-                                        size="small"
-                                        type="primary"
                                         className="admin-more-btn"
                                         aria-label="更多操作"
                                         onClick={event => event.stopPropagation()}
