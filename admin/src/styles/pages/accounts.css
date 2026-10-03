@@ -6,6 +6,12 @@
   min-width: 0;
 }
 
+/* v2 真卡片列表: 卡距 14px (mockup .m-acc-card 的 margin-bottom 口径, 移到容器 gap) */
+.admin-account-mobile-list {
+  display: grid;
+  gap: 14px;
+}
+
 .admin-mobile-list-heading,
 .admin-mobile-actions {
   display: flex;
@@ -14,26 +20,17 @@
   align-items: center;
 }
 
-/* mobile account list reads like a table: full-bleed rows separated by hairlines,
-   no framing box between the list and its card */
-.admin-account-mobile-list .admin-mobile-list-item {
-  display: block;
-  padding: 14px;
-  border-block-end: 1px solid var(--line);
-}
-
-.admin-account-mobile-list .admin-mobile-list-item:last-child {
-  border-block-end: 0;
-}
-
 .admin-mobile-list-item-clickable {
   cursor: pointer;
 }
 
-/* hover 仅限真实鼠标设备（维护者指定）: 触摸屏点按会粘滞 :hover 导致整卡变色 */
+/* hover 仅限真实鼠标设备（维护者指定）: 触摸屏点按会粘滞 :hover 导致整卡变色。
+   双层闸门: (hover: hover) 媒体查询 + html:not(.has-touch) —— 部分触屏浏览器
+   (维护者 iQOO) 会把媒体查询判真, main.tsx 在首次 touchstart 挂的 has-touch
+   作最终兜底 */
 @media (hover: hover) {
-  .admin-mobile-list-item-clickable:hover,
-  .admin-mobile-list-item-clickable:focus-visible {
+  html:not(.has-touch) .admin-mobile-list-item-clickable:hover,
+  html:not(.has-touch) .admin-mobile-list-item-clickable:focus-visible {
     background: var(--hover);
     outline: 2px solid var(--water);
     outline-offset: -2px;
@@ -111,8 +108,8 @@
 }
 
 @media (hover: hover) {
-  .acc-card:hover,
-  .acc-card:focus-visible {
+  html:not(.has-touch) .acc-card:hover,
+  html:not(.has-touch) .acc-card:focus-visible {
     background: var(--hover);
     border-color: var(--line-strong);
   }
@@ -200,8 +197,8 @@
 }
 
 @media (hover: hover) {
-  .save-sub:hover,
-  .save-sub:focus-visible {
+  html:not(.has-touch) .save-sub:hover,
+  html:not(.has-touch) .save-sub:focus-visible {
     background: var(--th-bg);
     border-color: var(--line-strong);
   }
