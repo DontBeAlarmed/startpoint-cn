@@ -143,6 +143,39 @@ test.after(async () => {
     else process.env.DATA_DIR = previousDataDirectory
 })
 
+test("Crazy select settles companion count mission progress", async () => {
+    const { playerId, viewerId } = await createPlayer("crazy-select-mission")
+    grantInventoryFixtureItemSync(playerId, CRAZY_TICKET_ID, 1)
+    const ownedBefore = Object.keys(getPlayerCharactersSync(playerId)).length
+
+    const first = await crazyExec(viewerId)
+    assert.equal(first.statusCode, 200, first.body)
+    const saved = await app.inject({
+        method: "POST",
+        url: "/gacha/crazy_gacha_save",
+        payload: { viewer_id: viewerId, index: 1 },
+    })
+    assert.equal(saved.statusCode, 200, saved.body)
+    const selected = await app.inject({
+        method: "POST",
+        url: "/gacha/crazy_gacha_select",
+        payload: { viewer_id: viewerId, gacha_id: CRAZY_GACHA_ID, index: 1 },
+    })
+    assert.equal(selected.statusCode, 200, selected.body)
+
+    const ownedAfter = Object.keys(getPlayerCharactersSync(playerId)).length
+    assert.ok(ownedAfter > ownedBefore, "测试前提:疯狂抽卡确定带来新角色")
+    const progress = database.prepare(`
+        SELECT progress FROM players_category_missions
+        WHERE player_id = ? AND category = 1 AND id = 32
+    `).get(playerId)?.progress ?? 0
+    assert.equal(
+        progress,
+        ownedAfter,
+        "疯狂抽卡确定新角色后任务 32 进度必须当场推进",
+    )
+})
+
 test("Crazy candidate, save, redraw, load recovery and select form one reachable lifecycle", async () => {
     const { playerId, viewerId } = await createPlayer("crazy-lifecycle")
     grantInventoryFixtureItemSync(playerId, CRAZY_TICKET_ID, 1)
