@@ -226,8 +226,23 @@
    断点切换与卡片骨架复用账号页已验证的 .admin-mobile-* 共享类（AccountsMobileView
    模式）；这里只补页面私有件：标题两行截断（同 .news-title-cell 的 clamp 语义）与
    缩略图+发布时间 meta 行。桌面表格零改动。 */
+/* 状态徽章即可点击启停（恒位重标记按钮制）: 复位按钮默认样式, 视觉走 admin-badge-* */
+.news-status-toggle {
+  cursor: pointer;
+  font: inherit;
+}
+
+.news-status-toggle:hover {
+  filter: brightness(1.08);
+}
+
+.news-status-toggle:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .news-mobile-title {
-  flex: 1 1 auto;
+  margin-top: 6px;
   min-width: 0;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -242,4 +257,9 @@
   gap: 10px;
   min-width: 0;
   margin-top: 8px;
+}
+
+/* 缩略图|时间 两端: 时间灰字钉行尾 */
+.news-mobile-meta > :last-child {
+  margin-left: auto;
 }

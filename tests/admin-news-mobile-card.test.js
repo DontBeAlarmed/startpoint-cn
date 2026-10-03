@@ -36,6 +36,10 @@ assert.match(newsPage, /categoryBadgeClass=\{CATEGORY_BADGE_CLASS\}/, "分类语
 // ── 移动卡片：徽章语义 + 操作行 + 确认文案 ─────────────────────────────────
 assert.match(newsMobile, /className=\{categoryBadgeClass\[row\.category\]\}/, "移动卡片分类徽章应沿用页面语义色映射")
 assert.match(newsMobile, /row\.enabled \? "admin-badge-ok" : "admin-badge-muted"/, "启用/停用应为 ok/muted 徽章")
+assert.match(newsMobile, /news-status-toggle/, "状态应为可点击启停按钮(恒位重标记制)")
+assert.match(newsMobile, /停用这条公告？/, "启停应走 Popconfirm 确认")
+assert.match(newsMobile, /onToggle: \(row: AdminNewsRow\) => Promise<unknown>/, "启停通道经 props 下传与桌面同源")
+assert.match(newsPage, /onToggle=\{row => toggle\.mutateAsync\(row\)\}/, "移动启停复用桌面 toggle mutation")
 assert.match(newsMobile, /启用/, "启用徽章文案存在")
 assert.match(newsMobile, /停用/, "停用徽章文案存在")
 assert.match(newsMobile, /news-mobile-title/, "移动卡片标题应走两行截断样式")

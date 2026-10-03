@@ -16,12 +16,15 @@ interface NewsMobileViewProps {
     onPageChange: (page: number, pageSize: number) => void
     onEdit: (row: AdminNewsRow) => void
     onDelete: (row: AdminNewsRow) => Promise<unknown>
+    // 状态徽章即可点击启停（维护者指定）：恒位重标记按钮制，Popconfirm 确认后走
+    // 与桌面 Switch 同一条 /api/news/:id/enabled 通道
+    onToggle: (row: AdminNewsRow) => Promise<unknown>
+    togglingId: number | null
 }
 
-// 公告移动卡片视图（<768px，Grid.useBreakpoint 断点切换）：卡片结构照搬账号页已验证的
-// AccountsMobileView 模式（.admin-mobile-* 共享类 + icon+文字操作行）；启用/停用在此只是
-// 状态徽章（切换仍走桌面表格 Switch 与编辑器）。数据/变更全部经 props 下传——queryKey、
-// API、删除确认文案与桌面零差异，桌面表格一字不动。
+// 公告移动卡片视图（<768px，Grid.useBreakpoint 断点切换）。四行结构（维护者指定）：
+// 分类|状态(居右可点) / 标题 / 缩略图|时间 / 编辑,删除。
+// 数据/变更全部经 props 下传——queryKey、API、确认文案与桌面零差异。
 export function NewsMobileView({
     rows,
     loading,
@@ -33,6 +36,8 @@ export function NewsMobileView({
     onPageChange,
     onEdit,
     onDelete,
+    onToggle,
+    togglingId,
 }: NewsMobileViewProps) {
     return (
         <List
@@ -49,19 +54,30 @@ export function NewsMobileView({
             renderItem={row => (
                 <List.Item className="admin-mobile-list-item">
                     <div className="admin-mobile-list-content">
-                        <div className="admin-mobile-list-heading">
-                            <span className="admin-mobile-heading-main">
-                                <span className={categoryBadgeClass[row.category]}>
-                                    {categoryLabels[row.category]}
-                                </span>
-                                <Typography.Text strong className="news-mobile-title">
-                                    {row.title}
-                                </Typography.Text>
+                        <div className="admin-mobile-list-heading news-mobile-topline">
+                            <span className={categoryBadgeClass[row.category]}>
+                                {categoryLabels[row.category]}
                             </span>
-                            <span className={row.enabled ? "admin-badge-ok" : "admin-badge-muted"}>
-                                {row.enabled ? "启用" : "停用"}
-                            </span>
+                            <Popconfirm
+                                title={row.enabled ? "停用这条公告？" : "启用这条公告？"}
+                                okText={row.enabled ? "停用" : "启用"}
+                                cancelText="取消"
+                                okButtonProps={{ danger: row.enabled }}
+                                onConfirm={() => void onToggle(row)}
+                            >
+                                <button
+                                    type="button"
+                                    className={`news-status-toggle ${row.enabled ? "admin-badge-ok" : "admin-badge-muted"}`}
+                                    disabled={togglingId === row.id}
+                                    aria-label={row.enabled ? "停用公告" : "启用公告"}
+                                >
+                                    {row.enabled ? "启用" : "停用"}
+                                </button>
+                            </Popconfirm>
                         </div>
+                        <Typography.Text strong className="news-mobile-title">
+                            {row.title}
+                        </Typography.Text>
                         <div className="news-mobile-meta">
                             <NewsThumb thumbnail={row.thumbnail} />
                             <Typography.Text type="secondary">
@@ -78,7 +94,7 @@ export function NewsMobileView({
                                 okText="删除"
                                 cancelText="取消"
                                 okButtonProps={{ danger: true }}
-                                onConfirm={() => onDelete(row)}
+                                onConfirm={() => void onDelete(row)}
                             >
                                 <Button danger icon={<Trash2 size={15} />} aria-label="删除公告">
                                     删除

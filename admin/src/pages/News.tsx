@@ -148,6 +148,8 @@ export default function News() {
                             }}
                             onEdit={openEdit}
                             onDelete={row => remove.mutateAsync(row)}
+                            onToggle={row => toggle.mutateAsync(row)}
+                            togglingId={toggle.isPending ? toggle.variables?.id ?? null : null}
                         />
                     </Card>
                 )}
