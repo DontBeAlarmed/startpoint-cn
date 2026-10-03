@@ -96,6 +96,8 @@
 }
 
 .gift-add-reward.ant-btn {
+  /* 与上方奖励卡片间距(维护者两次指出间隔丢失: chip 卡间距/此处, 显式钉住) */
+  margin-top: 10px;
   border-style: dashed;
   color: var(--ink-soft);
 }
@@ -133,6 +135,10 @@
 .gift-card-code {
   font-family: AdminMono, ui-monospace, SFMono-Regular, Menlo, monospace;
   word-break: break-all;
+  /* 礼包码即卡片标题(无名称字段), 用标题级字重而不是 id-chip 的 11.5px 灰字 */
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
 }
 
 /* grid 项 min-width:auto 会让内嵌记录表的 max-content 宽度撑爆 360px 视口

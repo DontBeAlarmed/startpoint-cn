@@ -97,6 +97,11 @@ assert.match(giftsCss, /\.gift-card-infoline \{[^}]*flex-direction: column/, "�
 assert.match(giftsCss, /@media \(min-width: 768px\) \{[\s\S]*?\.gift-card-infoline \{[^}]*flex-direction: row/, "桌面端 meta+操作并排一行")
 assert.match(giftsCss, /\.gift-card-heading \{[^}]*flex-direction: column/, "标题两行结构样式应存在")
 assert.match(giftsCss, /\.gift-card-time \{/, "更新时间行内样式应存在")
+// 礼包码即卡片标题(无名称字段): 标题级字重, 不是 id-chip 灰字
+assert.match(giftsCss, /\.gift-card-code \{[^}]*font-size: 15px/, "礼包码标题字号应为 15px")
+assert.match(giftsCss, /\.gift-card-code \{[^}]*font-weight: 700/, "礼包码标题应为粗体")
+// 编辑器添加奖励按钮与上方奖励卡片间距显式钉住(间隔丢失第二次返修)
+assert.match(giftsCss, /\.gift-add-reward\.ant-btn \{[^}]*margin-top: 10px/, "添加奖励按钮应与上方卡片保持间距")
 assert.equal(giftsCss.match(/\.admin-ops-table/g)?.length, 1, "gifts css 不应新增桌面表格规则")
 assert.doesNotMatch(giftsCss, /gift-mobile-/, "旧移动视图私有类应清除")
 
