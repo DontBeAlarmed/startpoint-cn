@@ -110,12 +110,18 @@ export class MissionRewardGranter {
                     break
                 case 7:
                     if (reward.amount <= 0) break
+                    // 降级策略(2026-10-03 用户定案):期次数据漂移时跳过 Pass 点
+                    // 奖励并告警,不回滚整个结算事务——避免漂移把完成任务变成
+                    // 「毒药任务」(每次领取都回滚、永久卡死)。漂移修复后任务
+                    // 照常可完成,缺失的 Pass 点不补发。
                     if (context.passCardEventId === undefined) {
-                        throw new Error("Pass card point reward is missing its event scope.")
+                        console.warn("[MISSION] pass point reward skipped: reward has no pass event scope (pass_card_event drift degraded)")
+                        break
                     }
                     const passCardEvent = getPassCardEventDefinition(context.passCardEventId)
                     if (!passCardEvent) {
-                        throw new Error(`Pass card event ${context.passCardEventId} is missing.`)
+                        console.warn(`[MISSION] pass point reward skipped: pass card event ${context.passCardEventId} is missing from pass_card_event.json (degraded)`)
+                        break
                     }
                     const result = addPlayerPassCardPointWithChangeSync(
                         this.playerId,

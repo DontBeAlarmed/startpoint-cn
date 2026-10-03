@@ -71,7 +71,7 @@
 2. **[P2·测试缺口] box gacha / crazy select / equipment bulk_upgrade 的 e2e 结算用例**:三链的当场发布目前靠夹具级/投影级测试覆盖,无端到端 RED 用例。
 3. **[已解决·时钟口径]** 窄域结算面统一为服务器虚拟时间(getServerDate,与 finish 兜底同钟);主日切已迁真实业务日(与登录奖励/每日挑战的双轨一致)——见 identity-time-and-load.md 双时钟表与 `tools/real_day_rollover.test.cjs`。
 4. **[已解决·响应形状路线统一]** 经 1.8.1 客户端反编译定案(RealRemoteService.as 通用响应解析器):mission_info 为 Option 语义(缺失/空数组均安全,逐条应用);degree_list 不在通用响应解析结构内(称号走 /profile/get_degree_list,通用响应忽略);item_list 空数组与空对象同解析。抑制变体 `mergeMissionSettlementResponse` 已删除,party/singleBattleQuest/characterElection/raidEvent/equipment 全部统一到 `composeMissionSettlementResponse`(空列表以空数组发布,客户端零长度应用)。
-5. **[P3·沿用 9 月审计]** pass 85/16/23 eventId 匹配、kind 7 fail-closed、all-complete row[19] 守卫、PERF-07、Attention/救援生产者(用户明确不做)——维持 9 月审计的 DEFERRED 决定;信赖证 status 语义已定案(领取进包 ≥2,2026-10-03 取证)。
+5. **[P3·沿用 9 月审计]** pass 85/16/23 eventId 匹配(用户已定案维持现状:官方期次不重叠,私服 CDN 重叠由 CDN 作者负责)、PERF-07、Attention/救援生产者(用户明确不做)——维持 DEFERRED。已定案:信赖证 status≥2(领取进包)、kind 7 降级跳过+告警、all-complete row[19] 启动守卫(2026-10-03)。
 6. **[P3·文档漂移]** cat5 冻结时启用 1079(非 1078);`mission-semantic-audit.md` §一的第 41 行口径可在下次修订时更新。
 7. **[P3·既有源码结构守卫失配(非本系列引入)** `character_awake_unlock.test.cjs:287` 与 `mission_battle_facts.test.cjs:262` 两个结构断言在早先剧情/结算结构重排后过期,建议专项清理。
 

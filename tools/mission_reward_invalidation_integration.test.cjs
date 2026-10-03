@@ -142,3 +142,26 @@ test.after(() => {
     if (previousDatabaseDirectory === undefined) delete process.env.WDFP_DATABASE_DIR
     else process.env.WDFP_DATABASE_DIR = previousDatabaseDirectory
 })
+
+test("Pass point reward without event scope degrades to a logged skip", () => {
+    // 降级策略(2026-10-03 定案):期次数据漂移时跳过 Pass 点并告警,
+    // 不抛错、不回滚结算事务(漂移不把完成任务变成毒药)
+    const beforePoint = getPlayerPassCardStateSync(playerId, 3)?.point ?? 0
+    const granter = db.transaction(() => {
+        const rewardGranter = new MissionRewardGranter(playerId, getPlayerSync(playerId))
+        // 故意缺 passCardEventId:触发降级路径
+        const keys = rewardGranter.grant([{ kind: 7, amount: 100 }])
+        rewardGranter.persistPlayer()
+        return { keys, rewardGranter }
+    })()
+    assert.equal(
+        getPlayerPassCardStateSync(playerId, 3)?.point ?? 0,
+        beforePoint,
+        "缺期次归属的 Pass 点必须被跳过而非抛错",
+    )
+    assert.deepEqual(
+        granter.keys.map(getFactKeyId),
+        [],
+        "被跳过的奖励不得产生事实失效键",
+    )
+})
