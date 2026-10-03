@@ -137,9 +137,11 @@ export function AccountsMobileView({
                     </span>
                     <span className="save-meta">Lv {player.rank} · {player.characterCount} 角色</span>
                 </span>
-                {/* 当前存档标识与切换合体（与桌面同构） */}
+            </div>
+            <div className="admin-mobile-actions admin-account-actions" onClick={event => event.stopPropagation()}>
+                {/* 当前/切换合体标识在编辑按钮前(维护者指定); 当前=按钮同高的绿徽章 */}
                 {player.isDefault
-                    ? <span className="admin-badge-ok save-current-chip">当前</span>
+                    ? <button type="button" disabled className="admin-badge-ok save-current-btn">当前</button>
                     : (
                         <Button
                             aria-label="切换存档"
@@ -149,9 +151,7 @@ export function AccountsMobileView({
                             }}
                         >切换</Button>
                     )}
-            </div>
-            <div className="admin-mobile-actions admin-account-actions" onClick={event => event.stopPropagation()}>
-                <Button icon={<Pencil size={15} />} aria-label="编辑存档" onClick={() => onOpenPlayer(player.id)}>编辑</Button>
+                <Button className="act-edit" icon={<Pencil size={15} />} aria-label="编辑存档" onClick={() => onOpenPlayer(player.id)}>编辑</Button>
                 <Dropdown menu={saveMoreMenu(account, player)} trigger={["click"]} placement="bottomRight">
                     <Button className="admin-more-btn" aria-label="更多操作">…</Button>
                 </Dropdown>

@@ -63,8 +63,18 @@ assert.match(accounts, /save-id admin-mono">#存档 \{player\.id\}<\/span>/)
 assert.match(mobileView, /save-id admin-mono">#存档 \{player\.id\}<\/span>/)
 // 合体标识: 当前=绿色徽章常驻(2 字与「切换」等长)/切换=默认钮, 仅存档子卡出现;
 // 卡片操作钮恢复默认配色(维护者指定: 统一的是尺寸内边距而非颜色), 全页仅卡头新建存档为 primary
-assert.equal((accounts.match(/admin-badge-ok save-current-chip">当前<\/span>/g) ?? []).length, 1, "当前标识应仅在存档子卡出现一次")
-assert.equal((mobileView.match(/admin-badge-ok save-current-chip">当前<\/span>/g) ?? []).length, 1, "移动当前标识应仅在存档子卡出现一次")
+assert.equal((accounts.match(/admin-badge-ok save-current-btn">当前<\/button>/g) ?? []).length, 1, "当前标识应仅在存档子卡出现一次(按钮同高)")
+assert.equal((mobileView.match(/admin-badge-ok save-current-btn">当前<\/button>/g) ?? []).length, 1, "移动当前标识应仅在存档子卡出现一次(按钮同高)")
+// 当前/切换在编辑按钮前(维护者指定): 移动端操作行顺序 当前|切换 → 编辑 → …
+{
+    const curIdx = mobileView.indexOf("save-current-btn")
+    const swapIdx = mobileView.indexOf('aria-label="切换存档"')
+    const editIdx = mobileView.indexOf('aria-label="编辑存档"')
+    assert.ok(curIdx !== -1 && editIdx !== -1 && curIdx < editIdx, "「当前/切换」应位于「编辑」前")
+    assert.ok(swapIdx === -1 || Math.abs(swapIdx - editIdx) < 400, "切换应与编辑同在操作行")
+}
+assert.match(accountsCss, /\.save-current-btn \{[^}]*height: 32px/)
+assert.match(accountsCss, /\.admin-account-actions \.act-edit \{[^}]*flex: 1 1 auto/)
 assert.match(accounts, />切换<\/Button>/)
 assert.equal((accounts.match(/type="primary"/g) ?? []).length, 2, "桌面 primary 仅新建存档+备注确定")
 assert.equal((mobileView.match(/type="primary"/g) ?? []).length, 2, "移动 primary 仅新建存档+备注确定")

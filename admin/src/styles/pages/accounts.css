@@ -84,11 +84,11 @@
 }
 
 /* 账号页操作行: 编辑占主(grow), […] 恒定紧凑 */
-.admin-account-actions .ant-btn:first-child {
+.admin-account-actions .act-edit {
   flex: 1 1 auto;
 }
 
-.admin-account-actions .ant-btn:not(:first-child) {
+.admin-account-actions .ant-btn:not(.act-edit) {
   flex: none;
 }
 
@@ -383,8 +383,15 @@
   font-size: 11px;
 }
 
-.save-current-chip {
-  flex: none;
+/* 当前标识: 按钮同高(32px)的绿徽章元素, 与 切换/编辑/[…] 尺寸统一 */
+.save-current-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 15px;
+  font-size: 14px;
+  cursor: default;
 }
 
 /* accounts page (approved mockup accounts-v2): panel-head star tick — the 账号管理 card

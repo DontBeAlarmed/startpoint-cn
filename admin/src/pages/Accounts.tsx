@@ -178,7 +178,7 @@ export default function Accounts() {
                 </span>
                 {/* 当前存档标识与切换合体: 绿色「当前」常驻标识 / 非当前「切换」按钮 (activateSave 同置账号当前存档与全局活动) */}
                 {player.isDefault
-                    ? <span className="admin-badge-ok save-current-chip">当前</span>
+                    ? <button type="button" disabled className="admin-badge-ok save-current-btn">当前</button>
                     : <Button onClick={() => activateSave.mutate(player.id)}>切换</Button>}
                 <Button onClick={() => navigate(`/players/${player.id}`)}>编辑</Button>
                 <Dropdown menu={saveMoreMenu(account, player)} trigger={["click"]} placement="bottomRight">
