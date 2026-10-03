@@ -23,52 +23,89 @@
   },
   "settlement": {
     "first": {
+      "persisted": {
+        "missionId": 1000,
+        "progress": 250,
+        "stages": {
+          "1": true
+        }
+      },
       "response": {
+        "characterList": [],
+        "degreeIds": [
+          1000,
+          1010,
+          1020,
+          1030,
+          1040,
+          1050,
+          1060,
+          1070
+        ],
+        "equipmentList": [],
+        "itemList": {},
         "missionInfo": [
           {
             "mission_category_id": 5,
             "mission_id": 1000,
             "mission_reward_id": 1000001
+          },
+          {
+            "mission_category_id": 5,
+            "mission_id": 1010,
+            "mission_reward_id": 1010001
+          },
+          {
+            "mission_category_id": 5,
+            "mission_id": 1020,
+            "mission_reward_id": 1020001
+          },
+          {
+            "mission_category_id": 5,
+            "mission_id": 1030,
+            "mission_reward_id": 1030001
+          },
+          {
+            "mission_category_id": 5,
+            "mission_id": 1040,
+            "mission_reward_id": 1040001
+          },
+          {
+            "mission_category_id": 5,
+            "mission_id": 1050,
+            "mission_reward_id": 1050001
+          },
+          {
+            "mission_category_id": 5,
+            "mission_id": 1060,
+            "mission_reward_id": 1060001
+          },
+          {
+            "mission_category_id": 5,
+            "mission_id": 1070,
+            "mission_reward_id": 1070001
           }
         ],
-        "itemList": {},
-        "characterList": [],
-        "equipmentList": [],
-        "degreeIds": [
-          1000
-        ],
         "passCardPoints": {},
-        "userInfo": {
-          "free_vmoney": 100,
-          "free_mana": 2000,
-          "exp_pool": 0,
-          "degree_id": 1000
-        }
-      },
-      "persisted": {
-        "missionId": 1000,
-        "progress": 250,
-        "stages": {
-          "1": true
-        }
+        "userInfo": null
       }
     },
     "repeated": {
-      "response": {
-        "missionInfo": [],
-        "itemList": {},
-        "characterList": [],
-        "equipmentList": [],
-        "degreeIds": [],
-        "passCardPoints": {},
-        "userInfo": null
-      },
       "persisted": {
         "missionId": 1000,
         "progress": 250,
         "stages": {
           "1": true
         }
+      },
+      "response": {
+        "characterList": [],
+        "degreeIds": [],
+        "equipmentList": [],
+        "itemList": {},
+        "missionInfo": [],
+        "passCardPoints": {},
+        "userInfo": null
       }
     }
   },
