@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react"
-import { Alert, Button, Card, Empty, Input, Segmented, Space, Table, Tag, Typography, message } from "antd"
+import { Alert, Button, Card, Empty, Input, Segmented, Space, Tag, Typography, message } from "antd"
 import { UndoOutlined } from "@ant-design/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import dayjs, { type Dayjs } from "dayjs"
@@ -238,14 +238,50 @@ function renderPoolCardBadge(gacha: Pick<ClairvoyanceGacha, "startDate" | "endDa
     return <span className="admin-badge-info">预告</span>
 }
 
+// ── 时间线统一单列条目（维护者指定 timeline-unified-list.html）────────────────
+// 行1 标题|#id(|活动类型徽章) · 行2 时间+状态 · 行3 内容(仅卡池: UP 角色芯片行, 不再 +N 折叠)
+const TIMELINE_VISIBLE_COUNT = 4
+
+function renderUpCharacterChips(characters: ClairvoyanceCharacter[]) {
+    return (
+        <div className="admin-tl-up-row">
+            {characters.map(character => (
+                <span key={character.id} className="admin-tl-up-chip">
+                    <span className="admin-tl-up-av" aria-hidden>
+                        {character.name.slice(0, 1)}
+                        <img
+                            className="admin-tl-up-av-img"
+                            src={`/api/content/character_avatar/${character.id}`}
+                            alt=""
+                            loading="lazy"
+                            onError={event => {
+                                event.currentTarget.classList.add("admin-tl-up-av-broken")
+                            }}
+                        />
+                    </span>
+                    <span className="admin-tl-up-meta">
+                        <span className="admin-tl-up-id">#{character.id}</span>
+                        <span className="admin-tl-up-name">{character.name}</span>
+                    </span>
+                </span>
+            ))}
+        </div>
+    )
+}
+
+// 活动类型配色: 按族标签关键词映射, 未识别族回退 info 蓝
+function activityFamilyBadgeClass(label: string): string {
+    if (label.includes("故事")) return "admin-tl-family admin-tl-family-story"
+    if (label.includes("讨伐")) return "admin-tl-family admin-tl-family-battle"
+    if (label.includes("大型")) return "admin-tl-family admin-tl-family-large"
+    if (label.includes("通关") || label.includes("累计") || label.includes("登录")) return "admin-tl-family admin-tl-family-clear"
+    return "admin-tl-family admin-tl-family-other"
+}
+
 // 近期活动段的状态徽章：与卡池段对称（未开始只出现在数据迟到时）
 function renderActivityCardBadge(activity: Pick<AdminActivityEvent, "startTime" | "activeEndTime" | "closeEndTime">, upcoming: boolean, nowIso: string | undefined) {
     if (upcoming) return <span className="admin-badge-info">预告</span>
     return renderActivityStatusBadge(activity, nowIso)
-}
-
-function renderActivityPeriod(activity: Pick<AdminActivityEvent, "startTime" | "activeEndTime">): string {
-    return `${formatGameWallTime(activity.startTime)} - ${activity.activeEndTime === null ? "长期" : formatGameWallTime(activity.activeEndTime)}`
 }
 
 type ActivityLiveState = "live" | "exchanging" | "ended" | "upcoming"
@@ -411,6 +447,9 @@ export default function TimeControl() {
     const [expandedPoolIds, setExpandedPoolIds] = useState<Set<number>>(new Set())
     const [gachaSearch, setGachaSearch] = useState("")
     const [activitySearch, setActivitySearch] = useState("")
+    // 时间线单列列表展开态（两线各自独立, 维护者指定 timeline-unified-list.html）
+    const [gachaListExpanded, setGachaListExpanded] = useState(false)
+    const [activityListExpanded, setActivityListExpanded] = useState(false)
     const togglePoolExpanded = (poolId: number) => {
         setExpandedPoolIds(current => {
             const next = new Set(current)
@@ -525,6 +564,34 @@ export default function TimeControl() {
                 return activity ? [activity] : []
             })
     }, [activitySearch, activityTimeline, activityTimelineByKey])
+
+    // 时间线统一单列列表（维护者指定）: 搜索即过滤(池名/池id/角色名/称号/角色id), 默认 4 项向下展开
+    const timelineGachas = useMemo(() => {
+        const rows = gachaTimeline?.timeline ?? []
+        const query = normalizeSearch(gachaSearch)
+        if (!query) return rows
+        return rows.filter(gacha =>
+            normalizeSearch(gacha.name).includes(query) ||
+            String(gacha.id).includes(query) ||
+            gacha.rateUpCharacters.some(character =>
+                normalizeSearch(character.name).includes(query) ||
+                normalizeSearch(character.title).includes(query) ||
+                String(character.id).includes(query)))
+    }, [gachaSearch, gachaTimeline])
+    const visibleTimelineGachas = gachaListExpanded ? timelineGachas : timelineGachas.slice(0, TIMELINE_VISIBLE_COUNT)
+
+    // 活动时间线同构: 搜索即过滤(活动名/族标签/stringId/eventId)
+    const timelineActivities = useMemo(() => {
+        const rows = activityTimeline?.timeline ?? []
+        const query = normalizeSearch(activitySearch)
+        if (!query) return rows
+        return rows.filter(activity =>
+            normalizeSearch(activity.name).includes(query) ||
+            normalizeSearch(activity.familyLabel).includes(query) ||
+            normalizeSearch(activity.stringId).includes(query) ||
+            String(activity.eventId).includes(query))
+    }, [activitySearch, activityTimeline])
+    const visibleTimelineActivities = activityListExpanded ? timelineActivities : timelineActivities.slice(0, TIMELINE_VISIBLE_COUNT)
 
     const isoText = data?.date ? data.date.replace("T", " ") : "-"
     const shownDraft = draftSegments ?? (data ? formatDraft(dayjs(data.date)) : null)
@@ -698,30 +765,44 @@ export default function TimeControl() {
             <section className="admin-dash-section">
                 <div className="admin-dash-section-title">时间线</div>
                 <div className="admin-dash-section-body">
-                    <Table<ClairvoyanceGacha>
-                        rowKey="id"
-                        size="small"
-                        loading={gachaTimelineLoading}
-                        dataSource={gachaTimeline?.timeline ?? []}
-                        scroll={{ x: "max-content" }}
-                        tableLayout="fixed"
-                        pagination={{ pageSize: 8, showSizeChanger: false }}
-                        columns={[
-                            { title: "卡池", dataIndex: "name", render: (name: string, row) => `${name} #${row.id}` },
-                            {
-                                title: "上线 / 下线",
-                                render: (_: unknown, row) => (
-                                    <Space wrap size={6} align="center">
-                                        {renderGachaPeriod(row)}
-                                        {renderGachaStatusBadge(row, gachaTimeline?.currentTime)}
-                                    </Space>
-                                ),
-                                width: 360,
-                                responsive: ["sm"] as any,
-                            },
-                            { title: "UP 角色", render: (_: unknown, row) => renderRateUpCharacters(row.rateUpCharacters, expandedPoolIds.has(row.id), () => togglePoolExpanded(row.id)) },
-                        ]}
-                    />
+                    {gachaTimelineLoading ? (
+                        <Typography.Text type="secondary">加载中...</Typography.Text>
+                    ) : visibleTimelineGachas.length === 0 ? (
+                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={gachaSearch ? "没有匹配的卡池" : "暂无卡池时间线"} />
+                    ) : (
+                        <>
+                            <div className="admin-tl-list">
+                                {visibleTimelineGachas.map(gacha => (
+                                    <div key={gacha.id} className="admin-tl-item">
+                                        <div className="admin-tl-head">
+                                            <span className="admin-tl-name">{gacha.name}</span>
+                                            <span className="admin-tl-id admin-mono">#{gacha.id}</span>
+                                        </div>
+                                        <div className="admin-tl-time">
+                                            <span className="admin-mono">{renderGachaCompactPeriod(gacha)}</span>
+                                            {renderGachaStatusBadge(gacha, gachaTimeline?.currentTime)}
+                                            <span>{renderRemainingDays(gacha, gachaTimeline?.currentTime)}</span>
+                                        </div>
+                                        <div className="admin-tl-body">
+                                            {renderUpCharacterChips(gacha.rateUpCharacters)}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            {(timelineGachas.length > TIMELINE_VISIBLE_COUNT || gachaListExpanded) && (
+                                <button
+                                    type="button"
+                                    className="admin-tl-expand"
+                                    aria-expanded={gachaListExpanded}
+                                    onClick={() => setGachaListExpanded(value => !value)}
+                                >
+                                    {gachaListExpanded
+                                        ? "收起 ▴"
+                                        : `展开其余 ${timelineGachas.length - TIMELINE_VISIBLE_COUNT} 个卡池 ▾`}
+                                </button>
+                            )}
+                        </>
+                    )}
                 </div>
             </section>
         </div>
@@ -776,48 +857,45 @@ export default function TimeControl() {
             <section className="admin-dash-section">
                 <div className="admin-dash-section-title">活动时间线</div>
                 <div className="admin-dash-section-body">
-                    <Table<AdminActivityEvent>
-                        rowKey={row => activityKey(row)}
-                        size="small"
-                        loading={activityTimelineLoading}
-                        dataSource={activityTimeline?.timeline ?? []}
-                        scroll={{ x: "max-content" }}
-                        tableLayout="fixed"
-                        pagination={{ pageSize: 8, showSizeChanger: false }}
-                        columns={[
-                            {
-                                title: "活动",
-                                render: (_: unknown, row) => (
-                                    <Space wrap size={6} align="center">
-                                        <Typography.Text strong>{row.name}</Typography.Text>
-                                        <Tag color="purple">{row.familyLabel}</Tag>
-                                        <Typography.Text type="secondary">#{row.eventId}</Typography.Text>
-                                    </Space>
-                                ),
-                            },
-                            {
-                                title: "起止 / 状态",
-                                render: (_: unknown, row) => (
-                                    <Space wrap size={6} align="center">
-                                        <span className="admin-mono">{renderActivityPeriod(row)}</span>
-                                        {renderActivityStatusBadge(row, activityTimeline?.currentTime)}
-                                    </Space>
-                                ),
-                                width: 400,
-                                responsive: ["sm"] as any,
-                            },
-                            {
-                                title: "剩余 / 换牌",
-                                render: (_: unknown, row) => (
-                                    <Space wrap size={6} align="center">
-                                        {renderActivityRemainingDays(row, activityTimeline?.currentTime)}
-                                        {row.closeEndTime !== null && `换牌截止 ${formatGameWallTime(row.closeEndTime)}`}
-                                    </Space>
-                                ),
-                                responsive: ["sm"] as any,
-                            },
-                        ]}
-                    />
+                    {activityTimelineLoading ? (
+                        <Typography.Text type="secondary">加载中...</Typography.Text>
+                    ) : visibleTimelineActivities.length === 0 ? (
+                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={activitySearch ? "没有匹配的活动" : "暂无活动时间线"} />
+                    ) : (
+                        <>
+                            <div className="admin-tl-list">
+                                {visibleTimelineActivities.map(activity => (
+                                    <div key={activityKey(activity)} className="admin-tl-item">
+                                        <div className="admin-tl-head">
+                                            <span className="admin-tl-name">{activity.name}</span>
+                                            <span className="admin-tl-id admin-mono">#{activity.eventId}</span>
+                                            <span className={activityFamilyBadgeClass(activity.familyLabel)}>{activity.familyLabel}</span>
+                                        </div>
+                                        <div className="admin-tl-time">
+                                            <span className="admin-mono">{renderActivityCompactPeriod(activity)}</span>
+                                            {renderActivityStatusBadge(activity, activityTimeline?.currentTime)}
+                                            <span>{renderActivityRemainingDays(activity, activityTimeline?.currentTime)}</span>
+                                            {activity.closeEndTime !== null && (
+                                                <span>换牌截止 {formatGameWallTime(activity.closeEndTime)}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            {(timelineActivities.length > TIMELINE_VISIBLE_COUNT || activityListExpanded) && (
+                                <button
+                                    type="button"
+                                    className="admin-tl-expand"
+                                    aria-expanded={activityListExpanded}
+                                    onClick={() => setActivityListExpanded(value => !value)}
+                                >
+                                    {activityListExpanded
+                                        ? "收起 ▴"
+                                        : `展开其余 ${timelineActivities.length - TIMELINE_VISIBLE_COUNT} 个活动 ▾`}
+                                </button>
+                            )}
+                        </>
+                    )}
                 </div>
             </section>
         </div>

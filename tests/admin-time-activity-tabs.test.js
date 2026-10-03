@@ -70,10 +70,17 @@ assert(
     && source.indexOf("UP 角色搜索") < source.indexOf('<div className="admin-dash-section-title">时间线</div>'),
     "卡池页签内部结构应保持原顺序",
 )
-// 卡池时间线的三元组（卡池/上线 / 下线/UP 角色）原样保留
-assert(source.includes('{ title: "卡池", dataIndex: "name"'), "卡池时间线第一列原样保留")
-assert(source.includes('title: "上线 / 下线"'), "卡池时间线第二列原样保留")
-assert(source.includes('renderRateUpCharacters(row.rateUpCharacters, expandedPoolIds.has(row.id)'), "卡池时间线第三列展开态接线原样保留")
+// 卡池时间线改为统一单列列表（维护者指定 timeline-unified-list.html, 两线同构）
+assert(source.includes("admin-tl-list"), "时间线应为统一单列列表")
+assert(source.includes("renderUpCharacterChips"), "UP 角色应为芯片行(折叠上移到卡池条目层)")
+assert(source.includes("TIMELINE_VISIBLE_COUNT = 4"), "时间线默认应显示 4 项")
+assert(source.includes("展开其余"), "超出应有向下展开按钮")
+assert(source.includes("收起 ▴"), "展开后应收起")
+assert(source.includes("activityFamilyBadgeClass"), "活动类型应按族配色")
+assert(source.includes("没有匹配的卡池"), "搜索过滤空态")
+assert(source.includes("visibleTimelineActivities"), "活动时间线应与卡池同构")
+assert(!source.includes("<Table"), "时间线区不应再使用 Table")
+assert(source.indexOf("UP 角色搜索") < source.indexOf("admin-tl-list"), "单列列表应位于 UP 角色搜索栏下方")
 
 // ── UP 角色真实头像：CDN 归档端点 + onError 首字占位回退 ─────────────────
 assert(source.includes("/api/content/character_avatar/"), "UP 角色头像应接 CDN 归档端点")
