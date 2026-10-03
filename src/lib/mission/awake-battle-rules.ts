@@ -333,6 +333,9 @@ export function getMatchedAwakeRaceMissionIds(
 export function isBondTokenMissionComplete(
     bondTokens: readonly { status: number }[] | undefined,
 ): boolean {
+    // 官方语义确认(2026-10-03 用户取证,同日首次口径「按获得」已撤回):
+    // 以【领取进包】为节点(status>=2);板完成只授予(0→1),领取是
+    // 玩家的独立动作,任务不依赖授予瞬间。
     return bondTokens !== undefined
         && bondTokens.length > 0
         && bondTokens.every(bondToken => bondToken.status >= 2)
