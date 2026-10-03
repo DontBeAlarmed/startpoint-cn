@@ -470,6 +470,7 @@ function missionProgressAt(playerId, category, missionId) {
     `).get(playerId, category, missionId)?.progress ?? 0
 }
 
+// ── 装备溶解的锻块任务当场结算 ──
 test("equipment dissolve settles craft point mission and degree at once", async () => {
     const { playerId, viewerId } = await createPlayer("equipment-dissolve-mission")
     addEquipment(playerId, 4050030, 26)

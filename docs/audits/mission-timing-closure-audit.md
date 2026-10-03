@@ -38,7 +38,7 @@
 
 - pattern 全部唯一;38 LIFETIME + 6 持久化增量 + 74 questProgress 选择器 + 7 救援族 fail-closed。
 - **唯一残留缺口:mission 66(total_craft_point_addition_count,锻块)**——装备溶解三入口(`/equipment/sell_equipment|sell_stack|bulk_sell_stack`)发放锻块但不结算(与 40 同形状,列为后续补面项,兜底=下次进关/任务页/open_mana_board)。
-- 低频兜底(已文档化):商店购买角色/装备(32/33)、邮件附件(32/33/40/66)、活动兑换过期/嘉年华玛纳(40)、/load awake 修复链写节点后的 37/96。
+- 低频兜底(已文档化):商店购买角色/装备(32/33)、邮件附件(32/33/40/66)、任务 33 奖励发放的锻块(66)、活动兑换过期/嘉年华玛纳(40)、/load awake 修复链写节点后的 37/96。
 - 核实无需结算面的显式动作:exBoost 破星(只写 exBoost 字段)、characterElection(无 cat1 事实)、receive_bond_token(1→2 不改 status>=1 计数)。
 
 ### 2. cat5(1288 条):~1279 条有正确结算点
@@ -67,7 +67,7 @@
 
 ## 四、遗留清单(按优先级,均为兜底可接受或性能项)
 
-1. **[P2·后续补面] mission 66 锻块**:溶解三入口接窄域结算(与 item-sell 同形状,下一迭代首选)。
+1. **[已解决·mission 66 锻块]**:溶解三入口已接窄域结算(cat1 66 族 + cond37 锻块称号族,按 craftPointGet 前缀收窄)——`src/lib/craft-point-mission-settlement.ts`。任务 33 奖励发放的 300 锻块等其它获取路径沿用兜底。
 2. **[P2·测试缺口] box gacha / crazy select / equipment bulk_upgrade 的 e2e 结算用例**:三链的当场发布目前靠夹具级/投影级测试覆盖,无端到端 RED 用例。
 3. **[已解决·时钟口径]** 窄域结算面统一为服务器虚拟时间(getServerDate,与 finish 兜底同钟);主日切已迁真实业务日(与登录奖励/每日挑战的双轨一致)——见 identity-time-and-load.md 双时钟表与 `tools/real_day_rollover.test.cjs`。
 4. **[已解决·响应形状路线统一]** 经 1.8.1 客户端反编译定案(RealRemoteService.as 通用响应解析器):mission_info 为 Option 语义(缺失/空数组均安全,逐条应用);degree_list 不在通用响应解析结构内(称号走 /profile/get_degree_list,通用响应忽略);item_list 空数组与空对象同解析。equipment 路由已统一到 compose(空 character_list 以空数组发布,客户端零长度应用)。party/singleBattleQuest 仍用 merge 抑制变体,客户端行为等价,收敛可选。

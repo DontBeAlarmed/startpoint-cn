@@ -17,10 +17,7 @@ import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
 import { projectEquipmentEntity } from "../../lib/common-response/entities";
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
-import type {
-    CommonResponseFragment,
-    CommonResponseProjection,
-} from "../../lib/common-response/model";
+import type { CommonResponseFragment } from "../../lib/common-response/model";
 import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
 import { createRewardGrantItemOverflowPolicy } from "../../lib/reward-grant-item-overflow";
 import {
@@ -123,7 +120,7 @@ function dissolveResponseData(
     settlement: ReturnType<typeof grantDissolveRewardsWithinTransactionSync>,
     playerId: number,
     viewerId: number,
-): CommonResponseProjection {
+): Record<string, unknown> {
     const overMax = projectItemOverflowCommonResponse(settlement.itemOverflowDispositions)
     const fragment: CommonResponseFragment = {
         equipment_list: buildFullEquipmentList(playerId).map(
@@ -147,7 +144,7 @@ function dissolveResponseData(
             viewerId,
         )
     }
-    return responseData as CommonResponseProjection
+    return responseData
 }
 
 const routes = async (fastify: FastifyInstance) => {
