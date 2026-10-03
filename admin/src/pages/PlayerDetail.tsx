@@ -567,7 +567,7 @@ export default function PlayerDetail() {
                 <Tabs items={tabItems} />
             </Card>
 
-            {/* 「详细信息」折叠卡 2026-10-04 移除: 存档名/存档 ID/账号 ID 均已在 hero 展示,
+            {/* 存档标识折叠卡 2026-10-04 移除: 存档名/存档 ID/账号 ID 均已在 hero 展示,
                 完全重复(维护者指定) */}
 
             {/* 危险操作默认收起(维护者指定): 复用 admin-details 折叠模式, 红条本体整体藏进 details */}
