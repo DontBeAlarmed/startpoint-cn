@@ -61,9 +61,10 @@ export function NewsCardView({
                                     {row.label > 0 && <span> · 标签 {row.label}</span>}
                                 </span>
                             </div>
-                            <span className="acc-actions">
+                            <span className="acc-actions news-card-actions">
                                 {/* 启停按钮恒在原位重标记(维护者 2026-10-04: 启动标识收敛,
-                                   徽章/Switch 两套表达移除), 直呼 toggle 与原桌面 Switch 同通道 */}
+                                   徽章/Switch 两套表达移除), 直呼 toggle 与原桌面 Switch 同通道。
+                                   三钮位置: 桌面右侧一簇 / 移动端最下一排(CSS 分流, 维护者指定) */}
                                 <Button
                                     icon={row.enabled ? <CircleStop size={15} /> : <Play size={15} />}
                                     aria-label={row.enabled ? "停用公告" : "启用公告"}
@@ -72,22 +73,20 @@ export function NewsCardView({
                                 >
                                     {row.enabled ? "停用" : "启用"}
                                 </Button>
+                                <Button icon={<Pencil size={15} />} aria-label="编辑公告" onClick={() => onEdit(row)}>
+                                    编辑
+                                </Button>
+                                <Popconfirm
+                                    title="删除这条公告？"
+                                    description="此操作会物理删除公告，且无法恢复。"
+                                    okText="删除"
+                                    cancelText="取消"
+                                    okButtonProps={{ danger: true }}
+                                    onConfirm={() => void onDelete(row)}
+                                >
+                                    <Button danger icon={<Trash2 size={15} />} aria-label="删除公告" />
+                                </Popconfirm>
                             </span>
-                        </div>
-                        <div className="acc-bottom-row news-card-actions">
-                            <Button icon={<Pencil size={15} />} aria-label="编辑公告" onClick={() => onEdit(row)}>
-                                编辑
-                            </Button>
-                            <Popconfirm
-                                title="删除这条公告？"
-                                description="此操作会物理删除公告，且无法恢复。"
-                                okText="删除"
-                                cancelText="取消"
-                                okButtonProps={{ danger: true }}
-                                onConfirm={() => void onDelete(row)}
-                            >
-                                <Button danger icon={<Trash2 size={15} />} aria-label="删除公告" />
-                            </Popconfirm>
                         </div>
                     </div>
                 ))}

@@ -69,7 +69,18 @@ assert.match(cardView, /暂无公告/, "空态文案与原桌面一致")
 // ── CSS: 私有件进页面 css ──────────────────────────────────────────────────
 assert.match(newsCss, /\.news-card-heading \{[^}]*flex-direction: column/, "两行标题块样式应存在")
 assert.match(newsCss, /\.news-card-title \{[^}]*-webkit-line-clamp: 2/, "标题应两行截断")
-assert.match(newsCss, /\.news-card-actions \{[^}]*justify-content: flex-end/, "底行操作应靠右")
+// 2026-10-04 二次调整: 三钮(启停/编辑/删除)合并一处 —— 桌面右侧一簇, 移动端最下一排
+assert.match(cardView, /acc-actions news-card-actions/, "三钮应合并进标题行 actions 簇")
+assert.doesNotMatch(cardView, /acc-bottom-row/, "独立底行应移除")
+{
+    const actionsStart = cardView.indexOf('acc-actions news-card-actions')
+    const titlebarEnd = cardView.indexOf("</div>\n                        </div>\n                    </div>")
+    const block = cardView.slice(actionsStart, actionsStart + 2200)
+    assert.match(block, /aria-label="编辑公告"/, "编辑钮应在 actions 簇内")
+    assert.match(block, /aria-label="删除公告"/, "删除钮应在 actions 簇内")
+}
+assert.match(newsCss, /\.news-card-actions \{[^}]*flex: 0 0 100%/, "移动端三钮应独占最下一排")
+assert.match(newsCss, /@media \(min-width: 768px\) \{[\s\S]*?\.news-card \.news-card-actions \{[^}]*margin-left: auto/, "桌面端三钮应靠右成簇")
 assert.doesNotMatch(newsCss, /news-status-toggle|news-mobile-/, "旧移动视图私有类应清除")
 assert.doesNotMatch(newsCss, /news-title-cell/, "旧表格标题单元格类应清除")
 

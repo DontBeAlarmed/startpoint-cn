@@ -267,8 +267,22 @@
   height: 36px;
 }
 
+/* 三钮(启停/编辑/删除)位置: 移动端独占最下一排, 桌面端右侧一簇(维护者指定) */
 .news-card-actions {
-  justify-content: flex-end;
+  flex: 0 0 100%;
+  margin-left: 0;
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+@media (min-width: 768px) {
+  .news-card .news-card-actions {
+    flex: none;
+    margin-left: auto;
+    margin-top: 0;
+    justify-content: flex-end;
+  }
 }
 
 .news-card-empty {
