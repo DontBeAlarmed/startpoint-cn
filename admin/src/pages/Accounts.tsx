@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useState } from "react"
 import { Card, Button, Space, Popconfirm, Input, Dropdown, Modal, message, Grid, Typography } from "antd"
 import { PlusOutlined, EditOutlined, ReloadOutlined } from "@ant-design/icons"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
@@ -21,12 +21,6 @@ export default function Accounts() {
     const [renameName, setRenameName] = useState("")
     const [noteEditId, setNoteEditId] = useState<number | null>(null)
     const [noteDraft, setNoteDraft] = useState("")
-    const savePanelRef = useRef<HTMLDivElement | null>(null)
-
-    // 存档子卡嵌在账号卡内部展开（mockup accounts-nested-saves）: 展开/切换滚动嵌套区到位, 收起不动
-    useEffect(() => {
-        if (selectedAccountId !== null) savePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-    }, [selectedAccountId])
 
     const { data: accounts = [], isLoading, isFetching } = useQuery({
         queryKey: ["accounts"],
@@ -149,6 +143,7 @@ export default function Accounts() {
                 onClick={() => { setNoteEditId(account.id); setNoteDraft(account.adminNote ?? "") }}
             >
                 {account.adminNote ?? "添加备注"}
+                <EditOutlined className="acc-note-pencil" />
             </a>
         )
 
@@ -190,27 +185,26 @@ export default function Accounts() {
                 <span className="save-meta">Lv {player.rank} · {player.characterCount} 角色</span>
                 <span className="save-ops">
                     {/* activateSave 服务端同时把该存档设为账号的当前存档与全局活动存档，故仅 isDefault 时禁用 */}
-                    <Button size="small" disabled={player.isDefault} onClick={() => activateSave.mutate(player.id)}>
+                    <Button disabled={player.isDefault} onClick={() => activateSave.mutate(player.id)}>
                         切换
                     </Button>
                 </span>
             </div>
             <div className="save-ops2">
-                <Button size="small" icon={<EditOutlined />} onClick={() => navigate(`/players/${player.id}`)}>
+                <Button icon={<EditOutlined />} onClick={() => navigate(`/players/${player.id}`)}>
                     编辑
                 </Button>
-                <Button size="small" onClick={() => cloneSave.mutate({ playerId: player.id, accountId: account.id })}>
+                <Button onClick={() => cloneSave.mutate({ playerId: player.id, accountId: account.id })}>
                     复制
                 </Button>
                 <Button
-                    size="small"
                     loading={exportSave.isPending && exportSave.variables === player.id}
                     onClick={() => exportSave.mutate(player.id)}
                 >
                     导出
                 </Button>
                 <Popconfirm title={`删除存档 ${player.id}？`} onConfirm={() => deleteSave.mutate(player.id)} okText="确认" cancelText="取消" okButtonProps={{ danger: true }}>
-                    <Button size="small" type="text" danger>删除</Button>
+                    <Button type="text" danger>删除</Button>
                 </Popconfirm>
             </div>
         </div>
@@ -229,11 +223,11 @@ export default function Accounts() {
                     <span className="acc-id">{account.defaultPlayerName ?? `账号 #${account.id}`}</span>
                     {renderNote(account)}
                     <span className="acc-actions">
-                        <Button size="small" aria-expanded={expanded} onClick={() => toggleSavePanel(account.id)}>
-                            存档列表 · {account.players.length} {expanded ? "▴" : "▾"}
+                        <Button aria-expanded={expanded} onClick={() => toggleSavePanel(account.id)}>
+                            存档数 {account.players.length} {expanded ? "▴" : "▾"}
                         </Button>
                         <Dropdown menu={moreActionsMenu(account.id)} trigger={["click"]} placement="bottomRight">
-                            <Button size="small" className="admin-more-btn" aria-label="更多操作">…</Button>
+                            <Button className="admin-more-btn" aria-label="更多操作">…</Button>
                         </Dropdown>
                     </span>
                 </div>
@@ -248,10 +242,10 @@ export default function Accounts() {
                     <span className="acc-v acc-devices">{renderDevices(account.devices)}</span>
                 </div>
                 {expanded && (
-                    <div className="acc-save-list" ref={savePanelRef}>
+                    <div className="acc-save-list">
                         <div className="acc-save-toolbar">
                             <span className="admin-badge-info">{account.players.length} 个存档</span>
-                            <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => newSave.mutate(account.id)}>新建存档</Button>
+                            <Button type="primary" icon={<PlusOutlined />} onClick={() => newSave.mutate(account.id)}>新建存档</Button>
                         </div>
                         {account.players.length === 0
                             ? <Typography.Text type="secondary">暂无存档</Typography.Text>

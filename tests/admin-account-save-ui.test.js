@@ -39,7 +39,8 @@ assert.match(accounts, /className="admin-edit-compact"[\s\S]*?onClick=\{event =>
 assert.doesNotMatch(accounts, /role: "button"/)
 assert.match(mobileView, /admin-account-mobile-list/)
 assert.doesNotMatch(mobileView, /返回账号列表/)
-assert.match(mobileView, /存档列表/)
+// 卡头展开按钮文案统一为「存档数 N」（维护者指定, 原「存档列表 · N」像模块标识）
+assert.match(mobileView, /存档数 \{account\.players\.length\}/)
 assert.match(mobileView, /编辑存档/)
 assert.match(mobileView, /player\.rank/)
 // 账号备注行内编辑（卡头灰字点击修改, 复用 updateNote → accountCleanup 备注位）;
@@ -56,9 +57,9 @@ assert.match(mobileView, /删除账号 \$\{accountId\} 及所有存档？/)
 assert.doesNotMatch(mobileView, /删除<\/Button>\s*<\/Popconfirm>[\s\S]{0,80}账号/)
 assert.doesNotMatch(accounts, /row\.degreeId \|\| 1/)
 
-// 存档列表 is no longer an inline panel below a table: task-38 (mockup accounts-nested-saves)
+// 存档数 is no longer an inline panel below a table: task-38 (mockup accounts-nested-saves)
 // turns each account into an acc-card and the save list expands INSIDE it as save-sub cards
-assert.match(accounts, /存档列表/)
+assert.match(accounts, /存档数 \{account\.players\.length\}/)
 assert.doesNotMatch(accounts, /管理存档/)
 assert.doesNotMatch(accounts, /返回账号列表/)
 assert.doesNotMatch(accounts, /<Table/, "桌面账号管理应废弃 Table 改为账号卡列表")
@@ -69,9 +70,28 @@ assert.match(accounts, /className="save-sub"/)
 assert.match(mobileView, /className="save-sub admin-mobile-list-item-clickable"/)
 assert.match(accounts, /aria-expanded=\{expanded\}/)
 assert.match(mobileView, /aria-expanded=\{expanded\}/)
-assert.match(accounts, /scrollIntoView\(\{ behavior: "smooth", block: "start" \}\)/)
+// 点开存档列表不做自动滚动（维护者指定移除 scrollIntoView）
+assert.doesNotMatch(accounts, /scrollIntoView/)
+assert.doesNotMatch(mobileView, /scrollIntoView/)
+assert.doesNotMatch(accounts, /useRef/)
+assert.doesNotMatch(mobileView, /useRef/)
 assert.match(accounts, /toggleSavePanel/)
 assert.match(accounts, /admin-badge-info">\{account\.players\.length\} 个存档</)
+
+// 卡片操作按钮与后台统一默认尺寸（维护者指定: 小尺寸 bordered 像 badge 标识风格）;
+// 保留 small 的仅限: 行内编辑器紧凑输入组（备注/改名各 Input+确定+取消 = 6）
+// + 存档名旁的重命名铅笔入口（icon 文字钮, 行内编辑入口而非卡片操作）= 桌面共 7;
+// 移动仅备注编辑器一组 = 3
+{
+    const smallCount = (accounts.match(/size="small"/g) ?? []).length
+    assert.equal(smallCount, 7, `桌面仅编辑器+改名铅笔保留 small, 实际 ${smallCount} 处`)
+    const mobileSmall = (mobileView.match(/size="small"/g) ?? []).length
+    assert.equal(mobileSmall, 3, `移动仅备注编辑器保留 small, 实际 ${mobileSmall} 处`)
+}
+
+// 备注铅笔提示 icon（维护者指定找回）
+assert.match(accounts, /acc-note-pencil/)
+assert.match(mobileView, /acc-note-pencil/)
 
 // 账号卡卡头 = 头像(当前存档喜爱角色) + 存档名作卡名 + 备注(点击修改)（mockup 规格第 1 条）
 assert.match(accounts, /acc-top[\s\S]*?FavoriteAvatar[\s\S]*?defaultPlayerAvatarId/)

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useState } from "react"
 import {
     Button,
     Dropdown,
@@ -44,13 +44,7 @@ export function AccountsMobileView({
     const [noteEditId, setNoteEditId] = useState<number | null>(null)
     const [noteDraft, setNoteDraft] = useState("")
     const [noteSaving, setNoteSaving] = useState(false)
-    const savePanelRef = useRef<HTMLDivElement | null>(null)
     const selectedAccountId = selectedAccount?.id ?? null
-
-    // 存档子卡嵌在账号卡内部展开（与桌面同构）: 展开/切换滚动嵌套区到位, 收起不动
-    useEffect(() => {
-        if (selectedAccountId !== null) savePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-    }, [selectedAccountId])
 
     const submitNote = async (accountId: number) => {
         if (noteSaving) return
@@ -106,6 +100,7 @@ export function AccountsMobileView({
                 onClick={() => { setNoteEditId(account.id); setNoteDraft(account.adminNote ?? "") }}
             >
                 {account.adminNote ?? "添加备注"}
+                <Pencil size={12} className="acc-note-pencil" />
             </a>
         )
 
@@ -125,7 +120,6 @@ export function AccountsMobileView({
                 <span className="save-ops">
                     {/* activateSave 服务端同时把该存档设为账号的当前存档与全局活动存档，故仅 isDefault 时禁用 */}
                     <Button
-                        size="small"
                         icon={<ArrowLeftRight size={15} />}
                         aria-label="切换存档"
                         disabled={player.isDefault}
@@ -176,11 +170,11 @@ export function AccountsMobileView({
                                         {renderNote(account)}
                                     </span>
                                     <span className="acc-actions">
-                                        <Button size="small" aria-expanded={expanded} onClick={() => onSelectAccount(account.id)}>
-                                            存档列表 · {account.players.length} {expanded ? "▴" : "▾"}
+                                        <Button aria-expanded={expanded} onClick={() => onSelectAccount(account.id)}>
+                                            存档数 {account.players.length} {expanded ? "▴" : "▾"}
                                         </Button>
                                         <Dropdown menu={moreActionsMenu(account.id)} trigger={["click"]} placement="bottomRight">
-                                            <Button size="small" className="admin-more-btn" aria-label="更多操作">…</Button>
+                                            <Button className="admin-more-btn" aria-label="更多操作">…</Button>
                                         </Dropdown>
                                     </span>
                                 </div>
@@ -203,10 +197,10 @@ export function AccountsMobileView({
                                     </div>
                                 </div>
                                 {expanded && (
-                                    <div className="acc-save-list" ref={savePanelRef}>
+                                    <div className="acc-save-list">
                                         <div className="acc-save-toolbar">
                                             <span className="admin-badge-info">{account.players.length} 个存档</span>
-                                            <Button size="small" type="primary" icon={<Plus size={15} />} onClick={() => void onNewSave(account.id)}>新建存档</Button>
+                                            <Button type="primary" icon={<Plus size={15} />} onClick={() => void onNewSave(account.id)}>新建存档</Button>
                                         </div>
                                         {account.players.length === 0
                                             ? <Empty description="暂无存档" />

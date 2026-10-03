@@ -300,6 +300,12 @@
   color: var(--ink);
 }
 
+/* 备注铅笔提示: 跟随文字色, 悬停时随文字提亮 */
+.acc-note-pencil {
+  margin-left: 4px;
+  font-size: 12px;
+}
+
 /* 卡头「…」更多操作按钮 (mockup .more-btn): 删除账号收进菜单 */
 .admin-more-btn {
   color: var(--ink-soft);
