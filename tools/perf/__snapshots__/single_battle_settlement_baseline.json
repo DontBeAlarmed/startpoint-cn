@@ -104,7 +104,9 @@
         "startResponse": {
           "data": {
             "category_id": 7,
+            "character_list": [],
             "degree_list": [],
+            "equipment_list": [],
             "is_multi": "single",
             "item_list": {
               "10000072": 1
@@ -130,7 +132,7 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "d917487d4b4fddb977228b9708c35aefe6ea6298a840636c4502073f51346a3d",
+      "behaviorSha256": "261e0b5baca8233743ced169fb138290e66542e525e524ace70f7c3f1150257a",
       "sql": {
         "statements": 42,
         "selectStatements": 27,
@@ -306,7 +308,7 @@
             }
           ],
           "items": {
-            "910001": 2,
+            "910001": 8,
             "910002": 3
           },
           "missionProgress": [
@@ -564,6 +566,21 @@
               "category": 5,
               "id": 37020,
               "progress": 5
+            },
+            {
+              "category": 5,
+              "id": 53000,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 53010,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 53020,
+              "progress": 1
             },
             {
               "category": 5,
@@ -914,6 +931,21 @@
               "group_id": 40000,
               "index": 1,
               "number": 2
+            },
+            {
+              "group_id": 40000,
+              "index": 1,
+              "number": 2
+            },
+            {
+              "group_id": 40000,
+              "index": 1,
+              "number": 2
+            },
+            {
+              "group_id": 40000,
+              "index": 1,
+              "number": 2
             }
           ]
         },
@@ -921,7 +953,7 @@
           "category": 1,
           "clearRewardId": 1,
           "questId": 1001002,
-          "sPlusRewardId": 1,
+          "sPlusRewardId": 3,
           "scoreRewardGroupId": 40000
         },
         "response": {
@@ -1024,12 +1056,27 @@
                 "group_id": 40000,
                 "index": 1,
                 "number": 2
+              },
+              {
+                "group_id": 40000,
+                "index": 1,
+                "number": 2
+              },
+              {
+                "group_id": 40000,
+                "index": 1,
+                "number": 2
+              },
+              {
+                "group_id": 40000,
+                "index": 1,
+                "number": 2
               }
             ],
             "equipment_list": [],
             "is_multi": "single",
             "item_list": {
-              "910001": 2,
+              "910001": 8,
               "910002": 3
             },
             "joined_character_id_list": [],
@@ -1175,16 +1222,16 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "4f1d811d335a1064f307756e9516ff498baa7cdc0d2259a5b34d4145d92253c4",
+      "behaviorSha256": "1c188bda34b2b23bdd269dd10c99e16d8b66348cc2d82e893073f880d70cc1b4",
       "sql": {
-        "statements": 101,
-        "selectStatements": 58,
-        "writeStatements": 37,
-        "transactionStatements": 6,
+        "statements": 115,
+        "selectStatements": 68,
+        "writeStatements": 39,
+        "transactionStatements": 8,
         "byTable": {
           "players": {
-            "statements": 13,
-            "reads": 7,
+            "statements": 15,
+            "reads": 9,
             "writes": 6
           },
           "players_active_mission_counters": {
@@ -1208,14 +1255,14 @@
             "writes": 1
           },
           "players_category_mission_stages": {
-            "statements": 4,
-            "reads": 3,
+            "statements": 5,
+            "reads": 4,
             "writes": 1
           },
           "players_category_missions": {
-            "statements": 9,
-            "reads": 3,
-            "writes": 6
+            "statements": 11,
+            "reads": 4,
+            "writes": 7
           },
           "players_character_awake_unlocks": {
             "statements": 2,
@@ -1273,8 +1320,8 @@
             "writes": 0
           },
           "players_mission_battle_counters": {
-            "statements": 2,
-            "reads": 1,
+            "statements": 3,
+            "reads": 2,
             "writes": 1
           },
           "players_party_race_clears": {
@@ -1283,13 +1330,13 @@
             "writes": 1
           },
           "players_pass_cards": {
-            "statements": 4,
-            "reads": 1,
-            "writes": 3
+            "statements": 6,
+            "reads": 2,
+            "writes": 4
           },
           "players_periodic_snapshots": {
-            "statements": 4,
-            "reads": 4,
+            "statements": 8,
+            "reads": 8,
             "writes": 0
           },
           "players_quest_progress": {
@@ -1453,14 +1500,14 @@
       },
       "behaviorSha256": "ece93a5759d57939832dd018021034f586638e6c14584eb71c241c6f4ff00a9e",
       "sql": {
-        "statements": 89,
-        "selectStatements": 47,
-        "writeStatements": 36,
-        "transactionStatements": 6,
+        "statements": 103,
+        "selectStatements": 57,
+        "writeStatements": 38,
+        "transactionStatements": 8,
         "byTable": {
           "players": {
-            "statements": 12,
-            "reads": 6,
+            "statements": 14,
+            "reads": 8,
             "writes": 6
           },
           "players_active_mission_counters": {
@@ -1484,14 +1531,14 @@
             "writes": 1
           },
           "players_category_mission_stages": {
-            "statements": 3,
-            "reads": 2,
+            "statements": 4,
+            "reads": 3,
             "writes": 1
           },
           "players_category_missions": {
-            "statements": 8,
-            "reads": 2,
-            "writes": 6
+            "statements": 10,
+            "reads": 3,
+            "writes": 7
           },
           "players_character_quest_clears": {
             "statements": 3,
@@ -1539,8 +1586,8 @@
             "writes": 2
           },
           "players_mission_battle_counters": {
-            "statements": 2,
-            "reads": 1,
+            "statements": 3,
+            "reads": 2,
             "writes": 1
           },
           "players_party_race_clears": {
@@ -1549,13 +1596,13 @@
             "writes": 1
           },
           "players_pass_cards": {
-            "statements": 4,
-            "reads": 1,
-            "writes": 3
+            "statements": 6,
+            "reads": 2,
+            "writes": 4
           },
           "players_periodic_snapshots": {
-            "statements": 4,
-            "reads": 4,
+            "statements": 8,
+            "reads": 8,
             "writes": 0
           },
           "players_quest_progress": {
@@ -1592,7 +1639,7 @@
           ],
           "databaseActive": null,
           "items": {
-            "910001": 2,
+            "910001": 8,
             "910002": 3
           },
           "memoryActive": null,
@@ -1811,6 +1858,21 @@
               "category": 5,
               "id": 37020,
               "progress": 5
+            },
+            {
+              "category": 5,
+              "id": 53000,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 53010,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 53020,
+              "progress": 1
             },
             {
               "category": 6,
@@ -2057,12 +2119,27 @@
                 "group_id": 40000,
                 "index": 1,
                 "number": 2
+              },
+              {
+                "group_id": 40000,
+                "index": 1,
+                "number": 2
+              },
+              {
+                "group_id": 40000,
+                "index": 1,
+                "number": 2
+              },
+              {
+                "group_id": 40000,
+                "index": 1,
+                "number": 2
               }
             ],
             "equipment_list": [],
             "is_multi": "single",
             "item_list": {
-              "910001": 2,
+              "910001": 8,
               "910002": 3
             },
             "joined_character_id_list": [],
@@ -2153,16 +2230,16 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "2a80131b6469aa46f269ff00f1ad9248cefc4e9de2402062739bf72572c31302",
+      "behaviorSha256": "3a0abc02ac26bfde3340ab9f5afb2078d5ac6e1d321f89932e4bb0f6983153f7",
       "sql": {
-        "statements": 93,
-        "selectStatements": 57,
-        "writeStatements": 28,
-        "transactionStatements": 8,
+        "statements": 107,
+        "selectStatements": 67,
+        "writeStatements": 30,
+        "transactionStatements": 10,
         "byTable": {
           "players": {
-            "statements": 12,
-            "reads": 7,
+            "statements": 14,
+            "reads": 9,
             "writes": 5
           },
           "players_active_mission_battle_facts": {
@@ -2191,14 +2268,14 @@
             "writes": 1
           },
           "players_category_mission_stages": {
-            "statements": 4,
-            "reads": 3,
+            "statements": 5,
+            "reads": 4,
             "writes": 1
           },
           "players_category_missions": {
-            "statements": 7,
-            "reads": 4,
-            "writes": 3
+            "statements": 9,
+            "reads": 5,
+            "writes": 4
           },
           "players_character_awake_unlocks": {
             "statements": 1,
@@ -2256,8 +2333,8 @@
             "writes": 0
           },
           "players_mission_battle_counters": {
-            "statements": 2,
-            "reads": 1,
+            "statements": 3,
+            "reads": 2,
             "writes": 1
           },
           "players_party_race_clears": {
@@ -2266,13 +2343,13 @@
             "writes": 1
           },
           "players_pass_cards": {
-            "statements": 4,
-            "reads": 1,
-            "writes": 3
+            "statements": 6,
+            "reads": 2,
+            "writes": 4
           },
           "players_periodic_snapshots": {
-            "statements": 4,
-            "reads": 4,
+            "statements": 8,
+            "reads": 8,
             "writes": 0
           },
           "players_quest_progress": {
@@ -2330,7 +2407,7 @@
             "useBossBoostPoint": false
           },
           "items": {
-            "910001": 2,
+            "910001": 8,
             "910002": 3
           },
           "memoryActive": {
@@ -2607,6 +2684,21 @@
             },
             {
               "category": 5,
+              "id": 53000,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 53010,
+              "progress": 1
+            },
+            {
+              "category": 5,
+              "id": 53020,
+              "progress": 1
+            },
+            {
+              "category": 5,
               "id": 341005,
               "progress": 1
             },
@@ -2820,7 +2912,7 @@
               }
             ],
             "items": {
-              "910001": 2,
+              "910001": 8,
               "910002": 3
             },
             "missionProgress": [
@@ -3078,6 +3170,21 @@
                 "category": 5,
                 "id": 37020,
                 "progress": 5
+              },
+              {
+                "category": 5,
+                "id": 53000,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 53010,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 53020,
+                "progress": 1
               },
               {
                 "category": 5,
@@ -3425,6 +3532,21 @@
                 "group_id": 40000,
                 "index": 1,
                 "number": 2
+              },
+              {
+                "group_id": 40000,
+                "index": 1,
+                "number": 2
+              },
+              {
+                "group_id": 40000,
+                "index": 1,
+                "number": 2
+              },
+              {
+                "group_id": 40000,
+                "index": 1,
+                "number": 2
               }
             ]
           }
@@ -3450,7 +3572,7 @@
               }
             ],
             "items": {
-              "910001": 4,
+              "910001": 16,
               "910002": 6
             },
             "missionProgress": [
@@ -3527,7 +3649,7 @@
               {
                 "category": 1,
                 "id": 40,
-                "progress": 62
+                "progress": 1562
               },
               {
                 "category": 1,
@@ -3713,6 +3835,21 @@
                 "category": 5,
                 "id": 37020,
                 "progress": 10
+              },
+              {
+                "category": 5,
+                "id": 53000,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 53010,
+                "progress": 1
+              },
+              {
+                "category": 5,
+                "id": 53020,
+                "progress": 1
               },
               {
                 "category": 5,
@@ -3995,6 +4132,21 @@
                 "group_id": 40000,
                 "index": 1,
                 "number": 2
+              },
+              {
+                "group_id": 40000,
+                "index": 1,
+                "number": 2
+              },
+              {
+                "group_id": 40000,
+                "index": 1,
+                "number": 2
+              },
+              {
+                "group_id": 40000,
+                "index": 1,
+                "number": 2
               }
             ]
           },
@@ -4062,12 +4214,27 @@
                   "group_id": 40000,
                   "index": 1,
                   "number": 2
+                },
+                {
+                  "group_id": 40000,
+                  "index": 1,
+                  "number": 2
+                },
+                {
+                  "group_id": 40000,
+                  "index": 1,
+                  "number": 2
+                },
+                {
+                  "group_id": 40000,
+                  "index": 1,
+                  "number": 2
                 }
               ],
               "equipment_list": [],
               "is_multi": "single",
               "item_list": {
-                "910001": 4,
+                "910001": 16,
                 "910002": 6
               },
               "joined_character_id_list": [],
@@ -4134,16 +4301,16 @@
           }
         }
       },
-      "behaviorSha256": "d3e51fa563ee2c840f9812d2d67ee9bfef2fa954912fe23bc1c49a6f8a82c350",
+      "behaviorSha256": "ecf4b90004f9f97572364c403ef24817a30dc70a90093633435ec70d197aac3e",
       "sql": {
-        "statements": 88,
-        "selectStatements": 57,
-        "writeStatements": 25,
-        "transactionStatements": 6,
+        "statements": 102,
+        "selectStatements": 67,
+        "writeStatements": 27,
+        "transactionStatements": 8,
         "byTable": {
           "players": {
-            "statements": 11,
-            "reads": 7,
+            "statements": 13,
+            "reads": 9,
             "writes": 4
           },
           "players_active_mission_counters": {
@@ -4167,14 +4334,14 @@
             "writes": 1
           },
           "players_category_mission_stages": {
-            "statements": 4,
-            "reads": 3,
+            "statements": 5,
+            "reads": 4,
             "writes": 1
           },
           "players_category_missions": {
-            "statements": 8,
-            "reads": 3,
-            "writes": 5
+            "statements": 10,
+            "reads": 4,
+            "writes": 6
           },
           "players_character_awake_unlocks": {
             "statements": 2,
@@ -4227,8 +4394,8 @@
             "writes": 0
           },
           "players_mission_battle_counters": {
-            "statements": 2,
-            "reads": 1,
+            "statements": 3,
+            "reads": 2,
             "writes": 1
           },
           "players_party_race_clears": {
@@ -4237,13 +4404,13 @@
             "writes": 1
           },
           "players_pass_cards": {
-            "statements": 3,
-            "reads": 1,
-            "writes": 2
+            "statements": 5,
+            "reads": 2,
+            "writes": 3
           },
           "players_periodic_snapshots": {
-            "statements": 4,
-            "reads": 4,
+            "statements": 8,
+            "reads": 8,
             "writes": 0
           },
           "players_quest_progress": {
@@ -4441,7 +4608,9 @@
         "response": {
           "data": {
             "category_id": 1,
+            "character_list": [],
             "degree_list": [],
+            "equipment_list": [],
             "is_multi": "single",
             "item_list": {},
             "mail_arrived": false,
@@ -4465,7 +4634,7 @@
           "statusCode": 200
         }
       },
-      "behaviorSha256": "780876a269295578a244231867470034253544eda341a2e25f90060a5d4b1438",
+      "behaviorSha256": "10188d2d75a9fc197cfc7ec7debe7951308d3f6ef091f00c5e5db2bd78011677",
       "sql": {
         "statements": 25,
         "selectStatements": 18,
