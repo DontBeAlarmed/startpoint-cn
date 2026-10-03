@@ -366,9 +366,19 @@
   font-size: 11px;
 }
 
-/* 当前标识: 与同排按钮同族形态(antd 禁用钮), 仅文字用绿色作状态提示 */
+/* 当前标识: 与同排按钮同族同尺寸, 绿描边+浅绿底作状态提示(维护者指定: 不用置灰) */
 .save-current-btn {
   color: var(--wind);
+  border-color: var(--wind);
+  background: var(--ok-bg);
+  cursor: default;
+}
+
+.save-current-btn:hover,
+.save-current-btn:focus-visible {
+  color: var(--wind);
+  border-color: var(--wind);
+  background: var(--ok-bg);
 }
 
 /* accounts page (approved mockup accounts-v2): panel-head star tick — the 账号管理 card

@@ -145,7 +145,7 @@ export function AccountsMobileView({
             <div className="admin-mobile-actions admin-account-actions" onClick={event => event.stopPropagation()}>
                 {/* 当前/切换合体标识在编辑按钮前(维护者指定); 当前=按钮同高的绿徽章 */}
                 {player.isDefault
-                    ? <Button disabled className="save-current-btn">当前</Button>
+                    ? <Button className="save-current-btn" onClick={event => event.stopPropagation()}>当前</Button>
                     : (
                         <Button
                             aria-label="切换存档"

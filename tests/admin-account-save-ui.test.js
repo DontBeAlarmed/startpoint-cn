@@ -63,8 +63,8 @@ assert.match(accounts, /save-id admin-mono">#存档 \{player\.id\}<\/span>/)
 assert.match(mobileView, /save-id admin-mono">#存档 \{player\.id\}<\/span>/)
 // 合体标识: 当前=绿色徽章常驻(2 字与「切换」等长)/切换=默认钮, 仅存档子卡出现;
 // 卡片操作钮恢复默认配色(维护者指定: 统一的是尺寸内边距而非颜色), 全页仅卡头新建存档为 primary
-assert.match(accounts, /<Button disabled className="save-current-btn">当前<\/Button>/, "当前=禁用态同族按钮")
-assert.match(mobileView, /<Button disabled className="save-current-btn">当前<\/Button>/, "移动当前=禁用态同族按钮")
+assert.match(accounts, /<Button className="save-current-btn" onClick=\{event => event\.stopPropagation\(\)\}>当前<\/Button>/, "当前=绿描边独立样式按钮")
+assert.match(mobileView, /<Button className="save-current-btn" onClick=\{event => event\.stopPropagation\(\)\}>当前<\/Button>/, "移动当前=绿描边独立样式按钮")
 // 当前/切换在编辑按钮前(维护者指定): 移动端操作行顺序 当前|切换 → 编辑 → …
 {
     const curIdx = mobileView.indexOf("save-current-btn")

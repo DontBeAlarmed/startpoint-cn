@@ -182,7 +182,7 @@ export default function Accounts() {
                 </span>
                 {/* 当前存档标识与切换合体: 绿色「当前」常驻标识 / 非当前「切换」按钮 (activateSave 同置账号当前存档与全局活动) */}
                 {player.isDefault
-                    ? <Button disabled className="save-current-btn">当前</Button>
+                    ? <Button className="save-current-btn" onClick={event => event.stopPropagation()}>当前</Button>
                     : <Button onClick={() => activateSave.mutate(player.id)}>切换</Button>}
                 <Button onClick={() => navigate(`/players/${player.id}`)}>编辑</Button>
                 <Dropdown menu={saveMoreMenu(account, player)} trigger={["click"]} placement="bottomRight">
