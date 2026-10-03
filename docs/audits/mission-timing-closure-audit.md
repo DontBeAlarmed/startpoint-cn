@@ -69,7 +69,7 @@
 
 1. **[P2·后续补面] mission 66 锻块**:溶解三入口接窄域结算(与 item-sell 同形状,下一迭代首选)。
 2. **[P2·测试缺口] box gacha / crazy select / equipment bulk_upgrade 的 e2e 结算用例**:三链的当场发布目前靠夹具级/投影级测试覆盖,无端到端 RED 用例。
-3. **[P3·时钟口径]** 窄域结算面并存 `getServerDate()`(learn/mana/equipment 路由)与 `getRealNow()`(gacha/item-sell/over-limit);当前窄域清单全部为无窗口常驻任务,无可观察差异。若未来接入窗口期任务,须先统一时钟(建议 getServerDate),否则窄域面与 finish 兜底会对同一任务使用不同「今天」。
+3. **[已解决·时钟口径]** 窄域结算面统一为服务器虚拟时间(getServerDate,与 finish 兜底同钟);主日切已迁真实业务日(与登录奖励/每日挑战的双轨一致)——见 identity-time-and-load.md 双时钟表与 `tools/real_day_rollover.test.cjs`。
 4. **[P3] 空结算响应形状路线不一致**:equipment 用 `mergeMissionSettlementResponse`(抑制空列表)、其余用 `composeMissionSettlementResponse`(恒带空 mission_info/degree_list)。客户端形状兼容性待实测确认。
 5. **[P3·沿用 9 月审计]** pass 85/16/23 eventId 匹配、kind 7 fail-closed、信赖证 status>=2 语义取证、all-complete row[19] 守卫、PERF-07、Attention/救援生产者——维持 9 月审计的 DEFERRED 决定。
 6. **[P3·文档漂移]** cat5 冻结时启用 1079(非 1078);`mission-semantic-audit.md` §一的第 41 行口径可在下次修订时更新。
@@ -77,4 +77,4 @@
 
 ## 五、结论
 
-cat1 的 113 条有事实源任务中 112 条、cat5 的 1288 条中 ~1279 条已在其事实产生时点当场结算(其余为已文档化的低频兜底);「玩家显式动作 → 奖励推迟到进关/任务页」的症状类缺口已全部收口,唯余 mission 66(锻块)一处与三个端到端测试缺口。9 月审计的全部关闭项零回归,无任何任务因本系列变为不可完成。任务系统向「完全完善」推进的下一步依次为:66 号补面 → 三条 e2e 用例 → 时钟口径统一。
+cat1 的 113 条有事实源任务中 112 条、cat5 的 1288 条中 ~1279 条已在其事实产生时点当场结算(其余为已文档化的低频兜底);「玩家显式动作 → 奖励推迟到进关/任务页」的症状类缺口已全部收口,唯余 mission 66(锻块)一处与三个端到端测试缺口。9 月审计的全部关闭项零回归,无任何任务因本系列变为不可完成。任务系统向「完全完善」推进的下一步依次为:66 号补面 → 三条 e2e 用例。时钟口径已完成统一(结算窗口=虚拟时间,日常周期刷新=真实业务日)。
