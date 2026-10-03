@@ -10,7 +10,6 @@ import {
     Typography,
     message,
 } from "antd"
-import { ReloadOutlined } from "@ant-design/icons"
 import { Eye, Pencil, Plus } from "lucide-react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
@@ -126,26 +125,19 @@ export default function Gifts() {
             eyebrow="GIFTS"
             title="礼包"
             description="维护公共兑换 code 和奖励定义；领取记录只用于运营查看。"
+            onRefresh={refresh}
+            refreshing={gifts.isFetching}
             actions={(
-                <>
-                    <Button
-                        icon={<ReloadOutlined />}
-                        loading={gifts.isFetching}
-                        onClick={refresh}
-                    >
-                        刷新
-                    </Button>
-                    <Button
-                        type="primary"
-                        icon={<Plus size={16} />}
-                        onClick={() => {
-                            setEditorGift(null)
-                            setEditorOpen(true)
-                        }}
-                    >
-                        新建礼包
-                    </Button>
-                </>
+                <Button
+                    type="primary"
+                    icon={<Plus size={16} />}
+                    onClick={() => {
+                        setEditorGift(null)
+                        setEditorOpen(true)
+                    }}
+                >
+                    新建礼包
+                </Button>
             )}
         >
             <Space direction="vertical" size="large" className="admin-stack">

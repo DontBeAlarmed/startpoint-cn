@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { Card, Button, Space, Popconfirm, Input, Dropdown, Modal, message, Grid, Typography } from "antd"
-import { PlusOutlined, EditOutlined, ReloadOutlined } from "@ant-design/icons"
+import { PlusOutlined, EditOutlined } from "@ant-design/icons"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
 import { apiGet, apiPost, apiDownloadFile } from "../api/client"
@@ -267,11 +267,8 @@ export default function Accounts() {
             eyebrow="SAVES"
             title="账号 / 存档"
             description="查看账号与当前存档关系。账号当前存档决定该账号登录时选用哪个存档；当前活动存档只是管理端最近切换的全局状态。"
-            actions={
-                <Button icon={<ReloadOutlined />} loading={isFetching} onClick={refresh}>
-                    刷新
-                </Button>
-            }
+            onRefresh={refresh}
+            refreshing={isFetching}
         >
         <Space direction="vertical" size="large" className="admin-stack">
             <div className="admin-page-note">

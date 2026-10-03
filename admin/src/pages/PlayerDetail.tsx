@@ -1,7 +1,7 @@
 import { useState } from "react"
 import type { ReactNode } from "react"
 import { Card, Table, Button, Space, InputNumber, Popconfirm, message, Tag, Tabs, Spin, Typography, Switch, Input, Upload } from "antd"
-import { SaveOutlined, PlusOutlined, DownloadOutlined, UploadOutlined, UndoOutlined, SearchOutlined, EditOutlined, ReloadOutlined } from "@ant-design/icons"
+import { SaveOutlined, PlusOutlined, DownloadOutlined, UploadOutlined, UndoOutlined, SearchOutlined, EditOutlined } from "@ant-design/icons"
 import { useParams, useNavigate } from "react-router-dom"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiGet, apiPost, apiPatch, apiDelete, apiUpload, apiDownloadFile, isAndroidWebView } from "../api/client"
@@ -478,11 +478,10 @@ export default function PlayerDetail() {
             eyebrow="PLAYER"
             title="玩家详情 · 存档编辑"
             description="角色获取入口仅保留邮件发送，避免绕过客户端领取校验。"
+            onRefresh={refreshPage}
+            refreshing={isFetching}
             actions={
-                <Space wrap size="small">
-                    <Button icon={<ReloadOutlined />} loading={isFetching} onClick={refreshPage}>刷新</Button>
-                    <Button onClick={() => navigate("/accounts")}>返回账号 / 存档</Button>
-                </Space>
+                <Button onClick={() => navigate("/accounts")}>返回账号 / 存档</Button>
             }
         >
         <Space direction="vertical" size="large" className="admin-stack">

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { Alert, Button, Card, InputNumber, Popconfirm, Skeleton, Space, Switch, Typography, Upload, message } from "antd"
-import { ReloadOutlined, SaveOutlined, UploadOutlined } from "@ant-design/icons"
+import { SaveOutlined, UploadOutlined } from "@ant-design/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { apiDelete, apiGet, apiPatch, apiUpload } from "../api/client"
@@ -155,11 +155,8 @@ export default function GameplaySettings() {
             eyebrow="SETTINGS"
             title="游戏设置"
             description="调整服务端运行时游戏规则，保存后无需重启。"
-            actions={
-                <Button icon={<ReloadOutlined />} loading={settings.isFetching} onClick={refreshSettings}>
-                    刷新
-                </Button>
-            }
+            onRefresh={refreshSettings}
+            refreshing={settings.isFetching}
         >
             <div className="admin-page-note">
                 <Typography.Text strong>保存方式说明</Typography.Text>

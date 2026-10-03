@@ -138,6 +138,32 @@
   padding-block: 2px 4px;
 }
 
+/* 页头两端布局（维护者指定）: 左=eyebrow+标题(+其余操作), 右上角=刷新 icon */
+.admin-page-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 10px;
+  min-width: 0;
+}
+
+.admin-page-heading {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.admin-page-refresh {
+  flex: none;
+  color: var(--ink-soft);
+  font-size: 16px;
+}
+
+.admin-page-refresh:hover,
+.admin-page-refresh:focus-visible {
+  color: var(--ink);
+}
+
 .admin-page-eyebrow {
   display: inline-flex;
   width: fit-content;

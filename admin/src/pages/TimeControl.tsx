@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react"
 import { Alert, Button, Card, Empty, Input, Segmented, Space, Table, Tag, Typography, message } from "antd"
-import { ReloadOutlined, UndoOutlined } from "@ant-design/icons"
+import { UndoOutlined } from "@ant-design/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import dayjs, { type Dayjs } from "dayjs"
 import { apiGet } from "../api/client"
@@ -827,19 +827,12 @@ export default function TimeControl() {
             eyebrow="TIME"
             title="时间 / 千里眼"
             description="管理服务端全局模拟时间，并按固定 CDN 基线查看短期 UP 角色池与活动日程时间线。"
-            actions={
-                <Button
-                    icon={<ReloadOutlined />}
-                    loading={isFetching || gachaTimelineLoading || activityTimelineLoading}
-                    onClick={() => {
-                        qc.invalidateQueries({ queryKey: ["serverTime"] })
-                        qc.invalidateQueries({ queryKey: ["clairvoyanceGacha"] })
-                        qc.invalidateQueries({ queryKey: ["clairvoyanceActivity"] })
-                    }}
-                >
-                    刷新
-                </Button>
-            }
+            onRefresh={() => {
+                qc.invalidateQueries({ queryKey: ["serverTime"] })
+                qc.invalidateQueries({ queryKey: ["clairvoyanceGacha"] })
+                qc.invalidateQueries({ queryKey: ["clairvoyanceActivity"] })
+            }}
+            refreshing={isFetching || gachaTimelineLoading || activityTimelineLoading}
         >
             <Space direction="vertical" size="large" className="admin-stack">
                 {isError ? (

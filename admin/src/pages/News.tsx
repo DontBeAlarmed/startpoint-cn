@@ -11,7 +11,6 @@ import {
     Typography,
     message,
 } from "antd"
-import { ReloadOutlined } from "@ant-design/icons"
 import { Pencil, Plus } from "lucide-react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
@@ -109,19 +108,12 @@ export default function News() {
             eyebrow="NEWS"
             title="公告"
             description="维护客户端的主题公告、活动通知和问题公告；系统类别暂缓。"
+            onRefresh={refresh}
+            refreshing={news.isFetching}
             actions={(
-                <>
-                    <Button
-                        icon={<ReloadOutlined />}
-                        loading={news.isFetching}
-                        onClick={refresh}
-                    >
-                        刷新
-                    </Button>
-                    <Button type="primary" icon={<Plus size={16} />} onClick={openCreate}>
-                        新建公告
-                    </Button>
-                </>
+                <Button type="primary" icon={<Plus size={16} />} onClick={openCreate}>
+                    新建公告
+                </Button>
             )}
         >
             <Space direction="vertical" size="large" className="admin-stack">

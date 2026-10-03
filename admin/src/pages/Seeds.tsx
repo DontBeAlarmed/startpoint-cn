@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react"
 import { Alert, Button, Card, Empty, Grid, Modal, Space, Spin, Table, Tag, Typography } from "antd"
-import { ReloadOutlined } from "@ant-design/icons"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { apiGet } from "../api/client"
@@ -88,18 +87,15 @@ export default function Seeds() {
             eyebrow="SEEDS"
             title="动画种子"
             description="Faithful Catalog 运行状态"
+            onRefresh={refresh}
+            refreshing={isFetching}
             actions={
-                <Space wrap size="small">
-                    {dataUpdatedAt > 0 && (
-                        <span className="admin-seed-refresh">
-                            最后刷新 {formatClock(dataUpdatedAt)}
-                            <span className="admin-badge-ok">30s 自动</span>
-                        </span>
-                    )}
-                    <Button icon={<ReloadOutlined />} loading={isFetching} onClick={refresh}>
-                        刷新
-                    </Button>
-                </Space>
+                dataUpdatedAt > 0 && (
+                    <span className="admin-seed-refresh">
+                        最后刷新 {formatClock(dataUpdatedAt)}
+                        <span className="admin-badge-ok">30s 自动</span>
+                    </span>
+                )
             }
         >
             <Space direction="vertical" size="large" className="admin-stack">

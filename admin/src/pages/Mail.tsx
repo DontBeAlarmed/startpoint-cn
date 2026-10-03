@@ -1,6 +1,5 @@
 import { ReactNode, useMemo, useState } from "react"
 import { Card, Form, Select, InputNumber, Input, Button, message, Alert, Typography, Radio, Modal, Descriptions, Table, Space } from "antd"
-import { ReloadOutlined } from "@ant-design/icons"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiGet, apiPost } from "../api/client"
 import { AdminPage } from "../components/AdminPage"
@@ -245,15 +244,8 @@ export default function Mail() {
             eyebrow="MAIL"
             title="邮件"
             description="按全体、账号或单个存档发送附件邮件。高风险发送动作会先展示目标和附件摘要。"
-            actions={
-                <Button
-                    icon={<ReloadOutlined />}
-                    loading={accountsFetching || playersFetching || historyFetching}
-                    onClick={refresh}
-                >
-                    刷新
-                </Button>
-            }
+            onRefresh={refresh}
+            refreshing={accountsFetching || playersFetching || historyFetching}
         >
         <Space direction="vertical" size="large" className="admin-stack">
             <div className="admin-page-note">

@@ -1,6 +1,5 @@
 import type { ReactNode } from "react"
-import { Alert, Button, Card, Col, Row, Space, Tag, Typography } from "antd"
-import { ReloadOutlined } from "@ant-design/icons"
+import { Alert, Card, Col, Row, Space, Tag, Typography } from "antd"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiGet } from "../api/client"
 import { AdminPage } from "../components/AdminPage"
@@ -223,15 +222,8 @@ export default function Dashboard() {
             eyebrow="OPERATIONS"
             title="服务器总览"
             description="查看服务端运行状态、当前内容快照和账号存档概况。"
-            actions={
-                <Button
-                    icon={<ReloadOutlined />}
-                    loading={accountsFetching || statusFetching}
-                    onClick={refreshOverview}
-                >
-                    刷新总览
-                </Button>
-            }
+            onRefresh={refreshOverview}
+            refreshing={accountsFetching || statusFetching}
         >
             <Space direction="vertical" size="large" className="admin-stack">
                 <div className="admin-hero">
