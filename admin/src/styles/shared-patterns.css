@@ -285,3 +285,12 @@ html[data-theme="dark"] {
   border-color: var(--fire);
   background: var(--fire-bg);
 }
+
+/* 卡片列表空态(礼包/公告/定时资源共用) */
+.admin-card-empty {
+  display: block;
+  padding: 24px 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  text-align: center;
+}

@@ -107,6 +107,13 @@ export default function Gifts() {
         },
     })
 
+    // 启停进行中的礼包 id: 卡片状态钮按行显示 loading, 防连点触发误报 409
+    const togglingGiftId = start.isPending
+        ? start.variables?.id ?? null
+        : stop.isPending
+            ? stop.variables?.id ?? null
+            : null
+
     const refresh = () => {
         queryClient.invalidateQueries({ queryKey: ["adminGifts"] })
         queryClient.invalidateQueries({ queryKey: ["adminGiftRedemptions"] })
@@ -168,12 +175,13 @@ export default function Gifts() {
                             setEditorOpen(true)
                         }}
                         onDelete={row => remove.mutateAsync(row)}
+                        togglingGiftId={togglingGiftId}
                     />
                 </Card>
                 <div className="admin-page-note admin-page-note-footer">
                     <Typography.Text strong>礼包维护须知</Typography.Text>
                     <Typography.Text type="secondary">
-                        删除礼包不可恢复，会清除全部领取记录，同 code 重建后可重新领取；启动中的礼包不提供编辑入口，需先停止再修改。
+                        删除礼包不可恢复，会清除全部领取记录，同 code 重建后可重新领取；生效中的礼包编辑/删除会置灰并提示需先停用。
                     </Typography.Text>
                 </div>
             </Space>

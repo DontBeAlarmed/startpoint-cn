@@ -312,10 +312,4 @@
   }
 }
 
-.news-card-empty {
-  display: block;
-  padding: 24px 0;
-  color: var(--ink-soft);
-  font-size: 13px;
-  text-align: center;
-}
+

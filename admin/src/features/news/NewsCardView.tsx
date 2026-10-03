@@ -21,7 +21,7 @@ interface NewsCardViewProps {
 }
 
 // 公告卡片视图（2026-10-04 卡片化改造, 双视口统一, 结构照礼包/账号页 acc-card 模式）：
-// 标题行 = 缩略图 + 两行标题块(第一行分类徽章+标题, 第二行发布时间[+标签]) + 启停按钮
+// 标题行 = 两行标题块(第一行分类徽章+标题, 第二行发布时间[+标签]) + 启停按钮; 配图为右半渐隐背景层
 // (恒位重标记, 启用标识收敛到按钮文字 — 维护者指定, 不再有徽章/Switch 两套表达)。
 // 底行 = 编辑 + 垃圾桶删除。数据/变更全部经 props 下传——queryKey、API、确认文案与
 // 原表格/移动卡零差异。
@@ -43,7 +43,7 @@ export function NewsCardView({
         <Spin spinning={loading}>
             <div className="admin-acc-list">
                 {rows.length === 0 && !loading && (
-                    <span className="news-card-empty">暂无公告</span>
+                    <span className="admin-card-empty">暂无公告</span>
                 )}
                 {rows.map(row => (
                     <div key={row.id} className="acc-card news-card">

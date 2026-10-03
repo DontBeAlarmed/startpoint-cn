@@ -52,7 +52,7 @@ assert.match(cardView, /className=\{rule\.enabled \? "admin-state-active" : "adm
 assert.match(cardView, /\{rule\.enabled \? "生效中" : "已停用"\}/, "状态钮显示当前状态(恒位重标记)")
 assert.match(cardView, /aria-label=\{rule\.enabled \? "点击停用规则" : "点击启用规则"\}/, "状态钮应有无障碍名(描述点击动作)")
 assert.doesNotMatch(cardView, /CircleStop|Play/, "状态钮不应有任何图标")
-assert.match(cardView, /loading=\{toggling\}/, "透传同一 pending 态")
+assert.match(cardView, /loading=\{togglingId === rule\.id\}/, "逐行 pending 态(同公告页 togglingId 模式)")
 
 // ── 操作行: 编辑 + 垃圾桶 icon-only 删除 ───────────────────────────────────
 assert.match(cardView, /icon=\{<Pencil size=\{15\} \/>\} aria-label="编辑规则"/, "编辑按钮保留")

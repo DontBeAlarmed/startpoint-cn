@@ -8,7 +8,7 @@ import type { ScheduledResourceRule } from "./ScheduledResourceRules"
 interface ScheduledResourceCardViewProps {
     rules: readonly ScheduledResourceRule[]
     loading: boolean
-    toggling: boolean
+    togglingId: number | null
     onToggle: (rule: ScheduledResourceRule) => void
     onEdit: (rule: ScheduledResourceRule) => void
     onDelete: (ruleId: number) => void
@@ -21,20 +21,22 @@ interface ScheduledResourceCardViewProps {
 export function ScheduledResourceCardView({
     rules,
     loading,
-    toggling,
+    togglingId,
     onToggle,
     onEdit,
     onDelete,
 }: ScheduledResourceCardViewProps) {
-    // 规则量少, 沿用原 List 的本地分页(每页 10, 单页隐藏)
+    // 规则量少, 沿用原 List 的本地分页(每页 10, 单页隐藏); 删除末页规则后钳回有效页
     const [page, setPage] = useState(1)
     const pageSize = 10
-    const pageRules = rules.slice((page - 1) * pageSize, page * pageSize)
+    const maxPage = Math.max(1, Math.ceil(rules.length / pageSize))
+    const currentPage = Math.min(page, maxPage)
+    const pageRules = rules.slice((currentPage - 1) * pageSize, currentPage * pageSize)
     return (
         <Spin spinning={loading}>
             <div className="admin-acc-list">
                 {rules.length === 0 && !loading && (
-                    <span className="news-card-empty">暂无定时补充规则</span>
+                    <span className="admin-card-empty">暂无定时补充规则</span>
                 )}
                 {pageRules.map(rule => (
                     <div key={rule.id} className="acc-card sched-card">
@@ -50,7 +52,7 @@ export function ScheduledResourceCardView({
                             <Button
                                 className={rule.enabled ? "admin-state-active" : "admin-state-stopped"}
                                 aria-label={rule.enabled ? "点击停用规则" : "点击启用规则"}
-                                loading={toggling}
+                                loading={togglingId === rule.id}
                                 onClick={() => onToggle(rule)}
                             >
                                 {rule.enabled ? "生效中" : "已停用"}
@@ -84,7 +86,7 @@ export function ScheduledResourceCardView({
                     </div>
                 ))}
                 <Pagination
-                    current={page}
+                    current={currentPage}
                     pageSize={pageSize}
                     total={rules.length}
                     hideOnSinglePage

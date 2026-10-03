@@ -19,6 +19,7 @@ interface GiftsCardViewProps {
     onStop: (row: AdminGiftRow) => Promise<unknown>
     onEdit: (row: AdminGiftRow) => void
     onDelete: (row: AdminGiftRow) => Promise<unknown>
+    togglingGiftId: number | null
 }
 
 // 礼包卡片视图（2026-10-04 卡片化改造, 双视口同构, 结构照账号页 acc-card 已验证模式）：
@@ -40,6 +41,7 @@ export function GiftsCardView({
     onStop,
     onEdit,
     onDelete,
+    togglingGiftId,
 }: GiftsCardViewProps) {
     return (
         <Spin spinning={loading}>
@@ -75,6 +77,7 @@ export function GiftsCardView({
                                 <Button
                                     className={active ? "admin-state-active" : "admin-state-stopped"}
                                     aria-label={active ? "点击停止礼包" : "点击启动礼包"}
+                                    loading={togglingGiftId === row.id}
                                     onClick={() => (active ? void onStop(row) : void onStart(row))}
                                 >
                                     {active ? "生效中" : "已停用"}
@@ -110,6 +113,7 @@ export function GiftsCardView({
                                     (维护者 2026-10-04: 不再隐藏按钮) */}
                                 <Button
                                     className={active ? "gift-card-btn-locked" : undefined}
+                                    aria-disabled={active}
                                     icon={<Pencil size={15} />}
                                     aria-label="编辑礼包"
                                     onClick={() => (active ? message.info("需停用后编辑礼包") : onEdit(row))}
@@ -127,6 +131,7 @@ export function GiftsCardView({
                                     <Button
                                         danger
                                         className={active ? "gift-card-btn-locked" : undefined}
+                                        aria-disabled={active}
                                         icon={<Trash2 size={15} />}
                                         aria-label="删除礼包"
                                         onClick={() => { if (active) message.info("需停用后删除礼包") }}

@@ -67,7 +67,7 @@ assert.match(cardView, /disabled=\{active\}/, "生效中删除应禁用 Popconfi
     assert.match(block, /aria-label="删除礼包"/, "删除钮常驻")
 }
 assert.equal(cardView.split('aria-label="删除礼包"').length - 1, 1, "删除入口唯一")
-assert.match(cardView, /<Button\s+danger\s+className=\{active \? "gift-card-btn-locked" : undefined\}\s+icon=\{<Trash2 size=\{15\} \/>\}\s+aria-label="删除礼包"/, "删除按钮应为垃圾桶 icon-only(A2', 生效中带锁定类)")
+assert.match(cardView, /<Button\s+danger\s+className=\{active \? "gift-card-btn-locked" : undefined\}\s+aria-disabled=\{active\}\s+icon=\{<Trash2 size=\{15\} \/>\}\s+aria-label="删除礼包"/, "删除按钮应为垃圾桶 icon-only(A2', 生效中带锁定类)")
 assert.doesNotMatch(cardView, />删除<\/Button>/, "删除按钮不得带文字(A2')")
 assert.match(cardView, /title="删除这个礼包？"/, "删除确认标题与原桌面逐字一致")
 assert.match(cardView, /description="此操作不可恢复，将清除全部领取记录，同 code 重建后可重新领取。"/, "删除确认说明逐字一致")

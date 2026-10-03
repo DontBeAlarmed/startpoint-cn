@@ -198,7 +198,7 @@ export function ScheduledResourceRules({ players }: ScheduledResourceRulesProps)
                 <ScheduledResourceCardView
                     rules={rules.data ?? []}
                     loading={rules.isLoading}
-                    toggling={toggle.isPending}
+                    togglingId={toggle.isPending ? toggle.variables?.id ?? null : null}
                     onToggle={rule => toggle.mutate(rule)}
                     onEdit={openEdit}
                     onDelete={ruleId => remove.mutate(ruleId)}
