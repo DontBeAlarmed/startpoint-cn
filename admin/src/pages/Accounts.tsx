@@ -188,12 +188,12 @@ export default function Accounts() {
                 {player.isDefault && <span className="admin-badge-ok">当前存档</span>}
                 <span className="save-meta">Lv {player.rank} · {player.characterCount} 角色</span>
                 <span className="save-ops">
-                    <Button size="small" icon={<EditOutlined />} onClick={() => navigate(`/players/${player.id}`)}>
-                        编辑
-                    </Button>
                     {/* activateSave 服务端同时把该存档设为账号的当前存档与全局活动存档，故仅 isDefault 时禁用 */}
                     <Button size="small" disabled={player.isDefault} onClick={() => activateSave.mutate(player.id)}>
                         切换
+                    </Button>
+                    <Button size="small" icon={<EditOutlined />} onClick={() => navigate(`/players/${player.id}`)}>
+                        编辑
                     </Button>
                     <Button
                         size="small"
