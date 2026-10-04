@@ -75,8 +75,8 @@ html[data-theme="dark"] {
 /* dashboard hero: card 「游戏主界面」 banner at the top of the overview page —
    2px strong border + star/sky tinted gradient wash + 右上角星黄光晕 (approved review
    draft v3). Inside, one wrapping flex row: virtual clock left, status chip middle,
-   five relocated band metrics right; the 唯一内置管理后台 note sits below as
-   .admin-hero-note. Mobile-first: zones wrap as whole blocks (never clipped). */
+   five relocated band metrics right. Mobile-first: zones wrap as whole blocks
+   (never clipped). */
 .admin-hero {
   position: relative;
   overflow: hidden;
@@ -107,10 +107,6 @@ html[data-theme="dark"] {
   align-items: center;
   gap: 16px 34px;
   min-width: 0;
-}
-
-.admin-hero-note {
-  margin-top: 16px;
 }
 
 .admin-hero-clock {

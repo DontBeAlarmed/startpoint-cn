@@ -277,10 +277,6 @@ export default function Dashboard() {
                             </div>
                         )}
                     </div>
-                    <div className="admin-page-note admin-hero-note">
-                        <Typography.Text strong>唯一内置管理后台</Typography.Text>
-                        <Typography.Text type="secondary">此管理后台随服务端一同构建，用于统一查看运行状态并执行日常管理操作。</Typography.Text>
-                    </div>
                 </div>
 
                 {accountsError && (
