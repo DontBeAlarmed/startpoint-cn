@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { Card, Button, Space, Dropdown, Modal, message, Grid, Typography } from "antd"
+import { useMemo, useState } from "react"
+import { Card, Button, Input, Pagination, Space, Dropdown, Modal, message, Grid, Typography } from "antd"
 import { PlusOutlined } from "@ant-design/icons"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { useNavigate } from "react-router-dom"
@@ -16,15 +16,42 @@ export default function Accounts() {
     const navigate = useNavigate()
     const screens = useBreakpoint()
     const isMobile = !screens.md
+
     const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null)
     const [noteEditId, setNoteEditId] = useState<number | null>(null)
     const [noteDraft, setNoteDraft] = useState("")
     const [noteOriginal, setNoteOriginal] = useState("")
+    // 账号卡搜索与分页(维护者 2026-10-05): 搜索匹配账号 ID/备注/存档名/设备号, 分页每页 10
+    const [accountSearch, setAccountSearch] = useState("")
+    const [accountPage, setAccountPage] = useState(1)
+    const accountPageSize = 10
 
     const { data: accounts = [], isLoading, isFetching } = useQuery({
         queryKey: ["accounts"],
         queryFn: () => apiGet<AccountRow[]>("/api/server/accounts"),
     })
+
+    // 搜索过滤: 匹配账号 ID/备注/存档名/设备号(不区分大小写包含匹配)
+    const filteredAccounts = useMemo(() => {
+        const q = accountSearch.trim().toLowerCase()
+        if (!q) return accounts
+        return accounts.filter(a => {
+            const hay = [
+                String(a.id),
+                a.adminNote ?? "",
+                ...a.players.map(pl => `${pl.name} ${pl.id}`),
+                ...a.devices.map(dv => String(dv.deviceId)),
+            ].join(" ").toLowerCase()
+            return hay.includes(q)
+        })
+    }, [accounts, accountSearch])
+
+    const maxAccountPage = Math.max(1, Math.ceil(filteredAccounts.length / accountPageSize))
+    const currentAccountPage = Math.min(accountPage, maxAccountPage)
+    const pagedAccounts = filteredAccounts.slice(
+        (currentAccountPage - 1) * accountPageSize,
+        currentAccountPage * accountPageSize,
+    )
 
     const refresh = () => {
         qc.invalidateQueries({ queryKey: ["accounts"] })
@@ -273,9 +300,21 @@ export default function Accounts() {
         >
         <Space direction="vertical" size="large" className="admin-stack">
             {isMobile ? (
-                <Card title="账号管理" className="admin-mobile-list-card">
+                <Card
+                    title="账号管理"
+                    className="admin-mobile-list-card"
+                    extra={(
+                        <Input
+                            allowClear
+                            placeholder="搜索账号/存档/备注/设备"
+                            value={accountSearch}
+                            onChange={event => { setAccountSearch(event.target.value); setAccountPage(1) }}
+                            style={{ width: 220 }}
+                        />
+                    )}
+                >
                     <AccountsMobileView
-                        accounts={accounts}
+                        accounts={pagedAccounts}
                         selectedAccount={accounts.find(a => a.id === selectedAccountId)}
                         loading={isLoading}
                         onSelectAccount={toggleSavePanel}
@@ -289,10 +328,29 @@ export default function Accounts() {
                     />
                 </Card>
             ) : (
-                <Card title="账号管理" className="admin-table-card admin-accounts-card">
+                <Card
+                    title="账号管理"
+                    className="admin-table-card admin-accounts-card"
+                    extra={(
+                        <Input
+                            allowClear
+                            placeholder="搜索账号/存档/备注/设备"
+                            value={accountSearch}
+                            onChange={event => { setAccountSearch(event.target.value); setAccountPage(1) }}
+                            style={{ width: 220 }}
+                        />
+                    )}
+                >
                     <div className="admin-acc-list">
-                        {accounts.map(renderAccountCard)}
+                        {pagedAccounts.map(renderAccountCard)}
                     </div>
+                    <Pagination
+                        current={currentAccountPage}
+                        pageSize={accountPageSize}
+                        total={filteredAccounts.length}
+                        onChange={setAccountPage}
+                        style={{ marginTop: 12 }}
+                    />
                 </Card>
             )}
             <div className="admin-page-note admin-page-note-footer">
