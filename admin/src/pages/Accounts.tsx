@@ -109,7 +109,13 @@ export default function Accounts() {
         items: [
             { key: "clone", label: "复制" },
             { key: "export", label: "导出" },
-            { key: "delete", danger: true, label: "删除" },
+            // 单存档账号不可删存档(维护者指定): 只能走显式的删除账号, 破坏性与按钮语义对齐
+            {
+                key: "delete",
+                danger: true,
+                label: account.players.length <= 1 ? "删除（账号仅剩这一个存档）" : "删除",
+                disabled: account.players.length <= 1,
+            },
         ],
         onClick: ({ key }: { key: string }) => {
             if (key === "clone") cloneSave.mutate({ playerId: player.id, accountId: account.id })
@@ -292,7 +298,7 @@ export default function Accounts() {
             <div className="admin-page-note admin-page-note-footer">
                 <Typography.Text strong>选档状态说明</Typography.Text>
                 <Typography.Text type="secondary">
-                    新建和复制存档会设为该账号当前存档并切换为当前活动；删除当前存档后，服务端会在该账号剩余存档中回退到第一个可用存档。删除最后一个存档会同时删除账号。
+                    新建和复制存档会设为该账号当前存档并切换为当前活动；删除当前存档后，服务端会在该账号剩余存档中回退到第一个可用存档。账号仅剩一个存档时不可删除存档，请使用删除账号。
                 </Typography.Text>
             </div>
         </Space>

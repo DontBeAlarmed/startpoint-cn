@@ -84,7 +84,13 @@ export function AccountsMobileView({
     const saveMoreMenu = (account: AccountRow, player: AccountRow["players"][number]) => ({
         items: [
             { key: "clone", label: "复制" },
-            { key: "delete", danger: true, label: "删除" },
+            // 单存档账号不可删存档(维护者指定): 只能走显式的删除账号
+            {
+                key: "delete",
+                danger: true,
+                label: account.players.length <= 1 ? "删除（账号仅剩这一个存档）" : "删除",
+                disabled: account.players.length <= 1,
+            },
         ],
         onClick: ({ key }: { key: string }) => {
             if (key === "clone") void onCloneSave(player.id, account.id)
