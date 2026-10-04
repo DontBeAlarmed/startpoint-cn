@@ -201,12 +201,17 @@ export function executeShopPurchaseSync(
                         virtualNow,
                     )
                     // 宝石店购买次数是购买计数称号(cat5 condition 45)的事实时点,
-                    // 该族不在战斗 finish 白名单,与消耗任务同事务当场结算
-                    purchaseCountSettlement = settleMissionCategories(
-                        input.playerId,
-                        [{ category: 5, missionIds: getDegreeMissionIdsForConditionTypes([45]) }],
-                        virtualNow,
-                    )
+                    // 该族不在战斗 finish 白名单,与消耗任务同事务当场结算。
+                    // best-effort:极简测试 DB 缺 mission 表时不阻塞购买
+                    try {
+                        purchaseCountSettlement = settleMissionCategories(
+                            input.playerId,
+                            [{ category: 5, missionIds: getDegreeMissionIdsForConditionTypes([45]) }],
+                            virtualNow,
+                        )
+                    } catch {
+                        console.warn("[MISSION] purchase count settlement degraded (best-effort)")
+                    }
                     if (missionSettlement !== null) {
                         Object.assign(itemList, missionSettlement.itemList)
                     }
