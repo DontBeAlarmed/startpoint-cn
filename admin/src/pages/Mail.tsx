@@ -170,9 +170,12 @@ export default function Mail() {
     const totalSaves = accounts.reduce((n, a) => n + a.saveCount, 0)
 
     // 附件摘要：发送前所见即所发（类型 + 对象名 + 数量）
+    // 未选对象提示仅用于需要选择具体对象的类型(道具/角色/装备)
     const attachmentSummary = type == null
         ? null
-        : `${TYPE_LABEL[type] ?? type} · ${attachmentTitle(type, typeId, attachmentLookup) || "未选对象"} × ${number ?? 1}`
+        : requiresTypeId(type)
+            ? `${TYPE_LABEL[type] ?? type} · ${attachmentTitle(type, typeId, attachmentLookup) || "未选对象"} × ${number ?? 1}`
+            : `${TYPE_LABEL[type] ?? type} × ${number ?? 1}`
 
     // 复制重发：按历史记录预填当前表单，不自动发送
     const prefillFromHistory = (record: MailRecord) => {
@@ -322,6 +325,17 @@ export default function Mail() {
 
                         {needsId ? (
                             <div className="mail-inline-row">
+                                <span className="mail-inlbl">数量:</span>
+                                <Form.Item
+                                    name="number"
+                                    style={{ marginBottom: 0, width: 110 }}
+                                >
+                                    <InputNumber
+                                        min={quantityRule.min}
+                                        max={quantityRule.max}
+                                        disabled={quantityRule.max === 1}
+                                    />
+                                </Form.Item>
                                 <Form.Item
                                     name="type_id"
                                     rules={[
@@ -352,32 +366,9 @@ export default function Mail() {
                                         }}
                                     />
                                 </Form.Item>
-                                <span className="mail-inlbl">数量:</span>
-                                <Form.Item
-                                    name="number"
-                                    rules={[
-                                        { required: true, message: "请输入数量" },
-                                        {
-                                            validator: async (_, value) => {
-                                                if (value == null) throw new Error("请输入数量")
-                                                if (value < quantityRule.min || value > quantityRule.max) {
-                                                    throw new Error(`数量需在 ${quantityRule.min}-${quantityRule.max} 之间`)
-                                                }
-                                            },
-                                        },
-                                    ]}
-                                    style={{ marginBottom: 0, width: 110 }}
-                                >
-                                    <InputNumber
-                                        min={quantityRule.min}
-                                        max={quantityRule.max}
-                                        disabled={quantityRule.max === 1}
-                                    />
-                                </Form.Item>
                             </div>
                         ) : (
                             <div className="mail-inline-row">
-                                <span className="mail-inlbl" style={{ marginLeft: "auto" }}>数量:</span>
                                 <Form.Item
                                     name="number"
                                     rules={[
@@ -406,10 +397,6 @@ export default function Mail() {
                     <div className="admin-form-section">
                         <div className="admin-form-section-title">正文</div>
                         <div className="mail-inline-row mail-title-row">
-                            <span className="mail-inlbl">标题:</span>
-                            <Form.Item name="subject" style={{ flex: "1 1 auto", marginBottom: 0 }}>
-                                <Input maxLength={64} showCount placeholder="标题(可选,留空使用游戏默认)" />
-                            </Form.Item>
                             <span className="mail-inlbl">有效期:</span>
                             <Form.Item
                                 name="expirationDays"
@@ -421,9 +408,12 @@ export default function Mail() {
                             >
                                 <InputNumber min={1} max={3650} precision={0} />
                             </Form.Item>
+                            <Form.Item name="subject" style={{ flex: "1 1 auto", marginBottom: 0 }}>
+                                <Input maxLength={64} showCount placeholder="默认标题(留空使用游戏默认)" />
+                            </Form.Item>
                         </div>
                         <Form.Item name="description" style={{ marginBottom: 0, marginTop: 8 }}>
-                            <TextArea rows={3} maxLength={512} placeholder="可选,留空使用游戏默认" />
+                            <TextArea rows={3} maxLength={512} placeholder="默认正文(留空使用游戏默认)" />
                         </Form.Item>
                     </div>
 
