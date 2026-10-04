@@ -162,18 +162,22 @@
   flex: none;
 }
 
-/* 移动端: 标题+有效期放不下时整组折行 */
-@media (max-width: 767px) {
-  .mail-title-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
+/* 移动优先: 标题+有效期窄屏整组折行(有效期对齐到下一行行首) */
+.mail-title-row {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 
 /* 附件类型桌面端一行最多 4 项(8 类折两行) */
 @media (min-width: 768px) {
   .admin-mail-type-group {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .mail-title-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
   }
 }
