@@ -372,13 +372,12 @@ export default function Mail() {
                     <div className="admin-form-section">
                         <div className="admin-form-section-title">正文</div>
                         <div className="mail-inline-row mail-title-row">
-                            <span className="mail-inlbl">标题:</span>
                             <Form.Item name="subject" style={{ flex: "1 1 auto", marginBottom: 0 }}>
                                 <Input maxLength={64} showCount placeholder="默认标题(留空使用游戏默认)" />
                             </Form.Item>
                         </div>
                         <Form.Item name="description" style={{ marginBottom: 0, marginTop: 8 }}>
-                            <TextArea rows={3} maxLength={512} placeholder="默认正文(留空使用游戏默认)" />
+                            <TextArea rows={3} maxLength={512} placeholder="默认内容(留空使用游戏默认)" />
                         </Form.Item>
                     </div>
 
