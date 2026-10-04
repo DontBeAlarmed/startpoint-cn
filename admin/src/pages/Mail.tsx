@@ -355,17 +355,19 @@ export default function Mail() {
                                     }}
                                 />
                             </Form.Item>
-                            <span className="mail-inlbl">数量:</span>
-                            <Form.Item
-                                name="number"
-                                style={{ marginBottom: 0, width: 96 }}
-                            >
-                                <InputNumber
-                                    min={quantityRule.min}
-                                    max={quantityRule.max}
-                                    disabled={quantityRule.max === 1}
-                                />
-                            </Form.Item>
+                            <div className="mail-fixed-group">
+                                <span className="mail-inlbl">数量:</span>
+                                <Form.Item
+                                    name="number"
+                                    style={{ marginBottom: 0, width: 96 }}
+                                >
+                                    <InputNumber
+                                        min={quantityRule.min}
+                                        max={quantityRule.max}
+                                        disabled={quantityRule.max === 1}
+                                    />
+                                </Form.Item>
+                            </div>
                         </div>
                     </div>
 

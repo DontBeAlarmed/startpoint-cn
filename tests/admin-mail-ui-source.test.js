@@ -65,4 +65,27 @@ const typeItemSource = typeItemMatch[0]
 assert(typeItemSource.includes("<Radio.Group"), "附件类型应使用可见快速选择控件")
 assert(!typeItemSource.includes("<Select"), "附件类型不应继续使用下拉 Select")
 
+// 有效期视口拆分(2026-10-05 五轮跷跷板修复): 移动端独占一整行居右(发送按钮上方),
+// 768px+ 恢复行内 预览|有效期|发送。DOM 只有一份, 视口差异只允许存在于这对 CSS 里。
+const mailCss = fs.readFileSync(path.join(__dirname, "../admin/src/styles/pages/mail.css"), "utf8")
+
+const sendRowMatch = mailCss.match(/\.mail-send-row\s*\{([^}]*)\}/)
+assert(sendRowMatch, "mail.css 应存在 .mail-send-row 规则")
+assert(sendRowMatch[1].includes("flex-wrap: wrap"), "发送行必须允许换行(有效期独占行依赖 flex-wrap)")
+
+const expiryBaseMatch = mailCss.match(/\.mail-send-expiry\s*\{([^}]*)\}/)
+assert(expiryBaseMatch, "mail.css 应存在 .mail-send-expiry 基础规则")
+assert(expiryBaseMatch[1].includes("flex: 0 0 100%"), "移动端有效期必须 flex-basis 100% 确定性独占一行(不随内容宽度变化)")
+assert(expiryBaseMatch[1].includes("justify-content: flex-end"), "移动端有效期组内容应居右")
+assert(expiryBaseMatch[1].includes("order: -1"), "移动端有效期行必须排在预览/发送行之前(发送按钮上方)")
+assert(!expiryBaseMatch[1].includes("margin-left"), "移动端有效期不得带桌面左边距(100% 行宽 + margin 会溢出)")
+
+const expiryDesktopMatch = mailCss.match(
+    /@media \(min-width: 768px\)\s*\{\s*\.mail-send-expiry\s*\{([^}]*)\}/,
+)
+assert(expiryDesktopMatch, "768px+ 必须有 .mail-send-expiry 桌面覆盖(恢复行内)")
+assert(expiryDesktopMatch[1].includes("flex: 0 0 auto"), "桌面有效期应恢复 auto 宽度(行内排列)")
+assert(expiryDesktopMatch[1].includes("order: 0"), "桌面有效期应恢复 DOM 顺序(预览|有效期|发送)")
+assert(expiryDesktopMatch[1].includes("margin-left: 12px"), "桌面有效期与预览之间应保留 12px 间距")
+
 console.log("admin-mail-ui-source tests passed")

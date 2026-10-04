@@ -146,6 +146,7 @@
 
 .mail-send-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   margin-top: 14px;
@@ -222,11 +223,32 @@
   justify-content: flex-end;
 }
 
-/* 发送行内: 有效期紧凑组(标签+数字框) */
+/* 发送行内: 有效期紧凑组(标签+数字框)。
+   移动端独占一整行、内容居右 = 正文下方/发送按钮上方; flex-basis 100% 是确定性
+   换行, 不随内容宽度变化——预览区(唯一可收缩元素)不再被固定宽的有效期+发送钮
+   挤压成竖条。768px+ 恢复行内 预览|有效期|发送(2026-10-05 五轮跷跷板修复) */
 .mail-send-expiry {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex: 0 0 100%;
+  justify-content: flex-end;
+  order: -1;
+}
+
+@media (min-width: 768px) {
+  .mail-send-expiry {
+    flex: 0 0 auto;
+    justify-content: flex-start;
+    margin-left: 12px;
+    order: 0;
+  }
+}
+
+/* 数量/有效期: 标签+输入框打包为不可拆整体(窄屏折行不拆散, 维护者 2026-10-05) */
+.mail-fixed-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex: none;
-  margin-left: 12px;
 }
