@@ -299,20 +299,20 @@ export default function Accounts() {
             refreshing={isFetching}
         >
         <Space direction="vertical" size="large" className="admin-stack">
-            {isMobile ? (
-                <Card
-                    title="账号管理"
-                    className="admin-mobile-list-card"
-                    extra={(
-                        <Input
-                            allowClear
-                            placeholder="搜索账号/存档/备注/设备"
-                            value={accountSearch}
-                            onChange={event => { setAccountSearch(event.target.value); setAccountPage(1) }}
-                            style={{ width: 220 }}
-                        />
-                    )}
-                >
+            <Card
+                title="账号管理"
+                className={isMobile ? "admin-mobile-list-card" : "admin-table-card admin-accounts-card"}
+                extra={(
+                    <Input
+                        allowClear
+                        placeholder="搜索账号/存档/备注/设备"
+                        value={accountSearch}
+                        onChange={event => { setAccountSearch(event.target.value); setAccountPage(1) }}
+                        style={{ width: 220 }}
+                    />
+                )}
+            >
+                {isMobile ? (
                     <AccountsMobileView
                         accounts={pagedAccounts}
                         selectedAccount={accounts.find(a => a.id === selectedAccountId)}
@@ -326,33 +326,19 @@ export default function Accounts() {
                         onDeleteSave={playerId => deleteSave.mutateAsync(playerId)}
                         onUpdateNote={(accountId, note) => updateNote.mutateAsync({ accountId, note })}
                     />
-                </Card>
-            ) : (
-                <Card
-                    title="账号管理"
-                    className="admin-table-card admin-accounts-card"
-                    extra={(
-                        <Input
-                            allowClear
-                            placeholder="搜索账号/存档/备注/设备"
-                            value={accountSearch}
-                            onChange={event => { setAccountSearch(event.target.value); setAccountPage(1) }}
-                            style={{ width: 220 }}
-                        />
-                    )}
-                >
+                ) : (
                     <div className="admin-acc-list">
                         {pagedAccounts.map(renderAccountCard)}
                     </div>
-                    <Pagination
-                        current={currentAccountPage}
-                        pageSize={accountPageSize}
-                        total={filteredAccounts.length}
-                        onChange={setAccountPage}
-                        style={{ marginTop: 12 }}
-                    />
-                </Card>
-            )}
+                )}
+                <Pagination
+                    current={currentAccountPage}
+                    pageSize={accountPageSize}
+                    total={filteredAccounts.length}
+                    onChange={setAccountPage}
+                    style={{ marginTop: 12 }}
+                />
+            </Card>
             <div className="admin-page-note admin-page-note-footer">
                 <Typography.Text strong>选档状态说明</Typography.Text>
                 <Typography.Text type="secondary">

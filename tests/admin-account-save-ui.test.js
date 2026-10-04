@@ -213,4 +213,20 @@ assert.doesNotMatch(playerDetail, /详细信息/)
 // 角色表头像带版本参数(服务端清扫修复前该 URL 可能缓存过坏字节)
 assert.match(playerDetail, /character_avatar\/\$\{r\.code\}\?v=2/)
 
+// 账号卡分页器双视口共享(2026-10-05): 单 Card 内条件渲染列表体, Pagination 挂在
+// 条件块之后——移动端 pagedAccounts 曾被切片却无翻页控件, 10 条之后不可见。
+assert.match(
+    accounts,
+    /className=\{isMobile \? "admin-mobile-list-card" : "admin-table-card admin-accounts-card"\}/,
+    "账号管理 Card 应按视口切换 className 而非拆成两张卡",
+)
+const accountsCardBody = accounts.match(/<Card[^>]*admin-mobile-list-card[\s\S]*?<\/Card>/)
+assert(accountsCardBody, "应存在账号管理 Card")
+assert(accountsCardBody[0].includes("AccountsMobileView"), "移动分支渲染账号卡列表")
+assert(
+    accountsCardBody[0].indexOf("<Pagination") > accountsCardBody[0].indexOf("isMobile ?"),
+    "Pagination 必须挂在视口条件块之后(两视口共享), 不得只留在桌面分支",
+)
+assert(/total=\{filteredAccounts\.length\}/.test(accountsCardBody[0]), "分页 total 应跟随搜索过滤后的数量")
+
 console.log("admin-account-save-ui tests passed")
