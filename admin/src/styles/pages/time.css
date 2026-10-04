@@ -337,7 +337,7 @@
 .admin-tl-pagination {
   margin-top: 10px;
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
 }
 
 /* 活动类型徽章: 每族一色(故事=紫 讨伐=红 大型=星黄 通关/累计/登录=绿 未识别=info蓝) */
@@ -346,3 +346,18 @@
 .admin-tl-family-large { color: #ffd335; border-color: #ffd335; background: rgba(255, 211, 53, 0.1); }
 .admin-tl-family-clear { color: #7ee787; border-color: #7ee787; background: rgba(126, 231, 135, 0.1); }
 .admin-tl-family-other { color: var(--info); border-color: var(--info); background: var(--info-bg); }
+
+/* UP 角色搜索结果: 头像 + 信息列(头像复用 admin-tl-up-av 家族) */
+.admin-search-character {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.admin-search-character-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}

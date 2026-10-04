@@ -290,3 +290,8 @@ html[data-theme="dark"] {
   font-size: 13px;
   text-align: center;
 }
+
+/* 分页器统一靠右(维护者 2026-10-04): 含卡片内独立分页与表格分页 */
+.ant-pagination {
+  justify-content: flex-end;
+}

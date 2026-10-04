@@ -685,9 +685,20 @@ export default function TimeControl() {
                     {gachaSearch && (
                         searchResults.length > 0 ? (
                             searchResults.map(row => (
-                                <div key={row.characterId} className="admin-clairvoyance-panel">
-                                    <Typography.Text strong>{row.name} #{row.characterId}</Typography.Text>
-                                    {row.title && <Typography.Text type="secondary">{row.title}</Typography.Text>}
+                                <div key={row.characterId} className="admin-clairvoyance-panel admin-search-character">
+                                    <span className="admin-tl-up-av" aria-hidden>
+                                        {row.name.slice(0, 1)}
+                                        <img
+                                            className="admin-tl-up-av-img"
+                                            src={`/api/content/character_avatar/${row.characterId}`}
+                                            alt=""
+                                            loading="lazy"
+                                            onError={event => event.currentTarget.classList.add("admin-tl-up-av-broken")}
+                                        />
+                                    </span>
+                                    <div className="admin-search-character-info">
+                                        <Typography.Text strong>{row.name} #{row.characterId}</Typography.Text>
+                                        {row.title && <Typography.Text type="secondary">{row.title}</Typography.Text>}
                                     <div className="admin-search-gacha-list">
                                         {row.gachas.map(gacha => (
                                             <div key={gacha.id} className="admin-search-gacha-row">
@@ -700,6 +711,7 @@ export default function TimeControl() {
                                                 </span>
                                             </div>
                                         ))}
+                                    </div>
                                     </div>
                                 </div>
                             ))
