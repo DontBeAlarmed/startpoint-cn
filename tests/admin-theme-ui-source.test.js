@@ -7,7 +7,7 @@ const adminSrcDir = path.join(__dirname, "../admin/src")
 const css = [...fs.readFileSync(path.join(adminSrcDir, "styles.css"), "utf8").matchAll(/@import\s+"([^"]+)";/g)]
     .map(match => fs.readFileSync(path.join(adminSrcDir, match[1]), "utf8"))
     .join("\n")
-for (const v of ["--bg:#F3F7FC", "--panel:#FFFFFF", "--star:#FFD335", "--ink:#1F2D4D", "--water:#2E7FD6", "--wind:#2FA85C", "--thunder:#D99A00", "--fire:#E8544A"]) {
+for (const v of ["--bg:#F5F6F9", "--panel:#FFFFFF", "--star:#FFD335", "--ink:#1F2D4D", "--water:#2E7FD6", "--wind:#2FA85C", "--thunder:#D99A00", "--fire:#E8544A"]) {
     assert.ok(css.includes(v), `缺少明色 token ${v}`)
 }
 assert.ok(css.includes('html[data-theme="dark"]'), "缺少暗色 token 块")
