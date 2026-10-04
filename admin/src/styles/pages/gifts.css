@@ -250,10 +250,10 @@
 
 /* 生效中的礼包: 编辑/删除常驻但锁定 —— 置灰不可用, 点击提示需先停用(维护者指定);
    antd 状态规则特异性更高, 镜像选择器把三态钉回灰色 */
-.gift-card-btn-locked,
-.gift-card-btn-locked:not(:disabled):not(.ant-btn-disabled):hover,
-.gift-card-btn-locked:not(:disabled):not(.ant-btn-disabled):active,
-.gift-card-btn-locked:not(:disabled):not(.ant-btn-disabled):focus-visible {
+.gift-card .acc-bottom-row .gift-card-btn-locked,
+.gift-card .acc-bottom-row .gift-card-btn-locked:not(:disabled):not(.ant-btn-disabled):hover,
+.gift-card .acc-bottom-row .gift-card-btn-locked:not(:disabled):not(.ant-btn-disabled):active,
+.gift-card .acc-bottom-row .gift-card-btn-locked:not(:disabled):not(.ant-btn-disabled):focus-visible {
   color: var(--ink-soft);
   border-color: var(--line);
   background: transparent;
