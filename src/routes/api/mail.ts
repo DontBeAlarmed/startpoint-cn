@@ -148,10 +148,13 @@ const routes = async (fastify: FastifyInstance) => {
         const body = request.body as ReceiveBody
         const viewerId = body.viewer_id
         const mailId = body.mail_id
-        if (!viewerId || isNaN(viewerId) || !mailId || isNaN(mailId)) return reply.status(400).send({
-            error: "Bad Request",
-            message: "Invalid request body"
-        })
+        if (!viewerId || isNaN(viewerId) || !mailId || isNaN(mailId)) {
+            console.log(`[MAIL:receive] 400 invalid body: viewerId=${viewerId} mailId=${mailId} bodyType=${typeof request.body} bodyKeys=${request.body ? Object.keys(request.body as object).join(",") : "null"}`)
+            return reply.status(400).send({
+                error: "Bad Request",
+                message: "Invalid request body"
+            })
+        }
 
         const session = await getSession(viewerId.toString())
         if (!session) return reply.status(400).send({
