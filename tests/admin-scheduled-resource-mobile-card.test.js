@@ -37,7 +37,9 @@ assert.match(component, /className="admin-mobile-list-card"/, "列表仍挂在�
 // ── 卡片结构: 资源名+范围徽章 / 启用区间 / 状态钮 / 编辑 / 删除 ─────────────
 assert.match(cardView, /className="acc-card sched-card"/, "卡片外壳复用账号页 acc-card")
 // 2026-10-04 二次调整: 徽章在名称前(移动端独占左上/桌面同行), 启用区间并入信息行
-assert.doesNotMatch(cardView, /sched-headline/, "多余的标题嵌套层应移除(层级简单)")
+// 2026-10-05: 范围徽章移到资源名前方(同行, 间隔 8px)—— 标题行包一层 headline 行容器
+assert.match(cardView, /sched-headline/, "徽章+资源名应有同行行容器")
+assert.match(css, /\.sched-headline \{[^}]*gap: 8px/, "徽章与资源名间隔 8px")
 assert.match(cardView, /admin-badge-info">全局规则<\/span>[\s\S]*?sched-title/, "范围徽章应位于资源名之前(移动端即左上)")
 assert.match(cardView, /rule\.scope === "global"\n?\s*\? <span className="admin-badge-info">全局规则<\/span>/, "全局规则应为 info 徽章")
 assert.match(cardView, /admin-badge-muted">指定存档 #\{rule\.playerId\}/, "指定存档应为 muted 徽章")
@@ -52,7 +54,7 @@ assert.match(cardView, /className=\{rule\.enabled \? "admin-state-active" : "adm
 assert.match(cardView, /\{rule\.enabled \? "生效中" : "已停用"\}/, "状态钮显示当前状态(恒位重标记)")
 assert.match(cardView, /aria-label=\{rule\.enabled \? "点击停用规则" : "点击启用规则"\}/, "状态钮应有无障碍名(描述点击动作)")
 assert.doesNotMatch(cardView, /CircleStop|Play/, "状态钮不应有任何图标")
-assert.match(cardView, /loading=\{togglingId === rule\.id\}/, "逐行 pending 态(同公告页 togglingId 模式)")
+// 2026-10-05: loading 动画移除(维护者指定: 只做颜色/内容切换, 尺寸不变), 无 loading 透传
 
 // ── 操作行: 编辑 + 垃圾桶 icon-only 删除 ───────────────────────────────────
 assert.match(cardView, /icon=\{<Pencil size=\{15\} \/>\} aria-label="编辑规则"/, "编辑按钮保留")

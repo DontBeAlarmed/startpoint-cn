@@ -58,7 +58,7 @@ assert.match(cardView, /aria-label=\{row\.enabled \? "点击停用公告" : "点
 assert.match(cardView, /className=\{row\.enabled \? "admin-state-active" : "admin-state-stopped"\}/, "启停钮应带状态色类(绿=生效中/红=已停用)")
 assert.doesNotMatch(cardView, /aria-label="点击停用公告"[^/]*icon=/, "状态钮一律不带图标")
 assert.doesNotMatch(cardView, /CircleStop/, "停用钮不应再有 CircleStop 图标")
-assert.match(cardView, /togglingId === row\.id/, "启停进行中应有 loading 反馈")
+// 2026-10-05: loading 动画移除(维护者指定: 只做颜色/内容切换, 尺寸不变), 无 loading 透传
 
 // ── 底行操作: 编辑 + 垃圾桶 icon-only 删除 ─────────────────────────────────
 assert.match(cardView, /icon=\{<Pencil size=\{15\} \/>\} aria-label="编辑公告"/, "编辑按钮保留")

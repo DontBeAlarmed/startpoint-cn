@@ -8,7 +8,6 @@ import type { ScheduledResourceRule } from "./ScheduledResourceRules"
 interface ScheduledResourceCardViewProps {
     rules: readonly ScheduledResourceRule[]
     loading: boolean
-    togglingId: number | null
     onToggle: (rule: ScheduledResourceRule) => void
     onEdit: (rule: ScheduledResourceRule) => void
     onDelete: (ruleId: number) => void
@@ -21,7 +20,6 @@ interface ScheduledResourceCardViewProps {
 export function ScheduledResourceCardView({
     rules,
     loading,
-    togglingId,
     onToggle,
     onEdit,
     onDelete,
@@ -43,16 +41,18 @@ export function ScheduledResourceCardView({
                         {/* 维护者 2026-10-04: 移动端范围徽章独占左上(标题上方), 桌面与名称同行;
                             三钮移动端独占最下一排, 桌面右侧一簇 —— grid 区块摆放 */}
                         <div className="sched-heading">
-                            {rule.scope === "global"
-                                ? <span className="admin-badge-info">全局规则</span>
-                                : <span className="admin-badge-muted">指定存档 #{rule.playerId}</span>}
-                            <Typography.Text strong className="sched-title">{rule.rewardName}</Typography.Text>
+                            {/* 范围徽章在资源名前方, 间隔 8px(维护者 2026-10-05, 两端一致) */}
+                            <div className="sched-headline">
+                                {rule.scope === "global"
+                                    ? <span className="admin-badge-info">全局规则</span>
+                                    : <span className="admin-badge-muted">指定存档 #{rule.playerId}</span>}
+                                <Typography.Text strong className="sched-title">{rule.rewardName}</Typography.Text>
+                            </div>
                         </div>
                         <span className="acc-actions sched-actions">
                             <Button
                                 className={rule.enabled ? "admin-state-active" : "admin-state-stopped"}
                                 aria-label={rule.enabled ? "点击停用规则" : "点击启用规则"}
-                                loading={togglingId === rule.id}
                                 onClick={() => onToggle(rule)}
                             >
                                 {rule.enabled ? "生效中" : "已停用"}
