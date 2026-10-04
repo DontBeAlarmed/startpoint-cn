@@ -352,6 +352,10 @@
   display: flex;
   gap: 10px;
   align-items: flex-start;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--stat-bg);
 }
 
 .admin-search-character-info {

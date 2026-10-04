@@ -685,7 +685,7 @@ export default function TimeControl() {
                     {gachaSearch && (
                         searchResults.length > 0 ? (
                             searchResults.map(row => (
-                                <div key={row.characterId} className="admin-clairvoyance-panel admin-search-character">
+                                <div key={row.characterId} className="admin-search-character">
                                     <span className="admin-tl-up-av" aria-hidden>
                                         {row.name.slice(0, 1)}
                                         <img
