@@ -7,7 +7,7 @@
     "max_stamina_overflow": 999,
     "max_virtual_money": 999999,
     "max_mana": 99999999,
-    "max_star_crumb": 9999,
+    "max_star_crumb": 99999,
     "pool_exp_gain_value": 1,
     "pool_exp_gain_seconds": 1,
     "max_pool_exp": 999999,
