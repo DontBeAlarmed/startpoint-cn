@@ -895,7 +895,7 @@
       "rereadReason": "earlier awake settlement precedes later authoritative reward, active-mission, response-state and active-quest writes",
       "freshPostWriteEvaluationRequired": true,
       "sqlReads": 60,
-      "sqlWrites": 34,
+      "sqlWrites": 35,
       "sqlByTable": {
         "players": {
           "reads": 8,
@@ -1014,8 +1014,8 @@
         },
         "players_quest_progress": {
           "reads": 6,
-          "statements": 7,
-          "writes": 1
+          "statements": 8,
+          "writes": 2
         },
         "server_gameplay_settings": {
           "reads": 2,
@@ -2740,7 +2740,7 @@
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
       "sqlReads": 26,
-      "sqlWrites": 8,
+      "sqlWrites": 9,
       "sqlByTable": {
         "players": {
           "reads": 4,
@@ -2749,8 +2749,8 @@
         },
         "players_active_mission_counters": {
           "reads": 1,
-          "statements": 1,
-          "writes": 0
+          "statements": 2,
+          "writes": 1
         },
         "players_active_missions": {
           "reads": 1,
@@ -3152,7 +3152,7 @@
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
       "sqlReads": 32,
-      "sqlWrites": 10,
+      "sqlWrites": 11,
       "sqlByTable": {
         "players": {
           "reads": 5,
@@ -3161,8 +3161,8 @@
         },
         "players_active_mission_counters": {
           "reads": 1,
-          "statements": 1,
-          "writes": 0
+          "statements": 2,
+          "writes": 1
         },
         "players_active_missions": {
           "reads": 1,
