@@ -63,16 +63,34 @@ const upsertMissionProgress = db.prepare(`
 `)
 
 const run = db.transaction(() => {
-    for (const playerId of playerIds) {
-        const archiveSum = db.prepare(`
-            SELECT COALESCE(SUM(single_clear_count), 0) AS total
+    const sectionPlaceholders = CHALLENGE_DUNGEON_SECTIONS.map(() => "?").join(",")
+    const mazeSumStatement = db.prepare(`
+        SELECT COALESCE(SUM(single_clear_count), 0) AS total
+        FROM players_quest_progress
+        WHERE player_id = ? AND section IN (${sectionPlaceholders})
+    `)
+    const counterRowStatement = db.prepare(`
+        SELECT challenge_dungeon_clear_count FROM players_mission_battle_counters
+        WHERE player_id = ?
+    `)
+    const missionProgressStatement = db.prepare(`
+        SELECT progress FROM players_category_missions
+        WHERE category = 5 AND id = ? AND player_id = ?
+    `)
+    const ruleQueries = exactRules.map(rule => {
+        const sections = [...new Set(rule.questIdCategories.values())]
+        const questIds = [...rule.questIdCategories.keys()]
+        const statement = db.prepare(`
+            SELECT COALESCE(SUM(single_clear_count + multi_clear_count), 0) AS total
             FROM players_quest_progress
-            WHERE player_id = ? AND section IN (6, 14, 13, 20)
-        `).get(playerId).total
-        const counterRow = db.prepare(`
-            SELECT challenge_dungeon_clear_count FROM players_mission_battle_counters
-            WHERE player_id = ?
-        `).get(playerId)
+            WHERE player_id = ? AND section IN (${sections.map(() => "?").join(",")})
+                AND quest_id IN (${questIds.map(() => "?").join(",")})
+        `)
+        return { rule, sections, questIds, statement }
+    })
+    for (const playerId of playerIds) {
+        const archiveSum = mazeSumStatement.get(playerId, ...CHALLENGE_DUNGEON_SECTIONS).total
+        const counterRow = counterRowStatement.get(playerId)
         const current = counterRow?.challenge_dungeon_clear_count ?? 0
         if (archiveSum > current) {
             if (apply) upsertCounter.run({ player_id: playerId, challenge_dungeon_clear_count: archiveSum })
@@ -81,23 +99,10 @@ const run = db.transaction(() => {
             console.log(`[maze-counter] player=${playerId} ${current} -> ${archiveSum}`)
         }
 
-        for (const rule of exactRules) {
-            const sections = [...new Set(rule.questIdCategories.values())]
-            const placeholders = sections.map(() => "?").join(",")
-            const questIds = [...rule.questIdCategories.keys()]
-            const questPlaceholders = questIds.map(() => "?").join(",")
-            const row = db.prepare(`
-                SELECT COALESCE(SUM(single_clear_count + multi_clear_count), 0) AS total
-                FROM players_quest_progress
-                WHERE player_id = ? AND section IN (${placeholders})
-                    AND quest_id IN (${questPlaceholders})
-            `).get(playerId, ...sections, ...questIds)
-            const computed = row.total
+        for (const { rule, sections, questIds, statement } of ruleQueries) {
+            const computed = statement.get(playerId, ...sections, ...questIds).total
             if (computed <= 0) continue
-            const existing = db.prepare(`
-                SELECT progress FROM players_category_missions
-                WHERE category = 5 AND id = ? AND player_id = ?
-            `).get(rule.missionId, playerId)
+            const existing = missionProgressStatement.get(rule.missionId, playerId)
             const currentProgress = existing?.progress ?? 0
             if (computed > currentProgress) {
                 if (apply) upsertMissionProgress.run({
@@ -113,7 +118,15 @@ const run = db.transaction(() => {
     }
 })
 
-run()
+let exitCode = 0
+try {
+    run()
+} catch (error) {
+    console.error("backfill failed:", error)
+    exitCode = 1
+} finally {
+    restore()
+}
 console.log(`done: counterRows changed=${counterRowsChanged} inserted=${counterRowsInserted}; `
     + `missionRows changed=${missionRowsChanged} inserted=${missionRowsInserted}`)
-restore()
+process.exitCode = exitCode
