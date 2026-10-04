@@ -323,52 +323,39 @@ export default function Mail() {
                             </Radio.Group>
                         </Form.Item>
 
-                        {needsId ? (
-                            <div className="mail-inline-row">
-                                <span className="mail-inlbl">数量:</span>
-                                <Form.Item
-                                    name="number"
-                                    style={{ marginBottom: 0, width: 110 }}
-                                >
-                                    <InputNumber
-                                        min={quantityRule.min}
-                                        max={quantityRule.max}
-                                        disabled={quantityRule.max === 1}
-                                    />
-                                </Form.Item>
-                                <Form.Item
-                                    name="type_id"
-                                    rules={[
-                                        {
-                                            validator: async (_, value) => {
-                                                if (attachmentError) throw new Error("附件索引加载失败，无法发送")
-                                                if (value == null) throw new Error("请选择附件")
-                                            },
+                        {/* 附件搜索常显: 需要 ID 的类型可选, 其余置灰; 数量在窄屏折到搜索栏下一行居右 */}
+                        <div className="mail-inline-row mail-attach-row">
+                            <Form.Item
+                                name="type_id"
+                                rules={[
+                                    {
+                                        validator: async (_, value) => {
+                                            if (needsId && attachmentError) throw new Error("附件索引加载失败，无法发送")
+                                            if (needsId && value == null) throw new Error("请选择附件")
                                         },
-                                    ]}
-                                    style={{ flex: "1 1 auto", marginBottom: 0 }}
-                                >
-                                    <Select
-                                        showSearch
-                                        allowClear
-                                        placeholder={`搜索${TYPE_LABEL[type] ?? ""}名称或 ID…`}
-                                        loading={attachmentLoading}
-                                        disabled={attachmentError}
-                                        options={attachmentOptions}
-                                        filterOption={filterAttachmentOption}
-                                        optionLabelProp="titleText"
-                                        notFoundContent={attachmentLoading ? "正在加载附件索引" : "没有匹配附件"}
-                                        onChange={(nextTypeId) => {
-                                            const nextRule = getMailAttachmentRule(type, nextTypeId)
-                                            const currentNumber = form.getFieldValue("number") ?? 1
-                                            form.setFieldValue("number", Math.min(currentNumber, nextRule.max))
-                                            form.validateFields(["number"]).catch(() => {})
-                                        }}
-                                    />
-                                </Form.Item>
-                            </div>
-                        ) : (
-                            <div className="mail-inline-row">
+                                    },
+                                ]}
+                                style={{ flex: "1 1 auto", marginBottom: 0 }}
+                            >
+                                <Select
+                                    showSearch
+                                    allowClear
+                                    placeholder={needsId ? `搜索${TYPE_LABEL[type] ?? ""}名称或 ID…` : "该类型无需选择对象"}
+                                    loading={attachmentLoading}
+                                    disabled={!needsId || attachmentError}
+                                    options={attachmentOptions}
+                                    filterOption={filterAttachmentOption}
+                                    optionLabelProp="titleText"
+                                    notFoundContent={attachmentLoading ? "正在加载附件索引" : "没有匹配附件"}
+                                    onChange={(nextTypeId) => {
+                                        const nextRule = getMailAttachmentRule(type, nextTypeId)
+                                        const currentNumber = form.getFieldValue("number") ?? 1
+                                        form.setFieldValue("number", Math.min(currentNumber, nextRule.max))
+                                        form.setFields([{ name: "type_id", errors: [] }])
+                                    }}
+                                />
+                            </Form.Item>
+                            <div className="mail-quantity-group">
                                 <span className="mail-inlbl">数量:</span>
                                 <Form.Item
                                     name="number"
@@ -383,7 +370,7 @@ export default function Mail() {
                                             },
                                         },
                                     ]}
-                                    style={{ marginBottom: 0, width: 130 }}
+                                    style={{ marginBottom: 0, width: 110 }}
                                 >
                                     <InputNumber
                                         min={quantityRule.min}
@@ -392,12 +379,21 @@ export default function Mail() {
                                     />
                                 </Form.Item>
                             </div>
-                        )}
+                        </div>
                     </div>
 
                     <div className="admin-form-section">
                         <div className="admin-form-section-title">正文</div>
                         <div className="mail-inline-row mail-title-row">
+                            <span className="mail-inlbl">标题:</span>
+                            <Form.Item name="subject" style={{ flex: "1 1 auto", marginBottom: 0 }}>
+                                <Input maxLength={64} showCount placeholder="默认标题(留空使用游戏默认)" />
+                            </Form.Item>
+                        </div>
+                        <Form.Item name="description" style={{ marginBottom: 0 }}>
+                            <TextArea rows={3} maxLength={512} placeholder="默认正文(留空使用游戏默认)" />
+                        </Form.Item>
+                        <div className="mail-inline-row mail-expiry-row">
                             <span className="mail-inlbl">有效期:</span>
                             <Form.Item
                                 name="expirationDays"
@@ -409,13 +405,7 @@ export default function Mail() {
                             >
                                 <InputNumber min={1} max={3650} precision={0} />
                             </Form.Item>
-                            <Form.Item name="subject" style={{ flex: "1 1 auto", marginBottom: 0 }}>
-                                <Input maxLength={64} showCount placeholder="默认标题(留空使用游戏默认)" />
-                            </Form.Item>
                         </div>
-                        <Form.Item name="description" style={{ marginBottom: 0, marginTop: 8 }}>
-                            <TextArea rows={3} maxLength={512} placeholder="默认正文(留空使用游戏默认)" />
-                        </Form.Item>
                     </div>
 
                     <div className="mail-send-row">

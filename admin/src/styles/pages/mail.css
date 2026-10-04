@@ -188,3 +188,27 @@
     gap: 8px;
   }
 }
+
+/* ── 发送卡 v3 调整(维护者 2026-10-05): 附件搜索常显(无需对象置灰),
+   数量窄屏折到搜索下一行居右, 标题占满一行, 有效期行居右 ── */
+.mail-attach-row {
+  flex-wrap: wrap;
+}
+
+.mail-quantity-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  /* 数量组靠右: 桌面在搜索框右侧, 移动端折行后同样居右(维护者指定) */
+  margin-left: auto;
+}
+
+@media (min-width: 768px) {
+  .mail-quantity-group {
+    margin-left: auto;
+  }
+}
+
+.mail-expiry-row {
+  justify-content: flex-end;
+}
