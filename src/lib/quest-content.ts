@@ -87,6 +87,26 @@ export function getBossBattleQuestIdsForFamilyStage(
         ))
 }
 
+/** Derived-lookup display name of a boss battle family/stage group. */
+export function getBossBattleQuestNameForFamilyStage(
+    family: number,
+    stageGroup: number,
+): string | undefined {
+    const questId = getBossBattleQuestIdsForFamilyStage(family, stageGroup)[0]
+    if (questId === undefined) return undefined
+    const name = getQuestLookup()[`2_${questId}`]
+    return typeof name === "string" && name !== "" ? name : undefined
+}
+
+/** Advent event quest ids whose derived display name equals the given boss name. */
+export function getAdventEventQuestIdsForBossName(bossName: string): readonly number[] {
+    if (bossName === "") return []
+    const lookup = getQuestLookup()
+    return Object.keys(getQuestTable("advent_event_quest.json"))
+        .filter(questId => lookup[`7_${questId}`] === bossName)
+        .map(Number)
+}
+
 export function hasChallengeDungeonQuest(questId: number): boolean {
     return getQuestTable("challenge_dungeon_event_quest.json")[String(questId)] !== undefined
 }
