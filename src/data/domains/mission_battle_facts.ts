@@ -30,6 +30,14 @@ export interface MissionBattleResult {
     skillUseCount?: number
 }
 
+/**
+ * 通关摇曳的迷宫统计口径(摇曳迷宫菜单四类日常地下城联合, quest range kind 12 =
+ * QuestRangeReferenceIdKind.DailyWeekEventAndDailyExpManaEventAndChallenge-
+ * DungeonEventAndTowerDungeonEvent):培育道具(6)/经验玛纳(14)/深层域+宝物域(13)/
+ * 层叠迷宫(20)。任务 degree_challenge_dungeon_clear_* 的进度事实源。
+ */
+const CHALLENGE_DUNGEON_CLEAR_CATEGORIES: ReadonlySet<number> = new Set([6, 14, 13, 20])
+
 const EMPTY_COUNTERS: Readonly<MissionBattleCounters> = Object.freeze({
     singlePlayCount: 0,
     singleClearCount: 0,
@@ -97,7 +105,10 @@ export function recordMissionBattleResultSync(
     const rankS = result.accomplished && result.clearRank === 4 ? 1 : 0
     const rankA = result.accomplished && result.clearRank === 3 ? 1 : 0
     const rankB = result.accomplished && result.clearRank === 2 ? 1 : 0
-    const challengeDungeonClear = result.questCategory === 13 && result.accomplished ? 1 : 0
+    const challengeDungeonClear = result.questCategory !== undefined
+        && CHALLENGE_DUNGEON_CLEAR_CATEGORIES.has(result.questCategory)
+        && !result.isMulti
+        && result.accomplished ? 1 : 0
     const singleScore = !result.isMulti
         && result.accomplished
         && typeof result.score === "number"

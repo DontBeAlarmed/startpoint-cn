@@ -135,6 +135,7 @@ for (let index = 0; index < 14; index++) {
     })
 }
 
+// cond14 = 单人通关计数:摇曳的迷宫计数器只收单人通关,多人通关不入计数
 assert.deepEqual(getMissionBattleCountersSync(playerId), {
     singlePlayCount: 4,
     singleClearCount: 3,
@@ -147,7 +148,7 @@ assert.deepEqual(getMissionBattleCountersSync(playerId), {
     rankSCount: 2,
     rankACount: 0,
     rankBCount: 0,
-    challengeDungeonClearCount: 18,
+    challengeDungeonClearCount: 3,
     singleScoreMax: 0,
     singleClearTimeMin: 0,
     bossBattleClearCount: 0,
@@ -166,8 +167,46 @@ assert.throws(() => {
 }, /rollback challenge dungeon fact/)
 assert.equal(
     getMissionBattleCountersSync(playerId).challengeDungeonClearCount,
-    18,
+    3,
     "结算事务回滚后不得留下挑战副本累计次数",
+)
+
+// 通关摇曳的迷宫口径 = 四类日常地下城联合(range kind 12):培育道具(6)/
+// 经验玛纳(14)/深层域+宝物域(13)/层叠迷宫(20);无关类别与世界剧情BOSS(19)不入计数。
+const unionAccountId = insertAccountSync({
+    appId: "wf_cn",
+    idpAlias: "",
+    idpCode: "test",
+    idpId: `mission-regular-facts-union-${randomUUID()}`,
+    status: "normal",
+})
+const unionPlayerId = insertDefaultPlayerSync(unionAccountId.id).id
+for (const questCategory of [13, 6, 14, 20]) {
+    recordMissionBattleResultSync(unionPlayerId, {
+        isMulti: false,
+        questCategory,
+        accomplished: true,
+    })
+}
+recordMissionBattleResultSync(unionPlayerId, {
+    isMulti: false,
+    questCategory: 19,
+    accomplished: true,
+})
+recordMissionBattleResultSync(unionPlayerId, {
+    isMulti: false,
+    accomplished: true,
+})
+recordMissionBattleResultSync(unionPlayerId, {
+    isMulti: true,
+    questCategory: 6,
+    isHost: true,
+    accomplished: true,
+})
+assert.equal(
+    getMissionBattleCountersSync(unionPlayerId).challengeDungeonClearCount,
+    4,
+    "摇曳的迷宫计数必须覆盖培育道具/经验玛纳/深层域宝物域/层叠迷宫四类",
 )
 
 insertPlayerQuestProgressSync(playerId, 1, {
@@ -351,7 +390,7 @@ recordMissionBattleResultSync(playerId, {
 })
 assert.equal(
     getMissionBattleCountersSync(playerId).challengeDungeonClearCount,
-    18,
+    3,
     "普通关卡成功不得污染挑战副本累计次数",
 )
 

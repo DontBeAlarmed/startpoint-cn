@@ -175,6 +175,52 @@ assert.deepEqual(
     exactResult.map(() => 1),
 )
 
+// 方案B:同 BOSS 的降临代次(cat7)与常驻领主战(cat2)通关都计数 —— 灼炎的荒龙(伊萨巴迪卡)
+const scarletMissionIds = [31100, 31110, 31120]
+assert.deepEqual(
+    recordDegreeMissionBattleFacts({
+        playerId,
+        questCategory: 7,
+        questId: 2002,
+        questAccomplished: true,
+        isMulti: false,
+        isMvp: false,
+    }, new Date("2024-08-14T12:00:00.000Z")),
+    scarletMissionIds,
+    "降临代次通关必须计入灼炎的荒龙三档计数任务",
+)
+assert.deepEqual(
+    recordDegreeMissionBattleFacts({
+        playerId,
+        questCategory: 7,
+        questId: 2001,
+        questAccomplished: true,
+        isMulti: false,
+        isMvp: false,
+    }, new Date("2024-08-14T12:00:00.000Z")),
+    [],
+    "序章不是 BOSS 本体关,不得计入荒龙计数",
+)
+assert.deepEqual(
+    recordDegreeMissionBattleFacts({
+        playerId,
+        questCategory: 2,
+        questId: 1026001,
+        questAccomplished: true,
+        isMulti: false,
+        isMvp: false,
+    }, new Date("2024-08-14T12:00:00.000Z")),
+    scarletMissionIds,
+    "常驻领主战通关同样计入荒龙计数",
+)
+for (const missionId of scarletMissionIds) {
+    assert.equal(
+        getPlayerCategoryMissionsSync(playerId, 5)[String(missionId)]?.progress,
+        2,
+        `降临一次+常驻一次后 ${missionId} 应为 2(序章不计)`,
+    )
+}
+
 const battleFactsSource = fs.readFileSync(path.join(__dirname, "../src/lib/mission/battle-facts.ts"), "utf8")
 const singlePublicationSource = fs.readFileSync(
     path.join(__dirname, "../src/lib/quest/finish/single-mission-publication.ts"),
