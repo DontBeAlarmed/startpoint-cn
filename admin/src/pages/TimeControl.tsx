@@ -671,45 +671,8 @@ export default function TimeControl() {
         <Alert type="error" showIcon message="千里眼数据加载失败" description="接口 /api/server/clairvoyance/gacha 不可用。" />
     ) : (
         <div className="admin-dash-sections">
-            <div className="admin-page-note">
-                <Typography.Text strong>当前阶段只追踪短期 UP 角色池</Typography.Text>
-                <Typography.Text type="secondary">
-                    范围限定为固定 CDN 基线内 pageKind=0、持续不超过 60 天且包含 UP 角色的角色扭蛋。
-                </Typography.Text>
-            </div>
 
-            <section className="admin-dash-section">
-                <div className="admin-dash-section-title">近期卡池</div>
-                <div className="admin-dash-section-body">
-                    {gachaTimelineLoading ? (
-                        <Typography.Text type="secondary">加载中...</Typography.Text>
-                    ) : gachaTimeline && recentGachas.length > 0 ? (
-                        recentGachas.map(({ gacha, upcoming }) => (
-                            <div key={gacha.id} className="admin-clairvoyance-panel">
-                                <div className="admin-pool-top">
-                                    <span className="admin-pool-name">{gacha.name} #{gacha.id}</span>
-                                    {renderPoolCardBadge(gacha, gachaTimeline?.currentTime)}
-                                    <span className="admin-pool-win admin-mono">{renderGachaCompactPeriod(gacha)}</span>
-                                    <span className="admin-pool-remaining">
-                                        {upcoming
-                                            ? renderGachaStartCountdown(gacha, gachaTimeline?.currentTime)
-                                            : renderRemainingDays(gacha, gachaTimeline?.currentTime)}
-                                    </span>
-                                </div>
-                                {renderRateUpCharacters(
-                                    gacha.rateUpCharacters,
-                                    expandedPoolIds.has(gacha.id),
-                                    () => togglePoolExpanded(gacha.id),
-                                )}
-                            </div>
-                        ))
-                    ) : (
-                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="近七日没有进行中或预告的短期 UP 角色池" />
-                    )}
-                </div>
-            </section>
-
-            <section className="admin-dash-section">
+<section className="admin-dash-section">
                 <div className="admin-dash-section-title">UP 角色搜索</div>
                 <div className="admin-dash-section-body">
                     <Input
@@ -746,6 +709,38 @@ export default function TimeControl() {
                     )}
                 </div>
             </section>
+<section className="admin-dash-section">
+                <div className="admin-dash-section-title">近期卡池</div>
+                <div className="admin-dash-section-body">
+                    {gachaTimelineLoading ? (
+                        <Typography.Text type="secondary">加载中...</Typography.Text>
+                    ) : gachaTimeline && recentGachas.length > 0 ? (
+                        recentGachas.map(({ gacha, upcoming }) => (
+                            <div key={gacha.id} className="admin-clairvoyance-panel">
+                                <div className="admin-pool-top">
+                                    <span className="admin-pool-name">{gacha.name} #{gacha.id}</span>
+                                    {renderPoolCardBadge(gacha, gachaTimeline?.currentTime)}
+                                    <span className="admin-pool-win admin-mono">{renderGachaCompactPeriod(gacha)}</span>
+                                    <span className="admin-pool-remaining">
+                                        {upcoming
+                                            ? renderGachaStartCountdown(gacha, gachaTimeline?.currentTime)
+                                            : renderRemainingDays(gacha, gachaTimeline?.currentTime)}
+                                    </span>
+                                </div>
+                                {renderRateUpCharacters(
+                                    gacha.rateUpCharacters,
+                                    expandedPoolIds.has(gacha.id),
+                                    () => togglePoolExpanded(gacha.id),
+                                )}
+                            </div>
+                        ))
+                    ) : (
+                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="近七日没有进行中或预告的短期 UP 角色池" />
+                    )}
+                </div>
+            </section>
+
+            
 
             <section className="admin-dash-section">
                 <div className="admin-dash-section-title">时间线</div>
@@ -796,29 +791,8 @@ export default function TimeControl() {
         <Alert type="error" showIcon message="活动日程加载失败" description="接口 /api/server/clairvoyance/activity 不可用。" />
     ) : (
         <div className="admin-dash-sections">
-            <div className="admin-page-note">
-                <Typography.Text strong>范围限定为固定 CDN 基线内 13 族活动主表的日程</Typography.Text>
-                <Typography.Text type="secondary">
-                    活跃截止前为进行中；活跃截止后进入换牌期，换牌截止后结束；无活跃截止的条目开始后长期开放。
-                </Typography.Text>
-            </div>
 
-            <section className="admin-dash-section">
-                <div className="admin-dash-section-title">近期活动</div>
-                <div className="admin-dash-section-body">
-                    {activityTimelineLoading ? (
-                        <Typography.Text type="secondary">加载中...</Typography.Text>
-                    ) : activityTimeline && recentActivities.length > 0 ? (
-                        recentActivities.map(({ activity, upcoming }) => (
-                            renderActivityCard(activity, upcoming, activityTimeline.currentTime)
-                        ))
-                    ) : (
-                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="近七日没有进行中或预告的活动" />
-                    )}
-                </div>
-            </section>
-
-            <section className="admin-dash-section">
+<section className="admin-dash-section">
                 <div className="admin-dash-section-title">活动搜索</div>
                 <div className="admin-dash-section-body">
                     <Input
@@ -837,6 +811,22 @@ export default function TimeControl() {
                     )}
                 </div>
             </section>
+<section className="admin-dash-section">
+                <div className="admin-dash-section-title">近期活动</div>
+                <div className="admin-dash-section-body">
+                    {activityTimelineLoading ? (
+                        <Typography.Text type="secondary">加载中...</Typography.Text>
+                    ) : activityTimeline && recentActivities.length > 0 ? (
+                        recentActivities.map(({ activity, upcoming }) => (
+                            renderActivityCard(activity, upcoming, activityTimeline.currentTime)
+                        ))
+                    ) : (
+                        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="近七日没有进行中或预告的活动" />
+                    )}
+                </div>
+            </section>
+
+            
 
             <section className="admin-dash-section">
                 <div className="admin-dash-section-title">活动时间线</div>
@@ -946,7 +936,7 @@ export default function TimeControl() {
                                                 <input
                                                     ref={(node) => { segmentRefs.current[index] = node }}
                                                     type="text"
-                                                    inputMode={coarsePointer ? "none" : "numeric"}
+                                                    inputMode="numeric"
                                                     aria-label={`编辑${segment.label}`}
                                                     className={segment.key === "year" ? "admin-time-hero-seg admin-time-hero-seg-year" : "admin-time-hero-seg"}
                                                     value={shownDraft?.[segment.key] ?? ""}
@@ -1050,6 +1040,20 @@ export default function TimeControl() {
                 >
                     {clairvoyanceTab === "gacha" ? gachaBody : activityBody}
                 </Card>
+            <div className="admin-page-note admin-page-note-footer">
+                <div>
+                    <Typography.Text strong>短期 UP 角色池追踪范围</Typography.Text>
+                    <Typography.Text type="secondary">
+                        范围限定为固定 CDN 基线内 pageKind=0、持续不超过 60 天且包含 UP 角色的角色扭蛋。
+                    </Typography.Text>
+                </div>
+                <div>
+                    <Typography.Text strong>活动日程追踪范围</Typography.Text>
+                    <Typography.Text type="secondary">
+                        固定 CDN 基线内 13 族活动主表；活跃截止前为进行中，活跃截止后进入换牌期，换牌截止后结束；无活跃截止的条目开始后长期开放。
+                    </Typography.Text>
+                </div>
+            </div>
             </Space>
         </AdminPage>
     )

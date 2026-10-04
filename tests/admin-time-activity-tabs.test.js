@@ -51,7 +51,7 @@ assert(!/#[0-9a-fA-F]{6}\b/.test(source.replace(/^import.*$/gm, "")), "时间页
 const anchors = [
     'queryKey: ["clairvoyanceGacha"]',
     "/api/server/clairvoyance/gacha",
-    "当前阶段只追踪短期 UP 角色池",
+    "短期 UP 角色池追踪范围",
     "UP 角色搜索",
     "输入角色名、称号或角色 ID",
     "时间线",
@@ -64,12 +64,19 @@ const anchors = [
 for (const anchor of anchors) {
     assert(source.includes(anchor), `卡池锚点缺失: ${anchor}`)
 }
-// 卡池三段结构的原始顺序：近期卡池 → UP 角色搜索 → 时间线
+// 2026-10-05 调整: 搜索上移 —— 卡池页签顺序 = UP 角色搜索 → 近期卡池 → 时间线;
+// 两条「范围限定」须知沉底为页脚注(整页最底)
 assert(
-    source.indexOf('admin-dash-section-title">近期卡池<') < source.indexOf("UP 角色搜索")
-    && source.indexOf("UP 角色搜索") < source.indexOf('<div className="admin-dash-section-title">时间线</div>'),
-    "卡池页签内部结构应保持原顺序",
+    source.indexOf('admin-dash-section-title">UP 角色搜索<') < source.indexOf('admin-dash-section-title">近期卡池<')
+    && source.indexOf('admin-dash-section-title">近期卡池<') < source.indexOf('<div className="admin-dash-section-title">时间线</div>'),
+    "卡池页签顺序应为 搜索 → 近期卡池 → 时间线",
 )
+assert(
+    source.indexOf("短期 UP 角色池追踪范围") > source.indexOf('admin-dash-section-title">时间线<')
+    && source.includes("活动日程追踪范围"),
+    "两条范围须知应沉底为页脚注",
+)
+assert(source.includes('inputMode="numeric"'), "时间数字段应弹手机数字键盘")
 // 卡池时间线改为统一单列列表（维护者指定 timeline-unified-list.html, 两线同构）
 assert(source.includes("admin-tl-list"), "时间线应为统一单列列表")
 assert(source.includes("renderUpCharacterChips"), "UP 角色应为芯片行(折叠上移到卡池条目层)")
