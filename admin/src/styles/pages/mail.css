@@ -131,3 +131,34 @@
   gap: 8px;
   margin-bottom: 10px;
 }
+
+/* ── 发送卡 v2 调整(维护者 2026-10-05): 目标分段居中、数量靠右、发送与预览同行 ── */
+.mail-target-center .ant-form-item-control-input-content {
+  display: flex;
+  justify-content: center;
+}
+
+.mail-send-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.mail-send-preview {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.mail-send-preview::-webkit-scrollbar {
+  display: none;
+}
+
+.mail-send-preview .admin-attach-chip {
+  flex: none;
+}

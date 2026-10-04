@@ -254,7 +254,7 @@ export default function Mail() {
                 <Form form={form} layout="vertical" onFinish={openConfirm} initialValues={{ number: 1, expirationDays: 31, targetMode: "all" }}>
                     <div className="admin-form-section">
                         <div className="admin-form-section-title">收件人</div>
-                        <Form.Item name="targetMode">
+                        <Form.Item name="targetMode" className="mail-target-center">
                             <Radio.Group optionType="button" buttonStyle="solid">
                                 <Radio.Button value="all">全体存档</Radio.Button>
                                 <Radio.Button value="account">指定账号</Radio.Button>
@@ -306,7 +306,10 @@ export default function Mail() {
                                         type_id: undefined,
                                         number: nextRule.max === 1 ? 1 : 1,
                                     })
-                                    form.validateFields(["type_id", "number"]).catch(() => {})
+                                    form.setFields([
+                                        { name: "type_id", errors: [] },
+                                        { name: "number", errors: [] },
+                                    ])
                                 }}
                             >
                                 {MAIL_TYPES.map(t => (
@@ -374,7 +377,7 @@ export default function Mail() {
                             </div>
                         ) : (
                             <div className="mail-inline-row">
-                                <span className="mail-inlbl">数量:</span>
+                                <span className="mail-inlbl" style={{ marginLeft: "auto" }}>数量:</span>
                                 <Form.Item
                                     name="number"
                                     rules={[
@@ -402,13 +405,11 @@ export default function Mail() {
 
                     <div className="admin-form-section">
                         <div className="admin-form-section-title">正文</div>
-                        <Form.Item name="subject" style={{ marginBottom: 0 }}>
-                            <Input maxLength={64} showCount placeholder="标题(可选,留空使用游戏默认)" />
-                        </Form.Item>
-                        <Form.Item name="description" style={{ marginBottom: 0 }}>
-                            <TextArea rows={3} maxLength={512} placeholder="可选,留空使用游戏默认" />
-                        </Form.Item>
-                        <div className="mail-inline-row" style={{ marginTop: 8 }}>
+                        <div className="mail-inline-row">
+                            <span className="mail-inlbl">标题:</span>
+                            <Form.Item name="subject" style={{ flex: "1 1 auto", marginBottom: 0 }}>
+                                <Input maxLength={64} showCount placeholder="标题(可选,留空使用游戏默认)" />
+                            </Form.Item>
                             <span className="mail-inlbl">有效期:</span>
                             <Form.Item
                                 name="expirationDays"
@@ -421,20 +422,25 @@ export default function Mail() {
                                 <InputNumber min={1} max={3650} precision={0} />
                             </Form.Item>
                         </div>
+                        <Form.Item name="description" style={{ marginBottom: 0 }}>
+                            <TextArea rows={3} maxLength={512} placeholder="可选,留空使用游戏默认" />
+                        </Form.Item>
                     </div>
 
-                    <div className="mail-send-summary">
-                        <span className="mail-inlbl">
-                            {targetMode === "all" ? "全体存档" : targetMode === "account" ? "指定账号" : "指定存档"}:
-                        </span>
-                        {attachmentSummary && (
-                            <span className="admin-attach-chip">
-                                <span className="admin-attach-chip-dot" />
-                                {attachmentSummary}
+                    <div className="mail-send-row">
+                        <span className="mail-send-preview">
+                            <span className="mail-inlbl">
+                                {targetMode === "all" ? "全体存档" : targetMode === "account" ? "指定账号" : "指定存档"}:
                             </span>
-                        )}
+                            {attachmentSummary && (
+                                <span className="admin-attach-chip">
+                                    <span className="admin-attach-chip-dot" />
+                                    {attachmentSummary}
+                                </span>
+                            )}
+                        </span>
+                        <Button type="primary" htmlType="submit" style={{ marginLeft: "auto", flex: "none" }}>发送</Button>
                     </div>
-                    <Button type="primary" htmlType="submit">发送</Button>
                 </Form>
                     </Card>
                 </div>
