@@ -882,11 +882,6 @@
         "passState:3",
         "periodicSnapshot:weekly",
         "player",
-        "missionBattleCounters",
-        "periodicSnapshot:daily",
-        "periodicSnapshot:passWeek:3",
-        "passState:3",
-        "periodicSnapshot:weekly",
         "player",
         "questProgress:3",
         "categoryMissionProgress:9:11,12,13",
@@ -895,16 +890,16 @@
         "categoryMissionProgress:9:11,12,13,2630021,2630022,2630023",
         "characters"
       ],
-      "missionComputes": 386,
+      "missionComputes": 370,
       "snapshotSource": "none",
       "rereadReason": "earlier awake settlement precedes later authoritative reward, active-mission, response-state and active-quest writes",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 67,
-      "sqlWrites": 35,
+      "sqlReads": 60,
+      "sqlWrites": 34,
       "sqlByTable": {
         "players": {
-          "reads": 9,
-          "statements": 14,
+          "reads": 8,
+          "statements": 13,
           "writes": 5
         },
         "players_active_mission_battle_facts": {
@@ -998,8 +993,8 @@
           "writes": 0
         },
         "players_mission_battle_counters": {
-          "reads": 2,
-          "statements": 3,
+          "reads": 1,
+          "statements": 2,
           "writes": 1
         },
         "players_party_race_clears": {
@@ -1008,13 +1003,13 @@
           "writes": 1
         },
         "players_pass_cards": {
-          "reads": 2,
-          "statements": 6,
-          "writes": 4
+          "reads": 1,
+          "statements": 4,
+          "writes": 3
         },
         "players_periodic_snapshots": {
-          "reads": 8,
-          "statements": 8,
+          "reads": 4,
+          "statements": 4,
           "writes": 0
         },
         "players_quest_progress": {
@@ -1212,11 +1207,6 @@
         "periodicSnapshot:weekly",
         "player",
         "collectedItems:100000",
-        "missionBattleCounters",
-        "periodicSnapshot:daily",
-        "periodicSnapshot:passWeek:3",
-        "passState:3",
-        "periodicSnapshot:weekly",
         "player",
         "questProgress:3",
         "categoryMissionProgress:9:11,12,13",
@@ -1225,16 +1215,16 @@
         "categoryMissionProgress:9:11,12,13,2630021,2630022,2630023",
         "characters"
       ],
-      "missionComputes": 390,
+      "missionComputes": 374,
       "snapshotSource": "none",
       "rereadReason": "no owner snapshot is injected; load the bounded post-write scope",
       "freshPostWriteEvaluationRequired": true,
-      "sqlReads": 69,
-      "sqlWrites": 34,
+      "sqlReads": 62,
+      "sqlWrites": 33,
       "sqlByTable": {
         "players": {
-          "reads": 12,
-          "statements": 17,
+          "reads": 11,
+          "statements": 16,
           "writes": 5
         },
         "players_active_mission_battle_facts": {
@@ -1323,8 +1313,8 @@
           "writes": 1
         },
         "players_mission_battle_counters": {
-          "reads": 2,
-          "statements": 3,
+          "reads": 1,
+          "statements": 2,
           "writes": 1
         },
         "players_party_race_clears": {
@@ -1333,13 +1323,13 @@
           "writes": 1
         },
         "players_pass_cards": {
-          "reads": 2,
-          "statements": 6,
-          "writes": 4
+          "reads": 1,
+          "statements": 4,
+          "writes": 3
         },
         "players_periodic_snapshots": {
-          "reads": 8,
-          "statements": 8,
+          "reads": 4,
+          "statements": 4,
           "writes": 0
         },
         "players_quest_progress": {
