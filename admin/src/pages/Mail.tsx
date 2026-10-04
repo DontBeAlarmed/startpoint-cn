@@ -323,19 +323,8 @@ export default function Mail() {
                             </Radio.Group>
                         </Form.Item>
 
-                        {/* 附件搜索常显: 需要 ID 的类型可选, 其余置灰; 数量在搜索框左侧 */}
+                        {/* 附件搜索常显: 需要 ID 的类型可选, 其余置灰; 数量在搜索框右侧 */}
                         <div className="mail-inline-row mail-attach-row">
-                            <span className="mail-inlbl">数量:</span>
-                            <Form.Item
-                                name="number"
-                                style={{ marginBottom: 0, width: 110 }}
-                            >
-                                <InputNumber
-                                    min={quantityRule.min}
-                                    max={quantityRule.max}
-                                    disabled={quantityRule.max === 1}
-                                />
-                            </Form.Item>
                             <Form.Item
                                 name="type_id"
                                 rules={[
@@ -366,13 +355,24 @@ export default function Mail() {
                                     }}
                                 />
                             </Form.Item>
+                            <span className="mail-inlbl">数量:</span>
+                            <Form.Item
+                                name="number"
+                                style={{ marginBottom: 0, width: 96 }}
+                            >
+                                <InputNumber
+                                    min={quantityRule.min}
+                                    max={quantityRule.max}
+                                    disabled={quantityRule.max === 1}
+                                />
+                            </Form.Item>
                         </div>
                     </div>
 
                     <div className="admin-form-section">
                         <div className="admin-form-section-title">正文</div>
                         <div className="mail-inline-row mail-title-row">
-                            <Form.Item name="subject" style={{ flex: "1 1 auto", marginBottom: 0 }}>
+                            <Form.Item name="subject" style={{ flex: "1 1 auto", minWidth: 0, marginBottom: 0 }}>
                                 <Input maxLength={64} showCount placeholder="默认标题(留空使用游戏默认)" />
                             </Form.Item>
                         </div>
