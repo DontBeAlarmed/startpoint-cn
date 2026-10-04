@@ -187,6 +187,13 @@ async function execBox(viewerId, boxId, number, stopOnFeaturedRewards) {
     })
 }
 
+function categoryMissionProgress(playerId, category, missionId) {
+    return database.prepare(`
+        SELECT progress FROM players_category_missions
+        WHERE player_id = ? AND category = ? AND id = ?
+    `).get(playerId, category, missionId)?.progress ?? 0
+}
+
 test.before(async () => {
     database = data.initializeDatabase({
         databaseFactory: databasePath => new BetterSqlite3(databasePath, {
@@ -508,3 +515,18 @@ test("resettable box ignores featured early stop and empties the requested inven
     assert.equal(after.drawn.reduce((sum, reward) => sum + reward.number, 0), 10)
     assert.equal(after.box.remainingNumber, 0)
 })
+
+test("box gacha exec settles companion count mission on new character", async () => {
+    const { playerId, viewerId } = await createPlayer("box-mission-settle")
+    // box 4 单发:唯一奖励即新角色(151006)→ 任务 32(持有角色数)当场推进
+    const ownedBefore = Object.keys(getPlayerCharactersSync(playerId)).length
+    assert.equal(ownedBefore, 1, "测试前提:初始仅默认角色")
+    const characterDraw = await execBox(viewerId, 4, 1, false)
+    assert.equal(characterDraw.statusCode, 200, characterDraw.body)
+    assert.equal(
+        categoryMissionProgress(playerId, 1, 32),
+        2,
+        "新角色入队后任务 32 进度必须当场推进",
+    )
+})
+

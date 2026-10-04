@@ -99,9 +99,31 @@ stubModule("../src/lib/character-content", {
 })
 stubModule("../src/data/utils", { clientSerializeDate: value => value })
 stubModule("../src/lib/character-stack", { validateCharacterStackConversion: () => null })
+// 经验注入的窄域任务结算(5134d7e3):级联引擎在本测试的自定义桩环境外,
+// 桩为恒空结算
+stubModule("../src/lib/mission/settlement", {
+    settleMissionCategories: () => ({
+        missionInfo: [], itemList: {}, characterList: [], equipmentList: [],
+        degreeIds: [], passCardPoints: {},
+    }),
+})
+stubModule("../src/lib/mission/response-fragment", {
+    composeMissionSettlementResponse: () => {},
+    projectMissionSettlementFragment: () => ({ common: {}, degreeIds: [] }),
+})
+stubModule("../src/lib/mission/active-publication-owner", {
+    publishActiveMissionOwnerStateWithinTransaction: () => ({ activeMissionList: [] }),
+})
+stubModule("../src/lib/mission/awake-request-context", {
+    createAwakeRequestContext: () => null,
+})
+stubModule("../src/lib/character-growth/facts/awake-unlock-facts", {
+    publishAwakeUnlockCharacterListWithStateWithinTransaction: () => ({ characterList: [] }),
+})
 stubModule("../src/utils", {
     generateDataHeaders: values => ({ viewer_id: values.viewer_id, result_code: values.result_code ?? 1 }),
     getServerTime: () => 0,
+    getServerDate: () => new Date(0),
     getTimeOffset: () => 0,
 })
 stubModule("../src/lib/character", {

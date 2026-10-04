@@ -11,6 +11,9 @@ import {
     validateGrowthCommandIds,
     validatePositiveAmount,
 } from "../mutation-support"
+import type { MissionSettlementResult } from "../../mission/settlement"
+import { publishActiveMissionOwnerStateWithinTransaction } from "../../mission/active-publication-owner"
+import { settleOverLimitMissions } from "../over-limit-mission-settlement"
 
 export interface OverLimitCommand {
     readonly playerId: number
@@ -27,6 +30,8 @@ export interface OverLimitResult {
     readonly after: ReturnType<typeof observedCore>
     readonly itemId?: number
     readonly itemCount?: number
+    readonly missionSettlement: MissionSettlementResult | null
+    readonly activeMissionList: readonly unknown[]
     readonly replayed: false
 }
 
@@ -77,6 +82,12 @@ export function executeOverLimit(command: OverLimitCommand): OverLimitResult {
                     overLimitStep: nextOverLimit,
                     stack: before.stack - command.overLimitCount,
                 }),
+                missionSettlement: settleOverLimitMissions(command.playerId, command.evaluationTime),
+                activeMissionList: publishActiveMissionOwnerStateWithinTransaction({
+                    playerId: command.playerId,
+                    now: command.evaluationTime,
+                    source: "character-growth/over-limit",
+                }).activeMissionList,
                 replayed: false,
             } as OverLimitResult
         }
@@ -101,6 +112,12 @@ export function executeOverLimit(command: OverLimitCommand): OverLimitResult {
                 after: observedCore(before, { overLimitStep: nextOverLimit }),
                 itemId,
                 itemCount: itemResult.afterAmount,
+                missionSettlement: settleOverLimitMissions(command.playerId, command.evaluationTime),
+                activeMissionList: publishActiveMissionOwnerStateWithinTransaction({
+                    playerId: command.playerId,
+                    now: command.evaluationTime,
+                    source: "character-growth/over-limit",
+                }).activeMissionList,
                 replayed: false,
             } as OverLimitResult
         })

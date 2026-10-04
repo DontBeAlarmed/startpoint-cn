@@ -5,7 +5,7 @@ import { getDefaultPlayerData } from "../utils/default-player";
 import { deserializeBoolean, serializeBoolean } from "../utils/primitives";
 import { getAccountSync } from "./account";
 import { getPlayerQuestProgressSync } from "./quest";
-import { getBusinessDayKey, isNewDay, isNewWeek } from "../../lib/time-utils";
+import { getBusinessDayKey, isNewWeek } from "../../lib/time-utils";
 import { buildPeriodicSnapshotData, getPassWeekSnapshotType, getSnapshot, initializePeriodicMissionSnapshots, takeSnapshot } from "../../lib/mission/snapshot";
 
 import { ensurePlayerPassCardLoginProgressSync } from "./pass-card";
@@ -1249,32 +1249,57 @@ export function collectPlayerPooledExpSync(
  * Performs a daily reset for a a player data object.
  * 
  * @param player The player data to perform the daily reset for
- * @param loginDate 
+ * @param virtualNow 服务器虚拟业务时间(lastLoginTime 与窗口判定)
+ * @param realNow 真实墙钟(跨天桶基准)
  * @returns A boolean; whether the daily reset was performed
  */
 export function dailyResetPlayerDataSync(
     player: Player,
-    loginDate: Date = getRealNow(),
+    virtualNow: Date,
+    realNow: Date,
     resetHour = 5,
 ): boolean {
     const lastLoginTime = player.lastLoginTime
     const playerId = player.id
-    const crossedDay = isNewDay(loginDate, lastLoginTime, resetHour)
-    const crossedWeek = isNewWeek(loginDate, lastLoginTime, resetHour)
+    // 跨天口径:周期刷新桶走【真实业务日】——时间可调服务的防加速钳制,
+    // 跳转服务器时间不推进日常周期,真实日缺口超过一天也只按一天计
+    // (identity-time-and-load.md 双时钟约定;开放/领取窗口仍走虚拟时间)。
+    // 真实业务日标记持久化在 players.last_daily_reset_real_business_day,
+    // 与 lastLoginTime(虚拟语义,含客户端存档展示)解耦。
+    const realBusinessDay = getBusinessDayKey(realNow, resetHour)
+    const storedRealBusinessDay = getPlayerDailyResetRealBusinessDaySync(playerId)
+    // 首次标记写入(新玩家/导入档/迁移)只落标记不触发日切:避免同真实日
+    // 双计登录天与意外的周常清空;周期从下一个真实业务日开始。
+    // 该标记是服务端内部态,刻意不进 Player 类型与存档格式(与
+    // lastLoginTime 的客户端可见语义解耦)。
+    if (storedRealBusinessDay === null) {
+        getDb().prepare(`
+            UPDATE players SET last_daily_reset_real_business_day = ? WHERE id = ?
+        `).run(realBusinessDay, playerId)
+        updatePlayerSync({ id: playerId, lastLoginTime: virtualNow })
+        player.lastLoginTime = virtualNow
+        return false
+    }
+    const lastRealBusinessDayDate = new Date(`${storedRealBusinessDay}T00:00:00Z`)
+    const crossedDay = realBusinessDay > storedRealBusinessDay
+    const crossedWeek = isNewWeek(realNow, lastRealBusinessDayDate, resetHour)
 
     if (crossedDay) {
         const resetPerformed = getDb().transaction(() => {
             updatePlayerSync({
                 id: playerId,
-                lastLoginTime: loginDate,
+                lastLoginTime: virtualNow,
                 bossBoostPoint: 3,
                 boostPoint: 3,
                 totalLoginDays: (player.totalLoginDays ?? 0) + 1
             })
+            getDb().prepare(`
+                UPDATE players SET last_daily_reset_real_business_day = ? WHERE id = ?
+            `).run(realBusinessDay, playerId)
             recordCurrentPassLogin(
                 playerId,
                 (player.totalLoginDays ?? 0) + 1,
-                loginDate,
+                virtualNow,
             )
 
             resetPlayerGachaDailyStateSync(playerId)
@@ -1302,7 +1327,7 @@ export function dailyResetPlayerDataSync(
 
             const activePassWeekEventId = getMissionCatalog().getDefinitions(7).find(definition =>
                 definition.eventId !== undefined
-                && isMissionMasterDefinitionEnabledAt(definition, loginDate)
+                && isMissionMasterDefinitionEnabledAt(definition, virtualNow)
             )?.eventId
             if (activePassWeekEventId !== undefined) {
                 const snapshotType = getPassWeekSnapshotType(activePassWeekEventId)
@@ -1320,7 +1345,7 @@ export function dailyResetPlayerDataSync(
 
             return true
         })()
-        player.lastLoginTime = loginDate
+        player.lastLoginTime = virtualNow
         player.bossBoostPoint = 3
         player.boostPoint = 3
         player.totalLoginDays = (player.totalLoginDays ?? 0) + 1
@@ -1328,25 +1353,18 @@ export function dailyResetPlayerDataSync(
     } else {
         updatePlayerSync({
             id: playerId,
-            lastLoginTime: loginDate,
+            lastLoginTime: virtualNow,
         })
-        player.lastLoginTime = loginDate
+        player.lastLoginTime = virtualNow
         return false
     }
 }
 
-/**
- * Performs a daily reset for a player
- * 
- * @param playerId The ID of the player to perform the daily reset for.
- * @returns A boolean; whether the daily reset was performed
- */
-export function dailyResetPlayerSync(
-    playerId: number,
-    resetHour = 5,
-): boolean {
-    const playerData = getPlayerSync(playerId)
-    if (!playerData) return false;
-
-    return dailyResetPlayerDataSync(playerData, getRealNow(), resetHour)
+function getPlayerDailyResetRealBusinessDaySync(playerId: number): string | null {
+    const row = getDb().prepare(`
+        SELECT last_daily_reset_real_business_day
+        FROM players WHERE id = ?
+    `).get(playerId) as { last_daily_reset_real_business_day: string | null } | undefined
+    return row?.last_daily_reset_real_business_day ?? null
 }
+

@@ -3,6 +3,9 @@ import { getCurrencyCapacityPolicySync } from "./config-content"
 import { getPlayerSync, updatePlayerSync } from "../data/domains/player"
 import { getDb } from "../data/db";
 import { withInventoryBatchContextWithinTransactionSync } from "./inventory"
+import { settleManaAdditionMissions } from "./mana-addition-mission-settlement"
+import { getServerDate } from "../utils"
+import type { MissionSettlementResult } from "./mission/settlement"
 
 const ABILITY_SOUL_RESERVED_COUNT = 3
 
@@ -12,6 +15,7 @@ export type ItemSellResult =
         newCount: number;
         freeMana: number;
         manaGained: number;
+        missionSettlement: MissionSettlementResult | null;
     }
     | {
         ok: false;
@@ -80,12 +84,15 @@ export function sellItemSync(
                 freeMana: newMana,
                 totalManaObtained: (player.totalManaObtained ?? 0) + manaGained,
             })
+            // 玛纳入账是「累计获得玛纳」事实的产生时点,结算与入账同事务
+            const missionSettlement = settleManaAdditionMissions(playerId, getServerDate())
 
             return {
                 ok: true,
                 newCount: itemResult.afterAmount,
                 freeMana: newMana,
                 manaGained,
+                missionSettlement,
             }
         })
     })()

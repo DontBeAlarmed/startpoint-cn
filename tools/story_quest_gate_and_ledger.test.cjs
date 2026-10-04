@@ -190,9 +190,11 @@ test("main story first clear settles the category 1 ledger in the same transacti
         true,
         "chapter count missions must settle together with the chapter mission",
     )
+    // 230 石(任务 11 + 45 + 46)+ 级联轮 10 石(player 族达标)
+    // = 240 石;官方依次结算语义(2026-10-03 级联批准)
     assert.equal(
-        getPlayerSync(playerId).freeVmoney,
-        playerBefore.freeVmoney + CHAPTER_MISSION_REWARD_STONE + 30 + 50,
+        getPlayerSync(playerId).freeVmoney - playerBefore.freeVmoney,
+        240,
         "chapter mission and count mission stones must be granted in the same transaction",
     )
 
@@ -205,8 +207,8 @@ test("main story first clear settles the category 1 ledger in the same transacti
         "repeated story finish must not re-grant mission rewards",
     )
     assert.equal(
-        getPlayerSync(playerId).freeVmoney,
-        playerBefore.freeVmoney + CHAPTER_MISSION_REWARD_STONE + 30 + 50,
+        getPlayerSync(playerId).freeVmoney - playerBefore.freeVmoney,
+        240,
         "repeated story finish must not re-grant stones",
     )
 })

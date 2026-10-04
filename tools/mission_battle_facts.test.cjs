@@ -210,7 +210,7 @@ const singleValuePlanCall = singleBattleSource.indexOf(
     singleTransactionStart,
 )
 const singleFactCall = singleBattleSource.indexOf(
-    "recordMissionBattleFacts(finishCtx, settlementTime)",
+    "recordMissionBattleFacts(",
     singleValuePlanCall,
 )
 const singleCharacterExp = singleBattleSource.indexOf(
@@ -309,7 +309,7 @@ const multiValuePlanCall = multiBattleSource.indexOf(
     multiTransactionStart,
 )
 const multiFactCall = multiBattleSource.indexOf(
-    "recordMissionBattleFacts(finishCtx, settlementTime)",
+    "recordMissionBattleFacts(",
     multiValuePlanCall,
 )
 const multiCharacterExp = multiBattleSource.indexOf(

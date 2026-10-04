@@ -7,7 +7,7 @@ import {
     normalizeEquipmentBatchIds, updatePlayerEquipmentStacksToZeroSync, updatePlayerEquipmentSync,
 } from "../../data/domains/equipment";
 import { getSession } from "../../data/domains/session";
-import { generateDataHeaders } from "../../utils";
+import { generateDataHeaders, getServerDate } from "../../utils";
 import { buildFullEquipmentList } from "../../lib/equipment";
 import { calculateDissolveRewards } from "../../lib/equipment-dissolve";
 import { asAccountId, asPlayerId, AccountId, PlayerId } from "../../lib/types";
@@ -17,10 +17,7 @@ import { getMailArrivedSync } from "../../lib/mail-notification";
 import { getDb } from "../../data/db";
 import { projectEquipmentEntity } from "../../lib/common-response/entities";
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
-import type {
-    CommonResponseFragment,
-    CommonResponseProjection,
-} from "../../lib/common-response/model";
+import type { CommonResponseFragment } from "../../lib/common-response/model";
 import { withInventoryBatchContextWithinTransactionSync } from "../../lib/inventory";
 import { createRewardGrantItemOverflowPolicy } from "../../lib/reward-grant-item-overflow";
 import {
@@ -28,6 +25,12 @@ import {
     settleDirectItemOverflowsWithinTransactionSync,
     type PlannedItemOverflowDisposition,
 } from "../../lib/item-overflow";
+import { settleCraftPointMissions } from "../../lib/craft-point-mission-settlement";
+import {
+    composeMissionSettlementResponse,
+    projectMissionSettlementFragment,
+} from "../../lib/mission/response-fragment";
+import type { MissionSettlementResult } from "../../lib/mission/settlement";
 
 interface SellEquipmentListItem {
     equipment_id: number
@@ -61,6 +64,7 @@ function grantDissolveRewardsWithinTransactionSync(
     itemList: Record<number, number>
     itemOverflowDispositions: readonly PlannedItemOverflowDisposition[]
     overflowFreeManaAfter: number | null
+    missionSettlement: MissionSettlementResult | null
 } {
     const grants = [
         ...(craftPoints > 0 ? [{ itemId: wrightpieceItemId(), amount: craftPoints }] : []),
@@ -71,7 +75,7 @@ function grantDissolveRewardsWithinTransactionSync(
         })),
     ]
     if (grants.length === 0) {
-        return { itemList: {}, itemOverflowDispositions: [], overflowFreeManaAfter: null }
+        return { itemList: {}, itemOverflowDispositions: [], overflowFreeManaAfter: null, missionSettlement: null }
     }
 
     return withInventoryBatchContextWithinTransactionSync({
@@ -99,10 +103,15 @@ function grantDissolveRewardsWithinTransactionSync(
                 playerId,
                 overflows: pendingOverflows,
             })
+        // 锻块到账是「累计获得锻造石」事实的产生时点,结算与发放同事务
+        const missionSettlement = craftPoints > 0
+            ? settleCraftPointMissions(playerId, getServerDate())
+            : null
         return {
             itemList,
             itemOverflowDispositions: overflowSettlement?.dispositions ?? [],
             overflowFreeManaAfter: overflowSettlement?.freeManaAfter ?? null,
+            missionSettlement,
         }
     })
 }
@@ -110,7 +119,8 @@ function grantDissolveRewardsWithinTransactionSync(
 function dissolveResponseData(
     settlement: ReturnType<typeof grantDissolveRewardsWithinTransactionSync>,
     playerId: number,
-): CommonResponseProjection {
+    viewerId: number,
+): Record<string, unknown> {
     const overMax = projectItemOverflowCommonResponse(settlement.itemOverflowDispositions)
     const fragment: CommonResponseFragment = {
         equipment_list: buildFullEquipmentList(playerId).map(
@@ -123,7 +133,18 @@ function dissolveResponseData(
             ? { user_info: { free_mana: settlement.overflowFreeManaAfter } }
             : {}),
     }
-    return mergeCommonResponseFragments([fragment])
+    const responseData: Record<string, unknown> = {
+        ...mergeCommonResponseFragments([fragment]),
+    }
+    if (settlement.missionSettlement !== null) {
+        // 锻块到账跨过任务/称号阶段时,完成与奖励在溶解响应内当场发布
+        composeMissionSettlementResponse(
+            responseData,
+            projectMissionSettlementFragment(settlement.missionSettlement),
+            viewerId,
+        )
+    }
+    return responseData
 }
 
 const routes = async (fastify: FastifyInstance) => {
@@ -193,7 +214,7 @@ const routes = async (fastify: FastifyInstance) => {
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": dissolveResponseData(rewardSettlement, playerId),
+            "data": dissolveResponseData(rewardSettlement, playerId, viewerId),
         })
     })
 
@@ -278,7 +299,7 @@ const routes = async (fastify: FastifyInstance) => {
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": dissolveResponseData(rewardSettlement, playerId),
+            "data": dissolveResponseData(rewardSettlement, playerId, viewerId),
         })
     })
 
@@ -357,7 +378,7 @@ const routes = async (fastify: FastifyInstance) => {
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send({
             "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": dissolveResponseData(rewardSettlement, playerId),
+            "data": dissolveResponseData(rewardSettlement, playerId, viewerId),
         })
     })
 }

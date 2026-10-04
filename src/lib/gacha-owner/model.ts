@@ -7,6 +7,7 @@ import type {
     GachaCharacterSampledLogSnapshot,
     GachaSeedMarkSnapshot,
 } from "../gacha-reward-grant"
+import type { MissionSettlementResult } from "../mission/settlement"
 
 export interface GachaExecCommand {
     readonly playerId: number
@@ -62,6 +63,7 @@ interface GachaExecSuccessBase {
     readonly itemOverflowDispositions: readonly PlannedItemOverflowDisposition[]
     readonly postCommitEffects: readonly GachaPostCommitEffect[]
     readonly activeMissionList: readonly unknown[]
+    readonly missionSettlement: MissionSettlementResult | null
 }
 
 export interface CharacterGachaExecSuccess extends GachaExecSuccessBase {
@@ -111,6 +113,8 @@ interface GachaExchangeSuccessBase {
     }>
     readonly itemOverflowDispositions: readonly PlannedItemOverflowDisposition[]
     readonly postCommitEffects: readonly GachaPostCommitEffect[]
+    readonly missionSettlement: MissionSettlementResult | null
+    readonly activeMissionList: readonly unknown[]
 }
 
 export interface CharacterGachaExchangeSuccess extends GachaExchangeSuccessBase {
@@ -167,6 +171,8 @@ export interface CrazyGachaSelectSuccess {
     readonly itemOverflowDispositions: readonly PlannedItemOverflowDisposition[]
     readonly mailArrived: boolean
     readonly postCommitEffects: readonly GachaPostCommitEffect[]
+    readonly missionSettlement: MissionSettlementResult | null
+    readonly activeMissionList: readonly unknown[]
 }
 
 export type CrazyGachaCandidateResult = CrazyGachaCandidateSuccess

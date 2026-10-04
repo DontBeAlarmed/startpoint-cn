@@ -83,6 +83,8 @@ flowchart LR
 | `server-time.json` 保存全局 offset | `src/runtime/server-time/store.ts` |
 | 默认服务器时间基准为 `2024-08-14T12:00:00Z` | `src/runtime/server-time/service.ts` |
 | `GameTimeContext` 同时捕获真实与虚拟时间 | `src/runtime/time/game-time.ts` |
+| 主日切(totalLoginDays/每日任务/gacha 每日态/周重置)以【真实业务日】为桶(UTC+8 05:00),标记持久化于 `players.last_daily_reset_real_business_day`;跳转服务器时间不推进日常周期,真实日缺口超过一天只按一天计(时间可调兼容钳制,不补计缺席天数);标记缺失(新玩家/导入档/迁移)时仅落标记不触发日切,周常清空顺延到下一个真实周边界 | `src/data/domains/player.ts` dailyResetPlayerDataSync、`tools/real_day_rollover.test.cjs` |
+| 任务领取/开放窗口(isEnabledAt)与登录奖励组选择走虚拟业务日;登录奖励另以 `lastGrantedRealBusinessDay`(真实业务日)防重发 | `src/lib/mission/settlement-prepare.ts`、`src/lib/login-bonus.ts` |
 | 客户端时间转换使用同一个全局 offset | `src/utils.ts` |
 
 本图不把 `players.time_offset` 连入运行时，也不把所有 `Date.now()` 自动解释为虚拟业务时间。

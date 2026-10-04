@@ -15,7 +15,10 @@ import {
 } from "../../lib/character-election"
 import { getOpenCharacterElectionVoteMissionId } from "../../lib/mission/event-entry-facts"
 import { settleMissionCategories } from "../../lib/mission/settlement"
-import { mergeMissionSettlementResponse } from "../../lib/mission/response"
+import {
+    composeMissionSettlementResponse,
+    projectMissionSettlementFragment,
+} from "../../lib/mission/response-fragment"
 import { generateDataHeaders, getServerTime } from "../../utils"
 
 interface ElectionBody {
@@ -146,7 +149,7 @@ export default async function characterElectionRoutes(
             }], evaluationTime)
         })()
         const responseData: Record<string, unknown> = {}
-        mergeMissionSettlementResponse(responseData, missionSettlement, context.viewerId)
+        composeMissionSettlementResponse(responseData, projectMissionSettlementFragment(missionSettlement), context.viewerId)
         return sendMsgpack(reply, context.viewerId, 1, responseData)
     })
 }

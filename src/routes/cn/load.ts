@@ -241,7 +241,7 @@ const routes = async (fastify: FastifyInstance, options: CnLoadRouteOptions) => 
         const now = gameTime.virtualNow;
         const previousLastLoginMs = player.lastLoginTime.getTime();
         const isBeginner = player.totalLoginDays <= 1;
-        dailyResetPlayerDataSync(player, now, options.dailyResetHour);
+        dailyResetPlayerDataSync(player, now, gameTime.realNow, options.dailyResetHour);
         getDb().transaction(() => {
             refreshPlayerDailyChallengePointsForRealDaySync(
                 playerId,

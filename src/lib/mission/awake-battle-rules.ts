@@ -1,6 +1,7 @@
 import {
     assertAwakeMissionFields,
 } from "./awake-rule-catalog"
+import { getMissionCatalog } from "./mission-catalog"
 
 export {
     getAwakeGenericCharacterClearRules,
@@ -333,12 +334,15 @@ export function getMatchedAwakeRaceMissionIds(
 export function isBondTokenMissionComplete(
     bondTokens: readonly { status: number }[] | undefined,
 ): boolean {
+    // 官方语义确认(2026-10-03 用户取证,同日首次口径「按获得」已撤回):
+    // 以【领取进包】为节点(status>=2);板完成只授予(0→1),领取是
+    // 玩家的独立动作,任务不依赖授予瞬间。
     return bondTokens !== undefined
         && bondTokens.length > 0
         && bondTokens.every(bondToken => bondToken.status >= 2)
 }
 
-function validateAwakeBattleRuleSchemas(): void {
+export function validateAwakeBattleRuleSchemas(): void {
 for (const rule of EXACT_QUEST_RULES) {
     const expectedPattern = rule.timeLimitMs === undefined
         ? rule.missionId === 1110013 ? "93" : "23"
@@ -359,4 +363,13 @@ assertAwakeMissionFields(13, { 4: "28", 5: "1", 7: "3", 23: "1" })
 assertAwakeMissionFields(1210012, { 4: "28", 5: "1", 7: "3", 23: "121001" })
 assertAwakeMissionFields(1210013, { 4: "30", 7: "3", 23: "121001" })
 assertAwakeMissionFields(2410633, { 4: "93", 7: "3", 24: "241063,243007,361009" })
+// all-complete 家族(cat9 中任务 ID 以 4 结尾):主数据 row[19] 的子任务
+// 选择器必须与运行时的位减推导(missionId-3/-2/-1)一致,主数据漂移即
+// 首次觉醒战斗事实计算时失败(2026-10-03 用户确认推导规则 = row[19] 权威)
+for (const missionId of getMissionCatalog().getMissionIds(9)) {
+    if (missionId % 10 !== 4) continue
+    assertAwakeMissionFields(missionId, {
+        19: `${missionId - 3},${missionId - 2},${missionId - 1}`,
+    })
+}
 }

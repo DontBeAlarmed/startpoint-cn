@@ -114,6 +114,7 @@ async function handleExec(request: FastifyRequest, reply: FastifyReply) {
     reply.header("content-type", "application/x-msgpack")
     return reply.status(200).send(projectGachaExecResponse({
         dataHeaders: generateDataHeaders({ viewer_id: viewerId }),
+        viewerId,
         result,
         postCommit,
     }))

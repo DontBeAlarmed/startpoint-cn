@@ -20,13 +20,17 @@ import {
     getEquipmentRaritySync,
 } from "../../lib/equipment-content";
 import { AccountId, PlayerId } from "../../lib/types";
+import type { PlayerEquipment } from "../../data/types";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDb } from "../../data/db";
 import { canUseEquipmentAwakeningCrystal } from "../../lib/equipment-upgrade";
 import { getMailArrivedSync } from "../../lib/mail-notification";
 import { settleMissionOperationFactsSync } from "../../lib/mission/operation-fact-settlement";
+import { getDegreeMissionIdsForConditionTypes } from "../../lib/mission/degree-candidates";
+import { settleMissionCategories } from "../../lib/mission/settlement";
+import { getMissionCatalog } from "../../lib/mission/mission-catalog";
 import { publishActiveMissionOwnerStateWithinTransaction } from "../../lib/mission/active-publication-owner";
-import { mergeMissionSettlementResponse } from "../../lib/mission";
+import { composeMissionSettlementResponse, projectMissionSettlementFragment } from "../../lib/mission/response-fragment";
 import { projectEquipmentEntity } from "../../lib/common-response/entities";
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
 import type { CommonResponseFragment } from "../../lib/common-response/model";
@@ -61,6 +65,31 @@ interface BulkUpgradeBody {
 }
 
 const wrightpieceItemId = () => getEquipmentCurrencyPolicySync().craftPointItemId
+
+// 装备升级跨过 5 级是「5级装备持有数」状态事实的产生时点:任务 68 族
+// (total_equipment_5_level_count)与 5 级装备称号(cat5 condition 36)必须
+// 同事务窄域当场结算,否则奖励被推迟到下次进关/任务页(2026-10-01 时点审计;
+// condition 36 本就不在战斗 finish 的 degree 结算白名单,升级动作又发生在
+// 战斗外,此前无任何运行时结算点)。
+function settleEquipmentLevelMissions(
+    playerId: number,
+    equipment: Record<string, PlayerEquipment>,
+    evaluationTime: Date,
+) {
+    const fiveLevelMissionIds = getMissionCatalog()
+        .getDefinitionsByPattern("total_equipment_5_level_count")
+        .map(definition => definition.missionId)
+    return settleMissionCategories(
+        playerId,
+        [
+            { category: 1, missionIds: fiveLevelMissionIds },
+            { category: 5, missionIds: getDegreeMissionIdsForConditionTypes([36]) },
+        ],
+        evaluationTime,
+        undefined,
+        { factSeeds: { equipment } },
+    )
+}
 
 // wrightpiece cost for each rank of weapon (awakening) — from CDN
 const getUpgradeCost = (rarity: number): number => {
@@ -150,6 +179,11 @@ const routes = async (fastify: FastifyInstance) => {
                 getServerDate(),
                 equipmentSnapshot,
             )
+            const levelMissionSettlement = settleEquipmentLevelMissions(
+                playerId,
+                equipmentSnapshot,
+                getServerDate(),
+            )
 
             if (dissolveInfo?.generate_ability_soul) {
                 withInventoryBatchContextWithinTransactionSync({
@@ -185,6 +219,7 @@ const routes = async (fastify: FastifyInstance) => {
             return {
                 equipmentSnapshot,
                 missionSettlement,
+                levelMissionSettlement,
                 itemOverflowDispositions,
                 overflowFreeManaAfter,
                 activeMissionList: activeMission.activeMissionList,
@@ -216,7 +251,18 @@ const routes = async (fastify: FastifyInstance) => {
             degree_list: [],
         }
         if (operationResult.missionSettlement) {
-            mergeMissionSettlementResponse(responseData, operationResult.missionSettlement, viewerId)
+            composeMissionSettlementResponse(
+                responseData,
+                projectMissionSettlementFragment(operationResult.missionSettlement),
+                viewerId,
+            )
+        }
+        if (operationResult.levelMissionSettlement) {
+            composeMissionSettlementResponse(
+                responseData,
+                projectMissionSettlementFragment(operationResult.levelMissionSettlement),
+                viewerId,
+            )
         }
         responseData.active_mission_list = operationResult.activeMissionList
         return reply.status(200).send({
@@ -352,6 +398,11 @@ const routes = async (fastify: FastifyInstance) => {
                     getServerDate(),
                     equipmentSnapshot,
                 )
+                const levelMissionSettlement = settleEquipmentLevelMissions(
+                    playerId,
+                    equipmentSnapshot,
+                    getServerDate(),
+                )
                 const activeMission = publishActiveMissionOwnerStateWithinTransaction({
                     playerId,
                     now: getServerDate(),
@@ -360,6 +411,7 @@ const routes = async (fastify: FastifyInstance) => {
                 return {
                     equipmentSnapshot,
                     missionSettlement,
+                    levelMissionSettlement,
                     itemOverflowDispositions: overflowSettlement.dispositions,
                     overflowFreeManaAfter: overflowSettlement.freeManaAfter,
                     activeMissionList: activeMission.activeMissionList,
@@ -389,7 +441,18 @@ const routes = async (fastify: FastifyInstance) => {
             degree_list: [],
         }
         if (operationResult.missionSettlement) {
-            mergeMissionSettlementResponse(bulkResponseData, operationResult.missionSettlement, viewerId)
+            composeMissionSettlementResponse(
+                bulkResponseData,
+                projectMissionSettlementFragment(operationResult.missionSettlement),
+                viewerId,
+            )
+        }
+        if (operationResult.levelMissionSettlement) {
+            composeMissionSettlementResponse(
+                bulkResponseData,
+                projectMissionSettlementFragment(operationResult.levelMissionSettlement),
+                viewerId,
+            )
         }
         bulkResponseData.active_mission_list = operationResult.activeMissionList
         return reply.status(200).send({

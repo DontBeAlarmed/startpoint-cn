@@ -511,7 +511,7 @@ function testRemainingAuthoritativeMutationRoutesPublishAwakeUnlocks() {
     assert.deepEqual(boxGachaCall.enclosingLoops, [])
     assert.deepEqual(
         findPropertyAssignmentValues(boxExecBlock, "character_list"),
-        ["characterList.map(\n                        character => projectCharacterPatch(character),\n                    )"],
+        ["characterList.map(\n                    character => projectCharacterPatch(character),\n                )"],
     )
     assert.equal(findCalls(boxCloseBlock, "reconcileAwakeUnlockCharacterList").length, 0)
     assert.equal(findCalls(boxReadOnlyBlock, "reconcileAwakeUnlockCharacterList").length, 0)

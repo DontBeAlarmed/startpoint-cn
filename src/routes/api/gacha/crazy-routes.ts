@@ -126,6 +126,7 @@ export function registerCrazyGachaRoutes(fastify: FastifyInstance): void {
         reply.header("content-type", "application/x-msgpack")
         return reply.status(200).send(projectCrazyGachaSelectResponse({
             dataHeaders: generateDataHeaders({ viewer_id: body.viewer_id }),
+            viewerId: body.viewer_id,
             result,
             postCommit,
         }))

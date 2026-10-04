@@ -78,6 +78,7 @@ async function handleExchange(
     reply.header("content-type", "application/x-msgpack")
     return reply.status(200).send(projectGachaExchangeResponse({
         dataHeaders: generateDataHeaders({ viewer_id: viewerId }),
+        viewerId,
         result,
         postCommit,
     }))

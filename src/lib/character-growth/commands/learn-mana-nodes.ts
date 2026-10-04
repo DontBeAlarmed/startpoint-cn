@@ -9,6 +9,11 @@ import { incrementActiveMissionUsedManaCountSync } from "../../../data/domains/a
 import { recordCollectMissionManaSpend } from "../../mission/collect-battle-facts"
 import { getServerTime } from "../../../utils"
 import { publishActiveMissionOwnerStateWithinTransaction } from "../../mission/active-publication-owner"
+import { settleMissionCategories } from "../../mission/settlement"
+import { getMissionCatalog } from "../../mission/mission-catalog"
+import { getDegreeMissionIdsForConditionTypes } from "../../mission/degree-candidates"
+import { DEGREE_SUPPORTED_FAMILIES } from "../../mission/degree-context-requirements"
+import type { MissionSettlementResult } from "../../mission/settlement"
 import { recordSecondManaBoardCompletionMilestoneSync } from "../../../lib/player-history-milestones"
 import { getPlayerSync, updatePlayerSync } from "../../../data/domains/player"
 import { isCharacterSecondManaBoardAvailable } from "../../mana-board-availability"
@@ -58,6 +63,7 @@ export interface LearnManaNodesResult extends CharacterGrowthCommandResult {
     readonly evolution: Object
     readonly missionFacts: Readonly<{ readonly usedMana: number }>
     readonly activeMissionList: readonly unknown[]
+    readonly missionSettlement: MissionSettlementResult | null
     readonly resourceState: Readonly<{
         mana: number
         freeMana: number
@@ -196,6 +202,48 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
         if (boardId === 2 && isBoardComplete) {
             recordSecondManaBoardCompletionMilestoneSync(command.playerId, command.characterId)
         }
+        // 学节点是「已学节点集合」事实的产生时点:玛纳板累计强化数
+        // (total_released_mana_node_count,任务 37 族)与二板全部强化完成
+        // (manaboard_2nd_complete_count,任务 96 族)是状态派生任务,必须在
+        // 同事务窄域当场结算,否则奖励被推迟到下次进关/任务页
+        // (2026-10-01 时点审计发现 #2:learn 显式 null)。开板数
+        // (manaboard_2nd_open_count)由 open_mana_board 的全量结算负责。
+        // 板完成同时触发信赖证授予(0→1),任务 39(累计获得信赖之证)与
+        // 该角色的好感/二板完成称号(cat5 condition 44/48)随之推进——44 虽在
+        // 战斗 finish 白名单内但只覆盖参战角色,48 完全不在白名单,授予动作
+        // 又都发生在战斗外,必须在此当场结算。
+        const learnMissionIds = [
+            ...getMissionCatalog().getDefinitionsByPattern("total_released_mana_node_count"),
+            ...getMissionCatalog().getDefinitionsByPattern("manaboard_2nd_complete_count"),
+            ...getMissionCatalog().getDefinitionsByPattern("total_obtained_bond_token_count"),
+        ].map(definition => definition.missionId)
+        // cond48 的角色绑定列(row[15])为空的是全角色聚合族(55000 三条),
+        // 同样由二板完成驱动,一并纳入;其余按角色收窄避免全表评估。
+        // cond8(degree_proof_of_bond_get_,信赖证累计)与 cond7
+        // (degree_manaboard_growth_,板强化总数)同样以学节点/信赖证授予为
+        // 唯一事实时点且不在战斗 finish 白名单,一并窄域结算
+        // (2026-10-03 全量审计:cat5 三个残留族之二)。
+        const bondDegreeMissionIds = getDegreeMissionIdsForConditionTypes(
+            [8, 44],
+            [command.characterId],
+        ).concat(getMissionCatalog().getDefinitions(5).filter(definition => {
+            const row = definition.row as readonly unknown[]
+            return (String(row[3]) === "48"
+                    && (row[15] === undefined || row[15] === null
+                        || row[15] === "" || row[15] === "(None)"
+                        || String(row[15]) === String(command.characterId)))
+                || definition.pattern.startsWith(DEGREE_SUPPORTED_FAMILIES.manaBoardCount)
+        }).map(definition => definition.missionId))
+        const missionSettlement = settleMissionCategories(
+            command.playerId,
+            [
+                { category: 1, missionIds: learnMissionIds },
+                ...(bondDegreeMissionIds.length > 0
+                    ? [{ category: 5, missionIds: bondDegreeMissionIds }]
+                    : []),
+            ],
+            command.evaluationTime,
+        )
         finalizeLearnManaAwakePublicationWrites(
             command.playerId,
             command.characterId,
@@ -256,7 +304,7 @@ export function executeLearnManaNodes(command: LearnManaNodesCommand): LearnMana
                 paidMana: resources.paidManaAfter,
                 items: resources.itemsAfter,
             },
-            missionSettlement: null,
+            missionSettlement,
             missionFacts: { usedMana: resources.totalManaCost },
             activeMissionList: activeMission.activeMissionList,
             replayed: false,

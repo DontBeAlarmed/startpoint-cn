@@ -3,6 +3,10 @@ import { getPlayerCharacterSync } from "../../../data/domains/character"
 import { executeLearnManaNodes } from "../../../lib/character-growth/commands/learn-mana-nodes"
 import { validateSessionAndPlayer, validateCharacterOwnership, sendCharacterResponse } from "../../../lib/character-helpers"
 import { getMailArrivedSync } from "../../../lib/mail-notification"
+import {
+    composeMissionSettlementResponse,
+    projectMissionSettlementFragment,
+} from "../../../lib/mission/response-fragment"
 import { mapToRecord } from "../../../lib/character-growth/resource-plan"
 import { sendGrowthMutationError } from "./mana-mutation-http"
 import { registerAwakeManaNodeRoute } from "./mana-awake"
@@ -57,7 +61,7 @@ const routes = async (fastify: FastifyInstance) => {
             includeChangedNodes: true,
             nodeIds: result.responseNodeEntries.map(entry => entry.multiplied_id),
         })
-        return sendCharacterResponse(reply, viewerId, {
+        const responseData = {
             user_info: {
                 free_mana: resourceState.freeMana,
                 paid_mana: resourceState.paidMana,
@@ -72,7 +76,19 @@ const routes = async (fastify: FastifyInstance) => {
             evolution: result.evolution,
             active_mission_list: result.activeMissionList,
             mail_arrived: getMailArrivedSync(session.playerId),
-        })
+            mission_info: [],
+            equipment_list: [],
+            degree_list: [],
+        }
+        if (result.missionSettlement !== null) {
+            // 学节点跨过任务阶段时,完成/奖励在 learn 响应内当场发布
+            composeMissionSettlementResponse(
+                responseData,
+                projectMissionSettlementFragment(result.missionSettlement),
+                viewerId,
+            )
+        }
+        return sendCharacterResponse(reply, viewerId, responseData)
     })
 
     registerAwakeManaNodeRoute(fastify)

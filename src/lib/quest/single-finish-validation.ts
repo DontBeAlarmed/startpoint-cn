@@ -64,6 +64,8 @@ export interface ValidatedSingleFinishBody {
     viewer_id: number
     add_mana: number
     is_accomplished: boolean
+    /** LoseBattle(允许失败)关卡败北时的客户端标记(BattleQuestFinishRemoteUtil.is_lose) */
+    is_lose?: boolean
     statistics: SingleFinishStatistics
     equipment_element?: number[]
     [key: string]: unknown

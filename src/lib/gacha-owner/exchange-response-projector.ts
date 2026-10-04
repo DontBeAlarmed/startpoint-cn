@@ -4,11 +4,16 @@ import {
 } from "../common-response/entities"
 import { mergeCommonResponseFragments } from "../common-response/merge"
 import type { CommonResponseFragment } from "../common-response/model"
+import {
+    composeMissionSettlementResponse,
+    projectMissionSettlementFragment,
+} from "../mission/response-fragment"
 import { projectItemOverflowCommonResponse } from "../item-overflow/common-response"
 import type { GachaExchangeSuccess, GachaPostCommitResult } from "./model"
 
 export function projectGachaExchangeResponse(input: {
     readonly dataHeaders: Readonly<Record<string, unknown>>
+    readonly viewerId: number
     readonly result: GachaExchangeSuccess
     readonly postCommit: GachaPostCommitResult
 }): Record<string, unknown> {
@@ -35,11 +40,20 @@ export function projectGachaExchangeResponse(input: {
                 ),
             }),
     }
-    const common = mergeCommonResponseFragments([fragment])
+    const responseData: Record<string, unknown> = { ...mergeCommonResponseFragments([fragment]) }
+    if (result.missionSettlement !== null) {
+        // 交换获得新角色跨过持有数任务/称号阶段时,完成与奖励在 exchange 响应内当场发布
+        composeMissionSettlementResponse(
+            responseData,
+            projectMissionSettlementFragment(result.missionSettlement),
+            input.viewerId,
+        )
+    }
     return {
         data_headers: input.dataHeaders,
         data: {
-            ...common,
+            ...responseData,
+            active_mission_list: result.activeMissionList,
             gacha_info_list: [{
                 gacha_id: result.gachaId,
                 is_account_first: result.isAccountFirst,

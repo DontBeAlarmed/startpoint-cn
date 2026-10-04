@@ -4,7 +4,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { getPlayerCharacterSync } from "../../data/domains/character"
 import { getPlayerSync } from "../../data/domains/player"
 import { getSession } from "../../data/domains/session"
-import { generateDataHeaders } from "../../utils";
+import { generateDataHeaders, getServerDate } from "../../utils";
 import { givePlayerCharacterSync } from "../../lib/character";
 import { resolvePlayerIdSync } from "../../data/activeAccount";
 import { getDb } from "../../data/db";
@@ -20,6 +20,7 @@ import { getMailArrivedSync } from "../../lib/mail-notification";
 import { canClaimTownStoryCharacter } from "../../lib/story-join-character";
 import { getRealNow } from "../../runtime/time/game-time";
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
+import { composeMissionSettlementResponse, projectMissionSettlementFragment } from "../../lib/mission/response-fragment"
 import { projectCharacterPatch } from "../../lib/common-response/entities";
 import {
     FULL_CHARACTER_GROWTH_FIELDS,
@@ -189,13 +190,12 @@ const routes = async (fastify: FastifyInstance) => {
                 overLimitCount: body.over_limit_count,
                 useStack: body.use_stack,
                 itemId: body.item_id,
-                evaluationTime: getRealNow(),
+                evaluationTime: getServerDate(),
             })
             const character = getPlayerCharacterSync(playerId, body.character_id)!
             reply.header("content-type", "application/x-msgpack")
-            return reply.status(200).send({
-                data_headers: generateDataHeaders({ viewer_id: viewerId }),
-                data: mergeCommonResponseFragments([{
+            const responseData: Record<string, unknown> = {
+                ...mergeCommonResponseFragments([{
                     character_list: [...projectCharacterGrowthIncrement({
                         after: result.after,
                         changedNodeIds: [],
@@ -208,6 +208,18 @@ const routes = async (fastify: FastifyInstance) => {
                         : { [result.itemId]: result.itemCount }) as Record<string, number>,
                     mail_arrived: getMailArrivedSync(playerId),
                 }]),
+            }
+            if (result.missionSettlement !== null) {
+                // 突破跨过任务/称号阶段时,完成与奖励在 over_limit 响应内当场发布
+                composeMissionSettlementResponse(
+                    responseData,
+                    projectMissionSettlementFragment(result.missionSettlement),
+                    viewerId,
+                )
+            }
+            return reply.status(200).send({
+                data_headers: generateDataHeaders({ viewer_id: viewerId }),
+                data: responseData,
             })
         } catch (error) {
             return growthFailure(reply, error)
@@ -234,7 +246,7 @@ const routes = async (fastify: FastifyInstance) => {
         })
 
         try {
-            const result = executeBulkOverLimit({ playerId, evaluationTime: getRealNow() })
+            const result = executeBulkOverLimit({ playerId, evaluationTime: getServerDate() })
             const characterList = result.characters.map(character => {
                 const written = result.projectionCharacters[String(character.characterId)]!
                 return projectCharacterGrowthIncrement(
@@ -244,12 +256,23 @@ const routes = async (fastify: FastifyInstance) => {
             })
 
             reply.header("content-type", "application/x-msgpack")
-            return reply.status(200).send({
-                data_headers: generateDataHeaders({ viewer_id: viewerId }),
-                data: mergeCommonResponseFragments([{
+            const responseData: Record<string, unknown> = {
+                ...mergeCommonResponseFragments([{
                     character_list: characterList.map(entry => projectCharacterPatch(entry)),
                     mail_arrived: getMailArrivedSync(playerId),
                 }]),
+            }
+            if (result.missionSettlement !== null) {
+                // 突破跨过任务/称号阶段时,完成与奖励在 bulk_over_limit 响应内当场发布
+                composeMissionSettlementResponse(
+                    responseData,
+                    projectMissionSettlementFragment(result.missionSettlement),
+                    viewerId,
+                )
+            }
+            return reply.status(200).send({
+                data_headers: generateDataHeaders({ viewer_id: viewerId }),
+                data: responseData,
             })
         } catch (error) {
             return growthFailure(reply, error)

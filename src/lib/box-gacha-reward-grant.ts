@@ -15,7 +15,10 @@ import type {
 import { RewardType } from "./types"
 import { getAwakeFactKeysFromRewardGrants } from "./mission/awake-reward-facts"
 import type { FactKey } from "./mission/facts/fact-key"
+import type { MissionSettlementResult } from "./mission/settlement"
 import { createRewardGrantItemOverflowPolicy } from "./reward-grant-item-overflow"
+import { settleGachaAcquisitionMissions } from "./gacha-acquisition-mission-settlement"
+import { getServerDate } from "../utils"
 
 export interface BoxGachaRewardKnownPlayerState {
     readonly id: number
@@ -28,6 +31,7 @@ export interface BoxGachaRewardGrantResult {
     readonly rewardResult: PlayerRewardResult
     readonly playerAfter: Omit<BoxGachaRewardKnownPlayerState, "id">
     readonly rewardInvalidatedFactKeys: readonly FactKey[]
+    readonly missionSettlement: MissionSettlementResult | null
 }
 
 function createBoxGachaRewardPlan(
@@ -123,9 +127,15 @@ export function grantBoxGachaDrawInTransactionOwnerWithInventorySync(
         { itemOverflow: createRewardGrantItemOverflowPolicy(playerId) },
     )
 
+    // 新角色入队/新装备种类是持有数事实的产生时点,结算与发放同事务。
+    // 装备资产暂无 joined 标志,重复种类也结算(幂等,max 单调不重复发奖)
     return {
         rewardResult: projectBoxGachaRewardResult(result),
         rewardInvalidatedFactKeys: getAwakeFactKeysFromRewardGrants(result),
+        missionSettlement: result.assets.characters.some(entry => entry.joined)
+            || drawResult.equipment.size > 0
+            ? settleGachaAcquisitionMissions(playerId, getServerDate())
+            : null,
         playerAfter: {
             freeMana: result.playerAfter.freeMana,
             freeVmoney: result.playerAfter.freeVmoney,

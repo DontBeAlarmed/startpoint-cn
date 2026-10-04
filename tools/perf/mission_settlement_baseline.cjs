@@ -10,6 +10,8 @@ const path = require("node:path")
 const BetterSqlite3 = require("better-sqlite3")
 
 const { percentile } = require("./http_metrics.cjs")
+const { installBundledGameplaySnapshot } = require("../helpers/install-bundled-gameplay-snapshot.cjs")
+let restoreContentSnapshot = () => {}
 const { createSqlCounter } = require("./mission_settlement_sql.cjs")
 
 const FIXED_TIME = "2024-07-18T12:00:00.000Z"
@@ -248,6 +250,7 @@ function runMissionSettlementBaseline({
             path.join(temporaryParent, "mission-settlement-baseline-"),
         )
         runtime = runtimeLoader()
+        restoreContentSnapshot = installBundledGameplaySnapshot()
         originalTimeOffset = runtime.getTimeOffset()
         timeOffsetCaptured = true
         runtime.setServerTimeOffset(fixedTime.getTime() - Date.now())

@@ -29,11 +29,12 @@ import {
 import { settleSingleBattleQuest } from "../../lib/quest/finish/single-orchestrator"
 import { buildSingleFinishResponse } from "../../lib/quest/finish/single-response-projector"
 import type { SingleFinishResponseHeaders } from "../../lib/quest/finish/single-response-projector"
-import {
-    mergeMissionSettlementResponse,
-    settleMissionCategories,
-} from "../../lib/mission"
+import { settleMissionCategories } from "../../lib/mission"
 import type { MissionSettlementResult } from "../../lib/mission"
+import {
+    composeMissionSettlementResponse,
+    projectMissionSettlementFragment,
+} from "../../lib/mission/response-fragment"
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge"
 import { getDb } from "../../data/db"
 import {
@@ -409,7 +410,7 @@ const routes = async (fastify: FastifyInstance, options: SingleBattleQuestRouteO
                 "quest_name": ""
         }
         if (missionSettlement) {
-            mergeMissionSettlementResponse(responseData, missionSettlement, viewerId)
+            composeMissionSettlementResponse(responseData, projectMissionSettlementFragment(missionSettlement), viewerId)
         }
         responseData.mail_arrived = getPlayerMailCountSync(playerId, true) > 0
         return reply.status(200).send({

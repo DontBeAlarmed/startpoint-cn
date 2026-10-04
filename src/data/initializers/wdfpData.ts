@@ -163,6 +163,7 @@ export default function init(
         max_combo_achieved INTEGER NOT NULL DEFAULT 0,
         total_login_days INTEGER NOT NULL DEFAULT 0,
         last_daily_challenge_real_business_day TEXT DEFAULT NULL,
+        last_daily_reset_real_business_day TEXT DEFAULT NULL,
         account_id INTEGER NOT NULL,
         tutorial_step INTEGER,
         tutorial_skip_flag INTEGER,
@@ -272,6 +273,7 @@ export default function init(
     // migration: add total_login_days for weekly mission tracking
     ensureSchemaColumn(database, "players.total_login_days")
     ensureSchemaColumn(database, "players.last_daily_challenge_real_business_day")
+    ensureSchemaColumn(database, "players.last_daily_reset_real_business_day")
 
     database.prepare(`CREATE TABLE IF NOT EXISTS players_party_member_co_clears (
         player_id INTEGER NOT NULL,

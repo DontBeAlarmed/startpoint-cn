@@ -41,6 +41,7 @@ function result(overrides = {}) {
         purchaseCounts: [],
         rewardInvalidatedFactKeys: [],
         missionSettlement: null,
+        purchaseCountSettlement: null,
         ...overrides,
     }
 }

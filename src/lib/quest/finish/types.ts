@@ -46,6 +46,8 @@ export interface FinishContext {
     questCategory: number
     questId: number
     questAccomplished: boolean
+    /** 任务战斗计数用的真实战斗结果(LoseBattle 败北通关时为 false,与 questAccomplished 解耦) */
+    battleFactsAccomplished?: boolean
     clearTime: number
     clearRank: number | null
     score?: number

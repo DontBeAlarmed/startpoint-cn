@@ -280,7 +280,8 @@ test("equipment upgrade atomically deducts the client-selected crystal and craft
     )))
     assert.ok(Array.isArray(payload.data.mission_info))
     assert.ok(Array.isArray(payload.data.degree_list))
-    assert.equal("character_list" in payload.data, false)
+    // compose 统一路线:空角色列表以空数组发布(客户端 Option 解析为零长度应用,已验证无害)
+    assert.deepEqual(payload.data.character_list, [])
     assert.equal(typeof payload.data.mail_arrived, "boolean")
 })
 
@@ -456,3 +457,166 @@ for (const scenario of [
         assert.equal(getPlayerEquipmentSync(playerId, equipmentId).protection, true)
     })
 }
+
+// ── 装备升级跨 5 级的持有任务当场结算 ──
+// 「5级装备持有数」(mission 68, total_equipment_5_level_count)与 5 级装备
+// 称号(cat5 degree_equipment_lv5_get_,condition 36)是状态派生任务,升级
+// 跨过 5 级的瞬间就是事实产生时点,必须同事务当场结算(2026-10-01 时点审计)。
+
+function missionProgressAt(playerId, category, missionId) {
+    return database.prepare(`
+        SELECT progress FROM players_category_missions
+        WHERE player_id = ? AND category = ? AND id = ?
+    `).get(playerId, category, missionId)?.progress ?? 0
+}
+
+test("equipment bulk upgrade crossing level 5 settles five-level mission and degree at once", async () => {
+    const { playerId, viewerId } = await createPlayer("equipment-bulk-five-level")
+    // 五件低星装备(1★×3 + 2★×2):L4 + 1 个 stack → 一键觉醒全部到 L5(满级)
+    const equipmentIds = [1010001, 1060001, 1080001, 2010002, 2020001]
+    for (const equipmentId of equipmentIds) {
+        insertPlayerEquipmentSync(playerId, equipmentId, { level: 4, enhancementLevel: 0, protection: false, stack: 1 })
+    }
+    setInventoryFixtureItemExactSync(playerId, 100000, 1000)
+    const stonesBefore = getPlayerSync(playerId).freeVmoney
+    const degreeMissionId = Number(Object.entries(require("../assets/mission_degree.json"))
+        .find(([, rows]) => String(rows[0][3]) === "36")?.[0])
+    assert.ok(degreeMissionId, "测试前提:存在 5 级装备称号任务(condition 36)")
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/equipment/bulk_upgrade",
+        payload: { viewer_id: viewerId, equipment_ids: equipmentIds },
+    })
+    assert.equal(response.statusCode, 200, response.body)
+
+    // 五件全部跨 5(满级):
+    // 任务 68(5 级持有数,状态派生)进度 5,跨第 1/2 阶段 = 30+10 = 40 石;
+    // 任务 67(觉醒计数,状态派生 Σ(level-1))进度 5×4=20,跨第 1/2/3/4 阶段 = 50+10+10+10 = 80 石;
+    // 锻块称号 43000(满级 5 件,目标 5)当场达成 → degree_list 发布
+    assert.equal(missionProgressAt(playerId, 1, 68), 5, "批量觉醒后任务 68 进度必须当场推进")
+    assert.equal(missionProgressAt(playerId, 1, 67), 20, "任务 67 进度为状态派生 Σ(level-1)=20")
+    assert.equal(
+        getPlayerSync(playerId).freeVmoney - stonesBefore,
+        120,
+        "任务 68 阶段 1/3(30+10)+ 任务 67 阶段 1/4/8/12(50+10+10+10)= 120 星导石",
+    )
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
+    assert.ok(
+        (payload.data.mission_info ?? []).some(entry => entry.mission_category_id === 1 && entry.mission_id === 68),
+        "bulk_upgrade 响应的 mission_info 必须包含任务 68",
+    )
+    assert.ok(
+        (payload.data.degree_list ?? []).some(entry => entry.degree_id === degreeMissionId),
+        "bulk_upgrade 响应的 degree_list 必须包含 5 级装备称号",
+    )
+})
+
+// ── 装备溶解的锻块任务当场结算 ──
+test("equipment dissolve settles craft point mission and degree at once", async () => {
+    const { playerId, viewerId } = await createPlayer("equipment-dissolve-mission")
+    addEquipment(playerId, 4050030, 26)
+    const stonesBefore = getPlayerSync(playerId).freeVmoney
+    const degreeMissionId = Number(Object.entries(require("../assets/mission_degree.json"))
+        .find(([, rows]) => String(rows[0][1] ?? "").startsWith("degree_craft_point_get_"))?.[0])
+    assert.ok(degreeMissionId, "测试前提:存在锻造石称号任务(cond 37)")
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/equipment/sell_stack",
+        payload: {
+            viewer_id: viewerId,
+            equipment_list: [{ equipment_id: 4050030, number: 26 }],
+            api_count: 1,
+        },
+    })
+    assert.equal(response.statusCode, 200, response.body)
+
+    // 4★ 锻块 4/个 × 26 = 104:任务 66 阶段 1(目标 100)当场发放 5 星导石
+    assert.equal(missionProgressAt(playerId, 1, 66), 104, "溶解后任务 66 进度必须当场推进")
+    assert.equal(
+        getPlayerSync(playerId).freeVmoney - stonesBefore,
+        5,
+        "任务 66 阶段 1 奖励(5 星导石)必须当场发放",
+    )
+    assert.ok(
+        missionProgressAt(playerId, 5, degreeMissionId) >= 104,
+        "锻造石称号进度必须当场推进",
+    )
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
+    const missionInfo = payload.data.mission_info ?? []
+    assert.ok(
+        missionInfo.some(entry => entry.mission_category_id === 1 && entry.mission_id === 66),
+        "溶解响应的 mission_info 必须包含任务 66",
+    )
+})
+
+test("equipment upgrade crossing level 5 settles five-level mission and degree at once", async () => {
+    const { playerId, viewerId } = await createPlayer("equipment-five-level")
+    addEquipment(playerId, 4050030, 10)
+    setInventoryFixtureItemExactSync(playerId, 100000, 1000)
+    const stonesBefore = getPlayerSync(playerId).freeVmoney
+    // 与生产判据同列:condition type(row[3])=36
+    const degreeMissionId = Number(Object.entries(require("../assets/mission_degree.json"))
+        .find(([, rows]) => String(rows[0][3]) === "36")?.[0])
+    assert.ok(degreeMissionId, "测试前提:存在 5 级装备称号任务(condition 36)")
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/equipment/upgrade",
+        payload: {
+            viewer_id: viewerId,
+            equipment_id: 4050030,
+            upgrade_count: 4,
+            use_stack: true,
+            api_count: 1,
+        },
+    })
+    assert.equal(response.statusCode, 200, response.body)
+
+    // 觉醒 4 次:任务 67 阶段 1/2(50+10 星导石)+ 任务 68 阶段 1(30 星导石)
+    assert.equal(missionProgressAt(playerId, 1, 67), 4, "觉醒计数任务 67 必须当场推进")
+    assert.equal(missionProgressAt(playerId, 1, 68), 1, "跨过 5 级后任务 68 进度必须当场推进")
+    assert.equal(
+        getPlayerSync(playerId).freeVmoney - stonesBefore,
+        90,
+        "任务 67 阶段 1/2(50+10)+ 任务 68 阶段 1(30)= 90 星导石",
+    )
+    if (degreeMissionId) {
+        assert.ok(
+            missionProgressAt(playerId, 5, degreeMissionId) >= 1,
+            "5 级装备称号进度必须当场推进",
+        )
+    }
+})
+
+test("item sale crossing mana addition stage settles mission 40 at once", async () => {
+    const { playerId, viewerId } = await createPlayer("item-sale-mana-mission")
+    // 物品 4 单价 150:卖 70 个 = 10500 玛纳,跨过任务 40 阶段 1(目标 10000)
+    setInventoryFixtureItemExactSync(playerId, 4, 70)
+    const stonesBefore = getPlayerSync(playerId).freeVmoney
+
+    const response = await app.inject({
+        method: "POST",
+        url: "/item/sell",
+        payload: { viewer_id: viewerId, item_id: 4, sell_number: 70 },
+    })
+    assert.equal(response.statusCode, 200, response.body)
+
+    assert.equal(
+        missionProgressAt(playerId, 1, 40),
+        10500,
+        "卖出道具后任务 40(累计获得玛纳)进度必须当场推进",
+    )
+    assert.equal(
+        getPlayerSync(playerId).freeVmoney - stonesBefore,
+        5,
+        "任务 40 阶段 1 奖励(5 星导石)必须当场发放",
+    )
+    const payload = require("msgpackr").unpack(Buffer.from(response.body, "base64"))
+    const missionInfo = payload.data.mission_info ?? []
+    assert.ok(
+        missionInfo.some(entry => entry.mission_category_id === 1 && entry.mission_id === 40),
+        "卖出响应的 mission_info 必须包含任务 40",
+    )
+})

@@ -221,11 +221,17 @@ const firstSettlement = settleMissionCategories(
     evaluationTime,
 )
 const settledMissionIds = firstSettlement.missionInfo.map(info => info.mission_id)
-assert.equal(new Set(settledMissionIds).size, 48)
-assert.deepEqual([...new Set(settledMissionIds)].sort((left, right) => left - right), enabledMissionIds)
-assert.deepEqual(
-    firstSettlement.missionInfo.map(info => info.mission_category_id),
-    Array.from({ length: 48 }, () => 1),
+// 首轮 48 条启用任务 + 奖励连锁轮(星导石入账使 player 族任务达标)= 50
+assert.equal(new Set(settledMissionIds).size, 50)
+// 首轮必须完整覆盖全部启用任务(级联追加项在 48 之外)
+assert.equal(
+    enabledMissionIds.every(missionId => settledMissionIds.includes(missionId)),
+    true,
+    "首轮必须结算全部启用任务",
+)
+assert.equal(
+    firstSettlement.missionInfo.every(info => info.mission_category_id === 1),
+    true,
 )
 
 const projectedEquipmentIds = new Set(firstSettlement.equipmentList.map(equipment => equipment.equipment_id))

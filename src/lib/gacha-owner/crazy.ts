@@ -36,6 +36,7 @@ import {
 } from "../gacha-reward-grant"
 import { withDeferredInventoryBatchContextWithinTransactionSync } from "../inventory"
 import { getMailArrivedSync } from "../mail-notification"
+import { publishActiveMissionOwnerStateWithinTransaction } from "../mission/active-publication-owner"
 import {
     collectRewardGrantItemOverflowDispositions,
     createRewardGrantExecutionPlan,
@@ -353,6 +354,11 @@ export function selectCrazyGachaCandidateSync(input: {
             number: 1,
         })))
         clearPlayerCrazyGachaResultsSync(input.playerId, input.gachaId)
+        const activeMission = publishActiveMissionOwnerStateWithinTransaction({
+            playerId: input.playerId,
+            now: new Date(input.nowMs),
+            source: "gacha/crazy_select",
+        })
         const characterSnapshots = [...characters.values()]
         return deepFreeze({
             ok: true as const,
@@ -375,6 +381,8 @@ export function selectCrazyGachaCandidateSync(input: {
                 characters: characterSnapshots,
                 source: "gacha/crazy_select" as const,
             }],
+            missionSettlement: grant.missionSettlement ?? null,
+            activeMissionList: activeMission.activeMissionList,
         })
     }))()
 }

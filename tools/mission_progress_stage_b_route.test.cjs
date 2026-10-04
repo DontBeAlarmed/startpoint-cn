@@ -48,9 +48,6 @@ const {
     getPlayerItemSync,
 } = require("../src/data/domains/item")
 const { grantInventoryFixtureItemSync } = require("./helpers/inventory-fixture.cjs")
-const {
-    mergeMissionSettlementResponse,
-} = require("../src/lib/mission/response")
 initializeDatabase()
 db = getDb()
 
@@ -115,7 +112,7 @@ stubModule("../src/lib/mission/index", {
     getCurrentStage: (_category, _missionId, progress) => progress >= 7 ? 2 : 1,
     getCharacterIdFromMission: missionId => missionId === 901 ? "341005" : "0",
     isMissionEnabledAt: () => true,
-    mergeMissionSettlementResponse,
+    composeMissionSettlementResponse: () => {},
     reconcileAwakeUnlockCharacterList: (_playerId, list) => list,
     settleAwakeMissionCandidatesWithEvaluation: (actualPlayerId, missionIds) => {
         assert.equal(actualPlayerId, playerId)

@@ -127,6 +127,20 @@ export function settleSingleBattleQuest({
         : calculateClearRank(clearTime, finishQuest)
 
     let questAccomplished = body.is_accomplished
+    // LoseBattle(允许失败)关卡:客户端败北事件以 is_lose 标记
+    // (BattleQuestFinishRemoteUtil 仅在 isLoseEventBattle 时下发),败北即通关。
+    // 主线 7014002(魔王战)是全域唯一实例。败北通关 = 等同正常 SS 通关的全部
+    // 结算(进度/首通/S+ 评级奖励/分数材料/体力 commit,评级按用时);唯一例外:
+    // 任务战斗计数保持真实败北语义(不计通关/SS 次数)——双因子防普通关伪造。
+    let battleFactsAccomplished = questAccomplished
+    if (questCategory === QuestCategory.MAIN
+        && !isScoreAttackEvent
+        && body.is_lose === true
+        && (finishQuest as { questKind?: number }).questKind === 2) {
+        questAccomplished = true
+        battleFactsAccomplished = false
+        console.log(`[BATTLE] lose-battle cleared: quest=${body.quest_id} clear_time_ms=${body.elapsed_time_ms}`)
+    }
     let scoreAttackBorderTiers: ScoreAttackBorderTier[] = []
     if (isScoreAttackEvent) {
         try {
@@ -170,6 +184,7 @@ export function settleSingleBattleQuest({
                     questCategory,
                     questId,
                     questAccomplished,
+                    battleFactsAccomplished,
                     clearTime,
                     clearRank,
                     score: body.score,

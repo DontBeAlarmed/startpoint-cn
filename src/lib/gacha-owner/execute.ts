@@ -336,6 +336,7 @@ export function executeGachaDrawSync(command: GachaExecCommand): GachaExecResult
                     itemOverflowDispositions: reward.itemOverflowDispositions ?? [],
                     postCommitEffects,
                     activeMissionList: activeMission.activeMissionList,
+                    missionSettlement: reward.missionSettlement ?? null,
                 }
                 return prepared.banner.kind === "character"
                     ? deepFreeze({

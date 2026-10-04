@@ -75,6 +75,7 @@ interface QuestRow {
 
 interface StandardLayout {
     readonly minimumColumns: number
+    readonly questKind?: number
     readonly clearReward?: number
     readonly sPlusReward?: number
     readonly storyClearReward?: number
@@ -149,6 +150,7 @@ const QUEST_DERIVATION_LAYOUTS: Readonly<Record<QuestTableName, QuestDerivationL
 const STANDARD_LAYOUTS: Readonly<Partial<Record<QuestTableName, StandardLayout>>> = {
     "main_quest.json": {
         minimumColumns: 119,
+        questKind: 49,
         clearReward: 3,
         sPlusReward: 71,
         scoreGroup: 70,
@@ -476,6 +478,15 @@ function standardQuest(
     const story = layout.storyCheck !== undefined && isMissing(fields[layout.storyCheck])
     const output: Record<string, unknown> = {
         name: fields[QUEST_DERIVATION_LAYOUTS[tableName].name],
+    }
+    if (layout.questKind !== undefined) {
+        // NormalQuestKind(客户端枚举):0=Story 1=Battle 2=LoseBattle(允许失败,
+        // 全灭即通关;主线 7014002 魔王战为全域唯一实例)。
+        addOptional(
+            output,
+            "questKind",
+            optionalInteger(tableName, fields[layout.questKind], "questKind"),
+        )
     }
     const clearRewardIndex = story
         ? layout.storyClearReward ?? layout.clearReward

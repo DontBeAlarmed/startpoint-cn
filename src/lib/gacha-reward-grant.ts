@@ -16,6 +16,7 @@ import type {
     RewardPlayerGachaDrawResult,
 } from "./types"
 import { GachaType } from "./types"
+import { getServerDate } from "../utils"
 import type { GachaDrawMetadata } from "./gacha-draw"
 import {
     computeEquipmentGachaMovieEffectsForGacha,
@@ -26,6 +27,8 @@ import { formatGachaCharacterDrawsSummary } from "./hot-path-log-formatters"
 import { sampledLog } from "./sampled-log"
 import { createRewardGrantItemOverflowPolicy } from "./reward-grant-item-overflow"
 import { prepareGachaAcquisitionBatchSync } from "./gacha-owner/acquisition-batch"
+import { settleGachaAcquisitionMissions } from "./gacha-acquisition-mission-settlement"
+import type { MissionSettlementResult } from "./mission/settlement"
 
 export interface PlannedCharacterGachaMovie {
     characterId: number
@@ -137,15 +140,20 @@ function validateGrant(
     return snapshotRewardGrantExecutionResultForPlan(playerId, plan, grant)
 }
 
+/** 发放结果附加任务结算——reward-grant 核心契约不知道 mission 域(架构守卫) */
+export type GachaRewardGrantExecutionResult = RewardGrantExecutionResult & {
+    readonly missionSettlement: MissionSettlementResult | null
+}
+
 export function grantGachaRewardPlanInTransactionOwnerWithInventorySync(
     playerId: number,
     plan: RewardGrantExecutionPlan,
     knownPlayerBefore: GachaRewardKnownPlayerState,
     inventory: InventoryBatchContext,
-): RewardGrantExecutionResult {
+): GachaRewardGrantExecutionResult {
     const acquisition = prepareGachaAcquisitionBatchSync(playerId, plan)
     inventory.readMany(acquisition.compensationItemIds)
-    return withRewardGrantExecutionPlanAsTransactionOwnerWithInventorySync(
+    const result = withRewardGrantExecutionPlanAsTransactionOwnerWithInventorySync(
         playerId,
         plan,
         {
@@ -165,6 +173,11 @@ export function grantGachaRewardPlanInTransactionOwnerWithInventorySync(
             assetAcquisition: acquisition.assetAcquisition,
         },
     )
+    // 新角色入队/新装备种类是持有数事实的产生时点,结算与发放同事务
+    const missionSettlement = acquisition.hadNewCharacter() || acquisition.hadNewEquipmentKind()
+        ? settleGachaAcquisitionMissions(playerId, getServerDate())
+        : null
+    return { ...result, missionSettlement }
 }
 
 function scheduleCharacterLog(
@@ -197,7 +210,7 @@ function scheduleCharacterLog(
 
 function projectCharacters(
     playerId: number,
-    grant: RewardGrantExecutionResult,
+    grant: GachaRewardGrantExecutionResult,
     drawResult: readonly number[],
     moviePlan: readonly PlannedCharacterGachaMovie[],
     deferLog: GachaRewardGrantOptions["deferCharacterSampledLog"],
@@ -265,7 +278,7 @@ function projectCharacters(
 }
 
 function projectEquipment(
-    grant: RewardGrantExecutionResult,
+    grant: GachaRewardGrantExecutionResult,
     drawResult: readonly number[],
     effects: ReturnType<typeof computeEquipmentGachaMovieEffectsForGacha>,
 ): RewardPlayerGachaDrawResult {
@@ -314,16 +327,22 @@ export function rewardGachaDrawResultThroughGrantOwnerSync(
         assertCharacterMoviePlan(drawResult, characterMoviePlan)
         const plan = createPlan("character", drawResult)
         assertPlanMatchesDrawResult(plan, "character", drawResult)
-        const grant = validateGrant(playerId, plan, options.ownerGrant(plan))
-        return projectCharacters(
-            playerId,
-            grant,
-            drawResult,
-            characterMoviePlan,
-            options.deferCharacterSampledLog,
-            options.collectCharacterSampledLog,
-            options.collectSeedMark,
-        )
+        const grant: GachaRewardGrantExecutionResult = {
+            ...validateGrant(playerId, plan, options.ownerGrant(plan)),
+            missionSettlement: null,
+        }
+        return {
+            ...projectCharacters(
+                playerId,
+                grant,
+                drawResult,
+                characterMoviePlan,
+                options.deferCharacterSampledLog,
+                options.collectCharacterSampledLog,
+                options.collectSeedMark,
+            ),
+            missionSettlement: grant.missionSettlement ?? null,
+        }
     }
 
     assertEquipmentMetadata(drawResult, drawMetadata)
@@ -338,6 +357,12 @@ export function rewardGachaDrawResultThroughGrantOwnerSync(
     )
     const plan = createPlan("equipment", drawResult)
     assertPlanMatchesDrawResult(plan, "equipment", drawResult)
-    const grant = validateGrant(playerId, plan, options.ownerGrant(plan))
-    return projectEquipment(grant, drawResult, effects)
+    const grant: GachaRewardGrantExecutionResult = {
+        ...validateGrant(playerId, plan, options.ownerGrant(plan)),
+        missionSettlement: null,
+    }
+    return {
+        ...projectEquipment(grant, drawResult, effects),
+        missionSettlement: grant.missionSettlement ?? null,
+    }
 }

@@ -30,6 +30,7 @@ test("pre-5B Degree fixture has complete versioned compute and settlement eviden
         version: "pre-5B",
         entrypoint: "src/lib/mission/computer-degree.ts",
         generator: "tools/generate_mission_degree_legacy_fixture.cjs",
+        note: "2026-10-03 重生成:奖励级联(依次结算)与窄域结算批准语义后的当前行为证据;settlement.first 含级联轮追加的 player 族称号",
     })
     assert.equal(fs.existsSync(path.join(__dirname, "generate_mission_degree_legacy_fixture.cjs")), true)
     assert.equal(fixture.compute.missionCount, 1288)
@@ -45,7 +46,8 @@ test("pre-5B Degree fixture has complete versioned compute and settlement eviden
             "missionId", "progress", "stages",
         ])
     }
-    assert.equal(integritySha256, "e2866694483a1015400e92fdd22d111ae65619bfe7927ab48c7c7cd60e737b30")
+    // 2026-10-03 重准入:奖励级联批准语义后的当前行为证据
+    assert.equal(integritySha256, "4686fabaa9ac7f6b63fe7da406503ee6955b4dc68a9b80d2633e6e66de3be5c1")
     assert.equal(
         createHash("sha256").update(JSON.stringify(sorted(payload))).digest("hex"),
         integritySha256,

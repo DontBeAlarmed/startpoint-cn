@@ -66,7 +66,7 @@ const routes = async (fastify: FastifyInstance) => {
 
         // Login/day-reset follows the virtual game calendar shared by all routes.
         const gameTime = getGameTimeContext()
-        dailyResetPlayerDataSync(player, gameTime.virtualNow)
+        dailyResetPlayerDataSync(player, gameTime.virtualNow, gameTime.realNow)
         getDb().transaction(() => {
             refreshPlayerDailyChallengePointsForRealDaySync(playerId, gameTime.realNow)
         })()

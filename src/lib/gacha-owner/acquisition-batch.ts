@@ -39,6 +39,10 @@ interface EquipmentWorkingState {
 export interface PreparedGachaAcquisitionBatch {
     readonly assetAcquisition: RewardGrantAssetAcquisition
     readonly compensationItemIds: readonly number[]
+    /** persistFinalStates 之后才有效:本次批量是否产生了新入队角色 */
+    readonly hadNewCharacter: () => boolean
+    /** persistFinalStates 之后才有效:本次批量是否产生了新装备种类 */
+    readonly hadNewEquipmentKind: () => boolean
 }
 
 function newCharacter(characterId: number, evaluationTime: Date): PlayerCharacter | null {
@@ -137,6 +141,8 @@ export function prepareGachaAcquisitionBatchSync(
     }
     const evaluationTime = getRealNow()
     let persisted = false
+    let grantedNewCharacter = false
+    let grantedNewEquipmentKind = false
     const assetAcquisition: RewardGrantAssetAcquisition = {
         grantCharacter(characterId, grantCompensation) {
             const key = String(characterId)
@@ -172,17 +178,21 @@ export function prepareGachaAcquisitionBatchSync(
         grantEquipment(equipmentId, amount) {
             const key = String(equipmentId)
             const current = equipmentState.get(key)
-            const equipment: PlayerEquipment = current === undefined
-                ? {
+            if (current === undefined) {
+                grantedNewEquipmentKind = true
+                const equipment: PlayerEquipment = {
                     enhancementLevel: 0,
                     level: 1,
                     protection: false,
                     stack: amount - 1,
                 }
-                : {
-                    ...current.equipment,
-                    stack: addSafeInteger(current.equipment.stack, amount, "equipment.stack"),
-                }
+                equipmentState.set(key, { equipment })
+                return clientSerializeEquipment(equipmentId, equipment) as RewardGrantObjectSnapshot
+            }
+            const equipment: PlayerEquipment = {
+                ...current.equipment,
+                stack: addSafeInteger(current.equipment.stack, amount, "equipment.stack"),
+            }
             equipmentState.set(key, { equipment })
             return clientSerializeEquipment(equipmentId, equipment) as RewardGrantObjectSnapshot
         },
@@ -204,6 +214,7 @@ export function prepareGachaAcquisitionBatchSync(
                 })),
             )
             if ([...characterState.values()].some(state => !state.wasOwned)) {
+                grantedNewCharacter = true
                 recordHundredCharactersMilestoneSync(playerId, evaluationTime)
             }
             persisted = true
@@ -212,5 +223,13 @@ export function prepareGachaAcquisitionBatchSync(
     return {
         assetAcquisition,
         compensationItemIds: [...compensationItemIds].sort((left, right) => left - right),
+        hadNewCharacter: () => {
+            if (!persisted) throw new Error("Gacha acquisition batch has not been persisted yet")
+            return grantedNewCharacter
+        },
+        hadNewEquipmentKind: () => {
+            if (!persisted) throw new Error("Gacha acquisition batch has not been persisted yet")
+            return grantedNewEquipmentKind
+        },
     }
 }

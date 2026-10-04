@@ -253,7 +253,7 @@ test("repeated item sale publication keeps the Awake unlock idempotent", async (
         getPlayerCharacterAwakeUnlocksSync(playerId).get(String(AWAKE_CHARACTER_ID)),
         { 1: 1 },
     )
-    assert.equal(secondResponseData.character_list, undefined)
+    assert.deepEqual(secondResponseData.character_list, [])
     assert.equal(database.prepare(`
         SELECT COUNT(*) AS count
         FROM players_character_awake_unlocks
@@ -287,7 +287,7 @@ test("Awake publication failure preserves the committed item sale", async t => {
     assert.equal(getPlayerSync(playerId).freeMana, freeManaBefore + 5)
     assert.equal(getPlayerItemSync(playerId, ITEM_ID), 0)
     assert.equal(getPlayerCharacterAwakeUnlocksSync(playerId).has(String(AWAKE_CHARACTER_ID)), false)
-    assert.equal(responseData.character_list, undefined)
+    assert.deepEqual(responseData.character_list, [])
     assert.equal(publicationErrors.length, 1)
     assert.match(
         String(publicationErrors[0][0]),

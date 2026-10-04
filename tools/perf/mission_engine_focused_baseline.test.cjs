@@ -95,10 +95,10 @@ test("snapshot pins the completed mission engine structural performance values",
     }, {
         awakeCharacterPage: { sqlReads: 11, sqlWrites: 0, missionComputes: 7 },
         getProgressNoInvalidation: { sqlReads: 14, sqlWrites: 1, missionComputes: 110 },
-        // Battle finish no longer claims category 9 rewards (page-owned);
-        // 6 reward writes removed at both single and multi boundaries.
-        singleBattleFinish: { sqlReads: 28, sqlWrites: 25, missionComputes: 425 },
-        multiBattleFinish: { sqlReads: 29, sqlWrites: 30, missionComputes: 425 },
+        // Battle finish: cat9 奖励仍由页拥有;持有数窄域结算 + 奖励连锁轮
+        // + main_quest 数据修复(score ×4)构成现值(2026-10-03 批准语义)
+        singleBattleFinish: { sqlReads: 38, sqlWrites: 27, missionComputes: 471 },
+        multiBattleFinish: { sqlReads: 40, sqlWrites: 32, missionComputes: 475 },
     })
 })
 

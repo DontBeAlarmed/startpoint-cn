@@ -17,6 +17,10 @@ import {
 } from "../../lib/item-use-settlement";
 import { projectCharacterPatch } from "../../lib/common-response/entities";
 import { mergeCommonResponseFragments } from "../../lib/common-response/merge";
+import {
+    composeMissionSettlementResponse,
+    projectMissionSettlementFragment,
+} from "../../lib/mission/response-fragment";
 import type { CommonResponseFragment } from "../../lib/common-response/model";
 import { projectItemOverflowCommonResponse } from "../../lib/item-overflow/common-response";
 
@@ -125,9 +129,8 @@ const routes = async (fastify: FastifyInstance) => {
 
 
         reply.header("content-type", "application/x-msgpack")
-        return reply.status(200).send({
-            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
-            "data": mergeCommonResponseFragments([{
+        const responseData: Record<string, unknown> = {
+            ...mergeCommonResponseFragments([{
                 "item_list": { [itemId]: result.newCount },
                 "user_info": { "free_mana": result.freeMana },
                 "mail_arrived": getMailArrivedSync(playerId),
@@ -135,6 +138,18 @@ const routes = async (fastify: FastifyInstance) => {
                     ? { "character_list": characterList.map(c => projectCharacterPatch(c)) }
                     : {}),
             }]),
+        }
+        if (result.missionSettlement !== null) {
+            // 玛纳入账跨过累计任务阶段时,完成与奖励在卖出响应内当场发布
+            composeMissionSettlementResponse(
+                responseData,
+                projectMissionSettlementFragment(result.missionSettlement),
+                viewerId,
+            )
+        }
+        return reply.status(200).send({
+            "data_headers": generateDataHeaders({ viewer_id: viewerId }),
+            "data": responseData,
         })
     })
 }
