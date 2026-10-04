@@ -156,8 +156,6 @@ export interface RewardGrantExecutionResult {
     readonly entries: readonly RewardGrantExecutionEntryResult[]
     readonly assets: RewardGrantAssetResult
     readonly playerAfter: RewardGrantKnownPlayerState
-    /** 发放 owner 在事实写入后附加的任务结算(gacha 获得链),缺省为未结算 */
-    readonly missionSettlement?: import("../mission/settlement").MissionSettlementResult | null
 }
 
 export type RewardGrantContractField =

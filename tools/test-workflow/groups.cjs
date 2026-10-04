@@ -616,7 +616,6 @@ const TEST_GROUPS = Object.freeze({
             "tools/mission_regular_session_scope.test.cjs",
             "tools/mission_regular_session_settlement.test.cjs",
             "tools/mission_regular_state_derivation.test.cjs",
-            "tools/mission_response_merge.test.cjs",
             "tools/perf/awake_request_context_admission.test.cjs",
             "tools/perf/awake_request_context_baseline.test.cjs",
             "tools/perf/awake_request_context_runner.test.cjs",

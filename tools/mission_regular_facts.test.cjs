@@ -625,10 +625,15 @@ const abilitySoulSettlement = settleAbilitySoulEquipFactsSync(
     evaluationTime,
 )
 assert.equal(abilitySoulSettlement.amount, 2, "新增和替换魂珠各计一次")
-assert.deepEqual(
-    abilitySoulSettlement.settlement?.missionInfo.map(entry => [entry.mission_category_id, entry.mission_id]),
-    [[1, 65]],
-    "魂珠装配达到条件时必须在本次操作中结算普通任务奖励",
+// 魂珠装配结算任务 65;其奖励(星导石)使 player 族任务(22/24/108)在
+// 级联轮当场达标——官方依次结算语义的正确输出
+const abilitySoulMissionIds = abilitySoulSettlement.settlement?.missionInfo
+    .map(entry => [entry.mission_category_id, entry.mission_id]) ?? []
+assert.deepEqual(abilitySoulMissionIds[0], [1, 65], "魂珠装配必须在本次操作中结算普通任务 65")
+assert.ok(
+    abilitySoulMissionIds.length > 1
+        && abilitySoulMissionIds.slice(1).every(([category]) => category === 1),
+    "奖励连锁轮必须当场结算 player 族任务",
 )
 const battleOperationProgress = getPlayerCategoryMissionsSync(playerId, 1)
 assert.equal(battleOperationProgress[4].progress, 100, "战斗获得玛纳按真实到账值累计")

@@ -12,7 +12,7 @@
 | 界限突破 | 7d02ccf7 / 574cd353 | `over_limit` / `bulk_over_limit` | cat1:38;cat5:cond9(degree_overlimit_growth_) |
 | 角色获得 | 562248c8 / 633fab98 | gacha exec / crazy select / exchange / box gacha | cat1:32/33;cat5:companion 族(degree_companion_add_) |
 | 装备获得/升级 | 11a36690 / 5abc1481 | equipment upgrade / bulk_upgrade(升级即觉醒) | cat1:67(既有 operation settle)/68(新增);cat5:cond36 |
-| 玛纳加算 | a11dcbb / 8184df5d | `/item/sell` | cat1:40 |
+| 玛纳加算 | a11dbcba / 8184df5d | `/item/sell` | cat1:40 |
 | 审计收尾 | f102a33b / 7beb8179 | expod degree_list 发布;learn cond7/8;宝石店 cond45;over-limit/crazy/exchange/box 补 Active Mission publish | — |
 
 既有结算面(系列前已存在):战斗 finish(cat1 全量 + degree 白名单 24 类)、story finish(clear_episode+剧情称号)、/load(登录族+校准)、任务页 get_mission_progress(请求类目全量)、open_mana_board(cat1 全量)、operation settle(宝石店消耗 41/装备觉醒 67 + cat5 42000/45000/8000 族)、party 魂珠(65)、update_mission_progress(107 twitter)。
@@ -23,11 +23,11 @@
 |---|---|---|
 | T-F1 inject-exp 注入不结算角色等级任务 | 已关闭 | 5134d7e3;f102a33b 补发布 degree_list(独立审查 P1) |
 | T-F2 learn/awake 显式 null(玛纳板 37/96) | 已关闭 | cf2f7800;awake 经核实不改 cat1 事实,null 正确保留 |
-| T-F3 信赖证授予时点(39/44/48)无结算 | 已关闭 | 009c81aa;48 按角色+聚合族收窄(f102a33b);cond7/8 同批补入(7beb8179) |
+| T-F3 信赖证授予时点(39/44/48)无结算 | 已关闭 | 009c81af;48 按角色+聚合族收窄(f102a33b);cond7/8 同批补入(7beb8179) |
 | T-F4 界限突破(38/突破称号)无结算 | 已关闭 | 7d02ccf7;degree_list 发布修复(574cd353);AM publish 补齐(7beb8179) |
 | T-F5 角色获得(32/伙伴称号)无结算 | 已关闭 | 562248c8;box gacha 链补齐 + viewerId 穿线(633fab98) |
 | T-F6 装备获得(33)/5级持有(68+cond36)无结算 | 已关闭 | 11a36690;注释事实订正(5abc1481) |
-| T-F7 卖道具玛纳(40)无结算 | 已关闭 | a11dcbb;时间源 getRealNow(8184df5d) |
+| T-F7 卖道具玛纳(40)无结算 | 已关闭 | a11dbcba;时间源 getRealNow(8184df5d) |
 | T-F8 宝石店购买次数称号(cond45)零结算点 | 已关闭 | 7beb8179(purchase-owner TREASURE 分支窄域) |
 | T-F9 over-limit/crazy/exchange/box 缺 Active Mission publish | 已关闭 | 7beb8179(AM-F2 模式的第 9-12 操作入口) |
 | T-F10 expod 响应丢弃 degreeIds | 已关闭 | f102a33b(独立审查发现) |
@@ -71,7 +71,7 @@
 2. **[P2·测试缺口] box gacha / crazy select / equipment bulk_upgrade 的 e2e 结算用例**:三链的当场发布目前靠夹具级/投影级测试覆盖,无端到端 RED 用例。
 3. **[已解决·时钟口径]** 窄域结算面统一为服务器虚拟时间(getServerDate,与 finish 兜底同钟);主日切已迁真实业务日(与登录奖励/每日挑战的双轨一致)——见 identity-time-and-load.md 双时钟表与 `tools/real_day_rollover.test.cjs`。
 4. **[已解决·响应形状路线统一]** 经 1.8.1 客户端反编译定案(RealRemoteService.as 通用响应解析器):mission_info 为 Option 语义(缺失/空数组均安全,逐条应用);degree_list 不在通用响应解析结构内(称号走 /profile/get_degree_list,通用响应忽略);item_list 空数组与空对象同解析。抑制变体 `mergeMissionSettlementResponse` 已删除,party/singleBattleQuest/characterElection/raidEvent/equipment 全部统一到 `composeMissionSettlementResponse`(空列表以空数组发布,客户端零长度应用)。
-5. **[P3·沿用 9 月审计]** pass 85/16/23 eventId 匹配(用户已定案维持现状:官方期次不重叠,私服 CDN 重叠由 CDN 作者负责)、PERF-07、Attention/救援生产者(用户明确不做)——维持 DEFERRED。已定案:信赖证 status≥2(领取进包)、kind 7 降级跳过+告警、all-complete row[19] 启动守卫(2026-10-03)。
+5. **[P3·沿用 9 月审计]** pass 85/16/23 eventId 匹配(用户已定案维持现状:官方期次不重叠,私服 CDN 重叠由 CDN 作者负责)、PERF-07、Attention/救援生产者(用户明确不做)——维持 DEFERRED。已定案:信赖证 status≥2(领取进包)、kind 7 降级跳过+告警、all-complete row[19] 启动守卫(2026-10-03)。级联上限实测为初轮+4 级联(MAX=5,材料奖励链驱动 11 条任务)。
 6. **[P3·文档漂移]** cat5 冻结时启用 1079(非 1078);`mission-semantic-audit.md` §一的第 41 行口径可在下次修订时更新。
 7. **[P3·既有源码结构守卫失配(非本系列引入)** `character_awake_unlock.test.cjs:287` 与 `mission_battle_facts.test.cjs:262` 两个结构断言在早先剧情/结算结构重排后过期,建议专项清理。
 

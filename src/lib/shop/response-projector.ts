@@ -67,14 +67,14 @@ export function projectShopPurchaseResponse(
         ...mergeCommonResponseFragments([fragment]),
         degree_list: [],
     }
-    if (result.missionSettlement !== null) {
+    if (result.missionSettlement != null) {
         composeMissionSettlementResponse(
             data,
             projectMissionSettlementFragment(result.missionSettlement),
             viewerId,
         )
     }
-    if (result.purchaseCountSettlement !== null) {
+    if (result.purchaseCountSettlement != null) {
         composeMissionSettlementResponse(
             data,
             projectMissionSettlementFragment(result.purchaseCountSettlement),

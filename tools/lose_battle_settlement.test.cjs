@@ -209,13 +209,14 @@ async function main() {
         assert.equal(progress.finished, true, "败北必须标记通关")
         assert.equal(progress.clearRank, 5, "评级按用时计算(快败即 SS)——用户确认 SS 语义正确")
 
-        // 奖励:仅首通 15 石——原始 CN 数据 col71='(None)',该关无 S+ 评级奖励
-        //(旧 assets 文件的 sPlusRewardId:1 为陈旧产物,不可作为预期)
+        // 奖励:首通 15 石 + S+ 评级奖励 10 石 = 25 石
+        //(官方源数据 col72 sPlusRewardId=4;旧 assets 缺字段时的
+        // 「官方未配置」结论系再生前坏数据所致,main_quest 再生已忠实转写)
         const after = { vmoney: getPlayerSync(a.playerId).freeVmoney, materials: materialTotal(a.playerId), counters: counters(a.playerId) }
         assert.equal(
             after.vmoney - before.vmoney,
-            15,
-            "首通奖励 15 星导石必须发放,且不得有 S+ 评级奖励(官方数据未配置)",
+            25,
+            "首通 15 石 + S+ 评级奖励 10 石(官方 col72=4)必须足额发放",
         )
         assert.ok(
             after.materials - before.materials >= 1,

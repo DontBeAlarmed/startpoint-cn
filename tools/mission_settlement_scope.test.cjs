@@ -159,7 +159,8 @@ const targeted = settleWithCandidates(
 )
 assert.deepEqual(targeted.candidates, [{ category: 1, count: 3 }])
 assert.ok(calls.getDb.length > 0, "targeted scope must exercise the real database monitor")
-assert.deepEqual(calls.transaction, [true])
+// 级联:初轮 + 奖励连锁轮(若首轮有阶段完成)各以嵌套事务运行
+assert.deepEqual(calls.transaction, [true, true])
 assert.ok(
     calls.getPlayerSync.includes(targetedPlayerId),
     "targeted scope must exercise the real player-read monitor",

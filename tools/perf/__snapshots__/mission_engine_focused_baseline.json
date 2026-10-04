@@ -291,9 +291,9 @@
       "behaviorSha256": "a3b22b37aa5187f24c4b9917d36dd7fec72405b7b1cd44911bb6652b49e34c1b"
     },
     "get-progress-equipment-invalidation": {
-      "sqlReads": 33,
+      "sqlReads": 38,
       "sqlWrites": 10,
-      "missionComputes": 1318,
+      "missionComputes": 1355,
       "behavior": {
         "characterIds": [],
         "degreeIds": [],

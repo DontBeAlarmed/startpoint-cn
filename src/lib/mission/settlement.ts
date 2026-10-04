@@ -16,9 +16,10 @@ import { getMissionFactRequirementRegistry } from "./requirements/registry"
 import type { MissionRef } from "./requirements/types"
 
 // 官方依次结算语义(2026-10-03 用户取证):A 完成发放的奖励使 B 达标时,
-// B 在同一请求内连锁结算。奖励种类→任务事实的边最长为
-// 装备→33→锻块→66→星导石,初始 + 2 级联即覆盖;上限防未来主数据自激励。
-const MAX_SETTLEMENT_CASCADE_ROUNDS = 3
+// B 在同一请求内连锁结算。当前主数据下 S+ 通关的材料奖励链会驱动
+// 33/67/68/66 与 player 族共 11 条任务在第 4 轮完成,初始 + 4 级联为
+// 实测收敛点;上限同时防未来主数据自激励循环。
+const MAX_SETTLEMENT_CASCADE_ROUNDS = 5
 
 export interface MissionSettlementInfo {
     mission_category_id: number
@@ -193,7 +194,8 @@ export function settleMissionCategoriesWithEvaluation(
         }
         if (capReached) {
             console.warn(
-                `[MISSION] settlement cascade reached the ${MAX_SETTLEMENT_CASCADE_ROUNDS}-round cap (player=${playerId})`,
+                `[MISSION] settlement cascade reached the ${MAX_SETTLEMENT_CASCADE_ROUNDS}-round cap (player=${playerId})`
+                + ` pending=${settlement.missionInfo.length}`,
             )
         }
         return {
@@ -247,10 +249,12 @@ function cascadeScopesForInvalidations(
 ): MissionSettlementScope[] {
     if (invalidatedFactKeys.length === 0) return []
     const registry = getMissionFactRequirementRegistry(getMissionCatalog())
-    const invalidatedIds = new Set(invalidatedFactKeys.map(getFactKeyId))
     const scopes: MissionSettlementScope[] = []
     for (const scope of categories) {
         const category = typeof scope === "number" ? scope : scope.category
+        // 周期快照差值类(每日 2/周常 10/Pass 6/7/8)不随奖励入账变化,
+        // 级联轮重评估是纯浪费——跳过
+        if ([2, 6, 7, 8, 10].includes(category)) continue
         const missionIds = new Set<number>()
         for (const key of invalidatedFactKeys) {
             for (const ref of registry.getMissionsForFact(key)) {
