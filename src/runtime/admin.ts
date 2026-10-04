@@ -110,13 +110,6 @@ export function registerAdminUi(
 
     fastify.get("/", (_request, reply) => reply.redirect("/admin/"))
     fastify.get("/admin", (_request, reply) => reply.redirect("/admin/"))
-    fastify.get("/player", (_request, reply) => reply.redirect("/admin/accounts"))
-    fastify.get("/player/", (_request, reply) => reply.redirect("/admin/accounts"))
-    fastify.get<{ Params: { playerId: string } }>("/player/:playerId", (request, reply) => (
-        reply.redirect(`/admin/players/${encodeURIComponent(request.params.playerId)}`)
-    ))
-    fastify.get("/mail", (_request, reply) => reply.redirect("/admin/mail"))
-    fastify.get("/seeds", (_request, reply) => reply.redirect("/admin/seeds"))
 
     fastify.setNotFoundHandler((request, reply) => {
         const pathname = request.url.split("?", 1)[0]

@@ -389,7 +389,7 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
         const pid = parseInt(playerId)
         if (isNaN(pid)) {
             if (wantsJson(request)) return reply.status(400).send({ error: "Invalid playerId" })
-            return reply.redirect('/player')
+            return reply.redirect('/admin/accounts')
         }
         setActivePlayerId(pid)
         const allAccounts = getAllAccountsSync()
@@ -400,7 +400,7 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
             }
         }
         if (wantsJson(request)) return reply.send({ ok: true, playerId: pid })
-        return reply.redirect('/player')
+        return reply.redirect('/admin/accounts')
     })
 
     // Create new empty save under the given account
@@ -409,7 +409,7 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
         const accId = parseInt(aid)
         if (isNaN(accId)) {
             if (wantsJson(request)) return reply.status(400).send({ error: "Invalid accountId" })
-            return reply.redirect('/player')
+            return reply.redirect('/admin/accounts')
         }
         const player = insertDefaultPlayerSync(accId)
         // 若管理员配置了默认存档模板，用它替换新建的空存档
@@ -424,7 +424,7 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
         setActivePlayerId(player.id)
         saveAccountDefaultPlayer(accId, player.id)
         if (wantsJson(request)) return reply.send({ ok: true, playerId: player.id, appliedTemplate })
-        return reply.redirect('/player')
+        return reply.redirect('/admin/accounts')
     })
 
     // Delete a save
@@ -433,7 +433,7 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
         const pid = parseInt(playerId)
         if (isNaN(pid)) {
             if (wantsJson(request)) return reply.status(400).send({ error: "Invalid playerId" })
-            return reply.redirect('/player')
+            return reply.redirect('/admin/accounts')
         }
         const allAccounts = getAllAccountsSync()
         let accountId = 0
@@ -446,7 +446,7 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
             if (wantsJson(request)) {
                 return reply.status(400).send({ error: "该账号仅剩这一个存档，请使用删除账号" })
             }
-            return reply.redirect('/player')
+            return reply.redirect('/admin/accounts')
         }
         deletePlayerSync(pid)
         if (accountId) {
@@ -457,7 +457,7 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
         }
         if (getActivePlayerId() === pid) setActivePlayerId(null)
         if (wantsJson(request)) return reply.send({ ok: true, deleted: pid, accountAlsoDeleted: false })
-        return reply.redirect('/player')
+        return reply.redirect('/admin/accounts')
     })
 
     // Delete entire account + all saves + device binding
@@ -480,7 +480,7 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
             writeState(state)
         } catch (_) {}
         if (wantsJson(request)) return reply.send({ ok: true, accountId, deletedSaves: playerIds.length })
-        return reply.redirect('/player')
+        return reply.redirect('/admin/accounts')
     })
 
     // Rename a save
@@ -491,7 +491,7 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
         if (isNaN(playerId) || !name) return reply.status(400).send({ error: "Missing params" })
         updatePlayerSync({ id: playerId, name: String(name) })
         if (wantsJson(request)) return reply.send({ ok: true, playerId, name: String(name) })
-        return reply.redirect('/player')
+        return reply.redirect('/admin/accounts')
     })
 
     // Clone a save to another account
@@ -501,12 +501,12 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
         const accountId = parseInt(aid)
         if (isNaN(playerId) || isNaN(accountId)) {
             if (wantsJson(request)) return reply.status(400).send({ error: "Invalid playerId or accountId" })
-            return reply.redirect('/player')
+            return reply.redirect('/admin/accounts')
         }
 
         if (getPlayerSync(playerId) === null) {
             if (wantsJson(request)) return reply.status(404).send({ error: "Source player not found" })
-            return reply.redirect('/player')
+            return reply.redirect('/admin/accounts')
         }
 
         let snapshot
@@ -515,7 +515,7 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
         } catch (error: any) {
             const message = `存档导出失败：${error?.message ?? error}`
             if (wantsJson(request)) return reply.status(500).send({ error: message })
-            return reply.redirect(`/player/${playerId}?error=${encodeURIComponent(message)}`)
+            return reply.redirect(`/admin/players/${playerId}?error=${encodeURIComponent(message)}`)
         }
 
         const cloned = clonePlayerSaveV2Sync(snapshot, accountId)
@@ -523,7 +523,7 @@ const routes = async (fastify: FastifyInstance, options: ServerRoutesOptions) =>
 
         saveAccountDefaultPlayer(accountId, cloned.playerId)
         if (wantsJson(request)) return reply.send({ ok: true, newPlayerId: cloned.playerId })
-        return reply.redirect('/player')
+        return reply.redirect('/admin/accounts')
     })
 
     // Device binding rename
