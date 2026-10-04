@@ -137,6 +137,13 @@
   justify-content: center;
 }
 
+@media (min-width: 768px) {
+  /* 桌面端居左(维护者 2026-10-05); 移动端保持居中 */
+  .mail-target-center .ant-form-item-control-input-content {
+    justify-content: flex-start;
+  }
+}
+
 .mail-send-row {
   display: flex;
   align-items: center;

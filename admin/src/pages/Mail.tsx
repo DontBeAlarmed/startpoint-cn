@@ -266,7 +266,7 @@ export default function Mail() {
                         </Form.Item>
 
                         {targetMode === "all" && (
-                            <div className="mail-cover-note">覆盖范围: 全体 {totalSaves} 个存档(含今后新增)</div>
+                            <div className="mail-cover-note">覆盖范围: 当前的全部存档,共 {totalSaves} 个</div>
                         )}
                         {targetMode === "account" && (
                             <Form.Item name="accountId" rules={[{ required: true, message: "请选择账号" }]}>
@@ -369,6 +369,7 @@ export default function Mail() {
                             </div>
                         ) : (
                             <div className="mail-inline-row">
+                                <span className="mail-inlbl">数量:</span>
                                 <Form.Item
                                     name="number"
                                     rules={[
