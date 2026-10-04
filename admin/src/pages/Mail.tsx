@@ -323,8 +323,19 @@ export default function Mail() {
                             </Radio.Group>
                         </Form.Item>
 
-                        {/* 附件搜索常显: 需要 ID 的类型可选, 其余置灰; 数量在窄屏折到搜索栏下一行居右 */}
+                        {/* 附件搜索常显: 需要 ID 的类型可选, 其余置灰; 数量在搜索框左侧 */}
                         <div className="mail-inline-row mail-attach-row">
+                            <span className="mail-inlbl">数量:</span>
+                            <Form.Item
+                                name="number"
+                                style={{ marginBottom: 0, width: 110 }}
+                            >
+                                <InputNumber
+                                    min={quantityRule.min}
+                                    max={quantityRule.max}
+                                    disabled={quantityRule.max === 1}
+                                />
+                            </Form.Item>
                             <Form.Item
                                 name="type_id"
                                 rules={[
@@ -355,30 +366,6 @@ export default function Mail() {
                                     }}
                                 />
                             </Form.Item>
-                            <div className="mail-quantity-group">
-                                <span className="mail-inlbl">数量:</span>
-                                <Form.Item
-                                    name="number"
-                                    rules={[
-                                        { required: true, message: "请输入数量" },
-                                        {
-                                            validator: async (_, value) => {
-                                                if (value == null) throw new Error("请输入数量")
-                                                if (value < quantityRule.min || value > quantityRule.max) {
-                                                    throw new Error(`数量需在 ${quantityRule.min}-${quantityRule.max} 之间`)
-                                                }
-                                            },
-                                        },
-                                    ]}
-                                    style={{ marginBottom: 0, width: 110 }}
-                                >
-                                    <InputNumber
-                                        min={quantityRule.min}
-                                        max={quantityRule.max}
-                                        disabled={quantityRule.max === 1}
-                                    />
-                                </Form.Item>
-                            </div>
                         </div>
                     </div>
 
@@ -390,22 +377,9 @@ export default function Mail() {
                                 <Input maxLength={64} showCount placeholder="默认标题(留空使用游戏默认)" />
                             </Form.Item>
                         </div>
-                        <Form.Item name="description" style={{ marginBottom: 0 }}>
+                        <Form.Item name="description" style={{ marginBottom: 0, marginTop: 8 }}>
                             <TextArea rows={3} maxLength={512} placeholder="默认正文(留空使用游戏默认)" />
                         </Form.Item>
-                        <div className="mail-inline-row mail-expiry-row">
-                            <span className="mail-inlbl">有效期:</span>
-                            <Form.Item
-                                name="expirationDays"
-                                rules={[
-                                    { required: true, message: "请输入有效天数" },
-                                    { type: "number", min: 1, max: 3650, message: "有效天数需在 1-3650 之间" },
-                                ]}
-                                style={{ marginBottom: 0, width: 110 }}
-                            >
-                                <InputNumber min={1} max={3650} precision={0} />
-                            </Form.Item>
-                        </div>
                     </div>
 
                     <div className="mail-send-row">
@@ -421,6 +395,19 @@ export default function Mail() {
                             ) : (
                                 <span className="hint">未选择附件</span>
                             )}
+                        </span>
+                        <span className="mail-send-expiry">
+                            <span className="mail-inlbl">有效期:</span>
+                            <Form.Item
+                                name="expirationDays"
+                                rules={[
+                                    { required: true, message: "请输入有效天数" },
+                                    { type: "number", min: 1, max: 3650, message: "有效天数需在 1-3650 之间" },
+                                ]}
+                                style={{ marginBottom: 0, width: 96 }}
+                            >
+                                <InputNumber min={1} max={3650} precision={0} />
+                            </Form.Item>
                         </span>
                         <Button type="primary" htmlType="submit" style={{ marginLeft: "auto", flex: "none" }}>发送</Button>
                     </div>

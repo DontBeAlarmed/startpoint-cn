@@ -212,3 +212,12 @@
 .mail-expiry-row {
   justify-content: flex-end;
 }
+
+/* 发送行内: 有效期紧凑组(标签+数字框) */
+.mail-send-expiry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  margin-left: 12px;
+}
