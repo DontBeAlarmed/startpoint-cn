@@ -285,9 +285,12 @@ function settleDedicatedMailBalance(
         if (field === null) continue
         if (field === "starCrumb"
             && balance.starCrumb + mail.number > currencyPolicy.maxStarCrumb) {
-            throw new MailRewardCapacityError(
-                "Mail Star Crumb cannot fit in the player's Star Crumb capacity.",
+            // 降级策略(2026-10-03 用户确认):星碎片超容量时跳过该附件并告警,
+            // 不阻塞邮件其余附件的正常领取(容量仅邮件路径检查,其他路径无此限制)
+            console.warn(
+                `[MAIL] star crumb attachment skipped: balance ${balance.starCrumb} + ${mail.number} > max ${currencyPolicy.maxStarCrumb}`,
             )
+            continue
         }
         addDedicatedReward(balance, field, mail.number)
         update[field] = balance[field]
