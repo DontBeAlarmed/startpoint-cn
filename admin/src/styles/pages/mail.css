@@ -124,12 +124,11 @@
   font-size: 12.5px;
 }
 
-.mail-send-summary {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 10px;
+.mail-send-preview {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--stat-bg);
 }
 
 /* ── 发送卡 v2 调整(维护者 2026-10-05): 目标分段居中、数量靠右、发送与预览同行 ── */
@@ -161,4 +160,20 @@
 
 .mail-send-preview .admin-attach-chip {
   flex: none;
+}
+
+/* 移动端: 标题+有效期放不下时整组折行 */
+@media (max-width: 767px) {
+  .mail-title-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}
+
+/* 附件类型桌面端一行最多 4 项(8 类折两行) */
+@media (min-width: 768px) {
+  .admin-mail-type-group {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }

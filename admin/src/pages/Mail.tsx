@@ -405,7 +405,7 @@ export default function Mail() {
 
                     <div className="admin-form-section">
                         <div className="admin-form-section-title">正文</div>
-                        <div className="mail-inline-row">
+                        <div className="mail-inline-row mail-title-row">
                             <span className="mail-inlbl">标题:</span>
                             <Form.Item name="subject" style={{ flex: "1 1 auto", marginBottom: 0 }}>
                                 <Input maxLength={64} showCount placeholder="标题(可选,留空使用游戏默认)" />
@@ -422,7 +422,7 @@ export default function Mail() {
                                 <InputNumber min={1} max={3650} precision={0} />
                             </Form.Item>
                         </div>
-                        <Form.Item name="description" style={{ marginBottom: 0 }}>
+                        <Form.Item name="description" style={{ marginBottom: 0, marginTop: 8 }}>
                             <TextArea rows={3} maxLength={512} placeholder="可选,留空使用游戏默认" />
                         </Form.Item>
                     </div>
@@ -432,11 +432,13 @@ export default function Mail() {
                             <span className="mail-inlbl">
                                 {targetMode === "all" ? "全体存档" : targetMode === "account" ? "指定账号" : "指定存档"}:
                             </span>
-                            {attachmentSummary && (
+                            {attachmentSummary ? (
                                 <span className="admin-attach-chip">
                                     <span className="admin-attach-chip-dot" />
                                     {attachmentSummary}
                                 </span>
+                            ) : (
+                                <span className="hint">未选择附件</span>
                             )}
                         </span>
                         <Button type="primary" htmlType="submit" style={{ marginLeft: "auto", flex: "none" }}>发送</Button>
