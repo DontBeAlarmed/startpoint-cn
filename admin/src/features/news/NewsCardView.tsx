@@ -17,7 +17,6 @@ interface NewsCardViewProps {
     onEdit: (row: AdminNewsRow) => void
     onDelete: (row: AdminNewsRow) => Promise<unknown>
     onToggle: (row: AdminNewsRow) => Promise<unknown>
-    togglingId: number | null
 }
 
 // 公告卡片视图（2026-10-04 卡片化改造, 双视口统一, 结构照礼包/账号页 acc-card 模式）：
@@ -37,7 +36,6 @@ export function NewsCardView({
     onEdit,
     onDelete,
     onToggle,
-    togglingId,
 }: NewsCardViewProps) {
     return (
         <Spin spinning={loading}>
@@ -74,7 +72,6 @@ export function NewsCardView({
                                 <Button
                                     className={row.enabled ? "admin-state-active" : "admin-state-stopped"}
                                     aria-label={row.enabled ? "点击停用公告" : "点击启用公告"}
-                                    loading={togglingId === row.id}
                                     onClick={() => void onToggle(row)}
                                 >
                                     {row.enabled ? "生效中" : "已停用"}

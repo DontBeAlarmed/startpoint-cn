@@ -155,6 +155,22 @@
   min-width: 0;
 }
 
+/* 范围徽章与资源名同行(徽章在前, 间隔 8px) */
+.sched-headline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.sched-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sched-actions {
   grid-area: actions;
   display: flex;
@@ -184,10 +200,6 @@
     grid-template-areas:
       "head actions"
       "meta meta";
-  }
-
-  .sched-title {
-    order: -1;
   }
 
   .sched-actions {

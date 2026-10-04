@@ -107,13 +107,6 @@ export default function Gifts() {
         },
     })
 
-    // 启停进行中的礼包 id: 卡片状态钮按行显示 loading, 防连点触发误报 409
-    const togglingGiftId = start.isPending
-        ? start.variables?.id ?? null
-        : stop.isPending
-            ? stop.variables?.id ?? null
-            : null
-
     const refresh = () => {
         queryClient.invalidateQueries({ queryKey: ["adminGifts"] })
         queryClient.invalidateQueries({ queryKey: ["adminGiftRedemptions"] })
@@ -175,7 +168,6 @@ export default function Gifts() {
                             setEditorOpen(true)
                         }}
                         onDelete={row => remove.mutateAsync(row)}
-                        togglingGiftId={togglingGiftId}
                     />
                 </Card>
                 <div className="admin-page-note admin-page-note-footer">

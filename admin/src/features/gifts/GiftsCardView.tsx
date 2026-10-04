@@ -19,7 +19,6 @@ interface GiftsCardViewProps {
     onStop: (row: AdminGiftRow) => Promise<unknown>
     onEdit: (row: AdminGiftRow) => void
     onDelete: (row: AdminGiftRow) => Promise<unknown>
-    togglingGiftId: number | null
 }
 
 // 礼包卡片视图（双视口同构, 结构照账号页 acc-card 模式）：
@@ -42,7 +41,6 @@ export function GiftsCardView({
     onStop,
     onEdit,
     onDelete,
-    togglingGiftId,
 }: GiftsCardViewProps) {
     return (
         <Spin spinning={loading}>
@@ -77,7 +75,6 @@ export function GiftsCardView({
                                 <Button
                                     className={active ? "admin-state-active" : "admin-state-stopped"}
                                     aria-label={active ? "点击停止礼包" : "点击启动礼包"}
-                                    loading={togglingGiftId === row.id}
                                     onClick={() => (active ? void onStop(row) : void onStart(row))}
                                 >
                                     {active ? "生效中" : "已停用"}
